@@ -1,15 +1,14 @@
+using Common.Messaging;
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
-using System;
+using GameInterface.Services.ObjectManager;
+using Moq;
 using Xunit;
 
 namespace GameInterface.Tests.Services.MapEvents;
 
-public class PlayerPartyTradeContextTests : IDisposable
+public class PlayerPartyTradeContextTests
 {
-    public void Dispose()
-    {
-        PlayerPartyTradeContext.End();
-    }
+    private readonly PlayerPartyTradeContext trade = new PlayerPartyTradeContext(Mock.Of<IMessageBroker>(), Mock.Of<IObjectManager>());
 
     [Theory]
     [InlineData(PlayerPartyInteractionOutcomeType.TradeAccepted, "Barter offer accepted.")]
@@ -28,33 +27,33 @@ public class PlayerPartyTradeContextTests : IDisposable
     [Fact]
     public void CanAccept_BlocksRepeatAcceptAfterLocalAccept()
     {
-        PlayerPartyTradeContext.Begin("session-1");
+        trade.Begin("session-1", localParty: null, localPartyId: null);
 
-        Assert.True(PlayerPartyTradeContext.CanAccept());
+        Assert.True(trade.CanAccept());
 
-        PlayerPartyTradeContext.UpdateAcceptance(localAccepted: true, remoteAccepted: false);
+        trade.UpdateAcceptance(localAccepted: true, remoteAccepted: false);
 
-        Assert.False(PlayerPartyTradeContext.CanAccept());
-        Assert.False(PlayerPartyTradeContext.CanCancel());
+        Assert.False(trade.CanAccept());
+        Assert.False(trade.CanCancel());
     }
 
     [Fact]
     public void CanReset_BlocksResetWhileActive()
     {
-        Assert.True(PlayerPartyTradeContext.CanReset());
+        Assert.True(trade.CanReset());
 
-        PlayerPartyTradeContext.Begin("session-1");
+        trade.Begin("session-1", localParty: null, localPartyId: null);
 
-        Assert.False(PlayerPartyTradeContext.CanReset());
+        Assert.False(trade.CanReset());
     }
 
     [Fact]
     public void CanOffer_BlocksUnknownBarterableWhenActive()
     {
-        Assert.True(PlayerPartyTradeContext.CanOffer(null));
+        Assert.True(trade.CanOffer(null));
 
-        PlayerPartyTradeContext.Begin("session-1");
+        trade.Begin("session-1", localParty: null, localPartyId: null);
 
-        Assert.False(PlayerPartyTradeContext.CanOffer(null));
+        Assert.False(trade.CanOffer(null));
     }
 }

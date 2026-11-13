@@ -67,7 +67,7 @@ internal class PlayerPartyInteractionHandler : IHandler
     private readonly IPlayerDivorceRules playerDivorceRules;
     private readonly IPlayerMapTracking mapTracking;
     private readonly PlayerPartyInteractionOutcomeHandler outcomeHandler;
-    private readonly IPlayerPartyTradeOfferSender offerSender;
+    private readonly IPlayerPartyTradeContext trade;
     private readonly ISendCoalescer sendCoalescer;
 
     private readonly ConcurrentDictionary<string, PlayerPartyInteractionSession> sessionsById = new ConcurrentDictionary<string, PlayerPartyInteractionSession>();
@@ -93,7 +93,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         IPlayerMarriageRules playerMarriageRules,
         IPlayerDivorceRules playerDivorceRules,
         IPlayerMapTracking mapTracking,
-        IPlayerPartyTradeOfferSender offerSender,
+        IPlayerPartyTradeContext trade,
         // Only the server container registers a send coalescer.
         ISendCoalescer sendCoalescer = null)
     {
@@ -108,7 +108,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         this.playerMarriageRules = playerMarriageRules;
         this.playerDivorceRules = playerDivorceRules;
         this.mapTracking = mapTracking;
-        this.offerSender = offerSender;
+        this.trade = trade;
         this.sendCoalescer = sendCoalescer;
         outcomeHandler = new PlayerPartyInteractionOutcomeHandler(
             objectManager,
@@ -249,7 +249,7 @@ internal class PlayerPartyInteractionHandler : IHandler
                 var localAccepted = message.IsInitiator ? message.InitiatorAcceptedTrade : message.ResponderAcceptedTrade;
                 var remoteAccepted = message.IsInitiator ? message.ResponderAcceptedTrade : message.InitiatorAcceptedTrade;
                 OpenTrade(message);
-                PlayerPartyTradeContext.UpdateAcceptance(localAccepted, remoteAccepted);
+                trade.UpdateAcceptance(localAccepted, remoteAccepted);
                 PlayerPartyTradeOverlay.Instance.UpdateState(localAccepted, remoteAccepted);
             }
         }, context: "Apply player-party interaction state");
@@ -336,8 +336,7 @@ internal class PlayerPartyInteractionHandler : IHandler
 
             endedInteractionSessionIds.Add(message.SessionId);
             PlayerPartyInteractionDialogState.Clear(message.SessionId);
-            PlayerPartyTradeContext.End(message.SessionId, message.OutcomeType);
-            offerSender.End(message.SessionId);
+            trade.End(message.SessionId, message.OutcomeType);
             PlayerPartyTradeOverlay.Instance.Hide(message.SessionId);
             var conversationWasOpened = openedConversationSessionIds.Remove(message.SessionId);
 
@@ -403,7 +402,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         {
             var clientMessage = payload.What;
             GameThread.RunSafe(
-                () => PlayerPartyTradeContext.ApplyOfferUpdate(clientMessage, objectManager),
+                () => trade.ApplyOfferUpdate(clientMessage),
                 context: "Apply player-party trade offer update");
             return;
         }
@@ -1495,9 +1494,9 @@ internal class PlayerPartyInteractionHandler : IHandler
         return false;
     }
 
-    private static bool IsCurrentLocalInteractionSession(string sessionId)
+    private bool IsCurrentLocalInteractionSession(string sessionId)
         => PlayerPartyInteractionDialogState.SessionId == sessionId ||
-           PlayerPartyTradeContext.SessionId == sessionId;
+           trade.SessionId == sessionId;
 
     private void EnsurePresentationTickListener()
     {
@@ -1664,12 +1663,11 @@ internal class PlayerPartyInteractionHandler : IHandler
 
     private void OpenTrade(NetworkPlayerPartyInteractionState state)
     {
-        if (PlayerPartyTradeContext.IsActive) return;
+        if (trade.IsActive) return;
         if (!objectManager.TryGetObject<PartyBase>(state.PartyId, out var myParty)) return;
         if (!objectManager.TryGetObject<PartyBase>(state.OtherPartyId, out var otherParty)) return;
 
-        PlayerPartyTradeContext.Begin(state.SessionId, myParty);
-        offerSender.Begin(state.SessionId, state.PartyId);
+        trade.Begin(state.SessionId, myParty, state.PartyId);
 
         try
         {

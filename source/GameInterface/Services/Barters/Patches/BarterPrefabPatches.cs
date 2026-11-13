@@ -13,16 +13,24 @@ internal static class BarterPrefabPatches
     [HarmonyPrefix]
     public static void LoadMoviePrefix(string movieName, ref bool doNotUseGeneratedPrefabs)
     {
+        if (movieName != "BarterScreen") return;
+        if (!ContainerProvider.TryResolve<IPlayerPartyTradeContext>(out var trade)) return;
+
         // Load XML so the barter item prefab edit below takes effect, only for player trades because vanilla barter items dont have the spouse bindings.
-        if (movieName == "BarterScreen" && PlayerPartyTradeContext.IsActive) doNotUseGeneratedPrefabs = true;
+        if (trade.IsActive) doNotUseGeneratedPrefabs = true;
     }
 
     [HarmonyPatch(typeof(WidgetTemplate), nameof(WidgetTemplate.LoadFrom))]
     [HarmonyPrefix]
     public static void LoadTemplatePrefix(XmlNode node)
     {
+        if (node.Name != "BarterItemVisualBrushWidget") return;
+        if (!ContainerProvider.TryResolve<IPlayerPartyTradeContext>(out var trade)) return;
+
         // Other barter screens can also load XML when generated prefabs are unavailable, so only edit for player trades.
-        if (node.Name == "BarterItemVisualBrushWidget" && PlayerPartyTradeContext.IsActive && ContainerProvider.TryResolve<IBarterPrefabEditor>(out var editor))
-            editor.AddSpousePortrait(node);
+        if (!trade.IsActive) return;
+        if (!ContainerProvider.TryResolve<IBarterPrefabEditor>(out var editor)) return;
+
+        editor.AddSpousePortrait(node);
     }
 }

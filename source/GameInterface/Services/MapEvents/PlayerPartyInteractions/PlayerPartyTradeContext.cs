@@ -7,7 +7,6 @@ using GameInterface.Services.TroopRosters.Data;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.BarterSystem;
 using TaleWorlds.CampaignSystem.BarterSystem.Barterables;
@@ -20,29 +19,118 @@ using TaleWorlds.Library;
 
 namespace GameInterface.Services.MapEvents.PlayerPartyInteractions;
 
-internal static class PlayerPartyTradeContext
+// Holds this client's player-party trade session and keeps the barter screen in step with it.
+internal interface IPlayerPartyTradeContext
 {
-    public static string SessionId { get; private set; }
-    public static bool IsActive => SessionId != null;
-    public static PartyBase LocalParty { get; private set; }
-    public static bool LocalAccepted { get; private set; }
-    public static bool RemoteAccepted { get; private set; }
-    public static bool SuppressNativeCloseMessages { get; private set; }
+    // The active trade's session id, or null when no player trade is open.
+    string SessionId { get; }
 
-    private static BarterVM activeBarterVM;
-    private static ButtonWidget resetButton;
-    private static bool isApplyingServerOffer;
-    private static readonly FieldInfo PrisonerCharacterField =
-        typeof(TransferPrisonerBarterable).GetField("_prisonerCharacter", BindingFlags.Instance | BindingFlags.NonPublic);
+    // True while a player trade is open on this client.
+    bool IsActive { get; }
 
-    private static readonly HashSet<BarterItemVM> scratchItems = new HashSet<BarterItemVM>();
-    private static readonly List<(BarterItemVM Item, MBBindingList<BarterItemVM> List)> hiddenMarriageItems =
+    // The local party's network id, which its offers are sent under.
+    string LocalPartyId { get; }
+
+    // Whether this player accepted the current offers.
+    bool LocalAccepted { get; }
+
+    // Whether the other player accepted the current offers.
+    bool RemoteAccepted { get; }
+
+    // True while ending the trade closes the barter screen, so its native close messages are hidden.
+    bool SuppressNativeCloseMessages { get; }
+
+    // Starts a trade session for the local party with nothing accepted.
+    void Begin(string sessionId, PartyBase localParty, string localPartyId);
+
+    // Ends the trade and closes its barter screen, unless another session is the active one.
+    void End(string sessionId, PlayerPartyInteractionOutcomeType outcomeType);
+
+    // Takes over a barter screen opened for the active trade.
+    void SetBarterVM(BarterVM barterVM);
+
+    // Maps the marriage group onto the Diplomatic columns of the barter screen.
+    void AddMarriageGroupLists(BarterVM barterVM, BarterData barterData);
+
+    // Applies both players' acceptance from the server.
+    void UpdateAcceptance(bool localAccepted, bool remoteAccepted);
+
+    // Whether the local player may move this barterable on or off the offer.
+    bool CanOffer(Barterable barterable);
+
+    // Whether a barter item's offered amount may change, which a server offer always may.
+    bool CanSetOfferedAmount(Barterable barterable, int currentAmount, int newAmount);
+
+    // Whether the local player may accept the current offers.
+    bool CanAccept();
+
+    // Whether the local player may leave the trade.
+    bool CanCancel();
+
+    // Whether the barter screen's reset button may run.
+    bool CanReset();
+
+    // Whether the local player may change the offer at all.
+    bool CanModifyOffer();
+
+    // Tracks the barter screen's reset button so it stays disabled during a trade.
+    void SetResetButton(ButtonWidget buttonWidget);
+
+    // Whether a transfer-all button moves anything the local player may offer.
+    bool CanOfferTransferAll(BarterVM barterVM, string methodName);
+
+    // Accepts the current offers for the local player.
+    void PublishAccept(bool accepted);
+
+    // Leaves the trade for the local player.
+    void PublishLeave();
+
+    // Applies an offer the server relayed for this trade to the barter screen.
+    void ApplyOfferUpdate(NetworkPlayerPartyTradeOfferUpdated message);
+
+    // Refreshes the barter screen's labels, buttons and which items may move.
+    void RefreshBarterControls();
+
+    // Clears both acceptances, which every changed offer does.
+    void ResetAcceptance();
+
+    // The barterables the local party currently offers on the barter screen.
+    IReadOnlyCollection<Barterable> GetLocalOffer();
+}
+
+// Scoped per client, so each client's barter patches and trade handler share only that client's trade.
+internal class PlayerPartyTradeContext : IPlayerPartyTradeContext
+{
+    private readonly IMessageBroker messageBroker;
+    private readonly IObjectManager objectManager;
+
+    public string SessionId { get; private set; }
+    public bool IsActive => SessionId != null;
+    public string LocalPartyId { get; private set; }
+    public bool LocalAccepted { get; private set; }
+    public bool RemoteAccepted { get; private set; }
+    public bool SuppressNativeCloseMessages { get; private set; }
+
+    private PartyBase localParty;
+    private BarterVM activeBarterVM;
+    private ButtonWidget resetButton;
+    private bool isApplyingServerOffer;
+
+    private readonly HashSet<BarterItemVM> scratchItems = new HashSet<BarterItemVM>();
+    private readonly List<(BarterItemVM Item, MBBindingList<BarterItemVM> List)> hiddenMarriageItems =
         new List<(BarterItemVM Item, MBBindingList<BarterItemVM> List)>();
 
-    public static void Begin(string sessionId, PartyBase localParty = null)
+    public PlayerPartyTradeContext(IMessageBroker messageBroker, IObjectManager objectManager)
+    {
+        this.messageBroker = messageBroker;
+        this.objectManager = objectManager;
+    }
+
+    public void Begin(string sessionId, PartyBase localParty, string localPartyId)
     {
         SessionId = sessionId;
-        LocalParty = localParty;
+        this.localParty = localParty;
+        LocalPartyId = localPartyId;
         LocalAccepted = false;
         RemoteAccepted = false;
         activeBarterVM = null;
@@ -50,14 +138,15 @@ internal static class PlayerPartyTradeContext
         hiddenMarriageItems.Clear();
     }
 
-    public static void End(string sessionId = null, PlayerPartyInteractionOutcomeType outcomeType = PlayerPartyInteractionOutcomeType.None)
+    public void End(string sessionId, PlayerPartyInteractionOutcomeType outcomeType)
     {
         if (sessionId != null && SessionId != null && SessionId != sessionId) return;
 
         var barterVM = activeBarterVM;
 
         SessionId = null;
-        LocalParty = null;
+        localParty = null;
+        LocalPartyId = null;
         LocalAccepted = false;
         RemoteAccepted = false;
         activeBarterVM = null;
@@ -80,7 +169,7 @@ internal static class PlayerPartyTradeContext
         ShowOutcomeMessage(outcomeType);
     }
 
-    public static void SetBarterVM(BarterVM barterVM)
+    public void SetBarterVM(BarterVM barterVM)
     {
         if (!IsActive) return;
 
@@ -91,7 +180,7 @@ internal static class PlayerPartyTradeContext
     }
 
     // Vanilla never maps a group to the Diplomatic column, so marriages take it over as their own category.
-    public static void AddMarriageGroupLists(BarterVM barterVM, BarterData barterData)
+    public void AddMarriageGroupLists(BarterVM barterVM, BarterData barterData)
     {
         var group = barterData?.GetBarterGroup<PlayerPartyMarriageBarterGroup>();
         if (group == null) return;
@@ -101,7 +190,7 @@ internal static class PlayerPartyTradeContext
     }
 
     // Runs from the BarterVM constructor postfix, before the barter movie binds to these lists.
-    private static void UseMarriageItemVMs(MBBindingList<BarterItemVM> items)
+    private void UseMarriageItemVMs(MBBindingList<BarterItemVM> items)
     {
         for (int i = 0; i < items.Count; i++)
         {
@@ -110,7 +199,7 @@ internal static class PlayerPartyTradeContext
         }
     }
 
-    public static void UpdateAcceptance(bool localAccepted, bool remoteAccepted)
+    public void UpdateAcceptance(bool localAccepted, bool remoteAccepted)
     {
         if (!IsActive) return;
 
@@ -119,19 +208,19 @@ internal static class PlayerPartyTradeContext
         RefreshBarterControls();
     }
 
-    public static bool CanOffer(Barterable barterable)
+    public bool CanOffer(Barterable barterable)
     {
         if (!IsActive) return true;
         if (!CanModifyOffer()) return false;
-        if (barterable == null || LocalParty == null) return false;
+        if (barterable == null || localParty == null) return false;
         if (hiddenMarriageItems.Any(hidden => hidden.Item.Barterable == barterable)) return false;
         if (barterable is FiefBarterable fiefBarterable)
             return IsOwnedByLocalParty(fiefBarterable);
 
-        return barterable.OriginalParty == LocalParty;
+        return barterable.OriginalParty == localParty;
     }
 
-    public static bool CanSetOfferedAmount(Barterable barterable, int currentAmount, int newAmount)
+    public bool CanSetOfferedAmount(Barterable barterable, int currentAmount, int newAmount)
     {
         if (!IsActive || isApplyingServerOffer) return true;
         if (currentAmount == 0 && newAmount == 1) return true;
@@ -139,20 +228,20 @@ internal static class PlayerPartyTradeContext
         return CanOffer(barterable);
     }
 
-    public static bool CanAccept()
+    public bool CanAccept()
         => !IsActive || !LocalAccepted;
 
-    public static bool CanCancel()
+    public bool CanCancel()
         => !IsActive || !LocalAccepted;
 
-    public static bool CanReset()
+    public bool CanReset()
         => !IsActive;
 
     // Offer changes are allowed after acceptance because every valid change clears both confirmations.
-    public static bool CanModifyOffer()
+    public bool CanModifyOffer()
         => true;
 
-    public static void SetResetButton(ButtonWidget buttonWidget)
+    public void SetResetButton(ButtonWidget buttonWidget)
     {
         if (!IsActive) return;
 
@@ -160,7 +249,7 @@ internal static class PlayerPartyTradeContext
         RefreshResetButton();
     }
 
-    public static bool CanOfferTransferAll(BarterVM barterVM, string methodName)
+    public bool CanOfferTransferAll(BarterVM barterVM, string methodName)
     {
         if (!IsActive) return true;
         if (barterVM == null || !CanModifyOffer()) return false;
@@ -192,7 +281,7 @@ internal static class PlayerPartyTradeContext
         }
     }
 
-    public static void PublishAccept(bool accepted)
+    public void PublishAccept(bool accepted)
     {
         if (!IsActive) return;
         if (!CanAccept()) return;
@@ -203,31 +292,32 @@ internal static class PlayerPartyTradeContext
             RefreshBarterControls();
         }
 
-        MessageBroker.Instance.Publish(null, new PlayerPartyTradeAcceptSelected(SessionId, accepted));
+        messageBroker.Publish(this, new PlayerPartyTradeAcceptSelected(SessionId, accepted));
     }
 
-    public static void PublishLeave()
+    public void PublishLeave()
     {
         if (!IsActive) return;
         if (!CanCancel()) return;
 
-        MessageBroker.Instance.Publish(
-            null,
+        messageBroker.Publish(
+            this,
             new PlayerPartyInteractionOptionSelected(
                 SessionId,
                 PlayerPartyInteractionDialogState.PartyId,
                 PlayerPartyInteractionOption.Leave));
     }
 
-    public static void ApplyOfferUpdate(NetworkPlayerPartyTradeOfferUpdated message, IObjectManager objectManager)
+    public void ApplyOfferUpdate(NetworkPlayerPartyTradeOfferUpdated message)
     {
         if (!IsActive || SessionId != message.SessionId) return;
 
         // The server clears both acceptances on every offer it relays, the local party's echo included.
         ResetAcceptance();
-        if (activeBarterVM == null || objectManager == null) return;
+        if (activeBarterVM == null) return;
 
-        if (IsLocalOfferMessage(message, objectManager))
+        // The local party's own offer is already on its screen.
+        if (message.PartyId == LocalPartyId)
         {
             RefreshBarterControls();
             return;
@@ -237,13 +327,13 @@ internal static class PlayerPartyTradeContext
 
         try
         {
-            ApplyItemOffers(message, objectManager);
-            ApplyGoldOffer(message, objectManager);
-            ApplyFiefOffers(message, objectManager);
-            ApplyPrisonerOffers(message, objectManager);
-            ApplyTroopOffers(message, objectManager);
-            ApplyPeaceOffer(message, objectManager);
-            ApplyMarriageOffers(message, objectManager);
+            ApplyItemOffers(message);
+            ApplyGoldOffer(message);
+            ApplyFiefOffers(message);
+            ApplyPrisonerOffers(message);
+            ApplyTroopOffers(message);
+            ApplyPeaceOffer(message);
+            ApplyMarriageOffers(message);
             RefreshBarterControls();
         }
         finally
@@ -252,7 +342,19 @@ internal static class PlayerPartyTradeContext
         }
     }
 
-    public static void RefreshBarterControls()
+    // Reads both offer columns because the local party can be on either side, keeping what it may offer.
+    public IReadOnlyCollection<Barterable> GetLocalOffer()
+    {
+        if (activeBarterVM == null) return Array.Empty<Barterable>();
+
+        return activeBarterVM.LeftOfferList
+            .Concat(activeBarterVM.RightOfferList)
+            .Select(item => item.Barterable)
+            .Where(CanOffer)
+            .ToArray();
+    }
+
+    public void RefreshBarterControls()
     {
         if (activeBarterVM == null) return;
 
@@ -268,7 +370,7 @@ internal static class PlayerPartyTradeContext
     }
 
     // Hides marriages that share a hero with an offered marriage until that marriage is taken off the offer.
-    private static void RefreshHiddenMarriages()
+    private void RefreshHiddenMarriages()
     {
         var offeredHeroes = new HashSet<Hero>(activeBarterVM.LeftOfferList
             .Concat(activeBarterVM.RightOfferList)
@@ -288,7 +390,7 @@ internal static class PlayerPartyTradeContext
         HideBlockedMarriages(activeBarterVM.RightDiplomaticList, offeredHeroes);
     }
 
-    private static void HideBlockedMarriages(MBBindingList<BarterItemVM> items, HashSet<Hero> offeredHeroes)
+    private void HideBlockedMarriages(MBBindingList<BarterItemVM> items, HashSet<Hero> offeredHeroes)
     {
         foreach (var item in items.Where(item => IsBlockedMarriage(item, offeredHeroes)).ToArray())
         {
@@ -301,14 +403,14 @@ internal static class PlayerPartyTradeContext
         => !item.IsOffered && item.Barterable is PlayerPartyMarriageBarterable marriage &&
            (offeredHeroes.Contains(marriage.HeroBeingMarried) || offeredHeroes.Contains(marriage.Spouse));
 
-    private static void RefreshResetButton()
+    private void RefreshResetButton()
     {
         if (resetButton == null) return;
 
         resetButton.IsDisabled = IsActive;
     }
 
-    public static void ResetAcceptance()
+    public void ResetAcceptance()
     {
         if (!LocalAccepted && !RemoteAccepted) return;
 
@@ -318,96 +420,87 @@ internal static class PlayerPartyTradeContext
         PlayerPartyTradeOverlay.Instance.UpdateState(false, false);
     }
 
-    private static bool IsLocalOfferMessage(NetworkPlayerPartyTradeOfferUpdated message, IObjectManager objectManager)
-    {
-        if (LocalParty == null) return false;
-        if (!objectManager.TryGetId(LocalParty, out var localPartyId)) return false;
-
-        return localPartyId == message.PartyId;
-    }
-
-    private static void ApplyItemOffers(NetworkPlayerPartyTradeOfferUpdated message, IObjectManager objectManager)
+    private void ApplyItemOffers(NetworkPlayerPartyTradeOfferUpdated message)
     {
         var offeredItems = BuildOfferedItems(message.OfferedItems);
 
         foreach (var item in GetAllBarterItems(activeBarterVM))
         {
-            if (!IsOwnedByParty(item, message.PartyId, objectManager)) continue;
+            if (!IsOwnedByParty(item, message.PartyId)) continue;
             if (!(item.Barterable is ItemBarterable itemBarterable)) continue;
-            if (!TryGetItemKey(itemBarterable.ItemRosterElement, objectManager, out var itemKey)) continue;
+            if (!TryGetItemKey(itemBarterable.ItemRosterElement, out var itemKey)) continue;
 
             offeredItems.TryGetValue(itemKey, out var offeredAmount);
             ApplyOfferedAmount(item, offeredAmount);
         }
     }
 
-    private static void ApplyGoldOffer(NetworkPlayerPartyTradeOfferUpdated message, IObjectManager objectManager)
+    private void ApplyGoldOffer(NetworkPlayerPartyTradeOfferUpdated message)
     {
         foreach (var item in GetAllBarterItems(activeBarterVM))
         {
-            if (!IsOwnedByParty(item, message.PartyId, objectManager)) continue;
+            if (!IsOwnedByParty(item, message.PartyId)) continue;
             if (!(item.Barterable is GoldBarterable)) continue;
 
             ApplyOfferedAmount(item, message.OfferedGold);
         }
     }
 
-    private static void ApplyFiefOffers(NetworkPlayerPartyTradeOfferUpdated message, IObjectManager objectManager)
+    private void ApplyFiefOffers(NetworkPlayerPartyTradeOfferUpdated message)
     {
         var offeredFiefs = new HashSet<string>(message.OfferedFiefs ?? new string[0]);
 
         foreach (var item in GetAllBarterItems(activeBarterVM))
         {
-            if (!IsOwnedByParty(item, message.PartyId, objectManager)) continue;
+            if (!IsOwnedByParty(item, message.PartyId)) continue;
             if (!(item.Barterable is FiefBarterable fiefBarterable)) continue;
-            if (!TryGetSettlementKey(fiefBarterable.TargetSettlement, objectManager, out var fiefKey)) continue;
+            if (!TryGetSettlementKey(fiefBarterable.TargetSettlement, out var fiefKey)) continue;
 
             ApplyOfferedAmount(item, offeredFiefs.Contains(fiefKey) ? 1 : 0);
         }
     }
 
-    private static void ApplyPrisonerOffers(NetworkPlayerPartyTradeOfferUpdated message, IObjectManager objectManager)
+    private void ApplyPrisonerOffers(NetworkPlayerPartyTradeOfferUpdated message)
     {
         var offeredPrisoners = BuildOfferedTroops(message.OfferedPrisoners);
 
         foreach (var item in GetAllBarterItems(activeBarterVM))
         {
-            if (!IsOwnedByParty(item, message.PartyId, objectManager)) continue;
+            if (!IsOwnedByParty(item, message.PartyId)) continue;
             if (!(item.Barterable is TransferPrisonerBarterable transferPrisonerBarterable)) continue;
-            if (!(PrisonerCharacterField?.GetValue(transferPrisonerBarterable) is Hero prisonerHero)) continue;
-            if (!TryGetCharacterKey(prisonerHero.CharacterObject, objectManager, out var prisonerKey)) continue;
+            if (!TryGetCharacterKey(transferPrisonerBarterable._prisonerCharacter?.CharacterObject, out var prisonerKey)) continue;
 
             ApplyOfferedAmount(item, offeredPrisoners.ContainsKey(prisonerKey) ? 1 : 0);
         }
     }
 
-    private static void ApplyTroopOffers(NetworkPlayerPartyTradeOfferUpdated message, IObjectManager objectManager)
+    private void ApplyTroopOffers(NetworkPlayerPartyTradeOfferUpdated message)
     {
         var offeredTroops = BuildOfferedTroops(message.OfferedTroops);
 
         foreach (var item in GetAllBarterItems(activeBarterVM))
         {
-            if (!IsOwnedByParty(item, message.PartyId, objectManager)) continue;
+            if (!IsOwnedByParty(item, message.PartyId)) continue;
             if (!(item.Barterable is PlayerPartyTroopBarterable troopBarterable)) continue;
-            if (!TryGetCharacterKey(troopBarterable.TroopRosterElement.Character, objectManager, out var troopKey)) continue;
+            if (!TryGetCharacterKey(troopBarterable.TroopRosterElement.Character, out var troopKey)) continue;
 
             offeredTroops.TryGetValue(troopKey, out var offeredAmount);
             ApplyOfferedAmount(item, offeredAmount);
         }
     }
 
-    private static void ApplyPeaceOffer(NetworkPlayerPartyTradeOfferUpdated message, IObjectManager objectManager)
+    private void ApplyPeaceOffer(NetworkPlayerPartyTradeOfferUpdated message)
     {
         foreach (var item in GetAllBarterItems(activeBarterVM))
         {
-            if (!IsOwnedByParty(item, message.PartyId, objectManager)) continue;
+            if (!IsOwnedByParty(item, message.PartyId)) continue;
             if (!(item.Barterable is PlayerPartyPeaceBarterable)) continue;
 
             ApplyOfferedAmount(item, message.OfferedPeace ? 1 : 0);
         }
     }
 
-    private static void ApplyMarriageOffers(NetworkPlayerPartyTradeOfferUpdated message, IObjectManager objectManager)
+    private void ApplyMarriageOffers(NetworkPlayerPartyTradeOfferUpdated message)
     {
         var offeredMarriages = new HashSet<string>(
             (message.OfferedMarriages ?? Array.Empty<PlayerPartyMarriageOfferData>())
@@ -415,7 +508,7 @@ internal static class PlayerPartyTradeContext
 
         foreach (var item in GetAllBarterItems(activeBarterVM))
         {
-            if (!IsOwnedByParty(item, message.PartyId, objectManager)) continue;
+            if (!IsOwnedByParty(item, message.PartyId)) continue;
             if (!(item.Barterable is PlayerPartyMarriageBarterable marriageBarterable)) continue;
             if (!objectManager.TryGetId(marriageBarterable.HeroBeingMarried, out var heroId)) continue;
             if (!objectManager.TryGetId(marriageBarterable.Spouse, out var spouseId)) continue;
@@ -457,7 +550,7 @@ internal static class PlayerPartyTradeContext
         return result;
     }
 
-    private static void ApplyOfferedAmount(BarterItemVM item, int offeredAmount)
+    private void ApplyOfferedAmount(BarterItemVM item, int offeredAmount)
     {
         var amount = Math.Max(0, Math.Min(offeredAmount, item.TotalItemCount));
         var offerList = GetOfferListForItem(activeBarterVM, item);
@@ -485,7 +578,7 @@ internal static class PlayerPartyTradeContext
         activeBarterVM.RightOfferList.Remove(item);
     }
 
-    private static IEnumerable<BarterItemVM> GetAllBarterItems(BarterVM barterVM)
+    private IEnumerable<BarterItemVM> GetAllBarterItems(BarterVM barterVM)
     {
         scratchItems.Clear();
 
@@ -508,7 +601,7 @@ internal static class PlayerPartyTradeContext
         return scratchItems.ToArray();
     }
 
-    private static void AddItems(IEnumerable<BarterItemVM> items)
+    private void AddItems(IEnumerable<BarterItemVM> items)
     {
         if (items == null) return;
 
@@ -519,26 +612,26 @@ internal static class PlayerPartyTradeContext
         }
     }
 
-    private static bool IsOwnedByParty(BarterItemVM item, string partyId, IObjectManager objectManager)
+    private bool IsOwnedByParty(BarterItemVM item, string partyId)
     {
-        if (!TryGetBarterablePartyId(item?.Barterable, objectManager, out var originalPartyId)) return false;
+        if (!TryGetBarterablePartyId(item?.Barterable, out var originalPartyId)) return false;
 
         return originalPartyId == partyId;
     }
 
-    private static bool IsOwnedByLocalParty(FiefBarterable fiefBarterable)
+    private bool IsOwnedByLocalParty(FiefBarterable fiefBarterable)
     {
-        if (fiefBarterable == null || LocalParty == null) return false;
-        if (fiefBarterable.OriginalOwner == LocalParty.LeaderHero) return true;
+        if (fiefBarterable == null || localParty == null) return false;
+        if (fiefBarterable.OriginalOwner == localParty.LeaderHero) return true;
 
-        return fiefBarterable.TargetSettlement?.OwnerClan?.Leader == LocalParty.LeaderHero;
+        return fiefBarterable.TargetSettlement?.OwnerClan?.Leader == localParty.LeaderHero;
     }
 
-    private static bool TryGetBarterablePartyId(Barterable barterable, IObjectManager objectManager, out string partyId)
+    private bool TryGetBarterablePartyId(Barterable barterable, out string partyId)
     {
         partyId = null;
 
-        if (barterable == null || objectManager == null) return false;
+        if (barterable == null) return false;
 
         var party = barterable.OriginalParty;
         if (party == null && barterable is FiefBarterable fiefBarterable)
@@ -560,7 +653,7 @@ internal static class PlayerPartyTradeContext
         }
     }
 
-    private static bool TryGetItemKey(ItemRosterElement item, IObjectManager objectManager, out string key)
+    private bool TryGetItemKey(ItemRosterElement item, out string key)
     {
         key = null;
 
@@ -576,7 +669,7 @@ internal static class PlayerPartyTradeContext
         return true;
     }
 
-    private static bool TryGetSettlementKey(Settlement settlement, IObjectManager objectManager, out string key)
+    private static bool TryGetSettlementKey(Settlement settlement, out string key)
     {
         key = null;
 
@@ -586,7 +679,7 @@ internal static class PlayerPartyTradeContext
         return !string.IsNullOrEmpty(key);
     }
 
-    private static bool TryGetCharacterKey(CharacterObject character, IObjectManager objectManager, out uint key)
+    private bool TryGetCharacterKey(CharacterObject character, out uint key)
     {
         key = 0;
 
@@ -598,7 +691,7 @@ internal static class PlayerPartyTradeContext
     private static string GetItemKey(ItemObjectData itemObjectData)
         => $"{itemObjectData.ItemObjectId}|{itemObjectData.ItemModifierId}|{itemObjectData.ItemModifierNull}";
 
-    private static TaleWorlds.Library.MBBindingList<BarterItemVM> GetOfferListForItem(BarterVM barterVM, BarterItemVM item)
+    private TaleWorlds.Library.MBBindingList<BarterItemVM> GetOfferListForItem(BarterVM barterVM, BarterItemVM item)
     {
         if (Contains(barterVM.LeftFiefList, item) ||
             Contains(barterVM.LeftPrisonerList, item) ||
@@ -615,7 +708,7 @@ internal static class PlayerPartyTradeContext
     private static bool Contains(IEnumerable<BarterItemVM> items, BarterItemVM item)
         => items != null && items.Contains(item);
 
-    private static bool CanOfferAny(IEnumerable<BarterItemVM> items)
+    private bool CanOfferAny(IEnumerable<BarterItemVM> items)
         => items != null && items.Any(item => CanOffer(item?.Barterable));
 
     private static void ShowOutcomeMessage(PlayerPartyInteractionOutcomeType outcomeType)

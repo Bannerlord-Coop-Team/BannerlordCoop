@@ -254,7 +254,8 @@ public class GameInterfaceModule : Module
         builder.RegisterType<MapEventLoadCleaner>().As<IMapEventLoadCleaner>().InstancePerDependency();
         // Shared so the per tick Update patch reads it from the provider cache.
         builder.RegisterType<StalledMapEventResolver>().As<IStalledMapEventResolver>().InstancePerLifetimeScope();
-        // Scoped so the barter patches and the trade handler share one pending offer per client.
+        // Scoped so the barter patches and the trade handler share one trade and one pending offer per client.
+        builder.RegisterType<PlayerPartyTradeContext>().As<IPlayerPartyTradeContext>().InstancePerLifetimeScope();
         builder.RegisterType<PlayerPartyTradeOfferSender>().As<IPlayerPartyTradeOfferSender>().InstancePerLifetimeScope();
         builder.RegisterType<PlayerPartyTradeOfferBuilder>().As<IPlayerPartyTradeOfferBuilder>().InstancePerDependency();
         builder.RegisterType<LeaderlessClanResolver>().As<ILeaderlessClanResolver>().InstancePerDependency();

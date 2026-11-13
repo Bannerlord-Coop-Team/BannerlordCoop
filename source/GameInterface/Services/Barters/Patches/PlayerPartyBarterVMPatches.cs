@@ -19,51 +19,84 @@ internal class PlayerPartyBarterVMPatches
     [HarmonyPatch(MethodType.Constructor, typeof(BarterData))]
     [HarmonyPostfix]
     static void ConstructorPostfix(BarterVM __instance)
-        => PlayerPartyTradeContext.SetBarterVM(__instance);
+    {
+        if (!ContainerProvider.TryResolve<IPlayerPartyTradeContext>(out var trade)) return;
+
+        trade.SetBarterVM(__instance);
+    }
 
     [HarmonyPatch(nameof(BarterVM.InitBarterList))]
     [HarmonyPrefix]
     static void InitBarterListPrefix(BarterVM __instance, BarterData args)
-        => PlayerPartyTradeContext.AddMarriageGroupLists(__instance, args);
+    {
+        if (!ContainerProvider.TryResolve<IPlayerPartyTradeContext>(out var trade)) return;
+
+        trade.AddMarriageGroupLists(__instance, args);
+    }
 
     [HarmonyPatch(nameof(BarterVM.OfferItemAdd))]
     [HarmonyPrefix]
     static bool OfferItemAddPrefix(BarterItemVM barterItemVM)
-        => PlayerPartyTradeContext.CanOffer(barterItemVM?.Barterable);
+    {
+        if (!ContainerProvider.TryResolve<IPlayerPartyTradeContext>(out var trade)) return true;
+
+        return trade.CanOffer(barterItemVM?.Barterable);
+    }
 
     [HarmonyPatch(nameof(BarterVM.OfferItemRemove))]
     [HarmonyPrefix]
     static bool OfferItemRemovePrefix(BarterItemVM barterItemVM)
-        => PlayerPartyTradeContext.CanOffer(barterItemVM?.Barterable);
+    {
+        if (!ContainerProvider.TryResolve<IPlayerPartyTradeContext>(out var trade)) return true;
+
+        return trade.CanOffer(barterItemVM?.Barterable);
+    }
 
     // Vanilla calls SendOffer after every single item change, so this only marks the offer for the next flush.
     [HarmonyPatch("SendOffer")]
     [HarmonyPostfix]
-    static void SendOfferPostfix(BarterVM __instance)
+    static void SendOfferPostfix()
     {
-        if (ContainerProvider.TryResolve<IPlayerPartyTradeOfferSender>(out var offerSender))
-            offerSender.MarkChanged(__instance);
+        if (!ContainerProvider.TryResolve<IPlayerPartyTradeOfferSender>(out var offerSender)) return;
+
+        offerSender.MarkChanged();
     }
 
     [HarmonyPatch("RefreshOfferLabel")]
     [HarmonyPostfix]
     static void RefreshOfferLabelPostfix()
-        => PlayerPartyTradeContext.RefreshBarterControls();
+    {
+        if (!ContainerProvider.TryResolve<IPlayerPartyTradeContext>(out var trade)) return;
+
+        trade.RefreshBarterControls();
+    }
 
     [HarmonyPatch(nameof(BarterVM.ExecuteReset))]
     [HarmonyPrefix]
     static bool ExecuteResetPrefix()
-        => PlayerPartyTradeContext.CanReset();
+    {
+        if (!ContainerProvider.TryResolve<IPlayerPartyTradeContext>(out var trade)) return true;
+
+        return trade.CanReset();
+    }
 
     [HarmonyPatch(nameof(BarterVM.ExecuteAutoBalance))]
     [HarmonyPrefix]
     static bool ExecuteAutoBalancePrefix()
-        => PlayerPartyTradeContext.CanModifyOffer();
+    {
+        if (!ContainerProvider.TryResolve<IPlayerPartyTradeContext>(out var trade)) return true;
+
+        return trade.CanModifyOffer();
+    }
 
     [HarmonyPatch("TransferItem")]
     [HarmonyPrefix]
     static bool TransferItemPrefix(BarterItemVM item)
-        => PlayerPartyTradeContext.CanOffer(item?.Barterable);
+    {
+        if (!ContainerProvider.TryResolve<IPlayerPartyTradeContext>(out var trade)) return true;
+
+        return trade.CanOffer(item?.Barterable);
+    }
 }
 
 [HarmonyPatch(typeof(DialogButtonsParentWidget))]
@@ -72,7 +105,11 @@ internal class PlayerPartyBarterDialogButtonsPatches
     [HarmonyPatch("set_ResetButton")]
     [HarmonyPostfix]
     static void SetResetButtonPostfix(ButtonWidget value)
-        => PlayerPartyTradeContext.SetResetButton(value);
+    {
+        if (!ContainerProvider.TryResolve<IPlayerPartyTradeContext>(out var trade)) return;
+
+        trade.SetResetButton(value);
+    }
 }
 
 [HarmonyPatch(typeof(PartyHeaderToggleWidget))]
@@ -82,7 +119,8 @@ internal class PlayerPartyBarterHeaderTogglePatches
     [HarmonyPostfix]
     static void UpdateSizePostfix(PartyHeaderToggleWidget __instance)
     {
-        if (!PlayerPartyTradeContext.IsActive) return;
+        if (!ContainerProvider.TryResolve<IPlayerPartyTradeContext>(out var trade)) return;
+        if (!trade.IsActive) return;
         if (__instance?.ListPanel == null) return;
         if (__instance.ListPanel.ChildCount != 0) return;
         if (__instance.ListPanel.Id?.Contains("Diplomatic") != true) return;
@@ -111,7 +149,11 @@ internal class PlayerPartyBarterTransferAllPatches
 
     [HarmonyPrefix]
     static bool ExecuteTransferAllPrefix(BarterVM __instance, MethodBase __originalMethod)
-        => PlayerPartyTradeContext.CanOfferTransferAll(__instance, __originalMethod?.Name);
+    {
+        if (!ContainerProvider.TryResolve<IPlayerPartyTradeContext>(out var trade)) return true;
+
+        return trade.CanOfferTransferAll(__instance, __originalMethod?.Name);
+    }
 }
 
 [HarmonyPatch]
@@ -126,7 +168,11 @@ internal class PlayerPartyBarterItemVMPatches
 
     [HarmonyPrefix]
     static bool ExecuteItemActionPrefix(BarterItemVM __instance)
-        => PlayerPartyTradeContext.CanOffer(__instance?.Barterable);
+    {
+        if (!ContainerProvider.TryResolve<IPlayerPartyTradeContext>(out var trade)) return true;
+
+        return trade.CanOffer(__instance?.Barterable);
+    }
 }
 
 [HarmonyPatch(typeof(BarterItemVM), nameof(BarterItemVM.CurrentOfferedAmount), MethodType.Setter)]
@@ -134,10 +180,14 @@ internal class PlayerPartyBarterItemAmountPatches
 {
     [HarmonyPrefix]
     static bool SetCurrentOfferedAmountPrefix(BarterItemVM __instance, int value)
-        => PlayerPartyTradeContext.CanSetOfferedAmount(
+    {
+        if (!ContainerProvider.TryResolve<IPlayerPartyTradeContext>(out var trade)) return true;
+
+        return trade.CanSetOfferedAmount(
             __instance?.Barterable,
             __instance?.CurrentOfferedAmount ?? 0,
             value);
+    }
 }
 
 // Turns accepting a player-party trade, from the barter screen or the barter manager, into a coop accept.
@@ -153,13 +203,15 @@ internal class PlayerPartyBarterAcceptPatches
     [HarmonyPrefix]
     static bool AcceptPrefix()
     {
-        if (!PlayerPartyTradeContext.IsActive) return true;
+        if (!ContainerProvider.TryResolve<IPlayerPartyTradeContext>(out var trade)) return true;
+        if (!trade.IsActive) return true;
+        if (!ContainerProvider.TryResolve<IPlayerPartyTradeOfferSender>(out var offerSender)) return true;
 
         // A pending edit goes out first, because it clears the acceptance this accept is checked against and must reach the server ahead of it.
         // An edit that failed to send isnt accepted, otherwise the server would apply the older offer it still holds.
-        if (ContainerProvider.TryResolve<IPlayerPartyTradeOfferSender>(out var offerSender) && !offerSender.Flush()) return false;
+        if (!offerSender.Flush()) return false;
 
-        PlayerPartyTradeContext.PublishAccept(true);
+        trade.PublishAccept(true);
         return false;
     }
 }
@@ -177,13 +229,14 @@ internal class PlayerPartyBarterCancelPatches
     [HarmonyPrefix]
     static bool CancelPrefix()
     {
-        if (!PlayerPartyTradeContext.IsActive) return true;
+        if (!ContainerProvider.TryResolve<IPlayerPartyTradeContext>(out var trade)) return true;
+        if (!trade.IsActive) return true;
+        if (!ContainerProvider.TryResolve<IPlayerPartyTradeOfferSender>(out var offerSender)) return true;
 
         // A pending edit goes out first, because it clears the acceptance that would block this cancel.
-        if (ContainerProvider.TryResolve<IPlayerPartyTradeOfferSender>(out var offerSender))
-            offerSender.Flush();
+        offerSender.Flush();
 
-        PlayerPartyTradeContext.PublishLeave();
+        trade.PublishLeave();
         return false;
     }
 }
@@ -194,7 +247,11 @@ internal class PlayerPartyBarterInformationManagerPatches
     [HarmonyPatch(nameof(InformationManager.DisplayMessage))]
     [HarmonyPrefix]
     static bool DisplayMessagePrefix(InformationMessage message)
-        => !PlayerPartyTradeContext.SuppressNativeCloseMessages;
+    {
+        if (!ContainerProvider.TryResolve<IPlayerPartyTradeContext>(out var trade)) return true;
+
+        return !trade.SuppressNativeCloseMessages;
+    }
 }
 
 [HarmonyPatch(typeof(MBInformationManager))]
@@ -209,5 +266,9 @@ internal class PlayerPartyBarterMBInformationManagerPatches
         typeof(string))]
     [HarmonyPrefix]
     static bool AddQuickInformationPrefix(TextObject message)
-        => !PlayerPartyTradeContext.SuppressNativeCloseMessages;
+    {
+        if (!ContainerProvider.TryResolve<IPlayerPartyTradeContext>(out var trade)) return true;
+
+        return !trade.SuppressNativeCloseMessages;
+    }
 }
