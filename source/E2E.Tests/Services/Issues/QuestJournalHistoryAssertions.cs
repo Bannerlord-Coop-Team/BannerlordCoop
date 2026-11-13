@@ -53,7 +53,7 @@ internal static class QuestJournalHistoryAssertions
             var entry = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
                 entry => entry._relatedObjectIds.Contains(issueId) && entry.IsEnded()));
             Assert.Equal(ownerQuest.Title.ToString(), entry.Title.ToString());
-            Assert.Equal(outcome == IssueOutcome.QuestFail, entry.IsEndedUnsuccessfully());
+            Assert.Equal(outcome is IssueOutcome.QuestFail or IssueOutcome.QuestCancel, entry.IsEndedUnsuccessfully());
         });
     }
 

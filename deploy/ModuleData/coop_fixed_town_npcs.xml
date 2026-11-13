@@ -714,7 +714,7 @@
     coop_location="tavern"
     coop_spawn_tag="npc_common"
     coop_dialogue="Başka nerde gezicem ki?"
-    coop_enabled="true">
+    coop_enabled="false">
     <face>
       <face_key_template value="BodyProperty.townsman_vlandia" />
     </face>
@@ -803,7 +803,7 @@
     coop_location="prison"
     coop_spawn_tag="npc_common"
     coop_dialogue="What do you think your looking at, pilgrim? Hit the road, Jack!"
-    coop_enabled="true">
+    coop_enabled="false">
     <face>
       <face_key_template value="BodyProperty.townsman_battania" />
     </face>

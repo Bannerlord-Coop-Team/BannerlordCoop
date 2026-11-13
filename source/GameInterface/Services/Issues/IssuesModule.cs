@@ -16,6 +16,7 @@ using GameInterface.Services.Issues.Quests.LesserNobleRevolt;
 using GameInterface.Services.Issues.Quests.TheConquestOfSettlement;
 using GameInterface.Services.Issues.Quests.VillageNeedsTools;
 using System;
+using GameInterface.Services.Issues.Quests.RevenueFarming;
 using GameInterface.Services.Issues.Quests.EscortMerchantCaravan;
 
 namespace GameInterface.Services.Issues;
@@ -68,6 +69,10 @@ internal class IssuesModule : Module
             .AsSelf()
             .AsImplementedInterfaces()
             .SingleInstance();
+
+        builder.RegisterType<RevenueFarmingSessionStore>().As<IRevenueFarmingSessionStore>().InstancePerLifetimeScope();
+        builder.RegisterType<RevenueFarmingExecutionScope>().As<IRevenueFarmingExecutionScope>().InstancePerLifetimeScope();
+        builder.RegisterType<RevenueFarmingActions>().As<IRevenueFarmingActions>().InstancePerDependency();
 
         base.Load(builder);
     }
