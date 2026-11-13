@@ -1,15 +1,19 @@
 ﻿#if COOP_NAVAL
 using HarmonyLib;
 using Missions.Naval;
+using Moq;
 using NavalDLC.Missions.NavalPhysics;
 using NavalDLC.Missions.Objects;
 using NavalDLC.Missions.Objects.UsableMachines;
 using System;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
+using TaleWorlds.MountAndBlade;
 using Xunit;
+using Attachment = NavalDLC.Missions.Objects.UsableMachines.ShipAttachmentMachine.ShipAttachment;
 using Joint = NavalDLC.Missions.Objects.UsableMachines.ShipAttachmentMachine.ShipAttachmentJoint;
 using RopeState = NavalDLC.Missions.Objects.UsableMachines.ShipAttachmentMachine.ShipAttachment.ShipAttachmentState;
 
@@ -25,6 +29,7 @@ public class NavalRopePatchesTests
     [InlineData(typeof(RopeStatePatch))]
     [InlineData(typeof(RopePlankEligibilityPatch))]
     [InlineData(typeof(RopeBreakCheckPatch))]
+    [InlineData(typeof(RopeReplicaHitPatch))]
     [InlineData(typeof(RopeReplicaPlankFlightPatch))]
     [InlineData(typeof(RopeReplicaTickPatch))]
     [InlineData(typeof(RopeRetargetPatch))]
@@ -42,6 +47,32 @@ public class NavalRopePatchesTests
         {
             harmony.UnpatchAll(harmony.Id);
         }
+    }
+
+    // #4597: a weapon breaks a rope by destroying its attachment point's fabric part. Only the rope's owner keeps that hit.
+    [Theory]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    public void RopeHit_IsDroppedOnlyForAnotherOwnersRope(bool sourceIsCopy, bool expected)
+    {
+        var source = ShipTestHulls.Uninitialized<MissionShip>();
+        var station = ShipTestHulls.Uninitialized<ShipAttachmentMachine>();
+        station.OwnerShip = source;
+        var rope = (Attachment)RuntimeHelpers.GetUninitializedObject(typeof(Attachment));
+        rope.AttachmentSource = station;
+        var point = ShipTestHulls.Uninitialized<ShipAttachmentPointMachine>();
+        point.CurrentAttachment = rope;
+        var part = ShipTestHulls.Uninitialized<DestructableComponent>();
+        point._shipAttachmentPointMachineDestructableComponent = part;
+        part.OnHitTakenWithImpact += point.OnDestructableHitTakenWithImpact;
+        var foreignHulls = new Mock<INavalForeignHullRegistry>();
+        foreignHulls.Setup(hulls => hulls.Contains(source)).Returns(sourceIsCopy);
+        var ropes = new NavalRopeRegistry(foreignHulls.Object, new NavalMissionTracker());
+
+        Assert.Equal(expected, RopeReplicaHitPatch.AllowsHit(part, ropes));
+        point.CurrentAttachment = null;
+        Assert.True(RopeReplicaHitPatch.AllowsHit(part, ropes));
+        Assert.True(RopeReplicaHitPatch.AllowsHit(ShipTestHulls.Uninitialized<DestructableComponent>(), ropes));
     }
 
     [Fact]
