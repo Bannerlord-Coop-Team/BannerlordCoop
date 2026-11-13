@@ -70,9 +70,9 @@ public class NavalCopyCrewPatchesTests
         builder.RegisterInstance(registry.Object).As<INavalForeignHullRegistry>();
         using var container = builder.Build();
         var harmony = new Harmony("coop.tests.naval.copy_crew_share");
+        var activeUse = ContainerProvider.UseContainerThreadSafe(container);
         try
         {
-            using var activeUse = ContainerProvider.UseContainerThreadSafe(container);
             Assert.NotEmpty(harmony.CreateClassProcessor(typeof(CopySkippingCrewSharePatch)).Patch());
 
             team.AutoComputeDesiredTroopCountsPerShip(loadBalanceShips: true, troopLimitFromBattleSize: 100);
@@ -82,7 +82,9 @@ public class NavalCopyCrewPatchesTests
         }
         finally
         {
+            // Clears while the handle is still held, as NavalClientContainer.Dispose does.
             ContainerProvider.Clear();
+            activeUse.Dispose();
             harmony.UnpatchAll(harmony.Id);
         }
     }

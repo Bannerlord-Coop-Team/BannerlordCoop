@@ -53,9 +53,8 @@ public class NavalFleetFailCoopCommandTests
 
     // The console route checks the words against the declared arguments before the command parses them.
     [Theory]
+    [InlineData()]
     [InlineData("ally", "before")]
-    [InlineData("ally")]
-    [InlineData("crewing")]
     public void ConsoleRoute_PassesTheSideAndStageWordsToTheCommand(params string[] values)
     {
         var registry = new CoopCommandRegistry(new ICoopCommand[] { new NavalFleetFailCoopCommand() },

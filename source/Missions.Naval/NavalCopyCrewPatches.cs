@@ -85,26 +85,13 @@ internal class CopySkippingCrewSharePatch
         AccessTools.Method(typeof(NavalTeamAgents), nameof(NavalTeamAgents.AssignTroops)),
     };
 
-    // Takes the copies out of the team's hulls for the call, with where each stood, last first.
+    // Takes the copies out of the team's hulls for the call, keeping where each stood.
     [HarmonyPrefix]
-    private static void Prefix(NavalTeamAgents __instance, out List<(int Index, NavalShipAgents Hull)> __state)
-    {
-        __state = new List<(int Index, NavalShipAgents Hull)>();
-        var hulls = __instance._allShipAgents;
-        for (int index = hulls.Count - 1; index >= 0; index--)
-        {
-            if (!NavalForeignHullRegistry.IsCopyHere(hulls[index].Ship)) continue;
-
-            __state.Add((index, hulls[index]));
-            hulls.RemoveAt(index);
-        }
-    }
+    private static void Prefix(NavalTeamAgents __instance, out List<(int Index, NavalShipAgents Item)> __state) =>
+        __state = ListTakeOut.TakeOut(__instance._allShipAgents, hull => !NavalForeignHullRegistry.IsCopyHere(hull.Ship));
 
     // Puts the copies back where they stood, also when vanilla threw.
     [HarmonyFinalizer]
-    private static void Finalizer(NavalTeamAgents __instance, List<(int Index, NavalShipAgents Hull)> __state)
-    {
-        for (int taken = __state.Count - 1; taken >= 0; taken--)
-            __instance._allShipAgents.Insert(__state[taken].Index, __state[taken].Hull);
-    }
+    private static void Finalizer(NavalTeamAgents __instance, List<(int Index, NavalShipAgents Item)> __state) =>
+        ListTakeOut.PutBack(__instance._allShipAgents, __state);
 }

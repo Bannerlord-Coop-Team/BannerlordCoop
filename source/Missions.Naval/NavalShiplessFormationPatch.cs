@@ -267,45 +267,25 @@ internal class ShiplessSelectedFormationOrdersPatch
     // Takes the selected formations without a hull out of the selection for the order, keeping where each stood; skips the
     // setter when that left nothing (the finalizer still restores).
     [HarmonyPrefix]
-    internal static bool Prefix(OrderController __instance, out List<(int Index, Formation Formation)> __state)
+    internal static bool Prefix(OrderController __instance, out List<(int Index, Formation Item)> __state)
     {
         __state = null;
         var shipsLogic = NavalShiplessFormations.ShipsLogic;
         if (!NavalMissionTracker.IsActiveHere() || shipsLogic == null) return true;
 
-        __state = TakeShipless(__instance._selectedFormations, formation =>
+        // Keeps a formation with a hull, or one whose hull is unknown, and takes out the rest.
+        __state = ListTakeOut.TakeOut(__instance._selectedFormations, formation =>
             NavalShiplessFormations.ShipOf(shipsLogic, formation, out bool known) != null || !known);
         return RunsOrder(__instance._selectedFormations.Count, __state.Count);
     }
 
     // Puts them back where they stood, whether the order returned or threw.
     [HarmonyFinalizer]
-    internal static void Finalizer(OrderController __instance, List<(int Index, Formation Formation)> __state) =>
-        Restore(__instance._selectedFormations, __state);
-
-    /// <summary>Removes the formations <paramref name="hasShip"/> rejects, returning each with its index, in order.</summary>
-    internal static List<(int Index, Formation Formation)> TakeShipless(IList<Formation> selected, Func<Formation, bool> hasShip)
-    {
-        var taken = new List<(int, Formation)>();
-        for (int index = 0; index < selected.Count; index++)
-        {
-            if (!hasShip(selected[index])) taken.Add((index, selected[index]));
-        }
-
-        for (int i = taken.Count - 1; i >= 0; i--) selected.RemoveAt(taken[i].Item1);
-        return taken;
-    }
+    internal static void Finalizer(OrderController __instance, List<(int Index, Formation Item)> __state) =>
+        ListTakeOut.PutBack(__instance._selectedFormations, __state);
 
     /// <summary>Whether the setter runs: not when taking the hull-less formations out emptied the selection.</summary>
     internal static bool RunsOrder(int selectedLeft, int taken) => selectedLeft > 0 || taken == 0;
-
-    /// <summary>Inserts the taken formations back at their indices, lowest first.</summary>
-    internal static void Restore(IList<Formation> selected, List<(int Index, Formation Formation)> taken)
-    {
-        if (taken == null) return;
-
-        foreach (var (index, formation) in taken) selected.Insert(Math.Min(index, selected.Count), formation);
-    }
 }
 
 /// <summary>

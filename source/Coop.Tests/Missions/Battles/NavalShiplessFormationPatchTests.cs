@@ -171,10 +171,10 @@ public class NavalShiplessFormationPatchTests
         var selected = formations.ToList();
         var shipless = new[] { formations[0], formations[2] };
 
-        var taken = ShiplessSelectedFormationOrdersPatch.TakeShipless(selected, formation => !shipless.Contains(formation));
+        var taken = ListTakeOut.TakeOut(selected, formation => !shipless.Contains(formation));
         Assert.Equal(new[] { formations[1], formations[3] }, selected);
 
-        ShiplessSelectedFormationOrdersPatch.Restore(selected, taken);
+        ListTakeOut.PutBack(selected, taken);
         Assert.Equal(formations, selected);
         Assert.Equal(6, ShiplessSelectedFormationOrdersPatch.TargetMethods().Count(method => method != null));
     }
@@ -190,11 +190,11 @@ public class NavalShiplessFormationPatchTests
             .ToArray();
         var selected = formations.ToList();
 
-        var taken = ShiplessSelectedFormationOrdersPatch.TakeShipless(selected, _ => false);
+        var taken = ListTakeOut.TakeOut(selected, _ => false);
 
         Assert.Empty(selected);
         Assert.False(ShiplessSelectedFormationOrdersPatch.RunsOrder(selected.Count, taken.Count));
-        ShiplessSelectedFormationOrdersPatch.Restore(selected, taken);
+        ListTakeOut.PutBack(selected, taken);
         Assert.Equal(formations, selected);
     }
 
