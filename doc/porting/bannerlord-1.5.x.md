@@ -233,8 +233,8 @@ are registered later, at `CampaignReady` (`MapScreen.OnInitialize`), through
   too. Every later load then
   crashed in `CampaignObjectManager.InitializeManagerObjectLists` (seen 2026-10-22 on v1.5.5).
   - What this loses: looter-faction parties no longer head for land battle sites (the only parties that
-    target land wreckages). Players never saw wrecks in co-op anyway, since nothing syncs them (#3837,
-    #3838). Re-enabling needs the wreckage to get an id, through a sync registry or
+    target land wreckages). Players never saw wrecks made during a co-op session, since nothing syncs
+    them (#3837, #3838). Re-enabling needs the wreckage to get an id, through a sync registry or
     `typeof(BattleWreckage)` in `MBObjectBasePatches.allowedTypes` after proving `CreateWreckage`'s log
     entry and map interactable work under co-op. It also needs `SavedWreckageRemovalPatch` removed or
     narrowed back to id-less entries.
