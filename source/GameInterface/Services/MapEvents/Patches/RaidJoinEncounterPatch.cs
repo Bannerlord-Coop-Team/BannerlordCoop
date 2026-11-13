@@ -1,7 +1,6 @@
 ﻿using Common;
 using GameInterface.Policies;
 using GameInterface.Services.MapEvents.Extensions;
-using GameInterface.Services.MapEvents.Initialization;
 using HarmonyLib;
 using System.Collections.Generic;
 using System.Reflection;
@@ -25,11 +24,11 @@ internal class RaidJoinEncounterConditionPatch
     }
 
     // Vanilla's join conditions throw when there is no encountered battle, before the server sets the encounter up
-    // and after it closes. The option is greyed instead until the battle is set up.
+    // and after it closes. The option is greyed instead while there is none.
     [HarmonyPrefix]
     private static bool Prefix(MenuCallbackArgs args, ref bool __result)
     {
-        if (ModInformation.IsServer || IsEncounterSetUp()) return true;
+        if (ModInformation.IsServer || PlayerEncounterExtensions.GetEncounteredBattleOrNull() != null) return true;
 
         __result = false;
         if (args != null)
@@ -59,15 +58,6 @@ internal class RaidJoinEncounterConditionPatch
         __result = false;
         args.IsEnabled = false;
         args.Tooltip = TextObject.GetEmpty();
-    }
-
-    private static bool IsEncounterSetUp()
-    {
-        var mapEvent = PlayerEncounterExtensions.GetEncounteredBattleOrNull();
-        if (mapEvent == null)
-            return false;
-
-        return !ContainerProvider.TryResolve<IMapEventInitializationBarrier>(out var barrier) || !barrier.IsPending(mapEvent);
     }
 }
 
