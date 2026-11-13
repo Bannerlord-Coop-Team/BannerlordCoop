@@ -168,7 +168,8 @@ namespace GameInterface.Serialization
         {
             if (obj == null) return string.Empty;
 
-            if (BinaryPackageFactory.ObjectManager.TryGetId(obj, out var id) == false)
+            if (BinaryPackageFactory.ObjectManager.TryGetId(obj, out var id) == false &&
+                BinaryPackageFactory.IsPackedWithoutId(obj) == false)
             {
                 Logger.Error("Failed to retrieve ID for object {type}", obj.GetType());
             }
