@@ -857,8 +857,10 @@ internal class ConversationRequestHandler : IHandler
     {
         if (ModInformation.IsClient) return;
 
-        ReleaseEngagementOnMainThread(payload.What.PlayerId);
-        conversationPartyTracker.ForgetDeferrals(payload.What.PlayerId);
+        var peer = payload.What.PlayerId;
+        ReleaseEngagementOnMainThread(peer);
+        // Deferrals are recorded on the game thread, so forget them there too, after any check already running.
+        GameThread.RunSafe(() => conversationPartyTracker.ForgetDeferrals(peer), context: nameof(Handle_PlayerDisconnected));
         EndPvpInteraction(payload.What.PlayerId);
         EndPvpInteractionForDefender(payload.What.PlayerId);
     }
