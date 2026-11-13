@@ -5478,7 +5478,6 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
     private static void ThrowAfterBanditBarterMutation()
         => throw new InvalidOperationException("Post-apply bandit barter work failed.");
 
-
     private static void SetupFief(Settlement settlement, Town town, PartyBase ownerParty)
     {
         settlement.Town = town;
