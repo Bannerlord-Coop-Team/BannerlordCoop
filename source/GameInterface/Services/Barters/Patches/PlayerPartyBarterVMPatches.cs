@@ -156,8 +156,8 @@ internal class PlayerPartyBarterAcceptPatches
         if (!PlayerPartyTradeContext.IsActive) return true;
 
         // A pending edit goes out first, because it clears the acceptance this accept is checked against and must reach the server ahead of it.
-        if (ContainerProvider.TryResolve<IPlayerPartyTradeOfferSender>(out var offerSender))
-            offerSender.Flush();
+        // An edit that failed to send isnt accepted, otherwise the server would apply the older offer it still holds.
+        if (ContainerProvider.TryResolve<IPlayerPartyTradeOfferSender>(out var offerSender) && !offerSender.Flush()) return false;
 
         PlayerPartyTradeContext.PublishAccept(true);
         return false;

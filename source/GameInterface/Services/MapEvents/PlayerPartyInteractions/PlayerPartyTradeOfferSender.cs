@@ -1,96 +1,119 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Network;
-using GameInterface.Services.MapEvents.Messages.Conversation;
-using GameInterface.Services.ObjectManager;
+using Common.Serialization;
 using Serilog;
 using System;
 using System.Linq;
+using TaleWorlds.CampaignSystem.BarterSystem.Barterables;
 using TaleWorlds.CampaignSystem.ViewModelCollection.Barter;
 
 namespace GameInterface.Services.MapEvents.PlayerPartyInteractions;
 
-// Coalesces the local trade offer into one send per flush, because vanilla recomputes it after every item change.
-public interface IPlayerPartyTradeOfferSender
+// Coalesces the local trade offer into one send per game-thread drain, because vanilla recomputes it after every item change.
+internal interface IPlayerPartyTradeOfferSender
 {
-    // Forgets the last sent offer and any pending change, because a new trade opens with nothing offered.
-    void Begin();
+    // Starts sending offers for this trade, compared against nothing offered.
+    void Begin(string sessionId, string partyId);
 
-    // Records that the offer on this barter screen may have changed since the last flush.
+    // Stops sending offers when the trade that ended is the one being sent for.
+    void End(string sessionId);
+
+    // Records that the offer on this barter screen may have changed and schedules a flush for it.
     void MarkChanged(BarterVM barterVM);
 
-    // Sends the pending offer when it differs from the last one sent, logging any failure.
-    void Flush();
+    // Sends the pending offer when it differs from the last one sent; false when sending it failed.
+    bool Flush();
 }
 
-// Scoped per client, because the barter patches and the application tick must share one pending offer.
+// Scoped per client, because the barter patches and the trade handler must share one pending offer.
 internal class PlayerPartyTradeOfferSender : IPlayerPartyTradeOfferSender
 {
     private static readonly ILogger Logger = LogManager.GetLogger<PlayerPartyTradeOfferSender>();
-    private static readonly NetworkPlayerPartyTradeOfferUpdated EmptyOffer = new NetworkPlayerPartyTradeOfferUpdated(null, null, null, null);
 
     private readonly INetwork network;
-    private readonly IObjectManager objectManager;
+    private readonly ICommonSerializer serializer;
     private readonly IPlayerPartyTradeOfferBuilder offerBuilder;
 
+    private string sessionId;
+    private string partyId;
     private BarterVM changedBarterVM;
-    private NetworkPlayerPartyTradeOfferUpdated lastSentOffer = EmptyOffer;
+    private byte[] lastSentOffer;
 
-    public PlayerPartyTradeOfferSender(INetwork network, IObjectManager objectManager, IPlayerPartyTradeOfferBuilder offerBuilder)
+    public PlayerPartyTradeOfferSender(INetwork network, ICommonSerializer serializer, IPlayerPartyTradeOfferBuilder offerBuilder)
     {
         this.network = network;
-        this.objectManager = objectManager;
+        this.serializer = serializer;
         this.offerBuilder = offerBuilder;
     }
 
-    // Resets the baseline the next offer is compared against.
-    public void Begin()
+    // The baseline is the empty offer for this trade, so a stack the last trade ended on still counts as a change.
+    public void Begin(string sessionId, string partyId)
     {
+        this.sessionId = sessionId;
+        this.partyId = partyId;
         changedBarterVM = null;
-        lastSentOffer = EmptyOffer;
+        lastSentOffer = serializer.Serialize(offerBuilder.Build(sessionId, partyId, Array.Empty<Barterable>()));
     }
 
-    // Keeps the barter screen to build from at the next flush.
-    public void MarkChanged(BarterVM barterVM)
-        => changedBarterVM = barterVM;
+    // Matches the trade context, which ignores the end of any other session.
+    public void End(string sessionId)
+    {
+        if (this.sessionId != sessionId) return;
 
-    // Clears the pending change before sending, so a failing offer logs once instead of every frame.
-    public void Flush()
+        this.sessionId = null;
+        partyId = null;
+        changedBarterVM = null;
+    }
+
+    // An NPC barter is settled locally, so it never schedules a send.
+    public void MarkChanged(BarterVM barterVM)
+    {
+        if (sessionId == null) return;
+
+        var flushScheduled = changedBarterVM != null;
+        changedBarterVM = barterVM;
+        if (flushScheduled) return;
+
+        GameThread.EnqueueSafe(() => Flush(), context: "Send player-party trade offer");
+    }
+
+    // Clears the pending change before sending, so a failing offer logs once instead of on every flush.
+    public bool Flush()
     {
         var barterVM = changedBarterVM;
-        if (barterVM == null) return;
+        if (barterVM == null) return true;
         changedBarterVM = null;
 
         try
         {
             SendIfChanged(barterVM);
+            return true;
         }
         catch (Exception ex)
         {
             Logger.Error(ex, "Failed to send the player-party trade offer");
+            return false;
         }
     }
 
-    // An NPC barter is settled locally, and a sent offer clears both acceptances the same as the server does when it arrives.
+    // Compares the serialized offer, so a new offer field can't be missed, and a sent offer clears both acceptances like the server does.
     private void SendIfChanged(BarterVM barterVM)
     {
-        if (!PlayerPartyTradeContext.IsActive) return;
-        if (!objectManager.TryGetIdWithLogging(PlayerPartyTradeContext.LocalParty, out var partyId)) return;
-
-        var offer = offerBuilder.Build(PlayerPartyTradeContext.SessionId, partyId, barterVM);
-        if (IsSameOffer(offer, lastSentOffer)) return;
+        var offer = offerBuilder.Build(sessionId, partyId, GetLocalOffer(barterVM));
+        var serializedOffer = serializer.Serialize(offer);
+        if (serializedOffer.SequenceEqual(lastSentOffer)) return;
 
         network.SendAll(offer);
-        lastSentOffer = offer;
+        lastSentOffer = serializedOffer;
         PlayerPartyTradeContext.ResetAcceptance();
     }
 
-    // Compares every offered field, so only a real change reaches the network.
-    private static bool IsSameOffer(NetworkPlayerPartyTradeOfferUpdated offer, NetworkPlayerPartyTradeOfferUpdated other)
-        => offer.OfferedGold == other.OfferedGold &&
-           offer.OfferedPeace == other.OfferedPeace &&
-           offer.OfferedItems.SequenceEqual(other.OfferedItems) &&
-           offer.OfferedTroops.SequenceEqual(other.OfferedTroops) &&
-           offer.OfferedFiefs.SequenceEqual(other.OfferedFiefs) &&
-           offer.OfferedPrisoners.SequenceEqual(other.OfferedPrisoners) &&
-           offer.OfferedMarriages.SequenceEqual(other.OfferedMarriages);
+    // Reads both offer columns because the local party can be on either side, keeping what the context lets it offer.
+    private static Barterable[] GetLocalOffer(BarterVM barterVM)
+        => barterVM.LeftOfferList
+            .Concat(barterVM.RightOfferList)
+            .Select(item => item.Barterable)
+            .Where(PlayerPartyTradeContext.CanOffer)
+            .ToArray();
 }

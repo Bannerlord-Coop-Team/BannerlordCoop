@@ -337,6 +337,7 @@ internal class PlayerPartyInteractionHandler : IHandler
             endedInteractionSessionIds.Add(message.SessionId);
             PlayerPartyInteractionDialogState.Clear(message.SessionId);
             PlayerPartyTradeContext.End(message.SessionId, message.OutcomeType);
+            offerSender.End(message.SessionId);
             PlayerPartyTradeOverlay.Instance.Hide(message.SessionId);
             var conversationWasOpened = openedConversationSessionIds.Remove(message.SessionId);
 
@@ -423,9 +424,9 @@ internal class PlayerPartyInteractionHandler : IHandler
             message.OfferedPrisoners,
             offeredPeace,
             message.OfferedMarriages);
-        // Clients clear both acceptances when the offer arrives, so no trade state is sent for it.
         session.InitiatorAcceptedTrade = false;
         session.ResponderAcceptedTrade = false;
+        // Clients clear both acceptances when the offer arrives, so no trade state is sent for it.
         SendToTradePeers(session, new NetworkPlayerPartyTradeOfferUpdated(
             message.SessionId,
             partyId,
@@ -1668,7 +1669,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         if (!objectManager.TryGetObject<PartyBase>(state.OtherPartyId, out var otherParty)) return;
 
         PlayerPartyTradeContext.Begin(state.SessionId, myParty);
-        offerSender.Begin();
+        offerSender.Begin(state.SessionId, state.PartyId);
 
         try
         {

@@ -1821,6 +1821,7 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
         });
 
         var sessionId = StartTrade(client1, client2, initiatorPartyId, responderPartyId);
+        OpenTradeOn(client2, sessionId, responderPartyId);
 
         BarterVM barterVM = null;
 
@@ -1832,8 +1833,6 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
             Assert.True(client2.ObjectManager.TryGetObject<Hero>(initiatorHeroId, out var initiatorHero));
             Assert.True(client2.ObjectManager.TryGetObject<CharacterObject>(initiatorTroopId, out var initiatorTroop));
             Assert.True(client2.ObjectManager.TryGetObject<CharacterObject>(responderTroopId, out var responderTroop));
-
-            PlayerPartyTradeContext.Begin(sessionId, responderParty);
 
             var troopRosterElement = new TroopRosterElement(initiatorTroop)
             {
@@ -1859,8 +1858,8 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
             var responderItem = Assert.Single(GetAllBarterItems(barterVM), item => item.Barterable == responderBarterable);
             responderBarterable.SetIsOffered(true);
             barterVM.RightOfferList.Add(responderItem);
-            client2.Resolve<IPlayerPartyTradeOfferSender>().Flush();
         });
+        client2.PumpGameThread();
 
         Assert.Single(client2.NetworkSentMessages.GetMessages<NetworkPlayerPartyTradeOfferUpdated>());
         Server.NetworkSentMessages.Clear();
@@ -1884,9 +1883,8 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
 
             Assert.True(troopItem.IsOffered);
             Assert.Equal(4, troopItem.CurrentOfferedAmount);
-
-            client2.Resolve<IPlayerPartyTradeOfferSender>().Flush();
         });
+        client2.PumpGameThread();
 
         // Applying the other player's offer runs SendOffer for every amount, which must not send an offer back.
         Assert.Empty(client2.NetworkSentMessages.GetMessages<NetworkPlayerPartyTradeOfferUpdated>());
@@ -1896,22 +1894,18 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
     public void OfferFlush_LargeBarterSetup_SendsNothing_ThenOneOfferPerChange()
     {
         var (client1, client2, initiatorHeroId, responderHeroId, initiatorPartyId, responderPartyId) = CreateTwoPlayerPartiesWithHeroes();
-        var sessionId = StartTrade(client1, client2, initiatorPartyId, responderPartyId);
+        StartTradeOnInitiator(client1, client2, initiatorPartyId, responderPartyId);
         client1.NetworkSentMessages.Clear();
 
-        RunOnInitiatorBarterScreen(client1, sessionId, initiatorHeroId, responderHeroId, initiatorPartyId, responderPartyId, troopStacks: 50, barterVM =>
+        RunOnInitiatorBarterScreen(client1, initiatorHeroId, responderHeroId, initiatorPartyId, responderPartyId, troopStacks: 50, barterVM =>
         {
-            var offerSender = client1.Resolve<IPlayerPartyTradeOfferSender>();
-
             // Every barter item's constructor runs SendOffer, but nothing is offered yet.
-            offerSender.Flush();
+            client1.Resolve<IPlayerPartyTradeOfferSender>().Flush();
             Assert.Empty(client1.NetworkSentMessages.GetMessages<NetworkPlayerPartyTradeOfferUpdated>());
 
             var item = OfferFirstTroopStack(barterVM);
             item.CurrentOfferedAmount = 2;
             item.CurrentOfferedAmount = 3;
-            offerSender.Flush();
-            offerSender.Flush();
         });
 
         var offer = Assert.Single(client1.NetworkSentMessages.GetMessages<NetworkPlayerPartyTradeOfferUpdated>());
@@ -1922,14 +1916,11 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
     public void OfferFlush_TransferAll_SendsOneOfferWithEveryStack()
     {
         var (client1, client2, initiatorHeroId, responderHeroId, initiatorPartyId, responderPartyId) = CreateTwoPlayerPartiesWithHeroes();
-        var sessionId = StartTrade(client1, client2, initiatorPartyId, responderPartyId);
+        StartTradeOnInitiator(client1, client2, initiatorPartyId, responderPartyId);
         client1.NetworkSentMessages.Clear();
 
-        RunOnInitiatorBarterScreen(client1, sessionId, initiatorHeroId, responderHeroId, initiatorPartyId, responderPartyId, troopStacks: 50, barterVM =>
-        {
-            barterVM.ExecuteTransferAllRightOther();
-            client1.Resolve<IPlayerPartyTradeOfferSender>().Flush();
-        });
+        RunOnInitiatorBarterScreen(client1, initiatorHeroId, responderHeroId, initiatorPartyId, responderPartyId, troopStacks: 50, barterVM =>
+            barterVM.ExecuteTransferAllRightOther());
 
         var offer = Assert.Single(client1.NetworkSentMessages.GetMessages<NetworkPlayerPartyTradeOfferUpdated>());
         Assert.Equal(50, offer.OfferedTroops.Length);
@@ -1940,14 +1931,13 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
     public void TradeAccept_AfterUnflushedOfferChange_ReachesServerAfterTheOffer()
     {
         var (client1, client2, initiatorHeroId, responderHeroId, initiatorPartyId, responderPartyId) = CreateTwoPlayerPartiesWithHeroes();
-        var sessionId = StartTrade(client1, client2, initiatorPartyId, responderPartyId);
+        var sessionId = StartTradeOnInitiator(client1, client2, initiatorPartyId, responderPartyId);
         Server.NetworkSentMessages.Clear();
 
-        RunOnInitiatorBarterScreen(client1, sessionId, initiatorHeroId, responderHeroId, initiatorPartyId, responderPartyId, troopStacks: 1, barterVM =>
+        RunOnInitiatorBarterScreen(client1, initiatorHeroId, responderHeroId, initiatorPartyId, responderPartyId, troopStacks: 1, barterVM =>
         {
             OfferFirstTroopStack(barterVM).CurrentOfferedAmount = 3;
             barterVM.ExecuteOffer();
-            client1.Resolve<IPlayerPartyTradeOfferSender>().Flush();
         });
         client2.Call(() => client2.Resolve<INetwork>().SendAll(new NetworkPlayerPartyTradeAcceptChanged(sessionId, accepted: true)));
 
@@ -1962,20 +1952,18 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
     public void TradeAccept_AgainAfterEditingTheAcceptedOfferInOneFrame_KeepsTheNewAccept()
     {
         var (client1, client2, initiatorHeroId, responderHeroId, initiatorPartyId, responderPartyId) = CreateTwoPlayerPartiesWithHeroes();
-        var sessionId = StartTrade(client1, client2, initiatorPartyId, responderPartyId);
+        var sessionId = StartTradeOnInitiator(client1, client2, initiatorPartyId, responderPartyId);
         Server.NetworkSentMessages.Clear();
 
-        RunOnInitiatorBarterScreen(client1, sessionId, initiatorHeroId, responderHeroId, initiatorPartyId, responderPartyId, troopStacks: 1, barterVM =>
+        RunOnInitiatorBarterScreen(client1, initiatorHeroId, responderHeroId, initiatorPartyId, responderPartyId, troopStacks: 1, barterVM =>
         {
             var item = OfferFirstTroopStack(barterVM);
             item.CurrentOfferedAmount = 2;
             barterVM.ExecuteOffer();
             item.CurrentOfferedAmount = 3;
             barterVM.ExecuteOffer();
-            client1.Resolve<IPlayerPartyTradeOfferSender>().Flush();
-
-            Assert.True(PlayerPartyTradeContext.LocalAccepted);
         });
+        client1.Call(() => Assert.True(PlayerPartyTradeContext.LocalAccepted));
         client2.Call(() => client2.Resolve<INetwork>().SendAll(new NetworkPlayerPartyTradeAcceptChanged(sessionId, accepted: true)));
 
         var ended = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionEnded>());
@@ -1988,10 +1976,10 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
     public void TradeCancel_AfterEditingTheAcceptedOfferInOneFrame_EndsTheTrade()
     {
         var (client1, client2, initiatorHeroId, responderHeroId, initiatorPartyId, responderPartyId) = CreateTwoPlayerPartiesWithHeroes();
-        var sessionId = StartTrade(client1, client2, initiatorPartyId, responderPartyId);
+        StartTradeOnInitiator(client1, client2, initiatorPartyId, responderPartyId);
         Server.NetworkSentMessages.Clear();
 
-        RunOnInitiatorBarterScreen(client1, sessionId, initiatorHeroId, responderHeroId, initiatorPartyId, responderPartyId, troopStacks: 1, barterVM =>
+        RunOnInitiatorBarterScreen(client1, initiatorHeroId, responderHeroId, initiatorPartyId, responderPartyId, troopStacks: 1, barterVM =>
         {
             var item = OfferFirstTroopStack(barterVM);
             item.CurrentOfferedAmount = 2;
@@ -2009,33 +1997,19 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
     {
         var (client1, client2, initiatorHeroId, responderHeroId, initiatorPartyId, responderPartyId) = CreateTwoPlayerPartiesWithHeroes();
         var troopIds = CreateTroops(1);
-        var firstSessionId = StartTrade(client1, client2, initiatorPartyId, responderPartyId);
+        var firstSessionId = StartTradeOnInitiator(client1, client2, initiatorPartyId, responderPartyId);
 
-        RunOnInitiatorBarterScreen(client1, firstSessionId, initiatorHeroId, responderHeroId, initiatorPartyId, responderPartyId, troopIds, barterVM =>
-        {
-            OfferFirstTroopStack(barterVM);
-            client1.Resolve<IPlayerPartyTradeOfferSender>().Flush();
-        });
+        RunOnInitiatorBarterScreen(client1, initiatorHeroId, responderHeroId, initiatorPartyId, responderPartyId, troopIds, barterVM =>
+            OfferFirstTroopStack(barterVM));
         Assert.Single(client1.NetworkSentMessages.GetMessages<NetworkPlayerPartyTradeOfferUpdated>());
         SubmitOption(client1, firstSessionId, initiatorPartyId, PlayerPartyInteractionOption.Leave);
 
         Server.NetworkSentMessages.Clear();
-        var secondSessionId = StartTrade(client1, client2, initiatorPartyId, responderPartyId);
-        var tradeState = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>().Single(state =>
-            state.SessionId == secondSessionId &&
-            state.PartyId == initiatorPartyId &&
-            state.Phase == PlayerPartyInteractionPhase.TradeActive);
-
-        // The harness shares one trade context, so either trader may have opened the trade; replaying client1's state opens it there.
-        client1.Call(() => PlayerPartyTradeContext.End());
-        client1.SimulateMessage(Server.NetPeer, tradeState);
+        var secondSessionId = StartTradeOnInitiator(client1, client2, initiatorPartyId, responderPartyId);
         client1.NetworkSentMessages.Clear();
 
-        RunOnInitiatorBarterScreen(client1, secondSessionId, initiatorHeroId, responderHeroId, initiatorPartyId, responderPartyId, troopIds, barterVM =>
-        {
-            OfferFirstTroopStack(barterVM);
-            client1.Resolve<IPlayerPartyTradeOfferSender>().Flush();
-        });
+        RunOnInitiatorBarterScreen(client1, initiatorHeroId, responderHeroId, initiatorPartyId, responderPartyId, troopIds, barterVM =>
+            OfferFirstTroopStack(barterVM));
 
         // The new trade opens with nothing offered, so the stack the last trade ended on is still a change.
         var offer = Assert.Single(client1.NetworkSentMessages.GetMessages<NetworkPlayerPartyTradeOfferUpdated>());
@@ -2095,6 +2069,7 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
         var updaterPartyId = initiatorUpdates ? initiatorPartyId : responderPartyId;
 
         acceptingClient.Call(() => acceptingClient.Resolve<INetwork>().SendAll(new NetworkPlayerPartyTradeAcceptChanged(sessionId, accepted: true)));
+        // The trade context is shared across harness instances, so either flag can carry the accept.
         acceptingClient.Call(() => Assert.True(PlayerPartyTradeContext.LocalAccepted || PlayerPartyTradeContext.RemoteAccepted));
 
         Server.NetworkSentMessages.Clear();
@@ -2111,6 +2086,7 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
         Assert.Equal(2, relayedOffers.Length);
         Assert.All(relayedOffers, offer => Assert.Equal(updaterPartyId, offer.PartyId));
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>());
+        // The trade context is shared across harness instances, so either flag can carry the accept.
         acceptingClient.Call(() => Assert.False(PlayerPartyTradeContext.LocalAccepted || PlayerPartyTradeContext.RemoteAccepted));
 
         // The first acceptance was cleared, so the other player's accept alone doesnt end the trade.
@@ -5077,22 +5053,44 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
         return sessionId;
     }
 
+    // Starts a trade and opens it on the initiator, whose barter screen the offer tests drive.
+    private string StartTradeOnInitiator(
+        EnvironmentInstance client1,
+        EnvironmentInstance client2,
+        string initiatorPartyId,
+        string responderPartyId)
+    {
+        var sessionId = StartTrade(client1, client2, initiatorPartyId, responderPartyId);
+        OpenTradeOn(client1, sessionId, initiatorPartyId);
+        return sessionId;
+    }
+
+    // The harness shares one trade context, so either trader may have opened the trade; replaying this trader's state opens it there.
+    private void OpenTradeOn(EnvironmentInstance trader, string sessionId, string partyId)
+    {
+        var tradeState = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>().Single(state =>
+            state.SessionId == sessionId &&
+            state.PartyId == partyId &&
+            state.Phase == PlayerPartyInteractionPhase.TradeActive);
+
+        trader.Call(() => PlayerPartyTradeContext.End());
+        trader.SimulateMessage(Server.NetPeer, tradeState);
+    }
+
     // Builds the initiator's barter screen with new troop stacks and runs an action on it as that player.
     private void RunOnInitiatorBarterScreen(
         EnvironmentInstance client,
-        string sessionId,
         string heroId,
         string otherHeroId,
         string partyId,
         string otherPartyId,
         int troopStacks,
         Action<BarterVM> action)
-        => RunOnInitiatorBarterScreen(client, sessionId, heroId, otherHeroId, partyId, otherPartyId, CreateTroops(troopStacks), action);
+        => RunOnInitiatorBarterScreen(client, heroId, otherHeroId, partyId, otherPartyId, CreateTroops(troopStacks), action);
 
-    // Builds the initiator's barter screen with a stack of five of each troop and runs an action on it as that player.
+    // Builds the initiator's barter screen with a stack of five of each troop, runs an action on it as that player, then drains the flush it scheduled.
     private void RunOnInitiatorBarterScreen(
         EnvironmentInstance client,
-        string sessionId,
         string heroId,
         string otherHeroId,
         string partyId,
@@ -5106,8 +5104,6 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
             Assert.True(client.ObjectManager.TryGetObject<PartyBase>(otherPartyId, out var otherParty));
             Assert.True(client.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
             Assert.True(client.ObjectManager.TryGetObject<Hero>(otherHeroId, out var otherHero));
-
-            PlayerPartyTradeContext.Begin(sessionId, party);
 
             var barterData = new BarterData(hero, otherHero, party, otherParty, null, 0, false);
             barterData.AddBarterGroup(new FiefBarterGroup());
@@ -5127,6 +5123,7 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
             using var playerContext = new BarterPlayerContext(hero, party.MobileParty);
             action(new BarterVM(barterData));
         });
+        client.PumpGameThread();
     }
 
     // Registers troops on every instance for a barter screen's troop stacks.
@@ -5152,20 +5149,23 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
         trader.Call(() =>
         {
             Assert.True(trader.ObjectManager.TryGetObject<PartyBase>(initiatorPartyId, out var initiatorParty));
-            var grain = DefaultItems.Grain;
             var barterManager = BarterManager.Instance;
-            BarterManager.BarterBeginEventDelegate capture = barterData => openedGrain.AddRange(barterData
-                .GetBarterables()
-                .OfType<ItemBarterable>()
-                .Where(barterable => barterable.OriginalParty == initiatorParty &&
-                                     barterable.ItemRosterElement.EquipmentElement.Item == grain)
-                .Select(barterable => barterable.ItemRosterElement.Amount));
+            BarterManager.BarterBeginEventDelegate capture = barterData => openedGrain.AddRange(GetOfferedGrainAmounts(barterData, initiatorParty));
             barterManager.BarterBegin += capture;
             unsubscribe = () => barterManager.BarterBegin -= capture;
         });
 
         return unsubscribe;
     }
+
+    // Reads the grain stack sizes this party brings to the barter.
+    private static IEnumerable<int> GetOfferedGrainAmounts(BarterData barterData, PartyBase party)
+        => barterData
+            .GetBarterables()
+            .OfType<ItemBarterable>()
+            .Where(barterable => barterable.OriginalParty == party &&
+                                 barterable.ItemRosterElement.EquipmentElement.Item == DefaultItems.Grain)
+            .Select(barterable => barterable.ItemRosterElement.Amount);
 
     private string CreateMobilePartyBase()
     {

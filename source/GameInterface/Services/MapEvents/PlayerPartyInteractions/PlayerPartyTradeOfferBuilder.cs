@@ -7,15 +7,14 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem.BarterSystem.Barterables;
-using TaleWorlds.CampaignSystem.ViewModelCollection.Barter;
 
 namespace GameInterface.Services.MapEvents.PlayerPartyInteractions;
 
-// Builds the local party's trade offer message from the barter screen.
+// Builds the local party's trade offer message from the barterables it offers.
 internal interface IPlayerPartyTradeOfferBuilder
 {
-    // Builds the offer from every barterable the local party has put on the barter screen.
-    NetworkPlayerPartyTradeOfferUpdated Build(string sessionId, string partyId, BarterVM barterVM);
+    // Builds the offer from barterables already filtered to what the local party may offer.
+    NetworkPlayerPartyTradeOfferUpdated Build(string sessionId, string partyId, IReadOnlyCollection<Barterable> offered);
 }
 
 // Resolves the local party's offered barterables into the network ids of the offer message.
@@ -28,25 +27,22 @@ internal class PlayerPartyTradeOfferBuilder : IPlayerPartyTradeOfferBuilder
         this.objectManager = objectManager;
     }
 
-    // Both offer columns are read because the local party can be on either side of the screen.
-    public NetworkPlayerPartyTradeOfferUpdated Build(string sessionId, string partyId, BarterVM barterVM)
+    // Translates the offered barterables into the offer message, each by the id every instance shares.
+    public NetworkPlayerPartyTradeOfferUpdated Build(string sessionId, string partyId, IReadOnlyCollection<Barterable> offered)
     {
-        var offered = barterVM.LeftOfferList
-            .Concat(barterVM.RightOfferList)
-            .Select(item => item.Barterable)
-            .Where(PlayerPartyTradeContext.CanOffer)
-            .ToArray();
+        var offeredGold = offered.OfType<GoldBarterable>().Sum(gold => Math.Max(0, gold.CurrentAmount));
+        var offeredPeace = offered.OfType<PlayerPartyPeaceBarterable>().Any();
 
         return new NetworkPlayerPartyTradeOfferUpdated(
-            sessionId,
-            partyId,
-            ResolveItems(offered.OfType<ItemBarterable>()),
-            ResolveTroops(offered.OfType<PlayerPartyTroopBarterable>()),
-            offered.OfType<GoldBarterable>().Sum(gold => Math.Max(0, gold.CurrentAmount)),
-            ResolveFiefs(offered.OfType<FiefBarterable>()),
-            ResolvePrisoners(offered.OfType<TransferPrisonerBarterable>()),
-            offered.OfType<PlayerPartyPeaceBarterable>().Any(),
-            ResolveMarriages(offered.OfType<PlayerPartyMarriageBarterable>()));
+            sessionId: sessionId,
+            partyId: partyId,
+            offeredItems: ResolveItems(offered.OfType<ItemBarterable>()),
+            offeredTroops: ResolveTroops(offered.OfType<PlayerPartyTroopBarterable>()),
+            offeredGold: offeredGold,
+            offeredFiefs: ResolveFiefs(offered.OfType<FiefBarterable>()),
+            offeredPrisoners: ResolvePrisoners(offered.OfType<TransferPrisonerBarterable>()),
+            offeredPeace: offeredPeace,
+            offeredMarriages: ResolveMarriages(offered.OfType<PlayerPartyMarriageBarterable>()));
     }
 
     // Resolves offered item stacks, capped at what the roster holds.
