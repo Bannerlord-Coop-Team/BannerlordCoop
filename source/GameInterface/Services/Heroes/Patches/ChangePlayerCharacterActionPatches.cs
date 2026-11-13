@@ -65,7 +65,7 @@ internal class ChangePlayerCharacterActionPatches
         // Map markers and nameplates were drawn against the previous main hero, and the native views
         // do not listen for player-character changes, so redraw their friendly/enemy state now.
         if (ContainerProvider.TryResolve<IMapStanceVisualsInterface>(out var stanceVisuals))
-            stanceVisuals.RedrawStanceVisuals(mainHero.MapFaction);
+            stanceVisuals.RedrawStanceVisuals(previousFaction: mainHero.MapFaction);
 
         return false;
     }

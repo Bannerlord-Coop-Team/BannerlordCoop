@@ -33,15 +33,15 @@ public class MapStanceVisualsInterface : IMapStanceVisualsInterface
     /// <summary>
     /// Marks visible party and settlement markers dirty when they are at war with exactly one of the two factions.
     /// </summary>
-    private static void MarkStanceFlippedVisualsDirty(IFaction oldFaction, IFaction newFaction)
+    private static void MarkStanceFlippedVisualsDirty(IFaction previousFaction, IFaction currentFaction)
     {
         var visibleParties = MobileParty.All.Where(mobileParty => mobileParty.IsVisible).Select(mobileParty => mobileParty.Party);
         var visibleSettlements = Settlement.All.Where(settlement => settlement.IsVisible).Select(settlement => settlement.Party);
         foreach (var mapParty in visibleParties.Concat(visibleSettlements))
         {
             // Same stance-flip test as ChangeKingdomAction.CheckIfPartyIconIsDirty, also applied to visible settlements.
-            var stanceFlipped = FactionManager.IsAtWarAgainstFaction(mapParty.MapFaction, oldFaction) !=
-                FactionManager.IsAtWarAgainstFaction(mapParty.MapFaction, newFaction);
+            var stanceFlipped = FactionManager.IsAtWarAgainstFaction(mapParty.MapFaction, previousFaction) !=
+                FactionManager.IsAtWarAgainstFaction(mapParty.MapFaction, currentFaction);
             if (!stanceFlipped) continue;
 
             mapParty.SetVisualAsDirty();
