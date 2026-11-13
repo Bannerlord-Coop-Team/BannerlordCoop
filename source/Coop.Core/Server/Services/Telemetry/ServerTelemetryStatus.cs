@@ -9,6 +9,9 @@ public sealed class ServerTelemetryStatus
     [JsonPropertyName("p_session_id")]
     public string SessionId { get; }
 
+    [JsonPropertyName("p_server_id")]
+    public string ServerId { get; }
+
     [JsonPropertyName("p_mod_version")]
     public string ModVersion { get; }
 
@@ -27,7 +30,19 @@ public sealed class ServerTelemetryStatus
         string commit,
         DateTime startedAt,
         int playerCount)
+        : this(sessionId, sessionId, modVersion, commit, startedAt, playerCount)
     {
+    }
+
+    public ServerTelemetryStatus(
+        string serverId,
+        string sessionId,
+        string modVersion,
+        string commit,
+        DateTime startedAt,
+        int playerCount)
+    {
+        ServerId = serverId;
         SessionId = sessionId;
         ModVersion = modVersion;
         Commit = commit;

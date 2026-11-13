@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Globalization;
+using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
@@ -26,6 +27,8 @@ public interface IBattlesFoughtUploader
 public class ServerTelemetryUploader : IServerTelemetryUploader, IBattlesFoughtUploader, IDisposable
 {
     public const string Endpoint =
+        "https://wfvqnijwuyqjibhlcrhz.supabase.co/rest/v1/rpc/report_server_presence";
+    public const string LegacyEndpoint =
         "https://wfvqnijwuyqjibhlcrhz.supabase.co/rest/v1/rpc/report_server_statistics";
     public const string BattlesFoughtEndpoint =
         "https://wfvqnijwuyqjibhlcrhz.supabase.co/rest/v1/rpc/increment_battles_fought";
@@ -38,6 +41,7 @@ public class ServerTelemetryUploader : IServerTelemetryUploader, IBattlesFoughtU
 
     private readonly HttpClient httpClient;
     private readonly string endpoint;
+    private readonly string legacyEndpoint;
     private readonly string battlesFoughtEndpoint;
     private readonly bool ownsClient;
 
@@ -54,7 +58,8 @@ public class ServerTelemetryUploader : IServerTelemetryUploader, IBattlesFoughtU
         HttpClient httpClient,
         string endpoint = Endpoint,
         bool ownsClient = false,
-        string battlesFoughtEndpoint = BattlesFoughtEndpoint)
+        string battlesFoughtEndpoint = BattlesFoughtEndpoint,
+        string legacyEndpoint = LegacyEndpoint)
     {
         if (httpClient == null) throw new ArgumentNullException(nameof(httpClient));
         if (string.IsNullOrWhiteSpace(endpoint))
@@ -63,9 +68,12 @@ public class ServerTelemetryUploader : IServerTelemetryUploader, IBattlesFoughtU
             throw new ArgumentException(
                 "Battles-fought endpoint cannot be empty.",
                 nameof(battlesFoughtEndpoint));
+        if (string.IsNullOrWhiteSpace(legacyEndpoint))
+            throw new ArgumentException("Legacy endpoint cannot be empty.", nameof(legacyEndpoint));
 
         this.httpClient = httpClient;
         this.endpoint = endpoint;
+        this.legacyEndpoint = legacyEndpoint;
         this.battlesFoughtEndpoint = battlesFoughtEndpoint;
         this.ownsClient = ownsClient;
     }
@@ -84,7 +92,25 @@ public class ServerTelemetryUploader : IServerTelemetryUploader, IBattlesFoughtU
         }
 
         var json = JsonSerializer.Serialize(status, JsonOptions);
-        return await PostAsync(endpoint, json, "server telemetry", cancellationToken).ConfigureAwait(false);
+        var result = await PostAsync(endpoint, json, "server telemetry", cancellationToken)
+            .ConfigureAwait(false);
+        if (result.StatusCode != HttpStatusCode.NotFound || !IsEndpointConfigured(legacyEndpoint))
+            return result;
+
+        var legacyJson = JsonSerializer.Serialize(new
+        {
+            p_session_id = status.SessionId,
+            p_mod_version = status.ModVersion,
+            p_commit_hash = status.Commit,
+            p_started_at = status.StartedAt,
+            p_player_count = status.PlayerCount,
+        }, JsonOptions);
+        return await PostAsync(
+                legacyEndpoint,
+                legacyJson,
+                "legacy server telemetry",
+                cancellationToken)
+            .ConfigureAwait(false);
     }
 
     public async Task<ServerTelemetryUploadResult> RecordBattleStartedAsync(
@@ -129,10 +155,11 @@ public class ServerTelemetryUploader : IServerTelemetryUploader, IBattlesFoughtU
                 string.IsNullOrWhiteSpace(details)
                     ? "The " + endpointName + " endpoint returned " +
                       ((int)response.StatusCode).ToString(CultureInfo.InvariantCulture) + "."
-                    : details);
+                    : details,
+                response.StatusCode);
         }
 
-        return new ServerTelemetryUploadResult(true, true, details);
+        return new ServerTelemetryUploadResult(true, true, details, response.StatusCode);
     }
 
     private static bool IsEndpointConfigured(string requestEndpoint) =>
@@ -150,11 +177,17 @@ public sealed class ServerTelemetryUploadResult
     public bool Uploaded { get; }
     public bool EndpointConfigured { get; }
     public string Details { get; }
+    public HttpStatusCode? StatusCode { get; }
 
-    public ServerTelemetryUploadResult(bool uploaded, bool endpointConfigured, string details)
+    public ServerTelemetryUploadResult(
+        bool uploaded,
+        bool endpointConfigured,
+        string details,
+        HttpStatusCode? statusCode = null)
     {
         Uploaded = uploaded;
         EndpointConfigured = endpointConfigured;
         Details = details;
+        StatusCode = statusCode;
     }
 }
