@@ -120,6 +120,67 @@ namespace GameInterface.Services.ItemRosters.Commands
             }
         }
 
+        // Adds one each of count different items to a settlement's or party's roster, so it gains count new stacks.
+        public sealed class ItemRostersAddDistinctItemsCoopCommand : ICoopCommand
+        {
+            private readonly ICommandObjectResolver resolver;
+
+            public ItemRostersAddDistinctItemsCoopCommand(ICommandObjectResolver resolver)
+            {
+                this.resolver = resolver;
+            }
+
+            public string Prefix => "coop.debug.item_rosters";
+
+            public string Name => "add_distinct_items";
+
+            public string Description => "Adds one each of count different items to a party's or settlement's roster.";
+
+            public CoopCommandSide Side => CoopCommandSide.Server;
+
+            public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+            {
+                new ExpectedArgs("party_or_settlement_id", "Party or settlement name or id; quote names with spaces.", isRequired: true),
+                new ExpectedArgs("count", "The positive number of different items to add.", isRequired: true),
+            };
+
+            public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+            {
+                if (ModInformation.IsClient)
+                {
+                    return Failed("Run this on the server; it is authoritative and replicates to clients.");
+                }
+
+                if (!TryFindItemRoster(resolver, args[0], out var roster, out var owner, out var error)) return Failed(error);
+
+                if (!int.TryParse(args[1], out var count) || count < 1)
+                {
+                    return Failed($"Invalid count: '{args[1]}'. Provide a positive integer.");
+                }
+
+                // Skip items already held so each add makes a new stack, and items a barter hides: ItemBarterBehavior
+                // only offers stacks worth over 100, and NotMerchandise and banner items are vanilla's untradeable ones.
+                var items = MBObjectManager.Instance.GetObjectTypeList<ItemObject>()
+                    .Where(item => item.IsReady && !item.NotMerchandise && !item.IsBannerItem && item.Value > 100)
+                    .Where(item => roster.FindIndexOfItem(item) < 0)
+                    .OrderBy(item => item.StringId, StringComparer.Ordinal)
+                    .Take(count)
+                    .ToList();
+
+                if (items.Count < count)
+                {
+                    return Failed($"Only {items.Count} usable items are missing from {owner}'s ItemRoster; {count} were requested.");
+                }
+
+                foreach (var item in items)
+                {
+                    roster.AddToCounts(new EquipmentElement(item), 1);
+                }
+
+                return Succeeded($"Added {items.Count} distinct items to {owner}'s ItemRoster; it now has {roster.Count} stacks");
+            }
+        }
+
         // Reports the item count, hash and food of a settlement's or party's roster.
         public sealed class ItemRostersInfoCoopCommand : ICoopCommand
         {
