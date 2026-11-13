@@ -1,29 +1,39 @@
-﻿using Common.Network;
+﻿using Common.Logging;
+using Common.Network;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.ObjectManager;
+using Serilog;
+using System;
 using System.Linq;
+using TaleWorlds.CampaignSystem.ViewModelCollection.Barter;
 
 namespace GameInterface.Services.MapEvents.PlayerPartyInteractions;
 
 // Coalesces the local trade offer into one send per flush, because vanilla recomputes it after every item change.
 public interface IPlayerPartyTradeOfferSender
 {
-    // Records that the local offer may have changed since the last flush.
-    void MarkChanged();
+    // Forgets the last sent offer and any pending change, because a new trade opens with nothing offered.
+    void Begin();
 
-    // Sends the local offer when it was marked changed and differs from the last one sent.
+    // Records that the offer on this barter screen may have changed since the last flush.
+    void MarkChanged(BarterVM barterVM);
+
+    // Sends the pending offer when it differs from the last one sent, logging any failure.
     void Flush();
 }
 
-// Keeps the pending flag and last sent offer per client, because E2E clients share one process.
+// Scoped per client, because the barter patches and the application tick must share one pending offer.
 internal class PlayerPartyTradeOfferSender : IPlayerPartyTradeOfferSender
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<PlayerPartyTradeOfferSender>();
+    private static readonly NetworkPlayerPartyTradeOfferUpdated EmptyOffer = new NetworkPlayerPartyTradeOfferUpdated(null, null, null, null);
+
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly IPlayerPartyTradeOfferBuilder offerBuilder;
 
-    private bool isChanged;
-    private NetworkPlayerPartyTradeOfferUpdated lastSentOffer;
+    private BarterVM changedBarterVM;
+    private NetworkPlayerPartyTradeOfferUpdated lastSentOffer = EmptyOffer;
 
     public PlayerPartyTradeOfferSender(INetwork network, IObjectManager objectManager, IPlayerPartyTradeOfferBuilder offerBuilder)
     {
@@ -32,37 +42,47 @@ internal class PlayerPartyTradeOfferSender : IPlayerPartyTradeOfferSender
         this.offerBuilder = offerBuilder;
     }
 
-    // Only a player-party trade sends offers, an NPC barter is settled locally.
-    public void MarkChanged()
+    // Resets the baseline the next offer is compared against.
+    public void Begin()
     {
-        if (!PlayerPartyTradeContext.IsActive) return;
-
-        isChanged = true;
+        changedBarterVM = null;
+        lastSentOffer = EmptyOffer;
     }
 
-    // Changing the offer clears both acceptances, the same as the server does when the offer arrives.
+    // Keeps the barter screen to build from at the next flush.
+    public void MarkChanged(BarterVM barterVM)
+        => changedBarterVM = barterVM;
+
+    // Clears the pending change before sending, so a failing offer logs once instead of every frame.
     public void Flush()
     {
-        if (!isChanged) return;
-        isChanged = false;
-
-        var barterVM = PlayerPartyTradeContext.ActiveBarterVM;
+        var barterVM = changedBarterVM;
         if (barterVM == null) return;
+        changedBarterVM = null;
+
+        try
+        {
+            SendIfChanged(barterVM);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "Failed to send the player-party trade offer");
+        }
+    }
+
+    // An NPC barter is settled locally, and a sent offer clears both acceptances the same as the server does when it arrives.
+    private void SendIfChanged(BarterVM barterVM)
+    {
+        if (!PlayerPartyTradeContext.IsActive) return;
         if (!objectManager.TryGetIdWithLogging(PlayerPartyTradeContext.LocalParty, out var partyId)) return;
 
         var offer = offerBuilder.Build(PlayerPartyTradeContext.SessionId, partyId, barterVM);
-        if (IsSameOffer(offer, GetLastSentOffer(offer))) return;
+        if (IsSameOffer(offer, lastSentOffer)) return;
 
+        network.SendAll(offer);
         lastSentOffer = offer;
         PlayerPartyTradeContext.ResetAcceptance();
-        network.SendAll(offer);
     }
-
-    // A trade opens with nothing offered, so a new session compares against an empty offer.
-    private NetworkPlayerPartyTradeOfferUpdated GetLastSentOffer(NetworkPlayerPartyTradeOfferUpdated offer)
-        => lastSentOffer.SessionId == offer.SessionId
-            ? lastSentOffer
-            : new NetworkPlayerPartyTradeOfferUpdated(offer.SessionId, offer.PartyId, null, null);
 
     // Compares every offered field, so only a real change reaches the network.
     private static bool IsSameOffer(NetworkPlayerPartyTradeOfferUpdated offer, NetworkPlayerPartyTradeOfferUpdated other)

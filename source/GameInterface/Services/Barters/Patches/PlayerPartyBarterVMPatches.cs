@@ -39,36 +39,16 @@ internal class PlayerPartyBarterVMPatches
     // Vanilla calls SendOffer after every single item change, so this only marks the offer for the next flush.
     [HarmonyPatch("SendOffer")]
     [HarmonyPostfix]
-    static void SendOfferPostfix()
+    static void SendOfferPostfix(BarterVM __instance)
     {
         if (ContainerProvider.TryResolve<IPlayerPartyTradeOfferSender>(out var offerSender))
-            offerSender.MarkChanged();
+            offerSender.MarkChanged(__instance);
     }
 
     [HarmonyPatch("RefreshOfferLabel")]
     [HarmonyPostfix]
     static void RefreshOfferLabelPostfix()
         => PlayerPartyTradeContext.RefreshBarterControls();
-
-    [HarmonyPatch(nameof(BarterVM.ExecuteOffer))]
-    [HarmonyPrefix]
-    static bool ExecuteOfferPrefix()
-    {
-        if (!PlayerPartyTradeContext.IsActive) return true;
-
-        PlayerPartyTradeContext.PublishAccept(true);
-        return false;
-    }
-
-    [HarmonyPatch(nameof(BarterVM.ExecuteCancel))]
-    [HarmonyPrefix]
-    static bool ExecuteCancelPrefix()
-    {
-        if (!PlayerPartyTradeContext.IsActive) return true;
-
-        PlayerPartyTradeContext.PublishLeave();
-        return false;
-    }
 
     [HarmonyPatch(nameof(BarterVM.ExecuteReset))]
     [HarmonyPrefix]
@@ -160,24 +140,48 @@ internal class PlayerPartyBarterItemAmountPatches
             value);
 }
 
-[HarmonyPatch(typeof(BarterManager))]
-internal class PlayerPartyBarterManagerPatches
+// Turns accepting a player-party trade, from the barter screen or the barter manager, into a coop accept.
+[HarmonyPatch]
+internal class PlayerPartyBarterAcceptPatches
 {
-    [HarmonyPatch(nameof(BarterManager.ApplyAndFinalizePlayerBarter))]
+    static IEnumerable<MethodBase> TargetMethods()
+    {
+        yield return AccessTools.Method(typeof(BarterVM), nameof(BarterVM.ExecuteOffer));
+        yield return AccessTools.Method(typeof(BarterManager), nameof(BarterManager.ApplyAndFinalizePlayerBarter));
+    }
+
     [HarmonyPrefix]
-    static bool ApplyAndFinalizePlayerBarterPrefix()
+    static bool AcceptPrefix()
     {
         if (!PlayerPartyTradeContext.IsActive) return true;
+
+        // A pending edit goes out first, because it clears the acceptance this accept is checked against and must reach the server ahead of it.
+        if (ContainerProvider.TryResolve<IPlayerPartyTradeOfferSender>(out var offerSender))
+            offerSender.Flush();
 
         PlayerPartyTradeContext.PublishAccept(true);
         return false;
     }
+}
 
-    [HarmonyPatch(nameof(BarterManager.CancelAndFinalizePlayerBarter))]
+// Turns cancelling a player-party trade, from the barter screen or the barter manager, into leaving the coop trade.
+[HarmonyPatch]
+internal class PlayerPartyBarterCancelPatches
+{
+    static IEnumerable<MethodBase> TargetMethods()
+    {
+        yield return AccessTools.Method(typeof(BarterVM), nameof(BarterVM.ExecuteCancel));
+        yield return AccessTools.Method(typeof(BarterManager), nameof(BarterManager.CancelAndFinalizePlayerBarter));
+    }
+
     [HarmonyPrefix]
-    static bool CancelAndFinalizePlayerBarterPrefix()
+    static bool CancelPrefix()
     {
         if (!PlayerPartyTradeContext.IsActive) return true;
+
+        // A pending edit goes out first, because it clears the acceptance that would block this cancel.
+        if (ContainerProvider.TryResolve<IPlayerPartyTradeOfferSender>(out var offerSender))
+            offerSender.Flush();
 
         PlayerPartyTradeContext.PublishLeave();
         return false;

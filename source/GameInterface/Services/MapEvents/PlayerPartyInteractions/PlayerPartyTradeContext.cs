@@ -28,7 +28,6 @@ internal static class PlayerPartyTradeContext
     public static bool LocalAccepted { get; private set; }
     public static bool RemoteAccepted { get; private set; }
     public static bool SuppressNativeCloseMessages { get; private set; }
-    public static BarterVM ActiveBarterVM => activeBarterVM;
 
     private static BarterVM activeBarterVM;
     private static ButtonWidget resetButton;
@@ -196,11 +195,6 @@ internal static class PlayerPartyTradeContext
     public static void PublishAccept(bool accepted)
     {
         if (!IsActive) return;
-
-        // Sends a pending offer first, so an edit since the last accept clears it and the accept never reaches the server ahead of its offer.
-        if (ContainerProvider.TryResolve<IPlayerPartyTradeOfferSender>(out var offerSender))
-            offerSender.Flush();
-
         if (!CanAccept()) return;
 
         if (accepted)
@@ -215,11 +209,6 @@ internal static class PlayerPartyTradeContext
     public static void PublishLeave()
     {
         if (!IsActive) return;
-
-        // Sends a pending offer first, because an edit since the last accept clears that accept and allows the cancel.
-        if (ContainerProvider.TryResolve<IPlayerPartyTradeOfferSender>(out var offerSender))
-            offerSender.Flush();
-
         if (!CanCancel()) return;
 
         MessageBroker.Instance.Publish(

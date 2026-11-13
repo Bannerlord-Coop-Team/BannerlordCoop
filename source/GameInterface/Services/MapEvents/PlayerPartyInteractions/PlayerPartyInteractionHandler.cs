@@ -67,6 +67,7 @@ internal class PlayerPartyInteractionHandler : IHandler
     private readonly IPlayerDivorceRules playerDivorceRules;
     private readonly IPlayerMapTracking mapTracking;
     private readonly PlayerPartyInteractionOutcomeHandler outcomeHandler;
+    private readonly IPlayerPartyTradeOfferSender offerSender;
     private readonly ISendCoalescer sendCoalescer;
 
     private readonly ConcurrentDictionary<string, PlayerPartyInteractionSession> sessionsById = new ConcurrentDictionary<string, PlayerPartyInteractionSession>();
@@ -92,6 +93,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         IPlayerMarriageRules playerMarriageRules,
         IPlayerDivorceRules playerDivorceRules,
         IPlayerMapTracking mapTracking,
+        IPlayerPartyTradeOfferSender offerSender,
         ISendCoalescer sendCoalescer = null)
     {
         this.messageBroker = messageBroker;
@@ -105,6 +107,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         this.playerMarriageRules = playerMarriageRules;
         this.playerDivorceRules = playerDivorceRules;
         this.mapTracking = mapTracking;
+        this.offerSender = offerSender;
         this.sendCoalescer = sendCoalescer;
         outcomeHandler = new PlayerPartyInteractionOutcomeHandler(
             objectManager,
@@ -1664,6 +1667,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         if (!objectManager.TryGetObject<PartyBase>(state.OtherPartyId, out var otherParty)) return;
 
         PlayerPartyTradeContext.Begin(state.SessionId, myParty);
+        offerSender.Begin();
 
         try
         {
