@@ -110,6 +110,35 @@ public class PlayerRaftFleetInterfaceTests : SyncTestBase
         }
     }
 
+    // Unstuck lands a raft stranded on land, and the fleet comes back with the coast anchor cached at the stranding.
+    [Fact]
+    public void PutAshore_OnLand_EndsTheRaftAndReturnsTheFleetAnchored()
+    {
+        var fleet = CreatePlayerFleetAtSea();
+
+        Server.Call(() =>
+        {
+            var party = Server.GetRegisteredObject<MobileParty>(fleet.PartyId);
+            var raftFleetInterface = Server.Resolve<IPlayerRaftFleetInterface>();
+            raftFleetInterface.StrandAfterRelease(party);
+            party._position = new CampaignVec2(new Vec2(31f, 41f), true);
+
+            Assert.True(raftFleetInterface.PutAshore(party));
+
+            Assert.False(party.IsInRaftState);
+            Assert.False(party.IsCurrentlyAtSea);
+            Assert.False(CachedFleets().ContainsKey(fleet.HeroId));
+            Assert.Single(party.Ships);
+            Assert.Equal(new Vec2(30f, 40f), party.Anchor.Position.ToVec2());
+        }, RaftDisabledMethods);
+
+        foreach (var client in Clients)
+        {
+            client.PumpGameThread();
+            client.Call(() => Assert.False(client.GetRegisteredObject<MobileParty>(fleet.PartyId).IsInRaftState));
+        }
+    }
+
     // Vanilla only strands a party that is still at sea and not already rafted.
     [Theory]
     [InlineData(false, false)]

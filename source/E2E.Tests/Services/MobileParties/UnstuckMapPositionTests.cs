@@ -155,7 +155,7 @@ public class UnstuckMapPositionTests : MapEventTestBase
             Server.NetworkSentMessages.GetMessages<NetworkUpdatePartyBehavior>(),
             update => update.BehaviorUpdateData.ForcePosition);
         var result = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPlayerUnstuckResult>());
-        Assert.Contains("No server-side stuck state found (captivity, map event, army, siege camp, settlement, map position).", result.Actions);
+        Assert.Contains("No server-side stuck state found (captivity, map event, army, siege camp, settlement, raft, map position).", result.Actions);
     }
 
     [Fact]

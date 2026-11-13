@@ -202,6 +202,43 @@ public class UnstuckCommandServerTests : MapEventTestBase
     }
 
     [Fact]
+    public void RaftStrandedOnLand_EndsTheRaftOnServerAndClient()
+    {
+        var target = CreateConnectedPlayer("unstuck-target", Client, "Lady Mira");
+        Server.Call(() =>
+        {
+            var party = Server.GetRegisteredObject<MobileParty>(target.PartyId);
+            party.IsInRaftState = true;
+            party._position = new CampaignVec2(new Vec2(31f, 41f), true);
+        });
+        Client.PumpGameThread();
+        Client.Call(() =>
+        {
+            var party = Client.GetRegisteredObject<MobileParty>(target.PartyId);
+            Assert.True(party.IsInRaftState);
+            // The raft's move toward the old shore, which the landing has to clear on the client
+            using (new AllowedThread())
+            {
+                party.SetMoveGoToPoint(new CampaignVec2(new Vec2(60f, 70f), true), MobileParty.NavigationType.Default);
+            }
+        });
+
+        var result = Execute("unstuck-target");
+
+        Assert.True(result.Succeeded, result.Output);
+        Assert.Single(result.Output.Split('\n'), line => line.StartsWith("Put ashore"));
+        Server.Call(() => Assert.False(Server.GetRegisteredObject<MobileParty>(target.PartyId).IsInRaftState));
+        Client.PumpGameThread();
+        Client.Call(() =>
+        {
+            var party = Client.GetRegisteredObject<MobileParty>(target.PartyId);
+            Assert.False(party.IsInRaftState);
+            Assert.Equal(MoveModeType.Hold, party.PartyMoveMode);
+            Assert.Equal(party.Position, party.MoveTargetPoint);
+        });
+    }
+
+    [Fact]
     public void PlayerLedArmy_IsKept()
     {
         var target = CreateConnectedPlayer("unstuck-target", Client, "Lady Mira");

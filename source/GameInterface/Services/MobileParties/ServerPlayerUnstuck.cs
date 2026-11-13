@@ -9,6 +9,7 @@ using GameInterface.Services.MobileParties.Messages.Unstuck;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.Rafts.Interfaces;
 using GameInterface.Services.Settlements.Interfaces;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using Serilog;
@@ -30,9 +31,9 @@ internal interface IServerPlayerUnstuck
     /// <summary>
     /// Force-applies every applicable exit for the player's registered party and hero, releases every
     /// party (not only the player's) still linked to a battle that already ended, ends battles left with no
-    /// healthy troops on one side, then moves a free party off a map spot it cannot move from, each step
-    /// guarded independently, and sends the result to the player's connection when it has one. Runs on
-    /// the game thread.
+    /// healthy troops on one side, ends the raft state of a party stranded on land, then moves a free party
+    /// off a map spot it cannot move from, each step guarded independently, and sends the result to the
+    /// player's connection when it has one. Runs on the game thread.
     /// </summary>
     /// <returns>One line per step applied, skipped or failed.</returns>
     string[] Apply(Player player, bool includeCaptivity);
@@ -52,6 +53,7 @@ internal class ServerPlayerUnstuck : IServerPlayerUnstuck
     private readonly IPartyNavigationRepair partyNavigationRepair;
     private readonly IMapEventLoadCleaner mapEventLoadCleaner;
     private readonly IStalledMapEventResolver stalledMapEventResolver;
+    private readonly IPlayerRaftFleetInterface raftFleetInterface;
 
     public ServerPlayerUnstuck(
         IMessageBroker messageBroker,
@@ -62,7 +64,8 @@ internal class ServerPlayerUnstuck : IServerPlayerUnstuck
         ISiegeEventInterface siegeEventInterface,
         IPartyNavigationRepair partyNavigationRepair,
         IMapEventLoadCleaner mapEventLoadCleaner,
-        IStalledMapEventResolver stalledMapEventResolver)
+        IStalledMapEventResolver stalledMapEventResolver,
+        IPlayerRaftFleetInterface raftFleetInterface = null)
     {
         this.partyNavigationRepair = partyNavigationRepair;
         this.messageBroker = messageBroker;
@@ -73,6 +76,7 @@ internal class ServerPlayerUnstuck : IServerPlayerUnstuck
         this.siegeEventInterface = siegeEventInterface;
         this.mapEventLoadCleaner = mapEventLoadCleaner;
         this.stalledMapEventResolver = stalledMapEventResolver;
+        this.raftFleetInterface = raftFleetInterface;
     }
 
     public string[] Apply(Player player, bool includeCaptivity)
@@ -199,6 +203,17 @@ internal class ServerPlayerUnstuck : IServerPlayerUnstuck
                 : $"Ended {resolved} battles left with no healthy troops on one side.";
         });
 
+        // Read here because the captivity step above can release the hero; a prisoner's party stays parked until release
+        var isStillPrisoner = hero != null && hero.IsPrisoner;
+        // Registered only while War Sails is on
+        if (raftFleetInterface != null && !isStillPrisoner)
+        {
+            TryStep(actions, "raft landing", () =>
+                raftFleetInterface.PutAshore(party)
+                    ? $"Put ashore the party left on a raft or marked at sea on land at {Format(party.Position)}."
+                    : null);
+        }
+
         // Last, so a party the exits above just freed is checked at its final spot.
         TryStep(actions, "map position repair", () =>
             partyNavigationRepair.TryRepair(party, out var previousPosition)
@@ -207,7 +222,7 @@ internal class ServerPlayerUnstuck : IServerPlayerUnstuck
 
         if (actions.Count == 0)
         {
-            actions.Add("No server-side stuck state found (captivity, map event, army, siege camp, settlement, map position).");
+            actions.Add("No server-side stuck state found (captivity, map event, army, siege camp, settlement, raft, map position).");
         }
 
         return SendResult(player, partyId, actions);
