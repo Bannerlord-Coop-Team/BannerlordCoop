@@ -279,9 +279,12 @@ public class NavalScenarioMissionLogic : MissionLogic
         .Where(ship => ship.IsNpcParty)
         .OrderBy(ship => ship.ShipId)
         .Select(ship => ship.Hull as MissionShip)
-        .Where(hull => hull != null && !hull.IsRemoved && !hull.IsSinking && hull.Team != null
-            && hull.Team.IsEnemyOf(Mission.PlayerTeam))
+        .Where(IsAfloatEnemyHull)
         .ToArray();
+
+    // A hull still in the mission and afloat, on a team the players fight.
+    private bool IsAfloatEnemyHull(MissionShip hull) =>
+        hull != null && !hull.IsRemoved && !hull.IsSinking && hull.Team != null && hull.Team.IsEnemyOf(Mission.PlayerTeam);
 
     // Fails the placement and the rope and helm steps that need it.
     private void FailPlacement(string detail)

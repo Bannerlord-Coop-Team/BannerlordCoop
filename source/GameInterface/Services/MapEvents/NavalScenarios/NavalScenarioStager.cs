@@ -802,26 +802,28 @@ public class NavalScenarioStager : INavalScenarioStager
 
         TopUpShips(ally.Party, config.AlliedShips, hull);
         staging.PlaceAtSea(ally, enemy.Position);
-        string army = config.PlayerArmy ? JoinPlayerArmy(player, ally) : null;
+        string army = "army=none";
+        if (config.PlayerArmy) army = JoinPlayerArmy(player, ally);
+
         ally.Party.MapEventSide = player.Party.MapEventSide;
         return ally.MapEvent == mapEvent
-            ? $"{ally.StringId}(ships={ally.Ships.Count},troops={ally.MemberRoster.TotalManCount}{army})"
-            : $"{ally.StringId}(not added to the map event)";
+            ? $"{ally.StringId}(ships={ally.Ships.Count},troops={ally.MemberRoster.TotalManCount},{army})"
+            : $"{ally.StringId}(not added to the map event,{army})";
     }
 
     // Puts the allied lord in an army the player leads, through the vanilla actions the clan and army syncs replicate; the
     // player's clan joins the lord's kingdom first, as only a kingdom's lords lead its armies.
     private static string JoinPlayerArmy(MobileParty player, MobileParty ally)
     {
-        if (ally.MapFaction is not Kingdom kingdom) return ",army=none(the allied lord has no kingdom)";
+        if (ally.MapFaction is not Kingdom kingdom) return "army=none(the allied lord has no kingdom)";
 
         var clan = player.LeaderHero.Clan;
         if (clan.Kingdom != kingdom) ChangeKingdomAction.ApplyByJoinToKingdom(clan, kingdom);
         kingdom.CreateArmy(player.LeaderHero, ally.HomeSettlement ?? kingdom.FactionMidSettlement, Army.ArmyTypes.Patrolling);
-        if (player.Army == null) return ",army=none(the army was not created)";
+        if (player.Army == null) return "army=none(the army was not created)";
 
         ally.Army = player.Army;
-        return $",army={player.Army.Name}(leader={player.StringId},members={player.Army.Parties.Count})";
+        return $"army={player.Army.Name}(leader={player.StringId},members={player.Army.Parties.Count})";
     }
 
     // A free AI lord party friendly to the player and at war with the AI fleet.

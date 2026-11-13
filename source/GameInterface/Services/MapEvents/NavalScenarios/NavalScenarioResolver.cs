@@ -77,7 +77,7 @@ public class NavalScenarioResolver : INavalScenarioResolver
         LateJoin = preset.LateJoin,
         Entry = preset.Entry,
         AlliedNpc = preset.AlliedNpc,
-        AlliedShips = preset.AlliedNpc ? 1 : 0,
+        AlliedShips = preset.AlliedShips,
         RetreatSecondPlayer = preset.RetreatSecondPlayer,
         RammedShipsPerParty = preset.RammedShipsPerParty,
         BlockadeTownId = "",
@@ -134,23 +134,23 @@ public class NavalScenarioResolver : INavalScenarioResolver
                 config.RammedShipsPerParty = rams;
                 return null;
             case "fleet_fail":
-                if (value != "0" && value != "1") return "fleet_fail must be 0 or 1.";
-                config.FailNpcFleet = value == "1";
+                if (!TryParseFlag(value, out bool failNpcFleet)) return "fleet_fail must be 0 or 1.";
+                config.FailNpcFleet = failNpcFleet;
                 return null;
             case "allies":
                 if (!config.AlliedNpc) return $"{config.Preset} stages no allied lord, so it takes no allies knob.";
-                if (!TryParseInt(value, 1, NavalScenarioPresets.MaxEnemyHulls, out int allies))
-                    return $"allies must be a whole number from 1 to {NavalScenarioPresets.MaxEnemyHulls}.";
+                if (!TryParseInt(value, 1, NavalScenarioPresets.MaxAlliedShips, out int allies))
+                    return $"allies must be a whole number from 1 to {NavalScenarioPresets.MaxAlliedShips}.";
                 config.AlliedShips = allies;
                 return null;
             case "ignore_limits":
-                if (value != "0" && value != "1") return "ignore_limits must be 0 or 1.";
-                config.IgnoreShipLimits = value == "1";
+                if (!TryParseFlag(value, out bool ignoreShipLimits)) return "ignore_limits must be 0 or 1.";
+                config.IgnoreShipLimits = ignoreShipLimits;
                 return null;
             case "army":
                 if (!config.AlliedNpc) return $"{config.Preset} stages no allied lord, so it takes no army knob.";
-                if (value != "0" && value != "1") return "army must be 0 or 1.";
-                config.PlayerArmy = value == "1";
+                if (!TryParseFlag(value, out bool playerArmy)) return "army must be 0 or 1.";
+                config.PlayerArmy = playerArmy;
                 return null;
             case "reserve":
                 if (!TryParseInt(value, 0, NavalScenarioPresets.MaxReserveTroops, out int reserve))
@@ -200,6 +200,13 @@ public class NavalScenarioResolver : INavalScenarioResolver
     // Parses a whole number within [min, max].
     private static bool TryParseInt(string value, int min, int max, out int result) =>
         int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out result) && result >= min && result <= max;
+
+    // Parses a 0 or 1 flag.
+    private static bool TryParseFlag(string value, out bool result)
+    {
+        result = value == "1";
+        return value == "0" || value == "1";
+    }
 
     // Parses a finite number within [min, max].
     private static bool TryParseFloat(string value, float min, float max, out float result) =>

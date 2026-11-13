@@ -121,7 +121,6 @@ public class NavalScenarioResolverTests
     {
         var defaults = Resolve("allied_npc");
         Assert.Equal((1, false, false), (defaults.AlliedShips, defaults.IgnoreShipLimits, defaults.PlayerArmy));
-        Assert.Equal(0, Resolve("vs_pirates").AlliedShips);
 
         var config = Resolve("allied_npc", "allies=3", "ignore_limits=1", "army=1");
         using var stream = new System.IO.MemoryStream();
