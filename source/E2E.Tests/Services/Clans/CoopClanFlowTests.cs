@@ -710,6 +710,7 @@ public class CoopClanFlowTests : MapEventTestBase, IDisposable
         var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
         var townId = TestEnvironment.CreateRegisteredObject<Town>();
         var markerPartyIds = new[] { enemyPartyId, sharedEnemyPartyId, neutralPartyId };
+        // The settlement is the enemy clan's town, so its marker flips with the enemy party.
         foreach (var instance in Clients.Prepend(Server))
         {
             instance.Call(() =>
@@ -751,6 +752,14 @@ public class CoopClanFlowTests : MapEventTestBase, IDisposable
             Assert.True(FactionManager.IsAtWarAgainstFaction(sharedEnemyParty.MapFaction, Hero.MainHero.MapFaction));
         });
 
+        // Clears the member's marker dirty flags so the following asserts prove the next clan change redrew them.
+        void ClearMarkerFlags() => memberClient.Call(() =>
+        {
+            Get<Settlement>(memberClient, settlementId).Party.OnVisualsUpdated();
+            foreach (var id in markerPartyIds)
+                Get<MobileParty>(memberClient, id).Party.OnVisualsUpdated();
+        });
+
         ClearMarkerFlags();
         Join();
 
@@ -775,14 +784,6 @@ public class CoopClanFlowTests : MapEventTestBase, IDisposable
             Assert.False(FactionManager.IsAtWarAgainstFaction(enemyParty.MapFaction, Hero.MainHero.MapFaction));
             Assert.True(enemyParty.Party.IsVisualDirty);
             Assert.True(Get<Settlement>(memberClient, settlementId).Party.IsVisualDirty);
-        });
-
-        // Clears the member's marker dirty flags so the following asserts prove the next clan change redrew them.
-        void ClearMarkerFlags() => memberClient.Call(() =>
-        {
-            Get<Settlement>(memberClient, settlementId).Party.OnVisualsUpdated();
-            foreach (var id in markerPartyIds)
-                Get<MobileParty>(memberClient, id).Party.OnVisualsUpdated();
         });
     }
 

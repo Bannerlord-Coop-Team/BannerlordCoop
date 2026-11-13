@@ -21,9 +21,10 @@ internal static class MainHeroClanChangePatches
     {
         if (ModInformation.IsServer) return;
         // Compares PlayerTroop because Hero.MainHero throws while PlayerTroop is still unset during a join.
-        if (hero.CharacterObject != Game.Current?.PlayerTroop) return;
+        var playerTroop = Game.Current?.PlayerTroop;
+        if (playerTroop == null || hero.CharacterObject != playerTroop) return;
         if (!ContainerProvider.TryResolve<IMapStanceVisualsInterface>(out var stanceVisuals)) return;
 
-        stanceVisuals.RedrawStanceVisuals(oldClan?.MapFaction, hero.MapFaction);
+        stanceVisuals.RedrawStanceVisuals(oldClan?.MapFaction);
     }
 }

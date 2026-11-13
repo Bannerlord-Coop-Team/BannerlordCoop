@@ -13,18 +13,20 @@ namespace GameInterface.Services.PartyVisuals.Interfaces;
 public interface IMapStanceVisualsInterface : IGameAbstraction
 {
     /// <summary>
-    /// Redraws visible parties and settlements whose war stance differs between the two factions, then every settlement nameplate.
+    /// Redraws visible markers whose war stance changed from the previous faction to the local main hero's current one, then every settlement nameplate.
     /// </summary>
-    void RedrawStanceVisuals(IFaction oldFaction, IFaction newFaction);
+    void RedrawStanceVisuals(IFaction previousFaction);
 }
 
 /// <inheritdoc cref="IMapStanceVisualsInterface"/>
 public class MapStanceVisualsInterface : IMapStanceVisualsInterface
 {
     /// <inheritdoc/>
-    public void RedrawStanceVisuals(IFaction oldFaction, IFaction newFaction)
+    public void RedrawStanceVisuals(IFaction previousFaction)
     {
-        MarkStanceFlippedVisualsDirty(oldFaction, newFaction);
+        // Vanilla nameplates compare against the main hero, so the markers use the same faction.
+        var currentFaction = Hero.MainHero.MapFaction;
+        MarkStanceFlippedVisualsDirty(previousFaction, currentFaction);
         MapScreen.Instance?.GetMapView<GauntletMapSettlementNameplateView>()?._dataSource?.RefreshRelationsOfNameplates();
     }
 
