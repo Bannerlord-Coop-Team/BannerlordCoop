@@ -1335,7 +1335,7 @@ public class VillageHostileActionTests : MapEventTestBase
     {
         var client = result.Client;
         var context = result.Context;
-        Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkRequestVillageHostileAction>());
+        Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestVillageHostileAction>());
         var createRequests = client.NetworkSentMessages.GetMessages<NetworkRequestCreateMapEvent>();
         Assert.Single(createRequests);
         var createdReplies = Server.NetworkSentMessages.GetMessages<NetworkMapEventCreated>().ToList();
