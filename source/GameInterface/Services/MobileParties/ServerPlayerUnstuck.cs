@@ -9,7 +9,6 @@ using GameInterface.Services.MobileParties.Messages.Unstuck;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
-using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.Rafts.Interfaces;
 using GameInterface.Services.Settlements.Interfaces;
 using GameInterface.Services.SiegeEvents.Interfaces;
@@ -204,17 +203,15 @@ internal class ServerPlayerUnstuck : IServerPlayerUnstuck
                 : $"Ended {resolved} battles left with no healthy troops on one side.";
         });
 
-        // Registered only while War Sails is on, and skipped for a hero still a prisoner because the party stays parked until release
-        if (raftFleetInterface != null && (hero == null || !hero.IsPrisoner))
+        // Read here because the captivity step above can release the hero; a prisoner's party stays parked until release
+        var isStillPrisoner = hero != null && hero.IsPrisoner;
+        // Registered only while War Sails is on
+        if (raftFleetInterface != null && !isStillPrisoner)
         {
             TryStep(actions, "raft landing", () =>
-            {
-                if (!raftFleetInterface.PutAshore(party)) return null;
-
-                // Clears the client's raft move target too, which would otherwise keep heading for the old shore
-                messageBroker.Publish(this, new PartyBehaviorChangeAttempted(party, forcePosition: true, isCurrentlyAtSea: false, resetMovementToHold: true));
-                return $"Ended the raft state of the party stranded on land at {Format(party.Position)}.";
-            });
+                raftFleetInterface.PutAshore(party)
+                    ? $"Put ashore the party left on a raft or marked at sea on land at {Format(party.Position)}."
+                    : null);
         }
 
         // Last, so a party the exits above just freed is checked at its final spot.
@@ -225,7 +222,7 @@ internal class ServerPlayerUnstuck : IServerPlayerUnstuck
 
         if (actions.Count == 0)
         {
-            actions.Add("No server-side stuck state found (captivity, map event, army, siege camp, settlement, map position).");
+            actions.Add("No server-side stuck state found (captivity, map event, army, siege camp, settlement, raft, map position).");
         }
 
         return SendResult(player, partyId, actions);

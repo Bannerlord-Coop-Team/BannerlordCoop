@@ -224,6 +224,29 @@ public class MapEventEnvironmentTests : MapEventTestBase
         AssertPartyManCount(Server, partyId, 1);
     }
 
+    // A parked party doesn't tick, so a landing started before capture would otherwise finish after release and flip it back to sea
+    [Fact]
+    public void PlayerCapturedMidLanding_Release_CancelsTheLanding()
+    {
+        var (heroId, partyId) = CreatePlayerHeroParty("MyControllerId");
+        var captorPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var mapEventId = CreateBattleStateDefeatMapEvent(heroId, partyId, captorPartyId);
+        // Started after joining the battle, because joining cancels a transition the party already had
+        Server.Call(() => Server.GetRegisteredObject<MobileParty>(partyId).NavigationTransitionStartTime = CampaignTime.Hours(1f));
+
+        CommitBattleStateDefeat(mapEventId);
+        Server.Call(() => Assert.True(Server.GetRegisteredObject<MobileParty>(partyId).IsTransitionInProgress));
+        ReleasePlayerAfterCaptorDefeated(heroId);
+
+        Server.Call(() =>
+        {
+            var party = Server.GetRegisteredObject<MobileParty>(partyId);
+            Assert.False(party.IsTransitionInProgress);
+            Assert.False(party.IsCurrentlyAtSea);
+            Assert.False(party.IsInRaftState);
+        });
+    }
+
     [Fact]
     public void ClientWoundsControlledHero_RequestsHitPoints_SyncsToServerAndClients()
     {
