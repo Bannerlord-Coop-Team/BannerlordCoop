@@ -224,6 +224,7 @@ internal class HeroInterface : IHeroInterface
         }
         else if (playerParty.IsInRaftState)
         {
+            // The save loads the raft state straight into its field, so the setter patch that opens the raft menu never runs
             GameThread.RunSafe(() =>
             {
                 GameMenu.ActivateGameMenu("player_raft_state");

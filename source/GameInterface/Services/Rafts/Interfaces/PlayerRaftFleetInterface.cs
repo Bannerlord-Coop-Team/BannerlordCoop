@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using GameInterface.CoopSessionData;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.NavalDLC;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -38,8 +39,8 @@ public interface IPlayerRaftFleetInterface : IGameAbstraction
     void LeaveRaftAtSea(MobileParty party);
 
     /// <summary>
-    /// Sends a player's raft to the nearest shore again after its move to land was lost. Returns whether the party was on a
-    /// raft, so the caller can force the new move on every client.
+    /// Sends a player's raft free at sea to the nearest shore again after its move to land was lost, on the server and every
+    /// client. Returns false for a party that isn't a raft free at sea.
     /// </summary>
     bool ResumeRaft(MobileParty party);
 
@@ -133,9 +134,10 @@ public class PlayerRaftFleetInterface : IPlayerRaftFleetInterface
 
     public bool ResumeRaft(MobileParty party)
     {
-        if (!party.IsInRaftState) return false;
+        if (!party.IsInRaftState || !party.IsCurrentlyAtSea || party.MapEvent != null || party.CurrentSettlement != null) return false;
 
         party.MovePartyToTheClosestLand();
+        messageBroker.Publish(this, new PartyBehaviorChangeAttempted(party, forcePosition: true, isCurrentlyAtSea: party.IsCurrentlyAtSea));
         return true;
     }
 
