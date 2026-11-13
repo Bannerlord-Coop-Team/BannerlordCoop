@@ -190,6 +190,15 @@ every role (below).
   (behind `MBSaveLoad.IsUpdatingGameVersion`): it removes dead heroes, and disabled heroes outside
   `Clan.PlayerClan`, from rosters. Co-op player clans are not `Clan.PlayerClan`, but co-op disables a
   hero only for deletion, heir selection and creation rollback.
+- `HeadmanNeedsGrainIssueQuest.OnWarDeclared` fails the quest for a crime or hostility war only while
+  the player raids a village of the quest giver's faction; otherwise
+  `QuestHelper.CheckWarDeclarationAndFailOrCancelTheQuest(..., forceCancel: true)` cancels it.
+  `HeadmanNeedsGrainWorldEventPatches` follows that (#4589). The other synced quests need no change:
+  Escort Merchant Caravan runs vanilla on the server, and Herd and Garrison have no logic change co-op
+  copies. An ArmyOfPoachers raid at the target village now cancels the quest
+  (`QuestCanceledTargetVillageRaided` calls `CompleteQuestWithCancel`), and its `StartQuestBattle`
+  opens the village center with the scene level `land_raid`, which `PoachersBattleMissionInitializer`
+  now passes too.
 
 ## Loading a v1.4.8 save (#4615)
 
