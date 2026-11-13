@@ -32,6 +32,7 @@ public class GameStateInterfaceTests
             () => endGameCalled = true,
             System.Array.Empty<SaveGameFileInfo>,
             _ => { },
+            _ => { },
             Mock.Of<INavalSaveCompatibility>(),
             Mock.Of<ILoadingInterface>());
 
@@ -56,7 +57,7 @@ public class GameStateInterfaceTests
         var loading = new Mock<ILoadingInterface>();
         var forcedLoads = new List<SaveGameFileInfo>();
         var gameStateInterface = new GameStateInterface(Mock.Of<IMessageBroker>(), () => { },
-            () => new[] { Save("vanilla", "Native;Sandbox") }, forcedLoads.Add, saveCheck.Object, loading.Object);
+            () => new[] { Save("vanilla", "Native;Sandbox") }, forcedLoads.Add, _ => { }, saveCheck.Object, loading.Object);
 
         Load(gameStateInterface, "vanilla", orStartNew);
 
@@ -74,7 +75,7 @@ public class GameStateInterfaceTests
         var forcedLoads = new List<SaveGameFileInfo>();
         var save = Save("naval", "Native;Sandbox;NavalDLC");
         var gameStateInterface = new GameStateInterface(Mock.Of<IMessageBroker>(), () => { },
-            () => new[] { save }, forcedLoads.Add, Mock.Of<INavalSaveCompatibility>(), loading.Object);
+            () => new[] { save }, forcedLoads.Add, _ => { }, Mock.Of<INavalSaveCompatibility>(), loading.Object);
 
         Load(gameStateInterface, "naval", orStartNew);
 

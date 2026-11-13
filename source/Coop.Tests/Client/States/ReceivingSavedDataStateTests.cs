@@ -1,5 +1,4 @@
 ﻿using Autofac;
-using Common;
 using Common.Messaging;
 using Common.Network;
 using Coop.Core.Common;
@@ -41,6 +40,7 @@ namespace Coop.Tests.Client.States
             clientLogic = container.Resolve<IClientLogic>()!;
             loadingInterfaceMock = container.Resolve<Mock<ILoadingInterface>>();
             gameStateMock = container.Resolve<Mock<IGameStateInterface>>();
+            gameStateMock.Setup(x => x.TryLoadSaveData(It.IsAny<byte[]>(), It.IsAny<TimeSpan>())).Returns(true);
         }
 
         private static NetworkGameSaveDataReceived SaveData(byte[] data, string campaignId) =>
@@ -85,7 +85,7 @@ namespace Coop.Tests.Client.States
 
             // Assert — the world is reset to the main menu, then the received save is loaded.
             gameStateMock.Verify(x => x.GoToMainMenu(), Times.Once);
-            gameStateMock.Verify(x => x.LoadSaveData(gameSaveData), Times.Once);
+            gameStateMock.Verify(x => x.TryLoadSaveData(gameSaveData, It.IsAny<TimeSpan>()), Times.Once);
             Assert.IsType<LoadingState>(clientLogic.State);
             loadingInterfaceMock.Verify(x => x.SetLoadingMessage(
                 "Joining Coop Campaign",
@@ -99,9 +99,6 @@ namespace Coop.Tests.Client.States
         public void NetworkGameSaveDataReceived_WaitsTheSaveHandoffTimeout()
         {
             // Arrange
-            TimeSpan? timeoutDuringLoad = null;
-            gameStateMock.Setup(x => x.LoadSaveData(It.IsAny<byte[]>()))
-                .Callback(() => timeoutDuringLoad = GameThread.Instance.EffectiveBlockingTimeout);
             var currentState = clientLogic.SetState<ReceivingSavedDataState>();
 
             // Act
@@ -109,7 +106,7 @@ namespace Coop.Tests.Client.States
                 new MessagePayload<NetworkGameSaveDataReceived>(this, SaveData(new byte[16], "12345")));
 
             // Assert — a busy first map frame after character creation can take over a minute
-            Assert.True(timeoutDuringLoad >= NetworkJoinLimits.SaveHandoffTimeout);
+            gameStateMock.Verify(x => x.TryLoadSaveData(It.IsAny<byte[]>(), NetworkJoinLimits.SaveHandoffTimeout), Times.Once);
         }
 
         [Fact]
@@ -125,7 +122,7 @@ namespace Coop.Tests.Client.States
                 coopFinalizer.Object);
             ((ClientLogic)clientLogic).State = currentState;
             var gameSaveData = new byte[16];
-            gameStateMock.Setup(x => x.LoadSaveData(gameSaveData)).Throws(new TimeoutException("It did not start and will not run."));
+            gameStateMock.Setup(x => x.TryLoadSaveData(gameSaveData, It.IsAny<TimeSpan>())).Returns(false);
 
             // Act
             currentState.Handle_NetworkGameSaveDataReceived(
@@ -164,7 +161,7 @@ namespace Coop.Tests.Client.States
 
             // Assert — no save to load, so we go to the main menu but remain waiting.
             gameStateMock.Verify(x => x.GoToMainMenu(), Times.Once);
-            gameStateMock.Verify(x => x.LoadSaveData(It.IsAny<byte[]>()), Times.Never);
+            gameStateMock.Verify(x => x.TryLoadSaveData(It.IsAny<byte[]>(), It.IsAny<TimeSpan>()), Times.Never);
             Assert.IsType<ReceivingSavedDataState>(clientLogic.State);
         }
 
@@ -180,7 +177,7 @@ namespace Coop.Tests.Client.States
 
             // Assert
             gameStateMock.Verify(x => x.GoToMainMenu(), Times.Once);
-            gameStateMock.Verify(x => x.LoadSaveData(It.IsAny<byte[]>()), Times.Never);
+            gameStateMock.Verify(x => x.TryLoadSaveData(It.IsAny<byte[]>(), It.IsAny<TimeSpan>()), Times.Never);
             Assert.IsType<ReceivingSavedDataState>(clientLogic.State);
         }
 

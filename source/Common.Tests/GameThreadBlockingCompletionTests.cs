@@ -37,7 +37,7 @@ public class GameThreadBlockingCompletionTests : IDisposable
         GameThread.Instance.Update(TimeSpan.Zero);
         budget.Dispose();
 
-        var timeout = Assert.IsType<TimeoutException>(failure);
+        var timeout = Assert.IsType<GameThreadActionExpiredException>(failure);
         Assert.False(ran);
         Assert.Contains("will not run", timeout.Message);
         Assert.Equal(0, queue.Count);
@@ -69,7 +69,7 @@ public class GameThreadBlockingCompletionTests : IDisposable
         var caller = new BlockingCaller(() => { });
         GameThread.QueuedAction queued = WaitUntilQueued(queue, 1)[0];
 
-        Assert.IsType<TimeoutException>(caller.Join());
+        Assert.IsType<GameThreadActionExpiredException>(caller.Join());
         Assert.True(queued.Wait.SafeWaitHandle.IsClosed);
 
         // A later pump must not signal the disposed handle.
@@ -96,7 +96,7 @@ public class GameThreadBlockingCompletionTests : IDisposable
         }
         Exception? failure = caller.Join();
 
-        Assert.IsType(cancel ? typeof(OperationCanceledException) : typeof(TimeoutException), failure);
+        Assert.IsType(cancel ? typeof(OperationCanceledException) : typeof(GameThreadActionExpiredException), failure);
         GC.Collect();
         GC.WaitForPendingFinalizers();
         GC.Collect();
@@ -114,7 +114,7 @@ public class GameThreadBlockingCompletionTests : IDisposable
         var order = new List<int>();
 
         GameThread.EnqueueSafe(() => order.Add(1));
-        Assert.IsType<TimeoutException>(RunBlockingOffThread(() => order.Add(2)));
+        Assert.IsType<GameThreadActionExpiredException>(RunBlockingOffThread(() => order.Add(2)));
         GameThread.EnqueueSafe(() => order.Add(3));
         GameThread.Instance.Update(TimeSpan.Zero);
 

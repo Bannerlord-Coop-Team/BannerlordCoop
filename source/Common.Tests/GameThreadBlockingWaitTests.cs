@@ -72,7 +72,7 @@ public class GameThreadBlockingWaitTests
         using var wait = new EventWaitHandle(false, EventResetMode.ManualReset);
         var queued = new GameThread.QueuedAction(() => { }, wait, "pending", default);
 
-        Assert.Throws<TimeoutException>(() => GameThread.WaitForBlockingCompletion(queued, default));
+        Assert.Throws<GameThreadActionExpiredException>(() => GameThread.WaitForBlockingCompletion(queued, default));
 
         Assert.False(queued.TryBeginRun(out Action? action));
         Assert.Null(action);

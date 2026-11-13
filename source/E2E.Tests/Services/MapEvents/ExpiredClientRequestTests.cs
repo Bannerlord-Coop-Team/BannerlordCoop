@@ -371,7 +371,7 @@ public class ExpiredClientRequestTests : MapEventTestBase
         public void AssertTimedOut()
         {
             Assert.True(thread.Join(LongTimeout), "the poller did not give up after the blocking timeout");
-            Assert.IsType<TimeoutException>(failure?.GetBaseException());
+            Assert.IsAssignableFrom<TimeoutException>(failure?.GetBaseException());
         }
 
         /// <summary>The poller gave up without throwing, because the expired work was queued again.</summary>

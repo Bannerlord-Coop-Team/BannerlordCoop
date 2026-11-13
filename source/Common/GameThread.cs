@@ -27,7 +27,8 @@ public class GameThread : IUpdateable
         internal long nextDrainBudgetId;
         internal long activeDrainTicks;
         internal long activeBlockingTimeoutTicks;
-        internal readonly Dictionary<long, (long DrainTicks, long TimeoutTicks)> drainBudgets = new();
+        internal readonly Dictionary<long, long> drainBudgets = new();
+        internal readonly Dictionary<long, long> blockingTimeouts = new();
         internal bool isClosed;
         internal int rejectedAfterCloseCount;
         private Action waitPump;
@@ -398,7 +399,7 @@ public class GameThread : IUpdateable
         if (maximumDrainTime <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(maximumDrainTime));
         TimeSpan timeout = blockingTimeout ?? BlockingTimeout;
         if (timeout <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(blockingTimeout));
-        return AddDrainBudget(Math.Max(1L, (long)(maximumDrainTime.TotalSeconds * Stopwatch.Frequency)), timeout);
+        return AddBudget(Math.Max(1L, (long)(maximumDrainTime.TotalSeconds * Stopwatch.Frequency)), timeout);
     }
 
     /// <summary>
@@ -409,18 +410,18 @@ public class GameThread : IUpdateable
     public IDisposable UseBlockingTimeout(TimeSpan blockingTimeout)
     {
         if (blockingTimeout <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(blockingTimeout));
-        // A drain budget of 0 carries only the timeout
-        return AddDrainBudget(0, blockingTimeout);
+        return AddBudget(null, blockingTimeout);
     }
 
-    private IDisposable AddDrainBudget(long drainTicks, TimeSpan timeout)
+    private IDisposable AddBudget(long? drainTicks, TimeSpan timeout)
     {
         QueueContext queue = CurrentQueue;
         lock (queue.gate)
         {
             if (queue.isClosed) throw new OperationCanceledException("The game-thread queue is closed.");
             long id = ++queue.nextDrainBudgetId;
-            queue.drainBudgets.Add(id, (drainTicks, timeout.Ticks));
+            if (drainTicks.HasValue) queue.drainBudgets.Add(id, drainTicks.Value);
+            queue.blockingTimeouts.Add(id, timeout.Ticks);
             RefreshDrainLimits(queue);
             return new FrameDrainBudgetScope(queue, id);
         }
@@ -432,7 +433,7 @@ public class GameThread : IUpdateable
         get
         {
             QueueContext queue = CurrentQueue;
-            lock (queue.gate) return queue.drainBudgets.Values.Count(value => value.DrainTicks > 0);
+            lock (queue.gate) return queue.drainBudgets.Count;
         }
     }
 
@@ -514,11 +515,10 @@ public class GameThread : IUpdateable
 
     private static void RefreshDrainLimits(QueueContext queue)
     {
-        long[] drainLimits = queue.drainBudgets.Values.Where(value => value.DrainTicks > 0)
-            .Select(value => value.DrainTicks).ToArray();
-        Interlocked.Exchange(ref queue.activeDrainTicks, drainLimits.Length == 0 ? 0 : drainLimits.Min());
+        Interlocked.Exchange(ref queue.activeDrainTicks,
+            queue.drainBudgets.Count == 0 ? 0 : queue.drainBudgets.Values.Min());
         Interlocked.Exchange(ref queue.activeBlockingTimeoutTicks,
-            queue.drainBudgets.Count == 0 ? 0 : queue.drainBudgets.Values.Max(value => value.TimeoutTicks));
+            queue.blockingTimeouts.Count == 0 ? 0 : queue.blockingTimeouts.Values.Max());
     }
 
     /// <summary>Releases the limit on its owning queue even after the ambient runtime changes.</summary>
@@ -540,6 +540,7 @@ public class GameThread : IUpdateable
             lock (owner.gate)
             {
                 owner.drainBudgets.Remove(id);
+                owner.blockingTimeouts.Remove(id);
                 RefreshDrainLimits(owner);
             }
         }
@@ -602,7 +603,8 @@ public class GameThread : IUpdateable
     /// Defaults to the calling file and method, so call sites do not need to pass anything.</param>
     /// <exception cref="TimeoutException">
     /// Thrown for blocking calls when the action did not start within the blocking timeout, in which case it
-    /// never runs, or when it started but did not finish within one more wait.
+    /// never runs (as <see cref="GameThreadActionExpiredException"/>), or when it started but did not finish
+    /// within one more wait.
     /// </exception>
     public static void Run(Action action, bool blocking = false, string label = null,
         [CallerFilePath] string callerFile = null,
@@ -705,7 +707,7 @@ public class GameThread : IUpdateable
             : $"The game-thread session ended before the blocking {nameof(Run)} action started. It will not run.";
         if (queuedAction.TryExpire(reason))
         {
-            if (timedOut) throw new TimeoutException(reason);
+            if (timedOut) throw new GameThreadActionExpiredException(reason);
             throw new OperationCanceledException(reason);
         }
 
@@ -1101,5 +1103,15 @@ public class GameThread : IUpdateable
         {
             m_AmbientQueue.Value = previous;
         }
+    }
+}
+
+/// <summary>
+/// A blocking <see cref="GameThread.Run"/> action that timed out before the game thread started it. It never runs.
+/// </summary>
+public sealed class GameThreadActionExpiredException : TimeoutException
+{
+    public GameThreadActionExpiredException(string message) : base(message)
+    {
     }
 }

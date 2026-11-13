@@ -10,7 +10,6 @@ using SandBox;
 using Serilog;
 using System;
 using System.Linq;
-using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
@@ -26,10 +25,10 @@ public interface IGameStateInterface : IGameAbstraction
     void GoToMainMenu();
     void StartNewGame();
     /// <summary>
-    /// Loads a transferred save on the game thread. Throws <see cref="TimeoutException"/> only when the load never
-    /// started; a load that started finishes on the game thread even after the wait ends.
+    /// Loads a transferred save on the game thread, waiting up to <paramref name="startTimeout"/> for it to start.
+    /// False only when the load never started; a load that started finishes on the game thread even after the wait ends.
     /// </summary>
-    void LoadSaveData(byte[] saveData);
+    bool TryLoadSaveData(byte[] saveData, TimeSpan startTimeout);
     void LoadGame(string saveName);
 
     /// <summary>
@@ -47,27 +46,27 @@ internal class GameStateInterface : IGameStateInterface
     private readonly Action endGame;
     private readonly Func<SaveGameFileInfo[]> getSaveFiles;
     private readonly Action<SaveGameFileInfo> forceLoadSave;
+    private readonly Action<byte[]> loadTransferredSave;
     private readonly INavalSaveCompatibility navalSaveCompatibility;
     private readonly ILoadingInterface loadingInterface;
-    private readonly Action<byte[]> loadTransferredSave;
 
     public GameStateInterface(IMessageBroker messageBroker, INavalSaveCompatibility navalSaveCompatibility,
         ILoadingInterface loadingInterface)
         : this(messageBroker, MBGameManager.EndGame, () => MBSaveLoad.GetSaveFiles(null), ForceLoadSave,
-            navalSaveCompatibility, loadingInterface)
+            InteralLoadSaveGame, navalSaveCompatibility, loadingInterface)
     {
     }
 
     // Lets tests replace the engine's end-game, save listing, forced load and transferred save load.
     internal GameStateInterface(IMessageBroker messageBroker, Action endGame, Func<SaveGameFileInfo[]> getSaveFiles,
-        Action<SaveGameFileInfo> forceLoadSave, INavalSaveCompatibility navalSaveCompatibility, ILoadingInterface loadingInterface,
-        Action<byte[]> loadTransferredSave = null)
+        Action<SaveGameFileInfo> forceLoadSave, Action<byte[]> loadTransferredSave,
+        INavalSaveCompatibility navalSaveCompatibility, ILoadingInterface loadingInterface)
     {
-        this.loadTransferredSave = loadTransferredSave ?? InteralLoadSaveGame;
         this.messageBroker = messageBroker;
         this.endGame = endGame;
         this.getSaveFiles = getSaveFiles;
         this.forceLoadSave = forceLoadSave;
+        this.loadTransferredSave = loadTransferredSave;
         this.navalSaveCompatibility = navalSaveCompatibility;
         this.loadingInterface = loadingInterface;
     }
@@ -80,27 +79,33 @@ internal class GameStateInterface : IGameStateInterface
         EndGame();
     }
 
-    public void LoadSaveData(byte[] saveData)
+    public bool TryLoadSaveData(byte[] saveData, TimeSpan startTimeout)
     {
         messageBroker.Publish(this, new GameLoadStarted());
-        int started = 0;
         try
         {
-            GameThread.Run(() =>
+            using (GameThread.Instance.UseBlockingTimeout(startTimeout))
             {
-                Interlocked.Exchange(ref started, 1);
-                loadTransferredSave(saveData);
-            }, blocking: true);
+                GameThread.Run(() => loadTransferredSave(saveData), blocking: true);
+            }
         }
-        catch (TimeoutException e) when (Volatile.Read(ref started) == 1)
+        catch (GameThreadActionExpiredException e)
+        {
+            Logger.Error(e, "The transferred save did not start loading within {Seconds} seconds",
+                startTimeout.TotalSeconds);
+            return false;
+        }
+        catch (TimeoutException e)
         {
             // A big save can take longer than the wait to read, and it still finishes on the game thread.
             // If that load then fails, the server's campaign entry timeout ends the join, as before.
             Logger.Warning(e, "The transferred save is still loading on the game thread after the blocking wait");
         }
+
+        return true;
     }
 
-    private void InteralLoadSaveGame(byte[] saveData)
+    private static void InteralLoadSaveGame(byte[] saveData)
     {
         if (saveData == null) throw new ArgumentNullException($"Received save data was null");
 
