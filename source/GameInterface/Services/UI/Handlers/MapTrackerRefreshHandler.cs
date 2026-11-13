@@ -12,13 +12,13 @@ namespace GameInterface.Services.UI.Handlers;
 /// <summary>
 /// Refreshes map trackers when changes to local player or their clan occur
 /// </summary>
-internal class MapTrackerProviderRefreshHandler : IHandler
+internal class MapTrackerRefreshHandler : IHandler
 {
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
 
-    public MapTrackerProviderRefreshHandler(
+    public MapTrackerRefreshHandler(
         IMessageBroker messageBroker,
         INetwork network,
         IObjectManager objectManager)

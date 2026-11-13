@@ -1,10 +1,8 @@
 ﻿using GameInterface.Services.MapEvents;
 using Common.Messaging;
 using Coop.Core.Server.Services.Save.Messages;
-using GameInterface.Services.Armies;
 using GameInterface.Services.Players;
 using Serilog;
-using Serilog.Events;
 using E2E.Tests.Util;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using HarmonyLib;
@@ -24,12 +22,7 @@ public class MapEventLoadCleanerTests : MapEventTestBase
     private static readonly AccessTools.FieldRef<MapEvent, TroopUpgradeTracker?> TrackerField =
         AccessTools.FieldRefAccess<MapEvent, TroopUpgradeTracker?>("<TroopUpgradeTracker>k__BackingField");
 
-    private readonly ITestOutputHelper output;
-
-    public MapEventLoadCleanerTests(ITestOutputHelper output) : base(output)
-    {
-        this.output = output;
-    }
+    public MapEventLoadCleanerTests(ITestOutputHelper output) : base(output) { }
 
     private IReadOnlyList<MethodBase> JoinDisabledMethods => MapEventDisabledMethods
         .Append(AccessTools.Method(typeof(CultureObject), nameof(CultureObject.HasFeat)))
@@ -692,7 +685,7 @@ public class MapEventLoadCleanerTests : MapEventTestBase
     [InlineData(false)]
     public void CleanUpLoadedMapEvents_OneEventThrows_FinalizesTheOthers(bool registerBrokenFirst)
     {
-        var brokenContext = CreateServerMapEvent(commit: false);
+        var brokenContext = CreateServerMapEvent();
         var healthyContext = CreateServerMapEvent(commit: false);
 
         // The player manager does not promise an order, so both registration orders run and one of
@@ -726,11 +719,11 @@ public class MapEventLoadCleanerTests : MapEventTestBase
 
             Server.Resolve<IMessageBroker>().Publish(this, new SavedPlayerRegistrationsRestored());
 
-            // A live event the load never restored: the component lost its back-reference to the event,
-            // which FieldBattleEventComponent reads when FinalizeEvent removes the parties.
+            // A half-finalized event whose component lost its back-reference to the event. The cleaner detaches its
+            // parties itself, outside the FinalizeEventAux finalizer patch, so the throw reaches the stage catch.
             var component = Assert.IsType<FieldBattleEventComponent>(broken.Component);
             component.MapEvent = null!;
-            Assert.False(broken.IsFinalized);
+            broken.State = MapEventState.WaitingRemoval;
 
             Server.Resolve<IMapEventLoadCleaner>().CleanUpLoadedMapEvents();
 
@@ -803,58 +796,5 @@ public class MapEventLoadCleanerTests : MapEventTestBase
         }
 
         return count;
-    }
-
-    [Fact]
-    public void ReleaseEndedMapEventLinks_FirstCallbackThrows_ReleasesAndReportsRemainingParties()
-    {
-        // the first party's broadcast fails after the ended battle already cleared every party's side,
-        // so a second run could never find the rest again
-        var mapEventContext = CreateServerMapEvent(commit: false);
-        var logger = new CapturingLogger();
-
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mapEventContext.AttackerPartyId, out var attacker));
-            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mapEventContext.DefenderPartyId, out var defender));
-
-            var cleaner = new MapEventLoadCleaner(
-                logger,
-                Server.Resolve<IMessageBroker>(),
-                Server.Resolve<IPlayerManager>(),
-                Server.ObjectManager,
-                Server.Resolve<IArmyDisbander>(),
-                Server.Resolve<IStalledMapEventResolver>());
-            var reportedParties = new List<PartyBase>();
-
-            var (releasedParties, failedMapEventIds) = cleaner.ReleaseEndedMapEventLinks(party =>
-            {
-                if (reportedParties.Count == 0)
-                {
-                    reportedParties.Add(party);
-                    throw new InvalidOperationException("broadcast failed");
-                }
-
-                reportedParties.Add(party);
-            });
-
-            Assert.Empty(failedMapEventIds);
-            Assert.Equal(2, releasedParties.Length);
-            Assert.Contains(attacker.Party, releasedParties);
-            Assert.Contains(defender.Party, releasedParties);
-            Assert.Equal(releasedParties, reportedParties);
-            Assert.Null(attacker.Party.MapEventSide);
-            Assert.Null(defender.Party.MapEventSide);
-        }, MapEventDisabledMethods);
-
-        var warning = Assert.Single(logger.Events, logEvent => logEvent.Exception is InvalidOperationException);
-        Assert.Equal(LogEventLevel.Warning, warning.Level);
-    }
-
-    private sealed class CapturingLogger : ILogger
-    {
-        public List<LogEvent> Events { get; } = new();
-
-        public void Write(LogEvent logEvent) => Events.Add(logEvent);
     }
 }

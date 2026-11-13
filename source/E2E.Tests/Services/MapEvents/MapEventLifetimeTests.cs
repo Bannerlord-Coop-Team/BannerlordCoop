@@ -5,6 +5,7 @@ using GameInterface.Services.TroopRosters.Messages;
 using TaleWorlds.CampaignSystem.Roster;
 using Common.Util;
 using E2E.Tests.Util;
+using GameInterface.Tests.Utils;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.MapEvents;

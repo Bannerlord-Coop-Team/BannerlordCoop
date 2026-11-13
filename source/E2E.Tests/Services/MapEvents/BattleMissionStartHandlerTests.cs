@@ -24,7 +24,7 @@ using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
 using Xunit.Abstractions;
-using E2E.Tests.Util;
+using GameInterface.Tests.Utils;
 
 namespace E2E.Tests.Services.MapEvents;
 

@@ -23,7 +23,7 @@ using TaleWorlds.Core;
 using Xunit.Abstractions;
 using Issue = TaleWorlds.CampaignSystem.Issues.CapturedByBountyHuntersIssueBehavior.CapturedByBountyHuntersIssue;
 using Quest = TaleWorlds.CampaignSystem.Issues.CapturedByBountyHuntersIssueBehavior.CapturedByBountyHuntersIssueQuest;
-using E2E.Tests.Util;
+using GameInterface.Tests.Utils;
 
 namespace E2E.Tests.Services.Issues;
 

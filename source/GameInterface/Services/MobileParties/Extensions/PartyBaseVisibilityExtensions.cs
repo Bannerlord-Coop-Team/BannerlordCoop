@@ -1,5 +1,4 @@
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.ComponentInterfaces;
+﻿using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
@@ -9,12 +8,8 @@ namespace GameInterface.Services.MobileParties.Extensions;
 public static class PartyBaseVisibilityExtensions
 {
     /// <summary>
-    /// Recomputes one party's fog of war state from <paramref name="fromPosition"/>.
-    /// Vanilla sweeps visibility around the main party every frame through <see cref="MapVisibilityModel"/>;
-    /// this recomputes one party on top of that model. A party inside a settlement stays hidden unless its
-    /// leader carries a clan banner or it is assaulting the walls; the model alone would keep whatever
-    /// visibility the party already had, which after a join is the server save's "everything visible".
-    /// Settlements only refresh <c>IsInspected</c>: their <c>IsVisible</c> is spotting state.
+    /// Recomputes one party's fog of war visibility and inspected state from <paramref name="fromPosition"/> with the map visibility model.
+    /// Inactive parties, and parties in a settlement whose leader has no clan banner, are hidden before the model runs, so garrisons and militia the model would leave as saved don't keep the server save's all-visible state.
     /// </summary>
     /// <param name="mainPartySeeingRange">The seeing range to use; 0 uses the main party's current range.</param>
     public static void UpdateVisibilityAndInspected(this PartyBase party, CampaignVec2 fromPosition, float mainPartySeeingRange = 0f)

@@ -6,6 +6,7 @@ using Common.Network.Messages;
 using Common.Util;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
+using GameInterface.Tests.Utils;
 using GameInterface;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Extensions;
