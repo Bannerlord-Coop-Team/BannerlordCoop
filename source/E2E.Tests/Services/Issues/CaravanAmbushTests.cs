@@ -119,7 +119,7 @@ public class CaravanAmbushTests : IDisposable
             var serverQuest = Server.GetRegisteredObject<Hero>(newGiverId).Issue.IssueQuest as Quest;
             Assert.NotNull(serverQuest);
             serverQuest._isCaravanSaved = true;
-            Server.Resolve<ICaravanAmbushStatePublisher>().Publish(serverQuest);
+            Server.Resolve<ICaravanAmbushProgress>().Publish(serverQuest);
         });
         Owner.Call(() =>
         {
@@ -140,7 +140,7 @@ public class CaravanAmbushTests : IDisposable
             text.SetTextVariable("CARAVAN", "Atilon's caravan");
             QuestOf(Server)._journalEntries.Add(new JournalLog(new CampaignTime(123456L), text,
                 new TextObject("{=caravan_task_test}Caravans saved"), 2, 5, LogType.Discreate));
-            Server.Resolve<ICaravanAmbushStatePublisher>().Publish(QuestOf(Server));
+            Server.Resolve<ICaravanAmbushProgress>().Publish(QuestOf(Server));
         });
         Owner.Call(() =>
         {
@@ -164,35 +164,33 @@ public class CaravanAmbushTests : IDisposable
         Server.Call(() =>
         {
             QuestOf(Server)._journalEntries.Add(new JournalLog(new CampaignTime(123456L), new TextObject("Follow the caravan")));
-            Server.Resolve<ICaravanAmbushStatePublisher>().Publish(QuestOf(Server));
+            Server.Resolve<ICaravanAmbushProgress>().Publish(QuestOf(Server));
         });
         Owner.Call(() => Assert.Single(QuestOf(Owner).JournalEntries));
         Assert.Equal(before, Owner.NetworkSentMessages.GetMessageCount<RequestQuestJournal>());
     }
 
     [Fact]
-    public void StatePublishesOnlyChangedOwnerState()
+    public void ProgressPublishesOnlyChangedOwnerState()
     {
         scenario.AttachQuest(Other, CreateQuest);
         Server.Call(() =>
         {
-            var publisher = Server.Resolve<ICaravanAmbushStatePublisher>();
-            var baseline = Server.NetworkSentMessages.GetMessageCount<NetworkCaravanAmbushState>();
-            publisher.Publish(QuestOf(Server));
-            Assert.Equal(baseline + 1, Server.NetworkSentMessages.GetMessageCount<NetworkCaravanAmbushState>());
+            var events = Server.Resolve<ICaravanAmbushEvents>();
+            var baseline = Server.NetworkSentMessages.GetMessageCount<NetworkCaravanAmbushProgress>();
+            events.Run(quest => quest._vicinityCheckFailCounter = 1);
+            Assert.Equal(baseline + 1, Server.NetworkSentMessages.GetMessageCount<NetworkCaravanAmbushProgress>());
 
-            publisher.Publish(QuestOf(Server));
-            Assert.Equal(baseline + 1, Server.NetworkSentMessages.GetMessageCount<NetworkCaravanAmbushState>());
+            events.Run(quest => quest._vicinityCheckFailCounter = 1);
+            Assert.Equal(baseline + 1, Server.NetworkSentMessages.GetMessageCount<NetworkCaravanAmbushProgress>());
 
-            QuestOf(Server)._vicinityCheckFailCounter = 1;
-            publisher.Publish(QuestOf(Server));
-            Assert.Equal(baseline + 2, Server.NetworkSentMessages.GetMessageCount<NetworkCaravanAmbushState>());
+            events.Run(quest => quest._vicinityCheckFailCounter = 2);
+            Assert.Equal(baseline + 2, Server.NetworkSentMessages.GetMessageCount<NetworkCaravanAmbushProgress>());
 
-            publisher.Forget(QuestOf(Server));
-            publisher.Publish(QuestOf(Server));
-            Assert.Equal(baseline + 3, Server.NetworkSentMessages.GetMessageCount<NetworkCaravanAmbushState>());
+            events.Run(quest => quest._journalEntries.Add(new JournalLog(CampaignTime.Now, new TextObject("Follow the caravan"))));
+            Assert.Equal(baseline + 3, Server.NetworkSentMessages.GetMessageCount<NetworkCaravanAmbushProgress>());
         });
-        Owner.Call(() => Assert.Equal(1, QuestOf(Owner)._vicinityCheckFailCounter));
+        Owner.Call(() => Assert.Equal(2, QuestOf(Owner)._vicinityCheckFailCounter));
         Other.Call(() => Assert.Equal(0, QuestOf(Other)._vicinityCheckFailCounter));
     }
 
@@ -205,15 +203,15 @@ public class CaravanAmbushTests : IDisposable
         {
             BindParties();
             var quest = QuestOf(Server);
-            var publisher = Server.Resolve<ICaravanAmbushStatePublisher>();
+            var publisher = Server.Resolve<ICaravanAmbushProgress>();
             publisher.Publish(quest);
-            var before = Server.NetworkSentMessages.GetMessageCount<NetworkCaravanAmbushState>();
+            var before = Server.NetworkSentMessages.GetMessageCount<NetworkCaravanAmbushProgress>();
             var party = caravanMissing ? quest._caravanParty : quest._banditParty;
             Assert.True(party.IsActive);
             Assert.True(Server.ObjectManager.Remove(party));
             quest._vicinityCheckFailCounter++;
             publisher.Publish(quest);
-            Assert.Equal(before, Server.NetworkSentMessages.GetMessageCount<NetworkCaravanAmbushState>());
+            Assert.Equal(before, Server.NetworkSentMessages.GetMessageCount<NetworkCaravanAmbushProgress>());
         });
         Owner.Call(() =>
         {
@@ -231,7 +229,7 @@ public class CaravanAmbushTests : IDisposable
         {
             BindParties();
             var quest = QuestOf(Server);
-            var publisher = Server.Resolve<ICaravanAmbushStatePublisher>();
+            var publisher = Server.Resolve<ICaravanAmbushProgress>();
             publisher.Publish(quest);
             if (inactive) quest._caravanParty.IsActive = false;
             else quest._caravanParty = null;
@@ -462,7 +460,7 @@ public class CaravanAmbushTests : IDisposable
         Server.Call(() =>
         {
             BindParties();
-            Server.Resolve<ICaravanAmbushEvents>().OpenOwnerConversation(QuestOf(Server));
+            Server.Resolve<ICaravanAmbushProgress>().SendConversation(QuestOf(Server));
         });
 
         var received = Assert.Single(Owner.InternalMessages.GetMessages<NetworkCaravanAmbushConversation>());
@@ -702,7 +700,7 @@ public class CaravanAmbushTests : IDisposable
 
     private void SendState(string controller, bool saved, int warnings, params string[] journal)
     {
-        Server.Call(() => Server.Resolve<INetwork>().SendAll(new NetworkCaravanAmbushState(
+        Server.Call(() => Server.Resolve<INetwork>().SendAll(new NetworkCaravanAmbushProgress(
             scenario.NotableId, QuestScenario.IssueId, controller, caravanId, banditId, saved, warnings,
             journal.Select(text => new IssueJournalEntry(new JournalLog(CampaignTime.Now, new TextObject(text)))).ToArray())));
     }

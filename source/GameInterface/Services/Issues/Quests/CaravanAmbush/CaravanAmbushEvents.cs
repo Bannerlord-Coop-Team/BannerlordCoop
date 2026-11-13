@@ -1,12 +1,8 @@
 ﻿using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.MapEvents.Participation;
-using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Players;
-using Common.Network;
 using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -18,32 +14,22 @@ namespace GameInterface.Services.Issues.Quests.CaravanAmbush;
 internal interface ICaravanAmbushEvents
 {
     void Run(Action<Quest> action);
-    void BattleEnded(Quest quest, MapEvent battle);
-    void HoldCaravanForReward(Quest quest);
+    void BattleEnded(MapEvent battle);
+    void End(Quest quest, bool publishFinalState);
     void Release(Quest quest);
-    void OpenOwnerConversation(Quest quest);
 }
 
 internal class CaravanAmbushEvents : ICaravanAmbushEvents
 {
     private readonly IOutcomeDispatcher dispatcher;
-    private readonly ICaravanAmbushStatePublisher publisher;
-    private readonly INetwork network;
-    private readonly IObjectManager objects;
-    private readonly IIssueOwnerResolver owners;
-    private readonly IPlayerManager players;
+    private readonly ICaravanAmbushProgress publisher;
     private readonly IRetreatedMapEventPartyTracker retreatedPartyTracker;
 
-    public CaravanAmbushEvents(IOutcomeDispatcher dispatcher, ICaravanAmbushStatePublisher publisher,
-        INetwork network, IObjectManager objects, IIssueOwnerResolver owners, IPlayerManager players,
+    public CaravanAmbushEvents(IOutcomeDispatcher dispatcher, ICaravanAmbushProgress publisher,
         IRetreatedMapEventPartyTracker retreatedPartyTracker)
     {
         this.dispatcher = dispatcher;
         this.publisher = publisher;
-        this.network = network;
-        this.objects = objects;
-        this.owners = owners;
-        this.players = players;
         this.retreatedPartyTracker = retreatedPartyTracker;
     }
 
@@ -51,13 +37,26 @@ internal class CaravanAmbushEvents : ICaravanAmbushEvents
     {
         dispatcher.RunAsOwners<Quest>(quest =>
         {
+            var before = (quest._caravanParty, quest._banditParty, quest._isCaravanSaved,
+                quest._vicinityCheckFailCounter, quest.JournalEntries.Count);
             action(quest);
-            if (quest.IsOngoing)
+            var after = (quest._caravanParty, quest._banditParty, quest._isCaravanSaved,
+                quest._vicinityCheckFailCounter, quest.JournalEntries.Count);
+            if (quest.IsOngoing && before != after)
                 publisher.Publish(quest);
         });
     }
 
-    public void BattleEnded(Quest quest, MapEvent battle)
+    public void End(Quest quest, bool publishFinalState)
+    {
+        if (publishFinalState) publisher.Publish(quest);
+        quest.RemoveAllTrackedObjects();
+        Release(quest);
+    }
+
+    public void BattleEnded(MapEvent battle) => Run(quest => BattleEnded(quest, battle));
+
+    private void BattleEnded(Quest quest, MapEvent battle)
     {
         if (quest._caravanParty == null || quest._banditParty == null ||
             battle.WinningSide == BattleSideEnum.None || battle.DefeatedSide == BattleSideEnum.None) return;
@@ -89,22 +88,11 @@ internal class CaravanAmbushEvents : ICaravanAmbushEvents
         }
         else
         {
-            OpenOwnerConversation(quest);
+            publisher.SendConversation(quest);
         }
     }
 
-    public void OpenOwnerConversation(Quest quest)
-    {
-        var issue = IssueManager.GetIssueOfQuest(quest);
-        if (issue == null || quest._caravanParty == null ||
-            !objects.TryGetIdWithLogging(issue.IssueOwner, out var ownerId) ||
-            !objects.TryGetIdWithLogging(quest._caravanParty, out var caravanId) ||
-            !owners.TryGetOwnerControllerId(issue, out var controllerId) ||
-            !players.TryGetPeer(controllerId, out var peer)) return;
-        network.Send(peer, new NetworkCaravanAmbushConversation(ownerId, issue.StringId, controllerId, caravanId));
-    }
-
-    public void HoldCaravanForReward(Quest quest)
+    private void HoldCaravanForReward(Quest quest)
     {
         if (quest._isCaravanSaved && quest._caravanParty?.IsActive == true)
         {

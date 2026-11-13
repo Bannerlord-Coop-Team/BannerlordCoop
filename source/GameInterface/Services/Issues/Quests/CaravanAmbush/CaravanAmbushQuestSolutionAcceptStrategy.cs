@@ -10,9 +10,9 @@ namespace GameInterface.Services.Issues.Quests.CaravanAmbush;
 internal class CaravanAmbushQuestSolutionAcceptStrategy : IQuestSolutionAcceptStrategy
 {
     private readonly IIssueOwnerResolver owners;
-    private readonly ICaravanAmbushStatePublisher publisher;
+    private readonly ICaravanAmbushProgress publisher;
 
-    public CaravanAmbushQuestSolutionAcceptStrategy(IIssueOwnerResolver owners, ICaravanAmbushStatePublisher publisher)
+    public CaravanAmbushQuestSolutionAcceptStrategy(IIssueOwnerResolver owners, ICaravanAmbushProgress publisher)
     {
         this.owners = owners;
         this.publisher = publisher;

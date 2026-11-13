@@ -5,21 +5,16 @@ using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Framework.Finalization;
 using Common.Util;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.PlayerCaptivityService.Messages;
 using System;
 using TaleWorlds.Core;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Localization;
-using TaleWorlds.CampaignSystem.Conversation;
-using TaleWorlds.CampaignSystem.Encounters;
-using TaleWorlds.CampaignSystem.GameState;
-using Helpers;
 using Quest = TaleWorlds.CampaignSystem.Issues.CaravanAmbushIssueBehavior.CaravanAmbushIssueQuest;
 
 namespace GameInterface.Services.Issues.Quests.CaravanAmbush;
 
-internal class CaravanAmbushStateHandler : IHandler
+internal class CaravanAmbushProgressHandler : IHandler
 {
     // Vanilla's last proximity warning and the strike that fails the quest, from CaravanAmbushIssueQuest.HourlyTick.
     private const int FinalWarning = 3;
@@ -30,9 +25,8 @@ internal class CaravanAmbushStateHandler : IHandler
     private readonly IIssueResolver issues;
     private readonly IControllerIdProvider controller;
     private readonly IIssueConversationGuard conversationGuard;
-    private NetworkCaravanAmbushConversation? pendingConversation;
 
-    public CaravanAmbushStateHandler(IMessageBroker broker, IObjectManager objects, IIssueResolver issues,
+    public CaravanAmbushProgressHandler(IMessageBroker broker, IObjectManager objects, IIssueResolver issues,
         IControllerIdProvider controller, IIssueConversationGuard conversationGuard)
     {
         this.broker = broker;
@@ -40,64 +34,15 @@ internal class CaravanAmbushStateHandler : IHandler
         this.issues = issues;
         this.controller = controller;
         this.conversationGuard = conversationGuard;
-        broker.Subscribe<NetworkCaravanAmbushState>(Handle);
-        broker.Subscribe<NetworkCaravanAmbushConversation>(Conversation);
-        broker.Subscribe<CampaignTick>(Tick);
+        broker.Subscribe<NetworkCaravanAmbushProgress>(Handle);
     }
 
     public void Dispose()
     {
-        broker.Unsubscribe<NetworkCaravanAmbushState>(Handle);
-        broker.Unsubscribe<NetworkCaravanAmbushConversation>(Conversation);
-        broker.Unsubscribe<CampaignTick>(Tick);
-        pendingConversation = null;
+        broker.Unsubscribe<NetworkCaravanAmbushProgress>(Handle);
     }
 
-    private void Conversation(MessagePayload<NetworkCaravanAmbushConversation> payload)
-    {
-        if (ModInformation.IsServer || payload.What.ControllerId != controller.ControllerId) return;
-        var data = payload.What;
-        GameThread.RunSafe(() => conversationGuard.RunInOrder(() =>
-        {
-            pendingConversation = data;
-            TryOpenConversation();
-        }, data.IssueOwnerId), context: nameof(CaravanAmbushStateHandler));
-    }
-
-    private void Tick(MessagePayload<CampaignTick> payload)
-    {
-        // Vanilla TickEvent stops while paused, including after battle loot closes.
-        if (ModInformation.IsClient && pendingConversation.HasValue) TryOpenConversation();
-    }
-
-    private void TryOpenConversation()
-    {
-        if (!pendingConversation.HasValue) return;
-        var data = pendingConversation.Value;
-        // These cases discard the pending conversation.
-        if (data.ControllerId != controller.ControllerId ||
-            !issues.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _) ||
-            !(issue.IssueQuest is Quest quest) || !quest.IsOngoing ||
-            !objects.TryGetObjectWithLogging<MobileParty>(data.CaravanId, out var caravan) || !caravan.IsActive)
-        {
-            pendingConversation = null;
-            return;
-        }
-        // The remaining guards keep it pending until a later tick.
-        if (!quest._isCaravanSaved) return;
-        if (!IsOwnerFreeOnMap()) return;
-        var leader = ConversationHelper.GetConversationCharacterPartyLeader(caravan.Party);
-        if (leader == null) return;
-        CampaignMapConversation.OpenConversation(
-            new ConversationCharacterData(Hero.MainHero.CharacterObject),
-            new ConversationCharacterData(leader));
-        pendingConversation = null;
-    }
-
-    private bool IsOwnerFreeOnMap() => GameStateManager.Current?.ActiveState is MapState map && !map.AtMenu &&
-        !map.IsSimulationActive && !Campaign.Current.ConversationManager.IsConversationInProgress;
-
-    private void Handle(MessagePayload<NetworkCaravanAmbushState> payload)
+    private void Handle(MessagePayload<NetworkCaravanAmbushProgress> payload)
     {
         if (ModInformation.IsServer || payload.What.ControllerId != controller.ControllerId) return;
         var data = payload.What;
@@ -116,7 +61,7 @@ internal class CaravanAmbushStateHandler : IHandler
                 if (party != null && !quest.IsTracked(party)) quest.AddTrackedObject(party);
             }
             ReplayJournal(quest, data.Journal);
-        }, data.IssueOwnerId), context: nameof(CaravanAmbushStateHandler));
+        }, data.IssueOwnerId), context: nameof(CaravanAmbushProgressHandler));
     }
 
     private static void ShowProximityWarning(int previous, int warnings)

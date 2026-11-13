@@ -10,9 +10,9 @@ using Xunit;
 
 namespace GameInterface.Tests.Services.Issues;
 
-public class CaravanAmbushStateTests
+public class CaravanAmbushProgressTests
 {
-    public CaravanAmbushStateTests() => new SurrogateCollection();
+    public CaravanAmbushProgressTests() => new SurrogateCollection();
 
     [Theory]
     [InlineData(false, 0)]
@@ -20,7 +20,7 @@ public class CaravanAmbushStateTests
     [InlineData(true, 4)]
     public void WireRoundTripKeepsPartyIdentityProgressAndPersonalJournal(bool saved, int warnings)
     {
-        var sent = new NetworkCaravanAmbushState("giver", "issue", "owner", "caravan", "raiders",
+        var sent = new NetworkCaravanAmbushProgress("giver", "issue", "owner", "caravan", "raiders",
             saved, warnings, new[]
             {
                 new IssueJournalEntry(new JournalLog(new CampaignTime(123456L),
@@ -32,7 +32,7 @@ public class CaravanAmbushStateTests
         using var stream = new MemoryStream();
         Serializer.Serialize(stream, sent);
         stream.Position = 0;
-        var received = Serializer.Deserialize<NetworkCaravanAmbushState>(stream);
+        var received = Serializer.Deserialize<NetworkCaravanAmbushProgress>(stream);
         Assert.Equal("giver", received.IssueOwnerId);
         Assert.Equal("issue", received.IssueId);
         Assert.Equal("owner", received.ControllerId);

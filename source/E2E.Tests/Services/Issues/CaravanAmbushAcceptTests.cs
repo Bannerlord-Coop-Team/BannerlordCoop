@@ -119,7 +119,7 @@ public class CaravanAmbushAcceptTests
             using var matchSpeed = new MethodCallRecorder(AccessTools.Method(typeof(MobilePartyHelper), nameof(MobilePartyHelper.TryMatchPartySpeedWithItemWeight)));
 
             scenario.Accept(owner);
-            owner.Call(() => ((Quest)scenario.QuestOf(owner)).QuestAcceptedConsequences());
+            owner.Call(() => ((Quest)scenario.QuestOf(owner)).OnQuestAccepted());
 
             Assert.Equal(QuestScenario.ControllerA, scenario.OwnerOnServer());
             Assert.Equal(2, spawns.Count);
@@ -143,8 +143,8 @@ public class CaravanAmbushAcceptTests
                 Assert.Equal("S4kpdrgw", Assert.Single(quest.JournalEntries).LogText.GetID());
             });
             other.Call(() => Assert.Null(other.GetRegisteredObject<Hero>(scenario.NotableId).Issue.IssueQuest));
-            Assert.Single(owner.InternalMessages.GetMessages<NetworkCaravanAmbushState>());
-            Assert.Empty(other.InternalMessages.GetMessages<NetworkCaravanAmbushState>());
+            Assert.Single(owner.InternalMessages.GetMessages<NetworkCaravanAmbushProgress>());
+            Assert.Empty(other.InternalMessages.GetMessages<NetworkCaravanAmbushProgress>());
             Assert.Single(server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAccepted>());
         }
         finally

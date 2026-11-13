@@ -16,6 +16,19 @@ namespace GameInterface.Services.Issues.Quests.CaravanAmbush.Patches;
 [HarmonyPatch]
 internal class CaravanAmbushEventPatches
 {
+    // Dispatcher postfixes below replace these native quest listeners.
+    [HarmonyPatch(typeof(Quest), nameof(Quest.MapEventEnded))]
+    [HarmonyPrefix]
+    private static bool NativeBattleEnded() => false;
+
+    [HarmonyPatch(typeof(Quest), nameof(Quest.OnSettlementEntered))]
+    [HarmonyPrefix]
+    private static bool NativeArrived() => false;
+
+    [HarmonyPatch(typeof(Quest), nameof(Quest.OnBanditPartyRecruited))]
+    [HarmonyPrefix]
+    private static bool NativeRecruited() => false;
+
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.HourlyTick))]
     [HarmonyPostfix]
     private static void Hourly() => Run(quest =>
@@ -41,7 +54,7 @@ internal class CaravanAmbushEventPatches
     private static void BattleEnded(MapEvent mapEvent)
     {
         if (ModInformation.IsServer && ContainerProvider.TryResolve<ICaravanAmbushEvents>(out var events))
-            events.Run(quest => events.BattleEnded(quest, mapEvent));
+            events.BattleEnded(mapEvent);
     }
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnBanditPartyRecruited))]
