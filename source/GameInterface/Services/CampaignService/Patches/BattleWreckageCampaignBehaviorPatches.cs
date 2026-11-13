@@ -27,15 +27,8 @@ internal class SavedWreckageRemovalPatch
     [HarmonyPrefix]
     private static void Prefix(CampaignObjectManager __instance)
     {
-        var removed = RemoveSavedWreckages(__instance);
-        if (removed > 0) Logger.Information("Dropped {Count} saved battle wreckages", removed);
-    }
-
-    // Clears the saved wreckage list and returns how many entries it held.
-    internal static int RemoveSavedWreckages(CampaignObjectManager manager)
-    {
-        var count = manager._wreckages.Count;
-        manager._wreckages.Clear();
-        return count;
+        var count = __instance._wreckages.Count;
+        __instance._wreckages.Clear();
+        if (count > 0) Logger.Information("Dropped {Count} saved battle wreckages", count);
     }
 }

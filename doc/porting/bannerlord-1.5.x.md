@@ -240,16 +240,16 @@ are registered later, at `CampaignReady` (`MapScreen.OnInitialize`), through
     narrowed back to id-less entries.
   - Saved wreckage removal: `SavedWreckageRemovalPatch` is a prefix on
     `CampaignObjectManager.InitializeOnLoad` (`OnGameLoaded` fires too late) and removes every saved
-    wreckage before the object lists are built, on the server and on clients, logging "Dropped
-    {Count} saved battle wreckages" (#4582). Id-less wreckages throw while the lists are built. A
-    valid one (for example from a single-player v1.5 campaign) would never expire, because the server
-    no longer registers the hourly tick. Clicking one would open a menu clients never registered. The
-    map visuals are built later from `Campaign.Wreckages`, so none are drawn. A dropped wreckage stays
-    only in its `WreckageCreatedLogEntry` (rumor text, as after a vanilla expiry) and in the disabled
-    behavior's `_encounteredBattleWreckage`. Saves already written by an affected server load again
-    once the fix is deployed on both sides. Checked live on 2026-10-22, when the patch only dropped
-    id-less wreckages: a server save hit by 7 throws dropped all 7, loaded, and a client that had
-    crashed on it rejoined.
+    wreckage on the server and on clients, logging "Dropped {Count} saved battle wreckages" (#4582).
+    - Why: id-less wreckages throw while the object lists are built. A valid one (for example from a
+      single-player v1.5 campaign) would never expire, because the server no longer registers the
+      hourly tick, and clicking one would open a menu clients never registered.
+    - What is left: no map visuals, since they are built later from `Campaign.Wreckages`. A dropped
+      wreckage stays only in its `WreckageCreatedLogEntry` (rumor text, as after a vanilla expiry)
+      and in the disabled behavior's `_encounteredBattleWreckage`.
+    - Saves already written by an affected server load again once the fix is deployed on both sides.
+      Checked live on 2026-10-22 with the earlier id-less-only version: a server save with 7 id-less
+      wreckages loaded with all 7 dropped, and a client that had crashed on it rejoined.
   - The wreckage removal does not undo the rest of the damage. A throw skipped the end of
     `FinalizeEventAux`, so that battle's parties stay attached to an event that never finished, and an
     AI encounter with such a party threw `NullReferenceException` in `PartyBase.set_MapEventSide`
