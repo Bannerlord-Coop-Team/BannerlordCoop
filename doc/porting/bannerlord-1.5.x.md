@@ -221,17 +221,17 @@ are registered later, at `CampaignReady` (`MapScreen.OnInitialize`), through
 - Blood feuds and empty clan parties are keyed on the local main hero and player clan. They run on
   the server only and are not multiplayer-aware yet (blood feuds: #3819).
 - Naval (War Sails) content stays unsupported, including the set sail and disembark leave paths.
-- v1.5 leaves a `BattleWreckage` after a field battle with a winner and at least 15 casualties: a
-  battle site on land, a wreckage at sea. `BattleWreckageCampaignBehavior` is disabled on the server
-  and on clients (`BattleWreckageCampaignBehaviorPatches`). Co-op's `MBObjectBasePatches.StringIdPrefix`
-  drops the `StringId` of a server-made wreckage, and vanilla's `CampaignObjectManager.AddWreckage` adds
-  it to the saved list before it reads that id, so a field battle that made a wreckage threw inside
-  `MapEvent.FinalizeEventAux` and left an id-less wreckage in the save. Vanilla needs 15+ casualties,
-  a winner, no quest party, fewer than 50 wreckages, a qualifying party mix and a site away from
+- v1.5 leaves a `BattleWreckage` after a field battle with a winner and at least 15 casualties: a battle
+  site on land, a wreckage at sea. `BattleWreckageCampaignBehavior` is disabled on the server and on
+  clients (`BattleWreckageCampaignBehaviorPatches`). Co-op's `MBObjectBasePatches.StringIdPrefix` drops
+  the `StringId` of a server-made wreckage, and vanilla's `CampaignObjectManager.AddWreckage` adds it to
+  the saved list before it reads that id, so a field battle that made a wreckage threw inside
+  `MapEvent.FinalizeEventAux` and left an id-less wreckage in the save. Vanilla needs 15+ casualties, a
+  winner, no quest party, fewer than 50 wreckages, a qualifying party mix and a site away from
   settlements and rivers, and makes small sites 85% of the time. It was not only AI battles:
   `IsPlayerMapEvent` checks the server's own main party, so a co-op player's field battle could throw
-  too. Every later load then
-  crashed in `CampaignObjectManager.InitializeManagerObjectLists` (seen 2026-10-22 on v1.5.5).
+  too. Every later load then crashed in `CampaignObjectManager.InitializeManagerObjectLists` (seen
+  2026-10-22 on v1.5.5).
   - What this loses: looter-faction parties no longer head for land battle sites (the only parties that
     target land wreckages). Players never saw wrecks made during a co-op session, since nothing syncs
     them (#3837, #3838). Re-enabling needs the wreckage to get an id, through a sync registry or
@@ -242,12 +242,12 @@ are registered later, at `CampaignReady` (`MapScreen.OnInitialize`), through
     `CampaignObjectManager.InitializeOnLoad` (`OnGameLoaded` fires too late) and removes every saved
     wreckage on the server and on clients, logging "Dropped {Count} saved battle wreckages" (#4582).
     - Why: id-less wreckages throw while the object lists are built. A valid one (for example from a
-      single-player v1.5 campaign) would never expire, because the server no longer registers the
-      hourly tick, and clicking one would open a menu clients never registered.
-    - What is left: no map visuals, since they are built later from `Campaign.Wreckages`. A dropped
-      wreckage stays only in its `WreckageCreatedLogEntry` (rumor text, as after a vanilla expiry)
-      and in the disabled behavior's `_encounteredBattleWreckage`.
-    - Saves already written by an affected server load again once the fix is deployed on both sides.
+      single-player v1.5 campaign) would never expire, because the server no longer registers the hourly
+      tick, and clicking one would open a menu clients never registered.
+    - What is left: nothing on the map, since its visuals are built later from `Campaign.Wreckages`. A
+      dropped wreckage stays only in its `WreckageCreatedLogEntry` (rumor text, as after a vanilla
+      expiry) and in the disabled behavior's `_encounteredBattleWreckage`.
+    - A save that an affected server already wrote loads again once the fix is deployed on both sides.
       Checked live on 2026-10-22 with the earlier id-less-only version: a server save with 7 id-less
       wreckages loaded with all 7 dropped, and a client that had crashed on it rejoined.
   - The wreckage removal does not undo the rest of the damage. A throw skipped the end of
