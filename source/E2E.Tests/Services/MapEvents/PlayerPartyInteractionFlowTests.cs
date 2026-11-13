@@ -2987,12 +2987,21 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
                         BattleSideEnum.Defender));
 
                     PayBreakIn(client, playerParty, settlement);
-                    Server.SimulateMessage(client.NetPeer, breakInRequest);
                 },
+                MapEventDisabledMethods);
+            TestEnvironment.FlushCoalescer();
+            Server.PumpGameThread();
+
+            // Pay first and let it drain before the continuation is read, the same order RequestBreakIn
+            // uses for the other break in tests. Asserting the payment here means a turned down payment
+            // fails at the payment, not later at the continuation.
+            Assert.True(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBreakInResult>()).Approved);
+
+            Server.Call(
+                () => Server.SimulateMessage(client.NetPeer, breakInRequest),
                 MapEventDisabledMethods);
         }
 
-        Assert.True(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBreakInResult>()).Approved);
         var settlementEntry = Assert.Single(
             Server.NetworkSentMessages.GetMessages<NetworkPartyEnterSettlement>());
         Assert.Equal(
