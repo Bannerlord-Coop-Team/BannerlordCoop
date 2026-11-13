@@ -1192,7 +1192,7 @@ public class VillageHostileActionTests : MapEventTestBase
                 AccessTools.Method(typeof(Campaign), nameof(Campaign.RealTick)),
                 AccessTools.Method(typeof(Campaign), nameof(Campaign.Tick)),
             }).ToArray());
-            Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkRequestVillageHostileAction>());
+            Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestVillageHostileAction>());
             Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestCreateMapEvent>());
             client.Call(() =>
             {
@@ -1791,6 +1791,13 @@ public class VillageHostileActionTests : MapEventTestBase
             Assert.Null(mobileParty.CurrentSettlement);
             Assert.Equal(Village.VillageStates.Normal, village.VillageState);
             Assert.Equal(remainingRaidHitPoints, settlement.SettlementHitPoints, 3);
+        }, MapEventDisabledMethods);
+
+        RequestHostileAction(client, VillageHostileAction.Raid, mobilePartyId, target.SettlementId);
+        Server.Call(() =>
+        {
+            var mobileParty = Server.GetRegisteredObject<MobileParty>(mobilePartyId);
+            var settlement = Server.GetRegisteredObject<Settlement>(target.SettlementId);
             Assert.True(Server.Resolve<IVillageHostileActionInterface>().TryConsumeApprovedMapEventStart(
                 mobileParty.Party, settlement.Party,
                 new BattleCreationFlags(true, false, false, false, false, false, false, false), out _));
