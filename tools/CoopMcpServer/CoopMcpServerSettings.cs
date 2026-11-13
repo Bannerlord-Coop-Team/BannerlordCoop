@@ -67,10 +67,10 @@ public sealed class LaunchProfile
             throw new ArgumentException("modules must include Coop and contain only module identifiers.");
     }
 
-    // Module ids such as Bannerlord.Harmony contain dots. A dot may only separate two other characters,
-    // so no id can be "..", hidden or empty-segmented.
-    private static bool IsModuleId(string module) =>
+    // Module ids such as Bannerlord.Harmony contain dots. A dot may only separate two other characters:
+    // no segment is empty, so no id can be "..", hidden or end in a dot.
+    internal static bool IsModuleId(string module) =>
         !string.IsNullOrWhiteSpace(module) && module.Length <= 128 &&
         module.All(c => char.IsAsciiLetterOrDigit(c) || c == '_' || c == '-' || c == '.') &&
-        module[0] != '.' && module[^1] != '.' && !module.Contains("..", StringComparison.Ordinal);
+        module.Split('.').All(segment => segment.Length > 0);
 }
