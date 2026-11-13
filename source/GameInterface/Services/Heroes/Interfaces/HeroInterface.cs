@@ -24,7 +24,6 @@ using System.Runtime.ExceptionServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
-using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
@@ -220,14 +219,6 @@ internal class HeroInterface : IHeroInterface
                 {
                     siegeEventInterface.RestoreReloadedPlayer();
                 }
-            });
-        }
-        else if (playerParty.IsInRaftState)
-        {
-            // The save loads the raft state straight into its field, so the setter patch that opens the raft menu never runs
-            GameThread.RunSafe(() =>
-            {
-                GameMenu.ActivateGameMenu("player_raft_state");
             });
         }
 

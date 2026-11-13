@@ -194,8 +194,9 @@ internal class ServerPlayerUnstuck : IServerPlayerUnstuck
             });
         }
 
-        // Resume a raft's AI that is off and holding a client stuck at sea, registered only while War Sails is on
-        if (raftFleetInterface != null && (hero == null || !hero.IsPrisoner))
+        // Sends a raft at sea toward the nearest shore again, since its AI is off and nothing else restarts the move
+        // raftFleetInterface is only registered while War Sails is on
+        if (raftFleetInterface != null)
         {
             TryStep(actions, "raft resume", () =>
                 raftFleetInterface.ResumeRaft(party)
