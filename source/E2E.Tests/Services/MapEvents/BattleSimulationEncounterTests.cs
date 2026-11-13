@@ -4,6 +4,7 @@ using Common.Messaging;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
+using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.Players;
 using HarmonyLib;
@@ -36,9 +37,11 @@ public class BattleSimulationEncounterTests : MapEventTestBase
         RegisterAsPlayerParty("1", TestEnvironment.CreateRegisteredObject<Hero>(), context.AttackerPartyId);
         SPScoreboardVM scoreboard = null;
         BattleSimulation simulation = null;
+        string playerPartyId = null;
         client.Call(() =>
         {
             Campaign.Current.MainParty = client.GetRegisteredObject<MobileParty>(context.AttackerPartyId);
+            Assert.True(client.ObjectManager.TryGetId(MobileParty.MainParty.Party, out playerPartyId));
             var encounter = SetMockPlayerEncounter(client, context.DefenderPartyId, context.MapEventId);
             simulation = new BattleSimulation(null, null);
             encounter.BattleSimulation = simulation;
@@ -53,6 +56,8 @@ public class BattleSimulationEncounterTests : MapEventTestBase
 
         client.SimulateMessage(Server.NetPeer, new NetworkDestroyInstance<MapEvent>(
             client.GetHandle<MapEvent>(context.MapEventId)));
+        client.SimulateMessage(Server.NetPeer, new NetworkClosePvpEncounter(
+            new[] { playerPartyId }, mapEventId: context.MapEventId));
 
         client.Call(() =>
         {
