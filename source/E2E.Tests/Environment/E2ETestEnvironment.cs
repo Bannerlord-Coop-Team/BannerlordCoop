@@ -66,7 +66,6 @@ public class E2ETestEnvironment : IDisposable
 
         // Process-wide interaction state must not leak between E2E test environments.
         PlayerPartyInteractionDialogState.Clear();
-        PlayerPartyTradeContext.End();
         ResetBattleModeState();
 
         IntegrationEnvironment = new TestEnvironment(output, numClients, registerGameInterface: true, configureDependencies);
