@@ -15,7 +15,7 @@ internal interface IPlayerPartyTradeOfferSender
     // Records that the local offer may have changed and schedules one flush for the burst.
     void MarkChanged();
 
-    // Sends the pending offer when it differs from the last one sent; false when sending it failed.
+    // Sends the pending offer when it differs from the last one sent; false while the last send failed.
     bool Flush();
 }
 
@@ -30,6 +30,7 @@ internal class PlayerPartyTradeOfferSender : IPlayerPartyTradeOfferSender
     private readonly IPlayerPartyTradeContext trade;
 
     private bool changePending;
+    private bool sendFailed;
     private string baselineSessionId;
     private byte[] lastSentOffer;
 
@@ -57,25 +58,27 @@ internal class PlayerPartyTradeOfferSender : IPlayerPartyTradeOfferSender
         GameThread.EnqueueSafe(() => Flush(), context: "Send player-party trade offer");
     }
 
-    // Clears the pending change before sending, so a failing offer logs once instead of on every flush.
+    // A failed send keeps failing until a later one goes out, so an accept is never checked against an offer the server doesnt have.
     public bool Flush()
     {
         if (!trade.IsActive) return true;
 
         ResetIfNewTrade();
-        if (!changePending) return true;
+        if (!changePending) return !sendFailed;
         changePending = false;
 
         try
         {
             SendIfChanged();
-            return true;
+            sendFailed = false;
         }
         catch (Exception ex)
         {
             Logger.Error(ex, "Failed to send the player-party trade offer");
-            return false;
+            sendFailed = true;
         }
+
+        return !sendFailed;
     }
 
     // A new trade starts from an empty offer, so a stack the last trade ended on still counts as a change.
@@ -86,6 +89,7 @@ internal class PlayerPartyTradeOfferSender : IPlayerPartyTradeOfferSender
         baselineSessionId = trade.SessionId;
         lastSentOffer = serializer.Serialize(offerBuilder.Build(trade.SessionId, trade.LocalPartyId, Array.Empty<Barterable>()));
         changePending = false;
+        sendFailed = false;
     }
 
     // Compares the serialized offer, so a new offer field can't be missed, and a sent offer clears both acceptances like the server does.
