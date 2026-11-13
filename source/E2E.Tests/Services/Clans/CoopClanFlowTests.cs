@@ -728,7 +728,8 @@ public class CoopClanFlowTests : MapEventTestBase, IDisposable
                 town._ownerClan = enemyClan;
             });
         }
-        // The enemy kingdom fights only the joined clan, and the shared enemy fights both clans, so the join rules allow it.
+        // The enemy kingdom fights only the joined clan, so its markers flip on join. The shared enemy fights both clans, so its marker
+        // stays an enemy and must not be redrawn (and the joiner's only war is one the target shares, as IncompatibleWars requires).
         Server.Call(() =>
         {
             var joinedClan = Get<Clan>(Server, leader.ClanId);
