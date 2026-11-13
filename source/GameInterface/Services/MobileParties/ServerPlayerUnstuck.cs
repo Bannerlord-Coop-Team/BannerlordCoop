@@ -9,6 +9,7 @@ using GameInterface.Services.MobileParties.Messages.Unstuck;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.Rafts.Messages;
 using GameInterface.Services.Settlements.Interfaces;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using Serilog;
@@ -187,6 +188,16 @@ internal class ServerPlayerUnstuck : IServerPlayerUnstuck
                     throw new InvalidOperationException("The battle leave flow did not remove the party from its map event.");
 
                 return "Removed the party from its map event.";
+            });
+        }
+
+        // Resume a raft's AI that is off and holding a client stuck at sea
+        if ((hero == null || !hero.IsPrisoner) && party.IsInRaftState && party.IsCurrentlyAtSea && party.Party?.MapEvent == null)
+        {
+            TryStep(actions, "raft resume", () =>
+            {
+                messageBroker.Publish(party, new PlayerRaftResumeAttempted(party));
+                return $"Sent the raft toward the nearest shore at {Format(party.MoveTargetPoint)}.";
             });
         }
 
