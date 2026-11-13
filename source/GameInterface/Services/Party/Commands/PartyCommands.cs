@@ -11,6 +11,7 @@ using GameInterface.Services.Party.Patches;
 using GameInterface.Services.TroopRosters.Data;
 using GameInterface.Services.TroopRosters.Interfaces;
 using GameInterface.Utils.Commands;
+using Helpers;
 using SandBox.GauntletUI;
 using Serilog;
 using System.Collections.Generic;
@@ -965,6 +966,68 @@ internal class PartyCommands
 
             return Succeeded($"Buffed {party.Name} ({party.StringId}): {party.MemberRoster.TotalManCount} troops, max morale, boosted speed and party-size limit, {foodTypes} food type(s) x500");
         }
+    }
+
+    // coop.debug.mobile_party.fill_cavalry MobileParty_player_1
+    /// <summary>
+    /// Fills a party up to its size limit with the top-tier cavalry of its leader's culture, falling back to
+    /// imperial cavalry for a culture without any (e.g. nords).
+    /// </summary>
+    public sealed class FillCavalryCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.mobile_party";
+
+        public string Name => "fill_cavalry";
+
+        public string Description => "Fills a party to its size limit with cavalry of its leader's culture, or imperial cavalry.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("party_id", "Mobile party name or id; quote names with spaces.", true),
+        };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public FillCavalryCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient) return Failed("Command can only be run on the server.");
+            if (!resolver.TryResolveMobileParty(args[0], out var party, out var error)) return Failed(error);
+
+            var leader = party.LeaderHero;
+            if (leader == null) return Failed($"{party.Name} ({party.StringId}) has no leader hero.");
+
+            var troop = GetBestCavalry(leader.Culture) ??
+                GetBestCavalry(MBObjectManager.Instance.GetObject<CultureObject>("empire"));
+            if (troop == null) return Failed($"No cavalry found for {leader.Culture?.Name} or the empire culture.");
+
+            int toAdd = party.Party.PartySizeLimit - party.MemberRoster.TotalManCount;
+            if (toAdd <= 0) return Failed($"{party.Name} is already at or over its limit of {party.Party.PartySizeLimit}.");
+
+            party.MemberRoster.AddToCounts(troop, toAdd);
+
+            return Succeeded($"Added {toAdd} {troop.StringId} to {party.Name} ({party.StringId}): " +
+                $"{party.MemberRoster.TotalManCount}/{party.Party.PartySizeLimit} members.");
+        }
+    }
+
+    // Highest-tier cavalry in the culture's basic and elite troop trees, or null when the culture has none.
+    private static CharacterObject GetBestCavalry(CultureObject culture)
+    {
+        if (culture == null) return null;
+
+        return new[] { culture.BasicTroop, culture.EliteBasicTroop }
+            .Where(baseTroop => baseTroop != null)
+            .SelectMany(baseTroop => CharacterHelper.GetTroopTree(baseTroop))
+            .Where(troop => troop.DefaultFormationClass == FormationClass.Cavalry)
+            .OrderByDescending(troop => troop.Tier)
+            .FirstOrDefault();
     }
 
     // coop.debug.mobileparty.declare_war
