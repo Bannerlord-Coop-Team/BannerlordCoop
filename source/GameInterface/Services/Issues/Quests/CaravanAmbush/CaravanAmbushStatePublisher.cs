@@ -6,6 +6,7 @@ using GameInterface.Services.Players;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.Party;
 using Quest = TaleWorlds.CampaignSystem.Issues.CaravanAmbushIssueBehavior.CaravanAmbushIssueQuest;
 
 namespace GameInterface.Services.Issues.Quests.CaravanAmbush;
@@ -39,8 +40,8 @@ internal class CaravanAmbushStatePublisher : ICaravanAmbushStatePublisher
         if (issue == null || !objects.TryGetIdWithLogging(issue.IssueOwner, out var ownerId) ||
             !owners.TryGetOwnerControllerId(issue, out var controllerId) ||
             !players.TryGetPeer(controllerId, out var peer)) return;
-        var caravanId = IdOf(quest._caravanParty);
-        var banditId = IdOf(quest._banditParty);
+        if (!TryGetPartyId(quest._caravanParty, out var caravanId) ||
+            !TryGetPartyId(quest._banditParty, out var banditId)) return;
         var journalCount = quest.JournalEntries.Count;
         if (published.TryGetValue(quest, out var previous) && previous.Matches(ownerId, issue.StringId,
             controllerId, caravanId, banditId, quest._isCaravanSaved, quest._vicinityCheckFailCounter, journalCount)) return;
@@ -54,11 +55,10 @@ internal class CaravanAmbushStatePublisher : ICaravanAmbushStatePublisher
 
     public void Forget(Quest quest) => published.Remove(quest);
 
-    private string IdOf(object obj)
+    private bool TryGetPartyId(MobileParty party, out string id)
     {
-        if (obj == null) return string.Empty;
-        objects.TryGetIdWithLogging(obj, out var id);
-        return id ?? string.Empty;
+        id = string.Empty;
+        return party == null || !party.IsActive || objects.TryGetIdWithLogging(party, out id);
     }
 
     private readonly struct State

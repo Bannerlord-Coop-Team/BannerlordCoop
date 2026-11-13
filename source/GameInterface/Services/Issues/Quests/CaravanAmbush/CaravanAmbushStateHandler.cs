@@ -74,6 +74,7 @@ internal class CaravanAmbushStateHandler : IHandler
     {
         if (!pendingConversation.HasValue) return;
         var data = pendingConversation.Value;
+        // These cases discard the pending conversation.
         if (data.ControllerId != controller.ControllerId ||
             !issues.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _) ||
             !(issue.IssueQuest is Quest quest) || !quest.IsOngoing ||
@@ -82,8 +83,8 @@ internal class CaravanAmbushStateHandler : IHandler
             pendingConversation = null;
             return;
         }
+        // The remaining guards keep it pending until a later tick.
         if (!quest._isCaravanSaved) return;
-        // Battle results can arrive before the owner leaves the mission and loot screens.
         if (!IsOwnerFreeOnMap()) return;
         var leader = ConversationHelper.GetConversationCharacterPartyLeader(caravan.Party);
         if (leader == null) return;
@@ -141,6 +142,7 @@ internal class CaravanAmbushStateHandler : IHandler
 
     private bool TryResolveParty(string id, out MobileParty party)
     {
+        // An empty id means the party is gone and resolves to null.
         party = null;
         return string.IsNullOrEmpty(id) || objects.TryGetObjectWithLogging(id, out party);
     }

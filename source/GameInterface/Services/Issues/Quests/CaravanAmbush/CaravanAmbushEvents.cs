@@ -63,24 +63,27 @@ internal class CaravanAmbushEvents : ICaravanAmbushEvents
             battle.WinningSide == BattleSideEnum.None || battle.DefeatedSide == BattleSideEnum.None) return;
         var winners = battle.GetMapEventSide(battle.WinningSide);
         var losers = battle.GetMapEventSide(battle.DefeatedSide);
-        if (losers.Parties.Any(party => party.Party == quest._caravanParty.Party))
+        bool OnSide(MapEventSide side, MobileParty party) => side.Parties.Any(entry => entry.Party == party.Party);
+        if (OnSide(losers, quest._caravanParty))
         {
             HoldCaravanForReward(quest);
             quest.OnCaravanDestroyed(winners.LeaderParty);
             return;
         }
-        if (!losers.Parties.Any(party => party.Party == quest._banditParty.Party)) return;
+        if (!OnSide(losers, quest._banditParty)) return;
         if (quest._isCaravanSaved) return;
         quest._isCaravanSaved = true;
         HoldCaravanForReward(quest);
         var ownerParty = MobileParty.MainParty;
         // A retreated party stays in the winners list until the event is finalized.
-        if (ownerParty == null || retreatedPartyTracker.IsRetreated(battle, ownerParty.Party) ||
-            !winners.Parties.Any(party => party.Party == ownerParty.Party))
+        var ownerWon = ownerParty != null && !retreatedPartyTracker.IsRetreated(battle, ownerParty.Party) &&
+            OnSide(winners, ownerParty);
+        var caravanOnWinningSide = quest._caravanParty.IsActive && OnSide(winners, quest._caravanParty);
+        if (!ownerWon)
         {
             quest.OnCaravanSurvivedWithoutHelp();
         }
-        else if (!quest._caravanParty.IsActive || !winners.Parties.Any(party => party.Party == quest._caravanParty.Party))
+        else if (!caravanOnWinningSide)
         {
             quest.OnQuestSucceeded();
         }
@@ -108,12 +111,12 @@ internal class CaravanAmbushEvents : ICaravanAmbushEvents
             // Keep the caravan available for the owner's reward conversation.
             quest._caravanParty.SetMoveGoToPoint(quest._caravanParty.Position, MobileParty.NavigationType.Default);
             quest._caravanParty.Ai.SetDoNotMakeNewDecisions(true);
+            ReleaseParty(quest._banditParty, quest._banditParty?.HomeSettlement);
         }
         else
         {
-            ReleaseParty(quest._caravanParty, quest._targetSettlement);
+            Release(quest);
         }
-        ReleaseParty(quest._banditParty, quest._banditParty?.HomeSettlement);
     }
 
     public void Release(Quest quest)

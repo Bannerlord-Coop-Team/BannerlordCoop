@@ -46,6 +46,7 @@ internal class CaravanAmbushPatches
         return false;
     }
 
+    // Vanilla dialog with a null-caravan guard and a one-shot end hook the Publicizer cannot bind directly.
     [HarmonyPatch(typeof(Quest), nameof(Quest.GetCaravaneerDialogFlow))]
     [HarmonyPrefix]
     private static bool CaravanDialog(Quest __instance, ref DialogFlow __result)
