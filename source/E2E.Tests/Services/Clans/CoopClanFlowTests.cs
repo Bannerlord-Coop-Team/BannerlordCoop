@@ -709,6 +709,7 @@ public class CoopClanFlowTests : MapEventTestBase, IDisposable
         var neutralPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
         var townId = TestEnvironment.CreateRegisteredObject<Town>();
+        var markerPartyIds = new[] { enemyPartyId, sharedEnemyPartyId, neutralPartyId };
         foreach (var instance in Clients.Prepend(Server))
         {
             instance.Call(() =>
@@ -724,8 +725,9 @@ public class CoopClanFlowTests : MapEventTestBase, IDisposable
         Server.Call(() =>
         {
             var joinedClan = Get<Clan>(Server, leader.ClanId);
+            var enemyClan = Get<MobileParty>(Server, enemyPartyId).LeaderHero.Clan;
             var sharedEnemyClan = Get<MobileParty>(Server, sharedEnemyPartyId).LeaderHero.Clan;
-            DeclareWarAction.ApplyByPlayerHostility(joinedClan, Get<MobileParty>(Server, enemyPartyId).LeaderHero.Clan);
+            DeclareWarAction.ApplyByPlayerHostility(joinedClan, enemyClan);
             DeclareWarAction.ApplyByPlayerHostility(joinedClan, sharedEnemyClan);
             DeclareWarAction.ApplyByPlayerHostility(Get<Clan>(Server, member.ClanId), sharedEnemyClan);
         });
@@ -733,15 +735,20 @@ public class CoopClanFlowTests : MapEventTestBase, IDisposable
         memberClient.Call(() =>
         {
             var settlement = Get<Settlement>(memberClient, settlementId);
-            Assert.False(FactionManager.IsAtWarAgainstFaction(settlement.MapFaction, Hero.MainHero.MapFaction));
-            Assert.True(FactionManager.IsAtWarAgainstFaction(Get<MobileParty>(memberClient, sharedEnemyPartyId).MapFaction, Hero.MainHero.MapFaction));
             // The harness doesn't list created settlements in Settlement.All, which the map walks.
             var settlements = new MBList<Settlement>(Settlement.All ?? new MBList<Settlement>());
             settlements.Add(settlement);
             Campaign.Current.CampaignObjectManager.Settlements = settlements;
             settlement._isVisible = true;
-            foreach (var id in new[] { enemyPartyId, sharedEnemyPartyId, neutralPartyId })
+            foreach (var id in markerPartyIds)
                 Get<MobileParty>(memberClient, id)._isVisible = true;
+        });
+        memberClient.Call(() =>
+        {
+            var settlement = Get<Settlement>(memberClient, settlementId);
+            var sharedEnemyParty = Get<MobileParty>(memberClient, sharedEnemyPartyId);
+            Assert.False(FactionManager.IsAtWarAgainstFaction(settlement.MapFaction, Hero.MainHero.MapFaction));
+            Assert.True(FactionManager.IsAtWarAgainstFaction(sharedEnemyParty.MapFaction, Hero.MainHero.MapFaction));
         });
 
         ClearMarkerFlags();
@@ -774,7 +781,7 @@ public class CoopClanFlowTests : MapEventTestBase, IDisposable
         void ClearMarkerFlags() => memberClient.Call(() =>
         {
             Get<Settlement>(memberClient, settlementId).Party.OnVisualsUpdated();
-            foreach (var id in new[] { enemyPartyId, sharedEnemyPartyId, neutralPartyId })
+            foreach (var id in markerPartyIds)
                 Get<MobileParty>(memberClient, id).Party.OnVisualsUpdated();
         });
     }

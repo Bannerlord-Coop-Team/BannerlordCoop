@@ -29,27 +29,20 @@ public class MapStanceVisualsInterface : IMapStanceVisualsInterface
     }
 
     /// <summary>
-    /// Marks visible party and settlement markers dirty when their war stance differs between the two factions.
+    /// Marks visible party and settlement markers dirty when they are at war with exactly one of the two factions.
     /// </summary>
     private static void MarkStanceFlippedVisualsDirty(IFaction oldFaction, IFaction newFaction)
     {
-        // Same stance-flip test as ChangeKingdomAction.CheckIfPartyIconIsDirty, also applied to visible settlements.
         var visibleParties = MobileParty.All.Where(mobileParty => mobileParty.IsVisible).Select(mobileParty => mobileParty.Party);
         var visibleSettlements = Settlement.All.Where(settlement => settlement.IsVisible).Select(settlement => settlement.Party);
         foreach (var mapParty in visibleParties.Concat(visibleSettlements))
         {
-            if (!HasStanceFlipped(mapParty, oldFaction, newFaction)) continue;
+            // Same stance-flip test as ChangeKingdomAction.CheckIfPartyIconIsDirty, also applied to visible settlements.
+            var stanceFlipped = FactionManager.IsAtWarAgainstFaction(mapParty.MapFaction, oldFaction) !=
+                FactionManager.IsAtWarAgainstFaction(mapParty.MapFaction, newFaction);
+            if (!stanceFlipped) continue;
 
             mapParty.SetVisualAsDirty();
         }
-    }
-
-    /// <summary>
-    /// Whether the party is at war with exactly one of the two factions, so its marker changes colour.
-    /// </summary>
-    private static bool HasStanceFlipped(PartyBase party, IFaction oldFaction, IFaction newFaction)
-    {
-        return FactionManager.IsAtWarAgainstFaction(party.MapFaction, oldFaction) !=
-            FactionManager.IsAtWarAgainstFaction(party.MapFaction, newFaction);
     }
 }
