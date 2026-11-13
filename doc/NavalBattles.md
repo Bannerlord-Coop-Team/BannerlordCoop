@@ -1064,8 +1064,8 @@ Knobs (`NavalScenarioResolver.Usage`):
   deck) until n fit, then tops the healthy troops (wounded don't count) up to the deck crew plus n. A ballista or ram hull
   is never swapped, so `hulls=1 weapons=1 reserve=20` has no room and logs a Warning; add a hull.
 - `allies=n` (1 to 8, `allied_npc` only, default 1) tops the allied lord up to n ships.
-- `ignore_limits=1` lets every party of the scenario's battle field 8 ships, the base vanilla's `IgnoreDeploymentLimits`
-  uses and the side's cap, with no perk bonus, on every client (`NavalScenarioShipLimitPatch`), so two players can take all of a side's 8 ships: `allied_npc ships=4
+- `ignore_limits=1` lets every party of the scenario's battle field 8 ships, vanilla's `IgnoreDeploymentLimits` base limit
+  before perks, on every client (`NavalScenarioShipLimitPatch`), so two players can take all of a side's 8 ships: `allied_npc ships=4
   ignore_limits=1 reserve=40` fields 4+4 and the allies settle on `NoShipsLeft` (`inspect` shows the Defender spawner
   `failed` with that reason and the host logs it as Information).
 - `army=1` (`allied_npc` only) has the first player's clan join the allied lord's kingdom and lead an army with the lord as

@@ -245,11 +245,11 @@ public class NavalScenarioMissionLogic : MissionLogic
     private void TryPlace()
     {
         string error = hulls.TryGetOwnHull(out var own);
-        var targets = error == null ? AfloatAiHulls() : Array.Empty<MissionShip>();
+        var targets = error == null ? AfloatEnemyAiHulls() : Array.Empty<MissionShip>();
         var shipsLogic = Mission.GetMissionBehavior<NavalShipsLogic>();
         if (error != null || targets.Length == 0 || shipsLogic == null)
         {
-            if (sinceDeployment >= TargetWaitSeconds) FailPlacement(error ?? "no afloat AI hull was fielded");
+            if (sinceDeployment >= TargetWaitSeconds) FailPlacement(error ?? "no afloat enemy AI hull was fielded");
             return;
         }
 
@@ -275,7 +275,7 @@ public class NavalScenarioMissionLogic : MissionLogic
     }
 
     // The enemy AI hulls still afloat, in a stable order every client shares; an allied lord's hulls are on the players' side.
-    private MissionShip[] AfloatAiHulls() => registry.Ships
+    private MissionShip[] AfloatEnemyAiHulls() => registry.Ships
         .Where(ship => ship.IsNpcParty)
         .OrderBy(ship => ship.ShipId)
         .Select(ship => ship.Hull as MissionShip)
@@ -354,10 +354,10 @@ public class NavalScenarioMissionLogic : MissionLogic
             return;
         }
 
-        var target = AfloatAiHulls().OrderBy(hull => hull.HitPoints / hull.ShipOrigin.MaxHitPoints).FirstOrDefault();
+        var target = AfloatEnemyAiHulls().OrderBy(hull => hull.HitPoints / hull.ShipOrigin.MaxHitPoints).FirstOrDefault();
         if (target == null)
         {
-            Complete(NavalScenarioState.SinkStep, false, "no afloat AI hull was fielded");
+            Complete(NavalScenarioState.SinkStep, false, "no afloat enemy AI hull was fielded");
             return;
         }
 
