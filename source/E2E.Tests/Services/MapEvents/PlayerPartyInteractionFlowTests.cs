@@ -66,6 +66,7 @@ using TaleWorlds.CampaignSystem.ViewModelCollection.Barter;
 using TaleWorlds.Core;
 using TaleWorlds.Core.ImageIdentifiers;
 using TaleWorlds.Library;
+using TaleWorlds.Localization;
 using Xunit.Abstractions;
 using GameInterface.Services.Clans.Data;
 using TaleWorlds.ObjectSystem;
@@ -1669,6 +1670,7 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
             offeredPeace: true)));
 
         var relayedOffers = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyTradeOfferUpdated>().ToArray();
+        Assert.NotEmpty(relayedOffers);
         Assert.All(relayedOffers, relayedOffer =>
         {
             Assert.Equal(initiatorPartyId, relayedOffer.PartyId);
@@ -1887,6 +1889,78 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
     }
 
     [Fact]
+    public void TradeOfferUpdate_ItemGoldAndFiefOffer_ShowsTheSameAmountsOnTheOtherClient()
+    {
+        var (client1, client2, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
+        var itemId = TestEnvironment.CreateRegisteredObject<ItemObject>();
+        var modifierId = string.Empty;
+        Server.Call(() => Assert.True(Server.ObjectManager.TryGetId(new ItemModifier(), out modifierId)));
+        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        var townId = TestEnvironment.CreateRegisteredObject<Town>();
+        StartTrade(client1, client2, initiatorPartyId, responderPartyId);
+
+        // Barter items show a name, an encyclopedia link and a fief image, which registered test objects and the harness campaign lack.
+        foreach (var client in new[] { client1, client2 })
+        {
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<ItemObject>(itemId, out var item));
+                Assert.True(client.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+                Assert.True(client.ObjectManager.TryGetObject<Town>(townId, out var town));
+
+                item.Name = new TextObject("Trade item");
+                settlement._name = new TextObject("Trade fief");
+                settlement.SetSettlementComponent(town);
+                Campaign.Current.EncyclopediaManager ??= new TaleWorlds.CampaignSystem.Encyclopedia.EncyclopediaManager();
+                Campaign.Current.EncyclopediaManager.CreateEncyclopediaPages();
+            });
+        }
+
+        BarterVM responderScreen = null!;
+        RunOnBarterScreen(
+            client2,
+            responderPartyId,
+            initiatorPartyId,
+            barterData => AddInitiatorItemGoldAndFief(client2, barterData, initiatorIsOfferer: false, itemId, modifierId, settlementId),
+            barterVM => responderScreen = barterVM);
+
+        RunOnBarterScreen(
+            client1,
+            initiatorPartyId,
+            responderPartyId,
+            barterData => AddInitiatorItemGoldAndFief(client1, barterData, initiatorIsOfferer: true, itemId, modifierId, settlementId),
+            barterVM =>
+            {
+                OfferLocalItem(barterVM, barterVM.RightItemList.Single(item => IsModifiedStack(item.Barterable)), 3);
+                OfferLocalItem(barterVM, barterVM.RightGoldList.Single(), 25);
+                OfferLocalItem(barterVM, barterVM.RightFiefList.Single(), 1);
+                // Sent inside the call, so client2 applies it while fiefs go unvalued.
+                client1.Resolve<IPlayerPartyTradeSender>().Flush();
+            },
+            // Every amount change values the offer, and the harness has no map to value a fief on.
+            disabledMethods: new[] { AccessTools.Method(typeof(FiefBarterable), nameof(FiefBarterable.GetUnitValueForFaction)) });
+
+        client2.Call(() =>
+        {
+            var items = GetAllBarterItems(responderScreen).Distinct().ToArray();
+            var modifiedStack = items.Single(item => IsModifiedStack(item.Barterable));
+            var plainStack = items.Single(item => item.Barterable is ItemBarterable && !IsModifiedStack(item.Barterable));
+            var gold = items.Single(item => item.Barterable is GoldBarterable);
+            var fief = items.Single(item => item.Barterable is FiefBarterable);
+
+            Assert.True(modifiedStack.IsOffered);
+            Assert.Equal(3, modifiedStack.CurrentOfferedAmount);
+            Assert.False(plainStack.IsOffered);
+            Assert.True(gold.IsOffered);
+            Assert.Equal(25, gold.CurrentOfferedAmount);
+            Assert.True(fief.IsOffered);
+            Assert.Equal(1, fief.CurrentOfferedAmount);
+        });
+        // Drains the flush the applied amounts scheduled.
+        client2.PumpGameThread();
+    }
+
+    [Fact]
     public void OfferFlush_LargeBarterSetup_SendsNothing_ThenOneOfferPerChange()
     {
         var parties = CreateTwoPlayerPartiesWithHeroes();
@@ -2057,8 +2131,8 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
                 unsubscribe();
         }
 
-        Assert.NotEmpty(openedGrain);
-        Assert.All(openedGrain, grain => Assert.Equal(serverGrain, grain));
+        // Each trader opens its own barter screen.
+        Assert.Equal(new[] { serverGrain, serverGrain }, openedGrain);
     }
 
     [Theory]
@@ -2095,6 +2169,7 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
             Array.Empty<TroopRosterElementData>())));
 
         var relayedOffers = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyTradeOfferUpdated>().ToArray();
+        Assert.NotEmpty(relayedOffers);
         Assert.All(relayedOffers, offer => Assert.Equal(updaterPartyId, offer.PartyId));
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>());
         Assert.False(acceptingTrade.LocalAccepted);
@@ -5084,33 +5159,92 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
     {
         var client = parties.Client1;
 
+        RunOnBarterScreen(client, parties.InitiatorPartyId, parties.ResponderPartyId, barterData =>
+        {
+            foreach (var troopId in troopIds)
+            {
+                Assert.True(client.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+                barterData.AddBarterable<OtherBarterGroup>(
+                    new PlayerPartyTroopBarterable(
+                        barterData.OffererHero,
+                        barterData.OtherHero,
+                        barterData.OffererParty,
+                        barterData.OtherParty,
+                        new TroopRosterElement(troop) { _number = TroopStackSize }),
+                    false);
+            }
+        }, action);
+    }
+
+    // Builds a trader's barter screen with what addBarterables puts on it, runs an action on it as that player, then drains the flush it scheduled.
+    private static void RunOnBarterScreen(
+        EnvironmentInstance client,
+        string partyId,
+        string otherPartyId,
+        Action<BarterData> addBarterables,
+        Action<BarterVM> action,
+        IEnumerable<MethodBase>? disabledMethods = null)
+    {
         client.Call(() =>
         {
-            Assert.True(client.ObjectManager.TryGetObject<PartyBase>(parties.InitiatorPartyId, out var party));
-            Assert.True(client.ObjectManager.TryGetObject<PartyBase>(parties.ResponderPartyId, out var otherParty));
-            Assert.True(client.ObjectManager.TryGetObject<Hero>(parties.InitiatorHeroId, out var hero));
-            Assert.True(client.ObjectManager.TryGetObject<Hero>(parties.ResponderHeroId, out var otherHero));
+            Assert.True(client.ObjectManager.TryGetObject<PartyBase>(partyId, out var party));
+            Assert.True(client.ObjectManager.TryGetObject<PartyBase>(otherPartyId, out var otherParty));
 
-            var barterData = new BarterData(hero, otherHero, party, otherParty, null, 0, false);
+            var barterData = new BarterData(party.LeaderHero, otherParty.LeaderHero, party, otherParty, null, 0, false);
             barterData.AddBarterGroup(new FiefBarterGroup());
             barterData.AddBarterGroup(new PrisonerBarterGroup());
             barterData.AddBarterGroup(new ItemBarterGroup());
             barterData.AddBarterGroup(new OtherBarterGroup());
             barterData.AddBarterGroup(new GoldBarterGroup());
+            addBarterables(barterData);
 
-            foreach (var troopId in troopIds)
-            {
-                Assert.True(client.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
-                barterData.AddBarterable<OtherBarterGroup>(
-                    new PlayerPartyTroopBarterable(hero, otherHero, party, otherParty, new TroopRosterElement(troop) { _number = TroopStackSize }),
-                    false);
-            }
-
-            using var playerContext = new BarterPlayerContext(hero, party.MobileParty);
+            using var playerContext = new BarterPlayerContext(party.LeaderHero, party.MobileParty);
             action(new BarterVM(barterData));
-        });
+        }, disabledMethods);
         client.PumpGameThread();
     }
+
+    // Puts the initiator's modified and plain stacks of one item, its gold and a fief on either trader's barter screen.
+    private static void AddInitiatorItemGoldAndFief(
+        EnvironmentInstance client,
+        BarterData barterData,
+        bool initiatorIsOfferer,
+        string itemId,
+        string modifierId,
+        string settlementId)
+    {
+        Assert.True(client.ObjectManager.TryGetObject<ItemObject>(itemId, out var item));
+        Assert.True(client.ObjectManager.TryGetObject<ItemModifier>(modifierId, out var modifier));
+        Assert.True(client.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+
+        var (initiator, responder) = initiatorIsOfferer
+            ? (barterData.OffererHero, barterData.OtherHero)
+            : (barterData.OtherHero, barterData.OffererHero);
+        var (initiatorParty, responderParty) = initiatorIsOfferer
+            ? (barterData.OffererParty, barterData.OtherParty)
+            : (barterData.OtherParty, barterData.OffererParty);
+
+        barterData.AddBarterable<ItemBarterGroup>(
+            new ItemBarterable(initiator, responder, initiatorParty, responderParty, new ItemRosterElement(item, 5, modifier), 0),
+            false);
+        barterData.AddBarterable<ItemBarterGroup>(
+            new ItemBarterable(initiator, responder, initiatorParty, responderParty, new ItemRosterElement(item, 5), 0),
+            false);
+        barterData.AddBarterable<GoldBarterGroup>(new GoldBarterable(initiator, responder, initiatorParty, responderParty, 100), false);
+        barterData.AddBarterable<FiefBarterGroup>(new FiefBarterable(settlement, initiator, responder), false);
+    }
+
+    // Puts a local barter item on the offer at an amount, the way dragging it across and setting its count does.
+    private static void OfferLocalItem(BarterVM barterVM, BarterItemVM item, int amount)
+    {
+        item.Barterable.SetIsOffered(true);
+        barterVM.RightOfferList.Add(item);
+        item.CurrentOfferedAmount = amount;
+    }
+
+    // Whether a barterable is an item stack with a modifier.
+    private static bool IsModifiedStack(Barterable barterable)
+        => barterable is ItemBarterable itemBarterable && itemBarterable.ItemRosterElement.EquipmentElement.ItemModifier != null;
 
     // Registers troops on every instance for a barter screen's troop stacks.
     private string[] CreateTroops(int count)
