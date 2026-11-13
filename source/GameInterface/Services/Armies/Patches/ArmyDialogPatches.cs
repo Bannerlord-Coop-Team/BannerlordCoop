@@ -2,6 +2,7 @@
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Armies.Messages;
+using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.PlayerCaptivityService.Patches;
 using GameInterface.Services.SiegeEvents.Messages;
@@ -43,7 +44,7 @@ internal class ArmyDialogPatches
     private static bool Prefixgame_menu_encounter_abandon_on_consequence(EncounterGameMenuBehavior __instance)
     {
         var mainParty = MobileParty.MainParty;
-        ((PlayerEncounter.Battle != null) ? PlayerEncounter.Battle : PlayerEncounter.EncounteredBattle).BeginWait();
+        (PlayerEncounter.Battle ?? PlayerEncounterExtensions.GetEncounteredBattleOrNull()).BeginWait();
         mainParty.SetMoveModeHold();
         var message = new MobilePartyInArmyRemoved(mainParty.Army, mainParty, mainParty);
         MessageBroker.Instance.Publish(__instance, message);

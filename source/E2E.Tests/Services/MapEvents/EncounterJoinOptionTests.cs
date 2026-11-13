@@ -41,8 +41,8 @@ public class EncounterJoinOptionTests : MapEventTestBase
         }, MapEventDisabledMethods);
     }
 
-    /// <summary>The finalizer only absorbs the null reference of an encounter that is not set up yet; any other
-    /// failure in the join condition still surfaces.</summary>
+    /// <summary>Only an encounter that is not set up yet is greyed; any other failure in the join condition still
+    /// surfaces.</summary>
     [Fact]
     public void JoinCondition_OtherExceptions_StillSurface()
     {

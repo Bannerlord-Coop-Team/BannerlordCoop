@@ -1,5 +1,6 @@
 ﻿using GameInterface.Services.MobileParties.Extensions;
 using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MapEvents.Extensions;
@@ -30,5 +31,16 @@ public static class PlayerEncounterExtensions
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// Null safe copy of native <see cref="PlayerEncounter.EncounteredBattle"/>, which throws while an encounter is
+    /// still being set up and after it closes.
+    /// </summary>
+    public static MapEvent GetEncounteredBattleOrNull()
+    {
+        var party = PlayerEncounter.Current?._encounteredParty;
+        return party?.MapEvent ??
+            (party?.IsSettlement == true ? party.SiegeEvent?.BesiegerCamp?.LeaderParty?.MapEvent : null);
     }
 }

@@ -88,7 +88,7 @@ public class BattleBenchmarkRecorderTests : IDisposable
 
         Assert.Empty(attached);
         string path = Assert.Single(Directory.GetFiles(Path.Combine(outputDirectory, "field-01")));
-        Assert.Equal($"battle-host-PlayerOne-{Process.GetCurrentProcess().Id}.json", Path.GetFileName(path));
+        Assert.Equal($"battle-host-PlayerOne-{Environment.ProcessId}.json", Path.GetFileName(path));
         Assert.Equal(path, recorder.Status.LastReportPath);
 
         using JsonDocument report = JsonDocument.Parse(File.ReadAllText(path));

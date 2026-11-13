@@ -128,7 +128,7 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
 
         var encounter = PlayerEncounter.Current;
         var battle = GetPlayerEncounterBattle();
-        var encounteredBattle = GetPlayerEncounterEncounteredBattle();
+        var encounteredBattle = PlayerEncounterExtensions.GetEncounteredBattleOrNull();
         if (encounter?._mapEvent == mapEvent ||
             encounter?.BattleSimulation?.MapEvent == mapEvent ||
             battle == mapEvent ||
@@ -236,18 +236,6 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
         try
         {
             return PlayerEncounter.Battle;
-        }
-        catch (NullReferenceException)
-        {
-            return null;
-        }
-    }
-
-    private static MapEvent GetPlayerEncounterEncounteredBattle()
-    {
-        try
-        {
-            return PlayerEncounter.EncounteredBattle;
         }
         catch (NullReferenceException)
         {

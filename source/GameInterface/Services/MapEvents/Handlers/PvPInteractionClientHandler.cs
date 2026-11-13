@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Locations;
 using GameInterface.Services.Locations.Conversations;
+using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MobileParties.Extensions;
@@ -278,7 +279,7 @@ internal class PvPInteractionClientHandler : IHandler
         var encounter = PlayerEncounter.Current;
         if (IsMapEventId(encounter?._mapEvent, message.MapEventId) ||
             IsMapEventId(GetPlayerEncounterBattle(), message.MapEventId) ||
-            IsMapEventId(GetPlayerEncounterEncounteredBattle(), message.MapEventId))
+            IsMapEventId(PlayerEncounterExtensions.GetEncounteredBattleOrNull(), message.MapEventId))
         {
             if (IsLocalParty(encounter?._attackerParty))
                 party = encounter._attackerParty;
@@ -352,18 +353,6 @@ internal class PvPInteractionClientHandler : IHandler
         try
         {
             return PlayerEncounter.Battle;
-        }
-        catch (NullReferenceException)
-        {
-            return null;
-        }
-    }
-
-    private static MapEvent GetPlayerEncounterEncounteredBattle()
-    {
-        try
-        {
-            return PlayerEncounter.EncounteredBattle;
         }
         catch (NullReferenceException)
         {

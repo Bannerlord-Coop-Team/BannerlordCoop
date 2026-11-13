@@ -5,6 +5,7 @@ using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.Armies.Patches;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
@@ -1206,7 +1207,7 @@ public class SiegeDebugCommand
                 var menu = Campaign.Current?.CurrentMenuContext?.GameMenu;
                 var joinOption = menu?.MenuOptions.FirstOrDefault(option => option.IdString == "join_encounter_help_attackers");
                 if (PlayerEncounter.Current == null || PlayerEncounter.EncounterSettlement != settlement ||
-                    PlayerEncounter.EncounteredBattle != mapEvent || PartyBase.MainParty.MapEvent != null ||
+                    PlayerEncounterExtensions.GetEncounteredBattleOrNull() != mapEvent || PartyBase.MainParty.MapEvent != null ||
                     menu?.StringId != "join_encounter" || joinOption == null ||
                     !menu.GetMenuOptionConditionsHold(Game.Current, Campaign.Current.CurrentMenuContext,
                         menu.MenuOptions.ToList().IndexOf(joinOption)) || !joinOption.IsEnabled)

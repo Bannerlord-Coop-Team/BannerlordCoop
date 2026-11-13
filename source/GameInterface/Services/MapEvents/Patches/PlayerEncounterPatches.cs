@@ -242,12 +242,7 @@ internal class PlayerEncounterPatches
             return false;
         }
 
-        var encounteredParty = encounter._encounteredParty;
-        var encounteredBattle = encounteredParty?.MapEvent;
-        if (encounteredBattle == null && encounteredParty?.IsSettlement == true)
-            encounteredBattle = encounteredParty.SiegeEvent?.BesiegerCamp?.LeaderParty?.MapEvent;
-
-        if (encounter._mapEvent != null || encounteredBattle != null)
+        if (encounter._mapEvent != null || PlayerEncounterExtensions.GetEncounteredBattleOrNull() != null)
             return true;
 
         var mainParty = MobileParty.MainParty;
