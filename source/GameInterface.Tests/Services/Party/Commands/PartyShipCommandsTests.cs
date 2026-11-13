@@ -15,7 +15,7 @@ public class PartyShipCommandsTests
     [InlineData(true, false, "NavalDLC is not active on the server.")]
     public void AddShip_RejectsInvalidRequestsBeforeTouchingTheCampaign(bool isServer, bool navalEnabled, string expectedOutput)
     {
-        var result = RunWithRole(isServer, navalEnabled, new PartyShipCommands.AddShipCoopCommand(resolver: null!), "PlayerOne");
+        var result = RunWithRole(isServer, navalEnabled, new PartyShipCommands.AddShipCoopCommand(), "PlayerOne");
 
         Assert.False(result.Succeeded);
         Assert.Equal(expectedOutput, result.Output);

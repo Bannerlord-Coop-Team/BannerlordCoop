@@ -21,7 +21,10 @@ using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.Party.Commands;
 
-/// <summary>Debug commands that give, list, damage and remove a player's War Sails ships.</summary>
+/// <summary>
+/// Debug commands for War Sails ships: add_ship gives one to a player's or any party; the others list, damage and remove a
+/// player's ships.
+/// </summary>
 public class PartyShipCommands
 {
     internal const string DefaultHullId = "northern_light_ship";
@@ -49,17 +52,9 @@ public class PartyShipCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("party", "A player's controller id, or a mobile party name or id (an allied AI lord's party).", true),
+            new ExpectedArgs("party", "A player's controller id, or a party or its leader's id or name (an allied AI lord's party).", true),
             new ExpectedArgs("ship_hull_id", $"The hull id, {DefaultHullId} when omitted.", false),
         };
-
-        private readonly ICommandObjectResolver resolver;
-
-        // Resolves a party that is not a player's by name or id.
-        public AddShipCoopCommand(ICommandObjectResolver resolver)
-        {
-            this.resolver = resolver;
-        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
@@ -70,21 +65,20 @@ public class PartyShipCommands
                 return Failed("NavalDLC is not active on the server.");
 
             var hullId = args.Count == 2 ? args[1] : DefaultHullId;
-            if (!MapEventDebugCommands.TryGetPlayerParty(args[0], requireReady: false, out var objectManager, out var party, out var playerError)
-                && (objectManager == null || !resolver.TryResolveMobileParty(args[0], out party, out _)))
-                return Failed($"{playerError} No mobile party matches {args[0]} either.");
+            if (!TryGetListedParty(args[0], out var objectManager, out var party, out var error))
+                return Failed(error);
 
             var hull = MBObjectManager.Instance.GetObject<ShipHull>(hullId);
             if (hull == null)
                 return Failed($"No ship hull has id {hullId}.");
 
             var ship = new Ship(hull);
-            ChangeShipOwnerAction.ApplyByProduction(party.Party, ship);
+            ChangeShipOwnerAction.ApplyByProduction(party, ship);
 
             var shipId = DescribeId(objectManager, ship);
             Logger.Information("Added {HullId} ship {ShipId} to party {PartyId} (asked for {Query})",
-                hullId, shipId, party.StringId, args[0]);
-            return Succeeded($"Added {hullId} {shipId} to {party.StringId} (ships={party.Ships.Count}).");
+                hullId, shipId, party.Id, args[0]);
+            return Succeeded($"Added {hullId} {shipId} to {party.Id} (ships={party.Ships.Count}).");
         }
     }
 
