@@ -59,7 +59,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
     private DeferredForceScreen deferredForceScreen;
     // Client-only: the encounter a hostile-action request opened, kept until the server resolves the
     // request, and a won raid's continuation waiting for the current encounter to end.
-    private PlayerEncounter pendingHostileActionEncounter;
+    private PlayerEncounter requestedHostileActionEncounter;
     private Settlement parkedRaidContinuation;
 
     public VillageHostileActionInterface(IMessageBroker messageBroker, IObjectManager objectManager)
@@ -149,6 +149,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
 
     public void BeginHostileActionPresentation(VillageHostileAction action)
     {
+        requestedHostileActionEncounter = null;
         var encounter = PlayerEncounter.Current;
         if (encounter == null)
         {
@@ -179,71 +180,51 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         GameMenu.SwitchToMenu("encounter");
     }
 
-    public bool TryTrackPendingHostileAction(PlayerEncounter playerEncounter)
+    public bool TryTrackHostileActionRequest()
     {
-        if (pendingHostileActionEncounter != null)
+        if (requestedHostileActionEncounter != null)
             return false;
 
-        pendingHostileActionEncounter = playerEncounter;
+        requestedHostileActionEncounter = PlayerEncounter.Current;
         return true;
     }
 
-    public void ClearPendingHostileAction() => pendingHostileActionEncounter = null;
-
     public void RecoverRejectedHostileAction()
     {
-        // Read and cleared inside the game-thread action: this runs on the network thread, while the
-        // other writes to the field are game-thread code.
-        GameThread.RunSafe(() =>
-        {
-            var expectedEncounter = pendingHostileActionEncounter;
-            pendingHostileActionEncounter = null;
-
-            var encounter = PlayerEncounter.Current;
-            if (encounter == null || !ReferenceEquals(encounter, expectedEncounter) ||
-                encounter._mapEvent != null || encounter.BattleSimulation != null)
-                return;
-
-            encounter._stateHandled = true;
-            PlayerEncounter.LeaveEncounter = true;
-            PlayerEncounter.Finish(true);
-        }, context: nameof(RecoverRejectedHostileAction));
-    }
-
-    public void BeginRaidContinuation(Settlement settlement)
-    {
-        if (settlement?.Village == null)
-            return;
+        var expectedEncounter = requestedHostileActionEncounter;
+        requestedHostileActionEncounter = null;
 
         var encounter = PlayerEncounter.Current;
-        if (encounter != null && encounter._mapEvent == null &&
-            !MapEventInitializationBarrier.IsBattleResultEncounter(encounter))
-        {
-            // A live encounter is waiting for this presentation (the normal request flow).
-            BeginHostileActionPresentation(VillageHostileAction.Raid);
+        if (encounter == null || !ReferenceEquals(encounter, expectedEncounter) ||
+            encounter._mapEvent != null || encounter.BattleSimulation != null)
             return;
-        }
 
-        // Request the continuation after the finalized battle's result screens close.
+        encounter._stateHandled = true;
+        PlayerEncounter.LeaveEncounter = true;
+        PlayerEncounter.Finish(true);
+    }
+
+    public void ParkRaidContinuation(Settlement settlement)
+    {
         parkedRaidContinuation = settlement;
     }
 
-    public void PresentParkedRaidContinuation()
+    private void PresentParkedRaidContinuation()
     {
         var settlement = parkedRaidContinuation;
         if (settlement == null)
             return;
 
-        if (PlayerCaptivity.IsCaptive || MobileParty.MainParty?.MapEvent != null)
-            return;
-
-        var encounter = PlayerEncounter.Current;
-        if (encounter != null && encounter.EncounterState != PlayerEncounterState.End)
+        if (!CanPresentRaidContinuation(PlayerCaptivity.IsCaptive, MobileParty.MainParty?.MapEvent != null,
+                PlayerEncounter.Current?.EncounterState))
             return;
 
         parkedRaidContinuation = null;
         StartRaidContinuationEncounter(settlement);
     }
+
+    internal static bool CanPresentRaidContinuation(bool isCaptive, bool hasMapEvent, PlayerEncounterState? encounterState) =>
+        !isCaptive && !hasMapEvent && (encounterState == null || encounterState == PlayerEncounterState.End);
 
     private void StartRaidContinuationEncounter(Settlement settlement)
     {

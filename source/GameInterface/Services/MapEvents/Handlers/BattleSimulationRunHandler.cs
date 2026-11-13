@@ -55,7 +55,7 @@ internal class BattleSimulationRunHandler : IHandler
     private readonly IMapEventLogger mapEventLogger;
     private readonly IPlayerManager playerManager;
 
-    internal sealed class ActiveSimulation
+    private sealed class ActiveSimulation
     {
         public NetPeer Peer;
         public MapEvent MapEvent;
@@ -266,25 +266,21 @@ internal class BattleSimulationRunHandler : IHandler
         GameThread.RunCleanupSafe(() =>
         {
             if (CancelSimulationSession(mapEventId, simulation))
-            {
-                // Own RunSafe: a failure here must not undo the claim release and cancelled
-                // messages CancelSimulationSession already sent.
-                GameThread.RunSafe(() =>
-                {
-                    if (playerManager.TryGetPlayer(requestingPeer, out var player) &&
-                        objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party) &&
-                        party.MapEvent == simulation.MapEvent)
-                    {
-                        // Pacing a simulation does not make a joining party its side's leader.
-                        if (party.MapEventSide.LeaderParty == party.Party)
-                            messageBroker.Publish(this, new MapEventFinalizeAttempted(simulation.MapEvent));
-                        else
-                            messageBroker.Publish(requestingPeer, new PlayerLeaveBattleAttempted(party.Party));
-                    }
-                }, context: nameof(Handle_NetworkCancelBattleSimulation));
-            }
+                PublishRetreatOutcome(requestingPeer, simulation.MapEvent);
             mapEventLogger.DebugMapEvent(simulation.MapEvent, "Battle simulation cancelled by initiating client");
         }, context: nameof(Handle_NetworkCancelBattleSimulation));
+    }
+
+    private void PublishRetreatOutcome(NetPeer requestingPeer, MapEvent mapEvent)
+    {
+        if (!playerManager.TryGetPlayer(requestingPeer, out var player)) return;
+        if (!objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party)) return;
+        if (party.MapEvent != mapEvent) return;
+
+        if (party.MapEventSide.LeaderParty == party.Party)
+            messageBroker.Publish(this, new MapEventFinalizeAttempted(mapEvent));
+        else
+            messageBroker.Publish(requestingPeer, new PlayerLeaveBattleAttempted(party.Party));
     }
     private bool TryGetRequestingParticipant(
         NetPeer requester,
@@ -502,10 +498,9 @@ internal class BattleSimulationRunHandler : IHandler
             if (sim.MapEvent.HasWinner)
             {
 #if DEBUG
-                if (observation != null) observation.SimulationAdvanceStage = "capture-loot";
+                if (observation != null) observation.SimulationAdvanceStage = "complete-session";
 #endif
-                // Set before the session ends: if teardown throws, the entry is still removed
-                // below and the finished messages have already gone out from the helper.
+                // Set first so the entry is still removed below if completion throws.
                 finished = true;
                 CompleteSimulationSession(mapEventId, sim);
             }
@@ -907,16 +902,20 @@ internal class BattleSimulationRunHandler : IHandler
                     Logger.Error(exception, "Battle simulation disconnect cleanup could not resolve another round; cancelling the session");
                 }
 
-                bool completed = sim.MapEvent.HasWinner;
-                if (completed)
+                if (sim.MapEvent.HasWinner)
+                {
                     CompleteSimulationSession(entry.Key, sim);
+                    mapEventLogger.DebugMapEvent(sim.MapEvent,
+                        "Battle simulation client disconnected; finished server-side. BattleState={BattleState}",
+                        sim.MapEvent.BattleState);
+                }
                 else
+                {
                     CancelSimulationSession(entry.Key, sim);
-                mapEventLogger.DebugMapEvent(sim.MapEvent,
-                    completed
-                        ? "Battle simulation client disconnected; finished server-side. BattleState={BattleState}"
-                        : "Battle simulation client disconnected; cancelled unfinished session. BattleState={BattleState}",
-                    sim.MapEvent.BattleState);
+                    mapEventLogger.DebugMapEvent(sim.MapEvent,
+                        "Battle simulation client disconnected; cancelled unfinished session. BattleState={BattleState}",
+                        sim.MapEvent.BattleState);
+                }
             }
         }, then: () =>
         {
@@ -993,7 +992,7 @@ internal class BattleSimulationRunHandler : IHandler
     /// allocations (mirroring <c>MapEvent.SimulateBattleRoundEndSession</c>), then restore the observer
     /// that was swapped out when the simulation began.
     /// </summary>
-    internal static void EndSimulationSession(ActiveSimulation sim)
+    private static void EndSimulationSession(ActiveSimulation sim)
     {
         if (sim.MapEvent.IsFinalized)
             return;

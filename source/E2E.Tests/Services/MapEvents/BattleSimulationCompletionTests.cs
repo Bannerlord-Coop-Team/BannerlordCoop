@@ -24,42 +24,6 @@ public class BattleSimulationCompletionTests : MapEventTestBase
     public BattleSimulationCompletionTests(ITestOutputHelper output) : base(output) { }
 
     [Fact]
-    public void CancelledSimulationWithWinner_RestoresObserverWithoutFinalizing()
-    {
-        var context = CreateServerMapEvent();
-        var ended = new List<MapEvent>();
-        var previousObserver = Mock.Of<IBattleObserver>();
-
-        Server.Call(() =>
-        {
-            var mapEvent = Server.GetRegisteredObject<MapEvent>(context.MapEventId);
-            mapEvent.BattleState = BattleState.AttackerVictory;
-            var simulation = new BattleSimulationRunHandler.ActiveSimulation
-            {
-                MapEvent = mapEvent,
-                PreviousObserver = previousObserver,
-            };
-            Assert.All(mapEvent._sides, side => Assert.True(side._simulationTroopList == null || side._simulationTroopList.Count == 0));
-            CampaignEvents.MapEventEnded.AddNonSerializedListener(this, ended.Add);
-            try
-            {
-                BattleSimulationRunHandler.EndSimulationSession(simulation);
-
-                Assert.False(mapEvent.IsFinalized);
-                Assert.Empty(ended);
-                Assert.Same(previousObserver, mapEvent.BattleObserver);
-            }
-            finally
-            {
-                CampaignEvents.MapEventEnded.ClearListeners(this);
-            }
-        }, MapEventDisabledMethods);
-
-        foreach (var instance in Clients.Append(Server))
-            instance.Call(() => Assert.True(instance.ObjectManager.TryGetObject<MapEvent>(context.MapEventId, out _)));
-    }
-
-    [Fact]
     public void CompletedAdvance_SendsLootBeforeRemovingMapEvent_AndFinishesOnce()
     {
         var context = CreateServerMapEvent();

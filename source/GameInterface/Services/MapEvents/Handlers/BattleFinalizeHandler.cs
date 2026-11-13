@@ -479,6 +479,7 @@ internal class BattleFinalizeHandler : IHandler
         string[] playerPartyIds = null;
         string settlementId = null;
         string leaderMobilePartyId = null;
+        NetPeer leaderPeer = null;
 
         GameThread.RunSafe(
             () =>
@@ -493,7 +494,8 @@ internal class BattleFinalizeHandler : IHandler
                 var leaderParty = mapEvent.AttackerSide.LeaderParty;
                 if (leaderParty?.MobileParty == null ||
                     !objectManager.TryGetIdWithLogging(leaderParty.MobileParty, out leaderMobilePartyId) ||
-                    !TryGetPlayerPeer(leaderMobilePartyId, out _))
+                    !playerManager.TryGetPlayer(leaderParty.MobileParty, out var leader) ||
+                    !playerManager.TryGetPeer(leader.ControllerId, out leaderPeer))
                     return;
 
                 if (!TryMarkFinalized(mapEvent))
@@ -508,8 +510,6 @@ internal class BattleFinalizeHandler : IHandler
                     mapEvent.FinalizeEventAux();
                     ClearMapEventBackReferences(involvedParties);
 
-                    // Request approval after the result screens close so its timeout does not run
-                    // while the player is still viewing the scoreboard or collecting loot.
                     continued = true;
                 }
                 finally
@@ -527,24 +527,10 @@ internal class BattleFinalizeHandler : IHandler
         if (playerPartyIds.Length > 0)
             PvpEncounterCloseSender.Send(network, playerPartyIds, mapEventId: mapEventId);
 
-        if (TryGetPlayerPeer(leaderMobilePartyId, out var leaderPeer))
-            network.Send(leaderPeer, new NetworkVillageHostileActionStarted(VillageHostileAction.Raid, leaderMobilePartyId, settlementId));
+        // The client parks the continuation until its battle result screens close.
+        network.Send(leaderPeer, new NetworkRaidContinuationRequested(settlementId));
 
         return true;
-    }
-
-    private bool TryGetPlayerPeer(string mobilePartyId, out NetPeer peer)
-    {
-        peer = null;
-        foreach (var player in playerManager.Players)
-        {
-            if (player.MobilePartyId != mobilePartyId)
-                continue;
-
-            return playerManager.TryGetPeer(player.ControllerId, out peer);
-        }
-
-        return false;
     }
 
     private static PartyBase[] CollectInvolvedParties(MapEvent mapEvent)

@@ -6,17 +6,19 @@ namespace GameInterface.Tests.Services.UI;
 public class FinishedSimulationScoreboardTickPatchTests
 {
     [Theory]
-    [InlineData(false, false, true)]
-    [InlineData(false, true, true)]
-    [InlineData(true, false, true)]
-    [InlineData(true, true, false)]
+    [InlineData(false, false, false, true)]
+    [InlineData(false, true, false, true)]
+    [InlineData(true, false, true, true)]
+    [InlineData(true, false, false, false)]
+    [InlineData(true, true, true, false)]
     public void ShouldContinueTick_SkipsOnlyFinishedSimulations(
         bool isSimulation,
         bool isOver,
+        bool hasMapEvent,
         bool expected)
     {
         Assert.Equal(
             expected,
-            FinishedSimulationScoreboardTickPatch.ShouldContinueTick(isSimulation, isOver));
+            FinishedSimulationScoreboardTickPatch.ShouldContinueTick(isSimulation, isOver, hasMapEvent));
     }
 }

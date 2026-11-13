@@ -10,15 +10,12 @@ internal static class FinishedSimulationScoreboardTickPatch
     [HarmonyPrefix]
     private static bool StopFinishedSimulationTick(SPScoreboardVM __instance)
     {
-        // Finalization detaches the party before playback finishes updating the scoreboard.
-        if (__instance.IsSimulation && MobileParty.MainParty?.MapEvent == null) return false;
-
-        return ShouldContinueTick(__instance.IsSimulation, __instance.IsOver);
+        return ShouldContinueTick(__instance.IsSimulation, __instance.IsOver, MobileParty.MainParty?.MapEvent != null);
     }
 
-    internal static bool ShouldContinueTick(bool isSimulation, bool isOver)
+    internal static bool ShouldContinueTick(bool isSimulation, bool isOver, bool hasMapEvent)
     {
         // The synchronized MapEvent can be destroyed while its finished scoreboard remains open.
-        return !isSimulation || !isOver;
+        return !isSimulation || (hasMapEvent && !isOver);
     }
 }

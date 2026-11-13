@@ -15,19 +15,13 @@ public interface IVillageHostileActionInterface : IGameAbstraction
     void BeginHostileActionPresentation(VillageHostileAction action);
 
     /// <summary>[Client, game thread] Track a hostile-action request until the server resolves it; false when one is already pending.</summary>
-    bool TryTrackPendingHostileAction(PlayerEncounter playerEncounter);
+    bool TryTrackHostileActionRequest();
 
-    /// <summary>[Client, game thread] The pending hostile-action request was approved.</summary>
-    void ClearPendingHostileAction();
-
-    /// <summary>[Client] The pending hostile-action request was denied; close the encounter it opened.</summary>
+    /// <summary>[Client, game thread] The hostile-action request was denied; close the encounter it opened.</summary>
     void RecoverRejectedHostileAction();
 
-    /// <summary>[Client, game thread] Present an approved raid start, or park a continuation until the current encounter ends.</summary>
-    void BeginRaidContinuation(Settlement settlement);
-
-    /// <summary>[Client, game thread] Request fresh approval for a parked raid continuation once the current encounter has ended.</summary>
-    void PresentParkedRaidContinuation();
+    /// <summary>[Client, game thread] Park a raid continuation until the current encounter ends.</summary>
+    void ParkRaidContinuation(Settlement settlement);
     bool CanStartHostileAction(MobileParty mobileParty, Settlement settlement, VillageHostileAction action, out VillageHostileActionDeniedReason reason);
     void ApplyHostileAction(MobileParty mobileParty, Settlement settlement, VillageHostileAction action);
     void ResolveRaidDefenders(MapEvent mapEvent);

@@ -366,7 +366,10 @@ public class VillageHostileActionTests : MapEventTestBase
         client.Call(() =>
         {
             Campaign.Current.MainParty = client.GetRegisteredObject<MobileParty>(mobilePartyId);
-            client.Resolve<IVillageHostileActionInterface>().TryTrackPendingHostileAction(encounter);
+            client.Resolve<IMessageBroker>().Publish(this, new VillageHostileActionAttempted(
+                VillageHostileAction.Raid,
+                MobileParty.MainParty,
+                Settlement.CurrentSettlement));
         }, MapEventDisabledMethods);
 
         client.SimulateMessage(Server.NetPeer,
@@ -1097,20 +1100,6 @@ public class VillageHostileActionTests : MapEventTestBase
     }
 
     [Fact]
-    public void CompletedRaidSimulation_RequestsFreshApprovalAfterPartyAndLootDone_ResumesRaiding()
-    {
-        var result = CompleteRaidSimulationAndLoot();
-        try
-        {
-            AssertRaidContinuationPresented(result);
-        }
-        finally
-        {
-            result.Dispose();
-        }
-    }
-
-    [Fact]
     public void CompletedRaidSimulation_ReinforcedRaid_ResumesRaidingAgain()
     {
         var result = CompleteRaidSimulationAndLoot();
@@ -1184,7 +1173,7 @@ public class VillageHostileActionTests : MapEventTestBase
                 states._gameStates.RemoveAt(states._gameStates.Count - 1);
                 client.NetworkSentMessages.Clear();
                 mapState.OnMapModeTick(0.1f);
-                client.Resolve<IVillageHostileActionInterface>().PresentParkedRaidContinuation();
+                client.Resolve<IMessageBroker>().Publish(this, new CampaignTick());
                 Assert.NotSame(reopened, PlayerEncounter.Current);
             }, MapEventDisabledMethods.Concat(new[]
             {
@@ -1327,7 +1316,7 @@ public class VillageHostileActionTests : MapEventTestBase
             client.NetworkSentMessages.Clear();
             Server.NetworkSentMessages.Clear();
             client.Resolve<IPlayerEncounterInterface>().UpdateInternalAfterBattle(encounter);
-            client.Resolve<IVillageHostileActionInterface>().PresentParkedRaidContinuation();
+            client.Resolve<IMessageBroker>().Publish(this, new CampaignTick());
         }, MapEventDisabledMethods
             .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast))));
         return result;
