@@ -9,6 +9,7 @@ using GameInterface.Services.MobileParties.Messages.Unstuck;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.Rafts.Interfaces;
 using GameInterface.Services.Settlements.Interfaces;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using Serilog;
@@ -52,6 +53,7 @@ internal class ServerPlayerUnstuck : IServerPlayerUnstuck
     private readonly IPartyNavigationRepair partyNavigationRepair;
     private readonly IMapEventLoadCleaner mapEventLoadCleaner;
     private readonly IStalledMapEventResolver stalledMapEventResolver;
+    private readonly IPlayerRaftFleetInterface raftFleetInterface;
 
     public ServerPlayerUnstuck(
         IMessageBroker messageBroker,
@@ -62,7 +64,8 @@ internal class ServerPlayerUnstuck : IServerPlayerUnstuck
         ISiegeEventInterface siegeEventInterface,
         IPartyNavigationRepair partyNavigationRepair,
         IMapEventLoadCleaner mapEventLoadCleaner,
-        IStalledMapEventResolver stalledMapEventResolver)
+        IStalledMapEventResolver stalledMapEventResolver,
+        IPlayerRaftFleetInterface raftFleetInterface = null)
     {
         this.partyNavigationRepair = partyNavigationRepair;
         this.messageBroker = messageBroker;
@@ -73,6 +76,7 @@ internal class ServerPlayerUnstuck : IServerPlayerUnstuck
         this.siegeEventInterface = siegeEventInterface;
         this.mapEventLoadCleaner = mapEventLoadCleaner;
         this.stalledMapEventResolver = stalledMapEventResolver;
+        this.raftFleetInterface = raftFleetInterface;
     }
 
     public string[] Apply(Player player, bool includeCaptivity)
@@ -190,6 +194,16 @@ internal class ServerPlayerUnstuck : IServerPlayerUnstuck
             });
         }
 
+        // Sends a raft at sea toward the nearest shore again, since its AI is off and nothing else restarts the move
+        // raftFleetInterface is only registered while War Sails is on
+        if (raftFleetInterface != null)
+        {
+            TryStep(actions, "raft resume", () =>
+                raftFleetInterface.ResumeRaft(party)
+                    ? $"Sent the raft toward the nearest shore at {Format(party.MoveTargetPoint)}."
+                    : null);
+        }
+
         // After the player left, so a battle that only the player kept waiting can end too.
         TryStep(actions, "stalled battle resolve", () =>
         {
@@ -207,7 +221,7 @@ internal class ServerPlayerUnstuck : IServerPlayerUnstuck
 
         if (actions.Count == 0)
         {
-            actions.Add("No server-side stuck state found (captivity, map event, army, siege camp, settlement, map position).");
+            actions.Add("No server-side stuck state found (captivity, map event, army, siege camp, settlement, raft, map position).");
         }
 
         return SendResult(player, partyId, actions);
