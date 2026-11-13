@@ -744,6 +744,8 @@ public class CoopClanFlowTests : MapEventTestBase, IDisposable
             foreach (var id in markerPartyIds)
                 Get<MobileParty>(memberClient, id)._isVisible = true;
         });
+
+        // Preconditions: before the join the enemy's town is not at war with the member, and the shared enemy already is.
         memberClient.Call(() =>
         {
             var settlement = Get<Settlement>(memberClient, settlementId);
