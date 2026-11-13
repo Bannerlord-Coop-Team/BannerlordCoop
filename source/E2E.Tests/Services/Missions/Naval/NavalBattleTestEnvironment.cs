@@ -618,7 +618,7 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment, IDisp
 
         /// <summary>
         /// [Battle host] An AI party's hull, registered and announced through the replicator; with a
-        /// <paramref name="formationIndex"/> it takes that formation of the team the NPC fleet spawner picks for the side: the
+        /// <paramref name="formationIndex"/> it takes that formation of the team the NPC fleet fielder picks for the side: the
         /// side's main team, or its ally team on this client's own side.
         /// </summary>
         public Guid FieldAiHull(BattleSideEnum side, Vec3 position, string mapEventPartyId, int? formationIndex = null,

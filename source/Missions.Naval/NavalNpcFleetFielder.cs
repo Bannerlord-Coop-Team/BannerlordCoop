@@ -30,7 +30,7 @@ public interface INavalNpcFleetFielder
 
     /// <summary>
     /// Fields the side's AI fleet from <paramref name="reserve"/>, recording each hull and pulled troop in <paramref name="work"/>
-    /// as it happens; returns why a step couldn't go on (<see cref="NavalNpcFleetAttemptWork.NoShipsLeft"/> when the players'
+    /// as it happens; returns why a step couldn't go on (<see cref="NavalNpcFleetFielder.NoShipsLeft"/> when the players'
     /// fleets take all of the side's ships), or null once the fleet is crewed.
     /// </summary>
     string Field(Mission mission, BattleSideEnum side, NavalNpcReserve reserve, NavalNpcFleetAttemptWork work);
@@ -43,6 +43,9 @@ public class NavalNpcFleetFielder : INavalNpcFleetFielder
 
     // AssignShipsToFormations (DefaultNavalMissionLogic) uses the first eight formations.
     private const int MaxShipFormations = 8;
+
+    /// <summary>Why <see cref="Field"/> fields nothing when the players' fleets take all of the side's ships, a normal outcome.</summary>
+    public const string NoShipsLeft = "the players' fleets take all of the side's ships";
 
     private readonly IBattleSession session;
     private readonly IBattleShipReplicator shipReplicator;
@@ -72,6 +75,7 @@ public class NavalNpcFleetFielder : INavalNpcFleetFielder
     internal static int ShipCount(int deploymentLimit, int ships, int freeFormations) =>
         Math.Max(0, Math.Min(Math.Min(deploymentLimit, ships), Math.Min(freeFormations, MaxShipFormations)));
 
+    // Reads the side's supplier and its AI parties once, for the spawner's decision and the fielding that follows.
     public NavalNpcReserve ReadReserve(BattleSideEnum side)
     {
         var supplier = SideSupplier(side);
@@ -97,7 +101,7 @@ public class NavalNpcFleetFielder : INavalNpcFleetFielder
         var parties = reserve.Parties;
         var limit = shipBudget.AiLimit(mapEvent.GetMapEventSide(side).Parties, parties);
         // The players' fleets can take all of the side's eight ships, which just leaves it no AI fleet.
-        if (limit.NetDeploymentLimit == 0) return NavalNpcFleetAttemptWork.NoShipsLeft;
+        if (limit.NetDeploymentLimit == 0) return NoShipsLeft;
 
         var model = NavalDLCManager.Instance.GameModels.ShipDeploymentModel;
         var campaignShips = new MBList<IShipOrigin>();

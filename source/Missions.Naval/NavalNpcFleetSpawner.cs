@@ -218,7 +218,7 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
     // Players taking all of the side's ships is a normal outcome, so only a real failure is a warning.
     private void LogNotFielded()
     {
-        if (failure == NavalNpcFleetAttemptWork.NoShipsLeft)
+        if (failure == NavalNpcFleetFielder.NoShipsLeft)
         {
             Logger.Information("[NavalBattle] The {Side} side of {MapEventId} fields no AI fleet: {Reason}", Side, session.InstanceId,
                 failure);

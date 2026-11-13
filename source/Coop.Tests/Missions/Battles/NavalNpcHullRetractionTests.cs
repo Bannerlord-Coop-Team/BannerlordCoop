@@ -154,9 +154,7 @@ public class NavalNpcHullRetractionTests
         harness.Network.Setup(n => n.SendAll(It.IsAny<NetworkNpcFleetAttempted>()))
             .Callback<IMessage>(message => sent.Add(((NetworkNpcFleetAttempted)message).Failed ? "failed" : "fielded"));
 
-        harness.Fielder.Setup(f => f.Field(It.IsAny<Mission>(), It.IsAny<BattleSideEnum>(), It.IsAny<NavalNpcReserve>(),
-                It.IsAny<NavalNpcFleetAttemptWork>()))
-            .Returns<Mission, BattleSideEnum, NavalNpcReserve, NavalNpcFleetAttemptWork>((_, _, _, work) =>
+        harness.Attempt(spawner, work =>
         {
             foreach (var hull in hulls)
             {
@@ -166,7 +164,6 @@ public class NavalNpcHullRetractionTests
 
             throw new InvalidOperationException("crewing threw");
         });
-        spawner.AttemptFleet(null, default);
 
         Assert.Equal(new[] { "removed:0" }, sent);
         Assert.False(spawner.AttemptFailed);
@@ -232,6 +229,15 @@ public class NavalNpcHullRetractionTests
             , Mock.Of<INavalScenarioState>()
 #endif
             );
+
+        // Makes one attempt of the spawner whose fielder does what the given step does with the attempt's work.
+        public void Attempt(NavalNpcFleetSpawner spawner, Func<NavalNpcFleetAttemptWork, string> field)
+        {
+            Fielder.Setup(f => f.Field(It.IsAny<Mission>(), It.IsAny<BattleSideEnum>(), It.IsAny<NavalNpcReserve>(),
+                    It.IsAny<NavalNpcFleetAttemptWork>()))
+                .Returns<Mission, BattleSideEnum, NavalNpcReserve, NavalNpcFleetAttemptWork>((_, _, _, work) => field(work));
+            spawner.AttemptFleet(null, default);
+        }
 #endif
     }
 }

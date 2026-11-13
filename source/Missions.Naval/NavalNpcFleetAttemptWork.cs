@@ -11,9 +11,6 @@ namespace Missions.Naval;
 /// </summary>
 public sealed class NavalNpcFleetAttemptWork
 {
-    /// <summary>Why an attempt fields nothing when the players' fleets take all of the side's ships, a normal outcome.</summary>
-    public const string NoShipsLeft = "the players' fleets take all of the side's ships";
-
     /// <summary>Every hull the attempt spawned, in spawn order, whether or not it registered.</summary>
     public List<MissionObject> Hulls { get; } = new List<MissionObject>();
 

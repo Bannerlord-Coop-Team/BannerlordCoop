@@ -162,7 +162,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         var deploymentModel = NavalDLCManager.Instance.GameModels.ShipDeploymentModel;
 
         var sideParties = mapEvent.GetMapEventSide(playerSide).Parties;
-        // The player registry the AI share and the spawner read too, so all three agree on who the side's players are.
+        // The player registry the AI share and the fielder read too, so all three agree on who the side's players are.
         Func<PartyBase, bool> isPlayerParty = party => playerManager.Contains(party.MobileParty);
         deploymentSlot.Rank = NavalPlayerDeploymentSlot.RankOf(
             sideParties.Select(party => party.Party), PartyBase.MainParty, isPlayerParty);
