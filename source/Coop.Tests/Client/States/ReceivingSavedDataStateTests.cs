@@ -1,5 +1,7 @@
 ﻿using Autofac;
 using Common.Messaging;
+using Common.Network;
+using Coop.Core.Common;
 using Coop.Core.Client;
 using Coop.Core.Client.Messages;
 using Coop.Core.Client.States;
@@ -38,6 +40,7 @@ namespace Coop.Tests.Client.States
             clientLogic = container.Resolve<IClientLogic>()!;
             loadingInterfaceMock = container.Resolve<Mock<ILoadingInterface>>();
             gameStateMock = container.Resolve<Mock<IGameStateInterface>>();
+            gameStateMock.Setup(x => x.TryLoadSaveData(It.IsAny<byte[]>(), It.IsAny<TimeSpan>())).Returns(true);
         }
 
         private static NetworkGameSaveDataReceived SaveData(byte[] data, string campaignId) =>
@@ -82,7 +85,7 @@ namespace Coop.Tests.Client.States
 
             // Assert — the world is reset to the main menu, then the received save is loaded.
             gameStateMock.Verify(x => x.GoToMainMenu(), Times.Once);
-            gameStateMock.Verify(x => x.LoadSaveData(gameSaveData), Times.Once);
+            gameStateMock.Verify(x => x.TryLoadSaveData(gameSaveData, NetworkJoinLimits.SaveHandoffTimeout), Times.Once);
             Assert.IsType<LoadingState>(clientLogic.State);
             loadingInterfaceMock.Verify(x => x.SetLoadingMessage(
                 "Joining Coop Campaign",
@@ -90,6 +93,30 @@ namespace Coop.Tests.Client.States
             loadingInterfaceMock.Verify(x => x.SetLoadingMessage(
                 "Loading Host Campaign",
                 "Loading host save data..."), Times.Once);
+        }
+
+        [Fact]
+        public void NetworkGameSaveDataReceived_SaveLoadNeverStarted_EndsTheJoinWithAMessage()
+        {
+            // Arrange
+            var coopFinalizer = new Mock<ICoopFinalizer>();
+            var currentState = new ReceivingSavedDataState(
+                clientLogic,
+                clientComponent.TestMessageBroker,
+                loadingInterfaceMock.Object,
+                gameStateMock.Object,
+                coopFinalizer.Object);
+            ((ClientLogic)clientLogic).State = currentState;
+            var gameSaveData = new byte[16];
+            gameStateMock.Setup(x => x.TryLoadSaveData(gameSaveData, It.IsAny<TimeSpan>())).Returns(false);
+
+            // Act
+            currentState.Handle_NetworkGameSaveDataReceived(
+                new MessagePayload<NetworkGameSaveDataReceived>(this, SaveData(gameSaveData, "12345")));
+
+            // Assert — back to the main menu with a message instead of an endless loading screen
+            coopFinalizer.Verify(x => x.Finalize(ReceivingSavedDataState.SaveHandoffTimedOutText), Times.Once);
+            Assert.Same(currentState, clientLogic.State);
         }
 
         [Fact]
@@ -120,7 +147,7 @@ namespace Coop.Tests.Client.States
 
             // Assert — no save to load, so we go to the main menu but remain waiting.
             gameStateMock.Verify(x => x.GoToMainMenu(), Times.Once);
-            gameStateMock.Verify(x => x.LoadSaveData(It.IsAny<byte[]>()), Times.Never);
+            gameStateMock.Verify(x => x.TryLoadSaveData(It.IsAny<byte[]>(), It.IsAny<TimeSpan>()), Times.Never);
             Assert.IsType<ReceivingSavedDataState>(clientLogic.State);
         }
 
@@ -136,7 +163,7 @@ namespace Coop.Tests.Client.States
 
             // Assert
             gameStateMock.Verify(x => x.GoToMainMenu(), Times.Once);
-            gameStateMock.Verify(x => x.LoadSaveData(It.IsAny<byte[]>()), Times.Never);
+            gameStateMock.Verify(x => x.TryLoadSaveData(It.IsAny<byte[]>(), It.IsAny<TimeSpan>()), Times.Never);
             Assert.IsType<ReceivingSavedDataState>(clientLogic.State);
         }
 

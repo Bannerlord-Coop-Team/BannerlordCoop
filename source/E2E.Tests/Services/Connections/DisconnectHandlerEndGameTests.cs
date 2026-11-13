@@ -151,7 +151,7 @@ public class DisconnectHandlerEndGameTests
             {
                 DuringEndGame?.Invoke();
                 order.Enqueue("EndGame");
-            }, Array.Empty<SaveGameFileInfo>, _ => { }, Mock.Of<INavalSaveCompatibility>(), Mock.Of<ILoadingInterface>());
+            }, Array.Empty<SaveGameFileInfo>, _ => { }, _ => { }, Mock.Of<INavalSaveCompatibility>(), Mock.Of<ILoadingInterface>());
             handler = new DisconnectHandler(Broker, new CoopFinalizer(Broker, loadingScreen.Object), gameState);
         }
 

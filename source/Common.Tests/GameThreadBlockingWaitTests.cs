@@ -72,11 +72,29 @@ public class GameThreadBlockingWaitTests
         using var wait = new EventWaitHandle(false, EventResetMode.ManualReset);
         var queued = new GameThread.QueuedAction(() => { }, wait, "pending", default);
 
-        Assert.Throws<TimeoutException>(() => GameThread.WaitForBlockingCompletion(queued, default));
+        Assert.Throws<GameThreadActionExpiredException>(() => GameThread.WaitForBlockingCompletion(queued, default));
 
         Assert.False(queued.TryBeginRun(out Action? action));
         Assert.Null(action);
         Assert.Null(queued.Act);
+    }
+
+    [Theory]
+    [InlineData(100, 1000)]
+    [InlineData(1000, 100)]
+    public void PendingAction_WaitsTheLongerOfItsOwnAndTheQueueTimeout(int queueMilliseconds, int callMilliseconds)
+    {
+        var queue = new GameThread.QueueContext();
+        using var active = GameThread.ActivateQueue(queue);
+        using var budget = GameThread.Instance.LimitFrameDrain(TimeSpan.FromSeconds(1),
+            TimeSpan.FromMilliseconds(queueMilliseconds));
+        using var wait = new EventWaitHandle(false, EventResetMode.ManualReset);
+        var queued = new GameThread.QueuedAction(() => { }, wait, "pending", default);
+
+        var exception = Assert.Throws<GameThreadActionExpiredException>(() =>
+            GameThread.WaitForBlockingCompletion(queued, default, TimeSpan.FromMilliseconds(callMilliseconds)));
+
+        Assert.Contains("within 1 seconds", exception.Message);
     }
 
     [Fact]

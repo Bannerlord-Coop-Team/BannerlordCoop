@@ -568,7 +568,7 @@ public class GameThread : IUpdateable
     public int Priority { get; } = UpdatePriority.MainLoop.GameThread;
 
     /// <summary>
-    /// Maximum time a blocking <see cref="Run(Action, bool, string, string, string)"/> call waits for the
+    /// Maximum time a blocking <see cref="Run(Action, bool, string, TimeSpan?, string, string)"/> call waits for the
     /// game loop to process the queued action before failing. Turns a silent deadlock into a loud error
     /// when the game loop is not pumping (or was never initialized, as in test environments).
     /// </summary>
@@ -583,11 +583,15 @@ public class GameThread : IUpdateable
     /// False queues and returns</param>
     /// <param name="label">Optional name used to attribute drain time in the instrumentation summary.
     /// Defaults to the calling file and method, so call sites do not need to pass anything.</param>
+    /// <param name="blockingTimeout">Optional start wait for this blocking call. The longer of it and
+    /// <see cref="EffectiveBlockingTimeout"/> is used.</param>
     /// <exception cref="TimeoutException">
     /// Thrown for blocking calls when the action did not start within the blocking timeout, in which case it
-    /// never runs, or when it started but did not finish within one more wait.
+    /// never runs (as <see cref="GameThreadActionExpiredException"/>), or when it started but did not finish
+    /// within one more wait.
     /// </exception>
     public static void Run(Action action, bool blocking = false, string label = null,
+        TimeSpan? blockingTimeout = null,
         [CallerFilePath] string callerFile = null,
         [CallerMemberName] string callerMember = null)
     {
@@ -654,7 +658,7 @@ public class GameThread : IUpdateable
 
             try
             {
-                WaitForBlockingCompletion(queuedAction, cancellation);
+                WaitForBlockingCompletion(queuedAction, cancellation, blockingTimeout);
             }
             finally
             {
@@ -669,10 +673,12 @@ public class GameThread : IUpdateable
     /// Waits for a queued blocking action. When the wait ends before the game thread claims the action,
     /// the action expires and never runs. When it is already running, a timeout waits once more.
     /// </summary>
-    internal static void WaitForBlockingCompletion(QueuedAction queuedAction, CancellationToken cancellation)
+    internal static void WaitForBlockingCompletion(QueuedAction queuedAction, CancellationToken cancellation,
+        TimeSpan? blockingTimeout = null)
     {
         EventWaitHandle ewh = queuedAction.Wait;
         TimeSpan waitTimeout = Instance.EffectiveBlockingTimeout;
+        if (blockingTimeout > waitTimeout) waitTimeout = blockingTimeout.Value;
         int waitResult = WaitForSignal(ewh, cancellation, waitTimeout);
         if (waitResult == 0)
         {
@@ -688,7 +694,7 @@ public class GameThread : IUpdateable
             : $"The game-thread session ended before the blocking {nameof(Run)} action started. It will not run.";
         if (queuedAction.TryExpire(reason))
         {
-            if (timedOut) throw new TimeoutException(reason);
+            if (timedOut) throw new GameThreadActionExpiredException(reason);
             throw new OperationCanceledException(reason);
         }
 
@@ -989,7 +995,7 @@ public class GameThread : IUpdateable
     /// Clears the game-loop thread registration. A thread that was marked via
     /// <see cref="MarkGameThread"/> must call this before it exits: .NET recycles managed thread
     /// ids, so a registration left behind by a dead thread can silently promote an unrelated
-    /// future thread to "game thread", flipping <see cref="Run(Action, bool, string, string, string)"/>
+    /// future thread to "game thread", flipping <see cref="Run(Action, bool, string, TimeSpan?, string, string)"/>
     /// from queueing to inline execution.
     /// </summary>
     public void UnmarkGameThread()
@@ -1084,5 +1090,15 @@ public class GameThread : IUpdateable
         {
             m_AmbientQueue.Value = previous;
         }
+    }
+}
+
+/// <summary>
+/// A blocking <see cref="GameThread.Run"/> action that timed out before the game thread started it. It never runs.
+/// </summary>
+public sealed class GameThreadActionExpiredException : TimeoutException
+{
+    public GameThreadActionExpiredException(string message) : base(message)
+    {
     }
 }
