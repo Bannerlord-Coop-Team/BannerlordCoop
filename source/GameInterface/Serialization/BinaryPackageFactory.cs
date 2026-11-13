@@ -15,15 +15,6 @@ namespace GameInterface.Serialization
         T GetBinaryPackage<T>(object obj);
 
         IBinaryPackage GetBinaryPackage(object obj);
-
-        /// <summary>
-        /// Marks objects that are packed on purpose without a network id, until the result is disposed.
-        /// A missing id for one of them is expected, so <see cref="BinaryPackageBase{T}"/> logs no error for it.
-        /// </summary>
-        IDisposable PackWithoutIds(params object[] objects);
-
-        /// <summary>True while <paramref name="obj"/> is inside a <see cref="PackWithoutIds"/> scope.</summary>
-        bool IsPackedWithoutId(object obj);
     }
 
     public class BinaryPackageFactory : IBinaryPackageFactory
@@ -43,51 +34,6 @@ namespace GameInterface.Serialization
 
         private readonly Dictionary<ObjectAndType, IBinaryPackage> InstantiatedPackages = new Dictionary<ObjectAndType, IBinaryPackage>();
         private int packageGraphDepth;
-
-        // Compared by reference: MBObjectBase overrides Equals and GetHashCode with its MBGUID.
-        private readonly List<object> packedWithoutIds = new List<object>();
-
-        public IDisposable PackWithoutIds(params object[] objects)
-        {
-            var marked = objects.Where(obj => obj != null).ToArray();
-            lock (packedWithoutIds) packedWithoutIds.AddRange(marked);
-            return new PackWithoutIdsScope(this, marked);
-        }
-
-        public bool IsPackedWithoutId(object obj)
-        {
-            lock (packedWithoutIds) return packedWithoutIds.Any(marked => ReferenceEquals(marked, obj));
-        }
-
-        private void EndPackWithoutIds(object[] marked)
-        {
-            lock (packedWithoutIds)
-            {
-                foreach (var obj in marked)
-                {
-                    int index = packedWithoutIds.FindIndex(existing => ReferenceEquals(existing, obj));
-                    if (index >= 0) packedWithoutIds.RemoveAt(index);
-                }
-            }
-        }
-
-        private sealed class PackWithoutIdsScope : IDisposable
-        {
-            private BinaryPackageFactory factory;
-            private readonly object[] marked;
-
-            public PackWithoutIdsScope(BinaryPackageFactory factory, object[] marked)
-            {
-                this.factory = factory;
-                this.marked = marked;
-            }
-
-            public void Dispose()
-            {
-                factory?.EndPackWithoutIds(marked);
-                factory = null;
-            }
-        }
 
         private static void CollectBinaryPackageTypes()
         {
