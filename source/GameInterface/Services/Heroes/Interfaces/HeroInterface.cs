@@ -76,13 +76,7 @@ internal class HeroInterface : IHeroInterface
         objectManager.Remove(Hero.MainHero.Clan);
         objectManager.Remove(Hero.MainHero.CharacterObject);
 
-        // The host gives these objects new ids (AssignServerHeroNetworkIds), so the package carries none for them.
-        HeroBinaryPackage package;
-        using (binaryPackageFactory.PackWithoutIds(
-            Hero.MainHero, Hero.MainHero.PartyBelongedTo, Hero.MainHero.Clan, Hero.MainHero.CharacterObject))
-        {
-            package = binaryPackageFactory.GetBinaryPackage<HeroBinaryPackage>(Hero.MainHero);
-        }
+        HeroBinaryPackage package = binaryPackageFactory.GetBinaryPackage<HeroBinaryPackage>(Hero.MainHero);
 
         return BinaryPackageSerializer.SerializeCompressed(package);
     }
