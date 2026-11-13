@@ -1109,7 +1109,28 @@ public class AgentStationUseReplicatorTests
         crew.Engine.Verify(e => e.PlaceSeatedAgent(crew.Agent, It.Is<Vec3>(spot => spot.DistanceSquared(spawnSpot) < 1e-8f)), Times.Once);
     }
 
-    // A puppet of a remote owner, crewing a registered hull whose oar station resolves.
+    // A puppet that stays off its hull after each return, as when its placement keeps failing, is put back once per retry
+    // interval instead of every frame.
+    [Fact]
+    public void Tick_ReturnsAPuppetThatStaysOffItsHull_OncePerRetryInterval()
+    {
+        var crew = SeatableCrew(out _);
+        var station = new Vec3(4f, 5f, 2f);
+        crew.Engine.Setup(e => e.GetSupportHull(crew.Agent)).Returns((MissionObject)null!);
+        crew.Engine.Setup(e => e.GetStationPosition(crew.Point)).Returns(station);
+        using var replicator = crew.CreateReplicator();
+        replicator.AcceptUse(Use(crew.AgentId, crew.ShipId, inUse: true, revision: 1, "owner"));
+
+        replicator.Tick(0f);
+        replicator.Tick(Frame);
+        crew.Engine.Verify(e => e.PlaceSeatedAgent(crew.Agent, station), Times.Once);
+        replicator.Tick(AfterRetry);
+
+        crew.Engine.Verify(e => e.PlaceSeatedAgent(crew.Agent, station), Times.Exactly(2));
+        Assert.Equal(2, (long)JObject.FromObject(replicator.Inspect())["strandedReturns"]!);
+    }
+
+    // A puppet of a remote owner, standing on a registered hull whose oar station resolves.
     private sealed class RemoteCrew
     {
         public RemoteCrew()
@@ -1120,6 +1141,7 @@ public class AgentStationUseReplicatorTests
             Registry.Setup(r => r.TryGetAgentInfo(Agent, out info)).Returns(() => Registered);
             Ships.TryRegister(new NetworkShipInfo(ShipId, "owner", "party", isNpcParty: false, Hull, null!));
             Engine.Setup(e => e.ResolveStation(Hull, "oar", 0)).Returns(Point);
+            Engine.Setup(e => e.GetSupportHull(Agent)).Returns(Hull);
         }
 
         public Guid AgentId { get; } = Guid.NewGuid();

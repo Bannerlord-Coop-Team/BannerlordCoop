@@ -334,6 +334,33 @@ public sealed class NavalDeckMovementTests : MissionTestEnvironment
         });
     }
 
+    // The owner's walking sample, sent before it seated its crew member, arrives after the seat, as movement and station uses
+    // travel on separate channels. The puppet stays with its station instead of walking or teleporting to the stale pose.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void WalkingSampleArrivingAfterTheOwnersSeat_DoesNotMoveTheSeatedPuppet(bool onDeck)
+    {
+        using var fixture = new MissionEngineFixture();
+        WithReceiver(fixture, receiver =>
+        {
+            bool seated = false;
+            receiver.Handler.ConfigureStationSeats(new FakeShipStationSeats { IsApplied = id => seated && id == receiver.Id });
+            var walkingFrom = receiver.Hull.TransformToParent(Local);
+            receiver.Receive(receiver.Data(onDeck, walkingFrom));
+            Assert.True(receiver.HasTarget);
+
+            // The seat applies as the station replicator applies it: seated, with the buffered pose dropped.
+            seated = true;
+            receiver.Handler.ForgetMovementTarget(receiver.Puppet);
+            receiver.Receive(receiver.Data(onDeck, walkingFrom + new Vec3(20f, 0f, -5f)));
+            receiver.Tick();
+
+            Assert.False(receiver.HasTarget);
+            Assert.Equal(0, receiver.Mirror.TeleportToPositionCalls);
+        });
+    }
+
     // S13 D5: a seated agent sends no movement, and its first sample after leaving the station goes out at once.
     [Fact]
     public void OwnedSeatedAgent_SendsNoMovement_AndItsFirstSampleAfterLeavingGoesOutAtOnce()

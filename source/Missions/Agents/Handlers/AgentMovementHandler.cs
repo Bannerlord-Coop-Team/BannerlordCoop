@@ -1937,6 +1937,15 @@ public partial class AgentMovementHandler : IAgentMovementHandler
                     continue;
                 }
 
+                // The owner's applied seat owns the puppet's pose until its release applies here, so a sample in between, sent
+                // before the seat or racing the release on this unordered channel, is dropped.
+                if (stationSeats?.IsAppliedSeat(agentInfo.AgentId) == true)
+                {
+                    RecordMovementSequence(agentInfo, snapshot.SampleSequence);
+                    seatedIgnored++;
+                    continue;
+                }
+
                 // The interpolator owns a deck pose and its rebased directions every tick.
                 if (data.DeckShipIndex != 0)
                 {
