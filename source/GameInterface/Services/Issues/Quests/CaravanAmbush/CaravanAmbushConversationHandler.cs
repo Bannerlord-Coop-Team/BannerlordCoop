@@ -86,5 +86,4 @@ internal class CaravanAmbushConversationHandler : IHandler
 
     private bool IsOwnerFreeOnMap() => GameStateManager.Current?.ActiveState is MapState map && !map.AtMenu &&
         !map.IsSimulationActive && !Campaign.Current.ConversationManager.IsConversationInProgress;
-
 }

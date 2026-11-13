@@ -47,5 +47,4 @@ internal class CaravanAmbushDialogPatches
             throw new MissingMemberException("ConversationEndOneShot");
         conversationEnd.AddEventHandler(conversationManager, new Action(quest.OnQuestSucceeded));
     }
-
 }

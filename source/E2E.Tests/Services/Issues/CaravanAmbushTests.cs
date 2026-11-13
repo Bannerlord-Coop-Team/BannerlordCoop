@@ -586,6 +586,22 @@ public class CaravanAmbushTests : IDisposable
         Owner.Call(() => Assert.True(ownerQuest.IsFinalized));
     }
 
+    [Fact]
+    public void ACapturedOwnerCanStillTimeOutThroughTheOwnerDispatchPath()
+    {
+        Server.Call(() =>
+        {
+            Campaign.Current.EncyclopediaManager ??= new EncyclopediaManager();
+            Campaign.Current.EncyclopediaManager.CreateEncyclopediaPages();
+            PlayerHero(QuestScenario.ControllerA)._partyBelongedTo = null;
+        });
+        var ownerQuest = QuestOf(Owner);
+        Owner.Call(() => ownerQuest.CompleteQuestWithTimeOut());
+        var finalized = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Assert.Equal(IssueOutcome.QuestTimeOut, finalized.Outcome);
+        Owner.Call(() => Assert.True(ownerQuest.IsFinalized));
+    }
+
     [Theory]
     [InlineData(IssueOutcome.QuestCancel)]
     [InlineData(IssueOutcome.QuestFail)]
