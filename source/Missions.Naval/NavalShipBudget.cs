@@ -97,11 +97,11 @@ public class NavalShipBudget : INavalShipBudget
     /// <summary>What the players' fielded ships leave of the side's eight, at most the AI parties' own limit and never below none.</summary>
     internal static int LeftForAi(int playerHulls, int aiLimit) => Math.Max(0, Math.Min(aiLimit, SideShips - playerHulls));
 
-    // A player its side's recorded AI fleet attempt didn't count joined after it, so it fields at most what the attempt leaves.
+    // Caps a player that joined after the side's recorded AI fleet attempt (so the attempt didn't count it) at what the attempt leaves.
     private NavalShipDeploymentLimit CapLateJoiner(MBReadOnlyList<MapEventParty> sideParties, PartyBase playerParty,
         NavalShipDeploymentLimit limit)
     {
-        if (!objectManager.TryGetId(playerParty.MapEventSide.MapEvent, out string mapEventId)) return limit;
+        if (!objectManager.TryGetIdWithLogging(playerParty.MapEventSide.MapEvent, out string mapEventId)) return limit;
         if (!attempts.TryGet(mapEventId, playerParty.Side, out var attempt)) return limit;
 
         var model = NavalDLCManager.Instance.GameModels.ShipDeploymentModel;
@@ -122,8 +122,13 @@ public class NavalShipBudget : INavalShipBudget
     }
 
     /// <summary>Whether the party is a player's the attempt didn't count; an attempt that counted none arrives with null ids.</summary>
-    internal bool IsUncountedPlayer(PartyBase party, string[] countedPartyIds) =>
-        TryGetPlayerPartyId(party, out string partyId) && !(countedPartyIds ?? Array.Empty<string>()).Contains(partyId);
+    internal bool IsUncountedPlayer(PartyBase party, string[] countedPartyIds)
+    {
+        if (!TryGetPlayerPartyId(party, out string partyId)) return false;
+
+        var counted = countedPartyIds ?? Array.Empty<string>();
+        return !counted.Contains(partyId);
+    }
 
     // A player's party and its id, the way the attempt counts players; logs a player party without an id.
     private bool TryGetPlayerPartyId(PartyBase party, out string partyId)
@@ -133,8 +138,8 @@ public class NavalShipBudget : INavalShipBudget
     }
 
     /// <summary>
-    /// A late joiner's cap: the side's eight less the attempt's hulls and every uncounted player before it in the side's party
-    /// order at the most it can field, and at least one, the player's own ship; a player the attempt counted keeps the eight.
+    /// The side's eight less the attempt's hulls and the most each earlier uncounted player can field. Never below one, the
+    /// player's own ship. A player the attempt counted keeps the eight.
     /// </summary>
     internal static int LateJoinerCap<T>(IEnumerable<T> sideParties, T own, Func<T, bool> isUncountedPlayer, Func<T, int> mostFielded,
         int recordedHulls) where T : class

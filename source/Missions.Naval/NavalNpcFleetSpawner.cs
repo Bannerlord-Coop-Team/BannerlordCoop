@@ -263,9 +263,10 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
         // A failed attempt took its hulls back.
         int aiHulls = failed ? 0 : lastAttempt.Hulls.Count;
         var players = lastAttempt.Players;
-        Settle(new NetworkNpcFleetAttempted(session.InstanceId, Side, failed, aiHulls, players.Hulls, players.PartyIds));
-        network.SendAll(attempt);
-        relayNetwork.SendAll(attempt);
+        var attempted = new NetworkNpcFleetAttempted(session.InstanceId, Side, failed, aiHulls, players.Hulls, players.PartyIds);
+        Settle(attempted);
+        network.SendAll(attempted);
+        relayNetwork.SendAll(attempted);
     }
 
     /// <summary>Whether the side's attempt was made, here or by an earlier host.</summary>
