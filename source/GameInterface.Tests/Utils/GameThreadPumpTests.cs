@@ -13,6 +13,7 @@ namespace GameInterface.Tests.Utils;
 /// deadlocking. A bare wait on that thread would stall the queue its completion depends on; WaitWhilePumping
 /// drains <see cref="GameThread.Update"/> itself while it waits so the network thread keeps making progress.
 /// </summary>
+[Collection(nameof(GameThreadPumpCollection))]
 public class GameThreadPumpTests
 {
     static GameThreadPumpTests()
@@ -162,3 +163,7 @@ public class GameThreadPumpTests
         Assert.True(callerAllowanceIntactAfter, "the caller's allowance was not restored after the pump");
     }
 }
+
+/// <summary>Serializes tests that recursively drain the process-wide game-thread queue.</summary>
+[CollectionDefinition(nameof(GameThreadPumpCollection), DisableParallelization = true)]
+public sealed class GameThreadPumpCollection { }
