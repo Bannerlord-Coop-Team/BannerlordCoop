@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem.BarterSystem.Barterables;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.MapEvents.PlayerPartyInteractions;
 
@@ -15,6 +16,9 @@ internal interface IPlayerPartyTradeOfferBuilder
 {
     // Builds the offer from barterables already filtered to what the local party may offer.
     NetworkPlayerPartyTradeOfferUpdated Build(string sessionId, string partyId, IReadOnlyCollection<Barterable> offered);
+
+    // Resolves an item and its modifier into the ids an offer carries them by.
+    bool TryResolveItem(EquipmentElement equipment, out ItemObjectData item);
 }
 
 // Resolves the local party's offered barterables into the network ids of the offer message.
@@ -54,18 +58,27 @@ internal class PlayerPartyTradeOfferBuilder : IPlayerPartyTradeOfferBuilder
         {
             var count = Math.Min(item.CurrentAmount, item.ItemRosterElement.Amount);
             if (count <= 0) continue;
+            if (!TryResolveItem(item.ItemRosterElement.EquipmentElement, out var itemData)) continue;
 
-            var equipment = item.ItemRosterElement.EquipmentElement;
-            if (!objectManager.TryGetIdWithLogging(equipment.Item, out var itemObjectId)) continue;
-
-            string itemModifierId = null;
-            var hasModifier = equipment.ItemModifier != null;
-            if (hasModifier && !objectManager.TryGetIdWithLogging(equipment.ItemModifier, out itemModifierId)) continue;
-
-            result.Add(new ItemRosterElementData(new ItemObjectData(itemObjectId, itemModifierId, itemModifierNull: !hasModifier), count));
+            result.Add(new ItemRosterElementData(itemData, count));
         }
 
         return result.ToArray();
+    }
+
+    // Shared with applying a received offer, so both directions key an item stack the same way.
+    public bool TryResolveItem(EquipmentElement equipment, out ItemObjectData item)
+    {
+        item = default;
+
+        if (!objectManager.TryGetIdWithLogging(equipment.Item, out var itemObjectId)) return false;
+
+        string itemModifierId = null;
+        var hasModifier = equipment.ItemModifier != null;
+        if (hasModifier && !objectManager.TryGetIdWithLogging(equipment.ItemModifier, out itemModifierId)) return false;
+
+        item = new ItemObjectData(itemObjectId, itemModifierId, itemModifierNull: !hasModifier);
+        return true;
     }
 
     // Resolves offered troop stacks, capped at what the roster holds.

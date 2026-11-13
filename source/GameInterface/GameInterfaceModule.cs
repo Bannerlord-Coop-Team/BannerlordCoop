@@ -256,8 +256,10 @@ public class GameInterfaceModule : Module
         builder.RegisterType<StalledMapEventResolver>().As<IStalledMapEventResolver>().InstancePerLifetimeScope();
         // Scoped so the barter patches and the trade handler share one trade and one pending offer per client.
         builder.RegisterType<PlayerPartyTradeContext>().As<IPlayerPartyTradeContext>().InstancePerLifetimeScope();
-        builder.RegisterType<PlayerPartyTradeOfferSender>().As<IPlayerPartyTradeOfferSender>().InstancePerLifetimeScope();
+        builder.RegisterType<PlayerPartyTradeSender>().As<IPlayerPartyTradeSender>().InstancePerLifetimeScope();
+        builder.RegisterType<PlayerPartyTradeOverlayInterface>().As<IPlayerPartyTradeOverlayInterface>().InstancePerLifetimeScope();
         builder.RegisterType<PlayerPartyTradeOfferBuilder>().As<IPlayerPartyTradeOfferBuilder>().InstancePerDependency();
+        builder.RegisterType<PlayerPartyTradeOfferApplier>().As<IPlayerPartyTradeOfferApplier>().InstancePerDependency();
         builder.RegisterType<LeaderlessClanResolver>().As<ILeaderlessClanResolver>().InstancePerDependency();
         builder.RegisterType<EmptyLordPartyResetter>().As<IEmptyLordPartyResetter>().InstancePerDependency();
         builder.RegisterType<EncounterMenuConditionRefresher>().As<IEncounterMenuConditionRefresher>().InstancePerDependency();

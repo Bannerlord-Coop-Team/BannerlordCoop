@@ -68,6 +68,7 @@ internal class PlayerPartyInteractionHandler : IHandler
     private readonly IPlayerMapTracking mapTracking;
     private readonly PlayerPartyInteractionOutcomeHandler outcomeHandler;
     private readonly IPlayerPartyTradeContext trade;
+    private readonly IPlayerPartyTradeOverlayInterface tradeOverlay;
     private readonly ISendCoalescer sendCoalescer;
 
     private readonly ConcurrentDictionary<string, PlayerPartyInteractionSession> sessionsById = new ConcurrentDictionary<string, PlayerPartyInteractionSession>();
@@ -94,6 +95,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         IPlayerDivorceRules playerDivorceRules,
         IPlayerMapTracking mapTracking,
         IPlayerPartyTradeContext trade,
+        IPlayerPartyTradeOverlayInterface tradeOverlay,
         // Only the server container registers a send coalescer.
         ISendCoalescer sendCoalescer = null)
     {
@@ -109,6 +111,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         this.playerDivorceRules = playerDivorceRules;
         this.mapTracking = mapTracking;
         this.trade = trade;
+        this.tradeOverlay = tradeOverlay;
         this.sendCoalescer = sendCoalescer;
         outcomeHandler = new PlayerPartyInteractionOutcomeHandler(
             objectManager,
@@ -128,7 +131,6 @@ internal class PlayerPartyInteractionHandler : IHandler
         messageBroker.Subscribe<NetworkPlayerPartyHostileEncounterStarted>(Handle_NetworkPlayerPartyHostileEncounterStarted);
         messageBroker.Subscribe<NetworkClosePvpEncounter>(Handle_NetworkClosePvpEncounter);
         messageBroker.Subscribe<PlayerPartyInteractionOptionSelected>(Handle_PlayerPartyInteractionOptionSelected);
-        messageBroker.Subscribe<PlayerPartyTradeAcceptSelected>(Handle_PlayerPartyTradeAcceptSelected);
         messageBroker.Subscribe<NetworkPlayerPartyTradeOfferUpdated>(Handle_NetworkPlayerPartyTradeOfferUpdated);
         messageBroker.Subscribe<NetworkPlayerPartyTradeAcceptChanged>(Handle_NetworkPlayerPartyTradeAcceptChanged);
         messageBroker.Subscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
@@ -148,7 +150,6 @@ internal class PlayerPartyInteractionHandler : IHandler
         messageBroker.Unsubscribe<NetworkPlayerPartyHostileEncounterStarted>(Handle_NetworkPlayerPartyHostileEncounterStarted);
         messageBroker.Unsubscribe<NetworkClosePvpEncounter>(Handle_NetworkClosePvpEncounter);
         messageBroker.Unsubscribe<PlayerPartyInteractionOptionSelected>(Handle_PlayerPartyInteractionOptionSelected);
-        messageBroker.Unsubscribe<PlayerPartyTradeAcceptSelected>(Handle_PlayerPartyTradeAcceptSelected);
         messageBroker.Unsubscribe<NetworkPlayerPartyTradeOfferUpdated>(Handle_NetworkPlayerPartyTradeOfferUpdated);
         messageBroker.Unsubscribe<NetworkPlayerPartyTradeAcceptChanged>(Handle_NetworkPlayerPartyTradeAcceptChanged);
         messageBroker.Unsubscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
@@ -250,7 +251,6 @@ internal class PlayerPartyInteractionHandler : IHandler
                 var remoteAccepted = message.IsInitiator ? message.ResponderAcceptedTrade : message.InitiatorAcceptedTrade;
                 OpenTrade(message);
                 trade.UpdateAcceptance(localAccepted, remoteAccepted);
-                PlayerPartyTradeOverlay.Instance.UpdateState(localAccepted, remoteAccepted);
             }
         }, context: "Apply player-party interaction state");
     }
@@ -337,7 +337,7 @@ internal class PlayerPartyInteractionHandler : IHandler
             endedInteractionSessionIds.Add(message.SessionId);
             PlayerPartyInteractionDialogState.Clear(message.SessionId);
             trade.End(message.SessionId, message.OutcomeType);
-            PlayerPartyTradeOverlay.Instance.Hide(message.SessionId);
+            tradeOverlay.Hide(message.SessionId);
             var conversationWasOpened = openedConversationSessionIds.Remove(message.SessionId);
 
             var conversationManager = Campaign.Current?.ConversationManager;
@@ -388,14 +388,6 @@ internal class PlayerPartyInteractionHandler : IHandler
         }, context: "Record closed player-party hostile encounter");
     }
 
-    private void Handle_PlayerPartyTradeAcceptSelected(MessagePayload<PlayerPartyTradeAcceptSelected> payload)
-    {
-        if (ModInformation.IsServer) return;
-
-        var message = payload.What;
-        network.SendAll(new NetworkPlayerPartyTradeAcceptChanged(message.SessionId, message.Accepted));
-    }
-
     private void Handle_NetworkPlayerPartyTradeOfferUpdated(MessagePayload<NetworkPlayerPartyTradeOfferUpdated> payload)
     {
         if (ModInformation.IsClient)
@@ -436,7 +428,7 @@ internal class PlayerPartyInteractionHandler : IHandler
             offeredPeace,
             message.OfferedMarriages);
         // Clients clear both acceptances when the offer arrives, so no trade state is sent for it.
-        // A trade only starts once the responder accepted it, which is what records the responder's peer.
+        // ResponderPeer is always set here, because a trade only starts after the responder accepted it from that peer.
         network.Send(session.InitiatorPeer, relayedOffer);
         network.Send(session.ResponderPeer, relayedOffer);
     }
@@ -1667,7 +1659,7 @@ internal class PlayerPartyInteractionHandler : IHandler
 
         try
         {
-            PlayerPartyTradeOverlay.Instance.Show(state.SessionId, state.OtherPlayerName);
+            tradeOverlay.Show(state.SessionId, state.OtherPlayerName);
         }
         catch (NullReferenceException ex)
         {

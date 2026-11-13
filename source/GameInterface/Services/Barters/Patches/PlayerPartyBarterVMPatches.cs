@@ -57,9 +57,9 @@ internal class PlayerPartyBarterVMPatches
     [HarmonyPostfix]
     static void SendOfferPostfix()
     {
-        if (!ContainerProvider.TryResolve<IPlayerPartyTradeOfferSender>(out var offerSender)) return;
+        if (!ContainerProvider.TryResolve<IPlayerPartyTradeSender>(out var tradeSender)) return;
 
-        offerSender.MarkChanged();
+        tradeSender.MarkChanged();
     }
 
     [HarmonyPatch("RefreshOfferLabel")]
@@ -203,16 +203,10 @@ internal class PlayerPartyBarterAcceptPatches
     [HarmonyPrefix]
     static bool AcceptPrefix()
     {
-        if (!ContainerProvider.TryResolve<IPlayerPartyTradeContext>(out var trade)) return true;
-        if (!trade.IsActive) return true;
-        if (!ContainerProvider.TryResolve<IPlayerPartyTradeOfferSender>(out var offerSender)) return true;
+        if (!ContainerProvider.TryResolve<IPlayerPartyTradeSender>(out var tradeSender)) return true;
 
-        // A pending edit goes out first, because it clears the acceptance this accept is checked against and must reach the server ahead of it.
-        // An edit that failed to send isnt accepted, otherwise the server would apply the older offer it still holds.
-        if (!offerSender.Flush()) return false;
-
-        trade.PublishAccept(true);
-        return false;
+        // A player trade sends the accept to the server, an NPC barter runs vanilla.
+        return !tradeSender.Accept();
     }
 }
 
@@ -229,15 +223,10 @@ internal class PlayerPartyBarterCancelPatches
     [HarmonyPrefix]
     static bool CancelPrefix()
     {
-        if (!ContainerProvider.TryResolve<IPlayerPartyTradeContext>(out var trade)) return true;
-        if (!trade.IsActive) return true;
-        if (!ContainerProvider.TryResolve<IPlayerPartyTradeOfferSender>(out var offerSender)) return true;
+        if (!ContainerProvider.TryResolve<IPlayerPartyTradeSender>(out var tradeSender)) return true;
 
-        // A pending edit goes out first, because it clears the acceptance that would block this cancel.
-        offerSender.Flush();
-
-        trade.PublishLeave();
-        return false;
+        // A player trade leaves through the server, an NPC barter runs vanilla.
+        return !tradeSender.Leave();
     }
 }
 
