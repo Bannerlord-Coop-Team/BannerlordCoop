@@ -107,6 +107,11 @@ epic #3836 tracks the v1.5 work that remains. Each port commit body lists its ch
 - v1.5 stops an AI party from starting any attack while a main party stronger than itself is near
   it. Co-op applies that check to every active player party; an offline player's party is parked
   and does not count (`DefaultMobilePartyAIModelPatches.cs`).
+- v1.5 lets the player parley with a party from the map: `MapScreen.HandleParleyClick` asks
+  `EncounterModel.CanMainHeroDoParleyWithParty` first. `PartyParleyPatch` makes that check refuse a
+  party, with an explanation that `MapScreen.TryParleyWith` shows, since a parley would open a local
+  conversation with a party the server owns (#4585, until #4601 sends it to the server). The party
+  tooltip drops its parley hint too. A settlement parley runs as before.
 
 ### New v1.5 campaign behaviors
 
