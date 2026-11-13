@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using GameInterface.CoopSessionData;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.NavalDLC;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -36,6 +37,12 @@ public interface IPlayerRaftFleetInterface : IGameAbstraction
     /// Ends a player party's raft state where it is at sea and gives back its fleet unanchored, as the naval scenario staging does.
     /// </summary>
     void LeaveRaftAtSea(MobileParty party);
+
+    /// <summary>
+    /// Sends a reconnected player's raft to the nearest shore again and forces it on every client, because the client
+    /// loads the raft without the move to land it got while offline.
+    /// </summary>
+    void ResumeRaft(MobileParty party);
 
     /// <summary>
     /// Puts a player's new party on a raft or gives it the fleet cached for that player, like
@@ -123,6 +130,14 @@ public class PlayerRaftFleetInterface : IPlayerRaftFleetInterface
         ReturnFleet(party);
         // ReturnFleet restores the coast anchor cached at the stranding, but a party at sea sails with its fleet, unanchored.
         party.Anchor.ResetPosition();
+    }
+
+    public void ResumeRaft(MobileParty party)
+    {
+        if (!party.IsInRaftState) return;
+
+        party.MovePartyToTheClosestLand();
+        messageBroker.Publish(this, new PartyBehaviorChangeAttempted(party, forcePosition: true, isCurrentlyAtSea: party.IsCurrentlyAtSea));
     }
 
     public void OnPlayerCharacterChanged(Hero newPlayerHero, MobileParty newMainParty)

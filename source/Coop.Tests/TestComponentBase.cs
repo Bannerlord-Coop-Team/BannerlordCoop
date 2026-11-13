@@ -40,6 +40,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Players.Interfaces;
+using GameInterface.Services.Rafts.Interfaces;
 using GameInterface.Services.Save.Interfaces;
 using GameInterface.Services.Settlements.Interfaces;
 using GameInterface.Services.Ships;
@@ -165,6 +166,8 @@ internal abstract class TestComponentBase
         // ServerBattleShipFateHandler (ServerModule, auto-activated) holds and applies naval ship fates through these.
         RegisterMock<IBattleShipFateLedger>(builder);
         RegisterMock<IBattleShipFateApplier>(builder);
+        // ServerPlayerRaftRejoinHandler (ServerModule, auto-activated) restarts a rejoined player's raft through this.
+        RegisterMock<IPlayerRaftFleetInterface>(builder);
         // LocationHostHandler (MissionModule, auto-activated) needs its registry the same way.
         RegisterMock<ILocationHostRegistry>(builder);
         // AgentHitSoundFixtureHandler (MissionModule, auto-activated in DEBUG) needs the args factory,
