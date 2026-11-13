@@ -26,7 +26,6 @@ namespace E2E.Tests.Services.Issues;
 public class CaravanAmbushAcceptTests
 {
     private static string caravanId = null!;
-    private static string banditId = null!;
     private static Hideout hideout = null!;
     private static readonly List<(object Container, Hero Hero, MobileParty Party)> spawns = new();
     private readonly ITestOutputHelper output;
@@ -44,10 +43,11 @@ public class CaravanAmbushAcceptTests
         var townComponentId = environment.CreateRegisteredObject<Town>();
         var targetId = environment.CreateRegisteredObject<Settlement>();
         var targetTownId = environment.CreateRegisteredObject<Town>();
+        var troopId = environment.CreateRegisteredObject<CharacterObject>();
+        var banditClanId = environment.CreateRegisteredObject<Clan>();
         var scenario = new QuestScenario(environment, (instance, giver) =>
             new Issue(giver, instance.GetRegisteredObject<Settlement>(targetId)));
         caravanId = environment.CreateRegisteredObject<MobileParty>();
-        banditId = environment.CreateRegisteredObject<MobileParty>();
 
         foreach (var instance in new[] { server, owner, other })
         {
@@ -64,7 +64,7 @@ public class CaravanAmbushAcceptTests
                         instance.GetRegisteredObject<Town>(targetTownId));
                     giver.StayingInSettlement = town;
                     giver.Occupation = Occupation.Merchant;
-                    var troop = GameObjectCreator.CreateInitializedObject<CharacterObject>();
+                    var troop = instance.GetRegisteredObject<CharacterObject>(troopId);
                     var culture = giver.Culture;
                     culture.BasicTroop = troop;
                     culture.CaravanMaster = troop;
@@ -94,24 +94,25 @@ public class CaravanAmbushAcceptTests
         {
             using (new AllowedThread())
             {
-                var bandits = GameObjectCreator.CreateInitializedObject<Clan>();
+                var bandits = server.GetRegisteredObject<Clan>(banditClanId);
                 bandits.StringId = "looters";
                 bandits.IsBanditFaction = true;
+                bandits.DefaultPartyTemplate.Stacks.Clear();
+                bandits.DefaultPartyTemplate.Stacks.Add(new PartyTemplateStack(
+                    server.GetRegisteredObject<CharacterObject>(troopId), 1, 10));
                 Campaign.Current.CampaignObjectManager.AddClan(bandits);
                 hideout = GameObjectCreator.CreateInitializedObject<Hideout>();
                 GameObjectCreator.CreateInitializedObject<Settlement>().SetSettlementComponent(hideout);
             }
         });
 
-        // Keep native acceptance intact; replace world factories and map speed that need the running map scene.
+        // Keep native acceptance and bandit creation intact; replace the caravan factory and map speed.
         var harmony = new Harmony($"caravan-accept-world-{Guid.NewGuid()}");
         spawns.Clear();
         try
         {
             harmony.Patch(AccessTools.Method(typeof(CaravanPartyComponent), nameof(CaravanPartyComponent.CreateCaravanParty)),
                 prefix: new HarmonyMethod(typeof(CaravanAmbushAcceptTests), nameof(CreateCaravan)));
-            harmony.Patch(AccessTools.Method(typeof(BanditPartyComponent), nameof(BanditPartyComponent.CreateBanditParty)),
-                prefix: new HarmonyMethod(typeof(CaravanAmbushAcceptTests), nameof(CreateBandits)));
             harmony.Patch(AccessTools.Method(typeof(SettlementHelper), nameof(SettlementHelper.FindNearestHideoutToMobileParty)),
                 prefix: new HarmonyMethod(typeof(CaravanAmbushAcceptTests), nameof(FindHideout)));
             harmony.Patch(AccessTools.PropertyGetter(typeof(MobileParty), nameof(MobileParty.Speed)),
@@ -122,8 +123,9 @@ public class CaravanAmbushAcceptTests
             owner.Call(() => ((Quest)scenario.QuestOf(owner)).OnQuestAccepted());
 
             Assert.Equal(QuestScenario.ControllerA, scenario.OwnerOnServer());
-            Assert.Equal(2, spawns.Count);
+            Assert.Single(spawns);
             Assert.All(spawns, call => Assert.Same(server.Container, call.Container));
+            string actualBanditId = null!;
             server.Call(() =>
             {
                 Assert.All(spawns, call =>
@@ -133,12 +135,15 @@ public class CaravanAmbushAcceptTests
                 });
                 var quest = Assert.IsType<Quest>(scenario.QuestOf(server));
                 Assert.Same(server.GetRegisteredObject<MobileParty>(caravanId), quest._caravanParty);
-                Assert.Same(server.GetRegisteredObject<MobileParty>(banditId), quest._banditParty);
+                Assert.NotNull(quest._banditParty);
+                Assert.True(quest._banditParty.IsBandit);
+                Assert.True(server.ObjectManager.TryGetId(quest._banditParty, out actualBanditId));
                 Assert.DoesNotContain(quest, Campaign.Current.QuestManager.Quests);
             });
             owner.Call(() =>
             {
                 var quest = Assert.IsType<Quest>(scenario.QuestOf(owner));
+                Assert.Same(owner.GetRegisteredObject<MobileParty>(actualBanditId), quest._banditParty);
                 Assert.Contains(quest, Campaign.Current.QuestManager.Quests);
                 Assert.Equal("S4kpdrgw", Assert.Single(quest.JournalEntries).LogText.GetID());
             });
@@ -156,7 +161,6 @@ public class CaravanAmbushAcceptTests
     }
 
     private static bool CreateCaravan(ref MobileParty __result) => SupplyParty(caravanId, out __result);
-    private static bool CreateBandits(ref MobileParty __result) => SupplyParty(banditId, out __result);
 
     private static bool SupplyParty(string id, out MobileParty party)
     {
