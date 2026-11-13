@@ -23,8 +23,8 @@ namespace GameInterface.Services.GameState.Interfaces;
 public interface IGameStateInterface : IGameAbstraction
 {
     /// <summary>
-    /// Waits up to <see cref="GameThread.BlockingTimeout"/> to leave the campaign. When that expires, leaving stays
-    /// queued ahead of later game-thread work.
+    /// Waits the game thread's blocking wait (<see cref="GameThread.BlockingTimeout"/>, longer during a join catch up)
+    /// for leaving the campaign to start. When that expires first, leaving stays queued ahead of later game-thread work.
     /// </summary>
     void GoToMainMenu();
     void StartNewGame();
