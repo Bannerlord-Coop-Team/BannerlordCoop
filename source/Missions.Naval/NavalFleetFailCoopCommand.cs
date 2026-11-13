@@ -17,7 +17,11 @@ public sealed class NavalFleetFailCoopCommand : ICoopCommand
         "Fails the next AI fleet spawn attempt of the enemy (default) or the allied side at a stage (before, after_hull, crewing; " +
         "default before); run on the battle host before Ready.";
     public CoopCommandSide Side => CoopCommandSide.Client;
-    public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+    public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+    {
+        new ExpectedArgs("side", "enemy (default) or ally, the host's own side.", false),
+        new ExpectedArgs("stage", "before (default), after_hull or crewing.", false),
+    };
 
     private const string Usage = "Usage: coop.debug.naval.fleet_fail [enemy|ally] [before|after_hull|crewing]";
 

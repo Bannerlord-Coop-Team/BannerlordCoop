@@ -1,4 +1,5 @@
 ﻿#if COOP_NAVAL && DEBUG
+using Common;
 using Common.Commands;
 using Missions.Naval;
 using Moq;
@@ -48,6 +49,29 @@ public class NavalFleetFailCoopCommandTests
 
         Assert.False(result.Succeeded);
         Assert.Equal("No active coop naval battle mission.", result.Output);
+    }
+
+    // The console route checks the words against the declared arguments before the command parses them.
+    [Theory]
+    [InlineData("ally", "before")]
+    [InlineData("ally")]
+    [InlineData("crewing")]
+    public void ConsoleRoute_PassesTheSideAndStageWordsToTheCommand(params string[] values)
+    {
+        var registry = new CoopCommandRegistry(new ICoopCommand[] { new NavalFleetFailCoopCommand() },
+            new Serilog.LoggerConfiguration().CreateLogger());
+        bool wasServer = ModInformation.IsServer;
+        ModInformation.IsServer = false;
+        try
+        {
+            var result = registry.ProcessCommand("coop.debug.naval.fleet_fail", new CoopCommandArgsFactory().FromValues(values));
+
+            Assert.Equal("No active coop naval battle mission.", result.Output);
+        }
+        finally
+        {
+            ModInformation.IsServer = wasServer;
+        }
     }
 
     // Console arguments holding the given words.
