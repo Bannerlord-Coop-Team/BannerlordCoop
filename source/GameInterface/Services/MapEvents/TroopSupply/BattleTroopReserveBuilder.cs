@@ -162,7 +162,7 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
             if (!objectManager.TryGetId(party, out var partyId))
                 continue;
 
-            // Who fields this party: its own player; or — for an AI party in a player-led army — that army
+            // Who fields this party: its own player; or — for an AI party in a player-led army on land — that army
             // leader (#3 "army leader deploys the army"); or, when no player does (including a player that
             // DROPPED from this battle and hasn't returned), the host.
             if (!ledger.TryGetReserve(mapEventId, partyId, out var entries, out var supplied))
@@ -180,7 +180,10 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
             else defenderTotal += entries.Count;
 
             TryGetOwningPlayer(party, absentControllers, presentControllers, out var partyOwnerController);
-            TryGetArmyLeaderPlayer(party, absentControllers, presentControllers, out var armyLeaderController);
+            // At sea the battle host fields every AI party on the ally team, a player-led army's members included.
+            string armyLeaderController = null;
+            if (!mapEvent.IsNavalMapEvent)
+                TryGetArmyLeaderPlayer(party, absentControllers, presentControllers, out armyLeaderController);
             var owningController = ResolveOwningController(partyOwnerController, armyLeaderController, absentControllers);
 
             // Only a present player's own party reserves a player slot. Offline or absent registrations fall
