@@ -34,9 +34,9 @@ public class MapStanceVisualsInterface : IMapStanceVisualsInterface
     private static void MarkStanceFlippedVisualsDirty(IFaction oldFaction, IFaction newFaction)
     {
         // Same stance-flip test as ChangeKingdomAction.CheckIfPartyIconIsDirty, also applied to visible settlements.
-        var visibleMapParties = MobileParty.All.Where(mobileParty => mobileParty.IsVisible).Select(mobileParty => mobileParty.Party)
-            .Concat(Settlement.All.Where(settlement => settlement.IsVisible).Select(settlement => settlement.Party));
-        foreach (var mapParty in visibleMapParties)
+        var visibleParties = MobileParty.All.Where(mobileParty => mobileParty.IsVisible).Select(mobileParty => mobileParty.Party);
+        var visibleSettlements = Settlement.All.Where(settlement => settlement.IsVisible).Select(settlement => settlement.Party);
+        foreach (var mapParty in visibleParties.Concat(visibleSettlements))
         {
             if (!HasStanceFlipped(mapParty, oldFaction, newFaction)) continue;
 

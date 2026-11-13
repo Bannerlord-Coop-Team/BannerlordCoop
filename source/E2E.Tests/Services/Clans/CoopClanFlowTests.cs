@@ -706,6 +706,7 @@ public class CoopClanFlowTests : MapEventTestBase, IDisposable
     {
         var enemyPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         var neutralPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var oldEnemyPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
         var townId = TestEnvironment.CreateRegisteredObject<Town>();
         foreach (var instance in Clients.Prepend(Server))
@@ -723,6 +724,8 @@ public class CoopClanFlowTests : MapEventTestBase, IDisposable
         {
             var enemyClan = Get<MobileParty>(Server, enemyPartyId).LeaderHero.Clan;
             DeclareWarAction.ApplyByPlayerHostility(Get<Clan>(Server, leader.ClanId), enemyClan);
+            var oldEnemyClan = Get<MobileParty>(Server, oldEnemyPartyId).LeaderHero.Clan;
+            DeclareWarAction.ApplyByPlayerHostility(Get<Clan>(Server, member.ClanId), oldEnemyClan);
         });
         Flush();
         memberClient.Call(() =>
@@ -733,7 +736,8 @@ public class CoopClanFlowTests : MapEventTestBase, IDisposable
             var settlements = new MBList<Settlement>(Settlement.All ?? new MBList<Settlement>());
             settlements.Add(settlement);
             Campaign.Current.CampaignObjectManager.Settlements = settlements;
-            var parties = new[] { Get<MobileParty>(memberClient, enemyPartyId), Get<MobileParty>(memberClient, neutralPartyId) };
+            var parties = new[] { enemyPartyId, neutralPartyId, oldEnemyPartyId }.Select(id => Get<MobileParty>(memberClient, id)).ToArray();
+            Assert.True(FactionManager.IsAtWarAgainstFaction(parties[2].MapFaction, Hero.MainHero.MapFaction));
             // Clear the dirty flags so the asserts below prove the join redrew them.
             settlement._isVisible = true;
             settlement.Party.OnVisualsUpdated();
@@ -753,6 +757,9 @@ public class CoopClanFlowTests : MapEventTestBase, IDisposable
             Assert.True(Get<MobileParty>(memberClient, enemyPartyId).Party.IsVisualDirty);
             Assert.True(settlement.Party.IsVisualDirty);
             Assert.False(Get<MobileParty>(memberClient, neutralPartyId).Party.IsVisualDirty);
+            var oldEnemyParty = Get<MobileParty>(memberClient, oldEnemyPartyId);
+            Assert.False(FactionManager.IsAtWarAgainstFaction(oldEnemyParty.MapFaction, Hero.MainHero.MapFaction));
+            Assert.True(oldEnemyParty.Party.IsVisualDirty);
         });
     }
 
