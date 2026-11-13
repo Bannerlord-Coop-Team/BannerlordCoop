@@ -277,10 +277,9 @@ internal class PvPInteractionClientHandler : IHandler
         }
 
         var encounter = PlayerEncounter.Current;
-        PlayerEncounterExtensions.TryGetEncounteredBattle(out var encounteredBattle);
         if (IsMapEventId(encounter?._mapEvent, message.MapEventId) ||
             IsMapEventId(GetPlayerEncounterBattle(), message.MapEventId) ||
-            IsMapEventId(encounteredBattle, message.MapEventId))
+            IsMapEventId(PlayerEncounterExtensions.GetEncounteredBattleOrNull(), message.MapEventId))
         {
             if (IsLocalParty(encounter?._attackerParty))
                 party = encounter._attackerParty;

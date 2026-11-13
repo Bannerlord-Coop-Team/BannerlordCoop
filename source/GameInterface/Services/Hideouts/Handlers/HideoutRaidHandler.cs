@@ -81,8 +81,7 @@ internal sealed class HideoutRaidHandler : IHandler
 
     internal void OpenTroopSelection(MenuCallbackArgs args, bool isDirectAssault)
     {
-        PlayerEncounterExtensions.TryGetEncounteredBattle(out var encounteredBattle);
-        var settlement = Settlement.CurrentSettlement ?? encounteredBattle?.MapEventSettlement;
+        var settlement = Settlement.CurrentSettlement ?? PlayerEncounterExtensions.GetEncounteredBattleOrNull()?.MapEventSettlement;
         if (settlement?.IsHideout != true) return;
         if (MobileParty.MainParty.CurrentSettlement != settlement)
         {

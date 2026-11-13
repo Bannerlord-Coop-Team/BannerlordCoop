@@ -197,8 +197,8 @@ internal class BattleJoinLeaveHandler : IHandler
         if (encounter._mapEvent == null && encounter._encounteredParty == null)
             return;
 
-        PlayerEncounterExtensions.TryGetEncounteredBattle(out var encounteredBattle);
-        var encounterMapEvent = encounter._mapEvent ?? encounteredBattle ?? MapEvent.PlayerMapEvent;
+        var encounterMapEvent = encounter._mapEvent ?? PlayerEncounterExtensions.GetEncounteredBattleOrNull() ??
+            MapEvent.PlayerMapEvent;
         if (encounterMapEvent != mapEvent)
             return;
 

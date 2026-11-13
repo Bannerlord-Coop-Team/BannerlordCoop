@@ -128,7 +128,7 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
 
         var encounter = PlayerEncounter.Current;
         var battle = GetPlayerEncounterBattle();
-        PlayerEncounterExtensions.TryGetEncounteredBattle(out var encounteredBattle);
+        var encounteredBattle = PlayerEncounterExtensions.GetEncounteredBattleOrNull();
         if (encounter?._mapEvent == mapEvent ||
             encounter?.BattleSimulation?.MapEvent == mapEvent ||
             battle == mapEvent ||
