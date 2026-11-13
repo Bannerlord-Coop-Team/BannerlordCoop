@@ -2,6 +2,7 @@
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.Villages.Data;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -12,6 +13,21 @@ public interface IVillageHostileActionInterface : IGameAbstraction
 {
     void RequestHostileAction(VillageHostileAction action);
     void BeginHostileActionPresentation(VillageHostileAction action);
+
+    /// <summary>[Client, game thread] Track a hostile-action request until the server resolves it; false when one is already pending.</summary>
+    bool TryTrackPendingHostileAction(PlayerEncounter playerEncounter);
+
+    /// <summary>[Client, game thread] The pending hostile-action request was approved.</summary>
+    void ClearPendingHostileAction();
+
+    /// <summary>[Client] The pending hostile-action request was denied; close the encounter it opened.</summary>
+    void RecoverRejectedHostileAction();
+
+    /// <summary>[Client, game thread] Present an approved raid continuation now, or park it until the current encounter ends.</summary>
+    void BeginRaidContinuation(Settlement settlement);
+
+    /// <summary>[Client, game thread] Present a parked raid continuation once the current encounter has ended.</summary>
+    void PresentParkedRaidContinuation();
     bool CanStartHostileAction(MobileParty mobileParty, Settlement settlement, VillageHostileAction action, out VillageHostileActionDeniedReason reason);
     void ApplyHostileAction(MobileParty mobileParty, Settlement settlement, VillageHostileAction action);
     void ResolveRaidDefenders(MapEvent mapEvent);

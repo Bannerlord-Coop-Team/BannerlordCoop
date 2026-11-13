@@ -26,15 +26,17 @@ internal static class StagedBattleResultUpdatePatch
         // A captured lord conversation is open; updating now would reopen it every tick.
         if (Campaign.Current.ConversationManager?.IsConversationInProgress == true) return;
 
-        // A raid's menu initialization can run while the scoreboard is leaving. Retry the preserved
-        // results after PlayerEncounterPatches stops deferring them for that screen.
+        // Custom hideout menus, the siege defeated menu and an empty map have no native menu init
+        // callback to resume the loot flow. A raid's menu initialization can also run while the
+        // scoreboard is leaving, so retry the preserved results after PlayerEncounterPatches stops
+        // deferring them for that screen.
         PlayerEncounter.Update();
     }
 
     internal static bool HasStagedResults(PlayerEncounter encounter) =>
         encounter?._mapEvent is MapEvent mapEvent &&
         (mapEvent.IsHideoutBattle ||
-         (mapEvent.IsRaid && encounter.BattleSimulation != null) ||
+         (mapEvent.IsRaidHostileAction() && encounter.BattleSimulation != null) ||
          (mapEvent.IsSiegeAssault && encounter.PlayerSide == BattleSideEnum.Defender)) &&
         MapEventInitializationBarrier.IsBattleResultEncounter(encounter);
 }

@@ -5,6 +5,7 @@ using Common.Util;
 using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PlayerCaptivityService.Messages;
@@ -56,6 +57,10 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
     private readonly ConditionalWeakTable<MapEvent, AppliedForceActionOutcomeState> appliedForceActionOutcomes = new ConditionalWeakTable<MapEvent, AppliedForceActionOutcomeState>();
     private readonly object deferredForceScreenGate = new object();
     private DeferredForceScreen deferredForceScreen;
+    // Client-only: the encounter a hostile-action request opened, kept until the server resolves the
+    // request, and a won raid's continuation waiting for the current encounter to end.
+    private PlayerEncounter pendingHostileActionEncounter;
+    private Settlement parkedRaidContinuation;
 
     public VillageHostileActionInterface(IMessageBroker messageBroker, IObjectManager objectManager)
     {
@@ -174,6 +179,85 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         GameMenu.SwitchToMenu("encounter");
     }
 
+    public bool TryTrackPendingHostileAction(PlayerEncounter playerEncounter)
+    {
+        if (pendingHostileActionEncounter != null)
+            return false;
+
+        pendingHostileActionEncounter = playerEncounter;
+        return true;
+    }
+
+    public void ClearPendingHostileAction() => pendingHostileActionEncounter = null;
+
+    public void RecoverRejectedHostileAction()
+    {
+        // Read and cleared inside the game-thread action: this runs on the network thread, while the
+        // other writes to the field are game-thread code.
+        GameThread.RunSafe(() =>
+        {
+            var expectedEncounter = pendingHostileActionEncounter;
+            pendingHostileActionEncounter = null;
+
+            var encounter = PlayerEncounter.Current;
+            if (encounter == null || !ReferenceEquals(encounter, expectedEncounter) ||
+                encounter._mapEvent != null || encounter.BattleSimulation != null)
+                return;
+
+            encounter._stateHandled = true;
+            PlayerEncounter.LeaveEncounter = true;
+            PlayerEncounter.Finish(true);
+        }, context: nameof(RecoverRejectedHostileAction));
+    }
+
+    public void BeginRaidContinuation(Settlement settlement)
+    {
+        if (settlement?.Village == null)
+            return;
+
+        var encounter = PlayerEncounter.Current;
+        if (encounter != null && encounter._mapEvent == null &&
+            !MapEventInitializationBarrier.IsBattleResultEncounter(encounter))
+        {
+            // A live encounter is waiting for this presentation (the normal request flow).
+            BeginHostileActionPresentation(VillageHostileAction.Raid);
+            return;
+        }
+
+        // The finalized battle's result screens are still walking; the campaign tick presents the
+        // continuation once that encounter ends.
+        parkedRaidContinuation = settlement;
+    }
+
+    public void PresentParkedRaidContinuation()
+    {
+        var settlement = parkedRaidContinuation;
+        if (settlement == null)
+            return;
+
+        if (PlayerCaptivity.IsCaptive || MobileParty.MainParty?.MapEvent != null)
+            return;
+
+        var encounter = PlayerEncounter.Current;
+        if (encounter != null && encounter.EncounterState != PlayerEncounterState.End)
+            return;
+
+        parkedRaidContinuation = null;
+        StartRaidContinuationEncounter(settlement);
+    }
+
+    private void StartRaidContinuationEncounter(Settlement settlement)
+    {
+        // The completed event is already finalized. Start a fresh encounter so the approved hostile
+        // action creates the next raid through the authoritative server path.
+        PartyBase.MainParty._mapEventSide = null;
+        settlement.Party._mapEventSide = null;
+        PlayerEncounter.Start();
+        PlayerEncounter.Current.SetupFields(PartyBase.MainParty, settlement.Party);
+        PlayerEncounter.Current._mapEvent = null;
+        BeginHostileActionPresentation(VillageHostileAction.Raid);
+    }
+
     public bool CanStartHostileAction(
         MobileParty mobileParty,
         Settlement settlement,
@@ -201,7 +285,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         if (!TryValidateHostileActionSettlement(settlement, out reason))
             return false;
 
-        if (!TryValidateHostileActionState(mobileParty, settlement, action, allowPendingApproval, out reason))
+        if (!TryValidateHostileActionState(mobileParty, settlement, allowPendingApproval, out reason))
             return false;
 
         var village = settlement.Village;
@@ -259,7 +343,6 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
     private bool TryValidateHostileActionState(
         MobileParty mobileParty,
         Settlement settlement,
-        VillageHostileAction action,
         bool allowPendingApproval,
         out VillageHostileActionDeniedReason reason)
     {
@@ -279,10 +362,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
             return false;
         }
 
-        bool continuingRaid = action == VillageHostileAction.Raid &&
-            settlement.Village.VillageState == Village.VillageStates.BeingRaided &&
-            settlement.SettlementHitPoints > 0f;
-        if (settlement.Village.VillageState != Village.VillageStates.Normal && !continuingRaid)
+        if (settlement.Village.VillageState != Village.VillageStates.Normal)
         {
             reason = VillageHostileActionDeniedReason.InvalidVillageState;
             return false;
@@ -847,6 +927,8 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
     {
         if (ModInformation.IsServer) return;
         if (IsInMission()) return;
+
+        PresentParkedRaidContinuation();
 
         // Always open the earned screen and let the server consume decide. A
         // gone pool is reported at Done time by the commit validation.

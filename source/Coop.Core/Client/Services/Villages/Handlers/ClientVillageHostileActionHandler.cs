@@ -2,13 +2,13 @@ using Common;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Entity;
-using GameInterface.Services.MapEvents.Interfaces;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Villages.Data;
 using GameInterface.Services.Villages.Interfaces;
 using GameInterface.Services.Villages.Messages;
 using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace Coop.Core.Client.Services.Villages.Handlers;
 
@@ -19,22 +19,19 @@ internal class ClientVillageHostileActionHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IVillageHostileActionInterface villageHostileActionInterface;
-    private readonly IPlayerEncounterInterface playerEncounterInterface;
 
     public ClientVillageHostileActionHandler(
         IMessageBroker messageBroker,
         INetwork network,
         IObjectManager objectManager,
         IControllerIdProvider controllerIdProvider,
-        IVillageHostileActionInterface villageHostileActionInterface,
-        IPlayerEncounterInterface playerEncounterInterface)
+        IVillageHostileActionInterface villageHostileActionInterface)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.controllerIdProvider = controllerIdProvider;
         this.villageHostileActionInterface = villageHostileActionInterface;
-        this.playerEncounterInterface = playerEncounterInterface;
 
         messageBroker.Subscribe<VillageHostileActionAttempted>(Handle_VillageHostileActionAttempted);
         messageBroker.Subscribe<NetworkVillageHostileActionStarted>(Handle_NetworkVillageHostileActionStarted);
@@ -60,7 +57,8 @@ internal class ClientVillageHostileActionHandler : IHandler
 
         if (!objectManager.TryGetIdWithLogging(message.MobileParty, out var mobilePartyId)) return;
         if (!objectManager.TryGetIdWithLogging(message.Settlement, out var settlementId)) return;
-        if (!playerEncounterInterface.TrackPendingHostileAction(PlayerEncounter.Current))
+        // A request is already pending: drop this one, the server still resolves the first.
+        if (!villageHostileActionInterface.TryTrackPendingHostileAction(PlayerEncounter.Current))
             return;
 
         network.SendAll(new NetworkRequestVillageHostileAction(message.Action, mobilePartyId, settlementId, controllerIdProvider.ControllerId));
@@ -71,15 +69,21 @@ internal class ClientVillageHostileActionHandler : IHandler
         GameThread.RunSafe(
             () =>
             {
-                playerEncounterInterface.ClearPendingHostileAction();
-                villageHostileActionInterface.BeginHostileActionPresentation(payload.What.Action);
+                villageHostileActionInterface.ClearPendingHostileAction();
+                // A raid start the server approved on finalize is a continuation: it presents
+                // once the finalized battle's encounter has ended, not over its result screens.
+                if (payload.What.Action == VillageHostileAction.Raid &&
+                    objectManager.TryGetObjectWithLogging<Settlement>(payload.What.SettlementId, out var settlement))
+                    villageHostileActionInterface.BeginRaidContinuation(settlement);
+                else
+                    villageHostileActionInterface.BeginHostileActionPresentation(payload.What.Action);
             },
             context: nameof(Handle_NetworkVillageHostileActionStarted));
     }
 
     private void Handle_NetworkVillageHostileActionDenied(MessagePayload<NetworkVillageHostileActionDenied> payload)
     {
-        playerEncounterInterface.RecoverRejectedHostileAction();
+        villageHostileActionInterface.RecoverRejectedHostileAction();
         messageBroker.Publish(this, new SendInformationMessage(GetDeniedMessage(payload.What.Reason)));
     }
 

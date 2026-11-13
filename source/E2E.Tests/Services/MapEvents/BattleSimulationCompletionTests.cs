@@ -7,7 +7,6 @@ using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.Players;
-using HarmonyLib;
 using Moq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -24,47 +23,8 @@ public class BattleSimulationCompletionTests : MapEventTestBase
 {
     public BattleSimulationCompletionTests(ITestOutputHelper output) : base(output) { }
 
-    [Theory]
-    [InlineData(BattleState.DefenderVictory)]
-    [InlineData(BattleState.AttackerVictory)]
-    public void CompletedSimulation_FinalizesMapEventOnce(BattleState result)
-    {
-        var context = CreateServerMapEvent();
-        var ended = new List<MapEvent>();
-
-        Server.Call(() =>
-        {
-            var mapEvent = Server.GetRegisteredObject<MapEvent>(context.MapEventId);
-            mapEvent.BattleState = result;
-            var simulation = new BattleSimulationRunHandler.ActiveSimulation { MapEvent = mapEvent };
-            CampaignEvents.MapEventEnded.AddNonSerializedListener(this, ended.Add);
-            try
-            {
-                BattleSimulationRunHandler.EndSimulationSession(simulation, completed: true);
-
-                Assert.True(mapEvent.IsFinalized);
-                Assert.Same(mapEvent, Assert.Single(ended));
-
-                for (var update = 0; update < 200; update++)
-                    BattleSimulationRunHandler.EndSimulationSession(simulation, completed: true);
-
-                Assert.Same(mapEvent, Assert.Single(ended));
-            }
-            finally
-            {
-                CampaignEvents.MapEventEnded.ClearListeners(this);
-            }
-        }, MapEventDisabledMethods);
-
-        foreach (var instance in Clients.Append(Server))
-            instance.Call(() => Assert.False(instance.ObjectManager.TryGetObject<MapEvent>(context.MapEventId, out _)));
-    }
-
-    [Theory]
-    [InlineData(BattleState.None)]
-    [InlineData(BattleState.AttackerVictory)]
-    [InlineData(BattleState.DefenderVictory)]
-    public void CancelledEmptySimulation_RestoresObserverWithoutFinalizing(BattleState result)
+    [Fact]
+    public void CancelledSimulationWithWinner_RestoresObserverWithoutFinalizing()
     {
         var context = CreateServerMapEvent();
         var ended = new List<MapEvent>();
@@ -73,7 +33,7 @@ public class BattleSimulationCompletionTests : MapEventTestBase
         Server.Call(() =>
         {
             var mapEvent = Server.GetRegisteredObject<MapEvent>(context.MapEventId);
-            mapEvent.BattleState = result;
+            mapEvent.BattleState = BattleState.AttackerVictory;
             var simulation = new BattleSimulationRunHandler.ActiveSimulation
             {
                 MapEvent = mapEvent,
@@ -83,7 +43,7 @@ public class BattleSimulationCompletionTests : MapEventTestBase
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, ended.Add);
             try
             {
-                BattleSimulationRunHandler.EndSimulationSession(simulation, completed: false);
+                BattleSimulationRunHandler.EndSimulationSession(simulation);
 
                 Assert.False(mapEvent.IsFinalized);
                 Assert.Empty(ended);
@@ -142,42 +102,8 @@ public class BattleSimulationCompletionTests : MapEventTestBase
         }, MapEventDisabledMethods);
 
         Assert.True(Assert.Single(lootSawRegisteredEvent));
-    }
 
-    [Fact]
-    public void ManuallyFinalizedSimulation_DoesNotRepeatTeardownOrCallbacks()
-    {
-        var context = CreateServerMapEvent();
-        var ended = new List<MapEvent>();
-
-        Server.Call(() =>
-        {
-            var mapEvent = Server.GetRegisteredObject<MapEvent>(context.MapEventId);
-            var simulation = new BattleSimulationRunHandler.ActiveSimulation { MapEvent = mapEvent };
-            CampaignEvents.MapEventEnded.AddNonSerializedListener(this, ended.Add);
-            try
-            {
-                mapEvent.FinalizeEvent();
-                Assert.True(mapEvent.IsFinalized);
-                Assert.Same(mapEvent, Assert.Single(ended));
-
-                using var teardown = new MethodCallRecorder(Priority.First, true,
-                    AccessTools.Method(typeof(MapEvent), nameof(MapEvent.CommitXpGains)),
-                    AccessTools.Method(typeof(MapEventSide), nameof(MapEventSide.EndSimulation)));
-                var observer = Mock.Of<IBattleObserver>();
-                mapEvent.BattleObserver = observer;
-
-                for (var update = 0; update < 200; update++)
-                    BattleSimulationRunHandler.EndSimulationSession(simulation, completed: true);
-
-                Assert.Equal(0, teardown.CountFor(Server));
-                Assert.Same(observer, mapEvent.BattleObserver);
-                Assert.Same(mapEvent, Assert.Single(ended));
-            }
-            finally
-            {
-                CampaignEvents.MapEventEnded.ClearListeners(this);
-            }
-        }, MapEventDisabledMethods);
+        foreach (var instance in Clients.Append(Server))
+            instance.Call(() => Assert.False(instance.ObjectManager.TryGetObject<MapEvent>(context.MapEventId, out _)));
     }
 }
