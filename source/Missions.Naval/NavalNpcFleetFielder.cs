@@ -148,7 +148,10 @@ public class NavalNpcFleetFielder : INavalNpcFleetFielder
 
         try
         {
-            PlanLate(mission, shipsLogic, navalLogic, planning, side, team, fleet);
+            // The AI team was planned with no ships at deployment start, so it is planned now: the host's own allies on their
+            // own, an enemy fleet with vanilla's plan for its side, which skips a team that already has one.
+            if (team == mission.PlayerAllyTeam) PlanAllyTeam(mission, shipsLogic, planning, side, team, fleet);
+            else latePlans.MakeForSide(navalLogic, side);
             SpawnAssignedHulls(shipsLogic, planning, team, fleet, parties, work);
         }
         finally
@@ -162,28 +165,17 @@ public class NavalNpcFleetFielder : INavalNpcFleetFielder
         }
     }
 
-    // The AI team was planned with no ships at deployment start, so it is planned now: an enemy fleet with vanilla's plan for
-    // its side, which skips a team that already has one, and the host's own allies on their own.
-    private void PlanLate(Mission mission, NavalShipsLogic shipsLogic, DefaultNavalMissionLogic navalLogic,
-        NavalMissionDeploymentPlanningLogic planning, BattleSideEnum side, Team team, List<FleetShip> fleet)
-    {
-        if (team != mission.PlayerAllyTeam)
-        {
-            latePlans.MakeForSide(navalLogic, side);
-            return;
-        }
-
-        PlanAllyTeam(mission, shipsLogic, planning, side, team, fleet);
-    }
-
     // Plans the allied AI fleet alone at its slot ahead of rank 0's fleet and says if the slot didn't fit.
     private void PlanAllyTeam(Mission mission, NavalShipsLogic shipsLogic, NavalMissionDeploymentPlanningLogic planning,
         BattleSideEnum side, Team team, List<FleetShip> fleet)
     {
         float allyRange = NavalSideDeploymentSlots.LongestTeamRange(fleet.Select(ship =>
             shipsLogic.GetShipAssignment(team.TeamSide, ship.Formation.FormationIndex).MissionShipObject.DeploymentArea.y));
-        var (slot, opposingBase) = NavalSideDeploymentSlots.AllySlot(mission.GetInitialSpawnPathData(side), playerSlots.Rank,
-            planning.GetSpawnPathOffset(mission.PlayerTeam), allyRange, NavalSideDeploymentSlots.LongestTeamRangeOfGame());
+        var (slot, opposingBase) = NavalSideDeploymentSlots.AllySlot(mission.GetInitialSpawnPathData(side),
+            ownRank: playerSlots.Rank,
+            ownPlanOffset: planning.GetSpawnPathOffset(mission.PlayerTeam),
+            allyRange: allyRange,
+            gameRange: NavalSideDeploymentSlots.LongestTeamRangeOfGame());
         var aiShips = fleet.Select(ship => (ship.Formation.FormationIndex, (IShipOrigin)ship.Snapshot));
         latePlans.MakeForAllyTeam(planning, team, aiShips, slot.Offset, opposingBase);
 

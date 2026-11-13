@@ -85,8 +85,7 @@ public class NavalSideDeploymentSlotsTests
         float[] freeSegments, float[] expectedOffsets, NavalSlotProblem[] expectedProblems, float expectedAlly,
         NavalSlotProblem expectedAllyProblem)
     {
-        var path = Path(pathLength, pivotOffset,
-            Enumerable.Range(0, freeSegments.Length / 2).Select(index => (freeSegments[2 * index], freeSegments[(2 * index) + 1])).ToArray());
+        var path = Path(pathLength, pivotOffset, freeSegments);
 
         var layout = NavalSideDeploymentSlots.Layout(path, expectedOffsets.Length, Longest);
         var (ally, _) = NavalSideDeploymentSlots.AllySlot(path, ownRank: 1, ownPlanOffset: 0f, Longest, Longest);
@@ -96,8 +95,8 @@ public class NavalSideDeploymentSlotsTests
         Assert.Equal((expectedAlly, expectedAllyProblem), ((float)Math.Round(ally.Offset, 2), ally.Problem));
     }
 
-    // The allies plan from rank 0's real plan: the host's own when it is rank 0 (a lone player 72 m behind the shared slot on
-    // vanilla's deeper plan for four ships), else rank 0's shared slot at -199. A 50 m fleet ends its depth and the gap ahead.
+    // The allies plan from rank 0's real plan: the host's own when it is rank 0 (a lone player on vanilla's deeper plan for four
+    // ships), else rank 0's shared slot. Rank 0's offset + 32 m gap + 50 m ally depth: -271 -> -189, -199 -> -117.
     [Theory]
     [InlineData(0, -271f, -189f)]
     [InlineData(1, -305.25f, -117f)]
@@ -122,6 +121,15 @@ public class NavalSideDeploymentSlotsTests
         var more = NavalSideDeploymentSlots.Layout(path, 4, Longest).Slots;
 
         Assert.Equal(fewer, more.Take(2));
+    }
+
+    // A path whose free segments are given as start and end pairs.
+    private static SpawnPathData Path(float pathLength, float pivotOffset, float[] freeSegmentBounds)
+    {
+        var segments = new List<(float start, float end)>();
+        for (int i = 0; i < freeSegmentBounds.Length; i += 2)
+            segments.Add((freeSegmentBounds[i], freeSegmentBounds[i + 1]));
+        return Path(pathLength, pivotOffset, segments.ToArray());
     }
 
     // A path with nothing blocked along it.

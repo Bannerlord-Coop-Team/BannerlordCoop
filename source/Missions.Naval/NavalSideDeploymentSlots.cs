@@ -71,6 +71,8 @@ internal static class NavalSideDeploymentSlots
             behindCursor = behind - range - InterTeamGap;
         }
 
+        if (rank == ranks) return new NavalSideLayout(slots, opposingBase);
+
         // Past the allies' slot, reserved as deep as any fleet since only the host knows the allies' ships.
         float aheadRear = AllyAhead(spawnPath, slots[0].Offset, range, forwardLimit).Offset + InterTeamGap;
         for (; rank < ranks; rank++)
@@ -79,7 +81,7 @@ internal static class NavalSideDeploymentSlots
             aheadRear = slots[rank].Offset + InterTeamGap;
         }
 
-        return new NavalSideLayout(slots, opposingBase, forwardLimit);
+        return new NavalSideLayout(slots, opposingBase);
     }
 
     /// <summary>
@@ -89,8 +91,10 @@ internal static class NavalSideDeploymentSlots
     internal static (NavalSideSlot Slot, float OpposingBase) AllySlot(SpawnPathData spawnPath, int ownRank, float ownPlanOffset,
         float allyRange, float gameRange)
     {
-        var (_, opposingBase, forwardLimit) = Bounds(spawnPath, gameRange);
-        float rankZero = ownRank == 0 ? ownPlanOffset : Layout(spawnPath, ranks: 1, gameRange).Slots[0].Offset;
+        var (sideBase, opposingBase, forwardLimit) = Bounds(spawnPath, gameRange);
+        float rankZero = ownPlanOffset;
+        if (ownRank != 0) rankZero = FrontSlot(spawnPath, sideBase, gameRange, forwardLimit).Offset;
+
         return (AllyAhead(spawnPath, rankZero, allyRange, forwardLimit), opposingBase);
     }
 
