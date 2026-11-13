@@ -7,6 +7,7 @@ using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.ModuleManager;
 using TaleWorlds.SaveSystem;
+using GameInterface.Services.Save.Interfaces;
 
 namespace GameInterface.Services.Heroes.Interfaces;
 
@@ -20,10 +21,10 @@ public interface ISaveInterface : IGameAbstraction
     /// <summary>True when a campaign's SaveHandler can take a queued save.</summary>
     bool CanQueueSave { get; }
 
-    /// <summary>True while the campaign's SaveHandler has a save queued or running.</summary>
+    /// <summary>True while the host has a save queued or running.</summary>
     bool IsSaving { get; }
 
-    /// <summary>Queues a named save on the campaign's SaveHandler. False when no campaign is loaded.</summary>
+    /// <summary>Queues a named save on the host. False when no campaign is loaded or the host didn't take it.</summary>
     bool TryQueueSave(string saveName);
 
     /// <summary>The slot every save of an ironman campaign goes to, or null when the campaign is not ironman.</summary>
@@ -33,22 +34,22 @@ public interface ISaveInterface : IGameAbstraction
 internal class SaveInterface : ISaveInterface
 {
     private readonly ILogger Logger = LogManager.GetLogger<SaveInterface>();
+    private readonly IHostSaveInterface hostSaveInterface;
+
+    /// <summary>Takes the host save backend that owns queued saves on this side.</summary>
+    public SaveInterface(IHostSaveInterface hostSaveInterface)
+    {
+        this.hostSaveInterface = hostSaveInterface;
+    }
 
     public bool CanQueueSave => Campaign.Current?.SaveHandler != null;
 
-    public bool IsSaving => Campaign.Current?.SaveHandler?.IsSaving == true;
+    public bool IsSaving => hostSaveInterface.IsSaving;
 
     public string IronmanSaveName =>
         CampaignOptions.IsIronmanMode ? Campaign.Current?.SaveHandler?.IronmanModSaveName : null;
 
-    public bool TryQueueSave(string saveName)
-    {
-        var saveHandler = Campaign.Current?.SaveHandler;
-        if (saveHandler == null) return false;
-
-        saveHandler.SaveAs(saveName);
-        return true;
-    }
+    public bool TryQueueSave(string saveName) => hostSaveInterface.TryQueueSave(saveName);
 
     public SaveResults SaveCurrentGame()
     {
