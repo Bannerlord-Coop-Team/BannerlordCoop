@@ -1097,7 +1097,7 @@ public class VillageHostileActionTests : MapEventTestBase
     }
 
     [Fact]
-    public void CompletedRaidSimulation_AfterPartyAndLootDone_ResumesRaiding()
+    public void CompletedRaidSimulation_RequestsFreshApprovalAfterPartyAndLootDone_ResumesRaiding()
     {
         var result = CompleteRaidSimulationAndLoot();
         try
@@ -1220,8 +1220,8 @@ public class VillageHostileActionTests : MapEventTestBase
     }
 
     // Arranges a raid simulation, completes it with an attacker victory, walks the native party
-    // and loot screens on the client, then presents the continuation the server approved at
-    // finalize. The patches and recorders stay installed until the result is disposed.
+    // and loot screens on the client, then requests approval for the continuation. The patches
+    // and recorders stay installed until the result is disposed.
     private CompletedRaidSimulation CompleteRaidSimulationAndLoot()
     {
         var client = Clients.First();
@@ -1284,8 +1284,8 @@ public class VillageHostileActionTests : MapEventTestBase
             Assert.Single(result.Ended);
             Assert.False(Server.ObjectManager.TryGetObject<MapEvent>(context.MapEventId, out _));
         }, MapEventDisabledMethods);
-        // The completion finalized through BattleFinalizeHandler, which approved the continuation
-        // and told the leader's client to present it once the result screens are done.
+        // The completion finalized through BattleFinalizeHandler, which told the leader's client
+        // to request the continuation once the result screens are done.
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionDenied>());
         var started = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionStarted>());
         Assert.Equal(context.SettlementId, started.SettlementId);
@@ -1313,6 +1313,7 @@ public class VillageHostileActionTests : MapEventTestBase
             Assert.IsType<PartyState>(states.ActiveState);
             Assert.Same(encounter, PlayerEncounter.Current);
             Assert.DoesNotContain("raiding_village", menus.MenusFor(client));
+            Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkRequestVillageHostileAction>());
 
             encounter.OnPlayerLootMembersAndPrisonerEnd(null, null, null, null, null, null, false);
             states._gameStates.RemoveAt(states._gameStates.Count - 1);
@@ -1320,6 +1321,7 @@ public class VillageHostileActionTests : MapEventTestBase
             Assert.IsType<InventoryState>(states.ActiveState);
             Assert.Same(encounter, PlayerEncounter.Current);
             Assert.DoesNotContain("raiding_village", menus.MenusFor(client));
+            Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkRequestVillageHostileAction>());
 
             states._gameStates.RemoveAt(states._gameStates.Count - 1);
             client.NetworkSentMessages.Clear();

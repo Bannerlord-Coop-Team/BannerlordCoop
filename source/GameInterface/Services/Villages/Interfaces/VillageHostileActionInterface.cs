@@ -224,8 +224,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
             return;
         }
 
-        // The finalized battle's result screens are still walking; the campaign tick presents the
-        // continuation once that encounter ends.
+        // Request the continuation after the finalized battle's result screens close.
         parkedRaidContinuation = settlement;
     }
 
@@ -248,14 +247,14 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
 
     private void StartRaidContinuationEncounter(Settlement settlement)
     {
-        // The completed event is already finalized. Start a fresh encounter so the approved hostile
-        // action creates the next raid through the authoritative server path.
+        // The completed event is already finalized. Request a fresh approval now, rather than
+        // letting its timeout run while the player is still viewing the previous battle's results.
         PartyBase.MainParty._mapEventSide = null;
         settlement.Party._mapEventSide = null;
         PlayerEncounter.Start();
         PlayerEncounter.Current.SetupFields(PartyBase.MainParty, settlement.Party);
         PlayerEncounter.Current._mapEvent = null;
-        BeginHostileActionPresentation(VillageHostileAction.Raid);
+        messageBroker.Publish(this, new VillageHostileActionAttempted(VillageHostileAction.Raid, MobileParty.MainParty, settlement));
     }
 
     public bool CanStartHostileAction(

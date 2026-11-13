@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Entity;
@@ -70,8 +70,8 @@ internal class ClientVillageHostileActionHandler : IHandler
             () =>
             {
                 villageHostileActionInterface.ClearPendingHostileAction();
-                // A raid start the server approved on finalize is a continuation: it presents
-                // once the finalized battle's encounter has ended, not over its result screens.
+                // A raid continuation waits for the previous encounter's results before requesting
+                // fresh approval. A normal approval presents the waiting encounter immediately.
                 if (payload.What.Action == VillageHostileAction.Raid &&
                     objectManager.TryGetObjectWithLogging<Settlement>(payload.What.SettlementId, out var settlement))
                     villageHostileActionInterface.BeginRaidContinuation(settlement);

@@ -17,7 +17,6 @@ using GameInterface.Services.Players;
 using GameInterface.Services.Settlements.Interfaces;
 using GameInterface.Services.SiegeEvents.Patches;
 using GameInterface.Services.Villages.Data;
-using GameInterface.Services.Villages.Interfaces;
 using GameInterface.Services.Villages.Messages;
 using LiteNetLib;
 using Serilog;
@@ -67,7 +66,6 @@ internal class BattleFinalizeHandler : IHandler
     private readonly IPlayerManager playerManager;
     private readonly ISiegeMapEventLeaderReconciler siegeMapEventLeaderReconciler;
     private readonly IBattleHostRetentionPolicy retentionPolicy;
-    private readonly IVillageHostileActionInterface villageHostileActionInterface;
 
     public BattleFinalizeHandler(
         IMessageBroker messageBroker,
@@ -80,8 +78,7 @@ internal class BattleFinalizeHandler : IHandler
         IBattleHostRegistry hostRegistry,
         IPlayerManager playerManager,
         ISiegeMapEventLeaderReconciler siegeMapEventLeaderReconciler,
-        IBattleHostRetentionPolicy retentionPolicy,
-        IVillageHostileActionInterface villageHostileActionInterface)
+        IBattleHostRetentionPolicy retentionPolicy)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -94,7 +91,6 @@ internal class BattleFinalizeHandler : IHandler
         this.playerManager = playerManager;
         this.siegeMapEventLeaderReconciler = siegeMapEventLeaderReconciler;
         this.retentionPolicy = retentionPolicy;
-        this.villageHostileActionInterface = villageHostileActionInterface;
 
         messageBroker.Subscribe<MapEventFinalizeAttempted>(Handle_MapEventFinalizeAttempted);
         messageBroker.Subscribe<NetworkMapEventFinalizeAttempted>(Handle_NetworkMapEventFinalizeAttempted);
@@ -474,9 +470,8 @@ internal class BattleFinalizeHandler : IHandler
     }
     /// <summary>
     /// [Server] A won raid with hit points left does not end at finalize: the raid itself continues.
-    /// Finalize the battle, close every involved player's encounter, then approve a fresh raid for the
-    /// attacker leader and tell its client to present the approved start once its result screens are
-    /// done. False when this finalize is not a continuable raid win, so the caller finalizes it plainly.
+    /// Finalize the battle, close every involved player's encounter, then tell the attacker leader to
+    /// request the next raid once its result screens are done. False for other battle outcomes.
     /// </summary>
     private bool TryContinueRaidAfterVictory(MapEvent mapEvent, string mapEventId)
     {
@@ -513,10 +508,8 @@ internal class BattleFinalizeHandler : IHandler
                     mapEvent.FinalizeEventAux();
                     ClearMapEventBackReferences(involvedParties);
 
-                    // The continuation is a fresh hostile action by the same leader on the same
-                    // village, applied here so the client only presents the approved start.
-                    villageHostileActionInterface.ApplyHostileAction(leaderParty.MobileParty, settlement, VillageHostileAction.Raid);
-                    villageHostileActionInterface.ApproveMapEventStart(leaderParty, settlement, VillageHostileAction.Raid);
+                    // Request approval after the result screens close so its timeout does not run
+                    // while the player is still viewing the scoreboard or collecting loot.
                     continued = true;
                 }
                 finally

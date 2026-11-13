@@ -8,7 +8,6 @@ using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Settlements.Interfaces;
-using GameInterface.Services.Villages.Interfaces;
 using HarmonyLib;
 using Moq;
 using System;
@@ -37,8 +36,7 @@ public class BattleFinalizeHandlerRetryTests : IDisposable
             Mock.Of<IBattleHostRegistry>(),
             Mock.Of<IPlayerManager>(),
             leaderReconciler,
-            Mock.Of<IBattleHostRetentionPolicy>(),
-            Mock.Of<IVillageHostileActionInterface>());
+            Mock.Of<IBattleHostRetentionPolicy>());
     }
 
     [Fact]

@@ -23,10 +23,10 @@ public interface IVillageHostileActionInterface : IGameAbstraction
     /// <summary>[Client] The pending hostile-action request was denied; close the encounter it opened.</summary>
     void RecoverRejectedHostileAction();
 
-    /// <summary>[Client, game thread] Present an approved raid continuation now, or park it until the current encounter ends.</summary>
+    /// <summary>[Client, game thread] Present an approved raid start, or park a continuation until the current encounter ends.</summary>
     void BeginRaidContinuation(Settlement settlement);
 
-    /// <summary>[Client, game thread] Present a parked raid continuation once the current encounter has ended.</summary>
+    /// <summary>[Client, game thread] Request fresh approval for a parked raid continuation once the current encounter has ended.</summary>
     void PresentParkedRaidContinuation();
     bool CanStartHostileAction(MobileParty mobileParty, Settlement settlement, VillageHostileAction action, out VillageHostileActionDeniedReason reason);
     void ApplyHostileAction(MobileParty mobileParty, Settlement settlement, VillageHostileAction action);
