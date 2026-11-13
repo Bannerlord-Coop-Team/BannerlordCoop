@@ -25,14 +25,15 @@ namespace Missions.Naval;
 /// </summary>
 public interface INavalNpcFleetFielder
 {
-    /// <summary>Whether the side's reserve reached this client, and how many parties in it no player owns still have troops.</summary>
-    (bool Populated, int NpcParties) ReadReserve(BattleSideEnum side);
+    /// <summary>The side's NPC reserve here: its supplier and the parties in it no player owns that still have troops.</summary>
+    NavalNpcReserve ReadReserve(BattleSideEnum side);
 
     /// <summary>
-    /// Fields the side's AI fleet, recording each hull and pulled troop in <paramref name="work"/> as it happens; returns why a
-    /// step couldn't go on, or null once the fleet is crewed.
+    /// Fields the side's AI fleet from <paramref name="reserve"/>, recording each hull and pulled troop in <paramref name="work"/>
+    /// as it happens; returns why a step couldn't go on (<see cref="NavalNpcFleetAttemptWork.NoShipsLeft"/> when the players'
+    /// fleets take all of the side's ships), or null once the fleet is crewed.
     /// </summary>
-    string Field(Mission mission, BattleSideEnum side, NavalNpcFleetAttemptWork work);
+    string Field(Mission mission, BattleSideEnum side, NavalNpcReserve reserve, NavalNpcFleetAttemptWork work);
 }
 
 /// <inheritdoc cref="INavalNpcFleetFielder"/>
@@ -71,14 +72,14 @@ public class NavalNpcFleetFielder : INavalNpcFleetFielder
     internal static int ShipCount(int deploymentLimit, int ships, int freeFormations) =>
         Math.Max(0, Math.Min(Math.Min(deploymentLimit, ships), Math.Min(freeFormations, MaxShipFormations)));
 
-    public (bool Populated, int NpcParties) ReadReserve(BattleSideEnum side)
+    public NavalNpcReserve ReadReserve(BattleSideEnum side)
     {
         var supplier = SideSupplier(side);
-        return (supplier?.IsPopulated == true, NpcParties(supplier).Count);
+        return new NavalNpcReserve(supplier, NpcParties(supplier));
     }
 
     // Picks the ships, crew and formations the way vanilla's naval start does, then spawns and crews them.
-    public string Field(Mission mission, BattleSideEnum side, NavalNpcFleetAttemptWork work)
+    public string Field(Mission mission, BattleSideEnum side, NavalNpcReserve reserve, NavalNpcFleetAttemptWork work)
     {
         var shipsLogic = mission.GetMissionBehavior<NavalShipsLogic>();
         var agentsLogic = mission.GetMissionBehavior<NavalAgentsLogic>();
@@ -93,10 +94,12 @@ public class NavalNpcFleetFielder : INavalNpcFleetFielder
 
         if (!objectManager.TryGetObject<MapEvent>(session.InstanceId, out var mapEvent)) return "map event not found";
 
-        var supplier = SideSupplier(side);
-        var parties = NpcParties(supplier);
-        var model = NavalDLCManager.Instance.GameModels.ShipDeploymentModel;
+        var parties = reserve.Parties;
         var limit = shipBudget.AiLimit(mapEvent.GetMapEventSide(side).Parties, parties);
+        // The players' fleets can take all of the side's eight ships, which just leaves it no AI fleet.
+        if (limit.NetDeploymentLimit == 0) return NavalNpcFleetAttemptWork.NoShipsLeft;
+
+        var model = NavalDLCManager.Instance.GameModels.ShipDeploymentModel;
         var campaignShips = new MBList<IShipOrigin>();
         model.FillShipsOfTeamParties(parties, limit, campaignShips);
         var ships = campaignShips.OfType<Ship>().Select(ship => (snapshot: snapshotBuilder.Build(ship), owner: ship.Owner)).ToList();
@@ -109,7 +112,8 @@ public class NavalNpcFleetFielder : INavalNpcFleetFielder
         // hull needs at least one crew, so the pulled troops also cap how many field.
         int planned = ShipCount(limit.NetDeploymentLimit, ships.Count, formations.Count);
         var plannedShips = ships.Take(planned).Select(ship => (IShipOrigin)ship.snapshot).ToMBList();
-        var troops = PullTroops(supplier, parties, model.GetMaximumDeployableTroopCountForTeam(plannedShips, isPlayerTeam: false));
+        int crewCapacity = model.GetMaximumDeployableTroopCountForTeam(plannedShips, isPlayerTeam: false);
+        var troops = PullTroops(reserve.Supplier, parties, crewCapacity);
         work.Troops.AddRange(troops);
         int count = Math.Min(planned, troops.Count);
         Logger.Information("[NavalBattle] Fielding the AI fleet of {MapEventId}: side={Side} team={Team} parties={Parties} ships={Ships} " +

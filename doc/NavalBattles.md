@@ -104,20 +104,22 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
 
 ### AI hulls follow the battle host
 
-- The battle host fields each side's AI fleet late, once the NPC reserve reached it and its deployment is over
-  (`Missions.Naval/NavalNpcFleetSpawner.cs`). The launcher builds a spawner for both sides, so an enemy
-  fleet and an allied fleet (AI lords on the players' side) each have their own attempt, outcome
-  (`NetworkNpcFleetAttempted.Side`) and relay to entrants. A side with no AI party in the reserve just waits, so one that
-  joins later (`add_allied_ai_party`) is still fielded.
+- The battle host fields each side's AI fleet late, once the NPC reserve reached it and its deployment is over. The
+  attempt, its outcome (`NetworkNpcFleetAttempted.Side`), the relay to entrants and the take-back are the spawner's
+  (`Missions.Naval/NavalNpcFleetSpawner.cs`); the fielding itself is the fielder's (`NavalNpcFleetFielder.cs`). The launcher
+  builds a spawner for both sides, so an enemy fleet and an allied fleet (AI lords on the players' side) each have their
+  own. A side with no AI party in the reserve just waits, so one that joins later (`add_allied_ai_party`) is still fielded.
+  The fielder:
   - Team: the hulls go where every peer puts their copies (`BattleTeamResolver.ResolveAiFleetTeam(side)`):
     the side's main team, or its ally team on the host's own side. The ally team also holds the other players' copies,
     so off-ship AI crew never joins a copy's formation (`NavalCopyCrewLookupPatches`).
   - Ships: the AI parties get what the players leave of the side's 8 ships, at most vanilla's limit for them
-    (`NavalShipBudget`). Each player's share is the one its launcher fields, from campaign data every client holds.
+    (`NavalShipBudget`). Each player's share is the one its launcher fields, from campaign data every client holds. When the
+    players take all 8, the side just has no AI fleet (logged as information, settled like a failed attempt).
   - Crew: troops are pulled only up to the crew capacity of the hulls that field; the rest stay in the reserve.
   - Reserve: at sea every AI party on a side belongs to the battle host, a player-led army's members included
     (`BattleTroopReserveBuilder.GetOwnedReserves`; on land they go to the army leader). The host gets it with the
-    election at mission-ready, after vanilla's one-time troop pull, so only the spawner fields it.
+    election at mission-ready, after vanilla's one-time troop pull, so only the fielder fields it.
   An attempt that fails after spawning takes back its own hulls, crew and waiting troops before it reports the failure
   (`NavalNpcFleetRollback`); its pulled troops stay supplied, since the server's supply ledger never rewinds.
   A take-back that throws is retried every tick, resuming each hull where it stopped, and the failure is reported only once

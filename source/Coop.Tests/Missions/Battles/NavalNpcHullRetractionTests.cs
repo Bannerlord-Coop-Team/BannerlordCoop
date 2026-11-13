@@ -154,7 +154,9 @@ public class NavalNpcHullRetractionTests
         harness.Network.Setup(n => n.SendAll(It.IsAny<NetworkNpcFleetAttempted>()))
             .Callback<IMessage>(message => sent.Add(((NetworkNpcFleetAttempted)message).Failed ? "failed" : "fielded"));
 
-        spawner.AttemptFleet(work =>
+        harness.Fielder.Setup(f => f.Field(It.IsAny<Mission>(), It.IsAny<BattleSideEnum>(), It.IsAny<NavalNpcReserve>(),
+                It.IsAny<NavalNpcFleetAttemptWork>()))
+            .Returns<Mission, BattleSideEnum, NavalNpcReserve, NavalNpcFleetAttemptWork>((_, _, _, work) =>
         {
             foreach (var hull in hulls)
             {
@@ -164,6 +166,7 @@ public class NavalNpcHullRetractionTests
 
             throw new InvalidOperationException("crewing threw");
         });
+        spawner.AttemptFleet(null, default);
 
         Assert.Equal(new[] { "removed:0" }, sent);
         Assert.False(spawner.AttemptFailed);
@@ -218,9 +221,12 @@ public class NavalNpcHullRetractionTests
         }
 
 #if COOP_NAVAL
+        // The fielder the spawner hands its attempt to.
+        public Mock<INavalNpcFleetFielder> Fielder { get; } = new Mock<INavalNpcFleetFielder>();
+
         // The battle's AI fleet spawner, taking a failed attempt back through the real rollback and this replicator.
         public NavalNpcFleetSpawner Spawner() => new NavalNpcFleetSpawner(Network.Object, new MessageBroker(), Session.Object,
-            Replicator, BattleSideEnum.Defender, (_, _) => Mock.Of<INavalNpcFleetFielder>(),
+            Replicator, BattleSideEnum.Defender, (_, _) => Fielder.Object,
             replicator => new NavalNpcFleetRollback(replicator)
 #if DEBUG
             , Mock.Of<INavalScenarioState>()

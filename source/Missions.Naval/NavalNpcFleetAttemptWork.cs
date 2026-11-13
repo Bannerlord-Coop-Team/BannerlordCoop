@@ -5,9 +5,15 @@ using TaleWorlds.MountAndBlade;
 
 namespace Missions.Naval;
 
-/// <summary>[Game thread] What one AI fleet attempt changed so far, so a failed attempt takes back exactly its own work.</summary>
+/// <summary>
+/// [Game thread] What one AI fleet attempt did so far: the hulls and troops a failed attempt takes back exactly, and its first
+/// crew batch for the inspect output.
+/// </summary>
 public sealed class NavalNpcFleetAttemptWork
 {
+    /// <summary>Why an attempt fields nothing when the players' fleets take all of the side's ships, a normal outcome.</summary>
+    public const string NoShipsLeft = "the players' fleets take all of the side's ships";
+
     /// <summary>Every hull the attempt spawned, in spawn order, whether or not it registered.</summary>
     public List<MissionObject> Hulls { get; } = new List<MissionObject>();
 

@@ -2,6 +2,7 @@
 using Common.Commands;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
@@ -57,10 +58,13 @@ public sealed class NavalFleetFailCoopCommand : ICoopCommand
     {
         ally = false;
         stage = NavalFleetFailStage.BeforeSpawn;
+        var words = Enumerable.Range(0, args.Count).Select(index => (args[index] ?? "").Trim()).ToList();
         int next = 0;
-        if (next < args.Count && IsSideWord((args[next] ?? "").Trim(), out ally)) next++;
-        if (next < args.Count && !Stages.TryGetValue((args[next++] ?? "").Trim(), out stage)) return false;
-        return next == args.Count;
+        if (next < words.Count && IsSideWord(words[next], out ally)) next++;
+        if (next == words.Count) return true;
+
+        if (!Stages.TryGetValue(words[next], out stage)) return false;
+        return next + 1 == words.Count;
     }
 
     // Whether the word names a side, and whether that side is the host's own.
