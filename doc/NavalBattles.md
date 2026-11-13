@@ -426,7 +426,9 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
 
 - **Detection is host-only.** `CoopNavalBattleEndLogic` (`Missions.Naval/CoopNavalBattleEndLogic.cs`) runs vanilla
   `NavalBattleEndLogic`, but only the battle host checks the end, and only once both sides fielded troops. That hold is
-  latched on every client, so a successor starts released.
+  latched on every client, so a successor starts released. Vanilla moves its "since" timers (the contested-island wait
+  for hulls out of action, the retreat waits) only while it checks, so a client that doesn't check keeps them at now; a
+  promoted host otherwise read the AI hulls, crewless for the ticks of their swap, as out of action for 20 s and won at once.
 - **Tally.** Side depletion and hulls out of action are counted by `NavalSideTally` (`Missions/Battles/NavalSideTally.cs`)
   with vanilla's rules, over the hulls `NavalSideTallyReader` gathers through the engine (the E2E scenarios count through
   the same reader):

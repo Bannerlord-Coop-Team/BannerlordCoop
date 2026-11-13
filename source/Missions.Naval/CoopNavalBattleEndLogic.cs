@@ -69,11 +69,21 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
                 endChecksReleased = BothSidesFielded();
 
             CanCheckForEndCondition = session.IsLocalHost && endChecksReleased;
+            if (!CanCheckForEndCondition) RestartEndCheckTimers();
             ObserveHeroes();
         }
 
         base.OnMissionTick(dt);
         ClearRetreat();
+    }
+
+    // Keeps vanilla's "since" timers at now while this client doesn't check, as vanilla moves them only inside the checks: a stale
+    // timer let a promoted host read the enemy hulls, crewless during their swap, as out of action for 20 s already and win.
+    private void RestartEndCheckTimers()
+    {
+        _contestedIslandCheckTimer = MissionTime.Now;
+        _enemySideNotYetRetreatingTime = MissionTime.Now;
+        _playerSideNotYetRetreatingTime = MissionTime.Now;
     }
 
     // Ends the mission with the resolved result where there is one; a non-host never concludes by itself.
