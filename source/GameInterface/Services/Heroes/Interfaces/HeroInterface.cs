@@ -24,6 +24,7 @@ using System.Runtime.ExceptionServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
+using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
@@ -219,6 +220,13 @@ internal class HeroInterface : IHeroInterface
                 {
                     siegeEventInterface.RestoreReloadedPlayer();
                 }
+            });
+        }
+        else if (playerParty.IsInRaftState)
+        {
+            GameThread.RunSafe(() =>
+            {
+                GameMenu.ActivateGameMenu("player_raft_state");
             });
         }
 

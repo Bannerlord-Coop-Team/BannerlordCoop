@@ -20,6 +20,7 @@ using GameInterface.Services.PartyVisuals.Messages;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.Players.Messages;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using HarmonyLib;
 using LiteNetLib;
@@ -250,6 +251,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
 
             ActivateParty(party, player.MobilePartyId);
             Logger.Information("Restored party {PartyId} for reconnected peer {Peer}", party.StringId, peer.Id);
+            messageBroker.Publish(this, new PlayerPartyRestoredOnReconnect(party));
         });
     }
 

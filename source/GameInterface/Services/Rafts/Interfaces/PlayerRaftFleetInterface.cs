@@ -1,7 +1,6 @@
 ﻿using Common.Messaging;
 using GameInterface.CoopSessionData;
 using GameInterface.Registry.Auto;
-using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.NavalDLC;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -39,10 +38,10 @@ public interface IPlayerRaftFleetInterface : IGameAbstraction
     void LeaveRaftAtSea(MobileParty party);
 
     /// <summary>
-    /// Sends a reconnected player's raft to the nearest shore again and forces it on every client, because the client
-    /// loads the raft without the move to land it got while offline.
+    /// Sends a player's raft to the nearest shore again after its move to land was lost. Returns whether the party was on a
+    /// raft, so the caller can force the new move on every client.
     /// </summary>
-    void ResumeRaft(MobileParty party);
+    bool ResumeRaft(MobileParty party);
 
     /// <summary>
     /// Puts a player's new party on a raft or gives it the fleet cached for that player, like
@@ -132,12 +131,12 @@ public class PlayerRaftFleetInterface : IPlayerRaftFleetInterface
         party.Anchor.ResetPosition();
     }
 
-    public void ResumeRaft(MobileParty party)
+    public bool ResumeRaft(MobileParty party)
     {
-        if (!party.IsInRaftState) return;
+        if (!party.IsInRaftState) return false;
 
         party.MovePartyToTheClosestLand();
-        messageBroker.Publish(this, new PartyBehaviorChangeAttempted(party, forcePosition: true, isCurrentlyAtSea: party.IsCurrentlyAtSea));
+        return true;
     }
 
     public void OnPlayerCharacterChanged(Hero newPlayerHero, MobileParty newMainParty)

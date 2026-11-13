@@ -21,7 +21,6 @@ using Coop.Core.Server.Services.Instances;
 using Coop.Core.Server.Services.Instances.Handlers;
 using Coop.Core.Server.Services.Kingdoms;
 using Coop.Core.Server.Services.MobileParties;
-using Coop.Core.Server.Services.MobileParties.Handlers;
 using Coop.Core.Server.Services.Save;
 using Coop.Core.Server.Services.Session;
 using Coop.Core.Server.Services.Settlements;
@@ -50,7 +49,6 @@ public class ServerModule : CommonModule
     internal static readonly Type[] NavalOnlyTypes =
     {
         typeof(ServerBattleShipFateHandler),
-        typeof(ServerPlayerRaftRejoinHandler),
     };
 
     protected override void Load(ContainerBuilder builder)
