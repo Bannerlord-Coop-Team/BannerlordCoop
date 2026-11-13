@@ -3358,26 +3358,24 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
     }
 
     [Fact]
-    public void ServerAiPartyEncounter_RetriedWhilePlayerTalksToAnotherParty_LogsDeferralOnce()
+    public void ServerAiPartyEncounter_RetriedWhilePlayerTalksToAnotherParty_LogsDeferralOnceUntilTheConversationEnds()
     {
-        var client = Clients.First();
-        client.Resolve<IControllerIdProvider>().SetControllerId("PlayerOne");
-        var (_, playerMobilePartyId) = CreatePlayerHeroParty("PlayerOne");
-        var playerPartyId = GetPartyBaseId(Server, playerMobilePartyId);
+        var (client1, client2, playerPartyId, otherPlayerPartyId) = CreateTwoPlayerParties();
         var firstAiPartyId = CreateMobilePartyBase();
         var secondAiPartyId = CreateMobilePartyBase();
         var thirdAiPartyId = CreateMobilePartyBase();
         var logs = new ConcurrentQueue<string>();
         Action<string> capture = logs.Enqueue;
+        // TestLogLevels raises ConversationRequestHandler to Verbose, otherwise this line is never captured.
         int Deferrals(string aiPartyId) => logs.Count(line =>
             line.StartsWith("Deferring server-detected conversation") && line.Contains($"AttackerId=\"{aiPartyId}\""));
 
-        Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client.NetPeer);
         StartServerAiPartyEncounter(firstAiPartyId, playerPartyId);
         OutputSinkManager.AddLogCallback(capture);
         try
         {
             // Two parties retry in turn every tick while the player talks to the first one.
+            logs.Clear();
             for (var tick = 0; tick < 5; tick++)
             {
                 StartServerAiPartyEncounter(secondAiPartyId, playerPartyId);
@@ -3387,28 +3385,22 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
             Assert.Equal(1, Deferrals(secondAiPartyId));
             Assert.Equal(1, Deferrals(thirdAiPartyId));
 
-            // Once the conversation ends the second party is approved, so the third one's next deferral logs again.
-            client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkConversationEnded()));
+            // Once the conversation ends, the second party logs again while another player holds it.
+            logs.Clear();
+            client1.Call(() => client1.Resolve<INetwork>().SendAll(new NetworkConversationEnded()));
             Server.PumpGameThread();
+            StartServerAiPartyEncounter(secondAiPartyId, otherPlayerPartyId);
+            Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAllowConversation>(), m => m.DefenderId == otherPlayerPartyId);
             StartServerAiPartyEncounter(secondAiPartyId, playerPartyId);
-            Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAllowConversation>(), m => m.AttackerId == secondAiPartyId);
-            StartServerAiPartyEncounter(thirdAiPartyId, playerPartyId);
-            StartServerAiPartyEncounter(thirdAiPartyId, playerPartyId);
-            Assert.Equal(2, Deferrals(thirdAiPartyId));
+            StartServerAiPartyEncounter(secondAiPartyId, playerPartyId);
 
-            // A conversation the player asks for clears it too.
-            client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkConversationEnded()));
-            Server.PumpGameThread();
-            RequestInteraction(client, playerPartyId, firstAiPartyId);
-            Server.PumpGameThread();
-            Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAllowConversation>(), m => m.AttackerId == playerPartyId);
-            StartServerAiPartyEncounter(thirdAiPartyId, playerPartyId);
-            Assert.Equal(3, Deferrals(thirdAiPartyId));
+            Assert.Equal(1, Deferrals(secondAiPartyId));
         }
         finally
         {
             OutputSinkManager.RemoveLogCallback(capture);
-            client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkConversationEnded()));
+            client1.Call(() => client1.Resolve<INetwork>().SendAll(new NetworkConversationEnded()));
+            client2.Call(() => client2.Resolve<INetwork>().SendAll(new NetworkConversationEnded()));
             Server.PumpGameThread();
         }
     }

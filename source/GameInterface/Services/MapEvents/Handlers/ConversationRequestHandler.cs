@@ -66,11 +66,10 @@ internal class ConversationRequestHandler : IHandler
     // so this is the only record of a PvP engagement). The defender's "hold on" popup is driven from these broadcasts.
     private readonly ConcurrentDictionary<NetPeer, PvpInteraction> pvpDefenderByAttacker =
         new ConcurrentDictionary<NetPeer, PvpInteraction>();
-    // [Server] AI parties whose server-detected encounter with a player party was deferred, so each one's per-tick
-    // retries log once. Game thread only; cleared when the server accepts a request between that player and an AI
-    // party (a later refusal costs one extra line), and a player that leaves keeps its small last set.
-    private readonly Dictionary<string, HashSet<string>> deferredAiPartiesByPlayerParty =
-        new Dictionary<string, HashSet<string>>();
+    // [Server] AI parties whose server-detected encounter with each player was deferred and logged. Game thread only;
+    // cleared when that player's conversation ends or the player leaves.
+    private readonly Dictionary<NetPeer, HashSet<string>> deferredAiPartiesByPeer =
+        new Dictionary<NetPeer, HashSet<string>>();
     private readonly Queue<IMessage> pvpInteractionNotifications = new Queue<IMessage>();
     private bool isDrainingPvpInteractionNotifications;
 
@@ -211,11 +210,11 @@ internal class ConversationRequestHandler : IHandler
         // otherwise the attacker retries every tick and each retry denies a request nobody made.
         if (conversationPartyTracker.IsInOtherConversation(playerPeer, playerPartyId, aiPartyId))
         {
-            // The attacker retries every tick, so log it once until the server accepts this player's next AI conversation.
-            if (!deferredAiPartiesByPlayerParty.TryGetValue(playerPartyId, out var deferredAiParties))
+            // The attacker retries every tick, so log it once until this player's conversation ends.
+            if (!deferredAiPartiesByPeer.TryGetValue(playerPeer, out var deferredAiParties))
             {
                 deferredAiParties = new HashSet<string>();
-                deferredAiPartiesByPlayerParty[playerPartyId] = deferredAiParties;
+                deferredAiPartiesByPeer[playerPeer] = deferredAiParties;
             }
 
             if (deferredAiParties.Add(aiPartyId))
@@ -273,9 +272,6 @@ internal class ConversationRequestHandler : IHandler
 
         if (!TryAcceptConversationRequest(requestingPeer, request, attacker, defender, out var aiParty, out var aiPartyId, out var playerPartyId, out var isPlayerVsPlayer))
             return;
-
-        if (playerPartyId != null)
-            deferredAiPartiesByPlayerParty.Remove(playerPartyId);
 
         if (aiParty == null)
         {
@@ -896,10 +892,13 @@ internal class ConversationRequestHandler : IHandler
         bool requireRequestIdMatch = false)
     {
         GameThread.Run(() =>
+        {
+            deferredAiPartiesByPeer.Remove(peer);
             ConversationPartyHold.EndEngagement(
                 conversationPartyTracker,
                 peer,
                 requestId,
-                requireRequestIdMatch));
+                requireRequestIdMatch);
+        });
     }
 }
