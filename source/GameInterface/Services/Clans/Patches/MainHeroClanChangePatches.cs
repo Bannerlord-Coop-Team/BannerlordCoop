@@ -13,14 +13,15 @@ namespace GameInterface.Services.Clans.Patches;
 internal static class MainHeroClanChangePatches
 {
     /// <summary>
-    /// Vanilla map views only refresh relations on war, peace and kingdom changes, so a clan join left them stale.
+    /// Redraws the local map's stance markers when the local player's hero changes clan.
     /// </summary>
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnHeroChangedClan))]
     [HarmonyPostfix]
     public static void HeroChangedClanPostfix(Hero hero, Clan oldClan)
     {
+        if (ModInformation.IsServer) return;
         // Compares PlayerTroop because Hero.MainHero throws while PlayerTroop is still unset during a join.
-        if (ModInformation.IsServer || hero.CharacterObject != Game.Current?.PlayerTroop) return;
+        if (hero.CharacterObject != Game.Current?.PlayerTroop) return;
         if (!ContainerProvider.TryResolve<IMapStanceVisualsInterface>(out var stanceVisuals)) return;
 
         stanceVisuals.RedrawStanceVisuals(oldClan?.MapFaction, hero.MapFaction);

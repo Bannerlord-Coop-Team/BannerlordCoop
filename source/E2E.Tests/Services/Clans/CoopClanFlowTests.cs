@@ -733,11 +733,15 @@ public class CoopClanFlowTests : MapEventTestBase, IDisposable
             var settlements = new MBList<Settlement>(Settlement.All ?? new MBList<Settlement>());
             settlements.Add(settlement);
             Campaign.Current.CampaignObjectManager.Settlements = settlements;
-            settlement._isVisible = true;
             var parties = new[] { Get<MobileParty>(memberClient, enemyPartyId), Get<MobileParty>(memberClient, neutralPartyId) };
-            foreach (var party in parties) party._isVisible = true;
             // Clear the dirty flags so the asserts below prove the join redrew them.
-            foreach (var party in parties.Select(party => party.Party).Append(settlement.Party)) party.OnVisualsUpdated();
+            settlement._isVisible = true;
+            settlement.Party.OnVisualsUpdated();
+            foreach (var party in parties)
+            {
+                party._isVisible = true;
+                party.Party.OnVisualsUpdated();
+            }
         });
 
         Join();

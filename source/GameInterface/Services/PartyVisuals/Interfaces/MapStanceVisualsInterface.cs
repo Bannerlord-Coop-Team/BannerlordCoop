@@ -1,5 +1,6 @@
 ﻿using SandBox.GauntletUI.Map;
 using SandBox.View.Map;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -23,24 +24,24 @@ public class MapStanceVisualsInterface : IMapStanceVisualsInterface
     /// <inheritdoc/>
     public void RedrawStanceVisuals(IFaction oldFaction, IFaction newFaction)
     {
-        // Same stance-flip test as ChangeKingdomAction.CheckIfPartyIconIsDirty, also applied to visible settlements.
-        foreach (var mobileParty in MobileParty.All)
-        {
-            if (mobileParty.IsVisible && HasStanceFlipped(mobileParty.Party, oldFaction, newFaction))
-            {
-                mobileParty.Party.SetVisualAsDirty();
-            }
-        }
-
-        foreach (var settlement in Settlement.All)
-        {
-            if (settlement.IsVisible && HasStanceFlipped(settlement.Party, oldFaction, newFaction))
-            {
-                settlement.Party.SetVisualAsDirty();
-            }
-        }
-
+        MarkStanceFlippedVisualsDirty(oldFaction, newFaction);
         MapScreen.Instance?.GetMapView<GauntletMapSettlementNameplateView>()?._dataSource?.RefreshRelationsOfNameplates();
+    }
+
+    /// <summary>
+    /// Marks visible party and settlement markers dirty when their war stance differs between the two factions.
+    /// </summary>
+    private static void MarkStanceFlippedVisualsDirty(IFaction oldFaction, IFaction newFaction)
+    {
+        // Same stance-flip test as ChangeKingdomAction.CheckIfPartyIconIsDirty, also applied to visible settlements.
+        var visibleMapParties = MobileParty.All.Where(mobileParty => mobileParty.IsVisible).Select(mobileParty => mobileParty.Party)
+            .Concat(Settlement.All.Where(settlement => settlement.IsVisible).Select(settlement => settlement.Party));
+        foreach (var mapParty in visibleMapParties)
+        {
+            if (!HasStanceFlipped(mapParty, oldFaction, newFaction)) continue;
+
+            mapParty.SetVisualAsDirty();
+        }
     }
 
     /// <summary>
