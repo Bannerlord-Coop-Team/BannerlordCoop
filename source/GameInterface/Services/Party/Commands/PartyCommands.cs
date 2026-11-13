@@ -970,8 +970,8 @@ internal class PartyCommands
 
     // coop.debug.mobile_party.fill_cavalry MobileParty_player_1
     /// <summary>
-    /// Fills a party up to its size limit with the top-tier cavalry of its leader's culture, falling back to
-    /// imperial cavalry for a culture without any (e.g. nords).
+    /// Fills a party up to its size limit with the top-tier cavalry and horse archers of its leader's culture,
+    /// falling back to imperial ones for a culture without any (e.g. nords).
     /// </summary>
     public sealed class FillCavalryCoopCommand : ICoopCommand
     {
@@ -979,7 +979,7 @@ internal class PartyCommands
 
         public string Name => "fill_cavalry";
 
-        public string Description => "Fills a party to its size limit with cavalry of its leader's culture, or imperial cavalry.";
+        public string Description => "Fills a party to its size limit with cavalry and horse archers of its leader's culture, or imperial ones.";
 
         public CoopCommandSide Side => CoopCommandSide.Server;
 
@@ -1003,31 +1003,44 @@ internal class PartyCommands
             var leader = party.LeaderHero;
             if (leader == null) return Failed($"{party.Name} ({party.StringId}) has no leader hero.");
 
-            var troop = GetBestCavalry(leader.Culture) ??
-                GetBestCavalry(MBObjectManager.Instance.GetObject<CultureObject>("empire"));
-            if (troop == null) return Failed($"No cavalry found for {leader.Culture?.Name} or the empire culture.");
+            var troops = GetBestMountedTroops(leader.Culture);
+            if (troops.Length == 0) troops = GetBestMountedTroops(MBObjectManager.Instance.GetObject<CultureObject>("empire"));
+            if (troops.Length == 0) return Failed($"No cavalry found for {leader.Culture?.Name} or the empire culture.");
 
             int toAdd = party.Party.PartySizeLimit - party.MemberRoster.TotalManCount;
             if (toAdd <= 0) return Failed($"{party.Name} is already at or over its limit of {party.Party.PartySizeLimit}.");
 
-            party.MemberRoster.AddToCounts(troop, toAdd);
+            var added = new List<string>();
+            for (int i = 0; i < troops.Length; i++)
+            {
+                // Splits evenly, with the remainder going to the first troop.
+                int count = (toAdd / troops.Length) + (i == 0 ? toAdd % troops.Length : 0);
+                party.MemberRoster.AddToCounts(troops[i], count);
+                added.Add($"{count} {troops[i].StringId}");
+            }
 
-            return Succeeded($"Added {toAdd} {troop.StringId} to {party.Name} ({party.StringId}): " +
+            return Succeeded($"Added {string.Join(", ", added)} to {party.Name} ({party.StringId}): " +
                 $"{party.MemberRoster.TotalManCount}/{party.Party.PartySizeLimit} members.");
         }
     }
 
-    // Highest-tier cavalry in the culture's basic and elite troop trees, or null when the culture has none.
-    private static CharacterObject GetBestCavalry(CultureObject culture)
+    // Highest-tier cavalry and horse archer in the culture's basic and elite troop trees; empty when the culture has neither.
+    private static CharacterObject[] GetBestMountedTroops(CultureObject culture)
     {
-        if (culture == null) return null;
+        if (culture == null) return Array.Empty<CharacterObject>();
 
-        return new[] { culture.BasicTroop, culture.EliteBasicTroop }
+        var tree = new[] { culture.BasicTroop, culture.EliteBasicTroop }
             .Where(baseTroop => baseTroop != null)
             .SelectMany(baseTroop => CharacterHelper.GetTroopTree(baseTroop))
-            .Where(troop => troop.DefaultFormationClass == FormationClass.Cavalry)
-            .OrderByDescending(troop => troop.Tier)
-            .FirstOrDefault();
+            .ToList();
+
+        return new[] { FormationClass.Cavalry, FormationClass.HorseArcher }
+            .Select(formation => tree
+                .Where(troop => troop.DefaultFormationClass == formation)
+                .OrderByDescending(troop => troop.Tier)
+                .FirstOrDefault())
+            .Where(troop => troop != null)
+            .ToArray();
     }
 
     // coop.debug.mobileparty.declare_war
