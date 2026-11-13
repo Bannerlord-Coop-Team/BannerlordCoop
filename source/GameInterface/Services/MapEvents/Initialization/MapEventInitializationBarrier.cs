@@ -593,14 +593,11 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         return true;
     }
 
-    private static bool References(PlayerEncounter encounter, MapEvent mapEvent)
-    {
-        PlayerEncounterExtensions.TryGetEncounteredBattle(out var encounteredBattle);
-        return encounter?._mapEvent == mapEvent ||
-            encounter?.BattleSimulation?.MapEvent == mapEvent ||
-            GetPlayerEncounterBattle() == mapEvent ||
-            encounteredBattle == mapEvent;
-    }
+    private static bool References(PlayerEncounter encounter, MapEvent mapEvent) =>
+        encounter?._mapEvent == mapEvent ||
+        encounter?.BattleSimulation?.MapEvent == mapEvent ||
+        GetPlayerEncounterBattle() == mapEvent ||
+        PlayerEncounterExtensions.GetEncounteredBattleOrNull() == mapEvent;
 
     internal static bool IsBattleResultEncounter(PlayerEncounter encounter)
     {

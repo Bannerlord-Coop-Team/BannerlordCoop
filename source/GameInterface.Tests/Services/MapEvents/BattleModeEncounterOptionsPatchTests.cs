@@ -34,9 +34,9 @@ public class BattleModeEncounterOptionsPatchTests
     [Theory]
     [InlineData("game_menu_join_encounter_help_attackers_on_condition")]
     [InlineData("game_menu_join_encounter_help_defenders_on_condition")]
-    public void HarmonyPatch_JoinEncounterConditionsGetEncounterMenuFinalizer(string conditionName)
+    public void HarmonyPatch_JoinEncounterConditionsGetNotReadyPrefix(string conditionName)
     {
-        var harmony = new Harmony(nameof(HarmonyPatch_JoinEncounterConditionsGetEncounterMenuFinalizer) + conditionName);
+        var harmony = new Harmony(nameof(HarmonyPatch_JoinEncounterConditionsGetNotReadyPrefix) + conditionName);
         try
         {
             harmony.CreateClassProcessor(typeof(RaidJoinEncounterConditionPatch)).Patch();
@@ -45,7 +45,7 @@ public class BattleModeEncounterOptionsPatchTests
             var patches = Harmony.GetPatchInfo(condition);
 
             Assert.NotNull(patches);
-            Assert.Contains(patches.Finalizers, patch => patch.owner == harmony.Id);
+            Assert.Contains(patches.Prefixes, patch => patch.owner == harmony.Id);
         }
         finally
         {

@@ -242,8 +242,7 @@ internal class PlayerEncounterPatches
             return false;
         }
 
-        PlayerEncounterExtensions.TryGetEncounteredBattle(out var encounteredBattle);
-        if (encounter._mapEvent != null || encounteredBattle != null)
+        if (encounter._mapEvent != null || PlayerEncounterExtensions.GetEncounteredBattleOrNull() != null)
             return true;
 
         var mainParty = MobileParty.MainParty;

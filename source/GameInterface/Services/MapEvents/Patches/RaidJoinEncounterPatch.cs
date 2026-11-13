@@ -1,11 +1,8 @@
 ﻿using Common;
-using Common.Logging;
 using GameInterface.Policies;
 using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Initialization;
 using HarmonyLib;
-using Serilog;
-using System;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -21,18 +18,33 @@ namespace GameInterface.Services.MapEvents.Patches;
 [HarmonyPatch]
 internal class RaidJoinEncounterConditionPatch
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<RaidJoinEncounterConditionPatch>();
-
     private static IEnumerable<MethodBase> TargetMethods()
     {
         yield return AccessTools.Method(typeof(EncounterGameMenuBehavior), "game_menu_join_encounter_help_attackers_on_condition");
         yield return AccessTools.Method(typeof(EncounterGameMenuBehavior), "game_menu_join_encounter_help_defenders_on_condition");
     }
 
+    // Vanilla's join conditions throw when there is no encountered battle, before the server sets the encounter up
+    // and after it closes. The option is greyed instead until the battle is set up.
+    [HarmonyPrefix]
+    private static bool Prefix(MenuCallbackArgs args, ref bool __result)
+    {
+        if (ModInformation.IsServer || IsEncounterSetUp()) return true;
+
+        __result = false;
+        if (args != null)
+        {
+            args.IsEnabled = false;
+            args.Tooltip = BattleModeEncounterOptionsPatch.BattleNotReadyTooltip;
+        }
+        return false;
+    }
+
     [HarmonyPostfix]
     private static void Postfix(MethodBase __originalMethod, MenuCallbackArgs args, ref bool __result)
     {
-        if (!PlayerEncounterExtensions.TryGetEncounteredBattle(out var mapEvent))
+        var mapEvent = PlayerEncounterExtensions.GetEncounteredBattleOrNull();
+        if (mapEvent == null)
             return;
 
         if (!mapEvent.IsActiveSlowVillageRaid())
@@ -49,29 +61,10 @@ internal class RaidJoinEncounterConditionPatch
         args.Tooltip = TextObject.GetEmpty();
     }
 
-    // Vanilla's join conditions dereference EncounteredBattle too. Only the null reference a refresh hits before the
-    // encounter is set up is turned into a greyed option; every other exception still surfaces.
-    [HarmonyFinalizer]
-    private static Exception Finalizer(MenuCallbackArgs args, MethodBase __originalMethod, ref bool __result, Exception __exception)
-    {
-        if (__exception is not NullReferenceException || ModInformation.IsServer || IsEncounterSetUp())
-            return __exception;
-
-        __result = false;
-        if (args != null)
-        {
-            args.IsEnabled = false;
-            args.Tooltip = BattleModeEncounterOptionsPatch.BattleNotReadyTooltip;
-        }
-
-        Logger.Debug("Join option {Method} refreshed before the encounter was set up; greyed until it is",
-            __originalMethod?.Name ?? "<unknown>");
-        return null;
-    }
-
     private static bool IsEncounterSetUp()
     {
-        if (!PlayerEncounterExtensions.TryGetEncounteredBattle(out var mapEvent))
+        var mapEvent = PlayerEncounterExtensions.GetEncounteredBattleOrNull();
+        if (mapEvent == null)
             return false;
 
         return !ContainerProvider.TryResolve<IMapEventInitializationBarrier>(out var barrier) || !barrier.IsPending(mapEvent);
