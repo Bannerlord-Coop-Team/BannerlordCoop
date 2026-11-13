@@ -1,5 +1,9 @@
 ﻿#if COOP_NAVAL
+using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
+using GameInterface.Services.Ships;
 using Missions.Naval;
+using Moq;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -43,9 +47,9 @@ public class NavalShipBudgetTests
         Assert.Equal(expected, NavalShipBudget.LeftForAi(playerHulls, aiLimit));
     }
 
-    // A player the side's AI fleet record didn't count gets the eight less the record and every uncounted player before it, at
+    // A player the side's AI fleet attempt didn't count gets the eight less the attempt and every uncounted player before it, at
     // the most that player can field, and at least its own ship. Rows: the phase 0 joiner onto a full side (3 + 5 AI, then 4),
-    // room the AI left, two joiners in party order, one the record counted (it joined before the attempt) and an uncounted
+    // room the AI left, two joiners in party order, one the attempt counted (it joined before it) and an uncounted
     // player after the own one, which counts the own one instead.
     [Theory]
     [InlineData("P1 AI J", "P1", "", 8, "J", 1)]
@@ -53,7 +57,7 @@ public class NavalShipBudgetTests
     [InlineData("P1 AI J1 J2", "P1", "J1=2", 5, "J2", 1)]
     [InlineData("P1 AI J1 J2", "P1 J1", "", 8, "J1", 8)]
     [InlineData("P1 AI J1 J2", "P1", "J2=3", 5, "J1", 3)]
-    public void LateJoinerCap_IsWhatTheRecordAndTheEarlierJoinersLeave(string side, string counted, string mostFielded,
+    public void LateJoinerCap_IsWhatTheAttemptAndTheEarlierJoinersLeave(string side, string counted, string mostFielded,
         int recordedHulls, string own, int expected)
     {
         var parties = side.Split(' ');
@@ -65,6 +69,28 @@ public class NavalShipBudgetTests
             party => party != "AI" && !countedParties.Contains(party), party => fleets[party], recordedHulls);
 
         Assert.Equal(expected, cap);
+    }
+
+    // Only a player's party the attempt didn't count is uncounted; an attempt that counted none arrives with null ids, and a
+    // player party without an id is left out, as the attempt left it out.
+    [Theory]
+    [InlineData(false, true, "MobileParty_P", false)]
+    [InlineData(true, true, "MobileParty_P", false)]
+    [InlineData(true, true, "MobileParty_Q", true)]
+    [InlineData(true, true, null, true)]
+    [InlineData(true, false, null, false)]
+    public void IsUncountedPlayer_IsAPlayersPartyTheAttemptDidNotCount(bool isPlayer, bool hasId, string counted, bool expected)
+    {
+        var party = CreateParty();
+        party.MobileParty = (MobileParty)RuntimeHelpers.GetUninitializedObject(typeof(MobileParty));
+        var playerManager = new Mock<IPlayerManager>();
+        playerManager.Setup(players => players.Contains(party.MobileParty)).Returns(isPlayer);
+        var objectManager = new Mock<IObjectManager>();
+        string partyId = "MobileParty_P";
+        objectManager.Setup(objects => objects.TryGetIdWithLogging(party.MobileParty, out partyId)).Returns(hasId);
+        var budget = new NavalShipBudget(playerManager.Object, objectManager.Object, Mock.Of<INavalNpcFleetAttemptTracker>());
+
+        Assert.Equal(expected, budget.IsUncountedPlayer(party, counted == null ? null : new[] { counted }));
     }
 
     private static PartyBase CreateParty() =>

@@ -1,6 +1,5 @@
 ﻿using Common.Messaging;
 using Common.Network;
-using GameInterface.Services.Ships.Messages;
 using Missions;
 using Missions.Battles;
 using Missions.Messages;

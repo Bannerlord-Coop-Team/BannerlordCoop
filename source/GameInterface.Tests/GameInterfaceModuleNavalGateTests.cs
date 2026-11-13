@@ -58,7 +58,7 @@ public sealed class GameInterfaceModuleNavalGateTests : IDisposable
         typeof(ShipUpgradePieceRegistry),
         typeof(BlockadeBattleMapEventRegistry),
         typeof(LootShipHoldHandler),
-        typeof(NavalFleetRecordHandler),
+        typeof(NavalNpcFleetAttemptHandler),
         typeof(LootShipsHandler),
         typeof(ShipPiecesHandler),
         typeof(PlayerRaftHandler),
@@ -69,7 +69,7 @@ public sealed class GameInterfaceModuleNavalGateTests : IDisposable
         typeof(RaftDebugCommands.StrandOnRaftCoopCommand),
         typeof(BattleShipFateLedger),
         typeof(BattleShipFateApplier),
-        typeof(NavalFleetRecords),
+        typeof(NavalNpcFleetAttemptTracker),
         typeof(WaterClock),
 #if DEBUG
         typeof(NavalScenarioClientHandler),

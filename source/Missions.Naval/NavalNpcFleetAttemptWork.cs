@@ -7,7 +7,7 @@ namespace Missions.Naval;
 
 /// <summary>
 /// [Game thread] What one AI fleet attempt did so far: the hulls and troops a failed attempt takes back exactly, the players its
-/// share counted for the attempt's record, and its first crew batch for the inspect output.
+/// share counted for the attempt it reports, and its first crew batch for the inspect output.
 /// </summary>
 public sealed class NavalNpcFleetAttemptWork
 {

@@ -15,6 +15,6 @@ public readonly struct NavalSidePlayerFleets
         Hulls = hulls;
     }
 
-    /// <summary>No player counted, as an attempt that failed before its share was worked out records.</summary>
+    /// <summary>No player counted, as an attempt that failed before its share was worked out reports.</summary>
     public static NavalSidePlayerFleets None => new NavalSidePlayerFleets(Array.Empty<string>(), 0);
 }

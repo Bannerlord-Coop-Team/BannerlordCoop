@@ -5,10 +5,10 @@ using Common.Network;
 #if DEBUG
 using GameInterface.Services.MapEvents.NavalScenarios;
 #endif
-using GameInterface.Services.Ships.Messages;
 using HarmonyLib;
 using Missions;
 using Missions.Battles;
+using Missions.Messages;
 using Missions.Naval;
 using Moq;
 using ProtoBuf;
@@ -114,31 +114,16 @@ public class NavalNpcFleetSpawnerTests
     [Fact]
     public void Attempt_RoundTripsOverTheWire()
     {
-        var copy = RoundTrip(new NetworkNpcFleetAttempted("MapEvent_1", BattleSideEnum.Attacker, failed: true, aiHulls: 2,
+        using var stream = new MemoryStream();
+        Serializer.Serialize(stream, new NetworkNpcFleetAttempted("MapEvent_1", BattleSideEnum.Attacker, failed: true, aiHulls: 2,
             playerHulls: 3, countedPartyIds: new[] { "MobileParty_1", "MobileParty_2" }));
+        stream.Position = 0;
+
+        var copy = Serializer.Deserialize<NetworkNpcFleetAttempted>(stream);
 
         Assert.Equal(("MapEvent_1", BattleSideEnum.Attacker, true, 2, 3), (copy.InstanceId, copy.Side, copy.Failed, copy.AiHulls,
             copy.PlayerHulls));
         Assert.Equal(new[] { "MobileParty_1", "MobileParty_2" }, copy.CountedPartyIds);
-    }
-
-    // protobuf-net writes nothing for an empty array, so an attempt that counted no player arrives with null ids.
-    [Fact]
-    public void Attempt_WithNoCountedPlayer_ArrivesWithNullIds()
-    {
-        var copy = RoundTrip(new NetworkNpcFleetAttempted("MapEvent_1", BattleSideEnum.Defender, failed: true, aiHulls: 0,
-            playerHulls: 0, countedPartyIds: System.Array.Empty<string>()));
-
-        Assert.Null(copy.CountedPartyIds);
-    }
-
-    // Serializes the attempt and reads it back.
-    private static NetworkNpcFleetAttempted RoundTrip(NetworkNpcFleetAttempted attempt)
-    {
-        using var stream = new MemoryStream();
-        Serializer.Serialize(stream, attempt);
-        stream.Position = 0;
-        return Serializer.Deserialize<NetworkNpcFleetAttempted>(stream);
     }
 
     // This battle's attempt of the side, counting no player.
@@ -252,7 +237,8 @@ public class NavalNpcFleetSpawnerTests
         Assert.Equal(1, (int)inspect["hullsRetracted"]);
     }
 
-    // A failure inside the crewing hands the rollback every hull, the pulled troops and the reinforcement switch to restore.
+    // A failure inside the crewing hands the rollback every hull, the pulled troops and the reinforcement switch to restore, and
+    // reports no AI hull to the server, with the players the share counted.
     [Fact]
     public void FailureDuringCrewing_TakesBackItsHullsAndWaitingTroops()
     {
@@ -267,6 +253,7 @@ public class NavalNpcFleetSpawnerTests
         {
             work.Troops.AddRange(troops);
             work.Hulls.AddRange(hulls);
+            work.Players = new NavalSidePlayerFleets(new[] { "MobileParty_P" }, 3);
             work.BeginCrewing(TeamSideEnum.EnemyTeam, spawnedOnTickBefore: false);
             throw new NullReferenceException("crewing threw");
         });
@@ -278,18 +265,25 @@ public class NavalNpcFleetSpawnerTests
         Assert.Equal(TeamSideEnum.EnemyTeam, taken.CrewSide);
         Assert.False(taken.SpawnedOnTickBefore);
         harness.Network.Verify(n => n.SendAll(It.Is<NetworkNpcFleetAttempted>(sent => sent.Failed)), Times.Once);
+        harness.VerifyReported(failed: true, aiHulls: 0, playerHulls: 3, "MobileParty_P");
     }
 
-    // A fielded fleet keeps everything it spawned.
+    // A fielded fleet keeps everything it spawned, and reports its hulls and the players its share counted to the server.
     [Fact]
     public void FieldedFleet_TakesNothingBack()
     {
         var harness = new Harness(BattleSideEnum.Defender) { IsLocalHost = true };
 
-        harness.Attempt(work => { work.Hulls.Add(ShipTestHulls.Create()); return null; });
+        harness.Attempt(work =>
+        {
+            work.Hulls.AddRange(new[] { ShipTestHulls.Create(), ShipTestHulls.Create() });
+            work.Players = new NavalSidePlayerFleets(new[] { "MobileParty_P", "MobileParty_Q" }, 4);
+            return null;
+        });
 
         harness.Rollback.Verify(r => r.Rollback(It.IsAny<NavalNpcFleetAttemptWork>()), Times.Never);
         harness.Network.Verify(n => n.SendAll(It.Is<NetworkNpcFleetAttempted>(sent => !sent.Failed)), Times.Once);
+        harness.VerifyReported(failed: false, aiHulls: 2, playerHulls: 4, "MobileParty_P", "MobileParty_Q");
     }
 
     // A rollback that throws keeps the attempt taking back, unsettled and unsent, and every tick retries it; the attempt fails
@@ -352,6 +346,12 @@ public class NavalNpcFleetSpawnerTests
 #endif
                 );
         }
+
+        // The one attempt sent to the server: this battle's, with what it left and counted.
+        public void VerifyReported(bool failed, int aiHulls, int playerHulls, params string[] countedPartyIds) =>
+            Relay.Verify(relay => relay.SendAll(It.Is<NetworkNpcFleetAttempted>(sent => sent.InstanceId == "MapEvent_1"
+                && sent.Failed == failed && sent.AiHulls == aiHulls && sent.PlayerHulls == playerHulls
+                && sent.CountedPartyIds.SequenceEqual(countedPartyIds))), Times.Once);
 
         // Makes one attempt whose fielder does what the given step does with the attempt's work.
         public void Attempt(System.Func<NavalNpcFleetAttemptWork, string> field)

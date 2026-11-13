@@ -97,7 +97,9 @@ public sealed class NavalModuleGateTests : System.IDisposable
         using var container = BuildServerContainer(new ServerModule(), new GameInterfaceModule());
 
         Assert.Equal(isNavalEnabled, container.IsRegistered<ServerBattleShipFateHandler>());
+        Assert.Equal(isNavalEnabled, container.IsRegistered<ServerNavalNpcFleetAttemptHandler>());
         Assert.Equal(isNavalEnabled, container.IsRegistered<IBattleShipFateLedger>());
+        Assert.Equal(isNavalEnabled, container.IsRegistered<INavalNpcFleetAttemptTracker>());
     }
 
     // The game's client modules read the startup decision, so off leaves the water clock and naval battle factory out.

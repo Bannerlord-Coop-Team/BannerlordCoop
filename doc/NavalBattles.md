@@ -116,16 +116,16 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
   - Ships: the AI parties get what the players leave of the side's 8 ships, at most vanilla's limit for them
     (`NavalShipBudget`). Each player's share is the one its launcher fields, from campaign data every client holds. When the
     players take all 8, the side just has no AI fleet (logged as information, settled like a failed attempt).
-  - Record: the attempt (`NetworkNpcFleetAttempted`) carries the AI hulls it left, the players' hulls its share counted and
-    those players' party ids. The host sends it to the server too, which keeps the side's first one for the battle's life
-    (`INavalFleetRecords`, in `ServerBattleShipFateHandler`, dropped at the battle's finalize) and passes it on to every
-    client, and to a client entering the campaign later. Clients keep it the same way (`NavalFleetRecordHandler`). It
-    travels on the server's ordered channel ahead of any later join reply, so a later joiner holds it before its launcher
-    picks ships.
-  - Late joiners: a player the record didn't count fields at most what the side's 8 leave after the record's hulls and
+  - Recorded attempt: the attempt (`NetworkNpcFleetAttempted`) carries the AI hulls it left, the players' hulls its share
+    counted and those players' party ids. The host also reports it to the server (`ServerNavalNpcFleetAttemptHandler`),
+    which records the side's first one while the battle is open (`INavalNpcFleetAttemptTracker`) and sends it to every
+    client as `NetworkNpcFleetAttemptRecorded`, and to a client entering the campaign later. Clients track it the same way
+    (`NavalNpcFleetAttemptHandler`); the spawner's own latch stays the mission's, set at once on the host. It travels on the
+    server's ordered channel ahead of any later join reply, so a later joiner holds it before its launcher picks ships.
+  - Late joiners: a player the attempt didn't count fields at most what the side's 8 leave after the attempt's hulls and
     every uncounted player before it in the side's party order, at the most that player can field (its ships, capped by its
     party's ship limit, which casualties never lower), and always its own ship. Players who start together keep the A2
-    split; a promoted host only latches the record, so nothing is fielded again.
+    split; a promoted host only latches the attempt, so nothing is fielded again.
   - Crew: troops are pulled only up to the crew capacity of the hulls that field; the rest stay in the reserve.
   - Reserve: at sea every AI party on a side belongs to the battle host, a player-led army's members included
     (`BattleTroopReserveBuilder.GetOwnedReserves`; on land they go to the army leader). The host gets it with the
@@ -535,7 +535,7 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
 | G3 Retreat, leave or disconnect without breaking the battle | Retreat and leave live-passed in R41a (A, B, C). Disconnect is a leave (D4); hard drops of a non-host and of the host live-passed in R41a-2 (D, E). Done: the R41a-2 W2 and S fixes and the departure order (parked N of N, then withdrew N) live-passed in R41a-3. | `retreat`, `migration who=nonhost`; `NavalDepartureScenarioTests`, `BattleReserveReconnectScopeTests` |
 | G4 Results match vanilla | Done in code (M6), not live yet (R45): battle HP, sail HP, sunk ships and Boatswain XP are written back, and loot ships survive the losing party's finalize. In-mission capture replicates (authority-confirmed, in place, PvP included), not live yet (R46). Disengage loot (M6c) is pending. | `NavalShipFateScenarioTests`, `NavalCaptureScenarioTests`, `LootShipHoldTests`, `BattleShipFateReporterTests`, `BattleShipFateLedgerTests`, `BattleShipCaptureReplicatorTests` |
 | G5 Battles from real campaign play | Presets done (WP4), never live. | `encounter`, `blockade`; preset unit tests |
-| G6 AI allies, 3+ players per side | Allied AI fleets done in code (M11 phase 1), not live yet: the battle host fields them on the ally team with what the players leave of the side's 8 ships, and a player who joins after the attempt caps its fleet against the attempt's record (phase 2). 3 players are E2E-covered; live runs had 2 clients. | `allied_npc`; 3-client E2E scenarios |
+| G6 AI allies, 3+ players per side | Allied AI fleets done in code (M11 phase 1), not live yet: the battle host fields them on the ally team with what the players leave of the side's 8 ships, and a player who joins after the attempt caps its fleet against the recorded attempt (phase 2). 3 players are E2E-covered; live runs had 2 clients. | `allied_npc`; 3-client E2E scenarios |
 | G7 Join or rejoin mid-battle shows the true state | Late-join catch-up done (records, condition, weapon, seats); `late_join` live-passed in R39. A rejoin is a late join with a fresh reserve (D4), live-passed in R41a-2 (D, E) and R41a-3 (W2, D, E); a late joiner's dropped host hull record (R41a-2 E) is fixed in E2E, its member hold not hit live yet. | `late_join`, `migration`; `NavalLateJoinScenarioTests`, `NavalDepartureScenarioTests` |
 
 ### Milestones
@@ -730,7 +730,7 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   count as departures from the players' side.
 - **Late joiners past the side's 8 ships.** The cap still lets a side pass 8 in three cases, each dropping copies on the
   older clients' ally team (`BattleShipReplicator`):
-  - a party that joined the side after the host's attempt and opened its mission before the record reached it (about one
+  - a party that joined the side after the host's attempt and opened its mission before the attempt reached it (about one
     round trip through the server) fields its full share: up to that share less one copy over on the older clients;
   - every player fields its own ship, so a second player joining a full side is one copy over;
   - players who start together keep the A2 split, which can pass 8 with four or more large fleets, as before M11.

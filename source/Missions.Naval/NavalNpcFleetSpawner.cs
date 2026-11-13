@@ -5,7 +5,6 @@ using Common.Network;
 #if DEBUG
 using GameInterface.Services.MapEvents.NavalScenarios;
 #endif
-using GameInterface.Services.Ships.Messages;
 using Missions.Battles;
 using Missions.Messages;
 using Serilog;
@@ -258,12 +257,13 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
     }
 
     // Latches this host's attempt, with the hulls it left and the players its share counted, and tells the peers and the server,
-    // which passes it on to every client for a later joiner's cap.
+    // which records it for a later joiner's cap.
     private void Publish(bool failed)
     {
+        // A failed attempt took its hulls back.
+        int aiHulls = failed ? 0 : lastAttempt.Hulls.Count;
         var players = lastAttempt.Players;
-        Settle(new NetworkNpcFleetAttempted(session.InstanceId, Side, failed, failed ? 0 : lastAttempt.Hulls.Count, players.Hulls,
-            players.PartyIds));
+        Settle(new NetworkNpcFleetAttempted(session.InstanceId, Side, failed, aiHulls, players.Hulls, players.PartyIds));
         network.SendAll(attempt);
         relayNetwork.SendAll(attempt);
     }
@@ -286,10 +286,10 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
     }
 
     // [Game thread] An earlier host's attempt of this side: a promoted client doesn't field it again, and a failed side releases
-    // its hold. The other side's attempt belongs to that side's spawner, and the server passes on other battles' too.
+    // its hold. The other side's attempt belongs to that side's spawner.
     internal void AcceptAttempt(NetworkNpcFleetAttempted attempted)
     {
-        if (HasAttempt || attempted.Side != Side || attempted.InstanceId != session.InstanceId) return;
+        if (HasAttempt || attempted.Side != Side) return;
 
         Settle(attempted);
         Logger.Information("[NavalBattle] The {Side} AI fleet of {MapEventId} was already attempted by a battle host: {Outcome}",

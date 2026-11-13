@@ -2,12 +2,12 @@
 using ProtoBuf;
 using TaleWorlds.Core;
 
-namespace GameInterface.Services.Ships.Messages;
+namespace Missions.Messages;
 
 /// <summary>
-/// The battle's one AI fleet attempt for <see cref="Side"/>, sent by the battle host to its peers and to the server, which keeps
-/// it and passes it on to every client: a promoted host never fields the fleet again, a failed side releases the end hold, and a
-/// player who joins later caps its own fleet at what the side's eight ships have left.
+/// Battle host to peers over the mission mesh: the battle's one AI fleet attempt was made for <see cref="Side"/>, and whether
+/// it failed. A promoted host never fields the fleet again, and every client counts a failed side as fielded for the end hold.
+/// The host also reports it to the server, which records it for players who join the battle later.
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
 public sealed class NetworkNpcFleetAttempted : IEvent
