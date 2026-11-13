@@ -1,14 +1,19 @@
 ﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.Heroes.HeirSelection.Messages;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Rafts.Interfaces;
+using GameInterface.Services.Rafts.Messages;
+using Serilog;
 
 namespace GameInterface.Services.Rafts.Handlers;
 
 internal class PlayerRaftHandler : IHandler
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<PlayerRaftHandler>();
+
     private readonly IMessageBroker messageBroker;
     private readonly IPlayerRaftFleetInterface raftFleetInterface;
 
@@ -19,12 +24,34 @@ internal class PlayerRaftHandler : IHandler
 
         messageBroker.Subscribe<PlayerPartyReleasedFromCaptivity>(Handle);
         messageBroker.Subscribe<PlayerCharacterChangedOnServer>(Handle_PlayerCharacterChanged);
+        messageBroker.Subscribe<PlayerRaftResumeAttempted>(Handle_RaftResume);
+        messageBroker.Subscribe<PartyOccupancyChanged>(Handle_OccupancyChanged);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<PlayerPartyReleasedFromCaptivity>(Handle);
         messageBroker.Unsubscribe<PlayerCharacterChangedOnServer>(Handle_PlayerCharacterChanged);
+        messageBroker.Unsubscribe<PlayerRaftResumeAttempted>(Handle_RaftResume);
+        messageBroker.Unsubscribe<PartyOccupancyChanged>(Handle_OccupancyChanged);
+    }
+
+    private void Handle_RaftResume(MessagePayload<PlayerRaftResumeAttempted> obj)
+    {
+        raftFleetInterface.ResumeRaft(obj.What.PlayerParty);
+    }
+
+    private void Handle_OccupancyChanged(MessagePayload<PartyOccupancyChanged> obj)
+    {
+        var party = obj.What.MobileParty;
+
+        // A raft's AI is off, so leaving a battle would hold it at sea for good.
+        GameThread.RunSafe(() =>
+        {
+            if (!party.IsInRaftState || !party.IsCurrentlyAtSea || party.MapEvent != null || party.CurrentSettlement != null) return;
+
+            raftFleetInterface.ResumeRaft(party);
+        });
     }
 
     private void Handle_PlayerCharacterChanged(MessagePayload<PlayerCharacterChangedOnServer> obj)
