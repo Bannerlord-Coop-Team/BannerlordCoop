@@ -115,7 +115,8 @@ public class CoopNavalBattleEndLogicTests
     public void ShouldReleaseHold_LetsTheSideOfAFailedFleetStartEmpty(bool activated, bool attackerFielded, bool defenderFielded,
         BattleSideEnum failedFleetSide, bool expected)
     {
-        Assert.Equal(expected, CoopNavalBattleEndLogic.ShouldReleaseHold(activated, attackerFielded, defenderFielded, failedFleetSide));
+        Assert.Equal(expected, CoopNavalBattleEndLogic.ShouldReleaseHold(activated, attackerFielded, defenderFielded,
+            new[] { failedFleetSide }));
     }
 
     [Fact]

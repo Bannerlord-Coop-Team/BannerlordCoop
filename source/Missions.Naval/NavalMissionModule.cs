@@ -50,6 +50,9 @@ public class NavalMissionModule : Module
         builder.RegisterType<NavalBattleServicesFactory>()
             .As<INavalBattleServicesFactory>()
             .InstancePerDependency();
+        builder.RegisterType<NavalShipBudget>()
+            .As<INavalShipBudget>()
+            .InstancePerDependency();
         builder.RegisterType<CoopShipSnapshotBuilder>()
             .As<ICoopShipSnapshotBuilder>()
             .InstancePerDependency();

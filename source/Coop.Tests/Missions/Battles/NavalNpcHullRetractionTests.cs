@@ -220,7 +220,8 @@ public class NavalNpcHullRetractionTests
         // The battle's AI fleet spawner, taking a failed attempt back through the real rollback and this replicator.
         public NavalNpcFleetSpawner Spawner() => new NavalNpcFleetSpawner(Network.Object, new MessageBroker(), Session.Object,
             Replicator, Mock.Of<ICoopShipSnapshotBuilder>(), Mock.Of<IObjectManager>(), Mock.Of<IPlayerManager>(),
-            Mock.Of<INavalLateDeploymentPlanTracker>(), new NavalNpcFleetRollback(Replicator), BattleSideEnum.Defender);
+            Mock.Of<INavalLateDeploymentPlanTracker>(), new NavalNpcFleetRollback(Replicator), Mock.Of<IBattleTeamResolver>(),
+            Mock.Of<INavalShipBudget>(), BattleSideEnum.Defender);
 #endif
     }
 }

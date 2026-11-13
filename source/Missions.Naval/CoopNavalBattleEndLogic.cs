@@ -28,7 +28,7 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
     private readonly IBattleSession session;
     private readonly IBattleDeploymentCoordinator deployment;
     private readonly IBattleResultCommitter resultCommitter;
-    private readonly INavalNpcFleetSpawner npcFleet;
+    private readonly IReadOnlyList<INavalNpcFleetSpawner> npcFleets;
     private readonly INavalSideHullLedger hullLedger;
     private readonly INavalSideTallyReader tallyReader;
     private readonly INavalPlayerHeroGrace heroGrace;
@@ -36,16 +36,16 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
     private bool endChecksReleased;
     private float nextHeroScanAt;
 
-    // Takes the battle's session, deployment, committer and AI fleet, the replicator's departed hulls, the side tally and the
+    // Takes the battle's session, deployment, committer and AI fleets, the replicator's departed hulls, the side tally and the
     // player hero grace.
     public CoopNavalBattleEndLogic(IBattleSession session, IBattleDeploymentCoordinator deployment, IBattleResultCommitter resultCommitter,
-        INavalNpcFleetSpawner npcFleet, INavalSideHullLedger hullLedger, INavalSideTallyReader tallyReader,
+        IReadOnlyList<INavalNpcFleetSpawner> npcFleets, INavalSideHullLedger hullLedger, INavalSideTallyReader tallyReader,
         INavalPlayerHeroGrace heroGrace)
     {
         this.session = session;
         this.deployment = deployment;
         this.resultCommitter = resultCommitter;
-        this.npcFleet = npcFleet;
+        this.npcFleets = npcFleets;
         this.hullLedger = hullLedger;
         this.tallyReader = tallyReader;
         this.heroGrace = heroGrace;
@@ -233,19 +233,22 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
     /// abandoned: it may start empty, so its depletion ends the battle instead of the hold keeping it open forever.
     /// </summary>
     internal static bool ShouldReleaseHold(bool deploymentActivated, bool attackerFielded, bool defenderFielded,
-        BattleSideEnum failedFleetSide) =>
+        IReadOnlyCollection<BattleSideEnum> failedFleetSides) =>
         CoopBattleController.ShouldReleaseEndConditionHold(deploymentActivated, attackerFielded, defenderFielded,
-            failedFleetSide == BattleSideEnum.Attacker, failedFleetSide == BattleSideEnum.Defender);
+            failedFleetSides.Contains(BattleSideEnum.Attacker), failedFleetSides.Contains(BattleSideEnum.Defender));
 
-    // Whether both sides fielded here, or the side whose AI fleet failed counts as fielded.
+    // Whether both sides fielded here, or a side whose AI fleet failed counts as fielded.
     private bool BothSidesFielded()
     {
         CoopBattleController.SidesFielded(Mission.Teams, out bool attackerFielded, out bool defenderFielded);
-        var failedFleetSide = npcFleet.FailedSide;
-        bool released = ShouldReleaseHold(deployment.IsActivated, attackerFielded, defenderFielded, failedFleetSide);
-        if (released && failedFleetSide != BattleSideEnum.None)
-            Logger.Warning("[NavalBattle] End checks released for {MapEventId} although the {Side} AI fleet failed to field",
-                session.InstanceId, failedFleetSide);
+        var failedFleetSides = npcFleets.Select(npcFleet => npcFleet.FailedSide).Where(side => side != BattleSideEnum.None).ToList();
+        bool released = ShouldReleaseHold(deployment.IsActivated, attackerFielded, defenderFielded, failedFleetSides);
+        // A failed allied fleet next to fielded players released nothing, so only a side left empty by its failure is logged.
+        var emptyFailedSides = failedFleetSides
+            .Where(side => side == BattleSideEnum.Attacker ? !attackerFielded : !defenderFielded).ToList();
+        if (released && emptyFailedSides.Count > 0)
+            Logger.Warning("[NavalBattle] End checks released for {MapEventId} although the {Sides} AI fleet failed to field",
+                session.InstanceId, string.Join(", ", emptyFailedSides));
         return released;
     }
 

@@ -2,11 +2,13 @@
 using Common.Commands;
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Naval;
 
-/// <summary>Arms the current battle host's one AI fleet attempt to fail through its normal exception path.</summary>
+/// <summary>Arms the battle host's enemy-side AI fleet attempt to fail through its normal exception path.</summary>
 public sealed class NavalFleetFailCoopCommand : ICoopCommand
 {
     public string Prefix => "coop.debug.naval";
@@ -34,16 +36,23 @@ public sealed class NavalFleetFailCoopCommand : ICoopCommand
         if (args.Count > 1 || (args.Count == 1 && !Stages.TryGetValue((args[0] ?? "").Trim(), out stage)))
             return new CoopCommandResult(false, Usage, "command_failed");
 
-        var spawner = Mission.Current?.GetMissionBehavior<CoopNavalBattleBehavior>()?.NpcFleetSpawner;
-        if (spawner == null)
+        var mission = Mission.Current;
+        var naval = mission?.GetMissionBehavior<CoopNavalBattleBehavior>();
+        if (naval == null || mission.PlayerTeam == null)
             return new CoopCommandResult(false, "No active coop naval battle mission.", "command_failed");
+
+        // The enemy side's fleet, the one the fleet presets fail.
+        var enemySide = mission.PlayerTeam.Side.GetOppositeSide();
+        var spawner = naval.NpcFleetSpawners.FirstOrDefault(npcFleet => npcFleet.Side == enemySide);
+        if (spawner == null)
+            return new CoopCommandResult(false, $"The {enemySide} side has no AI fleet in this battle.", "command_failed");
 
         var error = spawner.FailNextSpawn(stage);
         if (error != null) return new CoopCommandResult(false, error, "command_failed");
 
         return new CoopCommandResult(true,
-            $"NAVAL_FLEET_FAIL armed ({stage}): next eligible AI fleet spawn attempt will fail; inspect npcFleet.spawner.state, " +
-            "npcFleet.spawner.failure and npcFleet.spawner.hullsRetracted.");
+            $"NAVAL_FLEET_FAIL armed ({stage}): next eligible {enemySide} AI fleet spawn attempt will fail; inspect " +
+            $"npcFleet.spawners.{enemySide}.state, .failure and .hullsRetracted.");
     }
 }
 #endif

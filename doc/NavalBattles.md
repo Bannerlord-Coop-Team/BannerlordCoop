@@ -104,8 +104,19 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
 
 ### AI hulls follow the battle host
 
-- The battle host fields the AI fleet late, once the NPC reserve reached it and its deployment is over
-  (`Missions.Naval/NavalNpcFleetSpawner.cs`, enemy side only).
+- The battle host fields each side's AI fleet late, once the NPC reserve reached it and its deployment is over
+  (`Missions.Naval/NavalNpcFleetSpawner.cs`). The launcher builds one spawner for each side with an AI party, so an enemy
+  fleet and an allied fleet (AI lords on the players' side) each have their own attempt, outcome
+  (`NetworkNpcFleetAttempted.Side`) and relay to entrants.
+  - Team: the hulls go where every peer puts their copies (`BattleTeamResolver.ResolveReplicatedTeam(side, isOwn: false)`):
+    the side's main team, or its ally team on the host's own side. The ally team also holds the other players' copies,
+    so off-ship AI crew never joins a copy's formation (`NavalCopyCrewLookupPatches`).
+  - Ships: the AI parties get what the players leave of the side's 8 ships, at most vanilla's limit for them
+    (`NavalShipBudget`). Each player's share is the one its launcher fields, from campaign data every client holds.
+  - Crew: troops are pulled only up to the crew capacity of the hulls that field; the rest stay in the reserve.
+  - Reserve: at sea every AI party on a side belongs to the battle host, a player-led army's members included
+    (`BattleTroopReserveBuilder.GetOwnedReserves`; on land they go to the army leader). The host gets it with the
+    election at mission-ready, after vanilla's one-time troop pull, so only the spawner fields it.
   An attempt that fails after spawning takes back its own hulls, crew and waiting troops before it reports the failure
   (`NavalNpcFleetRollback`); its pulled troops stay supplied, since the server's supply ledger never rewinds.
   A take-back that throws is retried every tick, resuming each hull where it stopped, and the failure is reported only once
@@ -699,9 +710,10 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   - an old host that applies a hit just before its own move keeps it only if its next condition goes out first;
   - hits still in the arrivals queue at `Dispose` are cleared. Fates are flushed from the applied state, so results never
     see them.
-- **Allied fleets.** An AI lord on the players' side fields no hulls. Agents refused by a formation with no hull are not
-  re-assigned. The launcher still counts AI allies in vanilla's 8-ship side cap split, so their unfielded share is lost: a
-  player with 6 ships next to an AI lord with 6 fields about 4.
+- **Allied fleets.** Agents refused by a formation with no hull are not re-assigned. The AI share is computed once, when
+  the host fields the allies, so a player who joins later adds its own share on top and can push the ally team past its 8
+  formations on the older clients. Allied hulls take vanilla's late plan for the ally team, not a reserved slot, so they
+  can start near a player fleet. A failed allied attempt's retracted hulls count as departures from the players' side.
 - **Saved Order of Battle layout.** Co-op skips `NavalOrderOfBattleVM.LoadConfigurationShips`, so the player's saved ship
   and formation layout never applies, while vanilla's `SaveConfiguration` still stores the snapshot ships into the
   client's `NavalOrderOfBattleCampaignBehavior` after each battle.
@@ -869,7 +881,7 @@ For item 25, pair only the same instance, full ship id and unchanged authority, 
 | `fleet [party]` | server and client | Lists each ship of a party on this machine: its id, HP, sail HP and owner. `party` is a controller id, a `MobileParty`/`PartyBase` id, or a party or leader name or id (`Player`, `Player3325`; player parties first, then lord parties), on clients too; without it, the main party on a client and every player's party on the server. Run it before and after a battle on every machine. |
 | `finish_loot [take=<ship>[,<ship>...]\|none\|all]` | client | Finishes the open post-battle loot screens with their own buttons: the party screen takes every troop and prisoner then Done, the inventory takes every item then Done, the ship screen selects and takes each chosen ship (a `Ship_...` id, with or without `Ship_`, or a unique prefix of one) then Confirm, leaving the rest (`take` defaults to `none`). Each confirmation is answered yes. So `PortScreenChangesHandler` takes the ships and `OnPlayerLootShipEnd` sends `NetworkDiscardLootShips`, which releases the M6 loot hold. The next screen usually opens on a later frame, so run it again until it reports no loot screen. Still manual: the captured-lord conversation (`FreeOrCapturePrisonerHeroes`) before the party screen. |
 | `result_silence [on \| off]` | non-host client, DEBUG only | `on` withholds this mission's result-ready event/report/snapshot and retreat/mission-left announcements; relay and mesh keep running while the mission is open. No argument prints `NAVAL_RESULT_SILENCE enabled=true/false instance=...`. `off` resumes reporting a retained result once deployment is committed. The flag belongs to the mission, so a later mission starts unsilenced; outside a mission `off` confirms `enabled=false instance=none`. This client owns its outgoing announcements, so run here rather than on the server. Arm before the host runs `win`; it cannot retract an earlier report. Local mission teardown still clears registries and stops its mesh, but keeps the server relay connected and withholds departure. |
-| `fleet_fail [before\|after_hull\|crewing]` | battle host | Before Ready, arms the next eligible AI fleet spawn attempt in this mission to throw through its normal failure path: before anything spawns (default), right after the first hull registered, or inside the crewing after its first batch spawned. Refuses after an attempt or on another client. `NAVAL_FLEET_FAIL armed` confirms arming; `inspect` then shows `npcFleet.spawner.state=failed`, `npcFleet.spawner.failure` containing `DEBUG fleet_fail` and `npcFleet.spawner.hullsRetracted`, the hulls the failed attempt took back (every client drops them and their crew within two ticks). Mission-scoped, no retry after migration. |
+| `fleet_fail [before\|after_hull\|crewing]` | battle host | Before Ready, arms the next eligible enemy-side AI fleet spawn attempt in this mission to throw through its normal failure path: before anything spawns (default), right after the first hull registered, or inside the crewing after its first batch spawned. Refuses after an attempt or on another client. `NAVAL_FLEET_FAIL armed` confirms arming; `inspect` then shows `npcFleet.spawners.<side>.state=failed`, `npcFleet.spawners.<side>.failure` containing `DEBUG fleet_fail` and `npcFleet.spawners.<side>.hullsRetracted`, the hulls the failed attempt took back (every client drops them and their crew within two ticks). Mission-scoped, no retry after migration. |
 | `win`, `lose` | battle host | Ends the battle as a victory or defeat for the host's side; peers follow. |
 | `boatswain <partyId> [prepare]` | both; prepare server only | DEBUG. Reads the effective First Mate hero id, Boatswain level, XP and learning rate, plus campaign ship ids, hull/sail HP and a read-only 100-damage model probe. `prepare` sets that hero to Boatswain 100 (resetting its skill XP baseline) and raises focus to 5 before any map event, through normal replicated skill APIs. Capture the XP baseline after preparation. |
 | `damage <ship> <amount>`, `sink <ship>` | client | Hits a hull as a ship weapon would; another owner's hull takes it through its owner. |
@@ -968,7 +980,7 @@ Knobs (`NavalScenarioResolver.Usage`):
 
 - `fleet_fail=1` arms the battle host's AI fleet failure before the scenario presses Ready (default `0`). Use
   `coop.debug.naval.scenario vs_pirates hulls=3 fleet_fail=1` for item 17; after a host change, a late entrant's
-  `inspect` must still show `npcFleet.spawner.state=failed` (or `fielded` if an earlier attempt won the race).
+  `inspect` must still show `npcFleet.spawners.Defender.state=failed` (or `fielded` if an earlier attempt won the race).
   The forced exception is caught by the normal spawn attempt, broadcasts its outcome and releases the failed side's hold;
 - `hulls=n` AI hulls;
 - `hull=id` hull type;

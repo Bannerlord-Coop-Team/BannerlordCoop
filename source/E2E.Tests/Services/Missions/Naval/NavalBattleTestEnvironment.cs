@@ -618,7 +618,8 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment, IDisp
 
         /// <summary>
         /// [Battle host] An AI party's hull, registered and announced through the replicator; with a
-        /// <paramref name="formationIndex"/> it takes that formation of the side's main team, as the NPC fleet spawner does.
+        /// <paramref name="formationIndex"/> it takes that formation of the team the NPC fleet spawner picks for the side: the
+        /// side's main team, or its ally team on this client's own side.
         /// </summary>
         public Guid FieldAiHull(BattleSideEnum side, Vec3 position, string mapEventPartyId, int? formationIndex = null,
             string? campaignShipId = null)
@@ -627,7 +628,7 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment, IDisp
             Call(() =>
             {
                 var team = formationIndex == null ? null
-                    : side == BattleSideEnum.Attacker ? Mission.AttackerTeam.Shell : Mission.DefenderTeam.Shell;
+                    : Instance.Resolve<IBattleTeamResolver>().ResolveReplicatedTeam(side, isOwn: false);
                 var hull = Engine.Field(side, position, formationIndex ?? 0, team);
                 hull.CampaignShipId = campaignShipId;
                 shipId = Ships.RegisterNpcHull(hull.Hull, hull.Formation!, mapEventPartyId);
