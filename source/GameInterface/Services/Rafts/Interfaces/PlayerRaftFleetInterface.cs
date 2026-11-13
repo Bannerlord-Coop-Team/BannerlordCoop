@@ -40,8 +40,9 @@ public interface IPlayerRaftFleetInterface : IGameAbstraction
 
     /// <summary>
     /// Lands a party stranded on land as a raft or marked at sea where it stands, ends its raft state and gives back its fleet.
+    /// Returns false for a party not on land or with nothing to land.
     /// </summary>
-    void PutAshore(MobileParty party);
+    bool PutAshore(MobileParty party);
 
     /// <summary>
     /// Puts a player's new party on a raft or gives it the fleet cached for that player, like
@@ -117,22 +118,21 @@ public class PlayerRaftFleetInterface : IPlayerRaftFleetInterface
         party.Anchor.SetLastUsedDisembarkPosition(new CampaignVec2(new Vec2(fleet.DisembarkX, fleet.DisembarkY), fleet.DisembarkIsOnLand));
     }
 
-    // RaftStateChangeAction.DeactivateRaftStateForParty without the short-term behavior and AI rethink for a party its client
-    // moves; EnableAi restores vanilla's non-raft value of the synced _isDisabled, which the raft's DisableAi set.
     public void LeaveRaftAtSea(MobileParty party)
     {
         if (!party.IsInRaftState) return;
 
-        party.IsInRaftState = false;
-        party.Ai.EnableAi();
-        CampaignEventDispatcher.Instance.OnMobilePartyRaftStateChanged(party);
+        EndRaftState(party);
         ReturnFleet(party);
         // ReturnFleet restores the coast anchor cached at the stranding, but a party at sea sails with its fleet, unanchored.
         party.Anchor.ResetPosition();
     }
 
-    public void PutAshore(MobileParty party)
+    public bool PutAshore(MobileParty party)
     {
+        // Only a party already on land, so a raft still at sea can't skip washing ashore
+        if (!party.Position.IsOnLand || (!party.IsInRaftState && !party.IsCurrentlyAtSea)) return false;
+
         if (party.IsTransitionInProgress)
             party.CancelNavigationTransition();
 
@@ -140,14 +140,19 @@ public class PlayerRaftFleetInterface : IPlayerRaftFleetInterface
         party.SetMoveModeHold();
         party.ResetNavigationToHold();
 
-        // Same end of raft state as LeaveRaftAtSea, but the fleet keeps the coast anchor ReturnFleet restores, like a landing
+        // Unlike LeaveRaftAtSea, the fleet keeps the coast anchor ReturnFleet restores, like a landing
         if (party.IsInRaftState)
-        {
-            party.IsInRaftState = false;
-            party.Ai.EnableAi();
-            CampaignEventDispatcher.Instance.OnMobilePartyRaftStateChanged(party);
-        }
+            EndRaftState(party);
+
         ReturnFleet(party);
+        return true;
+    }
+
+    private static void EndRaftState(MobileParty party)
+    {
+        party.IsInRaftState = false;
+        party.Ai.EnableAi();
+        CampaignEventDispatcher.Instance.OnMobilePartyRaftStateChanged(party);
     }
 
     public void OnPlayerCharacterChanged(Hero newPlayerHero, MobileParty newMainParty)

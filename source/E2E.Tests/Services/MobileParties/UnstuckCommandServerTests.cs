@@ -202,6 +202,28 @@ public class UnstuckCommandServerTests : MapEventTestBase
     }
 
     [Fact]
+    public void RaftStrandedOnLand_EndsTheRaftOnServerAndClient()
+    {
+        var target = CreateConnectedPlayer("unstuck-target", Client, "Lady Mira");
+        Server.Call(() =>
+        {
+            var party = Server.GetRegisteredObject<MobileParty>(target.PartyId);
+            party.IsInRaftState = true;
+            party._position = new CampaignVec2(new Vec2(31f, 41f), true);
+        });
+        Client.PumpGameThread();
+        Client.Call(() => Assert.True(Client.GetRegisteredObject<MobileParty>(target.PartyId).IsInRaftState));
+
+        var result = Execute("unstuck-target");
+
+        Assert.True(result.Succeeded, result.Output);
+        Assert.Single(result.Output.Split('\n'), line => line.StartsWith("Ended the raft state"));
+        Server.Call(() => Assert.False(Server.GetRegisteredObject<MobileParty>(target.PartyId).IsInRaftState));
+        Client.PumpGameThread();
+        Client.Call(() => Assert.False(Client.GetRegisteredObject<MobileParty>(target.PartyId).IsInRaftState));
+    }
+
+    [Fact]
     public void PlayerLedArmy_IsKept()
     {
         var target = CreateConnectedPlayer("unstuck-target", Client, "Lady Mira");

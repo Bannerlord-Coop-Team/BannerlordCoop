@@ -4,7 +4,6 @@ using GameInterface.Services.Heroes.HeirSelection.Messages;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Rafts.Interfaces;
-using GameInterface.Services.Rafts.Messages;
 
 namespace GameInterface.Services.Rafts.Handlers;
 
@@ -20,24 +19,12 @@ internal class PlayerRaftHandler : IHandler
 
         messageBroker.Subscribe<PlayerPartyReleasedFromCaptivity>(Handle);
         messageBroker.Subscribe<PlayerCharacterChangedOnServer>(Handle_PlayerCharacterChanged);
-        messageBroker.Subscribe<PlayerRaftLandingAttempted>(Handle_RaftLanding);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<PlayerPartyReleasedFromCaptivity>(Handle);
         messageBroker.Unsubscribe<PlayerCharacterChangedOnServer>(Handle_PlayerCharacterChanged);
-        messageBroker.Unsubscribe<PlayerRaftLandingAttempted>(Handle_RaftLanding);
-    }
-
-    private void Handle_RaftLanding(MessagePayload<PlayerRaftLandingAttempted> obj)
-    {
-        var party = obj.What.PlayerParty;
-
-        raftFleetInterface.PutAshore(party);
-
-        // Clears the client's raft move target too, which would otherwise keep heading for the old shore
-        messageBroker.Publish(this, new PartyBehaviorChangeAttempted(party, forcePosition: true, isCurrentlyAtSea: false, resetMovementToHold: true));
     }
 
     private void Handle_PlayerCharacterChanged(MessagePayload<PlayerCharacterChangedOnServer> obj)

@@ -9,7 +9,8 @@ using GameInterface.Services.MobileParties.Messages.Unstuck;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
-using GameInterface.Services.Rafts.Messages;
+using GameInterface.Services.MobileParties.Messages.Behavior;
+using GameInterface.Services.Rafts.Interfaces;
 using GameInterface.Services.Settlements.Interfaces;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using Serilog;
@@ -32,8 +33,8 @@ internal interface IServerPlayerUnstuck
     /// Force-applies every applicable exit for the player's registered party and hero, releases every
     /// party (not only the player's) still linked to a battle that already ended, ends battles left with no
     /// healthy troops on one side, ends the raft state of a party stranded on land, then moves a free party
-    /// off a map spot it cannot move from, each step guarded independently, and sends the result to the player's connection when it has one. Runs on
-    /// the game thread.
+    /// off a map spot it cannot move from, each step guarded independently, and sends the result to the
+    /// player's connection when it has one. Runs on the game thread.
     /// </summary>
     /// <returns>One line per step applied, skipped or failed.</returns>
     string[] Apply(Player player, bool includeCaptivity);
@@ -53,6 +54,7 @@ internal class ServerPlayerUnstuck : IServerPlayerUnstuck
     private readonly IPartyNavigationRepair partyNavigationRepair;
     private readonly IMapEventLoadCleaner mapEventLoadCleaner;
     private readonly IStalledMapEventResolver stalledMapEventResolver;
+    private readonly IPlayerRaftFleetInterface raftFleetInterface;
 
     public ServerPlayerUnstuck(
         IMessageBroker messageBroker,
@@ -63,7 +65,8 @@ internal class ServerPlayerUnstuck : IServerPlayerUnstuck
         ISiegeEventInterface siegeEventInterface,
         IPartyNavigationRepair partyNavigationRepair,
         IMapEventLoadCleaner mapEventLoadCleaner,
-        IStalledMapEventResolver stalledMapEventResolver)
+        IStalledMapEventResolver stalledMapEventResolver,
+        IPlayerRaftFleetInterface raftFleetInterface = null)
     {
         this.partyNavigationRepair = partyNavigationRepair;
         this.messageBroker = messageBroker;
@@ -74,6 +77,7 @@ internal class ServerPlayerUnstuck : IServerPlayerUnstuck
         this.siegeEventInterface = siegeEventInterface;
         this.mapEventLoadCleaner = mapEventLoadCleaner;
         this.stalledMapEventResolver = stalledMapEventResolver;
+        this.raftFleetInterface = raftFleetInterface;
     }
 
     public string[] Apply(Player player, bool includeCaptivity)
@@ -200,17 +204,15 @@ internal class ServerPlayerUnstuck : IServerPlayerUnstuck
                 : $"Ended {resolved} battles left with no healthy troops on one side.";
         });
 
-        // Only a party already on land, so a raft still at sea can't use unstuck to skip washing ashore
-        if ((hero == null || !hero.IsPrisoner) && party.Position.IsOnLand &&
-            (party.IsInRaftState || party.IsCurrentlyAtSea))
+        // Registered only while War Sails is on
+        if (raftFleetInterface != null && (hero == null || !hero.IsPrisoner))
         {
             TryStep(actions, "raft landing", () =>
             {
-                // Handled by the War Sails raft handler, which nothing registers while War Sails is off
-                messageBroker.Publish(party, new PlayerRaftLandingAttempted(party));
-                if (party.IsInRaftState || party.IsCurrentlyAtSea)
-                    throw new InvalidOperationException("The raft landing did not put the party ashore.");
+                if (!raftFleetInterface.PutAshore(party)) return null;
 
+                // Clears the client's raft move target too, which would otherwise keep heading for the old shore
+                messageBroker.Publish(this, new PartyBehaviorChangeAttempted(party, forcePosition: true, isCurrentlyAtSea: false, resetMovementToHold: true));
                 return $"Ended the raft state of the party stranded on land at {Format(party.Position)}.";
             });
         }
