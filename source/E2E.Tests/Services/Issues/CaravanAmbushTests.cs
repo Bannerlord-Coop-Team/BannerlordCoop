@@ -312,6 +312,8 @@ public class CaravanAmbushTests : IDisposable
     {
         Server.Call(() =>
         {
+            Campaign.Current.EncyclopediaManager ??= new EncyclopediaManager();
+            Campaign.Current.EncyclopediaManager.CreateEncyclopediaPages();
             var quest = QuestOf(Server);
             var battle = StartAmbushBattle(PlayerHero(QuestScenario.ControllerA).PartyBelongedTo);
             quest._caravanParty.Party.MapEventSide = battle.DefenderSide;
@@ -549,6 +551,11 @@ public class CaravanAmbushTests : IDisposable
     [Fact]
     public void OwnerTimeoutFinalizesTheQuestOnceWithTheTimeoutOutcome()
     {
+        Server.Call(() =>
+        {
+            Campaign.Current.EncyclopediaManager ??= new EncyclopediaManager();
+            Campaign.Current.EncyclopediaManager.CreateEncyclopediaPages();
+        });
         var ownerQuest = QuestOf(Owner);
         Owner.Call(() => ownerQuest.CompleteQuestWithTimeOut());
         var finalized = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
