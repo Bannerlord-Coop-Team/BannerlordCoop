@@ -85,7 +85,8 @@ internal class InventoryLogicPatches
             __instance.GetBoughtItems(),
             __instance.GetSoldItems(),
             forceTransferId,
-            screenInventory.GetInventoryBaseline(__instance)
+            screenInventory.GetInventoryBaseline(__instance),
+            screenInventory.GetEquipmentBaseline(__instance)
         );
 
         MessageBroker.Instance.Publish(__instance, message);
