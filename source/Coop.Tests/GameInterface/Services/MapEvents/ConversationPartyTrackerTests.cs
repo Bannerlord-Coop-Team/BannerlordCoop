@@ -234,4 +234,85 @@ public class ConversationPartyTrackerTests
         Assert.False(tracker.IsInOtherConversation(secondPlayer, null, "looter1"));
         Assert.False(tracker.IsInOtherConversation(firstPlayer, "player1", null));
     }
+
+    [Fact]
+    public void RecordDeferral_WhileTheConversationLasts_RecordsEachPartyOnce()
+    {
+        tracker.TryBeginEngagement(firstPlayer, "player1", "looter1", wasAiDisabled: false);
+
+        Assert.True(tracker.RecordDeferral(firstPlayer, "player1", "looter2"));
+        Assert.True(tracker.RecordDeferral(firstPlayer, "player1", "looter3"));
+        Assert.False(tracker.RecordDeferral(firstPlayer, "player1", "looter2"));
+        Assert.False(tracker.RecordDeferral(firstPlayer, "player1", "looter3"));
+        Assert.True(tracker.RecordDeferral(secondPlayer, "player2", "looter2"));
+    }
+
+    [Fact]
+    public void RecordDeferral_AfterThePlayersEngagementEnds_RecordsAgain()
+    {
+        tracker.TryBeginEngagement(firstPlayer, "player1", "looter1", wasAiDisabled: false);
+        tracker.RecordDeferral(firstPlayer, "player1", "looter2");
+
+        tracker.TryEndEngagement(firstPlayer, out _, out _);
+        tracker.TryBeginEngagement(firstPlayer, "player1", "looter3", wasAiDisabled: false);
+
+        Assert.True(tracker.RecordDeferral(firstPlayer, "player1", "looter2"));
+    }
+
+    [Fact]
+    public void RecordDeferral_AfterAStaleEndIsRejected_StillRecordsOnce()
+    {
+        tracker.TryBeginEngagement(firstPlayer, "player1", "looter1", wasAiDisabled: false, requestId: "current-request");
+        tracker.RecordDeferral(firstPlayer, "player1", "looter2");
+
+        Assert.False(tracker.TryEndEngagement(
+            firstPlayer,
+            out _,
+            out _,
+            out _,
+            expectedRequestId: "older-request",
+            requireRequestIdMatch: true));
+
+        Assert.False(tracker.RecordDeferral(firstPlayer, "player1", "looter2"));
+    }
+
+    [Fact]
+    public void RecordDeferral_AfterTheOtherHolderReleasesTheParty_RecordsThatPartyAgain()
+    {
+        var thirdPlayer = new object();
+        tracker.TryBeginEngagement(secondPlayer, "player2", "looter1", wasAiDisabled: false);
+        tracker.TryBeginEngagement(thirdPlayer, "player3", "looter2", wasAiDisabled: false);
+        tracker.RecordDeferral(firstPlayer, "player1", "looter1");
+        tracker.RecordDeferral(firstPlayer, "player1", "looter2");
+
+        // A new holder takes looter1 after the old one lets it go; looter2 is still held by the same player.
+        tracker.TryEndEngagement(secondPlayer, out _, out _);
+        tracker.TryBeginEngagement(new object(), "player4", "looter1", wasAiDisabled: false);
+
+        Assert.True(tracker.RecordDeferral(firstPlayer, "player1", "looter1"));
+        Assert.False(tracker.RecordDeferral(firstPlayer, "player1", "looter2"));
+    }
+
+    [Fact]
+    public void RecordDeferral_AfterThePlayersPvpConversationEnds_RecordsAgain()
+    {
+        tracker.BeginPvpConversation("player1", "player2");
+        tracker.RecordDeferral(firstPlayer, "player1", "looter1");
+
+        tracker.EndPvpConversation("player2");
+        tracker.BeginPvpConversation("player1", "player3");
+
+        Assert.True(tracker.RecordDeferral(firstPlayer, "player1", "looter1"));
+    }
+
+    [Fact]
+    public void ForgetDeferrals_WhenThePlayerLeaves_DropsTheirRecord()
+    {
+        tracker.BeginPvpConversation("player1", "player2");
+        tracker.RecordDeferral(firstPlayer, "player1", "looter1");
+
+        tracker.ForgetDeferrals(firstPlayer);
+
+        Assert.True(tracker.RecordDeferral(firstPlayer, "player1", "looter1"));
+    }
 }
