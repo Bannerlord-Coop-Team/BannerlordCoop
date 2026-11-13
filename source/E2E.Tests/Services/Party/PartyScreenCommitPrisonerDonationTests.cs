@@ -21,13 +21,13 @@ using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Party;
 
-public class PartyDoneLogicPrisonerDonationTests : IDisposable
+public class PartyScreenCommitPrisonerDonationTests : IDisposable
 {
     private E2ETestEnvironment TestEnvironment { get; }
     private EnvironmentInstance Server => TestEnvironment.Server;
     private EnvironmentInstance Client => TestEnvironment.Clients.Single();
 
-    public PartyDoneLogicPrisonerDonationTests(ITestOutputHelper output)
+    public PartyScreenCommitPrisonerDonationTests(ITestOutputHelper output)
     {
         TestEnvironment = new E2ETestEnvironment(output, numClients: 1);
     }
@@ -170,29 +170,15 @@ public class PartyDoneLogicPrisonerDonationTests : IDisposable
     private NetworkCommitPartyScreen CreateDonationMessage(DonationFixture fixture)
     {
         uint prisonerHandle = Server.GetHandle<CharacterObject>(fixture.PrisonerId);
-        var donate = new PartyScreenCommandData(
-            PartyScreenLogic.PartyCommandCode.TransferTroop,
-            PartyScreenLogic.PartyRosterSide.Right,
-            PartyScreenLogic.TroopType.Prisoner,
-            prisonerHandle,
-            number: 1,
-            woundedNumber: 0,
-            upgradeTarget: 0);
+        var donate = PartyScreenCommits.Transfer(
+            PartyScreenLogic.PartyRosterSide.Right, PartyScreenLogic.TroopType.Prisoner, prisonerHandle, 1);
 
-        return new NetworkCommitPartyScreen(
+        return PartyScreenCommits.Create(
             fixture.MainHeroId,
             Helpers.PartyScreenHelper.PartyScreenMode.PrisonerManage,
             PartyScreenDoneKind.DonatePrisoners,
             new[] { donate },
-            new TroopRosterOrderData(new()),
-            leftPartyId: null,
-            leftMemberSeed: default,
-            leftPrisonerSeed: default,
-            isDonating: true,
-            doNotApplyGoldTransactions: true,
-            forceTransferId: null,
-            issueOwnerId: null,
-            issueId: null);
+            isDonating: true);
     }
 
     private void Send(NetworkCommitPartyScreen message)

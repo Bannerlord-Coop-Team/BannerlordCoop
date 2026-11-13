@@ -39,14 +39,8 @@ public class GarrisonDonationTests : IDisposable
 
         Send(fixture, new[]
         {
-            new PartyScreenCommandData(
-                PartyScreenLogic.PartyCommandCode.TransferTroop,
-                PartyScreenLogic.PartyRosterSide.Right,
-                PartyScreenLogic.TroopType.Member,
-                Server.GetHandle<CharacterObject>(fixture.TroopId),
-                number: 3,
-                woundedNumber: 0,
-                upgradeTarget: 0),
+            PartyScreenCommits.Transfer(
+                PartyScreenLogic.PartyRosterSide.Right, PartyScreenLogic.TroopType.Member, Server.GetHandle<CharacterObject>(fixture.TroopId), 3),
         });
 
         Server.Call(() =>
@@ -81,14 +75,8 @@ public class GarrisonDonationTests : IDisposable
 
         Send(fixture, new[]
         {
-            new PartyScreenCommandData(
-                PartyScreenLogic.PartyCommandCode.TransferTroop,
-                PartyScreenLogic.PartyRosterSide.Right,
-                PartyScreenLogic.TroopType.Member,
-                Server.GetHandle<CharacterObject>(fixture.TroopId),
-                number: 3,
-                woundedNumber: 0,
-                upgradeTarget: 0),
+            PartyScreenCommits.Transfer(
+                PartyScreenLogic.PartyRosterSide.Right, PartyScreenLogic.TroopType.Member, Server.GetHandle<CharacterObject>(fixture.TroopId), 3),
         });
 
         Server.Call(() =>
@@ -134,20 +122,13 @@ public class GarrisonDonationTests : IDisposable
 
     private void Send(GarrisonFixture fixture, PartyScreenCommandData[] commands)
     {
-        var message = new NetworkCommitPartyScreen(
+        var message = PartyScreenCommits.Create(
             fixture.MainHeroId,
             Helpers.PartyScreenHelper.PartyScreenMode.TroopsManage,
             PartyScreenDoneKind.DonateGarrison,
             commands,
-            new TroopRosterOrderData(new()),
-            leftPartyId: null,
-            leftMemberSeed: default,
-            leftPrisonerSeed: default,
             isDonating: true,
-            doNotApplyGoldTransactions: false,
-            forceTransferId: null,
-            issueOwnerId: null,
-            issueId: null);
+            doNotApplyGoldTransactions: false);
 
         Client.Call(() => Client.Resolve<INetwork>().SendAll(message));
         TestEnvironment.FlushCoalescer();

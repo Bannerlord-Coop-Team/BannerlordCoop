@@ -22,7 +22,7 @@ using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Party;
 
-public class PartyDoneLogicDeathRaceTests : IDisposable
+public class PartyScreenCommitDeathRaceTests : IDisposable
 {
     private static readonly MethodBase CreateObituaryMethod =
         AccessTools.Method(typeof(KillCharacterAction), "CreateObituary");
@@ -31,7 +31,7 @@ public class PartyDoneLogicDeathRaceTests : IDisposable
     private EnvironmentInstance Server => TestEnvironment.Server;
     private IEnumerable<EnvironmentInstance> Clients => TestEnvironment.Clients;
 
-    public PartyDoneLogicDeathRaceTests(ITestOutputHelper output)
+    public PartyScreenCommitDeathRaceTests(ITestOutputHelper output)
     {
         TestEnvironment = new E2ETestEnvironment(output);
     }
@@ -81,20 +81,12 @@ public class PartyDoneLogicDeathRaceTests : IDisposable
                 new TroopRosterElementData(ordinaryHandle, 1, 0, 0),
             });
 
-            delayedMessage = new NetworkCommitPartyScreen(
+            delayedMessage = PartyScreenCommits.Create(
                 leaderHeroId,
                 Helpers.PartyScreenHelper.PartyScreenMode.Loot,
                 PartyScreenDoneKind.Default,
                 new[] { Take(targetHandle), Take(ordinaryHandle) },
-                new TroopRosterOrderData(new()),
-                leftPartyId: null,
-                leftMemberSeed: default,
-                leftPrisonerSeed: lootPrisoners,
-                isDonating: false,
-                doNotApplyGoldTransactions: true,
-                forceTransferId: null,
-                issueOwnerId: null,
-                issueId: null);
+                leftPrisonerSeed: lootPrisoners);
         });
 
         Server.Call(() =>
@@ -117,14 +109,7 @@ public class PartyDoneLogicDeathRaceTests : IDisposable
     }
 
     private static PartyScreenCommandData Take(uint characterHandle)
-        => new(
-            PartyScreenLogic.PartyCommandCode.TransferTroop,
-            PartyScreenLogic.PartyRosterSide.Left,
-            PartyScreenLogic.TroopType.Prisoner,
-            characterHandle,
-            number: 1,
-            woundedNumber: 0,
-            upgradeTarget: 0);
+        => PartyScreenCommits.Transfer(PartyScreenLogic.PartyRosterSide.Left, PartyScreenLogic.TroopType.Prisoner, characterHandle, 1);
 
     private static void AssertFixedState(
         EnvironmentInstance instance,

@@ -26,19 +26,19 @@ namespace E2E.Tests.Services.Party;
 /// client. The bug applied it to <see cref="Hero.MainHero"/> (the local machine's hero), which is null on the
 /// dedicated server - so the influence either threw and was dropped, or landed on the wrong clan.
 /// </summary>
-public class PartyDoneLogicInfluenceSyncTests : IDisposable
+public class PartyScreenCommitInfluenceSyncTests : IDisposable
 {
     private E2ETestEnvironment TestEnvironment { get; }
     private EnvironmentInstance Server => TestEnvironment.Server;
     private IEnumerable<EnvironmentInstance> Clients => TestEnvironment.Clients;
 
-    public PartyDoneLogicInfluenceSyncTests(ITestOutputHelper output)
+    public PartyScreenCommitInfluenceSyncTests(ITestOutputHelper output)
     {
         TestEnvironment = new E2ETestEnvironment(output);
     }
 
     [Fact]
-    public void ClientPartyDoneLogic_WithInfluenceGain_CreditsRequestingClan_OnAllClients()
+    public void GarrisonDonation_CreditsRequestingClanInfluence_OnAllClients()
     {
         string heroId = null;
         string clanId = null;
@@ -89,29 +89,15 @@ public class PartyDoneLogicInfluenceSyncTests : IDisposable
         var requestingClient = Clients.First();
         requestingClient.Call(() =>
         {
-            var donate = new PartyScreenCommandData(
-                PartyScreenLogic.PartyCommandCode.TransferTroop,
-                PartyScreenLogic.PartyRosterSide.Right,
-                PartyScreenLogic.TroopType.Member,
-                troopHandle,
-                number: 100,
-                woundedNumber: 0,
-                upgradeTarget: 0);
+            var donate = PartyScreenCommits.Transfer(
+                PartyScreenLogic.PartyRosterSide.Right, PartyScreenLogic.TroopType.Member, troopHandle, 100);
 
-            requestingClient.Resolve<INetwork>().SendAll(new NetworkCommitPartyScreen(
+            requestingClient.Resolve<INetwork>().SendAll(PartyScreenCommits.Create(
                 heroId,
                 Helpers.PartyScreenHelper.PartyScreenMode.TroopsManage,
                 PartyScreenDoneKind.DonateGarrison,
                 new[] { donate },
-                new TroopRosterOrderData(new()),
-                leftPartyId: null,
-                leftMemberSeed: default,
-                leftPrisonerSeed: default,
-                isDonating: true,
-                doNotApplyGoldTransactions: true,
-                forceTransferId: null,
-                issueOwnerId: null,
-                issueId: null));
+                isDonating: true));
         });
         TestEnvironment.FlushCoalescer();
 

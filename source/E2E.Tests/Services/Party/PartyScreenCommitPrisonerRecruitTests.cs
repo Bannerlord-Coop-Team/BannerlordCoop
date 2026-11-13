@@ -16,7 +16,7 @@ namespace E2E.Tests.Services.Party;
 /// <summary>
 /// Normal party screen commits that release or take prisoners and recruit in one Done.
 /// </summary>
-public class PartyDoneLogicPrisonerRecruitTests : IDisposable
+public class PartyScreenCommitPrisonerRecruitTests : IDisposable
 {
     // Enough conformity for every prisoner, the roster caps it at what the stack can use.
     private const int FullConformity = 1_000_000;
@@ -25,7 +25,7 @@ public class PartyDoneLogicPrisonerRecruitTests : IDisposable
     private EnvironmentInstance Server => TestEnvironment.Server;
     private EnvironmentInstance Client => TestEnvironment.Clients.Single();
 
-    public PartyDoneLogicPrisonerRecruitTests(ITestOutputHelper output)
+    public PartyScreenCommitPrisonerRecruitTests(ITestOutputHelper output)
     {
         TestEnvironment = new E2ETestEnvironment(output, numClients: 1);
     }
@@ -116,37 +116,22 @@ public class PartyDoneLogicPrisonerRecruitTests : IDisposable
     private uint Handle(PrisonerFixture fixture) => Server.GetHandle<CharacterObject>(fixture.PrisonerId);
 
     private PartyScreenCommandData Release(PrisonerFixture fixture, int number)
-        => Command(PartyScreenLogic.PartyCommandCode.TransferTroop, PartyScreenLogic.PartyRosterSide.Right, fixture, number);
+        => PartyScreenCommits.Transfer(PartyScreenLogic.PartyRosterSide.Right, PartyScreenLogic.TroopType.Prisoner, Handle(fixture), number);
 
     private PartyScreenCommandData Take(PrisonerFixture fixture, int number)
-        => Command(PartyScreenLogic.PartyCommandCode.TransferTroop, PartyScreenLogic.PartyRosterSide.Left, fixture, number);
+        => PartyScreenCommits.Transfer(PartyScreenLogic.PartyRosterSide.Left, PartyScreenLogic.TroopType.Prisoner, Handle(fixture), number);
 
     private PartyScreenCommandData Recruit(PrisonerFixture fixture, int number)
-        => Command(PartyScreenLogic.PartyCommandCode.RecruitTroop, PartyScreenLogic.PartyRosterSide.Right, fixture, number);
-
-    private PartyScreenCommandData Command(
-        PartyScreenLogic.PartyCommandCode code,
-        PartyScreenLogic.PartyRosterSide side,
-        PrisonerFixture fixture,
-        int number)
-        => new(code, side, PartyScreenLogic.TroopType.Prisoner, Handle(fixture), number, 0, 0);
+        => PartyScreenCommits.Recruit(Handle(fixture), number);
 
     private void Send(PrisonerFixture fixture, TroopRosterData seed, params PartyScreenCommandData[] commands)
     {
-        var message = new NetworkCommitPartyScreen(
+        var message = PartyScreenCommits.Create(
             fixture.MainHeroId,
             Helpers.PartyScreenHelper.PartyScreenMode.Normal,
             PartyScreenDoneKind.Default,
             commands,
-            new TroopRosterOrderData(new()),
-            leftPartyId: null,
-            leftMemberSeed: default,
-            leftPrisonerSeed: seed,
-            isDonating: false,
-            doNotApplyGoldTransactions: true,
-            forceTransferId: null,
-            issueOwnerId: null,
-            issueId: null);
+            leftPrisonerSeed: seed);
 
         Client.Call(() => Client.Resolve<INetwork>().SendAll(message));
         TestEnvironment.FlushCoalescer();

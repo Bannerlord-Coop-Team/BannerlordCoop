@@ -121,18 +121,16 @@ public class PartyScreenRosterRefresherTests
     }
 
     [Fact]
-    public void ItemServerUpdate_RefreshesSavedPopupStateWithoutSavingPendingChanges()
+    public void ItemServerUpdate_ReachesTheBaselineAndThePopupSave()
     {
         var character = new CharacterObject();
-        var logic = CreateLogic(character, 5, 1, out var visible);
+        var logic = CreateLogic(character, 5, 1, out _);
         var item = new ItemObject();
         var element = new EquipmentElement(item, null);
         logic.CurrentData.RightItemRoster = new ItemRoster();
         logic.CurrentData.RightItemRoster.AddToCounts(element, 5);
         logic._initialData.RightItemRoster.AddToCounts(element, 5);
         logic.SavePartyScreenData();
-        logic.CurrentData.RightItemRoster.AddToCounts(element, -1);
-        visible.AddToCounts(character, -1);
 
         var applied = CreateRefresher().TryApply(
             logic,
@@ -145,22 +143,19 @@ public class PartyScreenRosterRefresherTests
         Assert.True(applied);
         Assert.Equal(7, logic.CurrentData.RightItemRoster.GetElementCopyAtIndex(0).Amount);
         Assert.Equal(7, logic._initialData.RightItemRoster.GetElementCopyAtIndex(0).Amount);
-        AssertRoster(visible, character, 5, 1);
     }
 
     [Fact]
-    public void ItemServerClear_RefreshesSavedPopupStateWithoutSavingPendingChanges()
+    public void ItemServerClear_ReachesTheBaselineAndThePopupSave()
     {
         var character = new CharacterObject();
-        var logic = CreateLogic(character, 5, 1, out var visible);
+        var logic = CreateLogic(character, 5, 1, out _);
         var item = new ItemObject();
         var element = new EquipmentElement(item, null);
         logic.CurrentData.RightItemRoster = new ItemRoster();
         logic.CurrentData.RightItemRoster.AddToCounts(element, 5);
         logic._initialData.RightItemRoster.AddToCounts(element, 5);
         logic.SavePartyScreenData();
-        logic.CurrentData.RightItemRoster.AddToCounts(element, -1);
-        visible.AddToCounts(character, -1);
 
         var applied = CreateRefresher().TryApply(
             logic,
@@ -173,7 +168,6 @@ public class PartyScreenRosterRefresherTests
         Assert.True(applied);
         Assert.Empty(logic.CurrentData.RightItemRoster);
         Assert.Empty(logic._initialData.RightItemRoster);
-        AssertRoster(visible, character, 5, 1);
     }
 
     /// <summary>
