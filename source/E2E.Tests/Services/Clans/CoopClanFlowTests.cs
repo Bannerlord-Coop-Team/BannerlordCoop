@@ -33,6 +33,7 @@ using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Buildings;
 using TaleWorlds.CampaignSystem.ViewModelCollection.GameMenu.TownManagement;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Clans;
@@ -697,6 +698,51 @@ public class CoopClanFlowTests : MapEventTestBase, IDisposable
                 Assert.Equal(member.HeroId, player.HeroId);
             });
         }
+    }
+
+    // #4656: the joiner's map must redraw the joined clan's enemies, which vanilla only does on war, peace or kingdom changes.
+    [Fact]
+    public void JoinedMember_MapRedrawsTheJoinedClansEnemies()
+    {
+        var enemyPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        var townId = TestEnvironment.CreateRegisteredObject<Town>();
+        foreach (var instance in Clients.Prepend(Server))
+        {
+            instance.Call(() =>
+            {
+                using var scope = new AllowedThread();
+                var settlement = Get<Settlement>(instance, settlementId);
+                settlement.SetSettlementComponent(Get<Town>(instance, townId));
+                Get<Town>(instance, townId)._ownerClan = Get<MobileParty>(instance, enemyPartyId).LeaderHero.Clan;
+            });
+        }
+        Server.Call(() => DeclareWarAction.ApplyByPlayerHostility(
+            Get<Clan>(Server, leader.ClanId), Get<MobileParty>(Server, enemyPartyId).LeaderHero.Clan));
+        Flush();
+        memberClient.Call(() =>
+        {
+            var enemyParty = Get<MobileParty>(memberClient, enemyPartyId);
+            var settlement = Get<Settlement>(memberClient, settlementId);
+            Assert.False(FactionManager.IsAtWarAgainstFaction(settlement.MapFaction, Hero.MainHero.MapFaction));
+            // The harness doesn't list created settlements in Settlement.All, which the map walks.
+            Campaign.Current.CampaignObjectManager.Settlements = new MBList<Settlement>(Settlement.All ?? new MBList<Settlement>()) { settlement };
+            enemyParty._isVisible = true;
+            settlement._isVisible = true;
+            enemyParty.Party.OnVisualsUpdated();
+            settlement.Party.OnVisualsUpdated();
+        });
+
+        Join();
+
+        memberClient.Call(() =>
+        {
+            var enemyParty = Get<MobileParty>(memberClient, enemyPartyId);
+            var settlement = Get<Settlement>(memberClient, settlementId);
+            Assert.True(FactionManager.IsAtWarAgainstFaction(settlement.MapFaction, Hero.MainHero.MapFaction));
+            Assert.True(enemyParty.Party.IsVisualDirty);
+            Assert.True(settlement.Party.IsVisualDirty);
+        });
     }
 
     private Player CreatePlayer(EnvironmentInstance client, string controllerId)
