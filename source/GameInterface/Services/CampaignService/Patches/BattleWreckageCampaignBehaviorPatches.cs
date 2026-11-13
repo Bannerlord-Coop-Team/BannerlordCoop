@@ -17,7 +17,7 @@ internal class BattleWreckageCampaignBehaviorPatches
 }
 
 // Goes with BattleWreckageCampaignBehaviorPatches. Drops saved wreckages here, since OnGameLoaded is too late.
-// Id-less ones throw while the object lists are built. Valid ones never expire and open an unregistered menu.
+// Id-less ones throw while the lists are built. Valid ones never expire, and clicking one opens an unregistered menu.
 [HarmonyPatch(typeof(CampaignObjectManager), nameof(CampaignObjectManager.InitializeOnLoad))]
 internal class SavedWreckageRemovalPatch
 {
