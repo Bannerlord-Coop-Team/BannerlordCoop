@@ -366,9 +366,15 @@ public class CaravanAmbushTests : IDisposable
                 Assert.Null(quest._caravanParty);
             }
         });
-        Assert.Equal(saved ? 0 : 1, Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>().Count());
-        if (!saved)
-            Assert.Equal(IssueOutcome.QuestCancel, Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()[0].Outcome);
+        if (saved)
+        {
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        }
+        else
+        {
+            var finalized = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+            Assert.Equal(IssueOutcome.QuestCancel, finalized.Outcome);
+        }
     }
 
     [Fact]
