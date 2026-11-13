@@ -273,9 +273,8 @@ internal class ShiplessSelectedFormationOrdersPatch
         var shipsLogic = NavalShiplessFormations.ShipsLogic;
         if (!NavalMissionTracker.IsActiveHere() || shipsLogic == null) return true;
 
-        // Keeps a formation with a hull, or one whose hull is unknown, and takes out the rest.
         __state = ListTakeOut.TakeOut(__instance._selectedFormations, formation =>
-            NavalShiplessFormations.ShipOf(shipsLogic, formation, out bool known) != null || !known);
+            NavalShiplessFormations.ShipOf(shipsLogic, formation, out bool known) == null && known);
         return RunsOrder(__instance._selectedFormations.Count, __state.Count);
     }
 

@@ -7,7 +7,10 @@ using Moq;
 using NavalDLC.Missions.MissionLogics;
 using NavalDLC.Missions.Objects;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
+using TaleWorlds.MountAndBlade;
 using Xunit;
 
 namespace Coop.Tests.Missions.Battles;
@@ -53,17 +56,22 @@ public class NavalCopyCrewPatchesTests
         Assert.Null(CopySkippingConnectedShipPatch.PickConnectedShip(teamShips, stepped, copies.Contains));
     }
 
-    // Vanilla's crew share over a team holding two own hulls and a copy, as the battle host's ally team does with an allied AI
-    // fleet next to another player's copy: the whole share goes to the own hulls, and the copy is back in its place untouched.
+    // Vanilla's crew share and troop assignment over a team holding two own hulls and a copy, as the battle host's ally team does
+    // with an allied AI fleet next to another player's copy: every troop goes to the own hulls, and the copy is back in its place.
     [Fact]
-    public void CrewShare_SpreadsTheTeamsTroopsOverItsOwnHullsOnly()
+    public void CrewShareAndAssignment_PutTheTeamsTroopsOnItsOwnHullsOnly()
     {
-        var own = HullAgents(crewCapacity: 20);
-        var copy = HullAgents(crewCapacity: 20);
-        var alsoOwn = HullAgents(crewCapacity: 20);
-        var team = new NavalTeamAgents(null, BattleSideEnum.Defender, TeamSideEnum.PlayerAllyTeam);
+        var team = new NavalTeamAgents(
+            (NavalAgentsLogic)RuntimeHelpers.GetUninitializedObject(typeof(NavalAgentsLogic)), BattleSideEnum.Defender,
+            TeamSideEnum.PlayerAllyTeam);
+        var own = HullAgents(team, crewCapacity: 20);
+        var copy = HullAgents(team, crewCapacity: 20);
+        var alsoOwn = HullAgents(team, crewCapacity: 20);
         team._allShipAgents.AddRange(new[] { own, copy, alsoOwn });
-        for (int troop = 0; troop < 30; troop++) team._allTroopOrigins.Add(Mock.Of<IAgentOriginBase>());
+        var soldier = Mock.Of<BasicCharacterObject>();
+        for (int troop = 0; troop < 30; troop++)
+            team.AddTroopOrigin(Mock.Of<IAgentOriginBase>(origin =>
+                origin.Troop == soldier && origin.GetTraitsMask() == TroopTraitsMask.Melee));
         var registry = new Mock<INavalForeignHullRegistry>();
         registry.Setup(hulls => hulls.Contains(copy.Ship)).Returns(true);
         var builder = new ContainerBuilder();
@@ -76,9 +84,11 @@ public class NavalCopyCrewPatchesTests
             Assert.NotEmpty(harmony.CreateClassProcessor(typeof(CopySkippingCrewSharePatch)).Patch());
 
             team.AutoComputeDesiredTroopCountsPerShip(loadBalanceShips: true, troopLimitFromBattleSize: 100);
+            team.AssignTroops();
 
             Assert.Equal(new[] { own, copy, alsoOwn }, team._allShipAgents);
             Assert.Equal((15, 15, 20), (own.DesiredTroopCount, alsoOwn.DesiredTroopCount, copy.DesiredTroopCount));
+            Assert.Equal((15, 15, 0), (own.ReservedTroopsCount, alsoOwn.ReservedTroopsCount, copy.ReservedTroopsCount));
         }
         finally
         {
@@ -89,8 +99,8 @@ public class NavalCopyCrewPatchesTests
         }
     }
 
-    // A constructor-skipped hull's crew record wanting its full crew, as vanilla's spawn makes it.
-    private static NavalShipAgents HullAgents(int crewCapacity)
+    // A constructor-skipped hull's crew record of the team, wanting its full crew of any class, as vanilla's spawn makes it.
+    private static NavalShipAgents HullAgents(NavalTeamAgents team, int crewCapacity)
     {
         var origin = new Mock<IShipOrigin>();
         origin.SetupGet(ship => ship.TotalCrewCapacity).Returns(crewCapacity);
@@ -100,8 +110,18 @@ public class NavalCopyCrewPatchesTests
         var agents = ShipTestHulls.Uninitialized<NavalShipAgents>();
         agents.Ship = hull;
         agents.DesiredTroopCount = crewCapacity;
+        agents.TroopClassFilter = (TroopTraitsMask)3;
+        // The readonly collections and team the skipped constructor would have set.
+        SetField(agents, "_teamAgents", team);
+        SetField(agents, "_activeAgents", new MBList<Agent>());
+        SetField(agents, "_reservedTroops", new Dictionary<IAgentOriginBase, NavalTroopAssignment>());
+        SetField(agents, "_reservedOrderedTroops", new MBSortedMultiList<int, NavalTroopAssignment>(true));
         return agents;
     }
+
+    // Sets a readonly field the publicizer can't make writable.
+    private static void SetField(NavalShipAgents agents, string name, object value) =>
+        AccessTools.Field(typeof(NavalShipAgents), name).SetValue(agents, value);
 
     // A constructor-skipped hull with only its island bits set.
     private static MissionShip Ship(ulong uniqueId, ulong islandId)

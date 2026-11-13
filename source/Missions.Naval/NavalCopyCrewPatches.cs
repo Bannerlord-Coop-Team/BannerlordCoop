@@ -88,7 +88,7 @@ internal class CopySkippingCrewSharePatch
     // Takes the copies out of the team's hulls for the call, keeping where each stood.
     [HarmonyPrefix]
     private static void Prefix(NavalTeamAgents __instance, out List<(int Index, NavalShipAgents Item)> __state) =>
-        __state = ListTakeOut.TakeOut(__instance._allShipAgents, hull => !NavalForeignHullRegistry.IsCopyHere(hull.Ship));
+        __state = ListTakeOut.TakeOut(__instance._allShipAgents, hull => NavalForeignHullRegistry.IsCopyHere(hull.Ship));
 
     // Puts the copies back where they stood, also when vanilla threw.
     [HarmonyFinalizer]
