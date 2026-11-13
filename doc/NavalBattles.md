@@ -112,7 +112,7 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
   The fielder:
   - Team: the hulls go where every peer puts their copies (`BattleTeamResolver.ResolveAiFleetTeam(side)`):
     the side's main team, or its ally team on the host's own side. The ally team also holds the other players' copies,
-    so off-ship AI crew never joins a copy's formation (`NavalCopyCrewLookupPatches`).
+    so its crew share, troop assignment and off-ship crew never reach a copy (`NavalCopyCrewPatches`).
   - Ships: the AI parties get what the players leave of the side's 8 ships, at most vanilla's limit for them
     (`NavalShipBudget`). Each player's share is the one its launcher fields, from campaign data every client holds. When the
     players take all 8, the side just has no AI fleet (logged as information, settled like a failed attempt).

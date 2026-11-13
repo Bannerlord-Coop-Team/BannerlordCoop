@@ -4,6 +4,7 @@ using NavalDLC.Missions.MissionLogics;
 using NavalDLC.Missions.Objects;
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using NavalPhysicsScript = NavalDLC.Missions.NavalPhysics.NavalPhysics;
@@ -68,5 +69,42 @@ internal class CopySkippingConnectedShipPatch
         }
 
         return connected;
+    }
+}
+
+// Vanilla's team crewing spreads the team's troops over every hull of its team side (NavalTeamAgents keeps one NavalShipAgents
+// per hull), copies included; a copy's crew is its owner's, so the crew share and the troop assignment see only own hulls.
+[HarmonyPatch]
+[HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
+internal class CopySkippingCrewSharePatch
+{
+    // The share of the team's crew per hull and the assignment of its troops to the hulls missing some.
+    private static IEnumerable<MethodBase> TargetMethods() => new MethodBase[]
+    {
+        AccessTools.Method(typeof(NavalTeamAgents), nameof(NavalTeamAgents.AutoComputeDesiredTroopCountsPerShip)),
+        AccessTools.Method(typeof(NavalTeamAgents), nameof(NavalTeamAgents.AssignTroops)),
+    };
+
+    // Takes the copies out of the team's hulls for the call, with where each stood, last first.
+    [HarmonyPrefix]
+    private static void Prefix(NavalTeamAgents __instance, out List<(int Index, NavalShipAgents Hull)> __state)
+    {
+        __state = new List<(int Index, NavalShipAgents Hull)>();
+        var hulls = __instance._allShipAgents;
+        for (int index = hulls.Count - 1; index >= 0; index--)
+        {
+            if (!NavalForeignHullRegistry.IsCopyHere(hulls[index].Ship)) continue;
+
+            __state.Add((index, hulls[index]));
+            hulls.RemoveAt(index);
+        }
+    }
+
+    // Puts the copies back where they stood, also when vanilla threw.
+    [HarmonyFinalizer]
+    private static void Finalizer(NavalTeamAgents __instance, List<(int Index, NavalShipAgents Hull)> __state)
+    {
+        for (int taken = __state.Count - 1; taken >= 0; taken--)
+            __instance._allShipAgents.Insert(__state[taken].Index, __state[taken].Hull);
     }
 }
