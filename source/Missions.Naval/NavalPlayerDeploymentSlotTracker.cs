@@ -9,7 +9,10 @@ namespace Missions.Naval;
 /// </summary>
 public interface INavalPlayerDeploymentSlotTracker
 {
-    /// <summary>The own party's index among the side's player parties; 0 is the front slot.</summary>
+    /// <summary>
+    /// The own party's index among the side's player parties; 0 is the slot at vanilla's base, or the first room from the path
+    /// start.
+    /// </summary>
     int Rank { get; set; }
 
     /// <summary>How many player parties fight on the own side, the own one included; one or none keeps vanilla's plan.</summary>

@@ -61,7 +61,7 @@ internal static class NavalSideDeploymentSlots
     {
         var (sideBase, opposingBase, forwardLimit) = Bounds(spawnPath, range);
         var slots = new NavalSideSlot[ranks];
-        slots[0] = FrontSlot(spawnPath, sideBase, range, forwardLimit);
+        slots[0] = RankZeroSlot(spawnPath, sideBase, range, forwardLimit);
 
         int rank = 1;
         float behindCursor = slots[0].Offset - range - InterTeamGap;
@@ -71,6 +71,8 @@ internal static class NavalSideDeploymentSlots
             behindCursor = behind - range - InterTeamGap;
         }
 
+        // Ranks with no room behind go ahead of rank 0 one after another; AllySlot then puts the allies ahead of the front-most
+        // player, as vanilla's forward packing keeps its allies' team in front.
         float aheadRear = slots[0].Offset + InterTeamGap;
         for (; rank < ranks; rank++)
         {
@@ -78,23 +80,23 @@ internal static class NavalSideDeploymentSlots
             aheadRear = slots[rank].Offset + InterTeamGap;
         }
 
-        return new NavalSideLayout(slots, opposingBase);
+        return new NavalSideLayout(slots, opposingBase, forwardLimit);
     }
 
     /// <summary>
     /// The allied AI fleet's slot and the opposing base it faces: a gap ahead of the front-most of the side's
-    /// <paramref name="playerCount"/> player fleets, with rank 0 on the host's own plan when it is rank 0 (a lone player's is
-    /// vanilla's). Vanilla keeps the allies in front even when its forward packing puts every team ahead of the base.
+    /// <paramref name="playerCount"/> player fleets (at least one, the host's own), with rank 0 on the host's own plan when it
+    /// is rank 0 (a lone player's is vanilla's). Vanilla keeps the allies in front even when it packs every team forward.
     /// </summary>
     internal static (NavalSideSlot Slot, float OpposingBase) AllySlot(SpawnPathData spawnPath, int ownRank, float ownPlanOffset,
         int playerCount, float allyRange, float gameRange)
     {
-        var (_, opposingBase, forwardLimit) = Bounds(spawnPath, gameRange);
-        var slots = Layout(spawnPath, Math.Max(1, playerCount), gameRange).Slots;
-        float rankZero = ownRank == 0 ? ownPlanOffset : slots[0].Offset;
-        float frontMost = new[] { rankZero }.Concat(slots.Skip(1).Select(slot => slot.Offset)).Max();
+        var layout = Layout(spawnPath, playerCount, gameRange);
+        float frontMost = ownRank == 0 ? ownPlanOffset : layout.Slots[0].Offset;
+        for (int rank = 1; rank < layout.Slots.Length; rank++)
+            frontMost = Math.Max(frontMost, layout.Slots[rank].Offset);
 
-        return (SlotAhead(spawnPath, frontMost + InterTeamGap, allyRange, forwardLimit), opposingBase);
+        return (SlotAhead(spawnPath, frontMost + InterTeamGap, allyRange, layout.ForwardLimit), layout.OpposingBase);
     }
 
     // Vanilla's base and opposing base for the shared offset, and the offset no fleet as deep as the range goes past.
@@ -106,7 +108,7 @@ internal static class NavalSideDeploymentSlots
     }
 
     // Rank 0 takes vanilla's slot behind the base, or the first room from the path start when the base leaves none behind.
-    private static NavalSideSlot FrontSlot(SpawnPathData spawnPath, float sideBase, float range, float forwardLimit)
+    private static NavalSideSlot RankZeroSlot(SpawnPathData spawnPath, float sideBase, float range, float forwardLimit)
     {
         if (TryPlaceBehind(spawnPath, sideBase, range, out float behind)) return new NavalSideSlot(behind, NavalSlotProblem.None);
 

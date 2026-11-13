@@ -113,7 +113,7 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
   - Team: the hulls go where every peer puts their copies (`BattleTeamResolver.ResolveAiFleetTeam(side)`):
     the side's main team, or its ally team on the host's own side. The ally team also holds the other players' copies,
     so its crew share, troop assignment and off-ship crew never reach a copy (`NavalCopyCrewPatches`).
-  - Slot: the host's own allies are planned alone, a gap ahead of the side's front player slot (Allied AI fleet slot in
+  - Slot: the host's own allies are planned alone, a gap ahead of the side's front-most player fleet (Allied AI fleet slot in
     section 6); an enemy fleet takes vanilla's late plan for its side.
   - Ships: the AI parties get what the players leave of the side's 8 ships, at most vanilla's limit for them
     (`NavalShipBudget`). Each player's share is the one its launcher fields, from campaign data every client holds. When the
@@ -755,7 +755,7 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   and keeps the allies in front when nothing fits behind the base too: `CollectSortedBattleSideTeamsData` sorts the allies
   first and the player team last, and `TryPlaceTeamsOneSide`'s forward packing places from the last team at the path start
   to the first, so the allies end up front-most. Here the battle host plans the allied AI fleet its own depth and a gap
-  ahead of the front-most player fleet among the ranks it counts (`NavalSideDeploymentSlots.AllySlot`, from
+  ahead of the front-most player fleet among the side's player parties when it fields them (`NavalSideDeploymentSlots.AllySlot`, from
   `NavalNpcFleetFielder`), with rank 0 on the host's own plan when it is rank 0 (a lone player's is vanilla's, which
   deepens with its ships). With room behind the base that is rank 0; with the base at the path start (live M11 phase 3
   check 2) it is the last rank, which went ahead of rank 0. So a lone player keeps vanilla's spot and the allies sit where
@@ -767,7 +767,7 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   like the player slots.
 - Known limits: a player who leaves shifts the ranks of the players after it in the side's party order, so a joiner
   that arrives after a departure can take the slot of a player still in the battle. With no room behind the base, a
-  player who joins after the allies were fielded goes ahead of the ranks the host counted, where the allies are.
+  player who joins after the allies were fielded goes ahead of the ranks there were then, where the allies are.
 - **R49 freeze (native, no managed guard).** Client1 crashed 29 s into `vs_pirates hulls=1 weapons=1` with an
   AccessViolation in native `Mission.GetNearbyAgentsAux`, called from vanilla `NavalPhysicsAgentCollisionSolver.OnParallelFixedTick`
   on the fixed-tick thread; the watchdog then held the process frozen. The dumps show valid inputs (a finite centre and a

@@ -57,7 +57,7 @@ public class NavalNpcFleetFielder : INavalNpcFleetFielder
     private readonly INavalShipBudget shipBudget;
     private readonly INavalPlayerDeploymentSlotTracker playerSlots;
 
-    // Takes the battle's session and ship replicator, the vanilla spawn helpers and the own player slot rank and count.
+    // Takes the battle's session and ship replicator, the vanilla spawn helpers and the own player slot rank.
     public NavalNpcFleetFielder(IBattleSession session, IBattleShipReplicator shipReplicator, ICoopShipSnapshotBuilder snapshotBuilder,
         IObjectManager objectManager, IPlayerManager playerManager, INavalLateDeploymentPlanTracker latePlans,
         IBattleTeamResolver teamResolver, INavalShipBudget shipBudget, INavalPlayerDeploymentSlotTracker playerSlots)
@@ -150,8 +150,10 @@ public class NavalNpcFleetFielder : INavalNpcFleetFielder
         {
             // The AI team was planned with no ships at deployment start, so it is planned now: the host's own allies on their
             // own, an enemy fleet with vanilla's plan for its side, which skips a team that already has one.
-            if (team == mission.PlayerAllyTeam) PlanAllyTeam(mission, shipsLogic, planning, side, team, fleet);
-            else latePlans.MakeForSide(navalLogic, side);
+            if (team == mission.PlayerAllyTeam)
+                PlanAllyTeam(mission, shipsLogic, planning, side, team, fleet, work.Players.PlayerCount);
+            else
+                latePlans.MakeForSide(navalLogic, side);
             SpawnAssignedHulls(shipsLogic, planning, team, fleet, parties, work);
         }
         finally
@@ -165,16 +167,17 @@ public class NavalNpcFleetFielder : INavalNpcFleetFielder
         }
     }
 
-    // Plans the allied AI fleet alone at its slot ahead of the front-most player fleet and says if the slot didn't fit.
+    // Plans the allied AI fleet alone ahead of the front-most of the side's players now, a joiner since the host opened included,
+    // and says if the slot didn't fit.
     private void PlanAllyTeam(Mission mission, NavalShipsLogic shipsLogic, NavalMissionDeploymentPlanningLogic planning,
-        BattleSideEnum side, Team team, List<FleetShip> fleet)
+        BattleSideEnum side, Team team, List<FleetShip> fleet, int playerCount)
     {
         float allyRange = NavalSideDeploymentSlots.LongestTeamRange(fleet.Select(ship =>
             shipsLogic.GetShipAssignment(team.TeamSide, ship.Formation.FormationIndex).MissionShipObject.DeploymentArea.y));
         var (slot, opposingBase) = NavalSideDeploymentSlots.AllySlot(mission.GetInitialSpawnPathData(side),
             ownRank: playerSlots.Rank,
             ownPlanOffset: planning.GetSpawnPathOffset(mission.PlayerTeam),
-            playerCount: playerSlots.PlayerCount,
+            playerCount: playerCount,
             allyRange: allyRange,
             gameRange: NavalSideDeploymentSlots.LongestTeamRangeOfGame());
         var aiShips = fleet.Select(ship => (ship.Formation.FormationIndex, (IShipOrigin)ship.Snapshot));

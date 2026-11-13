@@ -96,10 +96,14 @@ public class NavalSideDeploymentSlotsTests
         var layout = NavalSideDeploymentSlots.Layout(path, expectedOffsets.Length, Longest);
         var (ally, _) = NavalSideDeploymentSlots.AllySlot(path, ownRank: 1, ownPlanOffset: 0f, playerCount: expectedOffsets.Length,
             Longest, Longest);
+        // A rank-0 host on its own plan finds the same front-most player, also when later ranks went ahead of it.
+        var (rankZeroHostAlly, _) = NavalSideDeploymentSlots.AllySlot(path, ownRank: 0, ownPlanOffset: layout.Slots[0].Offset,
+            playerCount: expectedOffsets.Length, Longest, Longest);
 
         Assert.Equal(expectedOffsets, layout.Slots.Select(slot => (float)Math.Round(slot.Offset, 2)));
         Assert.Equal(expectedProblems, layout.Slots.Select(slot => slot.Problem));
         Assert.Equal((expectedAlly, expectedAllyProblem), ((float)Math.Round(ally.Offset, 2), ally.Problem));
+        Assert.Equal(ally, rankZeroHostAlly);
         Assert.All(layout.Slots, slot =>
             Assert.True(ally.Offset >= slot.Offset, $"allies at {ally.Offset} behind a player at {slot.Offset}"));
     }
@@ -118,7 +122,7 @@ public class NavalSideDeploymentSlotsTests
     }
 
     // R49 C3: a slot depends only on its rank, so a client that counts a late joiner or misses a disconnected player derives the
-    // same slot for an earlier rank, also when the ranks have gone ahead of the allies.
+    // same slot for an earlier rank, also when the ranks have gone ahead of rank 0.
     [Theory]
     [InlineData(1000f)]
     [InlineData(100f)]
