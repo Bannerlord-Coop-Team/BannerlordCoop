@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 using Common.Messaging;
+using GameInterface.Registry.Auto;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages.Start;
@@ -26,6 +27,51 @@ namespace E2E.Tests.Services.MapEvents;
 public class BattleSimulationEncounterTests : MapEventTestBase
 {
     public BattleSimulationEncounterTests(ITestOutputHelper output) : base(output) { }
+
+    [Fact]
+    public void DestroyedEvent_BeforePlaybackFinishes_ScoreboardTickKeepsPresentationOpen()
+    {
+        var context = CreateServerMapEvent();
+        var client = Clients.First();
+        RegisterAsPlayerParty("1", TestEnvironment.CreateRegisteredObject<Hero>(), context.AttackerPartyId);
+        SPScoreboardVM scoreboard = null;
+        BattleSimulation simulation = null;
+        client.Call(() =>
+        {
+            Campaign.Current.MainParty = client.GetRegisteredObject<MobileParty>(context.AttackerPartyId);
+            var encounter = SetMockPlayerEncounter(client, context.DefenderPartyId, context.MapEventId);
+            simulation = new BattleSimulation(null, null);
+            encounter.BattleSimulation = simulation;
+            var mapState = Game.Current.GameStateManager.CreateState<MapState>();
+            mapState._battleSimulation = simulation;
+            Game.Current.GameStateManager._gameStates.Add(mapState);
+            BattleSimulationReplay.Begin(context.MapEventId);
+            scoreboard = SPScoreboardVM.CreateSimulation(simulation);
+            scoreboard.IsSimulation = true;
+            Assert.False(scoreboard.IsOver);
+        }, MapEventDisabledMethods);
+
+        client.SimulateMessage(Server.NetPeer, new NetworkDestroyInstance<MapEvent>(
+            client.GetHandle<MapEvent>(context.MapEventId)));
+
+        client.Call(() =>
+        {
+            Assert.Null(MobileParty.MainParty.MapEvent);
+            Assert.False(scoreboard.IsOver);
+            Assert.False(simulation.IsSimulationFinished);
+            // The view can tick between event destruction and the final playback message.
+            // OnTick is protected in the game assembly used by the test project.
+            AccessTools.Method(typeof(SPScoreboardVM), "OnTick").Invoke(scoreboard, new object[] { 1.1f });
+            Assert.True(Game.Current.GameStateManager.GameStates.OfType<MapState>().Single().IsSimulationActive);
+        }, MapEventDisabledMethods);
+
+        client.SimulateMessage(Server.NetPeer, new NetworkBattleSimulationFinished(context.MapEventId));
+        client.Call(() =>
+        {
+            BattleSimulationReplay.Tick(simulation, 0f);
+            Assert.True(simulation.IsSimulationFinished);
+        }, MapEventDisabledMethods);
+    }
 
     [Theory]
     [InlineData(false)]
