@@ -8,13 +8,13 @@ using TaleWorlds.Core;
 namespace GameInterface.Services.Ships;
 
 /// <summary>
-/// [Game thread] Each open naval battle side's latest recorded AI fleet attempt: the server replays it to joining clients and a
-/// client's launcher caps a late joiner against it. The spawner's latch stays the mission's own, set at once on the host.
+/// [Game thread] Each open naval battle side's first AI fleet attempt per mission instance, forgotten on every machine when the
+/// instance empties: the server replays it to joining clients and a client's launcher caps a late joiner against it.
 /// </summary>
 public interface INavalNpcFleetAttemptTracker
 {
-    /// <summary>Keeps the attempt as its side's latest in its battle; a re-engaged battle's new mission attempts again.</summary>
-    void Record(NetworkNpcFleetAttemptRecorded attempt);
+    /// <summary>Keeps the side's first attempt in its battle's mission instance; returns whether this one was new.</summary>
+    bool Record(NetworkNpcFleetAttemptRecorded attempt);
 
     /// <summary>The side's attempt in the battle, if one was recorded and the battle is still open.</summary>
     bool TryGet(string mapEventId, BattleSideEnum side, out NetworkNpcFleetAttemptRecorded attempt);
@@ -39,10 +39,14 @@ public class NavalNpcFleetAttemptTracker : INavalNpcFleetAttemptTracker
         this.objectManager = objectManager;
     }
 
-    public void Record(NetworkNpcFleetAttemptRecorded attempt)
+    public bool Record(NetworkNpcFleetAttemptRecorded attempt)
     {
         DropEndedBattles();
-        attempts[(attempt.InstanceId, attempt.Side)] = attempt;
+        var key = (attempt.InstanceId, attempt.Side);
+        if (attempts.ContainsKey(key)) return false;
+
+        attempts.Add(key, attempt);
+        return true;
     }
 
     public bool TryGet(string mapEventId, BattleSideEnum side, out NetworkNpcFleetAttemptRecorded attempt)

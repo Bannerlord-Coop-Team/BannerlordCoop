@@ -120,12 +120,13 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
     players take all 8, the side just has no AI fleet (logged as information, settled like a failed attempt).
   - Recorded attempt: the attempt (`NetworkNpcFleetAttempted`) carries the AI hulls it left, the players' hulls its share
     counted and those players' party ids. The host also reports it to the server (`ServerNavalNpcFleetAttemptHandler`),
-    which records the side's first one for the battle's mission instance (`INavalNpcFleetAttemptTracker`) and sends it to
-    every client as `NetworkNpcFleetAttemptRecorded`, and to a client entering the campaign later. Clients keep the latest
-    one (`NavalNpcFleetAttemptHandler`); the spawner's own latch stays the mission's, set at once on the host. It travels on
+    which keeps the side's first one per mission instance (`INavalNpcFleetAttemptTracker`) and sends it to every client as
+    `NetworkNpcFleetAttemptRecorded`, and to a client entering the campaign later. Clients keep it the same way
+    (`NavalNpcFleetAttemptHandler`); the spawner's own latch stays the mission's, set at once on the host. It travels on
     the server's ordered channel ahead of any later join reply, so a later joiner holds it before its launcher picks ships.
-    When the instance empties (BR-017) the server forgets the battle's attempts, so re-engaging it records the new
-    mission's attempts, which replace the old ones on every client.
+    When the instance empties (BR-017) the battle's attempts are forgotten on every machine: the server drops them as it
+    publishes the departure and sends `NetworkNpcFleetAttemptsForgotten` ahead of any reply to a re-engaging player, so the
+    new mission's launchers and host read no old attempt.
   - Late joiners: a player the attempt didn't count fields at most what the side's 8 leave after the attempt's hulls and
     every uncounted player before it in the side's party order, at the most that player can field (its ships, capped by its
     party's ship limit, which casualties never lower), and always its own ship. Players who start together keep the A2

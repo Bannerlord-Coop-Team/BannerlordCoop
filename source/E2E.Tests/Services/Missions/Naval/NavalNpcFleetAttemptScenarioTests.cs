@@ -54,9 +54,9 @@ public class NavalNpcFleetAttemptScenarioTests : NavalBattleTestEnvironment
     }
 
     // BR-017: a battle whose last player left stays open, and re-engaging it opens a new mission whose host attempts the fleets
-    // again; that attempt is recorded and sent anew, and replaces the old one on every client.
+    // again; the old attempt is gone on every machine once the instance empties, and the new one is recorded and sent anew.
     [Fact]
-    public void ReEngagedBattle_RecordsItsNewMissionsAttempt_AndEveryClientReplacesTheOldOne()
+    public void ReEngagedBattle_ForgetsTheOldAttemptEverywhere_AndRecordsItsNewMissionsAttempt()
     {
         using var battle = StartServerBattle(atSea: true, out var a, out var b, out _);
         Report(a, battle, aiHulls: 5);
@@ -67,6 +67,13 @@ public class NavalNpcFleetAttemptScenarioTests : NavalBattleTestEnvironment
         }
 
         Server.PumpGameThread();
+        foreach (var instance in new[] { Server }.Concat(Clients))
+        {
+            instance.PumpGameThread();
+            instance.Call(() => Assert.False(instance.Resolve<INavalNpcFleetAttemptTracker>().TryGet(battle.MapEventId,
+                BattleSideEnum.Attacker, out _), "the emptied instance's attempt is still held"));
+        }
+
         Server.SimulateMessage(a.Instance.NetPeer, new NetworkMissionEntered(a.Id, battle.MapEventId));
         Server.NetworkSentMessages.Clear();
 

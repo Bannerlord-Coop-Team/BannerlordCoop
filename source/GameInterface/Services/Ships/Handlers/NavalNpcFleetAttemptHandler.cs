@@ -5,8 +5,8 @@ using GameInterface.Services.Ships.Messages;
 namespace GameInterface.Services.Ships.Handlers;
 
 /// <summary>
-/// [Client] Tracks the AI fleet attempts the server recorded, so a launcher opening one of their battles later caps its fleet
-/// against them; ServerNavalNpcFleetAttemptHandler records and sends them.
+/// [Client] Tracks the AI fleet attempts the server recorded, and drops a battle's when the server forgets them, so a launcher
+/// opening the battle later caps its fleet against the current ones; ServerNavalNpcFleetAttemptHandler sends both.
 /// </summary>
 internal class NavalNpcFleetAttemptHandler : IHandler
 {
@@ -20,12 +20,14 @@ internal class NavalNpcFleetAttemptHandler : IHandler
         this.attempts = attempts;
 
         messageBroker.Subscribe<NetworkNpcFleetAttemptRecorded>(Handle_NetworkNpcFleetAttemptRecorded);
+        messageBroker.Subscribe<NetworkNpcFleetAttemptsForgotten>(Handle_NetworkNpcFleetAttemptsForgotten);
     }
 
-    // Drops the subscription.
+    // Drops the subscriptions.
     public void Dispose()
     {
         messageBroker.Unsubscribe<NetworkNpcFleetAttemptRecorded>(Handle_NetworkNpcFleetAttemptRecorded);
+        messageBroker.Unsubscribe<NetworkNpcFleetAttemptsForgotten>(Handle_NetworkNpcFleetAttemptsForgotten);
     }
 
     // [Poller] Queues the attempt on the game thread, ahead of any later join or mission open the server sent after it.
@@ -33,5 +35,12 @@ internal class NavalNpcFleetAttemptHandler : IHandler
     {
         var attempt = payload.What;
         GameThread.RunSafe(() => attempts.Record(attempt), context: nameof(Handle_NetworkNpcFleetAttemptRecorded));
+    }
+
+    // [Poller] Queues dropping the battle's attempts on the game thread, ahead of the re-engaged mission's open and attempts.
+    private void Handle_NetworkNpcFleetAttemptsForgotten(MessagePayload<NetworkNpcFleetAttemptsForgotten> payload)
+    {
+        string mapEventId = payload.What.InstanceId;
+        GameThread.RunSafe(() => attempts.Forget(mapEventId), context: nameof(Handle_NetworkNpcFleetAttemptsForgotten));
     }
 }

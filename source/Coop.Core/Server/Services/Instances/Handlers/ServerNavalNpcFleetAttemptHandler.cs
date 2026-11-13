@@ -70,25 +70,27 @@ public class ServerNavalNpcFleetAttemptHandler : IHandler
     private void Record(string controllerId, NetworkNpcFleetAttempted reported)
     {
         if (!memberResolver.TryResolve(controllerId, reported.InstanceId, "an AI fleet attempt", out _, out _)) return;
-        if (attempts.TryGet(reported.InstanceId, reported.Side, out _)) return;
 
         var attempt = new NetworkNpcFleetAttemptRecorded(reported.InstanceId, reported.Side, reported.AiHulls, reported.PlayerHulls,
             reported.CountedPartyIds);
-        attempts.Record(attempt);
+        if (!attempts.Record(attempt)) return;
+
         network.SendAll(attempt);
         Logger.Information("[NavalBattle] Recorded the {Side} AI fleet attempt of {Instance} from {Controller}: failed={Failed} " +
             "aiHulls={AiHulls} playerHulls={PlayerHulls}", reported.Side, reported.InstanceId, controllerId, reported.Failed,
             reported.AiHulls, reported.PlayerHulls);
     }
 
-    // A battle whose last player left keeps its map event (BR-017), and re-engaging it opens a new mission whose host attempts
-    // the fleets again, so the old attempts go with the instance; clients keep theirs until the new ones replace them.
+    // [Game thread] A battle whose last player left keeps its map event (BR-017), and re-engaging it opens a new mission whose
+    // host attempts the fleets again, so the old attempts go with the instance on every machine. PublishDeparture runs on the
+    // game thread, so this runs inline, ahead of any reply the server sends a re-engaging player.
     private void Handle_MissionMemberDeparted(MessagePayload<MissionMemberDeparted> payload)
     {
         var departure = payload.What;
         if (!departure.IsInstanceEmpty) return;
 
-        GameThread.RunSafe(() => attempts.Forget(departure.InstanceId), context: nameof(Handle_MissionMemberDeparted));
+        attempts.Forget(departure.InstanceId);
+        network.SendAll(new NetworkNpcFleetAttemptsForgotten(departure.InstanceId));
     }
 
     // [Game thread] A client entering the campaign missed the earlier sends, so it gets every open battle's attempts now.
