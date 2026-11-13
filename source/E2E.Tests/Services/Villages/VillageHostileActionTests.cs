@@ -1793,6 +1793,7 @@ public class VillageHostileActionTests : MapEventTestBase
             Assert.Equal(remainingRaidHitPoints, settlement.SettlementHitPoints, 3);
         }, MapEventDisabledMethods);
 
+        client.Call(() => client.Resolve<IControllerIdProvider>().SetControllerId("PlayerOne"));
         RequestHostileAction(client, VillageHostileAction.Raid, mobilePartyId, target.SettlementId);
         Server.Call(() =>
         {
