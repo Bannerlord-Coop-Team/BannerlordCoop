@@ -24,7 +24,8 @@ public interface IGameStateInterface : IGameAbstraction
 {
     /// <summary>
     /// Waits the game thread's blocking wait (<see cref="GameThread.BlockingTimeout"/>, longer during a join catch up)
-    /// for leaving the campaign to start. When that expires first, leaving stays queued ahead of later game-thread work.
+    /// for leaving the campaign to run, and once more if it is still running then. When the wait ends before leaving
+    /// starts, leaving stays queued ahead of later game-thread work. The main menu may not be active yet on return.
     /// </summary>
     void GoToMainMenu();
     void StartNewGame();
