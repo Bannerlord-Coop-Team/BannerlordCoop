@@ -164,9 +164,9 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         var sideParties = mapEvent.GetMapEventSide(playerSide).Parties;
         // The player registry the AI share and the fielder read too, so all three agree on who the side's players are.
         Func<PartyBase, bool> isPlayerParty = party => playerManager.Contains(party.MobileParty);
-        deploymentSlot.Rank = NavalPlayerDeploymentSlot.RankOf(
+        deploymentSlot.Rank = NavalSideDeploymentSlots.RankOf(
             sideParties.Select(party => party.Party), PartyBase.MainParty, isPlayerParty);
-        deploymentSlot.PlayerCount = NavalPlayerDeploymentSlot.PlayerCountOf(sideParties.Select(party => party.Party), isPlayerParty);
+        deploymentSlot.PlayerCount = NavalSideDeploymentSlots.PlayerCountOf(sideParties.Select(party => party.Party), isPlayerParty);
         var enemyLimit = deploymentModel.GetTeamShipDeploymentLimit(mapEvent.GetMapEventSide(playerSide.GetOppositeSide()).Parties);
 
         // The battle host's AI share of this side subtracts this same fleet, so both come from the budget.

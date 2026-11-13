@@ -192,14 +192,17 @@ internal class PlayerFleetDeploymentSlotPatch
         if (planningSide == null || playerCount <= 1 || rank >= playerCount || mission == null || team != mission.PlayerTeam) return;
 
         var spawnPath = mission.GetInitialSpawnPathData(team.Side);
-        var slot = NavalPlayerDeploymentSlot.SlotFor(spawnPath, rank, NavalPlayerDeploymentSlot.LongestTeamRangeOfGame());
+        var layout = NavalSideDeploymentSlots.Layout(spawnPath, rank + 1, NavalSideDeploymentSlots.LongestTeamRangeOfGame());
+        var slot = layout.Slots[rank];
         Logger.Information("[NavalBattle] Deployment slot {Rank}/{PlayerCount}: vanilla offset {VanillaOffset}, slot {Slot}, " +
-            "opposing base {TargetOffset} (pivot {PivotOffset} m into a {PathLength} m path)", rank, playerCount, spawnPathOffset,
-            slot.Offset, slot.TargetOffset, spawnPath.PivotOffset, spawnPath.PathLength);
-        if (!slot.Fits)
-            Logger.Warning("[NavalBattle] The {PathLength} m spawn path has no room for fleet {Rank} of {PlayerCount}; it is " +
-                "held at {Slot}, short of the opposing base {TargetOffset}, and can overlap another fleet of its side",
-                spawnPath.PathLength, rank, playerCount, slot.Offset, slot.TargetOffset);
+            "opposing base {OpposingBase} (pivot {PivotOffset} m into a {PathLength} m path)", rank, playerCount, spawnPathOffset,
+            slot.Offset, layout.OpposingBase, spawnPath.PivotOffset, spawnPath.PathLength);
+        if (slot.Problem == NavalSlotProblem.NoRoomOnPath)
+            Logger.Warning("[NavalBattle] The {PathLength} m spawn path has no free room for fleet {Rank} of {PlayerCount}; it is " +
+                "planned at {Slot} and can overlap another fleet of its side", spawnPath.PathLength, rank, playerCount, slot.Offset);
+        if (slot.Problem == NavalSlotProblem.HeldShortOfOpposingBase)
+            Logger.Warning("[NavalBattle] Fleet {Rank} of {PlayerCount} would reach the opposing base {OpposingBase}; it is held " +
+                "at {Slot}, closer to its side's other fleets than the gap", rank, playerCount, layout.OpposingBase, slot.Offset);
         spawnPathOffset = slot.Offset;
     }
 }

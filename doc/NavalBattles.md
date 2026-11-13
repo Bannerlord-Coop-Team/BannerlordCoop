@@ -739,25 +739,28 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   and formation layout never applies, while vanilla's `SaveConfiguration` still stores the snapshot ships into the
   client's `NavalOrderOfBattleCampaignBehavior` after each battle.
 - **Player deployment slots.** When a side has more than one player, every client takes its own rank's slot on the side's
-  spawn path (`NavalPlayerDeploymentSlot.SlotFor`), each fleet as deep as the deepest possible one (1.1 times the longest
+  spawn path (`NavalSideDeploymentSlots.Layout`), each fleet as deep as the deepest possible one (1.1 times the longest
   ship deployment length in the game data) with vanilla's 32 m gap. The side base comes from vanilla's
   `ComputeDeploymentBaseOffsets` fed with the small-battle offset (-min(path, 400) / 2 + 1), not with
   `NavalShipsLogic.ComputeSpawnPathDeploymentOffset`, which deepens with the ships this client assigned (only its own fleet)
   and so differed between players with more than two hulls. Rank 0 takes vanilla's slot at the base, the next ranks go
-  behind it over the free segments as vanilla's `TryPlaceTeamsOneSide` places teams, and once the path runs out behind they
-  go ahead of the allied AI fleet's slot instead of vanilla's forward packing from the path start. When nothing fits behind
-  the base (R49: the spawn point sat near the path start), rank 0 takes the first room from the path start. A slot depends
-  only on its rank, so a client that counts a late joiner, or misses a player that left, still agrees on every earlier
-  rank (R49 C3), and no slot goes past the opposing base less a fleet and the gap (R49 C2): one that had to is held there
-  and logged as a Warning. The `Deployment slot` Information line logs the slot and the opposing base on each client.
-  A single player keeps vanilla's own slot.
-- **Allied AI fleet slot.** Vanilla puts the allies' team at the side base and the player team a gap behind. Here the
-  battle host plans the allied AI fleet a gap ahead of rank 0's slot (`NavalPlayerDeploymentSlot.AllySlotFor`), so the
-  player slots don't move: no client has to know whether the side has allies when it opens the mission, and an AI party
-  that joins later (`add_allied_ai_party`, a nearby lord) still lands clear of every player fleet. The plan holds the AI
-  hulls only (`INavalLateDeploymentPlanTracker.MakeForAllyTeam`); the ally team's copies of other players' hulls stay out
-  of it and keep their owners' positions. The cost is that the side starts one fleet and a gap closer to the enemy than
-  vanilla's layout; the slot stops short of the opposing base like the player slots.
+  behind it, and once the path runs out behind they go ahead of the allied AI fleet's reserved slot instead of vanilla's
+  forward packing from the path start. When nothing fits behind the base (R49: the spawn point sat near the path start),
+  rank 0 takes the first room from the path start. Each slot is one call of vanilla's `TryPlaceTeamsOneSide` for one team,
+  so a slot depends only on its rank: a client that counts a late joiner, or misses a player that left, still agrees on
+  every earlier rank (R49 C3). No slot goes past the opposing base less a fleet and the gap (R49 C2). A slot that had no
+  free room, or was held short of the opposing base, logs a Warning naming which. The `Deployment slot` Information line
+  logs the slot and the opposing base on each client. A single player keeps vanilla's own plan.
+- **Allied AI fleet slot.** Vanilla puts the allies' team at the side base and the player team its depth and a gap behind.
+  Here the battle host plans the allied AI fleet its own depth and a gap ahead of where rank 0's fleet planned
+  (`NavalSideDeploymentSlots.AllySlot`, from `NavalNpcFleetFielder`): a lone player's own vanilla plan, which deepens with
+  its ships, or rank 0's shared slot with several players. So a lone player keeps vanilla's spot and the allies sit where
+  vanilla's layout puts them relative to it, and the player slots don't move: no client has to know whether the side has
+  allies when it opens the mission, and an AI party that joins later (`add_allied_ai_party`, a nearby lord) still lands
+  clear of every player fleet. The plan holds the AI hulls only (`INavalLateDeploymentPlanTracker.MakeForAllyTeam`); the
+  ally team's copies of other players' hulls stay out of it and keep their owners' positions. The cost is that the side
+  starts the allies' depth and a gap closer to the enemy than vanilla's layout; the slot stops short of the opposing base
+  like the player slots.
 - Known limit: a player who leaves shifts the ranks of the players after it in the side's party order, so a joiner
   that arrives after a departure can take the slot of a player still in the battle.
 - **R49 freeze (native, no managed guard).** Client1 crashed 29 s into `vs_pirates hulls=1 weapons=1` with an
