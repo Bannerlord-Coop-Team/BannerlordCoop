@@ -247,10 +247,11 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
         bool defenderFleetFailed = npcFleets[BattleSideEnum.Defender].AttemptFailed;
         bool released = CoopBattleController.ShouldReleaseEndConditionHold(deployment.IsActivated, attackerFielded, defenderFielded,
             attackerFleetFailed, defenderFleetFailed);
-        // Each spawner warns of its own failure; this records that a failed fleet may be why the hold released.
+        // Each spawner logs why its fleet fielded nothing, the players taking every ship included; this records that a side with
+        // no AI fleet may be why the hold released.
         if (released && (attackerFleetFailed || defenderFleetFailed))
-            Logger.Information("[NavalBattle] End checks released for {MapEventId} with failed AI fleets (attacker {Attacker}, " +
-                "defender {Defender})", session.InstanceId, attackerFleetFailed, defenderFleetFailed);
+            Logger.Information("[NavalBattle] End checks released for {MapEventId} with sides that fielded no AI fleet (attacker " +
+                "{Attacker}, defender {Defender})", session.InstanceId, attackerFleetFailed, defenderFleetFailed);
         return released;
     }
 

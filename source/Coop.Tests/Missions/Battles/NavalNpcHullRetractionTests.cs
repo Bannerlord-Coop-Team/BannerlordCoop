@@ -9,6 +9,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using Xunit;
@@ -17,7 +18,6 @@ using Xunit;
 using GameInterface.Services.MapEvents.NavalScenarios;
 #endif
 using Missions.Naval;
-using TaleWorlds.Core;
 #endif
 
 namespace Coop.Tests.Missions.Battles;
@@ -30,7 +30,8 @@ public class NavalNpcHullRetractionTests
     private const string Peer = "peer";
 
     // A failed attempt's hulls were already announced, so peers hear they leave with their crew, and here the crew withdraws
-    // a tick after it is parked, before the hull goes (R33).
+    // a tick after it is parked, before the hull goes (R33). They never fought for the side, so the side counts no departure
+    // (M11 A5), which would keep its retreat once its other hulls are gone.
     [Fact]
     public void RetractNpcHulls_TellsPeersTheCrewLeaves_ThenWithdrawsTheCrewAndRemovesTheHull()
     {
@@ -42,6 +43,7 @@ public class NavalNpcHullRetractionTests
         var order = new List<string>();
         harness.Engine.Setup(e => e.WithdrawAgent(crew)).Callback(() => order.Add("withdraw"));
         harness.Engine.Setup(e => e.RemoveHull(hull)).Callback(() => order.Add("remove"));
+        harness.Engine.Setup(e => e.SideOf(hull)).Returns(BattleSideEnum.Defender);
         harness.LiveHulls.Add(hull);
         var shipId = harness.Replicator.RegisterNpcHull(hull, null, "MapEventParty_7");
 
@@ -51,9 +53,11 @@ public class NavalNpcHullRetractionTests
         harness.Replicator.Tick(0.1f);
 
         harness.Network.Verify(n => n.SendAll(It.Is<NetworkShipRemoved>(removed => removed.ShipId == shipId
-            && removed.OwnerControllerId == Own && removed.MissionEnding)), Times.Once);
+            && removed.OwnerControllerId == Own && removed.Reason == ShipRemovalReason.Retracted && removed.MissionEnding)),
+            Times.Once);
         Assert.Equal(new[] { "withdraw", "remove" }, order);
         Assert.Equal(ShipLifecycle.Removed, harness.Registry.StateOf(shipId));
+        Assert.Equal(0, harness.Fixture.Ledger.DepartedHulls(BattleSideEnum.Defender));
     }
 
     // Vanilla's removal event comes after the registry dropped the ship, so it announces nothing a second time.

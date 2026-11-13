@@ -53,4 +53,32 @@ public class NavalAlliedFleetScenarioTests : NavalBattleTestEnvironment
             Assert.Equal("B", peer.Ship(allied).CurrentAuthority);
         }
     }
+
+    // M11 A5: a failed allied attempt takes its hulls back on every client, and the players' side counts no departure for
+    // them, which would otherwise keep the side's retreat once its player hulls are gone.
+    [Fact]
+    public void FailedAlliedAttempt_TakesItsHullBackEverywhere_WithoutADepartureFromThePlayersSide()
+    {
+        using var battle = StartNavalBattle(new[] { ("A", BattleSideEnum.Attacker), ("B", BattleSideEnum.Attacker) });
+        var a = battle["A"];
+        var b = battle["B"];
+        var hullA = battle.FieldPlayerHull(a, new Vec3(0f, 0f, 0f));
+        var hullB = battle.FieldPlayerHull(b, new Vec3(40f, 0f, 0f));
+        battle.CommitAll();
+        battle.TickAll(3);
+        int freeFormation = 0;
+        a.Call(() => freeFormation = a.Engine.FirstFreeFormation(a.Mission.AttackerAllyTeam.Shell));
+        var allied = battle.FieldAiHull(a, BattleSideEnum.Attacker, new Vec3(40f, 80f, 0f), freeFormation);
+        battle.TickAll(3);
+
+        a.Call(() => a.Ships.RetractNpcHulls(new[] { a.Ship(allied).Hull }));
+        battle.TickAll(3);
+
+        foreach (var peer in battle.Peers)
+        {
+            Assert.False(peer.Has(allied), $"{peer.Id} kept the taken-back allied hull");
+            Assert.True(peer.Has(hullA) && peer.Has(hullB));
+            Assert.Equal(0, peer.Services.HullLedger.DepartedHulls(BattleSideEnum.Attacker));
+        }
+    }
 }

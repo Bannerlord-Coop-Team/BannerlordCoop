@@ -135,7 +135,16 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
   An attempt that fails after spawning takes back its own hulls, crew and waiting troops before it reports the failure
   (`NavalNpcFleetRollback`); its pulled troops stay supplied, since the server's supply ledger never rewinds.
   A take-back that throws is retried every tick, resuming each hull where it stopped, and the failure is reported only once
-  it went through.
+  it went through. The taken-back hulls go out as `ShipRemovalReason.Retracted`, which no client counts as a departure from
+  the side, so a side whose allies failed after spawning hulls never reads as retreating because of them.
+- A failed allied attempt (M11 A5), the players taking all 8 ships (`NoShipsLeft`) included, only means the side has no
+  allies: the end hold counts a failed side as one that may start empty, which on the players' side changes nothing as the
+  players fielded, so it neither ends nor holds the battle; depletion and retreat read the side's remaining hulls and crew,
+  where the taken-back fleet no longer is. D2 (a failed AI fleet as the players' victory) follows from the enemy side's
+  depletion, so it only applies there.
+- Every human of a side leaving while its allies fight (M11 A4) is the land behaviour: their hulls leave as departures but
+  the allied hulls stay, so the side keeps no retreat and the allies fight on under the battle host's AI; with no human
+  left in the mission it empties like a land battle.
 - Only AI hulls nobody captured have `FollowsBattleHost`. On every host change all clients move them to the new host at the
   same ordered event (`TransferHostHulls`), and their samples carry the host epoch so a stale host's traffic is dropped. A
   player's hull never changes owner unless it is captured: it stays with its player or leaves with it.
@@ -727,8 +736,7 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   - an old host that applies a hit just before its own move keeps it only if its next condition goes out first;
   - hits still in the arrivals queue at `Dispose` are cleared. Fates are flushed from the applied state, so results never
     see them.
-- **Allied fleets.** Agents refused by a formation with no hull are not re-assigned. A failed allied attempt's retracted hulls
-  count as departures from the players' side.
+- **Allied fleets.** Agents refused by a formation with no hull are not re-assigned.
 - **Late joiners past the side's 8 ships.** The cap still lets a side pass 8 in three cases, each dropping copies on the
   older clients' ally team (`BattleShipReplicator`):
   - a party that joined the side after the host's attempt and opened its mission before the attempt reached it (about one
