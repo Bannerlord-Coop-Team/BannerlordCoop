@@ -85,7 +85,7 @@ namespace Coop.Tests.Client.States
 
             // Assert — the world is reset to the main menu, then the received save is loaded.
             gameStateMock.Verify(x => x.GoToMainMenu(), Times.Once);
-            gameStateMock.Verify(x => x.TryLoadSaveData(gameSaveData, It.IsAny<TimeSpan>()), Times.Once);
+            gameStateMock.Verify(x => x.TryLoadSaveData(gameSaveData, NetworkJoinLimits.SaveHandoffTimeout), Times.Once);
             Assert.IsType<LoadingState>(clientLogic.State);
             loadingInterfaceMock.Verify(x => x.SetLoadingMessage(
                 "Joining Coop Campaign",
@@ -93,20 +93,6 @@ namespace Coop.Tests.Client.States
             loadingInterfaceMock.Verify(x => x.SetLoadingMessage(
                 "Loading Host Campaign",
                 "Loading host save data..."), Times.Once);
-        }
-
-        [Fact]
-        public void NetworkGameSaveDataReceived_WaitsTheSaveHandoffTimeout()
-        {
-            // Arrange
-            var currentState = clientLogic.SetState<ReceivingSavedDataState>();
-
-            // Act
-            currentState.Handle_NetworkGameSaveDataReceived(
-                new MessagePayload<NetworkGameSaveDataReceived>(this, SaveData(new byte[16], "12345")));
-
-            // Assert — a busy first map frame after character creation can take over a minute
-            gameStateMock.Verify(x => x.TryLoadSaveData(It.IsAny<byte[]>(), NetworkJoinLimits.SaveHandoffTimeout), Times.Once);
         }
 
         [Fact]

@@ -22,6 +22,10 @@ namespace GameInterface.Services.GameState.Interfaces;
 
 public interface IGameStateInterface : IGameAbstraction
 {
+    /// <summary>
+    /// Waits up to <see cref="GameThread.BlockingTimeout"/> to leave the campaign. When that expires, leaving stays
+    /// queued ahead of later game-thread work.
+    /// </summary>
     void GoToMainMenu();
     void StartNewGame();
     /// <summary>
@@ -53,7 +57,7 @@ internal class GameStateInterface : IGameStateInterface
     public GameStateInterface(IMessageBroker messageBroker, INavalSaveCompatibility navalSaveCompatibility,
         ILoadingInterface loadingInterface)
         : this(messageBroker, MBGameManager.EndGame, () => MBSaveLoad.GetSaveFiles(null), ForceLoadSave,
-            InteralLoadSaveGame, navalSaveCompatibility, loadingInterface)
+            LoadTransferredSave, navalSaveCompatibility, loadingInterface)
     {
     }
 
@@ -84,10 +88,7 @@ internal class GameStateInterface : IGameStateInterface
         messageBroker.Publish(this, new GameLoadStarted());
         try
         {
-            using (GameThread.Instance.UseBlockingTimeout(startTimeout))
-            {
-                GameThread.Run(() => loadTransferredSave(saveData), blocking: true);
-            }
+            GameThread.Run(() => loadTransferredSave(saveData), blocking: true, blockingTimeout: startTimeout);
         }
         catch (GameThreadActionExpiredException e)
         {
@@ -105,7 +106,7 @@ internal class GameStateInterface : IGameStateInterface
         return true;
     }
 
-    private static void InteralLoadSaveGame(byte[] saveData)
+    private static void LoadTransferredSave(byte[] saveData)
     {
         if (saveData == null) throw new ArgumentNullException($"Received save data was null");
 

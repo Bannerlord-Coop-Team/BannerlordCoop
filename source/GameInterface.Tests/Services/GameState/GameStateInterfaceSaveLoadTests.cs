@@ -16,14 +16,20 @@ namespace GameInterface.Tests.Services.GameState;
 
 /// <summary>Blocks the shared game thread pump, so it runs in the serial game thread collection.</summary>
 [Collection(nameof(GameThreadCancellationCollection))]
-public sealed class GameStateInterfaceSaveLoadTests
+public sealed class GameStateInterfaceSaveLoadTests : IDisposable
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);
+
+    // A short queue timeout, so each test's start timeout is the wait that counts
+    private readonly IDisposable shortQueueTimeout =
+        GameThread.Instance.LimitFrameDrain(TimeSpan.FromSeconds(1), TimeSpan.FromMilliseconds(100));
 
     static GameStateInterfaceSaveLoadTests()
     {
         RuntimeHelpers.RunModuleConstructor(typeof(Coop.Tests.Mocks.TestNetwork).Module.ModuleHandle);
     }
+
+    public void Dispose() => shortQueueTimeout.Dispose();
 
     [Fact]
     public void TryLoadSaveData_LoadNeverStarted_ReturnsFalse()
@@ -31,7 +37,8 @@ public sealed class GameStateInterfaceSaveLoadTests
         var messageBroker = new Mock<IMessageBroker>();
         bool loadRan = false;
         var gameStateInterface = new GameStateInterface(messageBroker.Object, () => { }, Array.Empty<SaveGameFileInfo>,
-            _ => { }, _ => loadRan = true, Mock.Of<INavalSaveCompatibility>(), Mock.Of<ILoadingInterface>());
+            _ => { }, loadTransferredSave: _ => loadRan = true,
+            navalSaveCompatibility: Mock.Of<INavalSaveCompatibility>(), loadingInterface: Mock.Of<ILoadingInterface>());
         using var entered = new ManualResetEventSlim(false);
         using var release = new ManualResetEventSlim(false);
         bool loadStarted;
@@ -48,8 +55,9 @@ public sealed class GameStateInterfaceSaveLoadTests
             release.Set();
         }
 
-        // The caller ends the join only for a load that never started
+        // Drain the queue so an expired load would have run by now
         GameThread.Run(() => { }, blocking: true);
+        // The caller ends the join only for a load that never started
         Assert.False(loadStarted);
         Assert.False(loadRan);
         messageBroker.Verify(broker => broker.Publish(It.IsAny<object>(), It.IsAny<GameLoadStarted>()), Times.Once);
@@ -61,11 +69,11 @@ public sealed class GameStateInterfaceSaveLoadTests
         using var loadStarted = new ManualResetEventSlim(false);
         using var release = new ManualResetEventSlim(false);
         var gameStateInterface = new GameStateInterface(Mock.Of<IMessageBroker>(), () => { }, Array.Empty<SaveGameFileInfo>,
-            _ => { }, _ =>
+            _ => { }, loadTransferredSave: _ =>
             {
                 loadStarted.Set();
                 release.Wait(Timeout);
-            }, Mock.Of<INavalSaveCompatibility>(), Mock.Of<ILoadingInterface>());
+            }, navalSaveCompatibility: Mock.Of<INavalSaveCompatibility>(), loadingInterface: Mock.Of<ILoadingInterface>());
 
         try
         {
@@ -85,16 +93,17 @@ public sealed class GameStateInterfaceSaveLoadTests
     [Fact]
     public void TryLoadSaveData_WaitsTheStartTimeout()
     {
-        TimeSpan startTimeout = TimeSpan.FromSeconds(42);
-        TimeSpan? timeoutDuringLoad = null;
+        bool loadRan = false;
         var gameStateInterface = new GameStateInterface(Mock.Of<IMessageBroker>(), () => { }, Array.Empty<SaveGameFileInfo>,
-            _ => { }, _ => timeoutDuringLoad = GameThread.Instance.EffectiveBlockingTimeout,
-            Mock.Of<INavalSaveCompatibility>(), Mock.Of<ILoadingInterface>());
+            _ => { }, loadTransferredSave: _ => loadRan = true,
+            navalSaveCompatibility: Mock.Of<INavalSaveCompatibility>(), loadingInterface: Mock.Of<ILoadingInterface>());
+        using var entered = new ManualResetEventSlim(false);
 
-        // The serial collection keeps other tests from changing the shared queue's timeout meanwhile
-        Assert.True(gameStateInterface.TryLoadSaveData(new byte[16], startTimeout));
+        // Busy past the queue timeout but not past the start timeout
+        GameThread.Run(() => { entered.Set(); Thread.Sleep(500); });
+        Assert.True(entered.Wait(Timeout));
 
-        Assert.Equal(startTimeout, timeoutDuringLoad);
-        Assert.Equal(GameThread.BlockingTimeout, GameThread.Instance.EffectiveBlockingTimeout);
+        Assert.True(gameStateInterface.TryLoadSaveData(new byte[16], Timeout));
+        Assert.True(loadRan);
     }
 }

@@ -67,7 +67,7 @@ public class ReceivingSavedDataState : ClientStateBase
             "Joining Coop Campaign",
             "Preparing host save data...");
 
-        // Keeps the usual wait. An expired EndGame is queued again ahead of the load below, so it still runs first
+        // Leaving stays queued ahead of the load below even when this wait expires
         gameStateInterface.GoToMainMenu();
 
         var saveData = obj.What.GameSaveData;
@@ -82,8 +82,7 @@ public class ReceivingSavedDataState : ClientStateBase
         // The first map frame after character creation can keep the game thread busy for over a minute on a big map
         if (!gameStateInterface.TryLoadSaveData(saveData, NetworkJoinLimits.SaveHandoffTimeout))
         {
-            // Back to the main menu with a message instead of an endless loading screen. GoToMainMenu above
-            // already queued leaving the campaign, and the finalizer ends the session and disconnects.
+            // GoToMainMenu above already left the campaign or queued leaving it
             coopFinalizer.Finalize(SaveHandoffTimedOutText);
             return;
         }
