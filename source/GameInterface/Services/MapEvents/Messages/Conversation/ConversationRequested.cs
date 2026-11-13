@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using TaleWorlds.CampaignSystem.Party;
+using System;
 
 namespace GameInterface.Services.MapEvents.Messages.Conversation;
 
@@ -14,13 +15,16 @@ internal readonly struct ConversationRequested : IEvent
     public readonly bool ForcePlayerOutFromSettlement;
     public readonly ConversationRestartSource Source;
     public readonly bool ArmyTalkEncounter;
+    public readonly Action<bool> OnRestartResolved;
 
-    public ConversationRequested(PartyBase defenderParty, PartyBase attackerParty, bool forcePlayerOutFromSettlement, ConversationRestartSource source, bool armyTalkEncounter)
+    public ConversationRequested(PartyBase defenderParty, PartyBase attackerParty, bool forcePlayerOutFromSettlement,
+        ConversationRestartSource source, bool armyTalkEncounter, Action<bool> onRestartResolved = null)
     {
         DefenderParty = defenderParty;
         AttackerParty = attackerParty;
         ForcePlayerOutFromSettlement = forcePlayerOutFromSettlement;
         Source = source;
         ArmyTalkEncounter = armyTalkEncounter;
+        OnRestartResolved = onRestartResolved;
     }
 }

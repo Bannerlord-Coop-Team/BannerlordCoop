@@ -250,7 +250,6 @@ public class LiteNetP2PClientTests
         private readonly object destinationBuffer = new object();
         private readonly ManualResetEventSlim promotionFlushEntered = new ManualResetEventSlim(false);
 
-        public int BudgetBytes => ReliableMessageBatcher<string>.DefaultBudgetBytes;
         public ManualResetEventSlim SendEntered { get; } = new ManualResetEventSlim(false);
         public bool PromotionFlushAcquiredBuffer { get; private set; }
 
@@ -263,6 +262,7 @@ public class LiteNetP2PClientTests
         public void Send(
             string destination,
             byte[] messagePayload,
+            int maxPacketBytes,
             Action<string, byte[]> sendReliableOrdered)
         {
             lock (destinationBuffer)
@@ -280,7 +280,7 @@ public class LiteNetP2PClientTests
             byte[] messagePayload,
             Action<string, byte[]> sendReliableOrdered)
         {
-            Send(destination, messagePayload, sendReliableOrdered);
+            Send(destination, messagePayload, int.MaxValue, sendReliableOrdered);
         }
 
         public void Flush(

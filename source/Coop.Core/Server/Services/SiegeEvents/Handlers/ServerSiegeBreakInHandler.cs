@@ -9,6 +9,7 @@ using Coop.Core.Server.Services.SiegeEvents.Messages;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.Settlements.Interfaces;
 using GameInterface.Services.SiegeEvents;
 using LiteNetLib;
 using Serilog;
@@ -34,10 +35,12 @@ internal class ServerSiegeBreakInHandler : IHandler
     private readonly ISiegeSacrifice sacrifice;
     private readonly IBreakInReceipts receipts;
     private readonly ISettlementEncounterDistanceValidator distanceValidator;
+    private readonly ISettlementInterface settlementInterface;
 
     public ServerSiegeBreakInHandler(IMessageBroker messageBroker, INetwork network,
         IObjectManager objectManager, IPlayerManager playerManager, ISiegeBreakOut breakOut,
-        ISiegeSacrifice sacrifice, IBreakInReceipts receipts, ISettlementEncounterDistanceValidator distanceValidator)
+        ISiegeSacrifice sacrifice, IBreakInReceipts receipts, ISettlementEncounterDistanceValidator distanceValidator,
+        ISettlementInterface settlementInterface)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -47,6 +50,7 @@ internal class ServerSiegeBreakInHandler : IHandler
         this.sacrifice = sacrifice;
         this.receipts = receipts;
         this.distanceValidator = distanceValidator;
+        this.settlementInterface = settlementInterface;
         messageBroker.Subscribe<NetworkRequestBreakIn>(Handle);
         messageBroker.Subscribe<PartyEnterSettlementAttempted>(HandleEnter);
         messageBroker.Subscribe<SettlementEncounterLeaveApplied>(HandleLeave);
@@ -99,9 +103,12 @@ internal class ServerSiegeBreakInHandler : IHandler
         // Vanilla only offers the break in to a party at the settlement that can still join the defenders. Checked before
         // the receipt too, so a request that lands after the siege moved on or the party was moved is turned down.
         string reason = "the party cannot join the defenders";
-        if (!breakOut.CanJoinDefenders(party, settlement, alreadyEntered: false) ||
-            !distanceValidator.TryValidate(party, settlement, out reason))
+        var canJoinDefenders = breakOut.CanJoinDefenders(party, settlement, alreadyEntered: false);
+        if (!canJoinDefenders || !distanceValidator.TryValidate(party, settlement, out reason))
         {
+            if (canJoinDefenders)
+                settlementInterface.CorrectPartyPosition(party);
+
             Logger.Warning("Rejecting break in request {RequestId} for party {PartyId} and settlement {SettlementId}: {Reason}",
                 request.RequestId, request.PartyId, request.SettlementId, reason);
             return rejected;

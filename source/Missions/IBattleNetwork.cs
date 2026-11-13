@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using Common.Network;
+using Common.Network.Session;
 using Common.PacketHandlers;
 
 namespace Missions;
@@ -28,4 +29,6 @@ public interface IBattleNetwork
     int GetMaxUnreliablePayloadBytes(string controllerId);
     /// <summary>Largest inner unreliable payload safe for every current viable direct or relay route.</summary>
     int GetMaxUnreliablePayloadBytes();
+    /// <summary>Reads one controller's direct or Steam-bridged route health; false for a relay route, which has no reading.</summary>
+    bool TryGetRouteHealth(string controllerId, out RouteHealth health);
 }

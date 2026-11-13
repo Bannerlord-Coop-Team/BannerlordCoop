@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.BattleBenchmark;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -71,6 +72,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
     private readonly Func<IReceivePathDiagnostics> diagnosticsFactory;
     private readonly Dictionary<NetPeer, IReceivePathDiagnostics> receiveDiagnostics = new();
     private readonly Dictionary<string, IReceivePathDiagnostics> routeDiagnostics = new();
+    private readonly IBattleBenchmarkRecorder battleBenchmark;
     private bool disposed;
 
     private string instanceId = null;
@@ -114,7 +116,9 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         ISteamMissionBridge steamBridge,
         IMovementPacketCompressor movementPacketCompressor,
         IReliableMessageBatcher<string> reliableMessageBatcher,
-        Func<IReceivePathDiagnostics> diagnosticsFactory)
+        Func<IReceivePathDiagnostics> diagnosticsFactory,
+        // Optional so the tests that build this client directly don't need a recorder.
+        IBattleBenchmarkRecorder battleBenchmark = null)
     {
         if (diagnosticsFactory == null) throw new ArgumentNullException(nameof(diagnosticsFactory));
         this.diagnosticsFactory = diagnosticsFactory;
@@ -132,6 +136,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         this.steamBridge = steamBridge;
         this.movementPacketCompressor = movementPacketCompressor;
         this.reliableMessageBatcher = reliableMessageBatcher;
+        this.battleBenchmark = battleBenchmark;
 
         netManager = new NetManager(this)
         {
@@ -150,6 +155,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         messageBroker.Subscribe<MissionPeerLeft>(Handle_MissionPeerLeft);
         messageBroker.Subscribe<MissionPeerDisconnected>(Handle_MissionPeerDisconnected);
         steamBridge.PeerDisconnected += Handle_SteamPeerDisconnected;
+        reliableMessageBatcher.AggregateSent += RecordAggregateSent;
     }
 
     public void Dispose()
@@ -163,6 +169,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         messageBroker.Unsubscribe<MissionPeerLeft>(Handle_MissionPeerLeft);
         messageBroker.Unsubscribe<MissionPeerDisconnected>(Handle_MissionPeerDisconnected);
         steamBridge.PeerDisconnected -= Handle_SteamPeerDisconnected;
+        reliableMessageBatcher.AggregateSent -= RecordAggregateSent;
         Stop();
     }
 
@@ -1011,6 +1018,9 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
                     pendingReliablePayloadCount--;
                     if (pending.Payloads.Count == 0) pendingReliablePayloads.Remove(peer);
                     GetReceiveDiagnostics(peer).Record(ReceivePathEvent.MappedReceive, payload.Length);
+                    // Buffered before the peer was mapped, so OnNetworkReceive didn't count it.
+                    if (battleBenchmark?.IsRecording == true && mappedPeerControllers.TryGetValue(peer, out string sender))
+                        battleBenchmark.RecordReceived(sender, reliable: true, payload.Length);
                 }
                 HandleReceivedPayload(peer, payload, generation);
             }
@@ -1083,6 +1093,12 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         return diagnostics;
     }
 
+    // The batched messages already counted their own bytes when sent; this adds the envelope's framing.
+    private void RecordAggregateSent(AggregateMessagePacket packet, int framingOverhead)
+    {
+        battleBenchmark?.RecordTypeSent(typeof(AggregateMessagePacket), framingOverhead);
+    }
+
     private void RecordRoute(string controllerId, ReceivePathEvent route, int bytes)
     {
         lock (peerGate)
@@ -1128,9 +1144,14 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
 
     public void SendAll(IMessage message)
     {
-        foreach (var controllerId in missionContext.ControllersInMission)
+        IReadOnlyCollection<string> controllers = missionContext.ControllersInMission;
+        if (controllers.Count == 0) return;
+
+        // The payload has nothing per peer, so every controller's batcher gets the same bytes.
+        MessagePacket packet = MessagePacket.Create(message, serializer);
+        foreach (var controllerId in controllers)
         {
-            Send(controllerId, message);
+            SendMessagePacket(controllerId, packet);
         }
     }
 
@@ -1149,12 +1170,16 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
 
     public void Send(string controllerId, IMessage message)
     {
-        Send(controllerId, MessagePacket.Create(message, serializer));
+        SendMessagePacket(controllerId, MessagePacket.Create(message, serializer));
     }
 
     public void SendAllBut(string excludedId, IMessage message)
     {
-        SendAllBut(excludedId, MessagePacket.Create(message, serializer));
+        MessagePacket packet = MessagePacket.Create(message, serializer);
+        foreach (var controllerId in missionContext.ControllersInMission.Where(id => id != excludedId))
+        {
+            SendMessagePacket(controllerId, packet);
+        }
     }
 
     public void SendAllBut(string excludedId, IPacket packet)
@@ -1175,27 +1200,14 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
     {
         if (packet is MessagePacket messagePacket)
         {
-            // Spawn admission must see a bare message before later authority changes reach the game thread.
-            if (messagePacket.MessageType == typeof(NetworkSpawnBattleAgents))
-            {
-                reliableMessageBatcher.SendImmediate(
-                    controllerId,
-                    messagePacket.Data,
-                    SendReliableMessagePayload);
-            }
-            else
-            {
-                reliableMessageBatcher.Send(
-                    controllerId,
-                    messagePacket.Data,
-                    SendReliableMessagePayload);
-            }
+            SendMessagePacket(controllerId, messagePacket);
             return;
         }
 
         if (packet.DeliveryMethod == DeliveryMethod.ReliableOrdered ||
             packet.DeliveryMethod == DeliveryMethod.ReliableUnordered)
         {
+            battleBenchmark?.RecordReliableMessageSent(controllerId, data.Length);
             reliableMessageBatcher.FlushThen(
                 controllerId,
                 SendReliableMessagePayload,
@@ -1206,12 +1218,40 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         SendPacketToController(controllerId, packet, data);
     }
 
+    private void SendMessagePacket(string controllerId, MessagePacket messagePacket)
+    {
+        battleBenchmark?.RecordReliableMessageSent(controllerId, messagePacket.Data.Length);
+        battleBenchmark?.RecordTypeSent(messagePacket.MessageType, messagePacket.Data.Length);
+        // Spawn admission must see a bare message before later authority changes reach the game thread.
+        if (messagePacket.MessageType == typeof(NetworkSpawnBattleAgents))
+        {
+            reliableMessageBatcher.SendImmediate(
+                controllerId,
+                messagePacket.Data,
+                SendReliableMessagePayload);
+            return;
+        }
+
+        reliableMessageBatcher.Send(
+            controllerId,
+            messagePacket.Data,
+            GetMaxReliablePayloadBytes(controllerId),
+            SendReliableMessagePayload);
+    }
+
     private void SendPacketToController(string controllerId, IPacket packet, byte[] data)
     {
         if (missionContext.TryGetPeer(controllerId, out NetPeer peer))
         {
             RecordRoute(controllerId, ReceivePathEvent.MissionPeerSend, data.Length);
-            Send(peer, packet, data);
+            DeliveryMethod? sent = Send(peer, packet, data);
+            if (sent.HasValue && battleBenchmark?.IsRecording == true)
+            {
+                battleBenchmark.RecordTypeSent(packet.GetType(), data.Length);
+                battleBenchmark.RecordSent(controllerId,
+                    sent.Value != DeliveryMethod.Unreliable && sent.Value != DeliveryMethod.Sequenced, data.Length,
+                    peer.GetMaxSinglePacketSize(sent.Value), relayed: false);
+            }
             return;
         }
 
@@ -1241,6 +1281,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         }
 
         RecordRoute(controllerId, ReceivePathEvent.CampaignRelaySend, data.Length);
+        battleBenchmark?.RecordTypeSent(packet.GetType(), data.Length);
         relayNetwork.SendAll(new RelayPacket(
             packet.DeliveryMethod,
             relayInstanceId,
@@ -1253,6 +1294,9 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         if (missionContext.TryGetPeer(controllerId, out NetPeer peer))
         {
             RecordRoute(controllerId, ReceivePathEvent.MissionPeerSend, data.Length);
+            if (battleBenchmark?.IsRecording == true)
+                battleBenchmark.RecordSent(controllerId, reliable: true, data.Length,
+                    peer.GetMaxSinglePacketSize(DeliveryMethod.ReliableOrdered), relayed: false);
             peer.Send(data, DeliveryMethod.ReliableOrdered);
             return;
         }
@@ -1269,6 +1313,21 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
             relayInstanceId,
             controllerId,
             data));
+    }
+
+    // Largest reliable payload that leaves as one datagram on the controller's current route, so batches don't fragment.
+    private int GetMaxReliablePayloadBytes(string controllerId)
+    {
+        if (missionContext.TryGetPeer(controllerId, out NetPeer peer))
+            return peer.GetMaxSinglePacketSize(DeliveryMethod.ReliableOrdered);
+
+        string currentInstanceId;
+        lock (peerGate)
+        {
+            currentInstanceId = instanceId;
+        }
+
+        return GetMaxRelayPayloadBytes(currentInstanceId, controllerId);
     }
 
     private bool IsControllerConnected(string controllerId)
@@ -1320,6 +1379,71 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
 
         return hasRoute && !hasViableRoute ? 0 : maxPayloadBytes;
     }
+
+    // Steam's counters win over LiteNetLib's ping on a bridged peer, because Steam drops pings in its unreliable lane.
+    public bool TryGetRouteHealth(string controllerId, out RouteHealth health)
+    {
+#if DEBUG
+        if (TryGetSimulatedRouteHealth(controllerId, out health)) return true;
+#endif
+        health = default;
+        if (!missionContext.TryGetPeer(controllerId, out NetPeer peer)) return false;
+
+        // LiteNetLib holds reliable packets behind its window, so this backlog never shows in Steam's counters.
+        long queuedBytes = (long)(peer.GetPacketsCountInReliableQueue(0, true) +
+            peer.GetPacketsCountInReliableQueue(0, false)) * SafeSinglePacketBytes;
+
+        ulong remoteSteamId;
+        lock (peerGate)
+        {
+            peerSteamIds.TryGetValue(peer, out remoteSteamId);
+        }
+
+        if (remoteSteamId != 0 && steamBridge.TryGetRouteHealth(remoteSteamId, out RouteHealth steamHealth))
+        {
+            health = new RouteHealth(
+                steamHealth.RoundTripMilliseconds,
+                steamHealth.Quality,
+                steamHealth.QueuedBytes + queuedBytes);
+            return true;
+        }
+
+        health = new RouteHealth(peer.RoundTripTime, RouteHealth.UnknownQuality, queuedBytes);
+        return true;
+    }
+
+#if DEBUG
+    private readonly Dictionary<string, (int RoundTripMilliseconds, long ExpiresAt)> simulatedRouteRoundTrips = new();
+
+    /// <summary>Makes a route report the given RTT for a while, so back-off can be driven without a shaped link.</summary>
+    internal void SetSimulatedRouteRoundTrip(string controllerId, float durationSeconds, int roundTripMilliseconds)
+    {
+        lock (peerGate)
+        {
+            simulatedRouteRoundTrips[controllerId] = (
+                roundTripMilliseconds,
+                Stopwatch.GetTimestamp() + (long)(durationSeconds * Stopwatch.Frequency));
+        }
+    }
+
+    /// <summary>Returns a route's unexpired simulated reading, dropping it once it has run out.</summary>
+    private bool TryGetSimulatedRouteHealth(string controllerId, out RouteHealth health)
+    {
+        health = default;
+        lock (peerGate)
+        {
+            if (!simulatedRouteRoundTrips.TryGetValue(controllerId, out var simulated)) return false;
+            if (Stopwatch.GetTimestamp() >= simulated.ExpiresAt)
+            {
+                simulatedRouteRoundTrips.Remove(controllerId);
+                return false;
+            }
+
+            health = new RouteHealth(simulated.RoundTripMilliseconds, RouteHealth.UnknownQuality, 0);
+            return true;
+        }
+    }
+#endif
 
     private int GetMaxRelayPayloadBytes(string currentInstanceId, string controllerId)
     {
@@ -1402,13 +1526,14 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         Send(netPeer, packet, movementPacketCompressor.Serialize(packet));
     }
 
-    private void Send(NetPeer netPeer, IPacket packet, byte[] data)
+    // Returns the method the packet left with, or null when it was dropped as an oversized movement packet.
+    private DeliveryMethod? Send(NetPeer netPeer, IPacket packet, byte[] data)
     {
         DeliveryMethod? selectedMethod = SelectDeliveryMethod(
             packet,
             data.Length,
             netPeer.GetMaxSinglePacketSize(packet.DeliveryMethod));
-        if (!selectedMethod.HasValue) return;
+        if (!selectedMethod.HasValue) return null;
 
         DeliveryMethod method = selectedMethod.Value;
         bool fragmentable = method == DeliveryMethod.ReliableOrdered || method == DeliveryMethod.ReliableUnordered;
@@ -1416,12 +1541,14 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         try
         {
             netPeer.Send(data, method);
+            return method;
         }
         catch (TooBigPacketException) when (!fragmentable)
         {
             DeliveryMethod? retryMethod = SelectDeliveryMethod(packet, data.Length, 0);
             if (retryMethod.HasValue)
                 netPeer.Send(data, retryMethod.Value);
+            return retryMethod;
         }
     }
 
@@ -1461,6 +1588,10 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
                 GetReceiveDiagnostics(peer).Record(
                     mapped ? ReceivePathEvent.MappedReceive : ReceivePathEvent.UnmappedDrop, bytes);
                 if (!mapped) return;
+                if (battleBenchmark?.IsRecording == true && mappedPeerControllers.TryGetValue(peer, out string sender))
+                {
+                    battleBenchmark.RecordReceived(sender, reliable, bytes);
+                }
             }
         }
 
@@ -1479,11 +1610,15 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
     internal void HandleReceivedPayload(NetPeer peer, byte[] serializedPacket, int? generation = null)
     {
         object received = serializer.Deserialize(serializedPacket);
+        battleBenchmark?.RecordPayloadReceived(received, serializedPacket.Length);
         lock (peerGate)
         {
             if (generation.HasValue &&
                 (instanceId == null || generation.Value != instanceGeneration ||
                     !mappedPeerControllers.ContainsKey(peer))) return;
+
+            if (battleBenchmark?.IsRecording == true && mappedPeerControllers.TryGetValue(peer, out string sender))
+                battleBenchmark.RecordReliableMessagesReceived(sender, received, serializedPacket.Length);
 
             if (received is NetworkSpawnBattleAgents spawn)
             {

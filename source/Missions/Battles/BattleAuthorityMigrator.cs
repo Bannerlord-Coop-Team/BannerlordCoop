@@ -484,9 +484,17 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
         interpolator.Forget(agent);
         if (mount != null) interpolator.Forget(mount);
 
+        // A drained spawn record of a won hideout's surrendered bandit spawns awake as our own agent, so idle it again
+        var hideout = Mission.Current.GetMissionBehavior<CoopHideoutMissionLogic>();
+        if (hideout?.IsSurrenderedDefender(agent) == true)
+        {
+            agent.Controller = AgentControllerType.None;
+            return;
+        }
+
         ConvertPuppetToHostAi(agent, activateAi);
         if (!agent.IsRunningAway && agent.Formation != null && !IsShipCrew(agent.Formation) &&
-            Mission.Current.GetMissionBehavior<CoopHideoutMissionLogic>()?.PreserveStealthPosture != true)
+            hideout?.PreserveStealthPosture != true && hideout?.HoldsSurrenderedDefenders != true)
             agent.Formation.SetMovementOrder(MovementOrder.MovementOrderCharge);
 
         Logger.Information(
@@ -592,7 +600,8 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
                 // has an active behavior (there is none here), so they'd stand idle. Give each adopted formation
                 // an explicit Charge so the NPCs actually engage. (Freshly spawned troops move because their
                 // OWNER's team AI drives them; these adopted puppets have no such driver and need the order.)
-                if (Mission.Current.GetMissionBehavior<Missions.Hideouts.CoopHideoutMissionLogic>()?.PreserveStealthPosture != true)
+                var hideout = Mission.Current.GetMissionBehavior<Missions.Hideouts.CoopHideoutMissionLogic>();
+                if (hideout?.PreserveStealthPosture != true && hideout?.HoldsSurrenderedDefenders != true)
                 {
                     foreach (var formation in formations)
                     {
@@ -647,10 +656,13 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
     // coop battle the host fights as a hero, not a general, so nothing would otherwise order it to engage.
     private void ConvertPuppetToHostAi(Agent agent, bool wakeAi)
     {
+        if (Mission.Current.GetMissionBehavior<Missions.Hideouts.CoopHideoutMissionLogic>()?.IsSurrenderedDefender(agent) == true)
+            return;
+
         agent.Controller = AgentControllerType.AI;
 
-        // A fleeing puppet already left its formation when the authoritative transition was mirrored. Keep it
-        // routed during migration instead of assigning it to a formation and charging it back into combat.
+        // Keep a fleeing puppet routed during migration instead of assigning it to a formation and charging it back
+        // into combat. Its authority refresh tells peers the flag it carries.
         if (agent.IsRunningAway)
         {
             if (wakeAi)

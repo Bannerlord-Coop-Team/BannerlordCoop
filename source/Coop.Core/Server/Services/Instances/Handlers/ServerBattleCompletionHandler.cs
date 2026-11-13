@@ -1,11 +1,13 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using Common.Network;
 using Common.Network.Messages;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
+using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
@@ -27,11 +29,13 @@ public class ServerBattleCompletionHandler : IHandler
     private static readonly ILogger Logger = LogManager.GetLogger<ServerBattleCompletionHandler>();
 
     private readonly IMessageBroker messageBroker;
+    private readonly INetwork network;
     private readonly IMissionManager missionManager;
     private readonly IObjectManager objectManager;
     private readonly IPlayerManager playerManager;
     private readonly IBattleHostRegistry hostRegistry;
     private readonly IBattleCompletionTracker completionTracker;
+    private readonly IBattleTroopReserveBuilder reserveBuilder;
     private readonly object pendingJoinersGate = new object();
     private readonly Dictionary<string, Dictionary<Guid, (string ControllerId, NetPeer Peer, DateTime ExpiresUtc)>> pendingJoiners = new();
     private readonly Dictionary<string, DateTime> conclusionRetries = new();
@@ -45,18 +49,22 @@ public class ServerBattleCompletionHandler : IHandler
 
     public ServerBattleCompletionHandler(
         IMessageBroker messageBroker,
+        INetwork network,
         IMissionManager missionManager,
         IObjectManager objectManager,
         IPlayerManager playerManager,
         IBattleHostRegistry hostRegistry,
-        IBattleCompletionTracker completionTracker)
+        IBattleCompletionTracker completionTracker,
+        IBattleTroopReserveBuilder reserveBuilder)
     {
         this.messageBroker = messageBroker;
+        this.network = network;
         this.missionManager = missionManager;
         this.objectManager = objectManager;
         this.playerManager = playerManager;
         this.hostRegistry = hostRegistry;
         this.completionTracker = completionTracker;
+        this.reserveBuilder = reserveBuilder;
 
         messageBroker.Subscribe<NetworkBattleResultReady>(Handle_NetworkBattleResultReady);
         messageBroker.Subscribe<MissionMemberDeparted>(Handle_MissionMemberDeparted);
@@ -371,12 +379,55 @@ public class ServerBattleCompletionHandler : IHandler
             if (!objectManager.TryGetId(mapEvent, out var mapEventId))
                 return;
 
+            var joinerPeers = new List<NetPeer>();
             lock (pendingJoinersGate)
+            {
+                if (pendingJoiners.TryGetValue(mapEventId, out var joiners))
+                    joinerPeers.AddRange(joiners.Values.Select(joiner => joiner.Peer));
                 pendingJoiners.Remove(mapEventId);
+            }
             conclusionRetries.Remove(mapEventId);
             keptHostDeadlines.Remove(mapEventId);
             completionTracker.Clear(mapEventId);
+            EndMissionsOfFinalizedBattle(mapEvent, mapEventId, joinerPeers);
         });
+    }
+
+    // Something other than our own conclusion (peace, say) finalized the battle while players were in or joining its
+    // mission. Our conclusion already holds the instance's fence, so winning it here tells the two apart.
+    private void EndMissionsOfFinalizedBattle(MapEvent mapEvent, string mapEventId, List<NetPeer> joinerPeers)
+    {
+        bool hasMembers = missionManager.TryGetControllers(mapEventId, out var members);
+        if (!hasMembers && joinerPeers.Count == 0)
+            return;
+
+        // Membership only changes on the game thread, so the members read above are the ones the fence checks.
+        // With only pending joiners the battle may never have had an instance; its fence record then lasts until
+        // ConclusionRetention expires and MaxConcludedInstances caps the records, so it does not leak.
+        bool fenced = hasMembers
+            ? missionManager.TryBeginActiveInstanceConclusion(mapEventId, members)
+            : missionManager.TryBeginEmptyInstanceConclusion(mapEventId);
+        if (!fenced)
+        {
+            Logger.Debug("Battle {Instance} was finalized while its conclusion held the fence; its missions end with that result",
+                mapEventId);
+            return;
+        }
+
+        // The fence now refuses late results and entries, and the members' later departures find no host to migrate.
+        missionManager.CompleteInstanceConclusion(mapEventId, succeeded: true);
+        hostRegistry.Remove(mapEventId);
+        reserveBuilder.ForgetMapEvent(mapEvent);
+        Logger.Warning("Battle {Instance} was finalized with {Members} player(s) in its mission and {Joiners} joining; ending their missions",
+            mapEventId, members.Count, joinerPeers.Count);
+        foreach (var controllerId in members)
+        {
+            if (playerManager.TryGetPeer(controllerId, out var peer))
+                joinerPeers.Add(peer);
+        }
+
+        foreach (var peer in joinerPeers.Distinct())
+            network.Send(peer, new NetworkEndBattleMission(mapEventId));
     }
 
     private void Handle_BattleStateChangeProcessed(MessagePayload<BattleStateChangeProcessed> payload)

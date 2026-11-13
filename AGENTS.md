@@ -57,7 +57,7 @@ Run from the repo root on Windows. The build finds the local Bannerlord install 
 
 `DeployToGame` in `Deploy.targets` runs after every successful build of a project that imports it (`Coop.csproj`, `MissionTestMod.csproj`), including a full `Coop.sln` build, whenever it runs in the main checkout; linked worktrees skip it with a message unless built with `-p:DeployFromWorktree=true`. Clearing `PostBuildEvent` doesn't stop it. For compile-only checks, pass an empty global `-p:ModName=`, which turns off `DeployToGame`.
 
-The coop launch profiles (`Coop`, `ClientDebug` and `ClientDebug2` `.csproj.user`, and `Coop.Core.csproj`) add `$(CoopDebugModules)` after `StoryMode` in `_MODULES_`. It's defined in `source/Directory.Build.props` from the `COOP_DEBUG_MODULES` env var (see the README), so keep it in every coop launch profile, Debug and Release, and in any new one.
+The coop launch profiles (`Coop`, `ClientDebug` and `ClientDebug2` `.csproj.user`, and `Coop.Core.csproj`) add `$(CoopDebugModules)` after `StoryMode` in `_MODULES_`. It comes straight from the `CoopDebugModules` user environment variable (see the README), so keep it in every coop launch profile, Debug and Release, and in any new one. Don't rename it or map it from another variable in `source/Directory.Build.props`, because Visual Studio launched without War Sails when it was mapped from `COOP_DEBUG_MODULES`.
 
 CI builds Release and runs `source\CoopUnitTests.slnf` plus the E2E shards in `.github/workflows/pull_request.yml`. After touching Coop.Core or Autofac registrations, run all of `Coop.Tests` with `-c Release`. `--no-restore` fails on the first build in a fresh worktree, so restore once first.
 

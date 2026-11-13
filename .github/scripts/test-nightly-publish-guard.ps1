@@ -1,5 +1,8 @@
 $ErrorActionPreference = 'Stop'
 
+node --test (Join-Path $PSScriptRoot 'test-nightly-workflow.cjs')
+if ($LASTEXITCODE -ne 0) { throw 'Nightly workflow regression tests failed' }
+
 $workflow = Get-Content -LiteralPath (Join-Path $PSScriptRoot '../workflows/nightly-release.yml') -Raw
 if (-not $workflow.Contains('Invalidate the legacy client manifest')) { throw 'Legacy client manifest invalidation was not found' }
 if (-not $workflow.Contains('nightly/client.json')) { throw 'Legacy client manifest path was not found' }
