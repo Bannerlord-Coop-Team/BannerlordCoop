@@ -38,7 +38,7 @@ jobs:
           ref: ${{ github.sha }}
 
       - name: Run the script tests
-        run: node --test .github/scripts/mutation-spans.test.cjs .github/scripts/mutation-projects.test.cjs .github/scripts/mutation-summary.test.cjs
+        run: node --test .github/scripts/mutation-*.test.cjs
 
   scope:
     name: Find projects with changed lines
@@ -58,7 +58,8 @@ jobs:
       - name: Find projects with changed lines
         id: scope
         run: |
-          # Its own command, so a failing script stops the step instead of reading as no projects.
+          # Assigned on its own line so a failing script stops the step. Piped straight into jq, the
+          # failure would be lost and read as an empty project list.
           listed=$(bash .github/scripts/run-mutation-tests.sh --list "$BASE_SHA")
           # One project per line to the JSON array the matrix job needs.
           projects=$(jq --raw-input --slurp --compact-output 'split("\n") | map(select(length > 0))' <<< "$listed")

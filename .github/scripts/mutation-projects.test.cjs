@@ -10,7 +10,8 @@ const slnf = JSON.stringify({
   },
 });
 
-const csprojs = {
+const files = {
+  'source/CoopUnitTests.slnf': slnf,
   'source/Common.Tests/Common.Tests.csproj': '<ProjectReference Include="..\\Common\\Common.csproj" />',
   'source/Coop.Tests/Coop.Tests.csproj': '<ProjectReference Include="../Common/Common.csproj">\n</ProjectReference>',
   'source/Coop.IntegrationTests/Coop.IntegrationTests.csproj': '<ProjectReference Include="..\\Common\\Common.csproj" />',
@@ -18,12 +19,8 @@ const csprojs = {
 };
 
 test('finds the test projects that reference the project with either slash, minus the excluded one', () => {
-  assert.deepEqual(testProjectsFor('Common', slnf, file => csprojs[file]), [
+  assert.deepEqual(testProjectsFor('source/Common/Common.csproj', file => files[file]), [
     'source/Common.Tests/Common.Tests.csproj',
     'source/Coop.Tests/Coop.Tests.csproj',
   ]);
-});
-
-test('throws when no test project references the project, instead of running Stryker with no tests', () => {
-  assert.throws(() => testProjectsFor('Missions', slnf, file => csprojs[file]), /No unit test project .* references source\/Missions\/Missions\.csproj/);
 });

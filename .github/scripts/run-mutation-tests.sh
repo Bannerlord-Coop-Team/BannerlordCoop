@@ -7,6 +7,8 @@
 #               (default artifacts/mutation)
 #   project     mutate only this project, one of mutated_projects
 set -euo pipefail
+# Keep -e inside $(...) too, so a failing helper stops the run instead of reading as empty output.
+shopt -s inherit_errexit
 
 # The mutated projects. mutation-projects.cjs finds the unit test projects that cover each one, and
 # the settings shared by all of them are in source/stryker-config.json.
@@ -41,12 +43,20 @@ fi
 
 merge_base=$(git merge-base "$base_ref" HEAD)
 
-# Prints the --mutate patterns, relative to the project folder, covering one project's changed lines.
-mutate_patterns() {
-  node "$scripts/mutation-spans.cjs" "$merge_base" "source/$1"
+# Prints a mutated project's repo-relative csproj path, the one place the source/<P>/<P>.csproj
+# layout is spelled out.
+csproj_for() {
+  echo "source/$1/$1.csproj"
 }
 
-# Prints the mutated projects that have changed lines, in the order of mutated_projects.
+# Prints the --mutate patterns, relative to the project folder, covering one project's changed lines.
+mutate_patterns() {
+  local csproj
+  csproj=$(csproj_for "$1")
+  node "$scripts/mutation-spans.cjs" "$merge_base" "$(dirname "$csproj")"
+}
+
+# Prints the mutated projects that have changed lines, in the order of mutated_projects, for --list.
 changed_projects() {
   local project patterns
   for project in "${mutated_projects[@]}"; do
@@ -57,15 +67,17 @@ changed_projects() {
   done
 }
 
-# Runs Stryker in one project, mutating only its changed lines against the tests that cover it.
+# Runs Stryker in one project, mutating the given newline-separated patterns against the tests
+# that cover it.
 mutate_project() {
   local project="$1"
-  local patterns test_projects test_project pattern
-  patterns=$(mutate_patterns "$project")
-  test_projects=$(node "$scripts/mutation-projects.cjs" "$project")
+  local patterns="$2"
+  local csproj test_projects test_project pattern
+  csproj=$(csproj_for "$project")
+  test_projects=$(node "$scripts/mutation-projects.cjs" "$csproj")
   local args=(
     --config-file "$repo_root/source/stryker-config.json"
-    --project "$project.csproj"
+    --project "$(basename "$csproj")"
     --output "$output_directory/$project"
   )
   while IFS= read -r test_project; do
@@ -76,14 +88,11 @@ mutate_project() {
   done <<< "$patterns"
 
   echo "== Stryker $project ($(wc -l <<< "$patterns") changed files)"
-  (cd "source/$project" && dotnet stryker "${args[@]}")
+  (cd "$(dirname "$csproj")" && dotnet stryker "${args[@]}")
 }
 
-projects_to_mutate=$(changed_projects)
 if [[ "$list_only" == true ]]; then
-  if [[ -n "$projects_to_mutate" ]]; then
-    echo "$projects_to_mutate"
-  fi
+  changed_projects
   exit 0
 fi
 
@@ -97,14 +106,15 @@ dotnet tool restore
 
 # Stryker writes each project's JSON report under its --output folder, in reports/.
 reports=()
-while IFS= read -r project; do
-  if [[ -z "$project" ]]; then
+for project in "${mutated_projects[@]}"; do
+  patterns=$(mutate_patterns "$project")
+  if [[ -z "$patterns" ]]; then
     continue
   fi
   rm -rf "${output_directory:?}/$project"
-  mutate_project "$project"
+  mutate_project "$project" "$patterns"
   reports+=("$project=$output_directory/$project/reports/mutation-report.json")
-done <<< "$projects_to_mutate"
+done
 
 # Captured first, so a summary that fails to render leaves no summary.md behind.
 summary=$(node "$scripts/mutation-summary.cjs" "${reports[@]}")

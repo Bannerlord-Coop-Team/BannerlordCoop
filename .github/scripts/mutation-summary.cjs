@@ -10,6 +10,7 @@ const caughtStatuses = ['Killed', 'Timeout'];
 // NoCoverage only appears when coverage analysis is on. Counting it as not caught keeps the score
 // equal to Stryker's own whatever source/stryker-config.json sets.
 const notCaughtStatuses = ['Survived', 'NoCoverage'];
+const scoredStatuses = [...caughtStatuses, ...notCaughtStatuses];
 
 // Reads one parsed report into caught and not-caught counts and the mutants no test caught.
 function summarizeProject(report, root = repoRoot) {
@@ -18,7 +19,7 @@ function summarizeProject(report, root = repoRoot) {
   let fileCount = 0;
 
   for (const [filePath, file] of Object.entries(report.files)) {
-    const scored = file.mutants.filter(mutant => [...caughtStatuses, ...notCaughtStatuses].includes(mutant.status));
+    const scored = file.mutants.filter(mutant => scoredStatuses.includes(mutant.status));
     if (scored.length === 0) continue;
     fileCount++;
     const relative = path.relative(root, filePath).split(path.sep).join('/');
@@ -50,9 +51,9 @@ function readResults(reportArguments) {
 // Escapes text for a markdown table cell and caps its length. Backticks become quotes so a
 // value can't close the code span it is shown in.
 function cell(text) {
-  const flat = String(text).replace(/\s+/g, ' ').trim();
-  const short = flat.length > maxCellLength ? `${flat.slice(0, maxCellLength - 3)}...` : flat;
-  return short.replace(/\|/g, '\\|').replace(/`/g, "'");
+  let flat = String(text).replace(/\s+/g, ' ').trim();
+  if (flat.length > maxCellLength) flat = `${flat.slice(0, maxCellLength - 3)}...`;
+  return flat.replace(/\|/g, '\\|').replace(/`/g, "'");
 }
 
 // Wraps text in a markdown code span.

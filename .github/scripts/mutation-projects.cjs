@@ -1,5 +1,5 @@
 // Prints the unit test projects that reference one mutated project, as repo-relative csproj paths.
-// Usage: node mutation-projects.cjs <project>
+// Usage: node mutation-projects.cjs <repo-relative-csproj>
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -20,12 +20,11 @@ function projectReferences(csproj, csprojText) {
     .map(match => resolveUnder(directory, match[1]));
 }
 
-// Returns the solution filter's test projects that reference the project directly, minus the
+// Returns the solution filter's test projects that reference the target csproj directly, minus the
 // excluded ones. Throws when none does, because Stryker would otherwise run with no tests.
-function testProjectsFor(project, slnfText, readText) {
+function testProjectsFor(target, readText) {
   const sourceDirectory = path.posix.dirname(solutionFilter);
-  const target = `${sourceDirectory}/${project}/${project}.csproj`;
-  const testProjects = JSON.parse(slnfText).solution.projects
+  const testProjects = JSON.parse(readText(solutionFilter)).solution.projects
     .map(entry => resolveUnder(sourceDirectory, entry))
     .filter(csproj => !excludedTestProjects.includes(path.posix.basename(csproj, '.csproj')))
     .filter(csproj => projectReferences(csproj, readText(csproj)).includes(target));
@@ -33,12 +32,12 @@ function testProjectsFor(project, slnfText, readText) {
   return testProjects;
 }
 
-// Prints the test projects for the project given on the command line.
+// Prints the test projects for the csproj given on the command line.
 function main() {
-  const [project] = process.argv.slice(2);
-  if (!project) throw new Error('usage: node mutation-projects.cjs <project>');
+  const [target] = process.argv.slice(2);
+  if (!target) throw new Error('usage: node mutation-projects.cjs <repo-relative-csproj>');
   const readText = file => fs.readFileSync(path.join(repoRoot, file), 'utf8');
-  for (const csproj of testProjectsFor(project, readText(solutionFilter), readText)) console.log(csproj);
+  for (const csproj of testProjectsFor(target, readText)) console.log(csproj);
 }
 
 if (require.main === module) main();
