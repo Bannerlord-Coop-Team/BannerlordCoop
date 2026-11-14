@@ -16,5 +16,4 @@ internal class CaravanAmbushDialogPatches
     [HarmonyPatch(typeof(Quest), nameof(Quest.SetDialogs))]
     [HarmonyPrefix]
     private static bool Dialogs() => ModInformation.IsClient;
-
 }
