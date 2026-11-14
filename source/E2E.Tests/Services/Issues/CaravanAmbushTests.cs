@@ -204,7 +204,7 @@ public class CaravanAmbushTests : IDisposable
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public void ANullOrInactivePartyClearsTheOwnersReference(bool inactive)
+    public void ANullOrInactivePartyKeepsTheOwnersReferenceForVanillaDialogue(bool inactive)
     {
         Server.Call(() =>
         {
@@ -218,7 +218,7 @@ public class CaravanAmbushTests : IDisposable
         });
         Owner.Call(() =>
         {
-            Assert.Null(QuestOf(Owner)._caravanParty);
+            Assert.Same(Owner.GetRegisteredObject<MobileParty>(caravanId), QuestOf(Owner)._caravanParty);
             Assert.Same(Owner.GetRegisteredObject<MobileParty>(banditId), QuestOf(Owner)._banditParty);
         });
     }
@@ -274,7 +274,6 @@ public class CaravanAmbushTests : IDisposable
     [InlineData(false)]
     public void LateCaravaneerDialogueDoesNotPayAfterTheQuestCanNoLongerSucceed(bool serverQuestEnded)
     {
-        var goldBefore = 0;
         var ownerQuest = QuestOf(Owner);
         Server.Call(() =>
         {
@@ -290,17 +289,17 @@ public class CaravanAmbushTests : IDisposable
             {
                 PlayerHero(QuestScenario.ControllerA)._partyBelongedTo = null;
             }
-            goldBefore = PlayerHero(QuestScenario.ControllerA).Gold;
         });
         SendState(QuestScenario.ControllerA, saved: true, warnings: 0);
+        if (!serverQuestEnded)
+            Owner.Call(() => Owner.GetRegisteredObject<Hero>(scenario.OwnerHeroId)._partyBelongedTo = null);
+        var goldBefore = Owner.GetRegisteredObject<Hero>(scenario.OwnerHeroId).Gold;
         Owner.Call(() =>
         {
-            var flow = ownerQuest.GetCaravaneerDialogFlow();
-            var rewardLine = Assert.Single(flow.Lines.Where(line => line.ConsequenceDelegate != null));
-            rewardLine.ConsequenceDelegate();
-            Campaign.Current.ConversationManager.EndConversation();
+            var strategy = Owner.Resolve<CaravanAmbushFinalizationProofStrategy>();
+            Assert.True(strategy.TryRunBranch(ownerQuest, (byte)CaravanAmbushBranch.CollectReward));
+            Assert.Equal(goldBefore, Owner.GetRegisteredObject<Hero>(scenario.OwnerHeroId).Gold);
         });
-        Server.Call(() => Assert.Equal(goldBefore, PlayerHero(QuestScenario.ControllerA).Gold));
         Assert.DoesNotContain(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>(),
             message => message.Outcome == IssueOutcome.QuestSuccess);
     }
