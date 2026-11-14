@@ -1,0 +1,96 @@
+name: Mutation Testing
+
+# Report-only: mutates the C# files a PR changes in Common, Coop.Core and GameInterface and lists
+# the mutants no unit test catches. It isn't a required check and never fails on the score.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'source/Common/**'
+      - 'source/Coop.Core/**'
+      - 'source/GameInterface/**'
+      - '.config/dotnet-tools.json'
+      - '.github/scripts/run-mutation-tests.sh'
+      - '.github/scripts/mutation-summary.cjs'
+      - '.github/workflows/mutation-testing.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  mutation:
+    name: Mutation testing (report only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    permissions:
+      contents: read
+      packages: read
+
+    env:
+      BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      DOTNET_CLI_TELEMETRY_OPTOUT: 1
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+
+      - name: Find changed source
+        id: scope
+        run: |
+          changed=$(bash .github/scripts/run-mutation-tests.sh --list "$BASE_SHA")
+          if [ -z "$changed" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "No changed C# files in Common, Coop.Core or GameInterface, so nothing was mutated." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          printf '%s\n' "$changed"
+
+      - name: Set up .NET
+        if: steps.scope.outputs.skip != 'true'
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5.4.0
+        with:
+          # 10 runs Stryker and builds, 6 runs the net6.0 test projects.
+          dotnet-version: |
+            6.0.428
+            10.0.300
+
+      # The game assemblies only ship inside the CI image, so copy them out instead of running in it,
+      # because the image's .NET 6 SDK can't run Stryker.
+      - name: Copy game assemblies from the CI image
+        if: steps.scope.outputs.skip != 'true'
+        env:
+          IMAGE: ghcr.io/bannerlord-coop-team/bannerlordcoop:latest
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+          docker create --name game-assemblies "$IMAGE" >/dev/null
+          docker cp game-assemblies:/home/mb2 "$RUNNER_TEMP/mb2"
+          docker rm game-assemblies >/dev/null
+          echo "BANNERLORD_DIR=$RUNNER_TEMP/mb2" >> "$GITHUB_ENV"
+
+      - name: Run Stryker on changed files
+        if: steps.scope.outputs.skip != 'true'
+        run: bash .github/scripts/run-mutation-tests.sh "$BASE_SHA" artifacts/mutation
+
+      - name: Write summary
+        if: ${{ always() && steps.scope.outputs.skip != 'true' }}
+        # Runs again here so a timed-out or failed run still lists the projects that finished.
+        run: |
+          if [ -f artifacts/mutation/merge-base ]; then
+            node .github/scripts/mutation-summary.cjs artifacts/mutation >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload mutation report
+        if: ${{ always() && steps.scope.outputs.skip != 'true' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mutation-report
+          path: artifacts/mutation/*/reports/mutation-report.html
+          retention-days: 14
+          if-no-files-found: warn

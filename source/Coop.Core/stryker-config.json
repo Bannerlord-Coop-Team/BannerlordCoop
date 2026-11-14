@@ -1,0 +1,20 @@
+{
+  "stryker-config": {
+    "project": "Coop.Core.csproj",
+    "test-projects": [
+      "../Coop.Tests/Coop.Tests.csproj"
+    ],
+    "configuration": "Release",
+    "reporters": ["html", "json", "progress"],
+    "thresholds": { "high": 80, "low": 60, "break": 0 },
+    "ignore-methods": [
+      "*Logger.Verbose",
+      "*Logger.Debug",
+      "*Logger.Information",
+      "*Logger.Warning",
+      "*Logger.Error",
+      "*Logger.Fatal",
+      "*Exception.ctor"
+    ]
+  }
+}
