@@ -1065,9 +1065,14 @@ Knobs (`NavalScenarioResolver.Usage`):
   is never swapped, so `hulls=1 weapons=1 reserve=20` has no room and logs a Warning; add a hull.
 - `allies=n` (1 to 8, `allied_npc` only, default 1) tops the allied lord up to n ships.
 - `ignore_limits=1` lets every party of the scenario's battle field 8 ships, vanilla's `IgnoreDeploymentLimits` base limit
-  before perks, on every client (`CoopNavalBattleLauncher` turns the switch on for that battle), so two players can take all of a side's 8 ships: `allied_npc ships=4
-  ignore_limits=1 reserve=40` fields 4+4 and the allies settle on `NoShipsLeft` (`inspect` shows the Defender spawner
-  `failed` with that reason and the host logs it as Information).
+  before perks, on every client (`CoopNavalBattleLauncher` turns the switch on for that battle). Vanilla still splits the
+  side's 8 between a player's own team and its ally team by their net limits, the smallest of the parties, skeletal crew and
+  battle limits, so a player with 4 ships (net 4) against an ally team of 8 gets `round(4 / 12 * 8) = 3`. For 4+4 each
+  player needs a net of 8: give each 8 ships with `coop.debug.party.add_ship <player> northern_light_ship` (the stager
+  only tops fleets up, so `ships=` doesn't cut them), then `allied_npc ignore_limits=1 reserve=40 testclient1
+  testclient2`. The reserve swaps one hull for an `empire_heavy_ship` and tops the healthy troops up to 344, past the 100
+  skeletal crew of the 8 hulls, so both teams net 8, each player fields 4 and the allies settle on `NoShipsLeft` (`inspect`
+  shows the Defender spawner `failed` with that reason and the host logs it as Information).
 - `army=1` (`allied_npc` only) has the first player's clan join the allied lord's kingdom and lead an army with the lord as
   its member, through the vanilla actions the clan and army syncs replicate (M11 A1: at sea the member's reserve goes to
   the battle host).
