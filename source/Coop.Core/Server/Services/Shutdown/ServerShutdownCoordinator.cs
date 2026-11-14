@@ -17,6 +17,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
+using Coop.Core.Common.Network;
 
 namespace Coop.Core.Server.Services.Shutdown;
 
@@ -43,7 +44,6 @@ public class ServerShutdownCoordinator : IServerShutdownCoordinator
     private static readonly ILogger Logger = LogManager.GetLogger<ServerShutdownCoordinator>();
 
     public const int MaxDelaySeconds = 3600;
-    internal const string DisconnectReason = "ServerRestarting";
     internal static readonly TimeSpan TickInterval = TimeSpan.FromSeconds(1);
     internal static readonly TimeSpan JoinCloseLead = TimeSpan.FromSeconds(120);
     internal static readonly TimeSpan DrainTimeout = TimeSpan.FromSeconds(15);
@@ -56,7 +56,7 @@ public class ServerShutdownCoordinator : IServerShutdownCoordinator
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IConnectionCollection connections;
-    private readonly IJoinPeerTerminator peerTerminator;
+    private readonly IPeerTerminator peerTerminator;
     private readonly IServerJoinAdmission joinAdmission;
     private readonly ISaveInterface saveInterface;
     private readonly IMissionManager missionManager;
@@ -82,7 +82,7 @@ public class ServerShutdownCoordinator : IServerShutdownCoordinator
         IMessageBroker messageBroker,
         INetwork network,
         IConnectionCollection connections,
-        IJoinPeerTerminator peerTerminator,
+        IPeerTerminator peerTerminator,
         IServerJoinAdmission joinAdmission,
         ISaveInterface saveInterface,
         IMissionManager missionManager)
@@ -104,7 +104,7 @@ public class ServerShutdownCoordinator : IServerShutdownCoordinator
         IMessageBroker messageBroker,
         INetwork network,
         IConnectionCollection connections,
-        IJoinPeerTerminator peerTerminator,
+        IPeerTerminator peerTerminator,
         IServerJoinAdmission joinAdmission,
         ISaveInterface saveInterface,
         IMissionManager missionManager,
@@ -364,7 +364,7 @@ public class ServerShutdownCoordinator : IServerShutdownCoordinator
             NetPeer peer = connection.Peer;
             if (peer == null || !disconnectedPeers.Add(peer)) continue;
 
-            peerTerminator.Disconnect(peer, DisconnectReason);
+            peerTerminator.Disconnect(peer, DisconnectReasons.ServerRestarting);
             disconnected++;
         }
 

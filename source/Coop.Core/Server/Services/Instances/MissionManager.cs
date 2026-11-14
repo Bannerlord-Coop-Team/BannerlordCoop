@@ -68,6 +68,9 @@ public interface IMissionManager
     /// </summary>
     bool TryGetControllers(string instanceId, out IReadOnlyCollection<string> controllers);
 
+    /// <summary>A snapshot of every current membership: the controller, the instance it is in and the connection it is on.</summary>
+    IReadOnlyList<(string controllerId, string instanceId, NetPeer peer)> GetMembers();
+
     /// <summary>
     /// Atomically fences entry when the current controllers still match the result decision's snapshot.
     /// </summary>
@@ -628,6 +631,17 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
             // MissionInstance.Controllers already returns a snapshot array — safe to hand out.
             controllers = instance.Controllers;
             return true;
+        }
+    }
+
+    /// <inheritdoc/>
+    public IReadOnlyList<(string controllerId, string instanceId, NetPeer peer)> GetMembers()
+    {
+        lock (gate)
+        {
+            return byController.Values
+                .Select(membership => (membership.ControllerId, membership.Instance.Id, membership.Peer))
+                .ToArray();
         }
     }
 

@@ -539,11 +539,9 @@ public class BattleShipReplicator : IBattleShipReplicator
         }
     }
 
-    /// <summary>[Game thread] Removes every hull a player who left the battle owned, and drops its records still waiting here.</summary>
-    internal void RemoveHullsOf(string controllerId)
+    /// <summary>[Game thread] Removes the <paramref name="departing"/> hulls of a player who left, and drops its records still waiting here.</summary>
+    private void RemoveHullsOf(string controllerId, IReadOnlyList<NetworkShipInfo> departing)
     {
-        // The hulls a departing host simulates for others stay and move to the next host.
-        var departing = Registry.Ships.Where(ship => !ship.FollowsBattleHost && ship.CurrentAuthority == controllerId).ToList();
         foreach (var ship in departing)
             leftWith[ship.ShipId] = controllerId;
         RemoveHulls(departing, ShipRemovalReason.Leave, DepartingCrew.All);
@@ -556,6 +554,10 @@ public class BattleShipReplicator : IBattleShipReplicator
             Prune(held.ShipId);
         }
     }
+
+    // The hulls a departed player takes with it; the AI hulls a departing host simulates for others stay for the next host.
+    private List<NetworkShipInfo> DepartingHullsOf(string controllerId) =>
+        Registry.Ships.Where(ship => !ship.FollowsBattleHost && ship.CurrentAuthority == controllerId).ToList();
 
     // [Game thread] Own hulls only; a joiner that enters after the commit gets the same records directly.
     private void SendSpawnRecords(string controllerId)
@@ -901,11 +903,12 @@ public class BattleShipReplicator : IBattleShipReplicator
     private void AcceptPeerLeft(string controllerId, bool wasHost)
     {
         departedOwners.Add(controllerId);
-        conditions.ForgetReserveOf(controllerId);
+        var departing = DepartingHullsOf(controllerId);
+        conditions.ForgetReserves(departing);
         if (Mission.Current == null) return;
 
         // At sea the hull removal takes the leaver's crew, so its party is withdrawn only once the hulls are gone.
-        RemoveHullsOf(controllerId);
+        RemoveHullsOf(controllerId, departing);
         pendingWithdrawals[controllerId] = wasHost;
     }
 

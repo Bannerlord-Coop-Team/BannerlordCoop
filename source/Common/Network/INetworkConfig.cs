@@ -34,6 +34,11 @@ public interface INetworkConfig
     TimeSpan ReconnectDelay { get; }
     TimeSpan DisconnectTimeout { get; }
     /// <summary>
+    /// [Server] How long a battle host with a successor waiting may go unheard before the server drops it, so a crashed host
+    /// hands its battle on well before <see cref="DisconnectTimeout"/>. Every other connection keeps that one.
+    /// </summary>
+    TimeSpan BattleHostDisconnectTimeout { get; }
+    /// <summary>
     /// LiteNetLib's internal logic-thread cycle (NetManager.UpdateTime): resends, packet merging and
     /// reliable-window advances happen at this cadence.
     /// </summary>

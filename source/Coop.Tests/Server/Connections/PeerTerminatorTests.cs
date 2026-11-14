@@ -20,7 +20,7 @@ using Xunit;
 namespace Coop.Tests.Server.Connections;
 
 /// <summary>Verifies that server join failures reach the client disconnect popup over the transport.</summary>
-public class JoinPeerTerminatorTests
+public class PeerTerminatorTests
 {
     [Theory]
     [InlineData(
@@ -46,7 +46,7 @@ public class JoinPeerTerminatorTests
         string code,
         string expectedMessage)
     {
-        RunDisconnect(peer => new JoinPeerTerminator().Disconnect(peer, code), code, expectedMessage);
+        RunDisconnect(peer => new PeerTerminator().Disconnect(peer, code), code, expectedMessage);
     }
 
     [Theory]
@@ -61,7 +61,7 @@ public class JoinPeerTerminatorTests
     [Fact]
     public void Disconnect_UnknownReasonUsesGenericPopup()
     {
-        RunDisconnect(peer => new JoinPeerTerminator().Disconnect(peer, "UnknownReason"),
+        RunDisconnect(peer => new PeerTerminator().Disconnect(peer, "UnknownReason"),
             "UnknownReason", "You have been Disconnected");
     }
 
