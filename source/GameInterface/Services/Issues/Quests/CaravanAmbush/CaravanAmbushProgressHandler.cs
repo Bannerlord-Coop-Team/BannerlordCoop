@@ -9,6 +9,7 @@ using System;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Localization;
+using TaleWorlds.Core;
 using Quest = TaleWorlds.CampaignSystem.Issues.CaravanAmbushIssueBehavior.CaravanAmbushIssueQuest;
 
 namespace GameInterface.Services.Issues.Quests.CaravanAmbush;

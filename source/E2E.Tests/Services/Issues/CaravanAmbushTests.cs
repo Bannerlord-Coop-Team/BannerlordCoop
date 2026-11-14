@@ -171,23 +171,18 @@ public class CaravanAmbushTests : IDisposable
     }
 
     [Fact]
-    public void HourlyProgressPublishesOnlyChangedOwnerState()
+    public void UnrelatedSettlementEntriesDoNotPublishProgress()
     {
-        scenario.AttachQuest(Other, CreateQuest);
         Server.Call(() =>
         {
             BindParties();
             var events = Server.Resolve<ICaravanAmbushWorldEventService>();
-            var baseline = Server.NetworkSentMessages.GetMessageCount<NetworkCaravanAmbushProgress>();
-            events.HourlyTick();
-            Assert.Equal(baseline + 1, Server.NetworkSentMessages.GetMessageCount<NetworkCaravanAmbushProgress>());
-            events.SettlementEntered(null);
-            Assert.Equal(baseline + 1, Server.NetworkSentMessages.GetMessageCount<NetworkCaravanAmbushProgress>());
-            events.HourlyTick();
-            Assert.Equal(baseline + 2, Server.NetworkSentMessages.GetMessageCount<NetworkCaravanAmbushProgress>());
+            var unrelated = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            for (var index = 0; index < 200; index++) events.SettlementEntered(unrelated);
         });
-        Owner.Call(() => Assert.Equal(2, QuestOf(Owner)._vicinityCheckFailCounter));
-        Other.Call(() => Assert.Equal(0, QuestOf(Other)._vicinityCheckFailCounter));
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkCaravanAmbushProgress>());
+        Owner.Call(() => Assert.True(QuestOf(Owner).IsOngoing));
+        Other.Call(() => Assert.Null(IssueOf(Other).IssueQuest));
     }
 
     [Fact]
