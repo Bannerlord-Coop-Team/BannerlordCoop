@@ -221,7 +221,7 @@ public class BattleShipReplicatorTests
     // A departed host's AI hulls still name it until the host change moves them, which nulls their reserve itself; the
     // departure must not take it first, as if they left with the host.
     [Fact]
-    public void ReportedReserveOf_DropsTheReport_WhenItsOwnerLeaves_ButKeepsTheAiHullsItSimulated()
+    public void MissionPeerLeft_DropsTheLeaversReportedReserve_ButKeepsTheAiHullsItSimulated()
     {
         var harness = new Harness(committed: false);
         var (copy, ship) = RegisterPeerCopy(harness, isNpcParty: false);
@@ -229,9 +229,10 @@ public class BattleShipReplicatorTests
         harness.Conditions.Receive(PeerCondition(ship, 1, reserve: 12));
         harness.Conditions.Receive(PeerCondition(aiShip, 1, reserve: 9));
 
-        harness.Conditions.ForgetReserveOf("someone_else");
+        harness.PublishAndDrain(new MissionPeerLeft("someone_else", Instance));
         int afterOtherLeft = harness.Conditions.ReportedReserveOf(copy);
-        harness.Conditions.ForgetReserveOf(Peer);
+        harness.Members.Remove(Peer);
+        harness.PublishAndDrain(new MissionPeerLeft(Peer, Instance));
 
         Assert.Equal(12, afterOtherLeft);
         Assert.Equal(0, harness.Conditions.ReportedReserveOf(copy));

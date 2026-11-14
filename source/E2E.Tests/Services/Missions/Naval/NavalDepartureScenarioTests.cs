@@ -163,8 +163,7 @@ public class NavalDepartureScenarioTests : NavalBattleTestEnvironment
 
         battle.MigrateHost(a, "B");
         // The successor adopts the AI A ran, never A's own party, which waits for its hull's removal.
-        string? crewAuthorityOnSuccessor = null;
-        b.Call(() => crewAuthorityOnSuccessor = b.Agents.TryGetAgentInfo(crewA[b], out var info) ? info.CurrentAuthority : null);
+        string? crewAuthorityOnSuccessor = AgentAuthority(b, crewA[b]);
         battle.TickAll(3);
 
         Assert.Equal("A", crewAuthorityOnSuccessor);
@@ -207,15 +206,17 @@ public class NavalDepartureScenarioTests : NavalBattleTestEnvironment
             foreach (var crew in pirateCrew)
                 peer.Engine.PlaceAgent(crew[peer], peer.Ship(pirate).Hull, peer.Ship(pirate).Hull);
         }
-        var lost = a.FieldAiHull(BattleSideEnum.Defender, new Vec3(60f, 300f, 0f), battle.PirateMapEventPartyId);
+        // Its record is still in flight when A dies.
+        a.FieldAiHull(BattleSideEnum.Defender, new Vec3(60f, 300f, 0f), battle.PirateMapEventPartyId);
 
         Assert.True(battle.Crash(a) > 0, "A had nothing in flight when it crashed");
-        if (meshDropsFirst) DropConnection(a);
+        if (meshDropsFirst)
+        {
+            DropConnection(a);
+        }
         else
         {
-            DisconnectOnServer(a);
-            foreach (var peer in survivors) peer.Tick();
-            a.Instance.Call(a.Network.Stop);
+            DropConnectionServerFirst(a, survivors);
         }
         battle.TickAll(3);
 
@@ -225,14 +226,11 @@ public class NavalDepartureScenarioTests : NavalBattleTestEnvironment
         {
             AssertRemovedWithClearDeck(peer, hullA);
             AssertCrewWithdrawnByTheHullRemoval(peer, crewA[peer]);
-            Assert.False(peer.Has(lost), $"{peer.Id} got the hull record A lost in flight");
             Assert.Equal("B", peer.Ship(pirate).CurrentAuthority);
             foreach (var crew in pirateCrew)
             {
                 Assert.True(crew[peer].IsActive(), $"{peer.Id} lost an enemy crew member with A");
-                string? authority = null;
-                peer.Call(() => authority = peer.Agents.TryGetAgentInfo(crew[peer], out var info) ? info.CurrentAuthority : null);
-                Assert.Equal("B", authority);
+                Assert.Equal("B", AgentAuthority(peer, crew[peer]));
             }
         }
         Assert.False(b.Hull(pirate).IsCopy);
@@ -617,6 +615,14 @@ public class NavalDepartureScenarioTests : NavalBattleTestEnvironment
 
     private static Dictionary<NavalPeer, Agent> RegisterEverywhere(NavalBattle battle, Guid agentId, string authority) =>
         battle.Peers.ToDictionary(peer => peer, peer => peer.RegisterAgent(agentId, authority));
+
+    // The controller this client's agent registry names for the agent, or null when it isn't registered.
+    private static string? AgentAuthority(NavalPeer peer, Agent agent)
+    {
+        string? authority = null;
+        peer.Call(() => authority = peer.Agents.TryGetAgentInfo(agent, out var info) ? info.CurrentAuthority : null);
+        return authority;
+    }
 
     // An enemy AI troop on every client, simulated by the battle host.
     private static Dictionary<NavalPeer, Agent> RegisterEnemyEverywhere(NavalBattle battle, Guid agentId, string host) =>

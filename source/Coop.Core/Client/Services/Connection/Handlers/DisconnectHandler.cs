@@ -2,6 +2,7 @@
 using Common.Messaging;
 using Coop.Core.Client.Messages;
 using Coop.Core.Common;
+using Coop.Core.Server.Services.Instances;
 using GameInterface.Services.GameState.Interfaces;
 using LiteNetLib;
 using Serilog;
@@ -70,7 +71,7 @@ internal class DisconnectHandler : IHandler
                        "The server stopped this join to keep the campaign responsive. Please try again.";
             case "ServerRestarting":
                 return "The server is restarting. Try again in a few minutes.";
-            case "BattleHostUnresponsive":
+            case UnresponsiveBattleHostManager.DisconnectReason:
                 return "The server lost contact with you while you were hosting a battle, so another player took it over.\n" +
                        "Rejoin the campaign to continue.";
         }

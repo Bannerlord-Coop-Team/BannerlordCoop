@@ -1,6 +1,7 @@
-﻿using Common.Network;
+﻿using Coop.Core.Common.Configuration;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Services.Instances;
+using Coop.Tests.Extensions;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.Players;
@@ -24,27 +25,28 @@ public class UnresponsiveBattleHostManagerTests
         new[] { typeof(NetManager), typeof(IPEndPoint), typeof(int) },
         modifiers: null)!;
 
-    // A fresh peer was last heard 0 ms ago, so a zero limit makes both members silent and an hour makes neither.
+    // Against the real 15 s limit: 20 s unheard is silent, 1 s is heard.
     [Theory]
-    [InlineData(0, true, true)]
-    [InlineData(3600, true, false)]
-    [InlineData(0, false, false)]
-    public void DisconnectsOnlyASilentHostWithASuccessorWaiting(int timeoutSeconds, bool successorWaiting, bool hostDropped)
+    [InlineData(20000f, true, true)]
+    [InlineData(1000f, true, false)]
+    [InlineData(20000f, false, false)]
+    public void DisconnectsOnlyASilentHostWithASuccessorWaiting(float silenceMs, bool successorWaiting, bool hostDropped)
     {
         var host = CreatePeer(1);
         var member = CreatePeer(2);
+        host.SetTimeSinceLastPacket(silenceMs);
+        member.SetTimeSinceLastPacket(silenceMs);
         var missions = new MissionManager(Mock.Of<IPlayerManager>());
         Assert.True(missions.TryEnterMission(host, "host", Battle, out _));
         Assert.True(missions.TryEnterMission(member, "member", Battle, out _));
         var hosts = new BattleHostRegistry(Mock.Of<IControllerIdProvider>());
         hosts.Set(Battle, new BattleHostAssignment("host", successorWaiting ? new[] { "member" } : Array.Empty<string>(), 1, isNaval: true));
-        var config = new Mock<INetworkConfig>();
-        config.SetupGet(value => value.BattleHostDisconnectTimeout).Returns(TimeSpan.FromSeconds(timeoutSeconds));
         var terminator = new Mock<IJoinPeerTerminator>();
 
-        new UnresponsiveBattleHostManager(config.Object, missions, hosts, terminator.Object).DisconnectUnresponsiveHosts();
+        new UnresponsiveBattleHostManager(new NetworkConfig(), missions, hosts, terminator.Object).DisconnectUnresponsiveHosts();
 
-        terminator.Verify(value => value.Disconnect(host, "BattleHostUnresponsive"), hostDropped ? Times.Once() : Times.Never());
+        terminator.Verify(value => value.Disconnect(host, UnresponsiveBattleHostManager.DisconnectReason),
+            hostDropped ? Times.Once() : Times.Never());
         terminator.Verify(value => value.Disconnect(member, It.IsAny<string>()), Times.Never());
     }
 

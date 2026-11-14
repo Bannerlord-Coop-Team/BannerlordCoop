@@ -20,6 +20,9 @@ public interface IUnresponsiveBattleHostManager
 /// <inheritdoc cref="IUnresponsiveBattleHostManager"/>
 internal class UnresponsiveBattleHostManager : IUnresponsiveBattleHostManager
 {
+    /// <summary>The reason code a dropped host's client reads, if it is still alive to read it.</summary>
+    internal const string DisconnectReason = "BattleHostUnresponsive";
+
     private static readonly ILogger Logger = LogManager.GetLogger<UnresponsiveBattleHostManager>();
 
     private readonly INetworkConfig config;
@@ -53,7 +56,7 @@ internal class UnresponsiveBattleHostManager : IUnresponsiveBattleHostManager
                 "(limit {Limit:0}s), so its successor takes over", controllerId, instanceId, peer.TimeSinceLastPacket / 1000f,
                 config.BattleHostDisconnectTimeout.TotalSeconds);
             // The same disconnect a drop or a timeout takes, so the departure and promotion that follow are the usual ones.
-            peerTerminator.Disconnect(peer, "BattleHostUnresponsive");
+            peerTerminator.Disconnect(peer, DisconnectReason);
         }
     }
 

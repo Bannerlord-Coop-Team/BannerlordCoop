@@ -143,8 +143,20 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment, IDisp
         DisconnectOnServer(departed);
     }
 
+    /// <summary>
+    /// <paramref name="departed"/>'s server link drops first: the server's departure reaches <paramref name="survivors"/>, which
+    /// apply it in a tick, and only then do their mesh links to it time out.
+    /// </summary>
+    protected void DropConnectionServerFirst(NavalPeer departed, IEnumerable<NavalPeer> survivors)
+    {
+        DisconnectOnServer(departed);
+        foreach (var peer in survivors)
+            peer.Tick();
+        departed.Instance.Call(departed.Network.Stop);
+    }
+
     /// <summary>The server's link to <paramref name="departed"/> drops, its mesh left as it is, and its disconnect path runs.</summary>
-    protected void DisconnectOnServer(NavalPeer departed)
+    private void DisconnectOnServer(NavalPeer departed)
     {
         Server.Call(() => Server.SimulateMessage(this, new PlayerDisconnected(departed.Instance.NetPeer, default)),
             VictoryConclusionDisabledMethods());

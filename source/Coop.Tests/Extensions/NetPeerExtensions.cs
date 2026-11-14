@@ -11,6 +11,7 @@ namespace Coop.Tests.Extensions
     {
         private static readonly FieldInfo Id = typeof(NetPeer).GetField(nameof(NetPeer.Id))!;
         private static readonly FieldInfo _channels = typeof(NetPeer).GetField("_channels", BindingFlags.NonPublic | BindingFlags.Instance);
+        private static readonly FieldInfo _timeSinceLastPacket = typeof(NetPeer).GetField("_timeSinceLastPacket", BindingFlags.NonPublic | BindingFlags.Instance)!;
 
         private static readonly ConstructorInfo ctor = typeof(NetPeer).GetConstructor(BindingFlags.NonPublic | BindingFlags.Instance, new Type[]
         {
@@ -34,6 +35,12 @@ namespace Coop.Tests.Extensions
         private static Assembly LiteNetLibAsm = typeof(NetPeer).Assembly;
         private static Type NetPacketType = LiteNetLibAsm.GetType("LiteNetLib.NetPacket", true)!;
         private static object CreatePacket => ObjectHelper.SkipConstructor(NetPacketType);
+
+        /// <summary>Sets how long ago LiteNetLib last heard from the peer, in milliseconds.</summary>
+        public static void SetTimeSinceLastPacket(this NetPeer peer, float milliseconds)
+        {
+            _timeSinceLastPacket.SetValue(peer, milliseconds);
+        }
 
         public static void SetQueueLength(this NetPeer peer, int queueLength)
         {

@@ -57,11 +57,9 @@ public interface IBattleShipConditionStream : IDisposable
     /// </summary>
     void AcceptFromDepartedOwner(NetworkShipInfo ship, NetworkShipCondition condition);
 
-    /// <summary>
-    /// Forgets the reserves a departed controller reported for its own hulls; the membership gate drops its late reports until it
-    /// returns. The AI hulls a departed host simulated keep theirs until the host change moves them (<see cref="OnAuthorityMoved"/>).
-    /// </summary>
-    void ForgetReserveOf(string controllerId);
+    /// <summary>Forgets the reserves reported for the hulls a departed controller takes with it; the membership gate drops its late
+    /// reports until it returns.</summary>
+    void ForgetReserves(IEnumerable<NetworkShipInfo> departingHulls);
 
     /// <summary>
     /// The hull's authority moved at an ordered event every client applies: the reserve is forgotten, the order restarts at
@@ -236,9 +234,9 @@ public class BattleShipConditionStream : IBattleShipConditionStream
         earlyHostConditions[condition.ShipId] = condition;
     }
 
-    public void ForgetReserveOf(string controllerId)
+    public void ForgetReserves(IEnumerable<NetworkShipInfo> departingHulls)
     {
-        foreach (var ship in Registry.Ships.Where(ship => !ship.FollowsBattleHost && ship.CurrentAuthority == controllerId))
+        foreach (var ship in departingHulls)
         {
             if (hulls.TryGetValue(ship.ShipId, out var hull)) hull.Reserve = null;
         }
