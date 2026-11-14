@@ -149,6 +149,41 @@ public class GameStateInterfaceTests
         Assert.All(campaign.MobileParties, party => Assert.Equal(forceAllVisible, party._isVisible));
     }
 
+    // A late initialize load refills every saved field in InitializeObjects, so the clear only holds after it (OnGameLoaded).
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ClearTransferredPartyVisibility_HoldsOnlyAfterLateInitialize(bool clearAfterInitialize)
+    {
+        bool wasForceAllVisible = DebugPartyVisibility.ForceAllVisible;
+        var saved = ObjectHelper.SkipConstructor<MobileParty>();
+        saved.Party = ObjectHelper.SkipConstructor<PartyBase>();
+        saved._isVisible = true;
+        var driver = new InMemDriver();
+        var saveResult = SaveManager.Save(saved, new MetaData { ["ApplicationVersion"] = "v1.4.8.0" }, "party", driver);
+        Assert.True(saveResult.Successful);
+        var loadResult = SaveManager.Load("party", driver, loadAsLateInitialize: true);
+        var party = Assert.IsType<MobileParty>(loadResult.Root);
+        Assert.True(party._isVisible);
+        var campaign = ObjectHelper.SkipConstructor<Campaign>();
+        campaign.CampaignObjectManager = new CampaignObjectManager();
+        campaign.CampaignObjectManager._mobileParties.Add(party);
+
+        try
+        {
+            DebugPartyVisibility.ForceAllVisible = false;
+            if (!clearAfterInitialize) GameStateInterface.ClearTransferredPartyVisibility(campaign);
+            loadResult.InitializeObjects();
+            if (clearAfterInitialize) GameStateInterface.ClearTransferredPartyVisibility(campaign);
+        }
+        finally
+        {
+            DebugPartyVisibility.ForceAllVisible = wasForceAllVisible;
+        }
+
+        Assert.Equal(!clearAfterInitialize, party._isVisible);
+    }
+
     private sealed class TestInformationData : InformationData
     {
         public TestInformationData(string description) : base(new TextObject(description))

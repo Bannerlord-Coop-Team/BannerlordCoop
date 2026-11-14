@@ -102,8 +102,7 @@ internal class GameStateInterface : IGameStateInterface
         var loadedGame = (Game)loadResult.Root;
         var loadedCampaign = (Campaign)loadedGame.GameType;
         ClearTransferredMapNotices(loadedCampaign.CampaignInformationManager);
-        ClearTransferredPartyVisibility(loadedCampaign);
-        MBGameManager.StartNewGame(new SandBoxGameManager(loadResult));
+        MBGameManager.StartNewGame(new TransferredSaveGameManager(loadResult));
     }
 
     internal static void ClearTransferredMapNotices(CampaignInformationManager informationManager)
@@ -118,7 +117,8 @@ internal class GameStateInterface : IGameStateInterface
         // The server keeps every active party visible (PartyVisibilityOnServerPatch), so its save marks the whole map
         // visible. Map visuals take their first alpha from it and visible ones build their ship models, which crashes
         // a client with hundreds of fleets, so clear it before they start; PartyVisibilitySweep then reveals the
-        // parties in range. Only network-transferred saves use this load path; debug builds keep everything visible.
+        // parties in range. Runs from TransferredSaveGameManager.OnGameLoaded, since the save system's late initialize
+        // rewrites every saved field before that. Only transferred saves use this; debug builds keep everything visible.
         if (DebugPartyVisibility.ForceAllVisible) return;
 
         foreach (var party in campaign.MobileParties)
