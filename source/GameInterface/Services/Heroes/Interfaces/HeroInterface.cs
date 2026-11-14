@@ -234,11 +234,10 @@ internal class HeroInterface : IHeroInterface
             playerParty.Party.SetAsCameraFollowParty();
         }
 
-        // The transferred host save carries the server's always-visible party state
-        // (PartyVisibilityServerPatches) and the native load path never rebuilds fog of war
-        // (Campaign.GameInitTick only runs for new campaigns), so distant parties and their battle
-        // icons would stay revealed forever. Queued so it runs once the campaign state is entered
-        // and the hero switched to above is the local main party.
+        // The transferred host save loads with every party hidden (ClearTransferredPartyVisibility)
+        // and the native load path never rebuilds fog of war (Campaign.GameInitTick only runs for
+        // new campaigns), so nearby parties would stay hidden. Queued so it runs once the campaign
+        // state is entered and the hero switched to above is the local main party.
         GameThread.RunSafe(partyVisibilitySweep.RebuildAroundMainParty);
         MessageBroker.Instance.Publish(player, new SwitchedPlayer());
     }

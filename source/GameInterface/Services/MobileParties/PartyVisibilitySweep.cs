@@ -16,8 +16,9 @@ public interface IPartyVisibilitySweep
 /// Loading a save restores each party's persisted visibility verbatim, and the native per-tick
 /// sweep (<c>CampaignTickCacheDataStore.UpdateVisibilitiesAroundMainParty</c>) only re-evaluates
 /// parties within seeing range of the main party — visibility is sticky everywhere else. A joining
-/// client loads the server's transferred save, where <see cref="Patches.PartyVisibilityOnServerPatch"/>
-/// keeps every party visible, so without this pass the whole map stays revealed for the client.
+/// client loads the server's transferred save with every party hidden
+/// (<see cref="GameState.Interfaces.GameStateInterface.ClearTransferredPartyVisibility"/>), so this pass
+/// reveals the parties in range of the local main party.
 /// </summary>
 internal sealed class PartyVisibilitySweep : IPartyVisibilitySweep
 {

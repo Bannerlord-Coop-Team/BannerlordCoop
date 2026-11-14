@@ -1,6 +1,7 @@
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
+using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.MobileParties;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
@@ -13,10 +14,10 @@ using Xunit.Abstractions;
 namespace E2E.Tests.Services.MobileParties;
 
 /// <summary>
-/// Verifies the post-join fog-of-war rebuild. A joining client loads the server's transferred save,
-/// where every party is forced visible (PartyVisibilityServerPatches); the native load path never
-/// recomputes visibility and the per-tick sweep only touches parties near the main party, so
-/// <see cref="PartyVisibilitySweep"/> must hide everything beyond seeing range in one pass.
+/// Verifies the post-join fog-of-war rebuild. The server's transferred save has every party forced
+/// visible (PartyVisibilityServerPatches), which a release client clears on load; the native load path
+/// never recomputes visibility and the per-tick sweep only touches parties near the main party, so
+/// <see cref="PartyVisibilitySweep"/> must settle every party against seeing range in one pass.
 /// </summary>
 public class PartyVisibilitySweepTests : IDisposable
 {
@@ -42,8 +43,11 @@ public class PartyVisibilitySweepTests : IDisposable
         TestEnvironment.Dispose();
     }
 
-    [Fact]
-    public void RebuildAroundMainParty_RestoresFogOfWar()
+    // Cleared is the release client load path, where every party starts hidden and the sweep reveals those in range.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RebuildAroundMainParty_RestoresFogOfWar(bool clearedOnLoad)
     {
         // Arrange
         string? mainPartyId = null;
@@ -87,6 +91,7 @@ public class PartyVisibilitySweepTests : IDisposable
             mainParty._isVisible = true;
             nearParty._isVisible = true;
             farParty._isVisible = true;
+            if (clearedOnLoad) GameStateInterface.ClearTransferredPartyVisibility(Campaign.Current);
 
             new PartyVisibilitySweep().RebuildAroundMainParty();
 
