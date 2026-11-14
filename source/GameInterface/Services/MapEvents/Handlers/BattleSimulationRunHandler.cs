@@ -6,6 +6,7 @@ using Common.Network.Messages;
 using Common.Util;
 using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Logging;
+using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MapEventSides.Messages;
