@@ -137,7 +137,7 @@ Tests use xUnit. Add unit tests for logic that does not require Bannerlord to ru
 
 Most PRs are agent-written and static analysis covers a lot, so don't add low or medium value tests, because they cost more to keep than they protect. That includes a test that injects a request a normal client never sends, re-tests a shared guard per handler instead of once at the shared method, asserts a one-line guard through a side effect, builds a state with no real route to it, or repeats an attribute. Keep tests for what reading the code can't settle, like wire round trips, ordering across threads, and Harmony or JIT behaviour.
 
-Before opening a PR that changes `Common`, `Coop.Core` or `GameInterface`, run `bash .github/scripts/run-mutation-tests.sh` (Stryker.NET on the changed files against the unit tests that cover them, about 5 to 15 minutes per project; the PR runs it too, report-only). A mutant that survives on a changed line means no test fails when that line is broken, so a test there should assert more, or the code is dead.
+Before opening a PR that changes C# in a project listed at the top of `.github/scripts/run-mutation-tests.sh` (Common, Coop.Core and GameInterface today), run `bash .github/scripts/run-mutation-tests.sh`. It runs Stryker.NET on the changed lines against the unit tests that cover them, about 5 to 15 minutes per project, and the PR runs it too, report-only. A mutant that survives on a changed line means no test fails when that line is broken, so a test there should assert more, or the code is dead.
 
 A new Coop.Core server handler that depends on a GameInterface service needs a `RegisterMock<T>` in `Coop.Tests/TestComponentBase.cs`, otherwise every server-container test in `Coop.Tests` fails to build its container.
 

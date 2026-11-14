@@ -1,17 +1,17 @@
 name: Mutation Testing
 
-# Report-only: mutates the C# files a PR changes in Common, Coop.Core and GameInterface and lists
-# the mutants no unit test catches. It isn't a required check and never fails on the score.
+# Report-only: mutates the C# lines a PR changes in the projects run-mutation-tests.sh lists and
+# shows the mutants no unit test catches. It isn't a required check and never fails on the score.
+# The paths filter is broad on purpose, and the scope step narrows it to the mutated projects.
 on:
   pull_request:
     types: [opened, synchronize, reopened]
     paths:
-      - 'source/Common/**'
-      - 'source/Coop.Core/**'
-      - 'source/GameInterface/**'
+      - 'source/**/*.cs'
+      - 'source/stryker-config.json'
       - '.config/dotnet-tools.json'
       - '.github/scripts/run-mutation-tests.sh'
-      - '.github/scripts/mutation-summary.cjs'
+      - '.github/scripts/mutation-*.cjs'
       - '.github/workflows/mutation-testing.yml'
 
 concurrency:
@@ -39,16 +39,19 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.sha }}
 
-      - name: Find changed source
+      - name: Test the mutation scripts
+        run: node --test .github/scripts/mutation-spans.test.cjs .github/scripts/mutation-summary.test.cjs
+
+      - name: Find changed lines
         id: scope
         run: |
-          changed=$(bash .github/scripts/run-mutation-tests.sh --list "$BASE_SHA")
-          if [ -z "$changed" ]; then
+          patterns=$(bash .github/scripts/run-mutation-tests.sh --list "$BASE_SHA")
+          if [ -z "$patterns" ]; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "No changed C# files in Common, Coop.Core or GameInterface, so nothing was mutated." >> "$GITHUB_STEP_SUMMARY"
+            echo "Skipped: this PR changes no C# lines in the mutation-tested projects." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
-          printf '%s\n' "$changed"
+          printf '%s\n' "$patterns"
 
       - name: Set up .NET
         if: steps.scope.outputs.skip != 'true'
@@ -74,16 +77,18 @@ jobs:
           docker rm game-assemblies >/dev/null
           echo "BANNERLORD_DIR=$RUNNER_TEMP/mb2" >> "$GITHUB_ENV"
 
-      - name: Run Stryker on changed files
+      - name: Run Stryker on changed lines
         if: steps.scope.outputs.skip != 'true'
         run: bash .github/scripts/run-mutation-tests.sh "$BASE_SHA" artifacts/mutation
 
       - name: Write summary
         if: ${{ always() && steps.scope.outputs.skip != 'true' }}
-        # Runs again here so a timed-out or failed run still lists the projects that finished.
+        # The script rewrites summary.md after each project, so a failed run still lists what finished.
         run: |
-          if [ -f artifacts/mutation/merge-base ]; then
-            node .github/scripts/mutation-summary.cjs artifacts/mutation >> "$GITHUB_STEP_SUMMARY"
+          if [ -f artifacts/mutation/summary.md ]; then
+            cat artifacts/mutation/summary.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "The mutation run stopped before it wrote a summary, see the Run Stryker step log." >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Upload mutation report
