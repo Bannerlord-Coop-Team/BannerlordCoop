@@ -10,12 +10,8 @@ public readonly struct NetworkRaidContinuationRequested : ICommand
     [ProtoMember(1)]
     public readonly string SettlementId;
 
-    [ProtoMember(2)]
-    public readonly string MobilePartyId;
-
-    public NetworkRaidContinuationRequested(string settlementId, string mobilePartyId)
+    public NetworkRaidContinuationRequested(string settlementId)
     {
         SettlementId = settlementId;
-        MobilePartyId = mobilePartyId;
     }
 }

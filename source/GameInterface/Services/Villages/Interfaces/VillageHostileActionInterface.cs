@@ -5,7 +5,6 @@ using Common.Util;
 using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.MapEvents;
-using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PlayerCaptivityService.Messages;
@@ -61,6 +60,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
     // request, and a won raid's continuation waiting for the current encounter to end.
     private PlayerEncounter requestedHostileActionEncounter;
     private Settlement parkedRaidContinuation;
+    private PlayerEncounter parkedRaidEncounter;
 
     public VillageHostileActionInterface(IMessageBroker messageBroker, IObjectManager objectManager)
     {
@@ -80,6 +80,9 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
             deferredForceScreen = null;
         }
         pendingForceTransfers.Clear();
+        requestedHostileActionEncounter = null;
+        parkedRaidContinuation = null;
+        parkedRaidEncounter = null;
     }
 
     public void RequestHostileAction(VillageHostileAction action)
@@ -207,6 +210,8 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
     public void ParkRaidContinuation(Settlement settlement)
     {
         parkedRaidContinuation = settlement;
+        parkedRaidEncounter = PlayerEncounter.Current;
+        // Keep the continuation parked until the result screens have finished and the encounter can be reused.
     }
 
     private void PresentParkedRaidContinuation()
@@ -215,11 +220,20 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         if (settlement == null)
             return;
 
+        if (PlayerCaptivity.IsCaptive ||
+            (parkedRaidEncounter != null && !ReferenceEquals(PlayerEncounter.Current, parkedRaidEncounter)))
+        {
+            parkedRaidContinuation = null;
+            parkedRaidEncounter = null;
+            return;
+        }
+
         if (!CanPresentRaidContinuation(PlayerCaptivity.IsCaptive, MobileParty.MainParty?.MapEvent != null,
                 PlayerEncounter.Current?.EncounterState))
             return;
 
         parkedRaidContinuation = null;
+        parkedRaidEncounter = null;
         StartRaidContinuationEncounter(settlement);
     }
 
@@ -230,11 +244,11 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
     {
         // The completed event is already finalized. Request a fresh approval now, rather than
         // letting its timeout run while the player is still viewing the previous battle's results.
+        // Both the player and village parties can still point at the finalized event after its registry entry is gone.
         PartyBase.MainParty._mapEventSide = null;
         settlement.Party._mapEventSide = null;
         PlayerEncounter.Start();
         PlayerEncounter.Current.SetupFields(PartyBase.MainParty, settlement.Party);
-        PlayerEncounter.Current._mapEvent = null;
         messageBroker.Publish(this, new VillageHostileActionAttempted(VillageHostileAction.Raid, MobileParty.MainParty, settlement));
     }
 

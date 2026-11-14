@@ -519,7 +519,8 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
             return false;
         }
 
-        // A winning simulation still needs the encounter references for the native loot-end continuation.
+        // A winning raid simulation keeps its encounter references for the native loot-end continuation;
+        // non-raid wins use the normal defeat cleanup below.
         if (mapEvent.IsRaidHostileAction() && mapEvent.WinningSide == encounter.PlayerSide)
             return false;
 

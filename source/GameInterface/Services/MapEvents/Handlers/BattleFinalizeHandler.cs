@@ -16,7 +16,6 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Settlements.Interfaces;
 using GameInterface.Services.SiegeEvents.Patches;
-using GameInterface.Services.Villages.Data;
 using GameInterface.Services.Villages.Messages;
 using LiteNetLib;
 using Serilog;
@@ -478,7 +477,6 @@ internal class BattleFinalizeHandler : IHandler
         var continued = false;
         string[] playerPartyIds = null;
         string settlementId = null;
-        string leaderMobilePartyId = null;
         NetPeer leaderPeer = null;
 
         GameThread.RunSafe(
@@ -492,10 +490,13 @@ internal class BattleFinalizeHandler : IHandler
                     return;
 
                 var leaderParty = mapEvent.AttackerSide.LeaderParty;
-                if (leaderParty?.MobileParty == null ||
-                    !objectManager.TryGetIdWithLogging(leaderParty.MobileParty, out leaderMobilePartyId) ||
-                    !playerManager.TryGetPlayer(leaderParty.MobileParty, out var leader) ||
-                    !playerManager.TryGetPeer(leader.ControllerId, out leaderPeer))
+                if (leaderParty?.MobileParty == null)
+                    return;
+
+                if (!playerManager.TryGetPlayer(leaderParty.MobileParty, out var leader))
+                    return;
+
+                if (!playerManager.TryGetPeer(leader.ControllerId, out leaderPeer))
                     return;
 
                 if (!TryMarkFinalized(mapEvent))
@@ -528,7 +529,7 @@ internal class BattleFinalizeHandler : IHandler
             PvpEncounterCloseSender.Send(network, playerPartyIds, mapEventId: mapEventId);
 
         // The client parks the continuation until its battle result screens close.
-        network.Send(leaderPeer, new NetworkRaidContinuationRequested(settlementId, leaderMobilePartyId));
+        network.Send(leaderPeer, new NetworkRaidContinuationRequested(settlementId));
 
         return true;
     }

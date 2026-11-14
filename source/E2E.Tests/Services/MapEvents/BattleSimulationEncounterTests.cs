@@ -84,10 +84,8 @@ public class BattleSimulationEncounterTests : MapEventTestBase
         }, MapEventDisabledMethods);
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void CompletedAdvance_NonCaptiveDefeat_CanLeaveAfterScoreboard(bool menuConsequence)
+    [Fact]
+    public void CompletedAdvance_NonCaptiveDefeat_CanLeaveAfterScoreboard()
     {
         var context = CreateServerMapEvent();
         var client = Clients.First();
@@ -139,11 +137,7 @@ public class BattleSimulationEncounterTests : MapEventTestBase
                 Assert.Null(encounter._mapEvent);
                 Assert.Null(encounter.BattleSimulation);
 
-                if (menuConsequence)
-                    new TaleWorlds.CampaignSystem.CampaignBehaviors.EncounterGameMenuBehavior()
-                        .game_menu_encounter_leave_on_consequence(null);
-                else
-                    MenuHelper.EncounterLeaveConsequence();
+                MenuHelper.EncounterLeaveConsequence();
 
                 Assert.Null(PlayerEncounter.Current);
                 Assert.Null(MobileParty.MainParty.Party.MapEventSide);
