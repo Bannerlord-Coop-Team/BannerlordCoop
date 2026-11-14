@@ -264,7 +264,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         if (isCaptive || encounterReplaced)
             return RaidContinuationDecision.Drop;
 
-        if (hasMapEvent || encounterState.HasValue && encounterState.Value != PlayerEncounterState.End)
+        if (hasMapEvent || (encounterState.HasValue && encounterState.Value != PlayerEncounterState.End))
             return RaidContinuationDecision.Wait;
 
         return RaidContinuationDecision.Present;
