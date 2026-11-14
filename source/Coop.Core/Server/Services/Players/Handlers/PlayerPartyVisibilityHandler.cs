@@ -339,7 +339,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
                         siegeEventInterface.BreakSiegeForPartyOnly(member);
 
                     // Same pair the army-removal network flow uses, the publish replicates it to clients
-                    messageBroker.Publish(member, new MobilePartyInArmyRemoved(army, member, null));
+                    messageBroker.Publish(member, new MobilePartyInArmyRemoved(army, member, null, abandonArmy: false));
                     ArmyPatches.RemoveMobilePartyInArmy(member, army, null);
                 }
                 catch (Exception e)

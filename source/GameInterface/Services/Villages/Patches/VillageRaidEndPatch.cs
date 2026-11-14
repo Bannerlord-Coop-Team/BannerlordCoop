@@ -23,16 +23,10 @@ internal class VillageRaidEndPatch
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         if (ModInformation.IsServer) return true;
 
-        var mapEvent = PlayerEncounter.Battle ?? MapEvent.PlayerMapEvent;
-        if (mapEvent != null)
-        {
-            MessageBroker.Instance.Publish(mapEvent, new MapEventFinalizeAttempted(mapEvent));
-            return false;
-        }
-
-        CloseLocalRaidMenu();
+        EndRaid();
         return false;
     }
+
     [HarmonyPatch(typeof(VillageHostileActionCampaignBehavior), nameof(VillageHostileActionCampaignBehavior.wait_menu_end_raiding_at_army_by_leaving_on_consequence))]
     [HarmonyPrefix]
     private static bool Prefixwait_menu_end_raiding_at_army_by_leaving_on_consequence()
@@ -40,20 +34,12 @@ internal class VillageRaidEndPatch
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         if (ModInformation.IsServer) return true;
 
-        var message = new MobilePartyInArmyRemoved(MobileParty.MainParty.Army, MobileParty.MainParty, MobileParty.MainParty);
-        var mapEvent = PlayerEncounter.Battle ?? MapEvent.PlayerMapEvent;
-        if (mapEvent != null)
-        {
-            MessageBroker.Instance.Publish(mapEvent, new MapEventFinalizeAttempted(mapEvent));
-            MessageBroker.Instance.Publish(mapEvent, message);
-            return false;
-        }
-
-        CloseLocalRaidMenu();
-
-        MessageBroker.Instance.Publish(mapEvent, message);
+        var army = MobileParty.MainParty.Army;
+        EndRaid();
+        PublishArmyRemoval(army, abandon: false);
         return false;
     }
+
     [HarmonyPatch(typeof(VillageHostileActionCampaignBehavior), nameof(VillageHostileActionCampaignBehavior.wait_menu_end_raiding_at_army_by_abandoning_on_consequence))]
     [HarmonyPrefix]
     private static bool Prefixwait_menu_end_raiding_at_army_by_abandoning_on_consequence()
@@ -61,23 +47,25 @@ internal class VillageRaidEndPatch
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         if (ModInformation.IsServer) return true;
 
-        MessageBroker.Instance.Publish(null,
-            new ChangeClanInfluence(Clan.PlayerClan,
-            (int)(float)Campaign.Current.Models.DiplomacyModel.GetInfluenceCostOfAbandoningArmy()));
+        var army = MobileParty.MainParty.Army;
+        EndRaid();
+        PublishArmyRemoval(army, abandon: true);
+        return false;
+    }
 
-        var message = new MobilePartyInArmyRemoved(MobileParty.MainParty.Army, MobileParty.MainParty, MobileParty.MainParty);
+    private static void EndRaid()
+    {
         var mapEvent = PlayerEncounter.Battle ?? MapEvent.PlayerMapEvent;
         if (mapEvent != null)
-        {
             MessageBroker.Instance.Publish(mapEvent, new MapEventFinalizeAttempted(mapEvent));
-            MessageBroker.Instance.Publish(mapEvent, message);
-            return false;
-        }
+        else
+            CloseLocalRaidMenu();
+    }
 
-        CloseLocalRaidMenu();
-
-        MessageBroker.Instance.Publish(mapEvent, message);
-        return false;
+    private static void PublishArmyRemoval(Army army, bool abandon)
+    {
+        var party = MobileParty.MainParty;
+        MessageBroker.Instance.Publish(party, new MobilePartyInArmyRemoved(army, party, party, abandonArmy: abandon));
     }
 
     private static void CloseLocalRaidMenu()

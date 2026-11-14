@@ -12,11 +12,13 @@ public readonly struct MobilePartyInArmyRemoved : IEvent
     public readonly Army Army;
     public readonly MobileParty MobileParty;
     public readonly MobileParty ClientMobileParty;
+    public readonly bool AbandonArmy;
 
-    public MobilePartyInArmyRemoved(Army army, MobileParty mobileParty, MobileParty clientMobileParty)
+    public MobilePartyInArmyRemoved(Army army, MobileParty mobileParty, MobileParty clientMobileParty, bool abandonArmy=false)
     {
         Army = army;
         MobileParty = mobileParty;
         ClientMobileParty = clientMobileParty;
+        AbandonArmy = abandonArmy;
     }
 }

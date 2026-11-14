@@ -159,7 +159,7 @@ internal class SiegeEntryFlowPatches
         var army = mainParty.Army;
         if (army != null)
         {
-            MessageBroker.Instance.Publish(army, new MobilePartyInArmyRemoved(army, mainParty, mainParty));
+            MessageBroker.Instance.Publish(army, new MobilePartyInArmyRemoved(army, mainParty, mainParty, abandonArmy: false));
         }
         PlayerSiege.FinalizePlayerSiege();
 
@@ -226,7 +226,8 @@ internal class SiegeEntryFlowPatches
         MessageBroker.Instance.Publish(null,
             new MobilePartyInArmyRemoved(MobileParty.MainParty.Army,
             MobileParty.MainParty,
-            MobileParty.MainParty));
+            MobileParty.MainParty,
+            abandonArmy: false));
         return false;
     }
 
@@ -281,7 +282,7 @@ internal class SiegeEntryFlowPatches
         var army = mainParty.Army;
         if (army != null && army.LeaderParty != mainParty)
         {
-            MessageBroker.Instance.Publish(army, new MobilePartyInArmyRemoved(army, mainParty, mainParty));
+            MessageBroker.Instance.Publish(army, new MobilePartyInArmyRemoved(army, mainParty, mainParty, abandonArmy: false));
         }
 
         // A besieger prompted into join_siege_event can already sit on a side of the sally-out/relief map
