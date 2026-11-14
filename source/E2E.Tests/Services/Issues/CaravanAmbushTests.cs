@@ -354,7 +354,7 @@ public class CaravanAmbushTests : IDisposable
         }, new[] { AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize)) });
         Assert.Equal(IssueOutcome.QuestFail, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
         Server.Call(AssertPartiesReleased);
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkCaravanAmbushProgress>(message => message.OpenRewardConversation));
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkCaravanAmbushProgress>().Where(message => message.OpenRewardConversation));
     }
 
     [Fact]
@@ -391,7 +391,7 @@ public class CaravanAmbushTests : IDisposable
             Assert.True(quest._isCaravanSaved);
         }, new[] { AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize)) });
         Server.Call(() => Assert.Equal(goldBefore + 1000, PlayerHero(QuestScenario.ControllerA).Gold));
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkCaravanAmbushProgress>(message => message.OpenRewardConversation));
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkCaravanAmbushProgress>().Where(message => message.OpenRewardConversation));
         var finalized = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
         Assert.Equal(IssueOutcome.QuestSuccess, finalized.Outcome);
     }
@@ -460,7 +460,7 @@ public class CaravanAmbushTests : IDisposable
                 CampaignEventDispatcher.Instance.OnMapEventEnded(battle);
             AssertPartiesReleased();
         }, new[] { AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize)) });
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkCaravanAmbushProgress>(message => message.OpenRewardConversation));
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkCaravanAmbushProgress>().Where(message => message.OpenRewardConversation));
         Assert.Equal(IssueOutcome.QuestFail, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
     }
 
