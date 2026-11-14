@@ -1129,4 +1129,31 @@
       </EquipmentRoster>
     </Equipments>
   </NPCCharacter>
+  <NPCCharacter
+    id="coop_fixed_npc_32b3b885"
+    name="{=!}Can Olcar"
+    default_group="Infantry"
+    level="1"
+    is_female="true"
+    is_hero="false"
+    is_template="false"
+    occupation="Townsfolk"
+    culture="Culture.aserai"
+    is_hidden_encyclopedia="true"
+    coop_settlement="town_EW3"
+    coop_location="tavern"
+    coop_spawn_tag="npc_common"
+    coop_dialogue="Her vuruş 10 kuruş"
+    coop_enabled="true">
+    <face>
+      <face_key_template value="BodyProperty.townswoman_aserai" />
+    </face>
+    <skills />
+    <Equipments>
+      <EquipmentRoster civilian="true">
+        <equipment slot="Head" id="Item.aserai_female_civil_hscarf_b" />
+        <equipment slot="Leg" id="Item.highland_boots" />
+      </EquipmentRoster>
+    </Equipments>
+  </NPCCharacter>
 </NPCCharacters>
