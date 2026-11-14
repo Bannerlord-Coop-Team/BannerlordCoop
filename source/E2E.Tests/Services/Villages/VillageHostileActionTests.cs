@@ -1335,7 +1335,7 @@ public class VillageHostileActionTests : MapEventTestBase
     }
 
     private static void CloseTopGameState(GameStateManager states) =>
-        CloseTopGameState(states);
+        states._gameStates.RemoveAt(states._gameStates.Count - 1);
 
     private void AssertRaidContinuationPresented(CompletedRaidSimulation result)
     {

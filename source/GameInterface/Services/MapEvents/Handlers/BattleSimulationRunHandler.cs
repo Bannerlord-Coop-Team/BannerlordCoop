@@ -920,6 +920,9 @@ internal class BattleSimulationRunHandler : IHandler
     /// </summary>
     private void CompleteSimulationSession(string mapEventId, ActiveSimulation sim)
     {
+        lock (simLock)
+            activeSimulations.Remove(mapEventId);
+
         EndSimulationSessionSafe(mapEventId, sim, () =>
         {
             if (!PlayerWonSimulation(sim.MapEvent))
