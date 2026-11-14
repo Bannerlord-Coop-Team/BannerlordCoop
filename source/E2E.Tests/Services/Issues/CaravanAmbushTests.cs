@@ -57,7 +57,12 @@ public class CaravanAmbushTests : IDisposable
             PlayerHero(QuestScenario.ControllerA);
             PlayerHero(QuestScenario.ControllerB);
         });
-        Owner.Call(() => QuestOf(Owner).StartQuest());
+        Owner.Call(() =>
+        {
+            Assert.True(Owner.Resolve<IIssueOwnershipRegistry>().TrySetOwner(
+                scenario.NotableId, QuestScenario.IssueId, QuestScenario.ControllerA));
+            QuestOf(Owner).StartQuest();
+        });
     }
 
     public void Dispose()
@@ -336,10 +341,11 @@ public class CaravanAmbushTests : IDisposable
         {
             Campaign.Current.EncyclopediaManager ??= new EncyclopediaManager();
             Campaign.Current.EncyclopediaManager.CreateEncyclopediaPages();
+            var quest = QuestOf(Server);
             var battle = StartAmbushBattle(GameObjectCreator.CreateInitializedObject<MobileParty>());
             battle.BattleState = BattleState.AttackerVictory;
             Server.Resolve<ICaravanAmbushWorldEventService>().BattleEnded(battle);
-            Assert.True(QuestOf(Server).IsFinalized);
+            Assert.True(quest.IsFinalized);
             AssertPartiesReleased();
         }, new[] { AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize)) });
         Assert.Equal(IssueOutcome.QuestFail, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
@@ -518,19 +524,18 @@ public class CaravanAmbushTests : IDisposable
     {
         Owner.Call(() =>
         {
-            var map = new Moq.Mock<ICaravanAmbushConversationMap>();
-            map.Setup(value => value.TryOpen(Moq.It.IsAny<MobileParty>())).Returns(true);
-            using var conversation = new CaravanAmbushRewardConversation(Owner.Resolve<IMessageBroker>(), Owner.Resolve<IIssueResolver>(), map.Object);
+            var map = new ConversationMap();
+            using var conversation = new CaravanAmbushRewardConversation(Owner.Resolve<IMessageBroker>(), Owner.Resolve<IIssueResolver>(), map);
             var quest = QuestOf(Owner);
             quest._caravanParty = Owner.GetRegisteredObject<MobileParty>(caravanId);
             quest._isCaravanSaved = true;
             conversation.Request(scenario.NotableId, QuestScenario.IssueId);
             TickOwner();
-            map.Verify(value => value.TryOpen(Moq.It.IsAny<MobileParty>()), Moq.Times.Never);
-            map.Setup(value => value.IsOwnerFreeOnMap()).Returns(true);
+            Assert.Empty(map.Opened);
+            map.IsFree = true;
             TickOwner();
             TickOwner();
-            map.Verify(value => value.TryOpen(quest._caravanParty), Moq.Times.Once);
+            Assert.Same(quest._caravanParty, Assert.Single(map.Opened));
         });
     }
 
@@ -539,16 +544,16 @@ public class CaravanAmbushTests : IDisposable
     {
         Owner.Call(() =>
         {
-            var map = new Moq.Mock<ICaravanAmbushConversationMap>();
-            map.Setup(value => value.IsOwnerFreeOnMap()).Returns(true);
-            map.Setup(value => value.TryOpen(Moq.It.IsAny<MobileParty>())).Throws(new InvalidOperationException("open failed"));
-            using var conversation = new CaravanAmbushRewardConversation(Owner.Resolve<IMessageBroker>(), Owner.Resolve<IIssueResolver>(), map.Object);
+            var map = new ConversationMap();
+            map.IsFree = true;
+            map.ThrowOnOpen = true;
+            using var conversation = new CaravanAmbushRewardConversation(Owner.Resolve<IMessageBroker>(), Owner.Resolve<IIssueResolver>(), map);
             var quest = QuestOf(Owner);
             quest._caravanParty = Owner.GetRegisteredObject<MobileParty>(caravanId);
             quest._isCaravanSaved = true;
             Assert.Throws<InvalidOperationException>(() => conversation.Request(scenario.NotableId, QuestScenario.IssueId));
             TickOwner();
-            map.Verify(value => value.TryOpen(quest._caravanParty), Moq.Times.Once);
+            Assert.Same(quest._caravanParty, Assert.Single(map.Opened));
         });
     }
 
@@ -557,14 +562,14 @@ public class CaravanAmbushTests : IDisposable
     {
         Owner.Call(() =>
         {
-            var map = new Moq.Mock<ICaravanAmbushConversationMap>();
-            using var conversation = new CaravanAmbushRewardConversation(Owner.Resolve<IMessageBroker>(), Owner.Resolve<IIssueResolver>(), map.Object);
+            var map = new ConversationMap();
+            using var conversation = new CaravanAmbushRewardConversation(Owner.Resolve<IMessageBroker>(), Owner.Resolve<IIssueResolver>(), map);
             conversation.Request(scenario.NotableId, QuestScenario.IssueId);
             using (new AllowedThread()) QuestOf(Owner)._questState = QuestBase.QuestStates.Finalized;
             TickOwner();
-            map.Setup(value => value.IsOwnerFreeOnMap()).Returns(true);
+            map.IsFree = true;
             TickOwner();
-            map.Verify(value => value.TryOpen(Moq.It.IsAny<MobileParty>()), Moq.Times.Never);
+            Assert.Empty(map.Opened);
         });
     }
 
@@ -697,6 +702,22 @@ public class CaravanAmbushTests : IDisposable
             Assert.True(otherQuest.IsOngoing);
             Assert.Contains(otherQuest, Campaign.Current.QuestManager.Quests);
         });
+    }
+
+    private sealed class ConversationMap : ICaravanAmbushConversationMap
+    {
+        public bool IsFree { get; set; }
+        public bool ThrowOnOpen { get; set; }
+        public List<MobileParty> Opened { get; } = new();
+
+        public bool IsOwnerFreeOnMap() => IsFree;
+
+        public bool TryOpen(MobileParty caravan)
+        {
+            Opened.Add(caravan);
+            if (ThrowOnOpen) throw new InvalidOperationException("open failed");
+            return true;
+        }
     }
 
     private void TickOwner()
