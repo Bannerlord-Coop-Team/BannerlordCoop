@@ -133,7 +133,7 @@ public class CoopServerStartTests
             Mock.Of<IMessagePacketHandler>(),
             Mock.Of<IConnectionMessageQueue>(),
             Mock.Of<IServerJoinAdmission>(),
-            Mock.Of<IJoinPeerTerminator>(),
+            Mock.Of<IPeerTerminator>(),
             Mock.Of<IControllerIdProvider>(),
             Mock.Of<IMissionManager>(),
             new Lazy<IOverloadedPeerManager>(() => Mock.Of<IOverloadedPeerManager>()),

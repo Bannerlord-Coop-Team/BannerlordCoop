@@ -56,7 +56,7 @@ public class ServerShutdownCoordinator : IServerShutdownCoordinator
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IConnectionCollection connections;
-    private readonly IJoinPeerTerminator peerTerminator;
+    private readonly IPeerTerminator peerTerminator;
     private readonly IServerJoinAdmission joinAdmission;
     private readonly ISaveInterface saveInterface;
     private readonly IMissionManager missionManager;
@@ -82,7 +82,7 @@ public class ServerShutdownCoordinator : IServerShutdownCoordinator
         IMessageBroker messageBroker,
         INetwork network,
         IConnectionCollection connections,
-        IJoinPeerTerminator peerTerminator,
+        IPeerTerminator peerTerminator,
         IServerJoinAdmission joinAdmission,
         ISaveInterface saveInterface,
         IMissionManager missionManager)
@@ -104,7 +104,7 @@ public class ServerShutdownCoordinator : IServerShutdownCoordinator
         IMessageBroker messageBroker,
         INetwork network,
         IConnectionCollection connections,
-        IJoinPeerTerminator peerTerminator,
+        IPeerTerminator peerTerminator,
         IServerJoinAdmission joinAdmission,
         ISaveInterface saveInterface,
         IMissionManager missionManager,

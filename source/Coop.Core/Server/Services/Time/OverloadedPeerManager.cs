@@ -39,7 +39,7 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
     private readonly IConnectionCollection connectionCollection;
     private readonly IConnectionMessageQueue connectionMessageQueue;
 
-    private readonly IJoinPeerTerminator joinPeerTerminator;
+    private readonly IPeerTerminator peerTerminator;
     private readonly Dictionary<NetPeer, JoinProgress> joinCatchUpProgress = new(ReferenceComparer<NetPeer>.Instance);
     private readonly Dictionary<NetPeer, DateTime> preEntryBackpressureStartedUtc = new(ReferenceComparer<NetPeer>.Instance);
 
@@ -59,7 +59,7 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
         ITimeControlInterface timeControlInterface,
         IConnectionCollection connectionCollection,
         IConnectionMessageQueue connectionMessageQueue,
-        IJoinPeerTerminator joinPeerTerminator
+        IPeerTerminator peerTerminator
     )
     {
         this.config = config;
@@ -68,7 +68,7 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
         this.timeControlInterface = timeControlInterface;
         this.connectionCollection = connectionCollection;
         this.connectionMessageQueue = connectionMessageQueue;
-        this.joinPeerTerminator = joinPeerTerminator;
+        this.peerTerminator = peerTerminator;
 
         timeControlInterface.AddUnpausePolicy(PlayersOverloadedPolicy);
     }
@@ -185,7 +185,7 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
                 clearedPackets,
                 queueDescription);
 
-            joinPeerTerminator.Disconnect(entry.Peer, disconnectCode);
+            peerTerminator.Disconnect(entry.Peer, disconnectCode);
         }
     }
 
@@ -279,7 +279,7 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
                 clearedPackets,
                 queueDescription);
 
-            joinPeerTerminator.Disconnect(entry.Peer, disconnectCode);
+            peerTerminator.Disconnect(entry.Peer, disconnectCode);
         }
     }
 

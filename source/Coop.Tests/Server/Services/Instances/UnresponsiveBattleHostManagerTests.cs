@@ -41,7 +41,7 @@ public class UnresponsiveBattleHostManagerTests
         Assert.True(missions.TryEnterMission(member, "member", Battle, out _));
         var hosts = new BattleHostRegistry(Mock.Of<IControllerIdProvider>());
         hosts.Set(Battle, new BattleHostAssignment("host", successorWaiting ? new[] { "member" } : Array.Empty<string>(), 1, isNaval: true));
-        var terminator = new Mock<IJoinPeerTerminator>();
+        var terminator = new Mock<IPeerTerminator>();
 
         new UnresponsiveBattleHostManager(new NetworkConfig(), missions, hosts, terminator.Object).DisconnectUnresponsiveHosts();
 

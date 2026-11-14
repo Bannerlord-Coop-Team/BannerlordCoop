@@ -28,7 +28,7 @@ public class ServerShutdownCoordinatorTests : IDisposable
     private readonly TestMessageBroker broker = new TestMessageBroker();
     private readonly Mock<INetwork> network = new Mock<INetwork>();
     private readonly Mock<IConnectionCollection> connections = new Mock<IConnectionCollection>();
-    private readonly Mock<IJoinPeerTerminator> terminator = new Mock<IJoinPeerTerminator>();
+    private readonly Mock<IPeerTerminator> terminator = new Mock<IPeerTerminator>();
     private readonly ServerJoinAdmission joinAdmission = new ServerJoinAdmission();
     private readonly Mock<ISaveInterface> saves = new Mock<ISaveInterface>();
     private readonly Mock<IMissionManager> missions = new Mock<IMissionManager>();

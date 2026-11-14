@@ -46,7 +46,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
     private readonly IMessagePacketHandler messagePacketHandler;
     private readonly IConnectionMessageQueue connectionMessageQueue;
     private readonly IServerJoinAdmission joinAdmission;
-    private readonly IJoinPeerTerminator peerTerminator;
+    private readonly IPeerTerminator peerTerminator;
     // Buffers per-change sends and merges them into one send per key. Drained each tick in Update.
     private readonly ISendCoalescer coalescer;
     // Lazy breaks the construction cycle: the manager depends on ITimeControlInterface, which depends
@@ -66,7 +66,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         IMessagePacketHandler messagePacketHandler,
         IConnectionMessageQueue connectionMessageQueue,
         IServerJoinAdmission joinAdmission,
-        IJoinPeerTerminator peerTerminator,
+        IPeerTerminator peerTerminator,
         IControllerIdProvider controllerIdProvider,
         IMissionManager missionManager,
         Lazy<IOverloadedPeerManager> overloadedPeerManager,

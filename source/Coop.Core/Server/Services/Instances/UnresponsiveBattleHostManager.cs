@@ -28,13 +28,13 @@ internal class UnresponsiveBattleHostManager : IUnresponsiveBattleHostManager
     private readonly INetworkConfig config;
     private readonly IMissionManager missionManager;
     private readonly IBattleHostRegistry hostRegistry;
-    private readonly IJoinPeerTerminator peerTerminator;
+    private readonly IPeerTerminator peerTerminator;
 
     public UnresponsiveBattleHostManager(
         INetworkConfig config,
         IMissionManager missionManager,
         IBattleHostRegistry hostRegistry,
-        IJoinPeerTerminator peerTerminator)
+        IPeerTerminator peerTerminator)
     {
         this.config = config;
         this.missionManager = missionManager;

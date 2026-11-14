@@ -263,7 +263,7 @@ public class OverloadedPeerManagerTests
         var connections = serverComponent.Container.Resolve<ConnectionCollection>();
         var peer = AddConnectedPeer(connections);
         var state = StartInitialCatchUp(connections, peer);
-        var terminator = new Mock<IJoinPeerTerminator>();
+        var terminator = new Mock<IPeerTerminator>();
         using var manager = CreateWatchdog(new Mock<IConnectionMessageQueue>().Object, terminator.Object);
         var started = DateTime.UtcNow;
         for (int sent = 1; sent < LoadingState.MaxBaselinesPerJoin; sent++)
@@ -334,7 +334,7 @@ public class OverloadedPeerManagerTests
         var queue = new Mock<IConnectionMessageQueue>();
         int heldPackets = AbovePauseThreshold;
         queue.Setup(value => value.TryGetCatchUpPacketsRemaining(peer, out heldPackets)).Returns(true);
-        var terminator = new Mock<IJoinPeerTerminator>();
+        var terminator = new Mock<IPeerTerminator>();
         using var manager = CreateWatchdog(queue.Object, terminator.Object);
         var started = DateTime.UtcNow;
         manager.CheckForOverloadedPeers(started);
@@ -365,7 +365,7 @@ public class OverloadedPeerManagerTests
         int heldPackets = AbovePauseThreshold;
         queue.Setup(value => value.TryGetCatchUpPacketsRemaining(leaving, out heldPackets)).Returns(true);
         queue.Setup(value => value.TryGetCatchUpPacketsRemaining(entering, out heldPackets)).Returns(true);
-        using var manager = CreateWatchdog(queue.Object, new Mock<IJoinPeerTerminator>().Object);
+        using var manager = CreateWatchdog(queue.Object, new Mock<IPeerTerminator>().Object);
         var started = DateTime.UtcNow;
 
         manager.CheckForOverloadedPeers(started);
@@ -397,7 +397,7 @@ public class OverloadedPeerManagerTests
         int betweenThresholds = BetweenThresholds;
         queue.Setup(value => value.TryGetCatchUpPacketsRemaining(entering, out abovePause)).Returns(true);
         queue.Setup(value => value.TryGetCatchUpPacketsRemaining(lingering, out betweenThresholds)).Returns(true);
-        var terminator = new Mock<IJoinPeerTerminator>();
+        var terminator = new Mock<IPeerTerminator>();
         using var manager = CreateWatchdog(queue.Object, terminator.Object);
         var started = DateTime.UtcNow;
 
@@ -430,7 +430,7 @@ public class OverloadedPeerManagerTests
         queue.Setup(value => value.TryGetCatchUpPacketsRemaining(peer, out heldPackets)).Returns(true);
         queue.Setup(value => value.TryGetCatchUpPendingBytes(peer, out pendingBytes)).Returns(true);
         queue.Setup(value => value.HasCatchUpOverflowed(peer)).Returns(overflowed);
-        var terminator = new Mock<IJoinPeerTerminator>();
+        var terminator = new Mock<IPeerTerminator>();
         using var manager = CreateWatchdog(queue.Object, terminator.Object);
         manager.CheckForOverloadedPeers(DateTime.UtcNow);
         AssertAbortedBeforeEntry(state, peer);
@@ -448,7 +448,7 @@ public class OverloadedPeerManagerTests
         return lease;
     }
 
-    private OverloadedPeerManager CreateWatchdog(IConnectionMessageQueue queue, IJoinPeerTerminator terminator) =>
+    private OverloadedPeerManager CreateWatchdog(IConnectionMessageQueue queue, IPeerTerminator terminator) =>
         new(serverComponent.Container.Resolve<INetworkConfig>(), TestMessageBroker,
             new Lazy<INetwork>(() => TestNetwork),
             serverComponent.Container.Resolve<ITimeControlInterface>(),
