@@ -34,9 +34,9 @@ public class DirectMigratedCommandTests
         Type[] commandTypes = GetCommandTypes();
 
 #if DEBUG
-        Assert.Equal(125, commandTypes.Length);
+        Assert.Equal(127, commandTypes.Length);
 #else
-        Assert.Equal(106, commandTypes.Length);
+        Assert.Equal(108, commandTypes.Length);
 #endif
         Assert.All(commandTypes, type =>
         {
@@ -96,7 +96,10 @@ public class DirectMigratedCommandTests
                 "engage_nearest_bandit",
                 "kms",
                 "move_to_settlement",
+                "open_party_screen_as",
                 "route_enemies",
+                "set_troop_state",
+                "stage_party_screen_transfer",
                 "start_nearest_bandit_attack",
                 "upgrade_party_screen_troop",
             },

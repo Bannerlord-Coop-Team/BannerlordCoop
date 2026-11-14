@@ -4,6 +4,8 @@ using Autofac;
 using Common;
 using Common.Logging;
 using Common.Messaging;
+using Common.Util;
+using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
@@ -501,6 +503,7 @@ internal class PartyCommands
             new ExpectedArgs("number", "The number.", true),
             new ExpectedArgs("wounded_count", "The wounded count.", true),
             new ExpectedArgs("xp", "The xp.", true),
+            new ExpectedArgs("replicate", "false keeps the change on the server only, like a change still on its way to the client.", false),
         };
 
         private readonly ICommandObjectResolver resolver;
@@ -533,24 +536,28 @@ internal class PartyCommands
             int oldWounded = oldExists ? oldState.WoundedNumber : 0;
             int oldXp = oldExists ? oldState.Xp : 0;
 
-            if (index < 0 && shouldExist)
+            bool replicate = args.Count < 7 || args[6] != "false";
+            using (replicate ? null : new AllowedThread())
             {
-                roster.AddToCounts(character, System.Math.Max(number, 1), removeDepleted: false);
-                index = roster.FindIndexOfTroop(character);
+                if (index < 0 && shouldExist)
+                {
+                    roster.AddToCounts(character, System.Math.Max(number, 1), removeDepleted: false);
+                    index = roster.FindIndexOfTroop(character);
+                }
+
+                if (index >= 0)
+                {
+                    int currentWounded = roster.GetElementWoundedNumber(index);
+                    if (currentWounded > number) roster.SetElementWoundedNumber(index, number);
+                    roster.SetElementNumber(index, number);
+                    roster.SetElementWoundedNumber(index, woundedCount);
+                    roster.SetElementXp(index, xp);
+                    if (!shouldExist) roster.RemoveZeroCounts();
+                    roster.InitializeCachedData();
+                }
             }
 
-            if (index >= 0)
-            {
-                int currentWounded = roster.GetElementWoundedNumber(index);
-                if (currentWounded > number) roster.SetElementWoundedNumber(index, number);
-                roster.SetElementNumber(index, number);
-                roster.SetElementWoundedNumber(index, woundedCount);
-                roster.SetElementXp(index, xp);
-                if (!shouldExist) roster.RemoveZeroCounts();
-                roster.InitializeCachedData();
-            }
-
-            return Succeeded($"TROOP_STATE_SET party={resolver.DisplayId(party)} character={resolver.DisplayId(character)} " +
+            return Succeeded($"TROOP_STATE_SET replicated={replicate} party={resolver.DisplayId(party)} character={resolver.DisplayId(character)} " +
                    $"oldExists={oldExists} oldNumber={oldNumber} oldWounded={oldWounded} oldXp={oldXp} " +
                    $"newExists={shouldExist} newNumber={number} newWounded={woundedCount} newXp={xp}");
         }
@@ -567,7 +574,7 @@ internal class PartyCommands
         number = 0;
         woundedCount = 0;
         xp = 0;
-        if (strings.Count != 6)
+        if (strings.Count != 6 && strings.Count != 7)
             return "Invalid troop state values.";
 
         if (!bool.TryParse(strings[2], out shouldExist) ||
@@ -644,6 +651,7 @@ internal class PartyCommands
         {
             new ExpectedArgs("character_id", "Troop character name or id; quote names with spaces.", true),
             new ExpectedArgs("upgrade_target_index", "The upgrade target index.", false),
+            new ExpectedArgs("count", "How many to upgrade, 1 by default.", false),
         };
 
         private readonly ICommandObjectResolver resolver;
@@ -661,8 +669,11 @@ internal class PartyCommands
                 return Failed("No active party screen.");
 
             int upgradeTarget = 0;
-            if (args.Count == 2 && (!int.TryParse(args[1], out upgradeTarget) || upgradeTarget < 0))
+            if (args.Count >= 2 && (!int.TryParse(args[1], out upgradeTarget) || upgradeTarget < 0))
                 return Failed("Upgrade target index must be a non-negative integer.");
+            int count = 1;
+            if (args.Count >= 3 && (!int.TryParse(args[2], out count) || count <= 0))
+                return Failed("Count must be a positive integer.");
             if (upgradeTarget >= character.UpgradeTargets.Length)
                 return Succeeded($"{resolver.DisplayId(character)} has {character.UpgradeTargets.Length} upgrade targets.");
 
@@ -682,7 +693,7 @@ internal class PartyCommands
                 PartyScreenLogic.PartyRosterSide.Right,
                 PartyScreenLogic.TroopType.Member,
                 character,
-                1,
+                count,
                 upgradeTarget,
                 insertionIndex);
             if (!logic.ValidateCommand(command))
@@ -710,6 +721,9 @@ internal class PartyCommands
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("character_id", "Troop character name or id; quote names with spaces.", true),
+            new ExpectedArgs("count", "How many to move, 1 by default.", false),
+            new ExpectedArgs("troop_type", "member or prisoner, member by default.", false),
+            new ExpectedArgs("from_side", "right (the player's party) or left, right by default.", false),
         };
 
         private readonly ICommandObjectResolver resolver;
@@ -726,16 +740,27 @@ internal class PartyCommands
             if (!(Game.Current?.GameStateManager?.ActiveState is PartyState partyState))
                 return Failed("No active party screen.");
 
+            int count = 1;
+            if (args.Count > 1 && (!int.TryParse(args[1], out count) || count <= 0))
+                return Failed("Count must be a positive integer.");
+            bool isPrisoner = args.Count > 2 && args[2] == "prisoner";
+            bool fromLeft = args.Count > 3 && args[3] == "left";
+
             var logic = partyState.PartyScreenLogic;
             var partyVm = (ScreenManager.TopScreen as GauntletPartyScreen)?._dataSource;
             if (partyVm == null) return Failed("No active Party screen view model.");
 
-            var row = partyVm.MainPartyTroops.FirstOrDefault(vm => vm.Character == character);
-            if (row == null) return Failed($"{resolver.DisplayId(character)} is not in the right member roster.");
+            var rows = fromLeft
+                ? (isPrisoner ? partyVm.OtherPartyPrisoners : partyVm.OtherPartyTroops)
+                : (isPrisoner ? partyVm.MainPartyPrisoners : partyVm.MainPartyTroops);
+            var row = rows.FirstOrDefault(vm => vm.Character == character);
+            if (row == null) return Failed($"{resolver.DisplayId(character)} is not on that side of the screen.");
+            if (row.Troop.Number < count) return Failed($"Only {row.Troop.Number} {resolver.DisplayId(character)} on that side.");
 
-            partyVm.OnTransferTroop(row, -1, 1, row.Side);
+            partyVm.OnTransferTroop(row, -1, count, row.Side);
             partyVm.ExecuteRemoveZeroCounts();
-            return Succeeded($"PARTY_SCREEN_EDIT_STAGED pending={logic.IsThereAnyChanges()}");
+            return Succeeded($"PARTY_SCREEN_EDIT_STAGED character={resolver.DisplayId(character)} count={count} " +
+                $"prisoner={isPrisoner} fromLeft={fromLeft} pending={logic.IsThereAnyChanges()}");
         }
     }
 
@@ -787,6 +812,148 @@ internal class PartyCommands
                    $"selected={row?.IsSelected == true} upgradeTargets={row?.Upgrades.Count ?? 0} " +
                    $"ready={row?.NumOfReadyToUpgradeTroops ?? 0} upgradeable={row?.NumOfUpgradeableTroops ?? 0} " +
                    $"pending={logic.IsThereAnyChanges()}");
+        }
+    }
+
+    /// <summary>
+    /// Reports every roster of the open Party screen, its Done baseline, and the commands recorded for Done.
+    /// </summary>
+    public sealed class PartyScreenStateCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.mobile_party";
+
+        public string Name => "party_screen_state";
+
+        public string Description => "Reports the open party screen's rosters, baseline and pending commands.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsServer) return Failed("Command can only be run on a client.");
+            var logic = PartyScreenRosterRefresher.GetOpenLogic(Game.Current?.GameStateManager);
+            if (logic == null) return Failed("No open party screen.");
+
+            var output = new StringBuilder();
+            AppendRoster(output, "rightMembers", logic.MemberRosters[1]);
+            AppendRoster(output, "rightPrisoners", logic.PrisonerRosters[1]);
+            AppendRoster(output, "leftMembers", logic.MemberRosters[0]);
+            AppendRoster(output, "leftPrisoners", logic.PrisonerRosters[0]);
+            AppendRoster(output, "baselineRightMembers", logic._initialData.RightMemberRoster);
+            AppendRoster(output, "baselineRightPrisoners", logic._initialData.RightPrisonerRoster);
+            output.AppendLine($"goldChange={logic.CurrentData.PartyGoldChangeAmount}");
+
+            if (ContainerProvider.TryResolve<IPartyScreenCommandTracker>(out var tracker))
+            {
+                foreach (var command in tracker.GetCommands(logic))
+                {
+                    output.AppendLine($"command {command.Code} side={command.RosterSide} type={command.Type} " +
+                        $"character={command.Character?.StringId} number={command.TotalNumber} " +
+                        $"wounded={command.WoundedNumber} target={command.UpgradeTarget}");
+                }
+            }
+
+            return Succeeded(output.ToString());
+        }
+
+        private static void AppendRoster(StringBuilder output, string label, TroopRoster roster)
+        {
+            output.Append(label).Append(':');
+            for (int i = 0; i < roster.Count; i++)
+            {
+                var element = roster.GetElementCopyAtIndex(i);
+                output.Append($" {element.Character?.StringId}={element.Number}/{element.WoundedNumber}w/{element.Xp}xp");
+            }
+            output.AppendLine();
+        }
+    }
+
+    /// <summary>
+    /// Opens a party screen the way the matching vanilla menu or dialog does, for live tests of every screen mode.
+    /// </summary>
+    public sealed class OpenPartyScreenAsCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.mobile_party";
+
+        public string Name => "open_party_screen_as";
+
+        public string Description => "Opens a party screen the way its vanilla menu or dialog does.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("kind", "normal, donate_garrison, donate_prisoners, manage_prisoners, manage_garrison, clan_party, create_clan_party or quest.", true),
+            new ExpectedArgs("target", "Party id for manage_garrison and clan_party, issue giver hero id for quest, companion hero id for create_clan_party.", false),
+        };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public OpenPartyScreenAsCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsServer) return Failed("Command can only be run on a client.");
+            if (Hero.MainHero?.PartyBelongedTo == null) return Failed("The local player hero has no party.");
+
+            string kind = args[0];
+            string target = args.Count > 1 ? args[1] : null;
+            MobileParty party = null;
+            string error = null;
+            if ((kind == "manage_garrison" || kind == "clan_party") &&
+                (target == null || !resolver.TryResolveMobileParty(target, out party, out error)))
+                return Failed(error ?? "This kind needs a party id.");
+
+            switch (kind)
+            {
+                case "normal":
+                    PartyScreenHelper.OpenScreenAsNormal();
+                    break;
+                case "donate_garrison":
+                case "donate_prisoners":
+                case "manage_prisoners":
+                    if (Hero.MainHero.CurrentSettlement?.Town == null) return Failed("The player must be in a town or castle.");
+                    if (kind == "donate_garrison") PartyScreenHelper.OpenScreenAsDonateGarrisonWithCurrentSettlement();
+                    else if (kind == "donate_prisoners") PartyScreenHelper.OpenScreenAsDonatePrisoners();
+                    else PartyScreenHelper.OpenScreenAsManagePrisoners();
+                    break;
+                case "manage_garrison":
+                    PartyScreenHelper.OpenScreenAsManageTroops(party);
+                    break;
+                case "clan_party":
+                    PartyScreenHelper.OpenScreenAsManageTroopsAndPrisoners(party);
+                    break;
+                case "create_clan_party":
+                    if (target == null || !resolver.TryResolveHero(target, out var leader, out error)) return Failed(error ?? "create_clan_party needs the companion hero id.");
+                    PartyScreenHelper.OpenScreenAsCreateClanPartyForHero(leader);
+                    break;
+                case "quest":
+                    if (target == null || !resolver.TryResolveHero(target, out var giver, out error)) return Failed(error ?? "Quest needs the issue giver hero id.");
+                    var issue = giver.Issue;
+                    if (issue == null) return Failed($"{resolver.DisplayId(giver)} has no issue.");
+                    if (ContainerProvider.TryResolve<IAlternativeSolutionPicker>(out var picker))
+                        picker.Open(issue);
+                    PartyScreenHelper.OpenScreenAsQuest(
+                        issue.AlternativeSolutionSentTroops,
+                        new TaleWorlds.Localization.TextObject("{=!}Select troops for mission"),
+                        issue.GetTotalAlternativeSolutionNeededMenCount() + 1,
+                        issue.GetTotalAlternativeSolutionDurationInDays(),
+                        null,
+                        null,
+                        (character, type, side, leftOwnerParty) => !character.IsPlayerCharacter);
+                    break;
+                default:
+                    return Failed($"Unknown kind {kind}.");
+            }
+
+            return Game.Current?.GameStateManager?.ActiveState is PartyState state
+                ? Succeeded($"PARTY_SCREEN_OPENED kind={kind} mode={state.PartyScreenMode} donating={state.IsDonating}")
+                : Failed($"PARTY_SCREEN_NOT_OPENED kind={kind}");
         }
     }
 

@@ -697,32 +697,13 @@ public abstract class MapEventTestBase : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(prisonerHeroId, out var prisonerHero));
             Assert.True(Server.ObjectManager.TryGetHandle(prisonerHero.CharacterObject, out var prisonerCharacterId));
 
-            var emptyRosterDelta = new TroopRosterData(Array.Empty<TroopRosterElementData>());
-            var message = new NetworkCompleteDoneLogic(
+            var release = PartyScreenCommits.Transfer(
+                PartyScreenLogic.PartyRosterSide.Right, PartyScreenLogic.TroopType.Prisoner, prisonerCharacterId, 1);
+            var message = PartyScreenCommits.Create(
                 captorHeroId,
-                Array.Empty<FlattenedTroop>(),
-                Array.Empty<FlattenedTroop>(),
-                Array.Empty<FlattenedTroop>(),
-                emptyRosterDelta,
-                new TroopRosterData(new[]
-                {
-                    new TroopRosterElementData(prisonerCharacterId, 1, 0, 0),
-                }),
-                emptyRosterDelta,
-                new TroopRosterData(new[]
-                {
-                    new TroopRosterElementData(prisonerCharacterId, -1, 0, 0),
-                }),
-                captorParty.ItemRoster.ToArray(),
-                new UpgradedTroopHistoryData(new()),
-                null,
-                null,
-                0,
-                0,
-                0,
-                true,
-                captorParty.Position,
                 PartyScreenHelper.PartyScreenMode.Normal,
+                PartyScreenDoneKind.Default,
+                new[] { release },
                 Server.Resolve<ITroopRosterInterface>().PackTroopRosterOrderData(captorParty.MemberRoster));
 
             var playerManager = Server.Resolve<IPlayerManager>();

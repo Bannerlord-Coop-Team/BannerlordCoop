@@ -600,11 +600,8 @@ public class ArmyOfPoachersTests : IDisposable
             Assert.True(IssueOf(Owner).DoTroopsSatisfyAlternativeSolution(sent, out var explanation), explanation?.ToString());
             Server.Call(() =>
             {
-                Assert.True(Server.ObjectManager.TryGetHandle(Get<CharacterObject>(Server, troopId), out var handle));
-                var delta = new TroopRosterData(new[] { new TroopRosterElementData(handle, 40, 0, 0) });
-                Server.Resolve<IMessageBroker>().Publish(this, new PartyDoneLogicApplied(Owner.NetPeer,
-                    PartyScreenHelper.PartyScreenMode.QuestTroopManage, delta,
-                    playerA.HeroId, scenario.NotableId, QuestScenario.IssueId));
+                Server.Resolve<IAlternativeSolutionCommitments>().SetSelection(Owner.NetPeer, scenario.NotableId, QuestScenario.IssueId,
+                    new[] { new TroopRosterElement(Get<CharacterObject>(Server, troopId)) { Number = 40 } });
             });
             IssueOf(Owner).StartIssueWithAlternativeSolution();
         });

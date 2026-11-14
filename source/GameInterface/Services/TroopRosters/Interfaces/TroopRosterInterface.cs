@@ -4,7 +4,6 @@ using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Heroes.Messages.Collections;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.TroopRosters.Data;
-using GameInterface.Services.TroopRosters.Logging;
 using GameInterface.Services.TroopRosters.Messages;
 using Serilog;
 using System;
@@ -37,22 +36,6 @@ public interface ITroopRosterInterface : IGameAbstraction
     void UpdateWithData(TroopRoster targetTroopRoster, TroopRosterData packedTroopRosterElements, Hero mainHero);
 
     /// <summary>
-    /// Packs the per-character difference between <paramref name="current"/> and <paramref name="initial"/>
-    /// (current minus initial). Only changed characters are included; an unchanged troop - including a hero -
-    /// nets to zero and is omitted, so the change can be re-applied as a delta on the server with no special
-    /// handling for heroes or companions.
-    /// </summary>
-    TroopRosterData PackTroopRosterDelta(TroopRoster current, TroopRoster initial);
-
-    /// <summary>
-    /// Validates and applies a set of packed deltas (produced by <see cref="PackTroopRosterDelta"/>).
-    /// Nothing is applied when any resulting roster element would be invalid. All count reductions are
-    /// applied before any additions across every roster so transferred heroes retain their party linkage.
-    /// </summary>
-    bool TryApplyTroopRosterDeltas(
-        IReadOnlyList<(TroopRoster roster, TroopRosterData delta)> deltas);
-
-    /// <summary>
     /// Runs troop recruitment logic for client requests.
     /// Returns how many cart entries were not recruited because the volunteers or the gold changed.
     /// </summary>
@@ -69,16 +52,13 @@ internal class TroopRosterInterface : ITroopRosterInterface
 {
     private static readonly ILogger Logger = LogManager.GetLogger<TroopRosterInterface>();
     private readonly IObjectManager objectManager;
-    private readonly ITroopRosterLogger troopRosterLogger;
     private readonly IRecruitmentSideEffects recruitmentSideEffects;
 
     public TroopRosterInterface(
         IObjectManager objectManager,
-        ITroopRosterLogger troopRosterLogger,
         IRecruitmentSideEffects recruitmentSideEffects)
     {
         this.objectManager = objectManager;
-        this.troopRosterLogger = troopRosterLogger;
         this.recruitmentSideEffects = recruitmentSideEffects;
     }
 
@@ -144,182 +124,6 @@ internal class TroopRosterInterface : ITroopRosterInterface
 
             targetTroopRoster.Add(element);
         }
-    }
-
-    public TroopRosterData PackTroopRosterDelta(TroopRoster current, TroopRoster initial)
-    {
-        // Diffed via per-character totals (not raw slots), so any quirk present in both snapshots cancels.
-        var currentCounts = SumByCharacter(current);
-        var initialCounts = SumByCharacter(initial);
-
-        var elements = new List<TroopRosterElementData>();
-        foreach (var character in currentCounts.Keys.Union(initialCounts.Keys))
-        {
-            currentCounts.TryGetValue(character, out var cur);
-            initialCounts.TryGetValue(character, out var init);
-
-            int numberDelta = cur.number - init.number;
-            int woundedDelta = cur.wounded - init.wounded;
-            int currentXp = cur.xp;
-            if (cur.number == 0)
-            {
-                currentXp = 0;
-            }
-
-            int initialXp = init.xp;
-            if (init.number == 0)
-            {
-                initialXp = 0;
-            }
-
-            int xpDelta = currentXp - initialXp;
-            if (numberDelta == 0 && woundedDelta == 0 && xpDelta == 0)
-                continue;
-
-            if (!objectManager.TryGetHandleWithLogging(character, out var characterId))
-                continue;
-
-            elements.Add(new TroopRosterElementData(characterId, numberDelta, woundedDelta, xpDelta));
-        }
-
-        return new TroopRosterData(elements);
-    }
-
-    public bool TryApplyTroopRosterDeltas(
-        IReadOnlyList<(TroopRoster roster, TroopRosterData delta)> deltas)
-    {
-        if (deltas == null) return false;
-
-        var elements = new List<(
-            TroopRoster roster,
-            CharacterObject character,
-            TroopRosterElementData delta)>();
-        var uniqueElements = new HashSet<(TroopRoster roster, CharacterObject character)>();
-        foreach (var (roster, delta) in deltas)
-        {
-            if (roster == null) return false;
-
-            if (delta.Data == null) continue;
-            var currentByCharacter = SumByCharacter(roster);
-
-            foreach (var elementData in delta.Data)
-            {
-                if (!objectManager.TryGetObjectWithLogging<CharacterObject>(elementData.CharacterId, out var character))
-                    return false;
-                if (!uniqueElements.Add((roster, character))) return false;
-
-                currentByCharacter.TryGetValue(character, out var current);
-                long finalNumber = current.number + elementData.Number;
-                long finalWounded = current.wounded + elementData.WoundedNumber;
-                long finalXp = current.xp + elementData.Xp;
-                var appliedDelta = elementData;
-                if (EmptiesStackAtVanillaXpCap(roster, character, current, elementData, finalNumber, finalXp))
-                {
-                    troopRosterLogger.Debug(
-                        roster,
-                        "DROP-XP character={CharacterId} xpAboveCap={Xp}",
-                        elementData.CharacterId,
-                        finalXp);
-                    finalXp = 0;
-                    appliedDelta = new TroopRosterElementData(
-                        elementData.CharacterId,
-                        elementData.Number,
-                        elementData.WoundedNumber,
-                        0);
-                }
-
-                if (finalNumber < 0 ||
-                    finalNumber > int.MaxValue ||
-                    (elementData.Number > 0 && character.IsHero && finalNumber > 1) ||
-                    finalWounded < 0 ||
-                    finalWounded > finalNumber ||
-                    finalXp < 0 ||
-                    finalXp > int.MaxValue ||
-                    (elementData.Xp != 0 && finalNumber == 0 && finalXp != 0))
-                {
-                    Logger.Warning(
-                        "Rejected troop roster delta for {CharacterId}: current=({CurrentNumber},{CurrentWounded},{CurrentXp}) delta=({NumberDelta},{WoundedDelta},{XpDelta})",
-                        elementData.CharacterId,
-                        current.number,
-                        current.wounded,
-                        current.xp,
-                        elementData.Number,
-                        elementData.WoundedNumber,
-                        elementData.Xp);
-                    return false;
-                }
-
-                elements.Add((roster, character, appliedDelta));
-            }
-        }
-
-        // AddToCounts(hero, -n) nulls the hero's party linkage, so additions must be the last operation.
-        ApplyDeltaElements(elements, applyAdditions: false);
-        ApplyDeltaElements(elements, applyAdditions: true);
-        return true;
-    }
-
-    // An xp-free count drop can leave the server above the vanilla xp cap that the client roster clamps to,
-    // so an emptying removal that spends exactly the capped xp only leaves xp vanilla would discard.
-    private static bool EmptiesStackAtVanillaXpCap(
-        TroopRoster roster,
-        CharacterObject character,
-        (int number, int wounded, int xp) current,
-        TroopRosterElementData delta,
-        long finalNumber,
-        long finalXp)
-    {
-        if (delta.Number >= 0 || finalNumber != 0 || finalXp <= 0 || roster.OwnerParty == null) return false;
-
-        var capped = new TroopRosterElement(character)
-        {
-            _number = current.number,
-            _xp = current.xp
-        };
-        roster.OwnerParty.OnXpChanged(roster, ref capped);
-        return -(long)delta.Xp == capped.Xp;
-    }
-
-    private void ApplyDeltaElements(
-        IReadOnlyList<(TroopRoster roster, CharacterObject character, TroopRosterElementData delta)> elements,
-        bool applyAdditions)
-    {
-        foreach (var element in elements)
-        {
-            bool isAddition = element.delta.Number >= 0;
-            if (isAddition != applyAdditions) continue;
-
-            troopRosterLogger.Debug(
-                element.roster,
-                "APPLY-DELTA pass={Pass} character={CharacterId} numberDelta={Number} woundedDelta={Wounded} xpDelta={Xp}",
-                applyAdditions ? "add" : "remove",
-                element.delta.CharacterId,
-                element.delta.Number,
-                element.delta.WoundedNumber,
-                element.delta.Xp);
-
-            element.roster.AddToCounts(
-                element.character,
-                element.delta.Number,
-                false,
-                element.delta.WoundedNumber,
-                element.delta.Xp,
-                true);
-        }
-    }
-
-    private static Dictionary<CharacterObject, (int number, int wounded, int xp)> SumByCharacter(TroopRoster roster)
-    {
-        var counts = new Dictionary<CharacterObject, (int number, int wounded, int xp)>();
-        if (roster == null) return counts;
-
-        foreach (TroopRosterElement element in roster.data)
-        {
-            if (element.Character == null) continue;
-            counts.TryGetValue(element.Character, out var existing);
-            counts[element.Character] = (existing.number + element.Number, existing.wounded + element.WoundedNumber, existing.xp + element.Xp);
-        }
-        return counts;
     }
 
     public int HandleOnRecruitmentDone(string mobilePartyId, TroopInfo[] troopsInCart)

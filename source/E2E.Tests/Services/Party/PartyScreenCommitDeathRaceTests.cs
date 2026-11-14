@@ -1,7 +1,10 @@
 ﻿using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
+using Common.Network;
+using GameInterface.Services.Party.Data;
 using GameInterface.Services.Party.Messages;
+using GameInterface.Services.TroopRosters.Data;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using HarmonyLib;
@@ -19,7 +22,7 @@ using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Party;
 
-public class PartyDoneLogicDeathRaceTests : IDisposable
+public class PartyScreenCommitDeathRaceTests : IDisposable
 {
     private static readonly MethodBase CreateObituaryMethod =
         AccessTools.Method(typeof(KillCharacterAction), "CreateObituary");
@@ -28,7 +31,7 @@ public class PartyDoneLogicDeathRaceTests : IDisposable
     private EnvironmentInstance Server => TestEnvironment.Server;
     private IEnumerable<EnvironmentInstance> Clients => TestEnvironment.Clients;
 
-    public PartyDoneLogicDeathRaceTests(ITestOutputHelper output)
+    public PartyScreenCommitDeathRaceTests(ITestOutputHelper output)
     {
         TestEnvironment = new E2ETestEnvironment(output);
     }
@@ -62,44 +65,28 @@ public class PartyDoneLogicDeathRaceTests : IDisposable
         });
         TestEnvironment.FlushCoalescer();
 
-        PartyDoneLogicAttempted delayedMessage = default;
+        uint targetHandle = Server.GetHandle<CharacterObject>(targetCharacterId);
+        uint ordinaryHandle = Server.GetHandle<CharacterObject>(ordinaryTroopId);
+        NetworkCommitPartyScreen delayedMessage = default;
         var requestingClient = Clients.First();
         requestingClient.Call(() =>
         {
             Assert.True(requestingClient.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
-            Assert.True(requestingClient.ObjectManager.TryGetObject<Hero>(targetHeroId, out var targetHero));
-            Assert.True(requestingClient.ObjectManager.TryGetObject<CharacterObject>(ordinaryTroopId, out var ordinaryTroop));
+            Assert.True(requestingClient.ObjectManager.TryGetId(party.LeaderHero, out var leaderHeroId));
 
-            var currentPrisoners = new TroopRoster();
-            currentPrisoners.AddToCounts(targetHero.CharacterObject, 1);
-            currentPrisoners.AddToCounts(ordinaryTroop, 1);
+            // A loot screen that offered both prisoners, and the player took both.
+            var lootPrisoners = new TroopRosterData(new[]
+            {
+                new TroopRosterElementData(targetHandle, 1, 0, 0),
+                new TroopRosterElementData(ordinaryHandle, 1, 0, 0),
+            });
 
-            var takenPrisoners = new FlattenedTroopRoster(4);
-            takenPrisoners.Add(targetHero.CharacterObject, 1, 0);
-            takenPrisoners.Add(ordinaryTroop, 1, 0);
-
-            delayedMessage = new PartyDoneLogicAttempted(
-                party.LeaderHero,
-                new FlattenedTroopRoster(4),
-                takenPrisoners,
-                new FlattenedTroopRoster(4),
-                leftMemberRoster: null,
-                leftPrisonerRoster: null,
-                rightMemberRoster: null,
-                rightPrisonerRoster: currentPrisoners,
-                initialLeftMemberRoster: null,
-                initialLeftPrisonerRoster: null,
-                initialRightMemberRoster: null,
-                initialRightPrisonerRoster: new TroopRoster(),
-                party.ItemRoster,
-                new List<Tuple<CharacterObject, CharacterObject, int>>(),
-                leftParty: null,
-                partyGoldChangeAmount: 0,
-                partyInfluenceChangeAmount: 0,
-                partyMoraleChangeAmount: 0,
-                doNotApplyGoldTransactions: true,
-                Helpers.PartyScreenHelper.PartyScreenMode.Normal,
-                applyReleasedAndTakenPrisonerActions: true);
+            delayedMessage = PartyScreenCommits.Create(
+                leaderHeroId,
+                Helpers.PartyScreenHelper.PartyScreenMode.Loot,
+                PartyScreenDoneKind.Default,
+                new[] { Take(targetHandle), Take(ordinaryHandle) },
+                leftPrisonerSeed: lootPrisoners);
         });
 
         Server.Call(() =>
@@ -113,13 +100,16 @@ public class PartyDoneLogicDeathRaceTests : IDisposable
         }, new[] { CreateObituaryMethod });
         TestEnvironment.FlushCoalescer();
 
-        requestingClient.Call(() => requestingClient.SimulateMessage(this, delayedMessage));
+        requestingClient.Call(() => requestingClient.Resolve<INetwork>().SendAll(delayedMessage));
         TestEnvironment.FlushCoalescer();
 
         AssertFixedState(Server, partyId, targetHeroId, targetCharacterId, ordinaryTroopId, assertDeathState: true);
         foreach (var client in Clients)
             AssertFixedState(client, partyId, targetHeroId, targetCharacterId, ordinaryTroopId, assertDeathState: false);
     }
+
+    private static PartyScreenCommandData Take(uint characterHandle)
+        => PartyScreenCommits.Transfer(PartyScreenLogic.PartyRosterSide.Left, PartyScreenLogic.TroopType.Prisoner, characterHandle, 1);
 
     private static void AssertFixedState(
         EnvironmentInstance instance,

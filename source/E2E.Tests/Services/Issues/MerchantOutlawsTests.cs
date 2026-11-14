@@ -13,6 +13,7 @@ using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Quests.MerchantNeedsHelpWithOutlaws;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Players;
+using GameInterface.Services.TroopRosters.Data;
 using HarmonyLib;
 using Helpers;
 using LiteNetLib;
@@ -850,36 +851,22 @@ public class MerchantOutlawsTests : IDisposable
     }
 
     [Fact]
-    public void CommittedSelectionsAllowReturningWoundedTroopsWithXpUsingCanonicalPlayerIdentity()
+    public void CommittedSelectionsKeepWoundedTroopsWithXpUnderTheCanonicalPlayerIdentity()
     {
         var troopId = environment.CreateRegisteredObject<CharacterObject>();
         Server.Call(() =>
         {
             var troop = Get<CharacterObject>(Server, troopId);
             troop.UpgradeTargets = Array.Empty<CharacterObject>();
-            var rosters = Server.Resolve<GameInterface.Services.TroopRosters.Interfaces.ITroopRosterInterface>();
-            var broker = Server.Resolve<IMessageBroker>();
             var commitments = Server.Resolve<IAlternativeSolutionCommitments>();
-            var empty = TroopRoster.CreateDummyTroopRoster();
-            var selected = TroopRoster.CreateDummyTroopRoster();
-            selected.AddToCounts(troop, 10, woundedCount: 2, xpChange: 100);
-            var commit = rosters.PackTroopRosterDelta(selected, empty);
-            Assert.True(commitments.CanApply(ClientA.NetPeer, scenario.NotableId, "return_test", commit));
-            broker.Publish(this, new GameInterface.Services.Party.Messages.PartyDoneLogicApplied(
-                ClientA.NetPeer, PartyScreenHelper.PartyScreenMode.QuestTroopManage, commit,
-                "client_registry_alias", scenario.NotableId, "return_test"));
-            var reduced = TroopRoster.CreateDummyTroopRoster();
-            reduced.AddToCounts(troop, 8, woundedCount: 1, xpChange: 70);
-            var returned = rosters.PackTroopRosterDelta(reduced, selected);
-            Assert.True(commitments.CanApply(ClientA.NetPeer, scenario.NotableId, "return_test", returned));
-            Assert.False(commitments.CanApply(ClientB.NetPeer, scenario.NotableId, "return_test", returned));
-            broker.Publish(this, new GameInterface.Services.Party.Messages.PartyDoneLogicApplied(
-                ClientA.NetPeer, PartyScreenHelper.PartyScreenMode.QuestTroopManage, returned,
-                "client_registry_alias", scenario.NotableId, "return_test"));
-            var remaining = Assert.Single(commitments.Consume(scenario.PlayerA.HeroId, scenario.NotableId, "return_test", null));
-            Assert.Equal(8, remaining.Number);
-            Assert.Equal(1, remaining.WoundedNumber);
-            Assert.Equal(70, remaining.Xp);
+            commitments.SetSelection(ClientA.NetPeer, scenario.NotableId, "return_test",
+                new[] { new TroopRosterElement(troop) { Number = 10, WoundedNumber = 2, Xp = 100 } });
+            var selection = Assert.Single(commitments.GetSelection(ClientA.NetPeer, scenario.NotableId, "return_test"));
+            Assert.Equal((10, 2, 100), (selection.Number, selection.WoundedNumber, selection.Xp));
+            Assert.Empty(commitments.GetSelection(ClientB.NetPeer, scenario.NotableId, "return_test"));
+            // The selection is stored under the player's hero, not the peer it came from.
+            var consumed = Assert.Single(commitments.Consume(scenario.PlayerA.HeroId, scenario.NotableId, "return_test", null));
+            Assert.Equal((10, 2, 100), (consumed.Number, consumed.WoundedNumber, consumed.Xp));
         });
     }
 
@@ -889,16 +876,10 @@ public class MerchantOutlawsTests : IDisposable
         var troopId = environment.CreateRegisteredObject<CharacterObject>();
         Server.Call(() =>
         {
-            var rosters = Server.Resolve<GameInterface.Services.TroopRosters.Interfaces.ITroopRosterInterface>();
-            var broker = Server.Resolve<IMessageBroker>();
             var commitments = Server.Resolve<IAlternativeSolutionCommitments>();
-            var initial = TroopRoster.CreateDummyTroopRoster();
-            initial.AddToCounts(Get<CharacterObject>(Server, troopId), 10);
-            var delta = rosters.PackTroopRosterDelta(initial, TroopRoster.CreateDummyTroopRoster());
+            var selection = new[] { new TroopRosterElement(Get<CharacterObject>(Server, troopId)) { Number = 10 } };
             foreach (var issueId in new[] { "pending_x", "accepted_y" })
-                broker.Publish(this, new GameInterface.Services.Party.Messages.PartyDoneLogicApplied(
-                    ClientA.NetPeer, PartyScreenHelper.PartyScreenMode.QuestTroopManage, delta,
-                    "client_registry_alias", scenario.NotableId, issueId));
+                commitments.SetSelection(ClientA.NetPeer, scenario.NotableId, issueId, selection);
             Assert.Equal(10, Assert.Single(commitments.Consume(scenario.PlayerA.HeroId, scenario.NotableId, "accepted_y", null)).Number);
             Assert.Equal(10, Assert.Single(commitments.Consume(scenario.PlayerA.HeroId, scenario.NotableId, "pending_x", null)).Number);
             Assert.Empty(commitments.Consume(scenario.PlayerA.HeroId, scenario.NotableId, "pending_x", null));
@@ -958,6 +939,12 @@ public class MerchantOutlawsTests : IDisposable
                 {
                     Get<CharacterObject>(instance, troopId).Level = 20;
                     Get<CharacterObject>(instance, troopId).UpgradeTargets = Array.Empty<CharacterObject>();
+                    if (upgradePicker)
+                    {
+                        // Same level as its target, so the upgrade costs no xp or gold.
+                        Get<CharacterObject>(instance, unupgradedId!).Level = 20;
+                        Get<CharacterObject>(instance, unupgradedId!).UpgradeTargets = new[] { Get<CharacterObject>(instance, troopId) };
+                    }
                     Get<Hero>(instance, companionId).HitPoints = 100;
                     Get<Hero>(instance, companionId).SetSkillValue(DefaultSkills.Tactics, 150);
                     Get<Hero>(instance, companionId)._partyBelongedTo = Get<MobileParty>(instance, scenario.PlayerA.MobilePartyId);
@@ -997,12 +984,12 @@ public class MerchantOutlawsTests : IDisposable
             logic._partyScreenMode = PartyScreenHelper.PartyScreenMode.QuestTroopManage;
             if (upgradePicker)
             {
-                // Stage the roster effects of upgrading in the open picker, keeping its original snapshots.
-                using (new AllowedThread())
-                {
-                    party.MemberRoster.AddToCounts(Get<CharacterObject>(ClientA, unupgradedId!), -(sent + 1));
-                    party.MemberRoster.AddToCounts(troop, sent + 1);
-                }
+                // Upgrade in the open picker, so the troops sent below were made on this screen.
+                var upgrade = new PartyScreenLogic.PartyCommand();
+                upgrade.FillForUpgradeTroop(PartyScreenLogic.PartyRosterSide.Right, PartyScreenLogic.TroopType.Member,
+                    Get<CharacterObject>(ClientA, unupgradedId!), sent + 1, 0, -1);
+                using (new AllowedThread()) logic.UpgradeTroop(upgrade);
+                Assert.Equal(sent + 6, party.MemberRoster.GetTroopCount(troop));
             }
             var transfer = new PartyScreenLogic.PartyCommand();
             transfer.FillForTransferTroop(PartyScreenLogic.PartyRosterSide.Right, PartyScreenLogic.TroopType.Member, troop, sent, 0, -1);
@@ -1038,8 +1025,12 @@ public class MerchantOutlawsTests : IDisposable
             delayed.ResumeLink(ClientA.NetPeer, Server.NetPeer);
             delayed.DrainReady();
             environment.FlushCoalescer();
-            Server.Call(() => Assert.Equal(sent - 1,
+            // The Done moves only the sent - 1 troops still there, so the selection falls short of what the issue needs.
+            Server.Call(() => Assert.Equal(0,
                 Get<MobileParty>(Server, scenario.PlayerA.MobilePartyId).MemberRoster.GetTroopCount(Get<CharacterObject>(Server, troopId))));
+            // The picker drops the troop the server couldn't move.
+            ClientA.Call(() => Assert.Equal(sent - 1,
+                Get<Hero>(ClientA, scenario.NotableId).Issue.AlternativeSolutionSentTroops.GetTroopCount(Get<CharacterObject>(ClientA, troopId))));
         }
         var expectedRegulars = rejectDone ? sent - 1 : sent + (upgradePicker ? 6 : 5);
         if (disconnectSelecting)
@@ -1123,11 +1114,12 @@ public class MerchantOutlawsTests : IDisposable
             }, TextHelpers);
             if (rejectDone)
             {
+                // The reopened picker takes one of the selected troops back and sends the replacement instead.
                 Server.Call(() =>
                 {
                     var party = Get<MobileParty>(Server, scenario.PlayerA.MobilePartyId);
-                    Assert.Equal(expectedRegulars, party.MemberRoster.GetTroopCount(Get<CharacterObject>(Server, troopId)));
-                    Assert.Equal(1, party.MemberRoster.GetTroopCount(Get<CharacterObject>(Server, replacementId!)));
+                    Assert.Equal(1, party.MemberRoster.GetTroopCount(Get<CharacterObject>(Server, troopId)));
+                    Assert.Equal(0, party.MemberRoster.GetTroopCount(Get<CharacterObject>(Server, replacementId!)));
                 });
             }
         }

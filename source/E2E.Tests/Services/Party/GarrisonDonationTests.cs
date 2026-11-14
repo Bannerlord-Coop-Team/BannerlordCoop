@@ -2,20 +2,22 @@
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
+using GameInterface.Services.Party.Data;
 using GameInterface.Services.Party.Messages;
-using GameInterface.Services.Party.Patches;
+using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
+using GameInterface.Services.TroopRosters.Data;
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Party;
 
 /// <summary>
-/// Covers the garrison troop donation round trip, including the empty donation that used to crash the dedicated server.
+/// Covers the garrison troop donation commit, including the empty donation that used to crash the dedicated server.
 /// </summary>
 public class GarrisonDonationTests : IDisposable
 {
@@ -28,137 +30,119 @@ public class GarrisonDonationTests : IDisposable
         TestEnvironment = new E2ETestEnvironment(output, numClients: 1);
     }
 
-    // Done on the donate screen with nothing moved must not send anything.
+    // A donation Done that lands after the party left the town keeps the troops in the party.
     [Fact]
-    public void EmptyDonation_IsNotSentToServer()
+    public void DonationAfterLeavingTheTown_KeepsTheTroops()
     {
-        string settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        var fixture = CreateFixture(troopCount: 3);
+        Server.Call(() => Resolve(fixture).Party.CurrentSettlement = null);
 
-        PublishGarrisonDonated(settlementId, TroopRoster.CreateDummyTroopRoster());
-
-        Assert.Empty(Client.NetworkSentMessages.GetMessages<DonateToGarrison>());
-    }
-
-    // Moved troops are sent to the server with their ids and counts.
-    [Fact]
-    public void Donation_IsSentToServer()
-    {
-        string settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
-        string characterId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
-        TroopRoster roster = TroopRoster.CreateDummyTroopRoster();
-        Client.Call(() =>
+        Send(fixture, new[]
         {
-            Assert.True(Client.ObjectManager.TryGetObject(characterId, out CharacterObject character));
-            roster.AddToCounts(character, 3);
+            PartyScreenCommits.Transfer(
+                PartyScreenLogic.PartyRosterSide.Right, PartyScreenLogic.TroopType.Member, Server.GetHandle<CharacterObject>(fixture.TroopId), 3),
         });
-
-        PublishGarrisonDonated(settlementId, roster);
-
-        var message = Assert.Single(Client.NetworkSentMessages.GetMessages<DonateToGarrison>());
-        var troop = Assert.Single(message.Troops);
-        Assert.Equal(characterId, troop.CharacterId);
-        Assert.Equal(3, troop.Count);
-    }
-
-    // A donate screen Done after the party left the town is refused, so the party keeps the troops.
-    [Fact]
-    public void DonationDone_AfterLeavingTheTown_IsRefused()
-    {
-        string characterId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
-        bool result = true;
-        bool runOriginal = true;
-
-        Client.Call(() =>
-        {
-            Assert.Null(Hero.MainHero.CurrentSettlement);
-            TroopRoster roster = TroopRoster.CreateDummyTroopRoster();
-            roster.AddToCounts(Client.GetRegisteredObject<CharacterObject>(characterId), 3);
-
-            runOriginal = PartyScreenHelperPatches.DonateGarrisonDoneHandlerPrefix(ref result, roster);
-        });
-
-        Assert.False(runOriginal);
-        Assert.False(result);
-    }
-
-    // An empty donation from an older client arrives with null troops and must not touch the garrison.
-    [Fact]
-    public void EmptyDonation_ArrivesWithNullTroops_AndLeavesGarrisonUntouched()
-    {
-        string settlementId = CreateTownSettlement();
-
-        Send(new DonateToGarrison(settlementId, new List<DonateTroop>()));
-
-        // protobuf drops the empty list, so the server sees null rather than an empty list
-        Assert.Null(Assert.Single(Server.InternalMessages.GetMessages<DonateToGarrison>()).Troops);
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject(settlementId, out Settlement settlement));
-            Assert.Null(settlement.Town.GarrisonParty);
-        });
-    }
-
-    // A real donation creates the garrison and adds the troops on the server.
-    [Fact]
-    public void Donation_AddsTroopsToGarrison()
-    {
-        string settlementId = CreateTownSettlement();
-        string characterId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
-
-        Send(new DonateToGarrison(settlementId, new List<DonateTroop> { new DonateTroop(characterId, 3) }));
 
         Server.Call(() =>
         {
-            Assert.True(Server.ObjectManager.TryGetObject(settlementId, out Settlement settlement));
-            Assert.True(Server.ObjectManager.TryGetObject(characterId, out CharacterObject character));
-            Assert.NotNull(settlement.Town.GarrisonParty);
-            Assert.Equal(3, settlement.Town.GarrisonParty.MemberRoster.GetTroopCount(character));
+            var state = Resolve(fixture);
+            Assert.Null(state.Settlement.Town.GarrisonParty);
+            Assert.Equal(3, state.Party.MemberRoster.GetTroopCount(state.Troop));
         });
     }
 
-    // Raises the client-side garrison donated event as the patched vanilla handler would.
-    private void PublishGarrisonDonated(string settlementId, TroopRoster roster)
+    // A Done with nothing moved arrives with null commands and must not create a garrison.
+    [Fact]
+    public void EmptyDonation_LeavesGarrisonUntouched()
     {
-        Client.Call(() =>
-        {
-            Assert.True(Client.ObjectManager.TryGetObject(settlementId, out Settlement settlement));
-            Client.SimulateMessage(this, new GarrisonDonated(settlement, roster));
-        });
-        TestEnvironment.FlushCoalescer();
-    }
+        var fixture = CreateFixture(troopCount: 3);
 
-    // Creates a server settlement with an owned town and no garrison yet.
-    private string CreateTownSettlement()
-    {
-        string settlementId = null;
+        Send(fixture, Array.Empty<PartyScreenCommandData>());
+
         Server.Call(() =>
         {
+            var state = Resolve(fixture);
+            Assert.Null(state.Settlement.Town.GarrisonParty);
+            Assert.Equal(3, state.Party.MemberRoster.GetTroopCount(state.Troop));
+        });
+    }
+
+    // A real donation creates the garrison and moves the troops into it on the server.
+    [Fact]
+    public void Donation_MovesTroopsToGarrison()
+    {
+        var fixture = CreateFixture(troopCount: 3);
+
+        Send(fixture, new[]
+        {
+            PartyScreenCommits.Transfer(
+                PartyScreenLogic.PartyRosterSide.Right, PartyScreenLogic.TroopType.Member, Server.GetHandle<CharacterObject>(fixture.TroopId), 3),
+        });
+
+        Server.Call(() =>
+        {
+            var state = Resolve(fixture);
+            Assert.NotNull(state.Settlement.Town.GarrisonParty);
+            Assert.Equal(3, state.Settlement.Town.GarrisonParty.MemberRoster.GetTroopCount(state.Troop));
+            Assert.Equal(0, state.Party.MemberRoster.GetTroopCount(state.Troop));
+        });
+    }
+
+    // A player party in an owned town with no garrison yet.
+    private GarrisonFixture CreateFixture(int troopCount)
+    {
+        GarrisonFixture fixture = default;
+        Server.Call(() =>
+        {
+            var party = GameObjectCreator.CreateInitializedObject<MobileParty>();
             var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
             var town = GameObjectCreator.CreateInitializedObject<Town>();
             var ownerClan = GameObjectCreator.CreateInitializedObject<Clan>();
+            var troop = GameObjectCreator.CreateInitializedObject<CharacterObject>();
             settlement.Town = town;
             settlement.SetSettlementComponent(town);
             town.OwnerClan = ownerClan;
             town.IsOwnerUnassigned = false;
+            party.CurrentSettlement = settlement;
+            party.MemberRoster.AddToCounts(troop, troopCount);
 
-            Assert.True(Server.ObjectManager.TryGetId(settlement, out settlementId));
+            Assert.True(Server.ObjectManager.TryGetId(party.LeaderHero, out var heroId));
+            Assert.True(Server.ObjectManager.TryGetId(settlement, out var settlementId));
+            Assert.True(Server.ObjectManager.TryGetId(troop, out var troopId));
+
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.AddPlayer(new Player("RequestingControllerId", heroId, string.Empty, string.Empty, string.Empty)));
+            playerManager.SetPeer("RequestingControllerId", Client.NetPeer);
+
+            fixture = new GarrisonFixture(heroId, settlementId, troopId);
         });
         TestEnvironment.FlushCoalescer();
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject(settlementId, out Settlement settlement));
-            Assert.NotNull(settlement.Town);
-        });
-        return settlementId;
+        return fixture;
     }
 
-    // Sends the donation from the client over the test network.
-    private void Send(DonateToGarrison message)
+    private void Send(GarrisonFixture fixture, PartyScreenCommandData[] commands)
     {
+        var message = PartyScreenCommits.Create(
+            fixture.MainHeroId,
+            Helpers.PartyScreenHelper.PartyScreenMode.TroopsManage,
+            PartyScreenDoneKind.DonateGarrison,
+            commands,
+            isDonating: true,
+            doNotApplyGoldTransactions: false);
+
         Client.Call(() => Client.Resolve<INetwork>().SendAll(message));
         TestEnvironment.FlushCoalescer();
     }
 
-    // Tears down the test environment.
+    private (Settlement Settlement, MobileParty Party, CharacterObject Troop) Resolve(GarrisonFixture fixture)
+    {
+        Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.MainHeroId, out var hero));
+        Assert.True(Server.ObjectManager.TryGetObject<Settlement>(fixture.SettlementId, out var settlement));
+        Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(fixture.TroopId, out var troop));
+        return (settlement, hero.PartyBelongedTo, troop);
+    }
+
     public void Dispose() => TestEnvironment.Dispose();
+
+    private readonly record struct GarrisonFixture(string MainHeroId, string SettlementId, string TroopId);
 }

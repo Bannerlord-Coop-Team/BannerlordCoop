@@ -14,11 +14,10 @@ namespace GameInterface.Tests.Services.Party;
 public class PartyScreenRosterRefresherTests
 {
     [Fact]
-    public void ServerUpdate_RebasesCompatiblePendingEdit()
+    public void ServerUpdate_AppliesToBaselineAndScreen()
     {
         var character = new CharacterObject();
         var logic = CreateLogic(character, 5, 1, out var visible);
-        visible.AddToCounts(character, -2);
         int notificationCount = 0;
         int applyCount = 0;
 
@@ -33,87 +32,13 @@ public class PartyScreenRosterRefresherTests
                 roster.SetElementWoundedNumber(index, 0);
                 roster.InitializeCachedData();
             },
-            () => notificationCount++);
+            _ => notificationCount++);
 
         Assert.True(applied);
         Assert.Equal(1, applyCount);
         Assert.Equal(0, notificationCount);
-        Assert.True(logic.IsThereAnyChanges());
-        AssertRoster(logic.CurrentData.RightMemberRoster, character, 3, 0);
+        AssertRoster(visible, character, 5, 0);
         AssertRoster(logic._initialData.RightMemberRoster, character, 5, 0);
-    }
-
-    [Fact]
-    public void ServerUpdate_ResetsAllPendingEditsWhenRebaseIsInvalid()
-    {
-        var character = new CharacterObject();
-        var logic = CreateLogic(character, 5, 1, out var visible);
-        visible.AddToCounts(character, -4);
-        logic.CurrentData.LeftMemberRoster.AddToCounts(character, 4);
-        int notificationCount = 0;
-        var lockPreserver = new RecordingLockPreserver();
-
-        var applied = CreateRefresher(lockPreserver).TryApply(
-            logic,
-            visible,
-            character,
-            (roster, troop) =>
-            {
-                int index = roster.FindIndexOfTroop(troop);
-                roster.SetElementNumber(index, 3);
-                roster.InitializeCachedData();
-            },
-            () => notificationCount++);
-
-        Assert.True(applied);
-        Assert.Equal(1, notificationCount);
-        Assert.False(logic.IsThereAnyChanges());
-        Assert.Same(logic, Assert.Single(lockPreserver.Resets));
-        AssertRoster(logic.CurrentData.RightMemberRoster, character, 3, 1);
-        AssertRoster(logic._initialData.RightMemberRoster, character, 3, 1);
-        Assert.Equal(-1, logic.CurrentData.LeftMemberRoster.FindIndexOfTroop(character));
-    }
-
-    [Fact]
-    public void ServerUpdate_RefreshesSavedPopupStateWithoutNotification()
-    {
-        var character = new CharacterObject();
-        var logic = CreateLogic(character, 5, 1, out var visible);
-        visible.AddToCounts(character, -1);
-        logic.SavePartyScreenData();
-        visible.AddToCounts(character, -1);
-        int notificationCount = 0;
-
-        var applied = CreateRefresher().TryApply(
-            logic,
-            visible,
-            character,
-            Heal,
-            () => notificationCount++);
-
-        logic.ResetToLastSavedPartyScreenData(false);
-
-        Assert.True(applied);
-        Assert.Equal(0, notificationCount);
-        AssertRoster(visible, character, 4, 0);
-    }
-
-    [Fact]
-    public void ServerUpdate_DoesNotResetUnrelatedItemRoster()
-    {
-        var character = new CharacterObject();
-        var logic = CreateLogic(character, 5, 1, out var visible);
-        var item = new ItemObject();
-        var currentItems = new ItemRoster();
-        currentItems.AddToCounts(new EquipmentElement(item, null), 2);
-        logic.CurrentData.RightItemRoster = currentItems;
-        logic._initialData.RightItemRoster = new ItemRoster();
-        logic._initialData.RightItemRoster.AddToCounts(new EquipmentElement(item, null), 1);
-
-        var applied = CreateRefresher().TryApply(logic, visible, character, Heal, () => { });
-
-        Assert.True(applied);
-        Assert.Equal(2, currentItems.GetElementCopyAtIndex(0).Amount);
     }
 
     [Fact]
@@ -123,15 +48,16 @@ public class PartyScreenRosterRefresherTests
         var logic = CreateLogic(character, 5, 1, out var visible);
         var authoritative = TroopRoster.CreateDummyTroopRoster();
         authoritative.AddToCounts(character, 5, false, 1);
-        visible.AddToCounts(character, -2);
         var refresher = new PartyScreenRosterRefresher(
             new FixedBaselineProvider(logic._initialData.RightMemberRoster),
-            new RecordingLockPreserver());
+            new RecordingLockPreserver(),
+            new PartyScreenCommandTracker());
 
-        var applied = refresher.TryApply(logic, authoritative, character, Heal, () => { });
+        var applied = refresher.TryApply(logic, authoritative, character, Heal, _ => { });
 
         Assert.True(applied);
-        AssertRoster(visible, character, 3, 0);
+        AssertRoster(authoritative, character, 5, 0);
+        AssertRoster(visible, character, 5, 0);
         AssertRoster(logic._initialData.RightMemberRoster, character, 5, 0);
     }
 
@@ -195,57 +121,53 @@ public class PartyScreenRosterRefresherTests
     }
 
     [Fact]
-    public void ItemServerUpdate_RefreshesSavedPopupStateWithoutSavingPendingChanges()
+    public void ItemServerUpdate_ReachesTheBaselineAndThePopupSave()
     {
         var character = new CharacterObject();
-        var logic = CreateLogic(character, 5, 1, out var visible);
+        var logic = CreateLogic(character, 5, 1, out _);
         var item = new ItemObject();
         var element = new EquipmentElement(item, null);
         logic.CurrentData.RightItemRoster = new ItemRoster();
         logic.CurrentData.RightItemRoster.AddToCounts(element, 5);
         logic._initialData.RightItemRoster.AddToCounts(element, 5);
         logic.SavePartyScreenData();
-        logic.CurrentData.RightItemRoster.AddToCounts(element, -1);
-        visible.AddToCounts(character, -1);
 
         var applied = CreateRefresher().TryApply(
             logic,
             logic.CurrentData.RightItemRoster,
-            roster => roster.AddToCounts(element, 2));
+            roster => roster.AddToCounts(element, 2),
+            _ => { });
 
         logic.ResetToLastSavedPartyScreenData(false);
 
         Assert.True(applied);
         Assert.Equal(7, logic.CurrentData.RightItemRoster.GetElementCopyAtIndex(0).Amount);
         Assert.Equal(7, logic._initialData.RightItemRoster.GetElementCopyAtIndex(0).Amount);
-        AssertRoster(visible, character, 5, 1);
     }
 
     [Fact]
-    public void ItemServerClear_RefreshesSavedPopupStateWithoutSavingPendingChanges()
+    public void ItemServerClear_ReachesTheBaselineAndThePopupSave()
     {
         var character = new CharacterObject();
-        var logic = CreateLogic(character, 5, 1, out var visible);
+        var logic = CreateLogic(character, 5, 1, out _);
         var item = new ItemObject();
         var element = new EquipmentElement(item, null);
         logic.CurrentData.RightItemRoster = new ItemRoster();
         logic.CurrentData.RightItemRoster.AddToCounts(element, 5);
         logic._initialData.RightItemRoster.AddToCounts(element, 5);
         logic.SavePartyScreenData();
-        logic.CurrentData.RightItemRoster.AddToCounts(element, -1);
-        visible.AddToCounts(character, -1);
 
         var applied = CreateRefresher().TryApply(
             logic,
             logic.CurrentData.RightItemRoster,
-            roster => roster.Clear());
+            roster => roster.Clear(),
+            _ => { });
 
         logic.ResetToLastSavedPartyScreenData(false);
 
         Assert.True(applied);
         Assert.Empty(logic.CurrentData.RightItemRoster);
         Assert.Empty(logic._initialData.RightItemRoster);
-        AssertRoster(visible, character, 5, 1);
     }
 
     /// <summary>
@@ -268,7 +190,7 @@ public class PartyScreenRosterRefresherTests
 
         // Same fallback as TroopRosterDeltaHandler when no open screen takes the change.
         var openLogic = PartyScreenRosterRefresher.GetOpenLogic(gameStates);
-        if (!CreateRefresher().TryApply(openLogic, prisoners, prisoner, Release, () => { }))
+        if (!CreateRefresher().TryApply(openLogic, prisoners, prisoner, Release, _ => { }))
             Release(prisoners, prisoner);
 
         logic.Reset(true);
@@ -329,7 +251,8 @@ public class PartyScreenRosterRefresherTests
     private static PartyScreenRosterRefresher CreateRefresher(RecordingLockPreserver lockPreserver = null)
         => new PartyScreenRosterRefresher(
             new PartyScreenRosterBaselineProvider(),
-            lockPreserver ?? new RecordingLockPreserver());
+            lockPreserver ?? new RecordingLockPreserver(),
+            new PartyScreenCommandTracker());
 
     private static void Heal(TroopRoster roster, CharacterObject troop)
     {
