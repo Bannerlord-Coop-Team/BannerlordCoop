@@ -17,15 +17,15 @@ using TaleWorlds.Library;
 namespace Missions.Naval;
 
 /// <summary>
-/// Splits a naval battle side's eight ships: each player fields its own share, the side's AI parties get what the players leave
-/// (M11 A2), and a player who joins after the side's AI fleet attempt gets only what the recorded attempt leaves.
+/// Splits a naval battle side's eight ships: each player fields its share against the side's other players, the side's AI
+/// parties get what the players leave, and a player who joins after the side's AI fleet attempt gets only what it leaves.
 /// </summary>
 public interface INavalShipBudget
 {
     /// <summary>
     /// [Game thread] The fleet <paramref name="playerParty"/> fields: vanilla's best player ship, then its party's ships up to its
-    /// share of the side, against every other party there as its ally team, capped by the side's recorded AI fleet attempt if it
-    /// joined after it. A party without ships fields none.
+    /// share of the side, against the side's other players as its ally team, capped by the side's recorded AI fleet attempt if
+    /// it joined after it. A party without ships fields none.
     /// </summary>
     NavalPlayerFleet PlayerFleet(MBReadOnlyList<MapEventParty> sideParties, PartyBase playerParty);
 
@@ -57,11 +57,13 @@ public class NavalShipBudget : INavalShipBudget
         this.attempts = attempts;
     }
 
-    // The launcher's own fleet; every client computes the same for each player, so the AI share below matches it.
+    // The launcher's own fleet; every client computes the same for each player, and AI parties joining later don't change it, so
+    // the AI share below matches what the players fielded.
     public NavalPlayerFleet PlayerFleet(MBReadOnlyList<MapEventParty> sideParties, PartyBase playerParty)
     {
         var model = NavalDLCManager.Instance.GameModels.ShipDeploymentModel;
-        SplitPlayerSideParties(sideParties, playerParty, out var playerMapEventParty, out var playerTeamParties, out var allyTeamParties);
+        SplitPlayerSideParties(sideParties, playerParty, party => playerManager.Contains(party.MobileParty),
+            out var playerMapEventParty, out var playerTeamParties, out var allyTeamParties);
         model.GetShipDeploymentLimitsOfPlayerTeams(playerTeamParties, allyTeamParties, out var playerLimit, out var allyLimit);
         if (playerMapEventParty.Ships.Count == 0) return new NavalPlayerFleet(Array.Empty<Ship>(), playerLimit, allyLimit);
 
@@ -154,12 +156,13 @@ public class NavalShipBudget : INavalShipBudget
     internal static int MostFielded(int ships, int partyShipLimit) => Math.Min(SideShips, Math.Min(ships, partyShipLimit));
 
     /// <summary>
-    /// Own party only: vanilla GetMapEventPartiesOfPlayerTeams takes the first non-NPC party as the player's, which is another
-    /// player's party whenever two players share a side.
+    /// The own party against the side's other players, leaving the AI parties out, so a share never shrinks when one joins after
+    /// the players fielded. Vanilla GetMapEventPartiesOfPlayerTeams takes the first non-NPC party as the player's instead.
     /// </summary>
     internal static void SplitPlayerSideParties(
         MBReadOnlyList<MapEventParty> sideParties,
         PartyBase ownParty,
+        Func<PartyBase, bool> isPlayerParty,
         out MapEventParty ownMapEventParty,
         out MBList<MapEventParty> ownTeamParties,
         out MBList<MapEventParty> allyTeamParties)
@@ -176,7 +179,7 @@ public class NavalShipBudget : INavalShipBudget
                 continue;
             }
 
-            allyTeamParties.Add(party);
+            if (isPlayerParty(party.Party)) allyTeamParties.Add(party);
         }
     }
 }

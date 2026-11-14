@@ -15,30 +15,34 @@ namespace Coop.Tests.Missions.Battles;
 
 public class NavalShipBudgetTests
 {
-    [Fact]
-    public void SplitPlayerSideParties_TwoPlayersOnOneSide_FieldsOnlyTheOwnParty()
+    // The own party fields against the other players only, so AI parties joining after the players opened never shrink its share.
+    // Row two is the review case: two players with 3 ships each, then two 3-ship AI lords join, and the players keep 3 each.
+    [Theory]
+    [InlineData("P2 P1", "P2")]
+    [InlineData("P1 P2 AI1 AI2", "P2")]
+    public void SplitPlayerSideParties_FieldsTheOwnPartyAgainstTheOtherPlayersOnly(string side, string allies)
     {
-        var ownParty = CreateParty();
-        var otherPlayerParty = CreateParty();
-        var own = CreateMapEventParty(ownParty);
-        var otherPlayer = CreateMapEventParty(otherPlayerParty);
+        var parties = side.Split(' ').ToDictionary(name => name, name => CreateMapEventParty(CreateParty()));
 
         NavalShipBudget.SplitPlayerSideParties(
-            new MBList<MapEventParty> { otherPlayer, own },
-            ownParty,
+            new MBList<MapEventParty>(parties.Values),
+            parties["P1"].Party,
+            party => parties.First(entry => ReferenceEquals(entry.Value.Party, party)).Key.StartsWith("P"),
             out var ownMapEventParty,
             out var ownTeamParties,
             out var allyTeamParties);
 
-        Assert.Same(own, ownMapEventParty);
-        Assert.Equal(new[] { own }, ownTeamParties);
-        Assert.Equal(new[] { otherPlayer }, allyTeamParties);
+        Assert.Same(parties["P1"], ownMapEventParty);
+        Assert.Equal(new[] { parties["P1"] }, ownTeamParties);
+        Assert.Equal(allies.Split(' ').Select(name => parties[name]), allyTeamParties);
     }
 
     // The allies get what the players' fielded ships leave of the side's eight, never more than their own limit nor below none.
-    // Row one has the 6+6 shape, with the player's share of 4 given as input: an AI lord limited to 6 gets the other 4.
+    // Row one has the 6+6 shape, with the player's share of 4 given as input: an AI lord limited to 6 gets the other 4. Row two is
+    // the review case: two players field 3 each and two 3-ship AI lords (limit 6) get the 2 left, so the side holds 8.
     [Theory]
     [InlineData(4, 6, 4)]
+    [InlineData(6, 6, 2)]
     [InlineData(3, 2, 2)]
     [InlineData(8, 6, 0)]
     [InlineData(9, 6, 0)]

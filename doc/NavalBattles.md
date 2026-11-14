@@ -116,8 +116,11 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
   - Slot: the host's own allies are planned alone, a gap ahead of the side's front-most player fleet (Allied AI fleet slot in
     section 6); an enemy fleet takes vanilla's late plan for its side.
   - Ships: the AI parties get what the players leave of the side's 8 ships, at most vanilla's limit for them
-    (`NavalShipBudget`). Each player's share is the one its launcher fields, from campaign data every client holds. When the
-    players take all 8, the side just has no AI fleet (logged as information, settled like a failed attempt).
+    (`NavalShipBudget`). Each player's share is the one its launcher fields, from campaign data every client holds: vanilla's
+    player/ally split taken against the side's other players only, with the AI parties left out, so an AI party joining after
+    the players opened never shrinks a share they already fielded. The cost is that players present with allies from the
+    start take more than vanilla gives (one player with 6 ships and a 6-ship lord: 6 and 2). When the players take all 8,
+    the side just has no AI fleet (logged as information, settled like a failed attempt).
   - Recorded attempt: the attempt (`NetworkNpcFleetAttempted`) carries the AI hulls it left, the players' hulls its share
     counted and those players' party ids. The host also reports it to the server (`ServerNavalNpcFleetAttemptHandler`),
     which keeps the side's first one per mission instance (`INavalNpcFleetAttemptTracker`) and sends it to every client as
@@ -129,8 +132,8 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
     new mission's launchers and host read no old attempt.
   - Late joiners: a player the attempt didn't count fields at most what the side's 8 leave after the attempt's hulls and
     every uncounted player before it in the side's party order, at the most that player can field (its ships, capped by its
-    party's ship limit, which casualties never lower), and always its own ship. Players who start together keep the A2
-    split; a promoted host only latches the attempt, so nothing is fielded again.
+    party's ship limit, which casualties never lower), and always its own ship. Players who start together keep the
+    players-only split; a promoted host only latches the attempt, so nothing is fielded again.
   - Crew: troops are pulled only up to the crew capacity of the hulls that field; the rest stay in the reserve.
   - Reserve: at sea every AI party on a side belongs to the battle host, a player-led army's members included
     (`BattleTroopReserveBuilder.GetOwnedReserves`; on land they go to the army leader). The host gets it with the
@@ -747,7 +750,8 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   - a party that joined the side after the host's attempt and opened its mission before the attempt reached it (about one
     round trip through the server) fields its full share: up to that share less one copy over on the older clients;
   - every player fields its own ship, so a second player joining a full side is one copy over;
-  - players who start together keep the A2 split, which can pass 8 with four or more large fleets, as before M11.
+  - players who start together keep the players-only split, whose rounding can pass 8 (three players with 3 ships each
+    field 3 each), as before M11.
 - **Saved Order of Battle layout.** Co-op skips `NavalOrderOfBattleVM.LoadConfigurationShips`, so the player's saved ship
   and formation layout never applies, while vanilla's `SaveConfiguration` still stores the snapshot ships into the
   client's `NavalOrderOfBattleCampaignBehavior` after each battle.
@@ -1065,14 +1069,12 @@ Knobs (`NavalScenarioResolver.Usage`):
   is never swapped, so `hulls=1 weapons=1 reserve=20` has no room and logs a Warning; add a hull.
 - `allies=n` (1 to 8, `allied_npc` only, default 1) tops the allied lord up to n ships.
 - `ignore_limits=1` lets every party of the scenario's battle field 8 ships, vanilla's `IgnoreDeploymentLimits` base limit
-  before perks, on every client (`CoopNavalBattleLauncher` turns the switch on for that battle). Vanilla still splits the
-  side's 8 between a player's own team and its ally team by their net limits, the smallest of the parties, skeletal crew and
-  battle limits, so a player with 4 ships (net 4) against an ally team of 8 gets `round(4 / 12 * 8) = 3`. For 4+4 each
-  player needs a net of 8: give each 8 ships with `coop.debug.party.add_ship <player> northern_light_ship` (the stager
-  only tops fleets up, so `ships=` doesn't cut them), then `allied_npc ignore_limits=1 reserve=40 testclient1
-  testclient2`. The reserve swaps one hull for an `empire_heavy_ship` and tops the healthy troops up to 344, past the 100
-  skeletal crew of the 8 hulls, so both teams net 8, each player fields 4 and the allies settle on `NoShipsLeft` (`inspect`
-  shows the Defender spawner `failed` with that reason and the host logs it as Information).
+  before perks, on every client (`CoopNavalBattleLauncher` turns the switch on for that battle). A player's net limit is the
+  smallest of its parties, skeletal crew and battle limits, and its ally team is the other players only, so `allied_npc
+  ships=4 ignore_limits=1 reserve=40 testclient1 testclient2` gives each player a net of 4 (4 ships, whose 68 skeletal crew
+  the reserve's 216 troops cover), 4+4 fits the side's 8 without a split, and the allies settle on `NoShipsLeft` (`inspect`
+  shows the Defender spawner `failed` with that reason and the host logs it as Information). The reserve swaps one hull for
+  an `empire_heavy_ship`; without `ignore_limits=1` each player's party limit of 3 gives 3+3 and the allies 2.
 - `army=1` (`allied_npc` only) has the first player's clan join the allied lord's kingdom and lead an army with the lord as
   its member, through the vanilla actions the clan and army syncs replicate (M11 A1: at sea the member's reserve goes to
   the battle host).
