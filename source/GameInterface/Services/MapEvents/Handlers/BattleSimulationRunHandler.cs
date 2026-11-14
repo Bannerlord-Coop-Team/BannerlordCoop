@@ -269,7 +269,7 @@ internal class BattleSimulationRunHandler : IHandler
         {
             var releasedClaim = CancelSimulationSession(mapEventId, simulation);
             if (releasedClaim)
-                battleFinalizeHandler.HandleRetreat(requestingPeer, simulation.MapEvent);
+                battleFinalizeHandler.HandleSimulationRetreat(requestingPeer, simulation.MapEvent);
             mapEventLogger.DebugMapEvent(simulation.MapEvent, "Battle simulation cancelled by initiating client");
         }, context: nameof(Handle_NetworkCancelBattleSimulation));
     }

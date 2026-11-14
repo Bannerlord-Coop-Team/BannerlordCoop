@@ -235,15 +235,35 @@ internal class BattleFinalizeHandler : IHandler
 
     private void HandleRetreat(NetPeer requester, MapEvent mapEvent, MobileParty party)
     {
-        // The side leader retreats from the whole event. A joining party retreats alone so the
-        // leader can keep the shared battle open for another simulation.
-        if (party.Party.MapEventSide?.LeaderParty == party.Party)
+        foreach (var participant in playerManager.Players)
         {
-            messageBroker.Publish(this, new MapEventFinalizeAttempted(mapEvent));
+            if (!playerManager.IsConnected(participant) ||
+                !objectManager.TryGetObject<MobileParty>(participant.MobilePartyId, out var otherParty) ||
+                otherParty == party || otherParty.Party.MapEventSide != party.Party.MapEventSide)
+                continue;
+
+            messageBroker.Publish(requester, new PlayerLeaveBattleAttempted(party.Party));
             return;
         }
 
-        messageBroker.Publish(requester, new PlayerLeaveBattleAttempted(party.Party));
+        messageBroker.Publish(this, new MapEventFinalizeAttempted(mapEvent));
+    }
+
+    /// <summary>[Server, game thread] Apply simulation cancellation's leader retreat rule.</summary>
+    public void HandleSimulationRetreat(NetPeer requester, MapEvent mapEvent)
+    {
+        if (requester == null || mapEvent == null)
+            return;
+
+        if (!playerManager.TryGetPlayer(requester, out var player) ||
+            !objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party) ||
+            party.MapEvent != mapEvent)
+            return;
+
+        if (party.Party.MapEventSide?.LeaderParty == party.Party)
+            messageBroker.Publish(this, new MapEventFinalizeAttempted(mapEvent));
+        else
+            messageBroker.Publish(requester, new PlayerLeaveBattleAttempted(party.Party));
     }
 
     /// <summary>
