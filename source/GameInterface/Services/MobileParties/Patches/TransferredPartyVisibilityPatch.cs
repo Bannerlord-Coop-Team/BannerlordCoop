@@ -1,4 +1,3 @@
-using Common;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 
@@ -10,23 +9,13 @@ namespace GameInterface.Services.MobileParties.Patches;
 [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnGameLoaded))]
 internal class TransferredPartyVisibilityPatch
 {
+    // The server's save marks every party visible, and visible fleets build ship models on the first map frames.
+    // OnGameLoaded runs after the late initialize re-reads saved fields, so the clear holds.
     [HarmonyPrefix]
-    private static void Prefix() => ClearServerVisibility(Campaign.Current);
-
-    // The server keeps every active party visible (PartyVisibilityOnServerPatch), so the save it sends marks the whole
-    // map visible. Map visuals take their first alpha from that and visible ones build their ship models, which crashes
-    // a client with hundreds of fleets. OnGameLoaded runs after the save system's late initialize re-reads each party's
-    // saved fields and before the naval visuals start (no OnGameLoaded listener sets party visibility, so the prefix is
-    // early enough); PartyVisibilitySweep then reveals the parties in range. Client patches only apply after joining a
-    // server and are never removed, so a single player save loaded later in the same process also starts hidden until
-    // the native sweep reveals the parties near the player. Debug builds keep everything visible.
-    internal static void ClearServerVisibility(Campaign campaign)
+    private static void HideTransferredParties()
     {
-        if (ModInformation.IsServer || DebugPartyVisibility.ForceAllVisible) return;
+        if (!ContainerProvider.TryResolve<IPartyVisibilitySweep>(out var sweep)) return;
 
-        foreach (var party in campaign.MobileParties)
-        {
-            party._isVisible = false;
-        }
+        sweep.HideAll(Campaign.Current.MobileParties);
     }
 }
