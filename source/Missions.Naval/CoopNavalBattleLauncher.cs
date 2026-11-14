@@ -11,6 +11,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using Missions.Battles;
 using NavalDLC;
+using NavalDLC.ComponentInterfaces;
 using NavalDLC.Missions;
 using NavalDLC.Missions.Deployment;
 using NavalDLC.Missions.Handlers;
@@ -167,6 +168,10 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         deploymentSlot.Rank = NavalSideDeploymentSlots.RankOf(
             sideParties.Select(party => party.Party), PartyBase.MainParty, isPlayerParty);
         deploymentSlot.PlayerCount = NavalSideDeploymentSlots.PlayerCountOf(sideParties.Select(party => party.Party), isPlayerParty);
+#if DEBUG
+        // The ignore_limits knob turns on vanilla's own switch, set on every launch so a later battle without it has its limits back.
+        ShipDeploymentModel.IgnoreDeploymentLimits = scenarioState.Current is { IgnoreShipLimits: true } scenario && scenario.MapEventId == mapEventId;
+#endif
         var enemyLimit = deploymentModel.GetTeamShipDeploymentLimit(mapEvent.GetMapEventSide(playerSide.GetOppositeSide()).Parties);
 
         // The battle host's AI share of this side subtracts this same fleet, so both come from the budget.
@@ -184,9 +189,11 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         };
 
         Logger.Information("[NavalBattle] Opening coop naval battle {MapEventId}: side={Side} deploymentRank={Rank}/{PlayerCount} ownShips={ShipCount} " +
-            "hulls={Hulls} captains={Captains} deployable={Deployable} crewCapacity={CrewCapacity}",
+            "hulls={Hulls} captains={Captains} deployable={Deployable} limit={PartiesLimit}/{SkeletalLimit}/{NetLimit} " +
+            "ignoreLimits={IgnoreLimits} crewCapacity={CrewCapacity}",
             mapEventId, playerSide, deploymentSlot.Rank, deploymentSlot.PlayerCount, ownShips.Count, string.Join(",", ownShips.Select(ship => ship.Hull.StringId)),
-            string.Join(",", captains), deployableOwnShipCount, maxDeployableTroopCountPerTeam[0]);
+            string.Join(",", captains), deployableOwnShipCount, ownFleet.PlayerLimit.PartiesLimit, ownFleet.PlayerLimit.SkeletalCrewLimit,
+            ownFleet.PlayerLimit.NetDeploymentLimit, ShipDeploymentModel.IgnoreDeploymentLimits, maxDeployableTroopCountPerTeam[0]);
 
         rec.AtmosphereOnCampaign.NauticalInfo.UsesNavalSimulatedWater = 1;
         var mission = NavalMissionState.OpenNew("NavalBattle", rec, naval =>

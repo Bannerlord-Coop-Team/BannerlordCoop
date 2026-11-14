@@ -108,8 +108,8 @@ public sealed class NavalScenarioConfig
     public int AlliedShips { get; set; }
 
     /// <summary>
-    /// Every party in the scenario's battle may field 8 ships, vanilla's IgnoreDeploymentLimits base limit before perks, on every
-    /// client that computes the side's split.
+    /// Every party in the scenario's battle may field 8 ships, vanilla's IgnoreDeploymentLimits base limit before perks: each
+    /// client's naval launcher turns that switch on for the battle.
     /// </summary>
     [ProtoMember(29)]
     public bool IgnoreShipLimits { get; set; }
