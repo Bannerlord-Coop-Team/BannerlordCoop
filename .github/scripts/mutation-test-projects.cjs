@@ -1,5 +1,5 @@
 // Prints the unit test projects that reference one mutated project, as repo-relative csproj paths.
-// Usage: node mutation-projects.cjs <repo-relative-csproj>
+// Usage: node mutation-test-projects.cjs <repo-relative-csproj>
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -35,7 +35,7 @@ function testProjectsFor(target, readText) {
 // Prints the test projects for the csproj given on the command line.
 function main() {
   const [target] = process.argv.slice(2);
-  if (!target) throw new Error('usage: node mutation-projects.cjs <repo-relative-csproj>');
+  if (!target) throw new Error('usage: node mutation-test-projects.cjs <repo-relative-csproj>');
   const readText = file => fs.readFileSync(path.join(repoRoot, file), 'utf8');
   for (const csproj of testProjectsFor(target, readText)) console.log(csproj);
 }

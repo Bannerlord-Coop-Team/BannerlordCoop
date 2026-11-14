@@ -1,6 +1,51 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const { execFileSync } = require('node:child_process');
 const { parseChangedLines, mutatePattern, projectPatterns } = require('./mutation-spans.cjs');
+
+test('scopes a real git diff to changed lines, renames, files moved in and untracked files', t => {
+  const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'mutation-spans-'));
+  t.after(() => fs.rmSync(repo, { recursive: true, force: true }));
+  const git = (...args) => execFileSync('git', args, { cwd: repo, encoding: 'utf8' });
+  const write = (file, text) => {
+    fs.mkdirSync(path.dirname(path.join(repo, file)), { recursive: true });
+    fs.writeFileSync(path.join(repo, file), text);
+  };
+  git('init', '-q');
+  git('config', 'core.autocrlf', 'false');
+  git('config', 'user.name', 'test');
+  git('config', 'user.email', 'test@example.com');
+  write('source/Common/Edited.cs', 'a\nb\nc\n');
+  write('source/Common/Old.cs', 'one\ntwo\nthree\nfour\nfive\n');
+  write('source/Other/Moved.cs', 'p\nq\nr\ns\nt\n');
+  write('source/Common/Trimmed.cs', 'x\ny\nz\n');
+  git('add', '.');
+  git('commit', '-qm', 'base');
+  const base = git('rev-parse', 'HEAD').trim();
+
+  write('source/Common/Edited.cs', 'a\nB\nc\n');
+  fs.mkdirSync(path.join(repo, 'source/Common/Sub'));
+  git('mv', 'source/Common/Old.cs', 'source/Common/Sub/Renamed.cs');
+  write('source/Common/Sub/Renamed.cs', 'one\ntwo\nthree\nFOUR\nfive\n');
+  git('mv', 'source/Other/Moved.cs', 'source/Common/Moved.cs');
+  write('source/Common/Moved.cs', 'p\nQ\nr\ns\nt\n');
+  write('source/Common/Trimmed.cs', 'x\nz\n');
+  write('source/Common/New.cs', 'n1\nn2\n');
+
+  const output = execFileSync('node', [path.join(__dirname, 'mutation-spans.cjs'), base, 'source/Common'], { cwd: repo, encoding: 'utf8' });
+
+  // Each edit covers only its changed line, the move from source/Other keeps to its one changed line,
+  // Trimmed.cs only lost a line so it has no pattern, and untracked New.cs is covered whole.
+  assert.deepEqual(output.trim().split('\n').sort(), [
+    'Edited.cs{2..3}',
+    'Moved.cs{2..3}',
+    'New.cs{0..5}',
+    'Sub/Renamed.cs{14..18}',
+  ]);
+});
 
 // Hunk bodies are mostly left out, because only the file and hunk headers are parsed.
 const diff = [
@@ -50,7 +95,7 @@ test('gives paths relative to the project folder and no pattern for a file with 
   };
   const deletionOnly = 'diff --git a/source/Common/D.cs b/source/Common/D.cs\n+++ b/source/Common/D.cs\n@@ -2,1 +1,0 @@\n';
 
-  const patterns = projectPatterns('source/Common', `${diff}\n${deletionOnly}`, file => texts[file]);
+  const patterns = projectPatterns('source/Common', `${diff}\n${deletionOnly}`, [], file => texts[file]);
 
   // A.cs: {6..8} is line 3 and {12..20} is lines 5 to 7. New.cs: {4..5} is line 3.
   assert.deepEqual(patterns, ['A.cs{6..8}{12..20}', 'Sub/New.cs{4..5}']);

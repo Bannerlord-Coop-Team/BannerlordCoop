@@ -1,11 +1,11 @@
 // Prints a Stryker --mutate pattern per C# file in one project, covering only the lines a branch adds
-// or changes. Paths are relative to the project folder, where Stryker runs.
-// Usage: node mutation-spans.cjs <merge-base> <repo-relative-project-dir>
+// or changes, untracked files included. Paths are relative to the project folder, where Stryker runs.
+// Usage, from inside the repo: node mutation-spans.cjs <merge-base> <repo-relative-project-dir>
 const fs = require('node:fs');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 
-const repoRoot = path.resolve(__dirname, '../..');
+const maxGitOutput = 64 * 1024 * 1024;
 
 // Returns the lines each file adds or changes in a `git diff -U0`, keyed by its new repo-relative path.
 // A hunk header with no count (`+12`) is one line, and `+12,0` is a pure deletion that adds none.
@@ -75,10 +75,23 @@ function mutatePattern(file, text, lines) {
   return file + spans.map(({ start, end }) => `{${start}..${end}}`).join('');
 }
 
-// Builds the patterns for every changed file in one project from its diff and the files' text.
-function projectPatterns(projectDirectory, diffText, readText) {
+// Returns every line number of a text, for a file that is new in its entirety. A final line
+// break doesn't start another line.
+function everyLine(text) {
+  const { starts } = lineBounds(text);
+  const lineCount = text.endsWith('\n') ? starts.length - 1 : starts.length;
+  return new Set(Array.from({ length: lineCount }, (_, index) => index + 1));
+}
+
+// Builds the patterns for the changed and untracked files under one project folder. The diff can
+// cover the whole repo, so files outside the project are skipped here.
+function projectPatterns(projectDirectory, diffText, untrackedFiles, readText) {
+  const changed = parseChangedLines(diffText);
+  for (const file of untrackedFiles) changed.set(file, everyLine(readText(file)));
+
   const patterns = [];
-  for (const [file, lines] of parseChangedLines(diffText)) {
+  for (const [file, lines] of changed) {
+    if (!file.startsWith(`${projectDirectory}/`)) continue;
     const relative = path.posix.relative(projectDirectory, file);
     const pattern = mutatePattern(relative, readText(file), lines);
     if (pattern) patterns.push(pattern);
@@ -86,18 +99,21 @@ function projectPatterns(projectDirectory, diffText, readText) {
   return patterns;
 }
 
-// Prints the patterns for the project, comparing the working tree with the merge base.
-// Rename detection keeps a moved file to its changed lines instead of mutating all of it, and
-// quotePath=false keeps non-ASCII paths unquoted so their `+++ b/` header still parses.
+// Prints the patterns for the project, comparing the working tree with the merge base. The diff
+// covers every C# file so rename detection can pair a file moved in from another project with its
+// old path, keeping it to its changed lines. quotePath=false keeps non-ASCII paths unquoted so their
+// `+++ b/` header still parses.
 function main() {
   const [mergeBase, projectDirectory] = process.argv.slice(2);
   if (!projectDirectory) throw new Error('usage: node mutation-spans.cjs <merge-base> <repo-relative-project-dir>');
-  const diffText = execFileSync(
-    'git',
-    ['-c', 'core.quotePath=false', 'diff', '-U0', '-M', '--diff-filter=AMR', mergeBase, '--', `${projectDirectory}/*.cs`],
-    { cwd: repoRoot, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+  const git = args => execFileSync('git', ['-c', 'core.quotePath=false', ...args], { encoding: 'utf8', maxBuffer: maxGitOutput });
+  const repoRoot = git(['rev-parse', '--show-toplevel']).trim();
+  const diffText = git(['-C', repoRoot, 'diff', '-U0', '-M', '--diff-filter=AMR', mergeBase, '--', '*.cs']);
+  const untrackedFiles = git(['-C', repoRoot, 'ls-files', '--others', '--exclude-standard', '--', `${projectDirectory}/*.cs`])
+    .split('\n')
+    .filter(file => file.length > 0);
   const readText = file => fs.readFileSync(path.join(repoRoot, file), 'utf8');
-  for (const pattern of projectPatterns(projectDirectory, diffText, readText)) console.log(pattern);
+  for (const pattern of projectPatterns(projectDirectory, diffText, untrackedFiles, readText)) console.log(pattern);
 }
 
 if (require.main === module) main();

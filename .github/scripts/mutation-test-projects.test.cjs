@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { testProjectsFor } = require('./mutation-projects.cjs');
+const { testProjectsFor } = require('./mutation-test-projects.cjs');
 
 // The solution filter lists paths relative to source/, with JSON-escaped backslashes.
 const slnf = JSON.stringify({

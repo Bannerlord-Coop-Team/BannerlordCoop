@@ -10,7 +10,7 @@ set -euo pipefail
 # Keep -e inside $(...) too, so a failing helper stops the run instead of reading as empty output.
 shopt -s inherit_errexit
 
-# The mutated projects. mutation-projects.cjs finds the unit test projects that cover each one, and
+# The mutated projects. mutation-test-projects.cjs finds the unit test projects that cover each one, and
 # the settings shared by all of them are in source/stryker-config.json.
 mutated_projects=(Common Coop.Core GameInterface)
 
@@ -28,8 +28,19 @@ base_ref="${1:-origin/development}"
 output_directory=$(realpath -m "${2:-artifacts/mutation}")
 only_project="${3:-}"
 
+# Succeeds when the name is one of mutated_projects.
+is_mutated_project() {
+  local project
+  for project in "${mutated_projects[@]}"; do
+    if [[ "$project" == "$1" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
 if [[ -n "$only_project" ]]; then
-  if [[ " ${mutated_projects[*]} " != *" $only_project "* ]]; then
+  if ! is_mutated_project "$only_project"; then
     echo "Unknown project '$only_project'. Mutated projects: ${mutated_projects[*]}" >&2
     exit 1
   fi
@@ -47,6 +58,16 @@ merge_base=$(git merge-base "$base_ref" HEAD)
 # layout is spelled out.
 csproj_for() {
   echo "source/$1/$1.csproj"
+}
+
+# Prints the folder Stryker writes one project's output to.
+output_for() {
+  echo "$output_directory/$1"
+}
+
+# Prints the JSON report Stryker writes under a project's output folder.
+report_for() {
+  echo "$(output_for "$1")/reports/mutation-report.json"
 }
 
 # Prints the --mutate patterns, relative to the project folder, covering one project's changed lines.
@@ -74,11 +95,11 @@ mutate_project() {
   local patterns="$2"
   local csproj test_projects test_project pattern
   csproj=$(csproj_for "$project")
-  test_projects=$(node "$scripts/mutation-projects.cjs" "$csproj")
+  test_projects=$(node "$scripts/mutation-test-projects.cjs" "$csproj")
   local args=(
     --config-file "$repo_root/source/stryker-config.json"
     --project "$(basename "$csproj")"
-    --output "$output_directory/$project"
+    --output "$(output_for "$project")"
   )
   while IFS= read -r test_project; do
     args+=(--test-project "$repo_root/$test_project")
@@ -104,16 +125,16 @@ rm -f "$output_directory/summary.md"
 export NuGetAudit=false
 dotnet tool restore
 
-# Stryker writes each project's JSON report under its --output folder, in reports/.
 reports=()
 for project in "${mutated_projects[@]}"; do
   patterns=$(mutate_patterns "$project")
   if [[ -z "$patterns" ]]; then
     continue
   fi
-  rm -rf "${output_directory:?}/$project"
+  project_output=$(output_for "$project")
+  rm -rf "${project_output:?}"
   mutate_project "$project" "$patterns"
-  reports+=("$project=$output_directory/$project/reports/mutation-report.json")
+  reports+=("$project=$(report_for "$project")")
 done
 
 # Captured first, so a summary that fails to render leaves no summary.md behind.

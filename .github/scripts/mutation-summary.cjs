@@ -7,14 +7,14 @@ const repoRoot = path.resolve(__dirname, '../..');
 const maxRows = 100;
 const maxCellLength = 80;
 const caughtStatuses = ['Killed', 'Timeout'];
-// NoCoverage only appears when coverage analysis is on. Counting it as not caught keeps the score
-// equal to Stryker's own whatever source/stryker-config.json sets.
+// NoCoverage only appears when coverage analysis is on. Counting it as not caught matches Stryker's
+// own score, so the summary stays right if source/stryker-config.json turns coverage analysis back on.
 const notCaughtStatuses = ['Survived', 'NoCoverage'];
 const scoredStatuses = [...caughtStatuses, ...notCaughtStatuses];
 
-// Reads one parsed report into caught and not-caught counts and the mutants no test caught.
+// Reads one parsed report into the caught count and the mutants no test caught.
 function summarizeProject(report, root = repoRoot) {
-  const counts = { caught: 0, notCaught: 0 };
+  let caught = 0;
   const misses = [];
   let fileCount = 0;
 
@@ -25,10 +25,9 @@ function summarizeProject(report, root = repoRoot) {
     const relative = path.relative(root, filePath).split(path.sep).join('/');
     for (const mutant of scored) {
       if (caughtStatuses.includes(mutant.status)) {
-        counts.caught++;
+        caught++;
         continue;
       }
-      counts.notCaught++;
       misses.push({
         location: `${relative}:${mutant.location.start.line}`,
         mutation: mutant.mutatorName,
@@ -36,15 +35,17 @@ function summarizeProject(report, root = repoRoot) {
       });
     }
   }
-  return { counts, misses, fileCount };
+  return { caught, misses, fileCount };
 }
 
-// Reads each `<project>=<report-path>` argument into that project's summary.
-function readResults(reportArguments) {
+// Reads each `<project>=<report-path>` argument, split at the first `=`, into that project's
+// summary, loading the report through the given reader.
+function readResults(reportArguments, readJson, root = repoRoot) {
   return reportArguments.map(argument => {
     const separator = argument.indexOf('=');
-    const report = JSON.parse(fs.readFileSync(argument.slice(separator + 1), 'utf8'));
-    return { project: argument.slice(0, separator), ...summarizeProject(report) };
+    const project = argument.slice(0, separator);
+    const reportPath = argument.slice(separator + 1);
+    return { project, ...summarizeProject(readJson(reportPath), root) };
   });
 }
 
@@ -72,16 +73,16 @@ function table(headers, rows) {
 }
 
 // Formats a mutation score from the caught and not-caught counts, or a dash when nothing was scored.
-function score(counts) {
-  const total = counts.caught + counts.notCaught;
+function score(caught, notCaught) {
+  const total = caught + notCaught;
   if (total === 0) return '-';
-  return `${(100 * counts.caught / total).toFixed(1)}%`;
+  return `${(100 * caught / total).toFixed(1)}%`;
 }
 
 // Builds the per-project score table.
 function renderScores(results) {
-  const rows = results.map(({ project, counts, fileCount }) =>
-    [project, fileCount, counts.caught, counts.notCaught, score(counts)]);
+  const rows = results.map(({ project, caught, misses, fileCount }) =>
+    [project, fileCount, caught, misses.length, score(caught, misses.length)]);
   return table(['Project', 'Files', 'Caught', 'Not caught', 'Score'], rows);
 }
 
@@ -115,9 +116,10 @@ function render(results) {
 
 // Prints the summary for the project reports given on the command line.
 function main() {
-  console.log(render(readResults(process.argv.slice(2))));
+  const readJson = file => JSON.parse(fs.readFileSync(file, 'utf8'));
+  console.log(render(readResults(process.argv.slice(2), readJson)));
 }
 
 if (require.main === module) main();
 
-module.exports = { summarizeProject, render };
+module.exports = { readResults, render };
