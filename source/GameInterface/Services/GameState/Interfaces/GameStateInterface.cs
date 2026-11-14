@@ -4,6 +4,7 @@ using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes;
+using GameInterface.Services.MobileParties;
 using GameInterface.Services.Modules;
 using GameInterface.Services.UI.Interfaces;
 using SandBox;
@@ -101,7 +102,7 @@ internal class GameStateInterface : IGameStateInterface
         var loadedGame = (Game)loadResult.Root;
         var loadedCampaign = (Campaign)loadedGame.GameType;
         ClearTransferredMapNotices(loadedCampaign.CampaignInformationManager);
-        MBGameManager.StartNewGame(new SandBoxGameManager(loadResult));
+        MBGameManager.StartNewGame(new TransferredSaveGameManager(loadResult));
     }
 
     internal static void ClearTransferredMapNotices(CampaignInformationManager informationManager)
@@ -109,6 +110,21 @@ internal class GameStateInterface : IGameStateInterface
         // A headless server cannot dismiss map notices, so its save contains the campaign's accumulated
         // UI backlog. Only network-transferred saves use this load path; live notices remain intact.
         informationManager._mapNotices.Clear();
+    }
+
+    internal static void ClearTransferredPartyVisibility(Campaign campaign)
+    {
+        // The server keeps every active party visible (PartyVisibilityOnServerPatch), so its save marks the whole map
+        // visible. Map visuals take their first alpha from it and visible ones build their ship models, which crashes
+        // a client with hundreds of fleets, so clear it before they start; PartyVisibilitySweep then reveals the
+        // parties in range. Runs from TransferredSaveGameManager.OnGameLoaded, since the save system's late initialize
+        // re-reads each party's saved fields (MobileParty.OnLoad) before that. Only transferred saves use this; debug builds keep everything visible.
+        if (DebugPartyVisibility.ForceAllVisible) return;
+
+        foreach (var party in campaign.MobileParties)
+        {
+            party._isVisible = false;
+        }
     }
 
     public void StartNewGame()

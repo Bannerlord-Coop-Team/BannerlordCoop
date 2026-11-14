@@ -1,12 +1,15 @@
 ﻿using Common.Messaging;
+using Common.Util;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.GameState.Messages;
+using GameInterface.Services.MobileParties;
 using GameInterface.Services.Modules;
 using GameInterface.Services.UI.Interfaces;
 using Moq;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
 using TaleWorlds.SaveSystem;
@@ -14,6 +17,8 @@ using Xunit;
 
 namespace GameInterface.Tests.Services.GameState;
 
+// Shares DebugPartyVisibility with the other visibility tests.
+[Collection(ModInformationRoleCollection.Name)]
 public class GameStateInterfaceTests
 {
     static GameStateInterfaceTests()
@@ -112,6 +117,73 @@ public class GameStateInterfaceTests
         informationManager.NewMapNoticeAdded(liveNotice);
 
         Assert.Same(liveNotice, Assert.Single(informationManager._mapNotices));
+    }
+
+    // The server's save has every party visible; release clients start them hidden, debug builds keep them all visible.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ClearTransferredPartyVisibility_HidesEveryPartyUnlessDebugForcesAllVisible(bool forceAllVisible)
+    {
+        bool wasForceAllVisible = DebugPartyVisibility.ForceAllVisible;
+        var campaign = ObjectHelper.SkipConstructor<Campaign>();
+        campaign.CampaignObjectManager = new CampaignObjectManager();
+        for (int i = 0; i < 3; i++)
+        {
+            var party = ObjectHelper.SkipConstructor<MobileParty>();
+            party._isVisible = true;
+            campaign.CampaignObjectManager._mobileParties.Add(party);
+        }
+
+        try
+        {
+            DebugPartyVisibility.ForceAllVisible = forceAllVisible;
+            GameStateInterface.ClearTransferredPartyVisibility(campaign);
+        }
+        finally
+        {
+            DebugPartyVisibility.ForceAllVisible = wasForceAllVisible;
+        }
+
+        Assert.Equal(3, campaign.MobileParties.Count);
+        Assert.All(campaign.MobileParties, party => Assert.Equal(forceAllVisible, party._isVisible));
+    }
+
+    // A late initialize load re-reads each party's saved fields in InitializeObjects (MobileParty.OnLoad), so the
+    // clear only holds after it. Production runs it from TransferredSaveGameManager.OnGameLoaded, which this test
+    // does not drive.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ClearTransferredPartyVisibility_HoldsOnlyAfterLateInitialize(bool clearAfterInitialize)
+    {
+        bool wasForceAllVisible = DebugPartyVisibility.ForceAllVisible;
+        var saved = ObjectHelper.SkipConstructor<MobileParty>();
+        saved.Party = ObjectHelper.SkipConstructor<PartyBase>();
+        saved._isVisible = true;
+        var driver = new InMemDriver();
+        var saveResult = SaveManager.Save(saved, new MetaData { ["ApplicationVersion"] = "v1.4.8.0" }, "party", driver);
+        Assert.True(saveResult.Successful);
+        var loadResult = SaveManager.Load("party", driver, loadAsLateInitialize: true);
+        var party = Assert.IsType<MobileParty>(loadResult.Root);
+        Assert.True(party._isVisible);
+        var campaign = ObjectHelper.SkipConstructor<Campaign>();
+        campaign.CampaignObjectManager = new CampaignObjectManager();
+        campaign.CampaignObjectManager._mobileParties.Add(party);
+
+        try
+        {
+            DebugPartyVisibility.ForceAllVisible = false;
+            if (!clearAfterInitialize) GameStateInterface.ClearTransferredPartyVisibility(campaign);
+            loadResult.InitializeObjects();
+            if (clearAfterInitialize) GameStateInterface.ClearTransferredPartyVisibility(campaign);
+        }
+        finally
+        {
+            DebugPartyVisibility.ForceAllVisible = wasForceAllVisible;
+        }
+
+        Assert.Equal(!clearAfterInitialize, party._isVisible);
     }
 
     private sealed class TestInformationData : InformationData
