@@ -47,7 +47,6 @@ internal class FinalizationCoordinator : IHandler, IIssueFinalizationReplay
     private readonly IIssueConversationGuard conversationGuard;
     private readonly IQuestSolutionAcceptCoordinator acceptCoordinator;
     private readonly ITextObjectComparer textComparer;
-    private readonly ILordSolutionCoordinator lordSolutions;
 
     public FinalizationCoordinator(
         IMessageBroker messageBroker,
@@ -60,8 +59,7 @@ internal class FinalizationCoordinator : IHandler, IIssueFinalizationReplay
         IAlternativeSolutionCommitments commitments,
         IIssueConversationGuard conversationGuard,
         IQuestSolutionAcceptCoordinator acceptCoordinator,
-        ITextObjectComparer textComparer,
-        ILordSolutionCoordinator lordSolutions)
+        ITextObjectComparer textComparer)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -74,7 +72,6 @@ internal class FinalizationCoordinator : IHandler, IIssueFinalizationReplay
         this.conversationGuard = conversationGuard;
         this.acceptCoordinator = acceptCoordinator;
         this.textComparer = textComparer;
-        this.lordSolutions = lordSolutions;
 
         messageBroker.Subscribe<QuestOutcomeRequested>(Handle_QuestOutcomeRequested);
         messageBroker.Subscribe<QuestBranchRequested>(Handle_QuestBranchRequested);
@@ -436,29 +433,24 @@ internal class FinalizationCoordinator : IHandler, IIssueFinalizationReplay
 
         GameThread.RunSafe(() =>
         {
-            // The owner's running quest ends mid dialog as in vanilla. Anything else waits, because the lines on screen read the issue or its quest
-            if (IsOwnersRunningQuest(data))
-            {
-                conversationGuard.RunInOrder(() => ReplayEnding(data), data.IssueOwnerId);
-            }
-            else
-            {
-                conversationGuard.RunWhenNotTalkingTo(() => ReplayEnding(data), data.IssueOwnerId);
-            }
+            QueueReplay(data.IssueOwnerId, IsOwnersRunningQuest(data.IssueOwnerId, data.IssueId), () => ReplayEnding(data));
         }, context: nameof(FinalizationCoordinator));
     }
 
     public void ReplayLocalCancel(string issueOwnerId, string issueId, bool wasOwner)
     {
-        lordSolutions.ClearPending(issueOwnerId, issueId);
         if (!issueResolver.TryResolve(issueOwnerId, issueId, out _, out var issue, out _)) return;
 
         // Keep the identity and quest captured before the snapshot replaces the ownership mirror.
         var quest = issue.IssueQuest;
-        if (wasOwner && quest != null && Campaign.Current.QuestManager.Quests.Contains(quest))
-            conversationGuard.RunInOrder(() => ReplayEnding(issue, IssueOutcome.QuestCancel, wasOwner), issueOwnerId);
-        else
-            conversationGuard.RunWhenNotTalkingTo(() => ReplayEnding(issue, IssueOutcome.QuestCancel, wasOwner), issueOwnerId);
+        QueueReplay(issueOwnerId, wasOwner && quest != null && Campaign.Current.QuestManager.Quests.Contains(quest),
+            () => ReplayEnding(issue, IssueOutcome.QuestCancel, wasOwner));
+    }
+
+    private void QueueReplay(string issueOwnerId, bool ownerQuest, Action replay)
+    {
+        if (ownerQuest) conversationGuard.RunInOrder(replay, issueOwnerId);
+        else conversationGuard.RunWhenNotTalkingTo(replay, issueOwnerId);
     }
 
     private void ReplayEnding(NetworkIssueFinalized data)
@@ -486,10 +478,10 @@ internal class FinalizationCoordinator : IHandler, IIssueFinalizationReplay
     }
 
     // The quest Replay drives, a hand in for example, rather than one it would only discard
-    private bool IsOwnersRunningQuest(NetworkIssueFinalized data)
+    private bool IsOwnersRunningQuest(string issueOwnerId, string issueId)
     {
-        if (!ownership.TryGetOwner(data.IssueOwnerId, data.IssueId, out var owner) || owner != controller.ControllerId ||
-            !objectManager.TryGetObject<Hero>(data.IssueOwnerId, out var issueOwner) || issueOwner.Issue?.StringId != data.IssueId)
+        if (!ownership.TryGetOwner(issueOwnerId, issueId, out var owner) || owner != controller.ControllerId ||
+            !objectManager.TryGetObject<Hero>(issueOwnerId, out var issueOwner) || issueOwner.Issue?.StringId != issueId)
         {
             return false;
         }

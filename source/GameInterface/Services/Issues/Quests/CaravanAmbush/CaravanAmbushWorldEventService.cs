@@ -32,7 +32,17 @@ internal class CaravanAmbushWorldEventService : ICaravanAmbushWorldEventService
         this.retreatedPartyTracker = retreatedPartyTracker;
     }
 
-    public void Run(Action<Quest> action)
+    public void Run(Action<Quest> action) => Run(action, openRewardConversation: false);
+
+    public void End(Quest quest)
+    {
+        quest.RemoveAllTrackedObjects();
+        Release(quest);
+    }
+
+    public void BattleEnded(MapEvent battle) => Run(quest => BattleEnded(quest, battle), openRewardConversation: true);
+
+    private void Run(Action<Quest> action, bool openRewardConversation)
     {
         dispatcher.RunAsOwners<Quest>(quest =>
         {
@@ -42,17 +52,9 @@ internal class CaravanAmbushWorldEventService : ICaravanAmbushWorldEventService
             var before = SyncedState(quest);
             action(quest);
             if (quest.IsOngoing && SyncedState(quest) != before)
-                progress.Publish(quest);
+                progress.Publish(quest, openRewardConversation);
         });
     }
-
-    public void End(Quest quest)
-    {
-        quest.RemoveAllTrackedObjects();
-        Release(quest);
-    }
-
-    public void BattleEnded(MapEvent battle) => Run(quest => BattleEnded(quest, battle));
 
     private void BattleEnded(Quest quest, MapEvent battle)
     {
@@ -86,7 +88,6 @@ internal class CaravanAmbushWorldEventService : ICaravanAmbushWorldEventService
         else
         {
             HoldCaravanForReward(quest);
-            progress.SendConversation(quest);
         }
     }
 
@@ -94,7 +95,7 @@ internal class CaravanAmbushWorldEventService : ICaravanAmbushWorldEventService
     {
         quest._caravanParty.SetMoveGoToPoint(quest._caravanParty.Position, MobileParty.NavigationType.Default);
         quest._caravanParty.Ai.SetDoNotMakeNewDecisions(true);
-        ReleaseParty(quest._banditParty, quest._banditParty?.HomeSettlement);
+        ReleaseParty(quest._banditParty, quest._banditParty.HomeSettlement);
     }
 
     private void Release(Quest quest)

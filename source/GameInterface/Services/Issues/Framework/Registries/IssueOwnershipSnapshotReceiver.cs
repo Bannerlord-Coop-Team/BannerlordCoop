@@ -4,6 +4,7 @@ using Common.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.Interface;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace GameInterface.Services.Issues.Framework.Registries;
@@ -51,10 +52,11 @@ internal class IssueOwnershipSnapshotReceiver : IHandler
     {
         var owners = snapshot.Owners ?? Array.Empty<IssueOwnershipData>();
         var rememberedOwners = ownership.GetAll();
-        var droppedBySnapshot = rememberedOwners.Where(remembered => !owners.Any(owner =>
-            owner.IssueOwnerId == remembered.IssueOwnerId && owner.IssueId == remembered.IssueId));
-        foreach (var remembered in droppedBySnapshot)
+        var snapshotPairs = new HashSet<(string IssueOwnerId, string IssueId)>(
+            owners.Select(owner => (owner.IssueOwnerId, owner.IssueId)));
+        foreach (var remembered in rememberedOwners)
         {
+            if (snapshotPairs.Contains((remembered.IssueOwnerId, remembered.IssueId))) continue;
             finalization.ReplayLocalCancel(remembered.IssueOwnerId, remembered.IssueId,
                 remembered.ControllerId == controller.ControllerId);
         }

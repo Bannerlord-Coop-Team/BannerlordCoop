@@ -13,8 +13,7 @@ namespace GameInterface.Services.Issues.Quests.CaravanAmbush;
 
 internal interface ICaravanAmbushProgress
 {
-    void Publish(Quest quest);
-    void SendConversation(Quest quest);
+    void Publish(Quest quest, bool openRewardConversation = false);
 }
 
 internal class CaravanAmbushProgress : ICaravanAmbushProgress
@@ -33,20 +32,14 @@ internal class CaravanAmbushProgress : ICaravanAmbushProgress
         this.players = players;
     }
 
-    public void Publish(Quest quest)
+    public void Publish(Quest quest, bool openRewardConversation = false)
     {
         if (!TryGetOwnerPeer(quest, out var issue, out var ownerId, out var controllerId, out var peer) ||
             !TryGetPartyId(quest._caravanParty, out var caravanId) ||
             !TryGetPartyId(quest._banditParty, out var banditId)) return;
         var journal = quest.JournalEntries.Select(entry => new IssueJournalEntry(entry)).ToArray();
         network.Send(peer, new NetworkCaravanAmbushProgress(ownerId, issue.StringId, controllerId, caravanId,
-            banditId, quest._isCaravanSaved, quest._vicinityCheckFailCounter, journal));
-    }
-
-    public void SendConversation(Quest quest)
-    {
-        if (!TryGetOwnerPeer(quest, out var issue, out var ownerId, out var controllerId, out var peer)) return;
-        network.Send(peer, new NetworkCaravanAmbushConversation(ownerId, issue.StringId, controllerId));
+            banditId, quest._isCaravanSaved, quest._vicinityCheckFailCounter, journal, openRewardConversation));
     }
 
     private bool TryGetOwnerPeer(Quest quest, out IssueBase issue, out string ownerId,
@@ -62,6 +55,7 @@ internal class CaravanAmbushProgress : ICaravanAmbushProgress
 
     private bool TryGetPartyId(MobileParty party, out string id)
     {
+        // An empty id tells the owner that the party is gone. An active party without an id skips the publish.
         id = string.Empty;
         return party == null || !party.IsActive || objects.TryGetIdWithLogging(party, out id);
     }

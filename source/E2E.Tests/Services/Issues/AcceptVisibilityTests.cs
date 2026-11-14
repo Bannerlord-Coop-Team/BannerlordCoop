@@ -313,6 +313,7 @@ public class AcceptVisibilityTests : IDisposable
     public void APollerSnapshotForADifferentIssueKeepsTheNewOwnerAfterGameThreadApplication()
     {
         var notableId = TestEnvironment.CreateRegisteredObject<Hero>();
+        AddIssue(Other, notableId);
         Other.Call(() => Assert.True(Other.Resolve<IIssueOwnershipRegistry>().TrySetOwner(notableId, IssueId, "stale-player")));
         Server.Resolve<TestNetworkRouter>().ReceiveContext = TestNetworkReceiveContext.PollerThread;
 

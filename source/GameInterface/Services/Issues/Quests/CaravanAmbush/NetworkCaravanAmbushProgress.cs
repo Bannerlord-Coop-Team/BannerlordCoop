@@ -15,9 +15,11 @@ public readonly struct NetworkCaravanAmbushProgress : ICommand
     [ProtoMember(6)] public readonly bool Saved;
     [ProtoMember(7)] public readonly int Warnings;
     [ProtoMember(8)] public readonly IssueJournalEntry[] Journal;
+    [ProtoMember(9)] public readonly bool OpenRewardConversation;
 
     public NetworkCaravanAmbushProgress(string ownerId, string issueId, string controllerId,
-        string caravanId, string banditId, bool saved, int warnings, IssueJournalEntry[] journal)
+        string caravanId, string banditId, bool saved, int warnings, IssueJournalEntry[] journal,
+        bool openRewardConversation = false)
     {
         IssueOwnerId = ownerId;
         IssueId = issueId;
@@ -27,5 +29,6 @@ public readonly struct NetworkCaravanAmbushProgress : ICommand
         Saved = saved;
         Warnings = warnings;
         Journal = journal;
+        OpenRewardConversation = openRewardConversation;
     }
 }

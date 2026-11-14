@@ -35,6 +35,7 @@ internal class CaravanAmbushPatches
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.HandlePartyAiAfterCompletion))]
     [HarmonyPrefix]
+    // Party cleanup is centralized in ICaravanAmbushWorldEventService.End.
     private static bool Release() => false;
 
     [HarmonyPatch(typeof(QuestBase), nameof(QuestBase.FinalizeQuest))]
