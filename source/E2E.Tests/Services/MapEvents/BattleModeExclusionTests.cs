@@ -31,6 +31,46 @@ public class BattleModeExclusionTests : MapEventTestBase
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public void SimulationStart_OnlyAnAcceptedParticipantReleasesBattleInvulnerability(bool missionClaimed)
+    {
+        var battle = CreateServerMapEvent();
+        var client = Clients.First();
+        var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        RegisterAsPlayerParty("ambush-owner", heroId, battle.DefenderPartyId);
+        TestEnvironment.ConnectRegisteredPlayer(client, "ambush-owner");
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
+            mapEvent.IsInvulnerable = true;
+            if (missionClaimed) Assert.True(ServerBattleModeArbiter.TryClaimMission(battle.MapEventId));
+        });
+        try
+        {
+            Server.NetworkSentMessages.Clear();
+            client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkBattleStartRequest(
+                Guid.NewGuid().ToString(), (int)BattleStartMode.Simulation,
+                battle.MapEventId, battle.DefenderPartyId)), MapEventDisabledMethods);
+
+            var reply = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleStartReply>());
+            Assert.Equal(!missionClaimed, reply.Accepted);
+            foreach (var instance in Clients.Append(Server))
+            {
+                instance.Call(() =>
+                {
+                    Assert.True(instance.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
+                    Assert.Equal(missionClaimed, mapEvent.IsInvulnerable);
+                });
+            }
+        }
+        finally
+        {
+            Server.Call(() => ServerBattleModeArbiter.Release(battle.MapEventId));
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public void ReceivedBattleMode_RefreshesConditionsWithoutReinitializingEncounter(bool clearMode)
     {
         var battle = CreateServerMapEvent();

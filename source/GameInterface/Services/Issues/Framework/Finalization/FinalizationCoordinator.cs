@@ -26,7 +26,7 @@ namespace GameInterface.Services.Issues.Framework.Finalization;
 /// The owning player's client reports how its quest ended, the server runs that ending as the owner and
 /// announces it, and then every client ends its copy of the issue without running vanilla's consequences again.
 /// </summary>
-internal class FinalizationCoordinator : IHandler
+internal class FinalizationCoordinator : IHandler, IIssueFinalizationReplay
 {
     private static readonly ILogger Logger = LogManager.GetLogger<FinalizationCoordinator>();
 
@@ -433,16 +433,25 @@ internal class FinalizationCoordinator : IHandler
 
         GameThread.RunSafe(() =>
         {
-            // The owner's running quest ends mid dialog as in vanilla. Anything else waits, because the lines on screen read the issue or its quest
-            if (IsOwnersRunningQuest(data))
-            {
-                conversationGuard.RunInOrder(() => ReplayEnding(data), data.IssueOwnerId);
-            }
-            else
-            {
-                conversationGuard.RunWhenNotTalkingTo(() => ReplayEnding(data), data.IssueOwnerId);
-            }
+            QueueReplay(data.IssueOwnerId, IsOwnersRunningQuest(data.IssueOwnerId, data.IssueId), () => ReplayEnding(data));
         }, context: nameof(FinalizationCoordinator));
+    }
+
+    public void ReplayLocalCancel(string issueOwnerId, string issueId, bool wasOwner)
+    {
+        if (!issueResolver.TryResolve(issueOwnerId, issueId, out _, out var issue, out _)) return;
+
+        // Capture the issue because a deferred replay may run after a replacement issue arrives.
+        var quest = issue.IssueQuest;
+        QueueReplay(issueOwnerId, wasOwner && IsRunningLocally(quest),
+            () => ReplayEnding(issue, IssueOutcome.QuestCancel, wasOwner));
+    }
+
+    private void QueueReplay(string issueOwnerId, bool ownerQuest, Action replay)
+    {
+        // Vanilla ends the owner's running quest mid dialogue; other removals wait for its lines to close.
+        if (ownerQuest) conversationGuard.RunInOrder(replay, issueOwnerId);
+        else conversationGuard.RunWhenNotTalkingTo(replay, issueOwnerId);
     }
 
     private void ReplayEnding(NetworkIssueFinalized data)
@@ -456,26 +465,33 @@ internal class FinalizationCoordinator : IHandler
             return;
         }
 
+        ReplayEnding(issue, data.Outcome, isOwner);
+    }
+
+    private void ReplayEnding(IssueBase issue, IssueOutcome outcome, bool isOwner)
+    {
         using (new AllowedThread())
         using (new QuestEndingReplay())
         using (new QuestJournalReplay())
         {
-            Replay(issue, data.Outcome, isOwner);
+            Replay(issue, outcome, isOwner);
         }
     }
 
     // The quest Replay drives, a hand in for example, rather than one it would only discard
-    private bool IsOwnersRunningQuest(NetworkIssueFinalized data)
+    private bool IsOwnersRunningQuest(string issueOwnerId, string issueId)
     {
-        if (!ownership.TryGetOwner(data.IssueOwnerId, data.IssueId, out var owner) || owner != controller.ControllerId ||
-            !objectManager.TryGetObject<Hero>(data.IssueOwnerId, out var issueOwner) || issueOwner.Issue?.StringId != data.IssueId)
+        if (!ownership.TryGetOwner(issueOwnerId, issueId, out var owner) || owner != controller.ControllerId ||
+            !objectManager.TryGetObject<Hero>(issueOwnerId, out var issueOwner) || issueOwner.Issue?.StringId != issueId)
         {
             return false;
         }
 
-        var quest = issueOwner.Issue.IssueQuest;
-        return quest != null && Campaign.Current.QuestManager.Quests.Contains(quest);
+        return IsRunningLocally(issueOwner.Issue.IssueQuest);
     }
+
+    private static bool IsRunningLocally(QuestBase quest) =>
+        quest != null && Campaign.Current.QuestManager.Quests.Contains(quest);
 
     private bool TryGetPlayer(object who, string messageName, out Player player)
     {
