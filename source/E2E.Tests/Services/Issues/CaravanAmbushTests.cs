@@ -3,7 +3,6 @@ using Common.Util;
 using Common.Messaging;
 using Common.Network.Messages;
 using LiteNetLib;
-using GameInterface.Registry.Messages;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
@@ -20,15 +19,12 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.Encyclopedia;
-using TaleWorlds.CampaignSystem.GameState;
-using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
-using TaleWorlds.MountAndBlade;
 using SandBox.GauntletUI.Map;
 using Xunit.Abstractions;
 using Issue = TaleWorlds.CampaignSystem.Issues.CaravanAmbushIssueBehavior.CaravanAmbushIssue;
@@ -42,7 +38,6 @@ public class CaravanAmbushTests : IDisposable
     private readonly QuestScenario scenario;
     private readonly string caravanId;
     private readonly string banditId;
-    private readonly GameStateManager previousGameStateManager = GameStateManager.Current;
     private EnvironmentInstance Server => scenario.Server;
     private EnvironmentInstance Owner => scenario.ClientA;
     private EnvironmentInstance Other => scenario.ClientB;
@@ -67,7 +62,6 @@ public class CaravanAmbushTests : IDisposable
 
     public void Dispose()
     {
-        Owner.Call(() => GameStateManager._current = previousGameStateManager);
         environment.Dispose();
     }
 
@@ -479,8 +473,6 @@ public class CaravanAmbushTests : IDisposable
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkCaravanAmbushProgress>().Where(message => message.OpenRewardConversation));
         Assert.Equal(IssueOutcome.QuestFail, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
     }
-
-
 
     [Fact]
     public void FrameworkDisconnectDismissalReleasesBothParties()

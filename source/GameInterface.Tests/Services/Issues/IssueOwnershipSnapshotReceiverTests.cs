@@ -126,12 +126,14 @@ public class IssueOwnershipSnapshotReceiverTests : IDisposable
     public void AThrowingCancelKeepsTheReplacedMirrorAndDoesNotSkipOtherCancels()
     {
         registry.TrySetOwner("hero_2", "issue_2", "another-player");
+        var replacementObservedBeforeCancel = false;
         var replay = new Mock<IIssueFinalizationReplay>();
         replay.Setup(value => value.ReplayLocalCancel("hero_1", "issue_1", true)).Callback(() =>
         {
             Assert.False(registry.TryGetOwner("hero_1", "issue_1", out _));
             Assert.True(registry.TryGetOwner("hero_1", "replacement", out var owner));
             Assert.Equal("new-player", owner);
+            replacementObservedBeforeCancel = true;
             throw new InvalidOperationException("cancel failed");
         });
         using var throwingReceiver = new IssueOwnershipSnapshotReceiver(new MessageBroker(), registry,
@@ -143,6 +145,7 @@ public class IssueOwnershipSnapshotReceiverTests : IDisposable
                 new IssueOwnershipData("hero_1", "replacement", "new-player"),
             }))), blocking: true);
 
+        Assert.True(replacementObservedBeforeCancel);
         replay.Verify(value => value.ReplayLocalCancel("hero_1", "issue_1", true), Times.Once);
         replay.Verify(value => value.ReplayLocalCancel("hero_2", "issue_2", false), Times.Once);
         Assert.Single(registry.GetAll());
