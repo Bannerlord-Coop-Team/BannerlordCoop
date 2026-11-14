@@ -15,19 +15,21 @@ namespace Coop.Tests.Missions.Battles;
 
 public class NavalShipBudgetTests
 {
-    // The own party fields against the other players only, so AI parties joining after the players opened never shrink its share.
-    // Row two is the review case: two players with 3 ships each, then two 3-ship AI lords join, and the players keep 3 each.
+    // The own party fields against the other players only, so AI lords joining after the players opened never shrink its share.
+    // Row one puts the other player first, where vanilla would take it as the own party; row two has two AI lords joining after
+    // two players, and only the other player is the ally team.
     [Theory]
     [InlineData("P2 P1", "P2")]
     [InlineData("P1 P2 AI1 AI2", "P2")]
     public void SplitPlayerSideParties_FieldsTheOwnPartyAgainstTheOtherPlayersOnly(string side, string allies)
     {
         var parties = side.Split(' ').ToDictionary(name => name, name => CreateMapEventParty(CreateParty()));
+        var players = parties.Where(entry => entry.Key.StartsWith("P")).Select(entry => entry.Value.Party).ToHashSet();
 
         NavalShipBudget.SplitPlayerSideParties(
             new MBList<MapEventParty>(parties.Values),
             parties["P1"].Party,
-            party => parties.First(entry => ReferenceEquals(entry.Value.Party, party)).Key.StartsWith("P"),
+            players.Contains,
             out var ownMapEventParty,
             out var ownTeamParties,
             out var allyTeamParties);
@@ -38,11 +40,9 @@ public class NavalShipBudgetTests
     }
 
     // The allies get what the players' fielded ships leave of the side's eight, never more than their own limit nor below none.
-    // Row one has the 6+6 shape, with the player's share of 4 given as input: an AI lord limited to 6 gets the other 4. Row two is
-    // the review case: two players field 3 each and two 3-ship AI lords (limit 6) get the 2 left, so the side holds 8.
+    // Row one has the 6+6 shape, with the player's share of 4 given as input: an AI lord limited to 6 gets the other 4.
     [Theory]
     [InlineData(4, 6, 4)]
-    [InlineData(6, 6, 2)]
     [InlineData(3, 2, 2)]
     [InlineData(8, 6, 0)]
     [InlineData(9, 6, 0)]

@@ -750,8 +750,8 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   - a party that joined the side after the host's attempt and opened its mission before the attempt reached it (about one
     round trip through the server) fields its full share: up to that share less one copy over on the older clients;
   - every player fields its own ship, so a second player joining a full side is one copy over;
-  - players who start together keep the players-only split, whose rounding can pass 8 (three players with 3 ships each
-    field 3 each), as before M11.
+  - players who start together keep the players-only split, whose rounding can pass 8: three players with 3 ships each
+    field 9, as before M11.
 - **Saved Order of Battle layout.** Co-op skips `NavalOrderOfBattleVM.LoadConfigurationShips`, so the player's saved ship
   and formation layout never applies, while vanilla's `SaveConfiguration` still stores the snapshot ships into the
   client's `NavalOrderOfBattleCampaignBehavior` after each battle.
@@ -1069,12 +1069,13 @@ Knobs (`NavalScenarioResolver.Usage`):
   is never swapped, so `hulls=1 weapons=1 reserve=20` has no room and logs a Warning; add a hull.
 - `allies=n` (1 to 8, `allied_npc` only, default 1) tops the allied lord up to n ships.
 - `ignore_limits=1` lets every party of the scenario's battle field 8 ships, vanilla's `IgnoreDeploymentLimits` base limit
-  before perks, on every client (`CoopNavalBattleLauncher` turns the switch on for that battle). A player's net limit is the
-  smallest of its parties, skeletal crew and battle limits, and its ally team is the other players only, so `allied_npc
-  ships=4 ignore_limits=1 reserve=40 testclient1 testclient2` gives each player a net of 4 (4 ships, whose 68 skeletal crew
-  the reserve's 216 troops cover), 4+4 fits the side's 8 without a split, and the allies settle on `NoShipsLeft` (`inspect`
-  shows the Defender spawner `failed` with that reason and the host logs it as Information). The reserve swaps one hull for
-  an `empire_heavy_ship`; without `ignore_limits=1` each player's party limit of 3 gives 3+3 and the allies 2.
+  before perks, on every client (`CoopNavalBattleLauncher` turns the switch on for that battle). Staged with `allied_npc
+  ships=4 ignore_limits=1 reserve=40 testclient1 testclient2`, the reserve swaps one hull of each player for an
+  `empire_heavy_ship` and tops its troops up to 216, past the 68 skeletal crew of its 4 ships. A player's net limit is the
+  smallest of its parties, skeletal crew and battle limits, here 4, and its ally team is the other players only, so 4+4 fits
+  the side's 8 without a split. The allies then settle on `NoShipsLeft` (`inspect` shows the Defender spawner `failed` with
+  that reason and the host logs it as Information). Without `ignore_limits=1` each player's party limit of 3 gives 3+3 and
+  the allies 2.
 - `army=1` (`allied_npc` only) has the first player's clan join the allied lord's kingdom and lead an army with the lord as
   its member, through the vanilla actions the clan and army syncs replicate (M11 A1: at sea the member's reserve goes to
   the battle host).

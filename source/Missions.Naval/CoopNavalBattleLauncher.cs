@@ -209,6 +209,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
                 new NavalShipsLogic(),
                 new NavalFloatsamLogic(),
                 new NavalAgentsLogic(),
+                // The ally limit is the other players' share; only the Order of Battle reads it, to disable the slots they take.
                 new DefaultNavalMissionLogic(ownShips, new MBList<IShipOrigin>(), new MBList<IShipOrigin>(),
                     ownFleet.PlayerLimit, ownFleet.AllyLimit, enemyLimit),
                 new NavalTrajectoryPlanningLogic(),

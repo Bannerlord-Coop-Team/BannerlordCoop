@@ -18,7 +18,8 @@ namespace Missions.Naval;
 
 /// <summary>
 /// Splits a naval battle side's eight ships: each player fields its share against the side's other players, the side's AI
-/// parties get what the players leave, and a player who joins after the side's AI fleet attempt gets only what it leaves.
+/// parties get what the players leave, and a player who joins after the side's AI fleet attempt gets only what the recorded
+/// attempt leaves.
 /// </summary>
 public interface INavalShipBudget
 {
@@ -62,8 +63,7 @@ public class NavalShipBudget : INavalShipBudget
     public NavalPlayerFleet PlayerFleet(MBReadOnlyList<MapEventParty> sideParties, PartyBase playerParty)
     {
         var model = NavalDLCManager.Instance.GameModels.ShipDeploymentModel;
-        SplitPlayerSideParties(sideParties, playerParty, party => playerManager.Contains(party.MobileParty),
-            out var playerMapEventParty, out var playerTeamParties, out var allyTeamParties);
+        SplitPlayerSideParties(sideParties, playerParty, IsPlayerParty, out var playerMapEventParty, out var playerTeamParties, out var allyTeamParties);
         model.GetShipDeploymentLimitsOfPlayerTeams(playerTeamParties, allyTeamParties, out var playerLimit, out var allyLimit);
         if (playerMapEventParty.Ships.Count == 0) return new NavalPlayerFleet(Array.Empty<Ship>(), playerLimit, allyLimit);
 
@@ -136,8 +136,11 @@ public class NavalShipBudget : INavalShipBudget
     private bool TryGetPlayerPartyId(PartyBase party, out string partyId)
     {
         partyId = null;
-        return playerManager.Contains(party.MobileParty) && objectManager.TryGetIdWithLogging(party.MobileParty, out partyId);
+        return IsPlayerParty(party) && objectManager.TryGetIdWithLogging(party.MobileParty, out partyId);
     }
+
+    // Whether the player registry holds the party, the same check the launcher and the fielder make.
+    private bool IsPlayerParty(PartyBase party) => playerManager.Contains(party.MobileParty);
 
     /// <summary>
     /// The side's eight less the attempt's hulls and the most each earlier uncounted player can field. Never below one, the
