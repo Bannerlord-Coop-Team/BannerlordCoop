@@ -16,7 +16,7 @@ public interface IPartyVisibilitySweep
 /// Loading a save restores each party's persisted visibility verbatim, and the native per-tick
 /// sweep (<c>CampaignTickCacheDataStore.UpdateVisibilitiesAroundMainParty</c>) only re-evaluates
 /// parties within seeing range of the main party — visibility is sticky everywhere else. A joining
-/// release client loads the server's transferred save with every party hidden (GameStateInterface
+/// release client loads the server's transferred save with every party hidden (GameStateInterface.ClearTransferredPartyVisibility
 /// clears the server's forced visibility on load), so this pass reveals the parties in range of the
 /// local main party.
 /// </summary>
@@ -38,7 +38,7 @@ internal sealed class PartyVisibilitySweep : IPartyVisibilitySweep
         // recomputed — besieging/raiding parties read their settlement's IsInspected, and attached
         // army followers copy their leader's visibility. So: settlements, then army leaders and
         // unattached parties, then attached followers. A follower swept before its leader would
-        // keep the server save's stale visibility.
+        // copy the leader's old visibility.
         foreach (var settlement in Settlement.All)
         {
             settlement.Party.UpdateVisibilityAndInspected(mainParty.Position);

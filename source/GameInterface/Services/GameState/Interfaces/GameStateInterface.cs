@@ -118,7 +118,7 @@ internal class GameStateInterface : IGameStateInterface
         // visible. Map visuals take their first alpha from it and visible ones build their ship models, which crashes
         // a client with hundreds of fleets, so clear it before they start; PartyVisibilitySweep then reveals the
         // parties in range. Runs from TransferredSaveGameManager.OnGameLoaded, since the save system's late initialize
-        // rewrites every saved field before that. Only transferred saves use this; debug builds keep everything visible.
+        // re-reads each party's saved fields (MobileParty.OnLoad) before that. Only transferred saves use this; debug builds keep everything visible.
         if (DebugPartyVisibility.ForceAllVisible) return;
 
         foreach (var party in campaign.MobileParties)

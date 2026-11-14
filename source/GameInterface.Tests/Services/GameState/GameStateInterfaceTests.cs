@@ -149,7 +149,9 @@ public class GameStateInterfaceTests
         Assert.All(campaign.MobileParties, party => Assert.Equal(forceAllVisible, party._isVisible));
     }
 
-    // A late initialize load refills every saved field in InitializeObjects, so the clear only holds after it (OnGameLoaded).
+    // A late initialize load re-reads each party's saved fields in InitializeObjects (MobileParty.OnLoad), so the
+    // clear only holds after it. Production runs it from TransferredSaveGameManager.OnGameLoaded, which this test
+    // does not drive.
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
