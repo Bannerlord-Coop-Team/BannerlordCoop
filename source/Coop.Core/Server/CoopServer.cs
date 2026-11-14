@@ -208,7 +208,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         if (joinAdmission.TryAdmit(() => messageBroker.Publish(this, new PlayerConnected(peer)))) return;
 
         Logger.Information("Client {Peer} disconnected before joining: the server is restarting", peer.Id);
-        peerTerminator.Disconnect(peer, ServerShutdownCoordinator.DisconnectReason);
+        peerTerminator.Disconnect(peer, DisconnectReasons.ServerRestarting);
     }
 
     public override void OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)

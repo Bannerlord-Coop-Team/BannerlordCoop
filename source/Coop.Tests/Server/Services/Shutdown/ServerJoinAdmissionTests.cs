@@ -41,6 +41,7 @@ using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
+using Coop.Core.Common.Network;
 
 namespace Coop.Tests.Server.Services.Shutdown;
 
@@ -210,7 +211,7 @@ public class ServerJoinAdmissionTests
         Assert.Empty(race.Connections);
         race.PumpUntil(() => race.ClientDisconnectReason != null);
 
-        Assert.Equal(ServerShutdownCoordinator.DisconnectReason, race.ClientDisconnectReason);
+        Assert.Equal(DisconnectReasons.ServerRestarting, race.ClientDisconnectReason);
         Assert.Equal(new[] { "save queued", "disconnected" }, race.ServerEvents);
         Assert.Empty(race.Connections);
         Assert.Equal(ended, race.Coordinator.Phase);
@@ -256,7 +257,7 @@ public class ServerJoinAdmissionTests
         race.CompleteSave();
 
         Assert.Equal(ServerShutdownPhase.Completed, race.Coordinator.Phase);
-        Assert.Equal(ServerShutdownCoordinator.DisconnectReason, race.ClientDisconnectReason);
+        Assert.Equal(DisconnectReasons.ServerRestarting, race.ClientDisconnectReason);
         Assert.Equal(new[] { "registered", "disconnected", "save queued" }, race.ServerEvents);
         GC.KeepAlive(pause);
     }

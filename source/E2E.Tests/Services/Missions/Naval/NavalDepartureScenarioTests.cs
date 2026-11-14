@@ -197,7 +197,7 @@ public class NavalDepartureScenarioTests : NavalBattleTestEnvironment
         battle.FieldPlayerHull(c, new Vec3(80f, 0f, 0f));
         var pirate = battle.FieldAiHull(a, BattleSideEnum.Defender, new Vec3(0f, 300f, 0f));
         var crewA = RegisterPartyTroopEverywhere(battle, Guid.NewGuid(), "A");
-        var pirateCrew = Enumerable.Range(0, 5).Select(_ => RegisterEnemyEverywhere(battle, Guid.NewGuid(), "A")).ToArray();
+        var pirateCrew = Enumerable.Range(0, 5).Select(_ => RegisterEverywhere(battle, Guid.NewGuid(), "A", peer => peer.Mission.DefenderTeam)).ToArray();
         battle.CommitAll();
         battle.TickAll(2);
         foreach (var peer in battle.Peers)
@@ -236,8 +236,8 @@ public class NavalDepartureScenarioTests : NavalBattleTestEnvironment
         Assert.False(b.Hull(pirate).IsCopy);
         Assert.Empty(b.Engine.ParkedAgents);
         int crewing = pirateCrew.Count(crew => b.Engine.CrewHullOf(crew[b]) == b.Ship(pirate).Hull);
-        var enemy = EndTally(b, BattleSideEnum.Defender, liveHumans: pirateCrew.Length, new Dictionary<Guid, int> { [pirate] = crewing });
         Assert.Equal(pirateCrew.Length, crewing);
+        var enemy = EndTally(b, BattleSideEnum.Defender, liveHumans: pirateCrew.Length, new Dictionary<Guid, int> { [pirate] = crewing });
         Assert.False(enemy.IsDepleted);
         Assert.False(enemy.IsOutOfAction);
 
@@ -613,8 +613,10 @@ public class NavalDepartureScenarioTests : NavalBattleTestEnvironment
             Assert.Contains(agent, peer.Engine.Withdrawn);
     }
 
-    private static Dictionary<NavalPeer, Agent> RegisterEverywhere(NavalBattle battle, Guid agentId, string authority) =>
-        battle.Peers.ToDictionary(peer => peer, peer => peer.RegisterAgent(agentId, authority));
+    // An agent under the given authority on every client, on the team the selector picks for each client when given.
+    private static Dictionary<NavalPeer, Agent> RegisterEverywhere(NavalBattle battle, Guid agentId, string authority,
+        Func<NavalPeer, MockTeam>? team = null) =>
+        battle.Peers.ToDictionary(peer => peer, peer => peer.RegisterAgent(agentId, authority, team?.Invoke(peer)));
 
     // The controller this client's agent registry names for the agent, or null when it isn't registered.
     private static string? AgentAuthority(NavalPeer peer, Agent agent)
@@ -623,10 +625,6 @@ public class NavalDepartureScenarioTests : NavalBattleTestEnvironment
         peer.Call(() => authority = peer.Agents.TryGetAgentInfo(agent, out var info) ? info.CurrentAuthority : null);
         return authority;
     }
-
-    // An enemy AI troop on every client, simulated by the battle host.
-    private static Dictionary<NavalPeer, Agent> RegisterEnemyEverywhere(NavalBattle battle, Guid agentId, string host) =>
-        battle.Peers.ToDictionary(peer => peer, peer => peer.RegisterAgent(agentId, host, peer.Mission.DefenderTeam));
 
     // A troop of the owner's own party on every client, which withdraws with the party when the owner leaves.
     private static Dictionary<NavalPeer, Agent> RegisterPartyTroopEverywhere(NavalBattle battle, Guid agentId, string owner) =>

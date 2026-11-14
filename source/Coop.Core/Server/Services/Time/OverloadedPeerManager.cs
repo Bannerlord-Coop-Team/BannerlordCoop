@@ -12,6 +12,7 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Coop.Core.Common.Network;
 
 namespace Coop.Core.Server.Services.Time;
 
@@ -161,10 +162,10 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
             string queueDescription = connectionMessageQueue.DescribeCatchUp(entry.Peer);
             int clearedPackets = connectionMessageQueue.AbortCatchUp(entry.Peer);
             string disconnectCode = baselinesExhausted
-                ? "JoinBaselineLimit"
+                ? DisconnectReasons.JoinBaselineLimit
                 : timedOut
-                    ? "JoinReplayAppliedTimeout"
-                    : "JoinReplayQueueLimit";
+                    ? DisconnectReasons.JoinReplayAppliedTimeout
+                    : DisconnectReasons.JoinReplayQueueLimit;
 
             joinCatchUpProgress.Remove(entry.Peer);
 
@@ -257,8 +258,8 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
             string queueDescription = connectionMessageQueue.DescribeCatchUp(entry.Peer);
             int clearedPackets = connectionMessageQueue.AbortCatchUp(entry.Peer);
             string disconnectCode = timedOut
-                ? "JoinCampaignEntryTimeout"
-                : "JoinReplayQueueLimit";
+                ? DisconnectReasons.JoinCampaignEntryTimeout
+                : DisconnectReasons.JoinReplayQueueLimit;
 
             preEntryBackpressureStartedUtc.Remove(entry.Peer);
 

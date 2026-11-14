@@ -11,6 +11,7 @@ using System;
 using System.Net;
 using System.Reflection;
 using Xunit;
+using Coop.Core.Common.Network;
 
 namespace Coop.Tests.Server.Services.Instances;
 
@@ -39,13 +40,14 @@ public class UnresponsiveBattleHostManagerTests
         var missions = new MissionManager(Mock.Of<IPlayerManager>());
         Assert.True(missions.TryEnterMission(host, "host", Battle, out _));
         Assert.True(missions.TryEnterMission(member, "member", Battle, out _));
+        string[] successors = successorWaiting ? new[] { "member" } : Array.Empty<string>();
         var hosts = new BattleHostRegistry(Mock.Of<IControllerIdProvider>());
-        hosts.Set(Battle, new BattleHostAssignment("host", successorWaiting ? new[] { "member" } : Array.Empty<string>(), 1, isNaval: true));
+        hosts.Set(Battle, new BattleHostAssignment("host", successors, 1, isNaval: true));
         var terminator = new Mock<IPeerTerminator>();
 
         new UnresponsiveBattleHostManager(new NetworkConfig(), missions, hosts, terminator.Object).DisconnectUnresponsiveHosts();
 
-        terminator.Verify(value => value.Disconnect(host, UnresponsiveBattleHostManager.DisconnectReason),
+        terminator.Verify(value => value.Disconnect(host, DisconnectReasons.BattleHostUnresponsive),
             hostDropped ? Times.Once() : Times.Never());
         terminator.Verify(value => value.Disconnect(member, It.IsAny<string>()), Times.Never());
     }

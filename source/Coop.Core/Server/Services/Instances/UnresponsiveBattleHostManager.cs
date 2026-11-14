@@ -4,12 +4,13 @@ using Coop.Core.Server.Connections;
 using GameInterface.Services.MapEvents;
 using LiteNetLib;
 using Serilog;
+using Coop.Core.Common.Network;
 
 namespace Coop.Core.Server.Services.Instances;
 
 /// <summary>
 /// [Server, poll thread] Drops a battle host the server hasn't heard from for <see cref="INetworkConfig.BattleHostDisconnectTimeout"/>,
-/// so its successor takes the battle over well before the link's own 60 s timeout. Every other peer keeps that timeout.
+/// so its successor takes the battle over well before <see cref="INetworkConfig.DisconnectTimeout"/>. Every other peer keeps that one.
 /// </summary>
 public interface IUnresponsiveBattleHostManager
 {
@@ -20,9 +21,6 @@ public interface IUnresponsiveBattleHostManager
 /// <inheritdoc cref="IUnresponsiveBattleHostManager"/>
 internal class UnresponsiveBattleHostManager : IUnresponsiveBattleHostManager
 {
-    /// <summary>The reason code a dropped host's client reads, if it is still alive to read it.</summary>
-    internal const string DisconnectReason = "BattleHostUnresponsive";
-
     private static readonly ILogger Logger = LogManager.GetLogger<UnresponsiveBattleHostManager>();
 
     private readonly INetworkConfig config;
@@ -46,17 +44,18 @@ internal class UnresponsiveBattleHostManager : IUnresponsiveBattleHostManager
     public void DisconnectUnresponsiveHosts()
     {
         double timeoutMs = config.BattleHostDisconnectTimeout.TotalMilliseconds;
-        foreach (var (controllerId, instanceId, peer) in missionManager.GetMembers())
+        // A battle's mission instance is named after its map event.
+        foreach (var (controllerId, mapEventId, peer) in missionManager.GetMembers())
         {
             if (peer.ConnectionState != ConnectionState.Connected) continue;
             if (peer.TimeSinceLastPacket < timeoutMs) continue;
-            if (!IsHostWithSuccessor(instanceId, controllerId)) continue;
+            if (!IsHostWithSuccessor(mapEventId, controllerId)) continue;
 
             Logger.Warning("[BattleHost] Disconnecting battle host {Host} of {MapEventId}: nothing heard for {Silence:0.0}s " +
-                "(limit {Limit:0}s), so its successor takes over", controllerId, instanceId, peer.TimeSinceLastPacket / 1000f,
+                "(limit {Limit:0}s), so its successor takes over", controllerId, mapEventId, peer.TimeSinceLastPacket / 1000f,
                 config.BattleHostDisconnectTimeout.TotalSeconds);
             // The same disconnect a drop or a timeout takes, so the departure and promotion that follow are the usual ones.
-            peerTerminator.Disconnect(peer, DisconnectReason);
+            peerTerminator.Disconnect(peer, DisconnectReasons.BattleHostUnresponsive);
         }
     }
 

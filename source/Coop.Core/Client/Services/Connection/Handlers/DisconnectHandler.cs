@@ -2,11 +2,11 @@
 using Common.Messaging;
 using Coop.Core.Client.Messages;
 using Coop.Core.Common;
-using Coop.Core.Server.Services.Instances;
 using GameInterface.Services.GameState.Interfaces;
 using LiteNetLib;
 using Serilog;
 using System;
+using Coop.Core.Common.Network;
 
 namespace Coop.Core.Client.Services.Connection.Handlers;
 
@@ -57,21 +57,21 @@ internal class DisconnectHandler : IHandler
     {
         switch (serverReason)
         {
-            case "JoinReplayAppliedTimeout":
+            case DisconnectReasons.JoinReplayAppliedTimeout:
                 return "Joining the campaign timed out while synchronizing.\n" +
                        "The server stopped this join to keep the campaign responsive. Please try again.";
-            case "JoinBaselineLimit":
+            case DisconnectReasons.JoinBaselineLimit:
                 return "Joining the campaign failed because it could not be synchronized after repeated attempts.\n" +
                        "Make sure your mods and save match the server's, then try again.";
-            case "JoinReplayQueueLimit":
+            case DisconnectReasons.JoinReplayQueueLimit:
                 return "Joining the campaign stopped because its synchronization queue exceeded the safety limit.\n" +
                        "Please try again.";
-            case "JoinCampaignEntryTimeout":
+            case DisconnectReasons.JoinCampaignEntryTimeout:
                 return "Joining the campaign timed out while loading the transferred save.\n" +
                        "The server stopped this join to keep the campaign responsive. Please try again.";
-            case "ServerRestarting":
+            case DisconnectReasons.ServerRestarting:
                 return "The server is restarting. Try again in a few minutes.";
-            case UnresponsiveBattleHostManager.DisconnectReason:
+            case DisconnectReasons.BattleHostUnresponsive:
                 return "The server lost contact with you while you were hosting a battle, so another player took it over.\n" +
                        "Rejoin the campaign to continue.";
         }
