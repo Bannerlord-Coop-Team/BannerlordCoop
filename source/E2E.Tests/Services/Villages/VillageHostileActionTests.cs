@@ -1468,7 +1468,7 @@ public class VillageHostileActionTests : MapEventTestBase
         Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client.NetPeer);
         client.Call(() => Assert.False(PlayerEncounterPatches.UpdatePrefix()), disabledMethods);
 
-        var started = Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionStarted>().Single();
+        var started = Server.NetworkSentMessages.GetMessages<NetworkRaidContinuationRequested>().Single();
         Assert.Equal(target.SettlementId, started.SettlementId);
         Assert.Equal(mobilePartyId, started.MobilePartyId);
 
