@@ -7,6 +7,7 @@ using Common.Network.Messages;
 using Common.Util;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.CampaignService.Messages;
+using GameInterface.Services.Clans;
 using GameInterface.Services.CampaignService.Statistics.Interfaces;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Extensions;
@@ -54,6 +55,7 @@ internal class HeirSelectionHandler : IHandler
     private readonly PlayerDeathCutsceneHandler cutscenesHandler;
     private readonly PlayerDeletionHandler playerDeletionHandler;
     private readonly ISendCoalescer sendCoalescer;
+    private readonly IPartyConfigurationService partyConfiguration;
     private readonly Dictionary<string, IMessage> sentSelections = new();
     private double lastCheckDays = -1;
     private int presentationVersion;
@@ -75,6 +77,7 @@ internal class HeirSelectionHandler : IHandler
         IIssueCancellationCoordinator issueCancellationCoordinator,
         PlayerDeathCutsceneHandler cutscenesHandler,
         PlayerDeletionHandler playerDeletionHandler,
+        IPartyConfigurationService partyConfiguration,
         ISendCoalescer sendCoalescer = null)
     {
         this.messageBroker = messageBroker;
@@ -91,6 +94,7 @@ internal class HeirSelectionHandler : IHandler
         this.cutscenesHandler = cutscenesHandler;
         this.playerDeletionHandler = playerDeletionHandler;
         this.sendCoalescer = sendCoalescer;
+        this.partyConfiguration = partyConfiguration;
 
         messageBroker.Subscribe<CampaignTick>(Handle_CampaignTick);
         messageBroker.Subscribe<PlayerConnectionStateChanged>(Handle_PlayerConnectionStateChanged);
@@ -449,12 +453,8 @@ internal class HeirSelectionHandler : IHandler
         // Finish personal quests before their inventory consequences are copied into the inheritance cache.
         issueCancellationCoordinator.CancelForPlayerDeath(registeredPlayer.ControllerId, data.OriginalHero, originalParty);
         heirSelectionCampaignBehaviorInterface.OnBeforePlayerCharacterChanged(data.OriginalHero, originalParty);
-
-        // Same as ChangePlayerCharacterAction.Apply, a fleet called by the old party stops travelling
-        if (originalParty?.Anchor != null && originalParty.Anchor.IsMovingToPoint)
-        {
-            originalParty.Anchor.ResetMoveTarget();
-        }
+        // The server never raises OnBeforePlayerCharacterChanged for an heir transfer, so the heir's party commands are reset here.
+        partyConfiguration.Reset(data.Heir);
 
         // Same as ChangePlayerCharacterAction.Apply, the player's fleet is transferred to their heir
         if (objectManager.TryGetObjectWithLogging<MobileParty>(replacementPlayer.MobilePartyId, out var heirParty))

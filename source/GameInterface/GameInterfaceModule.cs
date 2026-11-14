@@ -19,6 +19,7 @@ using GameInterface.Services.Bandits;
 using GameInterface.Services.Barters;
 using GameInterface.Services.BugReporting;
 using GameInterface.Services.Chat;
+using GameInterface.Services.Clans;
 using GameInterface.Services.Entity;
 using GameInterface.Services.GameDebug.Metrics;
 using GameInterface.Services.GameMenus;
@@ -111,7 +112,7 @@ public class GameInterfaceModule : Module
         typeof(FigureheadRegistry),
         typeof(ShipSlotRegistry),
         typeof(ShipUpgradePieceRegistry),
-        typeof(BlockadeBattleMapEventRegistry),
+        typeof(BlockadeBattleEventComponentRegistry),
         typeof(LootShipHoldHandler),
         typeof(LootShipsHandler),
         typeof(ShipPiecesHandler),
@@ -171,9 +172,14 @@ public class GameInterfaceModule : Module
         builder.RegisterType<BinaryPackageFactory>().As<IBinaryPackageFactory>().SingleInstance();
         builder.RegisterType<ControllerIdProvider>().As<IControllerIdProvider>().SingleInstance();
         builder.RegisterType<TimeControlModeConverter>().As<ITimeControlModeConverter>().SingleInstance();
+        builder.RegisterType<Services.Heroes.RomanceFlow.RomanceRetryHistory>()
+            .As<Services.Heroes.RomanceFlow.IRomanceRetryHistory>().SingleInstance();
+        builder.RegisterType<Services.Heroes.RomanceFlow.RomanceRetryCooldown>()
+            .As<Services.Heroes.RomanceFlow.IRomanceRetryCooldown>().InstancePerDependency();
         builder.RegisterType<Services.Crime.CrimeRatingService>().As<Services.Crime.ICrimeRatingService>().InstancePerDependency();
         builder.RegisterType<PlayerManager>().As<IPlayerManager>().SingleInstance();
         builder.RegisterType<HideoutPreparation>().As<IHideoutPreparation>().InstancePerDependency();
+        builder.RegisterType<PartyConfigurationService>().As<IPartyConfigurationService>().InstancePerDependency();
         builder.RegisterType<BugReportService>().As<IBugReportService>().SingleInstance().AutoActivate();
         builder.RegisterType<BugReportOverlay>().As<IBugReportOverlay>().SingleInstance();
         builder.RegisterType<CoopLogSnapshotProvider>().As<ICoopLogSnapshotProvider>().InstancePerDependency();
@@ -307,7 +313,6 @@ public class GameInterfaceModule : Module
         builder.RegisterType<PacketManager>().As<IPacketManager>().SingleInstance();
         builder.RegisterType<MapEventInitializationBarrierBinding>().SingleInstance().AutoActivate();
         builder.RegisterType<RetreatedMapEventPartyTracker>().As<IRetreatedMapEventPartyTracker>().SingleInstance();
-        builder.RegisterType<MapTrackerProviderHolder>().As<IMapTrackerProviderHolder>().SingleInstance();
 
 #if DEBUG
         builder.RegisterModule<global::GameInterface.Services.LiveTesting.LiveTestUiModule>();

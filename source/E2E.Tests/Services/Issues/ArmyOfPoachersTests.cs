@@ -17,6 +17,7 @@ using GameInterface.Services.Party.Messages;
 using GameInterface.Services.TroopRosters.Data;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Tests.Utils;
 using HarmonyLib;
 using Helpers;
 using LiteNetLib;
@@ -32,6 +33,8 @@ using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Settlements.Locations;
+using TaleWorlds.Localization;
 using TaleWorlds.Core;
 using Xunit.Abstractions;
 using Issue = TaleWorlds.CampaignSystem.Issues.MerchantArmyOfPoachersIssueBehavior.MerchantArmyOfPoachersIssue;
@@ -423,6 +426,33 @@ public class ArmyOfPoachersTests : IDisposable
             Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
     }
 
+    // v1.5.7 StartQuestBattle opens the village center with the "land_raid" scene level (v1.4.8 passed none).
+    [Fact]
+    public void BattleMissionUsesTheVillageCenterWithTheRaidSceneLevel()
+    {
+        Accept();
+        AttachParty();
+        Server.Call(() =>
+        {
+            var player = Get<MobileParty>(Server, playerA.MobilePartyId);
+            var poachers = Get<MobileParty>(Server, poachersId);
+            var village = Get<Settlement>(Server, villageId);
+            var locations = new LocationComplex();
+            locations._locations.Add("village_center", new Location("village_center", new TextObject("Village center"),
+                new TextObject("Village center"), 0, false, false, "true", "true", "true", "true",
+                new[] { "", "test_village_center", "", "" }, locations));
+            AccessTools.Property(typeof(Settlement), nameof(Settlement.LocationComplex)).SetValue(village, locations);
+            var battle = MapEventBattleFactory.CreateMapEvent(player.Party, poachers.Party, default);
+            var initializer = new PoachersBattleMissionInitializer();
+            Assert.True(initializer.CanHandle(battle));
+
+            var record = initializer.Create(battle, 7, default);
+
+            Assert.Equal("test_village_center", record.SceneName);
+            Assert.Equal("land_raid", record.SceneLevels);
+        });
+    }
+
     [Fact]
     public void TwoPlayersCanAcceptSeparateCopiesButOnePlayerCannotTakeBoth()
     {
@@ -500,19 +530,20 @@ public class ArmyOfPoachersTests : IDisposable
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public void OnlyARaidAtTheSelectedVillageFailsTheQuest(bool selectedVillage)
+    // v1.5.7 cancels the quest when its village is raided (QuestCanceledTargetVillageRaided); v1.4.8 failed it.
+    public void OnlyARaidAtTheSelectedVillageCancelsTheQuest(bool selectedVillage)
     {
         Accept();
         Server.Call(() =>
         {
             var raid = GameObjectCreator.CreateInitializedObject<MapEvent>();
-            raid._mapEventType = MapEvent.BattleTypes.Raid;
-            raid.MapEventSettlement = Get<Settlement>(Server, selectedVillage ? villageId : townId);
+            raid.SetBattleType(MapEvent.BattleTypes.Raid);
+            raid.SetMapEventSettlement(Get<Settlement>(Server, selectedVillage ? villageId : townId));
             CampaignEventDispatcher.Instance.OnMapEventStarted(raid, Get<MobileParty>(Server, playerB.MobilePartyId).Party, raid.MapEventSettlement.Party);
         });
 
         if (selectedVillage)
-            Assert.Equal(IssueOutcome.QuestFail, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+            Assert.Equal(IssueOutcome.QuestCancel, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
         else
             Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
     }

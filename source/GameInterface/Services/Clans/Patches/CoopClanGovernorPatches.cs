@@ -5,6 +5,7 @@ using System.Reflection.Emit;
 using GameInterface.Services.Heroes.Extensions;
 using Helpers;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -88,7 +89,7 @@ internal class CoopClanGovernorPatches
     public static IEnumerable<CodeInstruction> GovernorBonusTranspiler(IEnumerable<CodeInstruction> instructions)
     {
         var currentSettlement = AccessTools.PropertyGetter(typeof(Hero), nameof(Hero.CurrentSettlement));
-        var governorSettlement = AccessTools.Method(typeof(CoopClanGovernorPatches), nameof(GetGovernorSettlement));
+        var governorSettlement = AccessTools.Method(typeof(HeroExtensions), nameof(HeroExtensions.GetGovernorSettlement));
         foreach (var instruction in instructions)
         {
             if (instruction.Calls(currentSettlement))
@@ -110,6 +111,34 @@ internal class CoopClanGovernorPatches
     public static IEnumerable<CodeInstruction> GovernorConstructionTranspiler(IEnumerable<CodeInstruction> instructions)
         => GovernorBonusTranspiler(instructions);
 
-    private static Settlement GetGovernorSettlement(Hero hero)
-        => hero.IsPlayerHero() && hero.GovernorOf != null ? hero.GovernorOf.Settlement : hero.CurrentSettlement;
+    [HarmonyPatch(typeof(DefaultBuildingConstructionModel), nameof(DefaultBuildingConstructionModel.GetBoostCost))]
+    [HarmonyTranspiler]
+    public static IEnumerable<CodeInstruction> GovernorBoostCostTranspiler(IEnumerable<CodeInstruction> instructions)
+        => GovernorBonusTranspiler(instructions);
+
+    [HarmonyPatch(typeof(DefaultSettlementFoodModel), nameof(DefaultSettlementFoodModel.CalculateTownFoodChangeInternal))]
+    [HarmonyTranspiler]
+    public static IEnumerable<CodeInstruction> GovernorFoodTranspiler(IEnumerable<CodeInstruction> instructions)
+        => GovernorBonusTranspiler(instructions);
+
+    [HarmonyPatch(typeof(DefaultSettlementLoyaltyModel), nameof(DefaultSettlementLoyaltyModel.CalculateLoyaltyChangeInternal))]
+    [HarmonyTranspiler]
+    public static IEnumerable<CodeInstruction> GovernorLoyaltyTranspiler(IEnumerable<CodeInstruction> instructions)
+        => GovernorBonusTranspiler(instructions);
+
+    [HarmonyPatch(typeof(DefaultWorkshopModel), nameof(DefaultWorkshopModel.GetEffectiveConversionSpeedOfProduction))]
+    [HarmonyTranspiler]
+    public static IEnumerable<CodeInstruction> GovernorWorkshopTranspiler(IEnumerable<CodeInstruction> instructions)
+        => GovernorBonusTranspiler(instructions);
+
+    [HarmonyPatch(typeof(DefaultSettlementProsperityModel), nameof(DefaultSettlementProsperityModel.CalculateHearthChangeInternal))]
+    [HarmonyTranspiler]
+    public static IEnumerable<CodeInstruction> GovernorHearthTranspiler(IEnumerable<CodeInstruction> instructions)
+        => GovernorBonusTranspiler(instructions);
+
+    // The other CurrentSettlement read here is the static Settlement.CurrentSettlement, which the swap leaves alone.
+    [HarmonyPatch(typeof(RebellionsCampaignBehavior), nameof(RebellionsCampaignBehavior.DailyTickSettlement))]
+    [HarmonyTranspiler]
+    public static IEnumerable<CodeInstruction> GovernorRebellionTranspiler(IEnumerable<CodeInstruction> instructions)
+        => GovernorBonusTranspiler(instructions);
 }

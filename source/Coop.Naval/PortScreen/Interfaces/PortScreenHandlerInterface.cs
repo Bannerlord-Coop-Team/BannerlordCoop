@@ -106,7 +106,7 @@ internal class PortScreenHandlerInterface : IPortScreenHandlerInterface
         ResetAnchorIfNoShips(changes.MainParty);
         if (changes.MainParty.Ships.Count > 0 && !changes.MainParty.Anchor.IsValid && changes.LeftOwner.IsSettlement)
         {
-            changes.MainParty.Anchor.SetSettlement(changes.LeftOwner.Settlement);
+            changes.MainParty.Anchor.Settlement = changes.LeftOwner.Settlement;
         }
     }
     

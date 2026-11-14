@@ -62,9 +62,10 @@ internal class PlayerPartyBarterVMPatches
         tradeSender.MarkChanged();
     }
 
-    [HarmonyPatch("RefreshOfferLabel")]
-    [HarmonyPostfix]
-    static void RefreshOfferLabelPostfix()
+    // Runs as a prefix on RefreshCompatibility, which runs after every transfer.
+    [HarmonyPatch("RefreshCompatibility")]
+    [HarmonyPrefix]
+    static void RefreshCompatibilityPrefix()
     {
         if (!ContainerProvider.TryResolve<IPlayerPartyTradeContext>(out var trade)) return;
 

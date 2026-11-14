@@ -1,6 +1,7 @@
 ﻿using HarmonyLib;
 using SandBox;
 using System.Linq;
+using TaleWorlds.CampaignSystem.AdvancedStartOptions;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Party;
@@ -79,7 +80,7 @@ namespace GameInterface.Tests.Bootstrap
 
             ModuleHelper.InitializeModules(modules.ToArray());
 
-            Campaign campaign = new Campaign(CampaignGameMode.Campaign);
+            Campaign campaign = new Campaign(CampaignGameMode.Campaign, new AdvancedStartOptionsData());
             Campaign.Current = campaign;
             Game game = Game.CreateGame(campaign, gameManager);
 

@@ -18,23 +18,13 @@ internal class KingdomManagerPatches
     private static bool Prefix(KingdomManager __instance, Kingdom kingdom)
     {
         Clan rulingClan = kingdom.RulingClan;
-        int num = kingdom.Clans.Count((Clan x) => !x.IsUnderMercenaryService);
         if (rulingClan == Clan.PlayerClan)
         {
             kingdom.Banner = new Banner(Clan.PlayerClan.Banner);
         }
-        if (num > 1)
+        Clan clan = FindSuccessorClan(kingdom);
+        if (clan != null)
         {
-            float num2 = float.MinValue;
-            Clan clan = null;
-            foreach (Clan clan2 in kingdom.Clans)
-            {
-                if (clan2 != rulingClan && clan2.Influence > num2)
-                {
-                    num2 = clan2.Influence;
-                    clan = clan2;
-                }
-            }
             MessageBroker.Instance.Publish(__instance, new RulingClanChanged(kingdom, clan));
             GameThread.WaitWhilePumping(() => kingdom.RulingClan == clan, DateTime.UtcNow.AddSeconds(5));
             kingdom.AddDecision(new KingSelectionKingdomDecision(rulingClan, rulingClan)
@@ -45,5 +35,22 @@ internal class KingdomManagerPatches
         }
         MessageBroker.Instance.Publish(__instance, new DestroyKingdom(kingdom));
         return false;
+    }
+
+    // The throne goes to the most influential other clan that may rule, or null when none may.
+    internal static Clan FindSuccessorClan(Kingdom kingdom)
+    {
+        Clan successor = null;
+        float highestInfluence = float.MinValue;
+        foreach (Clan candidate in kingdom.Clans)
+        {
+            if (candidate == kingdom.RulingClan) continue;
+            if (!Campaign.Current.Models.DiplomacyModel.IsClanEligibleToBecomeRuler(candidate)) continue;
+            if (candidate.Influence <= highestInfluence) continue;
+
+            highestInfluence = candidate.Influence;
+            successor = candidate;
+        }
+        return successor;
     }
 }

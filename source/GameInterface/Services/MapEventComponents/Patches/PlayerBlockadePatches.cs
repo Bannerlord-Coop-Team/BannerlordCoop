@@ -13,14 +13,14 @@ using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MapEventComponents.Patches;
 
-[HarmonyPatch(typeof(BlockadeBattleMapEvent))]
+[HarmonyPatch(typeof(BlockadeBattleEventComponent))]
 [HarmonyPatchCategory(GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class PlayerBlockadePatches
 {
     // Replace MobileParty.IsMainParty usage so an online player is asked instead of the blockade lifting on its own
-    [HarmonyPatch(nameof(BlockadeBattleMapEvent.OnInitialize))]
+    [HarmonyPatch(nameof(BlockadeBattleEventComponent.OnInitialize))]
     [HarmonyPrefix]
-    private static bool OnInitializePrefix(BlockadeBattleMapEvent __instance)
+    private static bool OnInitializePrefix(BlockadeBattleEventComponent __instance)
     {
         if (ModInformation.IsClient || !IsLedByOnlinePlayer(__instance)) return true;
 
@@ -30,12 +30,12 @@ internal class PlayerBlockadePatches
     }
 
     // Only the server decides whether a blockade lifts without a battle
-    [HarmonyPatch(nameof(BlockadeBattleMapEvent.OnPartyAdded))]
+    [HarmonyPatch(nameof(BlockadeBattleEventComponent.OnPartyAdded))]
     [HarmonyPrefix]
-    private static bool OnPartyAddedPrefix(BlockadeBattleMapEvent __instance) =>
+    private static bool OnPartyAddedPrefix(BlockadeBattleEventComponent __instance) =>
         ModInformation.IsServer && !IsLedByOnlinePlayer(__instance);
 
-    private static bool IsLedByOnlinePlayer(BlockadeBattleMapEvent blockadeBattle)
+    private static bool IsLedByOnlinePlayer(BlockadeBattleEventComponent blockadeBattle)
     {
         var leaderParty = blockadeBattle.MapEvent.DefenderSide.LeaderParty.MobileParty;
         if (leaderParty?.IsPlayerParty() != true) return false;

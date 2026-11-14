@@ -50,7 +50,7 @@ internal class NavalDLCShipCostModelPatches
             if (owner.IsMobile)
             {
                 var explainedValue = new ExplainedNumber(value);
-                PerkHelper.AddPerkBonusForParty(NavalPerks.Boatswain.MasterShipwright, owner.MobileParty, true, ref explainedValue, false);
+                PerkHelper.AddPerkBonusForParty(NavalPerks.Boatswain.MasterShipwright, owner.MobileParty, true, ref explainedValue);
                 value = explainedValue.ResultNumber;
             }
 

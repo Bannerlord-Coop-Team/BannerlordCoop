@@ -72,7 +72,7 @@ public class PlayerRaftFleetInterface : IPlayerRaftFleetInterface
 
             // Cached before the ships are removed, same as vanilla
             var anchorPosition = party.Anchor.Position;
-            var disembarkPosition = party.Anchor.GetLastUsedDisembarkPosition();
+            var disembarkPosition = party.Anchor._lastUsedDisembarkPosition;
 
             // Vanilla adds to the ships still cached from an earlier stranding instead of replacing them
             var ships = PlayerCachedFleets.TryGetValue(player.HeroId, out var cachedFleet) && cachedFleet.Ships != null
@@ -107,7 +107,7 @@ public class PlayerRaftFleetInterface : IPlayerRaftFleetInterface
         if (!TryTakeCachedFleet(player.HeroId, party, out var fleet)) return;
 
         // Same as RaftStateCampaignBehavior.player_raft_state_end_continue_on_consequence
-        party.Anchor.SetPosition(new CampaignVec2(new Vec2(fleet.AnchorX, fleet.AnchorY), fleet.AnchorIsOnLand));
+        party.Anchor.Position = new CampaignVec2(new Vec2(fleet.AnchorX, fleet.AnchorY), fleet.AnchorIsOnLand);
         party.Anchor.SetLastUsedDisembarkPosition(new CampaignVec2(new Vec2(fleet.DisembarkX, fleet.DisembarkY), fleet.DisembarkIsOnLand));
     }
 

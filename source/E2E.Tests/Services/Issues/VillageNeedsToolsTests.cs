@@ -4,6 +4,7 @@ using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
+using GameInterface.Tests.Utils;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.AcceptCoordination;
@@ -914,8 +915,9 @@ public class VillageNeedsToolsTests : IDisposable
         {
             Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
             Assert.True(Server.ObjectManager.TryGetObject<Settlement>(giverVillage ? settlementId : otherVillageId, out var settlement));
-            mapEvent.MapEventSettlement = settlement;
-            CampaignEventDispatcher.Instance.RaidCompleted(BattleSideEnum.Attacker, new RaidEventComponent(mapEvent));
+            mapEvent.SetBattleType(MapEvent.BattleTypes.Raid);
+            mapEvent.SetMapEventSettlement(settlement);
+            CampaignEventDispatcher.Instance.RaidCompleted(BattleSideEnum.Attacker, (RaidEventComponent)mapEvent.Component);
         }, QuestLogTexts.Concat(new[] { AccessTools.PropertyGetter(typeof(Quest), nameof(Quest.VillageRaidedQuestCancelLog)) }));
 
         var finalized = Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>();
@@ -960,8 +962,8 @@ public class VillageNeedsToolsTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var party));
             Assert.True(Server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
-            mapEvent.MapEventSettlement = settlement;
-            mapEvent._mapEventType = type;
+            mapEvent.SetBattleType(type);
+            mapEvent.SetMapEventSettlement(settlement);
             CampaignEventDispatcher.Instance.OnMapEventStarted(mapEvent, party.Party, settlement.Party);
         }, QuestLogTexts.Concat(new[]
         {

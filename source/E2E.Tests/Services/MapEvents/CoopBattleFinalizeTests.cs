@@ -8,6 +8,7 @@ using Common.Util;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Environment.MockEngine;
 using E2E.Tests.Util;
+using GameInterface.Tests.Utils;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Data;
@@ -770,8 +771,8 @@ public class CoopBattleFinalizeTests : MapEventTestBase
         {
             Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(context.MapEventId, out var mapEvent));
             Assert.True(Server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
-            mapEvent._mapEventType = MapEvent.BattleTypes.Siege;
-            mapEvent.MapEventSettlement = settlement;
+            mapEvent.SetBattleType(MapEvent.BattleTypes.Siege);
+            mapEvent.SetMapEventSettlement(settlement);
             Assert.True(Server.ObjectManager.TryGetId(mapEvent.AttackerSide.Parties.Single(), out mapEventPartyId));
         }, MapEventDisabledMethods);
 
@@ -781,8 +782,8 @@ public class CoopBattleFinalizeTests : MapEventTestBase
             {
                 Assert.True(client.ObjectManager.TryGetObject<MapEvent>(context.MapEventId, out var mapEvent));
                 Assert.True(client.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
-                mapEvent._mapEventType = MapEvent.BattleTypes.Siege;
-                mapEvent.MapEventSettlement = settlement;
+                mapEvent.SetBattleType(MapEvent.BattleTypes.Siege);
+                mapEvent.SetMapEventSettlement(settlement);
             });
         }
 

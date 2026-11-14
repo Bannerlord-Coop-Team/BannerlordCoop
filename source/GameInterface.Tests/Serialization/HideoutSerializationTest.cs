@@ -45,10 +45,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         {
             lock (Hideout.All)
             {
-                Hideout hideout = new Hideout
-                {
-                    IsSpotted = true
-                };
+                Hideout hideout = new Hideout();
 
                 hideout._nextPossibleAttackTime = new CampaignTime();
 
@@ -77,7 +74,6 @@ namespace GameInterface.Tests.Serialization.SerializerTests
                 Hideout newHideout = returnedPackage.Unpack<Hideout>(deserializeFactory);
 
                 Assert.Equal(hideout, newHideout);
-                Assert.Equal(hideout.IsSpotted, newHideout.IsSpotted);
                 Assert.Equal(hideout._nextPossibleAttackTime,
                              newHideout._nextPossibleAttackTime);
             }

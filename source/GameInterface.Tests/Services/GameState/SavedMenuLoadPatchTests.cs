@@ -7,7 +7,8 @@ namespace GameInterface.Tests.Services.GameState;
 
 public class SavedMenuLoadPatchTests
 {
-    // Every menu the crashing EncounterGameMenuBehavior.encounter_menu_ui_castle_on_init is registered for.
+    // Every menu the crashing EncounterGameMenuBehavior.encounter_menu_ui_castle_on_init is registered for, plus
+    // castle_outside, which has its own castle_outside_on_init.
     [Theory]
     [InlineData("town_outside")]
     [InlineData("castle_outside")]

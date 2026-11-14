@@ -841,6 +841,7 @@ namespace Coop
 
             Logger.Fatal(ex, "Unhandled exception");
             Logger.Fatal(ex.StackTrace);
+            Serilog.Log.CloseAndFlush();
         }
 
         internal static void JoinWindow()

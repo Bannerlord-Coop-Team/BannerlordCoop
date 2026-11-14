@@ -2,7 +2,9 @@ using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.MobileParties;
+using System.Linq;
 using System.Runtime.Serialization;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.ComponentInterfaces;
 using TaleWorlds.CampaignSystem.Party;
@@ -161,6 +163,54 @@ public class PartyVisibilitySweepTests : IDisposable
         });
     }
 
+    [Fact]
+    public void RebuildAroundMainParty_HidesPartyInsideSettlement()
+    {
+        // Arrange
+        string? mainPartyId = null;
+        string? insidePartyId = null;
+        string? settlementId = null;
+
+        Server.Call(() =>
+        {
+            var mainParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var insideParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
+
+            Assert.True(Server.ObjectManager.TryGetId(mainParty, out mainPartyId));
+            Assert.True(Server.ObjectManager.TryGetId(insideParty, out insidePartyId));
+            Assert.True(Server.ObjectManager.TryGetId(settlement, out settlementId));
+        });
+
+        // Act + Assert
+        Client.Call(() =>
+        {
+            EnsureMapVisibilityModel();
+
+            Assert.True(Client.ObjectManager.TryGetObject<MobileParty>(mainPartyId, out var mainParty));
+            Assert.True(Client.ObjectManager.TryGetObject<MobileParty>(insidePartyId, out var insideParty));
+            Assert.True(Client.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+
+            // The harness leader has no clan banner, so the settlement filter hides this party before the model, which here would show it.
+            Assert.Null(insideParty.LeaderHero?.ClanBanner);
+
+            mainParty._position = LandPosition(100f, 100f);
+            insideParty._position = LandPosition(130f, 100f);   // distance 30, inside seeing range 50
+            insideParty._currentSettlement = settlement;
+            mainParty.IsActive = true;
+            insideParty.IsActive = true;
+            Campaign.Current.MainParty = mainParty;
+
+            // A joining client loads the server's save, where every party was forced visible.
+            mainParty._isVisible = true;
+            insideParty._isVisible = true;
+
+            new PartyVisibilitySweep().RebuildAroundMainParty();
+
+            Assert.False(insideParty.IsVisible);
+        });
+    }
+
     /// <summary>
     /// The harness campaign boots without <c>Campaign.Models</c>; visibility only needs the
     /// map-visibility model. Fixed ranges make the assertions exact: seeing range 50 with spotting
@@ -191,5 +241,29 @@ public class PartyVisibilitySweepTests : IDisposable
         public override float GetPartySpottingRatioForMainPartySeeingRange(MobileParty party) => 1f;
 
         public override float GetHideoutSpottingDistance() => 30f;
+
+        // The per-party visibility rule lives in the model. Same rule with the fixed ranges:
+        // attached army followers copy their leader, everyone else is visible within seeing range.
+        public override void GetMobilePartyVisibilityAndInspectedState(MobileParty mobileParty, Vec2[] points, float seeingRange, out bool isVisible, out bool isInspected)
+        {
+            if (mobileParty.Army != null && mobileParty.Army.LeaderParty.AttachedParties.IndexOf(mobileParty) >= 0)
+            {
+                isVisible = mobileParty.Army.LeaderParty.IsVisible;
+                isInspected = false;
+                return;
+            }
+
+            float range = seeingRange * GetPartySpottingRatioForMainPartySeeingRange(mobileParty);
+            isVisible = mobileParty.IsActive && points.Any(point => point.Distance(mobileParty.Position.ToVec2()) <= range);
+            isInspected = isVisible;
+        }
+
+        public override bool IsVisibilityPersistent(MobileParty mobileParty) => false;
+
+        public override void GetSettlementInspectedState(Settlement settlement, Vec2[] points, float seeingRange, out bool isInspected, out bool isDistanceDependent)
+        {
+            isDistanceDependent = true;
+            isInspected = points.Any(point => point.Distance(settlement.GatePosition.ToVec2()) <= seeingRange);
+        }
     }
 }

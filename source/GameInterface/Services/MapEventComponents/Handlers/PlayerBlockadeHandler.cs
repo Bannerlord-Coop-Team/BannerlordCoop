@@ -72,7 +72,7 @@ internal class PlayerBlockadeHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<MapEvent>(data.MapEventId, out var mapEvent)) return;
             if (mapEvent.DefenderSide.LeaderParty != PartyBase.MainParty) return;
 
-            // Same as BlockadeBattleMapEvent.OnInitialize for the main party
+            // Same as BlockadeBattleEventComponent.OnInitialize for the main party
             using (new AllowedThread())
             {
                 if (Campaign.Current.CurrentMenuContext == null)

@@ -4,6 +4,7 @@ using Common.Network.Messages;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
+using GameInterface.Tests.Utils;
 using GameInterface.Services.Bandits.Messages;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.AcceptCoordination;
@@ -820,8 +821,8 @@ public class MerchantOutlawsTests : IDisposable
             var giver = Get<Hero>(Server, scenario.NotableId);
             power = giver.Power;
             var forcing = (MapEvent)FormatterServices.GetUninitializedObject(typeof(MapEvent));
-            forcing._mapEventType = MapEvent.BattleTypes.IsForcingSupplies;
-            forcing.MapEventSettlement = Get<Settlement>(Server, settlementId);
+            forcing.SetBattleType(MapEvent.BattleTypes.IsForcingSupplies);
+            forcing.SetMapEventSettlement(Get<Settlement>(Server, settlementId));
             CampaignEventDispatcher.Instance.OnMapEventStarted(forcing, Get<MobileParty>(Server, scenario.PlayerA.MobilePartyId).Party, null);
         }, TextHelpers);
 

@@ -48,10 +48,12 @@ internal class HeadmanNeedsGrainWorldEventPatches
             !((faction1 == Hero.MainHero.MapFaction && faction2 == __instance.QuestGiver.MapFaction) ||
             (faction2 == Hero.MainHero.MapFaction && faction1 == __instance.QuestGiver.MapFaction))) return false;
         var mapEvent = Hero.MainHero?.PartyBelongedTo?.MapEvent;
-        if (detail == DeclareWarAction.DeclareWarDetail.CausedByCrimeRatingChange ||
-            (detail == DeclareWarAction.DeclareWarDetail.CausedByPlayerHostility && mapEvent?.IsRaid == true &&
-            mapEvent.MapEventSettlement.MapFaction == __instance.QuestGiver.MapFaction &&
-            __instance.QuestGiver.MapFaction.IsAtWarWith(Hero.MainHero.MapFaction)))
+        // v1.5 fails the quest for a crime war only during a raid on the giver's faction, as for a hostility war;
+        // otherwise QuestHelper cancels it.
+        if ((detail == DeclareWarAction.DeclareWarDetail.CausedByCrimeRatingChange ||
+            detail == DeclareWarAction.DeclareWarDetail.CausedByPlayerHostility) && mapEvent?.IsRaid == true &&
+            mapEvent.MapEventSettlement?.MapFaction == __instance.QuestGiver.MapFaction &&
+            __instance.QuestGiver.MapFaction.IsAtWarWith(Hero.MainHero.MapFaction))
         {
             __instance.CriminalRatingFail();
         }

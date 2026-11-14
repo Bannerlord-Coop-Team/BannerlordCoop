@@ -35,6 +35,7 @@ using GameInterface.Services.SiegeEvents.Commands;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
 using Xunit;
+using GameInterface.Tests.Utils;
 
 namespace GameInterface.Tests.Services.SiegeEvents;
 
@@ -588,9 +589,9 @@ public class DefenderSiegeContextFixtureTests
                 if (existingObjects == null) Assert.True(Objects.AddExisting("castle_ES1", Settlement));
                 Assert.True(Objects.AddExisting("besieger", besieger));
                 Assault = ObjectHelper.SkipConstructor<MapEvent>();
-                Assault._mapEventType = MapEvent.BattleTypes.Siege;
+                Assault.SetBattleType(MapEvent.BattleTypes.Siege);
                 Assault._battleState = BattleState.None;
-                Assault.MapEventSettlement = Settlement;
+                Assault.SetMapEventSettlement(Settlement);
                 var defenderSide = new MapEventSide(Assault, BattleSideEnum.Defender, Settlement.Party);
                 var attackerSide = new MapEventSide(Assault, BattleSideEnum.Attacker, besieger.Party);
                 AccessTools.Field(typeof(MapEvent), "_sides").SetValue(Assault, new[] { defenderSide, attackerSide });

@@ -25,19 +25,25 @@ internal class SavedMenuLoadPatch
 {
     private static readonly ILogger Logger = LogManager.GetLogger<SavedMenuLoadPatch>();
 
-    // The outside menus whose background init reads Settlement.CurrentSettlement; this is the handler in the crash.
+    // The outside menus whose background init reads Settlement.CurrentSettlement; the first handler is the one in the
+    // crash, and castle_outside has its own init that reads it too.
     private static readonly HashSet<string> OutsideSettlementMenus = FindOutsideSettlementMenus();
 
     private static HashSet<string> FindOutsideSettlementMenus()
     {
         var menus = new HashSet<string>(
-            AccessTools.Method(typeof(EncounterGameMenuBehavior), nameof(EncounterGameMenuBehavior.encounter_menu_ui_castle_on_init))
-                ?.GetCustomAttributes<GameMenuInitializationHandler>(false)
-                .Select(handler => handler.MenuId)
-            ?? Enumerable.Empty<string>());
+            new[]
+            {
+                nameof(EncounterGameMenuBehavior.encounter_menu_ui_castle_on_init),
+                nameof(EncounterGameMenuBehavior.castle_outside_on_init),
+            }
+            .Select(name => AccessTools.Method(typeof(EncounterGameMenuBehavior), name))
+            .Where(method => method != null)
+            .SelectMany(method => method.GetCustomAttributes<GameMenuInitializationHandler>(false))
+            .Select(handler => handler.MenuId));
 
         if (menus.Count == 0)
-            Logger.Warning("Found no menus for encounter_menu_ui_castle_on_init; stored outside settlement menus will not be dropped on load");
+            Logger.Warning("Found no menus for encounter_menu_ui_castle_on_init or castle_outside_on_init; stored outside settlement menus will not be dropped on load");
 
         return menus;
     }

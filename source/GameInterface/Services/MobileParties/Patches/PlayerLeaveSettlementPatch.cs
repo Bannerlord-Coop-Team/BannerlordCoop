@@ -25,7 +25,6 @@ internal class PlayerLeaveSettlementPatch
         typeof(EncounterGameMenuBehavior).GetMethod("game_menu_castle_outside_leave_on_consequence", BindingFlags.NonPublic | BindingFlags.Instance),
         typeof(EncounterGameMenuBehavior).GetMethod("army_encounter_leave_on_consequence", BindingFlags.NonPublic | BindingFlags.Instance),
         typeof(HideoutCampaignBehavior).GetMethod("game_menu_hideout_leave_on_consequence", BindingFlags.NonPublic | BindingFlags.Instance),
-        typeof(VillageHostileActionCampaignBehavior).GetMethod("game_menu_village_hostile_action_warn_leave_on_consequence", BindingFlags.NonPublic | BindingFlags.Static),
         typeof(VillageHostileActionCampaignBehavior).GetMethod("village_looted_leave_on_consequence", BindingFlags.NonPublic | BindingFlags.Static),
     };
 
@@ -47,12 +46,13 @@ internal class PlayerLeaveSettlementPatch
 [HarmonyPatchCategory(GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class PlayerVillageLandSeaLeavePatch
 {
-    [HarmonyPatch(nameof(PlayerTownVisitCampaignBehavior.game_menu_village_set_sail_leave_on_consequence))]
+    [HarmonyPatch(nameof(PlayerTownVisitCampaignBehavior.game_menu_set_sail_leave_on_consequence))]
     [HarmonyPrefix]
     public static bool SetSailPrefix() => RequestLeave(SettlementLeaveType.SetSail);
 
-    // Anchoring the fleet at the village only works on the server, so the whole disembark goes through it
-    [HarmonyPatch(nameof(PlayerTownVisitCampaignBehavior.game_menu_village_disembark_on_consequence))]
+    // v1.5 shares these two between the castle and village menus.
+    // Anchoring the fleet at the settlement only works on the server, so the whole disembark goes through it
+    [HarmonyPatch(nameof(PlayerTownVisitCampaignBehavior.game_menu_disembark_on_consequence))]
     [HarmonyPrefix]
     public static bool DisembarkPrefix() => RequestLeave(SettlementLeaveType.Disembark);
 

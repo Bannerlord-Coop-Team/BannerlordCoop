@@ -436,7 +436,7 @@ public class NavalScenarioStager : INavalScenarioStager
         var player = players[0];
         if (!TryFindBlockade(config, players, hull, log, out var town, out var besieger, out bool isNewSiege, out error)) return false;
 
-        // BlockadeBattleMapEvent.OnInitialize lifts the blockade with no battle when the attackers are this much stronger.
+        // BlockadeBattleEventComponent.OnInitialize lifts the blockade with no battle when the attackers are this much stronger.
         float attackerPower = players.Sum(party =>
             party.Party.GetCustomStrength(BattleSideEnum.Attacker, MapEvent.PowerCalculationContext.SeaBattle));
         float blockadePower = town.SiegeEvent.BesiegerCamp.GetInvolvedPartiesForEventType(MapEvent.BattleTypes.BlockadeBattle)

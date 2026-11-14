@@ -4,6 +4,7 @@ using Common.Network;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
+using GameInterface.Tests.Utils;
 using Common.Network.Messages;
 using Coop.Core.Server.Connections.Messages;
 using HarmonyLib;
@@ -536,8 +537,8 @@ public class LadysKnightOutTests : IDisposable
             {
                 settlement.SetSettlementComponent(village);
                 village.Bound = giver.CurrentSettlement;
-                mapEvent.MapEventSettlement = settlement;
-                mapEvent._mapEventType = type;
+                mapEvent.SetBattleType(type);
+                mapEvent.SetMapEventSettlement(settlement);
             }
             CampaignEventDispatcher.Instance.OnMapEventStarted(mapEvent, owner.PartyBelongedTo.Party, null);
         });
@@ -556,7 +557,7 @@ public class LadysKnightOutTests : IDisposable
         scenario.Server.Call(() => scenario.Server.Resolve<IOutcomeDispatcher>().RunAsOwners<Quest>(serverQuest =>
         {
             var mapEvent = ObjectHelper.SkipConstructor<MapEvent>();
-            using (new AllowedThread()) mapEvent.MapEventSettlement = serverQuest.QuestGiver.CurrentSettlement;
+            using (new AllowedThread()) mapEvent.SetMapEventSettlement(serverQuest.QuestGiver.CurrentSettlement);
             before = serverQuest.QuestGiver.Power;
             QuestHelper.ApplyGenericMinorMajorCoercionConsequences(serverQuest, mapEvent);
             after = serverQuest.QuestGiver.Power;

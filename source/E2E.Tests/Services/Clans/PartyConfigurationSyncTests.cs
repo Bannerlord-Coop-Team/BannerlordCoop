@@ -1,0 +1,94 @@
+﻿using Common.Messaging;
+using E2E.Tests.Environment.Instance;
+using E2E.Tests.Util;
+using GameInterface.Services.Clans;
+using GameInterface.Services.Clans.Data;
+using GameInterface.Services.Clans.Messages;
+using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using Xunit.Abstractions;
+
+namespace E2E.Tests.Services.Clans;
+
+/// <summary>
+/// The party commands (join armies, raid, donate troops, fleet) are hero flags the server owns.
+/// A client toggle is a request, and every server change, the vanilla resets included, reaches clients.
+/// </summary>
+public class PartyConfigurationSyncTests : SyncTestBase
+{
+    public PartyConfigurationSyncTests(ITestOutputHelper output) : base(output)
+    {
+    }
+
+    [Fact]
+    public void ClientToggle_ReachesServerAndEveryClient()
+    {
+        var leaderId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var client = Clients.First();
+
+        client.Call(() => client.Resolve<IMessageBroker>().Publish(
+            this,
+            new PartyConfigurationChangedOnSelection(
+                client.GetRegisteredObject<Hero>(leaderId),
+                PartyConfigurationFlag.CanRaid,
+                false)));
+
+        foreach (var instance in Clients.Prepend(Server))
+            instance.Call(() => Assert.False(instance.GetRegisteredObject<Hero>(leaderId).CanRaid));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void HeroLeavingAClan_ResetsCommandsOnlyWhenAPlayerLedIt(bool playerClan)
+    {
+        var playerHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        AddPlayer(playerHeroId);
+        SetAllFlagsOnServer(heroId, false);
+
+        Server.Call(() =>
+        {
+            var playerHero = Server.GetRegisteredObject<Hero>(playerHeroId);
+            var hero = Server.GetRegisteredObject<Hero>(heroId);
+            playerHero.Clan.SetLeader(playerHero);
+            var clanLeft = playerClan ? playerHero.Clan : hero.Clan;
+
+            // The event passes the clan the hero left.
+            new PartyConfigurationCampaignBehavior().OnHeroChangedClan(hero, clanLeft);
+        });
+
+        AssertAllFlags(heroId, playerClan);
+    }
+
+    private void AddPlayer(string heroId)
+    {
+        Server.Call(() => Assert.True(Server.Resolve<IPlayerManager>().AddPlayer(
+            new Player("PlayerOne", heroId, string.Empty, string.Empty, string.Empty))));
+    }
+
+    private void SetAllFlagsOnServer(string heroId, bool value)
+    {
+        Server.Call(() =>
+        {
+            var hero = Server.GetRegisteredObject<Hero>(heroId);
+            foreach (PartyConfigurationFlag flag in Enum.GetValues(typeof(PartyConfigurationFlag)))
+                Server.Resolve<IPartyConfigurationService>().Set(hero, flag, value);
+        });
+    }
+
+    private void AssertAllFlags(string heroId, bool expected)
+    {
+        foreach (EnvironmentInstance instance in Clients.Prepend(Server))
+        {
+            instance.Call(() =>
+            {
+                var hero = instance.GetRegisteredObject<Hero>(heroId);
+                foreach (PartyConfigurationFlag flag in Enum.GetValues(typeof(PartyConfigurationFlag)))
+                    Assert.Equal(expected, instance.Resolve<IPartyConfigurationService>().Get(hero, flag));
+            });
+        }
+    }
+}

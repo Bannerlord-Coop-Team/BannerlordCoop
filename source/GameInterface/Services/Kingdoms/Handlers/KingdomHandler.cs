@@ -289,8 +289,11 @@ public class KingdomHandler : IHandler
 
         var shortName = GameTexts.FindText("str_generic_kingdom_short_name", null);
         shortName.SetTextVariable("KINGDOM_SHORT_NAME", rawName);
+
+        var formalName = GameTexts.FindText("str_generic_kingdom_formal_name", null);
+        formalName.SetTextVariable("KINGDOM_FORMAL_NAME", rawName);
         
-        kingdom.ChangeKingdomName(fullName, shortName);
+        kingdom.ChangeKingdomName(fullName, shortName, formalName);
     }
 
     private static void RejectKingdomNameChange(ChangeKingdomName payload, string reason)
@@ -446,7 +449,7 @@ public class KingdomHandler : IHandler
             TextObject kingdomName = new TextObject(payload.KingdomName);
             kingdom.Name = kingdomName;
             kingdom.InformalName = kingdomName;
-            kingdom.EncyclopediaTitle = kingdomName;
+            kingdom.FormalName = kingdomName;
             kingdom.EncyclopediaText ??= TextObject.GetEmpty();
             kingdom.EncyclopediaRulerTitle ??= TextObject.GetEmpty();
         }

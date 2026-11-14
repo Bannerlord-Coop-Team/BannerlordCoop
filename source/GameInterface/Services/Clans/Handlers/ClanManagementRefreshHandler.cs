@@ -171,7 +171,7 @@ internal class ClanManagementRefreshHandler : IHandler
             {
                 if (partyItemVM.Party.IsMobile && partyItemVM.Party.MobileParty == mobileParty)
                 {
-                    partyItemVM.OnRoleAssigned();
+                    partyItemVM.Roles.ApplyActionOnAllItems(role => role.Refresh());
                     break;
                 }
             }

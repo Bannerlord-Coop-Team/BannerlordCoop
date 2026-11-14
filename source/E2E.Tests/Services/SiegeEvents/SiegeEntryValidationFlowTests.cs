@@ -10,6 +10,7 @@ using Coop.Core.Server.Services.SiegeEvents.Messages;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Services.MapEvents;
 using E2E.Tests.Util;
+using GameInterface.Tests.Utils;
 using GameInterface.Services.Entity;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.MapEventSides.Messages;
@@ -676,8 +677,8 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
                     party.CurrentSettlement = besiegedSettlement;
                     besiegedSettlement.Party._mapEventSide = mapEvent.DefenderSide;
                     mapEvent.DefenderSide.LeaderParty = besiegedSettlement.Party;
-                    mapEvent._mapEventType = MapEvent.BattleTypes.Siege;
-                    mapEvent.MapEventSettlement = besiegedSettlement;
+                    mapEvent.SetBattleType(MapEvent.BattleTypes.Siege);
+                    mapEvent.SetMapEventSettlement(besiegedSettlement);
                 });
                 using (new AllowedThread())
                 {
@@ -780,7 +781,7 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
             {
                 MobileParty.MainParty.CurrentSettlement = settlement;
                 settlement.Party._mapEventSide = mapEvent.DefenderSide;
-                mapEvent._mapEventType = battleType;
+                mapEvent.SetBattleType(battleType);
                 if (sameFaction) settlement.Town.OwnerClan = MobileParty.MainParty.ActualClan;
             }
             Assert.Equal(expectedMenu, new DefaultEncounterGameMenuModel().GetEncounterMenu(

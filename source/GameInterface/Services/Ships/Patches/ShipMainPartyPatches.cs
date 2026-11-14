@@ -2,9 +2,8 @@
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyBases.Extensions;
 using HarmonyLib;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Naval;
-using TaleWorlds.Core;
-using TaleWorlds.Library;
 
 namespace GameInterface.Services.Ships.Patches;
 
@@ -16,50 +15,27 @@ namespace GameInterface.Services.Ships.Patches;
 internal class ShipMainPartyPatches
 {
     /// <summary>
-    /// Rebuilds the unlocked pieces, except on a client's managed ship which gets them in the pieces snapshot.
+    /// Rebuilds or clears the unlocked pieces, except on a client's managed ship which gets them in the pieces snapshot.
     /// </summary>
-    [HarmonyPatch(nameof(Ship.ResetUnlockedUpgradePieces))]
+    [HarmonyPatch(typeof(Ship), nameof(Ship.CanHaveUnlockedPieces), MethodType.Setter)]
     [HarmonyPrefix]
-    public static bool ResetUnlockedUpgradePiecesPrefix(Ship __instance)
+    public static bool CanHaveUnlockedPiecesSetterPrefix(Ship __instance)
     {
         if (ModInformation.IsClient && IsManaged(__instance)) return false;
 
-        // Replace PartyBase.MainParty usage
-        if (__instance.Owner.IsPlayerParty())
-        {
-            __instance._unlockedUpgradePieces = new MBList<ShipUpgradePiece>(__instance._shipPieces.Count);
-
-            foreach (var pair in __instance._shipPieces)
-            {
-                if (pair.Value != null)
-                {
-                    __instance._unlockedUpgradePieces.Add(pair.Value);
-                }
-            }
-            return false;
-        }
-
-        __instance._unlockedUpgradePieces = null;
-        return false;
+        return true;
     }
 
     /// <summary>
-    /// Equips a piece and unlocks it for player-owned ships.
+    /// War Sails decides whether a ship that changed owner keeps unlocked pieces with a PartyBase.MainParty check.
+    /// Every player's party counts instead, as for the stash and return details that always keep them.
     /// </summary>
-    [HarmonyPatch(nameof(Ship.EquipUpgradePiece))]
-    [HarmonyPrefix]
-    public static bool EquipUpgradePiecePrefix(Ship __instance, string slotTag, ShipUpgradePiece newUpgradePiece)
+    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.CanHaveUnlockedUpgradePiece))]
+    [HarmonyPostfix]
+    public static void CanHaveUnlockedUpgradePiecePostfix(Ship ship, ref bool canHaveUpgradePiece)
     {
-        __instance.GetPieceAtSlot(slotTag);
-
-        // Replace PartyBase.MainParty usage
-        if (__instance.Owner.IsPlayerParty() && newUpgradePiece != null)
-        {
-            __instance.AddToUnlockedPieces(newUpgradePiece);
-        }
-        __instance.SetPieceAtSlot(slotTag, newUpgradePiece);
-
-        return false;
+        if (!canHaveUpgradePiece && ship?.Owner.IsPlayerParty() == true)
+            canHaveUpgradePiece = true;
     }
 
     // Mission-only ships are never registered, so their pieces stay local

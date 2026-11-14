@@ -40,7 +40,6 @@ public class MobilePartyPropertyTests : SyncTestBase
         //TestEnvironment.AssertProperty<MobileParty, TextObject>(nameof(MobileParty.Name), new TextObject("customName"), mobileParty.Name);
         TestEnvironment.AssertReferenceProperty<MobileParty, Settlement>(nameof(MobileParty.LastVisitedSettlement));
         //TestEnvironment.AssertProperty<MobileParty, float>(nameof(MobileParty.Aggressiveness), 5f);
-        TestEnvironment.AssertProperty<MobileParty, PartyObjective>(nameof(MobileParty.Objective), PartyObjective.Aggressive);
         //TestEnvironment.AssertReferenceProperty<MobileParty, MobilePartyAi>(nameof(MobileParty.Ai));
         TestEnvironment.AssertProperty<MobileParty, bool>(nameof(MobileParty.IsActive), false, true);
         TestEnvironment.AssertProperty<MobileParty, bool>(nameof(MobileParty.IsPartyTradeActive), true);

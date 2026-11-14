@@ -333,7 +333,6 @@ internal sealed class HideoutCampaignConsequencesHandler : IHandler
                 party.SetMoveModeHold();
             }
         }
-        rewards.Settlement.Hideout.IsSpotted = false;
         rewards.Settlement.IsVisible = false;
 
         foreach (var participant in rewards.Participants)

@@ -48,10 +48,11 @@ internal class FactionDiscontinuationCampaignBehaviorPatches
         {
             __instance._independentClans.Remove(clan);
         }
-        if (clan.IsPlayerClan() && oldKingdom != null && __instance.CanKingdomBeDiscontinued(oldKingdom))
-        {
-            __instance.DiscontinueKingdom(oldKingdom);
-        }
+        if (oldKingdom == null) return false;
+        if (detail == ChangeKingdomAction.ChangeKingdomActionDetail.LeaveByKingdomDestruction) return false;
+        if (!__instance.CanKingdomBeDiscontinued(oldKingdom)) return false;
+
+        __instance.DiscontinueKingdom(oldKingdom);
         return false;
     }
     [HarmonyPatch(nameof(FactionDiscontinuationCampaignBehavior.CanClanBeDiscontinued))]

@@ -22,10 +22,10 @@ public interface INavalBallistaTargets
 /// </summary>
 public class NavalBallistaTargets : INavalBallistaTargets
 {
-    // A ballista lists its targets once, at its own deployment (ThreatSeeker.InitializeTargetableObjects).
+    // A ballista lists its targets once, at its own deployment (ThreatSeeker.ResetTargetableObjects).
     public void Refresh(IEnumerable<MissionShip> ships)
     {
-        foreach (var ai in WeaponAisOf(ships)) ai.InitializeThreatSeeker();
+        foreach (var ai in WeaponAisOf(ships)) ai.ResetThreatSeeker();
     }
 
     // Runs from ShipRemovedEvent, which vanilla's RemoveShipAux fires before it frees the hull's entity.

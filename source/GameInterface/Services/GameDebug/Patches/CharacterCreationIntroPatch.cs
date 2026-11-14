@@ -30,7 +30,8 @@ internal class CharacterCreationIntroPatch
         }
 
 #if DEBUG
-        if (DebugCharacterCreationInterface.InCharacterCreationIntro())
+        bool inIntro = DebugCharacterCreationInterface.InCharacterCreationIntro();
+        if (ShouldAutomate(inIntro, __instance.GetType()))
         {
             // The DEBUG fast path previously depended on the lifecycle event above. Keep the
             // automation behavior without misreporting unrelated game-state transitions as
@@ -40,7 +41,7 @@ internal class CharacterCreationIntroPatch
                 characterCreationInterface.SkipCharacterCreation();
             }
 
-            if (VideoPlayerViewPatch.CurrentVideoPlayerView != null)
+            if (inIntro && VideoPlayerViewPatch.CurrentVideoPlayerView != null)
             {
                 VideoPlayerViewPatch.CurrentVideoPlayerView?.StopVideo();
                 VideoPlayerViewPatch.CurrentVideoPlayerView = null;
@@ -48,6 +49,11 @@ internal class CharacterCreationIntroPatch
         }
 #endif
     }
+
+    // A mod can skip the campaign intro video and open character creation directly, so the DEBUG
+    // automation runs from either entry.
+    internal static bool ShouldAutomate(bool inCharacterCreationIntro, Type activatedStateType) =>
+        inCharacterCreationIntro || IsCharacterCreationState(activatedStateType);
 
     internal static bool IsCharacterCreationState(Type stateType) =>
         typeof(TaleworldCharacterCreationState).IsAssignableFrom(stateType);

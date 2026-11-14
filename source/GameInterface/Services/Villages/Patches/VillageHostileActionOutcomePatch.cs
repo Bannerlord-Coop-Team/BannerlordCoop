@@ -6,7 +6,7 @@ using TaleWorlds.CampaignSystem.MapEvents;
 
 namespace GameInterface.Services.Villages.Patches;
 
-[HarmonyPatch(typeof(ForceVolunteersEventComponent), "OnBeforeFinalize")]
+[HarmonyPatch(typeof(ForceVolunteersEventComponent), nameof(ForceVolunteersEventComponent.OnBeforeMapEventFinalize))]
 internal class ForceVolunteersEventComponentOnBeforeFinalizePatch
 {
     [HarmonyPostfix]
@@ -19,7 +19,7 @@ internal class ForceVolunteersEventComponentOnBeforeFinalizePatch
     }
 }
 
-[HarmonyPatch(typeof(ForceSuppliesEventComponent), "OnBeforeFinalize")]
+[HarmonyPatch(typeof(ForceSuppliesEventComponent), nameof(ForceSuppliesEventComponent.OnBeforeMapEventFinalize))]
 internal class ForceSuppliesEventComponentOnBeforeFinalizePatch
 {
     [HarmonyPostfix]

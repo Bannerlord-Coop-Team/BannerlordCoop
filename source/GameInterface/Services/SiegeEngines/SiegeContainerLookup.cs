@@ -41,6 +41,18 @@ internal static class SiegeContainerLookup
         }
     }
 
+    /// <summary>
+    /// The active sieges that have not ended. SiegeEvent.FinalizeSiegeEvent clears the settlement's siege, which makes
+    /// the siege ReadyToBeRemoved, but SiegeEventManager keeps it listed until its next Tick.
+    /// </summary>
+    public static IEnumerable<SiegeEvent> UnendedSieges()
+    {
+        foreach (var siegeEvent in ActiveSieges())
+        {
+            if (!siegeEvent.ReadyToBeRemoved) yield return siegeEvent;
+        }
+    }
+
     /// <summary>Both engine containers of a siege with the side tag used in derived ids
     /// (attacker = besieger camp, defender = besieged settlement).</summary>
     public static IEnumerable<SiegeEngineSide> EngineContainers(SiegeEvent siegeEvent)

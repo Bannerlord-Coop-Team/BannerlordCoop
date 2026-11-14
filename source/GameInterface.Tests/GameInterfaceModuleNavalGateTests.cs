@@ -56,7 +56,7 @@ public sealed class GameInterfaceModuleNavalGateTests : IDisposable
         typeof(FigureheadRegistry),
         typeof(ShipSlotRegistry),
         typeof(ShipUpgradePieceRegistry),
-        typeof(BlockadeBattleMapEventRegistry),
+        typeof(BlockadeBattleEventComponentRegistry),
         typeof(LootShipHoldHandler),
         typeof(LootShipsHandler),
         typeof(ShipPiecesHandler),

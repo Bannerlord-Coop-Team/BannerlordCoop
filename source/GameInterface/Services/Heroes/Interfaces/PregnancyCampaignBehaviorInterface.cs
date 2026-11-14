@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using GameInterface.Services.CharacterObjects;
 using GameInterface.Services.Clans.Extensions;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Missions;
@@ -157,7 +158,7 @@ public class PregnancyCampaignBehaviorInterface : IPregnancyCampaignBehaviorInte
         {
             // Vanilla player characters use the main_hero range
             var bodyPropertyRange = parentCharacter.OriginalCharacter?.BodyPropertyRange
-                ?? MBObjectManager.Instance.GetObject<CharacterObject>("main_hero")?.BodyPropertyRange;
+                ?? PlayerCharacterTemplate.Find()?.BodyPropertyRange;
             if (bodyPropertyRange != null)
             {
                 // Repair template's properties for later reads during hero creation

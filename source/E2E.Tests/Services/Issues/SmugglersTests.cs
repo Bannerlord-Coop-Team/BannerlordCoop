@@ -557,7 +557,7 @@ public class SmugglersTests : IDisposable
 
             var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
             mapEvent.MapEventVisual = ObjectHelper.SkipConstructor<GauntletMapEventVisual>();
-            mapEvent.Initialize(attacker.Party, smugglers.Party, new FieldBattleEventComponent(mapEvent), MapEvent.BattleTypes.FieldBattle);
+            mapEvent.Initialize(attacker.Party, smugglers.Party, new FieldBattleEventComponent(mapEvent));
             mapEvent.MapEventVisual = null;
             mapEvent.BattleState = battleState;
             beforeEnd?.Invoke(mapEvent);

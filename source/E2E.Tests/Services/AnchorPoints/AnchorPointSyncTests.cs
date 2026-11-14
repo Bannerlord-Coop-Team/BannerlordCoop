@@ -99,7 +99,7 @@ public class AnchorPointSyncTests : SyncTestBase
             var settlement = Server.GetRegisteredObject<Settlement>(settlementId);
             settlement.PortPosition = new CampaignVec2(port, false);
             settlement.GatePosition = new CampaignVec2(gate, true);
-            Server.GetRegisteredObject<MobileParty>(partyId).Anchor.SetSettlement(settlement);
+            Server.GetRegisteredObject<MobileParty>(partyId).Anchor.Settlement = settlement;
         });
 
         foreach (var client in Clients)
@@ -109,7 +109,7 @@ public class AnchorPointSyncTests : SyncTestBase
             {
                 var anchor = client.GetRegisteredObject<MobileParty>(partyId).Anchor;
                 Assert.Equal(port, anchor.Position.ToVec2());
-                Assert.Equal(gate, anchor.GetLastUsedDisembarkPosition().ToVec2());
+                Assert.Equal(gate, anchor._lastUsedDisembarkPosition.ToVec2());
             });
         }
     }
@@ -123,11 +123,11 @@ public class AnchorPointSyncTests : SyncTestBase
         client.Call(() =>
         {
             var anchor = client.GetRegisteredObject<MobileParty>(partyId).Anchor;
-            anchor.SetPosition(new CampaignVec2(AnchorPosition, false));
+            anchor.Position = new CampaignVec2(AnchorPosition, false);
             anchor.SetLastUsedDisembarkPosition(new CampaignVec2(AnchorPosition, true));
 
             Assert.NotEqual(AnchorPosition, anchor.Position.ToVec2());
-            Assert.NotEqual(AnchorPosition, anchor.GetLastUsedDisembarkPosition().ToVec2());
+            Assert.NotEqual(AnchorPosition, anchor._lastUsedDisembarkPosition.ToVec2());
         });
     }
 
@@ -150,11 +150,11 @@ public class AnchorPointSyncTests : SyncTestBase
         {
             UseSeaMap();
             var party = Server.GetRegisteredObject<MobileParty>(partyId);
-            party.Anchor.SetPosition(new CampaignVec2(AnchorPosition, isOnLand: false)
+            party.Anchor.Position = new CampaignVec2(AnchorPosition, isOnLand: false)
             {
                 _faceCache = new PathFaceRecord(1, 0, 0),
                 _isPositionCacheValid = true,
-            });
+            };
 
             // The first client controls the party, which stands where its fleet last dropped it off
             party.Anchor.SetLastUsedDisembarkPosition(party.Position);

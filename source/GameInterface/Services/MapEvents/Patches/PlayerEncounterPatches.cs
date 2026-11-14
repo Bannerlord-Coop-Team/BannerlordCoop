@@ -20,6 +20,8 @@ using SandBox.View.Map;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 using System.Reflection.Emit;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -98,6 +100,9 @@ internal class PlayerEncounterPatches
     {
         // The server is authoritative and creates the MapEvent locally.
         if (ModInformation.IsServer) return true;
+
+        // The previous round's result is cleared here, not in ContinueBattle.
+        __instance._campaignBattleResult = null;
 
         // Approved restarts run under AllowedThread, but clients must still adopt the same server-authoritative
         // MapEvent and id instead of creating an unregistered local copy.
@@ -259,9 +264,14 @@ internal class PlayerEncounterPatches
             mainParty._besiegerCamp = null;
         }
 
-        RecoverEncounterWithoutMapEvent(
+        // Same as vanilla, leave a village but stay in a fortification, then restart the settlement encounter
+        var currentSettlement = mainParty.CurrentSettlement;
+        if (RecoverEncounterWithoutMapEvent(
             encounter,
-            forcePlayerOutFromSettlement: mainParty.CurrentSettlement == null);
+            forcePlayerOutFromSettlement: currentSettlement?.IsFortification == false) && currentSettlement != null)
+        {
+            EncounterManager.StartSettlementEncounter(mainParty, currentSettlement);
+        }
         return false;
     }
 
@@ -321,13 +331,6 @@ internal class PlayerEncounterPatches
 
         return ContainerProvider.TryResolve<IObjectManager>(out var objectManager) &&
                objectManager.TryGetId(mapEvent, out _);
-    }
-
-    [HarmonyPatch(nameof(PlayerEncounter.CheckNearbyPartiesToJoinPlayerMapEvent))]
-    [HarmonyPrefix]
-    private static bool PrefixCheckNearbyPartiesToJoinPlayerMapEvent()
-    {
-        return false;
     }
 
     // Vanilla looks up MainParty's MapEventParty via PartiesOnSide(PlayerSide), which indexes _sides by
@@ -614,4 +617,21 @@ internal class PlayerEncounterPatches
         // Wait for the previous loot screen to finish leaving before opening the next one.
         return activeState is PartyState or InventoryState || !isMapScreenTop;
     }
+}
+
+/// <summary>
+/// StartBattleInternal calls <see cref="MapEventComponent.AddNearbyPartiesToPlayerMapEvent"/>, which
+/// each component type overrides. Co-op keeps skipping the local nearby-party pull, so every override is patched.
+/// </summary>
+[HarmonyPatch]
+internal class SkipAddNearbyPartiesToPlayerMapEventPatch
+{
+    private static IEnumerable<MethodBase> TargetMethods() =>
+        typeof(MapEventComponent).Assembly.GetTypes()
+            .Where(type => !type.IsAbstract && type.IsSubclassOf(typeof(MapEventComponent)))
+            .Select(type => AccessTools.DeclaredMethod(type, nameof(MapEventComponent.AddNearbyPartiesToPlayerMapEvent)))
+            .Where(method => method != null);
+
+    [HarmonyPrefix]
+    private static bool Prefix() => false;
 }

@@ -5,9 +5,11 @@ using Common.Serialization;
 using Common.Util;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
+using GameInterface.Services.CharacterObjects;
 using GameInterface.Services.Heroes.Data;
 using GameInterface.Services.Issues.Framework.Gating;
 using GameInterface.Services.MobileParties;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyBases.Extensions;
@@ -153,6 +155,9 @@ internal class HeroInterface : IHeroInterface
                     hero = BinaryPackageSerializer
                         .DeserializeCompressed<HeroBinaryPackage>(bytes)
                         .Unpack<Hero>(binaryPackageFactory);
+
+                    // Host and client copies get the same template; the host's save carries it for the refill after a load (#4675)
+                    PlayerCharacterTemplate.Link(hero.CharacterObject, PlayerCharacterTemplate.Find());
 
                     assignNetworkIds(hero);
 
@@ -393,7 +398,7 @@ internal class HeroInterface : IHeroInterface
     }
 
     private string NewServerStringId<T>(T obj) where T : MBObjectBase
-        => Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<T>("Player");
+        => Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<T>(PlayerCharacterTemplate.JoinedPlayerIdPrefix);
 
     private void RegisterPrimary<T>(T obj, string stringId) where T : MBObjectBase
     {

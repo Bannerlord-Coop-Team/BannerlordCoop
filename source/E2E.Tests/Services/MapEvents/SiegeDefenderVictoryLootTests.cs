@@ -3,7 +3,7 @@ using Common.Util;
 using Coop.Core.Client.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.MobileParties.Messages;
 using E2E.Tests.Environment.Instance;
-using E2E.Tests.Util;
+using GameInterface.Tests.Utils;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MapEvents;
@@ -272,7 +272,7 @@ public class SiegeDefenderVictoryLootTests : MapEventTestBase
         {
             Assert.True(client.ObjectManager.TryGetObject<MapEvent>(ctx.MapEventId, out var mapEvent));
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(ctx.DefenderPartyId, out var party));
-            mapEvent._mapEventType = MapEvent.BattleTypes.Siege;
+            mapEvent.SetBattleType(MapEvent.BattleTypes.Siege);
             Campaign.Current.MainParty = party;
         }, MapEventDisabledMethods);
 
@@ -398,7 +398,7 @@ public class SiegeDefenderVictoryLootTests : MapEventTestBase
             Assert.True(client.ObjectManager.TryGetObject<MapEvent>(ctx.MapEventId, out var mapEvent));
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(ctx.DefenderPartyId, out var party));
             Assert.True(client.ObjectManager.TryGetObject(settlementId, out settlement));
-            mapEvent._mapEventType = MapEvent.BattleTypes.Siege;
+            mapEvent.SetBattleType(MapEvent.BattleTypes.Siege);
             Campaign.Current.MainParty = party;
             if (insideTown)
             {

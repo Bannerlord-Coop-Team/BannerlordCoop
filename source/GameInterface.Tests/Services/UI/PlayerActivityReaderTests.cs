@@ -9,6 +9,7 @@ using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using Xunit;
+using GameInterface.Tests.Utils;
 
 namespace GameInterface.Tests.Services.UI;
 
@@ -25,7 +26,7 @@ public class PlayerActivityReaderTests
     public void ClassifiesEncounterForAttachedParty(MapEvent.BattleTypes type, PlayerActivity expected)
     {
         var battle = ObjectHelper.SkipConstructor<MapEvent>();
-        battle._mapEventType = type;
+        battle.SetBattleType(type);
         var leader = ObjectHelper.SkipConstructor<MobileParty>();
         leader.Party = ObjectHelper.SkipConstructor<PartyBase>();
         leader.Party._mapEventSide = new MapEventSide(battle, BattleSideEnum.Attacker, leader.Party);

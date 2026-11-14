@@ -1,6 +1,7 @@
 using Common.Logging;
 using Serilog;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
@@ -39,8 +40,9 @@ public class BattleTeamDiagnostics
                 if (agent.Character != null && agent.Character.IsHero)
                     heroes.Add(agent.Character.StringId);
 
-            Logger.Information("[BattleDiag] Team side={Side} isPlayerTeam={IsPlayer} isPlayerAlly={IsAlly} activeAgents={Count} heroes=[{Heroes}]",
-                team.Side, team == mission.PlayerTeam, team == mission.PlayerAllyTeam, team.ActiveAgents.Count, string.Join(", ", heroes));
+            Logger.Information("[BattleDiag] Team side={Side} isPlayerTeam={IsPlayer} isPlayerAlly={IsAlly} activeAgents={Count} mounted={Mounted} heroes=[{Heroes}]",
+                team.Side, team == mission.PlayerTeam, team == mission.PlayerAllyTeam, team.ActiveAgents.Count,
+                team.ActiveAgents.Count(agent => agent.HasMount), string.Join(", ", heroes));
         }
 
         var heroChar = Hero.MainHero?.CharacterObject;
@@ -55,13 +57,15 @@ public class BattleTeamDiagnostics
             }
 
         var spawnLogic = mission.GetMissionBehavior<DefaultBattleMissionAgentSpawnLogic>();
-        Logger.Information("[BattleDiag] AttackerTeam={Atk} DefenderTeam={Def} PlayerTeam={Player} MainAgent={Main} heroOnField={Hero} spawnEnabled(Def={SDef},Atk={SAtk}) playerSide={PSide}",
+        Logger.Information("[BattleDiag] AttackerTeam={Atk} DefenderTeam={Def} PlayerTeam={Player} MainAgent={Main} heroOnField={Hero} spawnEnabled(Def={SDef},Atk={SAtk}) spawnHorses(Def={HDef},Atk={HAtk}) playerSide={PSide}",
             mission.AttackerTeam != null, mission.DefenderTeam != null,
             mission.PlayerTeam?.Side.ToString() ?? "null",
             mission.MainAgent != null,
             heroOnField,
             spawnLogic?.IsSideSpawnEnabled(BattleSideEnum.Defender),
             spawnLogic?.IsSideSpawnEnabled(BattleSideEnum.Attacker),
+            spawnLogic?.GetSpawnHorses(BattleSideEnum.Defender),
+            spawnLogic?.GetSpawnHorses(BattleSideEnum.Attacker),
             PartyBase.MainParty?.Side);
     }
 }

@@ -5,6 +5,7 @@ using GameInterface.Services.TroopRosters.Messages;
 using TaleWorlds.CampaignSystem.Roster;
 using Common.Util;
 using E2E.Tests.Util;
+using GameInterface.Tests.Utils;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.MapEvents;
@@ -238,8 +239,8 @@ public class MapEventLifetimeTests : MapEventTestBase
             CreateReplicableSiegeEvent(settlement, attacker);
 
             mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
-            mapEvent._mapEventType = MapEvent.BattleTypes.Siege;
-            mapEvent.MapEventSettlement = settlement;
+            mapEvent.SetBattleType(MapEvent.BattleTypes.Siege);
+            mapEvent.SetMapEventSettlement(settlement);
 
             var defenderSide = new MapEventSide(mapEvent, BattleSideEnum.Defender, settlement.Party);
             var attackerSide = new MapEventSide(mapEvent, BattleSideEnum.Attacker, attacker.Party);
@@ -320,8 +321,8 @@ public class MapEventLifetimeTests : MapEventTestBase
             CreateReplicableSiegeEvent(settlement, besieger);
 
             var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
-            mapEvent._mapEventType = MapEvent.BattleTypes.SallyOut;
-            mapEvent.MapEventSettlement = settlement;
+            mapEvent.SetBattleType(MapEvent.BattleTypes.SallyOut);
+            mapEvent.SetMapEventSettlement(settlement);
             var attackerSide = new MapEventSide(mapEvent, BattleSideEnum.Attacker, sallyingParty.Party);
             var defenderSide = new MapEventSide(mapEvent, BattleSideEnum.Defender, besieger.Party);
             mapEvent._sides[(int)BattleSideEnum.Attacker] = attackerSide;
@@ -436,8 +437,8 @@ public class MapEventLifetimeTests : MapEventTestBase
             CreateReplicableSiegeEvent(settlement, besieger);
 
             var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
-            mapEvent._mapEventType = MapEvent.BattleTypes.SallyOut;
-            mapEvent.MapEventSettlement = settlement;
+            mapEvent.SetBattleType(MapEvent.BattleTypes.SallyOut);
+            mapEvent.SetMapEventSettlement(settlement);
             var attackerSide = new MapEventSide(mapEvent, BattleSideEnum.Attacker, sallyingParty.Party);
             var defenderSide = new MapEventSide(mapEvent, BattleSideEnum.Defender, besieger.Party);
             mapEvent._sides[(int)BattleSideEnum.Attacker] = attackerSide;
@@ -543,8 +544,8 @@ public class MapEventLifetimeTests : MapEventTestBase
             CreateReplicableSiegeEvent(settlement, besieger);
 
             var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
-            mapEvent._mapEventType = MapEvent.BattleTypes.Siege;
-            mapEvent.MapEventSettlement = settlement;
+            mapEvent.SetBattleType(MapEvent.BattleTypes.Siege);
+            mapEvent.SetMapEventSettlement(settlement);
             var defenderSide = new MapEventSide(mapEvent, BattleSideEnum.Defender, settlement.Party);
             var attackerSide = new MapEventSide(mapEvent, BattleSideEnum.Attacker, besieger.Party);
             mapEvent._sides[(int)BattleSideEnum.Defender] = defenderSide;

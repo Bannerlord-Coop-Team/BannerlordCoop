@@ -23,6 +23,7 @@ using TaleWorlds.Core;
 using Xunit.Abstractions;
 using Issue = TaleWorlds.CampaignSystem.Issues.CapturedByBountyHuntersIssueBehavior.CapturedByBountyHuntersIssue;
 using Quest = TaleWorlds.CampaignSystem.Issues.CapturedByBountyHuntersIssueBehavior.CapturedByBountyHuntersIssueQuest;
+using GameInterface.Tests.Utils;
 
 namespace E2E.Tests.Services.Issues;
 
@@ -618,7 +619,7 @@ public class CapturedByBountyHuntersTests : IDisposable
         Assert.True(instance.ObjectManager.TryGetObject<Settlement>(settlementId ?? hideoutId, out var settlement));
 
         var mapEvent = (MapEvent)RuntimeHelpers.GetUninitializedObject(typeof(MapEvent));
-        mapEvent.MapEventSettlement = settlement;
+        mapEvent.SetMapEventSettlement(settlement);
         mapEvent._battleState = result;
         mapEvent._mapEventStartTime = BattleStartTime;
 

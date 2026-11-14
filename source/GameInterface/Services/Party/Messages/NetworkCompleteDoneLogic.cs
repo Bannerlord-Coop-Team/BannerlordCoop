@@ -55,7 +55,7 @@ internal readonly struct NetworkCompleteDoneLogic : ICommand
     public readonly int PartyInfluenceChangeAmount;
 
     [ProtoMember(15)]
-    public readonly int PartyMoraleChangeAmount;
+    public readonly float PartyMoraleChangeAmount;
 
     [ProtoMember(16)]
     public readonly bool DoNotApplyGoldTransactions;
@@ -98,7 +98,7 @@ internal readonly struct NetworkCompleteDoneLogic : ICommand
         string leftPrisonerRosterId,
         int partyGoldChangeAmount,
         int partyInfluenceChangeAmount,
-        int partyMoraleChangeAmount,
+        float partyMoraleChangeAmount,
         bool doNotApplyGoldTransactions,
         CampaignVec2 releaserPartyPosition,
         PartyScreenHelper.PartyScreenMode partyScreenMode,

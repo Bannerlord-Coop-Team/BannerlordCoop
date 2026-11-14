@@ -10,18 +10,18 @@ using Xunit;
 namespace GameInterface.Tests.Services.MobileParties;
 
 /// <summary>
-/// Tests for the forced-spotted override. On the server (and when debug visibility is on) live
-/// parties are always spotted, but a destroyed party must read as unspotted, or the map nameplate
+/// Tests for the forced-visible override on the IsVisible getter. On the server (and when debug visibility is on) live
+/// parties are always visible, but a destroyed party must read as hidden, or the map nameplate
 /// machinery keeps re-creating its banner after the destruction replicates. Release clients keep
-/// whatever the native spotting logic computed.
+/// whatever the native visibility logic computed.
 /// </summary>
 [Collection(ModInformationRoleCollection.Name)]
-public class PartyIsSpottedServerPatchTests : IDisposable
+public class PartyIsVisibleGetterServerPatchTests : IDisposable
 {
     private readonly bool wasServer;
     private readonly bool wasForceAllVisible;
 
-    public PartyIsSpottedServerPatchTests()
+    public PartyIsVisibleGetterServerPatchTests()
     {
         wasServer = ModInformation.IsServer;
         wasForceAllVisible = DebugPartyVisibility.ForceAllVisible;
@@ -37,27 +37,27 @@ public class PartyIsSpottedServerPatchTests : IDisposable
     }
 
     [Fact]
-    public void Postfix_OnServer_ActiveParty_IsSpotted()
+    public void Postfix_OnServer_ActiveParty_IsVisible()
     {
         var party = ObjectHelper.SkipConstructor<MobileParty>();
         party.IsActive = true;
         ModInformation.IsServer = true;
 
         var result = false;
-        PartyIsSpottedServerPatch.Postfix(party, ref result);
+        PartyIsVisibleGetterServerPatch.Postfix(party, ref result);
 
         Assert.True(result);
     }
 
     [Fact]
-    public void Postfix_OnServer_DestroyedParty_IsNotSpotted()
+    public void Postfix_OnServer_DestroyedParty_IsNotVisible()
     {
         // SkipConstructor leaves IsActive false, matching a party after RemoveParty ran.
         var party = ObjectHelper.SkipConstructor<MobileParty>();
         ModInformation.IsServer = true;
 
         var result = true;
-        PartyIsSpottedServerPatch.Postfix(party, ref result);
+        PartyIsVisibleGetterServerPatch.Postfix(party, ref result);
 
         Assert.False(result);
     }
@@ -69,17 +69,17 @@ public class PartyIsSpottedServerPatchTests : IDisposable
         party.IsActive = true;
         ModInformation.IsServer = false;
 
-        var unspotted = false;
-        PartyIsSpottedServerPatch.Postfix(party, ref unspotted);
-        Assert.False(unspotted);
+        var hidden = false;
+        PartyIsVisibleGetterServerPatch.Postfix(party, ref hidden);
+        Assert.False(hidden);
 
-        var spotted = true;
-        PartyIsSpottedServerPatch.Postfix(party, ref spotted);
-        Assert.True(spotted);
+        var visible = true;
+        PartyIsVisibleGetterServerPatch.Postfix(party, ref visible);
+        Assert.True(visible);
     }
 
     [Fact]
-    public void Postfix_DebugVisibility_ActiveParty_IsSpotted()
+    public void Postfix_DebugVisibility_ActiveParty_IsVisible()
     {
         var party = ObjectHelper.SkipConstructor<MobileParty>();
         party.IsActive = true;
@@ -87,7 +87,7 @@ public class PartyIsSpottedServerPatchTests : IDisposable
         DebugPartyVisibility.ForceAllVisible = true;
 
         var result = false;
-        PartyIsSpottedServerPatch.Postfix(party, ref result);
+        PartyIsVisibleGetterServerPatch.Postfix(party, ref result);
 
         Assert.True(result);
     }

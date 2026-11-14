@@ -184,7 +184,7 @@ public class ApplyHeirSelectionActionInterface : IApplyHeirSelectionActionInterf
         if (originalParty.Ships.Count == 0) return;
 
         var anchorPosition = originalParty.Anchor.Position;
-        var lastUsedDisembarkPosition = originalParty.Anchor.GetLastUsedDisembarkPosition();
+        var lastUsedDisembarkPosition = originalParty.Anchor._lastUsedDisembarkPosition;
 
         // A crew left at sea keeps its weakest ship
         Ship keptShip = originalParty.MemberRoster.TotalManCount <= 1 || !originalParty.IsCurrentlyAtSea
@@ -200,7 +200,7 @@ public class ApplyHeirSelectionActionInterface : IApplyHeirSelectionActionInterf
 
         if (heirParty.Ships.Count > 0 && anchorPosition.IsValid() && !heirParty.Anchor.IsValid && !heirParty.IsCurrentlyAtSea)
         {
-            heirParty.Anchor.SetPosition(anchorPosition);
+            heirParty.Anchor.Position = anchorPosition;
             heirParty.Anchor.SetLastUsedDisembarkPosition(lastUsedDisembarkPosition);
         }
     }

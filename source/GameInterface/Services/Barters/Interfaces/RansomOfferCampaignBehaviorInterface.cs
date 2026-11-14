@@ -72,6 +72,10 @@ public class RansomOfferCampaignBehaviorInterface : IRansomOfferCampaignBehavior
         Clan captorClanOfPrisoner = ransomOfferBehavior.GetCaptorClanOfPrisoner(hero);
         if (captorClanOfPrisoner == null) return;
 
+        bool canBeReleased = true;
+        CampaignEventDispatcher.Instance.CanHeroBeReleased(hero, ref canBeReleased);
+        if (!canBeReleased) return;
+
         Hero clanLeader = hero.Clan.Leader;
         Hero ransomPayer = clanLeader != hero
             ? clanLeader
@@ -90,7 +94,7 @@ public class RansomOfferCampaignBehaviorInterface : IRansomOfferCampaignBehavior
             if (!ValidatePlayerHeroId(playerHeroId, out var playerData, out var playerHero)) return;
             if (!objectManager.TryGetIdWithLogging(hero, out var heroId)) return;
 
-            if (playerData.CurrentRansomHeroId == null && playerHero.PartyBelongedTo?.IsInRaftState == false)
+            if (playerData.CurrentRansomHeroId == null && playerHero.PartyBelongedTo?.IsInNavalAutoTravel == false)
             {
                 float chanceToDisplayRansomOffer = (!playerData.HeroIdsWithDeclinedRansomOffers.Contains(heroId)) ? 0.2f : 0.12f;
                 if (MBRandom.RandomFloat < chanceToDisplayRansomOffer)

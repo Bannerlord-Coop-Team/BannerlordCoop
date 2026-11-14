@@ -19,10 +19,6 @@ internal class RetirementCampaignBehaviorPatches
     [HarmonyPrefix]
     public static bool OnSessionLaunchedPrefix() => ModInformation.IsClient;
 
-    [HarmonyPatch(nameof(RetirementCampaignBehavior.HourlyTick))]
-    [HarmonyPrefix]
-    public static bool HourlyTickPrefix() => ModInformation.IsClient;
-
     [HarmonyPatch(nameof(RetirementCampaignBehavior.GameMenuOpened))]
     [HarmonyPrefix]
     public static bool GameMenuOpenedPrefix(RetirementCampaignBehavior __instance, MenuCallbackArgs args)

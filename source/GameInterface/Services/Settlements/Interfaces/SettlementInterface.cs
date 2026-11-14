@@ -137,7 +137,7 @@ internal class SettlementInterface : ISettlementInterface
     {
         // Same as PlayerTownVisitCampaignBehavior.game_menu_village_disembark_on_consequence
         party.DisembarkToPosition(settlement.GatePosition);
-        party.Anchor.SetSettlement(settlement);
+        party.Anchor.Settlement = settlement;
 
         messageBroker.Publish(this, new PartyBehaviorChangeAttempted(party, forcePosition: true, isCurrentlyAtSea: false));
     }

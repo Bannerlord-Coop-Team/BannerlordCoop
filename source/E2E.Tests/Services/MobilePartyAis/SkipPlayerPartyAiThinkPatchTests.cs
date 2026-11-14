@@ -1,5 +1,6 @@
 ﻿using E2E.Tests.Services.MapEvents;
 using E2E.Tests.Util;
+using GameInterface.Tests.Utils;
 using HarmonyLib;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -56,7 +57,7 @@ public class SkipPlayerPartyAiThinkPatchTests : MapEventTestBase
             Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(context.MapEventId, out var mapEvent));
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(context.AttackerPartyId, out var attacker));
 
-            mapEvent._mapEventType = battleType;
+            mapEvent.SetBattleType(battleType);
             if (playerPartyId != null)
             {
                 Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(playerPartyId, out var playerParty));

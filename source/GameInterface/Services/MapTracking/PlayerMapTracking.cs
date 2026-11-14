@@ -4,7 +4,7 @@ using GameInterface.Services.MapTracking.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
-using GameInterface.Services.UI.Patches;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MapTracking;
@@ -24,20 +24,17 @@ internal class PlayerMapTracking : IPlayerMapTracking
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
-    private readonly IMapTrackerProviderHolder holder;
 
     public PlayerMapTracking(
         IPlayerManager playerManager,
         IControllerIdProvider controllerIdProvider,
         IObjectManager objectManager,
-        INetwork network,
-        IMapTrackerProviderHolder holder)
+        INetwork network)
     {
         this.playerManager = playerManager;
         this.controllerIdProvider = controllerIdProvider;
         this.objectManager = objectManager;
         this.network = network;
-        this.holder = holder;
     }
 
     public bool IsTrackedByLocalPlayer(MobileParty party) =>
@@ -74,12 +71,12 @@ internal class PlayerMapTracking : IPlayerMapTracking
 
     public void RefreshTracker(Player player)
     {
-        if (holder.Current == null || player == null) return;
+        var trackers = Campaign.Current?.MapTrackerManager;
+        if (trackers == null || player == null) return;
         if (!objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party)) return;
 
-        // Remove first so a party that is no longer tracked loses its tracker
-        holder.Current.RemoveIfExists(party);
-        holder.Current.AddIfEligible(party);
+        // Refresh removes the tracker of a party that is no longer tracked and adds one for an eligible party
+        trackers.Refresh(party);
     }
 
     private void ApplyOneWay(string controllerId, string otherControllerId, bool isTracking)

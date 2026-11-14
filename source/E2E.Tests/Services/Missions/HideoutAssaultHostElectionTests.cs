@@ -6,6 +6,7 @@ using E2E.Tests.Util;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
+using GameInterface.Tests.Utils;
 using Missions.Battles;
 using Missions.Messages;
 using SandBox.GauntletUI.Map;
@@ -224,7 +225,7 @@ public class HideoutAssaultHostElectionTests : MissionTestEnvironment
 
             var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
             mapEvent.MapEventVisual = ObjectHelper.SkipConstructor<GauntletMapEventVisual>();
-            mapEvent.Initialize(leader.Party, bandits.Party);
+            mapEvent.Initialize(leader.Party, bandits.Party, new FieldBattleEventComponent(mapEvent));
             ally.Party.MapEventSide = mapEvent.AttackerSide;
             secondAlly.Party.MapEventSide = mapEvent.AttackerSide;
             mapEvent.MapEventVisual = null;
@@ -241,7 +242,7 @@ public class HideoutAssaultHostElectionTests : MissionTestEnvironment
             instance.Call(() =>
             {
                 Assert.True(instance.ObjectManager.TryGetObject<MapEvent>(mapEventId!, out var mapEvent));
-                mapEvent._mapEventType = MapEvent.BattleTypes.Hideout;
+                mapEvent.SetBattleType(MapEvent.BattleTypes.Hideout);
                 Assert.True(mapEvent.IsHideoutBattle);
             });
         }

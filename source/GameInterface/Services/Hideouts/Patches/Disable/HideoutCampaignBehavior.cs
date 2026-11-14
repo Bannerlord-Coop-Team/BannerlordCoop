@@ -204,7 +204,7 @@ internal class HideoutCampaignBehaviorPatch
             return false;
         }
 
-        if (settlement.IsHideout && settlement.Hideout.IsInfested && !settlement.Hideout.IsSpotted)
+        if (settlement.IsHideout && settlement.Hideout.IsInfested && !settlement.IsVisible)
         {
             float hideoutSpottingDistance = Campaign.Current.Models.MapVisibilityModel.GetHideoutSpottingDistance();
 
@@ -220,9 +220,8 @@ internal class HideoutCampaignBehaviorPatch
                 {
                     float num = mobileParty.Position.DistanceSquared(settlement.Position);
                     float num2 = 1f - num / (hideoutSpottingDistance * hideoutSpottingDistance);
-                    if (num2 > 0f && settlement.Parties.Count > 0 && MBRandom.RandomFloat < num2 && !settlement.Hideout.IsSpotted)
+                    if (num2 > 0f && settlement.Parties.Count > 0 && MBRandom.RandomFloat < num2 && !settlement.IsVisible)
                     {
-                        settlement.Hideout.IsSpotted = true;
                         settlement.IsVisible = true;
                         CampaignEventDispatcher.Instance.OnHideoutSpotted(mobileParty.Party, settlement.Party);
                         break;

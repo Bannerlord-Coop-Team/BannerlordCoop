@@ -34,7 +34,7 @@ internal class AnchorVisualManagerPatches
     }
 
     // The server's removed main party has no anchor, which vanilla never expects, so it can't have an anchor visual
-    [HarmonyPatch(nameof(AnchorVisualManager.CanPartyHaveAnchor))]
+    [HarmonyPatch(nameof(AnchorVisualManager.CanPlayerHaveAnchor))]
     [HarmonyPrefix]
     private static bool CanPartyHaveAnchorPrefix(ref bool __result)
     {
@@ -86,7 +86,7 @@ internal class AnchorVisualManagerPatches
         }
     }
 
-    // Matches AnchorVisualManager.CanPartyHaveAnchor and AnchorVisual.IsVisibleOrFadingOut for another player's party
+    // Matches AnchorVisualManager.CanPlayerHaveAnchor and AnchorVisual.IsVisibleOrFadingOut for another player's party
     private static bool IsFleetVisible(MobileParty party, MobileParty mainParty)
     {
         var anchor = party.Anchor;

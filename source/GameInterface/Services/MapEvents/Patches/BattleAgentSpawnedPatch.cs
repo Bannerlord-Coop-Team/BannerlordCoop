@@ -3,6 +3,7 @@ using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.TroopSupply;
 using HarmonyLib;
 using System;
+using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
 namespace GameInterface.Services.MapEvents.Patches;
@@ -17,7 +18,7 @@ namespace GameInterface.Services.MapEvents.Patches;
 // Target the single overload explicitly. Mission.SpawnAgent has one overload today, but pinning the
 // parameter types keeps a future engine overload from making AccessTools.Method ambiguous — an
 // AmbiguousMatchException in PatchAll would abort every GameInterface patch, not just this one.
-[HarmonyPatch(typeof(Mission), nameof(Mission.SpawnAgent), new[] { typeof(AgentBuildData), typeof(bool) })]
+[HarmonyPatch(typeof(Mission), nameof(Mission.SpawnAgent), new[] { typeof(AgentBuildData), typeof(bool), typeof(Equipment), typeof(ItemObject) })]
 internal class BattleAgentSpawnedPatch
 {
     [HarmonyPostfix]

@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+﻿using E2E.Tests.Util;
+using Common.Messaging;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Configuration;
 using GameInterface.Services.MapEvents;
@@ -8,6 +9,7 @@ using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.MapEvents.TroopSupply.Messages;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
+using GameInterface.Tests.Utils;
 using Missions.Battles;
 using Missions.Messages;
 using TaleWorlds.CampaignSystem;
@@ -145,7 +147,7 @@ public class PreferredBattleHostTests : MissionTestEnvironment, IDisposable
         SetPreferredHosts("ctrl-C");
         ConnectPeers(clients, "ctrl-A", "ctrl-B", "ctrl-C");
         if (hideout)
-            Server.Call(() => Server.GetRegisteredObject<MapEvent>(mapEventId)._mapEventType = MapEvent.BattleTypes.Hideout);
+            Server.Call(() => Server.GetRegisteredObject<MapEvent>(mapEventId).SetBattleType(MapEvent.BattleTypes.Hideout));
 
         EnterBattle(clients[2], mapEventId, missionReady: false);
         DepartBattle("ctrl-C", mapEventId, wasRetreat);
@@ -164,7 +166,7 @@ public class PreferredBattleHostTests : MissionTestEnvironment, IDisposable
         // The preferred host leads the assault, so the hold and the hideout leader wait both wait for it once re-entry clears its departure
         SetPreferredHosts("ctrl-A");
         ConnectPeers(clients, "ctrl-A", "ctrl-B", "ctrl-C");
-        Server.Call(() => Server.GetRegisteredObject<MapEvent>(mapEventId)._mapEventType = MapEvent.BattleTypes.Hideout);
+        Server.Call(() => Server.GetRegisteredObject<MapEvent>(mapEventId).SetBattleType(MapEvent.BattleTypes.Hideout));
 
         EnterBattle(clients[0], mapEventId, missionReady: false);
         DepartBattle("ctrl-A", mapEventId, wasRetreat: true);
@@ -188,7 +190,7 @@ public class PreferredBattleHostTests : MissionTestEnvironment, IDisposable
         var clients = Clients.ToArray();
         SetPreferredHosts("ctrl-C");
         ConnectPeers(clients, "ctrl-A", "ctrl-B", "ctrl-C");
-        Server.Call(() => Server.GetRegisteredObject<MapEvent>(mapEventId)._mapEventType = MapEvent.BattleTypes.Hideout);
+        Server.Call(() => Server.GetRegisteredObject<MapEvent>(mapEventId).SetBattleType(MapEvent.BattleTypes.Hideout));
 
         // The assault leader would host at once, so only the hold for the loading preferred host keeps the election open
         EnterBattle(clients[2], mapEventId, missionReady: false);
@@ -212,7 +214,7 @@ public class PreferredBattleHostTests : MissionTestEnvironment, IDisposable
         var clients = Clients.ToArray();
         SetPreferredHosts("ctrl-C");
         ConnectPeers(clients, "ctrl-A", "ctrl-B", "ctrl-C");
-        Server.Call(() => Server.GetRegisteredObject<MapEvent>(mapEventId)._mapEventType = MapEvent.BattleTypes.Hideout);
+        Server.Call(() => Server.GetRegisteredObject<MapEvent>(mapEventId).SetBattleType(MapEvent.BattleTypes.Hideout));
 
         // The ready preferred host waits for the assault leader, so the leader hosts as soon as it is ready
         EnterBattle(clients[2], mapEventId);

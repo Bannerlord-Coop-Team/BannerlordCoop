@@ -23,7 +23,7 @@ public class IncidentsInterface : IIncidentsInterface
         if (incidentsBehavior == null) return false;
 
         // Same seed the server rolled with, so the text names the same targets the server applies effects to
-        incidentsBehavior._activeIncidentSeed = activeIncidentSeed;
+        Campaign.Current.IncidentManager._activeIncidentSeed = activeIncidentSeed;
 
         return incident.CanIncidentBeInvoked();
     }
@@ -36,7 +36,7 @@ public class IncidentsInterface : IIncidentsInterface
         if (incidentsBehavior == null) return false;
 
         // Vanilla conditions and effects pick their targets with the behaviour's seed, so use the one this player's incident was rolled with
-        incidentsBehavior._activeIncidentSeed = activeIncidentSeed;
+        Campaign.Current.IncidentManager._activeIncidentSeed = activeIncidentSeed;
 
         using (new MainHeroSubstitutionScope(mainHero, mainParty))
         {

@@ -1,5 +1,6 @@
 ﻿using Common.Util;
 using GameInterface.Services.SiegeEvents;
+using GameInterface.Tests.Utils;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -134,7 +135,7 @@ public class SiegeJoinMenuDeferralTrackerTests
     private static MapEvent CreateMapEvent(MapEvent.BattleTypes battleType)
     {
         var mapEvent = ObjectHelper.SkipConstructor<MapEvent>();
-        mapEvent._mapEventType = battleType;
+        mapEvent.SetBattleType(battleType);
         return mapEvent;
     }
 

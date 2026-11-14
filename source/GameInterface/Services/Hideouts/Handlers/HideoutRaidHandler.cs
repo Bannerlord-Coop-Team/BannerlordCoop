@@ -141,7 +141,6 @@ internal sealed class HideoutRaidHandler : IHandler
         }
 
         BattleMissionStartHandler.InitializePlayerEncounter(mapEvent);
-        behavior.UpdateInitialHideoutPopulation();
         GameMenu.SwitchToMenu("hideout_place");
         if (!ContainerProvider.TryResolve<BattleStartCoordinator>(out var coordinator) ||
             !objectManager.TryGetIdWithLogging(MobileParty.MainParty, out var partyId) ||

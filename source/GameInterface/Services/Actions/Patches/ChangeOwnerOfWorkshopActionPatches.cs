@@ -94,11 +94,11 @@ internal class ChangeOwnerOfWorkshopActionPatches
         {
             Hero owner = workshop.Owner;
             workshop.ChangeOwnerOfWorkshop(newOwner, workshopType, capital);
-            if (newOwner.IsPlayerHero())
+            if (newOwner.IsPlayerHero() && cost > 0)
             {
                 GiveGoldAction.ApplyBetweenCharacters(newOwner, owner, cost, false);
             }
-            if (owner.IsPlayerHero())
+            if (owner.IsPlayerHero() && cost > 0)
             {
                 GiveGoldAction.ApplyBetweenCharacters(null, owner, cost, false);
             }

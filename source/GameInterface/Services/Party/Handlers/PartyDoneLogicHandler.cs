@@ -755,8 +755,8 @@ internal class PartyDoneLogicHandler : IHandler
         recruitmentSideEffects.Apply(mainHero.PartyBelongedTo, characterObject, 1);
 
         // Replace ApplyPrisonerRecruitmentEffects
-        int prisonerRecruitmentMoraleEffect = Campaign.Current.Models.PrisonerRecruitmentCalculationModel.GetPrisonerRecruitmentMoraleEffect(mainHero.PartyBelongedTo.Party, characterObject, 1);
-        mainHero.PartyBelongedTo.RecentEventsMorale += (float)prisonerRecruitmentMoraleEffect;
+        float prisonerRecruitmentMoraleEffect = Campaign.Current.Models.PrisonerRecruitmentCalculationModel.GetPrisonerRecruitmentMoraleEffect(mainHero.PartyBelongedTo.Party, characterObject, 1);
+        mainHero.PartyBelongedTo.RecentEventsMorale += prisonerRecruitmentMoraleEffect;
     }
 
     private void ApplyRosterOrder(TroopRoster roster, TroopRosterOrderData orderData)

@@ -99,8 +99,7 @@ public abstract class MapEventTestBase : IDisposable
             mapEvent.Initialize(
                 attackerParty.Party,
                 defenderParty.Party,
-                new FieldBattleEventComponent(mapEvent),
-                MapEvent.BattleTypes.FieldBattle);
+                new FieldBattleEventComponent(mapEvent));
             mapEvent.MapEventVisual = null;
 
             if (commit && !Campaign.Current.MapEventManager.MapEvents.Contains(mapEvent))
@@ -438,7 +437,7 @@ public abstract class MapEventTestBase : IDisposable
             // attacker = captor (winner), defender = player party (loser)
             var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
             mapEvent.MapEventVisual = MockMapEventVisual();
-            mapEvent.Initialize(captorParty.Party, playerParty.Party);
+            mapEvent.Initialize(captorParty.Party, playerParty.Party, new FieldBattleEventComponent(mapEvent));
 
             mapEvent.CaptureDefeatedPartyMembers(mapEvent.AttackerSide.Parties, mapEvent.DefenderSide.Parties);
         }, disabledMethods);
@@ -493,7 +492,7 @@ public abstract class MapEventTestBase : IDisposable
             // MapEvent (and its sides) to the clients, so the committing client can resolve and finish it.
             var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
             mapEvent.MapEventVisual = MockMapEventVisual();
-            mapEvent.Initialize(captorParty.Party, playerParty.Party);
+            mapEvent.Initialize(captorParty.Party, playerParty.Party, new FieldBattleEventComponent(mapEvent));
 
             Assert.True(Server.ObjectManager.TryGetId(mapEvent, out mapEventId));
         }, MapEventDisabledMethods);
@@ -564,9 +563,9 @@ public abstract class MapEventTestBase : IDisposable
             var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
             mapEvent.MapEventVisual = MockMapEventVisual();
             if (playersAreAttackers)
-                mapEvent.Initialize(loserParties[0].Party, captorParty.Party);
+                mapEvent.Initialize(loserParties[0].Party, captorParty.Party, new FieldBattleEventComponent(mapEvent));
             else
-                mapEvent.Initialize(captorParty.Party, loserParties[0].Party);
+                mapEvent.Initialize(captorParty.Party, loserParties[0].Party, new FieldBattleEventComponent(mapEvent));
 
             var losingSide = playersAreAttackers ? mapEvent.AttackerSide : mapEvent.DefenderSide;
             for (int i = 1; i < loserParties.Length; i++)

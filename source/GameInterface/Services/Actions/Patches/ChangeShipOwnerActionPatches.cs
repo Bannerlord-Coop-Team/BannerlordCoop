@@ -30,7 +30,7 @@ internal class ChangeShipOwnerActionPatches
             GiveGoldAction.ApplyBetweenCharacters(newOwner.LeaderHero, null, tradeValue);
             if (newOwner.Ships.Any() && !newOwner.MobileParty.Anchor.IsValid)
             {
-                newOwner.MobileParty.Anchor.SetSettlement(owner.Settlement);
+                newOwner.MobileParty.Anchor.Settlement = owner.Settlement;
             }
         }
         else if (owner.IsPlayerParty())

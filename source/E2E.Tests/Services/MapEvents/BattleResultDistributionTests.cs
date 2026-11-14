@@ -7,6 +7,7 @@ using Common.Network;
 using Common.Util;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
+using GameInterface.Tests.Utils;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Data;
 using GameInterface.Services.MapEvents.Interfaces;
@@ -252,7 +253,7 @@ public class BattleResultDistributionTests : MapEventTestBase
                 instance.Call(() =>
                 {
                     Assert.True(instance.ObjectManager.TryGetObject<MapEvent>(ctx.MapEventId, out var mapEvent));
-                    mapEvent._mapEventType = MapEvent.BattleTypes.Hideout;
+                    mapEvent.SetBattleType(MapEvent.BattleTypes.Hideout);
                 });
         }
 
@@ -546,7 +547,7 @@ public class BattleResultDistributionTests : MapEventTestBase
         client.Call(() =>
         {
             Assert.True(client.ObjectManager.TryGetObject<MapEvent>(ctx.MapEventId, out var mapEvent));
-            mapEvent._mapEventType = MapEvent.BattleTypes.Hideout;
+            mapEvent.SetBattleType(MapEvent.BattleTypes.Hideout);
             mapEvent._battleState = BattleState.AttackerVictory;
             var encounter = PlayerEncounter.Current;
             encounter.EncounterState = PlayerEncounterState.ApplyResults;
@@ -571,7 +572,7 @@ public class BattleResultDistributionTests : MapEventTestBase
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(ctx.MapEventId, out var mapEvent));
-            mapEvent._mapEventType = hideout ? MapEvent.BattleTypes.Hideout : MapEvent.BattleTypes.FieldBattle;
+            mapEvent.SetBattleType(hideout ? MapEvent.BattleTypes.Hideout : MapEvent.BattleTypes.FieldBattle);
             mapEvent._battleState = BattleState.AttackerVictory;
             var parties = mapEvent.AttackerSide.Parties.ToArray();
             Assert.Equal(2, parties.Length);

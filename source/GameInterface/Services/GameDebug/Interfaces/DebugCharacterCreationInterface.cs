@@ -1,6 +1,7 @@
 ﻿using Common;
 using SandBox;
 using SandBox.GauntletUI.CharacterCreation;
+using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterCreationContent;
@@ -35,28 +36,86 @@ namespace GameInterface.Services.GameDebug.Interfaces
                    videoState.VideoPath.Contains(VideoPathName);
         }
 
+        /// <summary>
+        /// True while the skip runs, so the character creation state it pushes does not start a second skip.
+        /// </summary>
+        private static bool skipping;
+
+        public static bool InCharacterCreation()
+        {
+            return GameStateManager.Current?.ActiveState is CharacterCreationState;
+        }
+
+        /// <summary>
+        /// The culture the skip picks: Empire when the game has it, else the first one. A total conversion
+        /// can rename or remove Empire.
+        /// </summary>
+        internal static int ChooseCultureIndex(IReadOnlyList<string> cultureNames)
+        {
+            for (int i = 0; i < cultureNames.Count; i++)
+            {
+                if (cultureNames[i] == "Empire") return i;
+            }
+            return 0;
+        }
+
+        internal enum SkipEntry { None, Inline, NextFrame }
+
+        /// <summary>
+        /// The intro path runs the skip at once, as it pushes character creation itself. A direct start is seen
+        /// while the state activates, before its screen and stage views exist, so the skip waits a frame.
+        /// </summary>
+        internal static SkipEntry ChooseSkipEntry(bool inIntro, bool inCharacterCreation, bool skipInProgress)
+        {
+            if (skipInProgress) return SkipEntry.None;
+            if (inIntro) return SkipEntry.Inline;
+            return inCharacterCreation ? SkipEntry.NextFrame : SkipEntry.None;
+        }
+
         public void SkipCharacterCreation()
         {
-            // Validation
-            if (InCharacterCreationIntro() == false) return;
-
-            // Logic
-            GameThread.Run(SkipCharacterCreationInternal);
+            switch (ChooseSkipEntry(InCharacterCreationIntro(), InCharacterCreation(), skipping))
+            {
+                case SkipEntry.Inline:
+                    GameThread.Run(SkipCharacterCreationInternal);
+                    break;
+                case SkipEntry.NextFrame:
+                    GameThread.EnqueueSafe(SkipCharacterCreationInternal, "DEBUG character creation skip");
+                    break;
+            }
         }
 
         public void SkipCharacterCreationInternal()
         {
-            // Skip intro video
-            SandBoxGameManager gameManager = (SandBoxGameManager)Game.Current.GameManager;
-            gameManager.LaunchSandboxCharacterCreation();
+            if (skipping) return;
+            skipping = true;
+            try
+            {
+                SkipStages();
+            }
+            finally
+            {
+                skipping = false;
+            }
+        }
+
+        private static void SkipStages()
+        {
+            // Skip intro video, when the game plays it
+            if (InCharacterCreationIntro())
+            {
+                SandBoxGameManager gameManager = (SandBoxGameManager)Game.Current.GameManager;
+                gameManager.LaunchSandboxCharacterCreation();
+            }
 
             CharacterCreationState characterCreationState = GameStateManager.Current.ActiveState as CharacterCreationState;
+            if (characterCreationState == null) return;
             CharacterCreationStageBase currentStage = characterCreationState._characterCreationManager.CurrentStage;
             
             if (currentStage is CharacterCreationCultureStage)
             {
-                var cultures = characterCreationState._characterCreationManager.CharacterCreationContent.GetCultures();
-                CultureObject culture = cultures.First(c => c.Name.ToString() == "Empire");
+                var cultures = characterCreationState._characterCreationManager.CharacterCreationContent.GetCultures().ToList();
+                CultureObject culture = cultures[ChooseCultureIndex(cultures.Select(c => c.Name.ToString()).ToList())];
                 characterCreationState._characterCreationManager.CharacterCreationContent.SetSelectedCulture(culture, characterCreationState._characterCreationManager);
                 characterCreationState._characterCreationManager.NextStage();
             }
