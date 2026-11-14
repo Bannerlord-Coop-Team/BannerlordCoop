@@ -62,6 +62,13 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
     private Settlement parkedRaidContinuation;
     private PlayerEncounter parkedRaidEncounter;
 
+    internal enum RaidContinuationDecision
+    {
+        Wait,
+        Drop,
+        Present,
+    }
+
     public VillageHostileActionInterface(IMessageBroker messageBroker, IObjectManager objectManager)
     {
         if (messageBroker == null) throw new ArgumentNullException(nameof(messageBroker));
@@ -152,7 +159,6 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
 
     public void BeginHostileActionPresentation(VillageHostileAction action)
     {
-        requestedHostileActionEncounter = null;
         var encounter = PlayerEncounter.Current;
         if (encounter == null)
         {
@@ -192,6 +198,11 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         return true;
     }
 
+    public void CompleteHostileActionRequest()
+    {
+        requestedHostileActionEncounter = null;
+    }
+
     public void RecoverRejectedHostileAction()
     {
         var expectedEncounter = requestedHostileActionEncounter;
@@ -220,34 +231,48 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         if (settlement == null)
             return;
 
-        if (PlayerCaptivity.IsCaptive ||
-            (PlayerEncounter.Current != null && parkedRaidEncounter != null &&
-             !ReferenceEquals(PlayerEncounter.Current, parkedRaidEncounter)))
-        {
-            parkedRaidContinuation = null;
-            parkedRaidEncounter = null;
-            return;
-        }
-
-        if (!CanPresentRaidContinuation(PlayerCaptivity.IsCaptive, MobileParty.MainParty?.MapEvent != null,
-                PlayerEncounter.Current?.EncounterState))
+        var encounter = PlayerEncounter.Current;
+        bool encounterReplaced = encounter != null && parkedRaidEncounter != null &&
+            !ReferenceEquals(encounter, parkedRaidEncounter);
+        var decision = GetRaidContinuationDecision(
+            PlayerCaptivity.IsCaptive,
+            encounterReplaced,
+            MobileParty.MainParty?.MapEvent != null,
+            encounter?.EncounterState);
+        if (decision == RaidContinuationDecision.Wait)
             return;
 
         parkedRaidContinuation = null;
         parkedRaidEncounter = null;
+
+        if (decision == RaidContinuationDecision.Drop)
+        {
+            var reason = PlayerCaptivity.IsCaptive ? "the player is captive" : "a different encounter is active";
+            Logger.Information("Dropping parked raid continuation for {SettlementId}: {Reason}", settlement.StringId, reason);
+            return;
+        }
+
         StartRaidContinuationEncounter(settlement);
     }
 
-    internal static bool CanPresentRaidContinuation(bool isCaptive, bool hasMapEvent, PlayerEncounterState? encounterState) =>
-        !isCaptive && !hasMapEvent && (encounterState == null || encounterState == PlayerEncounterState.End);
+    internal static RaidContinuationDecision GetRaidContinuationDecision(
+        bool isCaptive,
+        bool encounterReplaced,
+        bool hasMapEvent,
+        PlayerEncounterState? encounterState)
+    {
+        if (isCaptive || encounterReplaced)
+            return RaidContinuationDecision.Drop;
+
+        if (hasMapEvent || encounterState.HasValue && encounterState.Value != PlayerEncounterState.End)
+            return RaidContinuationDecision.Wait;
+
+        return RaidContinuationDecision.Present;
+    }
 
     private void StartRaidContinuationEncounter(Settlement settlement)
     {
-        // The completed event is already finalized. Request a fresh approval now, rather than
-        // letting its timeout run while the player is still viewing the previous battle's results.
-        // Both the player and village parties can still point at the finalized event after its registry entry is gone.
-        PartyBase.MainParty._mapEventSide = null;
-        settlement.Party._mapEventSide = null;
+        // The map-event teardown clears both parties before this continuation requests fresh approval.
         PlayerEncounter.Start();
         PlayerEncounter.Current.SetupFields(PartyBase.MainParty, settlement.Party);
         messageBroker.Publish(this, new VillageHostileActionAttempted(VillageHostileAction.Raid, MobileParty.MainParty, settlement));

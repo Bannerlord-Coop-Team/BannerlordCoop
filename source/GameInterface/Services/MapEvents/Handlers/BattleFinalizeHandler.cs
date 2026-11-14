@@ -213,22 +213,40 @@ internal class BattleFinalizeHandler : IHandler
                 return;
             }
 
-            foreach (var participant in playerManager.Players)
-            {
-                if (!playerManager.IsConnected(participant) ||
-                    !objectManager.TryGetObject<MobileParty>(participant.MobilePartyId, out var otherParty) ||
-                    otherParty == party || otherParty.Party.MapEventSide != party.Party.MapEventSide)
-                    continue;
-
-                handled = true;
-                messageBroker.Publish(requester, new PlayerLeaveBattleAttempted(party.Party));
-                return;
-            }
-
             handled = true;
-            messageBroker.Publish(this, new MapEventFinalizeAttempted(mapEvent));
+            HandleRetreat(requester, mapEvent, party);
         }, blocking: true, context: nameof(TryLeaveSharedHideout));
         return handled;
+    }
+
+    /// <summary>[Server, game thread] Apply the shared-battle retreat rule to a requester.</summary>
+    public void HandleRetreat(NetPeer requester, MapEvent mapEvent)
+    {
+        if (requester == null || mapEvent == null)
+            return;
+
+        if (!playerManager.TryGetPlayer(requester, out var player) ||
+            !objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party) ||
+            party.MapEvent != mapEvent)
+            return;
+
+        HandleRetreat(requester, mapEvent, party);
+    }
+
+    private void HandleRetreat(NetPeer requester, MapEvent mapEvent, MobileParty party)
+    {
+        foreach (var participant in playerManager.Players)
+        {
+            if (!playerManager.IsConnected(participant) ||
+                !objectManager.TryGetObject<MobileParty>(participant.MobilePartyId, out var otherParty) ||
+                otherParty == party || otherParty.Party.MapEventSide != party.Party.MapEventSide)
+                continue;
+
+            messageBroker.Publish(requester, new PlayerLeaveBattleAttempted(party.Party));
+            return;
+        }
+
+        messageBroker.Publish(this, new MapEventFinalizeAttempted(mapEvent));
     }
 
     /// <summary>
@@ -413,7 +431,7 @@ internal class BattleFinalizeHandler : IHandler
             finalizedMapEvents.Add(mapEvent, FinalizedMarker);
         }
 
-        // The battle is over - release the mode claim so a later, unrelated battle on this event starts unclaimed.
+        // Release before FinalizeEventAux so the mode claim is gone before callbacks can start a later battle.
         if (objectManager.TryGetId(mapEvent, out var mapEventIdForRelease))
             ServerBattleModeArbiter.Release(mapEventIdForRelease);
 

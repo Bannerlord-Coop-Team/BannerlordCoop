@@ -17,6 +17,9 @@ public interface IVillageHostileActionInterface : IGameAbstraction
     /// <summary>[Client, game thread] Track a hostile-action request until the server resolves it; false when one is already pending.</summary>
     bool TryTrackHostileActionRequest();
 
+    /// <summary>[Client, game thread] Clear the pending hostile-action request after the server accepts it.</summary>
+    void CompleteHostileActionRequest();
+
     /// <summary>[Client, game thread] The hostile-action request was denied; close the encounter it opened.</summary>
     void RecoverRejectedHostileAction();
 

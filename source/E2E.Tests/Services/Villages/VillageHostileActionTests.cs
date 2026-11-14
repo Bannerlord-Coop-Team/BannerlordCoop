@@ -1108,6 +1108,20 @@ public class VillageHostileActionTests : MapEventTestBase
     }
 
     [Fact]
+    public void CompletedRaidSimulation_ResumesRaidingAgain()
+    {
+        var result = CompleteRaidSimulationAndLoot();
+        try
+        {
+            AssertRaidContinuationPresented(result);
+        }
+        finally
+        {
+            result.Dispose();
+        }
+    }
+
+    [Fact]
     public void CompletedRaidSimulation_ReinforcedRaid_ResumesRaidingAgain()
     {
         var result = CompleteRaidSimulationAndLoot();

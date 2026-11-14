@@ -21,6 +21,8 @@ namespace E2E.Tests.Services.MapEvents;
 /// </summary>
 public class BattleSimulationCompletionTests : MapEventTestBase
 {
+    private const int MaxAdvancesToFinish = 200;
+
     public BattleSimulationCompletionTests(ITestOutputHelper output) : base(output) { }
 
     [Fact]
@@ -47,7 +49,7 @@ public class BattleSimulationCompletionTests : MapEventTestBase
             try
             {
                 Server.NetworkSentMessages.Clear();
-                for (var update = 0; update < 200; update++)
+                for (var update = 0; update < MaxAdvancesToFinish; update++)
                     Server.Resolve<IMessageBroker>().Publish(client.NetPeer,
                         new NetworkAdvanceBattleSimulation(context.MapEventId, 1));
 
