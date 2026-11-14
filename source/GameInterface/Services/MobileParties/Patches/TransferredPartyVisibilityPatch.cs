@@ -18,7 +18,8 @@ internal class TransferredPartyVisibilityPatch
     // a client with hundreds of fleets. OnGameLoaded runs after the save system's late initialize re-reads each party's
     // saved fields and before the naval visuals start (no OnGameLoaded listener sets party visibility, so the prefix is
     // early enough); PartyVisibilitySweep then reveals the parties in range. Client patches only apply after joining a
-    // server, so the save is the one the server sent. Debug builds keep everything visible.
+    // server and are never removed, so a single player save loaded later in the same process also starts hidden until
+    // the native sweep reveals the parties near the player. Debug builds keep everything visible.
     internal static void ClearServerVisibility(Campaign campaign)
     {
         if (ModInformation.IsServer || DebugPartyVisibility.ForceAllVisible) return;
