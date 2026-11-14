@@ -528,7 +528,7 @@ internal class BattleFinalizeHandler : IHandler
             PvpEncounterCloseSender.Send(network, playerPartyIds, mapEventId: mapEventId);
 
         // The client parks the continuation until its battle result screens close.
-        network.Send(leaderPeer, new NetworkRaidContinuationRequested(settlementId));
+        network.Send(leaderPeer, new NetworkRaidContinuationRequested(settlementId, leaderMobilePartyId));
 
         return true;
     }
