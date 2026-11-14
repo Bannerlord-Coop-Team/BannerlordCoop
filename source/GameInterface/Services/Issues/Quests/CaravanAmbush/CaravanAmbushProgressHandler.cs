@@ -13,6 +13,7 @@ using TaleWorlds.Localization;
 using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.GameState;
 using Helpers;
+using GameInterface.Services.PlayerCaptivityService.Messages;
 using Quest = TaleWorlds.CampaignSystem.Issues.CaravanAmbushIssueBehavior.CaravanAmbushIssueQuest;
 
 namespace GameInterface.Services.Issues.Quests.CaravanAmbush;
