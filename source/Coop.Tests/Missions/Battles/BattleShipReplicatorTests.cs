@@ -218,12 +218,16 @@ public class BattleShipReplicatorTests
         Assert.Equal(4, harness.Conditions.HullReserve(unregistered));
     }
 
+    // A departed host's AI hulls still name it until the host change moves them, which nulls their reserve itself; the
+    // departure must not take it first, as if they left with the host.
     [Fact]
-    public void ReportedReserveOf_DropsTheReport_WhenItsOwnerLeaves()
+    public void ReportedReserveOf_DropsTheReport_WhenItsOwnerLeaves_ButKeepsTheAiHullsItSimulated()
     {
         var harness = new Harness(committed: false);
         var (copy, ship) = RegisterPeerCopy(harness, isNpcParty: false);
+        var (aiCopy, aiShip) = RegisterPeerCopy(harness, isNpcParty: true);
         harness.Conditions.Receive(PeerCondition(ship, 1, reserve: 12));
+        harness.Conditions.Receive(PeerCondition(aiShip, 1, reserve: 9));
 
         harness.Conditions.ForgetReserveOf("someone_else");
         int afterOtherLeft = harness.Conditions.ReportedReserveOf(copy);
@@ -231,6 +235,7 @@ public class BattleShipReplicatorTests
 
         Assert.Equal(12, afterOtherLeft);
         Assert.Equal(0, harness.Conditions.ReportedReserveOf(copy));
+        Assert.Equal(9, harness.Conditions.ReportedReserveOf(aiCopy));
     }
 
     // M12 r1, R7: the departure comes over the campaign connection, so a condition the owner sent before leaving can arrive
