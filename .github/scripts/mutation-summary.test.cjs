@@ -1,7 +1,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
-const { shortTestName, summarizeProject, render } = require('./mutation-summary.cjs');
+const { projectResult, summarizeProject, render } = require('./mutation-summary.cjs');
 
 const root = path.resolve('/repo');
 
@@ -29,11 +29,7 @@ function report() {
   };
 }
 
-test('shortens a full test name to Class.Method', () => {
-  assert.equal(shortTestName('Ns.Sub.Class.Method(x: 1)'), 'Class.Method');
-});
-
-test('counts only scored mutants and keeps the ones no test caught, with the tests that ran', () => {
+test('counts only scored mutants and keeps the ones no test caught, with the short names of the tests that ran', () => {
   const result = summarizeProject('Common', report(), root);
 
   assert.deepEqual(result.counts, { Killed: 1, Timeout: 1, Survived: 1, NoCoverage: 1 });
@@ -48,12 +44,11 @@ test('lists survivors before no-coverage mutants and scores caught over scored',
   const summary = render([summarizeProject('Common', report(), root)]);
 
   assert.match(summary, /\| Common \| 1 \| 1 \| 1 \| 1 \| 1 \| 50\.0% \|/);
-  assert.ok(summary.indexOf('Foo.cs:5') < summary.indexOf('Foo.cs:6'));
-  assert.match(summary, /### Not caught \(2\)/);
+  assert.match(summary, /\| `source\/Common\/Foo\.cs:5` \| Survived \|[^\n]*\n\| `source\/Common\/Foo\.cs:6` \| NoCoverage \|/);
 });
 
-test('reports a project without a report as failed instead of as having nothing to mutate', () => {
-  const summary = render([{ project: 'Coop.Core', finished: false }]);
+test('reports a scheduled project without a report as failed instead of as having nothing to mutate', () => {
+  const summary = render([projectResult('Coop.Core', null)]);
 
   assert.match(summary, /\| Coop\.Core \|.*no report, Stryker failed or didn't finish/);
   assert.doesNotMatch(summary, /nothing was mutated/);

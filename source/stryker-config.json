@@ -1,6 +1,7 @@
 {
   "stryker-config": {
     "configuration": "Release",
+    "coverage-analysis": "off",
     "reporters": ["html", "json", "progress"],
     "thresholds": { "high": 80, "low": 60, "break": 0 },
     "ignore-methods": [

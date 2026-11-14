@@ -1,5 +1,5 @@
 // Turns the Stryker JSON reports under an output folder into a markdown summary of the mutants
-// no unit test caught. Usage: node mutation-summary.cjs <output-dir>
+// no unit test caught. Usage: node mutation-summary.cjs <output-dir> [project...]
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -54,18 +54,19 @@ function summarizeProject(project, report, root = repoRoot) {
   return { project, finished: true, counts, misses, fileCount };
 }
 
-// Reads every project folder under the output folder. The runner creates a folder before it
-// mutates a project, so a folder without a report is a project that failed or didn't finish.
-function readResults(outputDirectory) {
-  return fs.readdirSync(outputDirectory, { withFileTypes: true })
-    .filter(entry => entry.isDirectory())
-    .map(entry => entry.name)
-    .sort()
-    .map(project => {
-      const reportPath = path.join(outputDirectory, project, 'reports', 'mutation-report.json');
-      if (!fs.existsSync(reportPath)) return { project, finished: false };
-      return summarizeProject(project, JSON.parse(fs.readFileSync(reportPath, 'utf8')));
-    });
+// Summarizes a scheduled project's report text, or marks the project unfinished when Stryker left
+// no report because it failed or never got to it.
+function projectResult(project, reportText) {
+  if (reportText === null) return { project, finished: false };
+  return summarizeProject(project, JSON.parse(reportText));
+}
+
+// Reads the report of each project the runner scheduled.
+function readResults(outputDirectory, projects) {
+  return projects.map(project => {
+    const reportPath = path.join(outputDirectory, project, 'reports', 'mutation-report.json');
+    return projectResult(project, fs.existsSync(reportPath) ? fs.readFileSync(reportPath, 'utf8') : null);
+  });
 }
 
 // Escapes text for a markdown table cell and caps its length.
@@ -128,13 +129,13 @@ function render(results) {
   return [...title, intro, '', ...renderScores(results), '', ...renderMisses(results)].join('\n');
 }
 
-// Prints the summary for the output folder given on the command line.
+// Prints the summary for the output folder and scheduled projects given on the command line.
 function main() {
-  const outputDirectory = process.argv[2];
-  if (!outputDirectory) throw new Error('usage: node mutation-summary.cjs <output-dir>');
-  console.log(render(readResults(outputDirectory)));
+  const [outputDirectory, ...projects] = process.argv.slice(2);
+  if (!outputDirectory) throw new Error('usage: node mutation-summary.cjs <output-dir> [project...]');
+  console.log(render(readResults(outputDirectory, projects)));
 }
 
 if (require.main === module) main();
 
-module.exports = { shortTestName, summarizeProject, render };
+module.exports = { projectResult, summarizeProject, render };

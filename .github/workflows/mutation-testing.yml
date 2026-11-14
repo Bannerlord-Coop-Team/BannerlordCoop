@@ -82,17 +82,17 @@ jobs:
         run: bash .github/scripts/run-mutation-tests.sh "$BASE_SHA" artifacts/mutation
 
       - name: Write summary
-        if: ${{ always() && steps.scope.outputs.skip != 'true' }}
+        if: ${{ always() && steps.scope.outcome == 'success' && steps.scope.outputs.skip != 'true' }}
         # The script rewrites summary.md after each project, so a failed run still lists what finished.
         run: |
           if [ -f artifacts/mutation/summary.md ]; then
             cat artifacts/mutation/summary.md >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "The mutation run stopped before it wrote a summary, see the Run Stryker step log." >> "$GITHUB_STEP_SUMMARY"
+            echo "The mutation run stopped before it wrote a summary, see the log of the step that failed." >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Upload mutation report
-        if: ${{ always() && steps.scope.outputs.skip != 'true' }}
+        if: ${{ always() && steps.scope.outcome == 'success' && steps.scope.outputs.skip != 'true' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: mutation-report

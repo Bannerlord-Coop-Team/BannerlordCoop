@@ -3,7 +3,8 @@
 # Usage: run-mutation-tests.sh [--list] [base-ref] [output-dir]
 #   --list      print the --mutate patterns for the changed lines and exit
 #   base-ref    branch or commit to diff against (default origin/development, diffed from the merge base)
-#   output-dir  where each project's report and summary.md go (default artifacts/mutation)
+#   output-dir  where each project's report and summary.md go, relative to the repo root
+#               (default artifacts/mutation)
 set -euo pipefail
 
 # The mutated projects and the unit test projects that cover each one. Settings shared by all of
@@ -21,11 +22,12 @@ if [[ "${1:-}" == "--list" ]]; then
   shift
 fi
 
-base_ref="${1:-origin/development}"
-output_directory="${2:-artifacts/mutation}"
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 scripts="$repo_root/.github/scripts"
 cd "$repo_root"
+base_ref="${1:-origin/development}"
+# Absolute, because Stryker runs from inside each project folder and resolves --output from there.
+output_directory=$(realpath -m "${2:-artifacts/mutation}")
 
 if ! command -v node >/dev/null; then
   echo "node is required to find the changed lines and write the summary." >&2
@@ -34,14 +36,9 @@ fi
 
 merge_base=$(git merge-base "$base_ref" HEAD)
 
-# Prints the --mutate patterns covering the changed lines of one project, nothing if it has none.
+# Prints the --mutate patterns, relative to the project folder, covering one project's changed lines.
 mutate_patterns() {
-  local files
-  mapfile -t files < <(git diff --name-only --diff-filter=AMR "$merge_base" -- "source/$1/*.cs")
-  if [[ ${#files[@]} -eq 0 ]]; then
-    return
-  fi
-  node "$scripts/mutation-spans.cjs" "$merge_base" "${files[@]}"
+  node "$scripts/mutation-spans.cjs" "$merge_base" "source/$1"
 }
 
 # Runs Stryker in one project, mutating only the given newline-separated patterns.
@@ -54,30 +51,24 @@ mutate_project() {
     args+=(--test-project "../$test_project/$test_project.csproj")
   done
   while IFS= read -r pattern; do
-    args+=(--mutate "${pattern#source/"$project"/}")
+    args+=(--mutate "$pattern")
   done <<< "$patterns"
 
   echo "== Stryker $project ($(wc -l <<< "$patterns") changed files)"
   (cd "source/$project" && dotnet stryker "${args[@]}")
 }
 
-# Rewrites summary.md from the reports so far, so a failed or cut-off run still has one.
-write_summary() {
-  node "$scripts/mutation-summary.cjs" "$output_directory" > "$output_directory/summary.md"
-}
-
 if [[ "$list_only" == true ]]; then
   for project in "${projects[@]}"; do
-    mutate_patterns "$project"
+    mutate_patterns "$project" | sed "s|^|source/$project/|"
   done
   exit 0
 fi
 
-# Absolute, because Stryker runs from inside each project folder and resolves --output from there.
 mkdir -p "$output_directory"
-output_directory=$(cd "$output_directory" && pwd)
 rm -f "$output_directory/summary.md"
 
+scheduled=()
 declare -A project_patterns=()
 for project in "${projects[@]}"; do
   rm -rf "${output_directory:?}/$project"
@@ -85,10 +76,16 @@ for project in "${projects[@]}"; do
   if [[ -z "$patterns" ]]; then
     continue
   fi
+  scheduled+=("$project")
   project_patterns[$project]=$patterns
-  # The folder stays without a report if Stryker fails or never gets to this project.
-  mkdir -p "$output_directory/$project"
 done
+
+# Rewrites summary.md from the reports so far, so a failed or cut-off run still has one. It goes
+# through a temp file so a summary that fails to render keeps the last good one.
+write_summary() {
+  node "$scripts/mutation-summary.cjs" "$output_directory" "${scheduled[@]}" > "$output_directory/summary.md.tmp"
+  mv "$output_directory/summary.md.tmp" "$output_directory/summary.md"
+}
 write_summary
 
 # Stryker builds with Platform=AnyCPU, where Coop.Core treats warnings as errors, so the
@@ -96,10 +93,7 @@ write_summary
 export NuGetAudit=false
 dotnet tool restore
 
-for project in "${projects[@]}"; do
-  if [[ -z "${project_patterns[$project]:-}" ]]; then
-    continue
-  fi
+for project in "${scheduled[@]}"; do
   mutate_project "$project" "${project_patterns[$project]}"
   write_summary
 done
