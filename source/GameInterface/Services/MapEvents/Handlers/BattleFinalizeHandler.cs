@@ -235,18 +235,15 @@ internal class BattleFinalizeHandler : IHandler
 
     private void HandleRetreat(NetPeer requester, MapEvent mapEvent, MobileParty party)
     {
-        foreach (var participant in playerManager.Players)
+        // The side leader retreats from the whole event. A joining party retreats alone so the
+        // leader can keep the shared battle open for another simulation.
+        if (party.Party.MapEventSide?.LeaderParty == party.Party)
         {
-            if (!playerManager.IsConnected(participant) ||
-                !objectManager.TryGetObject<MobileParty>(participant.MobilePartyId, out var otherParty) ||
-                otherParty == party || otherParty.Party.MapEventSide != party.Party.MapEventSide)
-                continue;
-
-            messageBroker.Publish(requester, new PlayerLeaveBattleAttempted(party.Party));
+            messageBroker.Publish(this, new MapEventFinalizeAttempted(mapEvent));
             return;
         }
 
-        messageBroker.Publish(this, new MapEventFinalizeAttempted(mapEvent));
+        messageBroker.Publish(requester, new PlayerLeaveBattleAttempted(party.Party));
     }
 
     /// <summary>
