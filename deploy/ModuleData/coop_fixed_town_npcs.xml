@@ -1099,4 +1099,34 @@
       </EquipmentRoster>
     </Equipments>
   </NPCCharacter>
+  <NPCCharacter
+    id="coop_fixed_npc_c22fae78"
+    name="{=!}Peter"
+    default_group="Infantry"
+    level="1"
+    is_female="false"
+    is_hero="false"
+    is_template="false"
+    occupation="Townsfolk"
+    culture="Culture.empire"
+    is_hidden_encyclopedia="true"
+    coop_settlement="town_S5"
+    coop_location="tavern"
+    coop_spawn_tag="npc_common"
+    coop_dialogue="You uncultured swine! What&apos;re you lookin&apos; at, ya hockey puck?"
+    coop_enabled="true">
+    <face>
+      <face_key_template value="BodyProperty.townsman_empire" />
+    </face>
+    <skills />
+    <Equipments>
+      <EquipmentRoster civilian="true">
+        <equipment slot="Head" id="Item.thinhide_coif" />
+        <equipment slot="Cape" id="Item.leopard_pelt" />
+        <equipment slot="Body" id="Item.layered_robe" />
+        <equipment slot="Gloves" id="Item.buttoned_leather_bracers" />
+        <equipment slot="Leg" id="Item.battania_fur_boots" />
+      </EquipmentRoster>
+    </Equipments>
+  </NPCCharacter>
 </NPCCharacters>
