@@ -213,7 +213,7 @@ namespace Coop
         }
 
         // Never disposed, because it holds the claim on the canonical log for the whole process.
-        private static ILogFileOpener logFileOpener;
+        private static ILogFileManager logFileManager;
 
         // Created in SetupLogging, not here, because CoopMod's type initializer runs before the check for a foreign Common.dll.
         private static ISessionSummarySink sessionSummary;
@@ -235,11 +235,11 @@ namespace Coop
 #else
             configuration.MinimumLevel.Information();
 #endif
-            logFileOpener = new LogFileOpener(
+            logFileManager = new LogFileManager(
                 Directory.GetCurrentDirectory(),
                 isServer ? "server" : "client",
                 System.Diagnostics.Process.GetCurrentProcess().Id);
-            var logFile = logFileOpener.Open(path => configuration.WriteTo.Sink(new SizeLimitedFileSink(
+            var logFile = logFileManager.Open(path => configuration.WriteTo.Sink(new SizeLimitedFileSink(
                 path,
                 outputTemplate,
                 maxLogFileSizeBytes,

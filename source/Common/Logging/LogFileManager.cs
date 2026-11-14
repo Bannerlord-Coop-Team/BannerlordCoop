@@ -10,14 +10,14 @@ namespace Common.Logging;
 /// Picks and opens this process's log file, <c>Coop_&lt;role&gt;.log</c> or a process-id log when that is taken,
 /// keeping the last session's log as <c>.prev.log</c>; disposing releases the claim on the canonical log.
 /// </summary>
-public interface ILogFileOpener : IDisposable
+public interface ILogFileManager : IDisposable
 {
     /// <summary>Runs <paramref name="openSink"/> on the log path and returns the path it opened and the warnings to log.</summary>
     LogFileOpenResult Open(Action<string> openSink);
 }
 
 /// <inheritdoc />
-public class LogFileOpener : ILogFileOpener
+public class LogFileManager : ILogFileManager
 {
     private const int KeptProcessLogs = 5;
 
@@ -28,7 +28,7 @@ public class LogFileOpener : ILogFileOpener
     private FileStream canonicalLogClaim;
 
     /// <summary>Names the role's canonical and process-id logs in <paramref name="directory"/>.</summary>
-    public LogFileOpener(string directory, string role, int processId)
+    public LogFileManager(string directory, string role, int processId)
     {
         this.directory = directory;
         processLogPattern = $"Coop_{role}_*.log";

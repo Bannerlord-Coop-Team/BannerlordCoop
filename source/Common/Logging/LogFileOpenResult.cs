@@ -5,7 +5,7 @@ using System.Collections.Generic;
 namespace Common.Logging;
 
 /// <summary>
-/// The outcome of <see cref="ILogFileOpener.Open"/>: the opened log path and the warnings to log once logging is configured.
+/// The outcome of <see cref="ILogFileManager.Open"/>: the opened log path and the warnings to log once logging is configured.
 /// </summary>
 public sealed class LogFileOpenResult
 {

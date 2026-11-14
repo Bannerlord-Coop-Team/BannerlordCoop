@@ -4,21 +4,21 @@ using Xunit;
 
 namespace Common.Tests.Logging;
 
-public class LogFileOpenerTests : IDisposable
+public class LogFileManagerTests : IDisposable
 {
     private readonly string tempRoot = Path.Combine(
         Path.GetTempPath(),
-        "LogFileOpenerTests_" + Guid.NewGuid().ToString("N"));
+        "LogFileManagerTests_" + Guid.NewGuid().ToString("N"));
 
-    private readonly LogFileOpener opener;
+    private readonly LogFileManager manager;
 
     private string LogPath => Path.Combine(tempRoot, "Coop_client.log");
     private string ProcessLogPath => Path.Combine(tempRoot, "Coop_client_1234.log");
 
-    public LogFileOpenerTests()
+    public LogFileManagerTests()
     {
         Directory.CreateDirectory(tempRoot);
-        opener = new LogFileOpener(tempRoot, "client", 1234);
+        manager = new LogFileManager(tempRoot, "client", 1234);
     }
 
     [Fact]
@@ -26,7 +26,7 @@ public class LogFileOpenerTests : IDisposable
     {
         File.WriteAllText(ProcessLogPath, "earlier process with the same id");
 
-        var logFile = opener.Open(path =>
+        var logFile = manager.Open(path =>
         {
             if (path == LogPath) throw new IOException("held by another program");
         });
@@ -38,15 +38,15 @@ public class LogFileOpenerTests : IDisposable
     [Fact]
     public void Open_NoPathOpens_OpensNoPath()
     {
-        Assert.Null(opener.Open(_ => throw new IOException("held by another program")).OpenedPath);
+        Assert.Null(manager.Open(_ => throw new IOException("held by another program")).OpenedPath);
     }
 
     [Fact]
     public void Open_CanonicalLogClaimedByALiveInstance_LeavesItsLogAlone()
     {
-        opener.Open(_ => { });
+        manager.Open(_ => { });
         File.WriteAllText(LogPath, "live session");
-        using var secondInstance = new LogFileOpener(tempRoot, "client", 5678);
+        using var secondInstance = new LogFileManager(tempRoot, "client", 5678);
 
         var logFile = secondInstance.Open(_ => { });
 
@@ -65,7 +65,7 @@ public class LogFileOpenerTests : IDisposable
         // A reader like tail -f or the crash reporter's copy, which allows delete.
         using (new FileStream(LogPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
         {
-            Assert.Equal(LogPath, opener.Open(_ => { }).OpenedPath);
+            Assert.Equal(LogPath, manager.Open(_ => { }).OpenedPath);
         }
 
         Assert.Equal("last session", File.ReadAllText(previousLogPath));
@@ -73,7 +73,7 @@ public class LogFileOpenerTests : IDisposable
 
     public void Dispose()
     {
-        opener.Dispose();
+        manager.Dispose();
         try
         {
             Directory.Delete(tempRoot, recursive: true);
