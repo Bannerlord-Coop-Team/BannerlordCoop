@@ -2065,7 +2065,8 @@ public class VillageHostileActionTests : MapEventTestBase
             MapEventDisabledMethods);
 
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkRaidContinuationRequested>());
-        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkMapEventFinalized>());
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkClosePvpEncounter>());
+        Server.Call(() => Assert.False(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId!, out _)));
     }
 
     [Fact]

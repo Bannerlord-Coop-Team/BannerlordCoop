@@ -221,7 +221,8 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
             return;
 
         if (PlayerCaptivity.IsCaptive ||
-            (parkedRaidEncounter != null && !ReferenceEquals(PlayerEncounter.Current, parkedRaidEncounter)))
+            (PlayerEncounter.Current != null && parkedRaidEncounter != null &&
+             !ReferenceEquals(PlayerEncounter.Current, parkedRaidEncounter)))
         {
             parkedRaidContinuation = null;
             parkedRaidEncounter = null;
