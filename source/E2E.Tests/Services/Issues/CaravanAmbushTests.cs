@@ -680,9 +680,20 @@ public class CaravanAmbushTests : IDisposable
     [InlineData(IssueOutcome.QuestFail)]
     public void TerminalReplayKeepsTheOwnersJournalAndEndsOnlyTheirQuest(IssueOutcome outcome)
     {
-        scenario.AttachQuest(Other, CreateQuest);
-        var otherQuest = QuestOf(Other);
-        Other.Call(() => otherQuest.StartQuest());
+        var otherGiverId = scenario.AddIssue();
+        Quest otherQuest = null!;
+        Other.Call(() =>
+        {
+            var giver = Other.GetRegisteredObject<Hero>(otherGiverId);
+            using (new AllowedThread())
+            {
+                otherQuest = new Quest("other_caravan_quest", giver, null, CampaignTime.Never, 1000, 0.5f);
+                giver.Issue.IssueQuest = otherQuest;
+                otherQuest.StartQuest();
+            }
+            Assert.True(Other.Resolve<IIssueOwnershipRegistry>().TrySetOwner(
+                otherGiverId, giver.Issue.StringId, QuestScenario.ControllerB));
+        });
         Server.Call(() =>
         {
             QuestOf(Server).AddLog(new TextObject("Follow the caravan"));

@@ -465,7 +465,7 @@ internal class FinalizationCoordinator : IHandler, IIssueFinalizationReplay
     {
         var hasOwner = ownership.TryGetOwner(data.IssueOwnerId, data.IssueId, out var owner);
         var isOwner = hasOwner && owner == controller.ControllerId;
-        if (hasOwner) ownership.Remove(data.IssueOwnerId, data.IssueId);
+        if (hasOwner) ownership.Remove(data.IssueOwnerId);
 
         if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _))
         {
