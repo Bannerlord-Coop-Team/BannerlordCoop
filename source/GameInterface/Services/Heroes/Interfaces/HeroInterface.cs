@@ -236,8 +236,9 @@ internal class HeroInterface : IHeroInterface
 
         // On a release client the transferred host save loads with every party hidden
         // (TransferredPartyVisibilityPatch) and the native load path never rebuilds fog of war
-        // (Campaign.GameInitTick only runs for new campaigns), so nearby parties would stay hidden. Queued so it runs once the campaign
-        // state is entered and the hero switched to above is the local main party.
+        // (Campaign.GameInitTick only runs for new campaigns), so nearby parties would stay hidden.
+        // Queued so it runs once the campaign state is entered and the hero switched to above is the
+        // local main party.
         GameThread.RunSafe(partyVisibilitySweep.RebuildAroundMainParty);
         MessageBroker.Instance.Publish(player, new SwitchedPlayer());
     }
