@@ -26,8 +26,23 @@ env:
   DOTNET_CLI_TELEMETRY_OPTOUT: 1
 
 jobs:
+  script-tests:
+    name: Test the mutation scripts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Run the script tests
+        run: node --test .github/scripts/mutation-spans.test.cjs .github/scripts/mutation-summary.test.cjs
+
   scope:
     name: Find projects with changed lines
+    needs: script-tests
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
@@ -40,13 +55,13 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.sha }}
 
-      - name: Test the mutation scripts
-        run: node --test .github/scripts/mutation-spans.test.cjs .github/scripts/mutation-summary.test.cjs
-
       - name: Find projects with changed lines
         id: scope
         run: |
-          projects=$(bash .github/scripts/run-mutation-tests.sh --list "$BASE_SHA" | jq --raw-input --slurp --compact-output 'split("\n") | map(select(length > 0))')
+          # Its own command, so a failing script stops the step instead of reading as no projects.
+          listed=$(bash .github/scripts/run-mutation-tests.sh --list "$BASE_SHA")
+          # One project per line to the JSON array the matrix job needs.
+          projects=$(jq --raw-input --slurp --compact-output 'split("\n") | map(select(length > 0))' <<< "$listed")
           echo "projects=$projects" >> "$GITHUB_OUTPUT"
           if [ "$projects" = "[]" ]; then
             echo "Skipped: this PR changes no C# lines in the mutation-tested projects." >> "$GITHUB_STEP_SUMMARY"
@@ -72,6 +87,7 @@ jobs:
 
     env:
       PROJECT: ${{ matrix.project }}
+      OUTPUT_DIR: artifacts/mutation
 
     steps:
       - name: Checkout
@@ -103,16 +119,16 @@ jobs:
           echo "BANNERLORD_DIR=$RUNNER_TEMP/mb2" >> "$GITHUB_ENV"
 
       - name: Run Stryker on changed lines
-        run: bash .github/scripts/run-mutation-tests.sh "$BASE_SHA" artifacts/mutation "$PROJECT"
+        run: bash .github/scripts/run-mutation-tests.sh "$BASE_SHA" "$OUTPUT_DIR" "$PROJECT"
 
       - name: Write summary
         if: always()
-        # The script writes summary.md before Stryker starts and again when it finishes.
+        # The script writes summary.md once Stryker finishes, so a failed or timed-out run has none.
         run: |
-          if [ -f artifacts/mutation/summary.md ]; then
-            cat artifacts/mutation/summary.md >> "$GITHUB_STEP_SUMMARY"
+          if [ -f "$OUTPUT_DIR/summary.md" ]; then
+            cat "$OUTPUT_DIR/summary.md" >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "The mutation run stopped before it wrote a summary, see the log of the step that failed." >> "$GITHUB_STEP_SUMMARY"
+            echo "The mutation run for $PROJECT failed or timed out before it wrote a summary, see the log of the step that failed." >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Upload mutation report
@@ -120,6 +136,6 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: mutation-report-${{ matrix.project }}
-          path: artifacts/mutation/
+          path: ${{ env.OUTPUT_DIR }}/
           retention-days: 14
           if-no-files-found: warn

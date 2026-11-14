@@ -8,10 +8,11 @@
 #   project     mutate only this project, one of the keys of test_projects
 set -euo pipefail
 
-# The mutated projects and the unit test projects that cover each one. Settings shared by all of
-# them are in source/stryker-config.json.
+# The mutated projects and, for each, every unit test project in source/CoopUnitTests.slnf that
+# references it, except Coop.IntegrationTests, which starts full sessions and is too slow per mutant.
+# Settings shared by all of them are in source/stryker-config.json.
 declare -A test_projects=(
-  [Common]="Common.Tests Coop.Tests"
+  [Common]="Common.Tests Coop.Tests GameInterface.Tests"
   [Coop.Core]="Coop.Tests"
   [GameInterface]="GameInterface.Tests Coop.Tests"
 )
@@ -60,8 +61,9 @@ mutate_project() {
     --project "$project.csproj"
     --output "$output_directory/$project"
   )
-  local test_project pattern
-  for test_project in ${test_projects[$project]}; do
+  local test_project_names test_project pattern
+  read -ra test_project_names <<< "${test_projects[$project]}"
+  for test_project in "${test_project_names[@]}"; do
     args+=(--test-project "$repo_root/source/$test_project/$test_project.csproj")
   done
   while IFS= read -r pattern; do
@@ -96,21 +98,16 @@ for project in "${scheduled[@]}"; do
   rm -rf "${output_directory:?}/$project"
 done
 
-# Rewrites summary.md from the reports so far, so a failed or cut-off run still has one. It goes
-# through a temp file so a summary that fails to render keeps the last good one.
-write_summary() {
-  node "$scripts/mutation-summary.cjs" "$output_directory" "${scheduled[@]}" > "$output_directory/summary.md.tmp"
-  mv "$output_directory/summary.md.tmp" "$output_directory/summary.md"
-}
-write_summary
-
 # Stryker builds with Platform=AnyCPU, where Coop.Core treats warnings as errors, so the
 # Scriban advisory from NuGet's audit would fail the build. The audit adds nothing to a mutation run.
 export NuGetAudit=false
 dotnet tool restore
 
+# Stryker writes each project's JSON report under its --output folder, in reports/.
+reports=()
 for project in "${scheduled[@]}"; do
   mutate_project "$project" "${project_patterns[$project]}"
-  write_summary
+  reports+=("$project=$output_directory/$project/reports/mutation-report.json")
 done
+node "$scripts/mutation-summary.cjs" "${reports[@]}" > "$output_directory/summary.md"
 cat "$output_directory/summary.md"

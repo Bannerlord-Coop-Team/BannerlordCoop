@@ -1,5 +1,5 @@
-// Turns the Stryker JSON reports under an output folder into a markdown summary of the mutants
-// no unit test caught. Usage: node mutation-summary.cjs <output-dir> [project...]
+// Turns Stryker JSON reports into a markdown summary of the mutants no unit test caught.
+// Usage: node mutation-summary.cjs [<project>=<mutation-report.json>...]
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -7,13 +7,11 @@ const repoRoot = path.resolve(__dirname, '../..');
 const maxRows = 100;
 const maxCellLength = 80;
 const detectedStatuses = ['Killed', 'Timeout'];
-// NoCoverage only appears with coverage analysis on, which source/stryker-config.json turns off.
-// It stays here so the score is still right if coverage analysis is turned back on.
-const missedStatuses = ['Survived', 'NoCoverage'];
+const missedStatuses = ['Survived'];
 const scoredStatuses = [...detectedStatuses, ...missedStatuses];
 
-// Reads one project's parsed report into status counts and the mutants no test caught.
-function summarizeProject(project, report, root = repoRoot) {
+// Reads one parsed report into status counts and the mutants no test caught.
+function summarizeProject(report, root = repoRoot) {
   const counts = Object.fromEntries(scoredStatuses.map(status => [status, 0]));
   const misses = [];
   let fileCount = 0;
@@ -34,22 +32,16 @@ function summarizeProject(project, report, root = repoRoot) {
       });
     }
   }
-  return { project, finished: true, counts, misses, fileCount };
+  return { counts, misses, fileCount };
 }
 
-// Summarizes a scheduled project's report text, or marks the project unfinished when Stryker left
-// no report because it failed or never got to it.
-function projectResult(project, reportText) {
-  if (reportText === null) return { project, finished: false };
-  return summarizeProject(project, JSON.parse(reportText));
-}
-
-// Reads the report of each project the runner scheduled.
-function readResults(outputDirectory, projects) {
-  return projects.map(project => {
-    const reportPath = path.join(outputDirectory, project, 'reports', 'mutation-report.json');
-    if (!fs.existsSync(reportPath)) return projectResult(project, null);
-    return projectResult(project, fs.readFileSync(reportPath, 'utf8'));
+// Reads each `project=report-path` argument into that project's summary.
+function readResults(reportArguments) {
+  return reportArguments.map(argument => {
+    const separator = argument.indexOf('=');
+    if (separator < 1) throw new Error(`expected <project>=<mutation-report.json>, got: ${argument}`);
+    const report = JSON.parse(fs.readFileSync(argument.slice(separator + 1), 'utf8'));
+    return { project: argument.slice(0, separator), ...summarizeProject(report) };
   });
 }
 
@@ -77,26 +69,24 @@ function score(counts) {
   return total === 0 ? '-' : `${(100 * detected / total).toFixed(1)}%`;
 }
 
-// Builds the per-project score table, with a row for each project that has no report.
+// Builds the per-project score table.
 function renderScores(results) {
-  const rows = results.map(result => {
-    if (!result.finished) return [result.project, '-', '-', '-', '-', "no report, Stryker failed or didn't finish, see the step log"];
-    const { project, counts, fileCount } = result;
-    return [project, fileCount, counts.Killed, counts.Timeout, counts.Survived, score(counts)];
-  });
+  const rows = results.map(({ project, counts, fileCount }) =>
+    [project, fileCount, counts.Killed, counts.Timeout, counts.Survived, score(counts)]);
   return table(['Project', 'Files', 'Killed', 'Timeout', 'Survived', 'Score'], rows);
 }
 
 // Builds the table of mutants no test caught, capped at maxRows.
 function renderMisses(results) {
-  const misses = results.filter(result => result.finished).flatMap(result => result.misses);
+  const misses = results.flatMap(result => result.misses);
   const heading = [`### Not caught (${misses.length})`, ''];
   if (misses.length === 0) return [...heading, 'None.'];
 
   const rows = misses.slice(0, maxRows).map(miss =>
     [`\`${miss.location}\``, miss.status, `${cell(miss.mutation)}: \`${cell(miss.replacement)}\``]);
-  const overflow = misses.length > maxRows ? ['', `${misses.length - maxRows} more are in the HTML report.`] : [];
-  return [...heading, ...table(['Location', 'Status', 'Mutation'], rows), ...overflow];
+  const lines = [...heading, ...table(['Location', 'Status', 'Mutation'], rows)];
+  if (misses.length <= maxRows) return lines;
+  return [...lines, '', `${misses.length - maxRows} more are in the HTML report.`];
 }
 
 // Builds the markdown summary from every project's results.
@@ -111,13 +101,11 @@ function render(results) {
   return [...title, intro, '', ...renderScores(results), '', ...renderMisses(results)].join('\n');
 }
 
-// Prints the summary for the output folder and scheduled projects given on the command line.
+// Prints the summary for the project reports given on the command line.
 function main() {
-  const [outputDirectory, ...projects] = process.argv.slice(2);
-  if (!outputDirectory) throw new Error('usage: node mutation-summary.cjs <output-dir> [project...]');
-  console.log(render(readResults(outputDirectory, projects)));
+  console.log(render(readResults(process.argv.slice(2))));
 }
 
 if (require.main === module) main();
 
-module.exports = { projectResult, summarizeProject, render };
+module.exports = { summarizeProject, render };

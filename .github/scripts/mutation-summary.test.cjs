@@ -1,7 +1,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
-const { projectResult, summarizeProject, render } = require('./mutation-summary.cjs');
+const { summarizeProject, render } = require('./mutation-summary.cjs');
 
 const root = path.resolve('/repo');
 
@@ -21,24 +21,16 @@ function report() {
 }
 
 test('counts only scored mutants and keeps the survivors with their repo-relative location', () => {
-  const result = summarizeProject('Common', report(), root);
+  const result = summarizeProject(report(), root);
 
-  assert.deepEqual(result.counts, { Killed: 1, Timeout: 1, Survived: 1, NoCoverage: 0 });
+  assert.deepEqual(result.counts, { Killed: 1, Timeout: 1, Survived: 1 });
   assert.equal(result.fileCount, 1);
   assert.deepEqual(result.misses.map(miss => [miss.location, miss.status]), [['source/Common/Foo.cs:5', 'Survived']]);
 });
 
 test('scores caught over scored and lists each survivor with its mutation', () => {
-  const summary = render([summarizeProject('Common', report(), root)]);
+  const summary = render([{ project: 'Common', ...summarizeProject(report(), root) }]);
 
   assert.match(summary, /^\| Common \| 1 \| 1 \| 1 \| 1 \| 66\.7% \|$/m);
   assert.match(summary, /^\| `source\/Common\/Foo\.cs:5` \| Survived \| Equality mutation: `a != b` \|$/m);
-});
-
-test('reports a scheduled project without a report as failed, and says nothing was mutated only when none was scheduled', () => {
-  const summary = render([projectResult('Coop.Core', null)]);
-
-  assert.match(summary, /^\| Coop\.Core \|.*no report, Stryker failed or didn't finish/m);
-  assert.doesNotMatch(summary, /nothing was mutated/);
-  assert.match(render([]), /nothing was mutated/);
 });

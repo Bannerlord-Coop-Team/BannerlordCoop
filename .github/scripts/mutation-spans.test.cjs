@@ -2,6 +2,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { parseChangedLines, mutatePattern, projectPatterns } = require('./mutation-spans.cjs');
 
+// Hunk bodies are mostly left out, because only the file and hunk headers are parsed.
 const diff = [
   'diff --git a/source/Common/A.cs b/source/Common/A.cs',
   'index 1111111..2222222 100644',
@@ -9,7 +10,7 @@ const diff = [
   '+++ b/source/Common/A.cs',
   '@@ -3 +3 @@ class A',
   '-old',
-  '+++ b/not-a-header',
+  '+++ b/not-a-header', // an added line inside a hunk that looks like a file header, not one
   '@@ -5,2 +5,3 @@',
   '@@ -9,2 +11,0 @@',
   'diff --git a/source/Common/Old.cs b/source/Common/Sub/New.cs',
