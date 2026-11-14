@@ -70,24 +70,6 @@ public class ConnectionToken
         return false;
     }
 
-    public override bool Equals(object obj)
-    {
-        if (obj is ConnectionToken == false) return false;
-
-        ConnectionToken token = (ConnectionToken)obj;
-
-        if (token.InstanceId != InstanceId) return false;
-        if (token.ControllerId != ControllerId) return false;
-        if (token.PeerCredential != PeerCredential) return false;
-
-        return true;
-    }
-
-    public override int GetHashCode()
-    {
-        return base.GetHashCode();
-    }
-
     public static implicit operator ConnectionToken(string tokenString)
     {
         string[] data = tokenString.Split('%');

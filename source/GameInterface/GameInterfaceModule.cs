@@ -42,6 +42,7 @@ using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MapEvents.NavalScenarios;
 #endif
 using GameInterface.Services.MapEvents.Participation;
+using GameInterface.Services.MapEvents.PlayerPartyInteractions;
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Commands;
@@ -261,6 +262,13 @@ public class GameInterfaceModule : Module
         builder.RegisterType<MapEventLoadCleaner>().As<IMapEventLoadCleaner>().InstancePerDependency();
         // Shared so the per tick Update patch reads it from the provider cache.
         builder.RegisterType<StalledMapEventResolver>().As<IStalledMapEventResolver>().InstancePerLifetimeScope();
+        // Scoped so the barter patches and the trade handler share one trade and one pending offer per client.
+        builder.RegisterType<PlayerPartyTradeContext>().As<IPlayerPartyTradeContext>().InstancePerLifetimeScope();
+        builder.RegisterType<PlayerPartyTradeSender>().As<IPlayerPartyTradeSender>().InstancePerLifetimeScope();
+        builder.RegisterType<PlayerPartyTradeOverlayInterface>().As<IPlayerPartyTradeOverlayInterface>().InstancePerDependency();
+        builder.RegisterType<PlayerPartyTradeKeyResolver>().As<IPlayerPartyTradeKeyResolver>().InstancePerDependency();
+        builder.RegisterType<PlayerPartyTradeOfferBuilder>().As<IPlayerPartyTradeOfferBuilder>().InstancePerDependency();
+        builder.RegisterType<PlayerPartyTradeOfferResolver>().As<IPlayerPartyTradeOfferResolver>().InstancePerDependency();
         builder.RegisterType<LeaderlessClanResolver>().As<ILeaderlessClanResolver>().InstancePerDependency();
         builder.RegisterType<EmptyLordPartyResetter>().As<IEmptyLordPartyResetter>().InstancePerDependency();
         builder.RegisterType<EncounterMenuConditionRefresher>().As<IEncounterMenuConditionRefresher>().InstancePerDependency();

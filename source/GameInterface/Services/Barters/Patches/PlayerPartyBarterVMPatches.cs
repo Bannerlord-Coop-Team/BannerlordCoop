@@ -19,70 +19,76 @@ internal class PlayerPartyBarterVMPatches
     [HarmonyPatch(MethodType.Constructor, typeof(BarterData))]
     [HarmonyPostfix]
     static void ConstructorPostfix(BarterVM __instance)
-        => PlayerPartyTradeContext.SetBarterVM(__instance);
+    {
+        if (!ContainerProvider.TryResolve<IPlayerPartyTradeContext>(out var trade)) return;
+
+        trade.SetBarterVM(__instance);
+    }
 
     [HarmonyPatch(nameof(BarterVM.InitBarterList))]
     [HarmonyPrefix]
     static void InitBarterListPrefix(BarterVM __instance, BarterData args)
-        => PlayerPartyTradeContext.AddMarriageGroupLists(__instance, args);
+    {
+        if (!ContainerProvider.TryResolve<IPlayerPartyTradeContext>(out var trade)) return;
+
+        trade.AddMarriageGroupLists(__instance, args);
+    }
 
     [HarmonyPatch(nameof(BarterVM.OfferItemAdd))]
     [HarmonyPrefix]
     static bool OfferItemAddPrefix(BarterItemVM barterItemVM)
-        => PlayerPartyTradeContext.CanOffer(barterItemVM?.Barterable);
+    {
+        if (!ContainerProvider.TryResolve<IPlayerPartyTradeContext>(out var trade)) return true;
+
+        return trade.CanOffer(barterItemVM?.Barterable);
+    }
 
     [HarmonyPatch(nameof(BarterVM.OfferItemRemove))]
     [HarmonyPrefix]
     static bool OfferItemRemovePrefix(BarterItemVM barterItemVM)
-        => PlayerPartyTradeContext.CanOffer(barterItemVM?.Barterable);
+    {
+        if (!ContainerProvider.TryResolve<IPlayerPartyTradeContext>(out var trade)) return true;
 
+        return trade.CanOffer(barterItemVM?.Barterable);
+    }
+
+    // Vanilla calls SendOffer after every single item change, so this only marks the offer for the next flush.
     [HarmonyPatch("SendOffer")]
     [HarmonyPostfix]
-    static void SendOfferPostfix(BarterVM __instance)
-        => PlayerPartyTradeContext.PublishOfferChanged(__instance);
+    static void SendOfferPostfix()
+    {
+        if (!ContainerProvider.TryResolve<IPlayerPartyTradeSender>(out var tradeSender)) return;
+
+        tradeSender.MarkChanged();
+    }
 
     // Runs as a prefix on RefreshCompatibility, which runs after every transfer.
     [HarmonyPatch("RefreshCompatibility")]
     [HarmonyPrefix]
     static void RefreshCompatibilityPrefix()
-        => PlayerPartyTradeContext.RefreshBarterControls();
-
-    [HarmonyPatch(nameof(BarterVM.ExecuteOffer))]
-    [HarmonyPrefix]
-    static bool ExecuteOfferPrefix()
     {
-        if (!PlayerPartyTradeContext.IsActive) return true;
-        if (!PlayerPartyTradeContext.CanAccept()) return false;
+        if (!ContainerProvider.TryResolve<IPlayerPartyTradeContext>(out var trade)) return;
 
-        PlayerPartyTradeContext.PublishAccept(true);
-        return false;
-    }
-
-    [HarmonyPatch(nameof(BarterVM.ExecuteCancel))]
-    [HarmonyPrefix]
-    static bool ExecuteCancelPrefix()
-    {
-        if (!PlayerPartyTradeContext.IsActive) return true;
-        if (!PlayerPartyTradeContext.CanCancel()) return false;
-
-        PlayerPartyTradeContext.PublishLeave();
-        return false;
+        trade.RefreshBarterControls();
     }
 
     [HarmonyPatch(nameof(BarterVM.ExecuteReset))]
     [HarmonyPrefix]
     static bool ExecuteResetPrefix()
-        => PlayerPartyTradeContext.CanReset();
+    {
+        if (!ContainerProvider.TryResolve<IPlayerPartyTradeContext>(out var trade)) return true;
 
-    [HarmonyPatch(nameof(BarterVM.ExecuteAutoBalance))]
-    [HarmonyPrefix]
-    static bool ExecuteAutoBalancePrefix()
-        => PlayerPartyTradeContext.CanModifyOffer();
+        return trade.CanReset();
+    }
 
     [HarmonyPatch("TransferItem")]
     [HarmonyPrefix]
     static bool TransferItemPrefix(BarterItemVM item)
-        => PlayerPartyTradeContext.CanOffer(item?.Barterable);
+    {
+        if (!ContainerProvider.TryResolve<IPlayerPartyTradeContext>(out var trade)) return true;
+
+        return trade.CanOffer(item?.Barterable);
+    }
 }
 
 [HarmonyPatch(typeof(DialogButtonsParentWidget))]
@@ -91,7 +97,11 @@ internal class PlayerPartyBarterDialogButtonsPatches
     [HarmonyPatch("set_ResetButton")]
     [HarmonyPostfix]
     static void SetResetButtonPostfix(ButtonWidget value)
-        => PlayerPartyTradeContext.SetResetButton(value);
+    {
+        if (!ContainerProvider.TryResolve<IPlayerPartyTradeContext>(out var trade)) return;
+
+        trade.SetResetButton(value);
+    }
 }
 
 [HarmonyPatch(typeof(PartyHeaderToggleWidget))]
@@ -101,7 +111,8 @@ internal class PlayerPartyBarterHeaderTogglePatches
     [HarmonyPostfix]
     static void UpdateSizePostfix(PartyHeaderToggleWidget __instance)
     {
-        if (!PlayerPartyTradeContext.IsActive) return;
+        if (!ContainerProvider.TryResolve<IPlayerPartyTradeContext>(out var trade)) return;
+        if (!trade.IsActive) return;
         if (__instance?.ListPanel == null) return;
         if (__instance.ListPanel.ChildCount != 0) return;
         if (__instance.ListPanel.Id?.Contains("Diplomatic") != true) return;
@@ -130,7 +141,11 @@ internal class PlayerPartyBarterTransferAllPatches
 
     [HarmonyPrefix]
     static bool ExecuteTransferAllPrefix(BarterVM __instance, MethodBase __originalMethod)
-        => PlayerPartyTradeContext.CanOfferTransferAll(__instance, __originalMethod?.Name);
+    {
+        if (!ContainerProvider.TryResolve<IPlayerPartyTradeContext>(out var trade)) return true;
+
+        return trade.CanOfferTransferAll(__instance, __originalMethod?.Name);
+    }
 }
 
 [HarmonyPatch]
@@ -145,7 +160,11 @@ internal class PlayerPartyBarterItemVMPatches
 
     [HarmonyPrefix]
     static bool ExecuteItemActionPrefix(BarterItemVM __instance)
-        => PlayerPartyTradeContext.CanOffer(__instance?.Barterable);
+    {
+        if (!ContainerProvider.TryResolve<IPlayerPartyTradeContext>(out var trade)) return true;
+
+        return trade.CanOffer(__instance?.Barterable);
+    }
 }
 
 [HarmonyPatch(typeof(BarterItemVM), nameof(BarterItemVM.CurrentOfferedAmount), MethodType.Setter)]
@@ -153,35 +172,53 @@ internal class PlayerPartyBarterItemAmountPatches
 {
     [HarmonyPrefix]
     static bool SetCurrentOfferedAmountPrefix(BarterItemVM __instance, int value)
-        => PlayerPartyTradeContext.CanSetOfferedAmount(
+    {
+        if (!ContainerProvider.TryResolve<IPlayerPartyTradeContext>(out var trade)) return true;
+
+        return trade.CanSetOfferedAmount(
             __instance?.Barterable,
             __instance?.CurrentOfferedAmount ?? 0,
             value);
+    }
 }
 
-[HarmonyPatch(typeof(BarterManager))]
-internal class PlayerPartyBarterManagerPatches
+// Turns accepting a player-party trade, from the barter screen or the barter manager, into a coop accept.
+[HarmonyPatch]
+internal class PlayerPartyBarterAcceptPatches
 {
-    [HarmonyPatch(nameof(BarterManager.ApplyAndFinalizePlayerBarter))]
-    [HarmonyPrefix]
-    static bool ApplyAndFinalizePlayerBarterPrefix()
+    static IEnumerable<MethodBase> TargetMethods()
     {
-        if (!PlayerPartyTradeContext.IsActive) return true;
-        if (!PlayerPartyTradeContext.CanAccept()) return false;
-
-        PlayerPartyTradeContext.PublishAccept(true);
-        return false;
+        yield return AccessTools.Method(typeof(BarterVM), nameof(BarterVM.ExecuteOffer));
+        yield return AccessTools.Method(typeof(BarterManager), nameof(BarterManager.ApplyAndFinalizePlayerBarter));
     }
 
-    [HarmonyPatch(nameof(BarterManager.CancelAndFinalizePlayerBarter))]
     [HarmonyPrefix]
-    static bool CancelAndFinalizePlayerBarterPrefix()
+    static bool AcceptPrefix()
     {
-        if (!PlayerPartyTradeContext.IsActive) return true;
-        if (!PlayerPartyTradeContext.CanCancel()) return false;
+        if (!ContainerProvider.TryResolve<IPlayerPartyTradeSender>(out var tradeSender)) return true;
 
-        PlayerPartyTradeContext.PublishLeave();
-        return false;
+        // A player trade sends the accept to the server, an NPC barter runs vanilla.
+        return !tradeSender.Accept();
+    }
+}
+
+// Turns cancelling a player-party trade, from the barter screen or the barter manager, into leaving the coop trade.
+[HarmonyPatch]
+internal class PlayerPartyBarterCancelPatches
+{
+    static IEnumerable<MethodBase> TargetMethods()
+    {
+        yield return AccessTools.Method(typeof(BarterVM), nameof(BarterVM.ExecuteCancel));
+        yield return AccessTools.Method(typeof(BarterManager), nameof(BarterManager.CancelAndFinalizePlayerBarter));
+    }
+
+    [HarmonyPrefix]
+    static bool CancelPrefix()
+    {
+        if (!ContainerProvider.TryResolve<IPlayerPartyTradeSender>(out var tradeSender)) return true;
+
+        // A player trade leaves through the server, an NPC barter runs vanilla.
+        return !tradeSender.Leave();
     }
 }
 
@@ -191,7 +228,11 @@ internal class PlayerPartyBarterInformationManagerPatches
     [HarmonyPatch(nameof(InformationManager.DisplayMessage))]
     [HarmonyPrefix]
     static bool DisplayMessagePrefix(InformationMessage message)
-        => !PlayerPartyTradeContext.SuppressNativeCloseMessages;
+    {
+        if (!ContainerProvider.TryResolve<IPlayerPartyTradeContext>(out var trade)) return true;
+
+        return !trade.SuppressNativeCloseMessages;
+    }
 }
 
 [HarmonyPatch(typeof(MBInformationManager))]
@@ -206,5 +247,9 @@ internal class PlayerPartyBarterMBInformationManagerPatches
         typeof(string))]
     [HarmonyPrefix]
     static bool AddQuickInformationPrefix(TextObject message)
-        => !PlayerPartyTradeContext.SuppressNativeCloseMessages;
+    {
+        if (!ContainerProvider.TryResolve<IPlayerPartyTradeContext>(out var trade)) return true;
+
+        return !trade.SuppressNativeCloseMessages;
+    }
 }

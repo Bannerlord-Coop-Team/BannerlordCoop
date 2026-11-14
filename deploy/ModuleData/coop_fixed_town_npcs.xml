@@ -714,7 +714,7 @@
     coop_location="tavern"
     coop_spawn_tag="npc_common"
     coop_dialogue="Başka nerde gezicem ki?"
-    coop_enabled="false">
+    coop_enabled="true">
     <face>
       <face_key_template value="BodyProperty.townsman_vlandia" />
     </face>
@@ -803,7 +803,7 @@
     coop_location="prison"
     coop_spawn_tag="npc_common"
     coop_dialogue="What do you think your looking at, pilgrim? Hit the road, Jack!"
-    coop_enabled="false">
+    coop_enabled="true">
     <face>
       <face_key_template value="BodyProperty.townsman_battania" />
     </face>
@@ -1068,6 +1068,34 @@
         <equipment slot="Body" id="Item.aserai_full_scale_armor_on_chain" />
         <equipment slot="Gloves" id="Item.lamellar_plate_gauntlets" />
         <equipment slot="Leg" id="Item.lamellar_plate_boots" />
+      </EquipmentRoster>
+    </Equipments>
+  </NPCCharacter>
+  <NPCCharacter
+    id="coop_fixed_npc_27103307"
+    name="{=!}Tibby the Cupbearer"
+    default_group="Infantry"
+    level="1"
+    is_female="false"
+    is_hero="false"
+    is_template="false"
+    occupation="Townsfolk"
+    culture="Culture.empire"
+    is_hidden_encyclopedia="true"
+    coop_settlement="town_EN1"
+    coop_location="lordshall"
+    coop_spawn_tag="npc_common"
+    coop_dialogue="Greetings! I am Tibby the Cupbearer, son of Tibby the cupbearer. I come from a long line of Cupbearers. If there is a cup that needs borne, my family will answer the call without failure."
+    coop_enabled="true">
+    <face>
+      <face_key_template value="BodyProperty.townsman_empire" />
+    </face>
+    <skills />
+    <Equipments>
+      <EquipmentRoster civilian="true">
+        <equipment slot="Head" id="Item.sturgian_crown" />
+        <equipment slot="Body" id="Item.fine_town_tunic" />
+        <equipment slot="Leg" id="Item.fine_town_boots" />
       </EquipmentRoster>
     </Equipments>
   </NPCCharacter>

@@ -39,6 +39,7 @@ internal class PatchBootstrap : IDisposable
         builder.RegisterType<TestNetwork>().As<INetwork>().SingleInstance();
         builder.RegisterType<NetworkConfig>().As<INetworkConfig>().SingleInstance();
         builder.RegisterType<SerializableTypeMapper>().As<ISerializableTypeMapper>().SingleInstance();
+        builder.RegisterType<ProtoBufSerializer>().As<ICommonSerializer>().SingleInstance();
         builder.RegisterModule<GameInterfaceModule>();
 
         builder.RegisterInstance(TestQuestFeatureFlag.On).As<IQuestFeatureFlag>();
