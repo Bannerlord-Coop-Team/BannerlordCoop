@@ -1,7 +1,6 @@
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
-using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.MobileParties;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
@@ -87,11 +86,11 @@ public class PartyVisibilitySweepTests : IDisposable
             farParty.IsActive = true;
             Campaign.Current.MainParty = mainParty;
 
-            // A joining client loads the server's save, where every party was forced visible.
-            mainParty._isVisible = true;
-            nearParty._isVisible = true;
-            farParty._isVisible = true;
-            if (clearedOnLoad) GameStateInterface.ClearTransferredPartyVisibility(Campaign.Current);
+            // The server's save has every party forced visible; a release client hides them all on load
+            // (TransferredPartyVisibilityPatch).
+            mainParty._isVisible = !clearedOnLoad;
+            nearParty._isVisible = !clearedOnLoad;
+            farParty._isVisible = !clearedOnLoad;
 
             new PartyVisibilitySweep().RebuildAroundMainParty();
 
