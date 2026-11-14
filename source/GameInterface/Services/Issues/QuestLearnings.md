@@ -78,6 +78,10 @@ it once the user agrees:
 
 ## Review learnings
 
+- **Keep quest patches in the quest category.** Every Harmony patch under `Services/Issues` needs `HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)`, and layout tests that enumerate quest patches must use that category instead of `PatchAllUncategorized`. (#3946, #3952, #3797)
+- **Drive branch tests through a real quest.** An `UnstartedQuest` or an attached synthetic quest can return before `TryRunBranch`, so it does not prove server evidence, payment, or the vanilla consequence. Start or accept the real quest path and assert the branch outcome and owner. (#4025, #3952)
+- **Keep client dialog evidence out of server-only state.** Fields set by an owner's dialog or client event are not present on the server mirror. Send explicit evidence or derive the branch from authoritative state inside the owner's server scope, then cover the path with a real client/server test. (#4025)
+
 - **Decision callbacks reject on exception.** Wrap them like `AlternativeSolutionAcceptCoordinator.AcceptOnServer`
   does, or the client keeps waiting. (#3795)
 - **Reading a capture fails cleanly on truncated data.** Check lengths before `BinaryReader.ReadString()`. (#3798)

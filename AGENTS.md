@@ -127,6 +127,8 @@ The game DLLs are the source of truth. **Decompile the real type before assertin
 
 `GameInterface` builds with **Krafs.Publicizer**, so `private`/`internal` game members and nested types compile as public (`Coop.Core` only publicizes `TaleWorlds.Library`). **Bind to them directly instead of using `AccessTools`/`FieldInfo`/`MethodInfo` reflection**, e.g. `alley.State = Alley.AreaState.OccupiedByPlayer;` (private setter). The `<Publicize Include="..." />` list in each `.csproj` says which assemblies are exposed. Reflection over a publicized member gets flagged in review, so decompile for the exact member name and bind to it; keep reflection for unpublicized assemblies or truly dynamic lookups.
 
+Before opening a PR, do one owner self-check against the changed files: compare each Harmony branch with the decompiled vanilla method, keep one owner for each patched method, and search for new reflection, ambient static state, optional service fallbacks, and duplicated guards or listeners. New tests must reach the behavior named by the test through a real request or accept path and assert the resulting state or message, using `Assert.Single`/`Assert.Empty` where duplicates matter. Record an intentional coverage limit in the PR instead of adding a test that stops before the behavior.
+
 ## Code Style & Naming
 
 Read @doc/CodeStyle.md before writing or reviewing code.
