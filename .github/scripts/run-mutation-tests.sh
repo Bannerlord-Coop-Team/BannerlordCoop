@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Runs Stryker.NET on the lines a branch changes in the projects the Linux unit tests cover.
-# Usage: run-mutation-tests.sh [--list] [base-ref] [output-dir]
-#   --list      print the --mutate patterns for the changed lines and exit
+# Usage: run-mutation-tests.sh [--list] [base-ref] [output-dir] [project]
+#   --list      print the projects that have changed lines, one per line, and exit
 #   base-ref    branch or commit to diff against (default origin/development, diffed from the merge base)
 #   output-dir  where each project's report and summary.md go, relative to the repo root
 #               (default artifacts/mutation)
+#   project     mutate only this project, one of the keys of test_projects
 set -euo pipefail
 
 # The mutated projects and the unit test projects that cover each one. Settings shared by all of
@@ -14,6 +15,7 @@ declare -A test_projects=(
   [Coop.Core]="Coop.Tests"
   [GameInterface]="GameInterface.Tests Coop.Tests"
 )
+# Sorted, because bash leaves associative array order unspecified, so runs and summary rows stay stable.
 mapfile -t projects < <(printf '%s\n' "${!test_projects[@]}" | sort)
 
 list_only=false
@@ -26,8 +28,16 @@ repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 scripts="$repo_root/.github/scripts"
 cd "$repo_root"
 base_ref="${1:-origin/development}"
-# Absolute, because Stryker runs from inside each project folder and resolves --output from there.
+# Absolute, like every path handed to Stryker, because Stryker runs from inside each project folder.
 output_directory=$(realpath -m "${2:-artifacts/mutation}")
+
+if [[ -n "${3:-}" ]]; then
+  if [[ -z "${test_projects[$3]:-}" ]]; then
+    echo "Unknown project '$3'. Mutated projects: ${projects[*]}" >&2
+    exit 1
+  fi
+  projects=("$3")
+fi
 
 if ! command -v node >/dev/null; then
   echo "node is required to find the changed lines and write the summary." >&2
@@ -45,10 +55,14 @@ mutate_patterns() {
 mutate_project() {
   local project="$1"
   local patterns="$2"
-  local args=(--config-file ../stryker-config.json --project "$project.csproj" --output "$output_directory/$project")
+  local args=(
+    --config-file "$repo_root/source/stryker-config.json"
+    --project "$project.csproj"
+    --output "$output_directory/$project"
+  )
   local test_project pattern
   for test_project in ${test_projects[$project]}; do
-    args+=(--test-project "../$test_project/$test_project.csproj")
+    args+=(--test-project "$repo_root/source/$test_project/$test_project.csproj")
   done
   while IFS= read -r pattern; do
     args+=(--mutate "$pattern")
@@ -58,26 +72,28 @@ mutate_project() {
   (cd "source/$project" && dotnet stryker "${args[@]}")
 }
 
-if [[ "$list_only" == true ]]; then
-  for project in "${projects[@]}"; do
-    mutate_patterns "$project" | sed "s|^|source/$project/|"
-  done
-  exit 0
-fi
-
-mkdir -p "$output_directory"
-rm -f "$output_directory/summary.md"
-
 scheduled=()
 declare -A project_patterns=()
 for project in "${projects[@]}"; do
-  rm -rf "${output_directory:?}/$project"
   patterns=$(mutate_patterns "$project")
   if [[ -z "$patterns" ]]; then
     continue
   fi
   scheduled+=("$project")
   project_patterns[$project]=$patterns
+done
+
+if [[ "$list_only" == true ]]; then
+  for project in "${scheduled[@]}"; do
+    echo "$project"
+  done
+  exit 0
+fi
+
+mkdir -p "$output_directory"
+rm -f "$output_directory/summary.md"
+for project in "${scheduled[@]}"; do
+  rm -rf "${output_directory:?}/$project"
 done
 
 # Rewrites summary.md from the reports so far, so a failed or cut-off run still has one. It goes

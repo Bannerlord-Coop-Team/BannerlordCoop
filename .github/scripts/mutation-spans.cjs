@@ -12,10 +12,13 @@ const repoRoot = path.resolve(__dirname, '../..');
 function parseChangedLines(diffText) {
   const changed = new Map();
   let lines = null;
+  // Only a `+++ b/` row before a file's first hunk names the file. Inside a hunk the same text is
+  // an added line that starts with `++ b/`.
   let inHeader = false;
   for (const row of diffText.split('\n')) {
     if (row.startsWith('diff --git ')) {
       inHeader = true;
+      lines = null;
       continue;
     }
     if (inHeader && row.startsWith('+++ b/')) {
@@ -25,6 +28,7 @@ function parseChangedLines(diffText) {
     }
     const hunk = /^@@ -\S+ \+(\d+)(?:,(\d+))? @@/.exec(row);
     if (!hunk) continue;
+    if (!lines) throw new Error(`git diff hunk without a "+++ b/" file header: ${row}`);
     inHeader = false;
     const start = Number(hunk[1]);
     const count = hunk[2] === undefined ? 1 : Number(hunk[2]);
@@ -82,13 +86,14 @@ function projectPatterns(projectDirectory, diffText, readText) {
 }
 
 // Prints the patterns for the project, comparing the working tree with the merge base.
-// Rename detection keeps a moved file to its changed lines instead of mutating all of it.
+// Rename detection keeps a moved file to its changed lines instead of mutating all of it, and
+// quotePath=false keeps non-ASCII paths unquoted so their `+++ b/` header still parses.
 function main() {
   const [mergeBase, projectDirectory] = process.argv.slice(2);
   if (!projectDirectory) throw new Error('usage: node mutation-spans.cjs <merge-base> <repo-relative-project-dir>');
   const diffText = execFileSync(
     'git',
-    ['diff', '-U0', '-M', '--diff-filter=AMR', mergeBase, '--', `${projectDirectory}/*.cs`],
+    ['-c', 'core.quotePath=false', 'diff', '-U0', '-M', '--diff-filter=AMR', mergeBase, '--', `${projectDirectory}/*.cs`],
     { cwd: repoRoot, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
   const readText = file => fs.readFileSync(path.join(repoRoot, file), 'utf8');
   for (const pattern of projectPatterns(projectDirectory, diffText, readText)) console.log(pattern);

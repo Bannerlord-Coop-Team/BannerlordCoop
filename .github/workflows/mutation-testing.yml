@@ -2,7 +2,7 @@ name: Mutation Testing
 
 # Report-only: mutates the C# lines a PR changes in the projects run-mutation-tests.sh lists and
 # shows the mutants no unit test catches. It isn't a required check and never fails on the score.
-# The paths filter is broad on purpose, and the scope step narrows it to the mutated projects.
+# The paths filter is broad on purpose, and the scope job narrows it to the mutated projects.
 on:
   pull_request:
     types: [opened, synchronize, reopened]
@@ -18,19 +18,20 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
+env:
+  BASE_SHA: ${{ github.event.pull_request.base.sha }}
+  DOTNET_CLI_TELEMETRY_OPTOUT: 1
+
 jobs:
-  mutation:
-    name: Mutation testing (report only)
+  scope:
+    name: Find projects with changed lines
     runs-on: ubuntu-latest
-    timeout-minutes: 60
-
-    permissions:
-      contents: read
-      packages: read
-
-    env:
-      BASE_SHA: ${{ github.event.pull_request.base.sha }}
-      DOTNET_CLI_TELEMETRY_OPTOUT: 1
+    timeout-minutes: 10
+    outputs:
+      projects: ${{ steps.scope.outputs.projects }}
 
     steps:
       - name: Checkout
@@ -42,19 +43,44 @@ jobs:
       - name: Test the mutation scripts
         run: node --test .github/scripts/mutation-spans.test.cjs .github/scripts/mutation-summary.test.cjs
 
-      - name: Find changed lines
+      - name: Find projects with changed lines
         id: scope
         run: |
-          patterns=$(bash .github/scripts/run-mutation-tests.sh --list "$BASE_SHA")
-          if [ -z "$patterns" ]; then
-            echo "skip=true" >> "$GITHUB_OUTPUT"
+          projects=$(bash .github/scripts/run-mutation-tests.sh --list "$BASE_SHA" | jq --raw-input --slurp --compact-output 'split("\n") | map(select(length > 0))')
+          echo "projects=$projects" >> "$GITHUB_OUTPUT"
+          if [ "$projects" = "[]" ]; then
             echo "Skipped: this PR changes no C# lines in the mutation-tested projects." >> "$GITHUB_STEP_SUMMARY"
-            exit 0
           fi
-          printf '%s\n' "$patterns"
+
+  # One job per project, so each gets its own timeout, summary and report, and a slow project
+  # can't cut off the others.
+  mutation:
+    name: Mutation testing ${{ matrix.project }} (report only)
+    needs: scope
+    if: needs.scope.outputs.projects != '[]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    permissions:
+      contents: read
+      packages: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        project: ${{ fromJSON(needs.scope.outputs.projects) }}
+
+    env:
+      PROJECT: ${{ matrix.project }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
 
       - name: Set up .NET
-        if: steps.scope.outputs.skip != 'true'
         uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5.4.0
         with:
           # 10 runs Stryker and builds, 6 runs the net6.0 test projects.
@@ -65,7 +91,6 @@ jobs:
       # The game assemblies only ship inside the CI image, so copy them out instead of running in it,
       # because the image's .NET 6 SDK can't run Stryker.
       - name: Copy game assemblies from the CI image
-        if: steps.scope.outputs.skip != 'true'
         env:
           IMAGE: ghcr.io/bannerlord-coop-team/bannerlordcoop:latest
           GHCR_USER: ${{ github.actor }}
@@ -78,12 +103,11 @@ jobs:
           echo "BANNERLORD_DIR=$RUNNER_TEMP/mb2" >> "$GITHUB_ENV"
 
       - name: Run Stryker on changed lines
-        if: steps.scope.outputs.skip != 'true'
-        run: bash .github/scripts/run-mutation-tests.sh "$BASE_SHA" artifacts/mutation
+        run: bash .github/scripts/run-mutation-tests.sh "$BASE_SHA" artifacts/mutation "$PROJECT"
 
       - name: Write summary
-        if: ${{ always() && steps.scope.outcome == 'success' && steps.scope.outputs.skip != 'true' }}
-        # The script rewrites summary.md after each project, so a failed run still lists what finished.
+        if: always()
+        # The script writes summary.md before Stryker starts and again when it finishes.
         run: |
           if [ -f artifacts/mutation/summary.md ]; then
             cat artifacts/mutation/summary.md >> "$GITHUB_STEP_SUMMARY"
@@ -92,10 +116,10 @@ jobs:
           fi
 
       - name: Upload mutation report
-        if: ${{ always() && steps.scope.outcome == 'success' && steps.scope.outputs.skip != 'true' }}
+        if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: mutation-report
-          path: artifacts/mutation/*/reports/mutation-report.html
+          name: mutation-report-${{ matrix.project }}
+          path: artifacts/mutation/
           retention-days: 14
           if-no-files-found: warn

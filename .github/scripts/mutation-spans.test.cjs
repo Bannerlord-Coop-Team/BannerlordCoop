@@ -42,10 +42,15 @@ test('counts offsets without the byte order mark, as Stryker reads the source', 
 });
 
 test('gives paths relative to the project folder and no pattern for a file with only deletions', () => {
-  const texts = { 'source/Common/A.cs': 'l1\nl2\nl3\nl4\nl5\nl6\nl7\n', 'source/Common/Sub/New.cs': 'x\ny\nz\n' };
+  const texts = {
+    'source/Common/A.cs': 'l1\nl2\nl3\nl4\nl5\nl6\nl7\n',
+    'source/Common/Sub/New.cs': 'x\ny\nz\n',
+    'source/Common/D.cs': 'a\nb\n',
+  };
   const deletionOnly = 'diff --git a/source/Common/D.cs b/source/Common/D.cs\n+++ b/source/Common/D.cs\n@@ -2,1 +1,0 @@\n';
 
-  const patterns = projectPatterns('source/Common', `${diff}\n${deletionOnly}`, file => texts[file] ?? 'a\nb\n');
+  const patterns = projectPatterns('source/Common', `${diff}\n${deletionOnly}`, file => texts[file]);
 
+  // A.cs: {6..8} is line 3 and {12..20} is lines 5 to 7. New.cs: {4..5} is line 3.
   assert.deepEqual(patterns, ['A.cs{6..8}{12..20}', 'Sub/New.cs{4..5}']);
 });
