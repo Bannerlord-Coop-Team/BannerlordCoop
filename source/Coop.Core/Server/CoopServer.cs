@@ -52,6 +52,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
     // Lazy breaks the construction cycle: the manager depends on ITimeControlInterface, which depends
     // on INetwork (this server). It is only needed each Update, so deferring construction is fine.
     private readonly Lazy<IOverloadedPeerManager> overloadedPeerManager;
+    private readonly IUnresponsiveBattleHostManager unresponsiveBattleHostManager;
 
     // Co-hosted NAT-punch rendezvous for P2P instances (taverns etc.). The server's NetManager
     // already has NatPunchEnabled; the MissionManager answers the introduction requests.
@@ -69,6 +70,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         IControllerIdProvider controllerIdProvider,
         IMissionManager missionManager,
         Lazy<IOverloadedPeerManager> overloadedPeerManager,
+        IUnresponsiveBattleHostManager unresponsiveBattleHostManager,
         ISendCoalescer coalescer,
         IUdpBindDiagnostics bindDiagnostics,
         ICommonSerializer serializer,
@@ -87,6 +89,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         this.peerTerminator = peerTerminator;
         this.missionManager = missionManager;
         this.overloadedPeerManager = overloadedPeerManager;
+        this.unresponsiveBattleHostManager = unresponsiveBattleHostManager;
         this.coalescer = coalescer;
         this.bindDiagnostics = bindDiagnostics;
 
@@ -217,6 +220,8 @@ public class CoopServer : CoopNetworkBase, ICoopServer
     public override void Update(TimeSpan frameTime)
     {
         overloadedPeerManager.Value.CheckForOverloadedPeers();
+        // Before the poll, so a host dropped here is reported as disconnected in this same update.
+        unresponsiveBattleHostManager.DisconnectUnresponsiveHosts();
 
         netManager.PollEvents();
         netManager.NatPunchModule.PollEvents();

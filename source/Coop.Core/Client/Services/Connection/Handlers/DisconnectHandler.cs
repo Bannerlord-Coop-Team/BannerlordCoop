@@ -70,6 +70,9 @@ internal class DisconnectHandler : IHandler
                        "The server stopped this join to keep the campaign responsive. Please try again.";
             case "ServerRestarting":
                 return "The server is restarting. Try again in a few minutes.";
+            case "BattleHostUnresponsive":
+                return "The server lost contact with you while you were hosting a battle, so another player took it over.\n" +
+                       "Rejoin the campaign to continue.";
         }
 
         return reason == DisconnectReason.Timeout

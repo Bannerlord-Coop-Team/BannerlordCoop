@@ -301,6 +301,7 @@ public class ServerJoinAdmissionTests
         Mock.Of<IControllerIdProvider>(),
         Mock.Of<IMissionManager>(),
         new Lazy<IOverloadedPeerManager>(() => Mock.Of<IOverloadedPeerManager>()),
+        Mock.Of<IUnresponsiveBattleHostManager>(),
         Mock.Of<ISendCoalescer>(),
         new UdpBindDiagnostics(),
         Mock.Of<ICommonSerializer>(),

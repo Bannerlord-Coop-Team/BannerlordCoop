@@ -386,6 +386,16 @@ Co-op runs vanilla's timer on the captor's view and lets the hull's current auth
   path above; no client code tells a naval drop apart. The server's own `MissionMemberDeparted` still says it was no
   retreat, and it withdraws the party's reserve (`WithdrawPartyReserves`), so the host never gets it. A disconnected
   host's AI hulls move to its successor with the migration; its own hull leaves.
+- **Crashed host:** every link waits 60 s before it calls a silent peer gone (`NetworkConfig.DisconnectTimeout`, the mesh
+  and the Steam tunnel alike), and nobody simulates the AI meanwhile. So the server drops a battle host it hasn't heard
+  from for 15 s (`BattleHostDisconnectTimeout`, `UnresponsiveBattleHostManager`, checked every server update from
+  LiteNetLib's `TimeSinceLastPacket`), if a successor is waiting. That is an ordinary disconnect, so the departure and
+  promotion above follow (`Disconnecting battle host ... nothing heard for` in the server log). LiteNetLib pings every
+  second off the game thread, so a loading screen or a frame hitch never counts as silence; a frozen process or a route
+  stall does. Every other peer keeps the 60 s, and the check reads only the host registry, so it covers land battle
+  hosts the same way. Cost: a live host whose route stalled 15 s is dropped from the campaign, not just the battle, and
+  comes back as a late joiner (D4). The mesh links drop on their own timeout and change nothing (`NavalDepartureScenarioTests`
+  `CrashedHost_...`, either order).
 - **Reconnect:** a late join. The returning player lands in the encounter menu and re-enters through Attack (BR-054); its
   launcher fields fresh hulls from a fresh, casualty-reduced reserve, announced like any late joiner's. Nothing of its old
   hulls comes back.
@@ -621,7 +631,8 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   deleted: hand-back could not work live (the returner's reserve is empty after an absence and vanilla assigns no ship
   to a team with no troops) and was never exercised live. Cost: a side whose only hull belonged to the disconnected
   player can lose the battle while the player is away. This differs from land, where the host adopts a disconnected
-  player's troops and hands them back (BR-031, BR-033).
+  player's troops and hands them back (BR-031, BR-033). A battle host is called disconnected after 15 s of silence
+  instead of 60 s (Crashed host in section 2), so a host whose connection stalls that long also leaves the campaign.
 - **D3, contact model (decided 2026-10-20): option B, steered copies.** A copy keeps its dynamic body and is steered
   toward the owner's samples, so hulls of different owners touch. R41b measured steered copies at 0.16 to 0.26 m mean
   drift with contact damage routed to the owner and identical HP on both clients; option C (static collider) could not
