@@ -189,6 +189,8 @@ public class NavalDepartureScenarioTests : NavalBattleTestEnvironment
     [InlineData(false)]
     public void CrashedHost_ItsSuccessorKeepsTheEnemyFleetAndItsCrew_AndTheBattleGoesOn(bool meshDropsFirst)
     {
+        // More than the out-of-action limit of 3, so a kept crew keeps the pirate hull in action.
+        const int PirateCrewSize = 5;
         using var battle = StartServerBattle(atSea: true, out var concluded, "A", "B", "C");
         var (a, b, c) = (battle["A"], battle["B"], battle["C"]);
         var survivors = new[] { b, c };
@@ -197,7 +199,10 @@ public class NavalDepartureScenarioTests : NavalBattleTestEnvironment
         battle.FieldPlayerHull(c, new Vec3(80f, 0f, 0f));
         var pirate = battle.FieldAiHull(a, BattleSideEnum.Defender, new Vec3(0f, 300f, 0f));
         var crewA = RegisterPartyTroopEverywhere(battle, Guid.NewGuid(), "A");
-        var pirateCrew = Enumerable.Range(0, 5).Select(_ => RegisterEverywhere(battle, Guid.NewGuid(), "A", peer => peer.Mission.DefenderTeam)).ToArray();
+        var pirateCrew = Enumerable.Range(0, PirateCrewSize)
+            .Select(_ => RegisterEverywhere(battle, Guid.NewGuid(), "A",
+                peer => peer.Mission.DefenderTeam))
+            .ToArray();
         battle.CommitAll();
         battle.TickAll(2);
         foreach (var peer in battle.Peers)

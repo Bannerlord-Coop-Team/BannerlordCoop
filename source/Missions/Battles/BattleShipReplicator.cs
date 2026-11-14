@@ -539,9 +539,6 @@ public class BattleShipReplicator : IBattleShipReplicator
         }
     }
 
-    /// <summary>[Game thread] Removes every hull a player who left the battle owned, and drops its records still waiting here.</summary>
-    internal void RemoveHullsOf(string controllerId) => RemoveHullsOf(controllerId, DepartingHullsOf(controllerId));
-
     /// <summary>[Game thread] Removes the <paramref name="departing"/> hulls of a player who left, and drops its records still waiting here.</summary>
     private void RemoveHullsOf(string controllerId, IReadOnlyList<NetworkShipInfo> departing)
     {

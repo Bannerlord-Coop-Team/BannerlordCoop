@@ -123,6 +123,8 @@ public class ServerModule : CommonModule
         // as a CoopServer dependency, so it registers its unpause policy when the server is built.
         builder.RegisterType<PeerTerminator>().As<IPeerTerminator>().InstancePerDependency();
         builder.RegisterType<OverloadedPeerManager>().As<IOverloadedPeerManager>().InstancePerLifetimeScope().AutoActivate();
+
+        // Drops a silent battle host with a successor waiting; CoopServer runs it each Update.
         builder.RegisterType<UnresponsiveBattleHostManager>().As<IUnresponsiveBattleHostManager>().InstancePerDependency();
 
         // DEBUG builds, including MCP live-test runs, keep their heartbeats and battle counts off the production statistics.

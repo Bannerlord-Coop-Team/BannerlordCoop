@@ -653,7 +653,7 @@ public class BattleShipReplicatorTests
 
     // M8a: a player who left takes its hulls and its records still waiting here; AI hulls it held move with the host instead.
     [Fact]
-    public void RemoveHullsOf_RemovesTheDepartedPlayersHullsAndWaitingRecords_AndKeepsTheAiHullsItHeld()
+    public void MissionPeerLeft_RemovesTheDepartedPlayersHullsAndWaitingRecords_AndKeepsTheAiHullsItHeld()
     {
         using var mission = new MissionCurrentScope();
         var harness = new Harness(committed: false);
@@ -666,7 +666,7 @@ public class BattleShipReplicatorTests
         harness.Replicator.AcceptSpawnRecords(new[] { waiting });
         bool waitingBefore = harness.HeldShips.IsAwaitingRecord(waiting.ShipId);
 
-        harness.Replicator.RemoveHullsOf(Peer);
+        harness.PublishAndDrain(new MissionPeerLeft(Peer, Instance));
         deploying = false;
         harness.Replicator.Tick(0.1f);
         harness.Replicator.Tick(0.1f);
@@ -683,7 +683,7 @@ public class BattleShipReplicatorTests
 
     // C4 while deploying: a record held here leaves with its owner, but a captor's record of that hull still spawns it.
     [Fact]
-    public void RemoveHullsOf_AHeldRecordOfTheDepartedPlayer_SpawnsAgainFromTheCaptorsRecord()
+    public void MissionPeerLeft_AHeldRecordOfTheDepartedPlayer_SpawnsAgainFromTheCaptorsRecord()
     {
         using var mission = new MissionCurrentScope();
         var harness = new Harness(committed: false);
@@ -697,7 +697,7 @@ public class BattleShipReplicatorTests
             100f, 50f, 1, "", captorControllerId: "captor", captureSequence: 1);
         harness.Replicator.AcceptSpawnRecords(new[] { victims });
 
-        harness.Replicator.RemoveHullsOf(Peer);
+        harness.PublishAndDrain(new MissionPeerLeft(Peer, Instance));
         harness.Replicator.AcceptSpawnRecords(new[] { captors });
         deploying = false;
         harness.Replicator.Tick(0.1f);
@@ -712,7 +712,7 @@ public class BattleShipReplicatorTests
     // An AI hull follows the battle host, so its record still waiting here when the host departs is kept and spawns under the
     // next host.
     [Fact]
-    public void RemoveHullsOf_KeepsAWaitingAiRecordOfTheDepartingHost_AndSpawnsItUnderTheNextHost()
+    public void MissionPeerLeft_KeepsAWaitingAiRecordOfTheDepartingHost_AndSpawnsItUnderTheNextHost()
     {
         using var mission = new MissionCurrentScope();
         var harness = new Harness(committed: true);
@@ -724,7 +724,7 @@ public class BattleShipReplicatorTests
             100f, 50f, 1, "", originalOwnerControllerId: "first_host");
         harness.Replicator.AcceptSpawnRecords(new[] { aiRecord });
 
-        harness.Replicator.RemoveHullsOf(Peer);
+        harness.PublishAndDrain(new MissionPeerLeft(Peer, Instance));
         harness.Members.Remove(Peer);
         harness.PublishAndDrain(new BattleHostMigrated(Instance, Peer, Own, harness.SessionEpoch));
         deploying = false;
