@@ -2,19 +2,16 @@
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.MapEvents;
-using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyBases.Extensions;
 using GameInterface.Services.Players;
-using GameInterface.Services.Players.Data;
 using GameInterface.Services.Ships;
 using GameInterface.Services.Ships.Data;
 using LiteNetLib;
 using Missions.Messages;
 using Serilog;
 using System;
-using System.Linq;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
@@ -30,7 +27,7 @@ public class ServerBattleShipFateHandler : IHandler
     private static readonly ILogger Logger = LogManager.GetLogger<ServerBattleShipFateHandler>();
 
     private readonly IMessageBroker messageBroker;
-    private readonly IMissionManager missionManager;
+    private readonly INavalBattleMemberResolver memberResolver;
     private readonly IObjectManager objectManager;
     private readonly IPlayerManager playerManager;
     private readonly IBattleHostRegistry hostRegistry;
@@ -40,7 +37,7 @@ public class ServerBattleShipFateHandler : IHandler
     // Takes the services that resolve the sender and battle, the ledger that holds the fates and the applier that writes them.
     public ServerBattleShipFateHandler(
         IMessageBroker messageBroker,
-        IMissionManager missionManager,
+        INavalBattleMemberResolver memberResolver,
         IObjectManager objectManager,
         IPlayerManager playerManager,
         IBattleHostRegistry hostRegistry,
@@ -48,7 +45,7 @@ public class ServerBattleShipFateHandler : IHandler
         IBattleShipFateApplier applier)
     {
         this.messageBroker = messageBroker;
-        this.missionManager = missionManager;
+        this.memberResolver = memberResolver;
         this.objectManager = objectManager;
         this.playerManager = playerManager;
         this.hostRegistry = hostRegistry;
@@ -90,38 +87,13 @@ public class ServerBattleShipFateHandler : IHandler
     // [Game thread] Holds each fate of a ship the sender may report for, while the battle is open and the sender is in it.
     private void Record(string controllerId, NetworkBattleShipFates message)
     {
-        if (!TryGetOpenBattle(controllerId, message.InstanceId, "ship fates", out var player, out var mapEvent)) return;
+        if (!memberResolver.TryResolve(controllerId, message.InstanceId, "ship fates", out var player, out var mapEvent)) return;
 
         objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var senderParty);
         bool isHostAtEpoch = hostRegistry.TryGet(message.InstanceId, out var assignment)
             && assignment.HostControllerId == controllerId && assignment.Epoch == message.HostEpoch;
         foreach (var fate in message.Fates ?? Array.Empty<BattleShipFate>())
             RecordFate(message, mapEvent, controllerId, senderParty?.Party, isHostAtEpoch, fate);
-    }
-
-    // The sender as a registered player in an open naval battle it is a member of; logs why the message is dropped otherwise.
-    private bool TryGetOpenBattle(string controllerId, string instanceId, string what, out Player player, out MapEvent mapEvent)
-    {
-        mapEvent = null;
-        if (!playerManager.TryGetPlayer(controllerId, out player))
-        {
-            Logger.Warning("[NavalSync] Dropped {What} from {Controller}: it is no registered player", what, controllerId);
-            return false;
-        }
-
-        if (!missionManager.TryGetControllers(instanceId, out var members) || !members.Contains(controllerId))
-        {
-            Logger.Information("[NavalSync] Dropped {What} from {Controller}: it is not in battle {Instance}", what, controllerId,
-                instanceId);
-            return false;
-        }
-
-        if (!objectManager.TryGetObjectWithLogging(instanceId, out mapEvent)) return false;
-        if (mapEvent.IsNavalMapEvent && !mapEvent.IsFinalized && !mapEvent.HasCalculatedResults()) return true;
-
-        Logger.Information("[NavalSync] Dropped {What} from {Controller}: battle {Instance} is not at sea or already has its results",
-            what, controllerId, instanceId);
-        return false;
     }
 
     // Holds one fate when the sender may report its ship: the ship's captor once one captured it, otherwise its own party's,
@@ -195,7 +167,7 @@ public class ServerBattleShipFateHandler : IHandler
     // party may have left the battle already (a PvP victim that disconnected right after confirming), so it isn't required in it.
     private void RecordCapture(string controllerId, NetworkBattleShipCaptured message)
     {
-        if (!TryGetOpenBattle(controllerId, message.InstanceId, "a ship capture", out var player, out _)) return;
+        if (!memberResolver.TryResolve(controllerId, message.InstanceId, "a ship capture", out var player, out _)) return;
         if (!objectManager.TryGetObjectWithLogging<Ship>(message.CampaignShipId, out var ship)) return;
 
         var owner = ship.Owner;

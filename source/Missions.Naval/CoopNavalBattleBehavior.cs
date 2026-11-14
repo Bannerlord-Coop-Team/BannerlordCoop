@@ -10,6 +10,7 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Naval;
@@ -37,7 +38,8 @@ public class CoopNavalBattleBehavior : MissionLogic
     private bool retreated;
 
     // Takes one failure log per tick kind, so a flood on one of them can't hide the first lines of the other.
-    public CoopNavalBattleBehavior(INavalBattleServices services, INavalSteeredCopies steeredCopies, INavalNpcFleetSpawner npcFleetSpawner,
+    public CoopNavalBattleBehavior(INavalBattleServices services, INavalSteeredCopies steeredCopies,
+        IReadOnlyDictionary<BattleSideEnum, INavalNpcFleetSpawner> npcFleetSpawners,
         NavalShipsLogic shipsLogic, INavalTickFailureLog fixedTickFailures, INavalTickFailureLog missionTickFailures,
         INavalLateHullDeployment lateHullDeployment, INavalBallistaTargets ballistaTargets, INavalMissionTracker missionTracker,
         INavalForeignHullRegistry foreignHulls, INavalRopeRegistry ropes, INavalShipDamageGate damageGate,
@@ -45,7 +47,7 @@ public class CoopNavalBattleBehavior : MissionLogic
     {
         Services = services;
         this.steeredCopies = steeredCopies;
-        NpcFleetSpawner = npcFleetSpawner;
+        NpcFleetSpawners = npcFleetSpawners;
         this.shipsLogic = shipsLogic;
         this.fixedTickFailures = fixedTickFailures;
         this.missionTickFailures = missionTickFailures;
@@ -69,8 +71,8 @@ public class CoopNavalBattleBehavior : MissionLogic
     /// <summary>The battle's naval services, which the debug commands read.</summary>
     public INavalBattleServices Services { get; }
 
-    /// <summary>Fields the AI fleet on the battle host; kept apart from the services because it binds NavalDLC types.</summary>
-    public INavalNpcFleetSpawner NpcFleetSpawner { get; }
+    /// <summary>Fields each AI side's fleet on the battle host; kept apart from the services because they bind NavalDLC types.</summary>
+    public IReadOnlyDictionary<BattleSideEnum, INavalNpcFleetSpawner> NpcFleetSpawners { get; }
 
     // Ticks the naval side of the battle. A throw is logged throttled, so the later behaviours and vanilla's naval logic still
     // tick this frame instead of the whole mission stalling on one broken step.
@@ -92,13 +94,14 @@ public class CoopNavalBattleBehavior : MissionLogic
 #endif
     }
 
-    // Snaps the copies, then ticks the services, the AI fleet and the tactic refresh, in that order.
+    // Snaps the copies, then ticks the services, the AI fleets and the tactic refresh, in that order.
     private void TickNaval(float dt)
     {
         // A snap teleports the hull and the agents on it, so it runs here rather than inside the fixed physics step.
         steeredCopies.ApplySnaps();
         Services.Tick(dt);
-        NpcFleetSpawner.Tick();
+        foreach (var npcFleet in NpcFleetSpawners.Values)
+            npcFleet.Tick();
         // After the services and the fleet, whose arrivals and fielding spawn the hulls this checks.
         lateHullDeployment.Apply(shipsLogic.AllShips);
     }
@@ -228,7 +231,8 @@ public class CoopNavalBattleBehavior : MissionLogic
             Logger.Error(exception, "[NavalSync] Disposing the naval services threw; the naval state is reset anyway");
         }
 
-        NpcFleetSpawner.Dispose();
+        foreach (var npcFleet in NpcFleetSpawners.Values)
+            npcFleet.Dispose();
 
         ropes.Clear();
 #if DEBUG

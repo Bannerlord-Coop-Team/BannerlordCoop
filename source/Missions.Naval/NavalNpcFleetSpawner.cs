@@ -1,30 +1,22 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
-using GameInterface.Services.MapEvents.TroopSupply;
-using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Players;
+using Common.Network;
+#if DEBUG
+using GameInterface.Services.MapEvents.NavalScenarios;
+#endif
 using Missions.Battles;
 using Missions.Messages;
-using NavalDLC;
-using NavalDLC.Missions.Deployment;
-using NavalDLC.Missions.MissionLogics;
 using Serilog;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using TaleWorlds.CampaignSystem.MapEvents;
-using TaleWorlds.CampaignSystem.Naval;
-using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
-using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Naval;
 
 /// <summary>
-/// [Game thread] Fields the AI (NPC) enemy fleet late, once per battle and on the battle host only, because the NPC reserve
-/// reaches the elected host after the mission loaded. Every client keeps the attempt's outcome.
+/// [Game thread] Runs one side's AI (NPC) fleet attempt once, on the battle host through the fielder, late because the NPC reserve
+/// reaches the elected host after the mission loaded; every client keeps the attempt's outcome for that side.
 /// </summary>
 public interface INavalNpcFleetSpawner : IDisposable
 {
@@ -35,8 +27,11 @@ public interface INavalNpcFleetSpawner : IDisposable
     string FailNextSpawn(NavalFleetFailStage stage = NavalFleetFailStage.BeforeSpawn);
 #endif
 
-    /// <summary>The side whose fleet this spawner tried to field and could not, otherwise <see cref="BattleSideEnum.None"/>.</summary>
-    BattleSideEnum FailedSide { get; }
+    /// <summary>The battle side whose AI parties this spawner fields.</summary>
+    BattleSideEnum Side { get; }
+
+    /// <summary>Whether the side's fleet was attempted, here or by an earlier host, and could not be fielded.</summary>
+    bool AttemptFailed { get; }
 
     /// <summary>Spawner state (diagnostics).</summary>
     object Inspect();
@@ -57,13 +52,13 @@ public enum NavalFleetFailStage
 }
 #endif
 
-/// <summary>Runs vanilla's late ship assignment, side plan, spawn and team crewing for the AI fleet, and latches the attempt.</summary>
+/// <summary>
+/// Runs one side's AI fleet attempt protocol: decides when the attempt may run, latches its outcome, tells the peers and late
+/// entrants, and takes back a failed attempt; the fielding itself is the fielder's.
+/// </summary>
 public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
 {
     private static readonly ILogger Logger = LogManager.GetLogger<NavalNpcFleetSpawner>();
-
-    // AssignShipsToFormations (DefaultNavalMissionLogic) uses the first eight formations.
-    private const int MaxShipFormations = 8;
 
     internal const string WaitingForHost = "waiting_for_host";
     internal const string WaitingForDeployment = "waiting_for_deployment";
@@ -74,78 +69,65 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
     internal const string TakingBack = "taking_back";
 
     private readonly IBattleNetwork network;
+    private readonly INetwork relayNetwork;
     private readonly IMessageBroker messageBroker;
     private readonly IBattleSession session;
-    private readonly IBattleShipReplicator shipReplicator;
-    private readonly ICoopShipSnapshotBuilder snapshotBuilder;
-    private readonly IObjectManager objectManager;
-    private readonly IPlayerManager playerManager;
-    private readonly INavalLateDeploymentPlanTracker latePlans;
+    private readonly INavalNpcFleetFielder fielder;
     private readonly INavalNpcFleetRollback rollback;
-    private readonly BattleSideEnum enemySide;
 
-    // The battle's one attempt, made here or by an earlier host; once set, this client never fields the fleet.
+    // The side's one attempt, made here or by an earlier host; once set, this client never fields the fleet.
     private NetworkNpcFleetAttempted attempt;
-    private bool attemptedHere;
 #if DEBUG
     private NavalFleetFailStage? failNextSpawn;
-    private readonly Func<bool> scenarioFailsSpawn;
+    private readonly INavalScenarioState scenarioState;
+
+    // Read at the eligible attempt, since the scenario can arrive after the mission opens or the host is elected.
+    private bool ScenarioFailsSpawn() =>
+        scenarioState.Current is { FailNpcFleet: true } scenario && scenario.MapEventId == session.InstanceId;
 
     // The battle host owns AI fielding, so this debug mutation runs there rather than on the campaign server.
     public string FailNextSpawn(NavalFleetFailStage stage = NavalFleetFailStage.BeforeSpawn)
     {
         if (!session.IsLocalHost) return "Run fleet_fail on the battle host client.";
-        if (HasAttempt) return "The AI fleet was already attempted in this battle.";
+        if (HasAttempt) return $"The {Side} AI fleet was already attempted in this battle.";
         failNextSpawn = stage;
         return null;
     }
-
-    // Throws the armed failure once the attempt reaches its stage, through the attempt's normal failure path.
-    private void ThrowIfArmed(NavalFleetFailStage stage)
-    {
-        if (failNextSpawn != stage) return;
-
-        failNextSpawn = null;
-        throw new InvalidOperationException($"DEBUG fleet_fail: forced AI fleet spawn failure ({stage})");
-    }
 #endif
     private string state = WaitingForHost;
-    private int hullsSpawned;
     private int hullsRetracted;
+    // The attempt made here, with what it did; null until this client attempts.
+    private NavalNpcFleetAttemptWork lastAttempt;
     // A failed attempt whose take-back threw; it is retried every tick and the attempt settles only once it went through.
-    private NavalNpcFleetAttemptWork unfinishedTakeBack;
+    private bool takeBackPending;
     private int takeBackFailures;
-    private int troopsFielded;
     private string failure;
 
+    // Takes the battle's mesh, the server relay, the session and ship replicator, the side it fields, and builds that battle's
+    // fielder and take-back.
     public NavalNpcFleetSpawner(
         IBattleNetwork network,
+        INetwork relayNetwork,
         IMessageBroker messageBroker,
         IBattleSession session,
         IBattleShipReplicator shipReplicator,
-        ICoopShipSnapshotBuilder snapshotBuilder,
-        IObjectManager objectManager,
-        IPlayerManager playerManager,
-        INavalLateDeploymentPlanTracker latePlans,
-        INavalNpcFleetRollback rollback,
-        BattleSideEnum enemySide
+        BattleSideEnum side,
+        Func<IBattleSession, IBattleShipReplicator, INavalNpcFleetFielder> fielders,
+        Func<IBattleShipReplicator, INavalNpcFleetRollback> rollbacks
 #if DEBUG
-        , Func<bool> scenarioFailsSpawn = null
+        , INavalScenarioState scenarioState
 #endif
         )
     {
         this.network = network;
+        this.relayNetwork = relayNetwork;
         this.messageBroker = messageBroker;
         this.session = session;
-        this.shipReplicator = shipReplicator;
-        this.snapshotBuilder = snapshotBuilder;
-        this.objectManager = objectManager;
-        this.playerManager = playerManager;
-        this.latePlans = latePlans;
-        this.rollback = rollback;
-        this.enemySide = enemySide;
+        Side = side;
+        fielder = fielders(session, shipReplicator);
+        rollback = rollbacks(shipReplicator);
 #if DEBUG
-        this.scenarioFailsSpawn = scenarioFailsSpawn;
+        this.scenarioState = scenarioState;
 #endif
 
         messageBroker.Subscribe<NetworkNpcFleetAttempted>(Handle_NetworkNpcFleetAttempted);
@@ -169,77 +151,87 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
         return Ready;
     }
 
-    /// <summary>Vanilla's ship count: the deployment limit, the ships, the crew and the ship formations.</summary>
-    internal static int ShipCount(int deploymentLimit, int ships, int troops, int freeFormations) =>
-        Math.Max(0, Math.Min(Math.Min(deploymentLimit, ships), Math.Min(troops, Math.Min(freeFormations, MaxShipFormations))));
-
     // Fields the fleet on the first tick Decide allows, then latches the attempt and sends it to the peers; a failed attempt's
     // unfinished take-back is retried first.
     public void Tick()
     {
-        if (unfinishedTakeBack != null)
+        if (takeBackPending)
         {
-            FinishFailedAttempt(unfinishedTakeBack);
+            FinishFailedAttempt();
             return;
         }
 
         var mission = Mission.Current;
         if (HasAttempt || mission == null) return;
 
-        var supplier = EnemySupplier();
-        var parties = NpcParties(supplier);
-        state = Decide(session.IsLocalHost, mission.IsDeploymentFinished, supplier?.IsPopulated == true, parties.Count);
+        var reserve = fielder.ReadReserve(Side);
+        state = Decide(session.IsLocalHost, mission.IsDeploymentFinished, reserve.IsPopulated, reserve.NpcParties);
         if (state != Ready) return;
 
-        AttemptFleet(work => SpawnFleet(mission, supplier, parties, work));
+        AttemptFleet(mission, reserve);
     }
 
-    // Makes the single eligible spawn attempt, including a DEBUG-injected failure, and settles it; a failed attempt is taken
-    // back first, so peers drop its hulls before they hear it failed.
-    internal void AttemptFleet(Action<NavalNpcFleetAttemptWork> spawn)
+    // Makes the side's single eligible spawn attempt through the fielder, including a DEBUG-injected failure, and settles it; a
+    // failed attempt is taken back first, so peers drop its hulls before they hear it failed.
+    internal void AttemptFleet(Mission mission, NavalNpcReserve reserve)
     {
-        if (HasAttempt || unfinishedTakeBack != null) return;
+        if (HasAttempt || lastAttempt != null) return;
 
-        // One attempt per battle: it consumes reserve troops, so a failure is reported once instead of retried every tick.
-        var work = new NavalNpcFleetAttemptWork();
+        // One attempt per side: it consumes reserve troops, so a failure is reported once instead of retried every tick.
+        lastAttempt = new NavalNpcFleetAttemptWork();
         try
         {
 #if DEBUG
-            if (scenarioFailsSpawn?.Invoke() == true) failNextSpawn = NavalFleetFailStage.BeforeSpawn;
-            ThrowIfArmed(NavalFleetFailStage.BeforeSpawn);
+            lastAttempt.ArmedFailure = ScenarioFailsSpawn() ? NavalFleetFailStage.BeforeSpawn : failNextSpawn;
+            failNextSpawn = null;
+            lastAttempt.ThrowIfArmed(NavalFleetFailStage.BeforeSpawn);
 #endif
-            spawn(work);
+            failure = fielder.Field(mission, Side, reserve, lastAttempt);
         }
         catch (Exception exception)
         {
             failure = exception.GetType().Name + ": " + exception.Message;
-            Logger.Error(exception, "[NavalBattle] Could not field the AI fleet of {MapEventId}", session.InstanceId);
+            Logger.Error(exception, "[NavalBattle] Could not field the {Side} AI fleet of {MapEventId}", Side, session.InstanceId);
         }
 
-        attemptedHere = true;
-        hullsSpawned = work.Hulls.Count;
-        if (Outcome(hullsSpawned, failure) == Failed)
+        if (Outcome(lastAttempt.Hulls.Count, failure) == Failed)
         {
-            FinishFailedAttempt(work);
+            FinishFailedAttempt();
             return;
         }
 
-        Publish(new NetworkNpcFleetAttempted(enemySide, failed: false));
+        Publish(failed: false);
     }
 
-    // Takes back a failed attempt and then settles it as failed; a take-back that throws keeps the work for the next tick.
-    private void FinishFailedAttempt(NavalNpcFleetAttemptWork work)
+    // Takes back the failed attempt and then settles it as failed; a take-back that throws is retried on the next tick.
+    private void FinishFailedAttempt()
     {
-        if (!TryTakeBack(work))
+        takeBackPending = !TryTakeBack(lastAttempt);
+        if (takeBackPending)
         {
-            unfinishedTakeBack = work;
             state = TakingBack;
             return;
         }
 
-        unfinishedTakeBack = null;
-        hullsRetracted = work.Hulls.Count;
-        if (!HasAttempt) Publish(new NetworkNpcFleetAttempted(enemySide, failed: true));
+        hullsRetracted = lastAttempt.Hulls.Count;
+        if (HasAttempt) return;
+
+        LogNotFielded();
+        Publish(failed: true);
+    }
+
+    // Players taking all of the side's ships is a normal outcome, so only a real failure is a warning.
+    private void LogNotFielded()
+    {
+        if (failure == NavalNpcFleetFielder.NoShipsLeft)
+        {
+            Logger.Information("[NavalBattle] The {Side} side of {MapEventId} fields no AI fleet: {Reason}", Side, session.InstanceId,
+                failure);
+            return;
+        }
+
+        Logger.Warning("[NavalBattle] The {Side} AI fleet of {MapEventId} was not fielded ({Failure}); {Hulls} hull(s) taken back",
+            Side, session.InstanceId, failure, hullsRetracted);
     }
 
     // The first throw is logged with its exception and a later recovery with the tries it took, so a stuck take-back logs once.
@@ -253,28 +245,34 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
         {
             if (++takeBackFailures == 1)
                 Logger.Error(exception,
-                    "[NavalBattle] Could not take back the failed AI fleet attempt of {MapEventId} ({Hulls} hull(s)); retrying every tick",
-                    session.InstanceId, work.Hulls.Count);
+                    "[NavalBattle] Could not take back the failed {Side} AI fleet attempt of {MapEventId} ({Hulls} hull(s)); retrying every tick",
+                    Side, session.InstanceId, work.Hulls.Count);
             return false;
         }
 
         if (takeBackFailures > 0)
-            Logger.Information("[NavalBattle] Took back the failed AI fleet attempt of {MapEventId} after {Tries} tries",
-                session.InstanceId, takeBackFailures + 1);
+            Logger.Information("[NavalBattle] Took back the failed {Side} AI fleet attempt of {MapEventId} after {Tries} tries",
+                Side, session.InstanceId, takeBackFailures + 1);
         return true;
     }
 
-    // Latches this host's attempt and tells the peers.
-    private void Publish(NetworkNpcFleetAttempted attempted)
+    // Latches this host's attempt, with the hulls it left and the players its share counted, and tells the peers and the server,
+    // which records it for a later joiner's cap.
+    private void Publish(bool failed)
     {
+        // A failed attempt took its hulls back.
+        int aiHulls = failed ? 0 : lastAttempt.Hulls.Count;
+        var players = lastAttempt.Players;
+        var attempted = new NetworkNpcFleetAttempted(session.InstanceId, Side, failed, aiHulls, players.Hulls, players.PartyIds);
         Settle(attempted);
-        network.SendAll(attempt);
+        network.SendAll(attempted);
+        relayNetwork.SendAll(attempted);
     }
 
-    /// <summary>Whether the battle's attempt was made, here or by an earlier host.</summary>
+    /// <summary>Whether the side's attempt was made, here or by an earlier host.</summary>
     internal bool HasAttempt => attempt != null;
 
-    // Latches the battle's attempt; its outcome is the spawner's state from then on.
+    // Latches the side's attempt; its outcome is the spawner's state from then on.
     private void Settle(NetworkNpcFleetAttempted attempted)
     {
         attempt = attempted;
@@ -288,10 +286,11 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
         GameThread.RunSafe(() => AcceptAttempt(attempted), context: nameof(Handle_NetworkNpcFleetAttempted));
     }
 
-    // [Game thread] An earlier host's attempt: a promoted client doesn't field again, and a failed side releases its hold.
+    // [Game thread] An earlier host's attempt of this side: a promoted client doesn't field it again, and a failed side releases
+    // its hold. The other side's attempt belongs to that side's spawner.
     internal void AcceptAttempt(NetworkNpcFleetAttempted attempted)
     {
-        if (HasAttempt) return;
+        if (HasAttempt || attempted.Side != Side) return;
 
         Settle(attempted);
         Logger.Information("[NavalBattle] The {Side} AI fleet of {MapEventId} was already attempted by a battle host: {Outcome}",
@@ -318,188 +317,19 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
     // A failure after some hulls spawned still fails: the attempt takes them back, so the side never reads as fielded.
     internal static string Outcome(int hullsSpawned, string failure) => hullsSpawned > 0 && failure == null ? Fielded : Failed;
 
-    // The attempt's side rather than this client's enemy side: in PvP the battle host's enemy is the other side's own.
-    public BattleSideEnum FailedSide => attempt?.Failed == true ? attempt.Side : BattleSideEnum.None;
+    public BattleSideEnum Side { get; }
 
-    // Picks the ships, crew and formations the way vanilla's naval start does, then spawns and crews them; a step that can't
-    // go on leaves its reason in failure.
-    private void SpawnFleet(Mission mission, CoopTroopSupplier supplier, MBList<MapEventParty> parties, NavalNpcFleetAttemptWork work)
-    {
-        var shipsLogic = mission.GetMissionBehavior<NavalShipsLogic>();
-        var agentsLogic = mission.GetMissionBehavior<NavalAgentsLogic>();
-        var navalLogic = mission.GetMissionBehavior<DefaultNavalMissionLogic>();
-        var planning = mission.GetMissionBehavior<NavalMissionDeploymentPlanningLogic>();
-        var team = BattleTeams.Resolve(enemySide);
-        if (shipsLogic == null || agentsLogic == null || navalLogic == null || planning == null || team == null)
-        {
-            failure = "naval mission behaviors or enemy team missing";
-            return;
-        }
+    public bool AttemptFailed => attempt?.Failed == true;
 
-        var model = NavalDLCManager.Instance.GameModels.ShipDeploymentModel;
-        var limit = model.GetTeamShipDeploymentLimit(parties);
-        var campaignShips = new MBList<IShipOrigin>();
-        model.FillShipsOfTeamParties(parties, limit, campaignShips);
-        var ships = campaignShips.OfType<Ship>().Select(ship => (snapshot: snapshotBuilder.Build(ship), owner: ship.Owner)).ToList();
-        var snapshots = ships.Select(ship => (IShipOrigin)ship.snapshot).ToMBList();
-
-        var troops = PullTroops(supplier, parties, model.GetMaximumDeployableTroopCountForTeam(snapshots, isPlayerTeam: false));
-        work.Troops.AddRange(troops);
-        var formations = team.FormationsIncludingEmpty
-            .Where(formation => (int)formation.FormationIndex < MaxShipFormations
-                && !shipsLogic.GetShipAssignment(team.TeamSide, formation.FormationIndex).IsSet)
-            .ToList();
-        int count = ShipCount(limit.NetDeploymentLimit, ships.Count, troops.Count, formations.Count);
-        Logger.Information("[NavalBattle] Fielding the AI fleet of {MapEventId}: side={Side} parties={Parties} ships={Ships} " +
-            "limit={Limit} troops={Troops} freeFormations={Formations} count={Count}",
-            session.InstanceId, enemySide, parties.Count, ships.Count, limit.NetDeploymentLimit, troops.Count, formations.Count, count);
-        if (count == 0)
-        {
-            failure = "no ship to field";
-            return;
-        }
-
-        AssignAndSpawnHulls(shipsLogic, navalLogic, planning, team, formations.Take(count).ToList(), ships, parties, work);
-        if (work.Hulls.Count == 0)
-        {
-            failure = "no hull spawned";
-            return;
-        }
-
-        CrewFleet(agentsLogic, team, troops, work);
-    }
-
-    // Assigns a ship to each formation, makes the side's late plan and spawns the hulls; an assignment left without a hull
-    // is cleared.
-    private void AssignAndSpawnHulls(NavalShipsLogic shipsLogic, DefaultNavalMissionLogic navalLogic,
-        NavalMissionDeploymentPlanningLogic planning, Team team, List<Formation> formations,
-        List<(Ship snapshot, PartyBase owner)> ships, MBList<MapEventParty> parties, NavalNpcFleetAttemptWork work)
-    {
-        for (int index = 0; index < formations.Count; index++)
-            shipsLogic.SetShipAssignment(team.TeamSide, formations[index].FormationIndex, ships[index].snapshot);
-
-        try
-        {
-            // The enemy side was planned with no ships at deployment start, so its plan is made now, after the fact.
-            latePlans.MakeForSide(navalLogic, enemySide);
-            SpawnAssignedHulls(shipsLogic, planning, team, formations, ships, parties, work);
-        }
-        finally
-        {
-            // An assignment without a hull would count as a ship in every later plan and spawn query.
-            foreach (var formation in formations)
-            {
-                if (shipsLogic.GetShipAssignment(team.TeamSide, formation.FormationIndex).MissionShip == null)
-                    shipsLogic.ClearShipAssignment(team.TeamSide, (int)formation.FormationIndex);
-            }
-        }
-    }
-
-    // The naval spawn logic's team crewing (AllocateAndDeployInitialTroopsOfTeam), with the late origins.
-    private void CrewFleet(NavalAgentsLogic agentsLogic, Team team, MBList<IAgentOriginBase> troops, NavalNpcFleetAttemptWork work)
-    {
-        var teamSide = team.TeamSide;
-        work.BeginCrewing(teamSide, agentsLogic.GetSpawnReinforcementsOnTick(teamSide));
-        agentsLogic.AddTroopOrigins(teamSide, troops);
-        agentsLogic.AutoComputeDesiredTroopCountsPerShip(teamSide);
-        agentsLogic.AssignTroops(teamSide);
-        agentsLogic.InitializeReinforcementTimers(teamSide);
-        agentsLogic.SetSpawnReinforcementsOnTick(teamSide, true);
-        troopsFielded = agentsLogic.SpawnNextBatch(teamSide);
-#if DEBUG
-        ThrowIfArmed(NavalFleetFailStage.DuringCrewing);
-#endif
-        agentsLogic.AssignAndTeleportCrewToShipMachines(teamSide);
-        Logger.Information("[NavalBattle] Fielded {Hulls} AI hull(s) and a first crew batch of {Troops} on {Team}",
-            work.Hulls.Count, troopsFielded, team.TeamSide);
-    }
-
-    // Spawns each assigned formation's hull at its plan frame, under AI control, and registers it for the peers. Each hull is
-    // recorded as soon as it exists, so a later throw still takes it back.
-    private void SpawnAssignedHulls(NavalShipsLogic shipsLogic, NavalMissionDeploymentPlanningLogic planning, Team team,
-        List<Formation> formations, List<(Ship snapshot, PartyBase owner)> ships, MBList<MapEventParty> parties,
-        NavalNpcFleetAttemptWork work)
-    {
-        for (int index = 0; index < formations.Count; index++)
-        {
-            var formation = formations[index];
-            var plan = planning.GetFormationPlan(team, formation.FormationIndex);
-            if (!plan.HasFrame())
-            {
-                Logger.Error("[NavalBattle] No deployment frame for AI formation {Formation}; its ship is not fielded", formation.FormationIndex);
-                continue;
-            }
-
-            var frame = plan.GetFrame();
-            var hull = shipsLogic.SpawnShip(formation, in frame, spawnAnchored: false, checkForFreeArea: false);
-            if (hull == null) continue;
-
-            work.Hulls.Add(hull);
-            hull.SetController(NavalDLC.Missions.ShipControl.ShipControllerType.AI);
-            formation.SetControlledByAI(true);
-            shipReplicator.RegisterNpcHull(hull, formation, PartyIdOf(parties, ships[index].owner));
-#if DEBUG
-            ThrowIfArmed(NavalFleetFailStage.AfterFirstHull);
-#endif
-        }
-    }
-
-    // The enemy side's supplier of this battle; it holds the NPC reserve once the server sent it to the battle host.
-    private CoopTroopSupplier EnemySupplier() =>
-        CoopTroopSupplierRegistry.GetSuppliers(session.InstanceId).FirstOrDefault(supplier => supplier.Side == enemySide);
-
-    // The reserve's parties with troops left that no player owns, by the player registry the server's fate rule reads.
-    private MBList<MapEventParty> NpcParties(CoopTroopSupplier supplier)
-    {
-        var parties = new MBList<MapEventParty>();
-        if (supplier == null) return parties;
-
-        foreach (var (partyId, remaining) in supplier.GetRemainingByParty())
-        {
-            if (remaining <= 0 || !objectManager.TryGetObject<MapEventParty>(partyId, out var party)) continue;
-            if (party.Party == null || playerManager.Contains(party.Party.MobileParty)) continue;
-            parties.Add(party);
-        }
-
-        return parties;
-    }
-
-    // Round-robin over the NPC parties up to vanilla's crew capacity, not SupplyOneTroop: the host's reserve also holds the
-    // party of a player who dropped from the battle (BattleTroopReserveBuilder), and its troops stay off the AI fleet.
-    private MBList<IAgentOriginBase> PullTroops(CoopTroopSupplier supplier, MBList<MapEventParty> parties, int maximum)
-    {
-        var partyIds = parties.Select(party => objectManager.TryGetId(party, out var id) ? id : null).Where(id => id != null).ToList();
-        var troops = new MBList<IAgentOriginBase>();
-        while (troops.Count < maximum && partyIds.Count > 0)
-        {
-            for (int index = partyIds.Count - 1; index >= 0 && troops.Count < maximum; index--)
-            {
-                var origin = supplier.SupplyOneTroopFromParty(partyIds[index]);
-                if (origin == null) partyIds.RemoveAt(index);
-                else troops.Add(origin);
-            }
-        }
-
-        return troops;
-    }
-
-    // The reserve id of the party that owns a fielded ship, for the hull's spawn record and fate report.
-    private string PartyIdOf(MBList<MapEventParty> parties, PartyBase owner)
-    {
-        var party = parties.FirstOrDefault(candidate => candidate.Party == owner);
-        return party != null && objectManager.TryGetId(party, out var id) ? id : null;
-    }
-
-    // The spawner's state and the battle's attempt, for the naval inspect command.
+    // The spawner's state and the side's attempt, for the naval inspect command.
     public object Inspect() => new
     {
-        enemySide = enemySide.ToString(),
+        side = Side.ToString(),
         state,
-        attemptedSide = attempt?.Side.ToString(),
-        attemptedHere,
-        hullsSpawned,
+        attemptedHere = lastAttempt != null,
+        hullsSpawned = lastAttempt?.Hulls.Count ?? 0,
         hullsRetracted,
-        firstCrewBatch = troopsFielded,
+        firstCrewBatch = lastAttempt?.FirstCrewBatch ?? 0,
         failure,
     };
 }

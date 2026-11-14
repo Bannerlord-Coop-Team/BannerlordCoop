@@ -162,9 +162,11 @@ internal abstract class TestComponentBase
         RegisterMock<IBattleHostRetentionPolicy>(builder);
         RegisterMock<IBattleTroopLedger>(builder);
         RegisterMock<IRetreatedMapEventPartyTracker>(builder);
-        // ServerBattleShipFateHandler (ServerModule, auto-activated) holds and applies naval ship fates through these.
+        // ServerBattleShipFateHandler (ServerModule, auto-activated) holds and applies naval ship fates through these, and
+        // ServerNavalNpcFleetAttemptHandler records the AI fleet attempts in the tracker.
         RegisterMock<IBattleShipFateLedger>(builder);
         RegisterMock<IBattleShipFateApplier>(builder);
+        RegisterMock<INavalNpcFleetAttemptTracker>(builder);
         // LocationHostHandler (MissionModule, auto-activated) needs its registry the same way.
         RegisterMock<ILocationHostRegistry>(builder);
         // AgentHitSoundFixtureHandler (MissionModule, auto-activated in DEBUG) needs the args factory,

@@ -104,12 +104,55 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
 
 ### AI hulls follow the battle host
 
-- The battle host fields the AI fleet late, once the NPC reserve reached it and its deployment is over
-  (`Missions.Naval/NavalNpcFleetSpawner.cs`, enemy side only).
+- The battle host fields each side's AI fleet late, once the NPC reserve reached it and its deployment is over. The
+  attempt, its outcome (`NetworkNpcFleetAttempted.Side`), the relay to entrants and the take-back are the spawner's
+  (`Missions.Naval/NavalNpcFleetSpawner.cs`); the fielding itself is the fielder's (`NavalNpcFleetFielder.cs`). The launcher
+  builds a spawner for both sides, so an enemy fleet and an allied fleet (AI lords on the players' side) each have their
+  own. A side with no AI party in the reserve just waits, so one that joins later (`add_allied_ai_party`) is still fielded.
+  The fielder:
+  - Team: the hulls go where every peer puts their copies (`BattleTeamResolver.ResolveAiFleetTeam(side)`):
+    the side's main team, or its ally team on the host's own side. The ally team also holds the other players' copies,
+    so its crew share, troop assignment and off-ship crew never reach a copy (`NavalCopyCrewPatches`).
+  - Slot: the host's own allies are planned alone, a gap ahead of the side's front-most player fleet (Allied AI fleet slot in
+    section 6); an enemy fleet takes vanilla's late plan for its side.
+  - Ships: the AI parties get what the players leave of the side's 8 ships, at most vanilla's limit for them
+    (`NavalShipBudget`). Each player's share is the one its launcher fields, from campaign data every client holds: vanilla's
+    player/ally split taken against the side's other players only, with the AI parties left out, so an AI party joining after
+    the players opened never shrinks a share they already fielded. The cost is that players present with allies from the
+    start take more than vanilla gives (one player with 6 ships and a 6-ship lord: 6 and 2). When the players take all 8,
+    the side just has no AI fleet (logged as information, settled like a failed attempt).
+  - Recorded attempt: the attempt (`NetworkNpcFleetAttempted`) carries the AI hulls it left, the players' hulls its share
+    counted and those players' party ids. The host also reports it to the server (`ServerNavalNpcFleetAttemptHandler`),
+    which keeps the side's first one per mission instance (`INavalNpcFleetAttemptTracker`) and sends it to every client as
+    `NetworkNpcFleetAttemptRecorded`, and to a client entering the campaign later. Clients keep it the same way
+    (`NavalNpcFleetAttemptHandler`); the spawner's own latch stays the mission's, set at once on the host. It travels on
+    the server's ordered channel ahead of any later join reply, so a later joiner holds it before its launcher picks ships.
+    When the instance empties (BR-017) the battle's attempts are forgotten on every machine: the server drops them as it
+    publishes the departure and sends `NetworkNpcFleetAttemptsForgotten` ahead of any reply to a re-engaging player, so the
+    new mission's launchers and host read no old attempt.
+  - Late joiners: a player the attempt didn't count fields at most what the side's 8 leave after the attempt's hulls and
+    every uncounted player before it in the side's party order, at the most that player can field (its ships, capped by its
+    party's ship limit, which casualties never lower), and always its own ship. Players who start together keep the
+    players-only split; a promoted host only latches the attempt, so nothing is fielded again.
+  - Crew: troops are pulled only up to the crew capacity of the hulls that field; the rest stay in the reserve.
+  - Reserve: at sea every AI party on a side belongs to the battle host, a player-led army's members included
+    (`BattleTroopReserveBuilder.GetOwnedReserves`; on land they go to the army leader). The host gets it with the
+    election at mission-ready, after vanilla's one-time troop pull, so only the fielder fields it.
   An attempt that fails after spawning takes back its own hulls, crew and waiting troops before it reports the failure
   (`NavalNpcFleetRollback`); its pulled troops stay supplied, since the server's supply ledger never rewinds.
   A take-back that throws is retried every tick, resuming each hull where it stopped, and the failure is reported only once
-  it went through.
+  it went through. The taken-back hulls go out as `ShipRemovalReason.Retracted`, which no client counts as a departure from
+  the side, so a side whose allies failed after spawning hulls never reads as retreating because of them.
+- A failed allied attempt (M11 A5), `NoShipsLeft` included, only means the side has no allies. The end hold doesn't change
+  on the players' side because the players fielded. Depletion and retreat read the hulls and crew that remain, and the
+  taken-back fleet isn't among them. D2 (a failed AI fleet as the players' victory) follows from the enemy side's
+  depletion, so it only applies there.
+- Every human of a side leaving while its allies fight (M11 A4) is the land behaviour: their hulls leave as departures but
+  the allied hulls stay, so the side keeps no retreat and the allies fight on under the battle host's AI. With no human
+  left in the mission the server destroys the instance and the map event stays unresolved at its last state (BR-017),
+  as vanilla returns a player who leaves a battle to the encounter menu with the map event alive: Attack opens a new
+  mission (fresh reserves, a new host election, the AI fleets fielded again) and Send ships simulates it. The staging
+  presets refuse a player still in that map event.
 - Only AI hulls nobody captured have `FollowsBattleHost`. On every host change all clients move them to the new host at the
   same ordered event (`TransferHostHulls`), and their samples carry the host epoch so a stale host's traffic is dropped. A
   player's hull never changes owner unless it is captured: it stays with its player or leaves with it.
@@ -412,7 +455,9 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
 
 - **Detection is host-only.** `CoopNavalBattleEndLogic` (`Missions.Naval/CoopNavalBattleEndLogic.cs`) runs vanilla
   `NavalBattleEndLogic`, but only the battle host checks the end, and only once both sides fielded troops. That hold is
-  latched on every client, so a successor starts released.
+  latched on every client, so a successor starts released. Vanilla moves its "since" timers (the contested-island wait
+  for hulls out of action, the retreat waits) only while it checks, so a client that doesn't check keeps them at now; a
+  promoted host otherwise read the AI hulls, crewless for the ticks of their swap, as out of action for 20 s and won at once.
 - **Tally.** Side depletion and hulls out of action are counted by `NavalSideTally` (`Missions/Battles/NavalSideTally.cs`)
   with vanilla's rules, over the hulls `NavalSideTallyReader` gathers through the engine (the E2E scenarios count through
   the same reader):
@@ -509,7 +554,7 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
 | G3 Retreat, leave or disconnect without breaking the battle | Retreat and leave live-passed in R41a (A, B, C). Disconnect is a leave (D4); hard drops of a non-host and of the host live-passed in R41a-2 (D, E). Done: the R41a-2 W2 and S fixes and the departure order (parked N of N, then withdrew N) live-passed in R41a-3. | `retreat`, `migration who=nonhost`; `NavalDepartureScenarioTests`, `BattleReserveReconnectScopeTests` |
 | G4 Results match vanilla | Done in code (M6), not live yet (R45): battle HP, sail HP, sunk ships and Boatswain XP are written back, and loot ships survive the losing party's finalize. In-mission capture replicates (authority-confirmed, in place, PvP included), not live yet (R46). Disengage loot (M6c) is pending. | `NavalShipFateScenarioTests`, `NavalCaptureScenarioTests`, `LootShipHoldTests`, `BattleShipFateReporterTests`, `BattleShipFateLedgerTests`, `BattleShipCaptureReplicatorTests` |
 | G5 Battles from real campaign play | Presets done (WP4), never live. | `encounter`, `blockade`; preset unit tests |
-| G6 AI allies, 3+ players per side | Allies pending (M11): the launcher passes empty ally lists and the spawner fields the enemy side only. 3 players are E2E-covered; live runs had 2 clients. | `allied_npc`; 3-client E2E scenarios |
+| G6 AI allies, 3+ players per side | Allied AI fleets done in code (M11 phase 1), not live yet: the battle host fields them on the ally team with what the players leave of the side's 8 ships, and a player who joins after the attempt caps its fleet against the recorded attempt (phase 2). 3 players are E2E-covered; live runs had 2 clients. | `allied_npc`; 3-client E2E scenarios |
 | G7 Join or rejoin mid-battle shows the true state | Late-join catch-up done (records, condition, weapon, seats); `late_join` live-passed in R39. A rejoin is a late join with a fresh reserve (D4), live-passed in R41a-2 (D, E) and R41a-3 (W2, D, E); a late joiner's dropped host hull record (R41a-2 E) is fixed in E2E, its member hold not hit live yet. | `late_join`, `migration`; `NavalLateJoinScenarioTests`, `NavalDepartureScenarioTests` |
 
 ### Milestones
@@ -541,7 +586,7 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
 | M6 results parity (fates, Boatswain XP, loot hold) | done in code, R45 next |
 | M6 in-mission capture | done in code, R46 next |
 | M6c disengage parity | pending |
-| M11 allied fleets | pending |
+| M11 allied fleets | phase 1 done in code, not live yet |
 
 ## 5. Live-run log
 
@@ -699,26 +744,48 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   - an old host that applies a hit just before its own move keeps it only if its next condition goes out first;
   - hits still in the arrivals queue at `Dispose` are cleared. Fates are flushed from the applied state, so results never
     see them.
-- **Allied fleets.** An AI lord on the players' side fields no hulls. Agents refused by a formation with no hull are not
-  re-assigned. The launcher still counts AI allies in vanilla's 8-ship side cap split, so their unfielded share is lost: a
-  player with 6 ships next to an AI lord with 6 fields about 4.
+- **Allied fleets.** Agents refused by a formation with no hull are not re-assigned.
+- **Late joiners past the side's 8 ships.** The cap still lets a side pass 8 in three cases, each dropping copies on the
+  older clients' ally team (`BattleShipReplicator`):
+  - a party that joined the side after the host's attempt and opened its mission before the attempt reached it (about one
+    round trip through the server) fields its full share: up to that share less one copy over on the older clients;
+  - every player fields its own ship, so a second player joining a full side is one copy over;
+  - players who start together keep the players-only split, whose rounding can pass 8: three players with 3 ships each
+    field 9, as before M11.
 - **Saved Order of Battle layout.** Co-op skips `NavalOrderOfBattleVM.LoadConfigurationShips`, so the player's saved ship
   and formation layout never applies, while vanilla's `SaveConfiguration` still stores the snapshot ships into the
   client's `NavalOrderOfBattleCampaignBehavior` after each battle.
-- **Player deployment slots.** When a side has more than one player, every client lays out all the side's player fleets
-  with vanilla's `ComputeTeamDeploymentOffsets`, each fleet as deep as the deepest possible one (1.1 times the longest
-  ship deployment length in the game data) with vanilla's 32 m gap, and takes its own rank's slot
-  (`NavalPlayerDeploymentSlot.SlotFor`). The side base comes from vanilla's `ComputeDeploymentBaseOffsets` fed with the
-  small-battle offset (-min(path, 400) / 2 + 1), not with `NavalShipsLogic.ComputeSpawnPathDeploymentOffset`, which deepens
-  with the ships this client assigned (only its own fleet) and so differed between players with more than two hulls. So
-  every client derives the same layout, blocked segments are skipped, and when nothing fits behind the side base (R49: the
-  spawn point sat near the path start) the fleets are packed forward from the path start as vanilla does. A Warning is
-  logged only when even that doesn't fit; the `Deployment slot` Information line logs the base and the slot on each client.
-  Known limits (M11, 3+ players per side):
-  - the forward packing of three or more fleets can reach the enemy's line (four 74 m fleets put the front one 5 m from
-    the opposing base), and the fit check doesn't look at the opposing base;
-  - the player count is the side's registered player parties when each client opens the mission, so a late joiner counts
-    one more party than the clients that opened before it, and in the forward packing every slot moves with that count.
+- **Player deployment slots.** When a side has more than one player, every client takes its own rank's slot on the side's
+  spawn path (`NavalSideDeploymentSlots.Layout`), each fleet as deep as the deepest possible one (1.1 times the longest
+  ship deployment length in the game data) with vanilla's 32 m gap. The side base comes from vanilla's
+  `ComputeDeploymentBaseOffsets` fed with the small-battle offset (-min(path, 400) / 2 + 1), not with
+  `NavalShipsLogic.ComputeSpawnPathDeploymentOffset`, which deepens with the ships this client assigned (only its own fleet)
+  and so differed between players with more than two hulls. Rank 0 takes vanilla's slot at the base, the next ranks go
+  behind it, and once the path runs out behind they go ahead of rank 0, one after another, instead of vanilla's forward
+  packing from the path start. When nothing fits behind the base (R49: the spawn point sat near the path start),
+  rank 0 takes the first room from the path start. Each slot is one call of vanilla's `TryPlaceTeamsOneSide` for one team,
+  so a slot depends only on its rank: a client that counts a late joiner, or misses a player that left, still agrees on
+  every earlier rank (R49 C3). No slot goes past the opposing base less a fleet and the gap (R49 C2). A slot that had no
+  free room, or was held short of the opposing base, logs a Warning naming which. The `Deployment slot` Information line
+  logs the slot and the opposing base on each client. A single player keeps vanilla's own plan.
+- **Allied AI fleet slot.** Vanilla puts the allies' team at the side base and the player team its depth and a gap behind,
+  and keeps the allies in front when nothing fits behind the base too: `CollectSortedBattleSideTeamsData` sorts the allies
+  first and the player team last, and `TryPlaceTeamsOneSide`'s forward packing places from the last team at the path start
+  to the first, so the allies end up front-most. Here the battle host plans the allied AI fleet its own depth and a gap
+  ahead of the front-most player fleet among the side's player parties when it fields them (`NavalSideDeploymentSlots.AllySlot`, from
+  `NavalNpcFleetFielder`), with rank 0 on the host's own plan when it is rank 0 (a lone player's is vanilla's, which
+  deepens with its ships). With room behind the base that is rank 0; with the base at the path start (live M11 phase 3
+  check 2) it is the last rank, which went ahead of rank 0. So a lone player keeps vanilla's spot and the allies sit where
+  vanilla's layout puts them relative to it, and the player slots don't move: no client has to know whether the side has
+  allies when it opens the mission, and an AI party that joins later (`add_allied_ai_party`, a nearby lord) still lands
+  clear of every player fleet. The plan holds the AI hulls only (`INavalLateDeploymentPlanTracker.MakeForAllyTeam`); the
+  ally team's copies of other players' hulls stay out of it and keep their owners' positions. The cost is that the side
+  starts the allies' depth and a gap closer to the enemy than vanilla's layout; the slot stops short of the opposing base
+  like the player slots.
+- Known limits: a player who leaves shifts the ranks of the players after it in the side's party order, so a joiner
+  that arrives after a departure can take the slot of a player still in the battle. With no room behind the base, a
+  player who joins after the allies were fielded goes ahead of the player fleets the side had when the allies were fielded,
+  where the allies are.
 - **R49 freeze (native, no managed guard).** Client1 crashed 29 s into `vs_pirates hulls=1 weapons=1` with an
   AccessViolation in native `Mission.GetNearbyAgentsAux`, called from vanilla `NavalPhysicsAgentCollisionSolver.OnParallelFixedTick`
   on the fixed-tick thread; the watchdog then held the process frozen. The dumps show valid inputs (a finite centre and a
@@ -869,7 +936,7 @@ For item 25, pair only the same instance, full ship id and unchanged authority, 
 | `fleet [party]` | server and client | Lists each ship of a party on this machine: its id, HP, sail HP and owner. `party` is a controller id, a `MobileParty`/`PartyBase` id, or a party or leader name or id (`Player`, `Player3325`; player parties first, then lord parties), on clients too; without it, the main party on a client and every player's party on the server. Run it before and after a battle on every machine. |
 | `finish_loot [take=<ship>[,<ship>...]\|none\|all]` | client | Finishes the open post-battle loot screens with their own buttons: the party screen takes every troop and prisoner then Done, the inventory takes every item then Done, the ship screen selects and takes each chosen ship (a `Ship_...` id, with or without `Ship_`, or a unique prefix of one) then Confirm, leaving the rest (`take` defaults to `none`). Each confirmation is answered yes. So `PortScreenChangesHandler` takes the ships and `OnPlayerLootShipEnd` sends `NetworkDiscardLootShips`, which releases the M6 loot hold. The next screen usually opens on a later frame, so run it again until it reports no loot screen. Still manual: the captured-lord conversation (`FreeOrCapturePrisonerHeroes`) before the party screen. |
 | `result_silence [on \| off]` | non-host client, DEBUG only | `on` withholds this mission's result-ready event/report/snapshot and retreat/mission-left announcements; relay and mesh keep running while the mission is open. No argument prints `NAVAL_RESULT_SILENCE enabled=true/false instance=...`. `off` resumes reporting a retained result once deployment is committed. The flag belongs to the mission, so a later mission starts unsilenced; outside a mission `off` confirms `enabled=false instance=none`. This client owns its outgoing announcements, so run here rather than on the server. Arm before the host runs `win`; it cannot retract an earlier report. Local mission teardown still clears registries and stops its mesh, but keeps the server relay connected and withholds departure. |
-| `fleet_fail [before\|after_hull\|crewing]` | battle host | Before Ready, arms the next eligible AI fleet spawn attempt in this mission to throw through its normal failure path: before anything spawns (default), right after the first hull registered, or inside the crewing after its first batch spawned. Refuses after an attempt or on another client. `NAVAL_FLEET_FAIL armed` confirms arming; `inspect` then shows `npcFleet.spawner.state=failed`, `npcFleet.spawner.failure` containing `DEBUG fleet_fail` and `npcFleet.spawner.hullsRetracted`, the hulls the failed attempt took back (every client drops them and their crew within two ticks). Mission-scoped, no retry after migration. |
+| `fleet_fail [enemy\|ally] [before\|after_hull\|crewing]` | battle host | Before Ready, arms the next eligible AI fleet spawn attempt of the enemy side (default) or of the host's own side (`ally`) in this mission to throw through its normal failure path: before anything spawns (default), right after the first hull registered, or inside the crewing after its first batch spawned. Refuses after an attempt or on another client. `NAVAL_FLEET_FAIL armed` confirms arming; `inspect` then shows `npcFleet.spawners.<side>.state=failed`, `npcFleet.spawners.<side>.failure` containing `DEBUG fleet_fail` and `npcFleet.spawners.<side>.hullsRetracted`, the hulls the failed attempt took back (every client drops them and their crew within two ticks). Mission-scoped, no retry after migration. |
 | `win`, `lose` | battle host | Ends the battle as a victory or defeat for the host's side; peers follow. |
 | `boatswain <partyId> [prepare]` | both; prepare server only | DEBUG. Reads the effective First Mate hero id, Boatswain level, XP and learning rate, plus campaign ship ids, hull/sail HP and a read-only 100-damage model probe. `prepare` sets that hero to Boatswain 100 (resetting its skill XP baseline) and raises focus to 5 before any map event, through normal replicated skill APIs. Capture the XP baseline after preparation. |
 | `damage <ship> <amount>`, `sink <ship>` | client | Hits a hull as a ship weapon would; another owner's hull takes it through its owner. |
@@ -966,9 +1033,10 @@ free lord of a third faction and declares the missing wars with `DeclareWarActio
 
 Knobs (`NavalScenarioResolver.Usage`):
 
-- `fleet_fail=1` arms the battle host's AI fleet failure before the scenario presses Ready (default `0`). Use
-  `coop.debug.naval.scenario vs_pirates hulls=3 fleet_fail=1` for item 17; after a host change, a late entrant's
-  `inspect` must still show `npcFleet.spawner.state=failed` (or `fielded` if an earlier attempt won the race).
+- `fleet_fail=1` arms the battle host's AI fleet failure, on every side with AI parties, before the scenario presses Ready
+  (default `0`). Use `coop.debug.naval.scenario vs_pirates hulls=3 fleet_fail=1` for item 17; after a host change, a late
+  entrant's `inspect` must still show `npcFleet.spawners.Defender.state=failed` (or `fielded` if an earlier attempt won the
+  race).
   The forced exception is caught by the normal spawn attempt, broadcasts its outcome and releases the failed side's hold;
 - `hulls=n` AI hulls;
 - `hull=id` hull type;
@@ -999,6 +1067,23 @@ Knobs (`NavalScenarioResolver.Usage`):
   carry their whole crew on deck, so the stager swaps plain roomless ships for an `empire_heavy_ship` (40 places below
   deck) until n fit, then tops the healthy troops (wounded don't count) up to the deck crew plus n. A ballista or ram hull
   is never swapped, so `hulls=1 weapons=1 reserve=20` has no room and logs a Warning; add a hull.
+- `allies=n` (1 to 8, `allied_npc` only, default 1) tops the allied lord up to n ships.
+- `ignore_limits=1` lets every party of the scenario's battle field 8 ships, vanilla's `IgnoreDeploymentLimits` base limit
+  before perks, on every client (`CoopNavalBattleLauncher` turns the switch on for that battle). Staged with `allied_npc
+  ships=4 ignore_limits=1 reserve=40 testclient1 testclient2`, the reserve swaps one hull of each player for an
+  `empire_heavy_ship` and tops its troops up to 216, past the 68 skeletal crew of its 4 ships. A player's net limit is the
+  smallest of its parties, skeletal crew and battle limits, here 4, and its ally team is the other players only, so 4+4 fits
+  the side's 8 without a split. The allies then settle on `NoShipsLeft` (`inspect` shows the Defender spawner `failed` with
+  that reason and the host logs it as Information). Without `ignore_limits=1` each player's party limit of 3 gives 3+3 and
+  the allies 2.
+- `army=1` (`allied_npc` only) has the first player's clan join the allied lord's kingdom and lead an army with the lord as
+  its member, through the vanilla actions the clan and army syncs replicate (M11 A1: at sea the member's reserve goes to
+  the battle host).
+
+`allied_npc` already fields AI on both sides (the allied lord's fleet and the enemy pirates), so it stages both spawners in
+one battle. To sink an allied hull, run `coop.debug.naval.sink <shipId>` on the battle host, which simulates the allied
+hulls; read the lord's ships and casualties on the server before and after with `coop.debug.party.list_ships <party>` and
+`coop.debug.mobile_party.character_ids <lord hero>` (each troop's number and wounded). The scenario's AI targets (`sink`, boarding, ramming) are enemy AI hulls only.
 
 A scenario client whose Ready press throws (R42 crash 2's first symptom) logs the exception, fails the `ready` step with
 `deployment half-finished` and runs no further steps in that battle.

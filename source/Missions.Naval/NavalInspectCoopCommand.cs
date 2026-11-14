@@ -132,7 +132,7 @@ public sealed class NavalInspectCoopCommand : ICoopCommand
         var afloat = hulls.Where(ship => (ship.Hull as MissionShip)?.IsSinking != true).ToArray();
         return new
         {
-            spawner = naval?.NpcFleetSpawner.Inspect(),
+            spawners = naval?.NpcFleetSpawners.ToDictionary(entry => entry.Key.ToString(), entry => entry.Value.Inspect()),
             migrationReserve = naval?.Services.MigrationReserveFielder.Inspect(),
             isLocalHost = controller.Session.IsLocalHost,
             hulls = hulls.Length,

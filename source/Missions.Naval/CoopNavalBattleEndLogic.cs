@@ -28,7 +28,7 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
     private readonly IBattleSession session;
     private readonly IBattleDeploymentCoordinator deployment;
     private readonly IBattleResultCommitter resultCommitter;
-    private readonly INavalNpcFleetSpawner npcFleet;
+    private readonly IReadOnlyDictionary<BattleSideEnum, INavalNpcFleetSpawner> npcFleets;
     private readonly INavalSideHullLedger hullLedger;
     private readonly INavalSideTallyReader tallyReader;
     private readonly INavalPlayerHeroGrace heroGrace;
@@ -36,16 +36,16 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
     private bool endChecksReleased;
     private float nextHeroScanAt;
 
-    // Takes the battle's session, deployment, committer and AI fleet, the replicator's departed hulls, the side tally and the
+    // Takes the battle's session, deployment, committer and AI fleets, the replicator's departed hulls, the side tally and the
     // player hero grace.
     public CoopNavalBattleEndLogic(IBattleSession session, IBattleDeploymentCoordinator deployment, IBattleResultCommitter resultCommitter,
-        INavalNpcFleetSpawner npcFleet, INavalSideHullLedger hullLedger, INavalSideTallyReader tallyReader,
-        INavalPlayerHeroGrace heroGrace)
+        IReadOnlyDictionary<BattleSideEnum, INavalNpcFleetSpawner> npcFleets, INavalSideHullLedger hullLedger,
+        INavalSideTallyReader tallyReader, INavalPlayerHeroGrace heroGrace)
     {
         this.session = session;
         this.deployment = deployment;
         this.resultCommitter = resultCommitter;
-        this.npcFleet = npcFleet;
+        this.npcFleets = npcFleets;
         this.hullLedger = hullLedger;
         this.tallyReader = tallyReader;
         this.heroGrace = heroGrace;
@@ -69,11 +69,21 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
                 endChecksReleased = BothSidesFielded();
 
             CanCheckForEndCondition = session.IsLocalHost && endChecksReleased;
+            if (!CanCheckForEndCondition) RestartEndCheckTimers();
             ObserveHeroes();
         }
 
         base.OnMissionTick(dt);
         ClearRetreat();
+    }
+
+    // Keeps vanilla's "since" timers at now while this client doesn't check, as vanilla moves them only inside the checks: a stale
+    // timer let a promoted host read the enemy hulls, crewless during their swap, as out of action for 20 s already and win.
+    private void RestartEndCheckTimers()
+    {
+        _contestedIslandCheckTimer = MissionTime.Now;
+        _enemySideNotYetRetreatingTime = MissionTime.Now;
+        _playerSideNotYetRetreatingTime = MissionTime.Now;
     }
 
     // Ends the mission with the resolved result where there is one; a non-host never concludes by itself.
@@ -228,24 +238,20 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
         return KeepsRetreat(hullLedger.DepartedHulls(side), hullsLeft);
     }
 
-    /// <summary>
-    /// The land hold's release rule, where a side whose AI fleet failed to field counts like a land side whose reserve was
-    /// abandoned: it may start empty, so its depletion ends the battle instead of the hold keeping it open forever.
-    /// </summary>
-    internal static bool ShouldReleaseHold(bool deploymentActivated, bool attackerFielded, bool defenderFielded,
-        BattleSideEnum failedFleetSide) =>
-        CoopBattleController.ShouldReleaseEndConditionHold(deploymentActivated, attackerFielded, defenderFielded,
-            failedFleetSide == BattleSideEnum.Attacker, failedFleetSide == BattleSideEnum.Defender);
-
-    // Whether both sides fielded here, or the side whose AI fleet failed counts as fielded.
+    // Whether both sides fielded here, by the land hold's release rule: a side whose AI fleet failed to field counts like a land
+    // side whose reserve was abandoned, so it may start empty and its depletion ends the battle instead of holding it open.
     private bool BothSidesFielded()
     {
         CoopBattleController.SidesFielded(Mission.Teams, out bool attackerFielded, out bool defenderFielded);
-        var failedFleetSide = npcFleet.FailedSide;
-        bool released = ShouldReleaseHold(deployment.IsActivated, attackerFielded, defenderFielded, failedFleetSide);
-        if (released && failedFleetSide != BattleSideEnum.None)
-            Logger.Warning("[NavalBattle] End checks released for {MapEventId} although the {Side} AI fleet failed to field",
-                session.InstanceId, failedFleetSide);
+        bool attackerFleetFailed = npcFleets[BattleSideEnum.Attacker].AttemptFailed;
+        bool defenderFleetFailed = npcFleets[BattleSideEnum.Defender].AttemptFailed;
+        bool released = CoopBattleController.ShouldReleaseEndConditionHold(deployment.IsActivated, attackerFielded, defenderFielded,
+            attackerFleetFailed, defenderFleetFailed);
+        // Each spawner logs why its fleet fielded nothing, the players taking every ship included; this records that a side with
+        // no AI fleet may be why the hold released.
+        if (released && (attackerFleetFailed || defenderFleetFailed))
+            Logger.Information("[NavalBattle] End checks released for {MapEventId} with sides that fielded no AI fleet (attacker " +
+                "{Attacker}, defender {Defender})", session.InstanceId, attackerFleetFailed, defenderFleetFailed);
         return released;
     }
 

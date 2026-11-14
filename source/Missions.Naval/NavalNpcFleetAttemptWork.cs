@@ -1,10 +1,14 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Naval;
 
-/// <summary>[Game thread] What one AI fleet attempt changed so far, so a failed attempt takes back exactly its own work.</summary>
+/// <summary>
+/// [Game thread] What one AI fleet attempt did so far: the hulls and troops a failed attempt takes back exactly, the players its
+/// share counted for the attempt it reports, and its first crew batch for the inspect output.
+/// </summary>
 public sealed class NavalNpcFleetAttemptWork
 {
     /// <summary>Every hull the attempt spawned, in spawn order, whether or not it registered.</summary>
@@ -12,6 +16,12 @@ public sealed class NavalNpcFleetAttemptWork
 
     /// <summary>The reserve troops the attempt pulled for its crew.</summary>
     public List<IAgentOriginBase> Troops { get; } = new List<IAgentOriginBase>();
+
+    /// <summary>The players' fleets the attempt's AI share left room for; none until the fielder worked the share out.</summary>
+    public NavalSidePlayerFleets Players { get; set; } = NavalSidePlayerFleets.None;
+
+    /// <summary>How many crew vanilla's first batch spawned (diagnostics).</summary>
+    public int FirstCrewBatch { get; set; }
 
     /// <summary>Whether the troops were handed to vanilla's crewing, which then holds the ones not spawned yet.</summary>
     public bool CrewingStarted { get; private set; }
@@ -35,4 +45,18 @@ public sealed class NavalNpcFleetAttemptWork
         CrewSide = side;
         SpawnedOnTickBefore = spawnedOnTickBefore;
     }
+#if DEBUG
+
+    /// <summary>The stage a DEBUG fleet failure throws at in this attempt, if one was armed.</summary>
+    public NavalFleetFailStage? ArmedFailure { get; set; }
+
+    // Throws the armed failure once the attempt reaches its stage, through the attempt's normal failure path.
+    public void ThrowIfArmed(NavalFleetFailStage stage)
+    {
+        if (ArmedFailure != stage) return;
+
+        ArmedFailure = null;
+        throw new InvalidOperationException($"DEBUG fleet_fail: forced AI fleet spawn failure ({stage})");
+    }
+#endif
 }

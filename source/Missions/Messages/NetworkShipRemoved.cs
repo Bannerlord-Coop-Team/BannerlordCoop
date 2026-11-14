@@ -12,6 +12,12 @@ public enum ShipRemovalReason
 
     /// <summary>The owner left the battle any other way, or the hull left the mission without a retreat.</summary>
     Leave,
+
+    /// <summary>
+    /// The battle host took back a hull of a failed AI fleet attempt; the hull never fought for its side, so it is no departure
+    /// that keeps the side's retreat.
+    /// </summary>
+    Retracted,
 }
 
 /// <summary>
