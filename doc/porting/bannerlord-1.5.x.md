@@ -240,29 +240,36 @@ are registered later, at `CampaignReady` (`MapScreen.OnInitialize`), through
 - Blood feuds and empty clan parties are keyed on the local main hero and player clan. They run on
   the server only and are not multiplayer-aware yet (blood feuds: #3819).
 - Naval (War Sails) content stays unsupported, including the set sail and disembark leave paths.
-- v1.5 leaves a `BattleWreckage` after a field battle with a winner and at least 15 casualties: a
-  battle site on land, a wreckage at sea. `BattleWreckageCampaignBehavior` is disabled on the server
-  and on clients (`BattleWreckageCampaignBehaviorPatches`). Co-op's `MBObjectBasePatches.StringIdPrefix`
-  drops the `StringId` of a server-made wreckage, and vanilla's `CampaignObjectManager.AddWreckage` adds
-  it to the saved list before it reads that id, so a field battle that made a wreckage threw inside
-  `MapEvent.FinalizeEventAux` and left an id-less wreckage in the save. Vanilla needs 15+ casualties,
-  a winner, no quest party, fewer than 50 wreckages, a qualifying party mix and a site away from
+- v1.5 leaves a `BattleWreckage` after a field battle with a winner and at least 15 casualties: a battle
+  site on land, a wreckage at sea. `BattleWreckageCampaignBehavior` is disabled on the server and on
+  clients (`BattleWreckageCampaignBehaviorPatches`). Co-op's `MBObjectBasePatches.StringIdPrefix` drops
+  the `StringId` of a server-made wreckage, and vanilla's `CampaignObjectManager.AddWreckage` adds it to
+  the saved list before it reads that id, so a field battle that made a wreckage threw inside
+  `MapEvent.FinalizeEventAux` and left an id-less wreckage in the save. Vanilla needs 15+ casualties, a
+  winner, no quest party, fewer than 50 wreckages, a qualifying party mix and a site away from
   settlements and rivers, and makes small sites 85% of the time. It was not only AI battles:
   `IsPlayerMapEvent` checks the server's own main party, so a co-op player's field battle could throw
-  too. Every later load then
-  crashed in `CampaignObjectManager.InitializeManagerObjectLists` (seen 2026-10-22 on v1.5.5).
+  too. Every later load then crashed in `CampaignObjectManager.InitializeManagerObjectLists` (seen
+  2026-10-22 on v1.5.5).
   - What this loses: looter-faction parties no longer head for land battle sites (the only parties that
-    target land wreckages). Players never saw wrecks
-    in co-op anyway, since nothing syncs them (#3837, #3838). Re-enabling needs the wreckage to get an
-    id (a sync registry, or `typeof(BattleWreckage)` in `MBObjectBasePatches.allowedTypes` after
-    proving `CreateWreckage`'s log entry and map interactable work under co-op).
-  - Save repair: `IdlessWreckageLoadRepairPatch` is a prefix on `CampaignObjectManager.InitializeOnLoad`
-    (`OnGameLoaded` fires too late) and removes wreckages with a null `StringId` before the object
-    lists are built, on the server and on clients, logging how many it dropped. Saves already
-    written by an affected server load again once the fix is deployed on both sides. Checked live on
-    2026-10-22: a server save hit by 7 throws logged "Dropped 7 battle wreckages saved without an id",
-    loaded, and a client that had crashed on it rejoined.
-  - The wreckage repair does not undo the rest of the damage. A throw skipped the end of
+    target land wreckages). Players never saw wrecks made during a co-op session, since nothing syncs
+    them (#3837, #3838). Re-enabling needs the wreckage to get an id, through a sync registry or
+    `typeof(BattleWreckage)` in `MBObjectBasePatches.allowedTypes` after proving `CreateWreckage`'s log
+    entry and map interactable work under co-op. It also needs `SavedWreckageRemovalPatch` removed or
+    narrowed back to id-less entries.
+  - Saved wreckage removal: `SavedWreckageRemovalPatch` is a prefix on
+    `CampaignObjectManager.InitializeOnLoad` (`OnGameLoaded` fires too late) and removes every saved
+    wreckage on the server and on clients, logging "Dropped {Count} saved battle wreckages" (#4582).
+    - Why: id-less wreckages throw while the object lists are built. A valid one (for example from a
+      single-player v1.5 campaign) would never expire, because the server no longer registers the hourly
+      tick, and clicking one would open a menu clients never registered.
+    - What is left: nothing on the map, since its visuals are built later from `Campaign.Wreckages`. A
+      dropped wreckage stays only in its `WreckageCreatedLogEntry` (rumor text, as after a vanilla
+      expiry) and in the disabled behavior's `_encounteredBattleWreckage`.
+    - A save that an affected server already wrote loads again once the fix is deployed on both sides.
+      Checked live on 2026-10-22 with the earlier id-less-only version: a server save with 7 id-less
+      wreckages loaded with all 7 dropped, and a client that had crashed on it rejoined.
+  - The wreckage removal does not undo the rest of the damage. A throw skipped the end of
     `FinalizeEventAux`, so that battle's parties stay attached to an event that never finished, and an
     AI encounter with such a party threw `NullReferenceException` in `PartyBase.set_MapEventSide`
     from `StartBattleAction` (seen twice on 2026-10-22, events `Created_139` and `Created_171`). A
@@ -290,9 +297,6 @@ are registered later, at `CampaignReady` (`MapScreen.OnInitialize`), through
     (#4615), and the orphan pass ends an unlisted live event whether or not vanilla set
     `WaitingRemoval` (the merge below). A successful `FinalizeEvent` in that pass still publishes no
     `MapEventFinalized` or `InstanceDestroyed<MapEvent>`, as on `development`.
-  - A wreckage already in a hosted save (for example from a single-player v1.5 campaign) no longer
-    expires, because the server no longer registers the hourly tick. Clients still draw it and can
-    click it, which opens a menu clients never registered (existing client path; in-game check owed).
 - v1.5 spawns deserter looter parties with a null `PartyTemplate` (co-op's own
   `DesertersCampaignBehaviorPatches` calls `CreateLooterParty(..., null, ...)`). The bandit init
   args handler now accepts a null template on the send and receive paths, as the caravan handler does

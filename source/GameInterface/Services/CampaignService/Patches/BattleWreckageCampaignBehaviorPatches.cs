@@ -6,6 +6,7 @@ using TaleWorlds.CampaignSystem.CampaignBehaviors;
 
 namespace GameInterface.Services.CampaignService.Patches;
 
+// Battle wreckages (the land battle sites and sea wreckages left after a battle) have no registry or sync yet.
 [HarmonyPatch(typeof(BattleWreckageCampaignBehavior))]
 internal class BattleWreckageCampaignBehaviorPatches
 {
@@ -15,19 +16,19 @@ internal class BattleWreckageCampaignBehaviorPatches
     internal static bool RegisterEventsPrefix() => false;
 }
 
-// Vanilla's object lists throw on wreckages saved without an id, and OnGameLoaded runs too late to drop them.
+// Goes with BattleWreckageCampaignBehaviorPatches. Drops saved wreckages here, since OnGameLoaded is too late.
+// Id-less ones throw while the lists are built. Valid ones never expire, and clicking one opens an unregistered menu.
 [HarmonyPatch(typeof(CampaignObjectManager), nameof(CampaignObjectManager.InitializeOnLoad))]
-internal class IdlessWreckageLoadRepairPatch
+internal class SavedWreckageRemovalPatch
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<IdlessWreckageLoadRepairPatch>();
+    private static readonly ILogger Logger = LogManager.GetLogger<SavedWreckageRemovalPatch>();
 
+    // Removes the saved wreckages and logs how many were dropped.
     [HarmonyPrefix]
     private static void Prefix(CampaignObjectManager __instance)
     {
-        var removed = RemoveIdlessWreckages(__instance);
-        if (removed > 0) Logger.Warning("Dropped {Count} battle wreckages saved without an id", removed);
+        var count = __instance._wreckages.Count;
+        __instance._wreckages.Clear();
+        if (count > 0) Logger.Information("Dropped {Count} saved battle wreckages", count);
     }
-
-    internal static int RemoveIdlessWreckages(CampaignObjectManager manager) =>
-        manager._wreckages?.RemoveAll(wreckage => wreckage == null || wreckage.StringId == null) ?? 0;
 }
