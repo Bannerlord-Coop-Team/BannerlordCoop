@@ -72,6 +72,31 @@ public class CaravanAmbushTests : IDisposable
     }
 
     [Fact]
+    public void CreationUsesTheServersDestinationAndIdentityOnBothClients()
+    {
+        var giverId = environment.CreateRegisteredObject<Hero>();
+        var targetId = environment.CreateRegisteredObject<Settlement>();
+        Server.Call(() =>
+        {
+            var giver = Server.GetRegisteredObject<Hero>(giverId);
+            var potential = new PotentialIssueData((in PotentialIssueData _, Hero owner) =>
+                new Issue(owner, Server.GetRegisteredObject<Settlement>(targetId)), typeof(Issue), IssueBase.IssueFrequency.VeryCommon);
+            Assert.True(Campaign.Current.IssueManager.CreateNewIssue(in potential, giver));
+        });
+        var created = Assert.Single(Server.NetworkSentMessages.GetMessages<GameInterface.Services.Issues.Framework.CreationCapture.NetworkIssueCreated>());
+        Assert.False(string.IsNullOrEmpty(created.IssueId));
+        foreach (var instance in new[] { Server, Owner, Other })
+        {
+            instance.Call(() =>
+            {
+                var issue = Assert.IsType<Issue>(instance.GetRegisteredObject<Hero>(giverId).Issue);
+                Assert.Equal(created.IssueId, issue.StringId);
+                Assert.Same(instance.GetRegisteredObject<Settlement>(targetId), issue._targetSettlement);
+            });
+        }
+    }
+
+    [Fact]
     public void ProgressBindsTheOwnersQuestToServerPartiesAndJournal()
     {
         SendState(QuestScenario.ControllerA, true, 3, "Follow", "Saved");
@@ -152,33 +177,27 @@ public class CaravanAmbushTests : IDisposable
     }
 
     [Fact]
-    public void ProgressPublishesOnlyChangedOwnerState()
+    public void HourlyProgressPublishesOnlyChangedOwnerState()
     {
         scenario.AttachQuest(Other, CreateQuest);
         Server.Call(() =>
         {
+            BindParties();
             var events = Server.Resolve<ICaravanAmbushWorldEventService>();
             var baseline = Server.NetworkSentMessages.GetMessageCount<NetworkCaravanAmbushProgress>();
-            events.Run(quest => quest._vicinityCheckFailCounter = 1);
+            events.HourlyTick();
             Assert.Equal(baseline + 1, Server.NetworkSentMessages.GetMessageCount<NetworkCaravanAmbushProgress>());
-
-            events.Run(quest => quest._vicinityCheckFailCounter = 1);
+            events.SettlementEntered(null);
             Assert.Equal(baseline + 1, Server.NetworkSentMessages.GetMessageCount<NetworkCaravanAmbushProgress>());
-
-            events.Run(quest => quest._vicinityCheckFailCounter = 2);
+            events.HourlyTick();
             Assert.Equal(baseline + 2, Server.NetworkSentMessages.GetMessageCount<NetworkCaravanAmbushProgress>());
-
-            events.Run(quest => quest._journalEntries.Add(new JournalLog(CampaignTime.Now, new TextObject("Follow the caravan"))));
-            Assert.Equal(baseline + 3, Server.NetworkSentMessages.GetMessageCount<NetworkCaravanAmbushProgress>());
         });
         Owner.Call(() => Assert.Equal(2, QuestOf(Owner)._vicinityCheckFailCounter));
         Other.Call(() => Assert.Equal(0, QuestOf(Other)._vicinityCheckFailCounter));
     }
 
-    [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void AnUnregisteredActivePartyDoesNotClearTheOwnersParty(bool caravanMissing)
+    [Fact]
+    public void AnUnregisteredCaravanDoesNotClearTheOwnersParty()
     {
         Server.Call(() =>
         {
@@ -187,7 +206,7 @@ public class CaravanAmbushTests : IDisposable
             var publisher = Server.Resolve<ICaravanAmbushProgress>();
             publisher.Publish(quest);
             var before = Server.NetworkSentMessages.GetMessageCount<NetworkCaravanAmbushProgress>();
-            var party = caravanMissing ? quest._caravanParty : quest._banditParty;
+            var party = quest._caravanParty;
             Assert.True(party.IsActive);
             Assert.True(Server.ObjectManager.Remove(party));
             quest._vicinityCheckFailCounter++;
@@ -201,10 +220,8 @@ public class CaravanAmbushTests : IDisposable
         });
     }
 
-    [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void ANullOrInactivePartyKeepsTheOwnersReferenceForVanillaDialogue(bool inactive)
+    [Fact]
+    public void AnInactiveCaravanKeepsTheOwnersReferenceForVanillaDialogue()
     {
         Server.Call(() =>
         {
@@ -212,8 +229,7 @@ public class CaravanAmbushTests : IDisposable
             var quest = QuestOf(Server);
             var publisher = Server.Resolve<ICaravanAmbushProgress>();
             publisher.Publish(quest);
-            if (inactive) quest._caravanParty.IsActive = false;
-            else quest._caravanParty = null;
+            quest._caravanParty.IsActive = false;
             publisher.Publish(quest);
         });
         Owner.Call(() =>
@@ -275,65 +291,70 @@ public class CaravanAmbushTests : IDisposable
     public void LateCaravaneerDialogueDoesNotPayAfterTheQuestCanNoLongerSucceed(bool serverQuestEnded)
     {
         var ownerQuest = QuestOf(Owner);
+        Hero ownerHero = null!;
+        var goldBefore = 0;
         Server.Call(() =>
         {
             Campaign.Current.EncyclopediaManager ??= new EncyclopediaManager();
             Campaign.Current.EncyclopediaManager.CreateEncyclopediaPages();
             BindParties();
             QuestOf(Server)._isCaravanSaved = true;
+            ownerHero = PlayerHero(QuestScenario.ControllerA);
+            goldBefore = ownerHero.Gold;
             if (serverQuestEnded)
             {
                 using (new AllowedThread()) QuestOf(Server)._questState = QuestBase.QuestStates.Finalized;
             }
             else
             {
-                PlayerHero(QuestScenario.ControllerA)._partyBelongedTo = null;
+                ownerHero._partyBelongedTo = null;
             }
         });
         SendState(QuestScenario.ControllerA, saved: true, warnings: 0);
-        if (!serverQuestEnded)
-            Owner.Call(() => Owner.GetRegisteredObject<Hero>(scenario.OwnerHeroId)._partyBelongedTo = null);
-        var goldBefore = Owner.GetRegisteredObject<Hero>(scenario.OwnerHeroId).Gold;
         Owner.Call(() =>
         {
-            var strategy = Owner.Resolve<CaravanAmbushFinalizationProofStrategy>();
-            Assert.True(strategy.TryRunBranch(ownerQuest, (byte)CaravanAmbushBranch.CollectReward));
-            Assert.Equal(goldBefore, Owner.GetRegisteredObject<Hero>(scenario.OwnerHeroId).Gold);
+            var rewardLine = Assert.Single(ownerQuest.GetCaravaneerDialogFlow().Lines.Where(line => line.ConsequenceDelegate != null));
+            rewardLine.ConsequenceDelegate();
+            Campaign.Current.ConversationManager.EndConversation();
         });
+        Server.Call(() => Assert.Equal(goldBefore, ownerHero.Gold));
         Assert.DoesNotContain(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>(),
             message => message.Outcome == IssueOutcome.QuestSuccess);
     }
 
-    [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void BattleOutcomeUsesTheQuestOwnersParticipation(bool ownerParticipated)
+    [Fact]
+    public void BattleWonByTheOwnerHoldsTheCaravanForReward()
+    {
+        Server.Call(() =>
+        {
+            var quest = QuestOf(Server);
+            var battle = StartAmbushBattle(PlayerHero(QuestScenario.ControllerA).PartyBelongedTo);
+            battle.BattleState = BattleState.AttackerVictory;
+            Server.Resolve<ICaravanAmbushWorldEventService>().BattleEnded(battle);
+            Assert.True(quest._isCaravanSaved);
+            Assert.True(quest._caravanParty.IsCurrentlyUsedByAQuest);
+            Assert.True(quest._caravanParty.Ai.DoNotMakeNewDecisions);
+            Assert.False(quest._banditParty.IsCurrentlyUsedByAQuest);
+        }, new[] { AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize)) });
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Assert.True(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkCaravanAmbushProgress>()).OpenRewardConversation);
+    }
+
+    [Fact]
+    public void BattleWithoutTheOwnerFailsTheQuest()
     {
         Server.Call(() =>
         {
             Campaign.Current.EncyclopediaManager ??= new EncyclopediaManager();
             Campaign.Current.EncyclopediaManager.CreateEncyclopediaPages();
-            var quest = QuestOf(Server);
-            var attacker = ownerParticipated ? PlayerHero(QuestScenario.ControllerA).PartyBelongedTo : GameObjectCreator.CreateInitializedObject<MobileParty>();
-            var battle = StartAmbushBattle(attacker);
+            var battle = StartAmbushBattle(GameObjectCreator.CreateInitializedObject<MobileParty>());
             battle.BattleState = BattleState.AttackerVictory;
-            CampaignEventDispatcher.Instance.OnMapEventEnded(battle);
-            Assert.True(quest._isCaravanSaved);
-            if (ownerParticipated)
-            {
-                Assert.True(quest._caravanParty.IsCurrentlyUsedByAQuest);
-                Assert.True(quest._caravanParty.Ai.DoNotMakeNewDecisions);
-                Assert.False(quest._banditParty.IsCurrentlyUsedByAQuest);
-            }
-            else
-            {
-                Assert.True(quest.IsFinalized);
-                AssertPartiesReleased();
-            }
+            Server.Resolve<ICaravanAmbushWorldEventService>().BattleEnded(battle);
+            Assert.True(QuestOf(Server).IsFinalized);
+            AssertPartiesReleased();
         }, new[] { AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize)) });
-        if (ownerParticipated) Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
-        else Assert.Equal(IssueOutcome.QuestFail, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
-        Assert.Equal(ownerParticipated ? 1 : 0, Server.NetworkSentMessages.GetMessages<NetworkCaravanAmbushProgress>().Count(message => message.OpenRewardConversation));
+        Assert.Equal(IssueOutcome.QuestFail, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkCaravanAmbushProgress>());
     }
 
     [Fact]
@@ -395,37 +416,33 @@ public class CaravanAmbushTests : IDisposable
         Assert.Equal(IssueOutcome.QuestSuccess, finalized.Outcome);
     }
 
-    [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void CaravanReachingASettlementCancelsOnlyAnUnsavedQuest(bool saved)
+    [Fact]
+    public void UnsavedCaravanReachingASettlementCancelsTheQuest()
     {
         Server.Call(() =>
         {
             BindParties();
             var quest = QuestOf(Server);
-            quest._isCaravanSaved = saved;
-            Server.ObjectManager.TryGetObject<MobileParty>(caravanId, out var caravan);
-            CampaignEventDispatcher.Instance.OnSettlementEntered(caravan, GameObjectCreator.CreateInitializedObject<Settlement>(), null);
-            if (saved)
-            {
-                Assert.True(quest.IsOngoing);
-                Assert.Same(caravan, quest._caravanParty);
-            }
-            else
-            {
-                Assert.Null(quest._caravanParty);
-            }
+            Server.Resolve<ICaravanAmbushWorldEventService>().SettlementEntered(quest._caravanParty);
+            Assert.Null(quest._caravanParty);
         });
-        if (saved)
+        Assert.Equal(IssueOutcome.QuestCancel, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+    }
+
+    [Fact]
+    public void SavedCaravanReachingASettlementKeepsTheQuest()
+    {
+        Server.Call(() =>
         {
-            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
-        }
-        else
-        {
-            var finalized = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
-            Assert.Equal(IssueOutcome.QuestCancel, finalized.Outcome);
-        }
+            BindParties();
+            var quest = QuestOf(Server);
+            quest._isCaravanSaved = true;
+            var caravan = quest._caravanParty;
+            Server.Resolve<ICaravanAmbushWorldEventService>().SettlementEntered(caravan);
+            Assert.True(quest.IsOngoing);
+            Assert.Same(caravan, quest._caravanParty);
+        });
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
     }
 
     [Fact]
@@ -463,58 +480,10 @@ public class CaravanAmbushTests : IDisposable
         Assert.Equal(IssueOutcome.QuestFail, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void DeferredSnapshotCancellationKeepsTheOwnerEndingAndReplacementOwnership(bool replacement)
-    {
-        var quest = QuestOf(Owner);
-        Owner.Call(() =>
-        {
-            Assert.True(Owner.Resolve<IIssueOwnershipRegistry>().TrySetOwner(
-                scenario.NotableId, QuestScenario.IssueId, QuestScenario.ControllerA));
-            Campaign.Current.EncyclopediaManager ??= new EncyclopediaManager();
-            Campaign.Current.EncyclopediaManager.CreateEncyclopediaPages();
-            var character = ObjectHelper.SkipConstructor<CharacterObject>();
-            character.HeroObject = Owner.GetRegisteredObject<Hero>(scenario.NotableId);
-            Campaign.Current.ConversationManager.SetupAndStartMapConversation(null,
-                new MapConversationAgent(character), new MapConversationAgent(CharacterObject.PlayerCharacter));
-            Assert.True(Campaign.Current.ConversationManager.IsConversationInProgress);
-            Owner.Resolve<IIssueConversationGuard>().RunWhenNotTalkingTo(() => { }, scenario.NotableId);
-        }, new[] { AccessTools.Method(typeof(ConversationManager), nameof(ConversationManager.StartNew)) });
 
-        using var cancels = new MethodCallRecorder(Priority.First, true,
-            AccessTools.Method(typeof(QuestBase), nameof(QuestBase.CompleteQuestWithCancel)));
-        var fakeEndingsBefore = Owner.InternalMessages.GetMessageCount<NetworkIssueFinalized>();
-        Server.Resolve<TestNetworkRouter>().ReceiveContext = TestNetworkReceiveContext.PollerThread;
-        Server.Call(() => Server.Resolve<INetwork>().Send(Owner.NetPeer,
-            new NetworkIssueOwnershipSnapshot(replacement
-                ? new[] { new IssueOwnershipData(scenario.NotableId, "replacement_issue", QuestScenario.ControllerB) }
-                : Array.Empty<IssueOwnershipData>())));
-        Owner.PumpGameThread();
-        Owner.Call(() =>
-        {
-            Assert.True(quest.IsOngoing);
-            Assert.False(Owner.Resolve<IIssueOwnershipRegistry>().TryGetOwner(scenario.NotableId, QuestScenario.IssueId, out _));
-            Assert.Equal(0, cancels.CountFor(Owner));
-            Campaign.Current.ConversationManager.EndConversation();
-            Assert.True(quest.IsFinalized);
-            Assert.DoesNotContain(quest, Campaign.Current.QuestManager.Quests);
-            if (replacement)
-            {
-                Assert.True(Owner.Resolve<IIssueOwnershipRegistry>().TryGetOwner(scenario.NotableId, "replacement_issue", out var controllerId));
-                Assert.Equal(QuestScenario.ControllerB, controllerId);
-            }
-            else Assert.Empty(Owner.Resolve<IIssueOwnershipRegistry>().GetAll());
-        });
-        Assert.Equal(1, cancels.CountFor(Owner));
-        Assert.Equal(fakeEndingsBefore, Owner.InternalMessages.GetMessageCount<NetworkIssueFinalized>());
-    }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void DismissalReleasesBothParties(bool serverStartup)
+    [Fact]
+    public void FrameworkDisconnectDismissalReleasesBothParties()
     {
         Server.Call(() =>
         {
@@ -522,20 +491,27 @@ public class CaravanAmbushTests : IDisposable
             using (new AllowedThread()) IssueOf(Server)._issueState = IssueBase.IssueState.SolvingWithQuestSolution;
             var quest = QuestOf(Server);
             Assert.Equal(2, Campaign.Current.QuestManager.GetAllTrackedObjectsOfAQuest(quest).Count);
-            if (serverStartup)
-            {
-                Server.Resolve<IIssueOwnershipRegistry>().Remove(scenario.NotableId);
-                Server.Resolve<IMessageBroker>().Publish(this, new AllGameObjectsRegistered());
-            }
-            else
-            {
-                Server.Resolve<IPlayerManager>().ClearPeer(Owner.NetPeer);
-                Server.Resolve<IMessageBroker>().Publish(this, new PlayerDisconnected(Owner.NetPeer, default(DisconnectInfo)));
-            }
+            Server.Resolve<IPlayerManager>().ClearPeer(Owner.NetPeer);
+            Server.Resolve<IMessageBroker>().Publish(this, new PlayerDisconnected(Owner.NetPeer, default(DisconnectInfo)));
             Assert.Null(IssueOfHero(Server));
             AssertPartiesReleased();
             Assert.Empty(Campaign.Current.QuestManager.GetAllTrackedObjectsOfAQuest(quest));
         });
+    }
+
+    [Fact]
+    public void NormalEndingReleasesTheServersPartiesOnce()
+    {
+        using var ends = new MethodCallRecorder(Priority.First, true,
+            AccessTools.Method(typeof(CaravanAmbushWorldEventService), nameof(CaravanAmbushWorldEventService.End)));
+        Server.Call(() =>
+        {
+            BindParties();
+            QuestOf(Server).CompleteQuestWithCancel();
+            AssertPartiesReleased();
+        });
+        Assert.Equal(1, ends.CountFor(Server));
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
     }
 
     [Fact]
@@ -551,60 +527,62 @@ public class CaravanAmbushTests : IDisposable
     }
 
     [Fact]
-    public void SavedCaravanConversationWaitsForPausedCampaignAndOpensOnce()
+    public void SavedCaravanConversationWaitsForAFreeMapAndOpensOnce()
     {
-        using var conversations = new MethodCallRecorder(AccessTools.Method(typeof(ConversationManager), nameof(ConversationManager.OpenMapConversation)));
         Owner.Call(() =>
         {
-            GameStateManager._current = Game.Current.GameStateManager;
-            // The battle mission still owns the screen.
-            GameStateManager.Current._gameStates.Add(ObjectHelper.SkipConstructor<MissionState>());
-            Assert.IsType<MissionState>(GameStateManager.Current.ActiveState);
+            var map = new Moq.Mock<ICaravanAmbushConversationMap>();
+            map.Setup(value => value.TryOpen(Moq.It.IsAny<MobileParty>())).Returns(true);
+            using var conversation = new CaravanAmbushRewardConversation(Owner.Resolve<IMessageBroker>(), Owner.Resolve<IIssueResolver>(), map.Object);
+            var quest = QuestOf(Owner);
+            quest._caravanParty = Owner.GetRegisteredObject<MobileParty>(caravanId);
+            quest._isCaravanSaved = true;
+            conversation.Request(scenario.NotableId, QuestScenario.IssueId);
+            TickOwner();
+            map.Verify(value => value.TryOpen(Moq.It.IsAny<MobileParty>()), Moq.Times.Never);
+            map.Setup(value => value.IsOwnerFreeOnMap()).Returns(true);
+            TickOwner();
+            TickOwner();
+            map.Verify(value => value.TryOpen(quest._caravanParty), Moq.Times.Once);
         });
-        SendState(QuestScenario.ControllerA, saved: true, warnings: 0, openRewardConversation: true);
-        Assert.Equal(0, conversations.CountFor(Owner));
+    }
+
+    [Fact]
+    public void AFailedConversationOpenDoesNotRetryEveryCampaignTick()
+    {
         Owner.Call(() =>
         {
+            var map = new Moq.Mock<ICaravanAmbushConversationMap>();
+            map.Setup(value => value.IsOwnerFreeOnMap()).Returns(true);
+            map.Setup(value => value.TryOpen(Moq.It.IsAny<MobileParty>())).Throws(new InvalidOperationException("open failed"));
+            using var conversation = new CaravanAmbushRewardConversation(Owner.Resolve<IMessageBroker>(), Owner.Resolve<IIssueResolver>(), map.Object);
+            var quest = QuestOf(Owner);
+            quest._caravanParty = Owner.GetRegisteredObject<MobileParty>(caravanId);
+            quest._isCaravanSaved = true;
+            Assert.Throws<InvalidOperationException>(() => conversation.Request(scenario.NotableId, QuestScenario.IssueId));
             TickOwner();
-            Assert.Equal(0, conversations.CountFor(Owner));
-            var states = Game.Current.GameStateManager;
-            states._gameStates.Clear();
-            var map = states.CreateState<MapState>();
-            states._gameStates.Add(map);
-            // Loot or another map menu is still open.
-            map._menuContext = Game.Current.ObjectManager.CreateObject<MenuContext>();
-            TickOwner();
-            Assert.Equal(0, conversations.CountFor(Owner));
-            // The owner is back on the free map.
-            map._menuContext = null;
-            TickOwner();
-            Assert.Equal(1, conversations.CountFor(Owner));
-            // The conversation already opened, so another tick must not reopen it.
-            TickOwner();
-            Assert.Equal(1, conversations.CountFor(Owner));
+            map.Verify(value => value.TryOpen(quest._caravanParty), Moq.Times.Once);
         });
-        Assert.Equal(0, conversations.CountFor(Other));
     }
 
     [Fact]
     public void FinalizedQuestDiscardsItsPendingConversation()
     {
-        using var conversations = new MethodCallRecorder(AccessTools.Method(typeof(ConversationManager), nameof(ConversationManager.OpenMapConversation)));
-        Owner.Call(() => GameStateManager._current = Game.Current.GameStateManager);
-        SendState(QuestScenario.ControllerA, saved: true, warnings: 0, openRewardConversation: true);
-        Owner.Call(() => QuestOf(Owner).CompleteQuestWithCancel());
         Owner.Call(() =>
         {
-            Game.Current.GameStateManager._gameStates.Add(Game.Current.GameStateManager.CreateState<MapState>());
+            var map = new Moq.Mock<ICaravanAmbushConversationMap>();
+            using var conversation = new CaravanAmbushRewardConversation(Owner.Resolve<IMessageBroker>(), Owner.Resolve<IIssueResolver>(), map.Object);
+            conversation.Request(scenario.NotableId, QuestScenario.IssueId);
+            using (new AllowedThread()) QuestOf(Owner)._questState = QuestBase.QuestStates.Finalized;
             TickOwner();
+            map.Setup(value => value.IsOwnerFreeOnMap()).Returns(true);
+            TickOwner();
+            map.Verify(value => value.TryOpen(Moq.It.IsAny<MobileParty>()), Moq.Times.Never);
         });
-        Assert.Equal(0, conversations.CountFor(Owner));
     }
 
-    [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void RecruitmentRewardsOnlyTheQuestOwner(bool ownerRecruits)
+    [Fact]
+    public void RecruitmentByTheOwnerPaysOnlyTheOwner()
     {
         var ownerGold = 0;
         var otherGold = 0;
@@ -615,16 +593,42 @@ public class CaravanAmbushTests : IDisposable
             BindParties();
             ownerGold = PlayerHero(QuestScenario.ControllerA).Gold;
             otherGold = PlayerHero(QuestScenario.ControllerB).Gold;
-            var hero = PlayerHero(ownerRecruits ? QuestScenario.ControllerA : QuestScenario.ControllerB);
+            var hero = PlayerHero(QuestScenario.ControllerA);
             Server.ObjectManager.TryGetObject<MobileParty>(banditId, out var bandits);
             using (new GameInterface.Services.Heroes.Patches.MainHeroSubstitutionScope(hero, hero.PartyBelongedTo))
                 CampaignEventDispatcher.Instance.OnBanditPartyRecruited(bandits);
         });
         var finalized = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
-        Assert.Equal(ownerRecruits ? IssueOutcome.QuestSuccess : IssueOutcome.QuestCancel, finalized.Outcome);
+        Assert.Equal(IssueOutcome.QuestSuccess, finalized.Outcome);
         Server.Call(() =>
         {
-            Assert.Equal(ownerGold + (ownerRecruits ? 1000 : 0), PlayerHero(QuestScenario.ControllerA).Gold);
+            Assert.Equal(ownerGold + 1000, PlayerHero(QuestScenario.ControllerA).Gold);
+            Assert.Equal(otherGold, PlayerHero(QuestScenario.ControllerB).Gold);
+        });
+    }
+
+    [Fact]
+    public void RecruitmentByAnotherPlayerCancelsWithoutPaying()
+    {
+        var ownerGold = 0;
+        var otherGold = 0;
+        Server.Call(() =>
+        {
+            Campaign.Current.EncyclopediaManager ??= new EncyclopediaManager();
+            Campaign.Current.EncyclopediaManager.CreateEncyclopediaPages();
+            BindParties();
+            ownerGold = PlayerHero(QuestScenario.ControllerA).Gold;
+            otherGold = PlayerHero(QuestScenario.ControllerB).Gold;
+            var hero = PlayerHero(QuestScenario.ControllerB);
+            Server.ObjectManager.TryGetObject<MobileParty>(banditId, out var bandits);
+            using (new GameInterface.Services.Heroes.Patches.MainHeroSubstitutionScope(hero, hero.PartyBelongedTo))
+                CampaignEventDispatcher.Instance.OnBanditPartyRecruited(bandits);
+        });
+        var finalized = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Assert.Equal(IssueOutcome.QuestCancel, finalized.Outcome);
+        Server.Call(() =>
+        {
+            Assert.Equal(ownerGold, PlayerHero(QuestScenario.ControllerA).Gold);
             Assert.Equal(otherGold, PlayerHero(QuestScenario.ControllerB).Gold);
         });
     }

@@ -43,7 +43,6 @@ internal class CaravanAmbushPatches
     private static void Finalize(QuestBase __instance)
     {
         if (ModInformation.IsClient || !(__instance is Quest quest)) return;
-        if (ContainerProvider.TryResolve<ICaravanAmbushProgress>(out var progress)) progress.Publish(quest);
         if (ContainerProvider.TryResolve<ICaravanAmbushWorldEventService>(out var events)) events.End(quest);
     }
 
@@ -52,7 +51,7 @@ internal class CaravanAmbushPatches
     private static void IssueFinalized(IssueBase __instance)
     {
         // The framework dismisses a disconnected owner's issue without finalizing its quest.
-        if (ModInformation.IsClient || !(__instance.IssueQuest is Quest quest)) return;
+        if (ModInformation.IsClient || !(__instance.IssueQuest is Quest quest) || !quest.IsOngoing) return;
         if (ContainerProvider.TryResolve<ICaravanAmbushWorldEventService>(out var events)) events.End(quest);
     }
 

@@ -441,14 +441,15 @@ internal class FinalizationCoordinator : IHandler, IIssueFinalizationReplay
     {
         if (!issueResolver.TryResolve(issueOwnerId, issueId, out _, out var issue, out _)) return;
 
-        // Keep the identity and quest captured before the snapshot replaces the ownership mirror.
+        // Capture the issue because a deferred replay may run after a replacement issue arrives.
         var quest = issue.IssueQuest;
-        QueueReplay(issueOwnerId, wasOwner && quest != null && Campaign.Current.QuestManager.Quests.Contains(quest),
+        QueueReplay(issueOwnerId, wasOwner && IsRunningLocally(quest),
             () => ReplayEnding(issue, IssueOutcome.QuestCancel, wasOwner));
     }
 
     private void QueueReplay(string issueOwnerId, bool ownerQuest, Action replay)
     {
+        // Vanilla ends the owner's running quest mid dialogue; other removals wait for its lines to close.
         if (ownerQuest) conversationGuard.RunInOrder(replay, issueOwnerId);
         else conversationGuard.RunWhenNotTalkingTo(replay, issueOwnerId);
     }
@@ -486,9 +487,11 @@ internal class FinalizationCoordinator : IHandler, IIssueFinalizationReplay
             return false;
         }
 
-        var quest = issueOwner.Issue.IssueQuest;
-        return quest != null && Campaign.Current.QuestManager.Quests.Contains(quest);
+        return IsRunningLocally(issueOwner.Issue.IssueQuest);
     }
+
+    private static bool IsRunningLocally(QuestBase quest) =>
+        quest != null && Campaign.Current.QuestManager.Quests.Contains(quest);
 
     private bool TryGetPlayer(object who, string messageName, out Player player)
     {

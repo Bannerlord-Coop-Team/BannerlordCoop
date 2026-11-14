@@ -54,12 +54,10 @@ internal class IssueOwnershipSnapshotReceiver : IHandler
         var rememberedOwners = ownership.GetAll();
         var snapshotPairs = new HashSet<(string IssueOwnerId, string IssueId)>(
             owners.Select(owner => (owner.IssueOwnerId, owner.IssueId)));
-        foreach (var remembered in rememberedOwners)
-        {
-            if (snapshotPairs.Contains((remembered.IssueOwnerId, remembered.IssueId))) continue;
-            finalization.ReplayLocalCancel(remembered.IssueOwnerId, remembered.IssueId,
-                remembered.ControllerId == controller.ControllerId);
-        }
+        var dropped = rememberedOwners
+            .Where(remembered => !snapshotPairs.Contains((remembered.IssueOwnerId, remembered.IssueId)))
+            .Select(remembered => (remembered.IssueOwnerId, remembered.IssueId,
+                WasOwner: remembered.ControllerId == controller.ControllerId)).ToArray();
 
         // Clear remembered controllers before the authoritative snapshot, since accept is first-wins.
         foreach (var remembered in rememberedOwners)
@@ -71,5 +69,9 @@ internal class IssueOwnershipSnapshotReceiver : IHandler
             if (resolver.TryResolve(owner.IssueOwnerId, owner.IssueId, out _, out var issue, out _))
                 issue.IsTriedToSolveBefore = owner.ControllerId == controller.ControllerId;
         }
+
+        foreach (var entry in dropped)
+            GameThread.RunSafe(() => finalization.ReplayLocalCancel(entry.IssueOwnerId, entry.IssueId, entry.WasOwner),
+                context: nameof(IssueOwnershipSnapshotReceiver));
     }
 }

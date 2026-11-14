@@ -41,6 +41,8 @@ internal class IssuesModule : Module
         builder.RegisterType<IssueAcceptPreconditions>().As<IIssueAcceptPreconditions>().InstancePerDependency();
         builder.RegisterType<ArtisanProductsProgress>().As<IArtisanProductsProgress>().InstancePerDependency();
         builder.RegisterType<OutcomeDispatcher>().As<IOutcomeDispatcher>().SingleInstance();
+        builder.Register(context => context.Resolve<CaravanAmbushRewardConversation>()).As<ICaravanAmbushRewardConversation>();
+        builder.RegisterType<CaravanAmbushConversationMap>().As<ICaravanAmbushConversationMap>().InstancePerDependency();
         builder.RegisterType<CaravanAmbushProgress>().As<ICaravanAmbushProgress>().InstancePerLifetimeScope();
         builder.RegisterType<CaravanAmbushWorldEventService>().As<ICaravanAmbushWorldEventService>().InstancePerLifetimeScope();
         builder.RegisterType<HeadmanHerdCleanup>().As<IHeadmanHerdCleanup>().SingleInstance();

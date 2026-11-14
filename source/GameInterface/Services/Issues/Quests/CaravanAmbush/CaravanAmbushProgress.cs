@@ -3,7 +3,6 @@ using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
-using LiteNetLib;
 using System.Linq;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
@@ -13,6 +12,7 @@ namespace GameInterface.Services.Issues.Quests.CaravanAmbush;
 
 internal interface ICaravanAmbushProgress
 {
+    (MobileParty Caravan, MobileParty Bandits, bool Saved, int Warnings, int JournalCount) Capture(Quest quest);
     void Publish(Quest quest, bool openRewardConversation = false);
 }
 
@@ -32,31 +32,26 @@ internal class CaravanAmbushProgress : ICaravanAmbushProgress
         this.players = players;
     }
 
+    public (MobileParty Caravan, MobileParty Bandits, bool Saved, int Warnings, int JournalCount) Capture(Quest quest) =>
+        (quest._caravanParty, quest._banditParty, quest._isCaravanSaved, quest._vicinityCheckFailCounter, quest.JournalEntries.Count);
+
     public void Publish(Quest quest, bool openRewardConversation = false)
     {
-        if (!TryGetOwnerPeer(quest, out var issue, out var ownerId, out var controllerId, out var peer) ||
-            !TryGetPartyId(quest._caravanParty, out var caravanId) ||
-            !TryGetPartyId(quest._banditParty, out var banditId)) return;
+        var issue = IssueManager.GetIssueOfQuest(quest);
+        if (issue == null) return;
+        if (!objects.TryGetIdWithLogging(issue.IssueOwner, out var ownerId)) return;
+        if (!owners.TryGetOwnerControllerId(issue, out var controllerId)) return;
+        if (!players.TryGetPeer(controllerId, out var peer)) return;
+        if (!TryGetPartyId(quest._caravanParty, out var caravanId)) return;
+        if (!TryGetPartyId(quest._banditParty, out var banditId)) return;
         var journal = quest.JournalEntries.Select(entry => new IssueJournalEntry(entry)).ToArray();
         network.Send(peer, new NetworkCaravanAmbushProgress(ownerId, issue.StringId, controllerId, caravanId,
             banditId, quest._isCaravanSaved, quest._vicinityCheckFailCounter, journal, openRewardConversation));
     }
 
-    private bool TryGetOwnerPeer(Quest quest, out IssueBase issue, out string ownerId,
-        out string controllerId, out NetPeer peer)
-    {
-        ownerId = null;
-        controllerId = null;
-        peer = null;
-        issue = IssueManager.GetIssueOfQuest(quest);
-        return issue != null && objects.TryGetIdWithLogging(issue.IssueOwner, out ownerId) &&
-            owners.TryGetOwnerControllerId(issue, out controllerId) && players.TryGetPeer(controllerId, out peer);
-    }
-
     private bool TryGetPartyId(MobileParty party, out string id)
     {
-        // An empty id tells the owner that the party is gone. An active party without an id skips the publish.
-        id = string.Empty;
+        id = null;
         return party == null || !party.IsActive || objects.TryGetIdWithLogging(party, out id);
     }
 }
