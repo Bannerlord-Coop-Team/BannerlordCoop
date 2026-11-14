@@ -42,7 +42,7 @@ internal class IssuesModule : Module
         builder.RegisterType<ArtisanProductsProgress>().As<IArtisanProductsProgress>().InstancePerDependency();
         builder.RegisterType<OutcomeDispatcher>().As<IOutcomeDispatcher>().SingleInstance();
         builder.RegisterType<CaravanAmbushProgress>().As<ICaravanAmbushProgress>().InstancePerLifetimeScope();
-        builder.RegisterType<CaravanAmbushEvents>().As<ICaravanAmbushEvents>().InstancePerLifetimeScope();
+        builder.RegisterType<CaravanAmbushWorldEventService>().As<ICaravanAmbushWorldEventService>().InstancePerLifetimeScope();
         builder.RegisterType<HeadmanHerdCleanup>().As<IHeadmanHerdCleanup>().SingleInstance();
         builder.RegisterType<IssueCancellationCoordinator>().As<IIssueCancellationCoordinator>().InstancePerLifetimeScope();
         builder.Register(context => context.Resolve<ActiveIssueDismisser>()).As<IActiveIssueDismisser>();
@@ -51,6 +51,7 @@ internal class IssuesModule : Module
         builder.RegisterType<MerchantOutlawsProgress>().As<IMerchantOutlawsProgress>().InstancePerLifetimeScope();
         builder.RegisterType<MerchantOutlawsHourlyTick>().As<IMerchantOutlawsHourlyTick>().InstancePerDependency();
         builder.Register(context => context.Resolve<LordSolutionCoordinator>()).As<ILordSolutionCoordinator>();
+        builder.Register(context => context.Resolve<FinalizationCoordinator>()).As<IIssueFinalizationReplay>();
         builder.Register(context => context.Resolve<QuestSolutionAcceptCoordinator>()).As<IQuestSolutionAcceptCoordinator>();
         builder.RegisterType<TheConquestOfSettlementService>()
             .As<ITheConquestOfSettlementService>()

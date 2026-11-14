@@ -28,16 +28,18 @@ public class IssueOwnershipSnapshotReceiverTests : IDisposable
     private readonly bool wasServer = ModInformation.IsServer;
     private readonly IssueOwnershipRegistry registry = new IssueOwnershipRegistry();
     private readonly MessageBroker broker = new MessageBroker();
-    private readonly List<NetworkIssueFinalized> finalized = new List<NetworkIssueFinalized>();
+    private readonly List<(string IssueOwnerId, string IssueId, bool WasOwner)> cancelled = new();
     private readonly IssueOwnershipSnapshotReceiver receiver;
 
     public IssueOwnershipSnapshotReceiverTests()
     {
         ModInformation.IsServer = false;
         registry.TrySetOwner("hero_1", "issue_1", "stale-player");
-        broker.Subscribe<NetworkIssueFinalized>(payload => finalized.Add(payload.What));
+        var finalization = new Mock<IIssueFinalizationReplay>();
+        finalization.Setup(replay => replay.ReplayLocalCancel(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>()))
+            .Callback<string, string, bool>((ownerId, issueId, wasOwner) => cancelled.Add((ownerId, issueId, wasOwner)));
         receiver = new IssueOwnershipSnapshotReceiver(broker, registry,
-            Mock.Of<IIssueResolver>(), Mock.Of<IControllerIdProvider>());
+            Mock.Of<IIssueResolver>(), Mock.Of<IControllerIdProvider>(c => c.ControllerId == "stale-player"), finalization.Object);
     }
 
     public void Dispose()
@@ -76,10 +78,10 @@ public class IssueOwnershipSnapshotReceiverTests : IDisposable
     {
         Receive(new NetworkIssueOwnershipSnapshot(Array.Empty<IssueOwnershipData>()));
 
-        var replayed = Assert.Single(finalized);
+        var replayed = Assert.Single(cancelled);
         Assert.Equal("hero_1", replayed.IssueOwnerId);
         Assert.Equal("issue_1", replayed.IssueId);
-        Assert.Equal(IssueOutcome.QuestCancel, replayed.Outcome);
+        Assert.True(replayed.WasOwner);
     }
 
     [Fact]
@@ -89,7 +91,7 @@ public class IssueOwnershipSnapshotReceiverTests : IDisposable
 
         Assert.True(registry.TryGetOwner("hero_1", "issue_1", out var owner));
         Assert.Equal("new-player", owner);
-        Assert.Empty(finalized);
+        Assert.Empty(cancelled);
     }
 
     [Fact]

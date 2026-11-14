@@ -26,7 +26,7 @@ namespace GameInterface.Services.Issues.Framework.Finalization;
 /// The owning player's client reports how its quest ended, the server runs that ending as the owner and
 /// announces it, and then every client ends its copy of the issue without running vanilla's consequences again.
 /// </summary>
-internal class FinalizationCoordinator : IHandler
+internal class FinalizationCoordinator : IHandler, IIssueFinalizationReplay
 {
     private static readonly ILogger Logger = LogManager.GetLogger<FinalizationCoordinator>();
 
@@ -47,6 +47,7 @@ internal class FinalizationCoordinator : IHandler
     private readonly IIssueConversationGuard conversationGuard;
     private readonly IQuestSolutionAcceptCoordinator acceptCoordinator;
     private readonly ITextObjectComparer textComparer;
+    private readonly ILordSolutionCoordinator lordSolutions;
 
     public FinalizationCoordinator(
         IMessageBroker messageBroker,
@@ -59,7 +60,8 @@ internal class FinalizationCoordinator : IHandler
         IAlternativeSolutionCommitments commitments,
         IIssueConversationGuard conversationGuard,
         IQuestSolutionAcceptCoordinator acceptCoordinator,
-        ITextObjectComparer textComparer)
+        ITextObjectComparer textComparer,
+        ILordSolutionCoordinator lordSolutions)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -72,6 +74,7 @@ internal class FinalizationCoordinator : IHandler
         this.conversationGuard = conversationGuard;
         this.acceptCoordinator = acceptCoordinator;
         this.textComparer = textComparer;
+        this.lordSolutions = lordSolutions;
 
         messageBroker.Subscribe<QuestOutcomeRequested>(Handle_QuestOutcomeRequested);
         messageBroker.Subscribe<QuestBranchRequested>(Handle_QuestBranchRequested);
@@ -445,6 +448,19 @@ internal class FinalizationCoordinator : IHandler
         }, context: nameof(FinalizationCoordinator));
     }
 
+    public void ReplayLocalCancel(string issueOwnerId, string issueId, bool wasOwner)
+    {
+        lordSolutions.ClearPending(issueOwnerId, issueId);
+        if (!issueResolver.TryResolve(issueOwnerId, issueId, out _, out var issue, out _)) return;
+
+        // Keep the identity and quest captured before the snapshot replaces the ownership mirror.
+        var quest = issue.IssueQuest;
+        if (wasOwner && quest != null && Campaign.Current.QuestManager.Quests.Contains(quest))
+            conversationGuard.RunInOrder(() => ReplayEnding(issue, IssueOutcome.QuestCancel, wasOwner), issueOwnerId);
+        else
+            conversationGuard.RunWhenNotTalkingTo(() => ReplayEnding(issue, IssueOutcome.QuestCancel, wasOwner), issueOwnerId);
+    }
+
     private void ReplayEnding(NetworkIssueFinalized data)
     {
         var hasOwner = ownership.TryGetOwner(data.IssueOwnerId, data.IssueId, out var owner);
@@ -456,11 +472,16 @@ internal class FinalizationCoordinator : IHandler
             return;
         }
 
+        ReplayEnding(issue, data.Outcome, isOwner);
+    }
+
+    private void ReplayEnding(IssueBase issue, IssueOutcome outcome, bool isOwner)
+    {
         using (new AllowedThread())
         using (new QuestEndingReplay())
         using (new QuestJournalReplay())
         {
-            Replay(issue, data.Outcome, isOwner);
+            Replay(issue, outcome, isOwner);
         }
     }
 

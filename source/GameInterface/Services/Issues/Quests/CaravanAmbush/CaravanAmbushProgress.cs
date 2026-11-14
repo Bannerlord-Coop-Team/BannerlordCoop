@@ -45,10 +45,8 @@ internal class CaravanAmbushProgress : ICaravanAmbushProgress
 
     public void SendConversation(Quest quest)
     {
-        if (quest._caravanParty == null ||
-            !TryGetOwnerPeer(quest, out var issue, out var ownerId, out var controllerId, out var peer) ||
-            !objects.TryGetIdWithLogging(quest._caravanParty, out var caravanId)) return;
-        network.Send(peer, new NetworkCaravanAmbushConversation(ownerId, issue.StringId, controllerId, caravanId));
+        if (!TryGetOwnerPeer(quest, out var issue, out var ownerId, out var controllerId, out var peer)) return;
+        network.Send(peer, new NetworkCaravanAmbushConversation(ownerId, issue.StringId, controllerId));
     }
 
     private bool TryGetOwnerPeer(Quest quest, out IssueBase issue, out string ownerId,

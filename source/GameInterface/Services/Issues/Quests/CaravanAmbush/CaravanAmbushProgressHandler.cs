@@ -67,9 +67,11 @@ internal class CaravanAmbushProgressHandler : IHandler
     private static void ShowProximityWarning(int previous, int warnings)
     {
         if (warnings <= previous || warnings >= CaughtAt) return;
-        var warning = warnings == FinalWarning
-            ? new TextObject("{=uD2pfRAh}Get back immediately! If you keep this close to the caravan the ambushers will certainly notice you.")
-            : new TextObject("{=ki1CWgcP}Warning! You are too close to the caravan. Stay a bit farther away.");
+        TextObject warning;
+        if (warnings == FinalWarning)
+            warning = new TextObject("{=uD2pfRAh}Get back immediately! If you keep this close to the caravan the ambushers will certainly notice you.");
+        else
+            warning = new TextObject("{=ki1CWgcP}Warning! You are too close to the caravan. Stay a bit farther away.");
         MBInformationManager.AddQuickInformation(warning);
     }
 

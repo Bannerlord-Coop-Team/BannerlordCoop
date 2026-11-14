@@ -11,25 +11,24 @@ using Quest = TaleWorlds.CampaignSystem.Issues.CaravanAmbushIssueBehavior.Carava
 
 namespace GameInterface.Services.Issues.Quests.CaravanAmbush;
 
-internal interface ICaravanAmbushEvents
+internal interface ICaravanAmbushWorldEventService
 {
     void Run(Action<Quest> action);
     void BattleEnded(MapEvent battle);
-    void End(Quest quest, bool publishFinalState);
-    void Release(Quest quest);
+    void End(Quest quest);
 }
 
-internal class CaravanAmbushEvents : ICaravanAmbushEvents
+internal class CaravanAmbushWorldEventService : ICaravanAmbushWorldEventService
 {
     private readonly IOutcomeDispatcher dispatcher;
-    private readonly ICaravanAmbushProgress publisher;
+    private readonly ICaravanAmbushProgress progress;
     private readonly IRetreatedMapEventPartyTracker retreatedPartyTracker;
 
-    public CaravanAmbushEvents(IOutcomeDispatcher dispatcher, ICaravanAmbushProgress publisher,
+    public CaravanAmbushWorldEventService(IOutcomeDispatcher dispatcher, ICaravanAmbushProgress progress,
         IRetreatedMapEventPartyTracker retreatedPartyTracker)
     {
         this.dispatcher = dispatcher;
-        this.publisher = publisher;
+        this.progress = progress;
         this.retreatedPartyTracker = retreatedPartyTracker;
     }
 
@@ -37,19 +36,18 @@ internal class CaravanAmbushEvents : ICaravanAmbushEvents
     {
         dispatcher.RunAsOwners<Quest>(quest =>
         {
-            var before = (quest._caravanParty, quest._banditParty, quest._isCaravanSaved,
-                quest._vicinityCheckFailCounter, quest.JournalEntries.Count);
+            static (MobileParty, MobileParty, bool, int, int) SyncedState(Quest q) =>
+                (q._caravanParty, q._banditParty, q._isCaravanSaved, q._vicinityCheckFailCounter, q.JournalEntries.Count);
+
+            var before = SyncedState(quest);
             action(quest);
-            var after = (quest._caravanParty, quest._banditParty, quest._isCaravanSaved,
-                quest._vicinityCheckFailCounter, quest.JournalEntries.Count);
-            if (quest.IsOngoing && before != after)
-                publisher.Publish(quest);
+            if (quest.IsOngoing && SyncedState(quest) != before)
+                progress.Publish(quest);
         });
     }
 
-    public void End(Quest quest, bool publishFinalState)
+    public void End(Quest quest)
     {
-        if (publishFinalState) publisher.Publish(quest);
         quest.RemoveAllTrackedObjects();
         Release(quest);
     }
@@ -65,15 +63,14 @@ internal class CaravanAmbushEvents : ICaravanAmbushEvents
         bool OnSide(MapEventSide side, MobileParty party) => side.Parties.Any(entry => entry.Party == party.Party);
         if (OnSide(losers, quest._caravanParty))
         {
-            HoldCaravanForReward(quest);
+            Release(quest);
             quest.OnCaravanDestroyed(winners.LeaderParty);
             return;
         }
         if (!OnSide(losers, quest._banditParty)) return;
         if (quest._isCaravanSaved) return;
         quest._isCaravanSaved = true;
-        HoldCaravanForReward(quest);
-        var ownerParty = MobileParty.MainParty;
+        var ownerParty = Hero.MainHero.PartyBelongedTo;
         // A retreated party stays in the winners list until the event is finalized.
         var ownerWon = ownerParty != null && !retreatedPartyTracker.IsRetreated(battle, ownerParty.Party) &&
             OnSide(winners, ownerParty);
@@ -88,26 +85,19 @@ internal class CaravanAmbushEvents : ICaravanAmbushEvents
         }
         else
         {
-            publisher.SendConversation(quest);
+            HoldCaravanForReward(quest);
+            progress.SendConversation(quest);
         }
     }
 
     private void HoldCaravanForReward(Quest quest)
     {
-        if (quest._isCaravanSaved && quest._caravanParty?.IsActive == true)
-        {
-            // Keep the caravan available for the owner's reward conversation.
-            quest._caravanParty.SetMoveGoToPoint(quest._caravanParty.Position, MobileParty.NavigationType.Default);
-            quest._caravanParty.Ai.SetDoNotMakeNewDecisions(true);
-            ReleaseParty(quest._banditParty, quest._banditParty?.HomeSettlement);
-        }
-        else
-        {
-            Release(quest);
-        }
+        quest._caravanParty.SetMoveGoToPoint(quest._caravanParty.Position, MobileParty.NavigationType.Default);
+        quest._caravanParty.Ai.SetDoNotMakeNewDecisions(true);
+        ReleaseParty(quest._banditParty, quest._banditParty?.HomeSettlement);
     }
 
-    public void Release(Quest quest)
+    private void Release(Quest quest)
     {
         ReleaseParty(quest._caravanParty, quest._targetSettlement);
         ReleaseParty(quest._banditParty, quest._banditParty?.HomeSettlement);

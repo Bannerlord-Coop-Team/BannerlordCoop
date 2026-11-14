@@ -9,4 +9,6 @@ internal interface ILordSolutionCoordinator
 
     /// <summary>The owner's counter-offer decision is waiting for the server, so the merchant must not ask again.</summary>
     bool IsDecisionPending(IssueBase issue);
+
+    void ClearPending(string issueOwnerId, string issueId);
 }

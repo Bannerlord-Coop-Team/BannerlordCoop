@@ -33,15 +33,8 @@ internal class CaravanAmbushEventPatches
     [HarmonyPostfix]
     private static void Hourly() => Run(quest =>
     {
-        if (MobileParty.MainParty != null)
-        {
+        if (Hero.MainHero.PartyBelongedTo != null || quest._caravanParty?.MapEvent != null || quest._isCaravanSaved)
             quest.HourlyTick();
-            return;
-        }
-        // A captured owner has no party, but an active ambush must still lose invulnerability after six hours.
-        var battle = quest._caravanParty?.MapEvent;
-        if (battle != null && battle.IsInvulnerable && battle.BattleStartTime.ElapsedHoursUntilNow > 6f)
-            battle.IsInvulnerable = false;
     });
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnMapEventStarted))]
@@ -53,7 +46,7 @@ internal class CaravanAmbushEventPatches
     [HarmonyPostfix]
     private static void BattleEnded(MapEvent mapEvent)
     {
-        if (ModInformation.IsServer && ContainerProvider.TryResolve<ICaravanAmbushEvents>(out var events))
+        if (ModInformation.IsServer && ContainerProvider.TryResolve<ICaravanAmbushWorldEventService>(out var events))
             events.BattleEnded(mapEvent);
     }
 
@@ -76,7 +69,6 @@ internal class CaravanAmbushEventPatches
     private static void Arrived(MobileParty party, Settlement settlement, Hero hero) => Run(quest =>
     {
         if (party == null || quest._caravanParty != party || quest._isCaravanSaved) return;
-        quest.HandlePartyAiAfterCompletion();
         DestroyPartyAction.Apply(party.Party, party);
         quest._caravanParty = null;
         quest.CompleteQuestWithCancel();
@@ -84,6 +76,6 @@ internal class CaravanAmbushEventPatches
 
     private static void Run(Action<Quest> action)
     {
-        if (ModInformation.IsServer && ContainerProvider.TryResolve<ICaravanAmbushEvents>(out var events)) events.Run(action);
+        if (ModInformation.IsServer && ContainerProvider.TryResolve<ICaravanAmbushWorldEventService>(out var events)) events.Run(action);
     }
 }

@@ -3,7 +3,6 @@ using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.Interface;
-using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using Helpers;
 using TaleWorlds.CampaignSystem;
@@ -18,17 +17,15 @@ namespace GameInterface.Services.Issues.Quests.CaravanAmbush;
 internal class CaravanAmbushConversationHandler : IHandler
 {
     private readonly IMessageBroker broker;
-    private readonly IObjectManager objects;
     private readonly IIssueResolver issues;
     private readonly IControllerIdProvider controller;
     private readonly IIssueConversationGuard conversationGuard;
     private NetworkCaravanAmbushConversation? pendingConversation;
 
-    public CaravanAmbushConversationHandler(IMessageBroker broker, IObjectManager objects, IIssueResolver issues,
+    public CaravanAmbushConversationHandler(IMessageBroker broker, IIssueResolver issues,
         IControllerIdProvider controller, IIssueConversationGuard conversationGuard)
     {
         this.broker = broker;
-        this.objects = objects;
         this.issues = issues;
         this.controller = controller;
         this.conversationGuard = conversationGuard;
@@ -57,7 +54,7 @@ internal class CaravanAmbushConversationHandler : IHandler
     private void Tick(MessagePayload<CampaignTick> payload)
     {
         // Vanilla TickEvent stops while paused, including after battle loot closes.
-        if (ModInformation.IsClient && pendingConversation.HasValue) TryOpenConversation();
+        if (ModInformation.IsClient) TryOpenConversation();
     }
 
     private void TryOpenConversation()
@@ -65,10 +62,7 @@ internal class CaravanAmbushConversationHandler : IHandler
         if (!pendingConversation.HasValue) return;
         var data = pendingConversation.Value;
         // These cases discard the pending conversation.
-        if (data.ControllerId != controller.ControllerId ||
-            !issues.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _) ||
-            !(issue.IssueQuest is Quest quest) || !quest.IsOngoing ||
-            !objects.TryGetObjectWithLogging<MobileParty>(data.CaravanId, out var caravan) || !caravan.IsActive)
+        if (!TryResolvePending(data, out var quest, out var caravan))
         {
             pendingConversation = null;
             return;
@@ -82,6 +76,17 @@ internal class CaravanAmbushConversationHandler : IHandler
             new ConversationCharacterData(Hero.MainHero.CharacterObject),
             new ConversationCharacterData(leader));
         pendingConversation = null;
+    }
+
+    private bool TryResolvePending(NetworkCaravanAmbushConversation data, out Quest quest, out MobileParty caravan)
+    {
+        quest = null;
+        caravan = null;
+        if (!issues.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _) ||
+            !(issue.IssueQuest is Quest resolved) || !resolved.IsOngoing) return false;
+        quest = resolved;
+        caravan = quest._caravanParty;
+        return !quest._isCaravanSaved || caravan?.IsActive == true;
     }
 
     private bool IsOwnerFreeOnMap() => GameStateManager.Current?.ActiveState is MapState map && !map.AtMenu &&

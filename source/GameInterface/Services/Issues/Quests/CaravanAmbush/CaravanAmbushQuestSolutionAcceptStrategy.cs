@@ -10,12 +10,12 @@ namespace GameInterface.Services.Issues.Quests.CaravanAmbush;
 internal class CaravanAmbushQuestSolutionAcceptStrategy : IQuestSolutionAcceptStrategy
 {
     private readonly IIssueOwnerResolver owners;
-    private readonly ICaravanAmbushProgress publisher;
+    private readonly ICaravanAmbushProgress progress;
 
-    public CaravanAmbushQuestSolutionAcceptStrategy(IIssueOwnerResolver owners, ICaravanAmbushProgress publisher)
+    public CaravanAmbushQuestSolutionAcceptStrategy(IIssueOwnerResolver owners, ICaravanAmbushProgress progress)
     {
         this.owners = owners;
-        this.publisher = publisher;
+        this.progress = progress;
     }
 
     public byte[] Capture(IssueBase issue) => Array.Empty<byte>();
@@ -29,6 +29,6 @@ internal class CaravanAmbushQuestSolutionAcceptStrategy : IQuestSolutionAcceptSt
             // StartQuest is suppressed on the server, so vanilla spawns the parties without registering listeners.
             quest.OnQuestAccepted();
         }
-        publisher.Publish(quest);
+        progress.Publish(quest);
     }
 }

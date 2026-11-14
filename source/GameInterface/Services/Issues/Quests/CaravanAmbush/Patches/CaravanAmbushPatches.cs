@@ -35,18 +35,15 @@ internal class CaravanAmbushPatches
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.HandlePartyAiAfterCompletion))]
     [HarmonyPrefix]
-    private static bool Release(Quest __instance)
-    {
-        if (ModInformation.IsServer && ContainerProvider.TryResolve<ICaravanAmbushEvents>(out var events)) events.Release(__instance);
-        return false;
-    }
+    private static bool Release() => false;
 
     [HarmonyPatch(typeof(QuestBase), nameof(QuestBase.FinalizeQuest))]
     [HarmonyPrefix]
     private static void Finalize(QuestBase __instance)
     {
         if (ModInformation.IsClient || !(__instance is Quest quest)) return;
-        if (ContainerProvider.TryResolve<ICaravanAmbushEvents>(out var events)) events.End(quest, publishFinalState: true);
+        if (ContainerProvider.TryResolve<ICaravanAmbushProgress>(out var progress)) progress.Publish(quest);
+        if (ContainerProvider.TryResolve<ICaravanAmbushWorldEventService>(out var events)) events.End(quest);
     }
 
     [HarmonyPatch(typeof(IssueBase), nameof(IssueBase.IssueFinalized))]
@@ -55,7 +52,7 @@ internal class CaravanAmbushPatches
     {
         // The framework dismisses a disconnected owner's issue without finalizing its quest.
         if (ModInformation.IsClient || !(__instance.IssueQuest is Quest quest)) return;
-        if (ContainerProvider.TryResolve<ICaravanAmbushEvents>(out var events)) events.End(quest, publishFinalState: false);
+        if (ContainerProvider.TryResolve<ICaravanAmbushWorldEventService>(out var events)) events.End(quest);
     }
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.InitializeQuestOnGameLoad))]

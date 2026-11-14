@@ -193,7 +193,7 @@ internal class LordSolutionCoordinator : ILordSolutionCoordinator, IHandler
             context: nameof(LordSolutionCoordinator));
     }
 
-    private void ClearPending(string issueOwnerId, string issueId)
+    public void ClearPending(string issueOwnerId, string issueId)
     {
         if (!objects.TryGetObject<Hero>(issueOwnerId, out var owner)) return;
         pendingDecisions.RemoveWhere(issue => issue.StringId == issueId && issue.IssueOwner == owner);
