@@ -371,6 +371,7 @@ public class VillageHostileActionTests : MapEventTestBase
                 VillageHostileAction.Raid,
                 MobileParty.MainParty,
                 Settlement.CurrentSettlement));
+            client.Resolve<IVillageHostileActionInterface>().TryTrackHostileActionRequest();
         }, MapEventDisabledMethods);
 
         client.SimulateMessage(Server.NetPeer,
@@ -1146,7 +1147,7 @@ public class VillageHostileActionTests : MapEventTestBase
                 Assert.False(Server.ObjectManager.TryGetObject<MapEvent>(reopenedEventId, out _));
             }, MapEventDisabledMethods);
             Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleSimulationFinished>());
-            Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionStarted>());
+            Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkRaidContinuationRequested>());
             client.Call(() =>
             {
                 var reopened = PlayerEncounter.Current;
@@ -1277,7 +1278,7 @@ public class VillageHostileActionTests : MapEventTestBase
         // The completion finalized through BattleFinalizeHandler, which told the leader's client
         // to request the continuation once the result screens are done.
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionDenied>());
-        var started = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionStarted>());
+        var started = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkRaidContinuationRequested>());
         Assert.Equal(context.SettlementId, started.SettlementId);
 
         client.Call(() =>
@@ -1762,7 +1763,7 @@ public class VillageHostileActionTests : MapEventTestBase
 
         client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkMapEventFinalizeAttempted(mapEventId!)), MapEventDisabledMethods);
 
-        var started = Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionStarted>().Single();
+        var started = Server.NetworkSentMessages.GetMessages<NetworkRaidContinuationRequested>().Single();
         Assert.Equal(target.SettlementId, started.SettlementId);
         Assert.Equal(mobilePartyId, started.MobilePartyId);
         var close = Server.NetworkSentMessages.GetMessages<NetworkClosePvpEncounter>().Single();
