@@ -49,6 +49,7 @@ public class ServerModule : CommonModule
     internal static readonly Type[] NavalOnlyTypes =
     {
         typeof(ServerBattleShipFateHandler),
+        typeof(ServerNavalNpcFleetAttemptHandler),
     };
 
     protected override void Load(ContainerBuilder builder)
@@ -102,6 +103,7 @@ public class ServerModule : CommonModule
             .As<IMissionMembershipRegistry>()
             .InstancePerLifetimeScope();
         builder.RegisterType<BattleCompletionTracker>().As<IBattleCompletionTracker>().InstancePerDependency();
+        builder.RegisterType<NavalBattleMemberResolver>().As<INavalBattleMemberResolver>().InstancePerDependency();
         builder.RegisterType<SettlementEncounterDistanceValidator>()
             .As<ISettlementEncounterDistanceValidator>()
             .InstancePerDependency();

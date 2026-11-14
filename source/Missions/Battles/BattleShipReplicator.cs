@@ -272,8 +272,8 @@ public class BattleShipReplicator : IBattleShipReplicator
 
         if (retraction.Announced) return;
 
-        Forget(ship, ShipRemovalReason.Leave);
-        network.SendAll(new NetworkShipRemoved(ship.ShipId, session.OwnControllerId, ShipRemovalReason.Leave, missionEnding: true));
+        Forget(ship, ShipRemovalReason.Retracted);
+        network.SendAll(new NetworkShipRemoved(ship.ShipId, session.OwnControllerId, ShipRemovalReason.Retracted, missionEnding: true));
         removalsSent++;
         retraction.Announced = true;
     }
@@ -501,15 +501,15 @@ public class BattleShipReplicator : IBattleShipReplicator
         hullAuthority.Remove(departing, crew);
     }
 
-    // Counts a queued hull as departed and drops it from the registry; repeatable, as both are keyed by the ship id.
+    // Counts a queued hull as departed, unless a failed AI fleet attempt took it back, and drops it from the registry; repeatable,
+    // as both are keyed by the ship id.
     private void Forget(NetworkShipInfo ship, ShipRemovalReason reason)
     {
         if (ship.ShipId == Guid.Empty) return;
 
-        CountDeparted(ship);
+        if (reason != ShipRemovalReason.Retracted) CountDeparted(ship);
         Prune(ship.ShipId);
-        Logger.Information("[NavalSync] Hull {ShipId} of {Owner} left with its owner ({Reason}); removed it",
-            ship.ShipId, ship.CurrentAuthority, reason);
+        Logger.Information("[NavalSync] Hull {ShipId} of {Owner} removed ({Reason})", ship.ShipId, ship.CurrentAuthority, reason);
     }
 
     // A departing hull's crew leaves with it; anyone else on its deck goes to the hull they crew, or the nearest friendly one.

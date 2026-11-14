@@ -1,10 +1,12 @@
 ﻿using GameInterface;
+using NavalDLC.Missions.MissionLogics;
 using NavalDLC.Missions.NavalPhysics;
 using NavalDLC.Missions.Objects;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.Engine;
+using TaleWorlds.MountAndBlade;
 
 namespace Missions.Naval;
 
@@ -92,6 +94,10 @@ internal class NavalForeignHullRegistry : INavalForeignHullRegistry
     /// <summary>[Any thread] Whether the hull is a copy in the client container patches resolve from; false when none resolves.</summary>
     internal static bool IsCopyHere(MissionShip ship) =>
         ContainerProvider.TryResolve<INavalForeignHullRegistry>(out var registry) && registry.Contains(ship);
+
+    /// <summary>[Game thread] Whether <paramref name="formation"/> is a copy's, whose crew is its owner's.</summary>
+    internal static bool IsCopyFormation(NavalShipsLogic shipsLogic, Formation formation) =>
+        formation != null && shipsLogic.GetShip(formation, out var ship) && IsCopyHere(ship);
 
     /// <summary>[Any thread] The copy running this physics script in the client container patches resolve from.</summary>
     internal static bool TryGetCopyHere(NavalPhysics physics, out SteeredCopy copy)
