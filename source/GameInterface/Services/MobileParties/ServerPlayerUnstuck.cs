@@ -123,7 +123,7 @@ internal class ServerPlayerUnstuck : IServerPlayerUnstuck
             {
                 // Same pair the army-removal network flow uses: the publish makes ArmyHandler
                 // broadcast NetworkRemovePartyInArmy to clients, the port applies it here.
-                messageBroker.Publish(party, new MobilePartyInArmyRemoved(army, party, null));
+                messageBroker.Publish(party, new MobilePartyInArmyRemoved(army, party, null, abandonArmy: false));
                 ArmyPatches.RemoveMobilePartyInArmy(party, army, null);
                 return $"Removed the party from the army of {army.LeaderParty?.StringId ?? "<unknown leader>"}.";
             });

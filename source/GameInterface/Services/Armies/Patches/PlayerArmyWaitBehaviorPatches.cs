@@ -194,15 +194,16 @@ internal class PlayerArmyWaitBehaviorPatches
             MessageBroker.Instance.Publish(MobileParty.MainParty, new EndSettlementEncounterAttempted(MobileParty.MainParty));
             PartyBase.MainParty.SetVisualAsDirty();
         }
-        var message = new MobilePartyInArmyRemoved(MobileParty.MainParty.Army, MobileParty.MainParty, MobileParty.MainParty);
+
+        var message = new MobilePartyInArmyRemoved(MobileParty.MainParty.Army, MobileParty.MainParty, MobileParty.MainParty, abandonArmy: false);
         MessageBroker.Instance.Publish(__instance, message);
         return false;
     }
+
     [HarmonyPatch(typeof(PlayerArmyWaitBehavior), nameof(PlayerArmyWaitBehavior.wait_menu_army_abandon_on_consequence))]
     [HarmonyPrefix]
     private static bool Prefixwait_menu_army_abandon_on_consequence(PlayerArmyWaitBehavior __instance, MenuCallbackArgs args)
     {
-        MessageBroker.Instance.Publish(__instance, new ChangeClanInfluence(Clan.PlayerClan, (int)(float)Campaign.Current.Models.DiplomacyModel.GetInfluenceCostOfAbandoningArmy()));
         if (PlayerEncounter.Current != null)
         {
             PlayerEncounter.Finish(true);
@@ -211,9 +212,20 @@ internal class PlayerArmyWaitBehaviorPatches
         {
             GameMenu.ExitToLast();
         }
-        var message = new MobilePartyInArmyRemoved(MobileParty.MainParty.Army, MobileParty.MainParty, MobileParty.MainParty);
-        ArmyPatches.RemoveMobilePartyInArmy(MobileParty.MainParty, MobileParty.MainParty.Army, MobileParty.MainParty);
+        var message = new MobilePartyInArmyRemoved(MobileParty.MainParty.Army, MobileParty.MainParty, MobileParty.MainParty, abandonArmy: true);
+        
         MessageBroker.Instance.Publish(__instance, message);
+        return false;
+    }
+
+    [HarmonyPatch(typeof(PlayerArmyWaitBehavior), nameof(PlayerArmyWaitBehavior.player_kicked_out_from_army_consequence))]
+    [HarmonyPrefix]
+    private static bool Prefixplayer_kicked_out_from_army_consequence(PlayerArmyWaitBehavior __instance, MenuCallbackArgs args)
+    {
+        var message = new MobilePartyInArmyRemoved(MobileParty.MainParty.Army, MobileParty.MainParty, MobileParty.MainParty, abandonArmy: false);
+
+        MessageBroker.Instance.Publish(__instance, message);
+        PlayerArmyWaitBehavior.army_dispersed_continue_on_consequence(args);
         return false;
     }
 }

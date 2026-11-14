@@ -45,7 +45,7 @@ public class ArmyPatches
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient) return false;
-        var message = new MobilePartyInArmyAdded(__instance, mobileParty, false);
+        var message = new MobilePartyInArmyAdded(__instance, mobileParty, addPartyToMergedPartiesBool: false);
         MessageBroker.Instance.Publish(mobileParty, message);
 
         return true;
@@ -62,7 +62,7 @@ public class ArmyPatches
             return false;
         }
 
-        var message = new MobilePartyInArmyRemoved(__instance, mobileParty, null); // mobileparty.mainparty is only needed for the client for ui stuff
+        var message = new MobilePartyInArmyRemoved(__instance, mobileParty, null, abandonArmy: false); // mobileparty.mainparty is only needed for the client for ui stuff
 
         MessageBroker.Instance.Publish(mobileParty, message);
 
