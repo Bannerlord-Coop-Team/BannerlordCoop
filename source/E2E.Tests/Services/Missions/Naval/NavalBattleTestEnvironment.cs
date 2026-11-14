@@ -140,6 +140,12 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment, IDisp
     protected void DropConnection(NavalPeer departed)
     {
         departed.Instance.Call(departed.Network.Stop);
+        DisconnectOnServer(departed);
+    }
+
+    /// <summary>The server's link to <paramref name="departed"/> drops, its mesh left as it is, and its disconnect path runs.</summary>
+    protected void DisconnectOnServer(NavalPeer departed)
+    {
         Server.Call(() => Server.SimulateMessage(this, new PlayerDisconnected(departed.Instance.NetPeer, default)),
             VictoryConclusionDisabledMethods());
         Server.PumpGameThread();
@@ -256,6 +262,17 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment, IDisp
             departed.Instance.Call(departed.Network.Stop);
             foreach (var peer in Peers)
                 peer.Instance.Call(() => peer.Broker.Publish(peer, new MissionPeerLeft(departed.Id, MapEventId)));
+        }
+
+        /// <summary>
+        /// <paramref name="crashed"/>'s process dies: what it still had in flight on the mesh never arrives and it sends nothing
+        /// more, while its peers' links to it stay up until their own timeout stops its mesh. Returns the deliveries lost.
+        /// </summary>
+        public int Crash(NavalPeer crashed)
+        {
+            crashed.Network.RouteMessages = false;
+            crashed.Network.RoutePackets = false;
+            return mesh.Cancel(crashed.Network);
         }
 
         /// <summary>Tells every other client on the mesh that <paramref name="entered"/> joined, as the mission lifecycle does.</summary>

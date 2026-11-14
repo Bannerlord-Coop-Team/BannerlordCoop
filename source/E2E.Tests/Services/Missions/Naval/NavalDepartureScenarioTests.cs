@@ -182,6 +182,72 @@ public class NavalDepartureScenarioTests : NavalBattleTestEnvironment
         Assert.Equal(-20f, c.Hull(pirate).Frame.origin.x, 3);
     }
 
+    // A battle host crash with three players against an enemy fleet: A's process dies with a hull record still in flight, the
+    // survivors' mesh links to it drop before or after the server's departure, and the server drops it through its own
+    // disconnect path. B takes the enemy fleet over with its crew, A's own hull leaves, and the battle goes on.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void CrashedHost_ItsSuccessorKeepsTheEnemyFleetAndItsCrew_AndTheBattleGoesOn(bool meshDropsFirst)
+    {
+        using var battle = StartServerBattle(atSea: true, out var concluded, "A", "B", "C");
+        var (a, b, c) = (battle["A"], battle["B"], battle["C"]);
+        var survivors = new[] { b, c };
+        var hullA = battle.FieldPlayerHull(a, new Vec3(0f, 0f, 0f));
+        battle.FieldPlayerHull(b, new Vec3(40f, 0f, 0f));
+        battle.FieldPlayerHull(c, new Vec3(80f, 0f, 0f));
+        var pirate = battle.FieldAiHull(a, BattleSideEnum.Defender, new Vec3(0f, 300f, 0f));
+        var crewA = RegisterPartyTroopEverywhere(battle, Guid.NewGuid(), "A");
+        var pirateCrew = Enumerable.Range(0, 5).Select(_ => RegisterEnemyEverywhere(battle, Guid.NewGuid(), "A")).ToArray();
+        battle.CommitAll();
+        battle.TickAll(2);
+        foreach (var peer in battle.Peers)
+        {
+            peer.Engine.PlaceAgent(crewA[peer], peer.Ship(hullA).Hull, peer.Ship(hullA).Hull);
+            foreach (var crew in pirateCrew)
+                peer.Engine.PlaceAgent(crew[peer], peer.Ship(pirate).Hull, peer.Ship(pirate).Hull);
+        }
+        var lost = a.FieldAiHull(BattleSideEnum.Defender, new Vec3(60f, 300f, 0f), battle.PirateMapEventPartyId);
+
+        Assert.True(battle.Crash(a) > 0, "A had nothing in flight when it crashed");
+        if (meshDropsFirst) DropConnection(a);
+        else
+        {
+            DisconnectOnServer(a);
+            foreach (var peer in survivors) peer.Tick();
+            a.Instance.Call(a.Network.Stop);
+        }
+        battle.TickAll(3);
+
+        var promotion = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleHostAssigned>(), sent => sent.Epoch > 1);
+        Assert.Equal(("B", 2), (promotion.HostControllerId, promotion.Epoch));
+        foreach (var peer in survivors)
+        {
+            AssertRemovedWithClearDeck(peer, hullA);
+            AssertCrewWithdrawnByTheHullRemoval(peer, crewA[peer]);
+            Assert.False(peer.Has(lost), $"{peer.Id} got the hull record A lost in flight");
+            Assert.Equal("B", peer.Ship(pirate).CurrentAuthority);
+            foreach (var crew in pirateCrew)
+            {
+                Assert.True(crew[peer].IsActive(), $"{peer.Id} lost an enemy crew member with A");
+                string? authority = null;
+                peer.Call(() => authority = peer.Agents.TryGetAgentInfo(crew[peer], out var info) ? info.CurrentAuthority : null);
+                Assert.Equal("B", authority);
+            }
+        }
+        Assert.False(b.Hull(pirate).IsCopy);
+        Assert.Empty(b.Engine.ParkedAgents);
+        int crewing = pirateCrew.Count(crew => b.Engine.CrewHullOf(crew[b]) == b.Ship(pirate).Hull);
+        var enemy = EndTally(b, BattleSideEnum.Defender, liveHumans: pirateCrew.Length, new Dictionary<Guid, int> { [pirate] = crewing });
+        Assert.Equal(pirateCrew.Length, crewing);
+        Assert.False(enemy.IsDepleted);
+        Assert.False(enemy.IsOutOfAction);
+
+        battle.TickAll(3);
+        Assert.Equal(0, concluded());
+        Assert.False(b.Controller.ResultCommitter.TryGetResolvedState(out _));
+    }
+
     // R41a-2: B's troop stands on A's deck, off every hull of B's. The hull removal can't take it, so the party withdrawal
     // fades it, but only once B's hull is gone: until then nothing of B's party leaves the battle outside the hull path.
     [Fact]
@@ -551,6 +617,10 @@ public class NavalDepartureScenarioTests : NavalBattleTestEnvironment
 
     private static Dictionary<NavalPeer, Agent> RegisterEverywhere(NavalBattle battle, Guid agentId, string authority) =>
         battle.Peers.ToDictionary(peer => peer, peer => peer.RegisterAgent(agentId, authority));
+
+    // An enemy AI troop on every client, simulated by the battle host.
+    private static Dictionary<NavalPeer, Agent> RegisterEnemyEverywhere(NavalBattle battle, Guid agentId, string host) =>
+        battle.Peers.ToDictionary(peer => peer, peer => peer.RegisterAgent(agentId, host, peer.Mission.DefenderTeam));
 
     // A troop of the owner's own party on every client, which withdraws with the party when the owner leaves.
     private static Dictionary<NavalPeer, Agent> RegisterPartyTroopEverywhere(NavalBattle battle, Guid agentId, string owner) =>
