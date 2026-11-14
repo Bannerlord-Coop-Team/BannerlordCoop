@@ -50,7 +50,8 @@ function lineBounds(text) {
   return { starts, ends };
 }
 
-// Turns 1-based line numbers into [start, end) character spans, merging runs of adjacent lines.
+// Turns 1-based line numbers into { start, end } character spans, end exclusive, merging runs of
+// adjacent lines. Each span also keeps its last line so the next line can extend it.
 function lineSpans(text, lines) {
   const { starts, ends } = lineBounds(text);
   const spans = [];
@@ -63,7 +64,7 @@ function lineSpans(text, lines) {
     }
     spans.push({ lastLine: line, start: starts[line - 1], end: ends[line - 1] });
   }
-  return spans.map(({ start, end }) => [start, end]);
+  return spans;
 }
 
 // Builds the --mutate pattern for one file, or null when the branch only deletes lines from it.
@@ -71,7 +72,7 @@ function lineSpans(text, lines) {
 function mutatePattern(file, text, lines) {
   const spans = lineSpans(text.replace(/^\uFEFF/, ''), lines);
   if (spans.length === 0) return null;
-  return file + spans.map(([start, end]) => `{${start}..${end}}`).join('');
+  return file + spans.map(({ start, end }) => `{${start}..${end}}`).join('');
 }
 
 // Builds the patterns for every changed file in one project from its diff and the files' text.
