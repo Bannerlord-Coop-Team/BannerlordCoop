@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Entity;
@@ -7,6 +7,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Villages.Data;
 using GameInterface.Services.Villages.Interfaces;
 using GameInterface.Services.Villages.Messages;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace Coop.Core.Client.Services.Villages.Handlers;
 
@@ -33,6 +34,7 @@ internal class ClientVillageHostileActionHandler : IHandler
 
         messageBroker.Subscribe<VillageHostileActionAttempted>(Handle_VillageHostileActionAttempted);
         messageBroker.Subscribe<NetworkVillageHostileActionStarted>(Handle_NetworkVillageHostileActionStarted);
+        messageBroker.Subscribe<NetworkRaidContinuationRequested>(Handle_NetworkRaidContinuationRequested);
         messageBroker.Subscribe<NetworkVillageHostileActionDenied>(Handle_NetworkVillageHostileActionDenied);
         messageBroker.Subscribe<NetworkVillageHostileActionCooldowns>(Handle_NetworkVillageHostileActionCooldowns);
         messageBroker.Subscribe<NetworkAuthorizeForceTransfer>(Handle_NetworkAuthorizeForceTransfer);
@@ -43,6 +45,7 @@ internal class ClientVillageHostileActionHandler : IHandler
     {
         messageBroker.Unsubscribe<VillageHostileActionAttempted>(Handle_VillageHostileActionAttempted);
         messageBroker.Unsubscribe<NetworkVillageHostileActionStarted>(Handle_NetworkVillageHostileActionStarted);
+        messageBroker.Unsubscribe<NetworkRaidContinuationRequested>(Handle_NetworkRaidContinuationRequested);
         messageBroker.Unsubscribe<NetworkVillageHostileActionDenied>(Handle_NetworkVillageHostileActionDenied);
         messageBroker.Unsubscribe<NetworkVillageHostileActionCooldowns>(Handle_NetworkVillageHostileActionCooldowns);
         messageBroker.Unsubscribe<NetworkAuthorizeForceTransfer>(Handle_NetworkAuthorizeForceTransfer);
@@ -55,6 +58,9 @@ internal class ClientVillageHostileActionHandler : IHandler
 
         if (!objectManager.TryGetIdWithLogging(message.MobileParty, out var mobilePartyId)) return;
         if (!objectManager.TryGetIdWithLogging(message.Settlement, out var settlementId)) return;
+        // A request is already pending: drop this one, the server still resolves the first.
+        if (!villageHostileActionInterface.TryTrackHostileActionRequest())
+            return;
 
         network.SendAll(new NetworkRequestVillageHostileAction(message.Action, mobilePartyId, settlementId, controllerIdProvider.ControllerId));
     }
@@ -62,12 +68,30 @@ internal class ClientVillageHostileActionHandler : IHandler
     private void Handle_NetworkVillageHostileActionStarted(MessagePayload<NetworkVillageHostileActionStarted> payload)
     {
         GameThread.RunSafe(
-            () => villageHostileActionInterface.BeginHostileActionPresentation(payload.What.Action),
+            () =>
+            {
+                villageHostileActionInterface.CompleteHostileActionRequest();
+                villageHostileActionInterface.BeginHostileActionPresentation(payload.What.Action);
+            },
             context: nameof(Handle_NetworkVillageHostileActionStarted));
+    }
+
+    private void Handle_NetworkRaidContinuationRequested(MessagePayload<NetworkRaidContinuationRequested> payload)
+    {
+        GameThread.RunSafe(
+            () =>
+            {
+                if (objectManager.TryGetObjectWithLogging<Settlement>(payload.What.SettlementId, out var settlement))
+                    villageHostileActionInterface.ParkRaidContinuation(settlement);
+            },
+            context: nameof(Handle_NetworkRaidContinuationRequested));
     }
 
     private void Handle_NetworkVillageHostileActionDenied(MessagePayload<NetworkVillageHostileActionDenied> payload)
     {
+        GameThread.RunSafe(
+            () => villageHostileActionInterface.RecoverRejectedHostileAction(),
+            context: nameof(Handle_NetworkVillageHostileActionDenied));
         messageBroker.Publish(this, new SendInformationMessage(GetDeniedMessage(payload.What.Reason)));
     }
 

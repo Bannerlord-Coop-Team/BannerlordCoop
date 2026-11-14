@@ -103,7 +103,7 @@ public class CompanionDismissalSyncTests : IDisposable
             var encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
             Campaign.Current.PlayerEncounter = encounter;
 
-            new PlayerEncounterInterface().UpdateInternalAfterBattle(encounter);
+            new PlayerEncounterInterface(null).UpdateInternalAfterBattle(encounter);
 
             Assert.Same(encounter, PlayerEncounter.Current);
             Assert.True(encounter._stateHandled);

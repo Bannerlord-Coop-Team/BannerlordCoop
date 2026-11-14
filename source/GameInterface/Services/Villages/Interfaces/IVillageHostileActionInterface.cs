@@ -2,6 +2,7 @@
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.Villages.Data;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -12,6 +13,18 @@ public interface IVillageHostileActionInterface : IGameAbstraction
 {
     void RequestHostileAction(VillageHostileAction action);
     void BeginHostileActionPresentation(VillageHostileAction action);
+
+    /// <summary>[Client, game thread] Track a hostile-action request until the server resolves it; false when one is already pending.</summary>
+    bool TryTrackHostileActionRequest();
+
+    /// <summary>[Client, game thread] Clear the pending hostile-action request after the server accepts it.</summary>
+    void CompleteHostileActionRequest();
+
+    /// <summary>[Client, game thread] The hostile-action request was denied; close the encounter it opened.</summary>
+    void RecoverRejectedHostileAction();
+
+    /// <summary>[Client, game thread] Park a raid continuation until the current encounter ends.</summary>
+    void ParkRaidContinuation(Settlement settlement);
     bool CanStartHostileAction(MobileParty mobileParty, Settlement settlement, VillageHostileAction action, out VillageHostileActionDeniedReason reason);
     void ApplyHostileAction(MobileParty mobileParty, Settlement settlement, VillageHostileAction action);
     void ResolveRaidDefenders(MapEvent mapEvent);

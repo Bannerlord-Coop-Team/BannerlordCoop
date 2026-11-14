@@ -56,6 +56,18 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
     private readonly ConditionalWeakTable<MapEvent, AppliedForceActionOutcomeState> appliedForceActionOutcomes = new ConditionalWeakTable<MapEvent, AppliedForceActionOutcomeState>();
     private readonly object deferredForceScreenGate = new object();
     private DeferredForceScreen deferredForceScreen;
+    // Client-only: the encounter a hostile-action request opened, kept until the server resolves the
+    // request, and a won raid's continuation waiting for the current encounter to end.
+    private PlayerEncounter requestedHostileActionEncounter;
+    private Settlement parkedRaidContinuation;
+    private PlayerEncounter parkedRaidEncounter;
+
+    internal enum RaidContinuationDecision
+    {
+        Wait,
+        Drop,
+        Present,
+    }
 
     public VillageHostileActionInterface(IMessageBroker messageBroker, IObjectManager objectManager)
     {
@@ -75,6 +87,9 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
             deferredForceScreen = null;
         }
         pendingForceTransfers.Clear();
+        requestedHostileActionEncounter = null;
+        parkedRaidContinuation = null;
+        parkedRaidEncounter = null;
     }
 
     public void RequestHostileAction(VillageHostileAction action)
@@ -172,6 +187,95 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         }
 
         GameMenu.SwitchToMenu("encounter");
+    }
+
+    public bool TryTrackHostileActionRequest()
+    {
+        if (requestedHostileActionEncounter != null)
+            return false;
+
+        requestedHostileActionEncounter = PlayerEncounter.Current;
+        return true;
+    }
+
+    public void CompleteHostileActionRequest()
+    {
+        requestedHostileActionEncounter = null;
+    }
+
+    public void RecoverRejectedHostileAction()
+    {
+        var expectedEncounter = requestedHostileActionEncounter;
+        requestedHostileActionEncounter = null;
+
+        var encounter = PlayerEncounter.Current;
+        if (encounter == null || !ReferenceEquals(encounter, expectedEncounter) ||
+            encounter._mapEvent != null || encounter.BattleSimulation != null)
+            return;
+
+        encounter._stateHandled = true;
+        PlayerEncounter.LeaveEncounter = true;
+        PlayerEncounter.Finish(true);
+    }
+
+    public void ParkRaidContinuation(Settlement settlement)
+    {
+        parkedRaidContinuation = settlement;
+        parkedRaidEncounter = PlayerEncounter.Current;
+        // Keep the continuation parked until the result screens have finished and the encounter can be reused.
+    }
+
+    private void PresentParkedRaidContinuation()
+    {
+        var settlement = parkedRaidContinuation;
+        if (settlement == null)
+            return;
+
+        var encounter = PlayerEncounter.Current;
+        bool encounterReplaced = encounter != null && parkedRaidEncounter != null &&
+            !ReferenceEquals(encounter, parkedRaidEncounter);
+        var decision = GetRaidContinuationDecision(
+            PlayerCaptivity.IsCaptive,
+            encounterReplaced,
+            MobileParty.MainParty?.MapEvent != null,
+            encounter?.EncounterState);
+        if (decision == RaidContinuationDecision.Wait)
+            return;
+
+        parkedRaidContinuation = null;
+        parkedRaidEncounter = null;
+
+        if (decision == RaidContinuationDecision.Drop)
+        {
+            var reason = PlayerCaptivity.IsCaptive ? "the player is captive" : "a different encounter is active";
+            Logger.Information("Dropping parked raid continuation for {SettlementId}: {Reason}", settlement.StringId, reason);
+            return;
+        }
+
+        StartRaidContinuationEncounter(settlement);
+    }
+
+    internal static RaidContinuationDecision GetRaidContinuationDecision(
+        bool isCaptive,
+        bool encounterReplaced,
+        bool hasMapEvent,
+        PlayerEncounterState? encounterState)
+    {
+        if (isCaptive || encounterReplaced)
+            return RaidContinuationDecision.Drop;
+
+        if (hasMapEvent || (encounterState.HasValue && encounterState.Value != PlayerEncounterState.End))
+            return RaidContinuationDecision.Wait;
+
+        return RaidContinuationDecision.Present;
+    }
+
+    private void StartRaidContinuationEncounter(Settlement settlement)
+    {
+        // The map-event teardown clears both parties before this continuation requests fresh approval.
+        PlayerEncounter.Start();
+        PlayerEncounter.Current.SetupFields(PartyBase.MainParty, settlement.Party);
+        messageBroker.Publish(this, new VillageHostileActionAttempted(VillageHostileAction.Raid, MobileParty.MainParty, settlement));
     }
 
     public bool CanStartHostileAction(
@@ -843,6 +947,8 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
     {
         if (ModInformation.IsServer) return;
         if (IsInMission()) return;
+
+        PresentParkedRaidContinuation();
 
         // Always open the earned screen and let the server consume decide. A
         // gone pool is reported at Done time by the commit validation.
