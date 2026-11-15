@@ -1186,4 +1186,34 @@
       </EquipmentRoster>
     </Equipments>
   </NPCCharacter>
+  <NPCCharacter
+    id="coop_fixed_npc_56ea02ce"
+    name="{=!}Austonius Santonius"
+    default_group="Infantry"
+    level="1"
+    is_female="false"
+    is_hero="false"
+    is_template="false"
+    occupation="Townsfolk"
+    culture="Culture.empire"
+    is_hidden_encyclopedia="true"
+    coop_settlement="town_ES1"
+    coop_location="tavern"
+    coop_spawn_tag="npc_common"
+    coop_dialogue="I dont know and I dont care to know you"
+    coop_enabled="true">
+    <face>
+      <face_key_template value="BodyProperty.townsman_empire" />
+    </face>
+    <skills />
+    <Equipments>
+      <EquipmentRoster civilian="true">
+        <equipment slot="Head" id="Item.kettle_helmet_over_padded_cap" />
+        <equipment slot="Cape" id="Item.imperial_lamellar_shoulders" />
+        <equipment slot="Body" id="Item.imperial_lamellar" />
+        <equipment slot="Gloves" id="Item.guarded_padded_vambrace" />
+        <equipment slot="Leg" id="Item.mail_cavalier_boots" />
+      </EquipmentRoster>
+    </Equipments>
+  </NPCCharacter>
 </NPCCharacters>
