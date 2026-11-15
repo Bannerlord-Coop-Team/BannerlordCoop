@@ -24,14 +24,9 @@ using TaleWorlds.MountAndBlade;
 namespace Missions.Sessions;
 
 /// <summary>
-/// Per-mission P2P controller for a campaign-free session: a second composition root over the battle parts,
-/// so a mod can run a mission with no campaign, no map event and no hero. It keeps the agent, damage, death,
-/// authority and siege replication, and leaves out everything that needs a campaign: results, supply, the
-/// deployment phase, team diagnostics, nameplates and the player handoff.
-/// <para>
-/// The tick, join replay and leave code is copied from <c>CoopBattleController</c>, which stays unchanged
-/// for the campaign. A fix to that code reaches sessions only when it is copied here too.
-/// </para>
+/// Per-mission P2P controller for a campaign-free session: the battle replication parts without a campaign,
+/// map event, deployment phase or hero.
+/// <para>The tick, join replay and leave code is copied from <c>CoopBattleController</c>, so a fix there needs a copy here.</para>
 /// </summary>
 internal class CoopSessionController : CoopMissionController
 {
@@ -57,6 +52,8 @@ internal class CoopSessionController : CoopMissionController
     private readonly ISiegeWeaponFireReplicator siegeWeaponFire;
     private readonly IBattleDeploymentCoordinator deployment;
     private readonly IBattleHostRegistry hostRegistryRef;
+    private string lastHost;
+    private int lastEpoch = -1;
 
     public CoopSessionController(
         IBattleNetwork network,
@@ -83,6 +80,8 @@ internal class CoopSessionController : CoopMissionController
         IBattleTeamResolver teamResolver,
         IBattleAgentFader agentFader,
         IBattlePlayerPartyResolver playerParties,
+        SessionBattleCharacterResolver characterResolver,
+        SessionPuppetOriginFactory puppetOrigins,
         SessionMissionContext context)
         : base(
             network,
@@ -100,7 +99,6 @@ internal class CoopSessionController : CoopMissionController
         coopMissionComponent.WeaponDropHandler.ConfigureLocalHostProvider(
             () => session.IsLocalHost);
         var casualties = new CasualtyAttributionMap();
-        var characterResolver = new SessionBattleCharacterResolver();
 
         deployment = new SessionDeploymentCoordinator();
 
@@ -168,7 +166,7 @@ internal class CoopSessionController : CoopMissionController
             authorityMigrator,
             teamResolver,
             characterResolver: characterResolver,
-            puppetOrigins: new SessionPuppetOriginFactory());
+            puppetOrigins: puppetOrigins);
         siegeEngineDeployment = new SiegeEngineDeploymentReplicator(network, messageBroker, session, hostEpochPolicy);
         siegeMachineState = new SiegeMachineStateReplicator(network, messageBroker, session, coopMissionComponent.AgentRegistry, hostEpochPolicy, rangedSiegeWeaponPresentation);
         siegeWeaponFire = new SiegeWeaponFireReplicator(network, messageBroker, coopMissionComponent.AgentRegistry, session, siegeMachineState, siegeGateHitApplier, hostEpochPolicy, rangedSiegeWeaponPresentation);
@@ -347,6 +345,12 @@ internal class CoopSessionController : CoopMissionController
 
         GameThread.RunSafe(() =>
         {
+            // A successor-line change re-sends the same host and epoch.
+            if (assignment.HostControllerId == lastHost && assignment.Epoch == lastEpoch)
+                return;
+
+            lastHost = assignment.HostControllerId;
+            lastEpoch = assignment.Epoch;
             messageBroker.Publish(this, new SessionHostChanged(
                 assignment.MapEventId,
                 assignment.HostControllerId,

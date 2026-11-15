@@ -139,7 +139,7 @@ public class MonsterSerializationTest : IDisposable
                 Mock.Of<IAutoSyncPatchCollector>(), objectManager, Mock.Of<ISerializableTypeMapper>());
             _ = new MonsterRegistry(Mock.Of<ILogger>(), activeFactory, objectManager);
             var manager = new RegistryManager(objectManager, Mock.Of<IRegistryCollection>(),
-                Mock.Of<IMessageBroker>(), activeFactory, Mock.Of<IAutoSyncPatchCollector>());
+                Mock.Of<IMessageBroker>(), activeFactory, Mock.Of<IAutoSyncPatchCollector>(), null, null);
 
             manager.RegisterAllGameObjects();
             Assert.True(activeFactory.IsManaged(typeof(Monster)));

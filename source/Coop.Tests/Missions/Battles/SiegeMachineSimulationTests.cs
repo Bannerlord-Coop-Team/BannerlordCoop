@@ -628,7 +628,7 @@ public class SiegeMachineSimulationTests : IDisposable
         void Broadcast(SiegeMachineStateReplicator replicator, ManagedStonePile pile, bool isHost, bool local)
         {
             GameThread.Run(() => AccessTools.Method(typeof(SiegeMachineStateReplicator), "BroadcastMachineStateIfChanged")
-                .Invoke(replicator, new object[] { Capture(pile, isHost, local) }), blocking: true);
+                .Invoke(replicator, new object[] { Capture(pile, isHost, local), false }), blocking: true);
         }
     }
 

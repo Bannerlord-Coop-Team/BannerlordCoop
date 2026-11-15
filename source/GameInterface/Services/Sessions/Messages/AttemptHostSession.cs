@@ -9,7 +9,7 @@ namespace GameInterface.Services.Sessions.Messages;
 /// </summary>
 public record AttemptHostSession : ICommand
 {
-    /// <summary>The largest payload that fits a managed server's command line.</summary>
+    /// <summary>A cap that keeps the command line short; the engine limit was not measured.</summary>
     public const int MaxPayloadBytes = 8192;
 
     public AttemptHostSession(string modId, byte[] payload, string password, ServerVisibility visibility)

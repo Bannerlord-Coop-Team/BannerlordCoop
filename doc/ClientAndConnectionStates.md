@@ -34,6 +34,9 @@ stateDiagram-v2
 
     MissionState --> CampaignState : CampaignStateEntered
     MissionState --> MainMenuState : MainMenuEntered → Finalize
+
+    ValidateModuleState --> SessionState : NetworkSessionJoined (session server, accepted)
+    SessionState --> MainMenuState : MainMenuEntered → Finalize
 ```
 
 | State | Waits for | On success |
@@ -45,6 +48,7 @@ stateDiagram-v2
 | `LoadingState` | `CampaignReady` | Register objects, switch to player hero → `CampaignState` |
 | `CampaignState` | `MissionStateEntered` | Enter battle → `MissionState` |
 | `MissionState` | `CampaignStateEntered` | Return to map → `CampaignState` |
+| `SessionState` | `MainMenuEntered` | Entered on `NetworkSessionJoined`: registers items, asks the mod to open its mission. See [Sessions](Sessions.md) |
 
 ---
 
@@ -66,6 +70,9 @@ stateDiagram-v2
     CampaignState --> MissionState : NetworkPlayerMissionEntered → EnterMission()
 
     MissionState --> CampaignState : NetworkPlayerCampaignEntered → EnterCampaign()
+
+    [*] --> SessionJoinState : session server
+    SessionJoinState --> MissionState : NetworkClientValidate (session open) → NetworkSessionJoined, EnterMission()
 ```
 
 | State | Waits for | On success |
@@ -76,6 +83,9 @@ stateDiagram-v2
 | `LoadingState` | `NetworkPlayerCampaignEntered` | Client is on the map → `CampaignState` |
 | `CampaignState` | `NetworkPlayerMissionEntered` | Client entered battle → `MissionState` |
 | `MissionState` | `NetworkPlayerCampaignEntered` | Client back on map → `CampaignState` |
+| `SessionJoinState` | `NetworkModuleVersionsValidate`, `NetworkClientValidate` | Registers a player with no hero or party, sends `NetworkSessionJoined`, marks the peer live in the connection queue → `MissionState`. A closed session gets a refusal and stays here |
+
+A session server also runs one `SessionServerState` (server side, not per client). It starts the network, shows no loading screen and exits the process after `SessionClosed`. A screen over the initial state does not end it.
 
 ---
 

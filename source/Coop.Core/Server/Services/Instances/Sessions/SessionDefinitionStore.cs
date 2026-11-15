@@ -9,7 +9,7 @@ public sealed class SessionDefinition
     {
         SessionId = sessionId;
         ModId = modId;
-        Payload = payload ?? Array.Empty<byte>();
+        Payload = payload;
     }
 
     public string SessionId { get; }
@@ -71,7 +71,7 @@ public class SessionDefinitionStore : ISessionDefinitionStore
             if (current != null)
                 throw new InvalidOperationException("A co-op session is already open");
 
-            current = new SessionDefinition(Missions.Sessions.SessionInstanceId.Create(), modId, payload);
+            current = new SessionDefinition(Missions.Sessions.SessionInstanceId.Create(), modId, payload ?? Array.Empty<byte>());
             isSessionServer = true;
             return current;
         }

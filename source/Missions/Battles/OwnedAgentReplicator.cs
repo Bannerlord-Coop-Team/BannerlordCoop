@@ -255,7 +255,7 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
         foreach (var info in coopMissionComponent.AgentRegistry.GetAgents(session.OwnControllerId))
         {
             var agent = info.Agent;
-            if (agent == null || !agent.IsActive() || agent.IsMount || !characterResolver.TryGetCharacterId(agent.Character, out var characterId)) continue;
+            if (agent == null || !agent.IsActive() || agent.IsMount || agent.Character == null) continue;
 
             var character = agent.Character;
             if (retainedPlayerHeroesOnly && !(character is CharacterObject heroCharacter && heroCharacter.IsHero)) continue;
@@ -266,6 +266,8 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
             // or a joiner catch-up spawns them at their pre-arrangement formation and dedupes the commit broadcast
             // that carries the real one. They arrive via that commit broadcast (or a post-commit catch-up) instead.
             if (deployment.ShouldWithhold(isOwnParty)) continue;
+
+            if (!characterResolver.TryGetCharacterId(character, out var characterId)) continue;
 
             var attribution = casualties.GetOrDefault(info.AgentId);
             var side = agent.Team != null ? agent.Team.Side : BattleSideEnum.None;

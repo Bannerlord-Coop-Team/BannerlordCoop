@@ -1,7 +1,8 @@
 ﻿using Common;
 using Common.Messaging;
 using Coop.Core.Common;
-using GameInterface.Services.GameState.Interfaces;
+using GameInterface.Registry;
+using GameInterface.Services.GameState;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.Sessions.Messages;
@@ -16,35 +17,42 @@ namespace Coop.Core.Client.States;
 public class SessionState : ClientStateBase
 {
     private readonly IMessageBroker messageBroker;
-    private readonly IGameStateInterface gameStateInterface;
     private readonly ICoopFinalizer coopFinalizer;
+    private readonly IRegistryManager registryManager;
 
     public SessionState(
         IClientLogic logic,
         IMessageBroker messageBroker,
-        IGameStateInterface gameStateInterface,
         ILoadingInterface loadingInterface,
-        ICoopFinalizer coopFinalizer) : base(logic)
+        ICoopFinalizer coopFinalizer,
+        IRegistryManager registryManager) : base(logic)
     {
         this.messageBroker = messageBroker;
-        this.gameStateInterface = gameStateInterface;
         this.coopFinalizer = coopFinalizer;
+        this.registryManager = registryManager;
         messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
 
-        loadingInterface.HideLoadingScreen();
-
         var session = logic.Session;
-        GameThread.RunSafe(
-            () => messageBroker.Publish(this, new SessionMissionOpenRequested(session.SessionId, session.ModId, session.Payload)),
-            context: nameof(SessionState));
+        GameThread.RunSafe(() =>
+        {
+            loadingInterface.HideLoadingScreen();
+            registryManager.RegisterMissionItemObjects();
+            messageBroker.Publish(this, new SessionMissionOpenRequested(session.SessionId, session.ModId, session.Payload));
+        }, context: nameof(SessionState));
     }
 
     public override void Dispose()
     {
         messageBroker.Unsubscribe<MainMenuEntered>(Handle_MainMenuEntered);
+        registryManager.ClearAllRegistries();
     }
 
     internal void Handle_MainMenuEntered(MessagePayload<MainMenuEntered> obj)
+    {
+        LeaveToMainMenu();
+    }
+
+    private void LeaveToMainMenu()
     {
         // A mod that never opened its mission leaves the spawn gate engaged otherwise.
         BattleSpawnGate.EndBattle();
@@ -55,7 +63,7 @@ public class SessionState : ClientStateBase
 
     public override void EnterMainMenu()
     {
-        gameStateInterface.GoToMainMenu();
+        Disconnect();
     }
 
     public override void Connect()
@@ -64,7 +72,18 @@ public class SessionState : ClientStateBase
 
     public override void Disconnect()
     {
-        gameStateInterface.GoToMainMenu();
+        // GoToMainMenu does nothing without a campaign, so the mod ends its own mission instead.
+        var sessionId = Logic.Session?.SessionId;
+        GameThread.RunSafe(() =>
+        {
+            if (GameStateQuery.IsAtMainMenu)
+            {
+                LeaveToMainMenu();
+                return;
+            }
+
+            messageBroker.Publish(this, new SessionMissionEndRequested(sessionId));
+        }, context: nameof(Disconnect));
     }
 
     public override void EnterCampaignState()

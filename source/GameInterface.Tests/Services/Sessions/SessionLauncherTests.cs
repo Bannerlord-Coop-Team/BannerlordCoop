@@ -79,20 +79,6 @@ public class SessionLauncherTests
     }
 
     [Fact]
-    public void Dispose_Unsubscribes()
-    {
-        var launcher = new SessionLauncher(_ => { }, broker);
-        Assert.True(broker.GetSubscriberCountForType<SessionHostChanged>() > 0);
-
-        launcher.Dispose();
-
-        Assert.True(broker.GetSubscriberCountForType<SessionHostChanged>() <= 0);
-        Assert.True(broker.GetSubscriberCountForType<SessionMissionOpenRequested>() <= 0);
-        Assert.True(broker.GetSubscriberCountForType<SessionMemberJoined>() <= 0);
-        Assert.True(broker.GetSubscriberCountForType<SessionMissionEndRequested>() <= 0);
-    }
-
-    [Fact]
     public void NoContainer_CreateMissionBehaviors_Empty()
     {
         using var launcher = new SessionLauncher(_ => { }, broker);

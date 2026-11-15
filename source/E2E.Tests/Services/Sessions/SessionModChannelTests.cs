@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using Common.Serialization;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Environment.MockEngine;
 using E2E.Tests.Services.Missions;
@@ -73,6 +74,19 @@ public class SessionModChannelTests : MissionTestEnvironment
 
         Assert.Single(members[1].InternalMessages.GetMessages<TestSessionModMessage>());
         Assert.Empty(members[2].InternalMessages.GetMessages<TestSessionModMessage>());
+    }
+
+    [Fact]
+    public void ModMessageFromAnotherAssembly_RoundTripsThroughTheWireSerializer()
+    {
+        // The mock network passes objects by reference, so only the real serializer proves a mod type can travel.
+        var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
+
+        var bytes = serializer.Serialize(new TestSessionModMessage("session:abc", 7));
+
+        var received = Assert.IsType<TestSessionModMessage>(serializer.Deserialize(bytes));
+        Assert.Equal("session:abc", received.SessionId);
+        Assert.Equal(7, received.Wave);
     }
 
     [Fact]

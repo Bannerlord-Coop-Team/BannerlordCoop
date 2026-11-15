@@ -112,6 +112,28 @@ public class SessionHostElectionTests : SessionTestEnvironment
     }
 
     [Fact]
+    public void HostRequest_QueuedBehindMissionEntry_IsStillElected()
+    {
+        var sessionId = OpenSession();
+        var client = Clients.First();
+        SetControllerId(client, "A");
+        Server.Call(() =>
+        {
+            var players = Server.Resolve<GameInterface.Services.Players.IPlayerManager>();
+            players.AddPlayer(new GameInterface.Services.Players.Data.Player("A", null, null, null, null));
+            players.SetPeer("A", client.NetPeer);
+        });
+
+        // Both messages arrive on the poll thread before the game thread drains the membership entry.
+        Server.SimulateMessage(client.NetPeer, new NetworkMissionEntered("A", sessionId), markGameThread: false);
+        Server.SimulateMessage(client.NetPeer, new NetworkRequestSessionHost(sessionId), markGameThread: false);
+        Server.PumpGameThread();
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleHostAssigned>());
+        AssertSessionHost(client, sessionId, "A", 1);
+    }
+
+    [Fact]
     public void RequestFromNonMember_Ignored()
     {
         var sessionId = OpenSession();
@@ -155,13 +177,14 @@ public class SessionHostElectionTests : SessionTestEnvironment
         RequestSessionClose(clients[0], sessionId, epoch: 1);
 
         foreach (var member in new[] { clients[0], clients[1], clients[2] })
-            Assert.Contains(member.InternalMessages.GetMessages<NetworkEndBattleMission>(), m => m.MapEventId == sessionId);
+            Assert.Single(member.InternalMessages.GetMessages<NetworkEndBattleMission>(), m => m.MapEventId == sessionId);
 
         Server.Call(() => Assert.Null(Server.Resolve<ISessionDefinitionStore>().Current));
+        Assert.Equal(sessionId, Assert.Single(Server.InternalMessages.GetMessages<SessionClosed>()).SessionId);
 
         var endsBefore = clients[2].InternalMessages.GetMessages<NetworkEndBattleMission>().Count();
         Server.SimulateMessage(clients[2].NetPeer, new NetworkMissionEntered("C", sessionId));
-        Assert.True(clients[2].InternalMessages.GetMessages<NetworkEndBattleMission>().Count() > endsBefore);
+        Assert.Equal(endsBefore + 1, clients[2].InternalMessages.GetMessages<NetworkEndBattleMission>().Count());
     }
 
     [Fact]
@@ -179,7 +202,7 @@ public class SessionHostElectionTests : SessionTestEnvironment
     }
 
     [Fact]
-    public void SessionPlayerDisconnect_DoesNotThrow()
+    public void PlayerDisconnected_OfNullIdPlayers_PromotesTheLastSuccessor()
     {
         var (sessionId, clients) = JoinAll();
         foreach (var client in clients)
@@ -188,6 +211,8 @@ public class SessionHostElectionTests : SessionTestEnvironment
         // Every PlayerDisconnected subscriber on the real server runs against a player with no hero, party or clan.
         Server.SimulateMessage(clients[0].NetPeer, new PlayerDisconnected(clients[0].NetPeer, default));
         Server.SimulateMessage(clients[1].NetPeer, new PlayerDisconnected(clients[1].NetPeer, default));
+        // The connection-state change a disconnect now publishes queues game-thread work.
+        Server.PumpGameThread();
 
         AssertSessionHost(clients[2], sessionId, "C", 3);
     }

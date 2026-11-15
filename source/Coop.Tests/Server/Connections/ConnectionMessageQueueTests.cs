@@ -134,6 +134,27 @@ public class ConnectionMessageQueueTests
     }
 
     [Fact]
+    public void MarkLive_LetsPerPeerSendsThrough()
+    {
+        var peer = Connect();
+
+        queue.MarkLive(peer);
+
+        Assert.False(queue.TryHandleBroadcast(peer, new FakePacket()));
+    }
+
+    [Fact]
+    public void MarkLive_OnStoppedPeer_StaysStopped()
+    {
+        var peer = Connect();
+        messageBroker.Publish(this, new PlayerDeletionStarted(peer));
+
+        queue.MarkLive(peer);
+
+        Assert.True(queue.TryHandleBroadcast(peer, new FakePacket()));
+    }
+
+    [Fact]
     public void CatchUpProgress_CombinesHeldAndReliablePacketsUntilClientAcknowledges()
     {
         var peer = Connect();

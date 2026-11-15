@@ -1,5 +1,7 @@
 ﻿using Autofac;
 using Common.Messaging;
+using Common.Network;
+using Common.PacketHandlers;
 using Common.Network.Messages;
 using Coop.Core.Client.Services.Heroes.Messages;
 using Coop.Core.Server.Connections;
@@ -22,6 +24,12 @@ public class SessionJoinStateTests
     private readonly ISessionDefinitionStore definitions;
     private readonly Mock<IPlayerManager> playerManager;
     private readonly NetPeer peer;
+
+    private sealed class WorldPacket : IPacket
+    {
+        public PacketType PacketType => PacketType.Message;
+        public DeliveryMethod DeliveryMethod => DeliveryMethod.ReliableOrdered;
+    }
 
     public SessionJoinStateTests(ITestOutputHelper output)
     {
@@ -92,6 +100,32 @@ public class SessionJoinStateTests
         Assert.False(string.IsNullOrEmpty(joined.Reason));
         Assert.IsType<SessionJoinState>(connection.State);
         playerManager.Verify(x => x.AddPlayer(It.IsAny<Player>()), Times.Never);
+    }
+
+    [Fact]
+    public void ClientValidate_AcceptedJoin_OpensPeerToPerPeerSends()
+    {
+        definitions.Open("test.mod", null);
+        var queue = serverComponent.Container.Resolve<IConnectionMessageQueue>();
+        var connection = Connect();
+        Assert.True(queue.TryHandleBroadcast(peer, new WorldPacket()));
+
+        Validate(connection, peer, "controller-1");
+
+        Assert.False(queue.TryHandleBroadcast(peer, new WorldPacket()));
+    }
+
+    [Fact]
+    public void ClientValidate_RefusedJoin_LeavesPeerGated()
+    {
+        var definition = definitions.Open("test.mod", null);
+        var queue = serverComponent.Container.Resolve<IConnectionMessageQueue>();
+        var connection = Connect();
+        definitions.Close(definition.SessionId);
+
+        Validate(connection, peer, "controller-1");
+
+        Assert.True(queue.TryHandleBroadcast(peer, new WorldPacket()));
     }
 
     [Fact]

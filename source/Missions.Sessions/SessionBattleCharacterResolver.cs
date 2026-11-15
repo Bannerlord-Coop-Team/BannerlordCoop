@@ -1,13 +1,14 @@
-﻿using TaleWorlds.Core;
+﻿using Missions.Battles;
+using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 
-namespace Missions.Battles;
+namespace Missions.Sessions;
 
 /// <summary>
 /// Character ids for a mission session with no campaign: the troop's StringId, which every client
 /// resolves from the same module data.
 /// </summary>
-public class SessionBattleCharacterResolver : IBattleCharacterResolver
+internal sealed class SessionBattleCharacterResolver : IBattleCharacterResolver
 {
     public bool TryGetCharacterId(BasicCharacterObject character, out string characterId)
     {

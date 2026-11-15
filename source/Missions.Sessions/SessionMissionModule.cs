@@ -19,6 +19,9 @@ public class SessionMissionModule : Module
         builder.Register((context, parameters) => context.Resolve<IMissionLifetimeFactory>().Create<CoopSessionController>(parameters))
             .AsSelf().InstancePerDependency().ExternallyOwned();
 
+        builder.RegisterType<SessionBattleCharacterResolver>().AsSelf().InstancePerDependency();
+        builder.RegisterType<SessionPuppetOriginFactory>().AsSelf().InstancePerDependency();
+
         builder.RegisterType<SessionMissionHost>()
             .As<ISessionMissionHost>()
             .SingleInstance();

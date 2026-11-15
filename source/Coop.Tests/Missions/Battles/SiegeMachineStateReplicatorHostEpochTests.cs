@@ -206,7 +206,7 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
             weaponState: -1,
             aimDirection: -1000f,
             aimReleaseAngle: -1000f);
-        InvokeBroadcastMachineStateIfChanged(unchangedDamage);
+        InvokeBroadcastMachineStateIfChanged(unchangedDamage, false);
 
         var revisionOneDamage = Assert.IsType<NetworkSiegeMachineState>(Assert.Single(sentToAll));
         Assert.Equal(1, revisionOneDamage.AuthorityRevision);
@@ -224,7 +224,7 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
         Assert.Empty(PendingStates(joiner));
         sentToAll.Clear();
 
-        InvokeBroadcastMachineStateIfChanged(unchangedDamage);
+        InvokeBroadcastMachineStateIfChanged(unchangedDamage, false);
 
         var revisionTwoDamage = Assert.IsType<NetworkSiegeMachineState>(Assert.Single(sentToAll));
         Assert.Equal(42.5f, revisionTwoDamage.HitPoints);
@@ -669,6 +669,43 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
     }
 
     [Fact]
+    public void MachineReset_FromTheHost_DiscardsTheBufferedState()
+    {
+        broker.Publish(this, MachineState(machineId: 30, hostEpoch: LocalEpoch));
+        DrainGameThread();
+        Assert.True(PendingStates().ContainsKey(30));
+
+        broker.Publish(this, new NetworkSiegeMachineReset(30, LocalEpoch, "host"));
+        DrainGameThread();
+
+        Assert.False(PendingStates().ContainsKey(30));
+    }
+
+    [Fact]
+    public void MachineReset_WithAStaleEpoch_IsDropped()
+    {
+        broker.Publish(this, MachineState(machineId: 31, hostEpoch: LocalEpoch));
+        DrainGameThread();
+
+        broker.Publish(this, new NetworkSiegeMachineReset(31, LocalEpoch - 1, "host"));
+        DrainGameThread();
+
+        Assert.True(PendingStates().ContainsKey(31));
+    }
+
+    [Fact]
+    public void MachineReset_FromANonHost_IsDropped()
+    {
+        broker.Publish(this, MachineState(machineId: 32, hostEpoch: LocalEpoch));
+        DrainGameThread();
+
+        broker.Publish(this, new NetworkSiegeMachineReset(32, LocalEpoch, "peer"));
+        DrainGameThread();
+
+        Assert.True(PendingStates().ContainsKey(32));
+    }
+
+    [Fact]
     [Trait("Requirement", "BR-102")]
     public void UnstampedAndAheadMachineStates_AreAccepted()
     {
@@ -999,21 +1036,24 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
     }
 
     [Theory]
-    [InlineData(0f, 2, 450f, 0, true)]
-    [InlineData(0f, 0, 450f, 0, true)]
-    [InlineData(450f, 1, 450f, 0, true)]
-    [InlineData(450f, 0, 200f, 1, false)]
-    [InlineData(200f, 1, 0f, 2, false)]
-    [InlineData(200f, 1, 450f, 1, false)]
+    [InlineData(0f, 2, 450f, 0, true, true)]
+    [InlineData(0f, 0, 450f, 0, true, true)]
+    [InlineData(450f, 1, 450f, 0, true, true)]
+    [InlineData(200f, 2, 450f, 0, true, true)]
+    [InlineData(450f, 1, 450f, 0, false, false)]
+    [InlineData(300f, 3, 300f, 2, false, false)]
+    [InlineData(450f, 0, 200f, 1, false, false)]
+    [InlineData(200f, 1, 0f, 2, false, false)]
+    [InlineData(200f, 1, 450f, 1, true, false)]
     public void HostStateChange_SendsResetOnlyForARepair(
-        float fromHp, int fromState, float toHp, int toState, bool expectReset)
+        float fromHp, int fromState, float toHp, int toState, bool atFullHealth, bool expectReset)
     {
         const int machineId = 21;
         session.SetupGet(s => s.IsLocalHost).Returns(true);
 
-        InvokeBroadcastMachineStateIfChanged(MachineState(machineId, fromHp, fromState));
+        InvokeBroadcastMachineStateIfChanged(MachineState(machineId, fromHp, fromState), false);
         sentToAll.Clear();
-        InvokeBroadcastMachineStateIfChanged(MachineState(machineId, toHp, toState));
+        InvokeBroadcastMachineStateIfChanged(MachineState(machineId, toHp, toState), atFullHealth);
 
         if (!expectReset)
         {
@@ -1051,12 +1091,12 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
         method!.Invoke(sut, new object[] { machineId, controllerId });
     }
 
-    private void InvokeBroadcastMachineStateIfChanged(NetworkSiegeMachineState state)
+    private void InvokeBroadcastMachineStateIfChanged(NetworkSiegeMachineState state, bool atFullHealth)
     {
         var method = typeof(SiegeMachineStateReplicator).GetMethod(
             "BroadcastMachineStateIfChanged", BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.NotNull(method);
-        method!.Invoke(sut, new object[] { state });
+        method!.Invoke(sut, new object[] { state, atFullHealth });
     }
 
     private T GetField<T>(string fieldName)

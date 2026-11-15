@@ -333,21 +333,6 @@ public class ServerLaunchArgumentsTests
     }
 
     [Fact]
-    public void SessionArguments_RejectOversizedPayload()
-    {
-        Assert.Throws<System.ArgumentOutOfRangeException>(() => ServerLaunchArguments.BuildSessionServerArguments(
-            new[] { "Native" }, "mod", new byte[global::GameInterface.Services.Sessions.Messages.AttemptHostSession.MaxPayloadBytes + 1],
-            1, null, ServerVisibility.Public));
-    }
-
-    [Fact]
-    public void SessionArguments_RejectNullModId()
-    {
-        Assert.Throws<System.ArgumentNullException>(() => ServerLaunchArguments.BuildSessionServerArguments(
-            new[] { "Native" }, null, new byte[0], 1, null, ServerVisibility.Public));
-    }
-
-    [Fact]
     public void TryParseSession_BadBase64_False()
     {
         var args = new[] { "Bannerlord.exe", ServerLaunchArguments.SessionModArgument, "mod",

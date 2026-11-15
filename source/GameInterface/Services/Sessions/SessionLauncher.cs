@@ -12,6 +12,15 @@ namespace GameInterface.Services.Sessions;
 /// <summary>
 /// The public entry for a mod that runs its own mission over Coop with no campaign: host or join a session,
 /// build the mission behaviors, follow the host and close the session.
+/// <para>
+/// Rules for the mod's mission:
+/// pass the behaviors of <see cref="CreateMissionBehaviors"/> in the <c>MissionState.OpenNew</c> list, or add them in
+/// <c>OnBeforeMissionBehaviorInitialize</c>.
+/// The mission needs a <c>MissionCombatantsLogic</c>, because Coop reserves the ally team for the other players through it.
+/// The mission owns its end condition and places its own siege engines.
+/// Only the host spawns shared AI, because every member's <c>SpawnAgent</c> is replicated as an owned agent.
+/// Mod channel messages carry no host epoch, so put <see cref="SessionHostChanged.Epoch"/> in your own messages.
+/// </para>
 /// </summary>
 public interface ISessionLauncher : IDisposable
 {
@@ -53,7 +62,9 @@ public sealed class SessionLauncher : ISessionLauncher
 
     internal SessionLauncher(Action<SessionMissionOpenRequested> openMission, IMessageBroker broker)
     {
-        this.openMission = openMission ?? throw new ArgumentNullException(nameof(openMission));
+        if (openMission == null) throw new ArgumentNullException(nameof(openMission));
+
+        this.openMission = openMission;
         this.broker = broker;
 
         broker.Subscribe<SessionMissionOpenRequested>(Handle_OpenRequested);
@@ -76,7 +87,7 @@ public sealed class SessionLauncher : ISessionLauncher
         if (payload != null && payload.Length > AttemptHostSession.MaxPayloadBytes)
             throw new ArgumentException($"The payload is over {AttemptHostSession.MaxPayloadBytes} bytes", nameof(payload));
 
-        broker.Publish(this, new AttemptHostSession(modId, payload ?? new byte[0], password, visibility));
+        broker.Publish(this, new AttemptHostSession(modId, payload ?? Array.Empty<byte>(), password, visibility));
     }
 
     public void Join(IPAddress address, int port, string password)
@@ -87,7 +98,7 @@ public sealed class SessionLauncher : ISessionLauncher
     public IReadOnlyList<MissionBehavior> CreateMissionBehaviors(string sessionId)
     {
         if (!ContainerProvider.TryResolve<ISessionMissionHost>(out var host))
-            return new MissionBehavior[0];
+            return Array.Empty<MissionBehavior>();
 
         return host.CreateMissionBehaviors(sessionId);
     }

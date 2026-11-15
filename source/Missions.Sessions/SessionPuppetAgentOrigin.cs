@@ -1,13 +1,13 @@
 ﻿using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
-namespace Missions.Battles;
+namespace Missions.Sessions;
 
 /// <summary>
-/// Origin of a session puppet: the team's colours and banner, which the owner's script spawn also used
-/// (Mission.GetAgentBuildDataToSpawnTroop).
+/// Origin of a session puppet: the team's colours and banner. The spawn takes the banner from the origin, so the
+/// puppet shows the same banner as the owner's script spawn (Mission.GetAgentBuildDataToSpawnTroop).
 /// </summary>
-public class SessionPuppetAgentOrigin : IAgentOriginBase
+internal sealed class SessionPuppetAgentOrigin : IAgentOriginBase
 {
     private readonly BasicCharacterObject troop;
     private readonly Team team;

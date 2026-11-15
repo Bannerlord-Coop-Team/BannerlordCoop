@@ -314,7 +314,8 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             if (!isHost && !simulatedLocally) continue;
 
             var state = CaptureState(machine, isHost, simulatedLocally);
-            BroadcastMachineStateIfChanged(state);
+            var destruction = machine.DestructionComponent;
+            BroadcastMachineStateIfChanged(state, destruction != null && destruction.HitPoint >= destruction.MaxHitPoint);
 
             if (simulatedLocally && machine is SiegeLadder ladder)
             {
@@ -328,22 +329,23 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         }
     }
 
-    private void BroadcastMachineStateIfChanged(NetworkSiegeMachineState state)
+    private void BroadcastMachineStateIfChanged(NetworkSiegeMachineState state, bool atFullHealth)
     {
         if (MachineStatesEqual(state.MachineId, state)) return;
 
         // The reset goes first on the same ordered channel, so every peer gets it before the lower state.
-        if (lastSent.TryGetValue(state.MachineId, out var previous) && IsRepair(previous, state))
+        if (lastSent.TryGetValue(state.MachineId, out var previous) && IsRepair(previous, state, atFullHealth))
             network.SendAll(new NetworkSiegeMachineReset(state.MachineId, GetSnapshotAuthorityEpoch(state.MachineId), session.OwnControllerId));
 
         lastSent[state.MachineId] = state;
         network.SendAll(Stamp(state));
     }
 
-    // A lower destruction state, or hit points back from 0, is a repair: vanilla lowers the state only in DestructableComponent.Reset.
-    internal static bool IsRepair(NetworkSiegeMachineState previous, NetworkSiegeMachineState current) =>
-        previous.DestructionState >= 0 && current.DestructionState >= 0
-        && (current.DestructionState < previous.DestructionState || (previous.HitPoints == 0f && current.HitPoints > 0f));
+    // Only DestructableComponent.Reset sets state 0 at full hit points; a hit after a heal can lower the state
+    // through SetDestructionLevel, which is not a repair.
+    internal static bool IsRepair(NetworkSiegeMachineState previous, NetworkSiegeMachineState current, bool atFullHealth) =>
+        atFullHealth && current.DestructionState == 0
+        && (previous.DestructionState > 0 || previous.HitPoints == 0f);
 
     private bool MachineStatesEqual(int machineId, NetworkSiegeMachineState state)
     {
@@ -1473,6 +1475,7 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         {
             if (Mission.Current == null) return;
             if (DropStaleHostEpoch(obj.HostEpoch, nameof(NetworkSiegeMachineReset))) return;
+            if (!session.IsHostController(obj.SenderControllerId)) return;
 
             RefreshMachineCache();
             // A buffered state predates the reset (same ordered channel); the post-reset state follows it.
@@ -1833,6 +1836,8 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         {
             // The gate's reset runs its destructible's reset first (CastleGate.OnMissionReset).
             gate.OnMissionReset();
+            // Vanilla AfterMissionStart does this too; the reset leaves the navmesh faces OnDestroyed enabled.
+            gate.SetAutoOpenState(gate.AutoOpen);
             return;
         }
 

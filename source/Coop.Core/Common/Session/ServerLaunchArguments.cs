@@ -111,7 +111,7 @@ public static class ServerLaunchArguments
             SessionModArgument,
             modId,
             SessionPayloadArgument,
-            Convert.ToBase64String(payload ?? new byte[0]),
+            Convert.ToBase64String(payload ?? Array.Empty<byte>()),
             OwnerArgument,
             ownerProcessId.ToString(CultureInfo.InvariantCulture),
             VisibilityArgument,
@@ -131,7 +131,7 @@ public static class ServerLaunchArguments
     public static bool TryParseSession(IReadOnlyList<string> args, out string modId, out byte[] payload, out int ownerProcessId)
     {
         modId = null;
-        payload = new byte[0];
+        payload = Array.Empty<byte>();
         ownerProcessId = 0;
         bool payloadValid = true;
 

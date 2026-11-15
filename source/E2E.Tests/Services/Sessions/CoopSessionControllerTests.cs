@@ -94,7 +94,7 @@ public class CoopSessionControllerTests : MissionTestEnvironment
             controller.OnBehaviorInitialize();
 
             Assert.Equal(sessionId, controller.Session.InstanceId);
-            Assert.Contains(client.NetworkSentMessages.GetMessages<NetworkMissionEntered>(),
+            Assert.Single(client.NetworkSentMessages.GetMessages<NetworkMissionEntered>(),
                 m => m.InstanceId == sessionId && m.ControllerId == "owner");
             GC.KeepAlive(controller);
         });
@@ -165,7 +165,7 @@ public class CoopSessionControllerTests : MissionTestEnvironment
 
             controller.AfterStart();
 
-            Assert.Contains(client.NetworkSentMessages.GetMessages<NetworkRequestSessionHost>(), m => m.SessionId == sessionId);
+            Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestSessionHost>(), m => m.SessionId == sessionId);
             Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkRequestBattleHost>());
             Assert.Empty(client.InternalMessages.GetMessages<BattleMissionReady>());
             GC.KeepAlive(controller);
@@ -196,6 +196,35 @@ public class CoopSessionControllerTests : MissionTestEnvironment
             Assert.Equal("owner", change.HostControllerId);
             Assert.Equal(1, change.Epoch);
             Assert.True(change.IsLocalHost);
+            GC.KeepAlive(controller);
+        });
+    }
+
+    [Fact]
+    public void SuccessorChange_SameHostAndEpoch_DoesNotRepublishHostChanged()
+    {
+        using var fixture = new MissionEngineFixture();
+        var client = Clients.First();
+        SetControllerId(client, "owner");
+        var sessionId = SessionInstanceId.Create();
+
+        client.Call(() =>
+        {
+            CreateConnectedMission(fixture, client, sessionId);
+            var controller = CreateController(client, sessionId);
+            controller.OnBehaviorInitialize();
+            var changes = new List<SessionHostChanged>();
+            var broker = client.Resolve<IMessageBroker>();
+            broker.Subscribe<SessionHostChanged>(payload => changes.Add(payload.What));
+
+            broker.Publish(this, new NetworkBattleHostAssigned(sessionId, "owner", System.Array.Empty<string>(), 1));
+            broker.Publish(this, new NetworkBattleHostAssigned(sessionId, "owner", new[] { "peer" }, 1));
+
+            Assert.Single(changes);
+
+            broker.Publish(this, new NetworkBattleHostAssigned(sessionId, "peer", System.Array.Empty<string>(), 2));
+
+            Assert.Equal(2, changes.Count);
             GC.KeepAlive(controller);
         });
     }

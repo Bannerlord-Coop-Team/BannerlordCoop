@@ -9,7 +9,7 @@ public sealed class SessionHostAssignment
     public SessionHostAssignment(string hostControllerId, IReadOnlyList<string> successorControllerIds, int epoch)
     {
         HostControllerId = hostControllerId;
-        SuccessorControllerIds = successorControllerIds ?? Array.Empty<string>();
+        SuccessorControllerIds = successorControllerIds;
         Epoch = epoch;
     }
 
@@ -33,9 +33,6 @@ public interface ISessionHostRegistry
 
     /// <summary>Returns max(last issued, <paramref name="floor"/>) + 1 and records it as the last issued epoch.</summary>
     int NextEpoch(string sessionId, int floor = 0);
-
-    /// <summary>Drops the assignment and the epoch watermark. Only a session close uses it.</summary>
-    void Forget(string sessionId);
 }
 
 /// <inheritdoc cref="ISessionHostRegistry"/>
@@ -77,15 +74,6 @@ public class SessionHostRegistry : ISessionHostRegistry
             var next = Math.Max(last, floor) + 1;
             issuedEpochs[sessionId] = next;
             return next;
-        }
-    }
-
-    public void Forget(string sessionId)
-    {
-        lock (gate)
-        {
-            assignments.Remove(sessionId);
-            issuedEpochs.Remove(sessionId);
         }
     }
 }

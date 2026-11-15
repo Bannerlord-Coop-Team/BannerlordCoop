@@ -29,6 +29,7 @@ public class SiegeGateDestroyedReplayTests : IDisposable
     private static int gateResets;
     private static int destructibleResets;
     private static int destructionLevelCalls;
+    private static readonly System.Collections.Generic.List<bool> autoOpenStates = new();
 
     private readonly Harmony harmony = new("coop.tests.siege-gate-destroyed-replay");
 
@@ -42,6 +43,8 @@ public class SiegeGateDestroyedReplayTests : IDisposable
         gateResets = 0;
         destructibleResets = 0;
         destructionLevelCalls = 0;
+        autoOpenStates.Clear();
+        Stub(AccessTools.Method(typeof(CastleGate), nameof(CastleGate.SetAutoOpenState)), nameof(RecordAutoOpenState));
         Stub(AccessTools.Method(typeof(ScriptComponentBehavior), "CacheEditableFieldsForAllScriptComponents"), nameof(Skip));
         Stub(AccessTools.Method(typeof(CastleGate), "OnDestroyed"), nameof(RecordDestroyedReplay));
         Stub(AccessTools.Method(typeof(CastleGate), "OnMissionReset"), nameof(RecordGateReset));
@@ -91,6 +94,8 @@ public class SiegeGateDestroyedReplayTests : IDisposable
         ApplySnapshot(gate, 0f, DestroyedStateIndex);
 
         Assert.Equal(1, gateResets);
+        // The gate's reset leaves the navmesh faces its destruction enabled.
+        Assert.Equal(new[] { gate.AutoOpen }, autoOpenStates);
         Assert.Equal(0, destructibleResets);
         Assert.Equal(2, destroyedReplays);
         Assert.Equal(2, destructionLevelCalls);
@@ -257,6 +262,12 @@ public class SiegeGateDestroyedReplayTests : IDisposable
     }
 
     // Stand-in for DestructableComponent.Reset: the native body needs scene entities.
+    private static bool RecordAutoOpenState(bool isEnabled)
+    {
+        autoOpenStates.Add(isEnabled);
+        return false;
+    }
+
     private static bool RecordGateReset(CastleGate __instance)
     {
         gateResets++;

@@ -87,7 +87,7 @@ public class ClientLogic : IClientLogic
             [typeof(LoadingState)] = () => new LoadingState(this, context.MessageBroker, context.RegistryManager, context.HeroInterface, context.ControllerIdProvider, context.PlayerManager, context.GameStateInterface, context.LoadingInterface),
             [typeof(CampaignState)] = () => new CampaignState(this, context.MessageBroker, context.Network, context.LoadingInterface, context.GameStateInterface, context.CoopFinalizer, context.MapTimeTrackerInterface),
             [typeof(MissionState)] = () => new MissionState(this, context.MessageBroker, context.GameStateInterface, context.CoopFinalizer),
-            [typeof(SessionState)] = () => new SessionState(this, context.MessageBroker, context.GameStateInterface, context.LoadingInterface, context.CoopFinalizer),
+            [typeof(SessionState)] = () => new SessionState(this, context.MessageBroker, context.LoadingInterface, context.CoopFinalizer, context.RegistryManager),
         };
 
     public void Start()

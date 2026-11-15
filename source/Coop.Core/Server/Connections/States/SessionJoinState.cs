@@ -14,14 +14,15 @@ namespace Coop.Core.Server.Connections.States;
 /// <summary>
 /// First state of a connection to a campaign-free session server. Module validation and the ban check are
 /// inherited; resolving the character registers a player with no hero or party, sends the session
-/// definition and moves to <see cref="MissionState"/>. It never transfers a save, so every later message to
-/// this peer must be sent per peer.
+/// definition and moves to <see cref="MissionState"/>. It never transfers a save, so the connection queue
+/// would drop every later send to this peer; the accepted join marks the peer live.
 /// </summary>
 public class SessionJoinState : ResolveCharacterState
 {
     private readonly INetwork network;
     private readonly IPlayerManager playerManager;
     private readonly ISessionDefinitionStore sessionDefinitions;
+    private readonly IConnectionMessageQueue connectionMessageQueue;
 
     public SessionJoinState(IConnectionLogic connectionLogic,
         IMessageBroker messageBroker,
@@ -35,13 +36,15 @@ public class SessionJoinState : ResolveCharacterState
         IExistingPlayerSender existingPlayerSender,
         ISteamBanList steamBanList,
         IJoinValidationDenialLog denialLog,
-        ISessionDefinitionStore sessionDefinitions)
+        ISessionDefinitionStore sessionDefinitions,
+        IConnectionMessageQueue connectionMessageQueue)
         : base(connectionLogic, messageBroker, network, moduleValidator, playerManager, playerPartyRestorer, objectManager,
             moduleInfoProvider, moduleNameProvider, existingPlayerSender, steamBanList, denialLog)
     {
         this.network = network;
         this.playerManager = playerManager;
         this.sessionDefinitions = sessionDefinitions;
+        this.connectionMessageQueue = connectionMessageQueue;
     }
 
     protected override void ResolveCharacter(NetPeer peer, string controllerId)
@@ -61,6 +64,7 @@ public class SessionJoinState : ResolveCharacterState
 
         playerManager.SetPeer(controllerId, peer);
         network.SendImmediate(peer, new NetworkSessionJoined(true, null, definition.SessionId, definition.ModId, definition.Payload, player));
+        connectionMessageQueue.MarkLive(peer);
         ConnectionLogic.EnterMission();
     }
 

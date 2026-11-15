@@ -79,6 +79,7 @@ public class ServerProcessManager : IDisposable
         CleanupLocked();
 
         var exePath = ManagedServerLauncher.GetEngineExecutablePath();
+        Logger.Information("Spawning the server executable {Exe}", exePath);
 
         var process = new Process
         {

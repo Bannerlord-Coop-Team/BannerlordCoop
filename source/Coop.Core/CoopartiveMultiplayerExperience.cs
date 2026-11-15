@@ -198,6 +198,18 @@ namespace Coop.Core
                 return;
             }
 
+            HostThroughSpawnedServer(
+                () => serverProcessManager.Start(obj.What.SaveName, password, visibility),
+                password,
+                visibility,
+                timeoutText: "The co-op server did not finish starting. Check that the save loads in singleplayer. The standalone server remains open until you close it.",
+                startingText: "Starting the co-op server; you will join it automatically once it is up");
+        }
+
+        // The Steam path of hosting: spawn the server process, then join it over loopback.
+        private void HostThroughSpawnedServer(
+            Action spawn, string password, ServerVisibility visibility, string timeoutText, string startingText)
+        {
             if (serverProcessManager.IsRunning)
             {
                 InformationManager.DisplayMessage(new InformationMessage(
@@ -212,7 +224,7 @@ namespace Coop.Core
 
             try
             {
-                serverProcessManager.Start(obj.What.SaveName, password, visibility);
+                spawn();
             }
             catch (Exception ex)
             {
@@ -248,10 +260,9 @@ namespace Coop.Core
 
                 container.Resolve<SteamJoinWatchdog>().Arm(configuration.Address, configuration.Port,
                     timeout: HostedServerStartTimeout,
-                    timeoutText: "The co-op server did not finish starting. Check that the save loads in singleplayer. The standalone server remains open until you close it.");
+                    timeoutText: timeoutText);
 
-                InformationManager.DisplayMessage(new InformationMessage(
-                    "Starting the co-op server; you will join it automatically once it is up"));
+                InformationManager.DisplayMessage(new InformationMessage(startingText));
             }
             catch (Exception ex)
             {
@@ -309,64 +320,12 @@ namespace Coop.Core
                 return;
             }
 
-            if (serverProcessManager.IsRunning)
-            {
-                InformationManager.DisplayMessage(new InformationMessage(
-                    "A hosted co-op server is still running; close its standalone server window before hosting again"));
-                return;
-            }
-
-            hostedSession = true;
-            clientConnectedOnce = false;
-
-            try
-            {
-                serverProcessManager.StartSession(request.ModId, request.Payload, password, visibility);
-            }
-            catch (Exception ex)
-            {
-                hostedSession = false;
-                Logger.Error(ex, "Failed to spawn the co-op session server process");
-                InformationManager.DisplayMessage(new InformationMessage(
-                    "Could not start the co-op server process"));
-                return;
-            }
-
-            configuration = new NetworkConfig()
-            {
-                Address = "127.0.0.1",
-                Token = password,
-            };
-
-            var advertisementConfig = new SessionAdvertisementConfig
-            {
-                EnableSteamInvites = false,
-                Visibility = visibility,
-            };
-
-            try
-            {
-                if (!StartAsClient(configuration, advertisementConfig, JoinIntent.HostLoopback))
-                {
-                    hostedSession = false;
-                    InformationManager.DisplayMessage(new InformationMessage(HostClientStartFailedNotice));
-                    return;
-                }
-
-                container.Resolve<SteamJoinWatchdog>().Arm(configuration.Address, configuration.Port,
-                    timeout: HostedServerStartTimeout,
-                    timeoutText: "The co-op session server did not finish starting.");
-
-                InformationManager.DisplayMessage(new InformationMessage(
-                    "Starting the co-op session; you will join it automatically once it is up"));
-            }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "Hosted co-op session failed to start");
-                hostedSession = false;
-                DestroyContainer();
-                InformationManager.DisplayMessage(new InformationMessage(HostClientStartFailedNotice));
-            }
+            HostThroughSpawnedServer(
+                () => serverProcessManager.StartSession(request.ModId, request.Payload, password, visibility),
+                password,
+                visibility,
+                timeoutText: "The co-op session server did not finish starting.",
+                startingText: "Starting the co-op session; you will join it automatically once it is up");
         }
 
         // A deliberate new session supersedes the client-side state for any half-started attempt.
@@ -568,10 +527,11 @@ namespace Coop.Core
             }
         }
 
-        private void StartAsServerCore(string saveName, string password, ServerVisibility visibility)
+        // Validates the settings and builds the server container. False when a start is already applying patches.
+        private bool TryBuildServerContainer(string password, ServerVisibility visibility)
         {
             // A second Host or Join click while patches are still applying would tear down the in-flight start
-            if (coopStarting) return;
+            if (coopStarting) return false;
 
             if (!ConnectionPassword.IsValid(password))
                 throw new ArgumentOutOfRangeException(nameof(password),
@@ -606,6 +566,13 @@ namespace Coop.Core
             container = builder.Build();
 
             GameInterface.ContainerProvider.SetContainer(container);
+
+            return true;
+        }
+
+        private void StartAsServerCore(string saveName, string password, ServerVisibility visibility)
+        {
+            if (!TryBuildServerContainer(password, visibility)) return;
 
             var gameInterface = container.Resolve<IGameInterface>();
             var loadingInterface = container.Resolve<ILoadingInterface>();
@@ -642,39 +609,7 @@ namespace Coop.Core
             if (coopStarting) return;
 
             if (string.IsNullOrEmpty(modId)) throw new ArgumentException("A session needs a mod id", nameof(modId));
-            if (!ConnectionPassword.IsValid(password))
-                throw new ArgumentOutOfRangeException(nameof(password),
-                    $"The server password cannot exceed {ConnectionPassword.MaxLength} characters");
-            if (!Enum.IsDefined(typeof(ServerVisibility), visibility))
-                throw new ArgumentOutOfRangeException(nameof(visibility));
-            if (!ManagedServerConfig.IsValidPort(ManagedServerConfig.Port))
-                throw new ArgumentOutOfRangeException(nameof(ManagedServerConfig.Port),
-                    "The server port must be between 1 and 65535");
-
-            DestroyContainer();
-            setCrashPhase("starting-server");
-            presenceClient?.ClearPresence();
-
-            ModInformation.IsServer = true;
-
-            ContainerBuilder builder = new ContainerBuilder();
-            builder.RegisterModule<ServerModule>();
-            builder.RegisterModule<GameInterfaceModule>();
-            builder.RegisterModule<NavalAssemblyModule>();
-            builder.RegisterInstance(new CoopLogFile(coopLogFilePath)).As<ICoopLogFile>().SingleInstance();
-            builder.RegisterInstance(new NetworkConfig
-            {
-                Token = password ?? string.Empty,
-                Port = ManagedServerConfig.Port,
-            })
-                .As<INetworkConfig>()
-                .SingleInstance();
-            builder.RegisterInstance(new SessionAdvertisementConfig { Visibility = visibility })
-                .AsSelf()
-                .SingleInstance();
-            container = builder.Build();
-
-            GameInterface.ContainerProvider.SetContainer(container);
+            if (!TryBuildServerContainer(password, visibility)) return;
 
             // Opened before any client can connect, so every connection starts at the session join state.
             container.Resolve<ISessionDefinitionStore>().Open(modId, payload);

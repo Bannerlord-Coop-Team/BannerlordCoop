@@ -1,8 +1,8 @@
 ﻿using Autofac;
 using Autofac.Core;
-using GameInterface.Services.Entity;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.Sessions;
+using System;
 using System.Collections.Generic;
 using TaleWorlds.MountAndBlade;
 
@@ -13,16 +13,11 @@ internal sealed class SessionMissionHost : ISessionMissionHost
 {
     private readonly IMissionLifetimeFactory lifetimes;
     private readonly IBattleHostRegistry hostRegistry;
-    private readonly IControllerIdProvider controllerIds;
 
-    public SessionMissionHost(
-        IMissionLifetimeFactory lifetimes,
-        IBattleHostRegistry hostRegistry,
-        IControllerIdProvider controllerIds)
+    public SessionMissionHost(IMissionLifetimeFactory lifetimes, IBattleHostRegistry hostRegistry)
     {
         this.lifetimes = lifetimes;
         this.hostRegistry = hostRegistry;
-        this.controllerIds = controllerIds;
     }
 
     public bool IsLocalHost
@@ -30,16 +25,14 @@ internal sealed class SessionMissionHost : ISessionMissionHost
         get
         {
             var sessionId = BattleSpawnGate.ActiveMapEventId;
-            return SessionInstanceId.IsSession(sessionId)
-                && hostRegistry.TryGet(sessionId, out var assignment)
-                && assignment.HostControllerId == controllerIds.ControllerId;
+            return SessionInstanceId.IsSession(sessionId) && hostRegistry.IsHost(sessionId);
         }
     }
 
     public IReadOnlyList<MissionBehavior> CreateMissionBehaviors(string sessionId)
     {
         if (!SessionInstanceId.IsSession(sessionId))
-            return new MissionBehavior[0];
+            return Array.Empty<MissionBehavior>();
 
         // Engaged before the mission spawns any agent, so the spawn patch captures the first wave.
         BattleSpawnGate.BeginBattle(sessionId);

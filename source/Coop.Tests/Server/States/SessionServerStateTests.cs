@@ -1,6 +1,7 @@
 ﻿using Autofac;
 using Common.Messaging;
 using Common.Network;
+using Coop.Core.Common.Services.Connection.Messages;
 using Coop.Core.Server;
 using Coop.Core.Server.Services.Instances.Sessions;
 using Coop.Core.Server.States;
@@ -29,26 +30,15 @@ public class SessionServerStateTests
     }
 
     [Fact]
-    public void Enter_StartsNetwork_HidesLoadingScreen()
+    public void MainMenuEntered_DoesNotEndTheSession()
     {
-        var network = new Mock<INetwork>();
-        var loading = new Mock<ILoadingInterface>();
+        // A screen closing over the initial state raises MainMenuEntered on a session server.
+        serverLogic.SetState<SessionServerState>();
 
-        using var state = new SessionServerState(serverLogic, serverComponent.TestMessageBroker, network.Object,
-            new Mock<IGameStateInterface>().Object, loading.Object);
+        serverComponent.TestMessageBroker.Publish(this, new MainMenuEntered());
 
-        network.Verify(x => x.Start(), Times.Once);
-        loading.Verify(x => x.HideLoadingScreen(), Times.Once);
-    }
-
-    [Fact]
-    public void MainMenuEntered_ReturnsToInitialState()
-    {
-        var state = Assert.IsType<SessionServerState>(serverLogic.SetState<SessionServerState>());
-
-        state.Handle_MainMenuEntered(new MessagePayload<MainMenuEntered>(this, new MainMenuEntered()));
-
-        Assert.IsType<InitialServerState>(serverLogic.State);
+        Assert.IsType<SessionServerState>(serverLogic.State);
+        Assert.Empty(serverComponent.TestMessageBroker.GetMessagesFromType<EndCoopMode>());
     }
 
     [Fact]

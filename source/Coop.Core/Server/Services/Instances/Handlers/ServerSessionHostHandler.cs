@@ -9,6 +9,7 @@ using Missions.Messages;
 using Missions.Sessions;
 using Missions.Sessions.Messages;
 using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -17,8 +18,8 @@ namespace Coop.Core.Server.Services.Instances.Handlers;
 /// <summary>
 /// [Server] Elects the host of a campaign-free session, keeps the successor line, and closes the session on
 /// the host's request. The first member to report mission ready is the host; a departure promotes the next
-/// successor. Every message to a member goes out per peer: a session client never transfers a save, so the
-/// connection queue drops a <c>SendAll</c> for it.
+/// successor. Every message to a member goes out per peer. A session client never transfers a save, so the
+/// connection queue withholds sends from it until its join marks it live.
 /// </summary>
 internal class ServerSessionHostHandler : IHandler
 {
@@ -30,7 +31,6 @@ internal class ServerSessionHostHandler : IHandler
     private readonly IPlayerManager playerManager;
     private readonly ISessionHostRegistry hostRegistry;
     private readonly ISessionDefinitionStore definitions;
-    private readonly object gate = new object();
 
     public ServerSessionHostHandler(
         IMessageBroker messageBroker,
@@ -63,12 +63,13 @@ internal class ServerSessionHostHandler : IHandler
     {
         if (payload.Who is not NetPeer peer)
             return;
-        if (!playerManager.TryGetCurrentController(peer, out var controllerId))
-            return;
 
         var sessionId = payload.What.SessionId;
-        lock (gate)
+        // Queued behind the membership entry that precedes this request on the same connection.
+        GameThread.RunSafe(() =>
         {
+            if (!playerManager.TryGetCurrentController(peer, out var controllerId))
+                return;
             if (!SessionInstanceId.IsSession(sessionId) || definitions.Current?.SessionId != sessionId)
                 return;
 
@@ -80,7 +81,7 @@ internal class ServerSessionHostHandler : IHandler
 
             if (!hostRegistry.TryGet(sessionId, out var current))
             {
-                var elected = new SessionHostAssignment(controllerId, new string[0], hostRegistry.NextEpoch(sessionId));
+                var elected = new SessionHostAssignment(controllerId, Array.Empty<string>(), hostRegistry.NextEpoch(sessionId));
                 hostRegistry.Set(sessionId, elected);
                 Logger.Information("Elected {Host} as host of session {Session} at epoch {Epoch}", controllerId, sessionId, elected.Epoch);
                 SendToMembers(sessionId, members, elected);
@@ -97,64 +98,63 @@ internal class ServerSessionHostHandler : IHandler
             var appended = new SessionHostAssignment(current.HostControllerId, successors, current.Epoch);
             hostRegistry.Set(sessionId, appended);
             SendToMembers(sessionId, members, appended);
-        }
+        }, context: nameof(Handle_RequestSessionHost));
     }
 
     private void Handle_MemberDeparted(MessagePayload<MissionMemberDeparted> payload)
     {
+        // Published from the game thread by the membership handler.
         var departure = payload.What;
-        lock (gate)
-        {
-            if (!hostRegistry.TryGet(departure.InstanceId, out var current))
-                return;
+        if (!hostRegistry.TryGet(departure.InstanceId, out var current))
+            return;
 
-            if (departure.IsInstanceEmpty)
+        if (departure.IsInstanceEmpty)
+        {
+            // The session stays open: the next member to report ready is elected at a higher epoch.
+            hostRegistry.Remove(departure.InstanceId);
+            return;
+        }
+
+        var successors = current.SuccessorControllerIds.ToList();
+        SessionHostAssignment updated;
+        if (current.HostControllerId == departure.ControllerId)
+        {
+            if (successors.Count == 0)
             {
-                // The session stays open: the next member to report ready is elected at a higher epoch.
                 hostRegistry.Remove(departure.InstanceId);
                 return;
             }
 
-            var successors = current.SuccessorControllerIds.ToList();
-            SessionHostAssignment updated;
-            if (current.HostControllerId == departure.ControllerId)
-            {
-                if (successors.Count == 0)
-                {
-                    hostRegistry.Remove(departure.InstanceId);
-                    return;
-                }
-
-                var promoted = successors[0];
-                successors.RemoveAt(0);
-                updated = new SessionHostAssignment(promoted, successors, hostRegistry.NextEpoch(departure.InstanceId, current.Epoch));
-                Logger.Information("Promoted {Host} to host of session {Session} at epoch {Epoch}", promoted, departure.InstanceId, updated.Epoch);
-            }
-            else if (successors.Remove(departure.ControllerId))
-            {
-                updated = new SessionHostAssignment(current.HostControllerId, successors, current.Epoch);
-            }
-            else
-            {
-                return;
-            }
-
-            hostRegistry.Set(departure.InstanceId, updated);
-            if (missionManager.TryGetControllers(departure.InstanceId, out var members))
-                SendToMembers(departure.InstanceId, members, updated);
+            var promoted = successors[0];
+            successors.RemoveAt(0);
+            updated = new SessionHostAssignment(promoted, successors, hostRegistry.NextEpoch(departure.InstanceId, current.Epoch));
+            Logger.Information("Promoted {Host} to host of session {Session} at epoch {Epoch}", promoted, departure.InstanceId, updated.Epoch);
         }
+        else if (successors.Remove(departure.ControllerId))
+        {
+            updated = new SessionHostAssignment(current.HostControllerId, successors, current.Epoch);
+        }
+        else
+        {
+            return;
+        }
+
+        hostRegistry.Set(departure.InstanceId, updated);
+        if (missionManager.TryGetControllers(departure.InstanceId, out var members))
+            SendToMembers(departure.InstanceId, members, updated);
     }
 
     private void Handle_RequestSessionClose(MessagePayload<NetworkRequestSessionClose> payload)
     {
         if (payload.Who is not NetPeer peer)
             return;
-        if (!playerManager.TryGetCurrentController(peer, out var controllerId))
-            return;
 
         var request = payload.What;
-        lock (gate)
+        GameThread.RunSafe(() =>
         {
+            if (!playerManager.TryGetCurrentController(peer, out var controllerId))
+                return;
+
             if (!hostRegistry.TryGet(request.SessionId, out var current)
                 || current.HostControllerId != controllerId
                 || current.Epoch != request.HostEpoch)
@@ -175,19 +175,20 @@ internal class ServerSessionHostHandler : IHandler
             }
 
             missionManager.CompleteInstanceConclusion(request.SessionId, true);
-            hostRegistry.Forget(request.SessionId);
+            hostRegistry.Remove(request.SessionId);
             definitions.Close(request.SessionId);
             Logger.Information("Closed session {Session}", request.SessionId);
             messageBroker.Publish(this, new SessionClosed(request.SessionId));
-        }
+        }, context: nameof(Handle_RequestSessionClose));
     }
 
     private void SendToMembers(string sessionId, IReadOnlyCollection<string> members, SessionHostAssignment assignment)
     {
+        var message = ToMessage(sessionId, assignment);
         foreach (var member in members)
         {
             if (playerManager.TryGetPeer(member, out var memberPeer))
-                network.Send(memberPeer, ToMessage(sessionId, assignment));
+                network.Send(memberPeer, message);
         }
     }
 

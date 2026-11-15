@@ -710,8 +710,6 @@ namespace Coop
                 ContainerProvider.TryResolve<GameInterface.Services.Voice.IVoiceClient>(out var voiceClient))
                 voiceClient.Tick();
 
-            TryManagedSessionAutoStart();
-
             TryManagedServerAutoStart();
 
             TryAutoConnect();
@@ -777,42 +775,30 @@ namespace Coop
                 inquiry => InformationManager.ShowInquiry(inquiry));
         }
 
-        private bool _managedSessionStarted = false;
-        private void TryManagedSessionAutoStart()
-        {
-            // A session server loads no save: it opens its session once the main menu is up.
-            if (!isServer || !ManagedServerConfig.HasSession || _managedSessionStarted) return;
-            if (!(GameStateManager.Current?.ActiveState is InitialState)) return;
-
-            _managedSessionStarted = true;
-            Logger.Information("[ManagedServer] InitialState active, hosting a session for mod '{ModId}'", ManagedServerConfig.SessionModId);
-
-            try
-            {
-                Coop.StartAsSessionServer(ManagedServerConfig.SessionModId, ManagedServerConfig.SessionPayload,
-                    ManagedServerConfig.Password, ManagedServerConfig.Visibility);
-            }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "[ManagedServer] Exception during session auto-start");
-            }
-        }
-
         private bool _managedAutoStarted = false;
         private void TryManagedServerAutoStart()
         {
-            // Keyed on the auto-load save, not the UI-spawned marker: a manually launched
-            // /coopsave server also auto-loads without an owner-process id.
-            if (!isServer || !ManagedServerConfig.HasAutoLoadSave || _managedAutoStarted) return;
+            // Keyed on the auto-load save or the session, not the UI-spawned marker: a manually launched
+            // /coopsave server also auto-loads without an owner-process id. A session server loads no save.
+            if (!isServer || !(ManagedServerConfig.HasAutoLoadSave || ManagedServerConfig.HasSession) || _managedAutoStarted) return;
             if (!(GameStateManager.Current?.ActiveState is InitialState)) return;
 
             _managedAutoStarted = true;
-            Logger.Information("[ManagedServer] InitialState active — hosting save '{SaveName}'", ManagedServerConfig.SaveName);
 
             try
             {
-                Coop.StartAsServer(ManagedServerConfig.SaveName, ManagedServerConfig.Password,
-                    ManagedServerConfig.Visibility);
+                if (ManagedServerConfig.HasSession)
+                {
+                    Logger.Information("[ManagedServer] InitialState active, hosting a session for mod '{ModId}'", ManagedServerConfig.SessionModId);
+                    Coop.StartAsSessionServer(ManagedServerConfig.SessionModId, ManagedServerConfig.SessionPayload,
+                        ManagedServerConfig.Password, ManagedServerConfig.Visibility);
+                }
+                else
+                {
+                    Logger.Information("[ManagedServer] InitialState active — hosting save '{SaveName}'", ManagedServerConfig.SaveName);
+                    Coop.StartAsServer(ManagedServerConfig.SaveName, ManagedServerConfig.Password,
+                        ManagedServerConfig.Visibility);
+                }
             }
             catch (Exception ex)
             {
