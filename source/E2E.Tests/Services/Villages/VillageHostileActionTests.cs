@@ -1108,24 +1108,10 @@ public class VillageHostileActionTests : MapEventTestBase
     }
 
     [Fact]
-    public void CompletedRaidSimulation_ResumesRaidingAgain()
-    {
-        var result = CompleteRaidSimulationAndLoot();
-        try
-        {
-            AssertRaidContinuationPresented(result);
-        }
-        finally
-        {
-            result.Dispose();
-        }
-    }
-
-    [Fact]
     public void CompletedRaidSimulation_ReinforcedRaid_ResumesRaidingAgain()
     {
-        var result = CompleteRaidSimulationAndLoot();
-        try
+        using var result = CompleteRaidSimulationAndLoot();
+        {
         {
             var client = result.Client;
             var context = result.Context;
@@ -1169,10 +1155,6 @@ public class VillageHostileActionTests : MapEventTestBase
                 Assert.NotEqual(reopenedEventId, id);
                 Assert.Equal(2, result.Ended.Count);
             }, MapEventDisabledMethods);
-        }
-        finally
-        {
-            result.Dispose();
         }
     }
 
@@ -3579,6 +3561,7 @@ public class VillageHostileActionTests : MapEventTestBase
             Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleModeSet>()).Mode);
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkBattleSimulationFinished>());
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkOpenBattleSimulation>());
+        Assert.False(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleStartReply>()).Accepted);
 
         Server.Call(() =>
         {

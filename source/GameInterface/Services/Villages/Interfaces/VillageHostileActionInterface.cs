@@ -160,6 +160,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
 
     public void BeginHostileActionPresentation(VillageHostileAction action)
     {
+        requestedHostileActionEncounter = null;
         var encounter = PlayerEncounter.Current;
         if (encounter == null)
         {
@@ -197,11 +198,6 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
 
         requestedHostileActionEncounter = PlayerEncounter.Current;
         return true;
-    }
-
-    public void CompleteHostileActionRequest()
-    {
-        requestedHostileActionEncounter = null;
     }
 
     public void RecoverRejectedHostileAction()

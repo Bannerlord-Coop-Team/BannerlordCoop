@@ -265,8 +265,9 @@ internal class BattleSimulationRunHandler : IHandler
         GameThread.RunCleanupSafe(() =>
         {
             var releasedClaim = CancelSimulationSession(mapEventId, simulation);
+            // only the cancel that released the claim owns the retreat, so a repeated cancel does nothing
             if (releasedClaim)
-                HandleSimulationRetreat(requestingPeer, simulation.MapEvent);
+                LeaveOrFinalizeCancelledSimulation(requestingPeer, simulation.MapEvent);
             mapEventLogger.DebugMapEvent(simulation.MapEvent, "Battle simulation cancelled by initiating client");
         }, context: nameof(Handle_NetworkCancelBattleSimulation));
     }
@@ -930,15 +931,14 @@ internal class BattleSimulationRunHandler : IHandler
 
         EndSimulationSessionSafe(mapEventId, sim);
 
-        // Release before finalize: TryMarkFinalized releases the same claim, and only this release sends Unclaimed.
-        var released = ServerBattleModeArbiter.ReleaseSimulation(mapEventId);
+        ServerBattleModeArbiter.ReleaseSimulation(mapEventId);
         messageBroker.Publish(this, new MapEventFinalizeAttempted(sim.MapEvent));
-        if (released)
-            network.SendAll(new NetworkBattleModeSet(mapEventId, (int)BattleStartMode.Unclaimed));
+        network.SendAll(new NetworkBattleModeSet(mapEventId, (int)BattleStartMode.Unclaimed));
         network.SendAll(new NetworkBattleSimulationFinished(mapEventId));
     }
 
-    private void HandleSimulationRetreat(NetPeer requester, MapEvent mapEvent)
+    // A simulation leader ends the event while a joiner only removes its own party.
+    private void LeaveOrFinalizeCancelledSimulation(NetPeer requester, MapEvent mapEvent)
     {
         if (!playerManager.TryGetPlayer(requester, out var player) ||
             !objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party) ||

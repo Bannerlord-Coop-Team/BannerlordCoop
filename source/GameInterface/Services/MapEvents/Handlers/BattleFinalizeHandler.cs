@@ -175,8 +175,11 @@ internal class BattleFinalizeHandler : IHandler
         if (MapEventConfig.Debug)
             mapEventLogger.DebugMapEvent(mapEvent, "Handling network map event finalize attempted. Finalizing map event.");
 
-        if (TryContinueRaidAfterVictory(mapEvent, payload.What.MapEventId))
-            return;
+        NetPeer raidLeaderPeer = null;
+        string raidSettlementId = null;
+        var continuesRaid = ShouldContinueRaidAfterVictory(mapEvent)
+            && TryGetRaidLeaderPeer(mapEvent, out raidLeaderPeer)
+            && objectManager.TryGetId(mapEvent.MapEventSettlement, out raidSettlementId);
 
         var playerPartyIds = FinalizeAndCollectPlayers(mapEvent);
 
@@ -186,8 +189,13 @@ internal class BattleFinalizeHandler : IHandler
         if (playerPartyIds.Length > 0)
         {
             PvpEncounterCloseSender.Send(network, playerPartyIds, mapEventId: payload.What.MapEventId);
-            return;
         }
+
+        if (continuesRaid)
+            network.Send(raidLeaderPeer, new NetworkRaidContinuationRequested(raidSettlementId));
+
+        if (playerPartyIds.Length > 0)
+            return;
 
         if (requester != null)
             network.Send(requester, new NetworkMapEventFinalized());
@@ -214,12 +222,12 @@ internal class BattleFinalizeHandler : IHandler
             }
 
             handled = true;
-            HandleRetreat(requester, mapEvent, party);
+            LeaveOrFinalizeSharedHideout(requester, mapEvent, party);
         }, blocking: true, context: nameof(TryLeaveSharedHideout));
         return handled;
     }
 
-    private void HandleRetreat(NetPeer requester, MapEvent mapEvent, MobileParty party)
+    private void LeaveOrFinalizeSharedHideout(NetPeer requester, MapEvent mapEvent, MobileParty party)
     {
         foreach (var participant in playerManager.Players)
         {
@@ -395,7 +403,8 @@ internal class BattleFinalizeHandler : IHandler
 
         using (CreateHideoutFinalizeContext(mapEvent))
             mapEvent.FinalizeEventAux();
-        MoveRaidAttackersToSettlementGate(raidAttackers, raidSettlement);
+        if (!ShouldContinueRaidAfterVictory(mapEvent))
+            MoveRaidAttackersToSettlementGate(raidAttackers, raidSettlement);
 
         // After the destroy (same game thread, so behind it on the reliable-ordered channel).
         if (!string.IsNullOrEmpty(defenderVictorySettlementId))
@@ -471,88 +480,13 @@ internal class BattleFinalizeHandler : IHandler
 
         return ids?.ToArray() ?? Array.Empty<string>();
     }
-    /// <summary>
-    /// [Server] A won raid with hit points left does not end at finalize: the raid itself continues.
-    /// Finalize the battle, close every involved player's encounter, then tell the attacker leader to
-    /// request the next raid once its result screens are done. False for other battle outcomes.
-    /// </summary>
-    private bool TryContinueRaidAfterVictory(MapEvent mapEvent, string mapEventId)
+    private bool TryGetRaidLeaderPeer(MapEvent mapEvent, out NetPeer leaderPeer)
     {
-        var continued = false;
-        string[] playerPartyIds = null;
-        string settlementId = null;
-        NetPeer leaderPeer = null;
-
-        GameThread.RunSafe(
-            () =>
-            {
-                if (!ShouldContinueRaidAfterVictory(mapEvent))
-                    return;
-
-                var settlement = mapEvent.MapEventSettlement;
-                if (!objectManager.TryGetIdWithLogging(settlement, out settlementId))
-                    return;
-
-                var leaderParty = mapEvent.AttackerSide.LeaderParty;
-                if (leaderParty?.MobileParty == null)
-                    return;
-
-                if (!playerManager.TryGetPlayer(leaderParty.MobileParty, out var leader))
-                    return;
-
-                if (!playerManager.TryGetPeer(leader.ControllerId, out leaderPeer))
-                    return;
-
-                if (!TryMarkFinalized(mapEvent))
-                    return;
-
-                try
-                {
-                    var involvedParties = CollectInvolvedParties(mapEvent);
-                    playerPartyIds = MapEventPlayerPartyCollector.CollectPartyIds(mapEvent, objectManager);
-
-                    reserveBuilder.ForgetMapEvent(mapEvent);
-                    mapEvent.FinalizeEventAux();
-                    ClearMapEventBackReferences(involvedParties);
-
-                    continued = true;
-                }
-                finally
-                {
-                    if (!mapEvent.IsFinalized)
-                        UnmarkFinalized(mapEvent);
-                }
-            },
-            blocking: true,
-            context: nameof(TryContinueRaidAfterVictory));
-
-        if (!continued)
-            return false;
-
-        if (playerPartyIds.Length > 0)
-            PvpEncounterCloseSender.Send(network, playerPartyIds, mapEventId: mapEventId);
-
-        // The client parks the continuation until its battle result screens close.
-        network.Send(leaderPeer, new NetworkRaidContinuationRequested(settlementId));
-
-        return true;
-    }
-
-    private static PartyBase[] CollectInvolvedParties(MapEvent mapEvent)
-    {
-        if (mapEvent?.AttackerSide == null || mapEvent.DefenderSide == null)
-            return Array.Empty<PartyBase>();
-
-        return mapEvent.InvolvedParties.Where(party => party != null).ToArray();
-    }
-
-    private static void ClearMapEventBackReferences(PartyBase[] parties)
-    {
-        foreach (var party in parties)
-        {
-            if (party?.MapEventSide != null)
-                party._mapEventSide = null;
-        }
+        leaderPeer = null;
+        var leaderParty = mapEvent.AttackerSide?.LeaderParty?.MobileParty;
+        return leaderParty != null
+            && playerManager.TryGetPlayer(leaderParty, out var leader)
+            && playerManager.TryGetPeer(leader.ControllerId, out leaderPeer);
     }
 
     private static bool ShouldContinueRaidAfterVictory(MapEvent mapEvent)
