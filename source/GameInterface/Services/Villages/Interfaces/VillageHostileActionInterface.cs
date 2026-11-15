@@ -48,6 +48,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
 
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
+    private readonly IHostileActionRequestTracker hostileActionRequestTracker;
     private readonly ConcurrentDictionary<string, MapEventStartApproval> approvedMapEventStarts = new ConcurrentDictionary<string, MapEventStartApproval>();
     private readonly ConcurrentDictionary<string, bool> pendingHostileActionSettlements = new ConcurrentDictionary<string, bool>();
     private readonly ConcurrentDictionary<string, CampaignTime> forceActionCooldowns = new ConcurrentDictionary<string, CampaignTime>();
@@ -58,16 +59,23 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
     private DeferredForceScreen deferredForceScreen;
     // Client-only: the encounter a hostile-action request opened, kept until the server resolves the
     // request, and a won raid's continuation waiting for the current encounter to end.
-    private PlayerEncounter requestedHostileActionEncounter;
-    private Settlement parkedRaidContinuation;
-    private PlayerEncounter parkedRaidEncounter;
+    private ParkedRaidContinuation parkedRaidContinuation;
 
     public VillageHostileActionInterface(IMessageBroker messageBroker, IObjectManager objectManager)
+        : this(messageBroker, objectManager, new HostileActionRequestTracker())
+    {
+    }
+
+    public VillageHostileActionInterface(
+        IMessageBroker messageBroker,
+        IObjectManager objectManager,
+        IHostileActionRequestTracker hostileActionRequestTracker)
     {
         if (messageBroker == null) throw new ArgumentNullException(nameof(messageBroker));
         if (objectManager == null) throw new ArgumentNullException(nameof(objectManager));
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
+        this.hostileActionRequestTracker = hostileActionRequestTracker;
 
         messageBroker.Subscribe<CampaignTick>(Handle_CampaignTick);
     }
@@ -80,9 +88,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
             deferredForceScreen = null;
         }
         pendingForceTransfers.Clear();
-        requestedHostileActionEncounter = null;
         parkedRaidContinuation = null;
-        parkedRaidEncounter = null;
     }
 
     public void RequestHostileAction(VillageHostileAction action)
@@ -152,7 +158,6 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
 
     public void BeginHostileActionPresentation(VillageHostileAction action)
     {
-        requestedHostileActionEncounter = null;
         var encounter = PlayerEncounter.Current;
         if (encounter == null)
         {
@@ -185,23 +190,15 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
 
     public bool TryTrackHostileActionRequest()
     {
-        if (requestedHostileActionEncounter != null)
-        {
-            Logger.Information("Dropping hostile action request: one is already pending");
-            return false;
-        }
-
-        requestedHostileActionEncounter = PlayerEncounter.Current;
-        return true;
+        if (hostileActionRequestTracker.TryTrack(PlayerEncounter.Current)) return true;
+        Logger.Information("Dropping hostile action request: one is already pending");
+        return false;
     }
 
     public void RecoverRejectedHostileAction()
     {
-        var expectedEncounter = requestedHostileActionEncounter;
-        requestedHostileActionEncounter = null;
-
         var encounter = PlayerEncounter.Current;
-        if (encounter == null || !ReferenceEquals(encounter, expectedEncounter))
+        if (encounter == null || !hostileActionRequestTracker.TryTake(encounter))
             return;
 
         // Leave a live encounter or simulation alone when a denial races its start.
@@ -216,23 +213,23 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
     public void ParkRaidContinuation(Settlement settlement)
     {
         // Presented from Handle_CampaignTick once the result screens are done and the encounter has ended.
-        parkedRaidContinuation = settlement;
-        parkedRaidEncounter = PlayerEncounter.Current;
+        parkedRaidContinuation = new ParkedRaidContinuation(settlement, PlayerEncounter.Current);
     }
 
     private void PresentParkedRaidContinuation()
     {
-        var settlement = parkedRaidContinuation;
-        if (settlement == null)
+        var parked = parkedRaidContinuation;
+        if (parked == null)
             return;
 
+        var settlement = parked.Settlement;
+
         var encounter = PlayerEncounter.Current;
-        bool encounterReplaced = encounter != null && parkedRaidEncounter != null &&
-            !ReferenceEquals(encounter, parkedRaidEncounter);
+        bool encounterReplaced = encounter != null && parked.Encounter != null &&
+            !ReferenceEquals(encounter, parked.Encounter);
         if (PlayerCaptivity.IsCaptive)
         {
             parkedRaidContinuation = null;
-            parkedRaidEncounter = null;
             Logger.Information("Dropping parked raid continuation for {SettlementId}: captive", settlement.StringId);
             return;
         }
@@ -240,7 +237,6 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         if (encounterReplaced)
         {
             parkedRaidContinuation = null;
-            parkedRaidEncounter = null;
             Logger.Information("Dropping parked raid continuation for {SettlementId}: encounter replaced", settlement.StringId);
             return;
         }
@@ -250,7 +246,6 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
             return;
 
         parkedRaidContinuation = null;
-        parkedRaidEncounter = null;
 
         StartRaidContinuationEncounter(settlement);
     }
@@ -992,6 +987,18 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
     private static bool IsInMission()
     {
         return MissionState.Current != null || Mission.Current != null;
+    }
+
+    private sealed class ParkedRaidContinuation
+    {
+        public ParkedRaidContinuation(Settlement settlement, PlayerEncounter encounter)
+        {
+            Settlement = settlement;
+            Encounter = encounter;
+        }
+
+        public Settlement Settlement { get; }
+        public PlayerEncounter Encounter { get; }
     }
 
     private sealed class DeferredForceScreen

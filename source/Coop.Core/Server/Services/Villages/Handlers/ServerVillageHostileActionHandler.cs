@@ -16,6 +16,7 @@ using LiteNetLib;
 using Serilog;
 using System;
 using System.Collections.Concurrent;
+using System.Threading;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 
@@ -86,14 +87,27 @@ internal class ServerVillageHostileActionHandler : IHandler
             return;
         }
 
+        int replied = 0;
+        void DenyOnce(VillageHostileActionDeniedReason reason)
+        {
+            if (Interlocked.Exchange(ref replied, 1) == 0)
+                Deny(peer, reason);
+        }
+
+        void StartOnce()
+        {
+            Interlocked.Exchange(ref replied, 1);
+            network.Send(peer, new NetworkVillageHostileActionStarted(request.Action, request.MobilePartyId, request.SettlementId));
+        }
+
         try
         {
-            GameThread.RunSafe(() => TryStartHostileAction(peer, request), blocking: true, context: nameof(Handle_NetworkRequestVillageHostileAction));
+            GameThread.RunSafe(() => TryStartHostileAction(peer, request, DenyOnce, StartOnce), blocking: true, context: nameof(Handle_NetworkRequestVillageHostileAction));
         }
         catch (TimeoutException exception)
         {
-            Logger.Error(exception, "Timed out starting hostile action; denying the pending client request");
-            Deny(peer, VillageHostileActionDeniedReason.Invalid);
+            Logger.Error(exception, "Timed out starting hostile action");
+            DenyOnce(VillageHostileActionDeniedReason.Invalid);
         }
     }
 
@@ -108,19 +122,23 @@ internal class ServerVillageHostileActionHandler : IHandler
         return player.MobilePartyId == mobilePartyId;
     }
 
-    private void TryStartHostileAction(NetPeer peer, NetworkRequestVillageHostileAction request)
+    private void TryStartHostileAction(
+        NetPeer peer,
+        NetworkRequestVillageHostileAction request,
+        Action<VillageHostileActionDeniedReason> deny,
+        Action started)
     {
         try
         {
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(request.MobilePartyId, out var mobileParty))
             {
-                Deny(peer, VillageHostileActionDeniedReason.InvalidRequester);
+                deny(VillageHostileActionDeniedReason.InvalidRequester);
                 return;
             }
 
             if (!objectManager.TryGetObjectWithLogging<Settlement>(request.SettlementId, out var settlement))
             {
-                Deny(peer, VillageHostileActionDeniedReason.NonVillageSettlement);
+                deny(VillageHostileActionDeniedReason.NonVillageSettlement);
                 return;
             }
 
@@ -132,7 +150,7 @@ internal class ServerVillageHostileActionHandler : IHandler
                     request.MobilePartyId,
                     request.SettlementId,
                     reason);
-                Deny(peer, reason);
+                deny(reason);
                 return;
             }
 
@@ -148,12 +166,12 @@ internal class ServerVillageHostileActionHandler : IHandler
                 request.Action,
                 request.MobilePartyId,
                 request.SettlementId);
-            network.Send(peer, new NetworkVillageHostileActionStarted(request.Action, request.MobilePartyId, request.SettlementId));
+            started();
         }
         catch (Exception e)
         {
             Logger.Error(e, "Failed to start village hostile action");
-            Deny(peer, VillageHostileActionDeniedReason.Invalid);
+            deny(VillageHostileActionDeniedReason.Invalid);
         }
     }
 

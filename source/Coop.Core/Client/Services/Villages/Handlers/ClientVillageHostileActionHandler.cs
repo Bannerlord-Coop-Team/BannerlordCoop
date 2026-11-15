@@ -18,19 +18,22 @@ internal class ClientVillageHostileActionHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IVillageHostileActionInterface villageHostileActionInterface;
+    private readonly IHostileActionRequestTracker hostileActionRequestTracker;
 
     public ClientVillageHostileActionHandler(
         IMessageBroker messageBroker,
         INetwork network,
         IObjectManager objectManager,
         IControllerIdProvider controllerIdProvider,
-        IVillageHostileActionInterface villageHostileActionInterface)
+        IVillageHostileActionInterface villageHostileActionInterface,
+        IHostileActionRequestTracker hostileActionRequestTracker)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.controllerIdProvider = controllerIdProvider;
         this.villageHostileActionInterface = villageHostileActionInterface;
+        this.hostileActionRequestTracker = hostileActionRequestTracker;
 
         messageBroker.Subscribe<VillageHostileActionAttempted>(Handle_VillageHostileActionAttempted);
         messageBroker.Subscribe<NetworkVillageHostileActionStarted>(Handle_NetworkVillageHostileActionStarted);
@@ -67,11 +70,9 @@ internal class ClientVillageHostileActionHandler : IHandler
 
     private void Handle_NetworkVillageHostileActionStarted(MessagePayload<NetworkVillageHostileActionStarted> payload)
     {
+        hostileActionRequestTracker.Complete();
         GameThread.RunSafe(
-            () =>
-            {
-                villageHostileActionInterface.BeginHostileActionPresentation(payload.What.Action);
-            },
+            () => villageHostileActionInterface.BeginHostileActionPresentation(payload.What.Action),
             context: nameof(Handle_NetworkVillageHostileActionStarted));
     }
 
@@ -89,7 +90,11 @@ internal class ClientVillageHostileActionHandler : IHandler
     private void Handle_NetworkVillageHostileActionDenied(MessagePayload<NetworkVillageHostileActionDenied> payload)
     {
         GameThread.RunSafe(
-            () => villageHostileActionInterface.RecoverRejectedHostileAction(),
+            () =>
+            {
+                villageHostileActionInterface.RecoverRejectedHostileAction();
+                hostileActionRequestTracker.Complete();
+            },
             context: nameof(Handle_NetworkVillageHostileActionDenied));
         messageBroker.Publish(this, new SendInformationMessage(GetDeniedMessage(payload.What.Reason)));
     }

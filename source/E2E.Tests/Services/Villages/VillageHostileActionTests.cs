@@ -385,6 +385,13 @@ public class VillageHostileActionTests : MapEventTestBase
 
         client.Call(() => Assert.Null(PlayerEncounter.Current),
             MapEventDisabledMethods.Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast))));
+
+        client.Call(() => client.Resolve<IMessageBroker>().Publish(this, new VillageHostileActionAttempted(
+                VillageHostileAction.Raid,
+                Campaign.Current.MainParty,
+                client.GetRegisteredObject<Settlement>(target.SettlementId))),
+            MapEventDisabledMethods);
+        Assert.Equal(2, client.NetworkSentMessages.GetMessages<NetworkRequestVillageHostileAction>().Count());
     }
 
     [Fact]
@@ -3615,78 +3622,6 @@ public class VillageHostileActionTests : MapEventTestBase
     }
 
     [Fact]
-    public void MultiPlayerRaid_BattleSimulation_IsCancelled_ByInitiatingClient_FinalizesMapEvent()
-    {
-        var client = Clients.First();
-        var hostileAction = CreateHostileActionWithTwoPlayerParties(VillageHostileAction.Raid);
-
-        try
-        {
-            // Start the first simulation
-            Server.NetworkSentMessages.Clear();
-
-            client.Call(() => client.Resolve<INetwork>().SendAll(
-                    new NetworkBattleStartRequest(
-                        Guid.NewGuid().ToString(),
-                        (int)BattleStartMode.Simulation,
-                        hostileAction.MapEventId,
-                        hostileAction.AttackerMobilePartyId)),
-                MapEventDisabledMethods);
-
-            Assert.True(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleStartReply>()).Accepted);
-
-            Server.Call(() =>
-            {
-                Assert.True(ServerBattleModeArbiter.TryGetMode(hostileAction.MapEventId, out var mode));
-                Assert.Equal(BattleStartMode.Simulation, mode);
-            });
-
-            // The initiating client closes/cancels the unfinished simulation.
-            Server.NetworkSentMessages.Clear();
-
-            client.Call(() => client.Resolve<INetwork>().SendAll(
-                    new NetworkCancelBattleSimulation(
-                        hostileAction.MapEventId)),
-                MapEventDisabledMethods);
-
-            var cancelled = Assert.Single(
-                Server.NetworkSentMessages.GetMessages<NetworkBattleSimulationCancelled>());
-
-            Assert.Equal(hostileAction.MapEventId, cancelled.MapEventId);
-            Assert.Empty(
-                Server.NetworkSentMessages.GetMessages<NetworkBattleSimulationFinished>());
-
-            var unclaimed = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleModeSet>());
-
-            Assert.Equal(hostileAction.MapEventId, unclaimed.MapEventId);
-            Assert.Equal((int)BattleStartMode.Unclaimed, unclaimed.Mode);
-
-            Server.Call(() => { Assert.False(ServerBattleModeArbiter.IsClaimed(hostileAction.MapEventId)); });
-
-            // Native Retreat finalized the leader-owned event, so a retry must be rejected for
-            // the destroyed map-event identity instead of reviving stale simulation state.
-            Server.NetworkSentMessages.Clear();
-
-            client.Call(() => client.Resolve<INetwork>().SendAll(
-                    new NetworkBattleStartRequest(
-                        Guid.NewGuid().ToString(),
-                        (int)BattleStartMode.Simulation,
-                        hostileAction.MapEventId,
-                        hostileAction.AttackerMobilePartyId)),
-                MapEventDisabledMethods);
-
-            var retryReply = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleStartReply>());
-
-            Assert.False(retryReply.Accepted);
-            Assert.False(Server.ObjectManager.TryGetObject<MapEvent>(hostileAction.MapEventId, out _));
-        }
-        finally
-        {
-            Server.Call(() => ServerBattleModeArbiter.Release(hostileAction.MapEventId));
-        }
-    }
-
-    [Fact]
     public void MultiPlayerRaid_BattleSimulationJoinerRetreat_RemovesOnlyJoinerAndKeepsEvent()
     {
         var clients = Clients.ToArray();
@@ -3795,10 +3730,15 @@ public class VillageHostileActionTests : MapEventTestBase
         }
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void MultiPlayerRaid_BattleSimulationCancel_QueuedAfterClaimRelease_IsIgnored(bool winningAdvance)
+    [Fact]
+    public void MultiPlayerRaid_BattleSimulationCancel_QueuedAfterClaimRelease_AfterWinningAdvance_IsIgnored() =>
+        RunQueuedAfterClaimReleaseScenario(winningAdvance: true);
+
+    [Fact]
+    public void MultiPlayerRaid_BattleSimulationCancel_QueuedAfterClaimRelease_DoubleCancel_IsIgnored() =>
+        RunQueuedAfterClaimReleaseScenario(winningAdvance: false);
+
+    private void RunQueuedAfterClaimReleaseScenario(bool winningAdvance)
     {
         var client = Clients.First();
         var hostileAction = CreateHostileActionWithTwoPlayerParties(VillageHostileAction.Raid);

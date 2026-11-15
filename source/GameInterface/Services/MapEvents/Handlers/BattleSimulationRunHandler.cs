@@ -925,8 +925,11 @@ internal class BattleSimulationRunHandler : IHandler
 
         EndSimulationSessionSafe(mapEventId, sim);
 
+        var released = ServerBattleModeArbiter.ReleaseSimulation(mapEventId);
+
         messageBroker.Publish(this, new MapEventFinalizeAttempted(sim.MapEvent));
-        network.SendAll(new NetworkBattleModeSet(mapEventId, (int)BattleStartMode.Unclaimed));
+        if (released)
+            network.SendAll(new NetworkBattleModeSet(mapEventId, (int)BattleStartMode.Unclaimed));
         network.SendAll(new NetworkBattleSimulationFinished(mapEventId));
     }
 

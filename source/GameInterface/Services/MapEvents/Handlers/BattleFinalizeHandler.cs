@@ -358,10 +358,7 @@ internal class BattleFinalizeHandler : IHandler
         var excludedIds = CollectExcludedPlayerPartyIds(mapEvent);
         if (excludedIds.Count > 0)
             playerPartyIds = playerPartyIds.Where(id => !excludedIds.Contains(id)).ToArray();
-        var raidSettlement = GetRaidFinalizationSettlement(mapEvent);
-        var raidAttackers = GetRaidAttackerPlayerParties(mapEvent);
-        // Capture the continuation decision and ids before FinalizeEventAux clears the event and its settlement.
-        var continuesRaid = TryGetRaidContinuation(mapEvent, raidSettlement, out var raidLeaderPeer, out var raidSettlementId);
+        var raidAftermath = CaptureRaidAftermath(mapEvent);
 
         // A winning inside defender is kept off the close above, but nothing seats it on the siege-defeated
         // menu: the server tears the SiegeEvent/MapEvent down via replication, bypassing vanilla's local
@@ -394,16 +391,47 @@ internal class BattleFinalizeHandler : IHandler
 
         using (CreateHideoutFinalizeContext(mapEvent))
             mapEvent.FinalizeEventAux();
-        if (continuesRaid)
-            network.Send(raidLeaderPeer, new NetworkPromptRaidContinuation(raidSettlementId));
-        else
-            MoveRaidAttackersToSettlementGate(raidAttackers, raidSettlement);
+        ApplyRaidAftermath(raidAftermath);
 
         // After the destroy (same game thread, so behind it on the reliable-ordered channel).
         if (!string.IsNullOrEmpty(defenderVictorySettlementId))
             network.SendAll(new NetworkPromptSiegeDefenderVictory(defenderVictorySettlementId, defenderVictoryPartyIds));
 
         return playerPartyIds;
+    }
+
+    private RaidAftermath CaptureRaidAftermath(MapEvent mapEvent)
+    {
+        var settlement = GetRaidFinalizationSettlement(mapEvent);
+        var attackers = GetRaidAttackerPlayerParties(mapEvent);
+        var continues = TryGetRaidContinuation(mapEvent, settlement, out var leaderPeer, out var settlementId);
+        return new RaidAftermath(settlement, attackers, continues, leaderPeer, settlementId);
+    }
+
+    private void ApplyRaidAftermath(RaidAftermath aftermath)
+    {
+        if (aftermath.Continues)
+            network.Send(aftermath.LeaderPeer, new NetworkPromptRaidContinuation(aftermath.SettlementId));
+        else
+            MoveRaidAttackersToSettlementGate(aftermath.Attackers, aftermath.Settlement);
+    }
+
+    private sealed class RaidAftermath
+    {
+        public RaidAftermath(Settlement settlement, MobileParty[] attackers, bool continues, NetPeer leaderPeer, string settlementId)
+        {
+            Settlement = settlement;
+            Attackers = attackers;
+            Continues = continues;
+            LeaderPeer = leaderPeer;
+            SettlementId = settlementId;
+        }
+
+        public Settlement Settlement { get; }
+        public MobileParty[] Attackers { get; }
+        public bool Continues { get; }
+        public NetPeer LeaderPeer { get; }
+        public string SettlementId { get; }
     }
 
     private bool TryMarkFinalized(MapEvent mapEvent)
