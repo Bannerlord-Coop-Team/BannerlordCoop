@@ -41,7 +41,8 @@ public interface IPlayerRaftFleetInterface : IGameAbstraction
 
     /// <summary>
     /// Lands a party that stands on land but is still on a raft or marked at sea, ends its raft state, gives back its fleet
-    /// and holds it there on every client. Returns false for a party at sea, or one neither on a raft nor marked at sea.
+    /// and holds it there on every client. Returns false for a parked party, a party at sea, or one neither on a raft nor
+    /// marked at sea.
     /// </summary>
     bool PutAshore(MobileParty party);
 
@@ -131,6 +132,8 @@ public class PlayerRaftFleetInterface : IPlayerRaftFleetInterface
 
     public bool PutAshore(MobileParty party)
     {
+        // A captive's party stays parked until its release reactivates it
+        if (!party.IsActive) return false;
         // Only a party already on land, so a raft still at sea can't skip washing ashore
         if (!party.Position.IsOnLand) return false;
         // Nothing to land, neither a raft nor marked at sea

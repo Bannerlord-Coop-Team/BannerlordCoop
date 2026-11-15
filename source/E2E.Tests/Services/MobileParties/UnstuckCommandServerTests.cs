@@ -208,6 +208,7 @@ public class UnstuckCommandServerTests : MapEventTestBase
         Server.Call(() =>
         {
             var party = Server.GetRegisteredObject<MobileParty>(target.PartyId);
+            party.IsActive = true;
             party.IsInRaftState = true;
             party._position = new CampaignVec2(new Vec2(31f, 41f), true);
         });
@@ -226,7 +227,7 @@ public class UnstuckCommandServerTests : MapEventTestBase
         var result = Execute("unstuck-target");
 
         Assert.True(result.Succeeded, result.Output);
-        Assert.Single(result.Output.Split('\n'), line => line.StartsWith("Put ashore"));
+        Assert.Single(result.Output.Split('\n'), line => line.StartsWith("Put the party ashore"));
         Server.Call(() => Assert.False(Server.GetRegisteredObject<MobileParty>(target.PartyId).IsInRaftState));
         Client.PumpGameThread();
         Client.Call(() =>

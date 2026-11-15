@@ -121,6 +121,7 @@ public class PlayerRaftFleetInterfaceTests : SyncTestBase
             var party = Server.GetRegisteredObject<MobileParty>(fleet.PartyId);
             var raftFleetInterface = Server.Resolve<IPlayerRaftFleetInterface>();
             raftFleetInterface.StrandAfterRelease(party);
+            party.IsActive = true;
             party._position = new CampaignVec2(new Vec2(31f, 41f), true);
 
             Assert.True(raftFleetInterface.PutAshore(party));

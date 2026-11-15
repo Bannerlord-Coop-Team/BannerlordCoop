@@ -203,14 +203,12 @@ internal class ServerPlayerUnstuck : IServerPlayerUnstuck
                 : $"Ended {resolved} battles left with no healthy troops on one side.";
         });
 
-        // Read here because the captivity step above can release the hero; a prisoner's party stays parked until release
-        var isStillPrisoner = hero != null && hero.IsPrisoner;
         // Registered only while War Sails is on
-        if (raftFleetInterface != null && !isStillPrisoner)
+        if (raftFleetInterface != null)
         {
-            TryStep(actions, "raft landing", () =>
+            TryStep(actions, "put ashore", () =>
                 raftFleetInterface.PutAshore(party)
-                    ? $"Put ashore the party left on a raft or marked at sea on land at {Format(party.Position)}."
+                    ? $"Put the party ashore at {Format(party.Position)}, it stood on land but was still on a raft or marked at sea."
                     : null);
         }
 
@@ -222,7 +220,7 @@ internal class ServerPlayerUnstuck : IServerPlayerUnstuck
 
         if (actions.Count == 0)
         {
-            actions.Add("No server-side stuck state found (captivity, map event, army, siege camp, settlement, raft, map position).");
+            actions.Add("No server-side stuck state found (captivity, map event, army, siege camp, settlement, raft or at sea, map position).");
         }
 
         return SendResult(player, partyId, actions);
