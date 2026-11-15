@@ -1,5 +1,4 @@
 ﻿using Common;
-using GameInterface.Services.MapEvents.Extensions;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.Core;

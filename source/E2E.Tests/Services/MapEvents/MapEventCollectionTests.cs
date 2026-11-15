@@ -7,6 +7,7 @@ using Common.Util;
 using Coop.Core.Server.Connections.Messages;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
+using GameInterface.Services.Entity;
 using GameInterface.Services.Players;
 using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.MapEvents.Initialization;
@@ -17,6 +18,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
 using Xunit.Abstractions;
 
@@ -194,26 +196,16 @@ public class MapEventCollectionTests : MapEventTestBase
     public void Client_FieldJoin_AttachesReplicatedBattleToJoinedPlayerEncounter()
     {
         var staged = CreateServerMapEvent();
+        var (_, partyId) = CreatePlayerHeroParty("PlayerTwo");
         var client = Clients.First();
-        string partyId = staged.AttackerPartyId;
-        string sideId = null;
-        string mapEventPartyId = null;
         string partyBaseId = null;
 
-        Server.Call(() =>
-        {
-            var mapEvent = Get<MapEvent>(Server, staged.MapEventId);
-            Assert.True(Server.ObjectManager.TryGetId(mapEvent.AttackerSide, out sideId));
-            Assert.True(Server.ObjectManager.TryGetId(Get<MobileParty>(Server, partyId).Party, out partyBaseId));
-            var mapEventParty = Assert.Single(mapEvent.AttackerSide.Parties,
-                party => party.Party == Get<MobileParty>(Server, partyId).Party);
-            Assert.True(Server.ObjectManager.TryGetId(mapEventParty, out mapEventPartyId));
-        });
+        TestEnvironment.ConnectRegisteredPlayer(client, "PlayerTwo");
+        client.Resolve<IControllerIdProvider>().SetControllerId("PlayerTwo");
+        client.NetworkSentMessages.Clear();
 
         client.Call(() =>
         {
-            // The live client reaches this state after the join option clears its local encounter binding while
-            // waiting for NetworkAddBattleParty. Headless E2E stages the observed state; the native click is live-only.
             var mapEvent = Get<MapEvent>(client, staged.MapEventId);
             var party = Get<MobileParty>(client, partyId);
             Campaign.Current.MainParty = party;
@@ -221,12 +213,22 @@ public class MapEventCollectionTests : MapEventTestBase
             var encounter = PlayerEncounter.Current;
             encounter._encounteredParty = mapEvent.DefenderSide.LeaderParty;
             encounter.IsJoinedBattle = true;
-            party.Party._mapEventSide = mapEvent.AttackerSide;
-            mapEvent.AttackerSide._battleParties.RemoveAll(entry => entry.Party == party.Party);
+            Assert.True(client.ObjectManager.TryGetId(party.Party, out partyBaseId));
+            party.Party.MapEventSide = mapEvent.DefenderSide;
             Assert.Null(PlayerEncounter.Battle);
-        });
+        }, WithoutNetworkDelivery());
 
-        client.SimulateMessage(Server.NetPeer, new NetworkAddBattleParty(sideId, mapEventPartyId, partyBaseId));
+        var request = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestJoinBattle>());
+        Assert.Equal(staged.MapEventId, request.MapEventId);
+        Assert.Equal(partyBaseId, request.PartyId);
+        Assert.Equal(BattleSideEnum.Defender, request.Side);
+
+        Server.NetworkSentMessages.Clear();
+        Server.Call(() => Server.SimulateMessage(client.NetPeer, request), MapEventDisabledMethods);
+        Assert.True(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkJoinBattleReply>()).Accepted);
+        var authoritativeAdd = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAddBattleParty>());
+
+        client.SimulateMessage(Server.NetPeer, authoritativeAdd);
 
         client.Call(() =>
         {
