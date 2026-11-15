@@ -1156,4 +1156,34 @@
       </EquipmentRoster>
     </Equipments>
   </NPCCharacter>
+  <NPCCharacter
+    id="coop_fixed_npc_3f23347c"
+    name="{=!}Alfredo"
+    default_group="Infantry"
+    level="1"
+    is_female="false"
+    is_hero="false"
+    is_template="false"
+    occupation="Townsfolk"
+    culture="Culture.empire"
+    is_hidden_encyclopedia="true"
+    coop_settlement="town_ES5"
+    coop_location="arena"
+    coop_spawn_tag="npc_common"
+    coop_dialogue="SOUP SOUP SOUP SOUP SOUP SOUP SOUP"
+    coop_enabled="true">
+    <face>
+      <face_key_template value="BodyProperty.townsman_empire" />
+    </face>
+    <skills />
+    <Equipments>
+      <EquipmentRoster civilian="true">
+        <equipment slot="Head" id="Item.head_scarf" />
+        <equipment slot="Cape" id="Item.battanian_leather_shoulder_a" />
+        <equipment slot="Body" id="Item.steppe_dress" />
+        <equipment slot="Gloves" id="Item.northern_plated_gloves" />
+        <equipment slot="Leg" id="Item.decorated_imperial_boots" />
+      </EquipmentRoster>
+    </Equipments>
+  </NPCCharacter>
 </NPCCharacters>
