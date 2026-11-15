@@ -1111,7 +1111,6 @@ public class VillageHostileActionTests : MapEventTestBase
     public void CompletedRaidSimulation_ReinforcedRaid_ResumesRaidingAgain()
     {
         using var result = CompleteRaidSimulationAndLoot();
-        {
             var client = result.Client;
             var context = result.Context;
             AssertRaidContinuationPresented(result);
@@ -1154,7 +1153,6 @@ public class VillageHostileActionTests : MapEventTestBase
                 Assert.NotEqual(reopenedEventId, id);
                 Assert.Equal(2, result.Ended.Count);
             }, MapEventDisabledMethods);
-        }
     }
 
     private string ReopenRaidWithReinforcement(CompletedRaidSimulation result)
@@ -1252,8 +1250,9 @@ public class VillageHostileActionTests : MapEventTestBase
 
         InstallResultScreenPatches(out var harmony, out var visualPatch, out var menus);
         var result = new CompletedRaidSimulation(client, context, encounter, troopId, itemId, this, harmony, visualPatch, menus);
-
-        Server.Call(() => CampaignEvents.MapEventEnded.AddNonSerializedListener(this, result.Ended.Add));
+        try
+        {
+            Server.Call(() => CampaignEvents.MapEventEnded.AddNonSerializedListener(this, result.Ended.Add));
         StartBattleSimulation(client, context);
         Server.Call(() =>
         {
@@ -1314,7 +1313,13 @@ public class VillageHostileActionTests : MapEventTestBase
             client.Resolve<IMessageBroker>().Publish(this, new CampaignTick());
         }, MapEventDisabledMethods
             .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast))));
-        return result;
+            return result;
+        }
+        catch
+        {
+            result.Dispose();
+            throw;
+        }
     }
 
     private static void InstallResultScreenPatches(

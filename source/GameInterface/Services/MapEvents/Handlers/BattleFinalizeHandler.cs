@@ -175,12 +175,6 @@ internal class BattleFinalizeHandler : IHandler
         if (MapEventConfig.Debug)
             mapEventLogger.DebugMapEvent(mapEvent, "Handling network map event finalize attempted. Finalizing map event.");
 
-        NetPeer raidLeaderPeer = null;
-        string raidSettlementId = null;
-        var continuesRaid = ShouldContinueRaidAfterVictory(mapEvent)
-            && TryGetRaidLeaderPeer(mapEvent, out raidLeaderPeer)
-            && objectManager.TryGetId(mapEvent.MapEventSettlement, out raidSettlementId);
-
         var playerPartyIds = FinalizeAndCollectPlayers(mapEvent);
 
         // Tell every involved player party to close its encounter menu through the same path. The legacy
@@ -190,9 +184,6 @@ internal class BattleFinalizeHandler : IHandler
         {
             PvpEncounterCloseSender.Send(network, playerPartyIds, mapEventId: payload.What.MapEventId);
         }
-
-        if (continuesRaid)
-            network.Send(raidLeaderPeer, new NetworkRaidContinuationRequested(raidSettlementId));
 
         if (playerPartyIds.Length > 0)
             return;
@@ -371,6 +362,11 @@ internal class BattleFinalizeHandler : IHandler
             playerPartyIds = playerPartyIds.Where(id => !excludedIds.Contains(id)).ToArray();
         var raidSettlement = GetRaidFinalizationSettlement(mapEvent);
         var raidAttackers = GetRaidAttackerPlayerParties(mapEvent);
+        NetPeer raidLeaderPeer = null;
+        string raidSettlementId = null;
+        var continuesRaid = ShouldContinueRaidAfterVictory(mapEvent)
+            && TryGetRaidLeaderPeer(mapEvent, out raidLeaderPeer)
+            && objectManager.TryGetIdWithLogging(mapEvent.MapEventSettlement, out raidSettlementId);
 
         // A winning inside defender is kept off the close above, but nothing seats it on the siege-defeated
         // menu: the server tears the SiegeEvent/MapEvent down via replication, bypassing vanilla's local
@@ -403,8 +399,10 @@ internal class BattleFinalizeHandler : IHandler
 
         using (CreateHideoutFinalizeContext(mapEvent))
             mapEvent.FinalizeEventAux();
-        if (!ShouldContinueRaidAfterVictory(mapEvent))
+        if (!continuesRaid)
             MoveRaidAttackersToSettlementGate(raidAttackers, raidSettlement);
+        else
+            network.Send(raidLeaderPeer, new NetworkRaidContinuationRequested(raidSettlementId));
 
         // After the destroy (same game thread, so behind it on the reliable-ordered channel).
         if (!string.IsNullOrEmpty(defenderVictorySettlementId))

@@ -217,6 +217,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
 
     public void ParkRaidContinuation(Settlement settlement)
     {
+        // Presented from Handle_CampaignTick once the result screens are done and the encounter has ended.
         parkedRaidContinuation = settlement;
         parkedRaidEncounter = PlayerEncounter.Current;
         // Keep the continuation parked until the result screens have finished and the encounter can be reused.
