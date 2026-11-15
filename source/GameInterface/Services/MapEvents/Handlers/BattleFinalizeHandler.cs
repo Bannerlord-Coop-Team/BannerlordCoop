@@ -395,7 +395,7 @@ internal class BattleFinalizeHandler : IHandler
         using (CreateHideoutFinalizeContext(mapEvent))
             mapEvent.FinalizeEventAux();
         if (continuesRaid)
-            network.Send(raidLeaderPeer, new NetworkRaidContinuationRequested(raidSettlementId));
+            network.Send(raidLeaderPeer, new NetworkPromptRaidContinuation(raidSettlementId));
         else
             MoveRaidAttackersToSettlementGate(raidAttackers, raidSettlement);
 

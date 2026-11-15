@@ -34,7 +34,7 @@ internal class ClientVillageHostileActionHandler : IHandler
 
         messageBroker.Subscribe<VillageHostileActionAttempted>(Handle_VillageHostileActionAttempted);
         messageBroker.Subscribe<NetworkVillageHostileActionStarted>(Handle_NetworkVillageHostileActionStarted);
-        messageBroker.Subscribe<NetworkRaidContinuationRequested>(Handle_NetworkRaidContinuationRequested);
+        messageBroker.Subscribe<NetworkPromptRaidContinuation>(Handle_NetworkPromptRaidContinuation);
         messageBroker.Subscribe<NetworkVillageHostileActionDenied>(Handle_NetworkVillageHostileActionDenied);
         messageBroker.Subscribe<NetworkVillageHostileActionCooldowns>(Handle_NetworkVillageHostileActionCooldowns);
         messageBroker.Subscribe<NetworkAuthorizeForceTransfer>(Handle_NetworkAuthorizeForceTransfer);
@@ -45,7 +45,7 @@ internal class ClientVillageHostileActionHandler : IHandler
     {
         messageBroker.Unsubscribe<VillageHostileActionAttempted>(Handle_VillageHostileActionAttempted);
         messageBroker.Unsubscribe<NetworkVillageHostileActionStarted>(Handle_NetworkVillageHostileActionStarted);
-        messageBroker.Unsubscribe<NetworkRaidContinuationRequested>(Handle_NetworkRaidContinuationRequested);
+        messageBroker.Unsubscribe<NetworkPromptRaidContinuation>(Handle_NetworkPromptRaidContinuation);
         messageBroker.Unsubscribe<NetworkVillageHostileActionDenied>(Handle_NetworkVillageHostileActionDenied);
         messageBroker.Unsubscribe<NetworkVillageHostileActionCooldowns>(Handle_NetworkVillageHostileActionCooldowns);
         messageBroker.Unsubscribe<NetworkAuthorizeForceTransfer>(Handle_NetworkAuthorizeForceTransfer);
@@ -70,13 +70,12 @@ internal class ClientVillageHostileActionHandler : IHandler
         GameThread.RunSafe(
             () =>
             {
-                villageHostileActionInterface.CompleteHostileActionRequest();
                 villageHostileActionInterface.BeginHostileActionPresentation(payload.What.Action);
             },
             context: nameof(Handle_NetworkVillageHostileActionStarted));
     }
 
-    private void Handle_NetworkRaidContinuationRequested(MessagePayload<NetworkRaidContinuationRequested> payload)
+    private void Handle_NetworkPromptRaidContinuation(MessagePayload<NetworkPromptRaidContinuation> payload)
     {
         GameThread.RunSafe(
             () =>
@@ -84,7 +83,7 @@ internal class ClientVillageHostileActionHandler : IHandler
                 if (objectManager.TryGetObjectWithLogging<Settlement>(payload.What.SettlementId, out var settlement))
                     villageHostileActionInterface.ParkRaidContinuation(settlement);
             },
-            context: nameof(Handle_NetworkRaidContinuationRequested));
+            context: nameof(Handle_NetworkPromptRaidContinuation));
     }
 
     private void Handle_NetworkVillageHostileActionDenied(MessagePayload<NetworkVillageHostileActionDenied> payload)

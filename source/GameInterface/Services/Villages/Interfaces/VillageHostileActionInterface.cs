@@ -62,14 +62,6 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
     private Settlement parkedRaidContinuation;
     private PlayerEncounter parkedRaidEncounter;
 
-    internal enum RaidContinuationDecision
-    {
-        Wait,
-        DropCaptive,
-        DropReplaced,
-        Present,
-    }
-
     public VillageHostileActionInterface(IMessageBroker messageBroker, IObjectManager objectManager)
     {
         if (messageBroker == null) throw new ArgumentNullException(nameof(messageBroker));
@@ -160,6 +152,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
 
     public void BeginHostileActionPresentation(VillageHostileAction action)
     {
+        requestedHostileActionEncounter = null;
         var encounter = PlayerEncounter.Current;
         if (encounter == null)
         {
@@ -190,11 +183,6 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         GameMenu.SwitchToMenu("encounter");
     }
 
-    public void CompleteHostileActionRequest()
-    {
-        requestedHostileActionEncounter = null;
-    }
-
     public bool TryTrackHostileActionRequest()
     {
         if (requestedHostileActionEncounter != null)
@@ -213,8 +201,11 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         requestedHostileActionEncounter = null;
 
         var encounter = PlayerEncounter.Current;
-        if (encounter == null || !ReferenceEquals(encounter, expectedEncounter) ||
-            encounter._mapEvent != null || encounter.BattleSimulation != null)
+        if (encounter == null || !ReferenceEquals(encounter, expectedEncounter))
+            return;
+
+        // Leave a live encounter or simulation alone when a denial races its start.
+        if (encounter._mapEvent != null || encounter.BattleSimulation != null)
             return;
 
         encounter._stateHandled = true;
@@ -238,41 +229,30 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         var encounter = PlayerEncounter.Current;
         bool encounterReplaced = encounter != null && parkedRaidEncounter != null &&
             !ReferenceEquals(encounter, parkedRaidEncounter);
-        var decision = GetRaidContinuationDecision(
-            PlayerCaptivity.IsCaptive,
-            encounterReplaced,
-            MobileParty.MainParty?.MapEvent != null,
-            encounter?.EncounterState);
-        if (decision == RaidContinuationDecision.Wait)
+        if (PlayerCaptivity.IsCaptive)
+        {
+            parkedRaidContinuation = null;
+            parkedRaidEncounter = null;
+            Logger.Information("Dropping parked raid continuation for {SettlementId}: captive", settlement.StringId);
+            return;
+        }
+
+        if (encounterReplaced)
+        {
+            parkedRaidContinuation = null;
+            parkedRaidEncounter = null;
+            Logger.Information("Dropping parked raid continuation for {SettlementId}: encounter replaced", settlement.StringId);
+            return;
+        }
+
+        if (MobileParty.MainParty?.MapEvent != null ||
+            (encounter != null && encounter.EncounterState != PlayerEncounterState.End))
             return;
 
         parkedRaidContinuation = null;
         parkedRaidEncounter = null;
 
-        if (decision is RaidContinuationDecision.DropCaptive or RaidContinuationDecision.DropReplaced)
-        {
-            Logger.Information("Dropping parked raid continuation for {SettlementId}: {Reason}", settlement.StringId, decision);
-            return;
-        }
-
         StartRaidContinuationEncounter(settlement);
-    }
-
-    internal static RaidContinuationDecision GetRaidContinuationDecision(
-        bool isCaptive,
-        bool encounterReplaced,
-        bool hasMapEvent,
-        PlayerEncounterState? encounterState)
-    {
-        if (isCaptive)
-            return RaidContinuationDecision.DropCaptive;
-        if (encounterReplaced)
-            return RaidContinuationDecision.DropReplaced;
-
-        if (hasMapEvent || (encounterState.HasValue && encounterState.Value != PlayerEncounterState.End))
-            return RaidContinuationDecision.Wait;
-
-        return RaidContinuationDecision.Present;
     }
 
     private void StartRaidContinuationEncounter(Settlement settlement)

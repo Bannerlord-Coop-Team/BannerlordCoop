@@ -13,7 +13,6 @@ public interface IVillageHostileActionInterface : IGameAbstraction
 {
     void RequestHostileAction(VillageHostileAction action);
     void BeginHostileActionPresentation(VillageHostileAction action);
-    void CompleteHostileActionRequest();
 
     /// <summary>[Client, game thread] Track a hostile-action request until the server resolves it; false when one is already pending.</summary>
     bool TryTrackHostileActionRequest();

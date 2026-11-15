@@ -90,7 +90,7 @@ internal class ServerVillageHostileActionHandler : IHandler
         {
             GameThread.RunSafe(() => TryStartHostileAction(peer, request), blocking: true, context: nameof(Handle_NetworkRequestVillageHostileAction));
         }
-        catch (Exception exception)
+        catch (TimeoutException exception)
         {
             Logger.Error(exception, "Timed out starting hostile action; denying the pending client request");
             Deny(peer, VillageHostileActionDeniedReason.Invalid);

@@ -19,7 +19,9 @@ internal static class StagedBattleResultUpdatePatch
     private static void Postfix(MapState __instance)
     {
         if (ModInformation.IsServer || Mission.Current != null || MissionState.Current != null ||
-            Game.Current?.GameStateManager?.ActiveState != __instance || __instance.IsSimulationActive) return;
+            Game.Current?.GameStateManager?.ActiveState != __instance) return;
+        // A raid's menu init can run while the scoreboard is leaving; retry the preserved results once it closes.
+        if (__instance.IsSimulationActive) return;
         var encounter = PlayerEncounter.Current;
         if (!HasStagedResults(encounter) ||
             Campaign.Current.MapEventManager.MapEvents.Contains(encounter._mapEvent)) return;
@@ -27,9 +29,7 @@ internal static class StagedBattleResultUpdatePatch
         if (Campaign.Current.ConversationManager?.IsConversationInProgress == true) return;
 
         // Custom hideout menus, the siege defeated menu and an empty map have no native menu init
-        // callback to resume the loot flow. A raid's menu initialization can also run while the
-        // scoreboard is leaving, so retry the preserved results after PlayerEncounterPatches stops
-        // deferring them for that screen.
+        // callback to resume the loot flow.
         PlayerEncounter.Update();
     }
 

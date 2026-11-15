@@ -1131,7 +1131,7 @@ public class VillageHostileActionTests : MapEventTestBase
             Assert.False(Server.ObjectManager.TryGetObject<MapEvent>(reopenedEventId, out _));
         }, MapEventDisabledMethods);
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleSimulationFinished>());
-        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkRaidContinuationRequested>());
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPromptRaidContinuation>());
         WalkReopenedResultScreens(result);
         Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestVillageHostileAction>());
         Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestCreateMapEvent>());
@@ -1268,7 +1268,7 @@ public class VillageHostileActionTests : MapEventTestBase
             // The completion finalized through BattleFinalizeHandler, which told the leader's client
             // to request the continuation once the result screens are done.
             Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionDenied>());
-            var started = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkRaidContinuationRequested>());
+            var started = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPromptRaidContinuation>());
             Assert.Equal(context.SettlementId, started.SettlementId);
 
             WalkInitialResultScreens(result);
@@ -1505,7 +1505,7 @@ public class VillageHostileActionTests : MapEventTestBase
         Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client.NetPeer);
         client.Call(() => Assert.False(PlayerEncounterPatches.UpdatePrefix()), disabledMethods);
 
-        var started = Server.NetworkSentMessages.GetMessages<NetworkRaidContinuationRequested>().Single();
+        var started = Server.NetworkSentMessages.GetMessages<NetworkPromptRaidContinuation>().Single();
         Assert.Equal(target.SettlementId, started.SettlementId);
 
         Server.Call(() =>
@@ -1799,7 +1799,7 @@ public class VillageHostileActionTests : MapEventTestBase
 
         client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkMapEventFinalizeAttempted(mapEventId!)), MapEventDisabledMethods);
 
-        var started = Server.NetworkSentMessages.GetMessages<NetworkRaidContinuationRequested>().Single();
+        var started = Server.NetworkSentMessages.GetMessages<NetworkPromptRaidContinuation>().Single();
         Assert.Equal(target.SettlementId, started.SettlementId);
         var close = Server.NetworkSentMessages.GetMessages<NetworkClosePvpEncounter>().Single();
         Assert.Contains(attackerPartyId, close.PartyIds);
@@ -2088,7 +2088,7 @@ public class VillageHostileActionTests : MapEventTestBase
         client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkMapEventFinalizeAttempted(mapEventId!)),
             MapEventDisabledMethods);
 
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkRaidContinuationRequested>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPromptRaidContinuation>());
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkClosePvpEncounter>());
         Server.Call(() => Assert.False(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId!, out _)));
     }
