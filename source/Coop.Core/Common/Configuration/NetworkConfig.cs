@@ -88,6 +88,12 @@ public class NetworkConfig : INetworkConfig
         public TimeSpan DisconnectTimeout { get; } = TimeSpan.FromSeconds(60);
 #endif
 
+    /// <summary>
+    ///     A battle host's AI runs nowhere else while it is unheard, so the server drops a silent one sooner. LiteNetLib pings
+    ///     every <see cref="PingInterval"/> off the game thread, so loading screens and frame hitches don't count as silence.
+    /// </summary>
+    public TimeSpan BattleHostDisconnectTimeout { get; } = TimeSpan.FromSeconds(15);
+
 #if DEBUG
     public NatAddressType NATType { get; } = NatAddressType.Internal;
 #else
