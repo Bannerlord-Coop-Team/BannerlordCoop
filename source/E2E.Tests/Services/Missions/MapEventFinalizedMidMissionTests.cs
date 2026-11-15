@@ -231,5 +231,4 @@ public class MapEventFinalizedMidMissionTests : MissionTestEnvironment
         });
         return mission!;
     }
-
 }
