@@ -1131,25 +1131,7 @@ public class VillageHostileActionTests : MapEventTestBase
             var context = result.Context;
             AssertRaidContinuationPresented(result);
 
-            string reopenedEventId = null;
-            Server.Call(() =>
-            {
-                var raid = Server.GetRegisteredObject<MobileParty>(context.AttackerMobilePartyId).MapEvent;
-                var reinforcement = GameObjectCreator.CreateInitializedObject<MobileParty>();
-                reinforcement.MemberRoster.AddToCounts(Server.GetRegisteredObject<CharacterObject>(result.TroopId), 1);
-                AddSyntheticMapEventParty(raid.DefenderSide, reinforcement.Party);
-                Assert.True(Server.ObjectManager.TryGetId(raid, out reopenedEventId));
-            }, MapEventDisabledMethods);
-            client.Call(() =>
-            {
-                var reopened = PlayerEncounter.Current;
-                reopened._mapEvent = MobileParty.MainParty.MapEvent;
-                reopened.EncounterState = PlayerEncounterState.Wait;
-                reopened.BattleSimulation = new BattleSimulation(null, null);
-                reopened._alternativeReceivedLootShips = new List<TaleWorlds.CampaignSystem.Naval.Ship>();
-                var mapState = Game.Current.GameStateManager.GameStates.OfType<MapState>().Single();
-                mapState._battleSimulation = reopened.BattleSimulation;
-            }, MapEventDisabledMethods);
+            var reopenedEventId = ReopenRaidWithReinforcement(result);
             Server.NetworkSentMessages.Clear();
             StartBattleSimulation(client, new RaidMapEventContext(reopenedEventId,
                 context.AttackerMobilePartyId, context.AttackerPartyId, context.SettlementId, context.OwnerFactionId));
@@ -1166,41 +1148,7 @@ public class VillageHostileActionTests : MapEventTestBase
             }, MapEventDisabledMethods);
             Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleSimulationFinished>());
             Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkRaidContinuationRequested>());
-            client.Call(() =>
-            {
-                var reopened = PlayerEncounter.Current;
-                var states = Game.Current.GameStateManager;
-                var mapState = states.GameStates.OfType<MapState>().Single();
-                using (new AllowedThread())
-                {
-                    reopened.RosterToReceiveLootMembers.AddToCounts(client.GetRegisteredObject<CharacterObject>(result.TroopId), 1);
-                    reopened.RosterToReceiveLootItems.AddToCounts(client.GetRegisteredObject<ItemObject>(result.ItemId), 1);
-                }
-                Assert.Equal(PlayerEncounterState.CaptureHeroes, reopened.EncounterState);
-                // The encounter menu is already open. No menu initialization or explicit encounter update
-                // will run when the reinforcement's scoreboard closes; map ticks must resume the results.
-                mapState.OnMapModeTick(0.1f);
-                Assert.Equal(PlayerEncounterState.CaptureHeroes, reopened.EncounterState);
-                mapState.EndBattleSimulation();
-                reopened.BattleSimulation.OnFinished();
-                mapState.OnMapModeTick(0.1f);
-                Assert.IsType<PartyState>(states.ActiveState);
-                reopened.OnPlayerLootMembersAndPrisonerEnd(null, null, null, null, null, null, false);
-                CloseTopGameState(states);
-                mapState.OnMapModeTick(0.1f);
-                Assert.IsType<InventoryState>(states.ActiveState);
-                Assert.Same(reopened, PlayerEncounter.Current);
-                CloseTopGameState(states);
-                client.NetworkSentMessages.Clear();
-                mapState.OnMapModeTick(0.1f);
-                client.Resolve<IMessageBroker>().Publish(this, new CampaignTick());
-                Assert.NotSame(reopened, PlayerEncounter.Current);
-            }, MapEventDisabledMethods.Concat(new[]
-            {
-                AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast)),
-                AccessTools.Method(typeof(Campaign), nameof(Campaign.RealTick)),
-                AccessTools.Method(typeof(Campaign), nameof(Campaign.Tick)),
-            }).ToArray());
+            WalkReopenedResultScreens(result);
             Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestVillageHostileAction>());
             Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestCreateMapEvent>());
             client.Call(() =>
@@ -1226,6 +1174,70 @@ public class VillageHostileActionTests : MapEventTestBase
         {
             result.Dispose();
         }
+    }
+
+    private string ReopenRaidWithReinforcement(CompletedRaidSimulation result)
+    {
+        var client = result.Client;
+        var context = result.Context;
+        string reopenedEventId = null;
+        Server.Call(() =>
+        {
+            var raid = Server.GetRegisteredObject<MobileParty>(context.AttackerMobilePartyId).MapEvent;
+            var reinforcement = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            reinforcement.MemberRoster.AddToCounts(Server.GetRegisteredObject<CharacterObject>(result.TroopId), 1);
+            AddSyntheticMapEventParty(raid.DefenderSide, reinforcement.Party);
+            Assert.True(Server.ObjectManager.TryGetId(raid, out reopenedEventId));
+        }, MapEventDisabledMethods);
+        client.Call(() =>
+        {
+            var reopened = PlayerEncounter.Current;
+            reopened._mapEvent = MobileParty.MainParty.MapEvent;
+            reopened.EncounterState = PlayerEncounterState.Wait;
+            reopened.BattleSimulation = new BattleSimulation(null, null);
+            reopened._alternativeReceivedLootShips = new List<TaleWorlds.CampaignSystem.Naval.Ship>();
+            var mapState = Game.Current.GameStateManager.GameStates.OfType<MapState>().Single();
+            mapState._battleSimulation = reopened.BattleSimulation;
+        }, MapEventDisabledMethods);
+        return reopenedEventId;
+    }
+
+    private void WalkReopenedResultScreens(CompletedRaidSimulation result)
+    {
+        var client = result.Client;
+        client.Call(() =>
+        {
+            var reopened = PlayerEncounter.Current;
+            var states = Game.Current.GameStateManager;
+            var mapState = states.GameStates.OfType<MapState>().Single();
+            using (new AllowedThread())
+            {
+                reopened.RosterToReceiveLootMembers.AddToCounts(client.GetRegisteredObject<CharacterObject>(result.TroopId), 1);
+                reopened.RosterToReceiveLootItems.AddToCounts(client.GetRegisteredObject<ItemObject>(result.ItemId), 1);
+            }
+            Assert.Equal(PlayerEncounterState.CaptureHeroes, reopened.EncounterState);
+            mapState.OnMapModeTick(0.1f);
+            Assert.Equal(PlayerEncounterState.CaptureHeroes, reopened.EncounterState);
+            mapState.EndBattleSimulation();
+            reopened.BattleSimulation.OnFinished();
+            mapState.OnMapModeTick(0.1f);
+            Assert.IsType<PartyState>(states.ActiveState);
+            reopened.OnPlayerLootMembersAndPrisonerEnd(null, null, null, null, null, null, false);
+            CloseTopGameState(states);
+            mapState.OnMapModeTick(0.1f);
+            Assert.IsType<InventoryState>(states.ActiveState);
+            Assert.Same(reopened, PlayerEncounter.Current);
+            CloseTopGameState(states);
+            client.NetworkSentMessages.Clear();
+            mapState.OnMapModeTick(0.1f);
+            client.Resolve<IMessageBroker>().Publish(this, new CampaignTick());
+            Assert.NotSame(reopened, PlayerEncounter.Current);
+        }, MapEventDisabledMethods.Concat(new[]
+        {
+            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast)),
+            AccessTools.Method(typeof(Campaign), nameof(Campaign.RealTick)),
+            AccessTools.Method(typeof(Campaign), nameof(Campaign.Tick)),
+        }).ToArray());
     }
 
     // Arranges a raid simulation, completes it with an attacker victory, walks the native party
