@@ -181,6 +181,17 @@ internal class ServerPlayerUnstuck : IServerPlayerUnstuck
                 : $"{line} Could not tell clients about {unreported} of them, see the server log.";
         });
 
+        // A raft at sea outside a battle whose move to shore was lost. Before the map event removal, because leaving a
+        // battle fires PartyOccupancyChanged and PlayerRaftHandler resumes the raft from there.
+        // raftFleetInterface is only registered while War Sails is on
+        if (raftFleetInterface != null)
+        {
+            TryStep(actions, "raft resume", () =>
+                raftFleetInterface.ResumeRaft(party)
+                    ? $"Sent the raft toward the nearest shore at {Format(party.MoveTargetPoint)}."
+                    : null);
+        }
+
         if (party.Party?.MapEvent != null)
         {
             TryStep(actions, "map event removal", () =>
@@ -192,16 +203,6 @@ internal class ServerPlayerUnstuck : IServerPlayerUnstuck
 
                 return "Removed the party from its map event.";
             });
-        }
-
-        // Sends a raft at sea toward the nearest shore again, since its AI is off and nothing else restarts the move
-        // raftFleetInterface is only registered while War Sails is on
-        if (raftFleetInterface != null)
-        {
-            TryStep(actions, "raft resume", () =>
-                raftFleetInterface.ResumeRaft(party)
-                    ? $"Sent the raft toward the nearest shore at {Format(party.MoveTargetPoint)}."
-                    : null);
         }
 
         // After the player left, so a battle that only the player kept waiting can end too.

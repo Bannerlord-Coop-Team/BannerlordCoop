@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Messaging;
 using GameInterface.Services.Heroes.HeirSelection.Messages;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players.Messages;
@@ -15,11 +16,13 @@ internal class PlayerRaftHandler : IHandler
 {
     private readonly IMessageBroker messageBroker;
     private readonly IPlayerRaftFleetInterface raftFleetInterface;
+    private readonly PostBattleScreens postBattleScreens;
 
-    public PlayerRaftHandler(IMessageBroker messageBroker, IPlayerRaftFleetInterface raftFleetInterface)
+    public PlayerRaftHandler(IMessageBroker messageBroker, IPlayerRaftFleetInterface raftFleetInterface, PostBattleScreens postBattleScreens)
     {
         this.messageBroker = messageBroker;
         this.raftFleetInterface = raftFleetInterface;
+        this.postBattleScreens = postBattleScreens;
 
         messageBroker.Subscribe<PlayerPartyReleasedFromCaptivity>(Handle);
         messageBroker.Subscribe<PlayerCharacterChangedOnServer>(Handle_PlayerCharacterChanged);
@@ -57,10 +60,16 @@ internal class PlayerRaftHandler : IHandler
     private void Handle_OccupancyChanged(MessagePayload<PartyOccupancyChanged> obj)
     {
         var party = obj.What.MobileParty;
+        // Published on the game thread, and only a raft needs the frame queued below.
+        if (!party.IsInRaftState) return;
 
-        // A raft's AI is off, so leaving a battle would hold it at sea for good.
-        GameThread.RunSafe(() =>
+        // A raft's AI is off, so leaving a battle or its post battle screens would hold it at sea for good.
+        // A finished battle resumes once the screens close, so its move isn't sent twice.
+        // Queued for a later frame, because the battle leave holds the party right after clearing its side.
+        GameThread.EnqueueSafe(() =>
         {
+            if (postBattleScreens.IsInScreens(party)) return;
+
             raftFleetInterface.ResumeRaft(party);
         });
     }
