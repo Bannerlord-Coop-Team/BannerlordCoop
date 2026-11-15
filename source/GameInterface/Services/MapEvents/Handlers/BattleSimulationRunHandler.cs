@@ -419,8 +419,6 @@ internal class BattleSimulationRunHandler : IHandler
         }
 #endif
         var maxRounds = payload.What.MaxRounds;
-        var finished = false;
-
         GameThread.RunSafe(() =>
         {
 #if DEBUG
@@ -482,8 +480,11 @@ internal class BattleSimulationRunHandler : IHandler
 #if DEBUG
                 if (observation != null) observation.SimulationAdvanceStage = "complete-session";
 #endif
-                finished = true;
                 CompleteSimulationSession(mapEventId, sim);
+                mapEventLogger.DebugMapEvent(sim.MapEvent, "Server-side battle simulation finished. BattleState={BattleState}", sim.MapEvent.BattleState);
+#if DEBUG
+                if (observation != null) observation.SimulationAdvanceStage = "completed";
+#endif
             }
 #if DEBUG
             }
@@ -495,13 +496,6 @@ internal class BattleSimulationRunHandler : IHandler
 #endif
         }, blocking: true, context: nameof(Handle_NetworkAdvanceBattleSimulation));
 
-        if (finished)
-        {
-            mapEventLogger.DebugMapEvent(sim.MapEvent, "Server-side battle simulation finished. BattleState={BattleState}", sim.MapEvent.BattleState);
-#if DEBUG
-            if (observation != null) observation.SimulationAdvanceStage = "completed";
-#endif
-        }
 #if DEBUG
         }
         catch (Exception exception)

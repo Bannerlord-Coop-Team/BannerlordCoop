@@ -360,11 +360,8 @@ internal class BattleFinalizeHandler : IHandler
             playerPartyIds = playerPartyIds.Where(id => !excludedIds.Contains(id)).ToArray();
         var raidSettlement = GetRaidFinalizationSettlement(mapEvent);
         var raidAttackers = GetRaidAttackerPlayerParties(mapEvent);
-        NetPeer raidLeaderPeer = null;
-        string raidSettlementId = null;
-        var continuesRaid = ShouldContinueRaidAfterVictory(mapEvent)
-            && TryGetRaidLeaderPeer(mapEvent, out raidLeaderPeer)
-            && objectManager.TryGetIdWithLogging(mapEvent.MapEventSettlement, out raidSettlementId);
+        // Capture the continuation decision and ids before FinalizeEventAux clears the event and its settlement.
+        var continuesRaid = TryGetRaidContinuation(mapEvent, raidSettlement, out var raidLeaderPeer, out var raidSettlementId);
 
         // A winning inside defender is kept off the close above, but nothing seats it on the siege-defeated
         // menu: the server tears the SiegeEvent/MapEvent down via replication, bypassing vanilla's local
@@ -485,7 +482,20 @@ internal class BattleFinalizeHandler : IHandler
             && playerManager.TryGetPeer(leader.ControllerId, out leaderPeer);
     }
 
-    private static bool ShouldContinueRaidAfterVictory(MapEvent mapEvent)
+    private bool TryGetRaidContinuation(
+        MapEvent mapEvent,
+        Settlement raidSettlement,
+        out NetPeer leaderPeer,
+        out string settlementId)
+    {
+        leaderPeer = null;
+        settlementId = null;
+        return ShouldContinueRaidAfterVictory(mapEvent, raidSettlement)
+            && TryGetRaidLeaderPeer(mapEvent, out leaderPeer)
+            && objectManager.TryGetIdWithLogging(raidSettlement, out settlementId);
+    }
+
+    private static bool ShouldContinueRaidAfterVictory(MapEvent mapEvent, Settlement raidSettlement)
     {
         if (!mapEvent.IsRaidHostileAction())
             return false;
@@ -493,11 +503,10 @@ internal class BattleFinalizeHandler : IHandler
         if (!IsAttackerVictory(mapEvent))
             return false;
 
-        var settlement = mapEvent.MapEventSettlement;
-        if (settlement?.Village == null)
+        if (raidSettlement?.Village == null)
             return false;
 
-        if (settlement.SettlementHitPoints <= 0f || settlement.Village.VillageState == Village.VillageStates.Looted)
+        if (raidSettlement.SettlementHitPoints <= 0f || raidSettlement.Village.VillageState == Village.VillageStates.Looted)
             return false;
 
         return true;

@@ -520,7 +520,7 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
             return false;
         }
 
-        // A winning raid keeps its references for native loot-end continuation; other wins share defeat cleanup.
+        // A deferred win also reaches here; a winning raid keeps its references so native loot-end can continue it.
         if (IsStagedRaidSimulationResult(encounter))
             return false;
 

@@ -198,7 +198,10 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
     public bool TryTrackHostileActionRequest()
     {
         if (requestedHostileActionEncounter != null)
+        {
+            Logger.Information("Dropping hostile action request: one is already pending");
             return false;
+        }
 
         requestedHostileActionEncounter = PlayerEncounter.Current;
         return true;

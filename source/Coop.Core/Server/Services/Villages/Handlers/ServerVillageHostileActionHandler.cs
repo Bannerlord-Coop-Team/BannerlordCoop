@@ -86,7 +86,15 @@ internal class ServerVillageHostileActionHandler : IHandler
             return;
         }
 
-        GameThread.RunSafe(() => TryStartHostileAction(peer, request), blocking: true, context: nameof(Handle_NetworkRequestVillageHostileAction));
+        try
+        {
+            GameThread.RunSafe(() => TryStartHostileAction(peer, request), blocking: true, context: nameof(Handle_NetworkRequestVillageHostileAction));
+        }
+        catch (Exception exception)
+        {
+            Logger.Error(exception, "Timed out starting hostile action; denying the pending client request");
+            Deny(peer, VillageHostileActionDeniedReason.Invalid);
+        }
     }
 
     private bool TryValidateRequester(string controllerId, string mobilePartyId)
