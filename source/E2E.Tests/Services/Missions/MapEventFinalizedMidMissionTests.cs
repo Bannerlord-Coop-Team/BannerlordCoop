@@ -12,7 +12,6 @@ using Missions.Battles;
 using Missions.Messages;
 using Moq;
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.Core;
@@ -39,8 +38,10 @@ public class MapEventFinalizedMidMissionTests : MissionTestEnvironment
         var clients = Clients.ToArray();
         using var fixture = new MissionEngineFixture();
         var missions = clients.Select((client, i) => EnterBattleMission(fixture, client, ControllerIds[i], mapEventId)).ToArray();
-        var notices = clients.Select(RecordNotices).ToArray();
         AssertHost(clients[0], mapEventId, "host", "successor");
+
+        foreach (var client in clients)
+            client.InternalMessages.Clear();
 
         FinalizeOnServer(mapEventId);
 
@@ -48,7 +49,7 @@ public class MapEventFinalizedMidMissionTests : MissionTestEnvironment
         for (int i = 0; i < clients.Length; i++)
         {
             Assert.True(missions[i].EndMissionCalled, $"{ControllerIds[i]} is still in the finalized battle's mission");
-            Assert.Single(notices[i]);
+            Assert.Single(clients[i].InternalMessages.GetMessages<SendInformationMessage>());
         }
     }
 
@@ -83,12 +84,12 @@ public class MapEventFinalizedMidMissionTests : MissionTestEnvironment
         var client = Clients.First();
         using var fixture = new MissionEngineFixture();
         var mission = OpenBattleMission(fixture, client, "battle-the-player-is-in-now");
-        var notices = RecordNotices(client);
+        client.InternalMessages.Clear();
 
         client.SimulateMessage(Server.NetPeer, new NetworkEndBattleMission(mapEventId));
 
         Assert.False(mission.EndMissionCalled);
-        Assert.Empty(notices);
+        Assert.Empty(client.InternalMessages.GetMessages<SendInformationMessage>());
     }
 
     // Native CheckMissionEnded sets MissionEnded when the result is ready but keeps the mission open on the scoreboard.
@@ -119,7 +120,7 @@ public class MapEventFinalizedMidMissionTests : MissionTestEnvironment
         using var fixture = new MissionEngineFixture();
         var mission = OpenBattleMission(fixture, client, mapEventId);
         var logic = mission.Shell.MissionBehaviors.OfType<BattleResultReadyLogic>().Single();
-        var notices = RecordNotices(client);
+        client.InternalMessages.Clear();
         mission.Shell.CurrentState = Mission.State.Initializing;
 
         client.SimulateMessage(Server.NetPeer, new NetworkEndBattleMission(mapEventId));
@@ -130,7 +131,7 @@ public class MapEventFinalizedMidMissionTests : MissionTestEnvironment
         client.Call(() => logic.OnMissionTick(0f));
 
         Assert.True(mission.EndMissionCalled);
-        Assert.Single(notices);
+        Assert.Single(client.InternalMessages.GetMessages<SendInformationMessage>());
     }
 
     [Fact]
@@ -231,25 +232,4 @@ public class MapEventFinalizedMidMissionTests : MissionTestEnvironment
         return mission!;
     }
 
-    private sealed class NoticeRecorder : IReadOnlyList<string>
-    {
-        private readonly Action<MessagePayload<SendInformationMessage>> handler;
-        private readonly List<string> notices = new();
-
-        public NoticeRecorder(EnvironmentInstance client)
-        {
-            handler = payload => notices.Add(payload.What.Text);
-            client.Resolve<IMessageBroker>().Subscribe(handler);
-        }
-
-        public int Count => notices.Count;
-        public string this[int index] => notices[index];
-        public IEnumerator<string> GetEnumerator() => notices.GetEnumerator();
-        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
-    }
-
-    private static NoticeRecorder RecordNotices(EnvironmentInstance client)
-    {
-        return new NoticeRecorder(client);
-    }
 }
