@@ -48,7 +48,7 @@ internal sealed class PlayerPartyInteractionSession
     // When either player was last sent a state, the pvpResponseTimerSeconds clock counts from here.
     public DateTime StateChangedUtc { get; set; }
     // The responder's last state as built, with Leave in it, while pvpBlockLeave hides Leave from them. Cleared by their next state.
-    public (PlayerPartyInteractionPhase Phase, PlayerPartyInteractionOption[] Options)? HiddenLeaveState { get; set; }
+    public (PlayerPartyInteractionPhase Phase, PlayerPartyInteractionProposal Proposal, PlayerPartyInteractionOption[] Options)? HiddenLeaveState { get; set; }
 
     public HashSet<PlayerPartyInteractionOption> InitiatorOptions { get; } = new HashSet<PlayerPartyInteractionOption>();
     public HashSet<PlayerPartyInteractionOption> InitiatorEnabledOptions { get; } = new HashSet<PlayerPartyInteractionOption>();
@@ -82,6 +82,22 @@ internal sealed class PlayerPartyInteractionSession
 
     public bool IsInitiator(string partyId)
         => partyId == InitiatorPartyId;
+
+    // The responder has a proposal to answer, the same checks the handler makes before it takes their answer.
+    public bool IsResponderTurn()
+    {
+        switch (Proposal)
+        {
+            case PlayerPartyInteractionProposal.None:
+                return false;
+            case PlayerPartyInteractionProposal.HostileDemand:
+                return HostileDemandConfirmed;
+            case PlayerPartyInteractionProposal.Mercenary:
+                return MercenaryConfirmed;
+            default:
+                return true;
+        }
+    }
 
     public void SetTradeOffer(
         string partyId,

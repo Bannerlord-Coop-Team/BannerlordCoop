@@ -2419,17 +2419,30 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
     }
 
     [Theory]
-    [InlineData(false, PlayerPartyInteractionOutcomeType.Left)]
-    [InlineData(true, PlayerPartyInteractionOutcomeType.HostileDemandAccepted)]
-    public void PvpResponseTimer_AtWar_EndsIdleAttackerAsLeftAndUnansweredDemandLikeRefuse_AfterTheSeconds(
+    [InlineData(true, false, false, 30, PlayerPartyInteractionOutcomeType.Left)]
+    [InlineData(true, true, false, 30, PlayerPartyInteractionOutcomeType.HostileDemandAccepted)]
+    [InlineData(false, true, false, 30, PlayerPartyInteractionOutcomeType.Left)]
+    [InlineData(true, false, true, 0, PlayerPartyInteractionOutcomeType.Left)]
+    public void PvpRules_EndMeetingNobodyAnswered_After30Seconds_WithBattleOnlyForADemandAtWar(
+        bool atWar,
         bool demandConfirmed,
+        bool blockLeave,
+        int responseTimerSeconds,
         PlayerPartyInteractionOutcomeType expectedOutcome)
     {
         var (client1, client2, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
-        MakePartiesHostile(initiatorPartyId, responderPartyId);
+        if (atWar)
+            MakePartiesHostile(initiatorPartyId, responderPartyId);
+        else
+            AssignDistinctClans(initiatorPartyId, responderPartyId);
 
-        WithPvpRules(blockLeave: false, responseTimerSeconds: 30, () =>
+        WithPvpRules(blockLeave, responseTimerSeconds, () =>
         {
+            // Held, so every state stamp and the server's own tick read the same time.
+            var handler = Server.Resolve<PlayerPartyInteractionHandler>();
+            var start = DateTime.UtcNow;
+            Server.Call(() => handler.UtcNow = () => start);
+
             RequestInteraction(client1, initiatorPartyId, responderPartyId);
             var sessionId = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>().Single().SessionId;
             if (demandConfirmed)
@@ -2441,13 +2454,16 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
             SetMainParty(client1, initiatorPartyId);
             SetMainParty(client2, responderPartyId);
             Server.NetworkSentMessages.Clear();
-            var handler = Server.Resolve<PlayerPartyInteractionHandler>();
 
-            Server.Call(() => handler.CheckPvpRules(DateTime.UtcNow.AddSeconds(29)), MapEventDisabledMethods);
+            Server.Call(() => handler.CheckPvpRules(start.AddSeconds(29)), MapEventDisabledMethods);
             Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionEnded>());
 
-            Server.Call(() => handler.CheckPvpRules(DateTime.UtcNow.AddSeconds(31)), MapEventDisabledMethods);
+            Server.Call(() => handler.CheckPvpRules(start.AddSeconds(30)), MapEventDisabledMethods);
             Assert.Equal(expectedOutcome, Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionEnded>().Single().OutcomeType);
+            Assert.Equal(
+                expectedOutcome == PlayerPartyInteractionOutcomeType.HostileDemandAccepted ? 1 : 0,
+                Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyHostileEncounterStarted>().Count());
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkDeclareWar>());
         });
     }
 
