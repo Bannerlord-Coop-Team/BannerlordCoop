@@ -26,13 +26,13 @@ internal class EncounterMenuConditionRefresher : IEncounterMenuConditionRefreshe
             return;
 
         var encounter = PlayerEncounter.Current;
-
-        // Before the menu check, because the attach can land while the joiner is still in join_encounter.
-        AdoptJoinedFieldBattleIfNeeded(mapEvent, encounter);
-
         var menuContext = Campaign.Current?.CurrentMenuContext;
         if (menuContext?.GameMenu?.StringId != "encounter")
+        {
+            // The attach can land while the joiner is still in join_encounter, where the menu re-init below never runs.
+            AdoptJoinedFieldBattleIfNeeded(mapEvent, encounter);
             return;
+        }
 
         // The encounter can hold the event before the main party's own attach lands (and the other way round).
         if (MobileParty.MainParty?.MapEvent != mapEvent && encounter?._mapEvent != mapEvent)
@@ -84,10 +84,6 @@ internal class EncounterMenuConditionRefresher : IEncounterMenuConditionRefreshe
             return;
 
         if (!mapEvent.IsFieldBattle)
-            return;
-
-        // Siege and sally joins are rebound by BattleJoinLeaveHandler.SwitchSiegeJoinerToEncounterIfNeeded.
-        if (mapEvent.IsSiegeStyleJoin())
             return;
 
         // The client join path leaves the encounter unbound while AddPartyInternal is suppressed and the

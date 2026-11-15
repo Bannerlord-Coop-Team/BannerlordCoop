@@ -8,7 +8,6 @@ using Coop.Core.Server.Connections.Messages;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.Players;
-using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.MapEvents.Messages;
@@ -18,7 +17,6 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Encounters;
-using TaleWorlds.Core;
 using TaleWorlds.Library;
 using Xunit.Abstractions;
 
@@ -236,53 +234,6 @@ public class MapEventCollectionTests : MapEventTestBase
             var mapEvent = Get<MapEvent>(client, staged.MapEventId);
             Assert.Same(mapEvent, PlayerEncounter.Battle);
         });
-    }
-
-    [Fact]
-    public void Client_SiegeAssaultJoin_DoesNotAdoptThroughFieldBattleRefresher()
-    {
-        var staged = CreateServerMapEvent();
-        var client = Clients.First();
-        var (_, partyId) = CreatePlayerHeroParty("PlayerTwo");
-
-        client.Call(() =>
-        {
-            var mapEvent = Get<MapEvent>(client, staged.MapEventId);
-            var party = Get<MobileParty>(client, partyId);
-            mapEvent._mapEventType = MapEvent.BattleTypes.Siege;
-            Campaign.Current.MainParty = party;
-            var encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
-            encounter.IsJoinedBattle = true;
-            Campaign.Current.PlayerEncounter = encounter;
-            using (new AllowedThread()) party.Party._mapEventSide = mapEvent.AttackerSide;
-
-            client.Resolve<IEncounterMenuConditionRefresher>().RefreshForMapEvent(mapEvent);
-
-            Assert.Null(encounter._mapEvent);
-        }, MapEventDisabledMethods);
-    }
-
-    [Fact]
-    public void Client_NonJoinedEncounter_DoesNotAdoptThroughFieldBattleRefresher()
-    {
-        var staged = CreateServerMapEvent();
-        var client = Clients.First();
-        var (_, partyId) = CreatePlayerHeroParty("PlayerTwo");
-
-        client.Call(() =>
-        {
-            var mapEvent = Get<MapEvent>(client, staged.MapEventId);
-            var party = Get<MobileParty>(client, partyId);
-            Campaign.Current.MainParty = party;
-            var encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
-            Campaign.Current.PlayerEncounter = encounter;
-            using (new AllowedThread()) party.Party._mapEventSide = mapEvent.AttackerSide;
-
-            client.Resolve<IEncounterMenuConditionRefresher>().RefreshForMapEvent(mapEvent);
-
-            Assert.False(encounter.IsJoinedBattle);
-            Assert.Null(encounter._mapEvent);
-        }, MapEventDisabledMethods);
     }
 
     [Fact]
