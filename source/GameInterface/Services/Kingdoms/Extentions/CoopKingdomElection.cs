@@ -130,10 +130,8 @@ namespace GameInterface.Services.Kingdoms.Extentions
 
         public void ApplyChosenOutcomeCoop()
         {
-            // The synchronized kingdom decision is the player-facing prompt. Native's peace
-            // notification checks process-local player singletons and must not run again when
-            // the explicit co-op vote is resolved on the authoritative server.
-            if (IsPendingPlayerPeaceOffer(this._decision) || this._decision.OnShowDecision() || IsPendingPlayerAllianceOffer(this._decision))
+            // Peace offers already use synchronized decisions; native's prompt reads the local player clan.
+            if (this._decision is MakePeaceKingdomDecision || this._decision.OnShowDecision() || IsPendingPlayerAllianceOffer(this._decision))
             {
                 this.ApplyChosenOutcome();
             }
@@ -146,7 +144,7 @@ namespace GameInterface.Services.Kingdoms.Extentions
             {
                 return;
             }
-            if (this._decision.OnShowDecision())
+            if (this._decision is MakePeaceKingdomDecision || this._decision.OnShowDecision())
             {
                 this.ApplyChosenOutcome();
             }

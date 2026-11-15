@@ -3,8 +3,9 @@
 namespace Missions.Messages;
 
 /// <summary>
-/// [Server, local] A controller left or dropped from a mission instance, published by the membership handler once it has
-/// resolved the ids and the remaining membership. Host election promotes a successor on it or drops the successor.
+/// [Server, local, game thread] A controller left or dropped from a mission instance, published synchronously by the membership
+/// handler once it resolved the ids and the remaining membership, so a subscriber can act inline ahead of any later battle-start
+/// reply. Host election promotes a successor on it or drops the successor.
 /// </summary>
 public readonly struct MissionMemberDeparted : IEvent
 {

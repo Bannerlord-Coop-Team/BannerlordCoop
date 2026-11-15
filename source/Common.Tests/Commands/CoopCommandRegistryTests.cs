@@ -125,15 +125,6 @@ public class CoopCommandRegistryTests : IDisposable
     }
 
     [Fact]
-    public void DescriptorConstructor_WithoutSide_DefaultsToBoth()
-    {
-        var descriptor = new CoopCommandDescriptor("coop.debug.test", "capture", "Captures values.", Array.Empty<IExpectedArgs>());
-
-        Assert.Equal(CoopCommandSide.Both, descriptor.Side);
-        Assert.Equal(0, (int)CoopCommandSide.Both);
-    }
-
-    [Fact]
     public void Constructor_ExposesCommandMetadataAndBuildsUsage()
     {
         var command = new TestCommand(

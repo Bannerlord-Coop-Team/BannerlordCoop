@@ -63,8 +63,6 @@ public class NetworkPlayerPartyInteractionSerializationTest
             mercenaryAwardMultiplier: 12,
             initiatorAcceptedTrade: true,
             responderAcceptedTrade: false,
-            partyItems: new[] { new ItemRosterElementData(new ItemObjectData("party-item", null, itemModifierNull: true), 3) },
-            otherPartyItems: new[] { new ItemRosterElementData(new ItemObjectData("other-item", null, itemModifierNull: true), 4) },
             enabledOptions: new[] { PlayerPartyInteractionOption.AcceptProposal },
             isHostile: true,
             mercenaryUnavailableReason: PlayerPartyInteractionMercenaryUnavailableReason.InitiatorClanTierTooLow,
@@ -87,12 +85,6 @@ public class NetworkPlayerPartyInteractionSerializationTest
         Assert.Equal(original.MercenaryAwardMultiplier, result.MercenaryAwardMultiplier);
         Assert.Equal(original.MercenaryUnavailableReason, result.MercenaryUnavailableReason);
         Assert.Equal(original.ClanJoinUnavailableReason, result.ClanJoinUnavailableReason);
-        Assert.Single(result.PartyItems);
-        Assert.Equal("party-item", result.PartyItems[0].ItemObjectData.ItemObjectId);
-        Assert.Equal(3, result.PartyItems[0].Amount);
-        Assert.Single(result.OtherPartyItems);
-        Assert.Equal("other-item", result.OtherPartyItems[0].ItemObjectData.ItemObjectId);
-        Assert.Equal(4, result.OtherPartyItems[0].Amount);
     }
 
     [Theory]

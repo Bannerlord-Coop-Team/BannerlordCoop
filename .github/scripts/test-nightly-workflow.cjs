@@ -50,26 +50,13 @@ function actionsApi(runs) {
   } } };
 }
 
-test('the late 11-03 run does not republish over dispatch 41615577213', async () => {
-  const github = actionsApi([published]);
-  const { outputs } = await runScript('Keep a late scheduled nightly from overwriting a published one', {
-    github, process: { env: { RELEASE_DATE: '2026-11-02' } },
-  });
-  assert.equal(outputs.should_publish, 'false');
-  assert.equal(github.calls[0].status, undefined);
-});
-
-test('both listings ignore incomplete or unsuccessful runs locally', async () => {
+test('the previous client lookup ignores incomplete or unsuccessful runs locally', async () => {
   const runs = [
     { ...published, id: 1, status: 'in_progress', conclusion: null },
     { ...published, id: 2, conclusion: 'failure' },
     { ...published, id: 3, conclusion: 'cancelled' },
   ];
   const github = actionsApi(runs);
-  const { outputs } = await runScript('Keep a late scheduled nightly from overwriting a published one', {
-    github, process: { env: { RELEASE_DATE: '2026-11-02' } },
-  });
-  assert.equal(outputs.should_publish, 'true');
   const previous = await runScript('Find previous nightly commit', { github });
   assert.equal(previous.result, '');
   assert.deepEqual(github.jobIds, []);
