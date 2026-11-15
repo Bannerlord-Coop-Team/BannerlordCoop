@@ -1112,7 +1112,6 @@ public class VillageHostileActionTests : MapEventTestBase
     {
         using var result = CompleteRaidSimulationAndLoot();
         {
-        {
             var client = result.Client;
             var context = result.Context;
             AssertRaidContinuationPresented(result);
@@ -1251,22 +1250,8 @@ public class VillageHostileActionTests : MapEventTestBase
             Game.Current.GameStateManager._gameStates.Add(mapState);
         }, MapEventDisabledMethods);
 
-        var result = new CompletedRaidSimulation(client, context, encounter, troopId, itemId, this);
-        var harmony = new Harmony($"raid-result-ui.{Guid.NewGuid()}");
-        harmony.Patch(AccessTools.Method(typeof(PartyScreenHelper), nameof(PartyScreenHelper.OpenScreenAsLoot)),
-            prefix: new HarmonyMethod(typeof(MapEventTestBase), nameof(OpenLootPartyScreen)));
-        harmony.Patch(AccessTools.Method(typeof(InventoryScreenHelper), nameof(InventoryScreenHelper.OpenScreenAsLoot)),
-            prefix: new HarmonyMethod(typeof(MapEventTestBase), nameof(OpenLootInventoryScreen)));
-        var menus = new MethodCallRecorder(Priority.First,
-            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu)),
-            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu)));
-        var visualPatch = new Harmony($"raid-continuation-visual.{Guid.NewGuid()}");
-        var initialize = AccessTools.Method(typeof(MapEvent), nameof(MapEvent.Initialize),
-            new[] { typeof(PartyBase), typeof(PartyBase), typeof(MapEventComponent), typeof(MapEvent.BattleTypes) });
-        visualPatch.Patch(initialize,
-            prefix: new HarmonyMethod(typeof(VillageHostileActionTests), nameof(ProvideHeadlessVisual)),
-            postfix: new HarmonyMethod(typeof(VillageHostileActionTests), nameof(ClearHeadlessVisual)));
-        result.Track(harmony, visualPatch, menus);
+        InstallResultScreenPatches(out var harmony, out var visualPatch, out var menus);
+        var result = new CompletedRaidSimulation(client, context, encounter, troopId, itemId, this, harmony, visualPatch, menus);
 
         Server.Call(() => CampaignEvents.MapEventEnded.AddNonSerializedListener(this, result.Ended.Add));
         StartBattleSimulation(client, context);
@@ -1332,6 +1317,27 @@ public class VillageHostileActionTests : MapEventTestBase
         return result;
     }
 
+    private static void InstallResultScreenPatches(
+        out Harmony lootScreens,
+        out Harmony visual,
+        out MethodCallRecorder menus)
+    {
+        lootScreens = new Harmony($"raid-result-ui.{Guid.NewGuid()}");
+        lootScreens.Patch(AccessTools.Method(typeof(PartyScreenHelper), nameof(PartyScreenHelper.OpenScreenAsLoot)),
+            prefix: new HarmonyMethod(typeof(MapEventTestBase), nameof(OpenLootPartyScreen)));
+        lootScreens.Patch(AccessTools.Method(typeof(InventoryScreenHelper), nameof(InventoryScreenHelper.OpenScreenAsLoot)),
+            prefix: new HarmonyMethod(typeof(MapEventTestBase), nameof(OpenLootInventoryScreen)));
+        menus = new MethodCallRecorder(Priority.First,
+            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu)),
+            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu)));
+        visual = new Harmony($"raid-continuation-visual.{Guid.NewGuid()}");
+        var initialize = AccessTools.Method(typeof(MapEvent), nameof(MapEvent.Initialize),
+            new[] { typeof(PartyBase), typeof(PartyBase), typeof(MapEventComponent), typeof(MapEvent.BattleTypes) });
+        visual.Patch(initialize,
+            prefix: new HarmonyMethod(typeof(VillageHostileActionTests), nameof(ProvideHeadlessVisual)),
+            postfix: new HarmonyMethod(typeof(VillageHostileActionTests), nameof(ClearHeadlessVisual)));
+    }
+
     private void AdvanceSimulationUntilFinished(EnvironmentInstance pacer, string mapEventId)
     {
         var broker = Server.Resolve<IMessageBroker>();
@@ -1389,7 +1395,10 @@ public class VillageHostileActionTests : MapEventTestBase
             PlayerEncounter encounter,
             string troopId,
             string itemId,
-            VillageHostileActionTests test)
+            VillageHostileActionTests test,
+            Harmony lootScreens,
+            Harmony visual,
+            MethodCallRecorder menus)
         {
             Client = client;
             Context = context;
@@ -1397,6 +1406,9 @@ public class VillageHostileActionTests : MapEventTestBase
             TroopId = troopId;
             ItemId = itemId;
             this.test = test;
+            this.lootScreens = lootScreens;
+            this.visual = visual;
+            this.menus = menus;
         }
 
         public EnvironmentInstance Client { get; }
@@ -1406,13 +1418,6 @@ public class VillageHostileActionTests : MapEventTestBase
         public string ItemId { get; }
         public BattleSimulation Simulation { get; set; }
         public List<MapEvent> Ended { get; } = new List<MapEvent>();
-
-        public void Track(Harmony lootScreens, Harmony visual, MethodCallRecorder menus)
-        {
-            this.lootScreens = lootScreens;
-            this.visual = visual;
-            this.menus = menus;
-        }
 
         public void Dispose()
         {

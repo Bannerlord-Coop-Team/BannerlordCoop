@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using Common.Messaging;
 using E2E.Tests.Util;
 using GameInterface.Registry.Auto;
@@ -189,25 +190,16 @@ public class BattleSimulationEncounterTests : MapEventTestBase
                 // ScoreboardBaseVM is not publicized; replace only the renderer's release callback.
                 AccessTools.Field(typeof(ScoreboardBaseVM), "_releaseSimulationSources")
                     .SetValue(scoreboard, (System.Action)mapState.EndBattleSimulation);
-                var inquiries = new List<InquiryData>();
-                void RecordInquiry(InquiryData inquiry, bool pause, bool prioritize) => inquiries.Add(inquiry);
-                // Publicizer exposes both the event and its backing field under the same name.
-                var showInquiry = typeof(InformationManager).GetEvent("OnShowInquiry");
-                showInquiry.AddEventHandler(null, (System.Action<InquiryData, bool, bool>)RecordInquiry);
-                try
+                using (var inquiries = new InquiryRecorder())
                 {
                     simulation.Pause();
                     scoreboard.ExecuteQuitAction();
                     Assert.False(simulation.IsPlayerRetreated);
                     Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkCancelBattleSimulation>());
-                    Assert.Single(inquiries).AffirmativeAction();
+                    Assert.Single(inquiries.Items).AffirmativeAction();
                     Assert.True(simulation.IsPlayerRetreated);
                     Assert.False(mapState.IsSimulationActive);
                     Assert.Single(client.NetworkSentMessages.GetMessages<NetworkCancelBattleSimulation>());
-                }
-                finally
-                {
-                    showInquiry.RemoveEventHandler(null, (System.Action<InquiryData, bool, bool>)RecordInquiry);
                 }
             }, MapEventDisabledMethods
                 .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu))));
@@ -268,5 +260,20 @@ public class BattleSimulationEncounterTests : MapEventTestBase
             Assert.Null(encounter.BattleSimulation);
             Assert.False(BattleSimulationReplay.IsActiveFor(context.MapEventId));
         }, MapEventDisabledMethods);
+    }
+
+    private sealed class InquiryRecorder : IDisposable
+    {
+        private readonly EventInfo showInquiry = typeof(InformationManager).GetEvent("OnShowInquiry");
+        private readonly Action<InquiryData, bool, bool> record;
+        public List<InquiryData> Items { get; } = new();
+
+        public InquiryRecorder()
+        {
+            record = (inquiry, _, _) => Items.Add(inquiry);
+            showInquiry.AddEventHandler(null, record);
+        }
+
+        public void Dispose() => showInquiry.RemoveEventHandler(null, record);
     }
 }
