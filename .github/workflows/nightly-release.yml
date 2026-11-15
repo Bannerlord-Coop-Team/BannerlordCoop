@@ -120,6 +120,7 @@ jobs:
             });
             const published = response.data.workflow_runs.find((run) =>
               run.id !== context.runId
+              && run.event === 'schedule'
               && run.status === 'completed'
               && run.conclusion === 'success'
               && (

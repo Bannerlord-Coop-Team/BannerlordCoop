@@ -10,7 +10,7 @@ const workflow = fs.readFileSync(path.join(__dirname, '../workflows/nightly-rele
 const published = {
   id: 41615577213, status: 'completed', conclusion: 'success',
   created_at: '2026-11-03T10:00:10Z', updated_at: '2026-11-03T10:04:30Z',
-  head_sha: '2d6d2cb72ff85f87ded657dbf20c720d4d815262', event: 'workflow_dispatch',
+  head_sha: '2d6d2cb72ff85f87ded657dbf20c720d4d815262', event: 'schedule',
 };
 
 function step(name) {
@@ -50,13 +50,21 @@ function actionsApi(runs) {
   } } };
 }
 
-test('the late 11-03 run does not republish over dispatch 41615577213', async () => {
+test('the late 11-03 run does not republish over scheduled run 41615577213', async () => {
   const github = actionsApi([published]);
   const { outputs } = await runScript('Keep a late scheduled nightly from overwriting a published one', {
     github, process: { env: { RELEASE_DATE: '2026-11-02' } },
   });
   assert.equal(outputs.should_publish, 'false');
   assert.equal(github.calls[0].status, undefined);
+});
+
+test('a manual client dispatch does not satisfy the scheduled publication guard', async () => {
+  const github = actionsApi([{ ...published, event: 'workflow_dispatch' }]);
+  const { outputs } = await runScript('Keep a late scheduled nightly from overwriting a published one', {
+    github, process: { env: { RELEASE_DATE: '2026-11-02' } },
+  });
+  assert.equal(outputs.should_publish, 'true');
 });
 
 test('both listings ignore incomplete or unsuccessful runs locally', async () => {
