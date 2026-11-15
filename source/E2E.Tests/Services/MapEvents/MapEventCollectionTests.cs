@@ -214,8 +214,8 @@ public class MapEventCollectionTests : MapEventTestBase
             encounter._encounteredParty = mapEvent.DefenderSide.LeaderParty;
             encounter.IsJoinedBattle = true;
             Assert.True(client.ObjectManager.TryGetId(party.Party, out partyBaseId));
-            // Stages the live join_encounter state after PlayerEncounter.Update cleared _mapEvent; this assignment also
-            // triggers NetworkRequestJoinBattle through the client AddPartyInternal patch.
+            // Stages the live joiner after the join option: a joined encounter with no _mapEvent.
+            // The side write is intercepted into NetworkRequestJoinBattle instead of attaching locally.
             party.Party.MapEventSide = mapEvent.DefenderSide;
             Assert.Null(PlayerEncounter.Battle);
         }, WithoutNetworkDelivery());

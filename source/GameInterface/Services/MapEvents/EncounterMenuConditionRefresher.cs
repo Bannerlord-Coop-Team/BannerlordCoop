@@ -49,7 +49,7 @@ internal class EncounterMenuConditionRefresher : IEncounterMenuConditionRefreshe
             return;
         }
 
-        if (NeedsEncounterMenuReinit(mapEvent, encounter))
+        if (IsMissingMainPartyBattle(mapEvent, encounter))
         {
             // The menu opened after the client's battle request timed out, so it was built without a battle and
             // its option conditions dereference PlayerEncounter.Battle. Re-entering it runs vanilla's
@@ -76,10 +76,10 @@ internal class EncounterMenuConditionRefresher : IEncounterMenuConditionRefreshe
 
     private static void AdoptJoinedFieldBattleIfNeeded(MapEvent mapEvent, PlayerEncounter encounter)
     {
-        if (encounter == null || !encounter.IsJoinedBattle)
+        if (!IsMissingMainPartyBattle(mapEvent, encounter))
             return;
 
-        if (!NeedsEncounterMenuReinit(mapEvent, encounter))
+        if (!encounter.IsJoinedBattle)
             return;
 
         // Siege and sally joins are rebound by BattleJoinLeaveHandler.SwitchSiegeJoinerToEncounterIfNeeded.
@@ -91,7 +91,7 @@ internal class EncounterMenuConditionRefresher : IEncounterMenuConditionRefreshe
         encounter._mapEvent = mapEvent;
     }
 
-    internal static bool NeedsEncounterMenuReinit(MapEvent mapEvent, PlayerEncounter encounter)
+    internal static bool IsMissingMainPartyBattle(MapEvent mapEvent, PlayerEncounter encounter)
         => encounter != null &&
            encounter._mapEvent == null &&
            MobileParty.MainParty?.MapEvent == mapEvent;
