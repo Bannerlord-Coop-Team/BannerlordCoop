@@ -127,6 +127,8 @@ public class CoopBattleController : CoopMissionController
         ISiegeGateHitApplier siegeGateHitApplier,
         IRangedSiegeWeaponPresentation rangedSiegeWeaponPresentation,
         IBattleTeamResolver teamResolver,
+        IBattleCharacterResolver characterResolver,
+        IPuppetOriginFactory puppetOrigins,
         IBattleAgentFader agentFader,
         IBattlePlayerPartyResolver playerParties,
         MissionMapTimeView mapTimeView,
@@ -202,7 +204,8 @@ public class CoopBattleController : CoopMissionController
             deployment,
             spawnBatchCodec,
             missionWeaponDataMapper,
-            authorityMigrator);
+            authorityMigrator,
+            characterResolver: characterResolver);
         replicator = ownedAgentReplicator;
         puppetSpawner = new PuppetSpawner(
             messageBroker,
@@ -218,7 +221,9 @@ public class CoopBattleController : CoopMissionController
             puppetRoutApplier,
             spawnBatchCodec,
             authorityMigrator,
-            teamResolver);
+            teamResolver,
+            characterResolver: characterResolver,
+            puppetOrigins: puppetOrigins);
         // BR-102: ONE host-epoch policy shared by both siege replicators, so its accepted-epoch
         // watermark spans every host-authority message type (engine placement + machine state/authority)
         // — a superseded hosting generation is dropped consistently across both. The policy is a

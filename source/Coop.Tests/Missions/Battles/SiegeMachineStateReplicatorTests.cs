@@ -159,6 +159,27 @@ public class SiegeMachineStateReplicatorTests
     }
 
     [Fact]
+    public void NetworkSiegeMachineReset_RoundTripsMachineAndHostStamp()
+    {
+        var original = new NetworkSiegeMachineReset(12, 4, "host-a");
+
+        NetworkSiegeMachineReset result;
+        using (var stream = new MemoryStream())
+        {
+            RuntimeTypeModel.Default.Serialize(stream, original);
+            stream.Position = 0;
+            result = (NetworkSiegeMachineReset)RuntimeTypeModel.Default.Deserialize(
+                stream,
+                null,
+                typeof(NetworkSiegeMachineReset));
+        }
+
+        Assert.Equal(original.MachineId, result.MachineId);
+        Assert.Equal(original.HostEpoch, result.HostEpoch);
+        Assert.Equal(original.SenderControllerId, result.SenderControllerId);
+    }
+
+    [Fact]
     public void NetworkSiegeMachineState_RoundTripsSimulatorOwnedState()
     {
         var original = new NetworkSiegeMachineState(

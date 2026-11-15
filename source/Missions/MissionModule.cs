@@ -159,6 +159,8 @@ public class MissionModule : Module
         // Per mission component, so hull identities never leak into the next mission.
         builder.RegisterType<NetworkShipRegistry>().As<INetworkShipRegistry>().InstancePerDependency();
         builder.RegisterType<BattleTeamResolver>().As<IBattleTeamResolver>().InstancePerDependency();
+        builder.RegisterType<CampaignBattleCharacterResolver>().As<IBattleCharacterResolver>().InstancePerDependency();
+        builder.RegisterType<CampaignPuppetOriginFactory>().As<IPuppetOriginFactory>().InstancePerDependency();
         builder.RegisterType<BattlePlayerPartyResolver>().As<IBattlePlayerPartyResolver>().InstancePerDependency();
         builder.RegisterType<GuardedHitWindow>()
             .As<IGuardedHitWindow>()

@@ -72,6 +72,8 @@ public class PuppetSpawner : IPuppetSpawner
     private readonly Dictionary<Guid, (string Controller, BattleAgentFormationData Data)> pendingFormations = new();
     private readonly HashSet<Guid> discardedFormationAgentIds = new();
     private bool disposed;
+    private readonly IBattleCharacterResolver characterResolver;
+    private readonly IPuppetOriginFactory puppetOrigins;
 
     public PuppetSpawner(
         IMessageBroker messageBroker,
@@ -87,7 +89,9 @@ public class PuppetSpawner : IPuppetSpawner
         IPuppetRoutApplier puppetRoutApplier = null,
         IBattleAgentSpawnBatchCodec spawnBatchCodec = null,
         IBattleAuthorityMigrator authorityMigrator = null,
-        IBattleTeamResolver teamResolver = null)
+        IBattleTeamResolver teamResolver = null,
+        IBattleCharacterResolver characterResolver = null,
+        IPuppetOriginFactory puppetOrigins = null)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -103,6 +107,8 @@ public class PuppetSpawner : IPuppetSpawner
         this.puppetRoutApplier = puppetRoutApplier;
         this.authorityMigrator = authorityMigrator;
         this.teamResolver = teamResolver ?? new BattleTeamResolver();
+        this.characterResolver = characterResolver ?? new CampaignBattleCharacterResolver(objectManager);
+        this.puppetOrigins = puppetOrigins ?? new CampaignPuppetOriginFactory(objectManager);
 
         messageBroker.Subscribe<NetworkSpawnBattleAgents>(Handle_NetworkSpawnBattleAgents);
         messageBroker.Subscribe<NetworkBattleAgentFormations>(Handle_Formations);
@@ -271,7 +277,7 @@ public class PuppetSpawner : IPuppetSpawner
     public bool HasRetainedPlayerAgent(Agent agent)
     {
         if (agent == null || !agent.IsActive() || agent.Mission != Mission.Current
-            || agent.Character != Hero.MainHero?.CharacterObject
+            || !(agent.Character is CharacterObject) || agent.Character != Hero.MainHero?.CharacterObject
             || !coopMissionComponent.AgentRegistry.TryGetAgentInfo(agent, out var info)
             || !session.IsOwn(info.CurrentAuthority)
             || !playerHandoffs.TryGetValue(info.AgentId, out var handoff)) return false;
@@ -441,7 +447,7 @@ public class PuppetSpawner : IPuppetSpawner
             return true;
         }
 
-        if (!objectManager.TryGetObjectWithLogging(data.CharacterId, out CharacterObject character))
+        if (!characterResolver.TryResolveCharacter(data.CharacterId, out BasicCharacterObject character))
         {
             DiscardPendingFormations(data.AgentId);
             Logger.Warning("[BattleSync] Puppet skipped: unresolved character {Char} for agent {AgentId}", data.CharacterId, data.AgentId);
@@ -451,32 +457,10 @@ public class PuppetSpawner : IPuppetSpawner
         // We own the agent when the record's assignment owner is us. This can be our initial spawn record or a
         // fresh record after re-entry. Our hero becomes the local main agent; our troops become locally driven
         // AI combatants. Everything else is an inert puppet driven by its owner over the mesh.
-        bool isOwnHero = isOwnAgent && character.IsHero && character.HeroObject == Hero.MainHero;
+        bool isOwnHero = isOwnAgent && character is CharacterObject heroCharacter && heroCharacter.IsHero && heroCharacter.HeroObject == Hero.MainHero;
 
-        // Carry the troop's party so the agent has a real BattleCombatant — the battle observer/scoreboard
-        // reads origin.BattleCombatant, and SimpleAgentOrigin leaves it null for non-hero troops.
-        var party = ResolvePuppetParty(data.MapEventPartyId);
-
-        if (party == null)
-        {
-            // World-state registration and mission-mesh spawns use different channels. An explicit party id
-            // can therefore arrive first; retain it until the game-thread registry apply catches up.
-            if (!string.IsNullOrEmpty(data.MapEventPartyId)) return false;
-
-            // An unattributed spawn record must still produce a body — a puppet that never spawns is an
-            // invisible enemy (and re-buffering forever spams the log every tick). Fall back to any
-            // involved party on the agent's side; only the scoreboard attribution degrades.
-            party = ResolveFallbackParty(data.Side);
-            if (party == null)
-            {
-                Logger.Warning("[BattleSync] Puppet skipped: unresolved party {Party} for agent {AgentId}", data.MapEventPartyId, data.AgentId);
-                return false;
-            }
-
-            Logger.Warning("[BattleSync] Puppet {AgentId} spawned with a fallback {Side} party; {Party} unresolved", data.AgentId, data.Side, data.MapEventPartyId);
-        }
-
-        var origin = new CoopAgentOrigin(character, party, -1, null, new UniqueTroopDescriptor(data.TroopSeed), data.MapEventPartyId);
+        // A campaign puppet waits for its battle party; a session puppet has none.
+        if (!puppetOrigins.TryCreate(character, data, team, out IAgentOriginBase origin)) return false;
 
         var missionEquipment = ResolveMissionEquipment(data.MissionEquipmentData);
 
@@ -629,8 +613,8 @@ public class PuppetSpawner : IPuppetSpawner
                 Logger.Warning("[BattleSync] Spawn record for {AgentId} carries mount {MountId} but the puppet spawned unmounted", data.AgentId, data.MountAgentId);
         }
 
-        // Key the casualty on the troop's CHARACTER through the object manager (never a raw StringId).
-        objectManager.TryGetId(character, out var troopCharacterId);
+        // Key the casualty on the resolver's character id.
+        characterResolver.TryGetCharacterId(character, out var troopCharacterId);
         casualties.Record(data.AgentId, data.MapEventPartyId, data.TroopSeed, troopCharacterId);
 
         // A retained record of a departed host can drain after the migration sweep. Every peer moves
@@ -1053,28 +1037,6 @@ public class PuppetSpawner : IPuppetSpawner
         if (data == null || string.IsNullOrEmpty(data.OwnerControllerId)) return false;
         return playerManager.TryGetPlayer(data.OwnerControllerId, out var player)
             && player.CharacterObjectId == data.CharacterId;
-    }
-
-    // The PartyBase for a battle party id (a MapEventParty object-manager id), used for a puppet's origin.
-    private PartyBase ResolvePuppetParty(string mapEventPartyId)
-    {
-        if (mapEventPartyId != null && objectManager.TryGetObject<MapEventParty>(mapEventPartyId, out var mapEventParty))
-            return mapEventParty?.Party;
-        return null;
-    }
-
-    // Any involved party of the given side, for a spawn record whose own party never resolved here.
-    private static PartyBase ResolveFallbackParty(BattleSideEnum side)
-    {
-        var mapEvent = MobileParty.MainParty?.MapEvent;
-        if (mapEvent == null || side == BattleSideEnum.None) return null;
-
-        foreach (var involved in mapEvent.GetMapEventSide(side).Parties)
-        {
-            if (involved?.Party != null) return involved.Party;
-        }
-
-        return null;
     }
 
     private MissionEquipment ResolveMissionEquipment(MissionEquipmentData data)

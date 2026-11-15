@@ -998,6 +998,51 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
         method!.Invoke(sut, Array.Empty<object>());
     }
 
+    [Theory]
+    [InlineData(0f, 2, 450f, 0, true)]
+    [InlineData(0f, 0, 450f, 0, true)]
+    [InlineData(450f, 1, 450f, 0, true)]
+    [InlineData(450f, 0, 200f, 1, false)]
+    [InlineData(200f, 1, 0f, 2, false)]
+    [InlineData(200f, 1, 450f, 1, false)]
+    public void HostStateChange_SendsResetOnlyForARepair(
+        float fromHp, int fromState, float toHp, int toState, bool expectReset)
+    {
+        const int machineId = 21;
+        session.SetupGet(s => s.IsLocalHost).Returns(true);
+
+        InvokeBroadcastMachineStateIfChanged(MachineState(machineId, fromHp, fromState));
+        sentToAll.Clear();
+        InvokeBroadcastMachineStateIfChanged(MachineState(machineId, toHp, toState));
+
+        if (!expectReset)
+        {
+            Assert.IsType<NetworkSiegeMachineState>(Assert.Single(sentToAll));
+            return;
+        }
+
+        Assert.Equal(2, sentToAll.Count);
+        var reset = Assert.IsType<NetworkSiegeMachineReset>(sentToAll[0]);
+        Assert.Equal(machineId, reset.MachineId);
+        Assert.Equal(LocalEpoch, reset.HostEpoch);
+        Assert.Equal("us", reset.SenderControllerId);
+        var state = Assert.IsType<NetworkSiegeMachineState>(sentToAll[1]);
+        Assert.Equal(toState, state.DestructionState);
+    }
+
+    private static NetworkSiegeMachineState MachineState(int machineId, float hitPoints, int destructionState) =>
+        new NetworkSiegeMachineState(
+            machineId,
+            hitPoints: hitPoints,
+            destructionState: destructionState,
+            gateState: -1,
+            ladderState: -1,
+            moveDistance: -1f,
+            hasArrived: false,
+            weaponState: -1,
+            aimDirection: -1000f,
+            aimReleaseAngle: -1000f);
+
     private void InvokeSetMachineAuthority(int machineId, string controllerId)
     {
         var method = typeof(SiegeMachineStateReplicator).GetMethod(

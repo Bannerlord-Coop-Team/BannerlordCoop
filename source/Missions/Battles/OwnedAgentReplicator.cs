@@ -70,6 +70,7 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
     private readonly IBattleAgentSpawnBatchCodec spawnBatchCodec;
     private readonly IMissionWeaponDataMapper missionWeaponDataMapper;
     private readonly IBattleAuthorityMigrator authorityMigrator;
+    private readonly IBattleCharacterResolver characterResolver;
     private float retainedHeroRecoverySeconds;
     // Captured spawns waiting for the next tick's batch, each with the agent it was captured from.
     private readonly List<(Agent Agent, BattleAgentSpawnData Record)> pendingSpawns =
@@ -95,9 +96,11 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
         IBattleDeploymentCoordinator deployment,
         IBattleAgentSpawnBatchCodec spawnBatchCodec,
         IMissionWeaponDataMapper missionWeaponDataMapper,
-        IBattleAuthorityMigrator authorityMigrator = null)
+        IBattleAuthorityMigrator authorityMigrator = null,
+        IBattleCharacterResolver characterResolver = null)
     {
         this.authorityMigrator = authorityMigrator;
+        this.characterResolver = characterResolver ?? new CampaignBattleCharacterResolver(objectManager);
         this.network = network;
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -139,8 +142,8 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
         {
             if (!coopMissionComponent.AgentRegistry.TryGetAgentInfo(agent, out var info)
                 || info.CurrentAuthority != session.OwnControllerId || !agent.IsActive()
-                || agent.IsMount || !(agent.Character is CharacterObject character)
-                || deployment.ShouldWithhold(IsOwnPartyAgent(agent, character))) continue;
+                || agent.IsMount || agent.Character == null
+                || deployment.ShouldWithhold(IsOwnPartyAgent(agent, agent.Character))) continue;
 
             updates.Add(new BattleAgentFormationData(info.AgentId,
                 agent.Formation == null ? -1 : (int)agent.Formation.FormationIndex, info.AuthorityRevision, GetCrewShipId(agent)));
@@ -252,9 +255,10 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
         foreach (var info in coopMissionComponent.AgentRegistry.GetAgents(session.OwnControllerId))
         {
             var agent = info.Agent;
-            if (agent == null || !agent.IsActive() || agent.IsMount || !(agent.Character is CharacterObject character)) continue;
+            if (agent == null || !agent.IsActive() || agent.IsMount || !characterResolver.TryGetCharacterId(agent.Character, out var characterId)) continue;
 
-            if (retainedPlayerHeroesOnly && !character.IsHero) continue;
+            var character = agent.Character;
+            if (retainedPlayerHeroesOnly && !(character is CharacterObject heroCharacter && heroCharacter.IsHero)) continue;
 
             bool isOwnParty = IsOwnPartyAgent(agent, character);
             if (ownPartyOnly && !isOwnParty) continue;
@@ -262,9 +266,6 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
             // or a joiner catch-up spawns them at their pre-arrangement formation and dedupes the commit broadcast
             // that carries the real one. They arrive via that commit broadcast (or a post-commit catch-up) instead.
             if (deployment.ShouldWithhold(isOwnParty)) continue;
-
-            // Carried by CharacterObject id, uniform for heroes and troops (hero CharacterObjects are registered).
-            if (!objectManager.TryGetId(character, out var characterId)) continue;
 
             var attribution = casualties.GetOrDefault(info.AgentId);
             var side = agent.Team != null ? agent.Team.Side : BattleSideEnum.None;
@@ -351,9 +352,9 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
     // Whether an agent belongs to the LOCAL player's own party — the troops withheld until deployment commit
     // (requirement #4). The player's hero and the troops the local supplier spawned for MainParty are own-party;
     // the host's enemy/allied AI (a different origin party) is not, so it shows up frozen during deployment (#1).
-    internal static bool IsOwnPartyAgent(Agent agent, CharacterObject character)
+    internal static bool IsOwnPartyAgent(Agent agent, BasicCharacterObject character)
     {
-        if (character.IsHero && character.HeroObject == Hero.MainHero) return true;
+        if (character is CharacterObject heroCharacter && heroCharacter.IsHero && heroCharacter.HeroObject == Hero.MainHero) return true;
         return agent.Origin is CoopAgentOrigin origin && origin.Party == PartyBase.MainParty;
     }
 
@@ -364,12 +365,13 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
     private void Handle_AgentSpawnedInBattle(MessagePayload<AgentSpawnedInBattle> payload)
     {
         var agent = payload.What.Agent;
-        if (agent == null || !(agent.Character is CharacterObject character)) return;
+        if (agent == null) return;
+        var character = agent.Character;
 
         AttachPlayerAgent(agent, character);
 
-        // Carried by CharacterObject id, uniform for heroes and troops (hero CharacterObjects are registered).
-        if (!objectManager.TryGetId(character, out var characterId)) return;
+        // The resolver's id: the object-manager id of a CharacterObject in a campaign.
+        if (!characterResolver.TryGetCharacterId(character, out var characterId)) return;
 
         string owner = session.OwnControllerId;
         var agentId = Guid.NewGuid();
@@ -459,7 +461,8 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
             shipId: GetCrewShipId(agent));
 
         // Populate MapEvent's UpgradeTroopTracker with spawned agent to handle on the server during battle.
-        if (!isDebugReplicationFixture)
+        // A session troop has no map event roster to upgrade.
+        if (!isDebugReplicationFixture && character is CharacterObject)
         messageBroker.Publish(this, new TrackTroopForUpgrades(mapEventPartyId, characterId));
 
         // Requirement #4 "hidden everywhere until deployed": while we are still placing our own formations our
@@ -513,7 +516,7 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
         return movementId;
     }
 
-    private static void AttachPlayerAgent(Agent agent, CharacterObject character)
+    private static void AttachPlayerAgent(Agent agent, BasicCharacterObject character)
     {
         // While a deployment phase is live, the deployment controller owns the player agent — it holds our hero
         // as Controller.None until Start Battle and assigns Mission.MainAgent itself on FinishDeployment (via
@@ -525,11 +528,11 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
         // Our own hero just spawned: take control of it ourselves — set it as the mission's controllable main
         // agent (the camera follows the main agent). Done before the resolution/registration below so it runs
         // even if those fail.
-        if (character.IsHero && character.HeroObject == Hero.MainHero && Mission.Current != null && Mission.Current.MainAgent != agent)
+        if (character is CharacterObject heroCharacter && heroCharacter.IsHero && heroCharacter.HeroObject == Hero.MainHero && Mission.Current != null && Mission.Current.MainAgent != agent)
         {
             agent.Controller = AgentControllerType.Player;
             Mission.Current.MainAgent = agent;
-            Logger.Information("[BattleSync] Attached player to own hero agent ({Char})", character.StringId);
+            Logger.Information("[BattleSync] Attached player to own hero agent ({Char})", heroCharacter.StringId);
         }
     }
 

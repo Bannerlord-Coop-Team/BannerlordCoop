@@ -132,6 +132,7 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         this.weaponPresentation = weaponPresentation;
 
         messageBroker.Subscribe<NetworkSiegeMachineState>(Handle_NetworkMachineState);
+        messageBroker.Subscribe<NetworkSiegeMachineReset>(Handle_NetworkMachineReset);
         messageBroker.Subscribe<NetworkSiegeLadderAnimationState>(Handle_NetworkLadderAnimationState);
         messageBroker.Subscribe<NetworkSiegeMachineClaim>(Handle_NetworkMachineClaim);
         messageBroker.Subscribe<NetworkSiegeMachineAuthority>(Handle_NetworkMachineAuthority);
@@ -147,6 +148,7 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
     public void Dispose()
     {
         messageBroker.Unsubscribe<NetworkSiegeMachineState>(Handle_NetworkMachineState);
+        messageBroker.Unsubscribe<NetworkSiegeMachineReset>(Handle_NetworkMachineReset);
         messageBroker.Unsubscribe<NetworkSiegeLadderAnimationState>(Handle_NetworkLadderAnimationState);
         messageBroker.Unsubscribe<NetworkSiegeMachineClaim>(Handle_NetworkMachineClaim);
         messageBroker.Unsubscribe<NetworkSiegeMachineAuthority>(Handle_NetworkMachineAuthority);
@@ -330,9 +332,18 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
     {
         if (MachineStatesEqual(state.MachineId, state)) return;
 
+        // The reset goes first on the same ordered channel, so every peer gets it before the lower state.
+        if (lastSent.TryGetValue(state.MachineId, out var previous) && IsRepair(previous, state))
+            network.SendAll(new NetworkSiegeMachineReset(state.MachineId, GetSnapshotAuthorityEpoch(state.MachineId), session.OwnControllerId));
+
         lastSent[state.MachineId] = state;
         network.SendAll(Stamp(state));
     }
+
+    // A lower destruction state, or hit points back from 0, is a repair: vanilla lowers the state only in DestructableComponent.Reset.
+    internal static bool IsRepair(NetworkSiegeMachineState previous, NetworkSiegeMachineState current) =>
+        previous.DestructionState >= 0 && current.DestructionState >= 0
+        && (current.DestructionState < previous.DestructionState || (previous.HitPoints == 0f && current.HitPoints > 0f));
 
     private bool MachineStatesEqual(int machineId, NetworkSiegeMachineState state)
     {
@@ -1455,6 +1466,33 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         }
     }
 
+    private void Handle_NetworkMachineReset(MessagePayload<NetworkSiegeMachineReset> payload)
+    {
+        var obj = payload.What;
+        GameThread.RunSafe(() =>
+        {
+            if (Mission.Current == null) return;
+            if (DropStaleHostEpoch(obj.HostEpoch, nameof(NetworkSiegeMachineReset))) return;
+
+            RefreshMachineCache();
+            // A buffered state predates the reset (same ordered channel); the post-reset state follows it.
+            pendingByMachineId.Remove(obj.MachineId);
+            peerWeaponState.Remove(obj.MachineId);
+            // An unregistered machine is still loading from the scene, so it is already intact.
+            if (!machinesById.TryGetValue(obj.MachineId, out var machine)) return;
+
+            SiegeMissionAuthorityGate.SuppressCapture = true;
+            try
+            {
+                ApplyReset(machine);
+            }
+            finally
+            {
+                SiegeMissionAuthorityGate.SuppressCapture = false;
+            }
+        });
+    }
+
     private void Handle_NetworkMachineState(MessagePayload<NetworkSiegeMachineState> payload)
     {
         var obj = payload.What;
@@ -1786,6 +1824,31 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
                 destruction.SetDestructionLevel(state.DestructionState, -1, 0f, TaleWorlds.Library.Vec3.Zero, TaleWorlds.Library.Vec3.Zero);
             }
         }
+    }
+
+    // [Peer, game thread] The native mission reset for one machine, as Mission.ResetMissionObjects runs it.
+    private static void ApplyReset(UsableMachine machine)
+    {
+        if (machine is CastleGate gate)
+        {
+            // The gate's reset runs its destructible's reset first (CastleGate.OnMissionReset).
+            gate.OnMissionReset();
+            return;
+        }
+
+        machine.DestructionComponent?.OnMissionReset();
+        if (machine is SiegeTower tower)
+        {
+            // Mid-mission, the tower reset would show its target wall broken; walls are not this message's state.
+            bool? wallShown = tower._nonDestroyedWallEntity?.GetVisibilityExcludeParents();
+            bool? brokenWallShown = tower._destroyedWallEntity?.GetVisibilityExcludeParents();
+            tower.OnMissionReset();
+            if (wallShown is bool shown) tower._nonDestroyedWallEntity.SetVisibilityExcludeParents(shown);
+            if (brokenWallShown is bool brokenShown) tower._destroyedWallEntity.SetVisibilityExcludeParents(brokenShown);
+            return;
+        }
+
+        machine.OnMissionReset();
     }
 
     private static void ApplyLadderAnimation(SiegeLadder ladder, NetworkSiegeLadderAnimationState state)
