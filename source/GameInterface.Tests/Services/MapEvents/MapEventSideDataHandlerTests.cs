@@ -12,7 +12,7 @@ public class MapEventSideDataHandlerTests
     {
         var mapEvent = ObjectHelper.SkipConstructor<MapEvent>();
 
-        Assert.True(MapEventSideDataHandler.ShouldAdoptPlayerEncounterMapEvent(mapEvent, mapEvent, null));
+        Assert.True(MapEventSideDataHandler.ShouldAdoptPlayerEncounterMapEvent(mapEvent, mapEvent, null, true));
     }
 
     [Fact]
@@ -21,7 +21,7 @@ public class MapEventSideDataHandlerTests
         var mapEvent = ObjectHelper.SkipConstructor<MapEvent>();
         var otherMapEvent = ObjectHelper.SkipConstructor<MapEvent>();
 
-        Assert.False(MapEventSideDataHandler.ShouldAdoptPlayerEncounterMapEvent(mapEvent, otherMapEvent, null));
+        Assert.False(MapEventSideDataHandler.ShouldAdoptPlayerEncounterMapEvent(mapEvent, otherMapEvent, null, true));
     }
 
     [Fact]
@@ -29,6 +29,14 @@ public class MapEventSideDataHandlerTests
     {
         var mapEvent = ObjectHelper.SkipConstructor<MapEvent>();
 
-        Assert.False(MapEventSideDataHandler.ShouldAdoptPlayerEncounterMapEvent(mapEvent, mapEvent, mapEvent));
+        Assert.False(MapEventSideDataHandler.ShouldAdoptPlayerEncounterMapEvent(mapEvent, mapEvent, mapEvent, true));
+    }
+
+    [Fact]
+    public void ShouldNotAdoptPlayerEncounterMapEvent_WhenEncounterIsNotAJoinedBattle()
+    {
+        var mapEvent = ObjectHelper.SkipConstructor<MapEvent>();
+
+        Assert.False(MapEventSideDataHandler.ShouldAdoptPlayerEncounterMapEvent(mapEvent, mapEvent, null, false));
     }
 }

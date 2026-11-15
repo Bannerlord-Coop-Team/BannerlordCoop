@@ -197,7 +197,8 @@ internal class MapEventSideDataHandler : IHandler
         if (ShouldAdoptPlayerEncounterMapEvent(
                 mapEvent,
                 MobileParty.MainParty?.MapEvent,
-                PlayerEncounter.Current?._mapEvent))
+                PlayerEncounter.Current?._mapEvent,
+                PlayerEncounter.Current?.IsJoinedBattle == true))
         {
             using (new AllowedThread())
                 PlayerEncounter.Current._mapEvent = mapEvent;
@@ -210,8 +211,10 @@ internal class MapEventSideDataHandler : IHandler
     internal static bool ShouldAdoptPlayerEncounterMapEvent(
         MapEvent mapEvent,
         MapEvent mainPartyMapEvent,
-        MapEvent encounterMapEvent)
-        => mainPartyMapEvent == mapEvent && encounterMapEvent == null;
+        MapEvent encounterMapEvent,
+        bool isJoinedBattle)
+        => mapEvent != null && mainPartyMapEvent == mapEvent && encounterMapEvent == null && isJoinedBattle &&
+           !mapEvent.IsSiegeAssault && !mapEvent.IsSallyOut;
 
     private static void SwitchRaiderToEncounterIfNeeded(MapEvent mapEvent)
     {
