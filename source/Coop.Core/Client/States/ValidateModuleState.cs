@@ -82,6 +82,7 @@ public class ValidateModuleState : ClientStateBase
         this.moduleValidator = moduleValidator;
         messageBroker.Subscribe<NetworkModuleVersionsValidated>(Handle_NetworkModuleVersionsValidated);
         messageBroker.Subscribe<NetworkClientValidated>(Handle_NetworkClientValidated);
+        messageBroker.Subscribe<NetworkSessionJoined>(Handle_NetworkSessionJoined);
 
 #if DEBUG
         controllerIdProvider.SetControllerFromProgramArgs();
@@ -114,6 +115,7 @@ public class ValidateModuleState : ClientStateBase
         validationTimeoutTimer?.Dispose();
         messageBroker.Unsubscribe<NetworkModuleVersionsValidated>(Handle_NetworkModuleVersionsValidated);
         messageBroker.Unsubscribe<NetworkClientValidated>(Handle_NetworkClientValidated);
+        messageBroker.Unsubscribe<NetworkSessionJoined>(Handle_NetworkSessionJoined);
     }
 
     internal void TimeoutValidation()
@@ -204,6 +206,26 @@ public class ValidateModuleState : ClientStateBase
             // window stays over the video until the real character-creation state activates.
             GameThread.RunSafe(BeginCharacterCreation, context: nameof(Handle_NetworkClientValidated));
         }
+    }
+
+    // Only a campaign-free session server answers the validation with this message instead of NetworkClientValidated.
+    internal void Handle_NetworkSessionJoined(MessagePayload<NetworkSessionJoined> obj)
+    {
+        var joined = obj.What;
+        if (!joined.Accepted)
+        {
+            var message = "Could not join the co-op session.\nReason: " + joined.Reason;
+            messageBroker.Publish(this, new SendInformationMessage(message));
+            disconnectReason = message;
+            Logic.Disconnect();
+            return;
+        }
+
+        if (!TryClaimCompletion()) return;
+
+        Logic.Player = joined.Player;
+        Logic.Session = new JoinedSessionInfo(joined.SessionId, joined.ModId, joined.Payload);
+        Logic.SetState<SessionState>();
     }
 
     private void BeginCharacterCreation()

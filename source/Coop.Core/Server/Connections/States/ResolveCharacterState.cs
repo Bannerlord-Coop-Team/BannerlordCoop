@@ -214,7 +214,7 @@ public class ResolveCharacterState : ConnectionStateBase
         }
     }
 
-    private void ResolveCharacter(NetPeer peer, string controllerId)
+    protected virtual void ResolveCharacter(NetPeer peer, string controllerId)
     {
         if (playerManager.TryGetPlayer(controllerId, out var player))
         {

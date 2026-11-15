@@ -48,46 +48,64 @@ public class ServerProcessManager : IDisposable
     {
         lock (stateLock)
         {
-            if (serverProcess != null && !HasExited(serverProcess))
-                throw new InvalidOperationException("A hosted server process is already running");
-
-            CleanupLocked();
-
-            var currentProcess = Process.GetCurrentProcess();
-            var exePath = ManagedServerLauncher.GetEngineExecutablePath();
             var arguments = ServerLaunchArguments.BuildManagedServerArguments(
-                ManagedServerLauncher.GetActiveModuleIds(), saveName, currentProcess.Id, password, visibility);
+                ManagedServerLauncher.GetActiveModuleIds(), saveName, Process.GetCurrentProcess().Id, password, visibility);
 
             // The arguments may contain the hosted-server password, so never write them to a log.
-            Logger.Information("Spawning co-op server for save '{SaveName}': {Exe}", saveName, exePath);
+            Logger.Information("Spawning co-op server for save '{SaveName}'", saveName);
+            Spawn(arguments);
+        }
+    }
 
-            var process = new Process
-            {
-                StartInfo = new ProcessStartInfo
-                {
-                    FileName = exePath,
-                    Arguments = arguments,
-                    WorkingDirectory = Path.GetDirectoryName(exePath),
-                    UseShellExecute = false,
-                },
-            };
+    /// <summary>Spawns a server for a campaign-free session of the mod <paramref name="modId"/>.</summary>
+    public void StartSession(string modId, byte[] payload, string password, ServerVisibility visibility)
+    {
+        lock (stateLock)
+        {
+            var arguments = ServerLaunchArguments.BuildSessionServerArguments(
+                ManagedServerLauncher.GetActiveModuleIds(), modId, payload, Process.GetCurrentProcess().Id, password, visibility);
 
-            // Arm the exit watch and record the child as current before Start, so an instantly
-            // exiting child still raises Exited and OnServerExited (which takes stateLock) sees it
-            // as the current process rather than dropping it as stale.
-            process.Exited += OnServerExited;
-            process.EnableRaisingEvents = true;
-            serverProcess = process;
+            Logger.Information("Spawning co-op session server for mod {ModId}", modId);
+            Spawn(arguments);
+        }
+    }
 
-            try
+    // Caller holds stateLock.
+    private void Spawn(string arguments)
+    {
+        if (serverProcess != null && !HasExited(serverProcess))
+            throw new InvalidOperationException("A hosted server process is already running");
+
+        CleanupLocked();
+
+        var exePath = ManagedServerLauncher.GetEngineExecutablePath();
+
+        var process = new Process
+        {
+            StartInfo = new ProcessStartInfo
             {
-                process.Start();
-            }
-            catch
-            {
-                CleanupLocked();
-                throw;
-            }
+                FileName = exePath,
+                Arguments = arguments,
+                WorkingDirectory = Path.GetDirectoryName(exePath),
+                UseShellExecute = false,
+            },
+        };
+
+        // Arm the exit watch and record the child as current before Start, so an instantly
+        // exiting child still raises Exited and OnServerExited (which takes stateLock) sees it
+        // as the current process rather than dropping it as stale.
+        process.Exited += OnServerExited;
+        process.EnableRaisingEvents = true;
+        serverProcess = process;
+
+        try
+        {
+            process.Start();
+        }
+        catch
+        {
+            CleanupLocked();
+            throw;
         }
     }
 

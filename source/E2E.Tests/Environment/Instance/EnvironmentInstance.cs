@@ -33,6 +33,7 @@ public abstract class EnvironmentInstance : IDisposable
     /// </summary>
     public MessageCollection NetworkSentMessages => mockNetwork.NetworkSentMessages;
     public MessageCollection NetworkSentImmediateMessages => mockNetwork.NetworkSentImmediateMessages;
+    public MessageCollection NetworkBroadcastMessages => mockNetwork.NetworkBroadcastMessages;
 
     public ILifetimeScope Container => container;
     public IObjectManager ObjectManager => Container.Resolve<IObjectManager>();

@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using Common.Network;
 using Common.Network.Coalescing;
+using Coop.Core.Server.Services.Instances.Sessions;
 using Coop.Core.Server.Services.Kingdoms;
 using Coop.Core.Server.Services.MobileParties;
 using GameInterface.CoopSessionData;
@@ -43,7 +44,8 @@ public class ConnectionContext
         IJoinCampaignBaselineSender joinCampaignBaselineSender,
         IJoinCampaignKingdomBaseLineSender joinCampaignKingdomBaseLineSender,
         IJoinValidationDenialLog joinValidationDenialLog,
-        ILootShipHold lootShipHold)
+        ILootShipHold lootShipHold,
+        ISessionDefinitionStore sessionDefinitions)
     {
         MessageBroker = messageBroker;
         Network = network;
@@ -67,6 +69,7 @@ public class ConnectionContext
         JoinCampaignKingdomBaseLineSender = joinCampaignKingdomBaseLineSender;
         JoinValidationDenialLog = joinValidationDenialLog;
         LootShipHold = lootShipHold;
+        SessionDefinitions = sessionDefinitions;
     }
 
     public IMessageBroker MessageBroker { get; }
@@ -91,4 +94,5 @@ public class ConnectionContext
     public IJoinCampaignKingdomBaseLineSender JoinCampaignKingdomBaseLineSender { get; }
     public IJoinValidationDenialLog JoinValidationDenialLog { get; }
     public ILootShipHold LootShipHold { get; }
+    public ISessionDefinitionStore SessionDefinitions { get; }
 }

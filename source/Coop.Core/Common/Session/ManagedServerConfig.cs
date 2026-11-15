@@ -21,6 +21,15 @@ public static class ManagedServerConfig
     /// <summary>The save the server auto-loads.</summary>
     public static string SaveName { get; set; }
 
+    /// <summary>The mod that owns a campaign-free session server; null on a campaign server.</summary>
+    public static string SessionModId { get; set; }
+
+    /// <summary>The opaque session payload from the command line.</summary>
+    public static byte[] SessionPayload { get; set; }
+
+    /// <summary>This server hosts a campaign-free session and loads no save.</summary>
+    public static bool HasSession => SessionModId != null;
+
     /// <summary>Process id of the hosting client that spawned this server; 0 when manually launched.</summary>
     public static int OwnerProcessId { get; set; }
 

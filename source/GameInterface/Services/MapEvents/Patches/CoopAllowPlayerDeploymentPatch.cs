@@ -66,6 +66,10 @@ internal class CoopAllowPlayerDeploymentPatch
     // fresh battle (excluded from the flatten) — in both cases there is no Agent.Main to command the Order of Battle.
     private static bool LocalPlayerHeroOnField()
     {
+        // A campaign-free session has no player hero, and Hero.MainHero throws for its non-campaign player troop.
+        if (Campaign.Current == null)
+            return false;
+
         var mission = Mission.Current;
         var heroCharacter = Hero.MainHero?.CharacterObject;
         if (mission == null || heroCharacter == null)

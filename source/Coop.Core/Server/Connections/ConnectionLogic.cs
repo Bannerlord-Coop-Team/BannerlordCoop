@@ -47,7 +47,8 @@ public class ConnectionLogic : IConnectionLogic
         Peer = peer;
         this.context = context;
         stateFactories = CreateStateFactories();
-        SetState<ResolveCharacterState>();
+        if (context.SessionDefinitions.IsSessionServer) SetState<SessionJoinState>();
+        else SetState<ResolveCharacterState>();
     }
 
     public bool IsLoading => State?.IsLoading ?? false;
@@ -81,6 +82,7 @@ public class ConnectionLogic : IConnectionLogic
         new Dictionary<Type, Func<IConnectionState>>
         {
             [typeof(ResolveCharacterState)] = () => new ResolveCharacterState(this, context.MessageBroker, context.Network, context.ModuleValidator, context.PlayerManager, context.PlayerPartyRestorer, context.ObjectManager, context.ModuleInfoProvider, context.ModuleNameProvider, context.ExistingPlayerSender, context.SteamBanList, context.JoinValidationDenialLog),
+            [typeof(SessionJoinState)] = () => new SessionJoinState(this, context.MessageBroker, context.Network, context.ModuleValidator, context.PlayerManager, context.PlayerPartyRestorer, context.ObjectManager, context.ModuleInfoProvider, context.ModuleNameProvider, context.ExistingPlayerSender, context.SteamBanList, context.JoinValidationDenialLog, context.SessionDefinitions),
             [typeof(CreateCharacterState)] = () => new CreateCharacterState(this, context.ObjectManager, context.MessageBroker, context.Network, context.HeroInterface, context.PlayerManager, context.PlayerCreationRollback, context.ExistingPlayerSender),
             [typeof(TransferSaveState)] = () => new TransferSaveState(this, context.MessageBroker, context.Network, context.CoopSessionProvider, context.SaveInterface, context.ConnectionMessageQueue, context.Coalescer, context.AttachmentIdMapper, context.ServerOptionsProvider, context.LootShipHold),
             [typeof(LoadingState)] = () => new LoadingState(this, context.MessageBroker, context.Network, context.JoinCampaignBaselineSender, context.JoinCampaignKingdomBaseLineSender, context.ConnectionMessageQueue, context.Coalescer),

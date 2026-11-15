@@ -44,6 +44,8 @@ public abstract class MockNetworkBase : INetwork
 
     public MessageCollection NetworkSentMessages { get; } = new MessageCollection();
     public MessageCollection NetworkSentImmediateMessages { get; } = new MessageCollection();
+    /// <summary>The messages sent with SendAll (every connected peer), a subset of <see cref="NetworkSentMessages"/>.</summary>
+    public MessageCollection NetworkBroadcastMessages { get; } = new MessageCollection();
     public PacketCollection NetworkSentPackets { get; } = new PacketCollection();
 
     public void ReceiveFromNetwork(NetPeer peer, IPacket packet) => packetManager.HandleReceive(peer, packet);
@@ -93,6 +95,7 @@ public abstract class MockNetworkBase : INetwork
     public void SendAll(IMessage message)
     {
         NetworkSentMessages.Add(message);
+        NetworkBroadcastMessages.Add(message);
         foreach (NetPeer recipient in networkOrchestrator.GetRecipients(NetPeer))
         {
             SendMessage(recipient, message, immediate: false);

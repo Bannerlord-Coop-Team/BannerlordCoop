@@ -28,6 +28,7 @@ using GameInterface.Services.UI.CoopOptions.Providers.VoiceTab;
 using Missions.Services.Voice;
 using LiteNetLib;
 using Missions;
+using Missions.Sessions;
 using System.Runtime.CompilerServices;
 
 namespace Coop.Core.Client;
@@ -42,6 +43,7 @@ public class ClientModule : CommonModule
         base.Load(builder);
 
         builder.RegisterModule<MissionModule>();
+        builder.RegisterModule<SessionMissionModule>();
         builder.RegisterType<SiegeCasualtyDecoder>().As<ISiegeCasualtyDecoder>().InstancePerDependency();
         builder.RegisterType<VoiceSceneSource>().As<IVoiceSceneSource>().InstancePerDependency();
         builder.RegisterType<VoiceGameInput>().As<IVoiceGameInput>().InstancePerDependency();

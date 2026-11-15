@@ -15,6 +15,9 @@ public interface IClientLogic : ILogic, IClientState
 {
     Player Player { get; set; }
 
+    /// <summary>The session this client joined; null in a campaign.</summary>
+    JoinedSessionInfo Session { get; set; }
+
     /// <summary>
     /// Client-side state
     /// </summary>
@@ -32,11 +35,13 @@ public class ClientLogic : IClientLogic
     private readonly IReadOnlyDictionary<Type, Func<IClientState>> stateFactories;
 
     public Player Player { get; set; }
+    public JoinedSessionInfo Session { get; set; }
     private IClientState InitialState => stateFactories[typeof(MainMenuState)]();
     private readonly HashSet<Type> RunningStates = new HashSet<Type>
     {
         typeof(MissionState),
         typeof(CampaignState),
+        typeof(SessionState),
     };
     public IClientState State
     {
@@ -82,6 +87,7 @@ public class ClientLogic : IClientLogic
             [typeof(LoadingState)] = () => new LoadingState(this, context.MessageBroker, context.RegistryManager, context.HeroInterface, context.ControllerIdProvider, context.PlayerManager, context.GameStateInterface, context.LoadingInterface),
             [typeof(CampaignState)] = () => new CampaignState(this, context.MessageBroker, context.Network, context.LoadingInterface, context.GameStateInterface, context.CoopFinalizer, context.MapTimeTrackerInterface),
             [typeof(MissionState)] = () => new MissionState(this, context.MessageBroker, context.GameStateInterface, context.CoopFinalizer),
+            [typeof(SessionState)] = () => new SessionState(this, context.MessageBroker, context.GameStateInterface, context.LoadingInterface, context.CoopFinalizer),
         };
 
     public void Start()

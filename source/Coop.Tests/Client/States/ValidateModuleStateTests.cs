@@ -170,6 +170,57 @@ namespace Coop.Tests.Client.States
         }
 
         [Fact]
+        public void NetworkSessionJoined_Accepted_EntersSessionState()
+        {
+            var validateState = clientLogic.SetState<ValidateModuleState>();
+            var player = new Player("12345", null, null, null, null);
+
+            validateState.Handle_NetworkSessionJoined(new MessagePayload<NetworkSessionJoined>(
+                this, new NetworkSessionJoined(true, null, "session:abc", "test.mod", new byte[] { 1, 2 }, player)));
+
+            Assert.IsType<SessionState>(clientLogic.State);
+            Assert.Same(player, clientLogic.Player);
+            Assert.Equal("session:abc", clientLogic.Session.SessionId);
+            Assert.Equal("test.mod", clientLogic.Session.ModId);
+            Assert.Equal(new byte[] { 1, 2 }, clientLogic.Session.Payload);
+        }
+
+        [Fact]
+        public void NetworkSessionJoined_ReceivedFromServer_EntersSessionState()
+        {
+            clientLogic.SetState<ValidateModuleState>();
+
+            clientComponent.TestMessageBroker.Publish(serverPeer, new NetworkSessionJoined(
+                true, null, "session:abc", "test.mod", null, new Player("12345", null, null, null, null)));
+
+            Assert.IsType<SessionState>(clientLogic.State);
+        }
+
+        [Fact]
+        public void NetworkSessionJoined_Refused_Disconnects()
+        {
+            var coopFinalizer = new Mock<ICoopFinalizer>();
+            var validateState = new ValidateModuleState(
+                clientLogic,
+                clientComponent.TestMessageBroker,
+                clientComponent.TestNetwork,
+                clientComponent.Container.Resolve<IControllerIdProvider>(),
+                coopFinalizer.Object,
+                Mock.Of<IGameStateInterface>(),
+                clientComponent.Container.Resolve<IModuleInfoProvider>(),
+                clientComponent.Container.Resolve<IModuleNameProvider>(),
+                clientComponent.Container.Resolve<IModuleValidator>());
+            ((ClientLogic)clientLogic).State = validateState;
+
+            validateState.Handle_NetworkSessionJoined(new MessagePayload<NetworkSessionJoined>(
+                this, new NetworkSessionJoined(false, "The co-op session has ended", null, null, null, null)));
+
+            coopFinalizer.Verify(x => x.Finalize(It.Is<string>(reason => reason.Contains("The co-op session has ended"))), Times.Once);
+            Assert.Same(validateState, clientLogic.State);
+            Assert.Null(clientLogic.Session);
+        }
+
+        [Fact]
         public void NetworkClientValidated_Transitions_ReceivingSavedDataState()
         {
             // Arrange

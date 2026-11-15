@@ -62,6 +62,15 @@ namespace Coop.Tests.Server.Connections.States
         }
 
         [Fact]
+        public void ConnectionLogic_WithoutSession_StartsAtResolveCharacterState()
+        {
+            // A campaign server never opens a session definition, so a new connection resolves a hero as before.
+            var connection = serverComponent.Container.Resolve<ConnectionLogic>(new TypedParameter(typeof(NetPeer), playerPeer));
+
+            Assert.IsType<ResolveCharacterState>(connection.State);
+        }
+
+        [Fact]
         public void TransferSaveMethod_TransitionState_LoadingState()
         {
             // Arrange
