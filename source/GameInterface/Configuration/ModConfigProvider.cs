@@ -83,6 +83,10 @@ public readonly struct ModOptions
     public readonly int PostBattleAiAmnestySeconds { get; } = 0;
     [ProtoMember(30)]
     public readonly List<string> PreferredBattleHosts { get; } = new();
+    [ProtoMember(31)]
+    public readonly bool PvpBlockLeave { get; } = false;
+    [ProtoMember(32)]
+    public readonly int PvpResponseTimerSeconds { get; } = 0;
 
     public ModOptions(ModOptions previous, bool voiceEnabled)
     {
@@ -122,5 +126,7 @@ public readonly struct ModOptions
         KingdomDecisionVoteTimeoutSeconds = modOptionsData.KingdomDecisionVoteTimeoutSeconds ?? KingdomDecisionVoteTimeoutSeconds;
         ClansAfterKingdomDestruction = modOptionsData.ClansAfterKingdomDestruction ?? ClansAfterKingdomDestruction;
         PreferredBattleHosts = modOptionsData.PreferredBattleHosts?.FindAll(id => id != null) ?? PreferredBattleHosts;
+        PvpBlockLeave = modOptionsData.PvpBlockLeave ?? PvpBlockLeave;
+        PvpResponseTimerSeconds = modOptionsData.PvpResponseTimerSeconds ?? PvpResponseTimerSeconds;
     }
 }

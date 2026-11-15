@@ -3,6 +3,7 @@ using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.MapEvents.Data;
 using GameInterface.Services.TroopRosters.Data;
 using LiteNetLib;
+using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 
@@ -44,6 +45,10 @@ internal sealed class PlayerPartyInteractionSession
     public PlayerPartyMarriageOfferData[] InitiatorOfferedMarriages { get; set; } = System.Array.Empty<PlayerPartyMarriageOfferData>();
     public PlayerPartyMarriageOfferData[] ResponderOfferedMarriages { get; set; } = System.Array.Empty<PlayerPartyMarriageOfferData>();
     public Kingdom TargetKingdom { get; set; }
+    // When either player was last sent a state, the pvpResponseTimerSeconds clock counts from here.
+    public DateTime StateChangedUtc { get; set; }
+    // The responder's last state as built, with Leave in it, while pvpBlockLeave hides Leave from them. Cleared by their next state.
+    public (PlayerPartyInteractionPhase Phase, PlayerPartyInteractionOption[] Options)? HiddenLeaveState { get; set; }
 
     public HashSet<PlayerPartyInteractionOption> InitiatorOptions { get; } = new HashSet<PlayerPartyInteractionOption>();
     public HashSet<PlayerPartyInteractionOption> InitiatorEnabledOptions { get; } = new HashSet<PlayerPartyInteractionOption>();

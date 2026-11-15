@@ -246,6 +246,20 @@
     // e.g. ["76561198000000001", "76561198000000002"]
     "preferredBattleHosts": [],
 
+    // Stop a player caught by an enemy player from leaving.
+    // (Default) false: The caught player can always pick "I must leave now."
+    // true: When the two players' factions are at war, the caught player isn't offered "I must leave now." and the server ignores it.
+    // A trade can still be cancelled, and Leave comes back if the two make peace during the meeting.
+    // If the other player then does nothing for 30 seconds (or pvpResponseTimerSeconds when set), the caught player goes free.
+    "pvpBlockLeave": false,
+
+    // Set how many real seconds a player has to answer in a meeting with another player.
+    // (Default) 0: Off. A player can wait as long as they like.
+    // Above 0: A caught player who doesn't answer a demand in time gets the battle, as if they picked refuse, while the two are at war.
+    // Any other unanswered meeting just ends, so the timer never starts a war. A player who caught someone and does nothing for this long lets them go.
+    // The time starts again after every answer. Trades are never timed.
+    "pvpResponseTimerSeconds": 0,
+
     // Toggle War Sails (NavalDLC) co-op on a dedicated server. War Sails is not officially supported yet.
     // Only the dedicated server reads this. Hosting in game and joining follow the launcher's NavalDLC setting.
     // (Default) false: the dedicated server runs without NavalDLC.

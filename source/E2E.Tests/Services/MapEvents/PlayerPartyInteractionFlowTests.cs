@@ -11,6 +11,7 @@ using Common.Serialization;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
+using GameInterface.Configuration;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.Bandits.Messages;
 using GameInterface.Services.Barters;
@@ -2377,6 +2378,77 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
 
         AssertHostileEncounterTornDown(client1, initiatorPartyId);
         AssertHostileEncounterTornDown(client2, responderPartyId);
+    }
+
+    [Fact]
+    public void PvpBlockLeave_AtWar_HidesAndIgnoresResponderLeave_UntilPeaceGivesItBack()
+    {
+        var (client1, client2, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
+        var (initiatorClanId, responderClanId) = MakePartiesHostile(initiatorPartyId, responderPartyId);
+
+        WithPvpRules(blockLeave: true, responseTimerSeconds: 0, () =>
+        {
+            RequestInteraction(client1, initiatorPartyId, responderPartyId);
+            var sessionId = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>().Single().SessionId;
+            var responderState = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>().Single(s => s.PartyId == responderPartyId);
+            Assert.Equal(PlayerPartyInteractionPhase.WaitingForProposal, responderState.Phase);
+            Assert.Empty(responderState.Options);
+
+            Server.NetworkSentMessages.Clear();
+            SubmitOption(client2, sessionId, responderPartyId, PlayerPartyInteractionOption.Leave);
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionEnded>());
+
+            // The server's own tick may give Leave back first, so only one state is expected either way.
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<Clan>(initiatorClanId, out var initiatorClan));
+                Assert.True(Server.ObjectManager.TryGetObject<Clan>(responderClanId, out var responderClan));
+                MakePeaceAction.Apply(initiatorClan, responderClan);
+                Server.Resolve<PlayerPartyInteractionHandler>().CheckPvpRules(DateTime.UtcNow);
+            });
+            var peaceState = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>().Single();
+            Assert.Equal(responderPartyId, peaceState.PartyId);
+            Assert.Equal(PlayerPartyInteractionPhase.WaitingForProposal, peaceState.Phase);
+            Assert.Equal(new[] { PlayerPartyInteractionOption.Leave }, peaceState.Options);
+
+            SubmitOption(client2, sessionId, responderPartyId, PlayerPartyInteractionOption.Leave);
+            Assert.Equal(
+                PlayerPartyInteractionOutcomeType.Left,
+                Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionEnded>().Single().OutcomeType);
+        });
+    }
+
+    [Theory]
+    [InlineData(false, PlayerPartyInteractionOutcomeType.Left)]
+    [InlineData(true, PlayerPartyInteractionOutcomeType.HostileDemandAccepted)]
+    public void PvpResponseTimer_AtWar_EndsIdleAttackerAsLeftAndUnansweredDemandLikeRefuse_AfterTheSeconds(
+        bool demandConfirmed,
+        PlayerPartyInteractionOutcomeType expectedOutcome)
+    {
+        var (client1, client2, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
+        MakePartiesHostile(initiatorPartyId, responderPartyId);
+
+        WithPvpRules(blockLeave: false, responseTimerSeconds: 30, () =>
+        {
+            RequestInteraction(client1, initiatorPartyId, responderPartyId);
+            var sessionId = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>().Single().SessionId;
+            if (demandConfirmed)
+            {
+                SubmitOption(client1, sessionId, initiatorPartyId, PlayerPartyInteractionOption.HostileDemand);
+                SubmitOption(client1, sessionId, initiatorPartyId, PlayerPartyInteractionOption.ConfirmHostileDemand);
+            }
+
+            SetMainParty(client1, initiatorPartyId);
+            SetMainParty(client2, responderPartyId);
+            Server.NetworkSentMessages.Clear();
+            var handler = Server.Resolve<PlayerPartyInteractionHandler>();
+
+            Server.Call(() => handler.CheckPvpRules(DateTime.UtcNow.AddSeconds(29)), MapEventDisabledMethods);
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionEnded>());
+
+            Server.Call(() => handler.CheckPvpRules(DateTime.UtcNow.AddSeconds(31)), MapEventDisabledMethods);
+            Assert.Equal(expectedOutcome, Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionEnded>().Single().OutcomeType);
+        });
     }
 
     [Fact]
@@ -5988,6 +6060,24 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
         });
 
         return (initiatorClanId, responderClanId);
+    }
+
+    private static void WithPvpRules(bool blockLeave, int responseTimerSeconds, Action test)
+    {
+        var previousOptions = ModConfigProvider.ModOptions;
+        ModConfigProvider.ModOptions = new ModOptions(new ModOptionsData
+        {
+            PvpBlockLeave = blockLeave,
+            PvpResponseTimerSeconds = responseTimerSeconds,
+        });
+        try
+        {
+            test();
+        }
+        finally
+        {
+            ModConfigProvider.ModOptions = previousOptions;
+        }
     }
 
     private static void InvokeAddBarterGroups(BarterData barterData)

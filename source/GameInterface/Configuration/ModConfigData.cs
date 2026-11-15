@@ -130,6 +130,10 @@ public sealed class ModOptionsData
 
     public List<string> PreferredBattleHosts { get; set; }
 
+    public bool? PvpBlockLeave { get; set; }
+
+    public int? PvpResponseTimerSeconds { get; set; }
+
     /// <summary>Whether a dedicated server runs War Sails (NavalDLC) co-op. It parses the file itself; declared so the key isn't reported as unknown.</summary>
     public bool? WarSails { get; set; }
 
