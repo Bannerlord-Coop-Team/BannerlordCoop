@@ -1,7 +1,6 @@
 ﻿using Common;
 using Common.Messaging;
 using Coop.Core.Common;
-using GameInterface.Registry;
 using GameInterface.Services.GameState;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.MapEvents;
@@ -18,25 +17,22 @@ public class SessionState : ClientStateBase
 {
     private readonly IMessageBroker messageBroker;
     private readonly ICoopFinalizer coopFinalizer;
-    private readonly IRegistryManager registryManager;
 
     public SessionState(
         IClientLogic logic,
         IMessageBroker messageBroker,
         ILoadingInterface loadingInterface,
-        ICoopFinalizer coopFinalizer,
-        IRegistryManager registryManager) : base(logic)
+        ICoopFinalizer coopFinalizer) : base(logic)
     {
         this.messageBroker = messageBroker;
         this.coopFinalizer = coopFinalizer;
-        this.registryManager = registryManager;
         messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
 
+        // No Game exists at the main menu, so the session mission registers its items (CoopSessionController).
         var session = logic.Session;
         GameThread.RunSafe(() =>
         {
             loadingInterface.HideLoadingScreen();
-            registryManager.RegisterMissionItemObjects();
             messageBroker.Publish(this, new SessionMissionOpenRequested(session.SessionId, session.ModId, session.Payload));
         }, context: nameof(SessionState));
     }
@@ -44,7 +40,6 @@ public class SessionState : ClientStateBase
     public override void Dispose()
     {
         messageBroker.Unsubscribe<MainMenuEntered>(Handle_MainMenuEntered);
-        registryManager.ClearAllRegistries();
     }
 
     internal void Handle_MainMenuEntered(MessagePayload<MainMenuEntered> obj)

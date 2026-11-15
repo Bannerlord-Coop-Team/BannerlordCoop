@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using GameInterface.Registry;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.ObjectManager;
@@ -52,6 +53,7 @@ internal class CoopSessionController : CoopMissionController
     private readonly ISiegeWeaponFireReplicator siegeWeaponFire;
     private readonly IBattleDeploymentCoordinator deployment;
     private readonly IBattleHostRegistry hostRegistryRef;
+    private readonly IRegistryManager registryManager;
     private string lastHost;
     private int lastEpoch = -1;
 
@@ -82,7 +84,8 @@ internal class CoopSessionController : CoopMissionController
         IBattlePlayerPartyResolver playerParties,
         SessionBattleCharacterResolver characterResolver,
         SessionPuppetOriginFactory puppetOrigins,
-        SessionMissionContext context)
+        SessionMissionContext context,
+        IRegistryManager registryManager)
         : base(
             network,
             messageBroker,
@@ -93,6 +96,7 @@ internal class CoopSessionController : CoopMissionController
         this.context = context;
         this.relayNetwork = relayNetwork;
         hostRegistryRef = hostRegistry;
+        this.registryManager = registryManager;
 
         var session = new BattleSession(controllerIdProvider, hostRegistry);
         Session = session;
@@ -178,6 +182,8 @@ internal class CoopSessionController : CoopMissionController
     public override void OnBehaviorInitialize()
     {
         base.OnBehaviorInitialize();
+        // The mod's Game exists now; its items get the ids the weapon sync packs.
+        registryManager.RegisterMissionItemObjects();
         lifecycle.Enter(context.SessionId);
     }
 

@@ -6,7 +6,6 @@ using Coop.Core.Client.States;
 using Coop.Core.Client.Services.Connection.Handlers;
 using Coop.Core.Common;
 using Coop.Core.Common.Services.Connection.Messages;
-using GameInterface.Registry;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.UI.Interfaces;
@@ -136,7 +135,7 @@ public class DisconnectHandlerTests
         var logic = new Mock<IClientLogic>();
         logic.SetupProperty(value => value.Session, new JoinedSessionInfo("session:abc", "test.mod", null));
         var state = new SessionState(
-            logic.Object, messageBroker, Mock.Of<ILoadingInterface>(), Mock.Of<ICoopFinalizer>(), Mock.Of<IRegistryManager>());
+            logic.Object, messageBroker, Mock.Of<ILoadingInterface>(), Mock.Of<ICoopFinalizer>());
         logic.Setup(value => value.State).Returns(state);
         logic.Setup(value => value.Disconnect()).Callback(state.Disconnect);
         using var handler = new DisconnectHandler(messageBroker, Mock.Of<ICoopFinalizer>(), gameState.Object, logic.Object);

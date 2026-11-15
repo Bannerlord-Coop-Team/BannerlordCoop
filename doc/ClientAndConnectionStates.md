@@ -48,7 +48,7 @@ stateDiagram-v2
 | `LoadingState` | `CampaignReady` | Register objects, switch to player hero → `CampaignState` |
 | `CampaignState` | `MissionStateEntered` | Enter battle → `MissionState` |
 | `MissionState` | `CampaignStateEntered` | Return to map → `CampaignState` |
-| `SessionState` | `MainMenuEntered` | Entered on `NetworkSessionJoined`: registers items, asks the mod to open its mission. See [Sessions](Sessions.md) |
+| `SessionState` | `MainMenuEntered` | Entered on `NetworkSessionJoined`: asks the mod to open its mission; the session mission registers the items of the mod's Game. See [Sessions](Sessions.md) |
 
 ---
 

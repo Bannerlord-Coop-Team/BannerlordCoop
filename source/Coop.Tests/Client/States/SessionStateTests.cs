@@ -44,32 +44,18 @@ public class SessionStateTests
         clientComponent.Container.Resolve<Mock<ILoadingInterface>>().Verify(x => x.HideLoadingScreen(), Times.AtLeastOnce);
     }
 
+    // At the main menu no Game exists yet, so the items are registered by the session mission, not here.
     [Fact]
-    public void SessionState_RegistersItemsOnly_BeforeOpeningTheMission()
+    public void SessionState_OpensTheMission_WithoutTouchingTheRegistries()
     {
         var registryManager = clientComponent.Container.Resolve<Mock<IRegistryManager>>();
-        var order = new System.Collections.Generic.List<string>();
-        registryManager.Setup(x => x.RegisterMissionItemObjects()).Callback(() => order.Add("register"));
-        clientComponent.TestMessageBroker.Subscribe<SessionMissionOpenRequested>(_ => order.Add("open"));
 
         clientLogic.SetState<SessionState>();
         GameThread.Run(() => { }, blocking: true);
 
-        registryManager.Verify(x => x.RegisterMissionItemObjects(), Times.Once);
+        Assert.Single(clientComponent.TestMessageBroker.GetMessagesFromType<SessionMissionOpenRequested>());
+        registryManager.Verify(x => x.RegisterMissionItemObjects(), Times.Never);
         registryManager.Verify(x => x.RegisterAllGameObjects(), Times.Never);
-        Assert.Equal(new[] { "register", "open" }, order);
-    }
-
-    [Fact]
-    public void SessionState_Dispose_ClearsWhatItRegistered()
-    {
-        var registryManager = clientComponent.Container.Resolve<Mock<IRegistryManager>>();
-        clientLogic.SetState<SessionState>();
-        GameThread.Run(() => { }, blocking: true);
-
-        clientLogic.SetState<MainMenuState>();
-
-        registryManager.Verify(x => x.ClearAllRegistries(), Times.Once);
     }
 
     [Fact]
@@ -103,7 +89,7 @@ public class SessionStateTests
         var logic = new Mock<IClientLogic>();
         logic.SetupProperty(x => x.Session, clientLogic.Session);
         var state = new SessionState(logic.Object, clientComponent.TestMessageBroker,
-            Mock.Of<ILoadingInterface>(), Mock.Of<ICoopFinalizer>(), Mock.Of<IRegistryManager>());
+            Mock.Of<ILoadingInterface>(), Mock.Of<ICoopFinalizer>());
         GameThread.Run(() => { }, blocking: true);
         var manager = new GameStateManager(Mock.Of<IGameStateManagerOwner>(), GameStateManager.GameStateManagerType.Game);
         GameStateManager.Current = manager;
@@ -130,7 +116,7 @@ public class SessionStateTests
         var logic = new Mock<IClientLogic>();
         logic.SetupProperty(x => x.Session, clientLogic.Session);
         var state = new SessionState(logic.Object, clientComponent.TestMessageBroker,
-            Mock.Of<ILoadingInterface>(), finalizer.Object, Mock.Of<IRegistryManager>());
+            Mock.Of<ILoadingInterface>(), finalizer.Object);
         BattleSpawnGate.BeginBattle("session:abc");
 
         state.Handle_MainMenuEntered(new MessagePayload<MainMenuEntered>(this, new MainMenuEntered()));

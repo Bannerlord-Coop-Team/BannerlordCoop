@@ -100,6 +100,32 @@ public class CoopSessionControllerTests : MissionTestEnvironment
         });
     }
 
+    // The mod creates its Game after the session state, so the mission registers the items that Game loaded.
+    [Fact]
+    public void OnBehaviorInitialize_RegistersTheItemsOfTheModsGame()
+    {
+        using var fixture = new MissionEngineFixture();
+        var client = Clients.First();
+        SetControllerId(client, "owner");
+        var sessionId = SessionInstanceId.Create();
+        var objectManager = client.Container.Resolve<GameInterface.Services.ObjectManager.IObjectManager>();
+
+        client.Call(() =>
+        {
+            var spear = MBObjectManager.Instance.GetObject<ItemObject>("linen");
+            Assert.NotNull(spear);
+            objectManager.Remove(spear);
+            Assert.False(objectManager.TryGetId(spear, out _));
+
+            CreateConnectedMission(fixture, client, sessionId);
+            var controller = CreateController(client, sessionId);
+            controller.OnBehaviorInitialize();
+
+            Assert.True(objectManager.TryGetId(spear, out _));
+            GC.KeepAlive(controller);
+        });
+    }
+
     [Fact]
     public void OwnedBasicCharacterSpawn_ReplicatesToPeer()
     {
