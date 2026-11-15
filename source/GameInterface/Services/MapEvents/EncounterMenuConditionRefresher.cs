@@ -24,6 +24,9 @@ internal class EncounterMenuConditionRefresher : IEncounterMenuConditionRefreshe
         if (ModInformation.IsServer || mapEvent == null)
             return;
 
+        var encounter = PlayerEncounter.Current;
+        AdoptJoinedFieldBattleIfNeeded(mapEvent, encounter);
+
         var menuContext = Campaign.Current?.CurrentMenuContext;
         if (menuContext?.GameMenu?.StringId != "encounter")
             return;
@@ -44,7 +47,7 @@ internal class EncounterMenuConditionRefresher : IEncounterMenuConditionRefreshe
             return;
         }
 
-        if (NeedsEncounterMenuReinit(mapEvent))
+        if (NeedsEncounterMenuReinit(mapEvent, encounter))
         {
             // The menu opened after the client's battle request timed out, so it was built without a battle and
             // its option conditions dereference PlayerEncounter.Battle. Re-entering it runs vanilla's
@@ -69,9 +72,20 @@ internal class EncounterMenuConditionRefresher : IEncounterMenuConditionRefreshe
         Campaign.Current.GameMenuManager.RefreshMenuOptions(menuContext);
     }
 
-    internal static bool NeedsEncounterMenuReinit(MapEvent mapEvent)
-        => PlayerEncounter.Current != null &&
-           PlayerEncounter.Battle == null &&
+    private static void AdoptJoinedFieldBattleIfNeeded(MapEvent mapEvent, PlayerEncounter encounter)
+    {
+        if (encounter?._mapEvent != null || encounter?.IsJoinedBattle != true ||
+            MobileParty.MainParty?.MapEvent != mapEvent || mapEvent.IsSiegeAssault || mapEvent.IsSallyOut)
+            return;
+
+        // The encounter menu's on_init runs PlayerEncounter.Update(), which nulls _mapEvent while the join is pending.
+        // Siege and sally joins are rebound by BattleJoinLeaveHandler.SwitchSiegeJoinerToEncounterIfNeeded.
+        encounter._mapEvent = mapEvent;
+    }
+
+    internal static bool NeedsEncounterMenuReinit(MapEvent mapEvent, PlayerEncounter encounter)
+        => encounter != null &&
+           encounter._mapEvent == null &&
            MobileParty.MainParty?.MapEvent == mapEvent;
 
     public void RefreshForRoster(TroopRoster roster)

@@ -212,6 +212,7 @@ public class MapEventCollectionTests : MapEventTestBase
 
         client.Call(() =>
         {
+            // Joined encounter after on_init's PlayerEncounter.Update() nulled _mapEvent, before the server attach lands.
             var mapEvent = Get<MapEvent>(client, staged.MapEventId);
             var party = Get<MobileParty>(client, partyId);
             Campaign.Current.MainParty = party;
