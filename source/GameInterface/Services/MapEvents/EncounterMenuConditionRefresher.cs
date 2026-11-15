@@ -83,11 +83,15 @@ internal class EncounterMenuConditionRefresher : IEncounterMenuConditionRefreshe
         if (MobileParty.MainParty?.MapEvent != mapEvent)
             return;
 
+        if (!mapEvent.IsFieldBattle)
+            return;
+
         // Siege and sally joins are rebound by BattleJoinLeaveHandler.SwitchSiegeJoinerToEncounterIfNeeded.
         if (mapEvent.IsSiegeStyleJoin())
             return;
 
-        // The encounter menu's on_init runs PlayerEncounter.Update(), which nulls _mapEvent while the join is pending.
+        // The client join path leaves the encounter unbound while AddPartyInternal is suppressed and the
+        // authoritative NetworkAddBattleParty is pending.
         encounter._mapEvent = mapEvent;
     }
 
