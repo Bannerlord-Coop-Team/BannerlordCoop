@@ -173,6 +173,7 @@ internal abstract class TestComponentBase
         RegisterMock<IRaidAiInterventionConfigInterface>(builder);
         RegisterMock<ITacticalUnitSymbolsConfigInterface>(builder);
         RegisterMock<IVillageHostileActionInterface>(builder);
+        RegisterMock<IHostileActionRequestTracker>(builder);
         RegisterMock<IIssueOwnershipRegistry>(builder);
         RegisterMock<IQuestFeatureFlag>(builder);
         RegisterMock<IEducationCampaignBehaviorInterface>(builder);
