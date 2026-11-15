@@ -231,10 +231,25 @@ public class MapEventFinalizedMidMissionTests : MissionTestEnvironment
         return mission!;
     }
 
-    private static List<string> RecordNotices(EnvironmentInstance client)
+    private sealed class NoticeRecorder : IReadOnlyList<string>
     {
-        var notices = new List<string>();
-        client.Resolve<IMessageBroker>().Subscribe<SendInformationMessage>(payload => notices.Add(payload.What.Text));
-        return notices;
+        private readonly Action<MessagePayload<SendInformationMessage>> handler;
+        private readonly List<string> notices = new();
+
+        public NoticeRecorder(EnvironmentInstance client)
+        {
+            handler = payload => notices.Add(payload.What.Text);
+            client.Resolve<IMessageBroker>().Subscribe(handler);
+        }
+
+        public int Count => notices.Count;
+        public string this[int index] => notices[index];
+        public IEnumerator<string> GetEnumerator() => notices.GetEnumerator();
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+    }
+
+    private static NoticeRecorder RecordNotices(EnvironmentInstance client)
+    {
+        return new NoticeRecorder(client);
     }
 }
