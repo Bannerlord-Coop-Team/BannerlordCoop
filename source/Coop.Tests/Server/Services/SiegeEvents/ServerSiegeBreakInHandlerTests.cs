@@ -12,6 +12,7 @@ using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.Settlements.Interfaces;
 using GameInterface.Services.SiegeEvents;
 using HarmonyLib;
 using LiteNetLib;
@@ -61,7 +62,7 @@ public class ServerSiegeBreakInHandlerTests : IDisposable
         action.Setup(service => service.GetBreakInCasualties(party, siege)).Returns(40);
         SacrificePays();
         handler = new ServerSiegeBreakInHandler(broker, network, objects.Object, players.Object, action.Object,
-            sacrifice.Object, receipts, distance.Object);
+            sacrifice.Object, receipts, distance.Object, new Mock<ISettlementInterface>().Object);
     }
 
     [Fact]

@@ -289,7 +289,8 @@ public class EndingJournalTests : IDisposable
             restarted = new QuestJournalMirrorHandler(restartedBroker, scenario.Server.Resolve<INetwork>(),
                 scenario.Server.Resolve<IObjectManager>(), scenario.Server.Resolve<IIssueResolver>(),
                 scenario.Server.Resolve<IIssueOwnershipRegistry>(), scenario.Server.Resolve<IQuestTypeRegistry>(),
-                scenario.Server.Resolve<IControllerIdProvider>(), scenario.Server.Resolve<IPlayerManager>());
+                scenario.Server.Resolve<IControllerIdProvider>(), scenario.Server.Resolve<IPlayerManager>(),
+                scenario.Server.Resolve<ITextObjectComparer>());
             // Only the restarted handler needs startup here, other subscribers require a running engine.
             restartedBroker.Publish(this, new CampaignReady());
             serverQuest.AddLog(new TextObject("authoritative row written after load"));

@@ -387,7 +387,8 @@ public class BattleDeploymentCoordinator : IBattleDeploymentCoordinator
         {
             var mission = Mission.Current;
             if (mission == null) return;
-            if (mission.GetMissionBehavior<Missions.Hideouts.CoopHideoutMissionLogic>()?.PreserveStealthPosture == true)
+            var hideout = mission.GetMissionBehavior<Missions.Hideouts.CoopHideoutMissionLogic>();
+            if (hideout?.PreserveStealthPosture == true || hideout?.HoldsSurrenderedDefenders == true)
             {
                 mission.AllowAiTicking = true;
                 return;

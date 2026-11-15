@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Network;
 using Common.Tests.Utils;
 using Coop.Core.Server.Services.Instances;
 using Coop.Core.Server.Services.Instances.Handlers;
@@ -6,6 +7,7 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Start;
+using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
@@ -83,11 +85,13 @@ public class ServerBattleCompletionHandlerOpenRefusedTests : IDisposable
 
         handler = new ServerBattleCompletionHandler(
             broker,
+            Mock.Of<INetwork>(),
             missionManager,
             Mock.Of<IObjectManager>(),
             playerManager,
             hostRegistry.Object,
-            completionTracker.Object);
+            completionTracker.Object,
+            Mock.Of<IBattleTroopReserveBuilder>());
 
         var hostPeer = RegisterPlayer(HostControllerId, port: 52200);
         Assert.True(missionManager.TryEnterMission(hostPeer, HostControllerId, MapEventId, out _));

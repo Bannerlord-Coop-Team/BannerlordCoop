@@ -5,6 +5,7 @@ using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
+using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
 using HarmonyLib;
@@ -409,7 +410,10 @@ public class BattleSurrenderTests : MapEventTestBase
     {
         var setup = SetupTwoOpposingPlayersInBattle();
 
-        // A healthy ally party fights on the recipient's (defender) side.
+        // A healthy ally party fights on the recipient's (defender) side. The players registered after Initialize, so
+        // open the AI join window a live player battle would have, otherwise the server blocks the ally's join.
+        Server.Call(() => InteractionPatches.OpenAiJoinWindowAndPublish(
+            Server.GetRegisteredObject<MapEvent>(setup.ctx.MapEventId), () => { }));
         var allyPartyId = JoinNewServerPartyToSide(setup.ctx.MapEventId, BattleSideEnum.Defender);
         var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
         SeedPartyTroopOnAll(allyPartyId, troopId, 3);

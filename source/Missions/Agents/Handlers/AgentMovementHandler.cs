@@ -34,6 +34,9 @@ public interface IAgentMovementHandler : IPacketHandler, IDisposable
 
     int AvailableOutgoingMovementBytes { get; }
 
+    /// <summary>Each recipient's effective movement ceiling (diagnostics).</summary>
+    IReadOnlyDictionary<string, double> RouteMovementBytesPerSecond { get; }
+
     void Configure(MovementCadenceProfile profile);
 
     bool TrySetForcedBulkHz(int? hz, out string error);
@@ -198,7 +201,8 @@ public partial class AgentMovementHandler : IAgentMovementHandler
         public readonly Dictionary<Guid, float> MovementPendingSince =
             new Dictionary<Guid, float>();
         public bool HasBulkPoll;
-        public float LastBulkPollTime;
+        public double LastBulkSlot;
+        public double LastBulkDueTime;
         public readonly ReusableMovementBatches<AgentData> Movement =
             new ReusableMovementBatches<AgentData>();
         public readonly ReusableMovementBatches<AgentData> PriorityMovement =
@@ -337,20 +341,6 @@ public partial class AgentMovementHandler : IAgentMovementHandler
         }
     }
 
-    private readonly struct PrioritizedCapturedMovement
-    {
-        public readonly CapturedMovement Captured;
-        public readonly MovementPriorityKey Priority;
-
-        public PrioritizedCapturedMovement(
-            CapturedMovement captured,
-            MovementPriorityKey priority)
-        {
-            Captured = captured;
-            Priority = priority;
-        }
-    }
-
     private readonly struct ReceivedMovement
     {
         public readonly string IdentityScopeId;
@@ -404,6 +394,10 @@ public partial class AgentMovementHandler : IAgentMovementHandler
         }
     }
 
+    // Reused by every recipient send: the capture indexes due for the recipient, sorted by their keys in captureKeys.
+    private readonly List<int> prioritizedCaptures = new List<int>();
+    private MovementPriorityKey[] captureKeys = Array.Empty<MovementPriorityKey>();
+    private readonly Comparison<int> compareCaptureKeys;
     private readonly Dictionary<string, RecipientMovementState> recipientMovementStates =
         new Dictionary<string, RecipientMovementState>(StringComparer.Ordinal);
     private readonly Dictionary<Agent, ResolvedMountIdentity> resolvedMountIdentities =
@@ -427,6 +421,9 @@ public partial class AgentMovementHandler : IAgentMovementHandler
     // guards against a second call (the GC finalizer, or the DI scope also disposing this transient handler).
     private bool _disposed;
     private float bulkPollElapsed;
+    // Total frame time, summed in double every frame and read at bulk polls for per-peer cadence. A float sum rounds and
+    // drifts, which would let a send through a few ns early and put one more than the cap allows into a second.
+    private double cadenceClockSeconds;
     private float priorityPollElapsed;
     private float bulkSampleElapsed;
     private float prioritySampleElapsed;
@@ -438,6 +435,14 @@ public partial class AgentMovementHandler : IAgentMovementHandler
     private string sharedBudgetReservedControllerId;
     private int sharedBudgetReservedBytes;
     private bool sharedBudgetReservationIsPriority;
+
+    // Per-tick scratch reused across polls so a bulk tick doesn't reallocate lists sized to every owned agent.
+    // Only the game thread polls movement, and ClearTickBuffers empties them after every poll.
+    private readonly List<CoopAgentInfo> ownedAgents = new List<CoopAgentInfo>();
+    private readonly List<CapturedMovement> capturedMovements = new List<CapturedMovement>();
+    private readonly HashSet<Guid> broadcastAgentIds = new HashSet<Guid>();
+    private readonly List<string> recipientIds = new List<string>();
+    private readonly HashSet<Guid> staleAgentIds = new HashSet<Guid>();
 #if DEBUG
     private int initialConfiguredBulkHz;
     private float syntheticReceivePressureRemainingSeconds;
@@ -480,6 +485,8 @@ public partial class AgentMovementHandler : IAgentMovementHandler
         this.visualActionAccessor = visualActionAccessor;
         this.movementRateController = movementRateController;
         this.movementPriorityScheduler = movementPriorityScheduler;
+        compareCaptureKeys = (left, right) =>
+            movementPriorityScheduler.Compare(captureKeys[left], captureKeys[right]);
         this.missionContext = missionContext;
         DeckMovementProbe = deckMovementProbe;
         this.locationAuthorityState = locationAuthorityState;
@@ -553,6 +560,9 @@ public partial class AgentMovementHandler : IAgentMovementHandler
     public MovementRateSnapshot MovementRate => movementRateController.Snapshot;
 
     public int AvailableOutgoingMovementBytes => movementBatchSender.AvailableOutgoingBytes;
+
+    public IReadOnlyDictionary<string, double> RouteMovementBytesPerSecond =>
+        movementBatchSender.GetRouteBytesPerSecond();
 
     public void Configure(MovementCadenceProfile profile)
     {
@@ -648,6 +658,7 @@ public partial class AgentMovementHandler : IAgentMovementHandler
 #endif
         MovementCadence rate = movementRateController.AdvanceFrame(dt);
         float elapsedSeconds = Math.Max(0f, dt);
+        cadenceClockSeconds += elapsedSeconds;
         bulkPollElapsed += elapsedSeconds;
         priorityPollElapsed += elapsedSeconds;
         bulkSampleElapsed += elapsedSeconds;
@@ -685,19 +696,35 @@ public partial class AgentMovementHandler : IAgentMovementHandler
         }
         firstMovementPoll = false;
 
-        IReadOnlyCollection<CoopAgentInfo> agents = authoritativeAgentsDue
-            ? agentRegistry.GetAgents(controllerIdProvider.ControllerId)
-            : GetPriorityAgents();
+        IReadOnlyCollection<CoopAgentInfo> agents;
+        if (authoritativeAgentsDue)
+        {
+            agentRegistry.GetAgents(controllerIdProvider.ControllerId, ownedAgents);
+            agents = ownedAgents;
+        }
+        else
+        {
+            agents = GetPriorityAgents();
+        }
         IReadOnlyCollection<string> recipients = missionContext.ControllersInMission;
         long startedAt = Stopwatch.GetTimestamp();
-        MovementTrafficFrame traffic = PollMovementAgents(
-            agents,
-            recipients,
-            authoritativeAgentsDue,
-            priorityAgentDue,
-            samplePopulation,
-            elapsedSinceBulkSample,
-            elapsedSincePrioritySample);
+        MovementTrafficFrame traffic;
+        try
+        {
+            traffic = PollMovementAgents(
+                agents,
+                recipients,
+                authoritativeAgentsDue,
+                priorityAgentDue,
+                samplePopulation,
+                elapsedSinceBulkSample,
+                elapsedSincePrioritySample,
+                rate.BulkHz);
+        }
+        finally
+        {
+            ClearTickBuffers();
+        }
         movementRateController.ReportSend(
             ElapsedMilliseconds(startedAt),
             traffic,
@@ -717,6 +744,24 @@ public partial class AgentMovementHandler : IAgentMovementHandler
 
         movementRateController.SetLocalFocusAgent(focusAgentId);
     }
+
+    // Clear zeroes the used slots, so no Agent or CoopAgentInfo reference outlives the tick that captured it.
+    private void ClearTickBuffers()
+    {
+        ownedAgents.Clear();
+        capturedMovements.Clear();
+        broadcastAgentIds.Clear();
+        recipientIds.Clear();
+        staleAgentIds.Clear();
+    }
+
+    // Capacity of each reused list and the number of entries left in all five buffers, for the buffer reuse tests.
+    internal (int OwnedAgents, int Captured, int RecipientIds, int Retained) GetBufferState() =>
+        (ownedAgents.Capacity,
+            capturedMovements.Capacity,
+            recipientIds.Capacity,
+            ownedAgents.Count + capturedMovements.Count + broadcastAgentIds.Count +
+                recipientIds.Count + staleAgentIds.Count);
 
     private IReadOnlyCollection<CoopAgentInfo> GetPriorityAgents()
     {
@@ -739,12 +784,11 @@ public partial class AgentMovementHandler : IAgentMovementHandler
         bool includePriorityAgent,
         bool samplePopulation,
         float bulkSampleElapsed,
-        float prioritySampleElapsed)
+        float prioritySampleElapsed,
+        int bulkHz)
     {
         // One sequence identifies this capture across recipients, priorities, and packet fragments.
         sampleSequence++;
-        var capturedMovements = new List<CapturedMovement>();
-        var broadcastAgentIds = new HashSet<Guid>();
         int activeLocallyControlledAgents = 0;
 
         foreach (CoopAgentInfo agentInfo in agentInfos)
@@ -830,10 +874,9 @@ public partial class AgentMovementHandler : IAgentMovementHandler
                 CountActiveMissionAgents(),
                 activeLocallyControlledAgents);
         if (includeAuthoritativeAgents)
-            RemoveStaleLocalState(broadcastAgentIds);
+            RemoveStaleLocalState();
 
         var traffic = new MovementTrafficFrame();
-        var recipientIds = new List<string>();
         foreach (string recipientId in recipients)
         {
             if (!string.IsNullOrEmpty(recipientId) &&
@@ -860,6 +903,21 @@ public partial class AgentMovementHandler : IAgentMovementHandler
             return traffic;
         }
 
+        // Sharing snapshot encodings only pays off when two or more recipients send this capture's agents.
+        int sendingRecipients = includeAuthoritativeAgents ? 0 : recipientIds.Count;
+        if (includeAuthoritativeAgents)
+        {
+            foreach (string recipientId in recipientIds)
+            {
+                if (!recipientMovementStates.TryGetValue(recipientId, out RecipientMovementState state) ||
+                    IsBulkIntervalElapsed(state, movementRateController.GetReceiverCapHz(recipientId), out _))
+                {
+                    sendingRecipients++;
+                }
+            }
+        }
+        movementBatchSender.SetCaptureRecipients(sendingRecipients);
+
         int recipientOffset = includeAuthoritativeAgents
             ? bulkRecipientSendOffset
             : priorityRecipientSendOffset;
@@ -880,7 +938,8 @@ public partial class AgentMovementHandler : IAgentMovementHandler
             bool recipientBulkDue = includeAuthoritativeAgents &&
                 IsRecipientBulkDue(
                     recipient,
-                    movementRateController.GetReceiverCapHz(recipientId));
+                    movementRateController.GetReceiverCapHz(recipientId),
+                    bulkHz);
             bool reservedRoute = string.Equals(
                 recipientId,
                 sharedBudgetReservedControllerId,
@@ -902,7 +961,10 @@ public partial class AgentMovementHandler : IAgentMovementHandler
                 out MovementSendPairResult sendResult);
             traffic = traffic.Add(recipientTraffic);
             if (sendResult.BulkSentCount > 0)
+            {
                 lastBulkSendingRecipient = routedRecipientIndex;
+                movementRateController.ReportRecipientBulkSend(recipientId);
+            }
             if (sendResult.PrioritySentCount > 0)
                 lastPrioritySendingRecipient = routedRecipientIndex;
             if (!sendResult.BlockedBySharedBudget)
@@ -964,37 +1026,52 @@ public partial class AgentMovementHandler : IAgentMovementHandler
         return recipient;
     }
 
-    private bool IsRecipientBulkDue(
-        RecipientMovementState recipient,
-        int receiverCapHz)
+    // The due test without taking a slot. A raised cap shortens the interval, so the last slot can't trail the last due
+    // poll by more than the new one; lastSlot is the last slot with that applied.
+    private bool IsBulkIntervalElapsed(RecipientMovementState recipient, int receiverCapHz, out double lastSlot)
     {
         float interval = 1f / Math.Max(1, receiverCapHz);
-        if (recipient.HasBulkPoll &&
-            totalSimulationTime - recipient.LastBulkPollTime + CadenceEpsilonSeconds < interval)
+        lastSlot = Math.Max(recipient.LastBulkSlot, recipient.LastBulkDueTime - interval + CadenceEpsilonSeconds);
+        return !(recipient.HasBulkPoll && cadenceClockSeconds - lastSlot + CadenceEpsilonSeconds < interval);
+    }
+
+    // Every send's slot is at least one interval after the last and less than one before the send, so no second holds
+    // more than cap + 1 sends. Each send takes the earliest such slot, so a peer reaches its cap whatever frame it started
+    // on; at or above the bulk rate the slot never goes before the bulk schedule's, so the peer lines up with every poll.
+    private bool IsRecipientBulkDue(
+        RecipientMovementState recipient,
+        int receiverCapHz,
+        int bulkHz)
+    {
+        float interval = 1f / Math.Max(1, receiverCapHz);
+        // Whole bulk intervals after the last bulk slot, never after this poll.
+        double bulkSlot = cadenceClockSeconds - bulkPollElapsed;
+        double earliestSlot = cadenceClockSeconds - interval + CadenceEpsilonSeconds;
+        if (!recipient.HasBulkPoll)
         {
-            return false;
+            recipient.HasBulkPoll = true;
+            recipient.LastBulkSlot = receiverCapHz >= bulkHz
+                ? Math.Max(bulkSlot, earliestSlot)
+                : cadenceClockSeconds;
+            recipient.LastBulkDueTime = cadenceClockSeconds;
+            return true;
         }
 
-        if (recipient.HasBulkPoll)
-        {
-            float elapsed = totalSimulationTime - recipient.LastBulkPollTime;
-            int elapsedIntervals = Math.Max(
-                1,
-                (int)Math.Floor((elapsed + CadenceEpsilonSeconds) / interval));
-            recipient.LastBulkPollTime += elapsedIntervals * interval;
-        }
-        else
-        {
-            recipient.LastBulkPollTime = totalSimulationTime;
-        }
-        recipient.HasBulkPoll = true;
+        bool elapsed = IsBulkIntervalElapsed(recipient, receiverCapHz, out double lastSlot);
+        // Kept when not due too, so a cap that rises and drops back before the next send still holds that send back.
+        recipient.LastBulkSlot = lastSlot;
+        if (!elapsed) return false;
+
+        double slot = Math.Max(lastSlot + interval, earliestSlot);
+        recipient.LastBulkSlot = receiverCapHz >= bulkHz ? Math.Max(slot, bulkSlot) : slot;
+        recipient.LastBulkDueTime = cadenceClockSeconds;
         return true;
     }
 
     private MovementTrafficFrame SendMovementToRecipient(
         string controllerId,
         RecipientMovementState recipient,
-        IReadOnlyCollection<CapturedMovement> capturedMovements,
+        List<CapturedMovement> capturedMovements,
         bool includeAuthoritativeAgents,
         bool includePriorityAgent,
         out MovementSendPairResult sendResult)
@@ -1020,9 +1097,12 @@ public partial class AgentMovementHandler : IAgentMovementHandler
             recipientFocus = focusInfo.Agent;
         }
 
-        var prioritized = new List<PrioritizedCapturedMovement>();
-        foreach (CapturedMovement captured in capturedMovements)
+        if (captureKeys.Length < capturedMovements.Count)
+            captureKeys = new MovementPriorityKey[capturedMovements.Count];
+        prioritizedCaptures.Clear();
+        for (int index = 0; index < capturedMovements.Count; index++)
         {
+            CapturedMovement captured = capturedMovements[index];
             if ((captured.IsPriority && !includePriorityAgent) ||
                 (!captured.IsPriority && !includeAuthoritativeAgents))
             {
@@ -1046,21 +1126,22 @@ public partial class AgentMovementHandler : IAgentMovementHandler
             float? distance = recipientFocus == null
                 ? (float?)null
                 : captured.AgentInfo.Agent.Position.Distance(recipientFocus.Position);
-            MovementPriorityKey priority = movementPriorityScheduler.CreateKey(
+            captureKeys[index] = movementPriorityScheduler.CreateKey(
                 captured.IsPriority,
                 distance,
                 totalSimulationTime,
                 lastSuccessfulSendTime,
                 pendingSince,
                 agentId);
-            prioritized.Add(new PrioritizedCapturedMovement(captured, priority));
+            prioritizedCaptures.Add(index);
         }
 
-        prioritized.Sort((left, right) =>
-            movementPriorityScheduler.Compare(left.Priority, right.Priority));
-        foreach (PrioritizedCapturedMovement candidate in prioritized)
+        // Keys break ties by agent id, so sorting indexes gives the same order as sorting the snapshots did.
+        prioritizedCaptures.Sort(compareCaptureKeys);
+        foreach (int index in prioritizedCaptures)
         {
-            CapturedMovement captured = candidate.Captured;
+            CapturedMovement captured = capturedMovements[index];
+            MovementPriorityKey priority = captureKeys[index];
             if (captured.IsMount)
             {
                 mountMovement
@@ -1068,7 +1149,7 @@ public partial class AgentMovementHandler : IAgentMovementHandler
                     .Add(
                         captured.AgentInfo,
                         captured.MountData,
-                        candidate.Priority);
+                        priority);
             }
             else if (captured.IsPriority)
             {
@@ -1077,7 +1158,7 @@ public partial class AgentMovementHandler : IAgentMovementHandler
                     .Add(
                         captured.AgentInfo,
                         captured.AgentData,
-                        candidate.Priority);
+                        priority);
             }
             else
             {
@@ -1086,7 +1167,7 @@ public partial class AgentMovementHandler : IAgentMovementHandler
                     .Add(
                         captured.AgentInfo,
                         captured.AgentData,
-                        candidate.Priority);
+                        priority);
             }
         }
 
@@ -1277,23 +1358,23 @@ public partial class AgentMovementHandler : IAgentMovementHandler
                    StringComparison.Ordinal);
     }
 
-    private void RemoveStaleLocalState(HashSet<Guid> broadcastAgentIds)
+    private void RemoveStaleLocalState()
     {
         foreach (RecipientMovementState recipient in recipientMovementStates.Values)
         {
-            var staleRecipientAgentIds = new HashSet<Guid>();
+            staleAgentIds.Clear();
             foreach (Guid agentId in recipient.LastSentMovement.Keys)
             {
                 if (!broadcastAgentIds.Contains(agentId))
-                    staleRecipientAgentIds.Add(agentId);
+                    staleAgentIds.Add(agentId);
             }
             foreach (Guid agentId in recipient.MovementPendingSince.Keys)
             {
                 if (!broadcastAgentIds.Contains(agentId))
-                    staleRecipientAgentIds.Add(agentId);
+                    staleAgentIds.Add(agentId);
             }
 
-            foreach (Guid agentId in staleRecipientAgentIds)
+            foreach (Guid agentId in staleAgentIds)
             {
                 recipient.LastSentMovement.Remove(agentId);
                 recipient.MovementPendingSince.Remove(agentId);

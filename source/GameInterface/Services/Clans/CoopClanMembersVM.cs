@@ -107,8 +107,7 @@ public class CoopClanMembersVM : ClanMembersVM
 
         MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData(
             GameTexts.FindText("str_coop_clan_manage_player_title").SetTextVariable("HERO", member.Name).ToString(),
-            GameTexts.FindText("str_coop_clan_experimental_warning") + "\n\n" +
-                GameTexts.FindText("str_coop_clan_manage_player_description"),
+            GameTexts.FindText("str_coop_clan_manage_player_description").ToString(),
             options, true, 1, 1, GameTexts.FindText("str_coop_clan_manage_player_confirm").ToString(),
             GameTexts.FindText("str_cancel").ToString(),
             selected =>

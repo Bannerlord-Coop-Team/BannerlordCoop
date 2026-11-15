@@ -12,6 +12,7 @@ using GameInterface.Services.NavalDLC;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.OrderOfBattle;
 using GameInterface.Services.Smithing;
+using GameInterface.Services.ViewData;
 using GameInterface.Services.Workshops;
 using LiteNetLib;
 using ProtoBuf;
@@ -94,6 +95,9 @@ public readonly struct GameSaveDataChunkPacket : IPacket
     [ProtoMember(22)]
     public readonly string[] HeldLootShipIds;
 
+    [ProtoMember(23)]
+    public readonly ViewDataPlayerData ViewDataPlayerData;
+
     public GameSaveDataChunkPacket(
         int transferId,
         int chunkIndex,
@@ -116,7 +120,8 @@ public readonly struct GameSaveDataChunkPacket : IPacket
         ServerOptions serverOptions,
         Dictionary<string, ClanFinanceSettings> clanFinance = null,
         OrderOfBattlePlayerData orderOfBattlePlayerData = null,
-        string[] heldLootShipIds = null)
+        string[] heldLootShipIds = null,
+        ViewDataPlayerData viewDataPlayerData = null)
     {
         TransferId = transferId;
         ChunkIndex = chunkIndex;
@@ -140,5 +145,6 @@ public readonly struct GameSaveDataChunkPacket : IPacket
         ClanFinance = clanFinance;
         OrderOfBattlePlayerData = orderOfBattlePlayerData;
         HeldLootShipIds = heldLootShipIds;
+        ViewDataPlayerData = viewDataPlayerData;
     }
 }

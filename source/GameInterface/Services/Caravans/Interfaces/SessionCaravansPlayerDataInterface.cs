@@ -80,7 +80,11 @@ public class SessionCaravansPlayerDataInterface : ISessionCaravansPlayerDataInte
         {
             if (!IsPlayerHeroIdValid(playerHeroId)) return;
 
-            CaravansPlayerData.PlayerTradeRumorTakenCaravans[playerHeroId] = tradeRumorTakenCaravansIds;
+            if (tradeRumorTakenCaravansIds == null)
+            {
+                Logger.Warning("Received null trade rumor caravans for {PlayerHeroId}", playerHeroId);
+            }
+            CaravansPlayerData.PlayerTradeRumorTakenCaravans[playerHeroId] = tradeRumorTakenCaravansIds ?? new Dictionary<string, long>();
         });
     }
 

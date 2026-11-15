@@ -2,6 +2,7 @@
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.Kingdoms.Handlers;
@@ -917,7 +918,9 @@ public class KingdomHandlerTests
             new Mock<IKingdomMembershipState>().Object,
             new Mock<IKingdomInterface>().Object,
             new Mock<IKingdomCreator>().Object,
-            new Mock<IKingdomDecisionDataConverter>().Object);
+            new Mock<IKingdomDecisionDataConverter>().Object,
+            new Mock<IControllerIdProvider>().Object,
+            new Mock<IKingdomCreationSettlementTracker>().Object);
     }
 
     private static Action<MessagePayload<RemoveDecision>> CreateRemoveDecisionHandler(
@@ -939,7 +942,9 @@ public class KingdomHandlerTests
             new Mock<IKingdomMembershipState>().Object,
             kingdomInterface,
             new Mock<IKingdomCreator>().Object,
-            new Mock<IKingdomDecisionDataConverter>().Object);
+            new Mock<IKingdomDecisionDataConverter>().Object,
+            new Mock<IControllerIdProvider>().Object,
+            new Mock<IKingdomCreationSettlementTracker>().Object);
         return removeDecisionHandler;
     }
 
@@ -977,7 +982,9 @@ public class KingdomHandlerTests
             new Mock<IKingdomMembershipState>().Object,
             new Mock<IKingdomInterface>().Object,
             new Mock<IKingdomCreator>().Object,
-            new Mock<IKingdomDecisionDataConverter>().Object);
+            new Mock<IKingdomDecisionDataConverter>().Object,
+            new Mock<IControllerIdProvider>().Object,
+            new Mock<IKingdomCreationSettlementTracker>().Object);
 
         return handler;
     }

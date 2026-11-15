@@ -11,6 +11,9 @@ using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Unstuck;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.UI.Patches;
+using System.Reflection;
+using TaleWorlds.Library;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -66,6 +69,72 @@ public class UnstuckCommandTests : MapEventTestBase
         var request = Assert.Single(Client.NetworkSentMessages.GetMessages<NetworkRequestPlayerUnstuck>());
         Assert.Equal(player.PartyId, request.PartyId);
         Assert.Equal(player.HeroId, request.HeroId);
+    }
+
+    [Fact]
+    public void EscapeMenuUnstuck_ConfirmYes_SendsTheSameRequestAsTheCommand()
+    {
+        var player = SetupRegisteredMainHeroAndParty();
+
+        var shownInquiries = new List<InquiryData>();
+        Action<InquiryData, bool, bool> onShowInquiry = (data, _, _) => shownInquiries.Add(data);
+        EventInfo showInquiryEvent = typeof(InformationManager).GetEvent(
+            "OnShowInquiry",
+            BindingFlags.Public | BindingFlags.Static);
+        showInquiryEvent.AddEventHandler(null, onShowInquiry);
+        try
+        {
+            Client.Call(() => EscapeMenuCoopOptionsPatch.ShowUnstuckConfirm());
+
+            var inquiry = Assert.Single(shownInquiries);
+            Assert.Empty(Client.NetworkSentMessages.GetMessages<NetworkRequestPlayerUnstuck>());
+
+            Client.Call(() => inquiry.AffirmativeAction());
+        }
+        finally
+        {
+            showInquiryEvent.RemoveEventHandler(null, onShowInquiry);
+        }
+
+        Assert.Single(Client.InternalMessages.GetMessages<PlayerUnstuckRequested>());
+
+        var request = Assert.Single(Client.NetworkSentMessages.GetMessages<NetworkRequestPlayerUnstuck>());
+        Assert.Equal(player.PartyId, request.PartyId);
+        Assert.Equal(player.HeroId, request.HeroId);
+    }
+
+    [Fact]
+    public void EscapeMenuUnstuck_ConfirmYesAfterTheCampaignIsGone_SendsNothingAndDoesNotThrow()
+    {
+        SetupRegisteredMainHeroAndParty();
+
+        var shownInquiries = new List<InquiryData>();
+        Action<InquiryData, bool, bool> onShowInquiry = (data, _, _) => shownInquiries.Add(data);
+        EventInfo showInquiryEvent = typeof(InformationManager).GetEvent(
+            "OnShowInquiry",
+            BindingFlags.Public | BindingFlags.Static);
+        showInquiryEvent.AddEventHandler(null, onShowInquiry);
+        try
+        {
+            Client.Call(() => EscapeMenuCoopOptionsPatch.ShowUnstuckConfirm());
+
+            var inquiry = Assert.Single(shownInquiries);
+
+            // A server disconnect ends the campaign while the popup stays open. Client.Call
+            // restores Campaign.Current afterwards.
+            Client.Call(() =>
+            {
+                Campaign.Current = null;
+                inquiry.AffirmativeAction();
+            });
+        }
+        finally
+        {
+            showInquiryEvent.RemoveEventHandler(null, onShowInquiry);
+        }
+
+        Assert.Empty(Client.InternalMessages.GetMessages<PlayerUnstuckRequested>());
+        Assert.Empty(Client.NetworkSentMessages.GetMessages<NetworkRequestPlayerUnstuck>());
     }
 
     [Fact]

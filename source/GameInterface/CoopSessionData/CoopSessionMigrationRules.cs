@@ -9,6 +9,7 @@ using GameInterface.Services.NavalDLC;
 using GameInterface.Services.OrderOfBattle;
 using GameInterface.Services.Smithing;
 using GameInterface.Services.Traits;
+using GameInterface.Services.ViewData;
 using GameInterface.Services.Workshops;
 using HarmonyLib;
 using System.Collections.Generic;
@@ -45,12 +46,16 @@ internal static class CoopSessionMigrationRules
         PreserveWithMigration.Add(AccessTools.Property(typeof(InventoryPlayerData), nameof(InventoryPlayerData.PlayerInventoryLocks)));
         PreserveWithMigration.Add(AccessTools.Property(typeof(InventoryPlayerData), nameof(InventoryPlayerData.PlayerInventorySortPreferences)));
 
+        PreserveWithMigration.Add(AccessTools.Property(typeof(HeroMeetingData), nameof(HeroMeetingData.PlayerScatteredCompanions)));
+
         PreserveWithMigration.Add(AccessTools.Property(typeof(NavalPlayerData), nameof(NavalPlayerData.PlayerUnlockedFigureHeads)));
         PreserveWithMigration.Add(AccessTools.Property(typeof(NavalPlayerData), nameof(NavalPlayerData.PlayerLastFigureheadLootTimes)));
         PreserveWithMigration.Add(AccessTools.Property(typeof(NavalPlayerData), nameof(NavalPlayerData.PlayerSentTroops)));
         PreserveWithMigration.Add(AccessTools.Property(typeof(NavalPlayerData), nameof(NavalPlayerData.PlayerCachedFleets)));
         PreserveWithMigration.Add(AccessTools.Property(typeof(OrderOfBattlePlayerData), nameof(OrderOfBattlePlayerData.PlayerOrderOfBattles)));
         PreserveWithMigration.Add(AccessTools.Property(typeof(StatisticsPlayerData), nameof(StatisticsPlayerData.PlayerStatistics)));
+
+        PreserveWithMigration.Add(AccessTools.Property(typeof(ViewDataPlayerData), nameof(ViewDataPlayerData.PlayerViewData)));
 
         /// Define fields that should have their data cleared
         ClearWithMigration.Add(AccessTools.Property(typeof(CaravansPlayerData), nameof(CaravansPlayerData.PlayerTradeRumorTakenCaravans)));

@@ -1,7 +1,6 @@
 ﻿using Common.Messaging;
 using Common.Network;
 using Common.Util;
-using Coop.Core.Server.Services.Kingdoms.Messages;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Services.MapEvents;
 using GameInterface.Services.Buildings.Messages;
@@ -34,6 +33,7 @@ using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Buildings;
 using TaleWorlds.CampaignSystem.ViewModelCollection.GameMenu.TownManagement;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Clans;
@@ -698,6 +698,105 @@ public class CoopClanFlowTests : MapEventTestBase, IDisposable
                 Assert.Equal(member.HeroId, player.HeroId);
             });
         }
+    }
+
+    // #4656: the member's map must redraw markers whose war stance flips on a clan join or leave, which vanilla only does on war, peace or kingdom changes.
+    [Fact]
+    public void JoinThenLeave_MapRedrawsOnlyMarkersWhoseStanceFlips()
+    {
+        var enemyPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var sharedEnemyPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var neutralPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        var townId = TestEnvironment.CreateRegisteredObject<Town>();
+        var enemyKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var markerPartyIds = new[] { enemyPartyId, sharedEnemyPartyId, neutralPartyId };
+        // The enemy clan rules a kingdom, like Sturgia, and owns the town, so both markers' stance comes from the kingdom.
+        foreach (var instance in Clients.Prepend(Server))
+        {
+            instance.Call(() =>
+            {
+                using var scope = new AllowedThread();
+                var town = Get<Town>(instance, townId);
+                var enemyClan = Get<MobileParty>(instance, enemyPartyId).LeaderHero.Clan;
+                var enemyKingdom = Get<Kingdom>(instance, enemyKingdomId);
+                enemyClan._kingdom = enemyKingdom;
+                enemyKingdom._rulingClan = enemyClan;
+                enemyKingdom._clans ??= new();
+                if (!enemyKingdom._clans.Contains(enemyClan)) enemyKingdom._clans.Add(enemyClan);
+                Get<Settlement>(instance, settlementId).SetSettlementComponent(town);
+                town._ownerClan = enemyClan;
+            });
+        }
+        // The enemy kingdom fights only the joined clan, so its markers flip on join. The shared enemy fights both clans, so its marker
+        // stays an enemy and must not be redrawn (and the joiner's only war is one the target shares, as IncompatibleWars requires).
+        Server.Call(() =>
+        {
+            var joinedClan = Get<Clan>(Server, leader.ClanId);
+            var enemyKingdom = Get<Kingdom>(Server, enemyKingdomId);
+            var sharedEnemyClan = Get<MobileParty>(Server, sharedEnemyPartyId).LeaderHero.Clan;
+            DeclareWarAction.ApplyByPlayerHostility(joinedClan, enemyKingdom);
+            DeclareWarAction.ApplyByPlayerHostility(joinedClan, sharedEnemyClan);
+            DeclareWarAction.ApplyByPlayerHostility(Get<Clan>(Server, member.ClanId), sharedEnemyClan);
+        });
+        Flush();
+        memberClient.Call(() =>
+        {
+            var settlement = Get<Settlement>(memberClient, settlementId);
+            // The harness doesn't list created settlements in Settlement.All, which the map walks.
+            var settlements = new MBList<Settlement>(Settlement.All ?? new MBList<Settlement>());
+            settlements.Add(settlement);
+            Campaign.Current.CampaignObjectManager.Settlements = settlements;
+            settlement._isVisible = true;
+            foreach (var id in markerPartyIds)
+                Get<MobileParty>(memberClient, id)._isVisible = true;
+        });
+
+        // Preconditions: the enemy markers resolve to the enemy kingdom, which isn't at war with the member yet, and the shared enemy already is.
+        memberClient.Call(() =>
+        {
+            var settlement = Get<Settlement>(memberClient, settlementId);
+            var sharedEnemyParty = Get<MobileParty>(memberClient, sharedEnemyPartyId);
+            var enemyKingdom = Get<Kingdom>(memberClient, enemyKingdomId);
+            Assert.Same(enemyKingdom, settlement.MapFaction);
+            Assert.Same(enemyKingdom, Get<MobileParty>(memberClient, enemyPartyId).MapFaction);
+            Assert.False(FactionManager.IsAtWarAgainstFaction(settlement.MapFaction, Hero.MainHero.MapFaction));
+            Assert.True(FactionManager.IsAtWarAgainstFaction(sharedEnemyParty.MapFaction, Hero.MainHero.MapFaction));
+        });
+
+        // Clears the member's marker dirty flags so the following asserts prove the next clan change redrew them.
+        void ClearMarkerFlags() => memberClient.Call(() =>
+        {
+            Get<Settlement>(memberClient, settlementId).Party.OnVisualsUpdated();
+            foreach (var id in markerPartyIds)
+                Get<MobileParty>(memberClient, id).Party.OnVisualsUpdated();
+        });
+
+        ClearMarkerFlags();
+        Join();
+
+        memberClient.Call(() =>
+        {
+            var settlement = Get<Settlement>(memberClient, settlementId);
+            Assert.True(FactionManager.IsAtWarAgainstFaction(settlement.MapFaction, Hero.MainHero.MapFaction));
+            Assert.True(Get<MobileParty>(memberClient, enemyPartyId).Party.IsVisualDirty);
+            Assert.True(settlement.Party.IsVisualDirty);
+            Assert.False(Get<MobileParty>(memberClient, sharedEnemyPartyId).Party.IsVisualDirty);
+            Assert.False(Get<MobileParty>(memberClient, neutralPartyId).Party.IsVisualDirty);
+        });
+
+        ClearMarkerFlags();
+        Send(memberClient, new RequestClanMemberLeave(member.HeroId, member.HeroId));
+        Flush();
+
+        memberClient.Call(() =>
+        {
+            var enemyParty = Get<MobileParty>(memberClient, enemyPartyId);
+            Assert.Same(Get<Clan>(memberClient, member.ClanId), Hero.MainHero.Clan);
+            Assert.False(FactionManager.IsAtWarAgainstFaction(enemyParty.MapFaction, Hero.MainHero.MapFaction));
+            Assert.True(enemyParty.Party.IsVisualDirty);
+            Assert.True(Get<Settlement>(memberClient, settlementId).Party.IsVisualDirty);
+        });
     }
 
     private Player CreatePlayer(EnvironmentInstance client, string controllerId)

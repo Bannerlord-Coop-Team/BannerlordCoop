@@ -1,4 +1,5 @@
-﻿using GameInterface.Services.Issues.Framework.Interface;
+﻿using GameInterface.Services.Heroes.Patches;
+using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -73,6 +74,19 @@ internal class QuestWorldEventRelayPatches
     private static void OnArmyDispersedPostfix(Army army, Army.ArmyDispersionReason reason, bool isPlayersArmy)
     {
         Relay("OnArmyDispersed", new[] { typeof(Army), typeof(Army.ArmyDispersionReason), typeof(bool) }, army, reason, isPlayersArmy);
+    }
+
+    // The server dispatches a desertion as the retreating player, so only that player's quests hear it
+    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnPlayerDesertedBattle))]
+    [HarmonyPostfix]
+    private static void OnPlayerDesertedBattlePostfix(int sacrificedMenCount)
+    {
+        if (!ContainerProvider.TryResolve<IQuestEventRelay>(out var relay))
+        {
+            return;
+        }
+
+        relay.RelayToOwner(ResolvedMainHeroContext.ResolvedMainHero, "OnPlayerDeserted", new[] { typeof(int) }, sacrificedMenCount);
     }
 
     private static void Relay(string listenerName, System.Type[] parameterTypes, params object[] arguments)

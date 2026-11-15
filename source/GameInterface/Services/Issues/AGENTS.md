@@ -73,7 +73,10 @@ Open framework gaps are tracked as `[QUESTS]` issues (#3981 to #3988).
    `OnSettlementOwnerChanged`, and `Framework/Dispatch/QuestEventRelay.cs`
    runs the listener with that exact name and parameter types on every running registered quest, as its owner through
    `IOutcomeDispatcher.RunAsOwners`. A listener under another name is skipped without a log. These two files pass
-   listener names as strings because `Framework/` cannot name quest types.
+   listener names as strings because `Framework/` cannot name quest types. `OnPlayerDesertedBattle` is about one
+   player: the server dispatches it inside the retreating player's `MainHeroSubstitutionScope`
+   (`EncounterGameMenuBehaviorInterface.LeftSoldiersBehindConsequence`), and the relay runs vanilla's `OnPlayerDeserted`
+   only on that player's quests, through `IOutcomeDispatcher.RunAsOwner`.
 10. `Replay` cancels the owner's running quest after an issue-only ending (`IssueStayAliveFailed`,
     `IssueTimedOut`), because vanilla's `IssueFinalized` detaches the quest first and would leave it in the
     journal. On the server `BeforeIssueOutcome` announces such an issue only while its quest still runs.

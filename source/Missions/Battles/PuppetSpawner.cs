@@ -191,10 +191,15 @@ public class PuppetSpawner : IPuppetSpawner
     }
 
     // Refresh an existing remote puppet from a snapshot without changing local or newer-authority membership.
-    private void RefreshExistingFormation(BattleAgentSpawnData data, CoopAgentInfo info)
+    // Applies what the current owner's snapshot says about a registered puppet. An adopter's authority refresh lands here,
+    // so its retreat flag, including false, reaches peers whose copy still holds what the previous owner last sent.
+    private void RefreshExistingPuppet(BattleAgentSpawnData data, CoopAgentInfo info)
     {
         if (session.IsOwn(info.CurrentAuthority) || info.CurrentAuthority != data.OwnerControllerId
             || info.AuthorityRevision != data.AuthorityRevision || info.Agent == null || !info.Agent.IsActive()) return;
+
+        puppetRoutApplier?.ApplyRetreatSnapshot(data.AgentId, data.IsRunningAway, data.AuthorityRevision);
+
         if (data.FormationIndex < -1 || data.FormationIndex >= (int)FormationClass.NumberOfAllFormations) return;
         if (!TryResolveCrewFormation(data.ShipId, data.FormationIndex, out int formationIndex)) return;
 
@@ -394,7 +399,7 @@ public class PuppetSpawner : IPuppetSpawner
         if (registry.TryGetAgentInfo(data.AgentId, out var existing))
         {
             // Only newly received snapshots refresh membership; buffered records may predate live transfers.
-            if (refreshFormation) RefreshExistingFormation(data, existing);
+            if (refreshFormation) RefreshExistingPuppet(data, existing);
             return true;
         }
         PendingAuthority pendingAuthority;

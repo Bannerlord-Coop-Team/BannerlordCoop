@@ -133,9 +133,11 @@ internal static class RomanceTransitionRules
         {
             Romance.RomanceLevelEnum.MatchMadeByFamily =>
                 currentLevel == Romance.RomanceLevelEnum.Untested,
+            // Vanilla's clan leader dialogue re-applies CourtshipStarted to a pair already at it.
             Romance.RomanceLevelEnum.CourtshipStarted =>
                 currentLevel == Romance.RomanceLevelEnum.Untested ||
-                currentLevel == Romance.RomanceLevelEnum.MatchMadeByFamily,
+                currentLevel == Romance.RomanceLevelEnum.MatchMadeByFamily ||
+                currentLevel == Romance.RomanceLevelEnum.CourtshipStarted,
             Romance.RomanceLevelEnum.CoupleDecidedThatTheyAreCompatible =>
                 currentLevel == Romance.RomanceLevelEnum.CourtshipStarted,
             Romance.RomanceLevelEnum.CoupleAgreedOnMarriage =>

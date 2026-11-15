@@ -757,6 +757,7 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
         var defenderHeroId = CreateRegisteredObject<Hero>();
         RegisterAsPlayerParty("attacker", attackerHeroId, partyIds[0]);
         RegisterAsPlayerParty("defender", defenderHeroId, partyIds[1]);
+        OpenAiJoinWindow(mapEventId!);
 
         var clients = Clients.ToArray();
         SetControllerId(clients[0], "attacker");
@@ -924,8 +925,6 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
             mapEvent.Component = interactionComponent;
             var mapEventParty = mapEvent.GetMapEventSide(side).Parties.Last(value => value.Party == party.Party);
             Assert.True(Server.ObjectManager.TryGetId(mapEventParty, out mapEventPartyId));
-            Server.Resolve<IMessageBroker>().Publish(this,
-                new MapEventInvolvedPartiesAdded(mapEvent, new[] { mapEventParty }));
         }, MapEventDisabledMethods);
 
         Assert.NotNull(mapEventPartyId);

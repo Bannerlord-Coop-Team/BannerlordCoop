@@ -21,7 +21,9 @@ public interface IWeaponDropWorldItemSpawner
         bool hasLifeTime,
         float remainingLifeTime,
         MatrixFrame frame,
-        out SpawnedItemEntity item);
+        out SpawnedItemEntity item,
+        MissionObject parent = null,
+        GameEntity attachmentParent = null);
     bool TryRemove(SpawnedItemEntity item);
 }
 
@@ -70,18 +72,40 @@ public sealed class WeaponDropWorldItemSpawner : IWeaponDropWorldItemSpawner
         bool hasLifeTime,
         float remainingLifeTime,
         MatrixFrame frame,
-        out SpawnedItemEntity item)
+        out SpawnedItemEntity item,
+        MissionObject parent = null,
+        GameEntity attachmentParent = null)
     {
         item = null;
         if (!IsReady || weapon.IsEmpty) return false;
 
-        GameEntity entity = Mission.Current.SpawnWeaponWithNewEntityAux(
-            weapon,
-            spawnFlags,
-            frame,
-            forcedSpawnIndex: -1,
-            attachedMissionObject: null,
-            hasLifeTime);
+        GameEntity entity;
+        const Mission.WeaponSpawnFlags stuckFlags = Mission.WeaponSpawnFlags.AsMissile | Mission.WeaponSpawnFlags.WithStaticPhysics;
+        if ((spawnFlags & stuckFlags) == stuckFlags)
+        {
+            entity = GameEntityExtensions.Instantiate(Mission.Current.Scene, weapon,
+                spawnFlags.HasAnyFlag(Mission.WeaponSpawnFlags.WithHolster), needBatchedVersion: true);
+            // A received outcome names the shooter's state even when destruction applied here first.
+            if (attachmentParent != null)
+                attachmentParent.AddChild(entity);
+            else
+                parent?.AddStuckMissile(entity);
+            MatrixFrame globalFrame = attachmentParent != null ? attachmentParent.GetGlobalFrame().TransformToParent(in frame)
+                : parent == null ? frame : parent.GameEntity.GetGlobalFrame().TransformToParent(in frame);
+            entity.SetGlobalFrame(in globalFrame);
+            entity.CreateAndAddScriptComponent(nameof(SpawnedItemEntity), callScriptCallbacks: true);
+            Mission.Current.SpawnWeaponAux(entity.WeakEntity, weapon, spawnFlags, Vec3.Zero, Vec3.Zero, hasLifeTime);
+        }
+        else
+        {
+            entity = Mission.Current.SpawnWeaponWithNewEntityAux(
+                weapon,
+                spawnFlags,
+                frame,
+                forcedSpawnIndex: -1,
+                attachedMissionObject: parent,
+                hasLifeTime);
+        }
         item = entity?.GetFirstScriptOfType<SpawnedItemEntity>();
         if (item == null)
         {

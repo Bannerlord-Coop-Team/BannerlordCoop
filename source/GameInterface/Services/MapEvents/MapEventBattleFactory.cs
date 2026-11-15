@@ -1,5 +1,6 @@
 ﻿using Common.Logging;
 using GameInterface.Services.MobilePartyAIs.Patches;
+using GameInterface.Services.Issues.Quests.ArmyOfPoachers;
 using Serilog;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -70,8 +71,12 @@ internal sealed class MapEventBattleFactory
         if (!WillCreateFieldBattle(attacker, defender, flags)) return true;
         var attackerMobileParty = attacker.MobileParty;
         var defenderMobileParty = defender.MobileParty;
-        return attackerMobileParty?.IsActive == true && defenderMobileParty?.IsActive == true &&
-            attackerMobileParty.CurrentSettlement == null && defenderMobileParty.CurrentSettlement == null;
+        if (attackerMobileParty?.IsActive != true || defenderMobileParty?.IsActive != true) return false;
+        if (attackerMobileParty.CurrentSettlement == null && defenderMobileParty.CurrentSettlement == null) return true;
+
+        // This quest fights inside its village, with the owner's party still in the settlement.
+        return ContainerProvider.TryResolve<PoachersEncounterHandler>(out var poachers) &&
+            poachers.IsVillageBattle(attackerMobileParty, defenderMobileParty);
     }
 
     private static bool WillCreateFieldBattle(PartyBase attacker, PartyBase defender, BattleCreationFlags flags)

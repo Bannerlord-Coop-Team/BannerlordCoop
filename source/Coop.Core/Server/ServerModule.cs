@@ -49,6 +49,7 @@ public class ServerModule : CommonModule
     internal static readonly Type[] NavalOnlyTypes =
     {
         typeof(ServerBattleShipFateHandler),
+        typeof(ServerNavalNpcFleetAttemptHandler),
     };
 
     protected override void Load(ContainerBuilder builder)
@@ -102,6 +103,7 @@ public class ServerModule : CommonModule
             .As<IMissionMembershipRegistry>()
             .InstancePerLifetimeScope();
         builder.RegisterType<BattleCompletionTracker>().As<IBattleCompletionTracker>().InstancePerDependency();
+        builder.RegisterType<NavalBattleMemberResolver>().As<INavalBattleMemberResolver>().InstancePerDependency();
         builder.RegisterType<SettlementEncounterDistanceValidator>()
             .As<ISettlementEncounterDistanceValidator>()
             .InstancePerDependency();
@@ -119,8 +121,11 @@ public class ServerModule : CommonModule
 
         // Pauses time while a peer's packet queue is overloaded (slow client catching up). Constructed
         // as a CoopServer dependency, so it registers its unpause policy when the server is built.
-        builder.RegisterType<JoinPeerTerminator>().As<IJoinPeerTerminator>().InstancePerDependency();
+        builder.RegisterType<PeerTerminator>().As<IPeerTerminator>().InstancePerDependency();
         builder.RegisterType<OverloadedPeerManager>().As<IOverloadedPeerManager>().InstancePerLifetimeScope().AutoActivate();
+
+        // Drops a silent battle host with a successor waiting; CoopServer runs it each Update.
+        builder.RegisterType<UnresponsiveBattleHostManager>().As<IUnresponsiveBattleHostManager>().InstancePerDependency();
 
         // DEBUG builds, including MCP live-test runs, keep their heartbeats and battle counts off the production statistics.
 #if DEBUG

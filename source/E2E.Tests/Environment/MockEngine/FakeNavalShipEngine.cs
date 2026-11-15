@@ -16,6 +16,15 @@ namespace E2E.Tests.Environment.MockEngine;
 /// </summary>
 public sealed class FakeNavalShipEngine : INavalShipEngine, INavalShipCaptureEngine
 {
+    public bool TryDescribeObject(MissionObject hull, MissionObject missionObject, out string objectKey, out int objectIndex)
+    {
+        objectKey = null!;
+        objectIndex = -1;
+        return false;
+    }
+
+    public MissionObject ResolveObject(MissionObject hull, string objectKey, int objectIndex) => null!;
+
     public const string HullId = "northern_light_ship";
     public const float FullHitPoints = 100f;
     public const float FullSailHitPoints = 50f;

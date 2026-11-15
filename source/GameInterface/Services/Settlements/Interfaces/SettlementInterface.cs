@@ -52,6 +52,11 @@ public interface ISettlementInterface : IGameAbstraction
     void PartyDisembark(MobileParty party, Settlement settlement);
 
     /// <summary>
+    /// Server-only: sends the party's server position and sea state to clients, pulling an owner whose copy drifted back.
+    /// </summary>
+    void CorrectPartyPosition(MobileParty party);
+
+    /// <summary>
     /// Server-only: updates a settlement's location population (hero/companion placement) after a
     /// party has entered it. No-op off the server.
     /// </summary>
@@ -135,6 +140,11 @@ internal class SettlementInterface : ISettlementInterface
         party.Anchor.SetSettlement(settlement);
 
         messageBroker.Publish(this, new PartyBehaviorChangeAttempted(party, forcePosition: true, isCurrentlyAtSea: false));
+    }
+
+    public void CorrectPartyPosition(MobileParty party)
+    {
+        messageBroker.Publish(this, new PartyBehaviorChangeAttempted(party, forcePosition: true, isCurrentlyAtSea: party.IsCurrentlyAtSea));
     }
 
     public void EndSettlementEncounter(SettlementLeaveType leaveType = SettlementLeaveType.Leave)

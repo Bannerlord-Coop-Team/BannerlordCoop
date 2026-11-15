@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.BattleBenchmark;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -45,12 +46,13 @@ public class CoopServer : CoopNetworkBase, ICoopServer
     private readonly IMessagePacketHandler messagePacketHandler;
     private readonly IConnectionMessageQueue connectionMessageQueue;
     private readonly IServerJoinAdmission joinAdmission;
-    private readonly IJoinPeerTerminator peerTerminator;
+    private readonly IPeerTerminator peerTerminator;
     // Buffers per-change sends and merges them into one send per key. Drained each tick in Update.
     private readonly ISendCoalescer coalescer;
     // Lazy breaks the construction cycle: the manager depends on ITimeControlInterface, which depends
     // on INetwork (this server). It is only needed each Update, so deferring construction is fine.
     private readonly Lazy<IOverloadedPeerManager> overloadedPeerManager;
+    private readonly IUnresponsiveBattleHostManager unresponsiveBattleHostManager;
 
     // Co-hosted NAT-punch rendezvous for P2P instances (taverns etc.). The server's NetManager
     // already has NatPunchEnabled; the MissionManager answers the introduction requests.
@@ -64,16 +66,19 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         IMessagePacketHandler messagePacketHandler,
         IConnectionMessageQueue connectionMessageQueue,
         IServerJoinAdmission joinAdmission,
-        IJoinPeerTerminator peerTerminator,
+        IPeerTerminator peerTerminator,
         IControllerIdProvider controllerIdProvider,
         IMissionManager missionManager,
         Lazy<IOverloadedPeerManager> overloadedPeerManager,
+        IUnresponsiveBattleHostManager unresponsiveBattleHostManager,
         ISendCoalescer coalescer,
         IUdpBindDiagnostics bindDiagnostics,
         ICommonSerializer serializer,
         IReliableMessageBatcher<NetPeer> reliableMessageBatcher,
-        CancellationTokenSource sessionCancellation)
-        : base(configuration, serializer, reliableMessageBatcher, sessionCancellation)
+        CancellationTokenSource sessionCancellation,
+        // Optional so the tests that build this server directly don't need a recorder.
+        IBattleBenchmarkRecorder battleBenchmark = null)
+        : base(configuration, serializer, reliableMessageBatcher, sessionCancellation, battleBenchmark)
     {
         // Dependancy assignment
         this.messageBroker = messageBroker;
@@ -84,6 +89,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         this.peerTerminator = peerTerminator;
         this.missionManager = missionManager;
         this.overloadedPeerManager = overloadedPeerManager;
+        this.unresponsiveBattleHostManager = unresponsiveBattleHostManager;
         this.coalescer = coalescer;
         this.bindDiagnostics = bindDiagnostics;
 
@@ -173,7 +179,9 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
     public override void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
     {
-        object received = serializer.Deserialize(reader.GetRemainingBytes());
+        byte[] payload = reader.GetRemainingBytes();
+        object received = serializer.Deserialize(payload);
+        battleBenchmark?.RecordPayloadReceived(received, payload.Length);
 
         if (received is IPacket packet)
         {
@@ -200,7 +208,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         if (joinAdmission.TryAdmit(() => messageBroker.Publish(this, new PlayerConnected(peer)))) return;
 
         Logger.Information("Client {Peer} disconnected before joining: the server is restarting", peer.Id);
-        peerTerminator.Disconnect(peer, ServerShutdownCoordinator.DisconnectReason);
+        peerTerminator.Disconnect(peer, DisconnectReasons.ServerRestarting);
     }
 
     public override void OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
@@ -212,6 +220,8 @@ public class CoopServer : CoopNetworkBase, ICoopServer
     public override void Update(TimeSpan frameTime)
     {
         overloadedPeerManager.Value.CheckForOverloadedPeers();
+        // Before the poll, so a host dropped here is reported as disconnected in this same update.
+        unresponsiveBattleHostManager.DisconnectUnresponsiveHosts();
 
         netManager.PollEvents();
         netManager.NatPunchModule.PollEvents();

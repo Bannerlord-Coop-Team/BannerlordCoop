@@ -19,8 +19,10 @@ public readonly struct NetworkMeleeHitPresentation : IEvent
     [ProtoMember(3)]
     public MeleeHitPresentationKind Kind { get; }
 
+    // The index fields below are shifted by one so protobuf omits their usual -1 instead of writing a 10-byte varint.
     [ProtoMember(4)]
-    public int CollisionBoneIndex { get; }
+    private int CollisionBoneIndexWire { get; }
+    public int CollisionBoneIndex => CollisionBoneIndexWire - 1;
 
     [ProtoMember(5)]
     public Vec3 CollisionPosition { get; }
@@ -29,13 +31,15 @@ public readonly struct NetworkMeleeHitPresentation : IEvent
     public WeaponClass AttackerWeaponClass { get; }
 
     [ProtoMember(7)]
-    public int PhysicsMaterialIndex { get; }
+    private int PhysicsMaterialIndexWire { get; }
+    public int PhysicsMaterialIndex => PhysicsMaterialIndexWire - 1;
 
     [ProtoMember(8)]
     public float Strength { get; }
 
     [ProtoMember(9)]
-    public int SoundIndex { get; }
+    private int SoundIndexWire { get; }
+    public int SoundIndex => SoundIndexWire - 1;
 
     [ProtoMember(10)]
     public float ArmorType { get; }
@@ -55,12 +59,12 @@ public readonly struct NetworkMeleeHitPresentation : IEvent
         VictimAgentId = victimAgentId;
         IsMount = isMount;
         Kind = kind;
-        CollisionBoneIndex = collisionBoneIndex;
+        CollisionBoneIndexWire = collisionBoneIndex + 1;
         CollisionPosition = collisionPosition;
         AttackerWeaponClass = attackerWeaponClass;
-        PhysicsMaterialIndex = physicsMaterialIndex;
+        PhysicsMaterialIndexWire = physicsMaterialIndex + 1;
         Strength = strength;
-        SoundIndex = soundIndex;
+        SoundIndexWire = soundIndex + 1;
         ArmorType = armorType;
     }
 }

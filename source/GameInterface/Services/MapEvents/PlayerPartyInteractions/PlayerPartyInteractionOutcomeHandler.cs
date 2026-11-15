@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using GameInterface.Services.Clans;
+using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.MapEvents.Data;
@@ -537,7 +538,11 @@ internal class PlayerPartyInteractionOutcomeHandler
 
         foreach (var (hero, spouse) in marriages)
         {
-            MarriageAction.Apply(hero, spouse);
+            // GetClanAfterMarriage keeps the clan of a first hero who IsHumanPlayerCharacter, so the npc always joins the player's clan.
+            if (spouse.IsPlayerHero())
+                MarriageAction.Apply(spouse, hero);
+            else
+                MarriageAction.Apply(hero, spouse);
         }
         return true;
     }

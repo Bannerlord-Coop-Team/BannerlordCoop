@@ -141,6 +141,27 @@ namespace Coop.Tests.Steam
         }
 
         [Fact]
+        public void Stop_StopsThePumpBeforeClosingTheListener()
+        {
+            host.Start(4200);
+            RaiseConnectedPeer(7);
+            Assert.True(SpinWait.SpinUntil(() => transport.ReceiveCalls > 0, TimeSpan.FromSeconds(2)));
+
+            // Closing the listener closes its accepted connections inside Steam, so no pump tick may run past it
+            int receivesDuringClose = -1;
+            transport.OnStopListening = () =>
+            {
+                int before = transport.ReceiveCalls;
+                Thread.Sleep(50);
+                receivesDuringClose = transport.ReceiveCalls - before;
+            };
+
+            host.Stop();
+
+            Assert.Equal(0, receivesDuringClose);
+        }
+
+        [Fact]
         public void Datagrams_FlowBothWaysBetweenPeerAndServer()
         {
             using var serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);

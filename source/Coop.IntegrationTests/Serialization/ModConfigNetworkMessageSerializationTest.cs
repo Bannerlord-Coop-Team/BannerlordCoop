@@ -69,6 +69,7 @@ namespace Coop.IntegrationTests.Serialization
                 GoldFoodInfluenceChangeInBattles = GoldFoodChangeMode.Enabled,
                 GoldFoodInfluenceChangeForDisconnectedPlayers = true,
                 PlayerBattleAiJoinWindowHours = 6,
+                PostBattleAiAmnestySeconds = 45,
                 KingdomDecisionVoteTimeoutSeconds = 600,
                 EnsureUnaffiliatedWanderers = false,
                 WandererLimit = 64,
@@ -85,6 +86,7 @@ namespace Coop.IntegrationTests.Serialization
                 PlayerWoundedBattleEntry = false,
                 BlockAiWarDeclarationsOnOfflinePlayers = true,
                 ClansAfterKingdomDestruction = ClansAfterKingdomDestructionMode.KeepClans,
+                PreferredBattleHosts = new List<string> { "76561198000000002", "76561198000000001" },
             });
 
             var copy = RoundTrip(new NetworkLoadModConfig(options)).ModOptions;
@@ -94,6 +96,7 @@ namespace Coop.IntegrationTests.Serialization
             Assert.Equal(GoldFoodChangeMode.Enabled, copy.GoldFoodInfluenceChangeInBattles);
             Assert.True(copy.GoldFoodInfluenceChangeForDisconnectedPlayers);
             Assert.Equal(6, copy.PlayerBattleAiJoinWindowHours);
+            Assert.Equal(45, copy.PostBattleAiAmnestySeconds);
             Assert.Equal(600, copy.KingdomDecisionVoteTimeoutSeconds);
             Assert.False(copy.EnsureUnaffiliatedWanderers);
             Assert.Equal(64, copy.WandererLimit);
@@ -109,6 +112,7 @@ namespace Coop.IntegrationTests.Serialization
             Assert.False(copy.PlayerWoundedBattleEntry);
             Assert.True(copy.BlockAiWarDeclarationsOnOfflinePlayers);
             Assert.Equal(ClansAfterKingdomDestructionMode.KeepClans, copy.ClansAfterKingdomDestruction);
+            Assert.Equal(new[] { "76561198000000002", "76561198000000001" }, copy.PreferredBattleHosts);
 
             // Keys the operator left absent still resolve to the documented defaults, not to zero.
             Assert.True(copy.FastForwardEnabled);
@@ -147,6 +151,7 @@ namespace Coop.IntegrationTests.Serialization
             GoldFoodInfluenceChangeInBattles = GoldFoodChangeMode.Disabled,
             GoldFoodInfluenceChangeForDisconnectedPlayers = false,
             PlayerBattleAiJoinWindowHours = 0,
+            PostBattleAiAmnestySeconds = 0,
             KingdomDecisionVoteTimeoutSeconds = 0,
             SpeedLimitWhilePlayersInBattle = false,
             EnsureUnaffiliatedWanderers = false,
@@ -167,6 +172,7 @@ namespace Coop.IntegrationTests.Serialization
             VoiceEnabled = false,
             BlockAiWarDeclarationsOnOfflinePlayers = false,
             ClansAfterKingdomDestruction = ClansAfterKingdomDestructionMode.Vanilla,
+            PreferredBattleHosts = new List<string>(),
         });
 
         private static void AssertAllOptionsOff(ModOptions copy)
@@ -178,6 +184,7 @@ namespace Coop.IntegrationTests.Serialization
             Assert.Equal(GoldFoodChangeMode.Disabled, copy.GoldFoodInfluenceChangeInBattles);
             Assert.False(copy.GoldFoodInfluenceChangeForDisconnectedPlayers);
             Assert.Equal(0, copy.PlayerBattleAiJoinWindowHours);
+            Assert.Equal(0, copy.PostBattleAiAmnestySeconds);
             Assert.Equal(0, copy.KingdomDecisionVoteTimeoutSeconds);
             Assert.False(copy.SpeedLimitWhilePlayersInBattle);
             Assert.False(copy.EnsureUnaffiliatedWanderers);
@@ -198,6 +205,8 @@ namespace Coop.IntegrationTests.Serialization
             Assert.False(copy.VoiceEnabled);
             Assert.False(copy.BlockAiWarDeclarationsOnOfflinePlayers);
             Assert.Equal(ClansAfterKingdomDestructionMode.Vanilla, copy.ClansAfterKingdomDestruction);
+            // An empty list is not sent, so it arrives null; readers treat null as empty.
+            Assert.True(copy.PreferredBattleHosts is null or { Count: 0 });
         }
 
         private static T RoundTrip<T>(T original)

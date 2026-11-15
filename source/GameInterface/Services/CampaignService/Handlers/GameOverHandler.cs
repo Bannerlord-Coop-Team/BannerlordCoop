@@ -92,7 +92,7 @@ internal class GameOverHandler : IHandler
                             .SetTextVariable("HERO", leader.Name).SetTextVariable("CLAN", playerHero.Clan.Name);
                     InformationManager.ShowInquiry(new InquiryData(
                         GameTexts.FindText("str_coop_succession_game_over_title").ToString(),
-                        GameTexts.FindText("str_coop_clan_experimental_warning") + "\n\n" + description, true, false,
+                        description.ToString(), true, false,
                         GameTexts.FindText("str_continue").ToString(), string.Empty, () =>
                         {
                             var state = Game.Current.GameStateManager.CreateState<TaleWorlds.CampaignSystem.GameState.GameOverState>(TaleWorlds.CampaignSystem.GameState.GameOverState.GameOverReason.ClanDestroyed);

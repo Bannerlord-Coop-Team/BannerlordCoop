@@ -281,7 +281,8 @@ public class CoopBattleController : CoopMissionController
     // MISSION-READY (BR-010): the native MissionState.FinishMissionLoading fans Mission.AfterStart() out to
     // the behaviors only once Mission.IsLoadingFinished turned true, so this is the moment this client has
     // FINISHED LOADING the battle mission. Announce it so BattleHostHandler requests the host election —
-    // the server's per-battle order becomes the mission-ready order (BR-013), not the entry order. The
+    // the server's per-battle order becomes the mission-ready order (BR-013), not the entry order, except in a
+    // hideout, where it follows the hideout state ready requests. The
     // session began at entry (PlayerEnteredBattle -> BattleInstanceLifecycle), well before loading finishes.
     public override void AfterStart()
     {
@@ -337,11 +338,9 @@ public class CoopBattleController : CoopMissionController
         // wedging forever. The release is one-shot, so a later real depletion still concludes normally.
         // Hideout controllers own this switch across their camp/boss phases; enabling it here can resolve the
         // attacker victory after the camp is cleared, before the boss fight has actually concluded.
-        if (!endConditionHoldReleased && ShouldManageBattleEndLogic(
-                Mission?.GetMissionBehavior<HideoutMissionController>() != null,
-                Mission?.GetMissionBehavior<HideoutAmbushMissionController>() != null))
+        if (!endConditionHoldReleased)
         {
-            var battleEndLogic = Mission?.GetMissionBehavior<BattleEndLogic>();
+            var battleEndLogic = ManagedBattleEndLogic();
             if (battleEndLogic != null)
             {
                 bool battleLive = BattleReadyForEndChecks();
@@ -425,6 +424,28 @@ public class CoopBattleController : CoopMissionController
         bool hasHideoutAmbushMissionController)
         => !hasHideoutMissionController && !hasHideoutAmbushMissionController;
 
+    // The land end logic this controller drives; null in a naval battle or where a hideout controller owns it.
+    private BattleEndLogic ManagedBattleEndLogic()
+    {
+        bool managed = ShouldManageBattleEndLogic(
+            Mission?.GetMissionBehavior<HideoutMissionController>() != null,
+            Mission?.GetMissionBehavior<HideoutAmbushMissionController>() != null);
+        return managed ? Mission?.GetMissionBehavior<BattleEndLogic>() : null;
+    }
+
+    // Ends this client's mission with the host's result by latching what vanilla's MissionEnded reads, because the
+    // server already acts on that result and this client's own end checks can miss a retreat the host saw.
+    private void ConcludeFromAcceptedResult()
+    {
+        var battleEndLogic = ManagedBattleEndLogic();
+        if (battleEndLogic == null || !ResultCommitter.TryGetResolvedState(out var state)) return;
+        if (state != BattleState.AttackerVictory && state != BattleState.DefenderVictory) return;
+
+        bool playerWon = (state == BattleState.AttackerVictory) == (Mission.PlayerTeam.Side == BattleSideEnum.Attacker);
+        battleEndLogic._isEnemySideRetreating = playerWon;
+        battleEndLogic._isPlayerSideRetreating = !playerWon;
+    }
+
     // Compare current authority with controller id
     private bool? ProbeHeroAgentAuthority(Hero hero)
     {
@@ -439,6 +460,7 @@ public class CoopBattleController : CoopMissionController
         base.OnAgentRemoved(affectedAgent, affectorAgent, agentState, killingBlow);
 
         deathReporter.OnAgentRemoved(affectedAgent, affectorAgent, agentState, killingBlow);
+        puppetRoutApplier.ForgetRemovedAgent(affectedAgent);
     }
 
     public override void OnAgentFleeing(Agent affectedAgent)
@@ -498,6 +520,7 @@ public class CoopBattleController : CoopMissionController
         Deployment.OnLocalDeploymentFinished(replicator.BroadcastOwnDeployedTroops);
 
         ResultCommitter.ReportAcceptedResult();
+        ConcludeFromAcceptedResult();
     }
 
     // The live fixture only replays to a peer that this mission has actually mapped to a connected P2P link.
@@ -648,9 +671,11 @@ public class CoopBattleController : CoopMissionController
 
         ClearAppliedPendingResultSnapshot();
         ResultCommitter.AcceptResolvedState(snapshot.BattleState);
+        if (!Deployment.IsCommitted) return;
+
         // The committer reports a result once per state and host epoch, so a repeated snapshot sends nothing.
-        if (Deployment.IsCommitted)
-            ResultCommitter.ReportAcceptedResult();
+        ResultCommitter.ReportAcceptedResult();
+        ConcludeFromAcceptedResult();
     }
 
     private void ClearAppliedPendingResultSnapshot()

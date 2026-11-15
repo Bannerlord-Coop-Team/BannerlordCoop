@@ -1,9 +1,12 @@
 ﻿using Common;
 using Common.Util;
+using Common.Messaging;
 using Coop.Core.Client.Services.Heroes.Messages;
+using Coop.Core.Server.Services.Heroes.Handlers;
 using E2E.Tests.Environment;
 using E2E.Tests.Util;
 using GameInterface.Services.Heroes;
+using GameInterface.Services.Heroes.Messages;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -315,6 +318,33 @@ public class HeroCreationTests : IDisposable
             characterObject.Culture.DefaultStealthEquipmentRoster.AllEquipments[0]._itemSlots[0].Item = GameObjectCreator.CreateInitializedObject<ItemObject>();
             serverHero = HeroCreator.CreateSpecialHero(characterObject);
         });
+        Assert.True(TestEnvironment.Server.ObjectManager.TryGetId(serverHero!, out var heroId));
+
+        foreach (var client in TestEnvironment.Clients)
+        {
+            client.PumpGameThread();
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+                Assert.NotNull(hero.CharacterObject);
+                Assert.Single(Hero.AllAliveHeroes.Concat(Hero.DeadOrDisabledHeroes), listed => listed == hero);
+            });
+        }
+    }
+
+    // Drops the field sync on the server, so only the initialization message can give clients the CharacterObject.
+    [Fact]
+    public void ServerCreateSpecialHero_WhenCharacterObjectSyncIsLost_InitializationRestoresItOnClients()
+    {
+        Hero? serverHero = null;
+        TestEnvironment.Server.Call(() =>
+        {
+            var characterObject = GameObjectCreator.CreateInitializedObject<CharacterObject>();
+            characterObject.Culture.DefaultBattleEquipmentRoster = GameObjectCreator.CreateInitializedObject<MBEquipmentRoster>();
+            characterObject.Culture.DefaultStealthEquipmentRoster = GameObjectCreator.CreateInitializedObject<MBEquipmentRoster>();
+            characterObject.Culture.DefaultStealthEquipmentRoster.AllEquipments[0]._itemSlots[0].Item = GameObjectCreator.CreateInitializedObject<ItemObject>();
+            serverHero = HeroCreator.CreateSpecialHero(characterObject);
+        }, new[] { AccessTools.Method(typeof(ServerHeroFieldsHandler), "Handle", new[] { typeof(MessagePayload<CharacterObjectChanged>) }) });
         Assert.True(TestEnvironment.Server.ObjectManager.TryGetId(serverHero!, out var heroId));
 
         foreach (var client in TestEnvironment.Clients)

@@ -654,52 +654,26 @@ public class NavalShipEngine : INavalShipEngine
         return false;
     }
 
-    /// <summary>
-    /// The entity's indexed, named child path below <paramref name="hullEntity"/>, or null outside it. Named child
-    /// paths are content identities, never process-local native pointers.
-    /// </summary>
-    internal static string EntityPath(WeakGameEntity entity, WeakGameEntity hullEntity)
+    public bool TryDescribeObject(MissionObject hull, MissionObject missionObject, out string objectKey, out int objectIndex)
     {
-        var parts = new List<string>();
-        while (entity.IsValid && parts.Count <= MaxPathDepth)
-        {
-            if (entity == hullEntity)
-            {
-                parts.Reverse();
-                return string.Join("/", parts);
-            }
-
-            var parent = entity.Parent;
-            if (!parent.IsValid) return null;
-            int index = parent.GetChildren().ToList().IndexOf(entity);
-            if (index < 0) return null;
-            parts.Add(index.ToString(CultureInfo.InvariantCulture) + ":" + entity.Name);
-            entity = parent;
-        }
-
-        return null;
+        objectKey = EntityPath(missionObject.GameEntity, hull.GameEntity);
+        objectIndex = objectKey == null ? -1
+            : missionObject.GameEntity.GetScriptComponents<MissionObject>().ToList().IndexOf(missionObject);
+        return objectIndex >= 0;
     }
 
-    /// <summary>The entity at <paramref name="path"/> below <paramref name="hullEntity"/>; invalid when it is not there.</summary>
-    internal static WeakGameEntity ResolvePath(WeakGameEntity hullEntity, string path)
+    public MissionObject ResolveObject(MissionObject hull, string objectKey, int objectIndex)
     {
-        var entity = hullEntity;
-        if (!entity.IsValid || path == null) return WeakGameEntity.Invalid;
-
-        foreach (var part in path.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries))
-        {
-            int separator = part.IndexOf(':');
-            if (separator <= 0 || !int.TryParse(part.Substring(0, separator), NumberStyles.Integer, CultureInfo.InvariantCulture, out int index)
-                || index >= entity.ChildCount)
-                return WeakGameEntity.Invalid;
-
-            var child = entity.GetChild(index);
-            if (!child.IsValid || child.Name != part.Substring(separator + 1)) return WeakGameEntity.Invalid;
-            entity = child;
-        }
-
-        return entity;
+        if (objectIndex < 0) return null;
+        var entity = ResolvePath(hull.GameEntity, objectKey);
+        return entity.IsValid ? entity.GetScriptComponents<MissionObject>().ElementAtOrDefault(objectIndex) : null;
     }
+
+    internal static string EntityPath(WeakGameEntity entity, WeakGameEntity hullEntity) =>
+        MissionObjectPath.EntityPath(entity, hullEntity);
+
+    internal static WeakGameEntity ResolvePath(WeakGameEntity hullEntity, string path) =>
+        MissionObjectPath.ResolvePath(hullEntity, path);
 
     public UsableMissionObject ResolveStation(MissionObject hull, string stationKey, int pointIndex)
     {

@@ -49,11 +49,13 @@ public class AgentRoutReporter : IAgentRoutReporter
         this.lifecycle = lifecycle;
 
         messageBroker.Subscribe<BattleAgentRouted>(Handle_BattleAgentRouted);
+        messageBroker.Subscribe<BattleAgentRetreatChanged>(Handle_BattleAgentRetreatChanged);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<BattleAgentRouted>(Handle_BattleAgentRouted);
+        messageBroker.Unsubscribe<BattleAgentRetreatChanged>(Handle_BattleAgentRetreatChanged);
     }
 
     /// <summary>
@@ -70,7 +72,18 @@ public class AgentRoutReporter : IAgentRoutReporter
         if (info.CurrentAuthority != session.OwnControllerId) return;
 
         Logger.Information("[BattleSync] Broadcasting fleeing state of agent {AgentId} to the battle mesh", info.AgentId);
-        network.SendAll(new NetworkBattleAgentFleeing(info.AgentId));
+        network.SendAll(new NetworkBattleAgentFleeing(info.AgentId, info.AuthorityRevision));
+    }
+
+    // Tells peers an owned troop's retreat flag changed. Authority is read here on the game thread, so a new owner reports its rallies.
+    private void Handle_BattleAgentRetreatChanged(MessagePayload<BattleAgentRetreatChanged> payload)
+    {
+        var change = payload.What;
+        if (!change.Agent.IsHuman) return;
+        if (!coopMissionComponent.AgentRegistry.TryGetAgentInfo(change.Agent, out var info)) return;
+        if (info.CurrentAuthority != session.OwnControllerId) return;
+
+        network.SendAll(new NetworkBattleAgentRetreatState(info.AgentId, change.IsRunningAway, info.AuthorityRevision));
     }
 
     // Published synchronously from Mission.OnAgentRemoved, so the mission state is the one the removal happened in.

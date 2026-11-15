@@ -163,21 +163,26 @@ internal class SiegeEventCampaignBehaviorPatches
         ref bool result)
     {
         args.optionLeaveType = leaveType;
-
-        var siegeEvent = PlayerSiege.PlayerSiegeEvent;
-        var settlement = siegeEvent?.BesiegedSettlement;
-        if (settlement?.SiegeEvent == siegeEvent &&
-            siegeEvent.BesiegerCamp?.SiegeEvent == siegeEvent &&
-            (PlayerSiege.PlayerSide != BattleSideEnum.Attacker ||
-             (MobileParty.MainParty?.BesiegerCamp == siegeEvent.BesiegerCamp &&
-              siegeEvent.BesiegerCamp.SiegeEngines != null &&
-              settlement.SiegeEngines != null)))
-        {
-            return true;
-        }
-
         result = false;
-        return false;
+
+        // Without a player siege both sides of the settlement check are null and would pass
+        var siegeEvent = PlayerSiege.PlayerSiegeEvent;
+        if (siegeEvent == null) return false;
+
+        var settlement = siegeEvent.BesiegedSettlement;
+        if (settlement?.SiegeEvent != siegeEvent) return false;
+
+        var besiegerCamp = siegeEvent.BesiegerCamp;
+        if (besiegerCamp?.SiegeEvent != siegeEvent) return false;
+
+        // Defenders only need the settlement and camp to agree
+        if (PlayerSiege.PlayerSide != BattleSideEnum.Attacker) return true;
+
+        if (MobileParty.MainParty?.BesiegerCamp != besiegerCamp) return false;
+        if (besiegerCamp.SiegeEngines == null) return false;
+        if (settlement.SiegeEngines == null) return false;
+
+        return true;
     }
 }
 

@@ -15,6 +15,7 @@ using Xunit;
 namespace Coop.Tests.Missions.Battles;
 
 /// <summary>Checks a silent member cannot report or depart, and can resume reporting without losing its result.</summary>
+[Collection("Mission.Current")]
 public class BattleCompletionSilenceTests
 {
     /// <summary>Silence does not consume the result or epoch deduplication latch.</summary>

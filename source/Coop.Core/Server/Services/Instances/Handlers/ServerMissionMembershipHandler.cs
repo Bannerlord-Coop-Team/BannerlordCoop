@@ -103,6 +103,8 @@ public class ServerMissionMembershipHandler : IHandler
         {
             if (!missionManager.TryEnterMission(peer, controllerId, message.InstanceId, out var result))
             {
+                // Only a concluded or finalized battle refuses an entry, so a late joiner leaves the mission it just opened.
+                network.Send(peer, new NetworkEndBattleMission(message.InstanceId));
                 return;
             }
 

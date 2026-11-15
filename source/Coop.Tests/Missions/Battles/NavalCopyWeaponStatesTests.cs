@@ -11,6 +11,7 @@ using Xunit;
 namespace Coop.Tests.Missions.Battles;
 
 /// <summary>R48 bug 1: a copy weapon's replicated state, kept for the ammo a migration swap carries.</summary>
+[Collection("Mission.Current")]
 public class NavalCopyWeaponStatesTests
 {
     // A swap takes the state once; the replaced weapon's entry goes with it.

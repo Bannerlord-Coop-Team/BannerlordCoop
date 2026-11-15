@@ -272,8 +272,8 @@ public class BattleShipReplicator : IBattleShipReplicator
 
         if (retraction.Announced) return;
 
-        Forget(ship, ShipRemovalReason.Leave);
-        network.SendAll(new NetworkShipRemoved(ship.ShipId, session.OwnControllerId, ShipRemovalReason.Leave, missionEnding: true));
+        Forget(ship, ShipRemovalReason.Retracted);
+        network.SendAll(new NetworkShipRemoved(ship.ShipId, session.OwnControllerId, ShipRemovalReason.Retracted, missionEnding: true));
         removalsSent++;
         retraction.Announced = true;
     }
@@ -501,15 +501,15 @@ public class BattleShipReplicator : IBattleShipReplicator
         hullAuthority.Remove(departing, crew);
     }
 
-    // Counts a queued hull as departed and drops it from the registry; repeatable, as both are keyed by the ship id.
+    // Counts a queued hull as departed, unless a failed AI fleet attempt took it back, and drops it from the registry; repeatable,
+    // as both are keyed by the ship id.
     private void Forget(NetworkShipInfo ship, ShipRemovalReason reason)
     {
         if (ship.ShipId == Guid.Empty) return;
 
-        CountDeparted(ship);
+        if (reason != ShipRemovalReason.Retracted) CountDeparted(ship);
         Prune(ship.ShipId);
-        Logger.Information("[NavalSync] Hull {ShipId} of {Owner} left with its owner ({Reason}); removed it",
-            ship.ShipId, ship.CurrentAuthority, reason);
+        Logger.Information("[NavalSync] Hull {ShipId} of {Owner} removed ({Reason})", ship.ShipId, ship.CurrentAuthority, reason);
     }
 
     // A departing hull's crew leaves with it; anyone else on its deck goes to the hull they crew, or the nearest friendly one.
@@ -539,11 +539,9 @@ public class BattleShipReplicator : IBattleShipReplicator
         }
     }
 
-    /// <summary>[Game thread] Removes every hull a player who left the battle owned, and drops its records still waiting here.</summary>
-    internal void RemoveHullsOf(string controllerId)
+    /// <summary>[Game thread] Removes the <paramref name="departing"/> hulls of a player who left, and drops its records still waiting here.</summary>
+    private void RemoveHullsOf(string controllerId, IReadOnlyList<NetworkShipInfo> departing)
     {
-        // The hulls a departing host simulates for others stay and move to the next host.
-        var departing = Registry.Ships.Where(ship => !ship.FollowsBattleHost && ship.CurrentAuthority == controllerId).ToList();
         foreach (var ship in departing)
             leftWith[ship.ShipId] = controllerId;
         RemoveHulls(departing, ShipRemovalReason.Leave, DepartingCrew.All);
@@ -556,6 +554,10 @@ public class BattleShipReplicator : IBattleShipReplicator
             Prune(held.ShipId);
         }
     }
+
+    // The hulls a departed player takes with it; the AI hulls a departing host simulates for others stay for the next host.
+    private List<NetworkShipInfo> DepartingHullsOf(string controllerId) =>
+        Registry.Ships.Where(ship => !ship.FollowsBattleHost && ship.CurrentAuthority == controllerId).ToList();
 
     // [Game thread] Own hulls only; a joiner that enters after the commit gets the same records directly.
     private void SendSpawnRecords(string controllerId)
@@ -901,11 +903,12 @@ public class BattleShipReplicator : IBattleShipReplicator
     private void AcceptPeerLeft(string controllerId, bool wasHost)
     {
         departedOwners.Add(controllerId);
-        conditions.ForgetReserveOf(controllerId);
+        var departing = DepartingHullsOf(controllerId);
+        conditions.ForgetReserves(departing);
         if (Mission.Current == null) return;
 
         // At sea the hull removal takes the leaver's crew, so its party is withdrawn only once the hulls are gone.
-        RemoveHullsOf(controllerId);
+        RemoveHullsOf(controllerId, departing);
         pendingWithdrawals[controllerId] = wasHost;
     }
 

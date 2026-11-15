@@ -3,6 +3,7 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using Coop.Core.Client.Services.MobileParties.Messages;
+using GameInterface.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.MobileParties.Messages;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages.Leave;

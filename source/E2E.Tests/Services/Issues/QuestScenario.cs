@@ -52,6 +52,16 @@ internal sealed class QuestScenario
         }
     }
 
+    public QuestScenario(E2ETestEnvironment testEnvironment, Action<EnvironmentInstance, string> setupIssue)
+    {
+        this.testEnvironment = testEnvironment;
+        NotableId = testEnvironment.CreateRegisteredObject<Hero>();
+        PlayerA = RegisterPlayer(ClientA, ControllerA);
+        PlayerB = RegisterPlayer(ClientB, ControllerB);
+        foreach (var instance in new[] { Server, ClientA, ClientB })
+            instance.Call(() => setupIssue(instance, NotableId));
+    }
+
     // Gives another hero an issue nobody has taken, on every machine
     public void AddIssue(string heroId, string issueId)
     {

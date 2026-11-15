@@ -1,7 +1,9 @@
-﻿using Coop.Steam;
+﻿using Common.Network.Session;
+using Coop.Steam;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 
 namespace Coop.Tests.Steam
 {
@@ -17,6 +19,7 @@ namespace Coop.Tests.Steam
             new List<(uint, byte[], bool)>();
         private readonly Dictionary<uint, Queue<byte[]>> pendingReceives = new Dictionary<uint, Queue<byte[]>>();
         private readonly Dictionary<uint, ulong> remoteSteamIds = new Dictionary<uint, ulong>();
+        private readonly Dictionary<uint, RouteHealth> connectionHealth = new Dictionary<uint, RouteHealth>();
 
         public uint NextConnection = 501;
         public ulong ConnectedHost;
@@ -87,7 +90,15 @@ namespace Coop.Tests.Steam
 
         public void ListenForClients(int virtualPort) => Listening = true;
 
-        public void StopListening() => Listening = false;
+        public Action OnStopListening;
+        public int ReceiveCalls => Volatile.Read(ref receiveCalls);
+        private int receiveCalls;
+
+        public void StopListening()
+        {
+            OnStopListening?.Invoke();
+            Listening = false;
+        }
 
         public void AcceptConnection(uint connection) => AcceptedConnections.Add(connection);
 
@@ -128,6 +139,7 @@ namespace Coop.Tests.Steam
 
         public int ReceiveDatagram(uint connection, byte[] buffer)
         {
+            Interlocked.Increment(ref receiveCalls);
             lock (gate)
             {
                 if (!pendingReceives.TryGetValue(connection, out var queue) || queue.Count == 0) return 0;
@@ -139,6 +151,23 @@ namespace Coop.Tests.Steam
         }
 
         public string DescribeConnection(uint connection) => "fake";
+
+        public bool TryGetConnectionHealth(uint connection, out RouteHealth health)
+        {
+            lock (gate)
+            {
+                return connectionHealth.TryGetValue(connection, out health);
+            }
+        }
+
+        /// <summary>Scripts the health <see cref="TryGetConnectionHealth"/> reports for a connection.</summary>
+        public void SetConnectionHealth(uint connection, RouteHealth health)
+        {
+            lock (gate)
+            {
+                connectionHealth[connection] = health;
+            }
+        }
 
         public void Dispose()
         {

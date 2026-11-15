@@ -16,6 +16,7 @@ using GameInterface.Services.NavalDLC;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.OrderOfBattle;
 using GameInterface.Services.Smithing;
+using GameInterface.Services.ViewData;
 using GameInterface.Services.Workshops;
 using LiteNetLib;
 using Serilog;
@@ -123,7 +124,8 @@ internal class GameSaveDataPacketHandler : IPacketHandler
             completedTransfer.ServerOptions,
             completedTransfer.ClanFinance,
             completedTransfer.OrderOfBattlePlayerData,
-            completedTransfer.HeldLootShipIds));
+            completedTransfer.HeldLootShipIds,
+            completedTransfer.ViewDataPlayerData));
     }
 
     private sealed class PendingTransfer
@@ -152,6 +154,7 @@ internal class GameSaveDataPacketHandler : IPacketHandler
             ClanFinance = firstChunk.ClanFinance;
             OrderOfBattlePlayerData = firstChunk.OrderOfBattlePlayerData;
             HeldLootShipIds = firstChunk.HeldLootShipIds;
+            ViewDataPlayerData = firstChunk.ViewDataPlayerData;
         }
 
         public int TransferId { get; }
@@ -173,6 +176,7 @@ internal class GameSaveDataPacketHandler : IPacketHandler
         public Dictionary<string, ClanFinanceSettings> ClanFinance { get; }
         public OrderOfBattlePlayerData OrderOfBattlePlayerData { get; }
         public string[] HeldLootShipIds { get; }
+        public ViewDataPlayerData ViewDataPlayerData { get; }
 
         public bool TryAdd(GameSaveDataChunkPacket chunk)
         {
