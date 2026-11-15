@@ -16,6 +16,7 @@ using GameInterface.Services.MapEvents.Patches;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.Library;
 using Xunit.Abstractions;
 
@@ -187,6 +188,51 @@ public class MapEventCollectionTests : MapEventTestBase
         client.Call(() => Assert.Same(
             Get<PartyBase>(client, partyId),
             Get<MapEventParty>(client, mapEventPartyId).Party));
+    }
+
+    [Fact]
+    public void Client_FieldJoin_AttachesReplicatedBattleToJoinedPlayerEncounter()
+    {
+        var staged = CreateServerMapEvent();
+        var client = Clients.First();
+        string sideId = null;
+        string mapEventPartyId = null;
+        string partyId = staged.AttackerPartyId;
+        string partyBaseId = null;
+
+        Server.Call(() =>
+        {
+            var mapEvent = Get<MapEvent>(Server, staged.MapEventId);
+            Assert.True(Server.ObjectManager.TryGetId(mapEvent.AttackerSide, out sideId));
+            Assert.True(Server.ObjectManager.TryGetId(Get<MobileParty>(Server, partyId).Party, out partyBaseId));
+            var mapEventParty = Assert.Single(mapEvent.AttackerSide.Parties,
+                party => party.Party == Get<MobileParty>(Server, partyId).Party);
+            Assert.True(Server.ObjectManager.TryGetId(mapEventParty, out mapEventPartyId));
+        });
+
+        client.Call(() =>
+        {
+            var mapEvent = Get<MapEvent>(client, staged.MapEventId);
+            var party = Get<MobileParty>(client, partyId);
+            Campaign.Current.MainParty = party;
+            PlayerEncounter.Start();
+            var encounter = PlayerEncounter.Current;
+            encounter._encounteredParty = mapEvent.DefenderSide.LeaderParty;
+            encounter.IsJoinedBattle = true;
+            encounter._mapEvent = null;
+            party.Party._mapEventSide = mapEvent.AttackerSide;
+            mapEvent.AttackerSide._battleParties.RemoveAll(entry => entry.Party == party.Party);
+            Assert.Null(PlayerEncounter.Battle);
+        });
+
+        client.SimulateMessage(Server.NetPeer, new NetworkAddBattleParty(sideId, mapEventPartyId, partyBaseId));
+
+        client.Call(() =>
+        {
+            var mapEvent = Get<MapEvent>(client, staged.MapEventId);
+            Assert.Same(mapEvent, PlayerEncounter.Battle);
+            Assert.Same(mapEvent, PlayerEncounter.Current._mapEvent);
+        });
     }
 
     [Fact]
