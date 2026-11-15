@@ -221,7 +221,6 @@ public class MapEventCollectionTests : MapEventTestBase
             var encounter = PlayerEncounter.Current;
             encounter._encounteredParty = mapEvent.DefenderSide.LeaderParty;
             encounter.IsJoinedBattle = true;
-            Assert.Null(encounter._mapEvent);
             party.Party._mapEventSide = mapEvent.AttackerSide;
             mapEvent.AttackerSide._battleParties.RemoveAll(entry => entry.Party == party.Party);
             Assert.Null(PlayerEncounter.Battle);

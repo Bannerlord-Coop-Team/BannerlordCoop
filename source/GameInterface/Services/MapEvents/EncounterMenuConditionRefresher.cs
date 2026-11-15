@@ -86,8 +86,8 @@ internal class EncounterMenuConditionRefresher : IEncounterMenuConditionRefreshe
         if (!mapEvent.IsFieldBattle)
             return;
 
-        // The client join path leaves the encounter unbound while AddPartyInternal is suppressed and the
-        // authoritative NetworkAddBattleParty is pending.
+        // Live logs show join_encounter with no encounterBattleId after the client AddPartyInternal interception
+        // clears MainParty.MapEventSide; NetworkAddBattleParty is the authoritative add that follows.
         encounter._mapEvent = mapEvent;
     }
 
