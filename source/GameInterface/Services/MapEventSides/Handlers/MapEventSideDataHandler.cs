@@ -194,7 +194,10 @@ internal class MapEventSideDataHandler : IHandler
         // server-authoritative, so MapEventSidePatches suppresses that local add and the encounter keeps
         // its pre-join state. Adopt the replicated event before rebuilding the menu, otherwise the native
         // order-attack consequence dereferences a null Battle.
-        if (MobileParty.MainParty?.MapEvent == mapEvent && PlayerEncounter.Current?._mapEvent == null)
+        if (ShouldAdoptPlayerEncounterMapEvent(
+                mapEvent,
+                MobileParty.MainParty?.MapEvent,
+                PlayerEncounter.Current?._mapEvent))
         {
             using (new AllowedThread())
                 PlayerEncounter.Current._mapEvent = mapEvent;
@@ -203,6 +206,12 @@ internal class MapEventSideDataHandler : IHandler
         SwitchRaiderToEncounterIfNeeded(mapEvent);
         encounterMenuConditionRefresher.RefreshForMapEvent(mapEvent);
     }
+
+    internal static bool ShouldAdoptPlayerEncounterMapEvent(
+        MapEvent mapEvent,
+        MapEvent mainPartyMapEvent,
+        MapEvent encounterMapEvent)
+        => mainPartyMapEvent == mapEvent && encounterMapEvent == null;
 
     private static void SwitchRaiderToEncounterIfNeeded(MapEvent mapEvent)
     {

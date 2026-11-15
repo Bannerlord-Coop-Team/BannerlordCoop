@@ -511,6 +511,12 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
             Assert.True(sendTroopsArgs.IsEnabled);
             Assert.Equal(GameMenuOption.LeaveType.OrderTroopsToAttack, sendTroopsArgs.optionLeaveType);
 
+            // The joining client must be able to execute the native Send troops consequence without the
+            // PlayerEncounter.Battle null reference that motivated this regression test.
+            var consequenceException = Record.Exception(() => MenuHelper.EncounterOrderAttack(null));
+            Assert.Null(consequenceException);
+            Assert.Same(mapEvent, PlayerEncounter.CurrentBattleSimulation?.MapEvent);
+
             var healthyHitPoints = Hero.MainHero.HitPoints;
             var previousOptions = ModConfigProvider.ModOptions;
             try
