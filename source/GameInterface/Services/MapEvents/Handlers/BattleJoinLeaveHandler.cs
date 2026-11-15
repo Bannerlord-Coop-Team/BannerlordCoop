@@ -180,7 +180,7 @@ internal class BattleJoinLeaveHandler : IHandler
 
     private static void SwitchSiegeJoinerToEncounterIfNeeded(MapEvent mapEvent)
     {
-        if (!mapEvent.IsSiegeAssault && !mapEvent.IsSallyOut)
+        if (!mapEvent.IsSiegeStyleJoin())
             return;
 
         if (MobileParty.MainParty?.MapEvent != mapEvent)

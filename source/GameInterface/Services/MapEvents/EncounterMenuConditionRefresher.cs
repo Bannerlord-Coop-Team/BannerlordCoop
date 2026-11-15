@@ -1,4 +1,5 @@
 ﻿using Common;
+using GameInterface.Services.MapEvents.Extensions;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.Core;
@@ -25,6 +26,8 @@ internal class EncounterMenuConditionRefresher : IEncounterMenuConditionRefreshe
             return;
 
         var encounter = PlayerEncounter.Current;
+
+        // The authoritative attach can land while the joiner is still in join_encounter, so bind before the menu check.
         AdoptJoinedFieldBattleIfNeeded(mapEvent, encounter);
 
         var menuContext = Campaign.Current?.CurrentMenuContext;
@@ -32,11 +35,11 @@ internal class EncounterMenuConditionRefresher : IEncounterMenuConditionRefreshe
             return;
 
         // The encounter can hold the event before the main party's own attach lands (and the other way round).
-        if (MobileParty.MainParty?.MapEvent != mapEvent && PlayerEncounter.Battle != mapEvent)
+        if (MobileParty.MainParty?.MapEvent != mapEvent && encounter?._mapEvent != mapEvent)
             return;
 
         if (mapEvent.IsRaidHostileAction() && !mapEvent.IsFinalized && !mapEvent.HasWinner &&
-            PlayerEncounter.Battle == mapEvent && MobileParty.MainParty?.Party.MapEventSide == mapEvent.AttackerSide &&
+            encounter?._mapEvent == mapEvent && MobileParty.MainParty?.Party.MapEventSide == mapEvent.AttackerSide &&
             mapEvent.DefenderSide.TroopCount == 0 && mapEvent.MapEventSettlement?.Militia == 0f &&
             Game.Current?.GameStateManager.ActiveState is MapState { MapConversationActive: false })
         {
@@ -74,12 +77,19 @@ internal class EncounterMenuConditionRefresher : IEncounterMenuConditionRefreshe
 
     private static void AdoptJoinedFieldBattleIfNeeded(MapEvent mapEvent, PlayerEncounter encounter)
     {
-        if (encounter?._mapEvent != null || encounter?.IsJoinedBattle != true ||
-            MobileParty.MainParty?.MapEvent != mapEvent || mapEvent.IsSiegeAssault || mapEvent.IsSallyOut)
-            return;
+        if (encounter?._mapEvent != null)
+            return; // Preserve an encounter that is already bound.
+
+        if (encounter?.IsJoinedBattle != true)
+            return; // Only a server-authoritative joined battle needs adoption.
+
+        if (MobileParty.MainParty?.MapEvent != mapEvent)
+            return; // The event must be the main party's current encounter.
+
+        if (mapEvent.IsSiegeStyleJoin())
+            return; // Siege and sally joins use BattleJoinLeaveHandler's re-entry flow.
 
         // The encounter menu's on_init runs PlayerEncounter.Update(), which nulls _mapEvent while the join is pending.
-        // Siege and sally joins are rebound by BattleJoinLeaveHandler.SwitchSiegeJoinerToEncounterIfNeeded.
         encounter._mapEvent = mapEvent;
     }
 

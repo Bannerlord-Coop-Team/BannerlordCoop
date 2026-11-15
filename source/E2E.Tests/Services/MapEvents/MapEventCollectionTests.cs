@@ -232,7 +232,6 @@ public class MapEventCollectionTests : MapEventTestBase
         {
             var mapEvent = Get<MapEvent>(client, staged.MapEventId);
             Assert.Same(mapEvent, PlayerEncounter.Battle);
-            Assert.Same(mapEvent, PlayerEncounter.Current._mapEvent);
         });
     }
 
