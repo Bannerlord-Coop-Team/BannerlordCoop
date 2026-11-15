@@ -160,7 +160,6 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
 
     public void BeginHostileActionPresentation(VillageHostileAction action)
     {
-        requestedHostileActionEncounter = null;
         var encounter = PlayerEncounter.Current;
         if (encounter == null)
         {
@@ -189,6 +188,11 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         }
 
         GameMenu.SwitchToMenu("encounter");
+    }
+
+    public void CompleteHostileActionRequest()
+    {
+        requestedHostileActionEncounter = null;
     }
 
     public bool TryTrackHostileActionRequest()
@@ -220,7 +224,6 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         // Presented from Handle_CampaignTick once the result screens are done and the encounter has ended.
         parkedRaidContinuation = settlement;
         parkedRaidEncounter = PlayerEncounter.Current;
-        // Keep the continuation parked until the result screens have finished and the encounter can be reused.
     }
 
     private void PresentParkedRaidContinuation()

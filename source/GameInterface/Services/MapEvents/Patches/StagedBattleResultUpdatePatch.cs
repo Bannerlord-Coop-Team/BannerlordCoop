@@ -36,7 +36,7 @@ internal static class StagedBattleResultUpdatePatch
     internal static bool HasStagedResults(PlayerEncounter encounter) =>
         encounter?._mapEvent is MapEvent mapEvent &&
         (mapEvent.IsHideoutBattle ||
-         (mapEvent.IsRaidHostileAction() && encounter.BattleSimulation != null) ||
+         MapEventInitializationBarrier.IsStagedRaidSimulationResult(encounter) ||
          (mapEvent.IsSiegeAssault && encounter.PlayerSide == BattleSideEnum.Defender)) &&
         MapEventInitializationBarrier.IsBattleResultEncounter(encounter);
 }

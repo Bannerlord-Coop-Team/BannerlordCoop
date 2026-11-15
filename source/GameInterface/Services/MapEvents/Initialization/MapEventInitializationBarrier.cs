@@ -521,7 +521,7 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         }
 
         // A winning raid keeps its references for native loot-end continuation; other wins share defeat cleanup.
-        if (mapEvent.IsRaidHostileAction() && playerWon)
+        if (IsStagedRaidSimulationResult(encounter))
             return false;
 
         if (PlayerCaptivity.IsCaptive)
@@ -620,6 +620,12 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
                 return false;
         }
     }
+
+    internal static bool IsStagedRaidSimulationResult(PlayerEncounter encounter) =>
+        encounter?._mapEvent is MapEvent mapEvent &&
+        mapEvent.IsRaidHostileAction() &&
+        encounter.BattleSimulation != null &&
+        mapEvent.WinningSide == encounter.PlayerSide;
 
     private static MapEvent GetPlayerEncounterBattle()
     {

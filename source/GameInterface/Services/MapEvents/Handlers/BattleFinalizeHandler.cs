@@ -183,10 +183,8 @@ internal class BattleFinalizeHandler : IHandler
         if (playerPartyIds.Length > 0)
         {
             PvpEncounterCloseSender.Send(network, playerPartyIds, mapEventId: payload.What.MapEventId);
-        }
-
-        if (playerPartyIds.Length > 0)
             return;
+        }
 
         if (requester != null)
             network.Send(requester, new NetworkMapEventFinalized());
@@ -399,10 +397,10 @@ internal class BattleFinalizeHandler : IHandler
 
         using (CreateHideoutFinalizeContext(mapEvent))
             mapEvent.FinalizeEventAux();
-        if (!continuesRaid)
-            MoveRaidAttackersToSettlementGate(raidAttackers, raidSettlement);
-        else
+        if (continuesRaid)
             network.Send(raidLeaderPeer, new NetworkRaidContinuationRequested(raidSettlementId));
+        else
+            MoveRaidAttackersToSettlementGate(raidAttackers, raidSettlement);
 
         // After the destroy (same game thread, so behind it on the reliable-ordered channel).
         if (!string.IsNullOrEmpty(defenderVictorySettlementId))
