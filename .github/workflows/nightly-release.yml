@@ -671,7 +671,7 @@ jobs:
 
   cleanup-private-handoff:
     needs: [build, sign-and-publish]
-    if: ${{ always() && needs.build.result == 'success' && needs.build.outputs.handoff_key != '' }}
+    if: ${{ always() && needs.build.result == 'success' && needs.sign-and-publish.result == 'success' && needs.build.outputs.handoff_key != '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
