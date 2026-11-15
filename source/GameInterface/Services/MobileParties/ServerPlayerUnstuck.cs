@@ -31,9 +31,9 @@ internal interface IServerPlayerUnstuck
     /// <summary>
     /// Force-applies every applicable exit for the player's registered party and hero, releases every
     /// party (not only the player's) still linked to a battle that already ended, ends battles left with no
-    /// healthy troops on one side, then moves a free party off a map spot it cannot move from, each step
-    /// guarded independently, and sends the result to the player's connection when it has one. Runs on
-    /// the game thread.
+    /// healthy troops on one side, ends the raft state of a party stranded on land, then moves a free party
+    /// off a map spot it cannot move from, each step guarded independently, and sends the result to the
+    /// player's connection when it has one. Runs on the game thread.
     /// </summary>
     /// <returns>One line per step applied, skipped or failed.</returns>
     string[] Apply(Player player, bool includeCaptivity);
@@ -214,6 +214,15 @@ internal class ServerPlayerUnstuck : IServerPlayerUnstuck
                 : $"Ended {resolved} battles left with no healthy troops on one side.";
         });
 
+        // Registered only while War Sails is on
+        if (raftFleetInterface != null)
+        {
+            TryStep(actions, "put ashore", () =>
+                raftFleetInterface.PutAshore(party)
+                    ? $"Put the party ashore at {Format(party.Position)}, it stood on land but was still on a raft or marked at sea."
+                    : null);
+        }
+
         // Last, so a party the exits above just freed is checked at its final spot.
         TryStep(actions, "map position repair", () =>
             partyNavigationRepair.TryRepair(party, out var previousPosition)
@@ -222,7 +231,7 @@ internal class ServerPlayerUnstuck : IServerPlayerUnstuck
 
         if (actions.Count == 0)
         {
-            actions.Add("No server-side stuck state found (captivity, map event, army, siege camp, settlement, raft, map position).");
+            actions.Add("No server-side stuck state found (captivity, map event, army, siege camp, settlement, raft or at sea, map position).");
         }
 
         return SendResult(player, partyId, actions);

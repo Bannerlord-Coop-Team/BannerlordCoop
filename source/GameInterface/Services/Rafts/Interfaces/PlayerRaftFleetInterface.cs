@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using GameInterface.CoopSessionData;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.NavalDLC;
 using GameInterface.Services.ObjectManager;
@@ -19,7 +20,7 @@ namespace GameInterface.Services.Rafts.Interfaces;
 
 /// <summary>
 /// Server-only: strands a player's party released from captivity at sea and keeps its fleet until it washes ashore or
-/// leaves its raft at sea.
+/// leaves its raft at sea, and lands a party left on a raft or marked at sea while it stands on land.
 /// </summary>
 public interface IPlayerRaftFleetInterface : IGameAbstraction
 {
@@ -43,6 +44,11 @@ public interface IPlayerRaftFleetInterface : IGameAbstraction
     /// client. Returns false for a party that isn't a raft free at sea.
     /// </summary>
     bool ResumeRaft(MobileParty party);
+    /// Lands a party that stands on land but is still on a raft or marked at sea, ends its raft state, gives back its fleet
+    /// and holds it there on every client. Returns false for a parked party, a party at sea, or one neither on a raft nor
+    /// marked at sea.
+    /// </summary>
+    bool PutAshore(MobileParty party);
 
     /// <summary>
     /// Puts a player's new party on a raft or gives it the fleet cached for that player, like
@@ -118,15 +124,11 @@ public class PlayerRaftFleetInterface : IPlayerRaftFleetInterface
         party.Anchor.SetLastUsedDisembarkPosition(new CampaignVec2(new Vec2(fleet.DisembarkX, fleet.DisembarkY), fleet.DisembarkIsOnLand));
     }
 
-    // RaftStateChangeAction.DeactivateRaftStateForParty without the short-term behavior and AI rethink for a party its client
-    // moves; EnableAi restores vanilla's non-raft value of the synced _isDisabled, which the raft's DisableAi set.
     public void LeaveRaftAtSea(MobileParty party)
     {
         if (!party.IsInRaftState) return;
 
-        party.IsInRaftState = false;
-        party.Ai.EnableAi();
-        CampaignEventDispatcher.Instance.OnMobilePartyRaftStateChanged(party);
+        EndRaftState(party);
         ReturnFleet(party);
         // ReturnFleet restores the coast anchor cached at the stranding, but a party at sea sails with its fleet, unanchored.
         party.Anchor.ResetPosition();
@@ -139,6 +141,42 @@ public class PlayerRaftFleetInterface : IPlayerRaftFleetInterface
         party.MovePartyToTheClosestLand();
         messageBroker.Publish(this, new PartyBehaviorChangeAttempted(party, forcePosition: true, isCurrentlyAtSea: party.IsCurrentlyAtSea));
         return true;
+    }
+
+    public bool PutAshore(MobileParty party)
+    {
+        // A captive's party stays parked until its release reactivates it
+        if (!party.IsActive) return false;
+        // Only a party already on land, so a raft still at sea can't skip washing ashore
+        if (!party.Position.IsOnLand) return false;
+        // Nothing to land, neither a raft nor marked at sea
+        if (!party.IsInRaftState && !party.IsCurrentlyAtSea) return false;
+
+        if (party.IsTransitionInProgress)
+            party.CancelNavigationTransition();
+
+        party.DisembarkToPosition(party.Position);
+        party.SetMoveModeHold();
+        party.ResetNavigationToHold();
+
+        if (party.IsInRaftState)
+            EndRaftState(party);
+
+        // Unlike LeaveRaftAtSea, the fleet keeps the coast anchor ReturnFleet restores, like a landing
+        ReturnFleet(party);
+
+        // Clears the client's raft move target too, which would otherwise keep heading for the old shore
+        messageBroker.Publish(this, new PartyBehaviorChangeAttempted(party, forcePosition: true, isCurrentlyAtSea: false, resetMovementToHold: true));
+        return true;
+    }
+
+    // RaftStateChangeAction.DeactivateRaftStateForParty without the short-term behavior and AI rethink for a party its client
+    // moves; EnableAi restores vanilla's non-raft value of the synced _isDisabled, which the raft's DisableAi set.
+    private static void EndRaftState(MobileParty party)
+    {
+        party.IsInRaftState = false;
+        party.Ai.EnableAi();
+        CampaignEventDispatcher.Instance.OnMobilePartyRaftStateChanged(party);
     }
 
     public void OnPlayerCharacterChanged(Hero newPlayerHero, MobileParty newMainParty)

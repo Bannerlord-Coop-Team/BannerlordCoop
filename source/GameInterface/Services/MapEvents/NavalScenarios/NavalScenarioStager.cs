@@ -693,7 +693,7 @@ public class NavalScenarioStager : INavalScenarioStager
         }
 
         if (config.AlliedNpc)
-            log.Append(" alliedNpc=").Append(JoinAlliedNpc(mapEvent, players[0], enemy, hull));
+            log.Append(" alliedNpc=").Append(JoinAlliedNpc(config, mapEvent, players[0], enemy, hull));
 
         error = null;
         return true;
@@ -789,8 +789,9 @@ public class NavalScenarioStager : INavalScenarioStager
         Logger.Information("[NavalScenario] Late join of {ControllerId}: {Outcome}", config.LateJoinerControllerId, error ?? "joined");
     }
 
-    // Allied NPC fleets are not fielded yet, so this only records how the battle treats the joined party.
-    private string JoinAlliedNpc(MapEvent mapEvent, MobileParty player, MobileParty enemy, ShipHull hull)
+    // Joins the nearest free allied lord with allies=n ships to the players' side, with army=1 as a member of the first player's
+    // army; the battle host fields its fleet on the ally team.
+    private string JoinAlliedNpc(NavalScenarioConfig config, MapEvent mapEvent, MobileParty player, MobileParty enemy, ShipHull hull)
     {
         var playerPosition = player.Position.ToVec2();
         var ally = MobileParty.All
@@ -799,12 +800,30 @@ public class NavalScenarioStager : INavalScenarioStager
             .FirstOrDefault();
         if (ally == null) return "none(no friendly lord party is free)";
 
-        TopUpShips(ally.Party, 1, hull);
+        TopUpShips(ally.Party, config.AlliedShips, hull);
         staging.PlaceAtSea(ally, enemy.Position);
+        string army = "army=none";
+        if (config.PlayerArmy) army = JoinPlayerArmy(player, ally);
+
         ally.Party.MapEventSide = player.Party.MapEventSide;
         return ally.MapEvent == mapEvent
-            ? $"{ally.StringId}(ships={ally.Ships.Count},troops={ally.MemberRoster.TotalManCount})"
-            : $"{ally.StringId}(not added to the map event)";
+            ? $"{ally.StringId}(ships={ally.Ships.Count},troops={ally.MemberRoster.TotalManCount},{army})"
+            : $"{ally.StringId}(not added to the map event,{army})";
+    }
+
+    // Puts the allied lord in an army the player leads, through the vanilla actions the clan and army syncs replicate; the
+    // player's clan joins the lord's kingdom first, as only a kingdom's lords lead its armies.
+    private static string JoinPlayerArmy(MobileParty player, MobileParty ally)
+    {
+        if (ally.MapFaction is not Kingdom kingdom) return "army=none(the allied lord has no kingdom)";
+
+        var clan = player.LeaderHero.Clan;
+        if (clan.Kingdom != kingdom) ChangeKingdomAction.ApplyByJoinToKingdom(clan, kingdom);
+        kingdom.CreateArmy(player.LeaderHero, ally.HomeSettlement ?? kingdom.FactionMidSettlement, Army.ArmyTypes.Patrolling);
+        if (player.Army == null) return "army=none(the army was not created)";
+
+        ally.Army = player.Army;
+        return $"army={player.Army.Name}(leader={player.StringId},members={player.Army.Parties.Count})";
     }
 
     // A free AI lord party friendly to the player and at war with the AI fleet.
