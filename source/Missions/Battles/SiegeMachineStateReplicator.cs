@@ -343,8 +343,10 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         network.SendAll(Stamp(state));
     }
 
-    // Only DestructableComponent.Reset moves a broken machine back to state 0: a hit that computes state 0 throws
-    // in ReplaceEntityWithBrokenEntity. A hit after a heal can lower the state to any value above 0; not a repair.
+    // Only DestructableComponent.Reset moves a broken machine back to state 0 cleanly. A hit that computes state 0
+    // sets it, then throws in ReplaceEntityWithBrokenEntity, which leaves the host's own machine broken; that is not
+    // mirrored. A hit after a heal can lower the state to any value above 0; not a repair. The host's real state
+    // follows every reset, so a peer ends at the host's hit points.
     internal static bool IsRepair(NetworkSiegeMachineState previous, NetworkSiegeMachineState current) =>
         current.DestructionState == 0 && (previous.DestructionState > 0 || previous.HitPoints == 0f);
 
@@ -1480,10 +1482,14 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
 
             // First, so a mission change clears the buffers before this reset is kept, not after.
             RefreshMachineCache();
+            // Decide on the same key as a state message (ClassifySnapshotAuthority): once the machine's authority for
+            // this epoch is recorded, the states after this reset apply at once, so the reset must apply at once too.
+            bool fromHost = IsResetFromHost(obj, out bool authorityRecorded);
+
             // A promoted host's reset can arrive before its host assignment (server broadcasts race the mesh):
-            // keep it until that epoch is ours, as a state message is buffered.
-            bool ahead = obj.HostEpoch > session.HostEpoch;
-            if (!ahead && !session.IsHostController(obj.SenderControllerId)) return;
+            // keep it until that epoch is ours. A late reset from an older host is already dropped by the watermark above.
+            bool ahead = !fromHost && !authorityRecorded && obj.HostEpoch > session.HostEpoch;
+            if (!fromHost && !ahead) return;
 
             // A buffered state predates the reset (same ordered channel); the post-reset state follows it.
             pendingByMachineId.Remove(obj.MachineId);
@@ -1494,6 +1500,7 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
                 return;
             }
 
+            pendingResetsByMachineId.Remove(obj.MachineId);
             ApplyResetToMachine(obj.MachineId);
         });
     }
@@ -1506,12 +1513,23 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         int localEpoch = session.HostEpoch;
         foreach (var reset in new List<NetworkSiegeMachineReset>(pendingResetsByMachineId.Values))
         {
-            if (reset.HostEpoch > localEpoch) continue;
+            bool fromHost = IsResetFromHost(reset, out bool authorityRecorded);
+            if (!fromHost && !authorityRecorded && reset.HostEpoch > localEpoch) continue;
 
             pendingResetsByMachineId.Remove(reset.MachineId);
-            if (reset.HostEpoch == localEpoch && session.IsHostController(reset.SenderControllerId))
-                ApplyResetToMachine(reset.MachineId);
+            if (fromHost) ApplyResetToMachine(reset.MachineId);
         }
+    }
+
+    // The same key a state message uses (ClassifySnapshotAuthority): the machine's recorded authority for the
+    // reset's epoch when there is one, else the session's current host.
+    private bool IsResetFromHost(NetworkSiegeMachineReset reset, out bool authorityRecorded)
+    {
+        authorityRecorded = authorityRevisions.ContainsKey(reset.MachineId)
+            && GetAuthorityEpoch(reset.MachineId) == reset.HostEpoch;
+        return authorityRecorded
+            ? GetAuthorityHostController(reset.MachineId) == (reset.SenderControllerId ?? string.Empty)
+            : reset.HostEpoch == session.HostEpoch && session.IsHostController(reset.SenderControllerId);
     }
 
     private void ApplyResetToMachine(int machineId)

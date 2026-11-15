@@ -724,6 +724,62 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
         Assert.Equal("promoted-host", PendingStates()[33].SenderControllerId);
     }
 
+    // A promoted host sends its authority before its reset. States after the reset apply against that recorded
+    // authority at once, so the reset must apply at once too, or it lands later and overwrites them.
+    [Fact]
+    public void MachineReset_FromTheRecordedAuthorityHost_AppliesBeforeTheHostAssignment()
+    {
+        broker.Publish(this, new NetworkSiegeMachineAuthority(33, "promoted-host", hostEpoch: LocalEpoch + 1,
+            authorityRevision: 1, senderControllerId: "promoted-host"));
+        DrainGameThread();
+        broker.Publish(this, new NetworkSiegeMachineReset(33, LocalEpoch + 1, "promoted-host"));
+        DrainGameThread();
+
+        Assert.Empty(PendingResets());
+    }
+
+    [Fact]
+    public void MachineReset_FromAPeerThatIsNotTheRecordedAuthorityHost_IsDropped()
+    {
+        broker.Publish(this, new NetworkSiegeMachineAuthority(33, "promoted-host", hostEpoch: LocalEpoch + 1,
+            authorityRevision: 1, senderControllerId: "promoted-host"));
+        DrainGameThread();
+        broker.Publish(this, new NetworkSiegeMachineReset(33, LocalEpoch + 1, "other-peer"));
+        DrainGameThread();
+
+        Assert.Empty(PendingResets());
+    }
+
+    [Fact]
+    public void BufferedMachineReset_AppliesWhenItsHostsAuthorityArrives()
+    {
+        broker.Publish(this, new NetworkSiegeMachineReset(33, LocalEpoch + 1, "promoted-host"));
+        DrainGameThread();
+        Assert.True(PendingResets().ContainsKey(33));
+
+        broker.Publish(this, new NetworkSiegeMachineAuthority(33, "promoted-host", hostEpoch: LocalEpoch + 1,
+            authorityRevision: 1, senderControllerId: "promoted-host"));
+        DrainGameThread();
+
+        Assert.Empty(PendingResets());
+    }
+
+    // Two migrations in a row: messages from different hosts are not ordered against each other. The accepted-epoch
+    // watermark (HostEpochPolicy) drops the older reset.
+    [Fact]
+    public void MachineReset_FromAnOlderHost_DoesNotReplaceTheNewerBufferedResetOrItsState()
+    {
+        broker.Publish(this, new NetworkSiegeMachineReset(33, LocalEpoch + 2, "newest-host"));
+        DrainGameThread();
+        broker.Publish(this, MachineState(33, LocalEpoch + 2, senderControllerId: "newest-host", authorityRevision: 0));
+        DrainGameThread();
+        broker.Publish(this, new NetworkSiegeMachineReset(33, LocalEpoch + 1, "older-host"));
+        DrainGameThread();
+
+        Assert.Equal(LocalEpoch + 2, PendingResets()[33].HostEpoch);
+        Assert.Equal("newest-host", PendingStates()[33].SenderControllerId);
+    }
+
     private Dictionary<int, NetworkSiegeMachineReset> PendingResets()
         => GetField<Dictionary<int, NetworkSiegeMachineReset>>(sut, "pendingResetsByMachineId");
 
