@@ -8,6 +8,7 @@ using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.UI.Notifications;
 using Serilog;
 using System;
 using System.Linq;
@@ -109,13 +110,21 @@ internal class ActiveIssueDismisser : IHandler, IActiveIssueDismisser
                 if ((issue.IsSolvingWithQuest || issue.IsSolvingWithLordSolution) && !OwnerIsConnected(issue))
                 {
                     DismissQuest(issue, announce);
-                    dismissed++;
                 }
                 else if (issue.IsSolvingWithAlternative && !HasOwner(issue))
                 {
                     DismissTroops(issue, announce);
-                    dismissed++;
                 }
+                else
+                {
+                    continue;
+                }
+
+                dismissed++;
+                // Startup has no client replay to remove stale unfinished rows, but cancelled history stays.
+                if (!announce)
+                    Campaign.Current.LogEntryHistory._logs.RemoveAll(
+                        entry => entry is JournalLogEntry journal && journal.IsRelatedTo(issue) && !journal.IsEnded());
             }
             catch (Exception e)
             {
