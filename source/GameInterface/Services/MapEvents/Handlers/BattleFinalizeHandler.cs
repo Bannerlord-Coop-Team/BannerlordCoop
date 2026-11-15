@@ -219,20 +219,6 @@ internal class BattleFinalizeHandler : IHandler
         return handled;
     }
 
-    /// <summary>[Server, game thread] Apply the shared-battle retreat rule to a requester.</summary>
-    public void HandleRetreat(NetPeer requester, MapEvent mapEvent)
-    {
-        if (requester == null || mapEvent == null)
-            return;
-
-        if (!playerManager.TryGetPlayer(requester, out var player) ||
-            !objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party) ||
-            party.MapEvent != mapEvent)
-            return;
-
-        HandleRetreat(requester, mapEvent, party);
-    }
-
     private void HandleRetreat(NetPeer requester, MapEvent mapEvent, MobileParty party)
     {
         foreach (var participant in playerManager.Players)
@@ -247,23 +233,6 @@ internal class BattleFinalizeHandler : IHandler
         }
 
         messageBroker.Publish(this, new MapEventFinalizeAttempted(mapEvent));
-    }
-
-    /// <summary>[Server, game thread] Apply simulation cancellation's leader retreat rule.</summary>
-    public void HandleSimulationRetreat(NetPeer requester, MapEvent mapEvent)
-    {
-        if (requester == null || mapEvent == null)
-            return;
-
-        if (!playerManager.TryGetPlayer(requester, out var player) ||
-            !objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party) ||
-            party.MapEvent != mapEvent)
-            return;
-
-        if (party.Party.MapEventSide?.LeaderParty == party.Party)
-            messageBroker.Publish(this, new MapEventFinalizeAttempted(mapEvent));
-        else
-            messageBroker.Publish(requester, new PlayerLeaveBattleAttempted(party.Party));
     }
 
     /// <summary>

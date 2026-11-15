@@ -65,7 +65,8 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
     internal enum RaidContinuationDecision
     {
         Wait,
-        Drop,
+        DropCaptive,
+        DropReplaced,
         Present,
     }
 
@@ -245,10 +246,9 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         parkedRaidContinuation = null;
         parkedRaidEncounter = null;
 
-        if (decision == RaidContinuationDecision.Drop)
+        if (decision is RaidContinuationDecision.DropCaptive or RaidContinuationDecision.DropReplaced)
         {
-            var reason = PlayerCaptivity.IsCaptive ? "the player is captive" : "a different encounter is active";
-            Logger.Information("Dropping parked raid continuation for {SettlementId}: {Reason}", settlement.StringId, reason);
+            Logger.Information("Dropping parked raid continuation for {SettlementId}: {Reason}", settlement.StringId, decision);
             return;
         }
 
@@ -261,8 +261,10 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         bool hasMapEvent,
         PlayerEncounterState? encounterState)
     {
-        if (isCaptive || encounterReplaced)
-            return RaidContinuationDecision.Drop;
+        if (isCaptive)
+            return RaidContinuationDecision.DropCaptive;
+        if (encounterReplaced)
+            return RaidContinuationDecision.DropReplaced;
 
         if (hasMapEvent || (encounterState.HasValue && encounterState.Value != PlayerEncounterState.End))
             return RaidContinuationDecision.Wait;

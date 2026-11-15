@@ -54,7 +54,6 @@ internal class BattleSimulationRunHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly IMapEventLogger mapEventLogger;
     private readonly IPlayerManager playerManager;
-    private readonly BattleFinalizeHandler battleFinalizeHandler;
 
     private sealed class ActiveSimulation
     {
@@ -72,15 +71,13 @@ internal class BattleSimulationRunHandler : IHandler
         INetwork network,
         IObjectManager objectManager,
         IMapEventLogger mapEventLogger,
-        IPlayerManager playerManager,
-        BattleFinalizeHandler battleFinalizeHandler)
+        IPlayerManager playerManager)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.mapEventLogger = mapEventLogger;
         this.playerManager = playerManager;
-        this.battleFinalizeHandler = battleFinalizeHandler;
 
         messageBroker.Subscribe<RequestAdvanceBattleSimulation>(Handle_RequestAdvanceBattleSimulation);
         messageBroker.Subscribe<RequestCancelBattleSimulation>(Handle_RequestCancelBattleSimulation);
@@ -269,7 +266,7 @@ internal class BattleSimulationRunHandler : IHandler
         {
             var releasedClaim = CancelSimulationSession(mapEventId, simulation);
             if (releasedClaim)
-                battleFinalizeHandler.HandleSimulationRetreat(requestingPeer, simulation.MapEvent);
+                HandleSimulationRetreat(requestingPeer, simulation.MapEvent);
             mapEventLogger.DebugMapEvent(simulation.MapEvent, "Battle simulation cancelled by initiating client");
         }, context: nameof(Handle_NetworkCancelBattleSimulation));
     }
@@ -933,12 +930,25 @@ internal class BattleSimulationRunHandler : IHandler
 
         EndSimulationSessionSafe(mapEventId, sim);
 
-        // Release before finalize so the unclaimed broadcast is sent while the event id still resolves.
+        // Release before finalize: TryMarkFinalized releases the same claim, and only this release sends Unclaimed.
         var released = ServerBattleModeArbiter.ReleaseSimulation(mapEventId);
         messageBroker.Publish(this, new MapEventFinalizeAttempted(sim.MapEvent));
         if (released)
             network.SendAll(new NetworkBattleModeSet(mapEventId, (int)BattleStartMode.Unclaimed));
         network.SendAll(new NetworkBattleSimulationFinished(mapEventId));
+    }
+
+    private void HandleSimulationRetreat(NetPeer requester, MapEvent mapEvent)
+    {
+        if (!playerManager.TryGetPlayer(requester, out var player) ||
+            !objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party) ||
+            party.MapEvent != mapEvent)
+            return;
+
+        if (party.Party.MapEventSide?.LeaderParty == party.Party)
+            messageBroker.Publish(this, new MapEventFinalizeAttempted(mapEvent));
+        else
+            messageBroker.Publish(requester, new PlayerLeaveBattleAttempted(party.Party));
     }
 
     /// <summary>
