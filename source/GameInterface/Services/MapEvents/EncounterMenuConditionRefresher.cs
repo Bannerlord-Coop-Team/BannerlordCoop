@@ -27,7 +27,7 @@ internal class EncounterMenuConditionRefresher : IEncounterMenuConditionRefreshe
 
         var encounter = PlayerEncounter.Current;
 
-        // The authoritative attach can land while the joiner is still in join_encounter, so bind before the menu check.
+        // Before the menu check, because the attach can land while the joiner is still in join_encounter.
         AdoptJoinedFieldBattleIfNeeded(mapEvent, encounter);
 
         var menuContext = Campaign.Current?.CurrentMenuContext;
@@ -77,17 +77,15 @@ internal class EncounterMenuConditionRefresher : IEncounterMenuConditionRefreshe
 
     private static void AdoptJoinedFieldBattleIfNeeded(MapEvent mapEvent, PlayerEncounter encounter)
     {
-        if (encounter?._mapEvent != null)
-            return; // Preserve an encounter that is already bound.
-
-        if (encounter?.IsJoinedBattle != true)
-            return; // Only a server-authoritative joined battle needs adoption.
+        if (encounter == null || !encounter.IsJoinedBattle || encounter._mapEvent != null)
+            return;
 
         if (MobileParty.MainParty?.MapEvent != mapEvent)
-            return; // The event must be the main party's current encounter.
+            return;
 
+        // Siege and sally joins are rebound by BattleJoinLeaveHandler.SwitchSiegeJoinerToEncounterIfNeeded.
         if (mapEvent.IsSiegeStyleJoin())
-            return; // Siege and sally joins use BattleJoinLeaveHandler's re-entry flow.
+            return;
 
         // The encounter menu's on_init runs PlayerEncounter.Update(), which nulls _mapEvent while the join is pending.
         encounter._mapEvent = mapEvent;
