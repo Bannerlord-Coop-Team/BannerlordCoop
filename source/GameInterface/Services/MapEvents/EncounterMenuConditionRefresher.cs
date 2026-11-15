@@ -76,12 +76,13 @@ internal class EncounterMenuConditionRefresher : IEncounterMenuConditionRefreshe
 
     private static void AdoptJoinedFieldBattleIfNeeded(MapEvent mapEvent, PlayerEncounter encounter)
     {
-        if (encounter == null || !encounter.IsJoinedBattle || encounter._mapEvent != null)
+        if (encounter == null || !encounter.IsJoinedBattle)
             return;
 
-        if (MobileParty.MainParty?.MapEvent != mapEvent)
+        if (!NeedsEncounterMenuReinit(mapEvent, encounter))
             return;
 
+        // Siege and sally joins are rebound by BattleJoinLeaveHandler.SwitchSiegeJoinerToEncounterIfNeeded.
         if (!mapEvent.IsFieldBattle)
             return;
 
