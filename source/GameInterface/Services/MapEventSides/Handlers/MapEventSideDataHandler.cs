@@ -190,6 +190,16 @@ internal class MapEventSideDataHandler : IHandler
         if (ModInformation.IsServer)
             return;
 
+        // Vanilla JoinBattle assigns PlayerEncounter.Battle while adding the party. The client join is
+        // server-authoritative, so MapEventSidePatches suppresses that local add and the encounter keeps
+        // its pre-join state. Adopt the replicated event before rebuilding the menu, otherwise the native
+        // order-attack consequence dereferences a null Battle.
+        if (MobileParty.MainParty?.MapEvent == mapEvent && PlayerEncounter.Current?._mapEvent == null)
+        {
+            using (new AllowedThread())
+                PlayerEncounter.Current._mapEvent = mapEvent;
+        }
+
         SwitchRaiderToEncounterIfNeeded(mapEvent);
         encounterMenuConditionRefresher.RefreshForMapEvent(mapEvent);
     }
