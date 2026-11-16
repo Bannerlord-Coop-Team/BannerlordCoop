@@ -55,7 +55,7 @@ public class PartyScreenTransferXpGainTests : IDisposable
     }
 
     [Fact]
-    public void TransferAgainAfterReset_CommitsServerXp()
+    public void TransferAgainAfterServerXpGain_CommitsServerXp()
     {
         var fixture = CreateFixture();
         var logic = OpenPartyScreen(fixture);
@@ -92,8 +92,8 @@ public class PartyScreenTransferXpGainTests : IDisposable
     // The refresher carries XP from a server update on the emptied source stack to the moved destination stack.
     private void AssertServerUpdateRetainsTransfer(TransferFixture fixture, PartyScreenLogic logic)
     {
-        var expected = new RosterState((-1, -1), (1, ServerXp));
-        Assert.Equal(expected, ReadClient(fixture));
+        var expectedVisible = new RosterState((-1, -1), (1, ServerXp));
+        Assert.Equal(expectedVisible, ReadClient(fixture));
 
         RosterState baseline = default;
         Client.Call(() =>
@@ -103,7 +103,7 @@ public class PartyScreenTransferXpGainTests : IDisposable
                 Read(logic._initialData.RightMemberRoster, troop),
                 Read(logic._initialData.LeftMemberRoster, troop));
         });
-        Assert.Equal(expected, baseline);
+        Assert.Equal(new RosterState((1, ServerXp), (-1, -1)), baseline);
     }
 
     private void AssertServerKeepsTotalXp(TransferFixture fixture, RosterState expected)
