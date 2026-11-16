@@ -37,16 +37,19 @@ public class TimeHandler : IHandler
     {
         var peer = obj.Who as NetPeer;
 
+        if (!ModConfigProvider.ModOptions.AllowClientTimeControls)
+        {
+            Logger.Information(
+                "Ignored time control from peer={PeerId} mode={RequestedMode} because allowClientTimeControls is off",
+                peer?.Id,
+                obj.What.NewControlMode);
+            return;
+        }
+
         Logger.Information(
             "Peer requested time control: peer={PeerId} mode={RequestedMode}",
             peer?.Id,
             obj.What.NewControlMode);
-
-        if (!ModConfigProvider.ModOptions.AllowClientTimeControls)
-        {
-            Logger.Information("Ignored time control from peer={PeerId} because allowClientTimeControls is off", peer?.Id);
-            return;
-        }
 
         timeControlInterface.ServerSetTimeControl(obj.What.NewControlMode);
     }

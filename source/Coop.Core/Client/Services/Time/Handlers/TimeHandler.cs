@@ -19,6 +19,8 @@ namespace Coop.Core.Client.Services.Time.Handlers
     {
         private static readonly ILogger Logger = LogManager.GetLogger<TimeHandler>();
 
+        private const string HostOnlyTimeControlsMessage = "Only the host can pause or change the game speed on this server.";
+
         private readonly IMessageBroker messageBroker;
         private readonly INetwork network;
         private readonly ITimeControlInterface timeControlInterface;
@@ -45,10 +47,10 @@ namespace Coop.Core.Client.Services.Time.Handlers
         {
             var newMode = obj.What.NewControlMode;
 
-            // The time buttons show the server's mode again on the next tick, since the client never applies its own change
+            // Nothing to revert here, the time buttons show the server's mode again on the next tick
             if (!ModConfigProvider.ModOptions.AllowClientTimeControls)
             {
-                messageBroker.Publish(this, new SendInformationMessage("Only the host can pause or change the game speed on this server."));
+                messageBroker.Publish(this, new SendInformationMessage(HostOnlyTimeControlsMessage));
                 return;
             }
 

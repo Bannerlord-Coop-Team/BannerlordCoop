@@ -83,7 +83,7 @@ public readonly struct ModOptions
     public readonly int PostBattleAiAmnestySeconds { get; } = 0;
     [ProtoMember(30)]
     public readonly List<string> PreferredBattleHosts { get; } = new();
-    [ProtoMember(31)]
+    [ProtoMember(33)]
     public readonly bool AllowClientTimeControls { get; } = true;
 
     public ModOptions(ModOptions previous, bool voiceEnabled)
