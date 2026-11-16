@@ -2388,6 +2388,10 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
 
         WithPvpRules(blockLeave: true, responseTimerSeconds: 0, () =>
         {
+            var handler = Server.Resolve<PlayerPartyInteractionHandler>();
+            var start = DateTime.UtcNow;
+            Server.Call(() => handler.UtcNow = () => start);
+
             RequestInteraction(client1, initiatorPartyId, responderPartyId);
             var sessionId = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>().Single().SessionId;
             var responderState = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>().Single(s => s.PartyId == responderPartyId);
@@ -2398,18 +2402,18 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
             SubmitOption(client2, sessionId, responderPartyId, PlayerPartyInteractionOption.Leave);
             Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionEnded>());
 
-            // The server's own tick may give Leave back first, so only one state is expected either way.
             Server.Call(() =>
             {
                 Assert.True(Server.ObjectManager.TryGetObject<Clan>(initiatorClanId, out var initiatorClan));
                 Assert.True(Server.ObjectManager.TryGetObject<Clan>(responderClanId, out var responderClan));
                 MakePeaceAction.Apply(initiatorClan, responderClan);
-                Server.Resolve<PlayerPartyInteractionHandler>().CheckPvpRules(DateTime.UtcNow);
+                handler.CheckPvpRules(start);
             });
             var peaceState = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>().Single();
             Assert.Equal(responderPartyId, peaceState.PartyId);
             Assert.Equal(PlayerPartyInteractionPhase.WaitingForProposal, peaceState.Phase);
             Assert.Equal(new[] { PlayerPartyInteractionOption.Leave }, peaceState.Options);
+            Assert.Equal(new[] { PlayerPartyInteractionOption.Leave }, peaceState.EnabledOptions);
 
             SubmitOption(client2, sessionId, responderPartyId, PlayerPartyInteractionOption.Leave);
             Assert.Equal(

@@ -57,10 +57,6 @@ internal class PlayerPartyInteractionHandler : IHandler
     };
 
     private static readonly TimeSpan PvpRulesTickInterval = TimeSpan.FromSeconds(1);
-    // How long an attacker can do nothing while pvpBlockLeave hides Leave and pvpResponseTimerSeconds is off.
-    private const int BlockLeaveIdleSeconds = 30;
-    // Lower pvpResponseTimerSeconds values count as this, so a player has time to read the dialog.
-    private const int MinimumResponseTimerSeconds = 10;
 
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
@@ -75,6 +71,7 @@ internal class PlayerPartyInteractionHandler : IHandler
     private readonly IPlayerMapTracking mapTracking;
     private readonly PlayerPartyInteractionOutcomeHandler outcomeHandler;
     private readonly IPlayerPartyTradeContext trade;
+    private readonly IPlayerPartyPvpRules pvpRules;
     private readonly ISendCoalescer sendCoalescer;
 
     private readonly ConcurrentDictionary<string, PlayerPartyInteractionSession> sessionsById = new ConcurrentDictionary<string, PlayerPartyInteractionSession>();
@@ -105,6 +102,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         IPlayerDivorceRules playerDivorceRules,
         IPlayerMapTracking mapTracking,
         IPlayerPartyTradeContext trade,
+        IPlayerPartyPvpRules pvpRules,
         // Only the server container registers a send coalescer.
         ISendCoalescer sendCoalescer = null)
     {
@@ -120,6 +118,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         this.playerDivorceRules = playerDivorceRules;
         this.mapTracking = mapTracking;
         this.trade = trade;
+        this.pvpRules = pvpRules;
         this.sendCoalescer = sendCoalescer;
         outcomeHandler = new PlayerPartyInteractionOutcomeHandler(
             objectManager,
@@ -727,7 +726,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         if (option == PlayerPartyInteractionOption.YieldHostileDemand)
         {
             if (session.Proposal != PlayerPartyInteractionProposal.HostileDemand) return;
-            if (!session.HostileDemandConfirmed) return;
+            if (!session.IsResponderTurn()) return;
 
             EndSession(session, PlayerPartyInteractionOutcomeType.HostileDemandYielded);
             return;
@@ -736,7 +735,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         if (option == PlayerPartyInteractionOption.RefuseHostileDemand)
         {
             if (session.Proposal != PlayerPartyInteractionProposal.HostileDemand) return;
-            if (!session.HostileDemandConfirmed) return;
+            if (!session.IsResponderTurn()) return;
 
             EndSession(session, PlayerPartyInteractionOutcomeType.HostileDemandAccepted);
             return;
@@ -747,7 +746,7 @@ internal class PlayerPartyInteractionHandler : IHandler
             if (session.Proposal == PlayerPartyInteractionProposal.HostileDemand && session.HostileDemandConfirmed)
                 return;
             // pvpBlockLeave took Leave out of what the responder was shown, so the server doesn't take it either.
-            if (session.HiddenLeaveState != null)
+            if (session.IsLeaveHidden)
             {
                 Logger.Debug("Ignored Leave from a responder whose options have no Leave. SessionId={SessionId}", session.SessionId);
                 return;
@@ -759,17 +758,14 @@ internal class PlayerPartyInteractionHandler : IHandler
 
         if (option == PlayerPartyInteractionOption.DeclineProposal)
         {
-            if (session.Proposal == PlayerPartyInteractionProposal.None) return;
-            if (session.Proposal == PlayerPartyInteractionProposal.Mercenary && !session.MercenaryConfirmed) return;
+            if (!session.IsResponderTurn()) return;
 
             EndSession(session, GetDeclinedOutcome(session.Proposal));
             return;
         }
 
         if (option != PlayerPartyInteractionOption.AcceptProposal) return;
-
-        if (session.Proposal == PlayerPartyInteractionProposal.None) return;
-        if (session.Proposal == PlayerPartyInteractionProposal.Mercenary && !session.MercenaryConfirmed) return;
+        if (!session.IsResponderTurn()) return;
 
         if (IsMarriageProposal(session.Proposal))
         {
@@ -855,35 +851,37 @@ internal class PlayerPartyInteractionHandler : IHandler
         PlayerPartyInteractionOption[] enabledOptions = null)
     {
         session.StateChangedUtc = UtcNow();
-        session.HiddenLeaveState = null;
-        if (options.Contains(PlayerPartyInteractionOption.Leave) && IsLeaveBlocked(session))
+        session.ResponderPhase = phase;
+        session.ResponderProposal = proposal;
+        session.ResponderOptions.Clear();
+        session.ResponderOptions.UnionWith(options);
+        session.ResponderEnabledOptions.Clear();
+        session.ResponderEnabledOptions.UnionWith(enabledOptions ?? options);
+
+        session.IsLeaveHidden = options.Contains(PlayerPartyInteractionOption.Leave) &&
+            pvpRules.IsLeaveBlocked(session, ModConfigProvider.ModOptions, IsAtWarNow(session));
+        if (session.IsLeaveHidden)
         {
-            session.HiddenLeaveState = (phase, proposal, options);
             options = options.Where(option => option != PlayerPartyInteractionOption.Leave).ToArray();
+            enabledOptions = session.ResponderEnabledOptions.Where(option => option != PlayerPartyInteractionOption.Leave).ToArray();
         }
 
         network.SendAll(CreateResponderState(session, phase, proposal, options, enabledOptions));
     }
 
-    // pvpBlockLeave only covers a meeting that started at war, so Leave is never taken from a dialog that already
-    // showed it: an honest client that sends Leave has closed its dialog already. A trade can always be left,
-    // because its barter Cancel is the same Leave.
-    private bool IsLeaveBlocked(PlayerPartyInteractionSession session)
-        => ModConfigProvider.ModOptions.PvpBlockLeave &&
-           session.IsHostile &&
-           session.Proposal != PlayerPartyInteractionProposal.Trade &&
-           IsAtWarNow(session);
-
     // Asked again each time, so peace made during the meeting counts.
     private bool IsAtWarNow(PlayerPartyInteractionSession session)
-        => objectManager.TryGetObject<PartyBase>(session.InitiatorPartyId, out var initiatorParty) &&
-           objectManager.TryGetObject<PartyBase>(session.ResponderPartyId, out var responderParty) &&
+        => objectManager.TryGetObjectWithLogging(session.InitiatorPartyId, out PartyBase initiatorParty) &&
+           objectManager.TryGetObjectWithLogging(session.ResponderPartyId, out PartyBase responderParty) &&
            AreHostile(initiatorParty, responderParty);
 
     private void QueuePvpRulesTick()
     {
         if (Volatile.Read(ref isDisposed) != 0 || sessionsById.IsEmpty) return;
         if (!GameThread.Instance.IsInitialized) return;
+
+        var modOptions = ModConfigProvider.ModOptions;
+        if (!modOptions.PvpBlockLeave && modOptions.PvpResponseTimerSeconds <= 0) return;
 
         // Read before queueing, so an answer queued behind this tick on a stalled game thread is still on time.
         var utcNow = UtcNow();
@@ -897,49 +895,46 @@ internal class PlayerPartyInteractionHandler : IHandler
     }
 
     /// <summary>
-    /// [Server, game thread] Gives Leave back to responders who made peace during the meeting, and ends meetings
-    /// nobody answered in time. An unanswered hostile demand while still at war ends like Refuse, so the battle
-    /// starts; anything else ends as Left, so the timer never starts a war.
+    /// [Server, game thread] Gives Leave back to responders who made peace during the meeting, otherwise ends
+    /// meetings nobody answered in time.
     /// </summary>
     internal void CheckPvpRules(DateTime utcNow)
     {
         var modOptions = ModConfigProvider.ModOptions;
-        var responseTimerSeconds = modOptions.PvpResponseTimerSeconds > 0
-            ? Math.Max(MinimumResponseTimerSeconds, modOptions.PvpResponseTimerSeconds)
-            : 0;
-        if (!modOptions.PvpBlockLeave && responseTimerSeconds == 0) return;
-
         foreach (var session in sessionsById.Values.ToArray())
         {
-            // Peace sends no new state, so the hidden Leave goes back from here.
-            if (session.HiddenLeaveState is { } hidden && !IsLeaveBlocked(session))
-            {
-                SendResponderState(session, hidden.Phase, hidden.Proposal, hidden.Options);
-                continue;
-            }
-
-            var idleSeconds = GetIdleSeconds(session, responseTimerSeconds);
-            if (idleSeconds == 0 || utcNow - session.StateChangedUtc < TimeSpan.FromSeconds(idleSeconds)) continue;
-
-            var demandUnanswered = session.Proposal == PlayerPartyInteractionProposal.HostileDemand && session.IsResponderTurn();
-            var outcome = demandUnanswered && IsAtWarNow(session)
-                ? PlayerPartyInteractionOutcomeType.HostileDemandAccepted
-                : PlayerPartyInteractionOutcomeType.Left;
-            Logger.Information(
-                "Ended player-party interaction nobody answered for {Seconds} seconds. SessionId={SessionId}, Outcome={Outcome}",
-                idleSeconds, session.SessionId, outcome);
-            EndSession(session, outcome);
+            if (!RestoreLeaveAfterPeace(session, modOptions))
+                EndIfUnanswered(session, utcNow, modOptions);
         }
     }
 
-    // How long the session can sit without a new state, 0 when it isn't timed.
-    private static int GetIdleSeconds(PlayerPartyInteractionSession session, int responseTimerSeconds)
+    // Peace sends no new state, so the hidden Leave goes back from here. Returns whether the state was sent again,
+    // which also restarts the session's clock.
+    private bool RestoreLeaveAfterPeace(PlayerPartyInteractionSession session, ModOptions modOptions)
     {
-        if (session.Proposal == PlayerPartyInteractionProposal.Trade) return 0;
-        if (responseTimerSeconds > 0) return responseTimerSeconds;
+        if (!session.IsLeaveHidden) return false;
+        if (pvpRules.IsLeaveBlocked(session, modOptions, IsAtWarNow(session))) return false;
 
-        // Only pvpBlockLeave is on: an idle attacker is released, otherwise a responder without Leave has nothing to pick.
-        return !session.IsResponderTurn() && session.HiddenLeaveState != null ? BlockLeaveIdleSeconds : 0;
+        SendResponderState(
+            session,
+            session.ResponderPhase,
+            session.ResponderProposal,
+            session.ResponderOptions.ToArray(),
+            session.ResponderEnabledOptions.ToArray());
+        return true;
+    }
+
+    private void EndIfUnanswered(PlayerPartyInteractionSession session, DateTime utcNow, ModOptions modOptions)
+    {
+        var idleSeconds = pvpRules.GetIdleSeconds(session, modOptions);
+        if (idleSeconds == 0) return;
+        if (utcNow - session.StateChangedUtc < TimeSpan.FromSeconds(idleSeconds)) return;
+
+        var outcome = pvpRules.GetTimeoutOutcome(session, IsAtWarNow(session));
+        Logger.Information(
+            "Ended player-party interaction nobody answered for {Seconds} seconds. SessionId={SessionId}, Outcome={Outcome}",
+            idleSeconds, session.SessionId, outcome);
+        EndSession(session, outcome);
     }
 
     // Builds the dialog state the initiator's client shows.

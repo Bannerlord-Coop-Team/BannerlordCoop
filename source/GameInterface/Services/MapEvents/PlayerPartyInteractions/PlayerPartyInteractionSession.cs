@@ -47,11 +47,16 @@ internal sealed class PlayerPartyInteractionSession
     public Kingdom TargetKingdom { get; set; }
     // When either player was last sent a state, the pvpResponseTimerSeconds clock counts from here.
     public DateTime StateChangedUtc { get; set; }
-    // The responder's last state as built, with Leave in it, while pvpBlockLeave hides Leave from them. Cleared by their next state.
-    public (PlayerPartyInteractionPhase Phase, PlayerPartyInteractionProposal Proposal, PlayerPartyInteractionOption[] Options)? HiddenLeaveState { get; set; }
+    // Whether pvpBlockLeave took Leave out of the responder's last state.
+    public bool IsLeaveHidden { get; set; }
 
     public HashSet<PlayerPartyInteractionOption> InitiatorOptions { get; } = new HashSet<PlayerPartyInteractionOption>();
     public HashSet<PlayerPartyInteractionOption> InitiatorEnabledOptions { get; } = new HashSet<PlayerPartyInteractionOption>();
+    // The responder's last state as built, Leave included, so peace can send it again with Leave back.
+    public PlayerPartyInteractionPhase ResponderPhase { get; set; }
+    public PlayerPartyInteractionProposal ResponderProposal { get; set; }
+    public HashSet<PlayerPartyInteractionOption> ResponderOptions { get; } = new HashSet<PlayerPartyInteractionOption>();
+    public HashSet<PlayerPartyInteractionOption> ResponderEnabledOptions { get; } = new HashSet<PlayerPartyInteractionOption>();
 
     public PlayerPartyInteractionSession(
         string sessionId,
@@ -83,7 +88,7 @@ internal sealed class PlayerPartyInteractionSession
     public bool IsInitiator(string partyId)
         => partyId == InitiatorPartyId;
 
-    // The responder has a proposal to answer, the same checks the handler makes before it takes their answer.
+    // The responder has a proposal to answer, so the server takes their answer and the timer waits on them.
     public bool IsResponderTurn()
     {
         switch (Proposal)

@@ -1,0 +1,52 @@
+﻿using GameInterface.Configuration;
+using System;
+
+namespace GameInterface.Services.MapEvents.PlayerPartyInteractions;
+
+internal interface IPlayerPartyPvpRules : IGameAbstraction
+{
+    bool IsLeaveBlocked(PlayerPartyInteractionSession session, ModOptions options, bool atWar);
+    // How long the meeting can sit without a new state, 0 when it isn't timed.
+    int GetIdleSeconds(PlayerPartyInteractionSession session, ModOptions options);
+    PlayerPartyInteractionOutcomeType GetTimeoutOutcome(PlayerPartyInteractionSession session, bool atWar);
+}
+
+/// <summary>
+/// The host's pvpBlockLeave and pvpResponseTimerSeconds rules for a meeting between two players.
+/// </summary>
+internal class PlayerPartyPvpRules : IPlayerPartyPvpRules
+{
+    // How long an attacker can do nothing while pvpBlockLeave hides Leave and pvpResponseTimerSeconds is off.
+    internal const int BlockLeaveIdleSeconds = 30;
+    // Lower pvpResponseTimerSeconds values count as this, so a player has time to read the dialog.
+    internal const int MinimumResponseTimerSeconds = 10;
+
+    // IsHostile is set when the meeting starts, so a war declared mid-meeting never hides a Leave the responder
+    // already saw. Trades keep Leave because barter Cancel is the same Leave.
+    public bool IsLeaveBlocked(PlayerPartyInteractionSession session, ModOptions options, bool atWar)
+        => options.PvpBlockLeave &&
+           session.IsHostile &&
+           session.Proposal != PlayerPartyInteractionProposal.Trade &&
+           atWar;
+
+    public int GetIdleSeconds(PlayerPartyInteractionSession session, ModOptions options)
+    {
+        if (session.Proposal == PlayerPartyInteractionProposal.Trade) return 0;
+        if (options.PvpResponseTimerSeconds > 0) return Math.Max(MinimumResponseTimerSeconds, options.PvpResponseTimerSeconds);
+
+        // Only pvpBlockLeave is on: an idle attacker is released, otherwise a responder without Leave has nothing to pick.
+        if (session.IsResponderTurn() || !session.IsLeaveHidden) return 0;
+        return BlockLeaveIdleSeconds;
+    }
+
+    // An unanswered hostile demand at war ends like Refuse, so the battle starts. Anything else ends as Left,
+    // so the timer never starts a war.
+    public PlayerPartyInteractionOutcomeType GetTimeoutOutcome(PlayerPartyInteractionSession session, bool atWar)
+    {
+        if (!atWar) return PlayerPartyInteractionOutcomeType.Left;
+        if (session.Proposal != PlayerPartyInteractionProposal.HostileDemand) return PlayerPartyInteractionOutcomeType.Left;
+        if (!session.IsResponderTurn()) return PlayerPartyInteractionOutcomeType.Left;
+
+        return PlayerPartyInteractionOutcomeType.HostileDemandAccepted;
+    }
+}
