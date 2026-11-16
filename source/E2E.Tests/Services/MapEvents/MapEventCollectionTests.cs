@@ -19,6 +19,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using Xunit.Abstractions;
@@ -214,6 +215,11 @@ public class MapEventCollectionTests : MapEventTestBase
             var encounter = PlayerEncounter.Current;
             encounter._encounteredParty = mapEvent.DefenderSide.LeaderParty;
             encounter.IsJoinedBattle = true;
+            Campaign.Current.MapStateData ??= new MapStateData();
+            var mapState = Game.Current.GameStateManager.CreateState<MapState>();
+            Game.Current.GameStateManager._gameStates.Add(mapState);
+            mapState.GameMenuId = "encounter";
+            mapState.EnterMenuMode();
             Assert.True(client.ObjectManager.TryGetId(party.Party, out partyBaseId));
             // Stages the live joiner after the join option: a joined encounter with no _mapEvent.
             // The side write is intercepted into NetworkRequestJoinBattle instead of attaching locally.
@@ -279,13 +285,11 @@ public class MapEventCollectionTests : MapEventTestBase
         var authoritativeAdd = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAddBattleParty>());
 
         client.SimulateMessage(Server.NetPeer, authoritativeAdd);
+        client.PumpGameThread(maximumPasses: 10);
 
         client.Call(() =>
         {
             var mapEvent = Get<MapEvent>(client, staged.MapEventId);
-            // The attacker-side live trace arrives in encounter with the binding still unset after the authoritative attach.
-            PlayerEncounter.Current._mapEvent = null;
-            client.Resolve<IEncounterMenuConditionRefresher>().RefreshForMapEvent(mapEvent);
             Assert.Same(mapEvent, PlayerEncounter.Battle);
             // The native consequence cannot run headless: BannerlordConfig.GetSystemLanguage fails before battle setup.
         });
