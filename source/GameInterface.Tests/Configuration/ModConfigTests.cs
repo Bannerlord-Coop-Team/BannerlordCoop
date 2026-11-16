@@ -294,6 +294,7 @@ public class ModConfigTests : IDisposable
 
         Assert.True(options.FastForwardEnabled);
         Assert.True(options.AutoPauseEnabled);
+        Assert.True(options.AllowClientTimeControls);
         Assert.False(options.ClientsCanUseCheats);
         Assert.False(options.GoldFoodInfluenceChangeInSettlements);
         Assert.Equal(GoldFoodChangeMode.Disabled, options.GoldFoodInfluenceChangeInBattles);

@@ -121,6 +121,7 @@ namespace Coop.IntegrationTests.Serialization
             // Keys the operator left absent still resolve to the documented defaults, not to zero.
             Assert.True(copy.FastForwardEnabled);
             Assert.True(copy.AutoPauseEnabled);
+            Assert.True(copy.AllowClientTimeControls);
             Assert.True(copy.SpeedLimitWhilePlayersInBattle);
             Assert.True(copy.ShowPlayerNameplates);
             Assert.True(copy.CoopClansEnabled);
@@ -150,6 +151,7 @@ namespace Coop.IntegrationTests.Serialization
         {
             FastForwardEnabled = false,
             AutoPauseEnabled = false,
+            AllowClientTimeControls = false,
             ClientsCanUseCheats = false,
             GoldFoodInfluenceChangeInSettlements = false,
             GoldFoodInfluenceChangeInBattles = GoldFoodChangeMode.Disabled,
@@ -183,6 +185,7 @@ namespace Coop.IntegrationTests.Serialization
         {
             Assert.False(copy.FastForwardEnabled);
             Assert.False(copy.AutoPauseEnabled);
+            Assert.False(copy.AllowClientTimeControls);
             Assert.False(copy.ClientsCanUseCheats);
             Assert.False(copy.GoldFoodInfluenceChangeInSettlements);
             Assert.Equal(GoldFoodChangeMode.Disabled, copy.GoldFoodInfluenceChangeInBattles);

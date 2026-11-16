@@ -96,6 +96,14 @@
     // false: Auto pause is disabled. The game will still automatically pause for clients catching up and when there are no players online.
     "autoPauseEnabled": true,
 
+    // Toggle players being able to pause or change the game speed
+    // (Default) true: Any player can pause, play or fast forward.
+    // false: Only the host (the server console or the dedicated server manager) can pause or change the speed.
+    // The game still pauses by itself when players join or catch up, when nobody is online and for auto pause.
+    // Players can't resume those pauses themselves. The pauses for catching up and auto pause end on their own,
+    // but after the pause for nobody online the host has to start the game again.
+    "allowClientTimeControls": true,
+
     // Toggle clients being able to use cheats
     // Vanilla bannerlord commands are always disabled on clients but this disables cheating in troops, equipment, teleporting etc.
     // Default is false.

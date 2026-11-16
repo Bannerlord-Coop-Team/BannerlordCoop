@@ -87,6 +87,8 @@ public readonly struct ModOptions
     public readonly bool PvpBlockLeave { get; } = false;
     [ProtoMember(32)]
     public readonly int PvpResponseTimerSeconds { get; } = 0;
+    [ProtoMember(33)]
+    public readonly bool AllowClientTimeControls { get; } = true;
 
     public ModOptions(ModOptions previous, bool voiceEnabled)
     {
@@ -99,6 +101,7 @@ public readonly struct ModOptions
         VoiceEnabled = modOptionsData.VoiceEnabled ?? VoiceEnabled;
         FastForwardEnabled = modOptionsData.FastForwardEnabled ?? FastForwardEnabled;
         AutoPauseEnabled = modOptionsData.AutoPauseEnabled ?? AutoPauseEnabled;
+        AllowClientTimeControls = modOptionsData.AllowClientTimeControls ?? AllowClientTimeControls;
         ClientsCanUseCheats = modOptionsData.ClientsCanUseCheats ?? ClientsCanUseCheats;
         GoldFoodInfluenceChangeInSettlements = modOptionsData.GoldFoodInfluenceChangeInSettlements ?? GoldFoodInfluenceChangeInSettlements;
         GoldFoodInfluenceChangeInBattles = modOptionsData.GoldFoodInfluenceChangeInBattles ?? GoldFoodInfluenceChangeInBattles;

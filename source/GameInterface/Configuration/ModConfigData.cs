@@ -76,6 +76,8 @@ public sealed class ModOptionsData
 
     public bool? AutoPauseEnabled { get; set; }
 
+    public bool? AllowClientTimeControls { get; set; }
+
     public bool? ClientsCanUseCheats { get; set; }
 
     public bool? GoldFoodInfluenceChangeInSettlements { get; set; }
