@@ -1859,6 +1859,41 @@ public class VillageHostileActionTests : MapEventTestBase
     }
 
     [Fact]
+    public void RaidAttackerVictoryFinalizeRequest_ContinuesRaidAndMovesJoiningAttackerToGate()
+    {
+        var leaderClient = Clients.First();
+        var joinerClient = Clients.Skip(1).First();
+        var context = CreateHostileActionWithTwoPlayerParties(VillageHostileAction.Raid);
+        string joinerMobilePartyId = null!;
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer("PlayerTwo", out var joiner));
+            joinerMobilePartyId = joiner.MobilePartyId;
+            Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", leaderClient.NetPeer);
+            Server.Resolve<IPlayerManager>().SetPeer("PlayerTwo", joinerClient.NetPeer);
+            var mapEvent = Server.GetRegisteredObject<MapEvent>(context.MapEventId);
+            mapEvent._battleState = BattleState.AttackerVictory;
+        });
+
+        Server.NetworkSentMessages.Clear();
+        leaderClient.Call(() => leaderClient.Resolve<INetwork>().SendAll(
+            new NetworkMapEventFinalizeAttempted(context.MapEventId)), MapEventDisabledMethods);
+
+        var prompt = Server.NetworkSentMessages.GetMessages<NetworkPromptRaidContinuation>().Single();
+        Assert.Equal(context.SettlementId, prompt.SettlementId);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(joinerMobilePartyId, out var joiner));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(context.SettlementId, out var settlement));
+            Assert.Null(joiner.Party.MapEventSide);
+            Assert.Null(joiner.CurrentSettlement);
+            Assert.Equal(settlement.GatePosition, joiner.Position);
+        }, MapEventDisabledMethods);
+    }
+
+    [Fact]
     public void RaidFinalizeRequest_EndingSlowRaidMovesRaiderToVillageGate()
     {
         AssertSlowRaidExit(naturalCompletion: false, lateFinalizeRequest: false);

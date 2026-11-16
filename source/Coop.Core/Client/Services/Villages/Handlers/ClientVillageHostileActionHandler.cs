@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Entity;
@@ -9,11 +10,13 @@ using GameInterface.Services.Villages.Interfaces;
 using GameInterface.Services.Villages;
 using GameInterface.Services.Villages.Messages;
 using TaleWorlds.CampaignSystem.Settlements;
+using Serilog;
 
 namespace Coop.Core.Client.Services.Villages.Handlers;
 
 internal class ClientVillageHostileActionHandler : IHandler
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<ClientVillageHostileActionHandler>();
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
@@ -65,6 +68,7 @@ internal class ClientVillageHostileActionHandler : IHandler
         // A request is already pending: drop this one, the server still resolves the first.
         if (!hostileActionRequestTracker.TryBeginRequest())
         {
+            Logger.Information("Dropping hostile action request: one is already pending");
             return;
         }
 

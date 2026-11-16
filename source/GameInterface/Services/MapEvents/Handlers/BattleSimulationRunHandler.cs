@@ -216,6 +216,7 @@ internal class BattleSimulationRunHandler : IHandler
 
             if (unsupportedHostileAction)
             {
+                // Reset the requester client from its tentative simulation state before the rejected start reply.
                 network.Send(requestingPeer, new NetworkBattleSimulationCancelled(mapEventId));
                 network.Send(requestingPeer, new NetworkBattleModeSet(mapEventId, (int)BattleStartMode.Unclaimed));
             }
