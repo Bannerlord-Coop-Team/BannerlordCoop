@@ -1865,14 +1865,33 @@ public class VillageHostileActionTests : MapEventTestBase
         var joinerClient = Clients.Skip(1).First();
         var context = CreateHostileActionWithTwoPlayerParties(VillageHostileAction.Raid);
         string joinerMobilePartyId = null!;
+        var gatePosition = new CampaignVec2(new Vec2(42f, 24f), true);
+        var leaderPosition = new CampaignVec2(new Vec2(40f, 24f), true);
+        var joinerPosition = new CampaignVec2(new Vec2(41f, 24f), true);
 
         Server.Call(() =>
         {
             Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer("PlayerTwo", out var joiner));
             joinerMobilePartyId = joiner.MobilePartyId;
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(context.AttackerMobilePartyId, out var leaderParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(joinerMobilePartyId, out var joinerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(context.SettlementId, out var settlement));
+            var mapEvent = Server.GetRegisteredObject<MapEvent>(context.MapEventId);
+            mapEvent.AttackerSide.LeaderParty = leaderParty.Party;
+            using (new AllowedThread())
+            {
+                settlement.GatePosition = gatePosition;
+                leaderParty.CurrentSettlement = settlement;
+                joinerParty.CurrentSettlement = settlement;
+                leaderParty.Position = leaderPosition;
+                joinerParty.Position = joinerPosition;
+            }
+            Assert.Contains(leaderParty, settlement.Parties);
+            Assert.Contains(joinerParty, settlement.Parties);
+            Assert.Equal(leaderPosition, leaderParty.Position);
+            Assert.Equal(joinerPosition, joinerParty.Position);
             Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", leaderClient.NetPeer);
             Server.Resolve<IPlayerManager>().SetPeer("PlayerTwo", joinerClient.NetPeer);
-            var mapEvent = Server.GetRegisteredObject<MapEvent>(context.MapEventId);
             mapEvent._battleState = BattleState.AttackerVictory;
         });
 
@@ -1886,10 +1905,14 @@ public class VillageHostileActionTests : MapEventTestBase
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(joinerMobilePartyId, out var joiner));
+            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer("PlayerOne", out var leaderPlayer));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(leaderPlayer.MobilePartyId, out var leader));
             Assert.True(Server.ObjectManager.TryGetObject<Settlement>(context.SettlementId, out var settlement));
             Assert.Null(joiner.Party.MapEventSide);
             Assert.Null(joiner.CurrentSettlement);
-            Assert.Equal(settlement.GatePosition, joiner.Position);
+            Assert.Equal(gatePosition, joiner.Position);
+            Assert.Equal(leaderPosition, leader.Position);
+            Assert.Same(settlement, leader.CurrentSettlement);
         }, MapEventDisabledMethods);
     }
 

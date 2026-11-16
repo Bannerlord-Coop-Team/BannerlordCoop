@@ -413,11 +413,26 @@ internal class BattleFinalizeHandler : IHandler
     {
         var settlement = GetRaidFinalizationSettlement(mapEvent);
         var attackers = GetRaidAttackerPlayerParties(mapEvent);
-        var leaderParty = mapEvent.AttackerSide?.LeaderParty?.MobileParty;
+        var leaderParty = mapEvent.AttackerSide?.LeaderParty?.MobileParty ?? attackers.FirstOrDefault();
+        var leaderPosition = leaderParty != null ? leaderParty.Position : default;
+        var leaderSettlement = leaderParty?.CurrentSettlement;
+        var hasJoiningAttackers = mapEvent.AttackerSide?.Parties.Count(party => party.Party?.MobileParty?.IsPlayerParty() == true) > 1;
         NetPeer leaderPeer = null;
         if (ShouldContinueRaidAfterVictory(mapEvent, settlement))
+        {
             TryGetRaidLeaderPeer(leaderParty, out leaderPeer);
-        return new RaidAftermath(settlement, attackers, leaderParty, leaderPeer);
+            if (leaderPeer != null
+                && playerManager.TryGetPlayer(leaderPeer, out var leader)
+                && attackers.FirstOrDefault(attacker =>
+                    playerManager.TryGetPlayer(attacker, out var attackerPlayer)
+                    && attackerPlayer.ControllerId == leader.ControllerId) is MobileParty controlledLeader)
+            {
+                leaderParty = controlledLeader;
+                leaderPosition = leaderParty.Position;
+                leaderSettlement = leaderParty.CurrentSettlement;
+            }
+        }
+        return new RaidAftermath(settlement, attackers, leaderParty, leaderPosition, leaderSettlement, hasJoiningAttackers, leaderPeer);
     }
 
     private void ApplyRaidAftermath(RaidAftermath aftermath)
@@ -429,6 +444,11 @@ internal class BattleFinalizeHandler : IHandler
                 aftermath.Attackers.Where(attacker => attacker != aftermath.LeaderParty).ToArray(),
                 aftermath.Settlement);
             network.Send(aftermath.LeaderPeer, new NetworkPromptRaidContinuation(settlementId));
+            if (aftermath.HasJoiningAttackers)
+            {
+                aftermath.LeaderParty.CurrentSettlement = aftermath.LeaderSettlement;
+                aftermath.LeaderParty.Position = aftermath.LeaderPosition;
+            }
             return;
         }
 
@@ -437,17 +457,30 @@ internal class BattleFinalizeHandler : IHandler
 
     private sealed class RaidAftermath
     {
-        public RaidAftermath(Settlement settlement, MobileParty[] attackers, MobileParty leaderParty, NetPeer leaderPeer)
+        public RaidAftermath(
+            Settlement settlement,
+            MobileParty[] attackers,
+            MobileParty leaderParty,
+            CampaignVec2 leaderPosition,
+            Settlement leaderSettlement,
+            bool hasJoiningAttackers,
+            NetPeer leaderPeer)
         {
             Settlement = settlement;
             Attackers = attackers;
             LeaderParty = leaderParty;
+            LeaderPosition = leaderPosition;
+            LeaderSettlement = leaderSettlement;
+            HasJoiningAttackers = hasJoiningAttackers;
             LeaderPeer = leaderPeer;
         }
 
         public Settlement Settlement { get; }
         public MobileParty[] Attackers { get; }
         public MobileParty LeaderParty { get; }
+        public CampaignVec2 LeaderPosition { get; }
+        public Settlement LeaderSettlement { get; }
+        public bool HasJoiningAttackers { get; }
         public NetPeer LeaderPeer { get; }
     }
 
