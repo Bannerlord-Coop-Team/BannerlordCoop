@@ -2,6 +2,7 @@
 using Common.Messaging;
 using Common.Network;
 using Coop.Core.Server.Services.Time.Messages;
+using GameInterface.Configuration;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
@@ -43,6 +44,13 @@ namespace Coop.Core.Client.Services.Time.Handlers
         internal void Handle_TimeSpeedChanged(MessagePayload<TimeSpeedChangedAttempted> obj)
         {
             var newMode = obj.What.NewControlMode;
+
+            // The time buttons show the server's mode again on the next tick, since the client never applies its own change
+            if (!ModConfigProvider.ModOptions.AllowClientTimeControls)
+            {
+                messageBroker.Publish(this, new SendInformationMessage("Only the host can pause or change the game speed on this server."));
+                return;
+            }
 
             if (mapEventState.IsBlocked && newMode == TimeControlEnum.Play_2x)
             {
