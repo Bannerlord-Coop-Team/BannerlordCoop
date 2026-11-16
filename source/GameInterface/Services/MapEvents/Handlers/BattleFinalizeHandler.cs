@@ -418,8 +418,9 @@ internal class BattleFinalizeHandler : IHandler
         if (leaderParty != null)
             objectManager.TryGetId(leaderParty, out leaderPartyId);
         NetPeer leaderPeer = null;
-        if (ShouldContinueRaidAfterVictory(mapEvent, settlement))
-            TryGetRaidLeaderPeer(leaderParty, out leaderPeer);
+        if (!ShouldContinueRaidAfterVictory(mapEvent, settlement)
+            || !TryGetRaidLeaderPeer(leaderParty, out leaderPeer))
+            leaderPeer = null;
         return new RaidAftermath(settlement, attackers, leaderPartyId, leaderPeer);
     }
 
@@ -428,12 +429,14 @@ internal class BattleFinalizeHandler : IHandler
         if (aftermath.LeaderPeer != null && objectManager.TryGetIdWithLogging(aftermath.Settlement, out var settlementId))
         {
             // Joiners go to the gate; the leader stays put because it re-requests the raid.
-            var joiningAttackers = aftermath.Attackers.Where(attacker =>
-            {
-                if (!objectManager.TryGetId(attacker, out var attackerId))
-                    return true;
-                return attackerId != aftermath.LeaderPartyId;
-            }).ToArray();
+            var joiningAttackers = aftermath.Attackers.Length > 1
+                ? aftermath.Attackers.Where(attacker =>
+                {
+                    if (!objectManager.TryGetId(attacker, out var attackerId))
+                        return true;
+                    return attackerId != aftermath.LeaderPartyId;
+                }).ToArray()
+                : Array.Empty<MobileParty>();
             MoveRaidAttackersToSettlementGate(joiningAttackers, aftermath.Settlement);
             network.Send(aftermath.LeaderPeer, new NetworkPromptRaidContinuation(settlementId));
             return;

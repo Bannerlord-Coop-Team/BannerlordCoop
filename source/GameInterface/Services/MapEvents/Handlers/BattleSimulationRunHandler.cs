@@ -855,13 +855,13 @@ internal class BattleSimulationRunHandler : IHandler
             foreach (var entry in orphaned)
             {
                 var sim = entry.Value;
-                ResolveRemainingRounds(sim);
+                ResolveRemainingRounds(entry.Key, sim);
                 FinishOrphanedSimulation(entry.Key, sim);
             }
         }, context: nameof(Handle_PlayerDisconnected));
     }
 
-    private void ResolveRemainingRounds(ActiveSimulation sim)
+    private void ResolveRemainingRounds(string mapEventId, ActiveSimulation sim)
     {
         // No client left to pace the playback, so resolve whatever remains and let the battle reach its decision.
         try
@@ -875,7 +875,7 @@ internal class BattleSimulationRunHandler : IHandler
         }
         catch (Exception exception)
         {
-            Logger.Error(exception, "Battle simulation disconnect cleanup could not resolve another round");
+            Logger.Error(exception, "Battle simulation disconnect cleanup could not resolve another round for {MapEventId}", mapEventId);
         }
     }
 
