@@ -100,9 +100,7 @@ internal class ServerVillageHostileActionHandler : IHandler
         return player.MobilePartyId == mobilePartyId;
     }
 
-    private void TryStartHostileAction(
-        NetPeer peer,
-        NetworkRequestVillageHostileAction request)
+    private void TryStartHostileAction(NetPeer peer, NetworkRequestVillageHostileAction request)
     {
         try
         {

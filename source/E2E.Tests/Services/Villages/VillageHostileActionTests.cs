@@ -3753,6 +3753,7 @@ public class VillageHostileActionTests : MapEventTestBase
                     TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(10));
                 Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(hostileAction.MapEventId, out var mapEvent));
                 mapEvent._battleState = BattleState.AttackerVictory;
+                Assert.Equal(0, GameThread.Instance.QueueLength);
                 advanceQueued = new Thread(() =>
                 {
                     try
@@ -3766,7 +3767,7 @@ public class VillageHostileActionTests : MapEventTestBase
                     }
                 }) { IsBackground = true };
                 advanceQueued.Start();
-                Assert.True(SpinWait.SpinUntil(() => GameThread.Instance.QueueLength > 0, TimeSpan.FromSeconds(10)));
+                Assert.True(SpinWait.SpinUntil(() => GameThread.Instance.QueueLength == 1, TimeSpan.FromSeconds(10)));
                 cancelQueued = new Thread(() =>
                 {
                     try
@@ -3780,7 +3781,7 @@ public class VillageHostileActionTests : MapEventTestBase
                     }
                 }) { IsBackground = true };
                 cancelQueued.Start();
-                Assert.True(SpinWait.SpinUntil(() => GameThread.Instance.QueueLength > 1, TimeSpan.FromSeconds(10)));
+                Assert.True(SpinWait.SpinUntil(() => GameThread.Instance.QueueLength == 2, TimeSpan.FromSeconds(10)));
             }, MapEventDisabledMethods);
 
             Server.PumpGameThread();
