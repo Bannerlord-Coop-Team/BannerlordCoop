@@ -48,7 +48,6 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
 
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
-    private readonly IHostileActionRequestTracker hostileActionRequestTracker;
     private readonly ConcurrentDictionary<string, MapEventStartApproval> approvedMapEventStarts = new ConcurrentDictionary<string, MapEventStartApproval>();
     private readonly ConcurrentDictionary<string, bool> pendingHostileActionSettlements = new ConcurrentDictionary<string, bool>();
     private readonly ConcurrentDictionary<string, CampaignTime> forceActionCooldowns = new ConcurrentDictionary<string, CampaignTime>();
@@ -57,25 +56,15 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
     private readonly ConditionalWeakTable<MapEvent, AppliedForceActionOutcomeState> appliedForceActionOutcomes = new ConditionalWeakTable<MapEvent, AppliedForceActionOutcomeState>();
     private readonly object deferredForceScreenGate = new object();
     private DeferredForceScreen deferredForceScreen;
-    // Client-only: the encounter a hostile-action request opened, kept until the server resolves the
-    // request, and a won raid's continuation waiting for the current encounter to end.
+    // Client-only: a won raid's continuation, waiting for the current encounter to end.
     private ParkedRaidContinuation parkedRaidContinuation;
 
     public VillageHostileActionInterface(IMessageBroker messageBroker, IObjectManager objectManager)
-        : this(messageBroker, objectManager, new HostileActionRequestTracker())
-    {
-    }
-
-    public VillageHostileActionInterface(
-        IMessageBroker messageBroker,
-        IObjectManager objectManager,
-        IHostileActionRequestTracker hostileActionRequestTracker)
     {
         if (messageBroker == null) throw new ArgumentNullException(nameof(messageBroker));
         if (objectManager == null) throw new ArgumentNullException(nameof(objectManager));
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
-        this.hostileActionRequestTracker = hostileActionRequestTracker;
 
         messageBroker.Subscribe<CampaignTick>(Handle_CampaignTick);
     }
@@ -188,17 +177,9 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         GameMenu.SwitchToMenu("encounter");
     }
 
-    public bool TryTrackHostileActionRequest()
+    public void RecoverRejectedHostileAction(PlayerEncounter encounter)
     {
-        if (hostileActionRequestTracker.TryTrack(PlayerEncounter.Current)) return true;
-        Logger.Information("Dropping hostile action request: one is already pending");
-        return false;
-    }
-
-    public void RecoverRejectedHostileAction()
-    {
-        var encounter = PlayerEncounter.Current;
-        if (encounter == null || !hostileActionRequestTracker.TryTake(encounter))
+        if (encounter == null || !ReferenceEquals(encounter, PlayerEncounter.Current))
             return;
 
         // Leave a live encounter or simulation alone when a denial races its start.
@@ -241,8 +222,9 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
             return;
         }
 
-        if (MobileParty.MainParty?.MapEvent != null ||
-            (encounter != null && encounter.EncounterState != PlayerEncounterState.End))
+        bool encounterStillOpen = MobileParty.MainParty?.MapEvent != null ||
+            (encounter != null && encounter.EncounterState != PlayerEncounterState.End);
+        if (encounterStillOpen)
             return;
 
         parkedRaidContinuation = null;

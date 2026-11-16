@@ -6,8 +6,10 @@ using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Villages.Data;
 using GameInterface.Services.Villages.Interfaces;
+using GameInterface.Services.Villages;
 using GameInterface.Services.Villages.Messages;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Encounters;
 
 namespace Coop.Core.Client.Services.Villages.Handlers;
 
@@ -62,17 +64,22 @@ internal class ClientVillageHostileActionHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(message.MobileParty, out var mobilePartyId)) return;
         if (!objectManager.TryGetIdWithLogging(message.Settlement, out var settlementId)) return;
         // A request is already pending: drop this one, the server still resolves the first.
-        if (!villageHostileActionInterface.TryTrackHostileActionRequest())
+        if (!hostileActionRequestTracker.TryTrack(PlayerEncounter.Current))
+        {
             return;
+        }
 
         network.SendAll(new NetworkRequestVillageHostileAction(message.Action, mobilePartyId, settlementId, controllerIdProvider.ControllerId));
     }
 
     private void Handle_NetworkVillageHostileActionStarted(MessagePayload<NetworkVillageHostileActionStarted> payload)
     {
-        hostileActionRequestTracker.Complete();
         GameThread.RunSafe(
-            () => villageHostileActionInterface.BeginHostileActionPresentation(payload.What.Action),
+            () =>
+            {
+                hostileActionRequestTracker.Take();
+                villageHostileActionInterface.BeginHostileActionPresentation(payload.What.Action);
+            },
             context: nameof(Handle_NetworkVillageHostileActionStarted));
     }
 
@@ -92,8 +99,7 @@ internal class ClientVillageHostileActionHandler : IHandler
         GameThread.RunSafe(
             () =>
             {
-                villageHostileActionInterface.RecoverRejectedHostileAction();
-                hostileActionRequestTracker.Complete();
+                villageHostileActionInterface.RecoverRejectedHostileAction(hostileActionRequestTracker.Take());
             },
             context: nameof(Handle_NetworkVillageHostileActionDenied));
         messageBroker.Publish(this, new SendInformationMessage(GetDeniedMessage(payload.What.Reason)));

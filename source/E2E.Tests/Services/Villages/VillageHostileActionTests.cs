@@ -395,32 +395,6 @@ public class VillageHostileActionTests : MapEventTestBase
     }
 
     [Fact]
-    public void HostileActionStart_TimeoutSendsSingleReply()
-    {
-        var client = Clients.First();
-        var hostileAction = CreateHostileActionWithTwoPlayerParties(VillageHostileAction.Raid);
-        Server.NetworkSentMessages.Clear();
-
-        Server.Call(() =>
-        {
-            using var shortTimeout = GameThread.Instance.LimitFrameDrain(
-                TimeSpan.FromSeconds(1), TimeSpan.FromMilliseconds(200));
-            var request = new NetworkRequestVillageHostileAction(
-                VillageHostileAction.Raid,
-                hostileAction.AttackerMobilePartyId,
-                hostileAction.SettlementId,
-                "PlayerOne");
-            var broker = Server.Resolve<IMessageBroker>();
-            Assert.Null(RunOnServerPoller(() => broker.Publish(client.NetPeer, request)));
-        }, MapEventDisabledMethods);
-
-        Server.PumpGameThread();
-
-        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionDenied>());
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionStarted>());
-    }
-
-    [Fact]
     public void ClientRequestRaid_WithPendingRaidApprovalForSameVillage_IsRejected()
     {
         var firstClient = Clients.First();
@@ -432,7 +406,6 @@ public class VillageHostileActionTests : MapEventTestBase
         var target = CreateVillageTarget();
 
         Server.NetworkSentMessages.Clear();
-
         RequestHostileAction(firstClient, VillageHostileAction.Raid, firstMobilePartyId, target.SettlementId);
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionStarted>());
 
@@ -442,7 +415,7 @@ public class VillageHostileActionTests : MapEventTestBase
 
         var denied = Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionDenied>().Single();
         Assert.Equal(VillageHostileActionDeniedReason.AlreadyInMapEvent, denied.Reason);
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionStarted>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPromptRaidContinuation>());
     }
 
     [Fact]

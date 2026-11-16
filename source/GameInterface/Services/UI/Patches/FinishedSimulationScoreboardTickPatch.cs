@@ -17,6 +17,7 @@ internal static class FinishedSimulationScoreboardTickPatch
     {
         if (!isSimulation) return true;
         if (isOver) return false;
+        // The synced MapEvent can be destroyed before playback finishes; stop ticking once it is gone.
         return eventStillLive;
     }
 }

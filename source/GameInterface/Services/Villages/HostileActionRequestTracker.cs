@@ -1,12 +1,11 @@
 using TaleWorlds.CampaignSystem.Encounters;
 
-namespace GameInterface.Services.Villages.Interfaces;
+namespace GameInterface.Services.Villages;
 
 public interface IHostileActionRequestTracker : IGameAbstraction
 {
     bool TryTrack(PlayerEncounter encounter);
-    void Complete();
-    bool TryTake(PlayerEncounter encounter);
+    PlayerEncounter Take();
 }
 
 internal sealed class HostileActionRequestTracker : IHostileActionRequestTracker
@@ -20,12 +19,10 @@ internal sealed class HostileActionRequestTracker : IHostileActionRequestTracker
         return true;
     }
 
-    public void Complete() => pending = null;
-
-    public bool TryTake(PlayerEncounter encounter)
+    public PlayerEncounter Take()
     {
-        if (!ReferenceEquals(pending, encounter)) return false;
+        var encounter = pending;
         pending = null;
-        return true;
+        return encounter;
     }
 }

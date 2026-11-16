@@ -18,6 +18,7 @@ using GameInterface.Registry.Auto;
 using GameInterface.Services.CampaignService.Interfaces;
 using GameInterface.Services.Chat;
 using GameInterface.Services.Voice;
+using GameInterface.Services.Villages;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.MapTracking;

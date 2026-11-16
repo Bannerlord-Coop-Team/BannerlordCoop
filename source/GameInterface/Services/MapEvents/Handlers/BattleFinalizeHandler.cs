@@ -405,34 +405,35 @@ internal class BattleFinalizeHandler : IHandler
     {
         var settlement = GetRaidFinalizationSettlement(mapEvent);
         var attackers = GetRaidAttackerPlayerParties(mapEvent);
-        var continues = TryGetRaidContinuation(mapEvent, settlement, out var leaderPeer, out var settlementId);
-        return new RaidAftermath(settlement, attackers, continues, leaderPeer, settlementId);
+        var leaderPeer = ShouldContinueRaidAfterVictory(mapEvent, settlement) &&
+            TryGetRaidLeaderPeer(mapEvent, out var peer) ? peer : null;
+        return new RaidAftermath(settlement, attackers, leaderPeer);
     }
 
     private void ApplyRaidAftermath(RaidAftermath aftermath)
     {
-        if (aftermath.Continues)
-            network.Send(aftermath.LeaderPeer, new NetworkPromptRaidContinuation(aftermath.SettlementId));
-        else
-            MoveRaidAttackersToSettlementGate(aftermath.Attackers, aftermath.Settlement);
+        if (aftermath.LeaderPeer != null && objectManager.TryGetIdWithLogging(aftermath.Settlement, out var settlementId))
+        {
+            // A continuing raid skips the gate move because the leader re-requests the raid.
+            network.Send(aftermath.LeaderPeer, new NetworkPromptRaidContinuation(settlementId));
+            return;
+        }
+
+        MoveRaidAttackersToSettlementGate(aftermath.Attackers, aftermath.Settlement);
     }
 
     private sealed class RaidAftermath
     {
-        public RaidAftermath(Settlement settlement, MobileParty[] attackers, bool continues, NetPeer leaderPeer, string settlementId)
+        public RaidAftermath(Settlement settlement, MobileParty[] attackers, NetPeer leaderPeer)
         {
             Settlement = settlement;
             Attackers = attackers;
-            Continues = continues;
             LeaderPeer = leaderPeer;
-            SettlementId = settlementId;
         }
 
         public Settlement Settlement { get; }
         public MobileParty[] Attackers { get; }
-        public bool Continues { get; }
         public NetPeer LeaderPeer { get; }
-        public string SettlementId { get; }
     }
 
     private bool TryMarkFinalized(MapEvent mapEvent)
@@ -509,19 +510,6 @@ internal class BattleFinalizeHandler : IHandler
         return leaderParty != null
             && playerManager.TryGetPlayer(leaderParty, out var leader)
             && playerManager.TryGetPeer(leader.ControllerId, out leaderPeer);
-    }
-
-    private bool TryGetRaidContinuation(
-        MapEvent mapEvent,
-        Settlement raidSettlement,
-        out NetPeer leaderPeer,
-        out string settlementId)
-    {
-        leaderPeer = null;
-        settlementId = null;
-        return ShouldContinueRaidAfterVictory(mapEvent, raidSettlement)
-            && TryGetRaidLeaderPeer(mapEvent, out leaderPeer)
-            && objectManager.TryGetIdWithLogging(raidSettlement, out settlementId);
     }
 
     private static bool ShouldContinueRaidAfterVictory(MapEvent mapEvent, Settlement raidSettlement)
