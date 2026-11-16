@@ -236,7 +236,7 @@ internal class BattleSimulationRunHandler : IHandler
     }
 
     /// <summary>
-    ///  Cancels an unfinished simulation when requested by the client currently doing it.
+    /// Cancels an unfinished simulation for the client pacing it and retreats: a side leader finalizes the event, a joiner leaves it.
     /// </summary>
     private void Handle_NetworkCancelBattleSimulation(MessagePayload<NetworkCancelBattleSimulation> payload)
     {
