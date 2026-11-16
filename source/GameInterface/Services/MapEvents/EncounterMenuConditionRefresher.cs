@@ -25,11 +25,10 @@ internal class EncounterMenuConditionRefresher : IEncounterMenuConditionRefreshe
             return;
 
         var encounter = PlayerEncounter.Current;
-        // The attach can arrive after the joiner has already entered encounter, so adopt before the menu check.
-        AdoptJoinedFieldBattleIfNeeded(mapEvent, encounter);
         var menuContext = Campaign.Current?.CurrentMenuContext;
         if (menuContext?.GameMenu?.StringId != "encounter")
         {
+            AdoptJoinedFieldBattleIfNeeded(mapEvent, encounter);
             return;
         }
 
@@ -55,6 +54,11 @@ internal class EncounterMenuConditionRefresher : IEncounterMenuConditionRefreshe
             // its option conditions dereference PlayerEncounter.Battle. Re-entering it runs vanilla's
             // game_menu_encounter_on_init, which adopts MainParty.MapEvent through PlayerEncounter.Init().
             GameMenu.SwitchToMenu("encounter");
+
+            // InitAux cannot bind until MainParty.MapEvent is visible; the encountered party is authoritative
+            // during the short attach window, so retain the event for the order-attack path if re-entry did not bind it.
+            if (PlayerEncounter.Battle == null && PlayerEncounter.EncounteredBattle == mapEvent)
+                encounter._mapEvent = mapEvent;
             return;
         }
 
@@ -94,7 +98,7 @@ internal class EncounterMenuConditionRefresher : IEncounterMenuConditionRefreshe
     internal static bool IsMissingMainPartyBattle(MapEvent mapEvent, PlayerEncounter encounter)
         => encounter != null &&
            encounter._mapEvent == null &&
-           MobileParty.MainParty?.MapEvent == mapEvent;
+           (MobileParty.MainParty?.MapEvent == mapEvent || PlayerEncounter.EncounteredBattle == mapEvent);
 
     public void RefreshForRoster(TroopRoster roster)
     {
