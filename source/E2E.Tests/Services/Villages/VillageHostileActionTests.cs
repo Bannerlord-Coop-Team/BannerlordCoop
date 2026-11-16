@@ -3751,6 +3751,8 @@ public class VillageHostileActionTests : MapEventTestBase
         var joinerClient = Clients.Skip(1).First();
         var hostileAction = CreateHostileActionWithTwoPlayerParties(VillageHostileAction.Raid);
         var ended = new List<MapEvent>();
+        Thread advanceQueued = null;
+        Thread cancelQueued = null;
         Exception advanceFailure = null;
         Exception cancelFailure = null;
 
@@ -3766,12 +3768,12 @@ public class VillageHostileActionTests : MapEventTestBase
                 Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(hostileAction.MapEventId, out var mapEvent));
                 mapEvent._battleState = BattleState.AttackerVictory;
                 Assert.Equal(0, GameThread.Instance.QueueLength);
-                StartOnServerPoller(
+                advanceQueued = StartOnServerPoller(
                     () => Server.Resolve<IMessageBroker>().Publish(leaderClient.NetPeer,
                         new NetworkAdvanceBattleSimulation(hostileAction.MapEventId, 1)),
                     exception => advanceFailure = exception);
                 Assert.True(SpinWait.SpinUntil(() => GameThread.Instance.QueueLength == 1, TimeSpan.FromSeconds(10)));
-                StartOnServerPoller(
+                cancelQueued = StartOnServerPoller(
                     () => Server.Resolve<IMessageBroker>().Publish(leaderClient.NetPeer,
                         new NetworkCancelBattleSimulation(hostileAction.MapEventId)),
                     exception => cancelFailure = exception);
@@ -3779,6 +3781,8 @@ public class VillageHostileActionTests : MapEventTestBase
             }, MapEventDisabledMethods);
 
             Server.PumpGameThread();
+            Assert.True(advanceQueued.Join(TimeSpan.FromSeconds(10)), "the advance poller did not return");
+            Assert.True(cancelQueued.Join(TimeSpan.FromSeconds(10)), "the cancel poller did not return");
             Assert.Null(advanceFailure);
             Assert.Null(cancelFailure);
 
@@ -5012,7 +5016,7 @@ public class VillageHostileActionTests : MapEventTestBase
         return failure;
     }
 
-    private static void StartOnServerPoller(Action receive, Action<Exception> onFailure)
+    private static Thread StartOnServerPoller(Action receive, Action<Exception> onFailure)
     {
         var poller = new Thread(() =>
         {
@@ -5026,6 +5030,7 @@ public class VillageHostileActionTests : MapEventTestBase
             }
         }) { IsBackground = true };
         poller.Start();
+        return poller;
     }
 
     private static BattleCreationFlags RaidFlags() => HostileActionFlags(VillageHostileAction.Raid);
