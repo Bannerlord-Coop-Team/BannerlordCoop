@@ -21,7 +21,6 @@ using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
-// v1.5 turned the IncidentTrigger flags into string ids, which an Incident.IncidentTrigger set holds
 using IncidentTrigger = TaleWorlds.CampaignSystem.Incidents.Incident.IncidentTrigger;
 using TriggerId = TaleWorlds.CampaignSystem.CampaignBehaviors.IncidentsCampaignBehaviour.IncidentTrigger;
 
@@ -50,7 +49,6 @@ public class IncidentsCampaignBehaviourInterface : IIncidentsCampaignBehaviourIn
     private static readonly ILogger Logger = LogManager.GetLogger<IncidentsCampaignBehaviourInterface>();
 
     private static readonly IncidentTrigger EnteringSettlementTriggers = new IncidentTrigger(TriggerId.EnteringCastle, TriggerId.EnteringTown, TriggerId.EnteringVillage);
-    // v1.5 has no LeavingSettlement trigger, and leaving a castle now counts as leaving a settlement too
     private static readonly IncidentTrigger LeavingSettlementTriggers = new IncidentTrigger(TriggerId.LeavingTown, TriggerId.LeavingVillage, TriggerId.LeavingCastle);
 
     private readonly IPlayerManager playerManager;
@@ -177,10 +175,10 @@ public class IncidentsCampaignBehaviourInterface : IIncidentsCampaignBehaviourIn
 
     public void ConversationEnded(Player player, MobileParty mainParty, Hero mainHero)
     {
-        if (mainParty.CurrentSettlement == null && !mainParty.IsCurrentlyAtSea && mainParty.RandomFloatWithSeed((uint)CampaignTime.Now.ToMinutes) < Campaign.Current.Models.IncidentModel.GetIncidentTriggerGlobalProbability())
-        {
-            TryInvokeIncident(player, mainParty, mainHero, new IncidentTrigger(TriggerId.LeavingEncounter));
-        }
+        if (mainParty.CurrentSettlement != null || mainParty.IsCurrentlyAtSea) return;
+        if (mainParty.RandomFloatWithSeed((uint)CampaignTime.Now.ToMinutes) >= Campaign.Current.Models.IncidentModel.GetIncidentTriggerGlobalProbability()) return;
+
+        TryInvokeIncident(player, mainParty, mainHero, new IncidentTrigger(TriggerId.LeavingEncounter));
     }
 
     public void OnHeirSelectionOver(string playerHeroId)
