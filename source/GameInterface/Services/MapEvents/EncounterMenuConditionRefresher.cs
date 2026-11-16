@@ -25,11 +25,11 @@ internal class EncounterMenuConditionRefresher : IEncounterMenuConditionRefreshe
             return;
 
         var encounter = PlayerEncounter.Current;
+        // The attach can arrive after the joiner has already entered encounter, so adopt before the menu check.
+        AdoptJoinedFieldBattleIfNeeded(mapEvent, encounter);
         var menuContext = Campaign.Current?.CurrentMenuContext;
         if (menuContext?.GameMenu?.StringId != "encounter")
         {
-            // The attach can land while the joiner is still in join_encounter, where the menu re-init below never runs.
-            AdoptJoinedFieldBattleIfNeeded(mapEvent, encounter);
             return;
         }
 

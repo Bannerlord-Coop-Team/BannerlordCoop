@@ -10,6 +10,7 @@ using E2E.Tests.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Players;
 using GameInterface.Services.MapEventSides.Messages;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Start;
@@ -236,6 +237,57 @@ public class MapEventCollectionTests : MapEventTestBase
         {
             var mapEvent = Get<MapEvent>(client, staged.MapEventId);
             Assert.Same(mapEvent, PlayerEncounter.Battle);
+        });
+    }
+
+    [Fact]
+    public void Client_FieldJoinAsAttackerAgainstPlayer_AttachesBattleBeforeOrderAttack()
+    {
+        var staged = CreateServerMapEvent();
+        var defenderHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        RegisterAsPlayerParty("PlayerOne", defenderHeroId, staged.DefenderPartyId);
+        var (_, partyId) = CreatePlayerHeroParty("PlayerTwo");
+        var client = Clients.Last();
+        string partyBaseId = null;
+
+        TestEnvironment.ConnectRegisteredPlayer(client, "PlayerTwo");
+        client.Resolve<IControllerIdProvider>().SetControllerId("PlayerTwo");
+        client.NetworkSentMessages.Clear();
+
+        client.Call(() =>
+        {
+            var mapEvent = Get<MapEvent>(client, staged.MapEventId);
+            var party = Get<MobileParty>(client, partyId);
+            Campaign.Current.MainParty = party;
+            PlayerEncounter.Start();
+            var encounter = PlayerEncounter.Current;
+            encounter._encounteredParty = mapEvent.DefenderSide.LeaderParty;
+            encounter.IsJoinedBattle = true;
+            Assert.True(client.ObjectManager.TryGetId(party.Party, out partyBaseId));
+            party.Party.MapEventSide = mapEvent.AttackerSide;
+            Assert.Null(PlayerEncounter.Battle);
+        }, WithoutNetworkDelivery());
+
+        var request = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestJoinBattle>());
+        Assert.Equal(staged.MapEventId, request.MapEventId);
+        Assert.Equal(partyBaseId, request.PartyId);
+        Assert.Equal(BattleSideEnum.Attacker, request.Side);
+
+        Server.NetworkSentMessages.Clear();
+        Server.Call(() => Server.SimulateMessage(client.NetPeer, request), MapEventDisabledMethods);
+        Assert.True(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkJoinBattleReply>()).Accepted);
+        var authoritativeAdd = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAddBattleParty>());
+
+        client.SimulateMessage(Server.NetPeer, authoritativeAdd);
+
+        client.Call(() =>
+        {
+            var mapEvent = Get<MapEvent>(client, staged.MapEventId);
+            // The attacker-side live trace arrives in encounter with the binding still unset after the authoritative attach.
+            PlayerEncounter.Current._mapEvent = null;
+            client.Resolve<IEncounterMenuConditionRefresher>().RefreshForMapEvent(mapEvent);
+            Assert.Same(mapEvent, PlayerEncounter.Battle);
+            // The native consequence cannot run headless: BannerlordConfig.GetSystemLanguage fails before battle setup.
         });
     }
 
