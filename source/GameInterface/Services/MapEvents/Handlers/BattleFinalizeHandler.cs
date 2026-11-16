@@ -415,20 +415,17 @@ internal class BattleFinalizeHandler : IHandler
         var attackers = GetRaidAttackerPlayerParties(mapEvent);
         var leaderParty = mapEvent.AttackerSide?.LeaderParty?.MobileParty;
         NetPeer leaderPeer = null;
-        if (!ShouldContinueRaidAfterVictory(mapEvent, settlement)
-            || !TryGetRaidLeaderPeer(leaderParty, out leaderPeer))
-            leaderPeer = null;
-        return new RaidAftermath(settlement, attackers, leaderParty, leaderPeer);
+        bool continuesRaid = ShouldContinueRaidAfterVictory(mapEvent, settlement)
+            && TryGetRaidLeaderPeer(leaderParty, out leaderPeer);
+        return new RaidAftermath(settlement, attackers, leaderParty, leaderPeer, continuesRaid);
     }
 
     private void ApplyRaidAftermath(RaidAftermath aftermath)
     {
-        if (aftermath.LeaderPeer != null && objectManager.TryGetIdWithLogging(aftermath.Settlement, out var settlementId))
+        if (aftermath.ContinuesRaid && objectManager.TryGetIdWithLogging(aftermath.Settlement, out var settlementId))
         {
             // Joiners go to the gate; the leader stays put because it re-requests the raid.
-            var joiningAttackers = aftermath.Attackers.Length > 1
-                ? aftermath.Attackers.Where(attacker => attacker != aftermath.LeaderParty).ToArray()
-                : Array.Empty<MobileParty>();
+            var joiningAttackers = aftermath.Attackers.Where(attacker => attacker != aftermath.LeaderParty).ToArray();
             MoveRaidAttackersToSettlementGate(joiningAttackers, aftermath.Settlement);
             network.Send(aftermath.LeaderPeer, new NetworkPromptRaidContinuation(settlementId));
             return;
@@ -439,18 +436,45 @@ internal class BattleFinalizeHandler : IHandler
 
     private sealed class RaidAftermath
     {
-        public RaidAftermath(Settlement settlement, MobileParty[] attackers, MobileParty leaderParty, NetPeer leaderPeer)
+        public RaidAftermath(Settlement settlement, MobileParty[] attackers, MobileParty leaderParty, NetPeer leaderPeer, bool continuesRaid)
         {
             Settlement = settlement;
             Attackers = attackers;
             LeaderParty = leaderParty;
             LeaderPeer = leaderPeer;
+            ContinuesRaid = continuesRaid;
         }
 
         public Settlement Settlement { get; }
         public MobileParty[] Attackers { get; }
         public MobileParty LeaderParty { get; }
         public NetPeer LeaderPeer { get; }
+        public bool ContinuesRaid { get; }
+    }
+
+    private bool TryGetRaidLeaderPeer(MobileParty leaderParty, out NetPeer leaderPeer)
+    {
+        leaderPeer = null;
+        return leaderParty != null
+            && playerManager.TryGetPlayer(leaderParty, out var leader)
+            && playerManager.TryGetPeer(leader.ControllerId, out leaderPeer);
+    }
+
+    private static bool ShouldContinueRaidAfterVictory(MapEvent mapEvent, Settlement raidSettlement)
+    {
+        if (!mapEvent.IsRaidHostileAction())
+            return false;
+
+        if (!IsAttackerVictory(mapEvent))
+            return false;
+
+        if (raidSettlement?.Village == null)
+            return false;
+
+        if (raidSettlement.SettlementHitPoints <= 0f || raidSettlement.Village.VillageState == Village.VillageStates.Looted)
+            return false;
+
+        return true;
     }
 
     private bool TryMarkFinalized(MapEvent mapEvent)
@@ -519,30 +543,6 @@ internal class BattleFinalizeHandler : IHandler
         }
 
         return ids?.ToArray() ?? Array.Empty<string>();
-    }
-    private bool TryGetRaidLeaderPeer(MobileParty leaderParty, out NetPeer leaderPeer)
-    {
-        leaderPeer = null;
-        return leaderParty != null
-            && playerManager.TryGetPlayer(leaderParty, out var leader)
-            && playerManager.TryGetPeer(leader.ControllerId, out leaderPeer);
-    }
-
-    private static bool ShouldContinueRaidAfterVictory(MapEvent mapEvent, Settlement raidSettlement)
-    {
-        if (!mapEvent.IsRaidHostileAction())
-            return false;
-
-        if (!IsAttackerVictory(mapEvent))
-            return false;
-
-        if (raidSettlement?.Village == null)
-            return false;
-
-        if (raidSettlement.SettlementHitPoints <= 0f || raidSettlement.Village.VillageState == Village.VillageStates.Looted)
-            return false;
-
-        return true;
     }
 
     private static bool IsAttackerVictory(MapEvent mapEvent)
