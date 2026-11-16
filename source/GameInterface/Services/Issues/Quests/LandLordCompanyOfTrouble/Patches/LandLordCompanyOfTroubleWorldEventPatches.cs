@@ -26,6 +26,7 @@ internal static class LandLordCompanyOfTroubleWorldEventPatches
     [HarmonyPostfix]
     private static void FinalizePostfix(Quest __instance) => Run(service => service.RemoveCompanyOf(__instance));
 
+    // Vanilla's IssueFinalized drops the quest without finalizing it, which would leave the mercenaries and the hostile company behind
     [HarmonyPatch(typeof(IssueBase), nameof(IssueBase.IssueFinalized))]
     [HarmonyPrefix]
     private static void IssueFinalizedPrefix(IssueBase __instance) => Run(service => service.FinalizeIssue(__instance));
@@ -40,10 +41,10 @@ internal static class LandLordCompanyOfTroubleWorldEventPatches
     [HarmonyPrefix]
     private static bool MapEventStartedPrefix() => ModInformation.IsServer;
 
-    // Vanilla removes the mercenaries from the main party here, the server removes them from the owner's party
+    // Vanilla removes the mercenaries from the main party here, the server removes them from the owner's party when it has one
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnFinalize))]
     [HarmonyPrefix]
-    private static bool FinalizePrefix() => ModInformation.IsServer;
+    private static bool FinalizePrefix() => ModInformation.IsServer && MobileParty.MainParty != null;
 
     private static void Run(Action<ILandLordCompanyOfTroubleService> action)
     {

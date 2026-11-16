@@ -18,7 +18,7 @@ internal class LandLordCompanyOfTroubleSurrenderPatch
             return;
         }
 
-        if (service.IsHostileCompany(MobileParty.ConversationParty))
+        if (service.CarriesCompanyMercenaries(MobileParty.ConversationParty))
         {
             __result = false;
         }

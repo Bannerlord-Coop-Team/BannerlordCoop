@@ -13,6 +13,7 @@ using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using HarmonyLib;
 using Helpers;
+using Moq;
 using SandBox.GauntletUI.Map;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -214,7 +215,7 @@ public class LandLordCompanyOfTroubleTests : IDisposable
 
             using (new AllowedThread())
             {
-                troop.StringId = "company_of_trouble_character";
+                troop.StringId = Quest.TroubleCharacterObjectStringId;
             }
 
             MBObjectManager.Instance.RegisterObject(troop);
@@ -294,6 +295,30 @@ public class LandLordCompanyOfTroubleTests : IDisposable
         Quest quest = null!;
 
         Server.Call(() => quest = CompanyTurnedHostile(companyPartyId));
+        EndFightOnServer(companyPartyId, BattleState.DefenderVictory);
+
+        Assert.Equal(-2, quest.RelationshipChangeWithQuestGiver);
+        Assert.Equal(1, questEndings.Count);
+    }
+
+    [Fact]
+    public void LosingToTheCompanyAsItsPrisoner_FailsTheQuest()
+    {
+        var companyPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        SetOwner();
+        Quest quest = null!;
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var ownerHero));
+            quest = CompanyTurnedHostile(companyPartyId);
+
+            using (new AllowedThread())
+            {
+                ownerHero._partyBelongedTo = null;
+                ownerHero.PartyBelongedToAsPrisoner = quest._companyOfTroubleParty.Party;
+            }
+        });
         EndFightOnServer(companyPartyId, BattleState.DefenderVictory);
 
         Assert.Equal(-2, quest.RelationshipChangeWithQuestGiver);
@@ -526,9 +551,9 @@ public class LandLordCompanyOfTroubleTests : IDisposable
     }
 
     [Theory]
-    [InlineData(1)]
-    [InlineData(2)]
-    [InlineData(3)]
+    [InlineData((int)LandLordCompanyOfTroubleBranch.SuccessBySellingCompany)]
+    [InlineData((int)LandLordCompanyOfTroubleBranch.FailByCompanyLeaving)]
+    [InlineData((int)LandLordCompanyOfTroubleBranch.CompanyTurnedHostile)]
     public void ABranchOnTheOwnersClient_OnlyAsksTheServer(int branch)
     {
         GiveMercenaries(3);
@@ -625,7 +650,7 @@ public class LandLordCompanyOfTroubleTests : IDisposable
     [Fact]
     public void TheHostileCompany_DoesNotSurrenderToTheOwner()
     {
-        Assert.False(BanditsSurrender(troopStringId: "company_of_trouble_character"));
+        Assert.False(BanditsSurrender(troopStringId: Quest.TroubleCharacterObjectStringId));
     }
 
     [Fact]
@@ -676,7 +701,9 @@ public class LandLordCompanyOfTroubleTests : IDisposable
                 Campaign.Current.MainParty = ownerParty;
                 conversation._conversationParty = conversationParty;
                 conversation._conversationAgents.Clear();
-                conversation._conversationAgents.Add(new ConversationAgentStub(quest._troubleCharacterObject));
+                var agent = new Mock<IAgent>();
+                agent.SetupGet(candidate => candidate.Character).Returns(quest._troubleCharacterObject);
+                conversation._conversationAgents.Add(agent.Object);
             }
 
             opens = quest.CompanyDialogFromCondition();

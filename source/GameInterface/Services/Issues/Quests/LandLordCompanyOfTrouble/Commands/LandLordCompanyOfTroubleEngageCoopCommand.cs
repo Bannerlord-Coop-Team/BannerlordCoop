@@ -32,7 +32,7 @@ internal sealed class LandLordCompanyOfTroubleEngageCoopCommand : ICoopCommand
             return Failed("This client has no main party");
         }
 
-        var company = MobileParty.All.FirstOrDefault(party => party.IsActive && service.IsHostileCompany(party));
+        var company = MobileParty.All.FirstOrDefault(party => party.IsActive && party.IsBandit && service.CarriesCompanyMercenaries(party));
         if (company == null)
         {
             return Failed("No hostile company on the map");

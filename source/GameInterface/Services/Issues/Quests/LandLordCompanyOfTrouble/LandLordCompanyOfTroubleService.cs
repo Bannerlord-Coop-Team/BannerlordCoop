@@ -29,8 +29,8 @@ internal interface ILandLordCompanyOfTroubleService
     // Server: fails an owner's quest when someone other than the owner destroys the hostile company
     void OnMobilePartyDestroyed(MobileParty mobileParty, PartyBase destroyerParty);
 
-    // Owner's client: whether a party is a hostile company, which only the server knows as the quest's party
-    bool IsHostileCompany(MobileParty party);
+    // Owner's client: whether a party other than the local main party carries company mercenaries, a hostile company or another player's
+    bool CarriesCompanyMercenaries(MobileParty party);
 }
 
 internal class LandLordCompanyOfTroubleService : ILandLordCompanyOfTroubleService
@@ -62,7 +62,8 @@ internal class LandLordCompanyOfTroubleService : ILandLordCompanyOfTroubleServic
             quest._troubleCharacterObject = MBObjectManager.Instance.GetObject<CharacterObject>(Quest.TroubleCharacterObjectStringId);
         }
 
-        if (!ownerResolver.TryResolveOwnerHero(issue, out var ownerHero))
+        // An owner without a party, like one held prisoner, has no mercenaries for vanilla's OnFinalize to count
+        if (!ownerResolver.TryResolveOwnerHero(issue, out var ownerHero) || ownerHero.PartyBelongedTo == null)
         {
             RemoveLeftovers(quest);
             return;
@@ -92,7 +93,7 @@ internal class LandLordCompanyOfTroubleService : ILandLordCompanyOfTroubleServic
         dispatcher.RunAsOwners<Quest>(quest => OnPartyDestroyed(quest, mobileParty, destroyerParty));
     }
 
-    public bool IsHostileCompany(MobileParty party)
+    public bool CarriesCompanyMercenaries(MobileParty party)
     {
         if (party == null || party == MobileParty.MainParty)
         {
@@ -112,8 +113,21 @@ internal class LandLordCompanyOfTroubleService : ILandLordCompanyOfTroubleServic
 
     private static void OnMapEventEnded(Quest quest, MapEvent mapEvent)
     {
-        var involvedParties = mapEvent.InvolvedParties.ToList();
         var company = quest._companyOfTroubleParty;
+        var owner = Hero.MainHero;
+
+        // Losing to the company takes the owner prisoner, which leaves them without a party when the battle ends
+        if (owner?.PartyBelongedTo == null)
+        {
+            if (company != null && owner?.PartyBelongedToAsPrisoner == company.Party)
+            {
+                quest.QuestFailWithPlayerDefeatedAgainstCompany();
+            }
+
+            return;
+        }
+
+        var involvedParties = mapEvent.InvolvedParties.ToList();
         var end = ClassifyBattleEnd(
             ownerInvolved: involvedParties.Contains(PartyBase.MainParty),
             companyExists: company != null,
@@ -164,9 +178,7 @@ internal class LandLordCompanyOfTroubleService : ILandLordCompanyOfTroubleServic
 
         // DestroyPartyAction is still running for this party, so the finalize cleanup must not destroy it again
         quest._companyOfTroubleParty = null;
-        quest.RelationshipChangeWithQuestGiver = -2;
-        quest.AddLog(quest.QuestFailCompanyLeft);
-        quest.CompleteQuestWithFail();
+        LandLordCompanyOfTroubleFinalizationProofStrategy.FailAsCompanyLeft(quest);
     }
 
     private static void RemoveCompany(Quest quest)

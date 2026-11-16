@@ -61,9 +61,14 @@ internal class LandLordCompanyOfTroubleFinalizationProofStrategy : IFinalization
     // Vanilla's CompanyLeftQuestFail without its GameMenu.ExitToLast, which the owner's client already ran
     private static void LetCompanyLeave(Quest quest)
     {
-        quest.RelationshipChangeWithQuestGiver = -2;
         quest.UpdateCompanyTroopCount();
         MobileParty.MainParty.MemberRoster.AddToCounts(quest._troubleCharacterObject, -quest._companyTroopCount);
+        FailAsCompanyLeft(quest);
+    }
+
+    internal static void FailAsCompanyLeft(Quest quest)
+    {
+        quest.RelationshipChangeWithQuestGiver = -2;
         quest.AddLog(quest.QuestFailCompanyLeft);
         quest.CompleteQuestWithFail();
     }
