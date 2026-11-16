@@ -215,11 +215,6 @@ public class MapEventCollectionTests : MapEventTestBase
             var encounter = PlayerEncounter.Current;
             encounter._encounteredParty = mapEvent.DefenderSide.LeaderParty;
             encounter.IsJoinedBattle = true;
-            Campaign.Current.MapStateData ??= new MapStateData();
-            var mapState = Game.Current.GameStateManager.CreateState<MapState>();
-            Game.Current.GameStateManager._gameStates.Add(mapState);
-            mapState.GameMenuId = "encounter";
-            mapState.EnterMenuMode();
             Assert.True(client.ObjectManager.TryGetId(party.Party, out partyBaseId));
             // Stages the live joiner after the join option: a joined encounter with no _mapEvent.
             // The side write is intercepted into NetworkRequestJoinBattle instead of attaching locally.
@@ -290,6 +285,7 @@ public class MapEventCollectionTests : MapEventTestBase
         client.Call(() =>
         {
             var mapEvent = Get<MapEvent>(client, staged.MapEventId);
+            PlayerEncounter.Init();
             Assert.Same(mapEvent, PlayerEncounter.Battle);
             // The native consequence cannot run headless: BannerlordConfig.GetSystemLanguage fails before battle setup.
         });
