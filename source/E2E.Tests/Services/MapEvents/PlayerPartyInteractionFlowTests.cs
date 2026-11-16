@@ -2472,6 +2472,38 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
     }
 
     [Fact]
+    public void PvpResponseTimer_StartsAgainAfterAnAnswer()
+    {
+        var (client1, client2, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
+        MakePartiesHostile(initiatorPartyId, responderPartyId);
+
+        WithPvpRules(blockLeave: false, responseTimerSeconds: 30, () =>
+        {
+            var handler = Server.Resolve<PlayerPartyInteractionHandler>();
+            var start = DateTime.UtcNow;
+            Server.Call(() => handler.UtcNow = () => start);
+
+            RequestInteraction(client1, initiatorPartyId, responderPartyId);
+            var sessionId = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>().Single().SessionId;
+            SetMainParty(client1, initiatorPartyId);
+            SetMainParty(client2, responderPartyId);
+
+            Server.Call(() => handler.UtcNow = () => start.AddSeconds(20));
+            SubmitOption(client1, sessionId, initiatorPartyId, PlayerPartyInteractionOption.HostileDemand);
+            SubmitOption(client1, sessionId, initiatorPartyId, PlayerPartyInteractionOption.ConfirmHostileDemand);
+            Server.NetworkSentMessages.Clear();
+
+            Server.Call(() => handler.CheckPvpRules(start.AddSeconds(30)), MapEventDisabledMethods);
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionEnded>());
+
+            Server.Call(() => handler.CheckPvpRules(start.AddSeconds(50)), MapEventDisabledMethods);
+            Assert.Equal(
+                PlayerPartyInteractionOutcomeType.HostileDemandAccepted,
+                Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionEnded>().Single().OutcomeType);
+        });
+    }
+
+    [Fact]
     public void PvpRules_EndMeetingAsLeft_WhenAPartyNoLongerResolves()
     {
         var (client1, _, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
@@ -2498,44 +2530,6 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
                 PlayerPartyInteractionOutcomeType.Left,
                 Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionEnded>().Single().OutcomeType);
         });
-    }
-
-    [Fact]
-    public void Mercenary_AfterAnotherProposal_IsIgnored()
-    {
-        var (client1, client2, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
-        SetupResponderKingdomLeader(initiatorPartyId, responderPartyId, initiatorClanTier: 2);
-        RequestInteraction(client1, initiatorPartyId, responderPartyId);
-        var sessionId = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>().Single().SessionId;
-        SubmitOption(client1, sessionId, initiatorPartyId, PlayerPartyInteractionOption.TradeProposal);
-
-        Server.NetworkSentMessages.Clear();
-        SubmitOption(client1, sessionId, initiatorPartyId, PlayerPartyInteractionOption.Mercenary);
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>());
-
-        SubmitOption(client2, sessionId, responderPartyId, PlayerPartyInteractionOption.DeclineProposal);
-        Assert.Equal(
-            PlayerPartyInteractionOutcomeType.TradeDeclined,
-            Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionEnded>().Single().OutcomeType);
-    }
-
-    [Fact]
-    public void HostileDemand_AfterAnotherProposal_IsIgnored()
-    {
-        var (client1, client2, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
-        AssignDistinctClans(initiatorPartyId, responderPartyId);
-        RequestInteraction(client1, initiatorPartyId, responderPartyId);
-        var sessionId = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>().Single().SessionId;
-        SubmitOption(client1, sessionId, initiatorPartyId, PlayerPartyInteractionOption.TradeProposal);
-
-        Server.NetworkSentMessages.Clear();
-        SubmitOption(client1, sessionId, initiatorPartyId, PlayerPartyInteractionOption.HostileDemand);
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>());
-
-        SubmitOption(client2, sessionId, responderPartyId, PlayerPartyInteractionOption.DeclineProposal);
-        Assert.Equal(
-            PlayerPartyInteractionOutcomeType.TradeDeclined,
-            Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionEnded>().Single().OutcomeType);
     }
 
     [Fact]

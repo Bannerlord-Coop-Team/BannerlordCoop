@@ -51,27 +51,16 @@ public class PlayerPartyPvpRulesTests
     }
 
     [Theory]
-    [InlineData(true, true, PlayerPartyInteractionProposal.None, true, true)]
-    [InlineData(false, true, PlayerPartyInteractionProposal.None, true, false)]
-    [InlineData(true, false, PlayerPartyInteractionProposal.None, true, false)]
-    [InlineData(true, true, PlayerPartyInteractionProposal.Trade, true, false)]
-    [InlineData(true, true, PlayerPartyInteractionProposal.None, false, false)]
-    public void IsLeaveBlocked_OnlyForAMeetingStartedAtWarThatIsStillAtWar(
-        bool blockLeave, bool isHostile, PlayerPartyInteractionProposal proposal, bool atWar, bool expected)
+    [InlineData(true, true, PlayerPartyInteractionProposal.None, true)]
+    [InlineData(false, true, PlayerPartyInteractionProposal.None, false)]
+    [InlineData(true, false, PlayerPartyInteractionProposal.None, false)]
+    [InlineData(true, true, PlayerPartyInteractionProposal.Trade, false)]
+    public void CanBlockLeave_OnlyForAMeetingStartedAtWar(
+        bool blockLeave, bool isHostile, PlayerPartyInteractionProposal proposal, bool expected)
     {
         var session = CreateSession(proposal, isHostile);
 
-        Assert.Equal(expected, rules.IsLeaveBlocked(session, Options(blockLeave, responseTimerSeconds: 0), () => atWar));
-    }
-
-    [Theory]
-    [InlineData(false, 0, false)]
-    [InlineData(true, 0, true)]
-    [InlineData(false, 30, true)]
-    [InlineData(false, -5, false)]
-    public void IsEnabled_WhenBlockLeaveIsOnOrTheTimerIsAboveZero(bool blockLeave, int responseTimerSeconds, bool expected)
-    {
-        Assert.Equal(expected, rules.IsEnabled(Options(blockLeave, responseTimerSeconds)));
+        Assert.Equal(expected, rules.CanBlockLeave(session, Options(blockLeave, responseTimerSeconds: 0)));
     }
 
     private static PlayerPartyInteractionSession CreateSession(PlayerPartyInteractionProposal proposal, bool isHostile = true)

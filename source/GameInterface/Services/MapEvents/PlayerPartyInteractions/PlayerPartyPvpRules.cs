@@ -7,8 +7,8 @@ internal interface IPlayerPartyPvpRules : IGameAbstraction
 {
     // Whether either rule is on, so the server checks open meetings at all.
     bool IsEnabled(ModOptions options);
-    // atWar is only asked once the other checks pass, so a server with pvpBlockLeave off never looks the parties up.
-    bool IsLeaveBlocked(PlayerPartyInteractionSession session, ModOptions options, Func<bool> atWar);
+    // Whether pvpBlockLeave can hide Leave in this meeting, before asking whether the parties are still at war.
+    bool CanBlockLeave(PlayerPartyInteractionSession session, ModOptions options);
     // How long the meeting can sit without a new state, 0 when it isn't timed.
     int GetIdleSeconds(PlayerPartyInteractionSession session, ModOptions options);
     PlayerPartyInteractionOutcomeType GetTimeoutOutcome(PlayerPartyInteractionSession session, bool atWar);
@@ -29,11 +29,10 @@ internal class PlayerPartyPvpRules : IPlayerPartyPvpRules
 
     // IsHostile is set when the meeting starts, so a war declared mid-meeting never hides a Leave the responder
     // already saw. Trades keep Leave because barter Cancel is the same Leave.
-    public bool IsLeaveBlocked(PlayerPartyInteractionSession session, ModOptions options, Func<bool> atWar)
+    public bool CanBlockLeave(PlayerPartyInteractionSession session, ModOptions options)
         => options.PvpBlockLeave &&
            session.IsHostile &&
-           session.Proposal != PlayerPartyInteractionProposal.Trade &&
-           atWar();
+           session.Proposal != PlayerPartyInteractionProposal.Trade;
 
     public int GetIdleSeconds(PlayerPartyInteractionSession session, ModOptions options)
     {

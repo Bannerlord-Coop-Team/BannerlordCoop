@@ -812,9 +812,7 @@ internal class PlayerPartyInteractionHandler : IHandler
 
     private bool CanProposeMarriage(PlayerPartyInteractionSession session, PlayerPartyInteractionProposal proposal)
     {
-        if (session.IsHostile ||
-            !objectManager.TryGetObjectWithLogging(session.InitiatorPartyId, out PartyBase initiatorParty) ||
-            !objectManager.TryGetObjectWithLogging(session.ResponderPartyId, out PartyBase responderParty)) return false;
+        if (session.IsHostile || !TryGetParties(session, out var initiatorParty, out var responderParty)) return false;
 
         return playerMarriageRules.CanMarry(initiatorParty.LeaderHero, responderParty.LeaderHero) &&
             playerMarriageRules.GetClanJoinUnavailableReason(initiatorParty.LeaderHero, responderParty.LeaderHero,
@@ -858,7 +856,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         session.RecordResponderState(phase, proposal, options, enabledOptions);
 
         session.IsLeaveHidden = options.Contains(PlayerPartyInteractionOption.Leave) &&
-            pvpRules.IsLeaveBlocked(session, ModConfigProvider.ModOptions, () => IsAtWarNow(session));
+            pvpRules.CanBlockLeave(session, ModConfigProvider.ModOptions) && IsAtWarNow(session);
         if (session.IsLeaveHidden)
         {
             options = options.Where(option => option != PlayerPartyInteractionOption.Leave).ToArray();
@@ -928,7 +926,7 @@ internal class PlayerPartyInteractionHandler : IHandler
     private bool RestoreLeaveAfterPeace(PlayerPartyInteractionSession session, ModOptions modOptions, bool atWar)
     {
         if (!session.IsLeaveHidden) return false;
-        if (pvpRules.IsLeaveBlocked(session, modOptions, () => atWar)) return false;
+        if (pvpRules.CanBlockLeave(session, modOptions) && atWar) return false;
 
         SendResponderState(
             session,
@@ -1088,8 +1086,7 @@ internal class PlayerPartyInteractionHandler : IHandler
 
     private bool CanJoinClan(PlayerPartyInteractionSession session)
     {
-        if (!objectManager.TryGetObjectWithLogging(session.InitiatorPartyId, out PartyBase initiatorParty) ||
-            !objectManager.TryGetObjectWithLogging(session.ResponderPartyId, out PartyBase responderParty)) return false;
+        if (!TryGetParties(session, out var initiatorParty, out var responderParty)) return false;
 
         return clanJoinRules.GetUnavailableReason(initiatorParty.LeaderHero, responderParty.LeaderHero) == ClanJoinUnavailableReason.None;
     }
