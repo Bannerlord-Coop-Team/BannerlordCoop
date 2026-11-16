@@ -986,6 +986,7 @@ internal class BattleSimulationRunHandler : IHandler
     /// </summary>
     private static void EndSimulationSession(ActiveSimulation sim)
     {
+        // A cancel queued behind a completed advance arrives after the finalize tore the sides down.
         if (sim.MapEvent.IsFinalized)
             return;
 
