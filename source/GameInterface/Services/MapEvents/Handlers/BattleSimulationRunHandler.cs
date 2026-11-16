@@ -1,4 +1,4 @@
-﻿using Common;
+using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -874,7 +874,7 @@ internal class BattleSimulationRunHandler : IHandler
         }
         catch (Exception exception)
         {
-            Logger.Error(exception, "Battle simulation disconnect cleanup could not resolve another round; cancelling the session");
+            Logger.Error(exception, "Battle simulation disconnect cleanup could not resolve another round");
         }
     }
 

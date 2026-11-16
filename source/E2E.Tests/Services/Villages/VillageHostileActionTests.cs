@@ -1,4 +1,4 @@
-﻿using Common;
+using Common;
 using Common.Commands;
 using Common.Messaging;
 using Common.Network;
@@ -3637,7 +3637,8 @@ public class VillageHostileActionTests : MapEventTestBase
     [Fact]
     public void MultiPlayerRaid_BattleSimulationJoinerRetreat_RemovesOnlyJoinerAndKeepsEvent()
     {
-        var clients = Clients.ToArray();
+        var leaderClient = Clients.First();
+        var joinerClient = Clients.Skip(1).First();
         var hostileAction = CreateHostileActionWithTwoPlayerParties(VillageHostileAction.Raid);
         string joinerMobilePartyId = null!;
         string joinerPartyId = null!;
@@ -3654,7 +3655,7 @@ public class VillageHostileActionTests : MapEventTestBase
         {
             Server.NetworkSentMessages.Clear();
 
-            clients[1].Call(() => clients[1].Resolve<INetwork>().SendAll(
+            joinerClient.Call(() => joinerClient.Resolve<INetwork>().SendAll(
                 new NetworkBattleStartRequest(
                     Guid.NewGuid().ToString(),
                     (int)BattleStartMode.Simulation,
@@ -3665,7 +3666,7 @@ public class VillageHostileActionTests : MapEventTestBase
             Assert.True(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleStartReply>()).Accepted);
 
             Server.NetworkSentMessages.Clear();
-            clients[1].Call(() => clients[1].Resolve<INetwork>().SendAll(
+            joinerClient.Call(() => joinerClient.Resolve<INetwork>().SendAll(
                 new NetworkCancelBattleSimulation(hostileAction.MapEventId)),
                 MapEventDisabledMethods);
 
@@ -3685,12 +3686,12 @@ public class VillageHostileActionTests : MapEventTestBase
             Server.Call(() => Assert.False(ServerBattleModeArbiter.IsClaimed(hostileAction.MapEventId)));
 
             // The side leader can start another simulation on the still-registered battle.
-            StartBattleSimulation(clients[0], hostileAction);
+            StartBattleSimulation(leaderClient, hostileAction);
             Server.Call(() =>
             {
                 var mapEvent = Server.GetRegisteredObject<MapEvent>(hostileAction.MapEventId);
                 mapEvent._battleState = BattleState.AttackerVictory;
-                Server.Resolve<IMessageBroker>().Publish(clients[0].NetPeer,
+                Server.Resolve<IMessageBroker>().Publish(leaderClient.NetPeer,
                     new NetworkAdvanceBattleSimulation(hostileAction.MapEventId, 1));
                 Assert.True(mapEvent.IsFinalized);
                 Assert.Same(mapEvent, Assert.Single(ended));
@@ -3750,8 +3751,6 @@ public class VillageHostileActionTests : MapEventTestBase
         var joinerClient = Clients.Skip(1).First();
         var hostileAction = CreateHostileActionWithTwoPlayerParties(VillageHostileAction.Raid);
         var ended = new List<MapEvent>();
-        Thread advanceQueued = null;
-        Thread cancelQueued = null;
         Exception advanceFailure = null;
         Exception cancelFailure = null;
 
@@ -3762,45 +3761,24 @@ public class VillageHostileActionTests : MapEventTestBase
             Server.NetworkSentMessages.Clear();
             Server.Call(() =>
             {
-                var broker = Server.Resolve<IMessageBroker>();
                 using var shortTimeout = GameThread.Instance.LimitFrameDrain(
                     TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(10));
                 Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(hostileAction.MapEventId, out var mapEvent));
                 mapEvent._battleState = BattleState.AttackerVictory;
                 Assert.Equal(0, GameThread.Instance.QueueLength);
-                advanceQueued = new Thread(() =>
-                {
-                    try
-                    {
-                        broker.Publish(leaderClient.NetPeer,
-                            new NetworkAdvanceBattleSimulation(hostileAction.MapEventId, 1));
-                    }
-                    catch (Exception exception)
-                    {
-                        advanceFailure = exception;
-                    }
-                }) { IsBackground = true };
-                advanceQueued.Start();
+                StartOnServerPoller(
+                    () => Server.Resolve<IMessageBroker>().Publish(leaderClient.NetPeer,
+                        new NetworkAdvanceBattleSimulation(hostileAction.MapEventId, 1)),
+                    exception => advanceFailure = exception);
                 Assert.True(SpinWait.SpinUntil(() => GameThread.Instance.QueueLength == 1, TimeSpan.FromSeconds(10)));
-                cancelQueued = new Thread(() =>
-                {
-                    try
-                    {
-                        broker.Publish(leaderClient.NetPeer,
-                            new NetworkCancelBattleSimulation(hostileAction.MapEventId));
-                    }
-                    catch (Exception exception)
-                    {
-                        cancelFailure = exception;
-                    }
-                }) { IsBackground = true };
-                cancelQueued.Start();
+                StartOnServerPoller(
+                    () => Server.Resolve<IMessageBroker>().Publish(leaderClient.NetPeer,
+                        new NetworkCancelBattleSimulation(hostileAction.MapEventId)),
+                    exception => cancelFailure = exception);
                 Assert.True(SpinWait.SpinUntil(() => GameThread.Instance.QueueLength == 2, TimeSpan.FromSeconds(10)));
             }, MapEventDisabledMethods);
 
             Server.PumpGameThread();
-            Assert.True(advanceQueued.Join(TimeSpan.FromSeconds(10)), "the advance poller did not return");
-            Assert.True(cancelQueued.Join(TimeSpan.FromSeconds(10)), "the cancel poller did not return");
             Assert.Null(advanceFailure);
             Assert.Null(cancelFailure);
 
@@ -5032,6 +5010,22 @@ public class VillageHostileActionTests : MapEventTestBase
         poller.Start();
         Assert.True(poller.Join(TimeSpan.FromSeconds(10)), "the poller did not return");
         return failure;
+    }
+
+    private static void StartOnServerPoller(Action receive, Action<Exception> onFailure)
+    {
+        var poller = new Thread(() =>
+        {
+            try
+            {
+                receive();
+            }
+            catch (Exception exception)
+            {
+                onFailure(exception);
+            }
+        }) { IsBackground = true };
+        poller.Start();
     }
 
     private static BattleCreationFlags RaidFlags() => HostileActionFlags(VillageHostileAction.Raid);

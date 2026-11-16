@@ -1,4 +1,4 @@
-﻿using Common;
+using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Util;
@@ -58,6 +58,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
     private DeferredForceScreen deferredForceScreen;
     // Client-only: a won raid's continuation, waiting for the current encounter to end.
     private ParkedRaidContinuation parkedRaidContinuation;
+    // Client-only: the encounter a continuation request opened; finished if the server denies it.
     private PlayerEncounter continuationEncounter;
 
     public VillageHostileActionInterface(IMessageBroker messageBroker, IObjectManager objectManager)
