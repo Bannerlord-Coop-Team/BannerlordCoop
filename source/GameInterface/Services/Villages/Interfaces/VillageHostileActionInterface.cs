@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Util;
@@ -181,7 +181,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         GameMenu.SwitchToMenu("encounter");
     }
 
-    public void RecoverRejectedHostileAction()
+    public void CloseDeniedRaidContinuation()
     {
         var encounter = continuationEncounter;
         continuationEncounter = null;

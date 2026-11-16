@@ -1,5 +1,4 @@
-
-namespace GameInterface.Services.Villages;
+﻿namespace GameInterface.Services.Villages;
 
 // Tracks whether one hostile-action request is waiting for a server reply; Take clears the slot.
 public interface IHostileActionRequestTracker : IGameAbstraction

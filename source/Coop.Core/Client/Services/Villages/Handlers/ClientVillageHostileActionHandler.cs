@@ -99,7 +99,7 @@ internal class ClientVillageHostileActionHandler : IHandler
             () =>
             {
                 hostileActionRequestTracker.Complete();
-                villageHostileActionInterface.RecoverRejectedHostileAction();
+                villageHostileActionInterface.CloseDeniedRaidContinuation();
             },
             context: nameof(Handle_NetworkVillageHostileActionDenied));
         messageBroker.Publish(this, new SendInformationMessage(GetDeniedMessage(payload.What.Reason)));

@@ -15,7 +15,7 @@ public interface IVillageHostileActionInterface : IGameAbstraction
     void BeginHostileActionPresentation(VillageHostileAction action);
 
     /// <summary>[Client, game thread] The hostile-action request was denied; close the continuation encounter it opened.</summary>
-    void RecoverRejectedHostileAction();
+    void CloseDeniedRaidContinuation();
 
     /// <summary>[Client, game thread] Park a raid continuation until the current encounter ends.</summary>
     void ParkRaidContinuation(Settlement settlement);

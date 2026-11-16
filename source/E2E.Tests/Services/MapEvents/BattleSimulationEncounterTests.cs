@@ -71,8 +71,10 @@ public class BattleSimulationEncounterTests : MapEventTestBase
             using var moraleReads = new MethodCallRecorder(Priority.First, true,
                 AccessTools.Method(typeof(MapEventSide), nameof(MapEventSide.GetSideMorale)));
             var tick = AccessTools.Method(typeof(SPScoreboardVM), "OnTick");
-            for (var frame = 0; frame < 200; frame++)
-                tick.Invoke(scoreboard, new object[] { 1.1f });
+            const int ScoreboardTicks = 200;
+            const float TickSeconds = 1.1f; // Match the game tick duration used while the scoreboard is displayed.
+            for (var frame = 0; frame < ScoreboardTicks; frame++)
+                tick.Invoke(scoreboard, new object[] { TickSeconds });
             Assert.Equal(0, moraleReads.CountFor(client));
             Assert.True(Game.Current.GameStateManager.GameStates.OfType<MapState>().Single().IsSimulationActive);
         }, MapEventDisabledMethods);
