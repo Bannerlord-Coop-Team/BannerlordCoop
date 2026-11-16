@@ -255,9 +255,9 @@
     "preferredBattleHosts": [],
 
     // Stop a player caught by an enemy player from leaving.
-    // (Default) false: The caught player can always pick "I must leave now."
+    // (Default) false: The caught player can pick "I must leave now." whenever the meeting offers it.
     // true: When the two players' factions are at war as the meeting starts, the caught player isn't offered "I must leave now." and the server ignores it.
-    // A trade can still be cancelled, and Leave comes back if the two make peace during the meeting.
+    // A trade can still be cancelled, and Leave comes back if the two make peace during the meeting, except while answering a hostile demand, which never offers Leave.
     // If the other player then does nothing for 30 seconds (or pvpResponseTimerSeconds when set), the caught player goes free.
     "pvpBlockLeave": false,
 
