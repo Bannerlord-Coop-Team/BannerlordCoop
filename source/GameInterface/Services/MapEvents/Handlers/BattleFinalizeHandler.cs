@@ -405,8 +405,9 @@ internal class BattleFinalizeHandler : IHandler
     {
         var settlement = GetRaidFinalizationSettlement(mapEvent);
         var attackers = GetRaidAttackerPlayerParties(mapEvent);
-        var leaderPeer = ShouldContinueRaidAfterVictory(mapEvent, settlement) &&
-            TryGetRaidLeaderPeer(mapEvent, out var peer) ? peer : null;
+        NetPeer leaderPeer = null;
+        if (ShouldContinueRaidAfterVictory(mapEvent, settlement))
+            TryGetRaidLeaderPeer(mapEvent, out leaderPeer);
         return new RaidAftermath(settlement, attackers, leaderPeer);
     }
 

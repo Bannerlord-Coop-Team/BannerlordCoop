@@ -205,9 +205,6 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
 
         var settlement = parked.Settlement;
 
-        var encounter = PlayerEncounter.Current;
-        bool encounterReplaced = encounter != null && parked.Encounter != null &&
-            !ReferenceEquals(encounter, parked.Encounter);
         if (PlayerCaptivity.IsCaptive)
         {
             parkedRaidContinuation = null;
@@ -215,6 +212,9 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
             return;
         }
 
+        var encounter = PlayerEncounter.Current;
+        bool encounterReplaced = encounter != null && parked.Encounter != null &&
+            !ReferenceEquals(encounter, parked.Encounter);
         if (encounterReplaced)
         {
             parkedRaidContinuation = null;

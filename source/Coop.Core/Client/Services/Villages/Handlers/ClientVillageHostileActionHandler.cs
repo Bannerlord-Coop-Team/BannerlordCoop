@@ -9,7 +9,6 @@ using GameInterface.Services.Villages.Interfaces;
 using GameInterface.Services.Villages;
 using GameInterface.Services.Villages.Messages;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.CampaignSystem.Encounters;
 
 namespace Coop.Core.Client.Services.Villages.Handlers;
 
@@ -64,7 +63,7 @@ internal class ClientVillageHostileActionHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(message.MobileParty, out var mobilePartyId)) return;
         if (!objectManager.TryGetIdWithLogging(message.Settlement, out var settlementId)) return;
         // A request is already pending: drop this one, the server still resolves the first.
-        if (!hostileActionRequestTracker.TryTrack(PlayerEncounter.Current))
+        if (!hostileActionRequestTracker.TryTrackCurrentEncounter())
         {
             return;
         }

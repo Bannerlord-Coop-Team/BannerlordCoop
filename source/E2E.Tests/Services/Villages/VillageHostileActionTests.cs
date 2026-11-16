@@ -415,7 +415,7 @@ public class VillageHostileActionTests : MapEventTestBase
 
         var denied = Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionDenied>().Single();
         Assert.Equal(VillageHostileActionDeniedReason.AlreadyInMapEvent, denied.Reason);
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPromptRaidContinuation>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionStarted>());
     }
 
     [Fact]
@@ -2013,7 +2013,8 @@ public class VillageHostileActionTests : MapEventTestBase
         var close = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkClosePvpEncounter>());
         Assert.Contains(GetPartyBaseId(mobilePartyId), close.PartyIds);
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPartyLeaveSettlement>());
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionStarted>());
+        Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client.NetPeer);
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPromptRaidContinuation>());
         AssertHasPlayerEncounter(client, expected: false);
         if (naturalCompletion)
         {
@@ -3730,21 +3731,14 @@ public class VillageHostileActionTests : MapEventTestBase
     }
 
     [Fact]
-    public void MultiPlayerRaid_BattleSimulationCancel_QueuedAfterClaimRelease_AfterWinningAdvance_IsIgnored() =>
-        RunQueuedAfterClaimReleaseScenario(winningAdvance: true);
-
-    [Fact]
-    public void MultiPlayerRaid_BattleSimulationCancel_QueuedAfterClaimRelease_DoubleCancel_IsIgnored() =>
-        RunQueuedAfterClaimReleaseScenario(winningAdvance: false);
-
-    private void RunQueuedAfterClaimReleaseScenario(bool winningAdvance)
+    public void MultiPlayerRaid_BattleSimulationCancel_QueuedAfterClaimRelease_AfterWinningAdvance_IsIgnored()
     {
         var client = Clients.First();
         var hostileAction = CreateHostileActionWithTwoPlayerParties(VillageHostileAction.Raid);
         var ended = new List<MapEvent>();
         Thread advanceQueued = null;
-        Exception advanceFailure = null;
         Thread cancelQueued = null;
+        Exception advanceFailure = null;
         Exception cancelFailure = null;
 
         Server.Call(() => CampaignEvents.MapEventEnded.AddNonSerializedListener(this, ended.Add));
@@ -3756,69 +3750,92 @@ public class VillageHostileActionTests : MapEventTestBase
             {
                 var broker = Server.Resolve<IMessageBroker>();
                 using var shortTimeout = GameThread.Instance.LimitFrameDrain(
-                    TimeSpan.FromSeconds(1), winningAdvance ? TimeSpan.FromSeconds(10) : TimeSpan.FromMilliseconds(200));
-                if (winningAdvance)
+                    TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(10));
+                Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(hostileAction.MapEventId, out var mapEvent));
+                mapEvent._battleState = BattleState.AttackerVictory;
+                advanceQueued = new Thread(() =>
                 {
-                    Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(hostileAction.MapEventId, out var mapEvent));
-                    mapEvent._battleState = BattleState.AttackerVictory;
-                    advanceQueued = new Thread(() =>
+                    try
                     {
-                        try
-                        {
-                            broker.Publish(client.NetPeer,
-                                new NetworkAdvanceBattleSimulation(hostileAction.MapEventId, 1));
-                        }
-                        catch (Exception exception)
-                        {
-                            advanceFailure = exception;
-                        }
-                    }) { IsBackground = true };
-                    advanceQueued.Start();
-                    Assert.True(SpinWait.SpinUntil(() => GameThread.Instance.QueueLength > 0, TimeSpan.FromSeconds(10)));
-                    cancelQueued = new Thread(() =>
+                        broker.Publish(client.NetPeer,
+                            new NetworkAdvanceBattleSimulation(hostileAction.MapEventId, 1));
+                    }
+                    catch (Exception exception)
                     {
-                        try
-                        {
-                            broker.Publish(client.NetPeer,
-                                new NetworkCancelBattleSimulation(hostileAction.MapEventId));
-                        }
-                        catch (Exception exception)
-                        {
-                            cancelFailure = exception;
-                        }
-                    }) { IsBackground = true };
-                    cancelQueued.Start();
-                    Assert.True(SpinWait.SpinUntil(() => GameThread.Instance.QueueLength > 1, TimeSpan.FromSeconds(10)));
-                }
-                else
+                        advanceFailure = exception;
+                    }
+                }) { IsBackground = true };
+                advanceQueued.Start();
+                Assert.True(SpinWait.SpinUntil(() => GameThread.Instance.QueueLength > 0, TimeSpan.FromSeconds(10)));
+                cancelQueued = new Thread(() =>
                 {
-                    Assert.Null(RunOnServerPoller(() =>
+                    try
                     {
                         broker.Publish(client.NetPeer,
                             new NetworkCancelBattleSimulation(hostileAction.MapEventId));
-                        broker.Publish(client.NetPeer,
-                            new NetworkCancelBattleSimulation(hostileAction.MapEventId));
-                    }));
-                }
-                Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkBattleSimulationCancelled>());
+                    }
+                    catch (Exception exception)
+                    {
+                        cancelFailure = exception;
+                    }
+                }) { IsBackground = true };
+                cancelQueued.Start();
+                Assert.True(SpinWait.SpinUntil(() => GameThread.Instance.QueueLength > 1, TimeSpan.FromSeconds(10)));
             }, MapEventDisabledMethods);
 
-            if (winningAdvance)
-            {
-                Server.PumpGameThread();
-                Assert.True(advanceQueued.Join(TimeSpan.FromSeconds(10)), "the advance poller did not return");
-                Assert.True(cancelQueued.Join(TimeSpan.FromSeconds(10)), "the cancel poller did not return");
-                Assert.Null(advanceFailure);
-                Assert.Null(cancelFailure);
-            }
+            Server.PumpGameThread();
+            Assert.True(advanceQueued.Join(TimeSpan.FromSeconds(10)), "the advance poller did not return");
+            Assert.True(cancelQueued.Join(TimeSpan.FromSeconds(10)), "the cancel poller did not return");
+            Assert.Null(advanceFailure);
+            Assert.Null(cancelFailure);
 
             Server.PumpGameThread();
 
             Assert.Single(ended);
-            Assert.Equal(winningAdvance ? 1 : 0,
-                Server.NetworkSentMessages.GetMessages<NetworkBattleSimulationFinished>().Count());
-            Assert.Equal(winningAdvance ? 0 : 1,
-                Server.NetworkSentMessages.GetMessages<NetworkBattleSimulationCancelled>().Count());
+            Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleSimulationFinished>());
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkBattleSimulationCancelled>());
+            Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleModeSet>());
+            Server.Call(() => Assert.False(ServerBattleModeArbiter.IsClaimed(hostileAction.MapEventId)), MapEventDisabledMethods);
+        }
+        finally
+        {
+            Server.Call(() => CampaignEvents.MapEventEnded.ClearListeners(this));
+            Server.Call(() => ServerBattleModeArbiter.Release(hostileAction.MapEventId));
+        }
+    }
+
+    [Fact]
+    public void MultiPlayerRaid_BattleSimulationCancel_QueuedAfterClaimRelease_DoubleCancel_IsIgnored()
+    {
+        var client = Clients.First();
+        var hostileAction = CreateHostileActionWithTwoPlayerParties(VillageHostileAction.Raid);
+        var ended = new List<MapEvent>();
+
+        Server.Call(() => CampaignEvents.MapEventEnded.AddNonSerializedListener(this, ended.Add));
+        try
+        {
+            StartBattleSimulation(client, hostileAction);
+            Server.NetworkSentMessages.Clear();
+            Server.Call(() =>
+            {
+                var broker = Server.Resolve<IMessageBroker>();
+                using var shortTimeout = GameThread.Instance.LimitFrameDrain(
+                    TimeSpan.FromSeconds(1), TimeSpan.FromMilliseconds(200));
+                Assert.Null(RunOnServerPoller(() =>
+                {
+                    broker.Publish(client.NetPeer,
+                        new NetworkCancelBattleSimulation(hostileAction.MapEventId));
+                    broker.Publish(client.NetPeer,
+                        new NetworkCancelBattleSimulation(hostileAction.MapEventId));
+                }));
+                Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkBattleSimulationCancelled>());
+            }, MapEventDisabledMethods);
+
+            Server.PumpGameThread();
+
+            Assert.Single(ended);
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkBattleSimulationFinished>());
+            Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleSimulationCancelled>());
             Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleModeSet>());
             Server.Call(() => Assert.False(ServerBattleModeArbiter.IsClaimed(hostileAction.MapEventId)), MapEventDisabledMethods);
         }

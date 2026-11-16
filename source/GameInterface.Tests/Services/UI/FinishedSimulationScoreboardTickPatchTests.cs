@@ -1,4 +1,4 @@
-using GameInterface.Services.UI.Patches;
+﻿using GameInterface.Services.UI.Patches;
 using Xunit;
 
 namespace GameInterface.Tests.Services.UI;
