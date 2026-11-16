@@ -36,6 +36,7 @@ public class PlayerPartyPvpRulesTests
     [Theory]
     [InlineData(PlayerPartyInteractionProposal.None, true, 30)]
     [InlineData(PlayerPartyInteractionProposal.None, false, 0)]
+    [InlineData(PlayerPartyInteractionProposal.HostileDemand, true, 30)]
     [InlineData(PlayerPartyInteractionProposal.Vassal, true, 0)]
     [InlineData(PlayerPartyInteractionProposal.Trade, true, 0)]
     public void GetIdleSeconds_WithOnlyBlockLeave_ReleasesAnIdleAttacker(
@@ -58,7 +59,17 @@ public class PlayerPartyPvpRulesTests
     {
         var session = CreateSession(proposal, isHostile);
 
-        Assert.Equal(expected, rules.IsLeaveBlocked(session, Options(blockLeave, responseTimerSeconds: 0), atWar));
+        Assert.Equal(expected, rules.IsLeaveBlocked(session, Options(blockLeave, responseTimerSeconds: 0), () => atWar));
+    }
+
+    [Fact]
+    public void IsLeaveBlocked_WithBlockLeaveOff_NeverAsksAboutWar()
+    {
+        var session = CreateSession(PlayerPartyInteractionProposal.None);
+        var lookups = 0;
+
+        Assert.False(rules.IsLeaveBlocked(session, Options(blockLeave: false, responseTimerSeconds: 0), () => ++lookups > 0));
+        Assert.Equal(0, lookups);
     }
 
     private static PlayerPartyInteractionSession CreateSession(PlayerPartyInteractionProposal proposal, bool isHostile = true)

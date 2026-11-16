@@ -859,7 +859,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         session.ResponderEnabledOptions.UnionWith(enabledOptions ?? options);
 
         session.IsLeaveHidden = options.Contains(PlayerPartyInteractionOption.Leave) &&
-            pvpRules.IsLeaveBlocked(session, ModConfigProvider.ModOptions, IsAtWarNow(session));
+            pvpRules.IsLeaveBlocked(session, ModConfigProvider.ModOptions, () => IsAtWarNow(session));
         if (session.IsLeaveHidden)
         {
             options = options.Where(option => option != PlayerPartyInteractionOption.Leave).ToArray();
@@ -913,7 +913,7 @@ internal class PlayerPartyInteractionHandler : IHandler
     private bool RestoreLeaveAfterPeace(PlayerPartyInteractionSession session, ModOptions modOptions)
     {
         if (!session.IsLeaveHidden) return false;
-        if (pvpRules.IsLeaveBlocked(session, modOptions, IsAtWarNow(session))) return false;
+        if (pvpRules.IsLeaveBlocked(session, modOptions, () => IsAtWarNow(session))) return false;
 
         SendResponderState(
             session,
