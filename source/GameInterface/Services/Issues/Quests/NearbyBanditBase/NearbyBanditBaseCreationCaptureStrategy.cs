@@ -1,5 +1,6 @@
 ﻿using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
+using System.IO;
 using System.Linq;
 using System.Text;
 using TaleWorlds.CampaignSystem;
@@ -27,7 +28,7 @@ internal class NearbyBanditBaseCreationCaptureStrategy : ICreationCaptureStrateg
     {
         if (!objectManager.TryGetObjectWithLogging<Settlement>(Encoding.UTF8.GetString(captured), out var hideout))
         {
-            return null;
+            throw new InvalidDataException("The bandit base issue's target hideout is missing");
         }
 
         return new Issue(issueOwner, hideout);
