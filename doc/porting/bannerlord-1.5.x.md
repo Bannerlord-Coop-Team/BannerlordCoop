@@ -401,8 +401,9 @@ v1.5, because copies written on v1.4.8 (the ransom and mercenary offers) still r
   arrived" itself, and the server's `NetworkNotifyFleetArrived` is gone.
 - Map event results ask the event component what the winners loot. A partial ship loot reads the
   player encounter, which the server lacks, so it loots no ships.
-- Incidents build against v1.5.7, and `IncidentDisable` still blocks
-  `IncidentManager.InvokeIncident` until #4590 moves the service onto the v1.5 API.
+- Incidents run on the v1.5.7 `IncidentManager` API (#4590). Naval incidents stay off until #4608,
+  because `NavalIncidentsCampaignBehaviourPatches` in `Coop.Naval` blocks
+  `NavalIncidentsCampaignBehaviour.TryInvokeIncident`.
 - Conflicts: development's server side fleet transfer to the heir, its per player companion
   tracking and the prison break sync (#4613) are active. `CoopHideoutMissionLogic` keeps the call
   to `Mission.OnInitialSpawnCompleted` (#4591).
