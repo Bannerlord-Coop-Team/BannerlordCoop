@@ -52,11 +52,12 @@ internal sealed class PlayerPartyInteractionSession
 
     public HashSet<PlayerPartyInteractionOption> InitiatorOptions { get; } = new HashSet<PlayerPartyInteractionOption>();
     public HashSet<PlayerPartyInteractionOption> InitiatorEnabledOptions { get; } = new HashSet<PlayerPartyInteractionOption>();
-    // The responder's last state as built, Leave included, so peace can send it again with Leave back.
-    public PlayerPartyInteractionPhase ResponderPhase { get; set; }
-    public PlayerPartyInteractionProposal ResponderProposal { get; set; }
-    public HashSet<PlayerPartyInteractionOption> ResponderOptions { get; } = new HashSet<PlayerPartyInteractionOption>();
-    public HashSet<PlayerPartyInteractionOption> ResponderEnabledOptions { get; } = new HashSet<PlayerPartyInteractionOption>();
+    // A record of the responder's last state as built, Leave included, so peace can send it again with Leave back.
+    // Not what the responder may pick, because a Leave pvpBlockLeave hid is still in it.
+    public PlayerPartyInteractionPhase LastResponderPhase { get; private set; }
+    public PlayerPartyInteractionProposal LastResponderProposal { get; private set; }
+    public HashSet<PlayerPartyInteractionOption> LastResponderOptions { get; } = new HashSet<PlayerPartyInteractionOption>();
+    public HashSet<PlayerPartyInteractionOption> LastResponderEnabledOptions { get; } = new HashSet<PlayerPartyInteractionOption>();
 
     public PlayerPartyInteractionSession(
         string sessionId,
@@ -102,6 +103,20 @@ internal sealed class PlayerPartyInteractionSession
             default:
                 return true;
         }
+    }
+
+    public void RecordResponderState(
+        PlayerPartyInteractionPhase phase,
+        PlayerPartyInteractionProposal proposal,
+        PlayerPartyInteractionOption[] options,
+        PlayerPartyInteractionOption[] enabledOptions)
+    {
+        LastResponderPhase = phase;
+        LastResponderProposal = proposal;
+        LastResponderOptions.Clear();
+        LastResponderOptions.UnionWith(options);
+        LastResponderEnabledOptions.Clear();
+        LastResponderEnabledOptions.UnionWith(enabledOptions);
     }
 
     public void SetTradeOffer(

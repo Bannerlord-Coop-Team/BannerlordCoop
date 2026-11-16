@@ -9,14 +9,14 @@ public class PlayerPartyPvpRulesTests
     private readonly PlayerPartyPvpRules rules = new PlayerPartyPvpRules();
 
     [Theory]
-    [InlineData(true, true, PlayerPartyInteractionOutcomeType.HostileDemandAccepted)]
-    [InlineData(true, false, PlayerPartyInteractionOutcomeType.Left)]
-    [InlineData(false, true, PlayerPartyInteractionOutcomeType.Left)]
-    [InlineData(false, false, PlayerPartyInteractionOutcomeType.Left)]
+    [InlineData(PlayerPartyInteractionProposal.HostileDemand, true, true, PlayerPartyInteractionOutcomeType.HostileDemandAccepted)]
+    [InlineData(PlayerPartyInteractionProposal.HostileDemand, true, false, PlayerPartyInteractionOutcomeType.Left)]
+    [InlineData(PlayerPartyInteractionProposal.HostileDemand, false, true, PlayerPartyInteractionOutcomeType.Left)]
+    [InlineData(PlayerPartyInteractionProposal.Vassal, true, false, PlayerPartyInteractionOutcomeType.Left)]
     public void GetTimeoutOutcome_StartsTheBattleOnlyForAConfirmedDemandAtWar(
-        bool atWar, bool demandConfirmed, PlayerPartyInteractionOutcomeType expectedOutcome)
+        PlayerPartyInteractionProposal proposal, bool atWar, bool demandConfirmed, PlayerPartyInteractionOutcomeType expectedOutcome)
     {
-        var session = CreateSession(PlayerPartyInteractionProposal.HostileDemand);
+        var session = CreateSession(proposal);
         session.HostileDemandConfirmed = demandConfirmed;
 
         Assert.Equal(expectedOutcome, rules.GetTimeoutOutcome(session, atWar));
@@ -64,14 +64,14 @@ public class PlayerPartyPvpRulesTests
         Assert.Equal(expected, rules.IsLeaveBlocked(session, Options(blockLeave, responseTimerSeconds: 0), () => atWar));
     }
 
-    [Fact]
-    public void IsLeaveBlocked_WithBlockLeaveOff_NeverAsksAboutWar()
+    [Theory]
+    [InlineData(false, 0, false)]
+    [InlineData(true, 0, true)]
+    [InlineData(false, 30, true)]
+    [InlineData(false, -5, false)]
+    public void IsEnabled_WhenBlockLeaveIsOnOrTheTimerIsAboveZero(bool blockLeave, int responseTimerSeconds, bool expected)
     {
-        var session = CreateSession(PlayerPartyInteractionProposal.None);
-        var lookups = 0;
-
-        Assert.False(rules.IsLeaveBlocked(session, Options(blockLeave: false, responseTimerSeconds: 0), () => ++lookups > 0));
-        Assert.Equal(0, lookups);
+        Assert.Equal(expected, rules.IsEnabled(Options(blockLeave, responseTimerSeconds)));
     }
 
     private static PlayerPartyInteractionSession CreateSession(PlayerPartyInteractionProposal proposal, bool isHostile = true)

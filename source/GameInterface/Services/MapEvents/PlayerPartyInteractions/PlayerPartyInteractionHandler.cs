@@ -830,6 +830,7 @@ internal class PlayerPartyInteractionHandler : IHandler
     {
         var options = Array.Empty<PlayerPartyInteractionOption>();
 
+        session.RecordResponderState(PlayerPartyInteractionPhase.TradeActive, session.Proposal, options, options);
         network.Send(session.InitiatorPeer, CreateInitiatorState(session, PlayerPartyInteractionPhase.TradeActive, session.Proposal, options));
         network.Send(session.ResponderPeer, CreateResponderState(session, PlayerPartyInteractionPhase.TradeActive, session.Proposal, options));
     }
@@ -852,20 +853,16 @@ internal class PlayerPartyInteractionHandler : IHandler
         PlayerPartyInteractionOption[] options,
         PlayerPartyInteractionOption[] enabledOptions = null)
     {
+        enabledOptions ??= options;
         session.StateChangedUtc = UtcNow();
-        session.ResponderPhase = phase;
-        session.ResponderProposal = proposal;
-        session.ResponderOptions.Clear();
-        session.ResponderOptions.UnionWith(options);
-        session.ResponderEnabledOptions.Clear();
-        session.ResponderEnabledOptions.UnionWith(enabledOptions ?? options);
+        session.RecordResponderState(phase, proposal, options, enabledOptions);
 
         session.IsLeaveHidden = options.Contains(PlayerPartyInteractionOption.Leave) &&
             pvpRules.IsLeaveBlocked(session, ModConfigProvider.ModOptions, () => IsAtWarNow(session));
         if (session.IsLeaveHidden)
         {
             options = options.Where(option => option != PlayerPartyInteractionOption.Leave).ToArray();
-            enabledOptions = session.ResponderEnabledOptions.Where(option => option != PlayerPartyInteractionOption.Leave).ToArray();
+            enabledOptions = enabledOptions.Where(option => option != PlayerPartyInteractionOption.Leave).ToArray();
         }
 
         network.SendAll(CreateResponderState(session, phase, proposal, options, enabledOptions));
@@ -888,8 +885,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         if (Volatile.Read(ref isDisposed) != 0 || sessionsById.IsEmpty) return;
         if (!GameThread.Instance.IsInitialized) return;
 
-        var modOptions = ModConfigProvider.ModOptions;
-        if (!modOptions.PvpBlockLeave && modOptions.PvpResponseTimerSeconds <= 0) return;
+        if (!pvpRules.IsEnabled(ModConfigProvider.ModOptions)) return;
 
         // Read before queueing, so an answer queued behind this tick on a stalled game thread is still on time.
         var utcNow = UtcNow();
@@ -936,10 +932,10 @@ internal class PlayerPartyInteractionHandler : IHandler
 
         SendResponderState(
             session,
-            session.ResponderPhase,
-            session.ResponderProposal,
-            session.ResponderOptions.ToArray(),
-            session.ResponderEnabledOptions.ToArray());
+            session.LastResponderPhase,
+            session.LastResponderProposal,
+            session.LastResponderOptions.ToArray(),
+            session.LastResponderEnabledOptions.ToArray());
         return true;
     }
 
