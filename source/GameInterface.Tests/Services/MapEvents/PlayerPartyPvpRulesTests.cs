@@ -23,12 +23,14 @@ public class PlayerPartyPvpRulesTests
     }
 
     [Theory]
-    [InlineData(1, 10)]
-    [InlineData(10, 10)]
-    [InlineData(45, 45)]
-    public void GetIdleSeconds_RaisesAShortResponseTimerToTenSeconds(int responseTimerSeconds, int expectedSeconds)
+    [InlineData(PlayerPartyInteractionProposal.Vassal, 1, 10)]
+    [InlineData(PlayerPartyInteractionProposal.Vassal, 10, 10)]
+    [InlineData(PlayerPartyInteractionProposal.Vassal, 45, 45)]
+    [InlineData(PlayerPartyInteractionProposal.Trade, 30, 0)]
+    public void GetIdleSeconds_RaisesAShortResponseTimerToTenSeconds_AndNeverTimesATrade(
+        PlayerPartyInteractionProposal proposal, int responseTimerSeconds, int expectedSeconds)
     {
-        var session = CreateSession(PlayerPartyInteractionProposal.Vassal);
+        var session = CreateSession(proposal);
 
         Assert.Equal(expectedSeconds, rules.GetIdleSeconds(session, Options(blockLeave: false, responseTimerSeconds)));
     }
