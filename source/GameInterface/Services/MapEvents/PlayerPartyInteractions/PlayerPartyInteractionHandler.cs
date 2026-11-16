@@ -903,8 +903,8 @@ internal class PlayerPartyInteractionHandler : IHandler
     }
 
     /// <summary>
-    /// [Server, game thread] Gives Leave back to responders who made peace during the meeting, otherwise ends
-    /// meetings nobody answered in time.
+    /// [Server, game thread] Ends meetings whose party no longer resolves, gives Leave back to responders who made
+    /// peace during the meeting, and otherwise ends meetings nobody answered in time.
     /// </summary>
     internal void CheckPvpRules(DateTime utcNow)
     {
@@ -914,6 +914,9 @@ internal class PlayerPartyInteractionHandler : IHandler
             // A party that no longer resolves can never answer, so the meeting ends instead of the miss reading as peace.
             if (!TryGetParties(session, out var initiatorParty, out var responderParty))
             {
+                Logger.Information(
+                    "Ended player-party interaction because a party no longer resolves. SessionId={SessionId}, Outcome={Outcome}",
+                    session.SessionId, PlayerPartyInteractionOutcomeType.Left);
                 EndSession(session, PlayerPartyInteractionOutcomeType.Left);
                 continue;
             }
