@@ -414,14 +414,11 @@ internal class BattleFinalizeHandler : IHandler
         var settlement = GetRaidFinalizationSettlement(mapEvent);
         var attackers = GetRaidAttackerPlayerParties(mapEvent);
         var leaderParty = mapEvent.AttackerSide?.LeaderParty?.MobileParty;
-        string leaderPartyId = null;
-        if (leaderParty != null)
-            objectManager.TryGetId(leaderParty, out leaderPartyId);
         NetPeer leaderPeer = null;
         if (!ShouldContinueRaidAfterVictory(mapEvent, settlement)
             || !TryGetRaidLeaderPeer(leaderParty, out leaderPeer))
             leaderPeer = null;
-        return new RaidAftermath(settlement, attackers, leaderPartyId, leaderPeer);
+        return new RaidAftermath(settlement, attackers, leaderParty, leaderPeer);
     }
 
     private void ApplyRaidAftermath(RaidAftermath aftermath)
@@ -430,12 +427,7 @@ internal class BattleFinalizeHandler : IHandler
         {
             // Joiners go to the gate; the leader stays put because it re-requests the raid.
             var joiningAttackers = aftermath.Attackers.Length > 1
-                ? aftermath.Attackers.Where(attacker =>
-                {
-                    if (!objectManager.TryGetId(attacker, out var attackerId))
-                        return true;
-                    return attackerId != aftermath.LeaderPartyId;
-                }).ToArray()
+                ? aftermath.Attackers.Where(attacker => attacker != aftermath.LeaderParty).ToArray()
                 : Array.Empty<MobileParty>();
             MoveRaidAttackersToSettlementGate(joiningAttackers, aftermath.Settlement);
             network.Send(aftermath.LeaderPeer, new NetworkPromptRaidContinuation(settlementId));
@@ -447,17 +439,17 @@ internal class BattleFinalizeHandler : IHandler
 
     private sealed class RaidAftermath
     {
-        public RaidAftermath(Settlement settlement, MobileParty[] attackers, string leaderPartyId, NetPeer leaderPeer)
+        public RaidAftermath(Settlement settlement, MobileParty[] attackers, MobileParty leaderParty, NetPeer leaderPeer)
         {
             Settlement = settlement;
             Attackers = attackers;
-            LeaderPartyId = leaderPartyId;
+            LeaderParty = leaderParty;
             LeaderPeer = leaderPeer;
         }
 
         public Settlement Settlement { get; }
         public MobileParty[] Attackers { get; }
-        public string LeaderPartyId { get; }
+        public MobileParty LeaderParty { get; }
         public NetPeer LeaderPeer { get; }
     }
 
