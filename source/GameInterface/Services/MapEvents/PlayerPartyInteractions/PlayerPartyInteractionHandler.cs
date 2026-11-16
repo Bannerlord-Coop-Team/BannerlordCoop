@@ -598,6 +598,7 @@ internal class PlayerPartyInteractionHandler : IHandler
 
     private void HandleMercenarySelected(PlayerPartyInteractionSession session, PlayerPartyInteractionOption option)
     {
+        if (session.Proposal != PlayerPartyInteractionProposal.None) return;
         if (!session.InitiatorEnabledOptions.Contains(option)) return;
 
         session.Proposal = PlayerPartyInteractionProposal.Mercenary;
@@ -647,6 +648,7 @@ internal class PlayerPartyInteractionHandler : IHandler
     }
     private void HandleHostileDemandSelected(PlayerPartyInteractionSession session, PlayerPartyInteractionOption option)
     {
+        if (session.Proposal != PlayerPartyInteractionProposal.None) return;
         if (!session.InitiatorEnabledOptions.Contains(option)) return;
 
         session.Proposal = PlayerPartyInteractionProposal.HostileDemand;
@@ -748,7 +750,7 @@ internal class PlayerPartyInteractionHandler : IHandler
             // pvpBlockLeave took Leave out of what the responder was shown, so the server doesn't take it either.
             if (session.IsLeaveHidden)
             {
-                Logger.Debug("Ignored Leave from a responder whose options have no Leave. SessionId={SessionId}", session.SessionId);
+                Logger.Warning("Ignored Leave from a responder whose options have no Leave. SessionId={SessionId}", session.SessionId);
                 return;
             }
 
@@ -871,9 +873,15 @@ internal class PlayerPartyInteractionHandler : IHandler
 
     // Asked again each time, so peace made during the meeting counts.
     private bool IsAtWarNow(PlayerPartyInteractionSession session)
-        => objectManager.TryGetObjectWithLogging(session.InitiatorPartyId, out PartyBase initiatorParty) &&
-           objectManager.TryGetObjectWithLogging(session.ResponderPartyId, out PartyBase responderParty) &&
+        => TryGetParties(session, out var initiatorParty, out var responderParty) &&
            AreHostile(initiatorParty, responderParty);
+
+    private bool TryGetParties(PlayerPartyInteractionSession session, out PartyBase initiatorParty, out PartyBase responderParty)
+    {
+        responderParty = null;
+        return objectManager.TryGetObjectWithLogging(session.InitiatorPartyId, out initiatorParty) &&
+               objectManager.TryGetObjectWithLogging(session.ResponderPartyId, out responderParty);
+    }
 
     private void QueuePvpRulesTick()
     {
@@ -903,17 +911,25 @@ internal class PlayerPartyInteractionHandler : IHandler
         var modOptions = ModConfigProvider.ModOptions;
         foreach (var session in sessionsById.Values.ToArray())
         {
-            if (!RestoreLeaveAfterPeace(session, modOptions))
-                EndIfUnanswered(session, utcNow, modOptions);
+            // A party that no longer resolves can never answer, so the meeting ends instead of the miss reading as peace.
+            if (!TryGetParties(session, out var initiatorParty, out var responderParty))
+            {
+                EndSession(session, PlayerPartyInteractionOutcomeType.Left);
+                continue;
+            }
+
+            var atWar = AreHostile(initiatorParty, responderParty);
+            if (!RestoreLeaveAfterPeace(session, modOptions, atWar))
+                EndIfUnanswered(session, utcNow, modOptions, atWar);
         }
     }
 
     // Peace sends no new state, so the hidden Leave goes back from here. Returns whether the state was sent again,
     // which also restarts the session's clock.
-    private bool RestoreLeaveAfterPeace(PlayerPartyInteractionSession session, ModOptions modOptions)
+    private bool RestoreLeaveAfterPeace(PlayerPartyInteractionSession session, ModOptions modOptions, bool atWar)
     {
         if (!session.IsLeaveHidden) return false;
-        if (pvpRules.IsLeaveBlocked(session, modOptions, () => IsAtWarNow(session))) return false;
+        if (pvpRules.IsLeaveBlocked(session, modOptions, () => atWar)) return false;
 
         SendResponderState(
             session,
@@ -924,13 +940,13 @@ internal class PlayerPartyInteractionHandler : IHandler
         return true;
     }
 
-    private void EndIfUnanswered(PlayerPartyInteractionSession session, DateTime utcNow, ModOptions modOptions)
+    private void EndIfUnanswered(PlayerPartyInteractionSession session, DateTime utcNow, ModOptions modOptions, bool atWar)
     {
         var idleSeconds = pvpRules.GetIdleSeconds(session, modOptions);
         if (idleSeconds == 0) return;
         if (utcNow - session.StateChangedUtc < TimeSpan.FromSeconds(idleSeconds)) return;
 
-        var outcome = pvpRules.GetTimeoutOutcome(session, IsAtWarNow(session));
+        var outcome = pvpRules.GetTimeoutOutcome(session, atWar);
         Logger.Information(
             "Ended player-party interaction nobody answered for {Seconds} seconds. SessionId={SessionId}, Outcome={Outcome}",
             idleSeconds, session.SessionId, outcome);

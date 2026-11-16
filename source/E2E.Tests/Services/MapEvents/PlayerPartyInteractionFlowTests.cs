@@ -2472,6 +2472,54 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
     }
 
     [Fact]
+    public void PvpRules_EndMeetingAsLeft_WhenAPartyNoLongerResolves()
+    {
+        var (client1, _, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
+        MakePartiesHostile(initiatorPartyId, responderPartyId);
+
+        WithPvpRules(blockLeave: true, responseTimerSeconds: 0, () =>
+        {
+            var handler = Server.Resolve<PlayerPartyInteractionHandler>();
+            var start = DateTime.UtcNow;
+            Server.Call(() => handler.UtcNow = () => start);
+
+            RequestInteraction(client1, initiatorPartyId, responderPartyId);
+            Server.NetworkSentMessages.Clear();
+
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(responderPartyId, out var responderParty));
+                Assert.True(Server.ObjectManager.Remove(responderParty));
+                handler.CheckPvpRules(start);
+            });
+
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>());
+            Assert.Equal(
+                PlayerPartyInteractionOutcomeType.Left,
+                Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionEnded>().Single().OutcomeType);
+        });
+    }
+
+    [Fact]
+    public void HostileDemand_AfterAnotherProposal_IsIgnored()
+    {
+        var (client1, client2, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
+        AssignDistinctClans(initiatorPartyId, responderPartyId);
+        RequestInteraction(client1, initiatorPartyId, responderPartyId);
+        var sessionId = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>().Single().SessionId;
+        SubmitOption(client1, sessionId, initiatorPartyId, PlayerPartyInteractionOption.TradeProposal);
+
+        Server.NetworkSentMessages.Clear();
+        SubmitOption(client1, sessionId, initiatorPartyId, PlayerPartyInteractionOption.HostileDemand);
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>());
+
+        SubmitOption(client2, sessionId, responderPartyId, PlayerPartyInteractionOption.DeclineProposal);
+        Assert.Equal(
+            PlayerPartyInteractionOutcomeType.TradeDeclined,
+            Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionEnded>().Single().OutcomeType);
+    }
+
+    [Fact]
     public void HostileDemand_ResponderYields_DeclaresWarAndAutoSurrendersResponder()
     {
         var (client1, client2, _, responderHeroId, initiatorPartyId, responderPartyId) = CreateTwoPlayerPartiesWithHeroes();
