@@ -177,9 +177,9 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         GameMenu.SwitchToMenu("encounter");
     }
 
-    public void RecoverRejectedHostileAction(PlayerEncounter encounter)
+    public void RecoverRejectedHostileAction(PlayerEncounter encounter, bool finishEncounterOnDenied)
     {
-        if (encounter == null || !ReferenceEquals(encounter, PlayerEncounter.Current))
+        if (!finishEncounterOnDenied || encounter == null || !ReferenceEquals(encounter, PlayerEncounter.Current))
             return;
 
         // Leave a live encounter or simulation alone when a denial races its start.
@@ -237,7 +237,11 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         // The map-event teardown clears both parties before this continuation requests fresh approval.
         PlayerEncounter.Start();
         PlayerEncounter.Current.SetupFields(PartyBase.MainParty, settlement.Party);
-        messageBroker.Publish(this, new VillageHostileActionAttempted(VillageHostileAction.Raid, MobileParty.MainParty, settlement));
+        messageBroker.Publish(this, new VillageHostileActionAttempted(
+            VillageHostileAction.Raid,
+            MobileParty.MainParty,
+            settlement,
+            finishEncounterOnDenied: true));
     }
 
     public bool CanStartHostileAction(

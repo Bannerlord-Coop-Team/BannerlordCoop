@@ -63,7 +63,7 @@ internal class ClientVillageHostileActionHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(message.MobileParty, out var mobilePartyId)) return;
         if (!objectManager.TryGetIdWithLogging(message.Settlement, out var settlementId)) return;
         // A request is already pending: drop this one, the server still resolves the first.
-        if (!hostileActionRequestTracker.TryTrackCurrentEncounter())
+        if (!hostileActionRequestTracker.TryTrackCurrentEncounter(message.FinishEncounterOnDenied))
         {
             return;
         }
@@ -76,7 +76,7 @@ internal class ClientVillageHostileActionHandler : IHandler
         GameThread.RunSafe(
             () =>
             {
-                hostileActionRequestTracker.Take();
+                hostileActionRequestTracker.Take(out _);
                 villageHostileActionInterface.BeginHostileActionPresentation(payload.What.Action);
             },
             context: nameof(Handle_NetworkVillageHostileActionStarted));
@@ -98,7 +98,9 @@ internal class ClientVillageHostileActionHandler : IHandler
         GameThread.RunSafe(
             () =>
             {
-                villageHostileActionInterface.RecoverRejectedHostileAction(hostileActionRequestTracker.Take());
+                villageHostileActionInterface.RecoverRejectedHostileAction(
+                    hostileActionRequestTracker.Take(out var finishEncounterOnDenied),
+                    finishEncounterOnDenied);
             },
             context: nameof(Handle_NetworkVillageHostileActionDenied));
         messageBroker.Publish(this, new SendInformationMessage(GetDeniedMessage(payload.What.Reason)));

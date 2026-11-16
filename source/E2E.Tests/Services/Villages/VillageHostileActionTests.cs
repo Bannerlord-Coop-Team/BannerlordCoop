@@ -372,6 +372,7 @@ public class VillageHostileActionTests : MapEventTestBase
             var mobileParty = Campaign.Current.MainParty;
             var settlement = client.GetRegisteredObject<Settlement>(target.SettlementId);
             mobileParty._currentSettlement = settlement;
+            Campaign.Current.MapStateData.GameMenuId = "village";
             client.Resolve<IMessageBroker>().Publish(this, new VillageHostileActionAttempted(
                 VillageHostileAction.Raid,
                 mobileParty,
@@ -383,14 +384,28 @@ public class VillageHostileActionTests : MapEventTestBase
         client.SimulateMessage(Server.NetPeer,
             new NetworkVillageHostileActionDenied(VillageHostileActionDeniedReason.AlreadyInMapEvent));
 
-        client.Call(() => Assert.Null(PlayerEncounter.Current),
-            MapEventDisabledMethods.Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast))));
+        client.Call(() =>
+        {
+            Assert.Same(encounter, PlayerEncounter.Current);
+            Assert.Equal("village", Campaign.Current.MapStateData.GameMenuId);
+        }, MapEventDisabledMethods);
 
-        client.Call(() => client.Resolve<IMessageBroker>().Publish(this, new VillageHostileActionAttempted(
+        var continuationEncounter = SetMockPlayerEncounter(client);
+        client.Call(() =>
+        {
+            Campaign.Current.MapStateData.GameMenuId = "encounter";
+            client.Resolve<IMessageBroker>().Publish(this, new VillageHostileActionAttempted(
                 VillageHostileAction.Raid,
                 Campaign.Current.MainParty,
-                client.GetRegisteredObject<Settlement>(target.SettlementId))),
+                client.GetRegisteredObject<Settlement>(target.SettlementId),
+                finishEncounterOnDenied: true));
+        }, MapEventDisabledMethods);
+        client.SimulateMessage(Server.NetPeer,
+            new NetworkVillageHostileActionDenied(VillageHostileActionDeniedReason.AlreadyInMapEvent));
+
+        client.Call(() => Assert.Null(PlayerEncounter.Current),
             MapEventDisabledMethods);
+        Assert.NotSame(encounter, continuationEncounter);
         Assert.Equal(2, client.NetworkSentMessages.GetMessages<NetworkRequestVillageHostileAction>().Count());
     }
 
