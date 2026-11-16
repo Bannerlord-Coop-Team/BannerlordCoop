@@ -93,7 +93,7 @@ public class IncidentsCampaignBehaviourInterface : IIncidentsCampaignBehaviourIn
                 continue;
             }
 
-            float randomChance = playerParty.RandomFloatWithSeed((uint)CampaignTime.Now.NumTicks);
+            float randomChance = playerParty.RandomFloatWithSeed((uint)CampaignTime.Now.ToMinutes);
             if (playerParty.SiegeEvent != null && randomChance < Campaign.Current.Models.IncidentModel.GetIncidentTriggerProbabilityDuringSiege())
             {
                 TryInvokeIncident(player, playerParty, partyLeader, new IncidentTrigger(TriggerId.DuringSiege));
@@ -106,7 +106,7 @@ public class IncidentsCampaignBehaviourInterface : IIncidentsCampaignBehaviourIn
 
     public void OnGameMenuOptionSelected(Player player, MobileParty mainParty, Hero mainHero, string gameMenuId, string optionId)
     {
-        if (mainParty.RandomFloatWithSeed((uint)CampaignTime.Now.NumTicks) < Campaign.Current.Models.IncidentModel.GetIncidentTriggerGlobalProbability())
+        if (mainParty.RandomFloatWithSeed((uint)CampaignTime.Now.ToMinutes) < Campaign.Current.Models.IncidentModel.GetIncidentTriggerGlobalProbability())
         {
             if (gameMenuId == "town" && optionId == "town_leave")
             {
@@ -127,7 +127,7 @@ public class IncidentsCampaignBehaviourInterface : IIncidentsCampaignBehaviourIn
     {
         if (!sessionIncidentsPlayerDataInterface.CanInvokeSettlementEvent(player.HeroId)) return;
 
-        if (mainParty.RandomFloatWithSeed((uint)CampaignTime.Now.NumTicks) < Campaign.Current.Models.IncidentModel.GetIncidentTriggerGlobalProbability())
+        if (mainParty.RandomFloatWithSeed((uint)CampaignTime.Now.ToMinutes) < Campaign.Current.Models.IncidentModel.GetIncidentTriggerGlobalProbability())
         {
             if (menuContextId == "town")
             {
@@ -168,7 +168,7 @@ public class IncidentsCampaignBehaviourInterface : IIncidentsCampaignBehaviourIn
 
                 playerBattleLogs[player.HeroId] = CreateBattleLog(mapEvent, party, partyLeader);
 
-                if (party.RandomFloatWithSeed((uint)CampaignTime.Now.NumTicks) >= Campaign.Current.Models.IncidentModel.GetIncidentTriggerGlobalProbability()) continue;
+                if (party.RandomFloatWithSeed((uint)CampaignTime.Now.ToMinutes) >= Campaign.Current.Models.IncidentModel.GetIncidentTriggerGlobalProbability()) continue;
 
                 TryInvokeIncident(player, party, partyLeader, new IncidentTrigger(TriggerId.LeavingBattle));
             }
@@ -177,7 +177,7 @@ public class IncidentsCampaignBehaviourInterface : IIncidentsCampaignBehaviourIn
 
     public void ConversationEnded(Player player, MobileParty mainParty, Hero mainHero)
     {
-        if (mainParty.CurrentSettlement == null && mainParty.RandomFloatWithSeed((uint)CampaignTime.Now.NumTicks) < Campaign.Current.Models.IncidentModel.GetIncidentTriggerGlobalProbability())
+        if (mainParty.CurrentSettlement == null && !mainParty.IsCurrentlyAtSea && mainParty.RandomFloatWithSeed((uint)CampaignTime.Now.ToMinutes) < Campaign.Current.Models.IncidentModel.GetIncidentTriggerGlobalProbability())
         {
             TryInvokeIncident(player, mainParty, mainHero, new IncidentTrigger(TriggerId.LeavingEncounter));
         }
