@@ -21,6 +21,8 @@ using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Party.PartyComponents;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.ObjectSystem;
@@ -120,6 +122,15 @@ public class LandLordCompanyOfTroubleTests : IDisposable
         });
         TestEnvironment.FlushCoalescer();
 
+        Owner.Call(() =>
+        {
+            var quest = (Quest)AttachQuest(Owner, companyTroopCount: 5).IssueQuest;
+            MakeTheOwnersPartyTheMainParty(Owner);
+
+            quest.QuestAcceptedConsequences();
+        }, CharacterLinks);
+        TestEnvironment.FlushCoalescer();
+
         Assert.Equal(5, MercenariesIn(Server));
         Assert.Equal(5, MercenariesIn(Owner));
     }
@@ -192,26 +203,6 @@ public class LandLordCompanyOfTroubleTests : IDisposable
     }
 
     [Fact]
-    public void FinalizingOnTheOwnersClient_LeavesTheMercenariesToTheServer()
-    {
-        GiveMercenaries(4);
-
-        Owner.Call(() =>
-        {
-            Assert.True(Owner.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var ownerParty));
-            var quest = (Quest)AttachQuest(Owner, companyTroopCount: 4).IssueQuest;
-
-            using (new AllowedThread())
-            {
-                Campaign.Current.MainParty = ownerParty;
-                quest.OnFinalize();
-            }
-        });
-
-        Assert.Equal(4, MercenariesIn(Owner));
-    }
-
-    [Fact]
     public void DismissingTheQuest_RemovesTheMercenariesFromTheOwnersParty()
     {
         GiveMercenaries(4);
@@ -265,6 +256,11 @@ public class LandLordCompanyOfTroubleTests : IDisposable
 
             quest.TryToStealItemFromPlayer();
         });
+
+        var request = Assert.Single(Owner.NetworkSentMessages.GetMessages<RequestQuestBranch>());
+        Assert.Equal((byte)LandLordCompanyOfTroubleBranch.FoodStolen, request.Proof);
+        Assert.Equal(ownerGrainBefore, GrainIn(Owner));
+
         Server.PumpGameThread();
         TestEnvironment.FlushCoalescer();
 
@@ -318,30 +314,6 @@ public class LandLordCompanyOfTroubleTests : IDisposable
 
         Assert.Equal(0, questEndings.Count);
         Assert.Equal(goldBefore, GoldOfOwner());
-    }
-
-    [Fact]
-    public void EndingTheQuest_DestroysTheHostileCompany()
-    {
-        var companyPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
-        MobileParty company = null!;
-
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var ownerParty));
-            var quest = CompanyTurnedHostile(companyPartyId);
-            company = quest._companyOfTroubleParty;
-
-            using (new AllowedThread())
-            {
-                Campaign.Current.MainParty = ownerParty;
-            }
-
-            quest.OnFinalize();
-        });
-        Server.PumpGameThread();
-
-        Assert.False(company.IsActive);
     }
 
     [Fact]
@@ -553,28 +525,11 @@ public class LandLordCompanyOfTroubleTests : IDisposable
         Assert.Equal(1, questEndings.Count);
     }
 
-    [Fact]
-    public void SellingOnTheOwnersClient_OnlyAsksTheServer()
-    {
-        GiveMercenaries(3);
-        var goldBefore = GoldOfOwnerOn(Owner);
-
-        Owner.Call(() =>
-        {
-            var quest = (Quest)AttachQuest(Owner, companyTroopCount: 3).IssueQuest;
-            MakeTheOwnersPartyTheMainParty(Owner);
-
-            quest.persuasion_complete_with_company_of_trouble_on_consequence();
-        }, CharacterLinks);
-        TestEnvironment.FlushCoalescer();
-
-        Assert.Single(Owner.NetworkSentMessages.GetMessages<RequestQuestBranch>());
-        Assert.Equal(goldBefore, GoldOfOwnerOn(Owner));
-        Assert.Equal(3, MercenariesIn(Owner));
-    }
-
-    [Fact]
-    public void LettingTheCompanyLeaveOnTheOwnersClient_OnlyAsksTheServer()
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    public void ABranchOnTheOwnersClient_OnlyAsksTheServer(int branch)
     {
         GiveMercenaries(3);
 
@@ -583,37 +538,74 @@ public class LandLordCompanyOfTroubleTests : IDisposable
             var quest = (Quest)AttachQuest(Owner, companyTroopCount: 3).IssueQuest;
             MakeTheOwnersPartyTheMainParty(Owner);
 
-            quest.CompanyLeftQuestFail();
+            switch ((LandLordCompanyOfTroubleBranch)branch)
+            {
+                case LandLordCompanyOfTroubleBranch.SuccessBySellingCompany:
+                    quest.persuasion_complete_with_company_of_trouble_on_consequence();
+                    break;
+                case LandLordCompanyOfTroubleBranch.FailByCompanyLeaving:
+                    quest.CompanyLeftQuestFail();
+                    break;
+                case LandLordCompanyOfTroubleBranch.CompanyTurnedHostile:
+                    quest.CreateCompanyEnemyParty();
+                    break;
+            }
         }, CharacterLinks);
         TestEnvironment.FlushCoalescer();
 
-        Assert.Single(Owner.NetworkSentMessages.GetMessages<RequestQuestBranch>());
+        var request = Assert.Single(Owner.NetworkSentMessages.GetMessages<RequestQuestBranch>());
+        Assert.Equal((byte)branch, request.Proof);
         Assert.Equal(3, MercenariesIn(Owner));
     }
 
     [Fact]
-    public void FoodTheftOnTheOwnersClient_OnlyAsksTheServer()
+    public void SoBeIt_TheServerSpawnsTheCompanyFromTheOwnersMercenaries()
     {
-        GiveMercenaries(3);
+        var hideoutId = TestEnvironment.CreateRegisteredObject<Hideout>();
+        var hideoutSettlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        SetOwner();
+        GiveMercenaries(4);
+
+        foreach (var instance in new[] { Server, Owner })
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hideout>(hideoutId, out var hideout));
+                Assert.True(instance.ObjectManager.TryGetObject<Settlement>(hideoutSettlementId, out var hideoutSettlement));
+
+                using (new AllowedThread())
+                {
+                    hideoutSettlement.SetSettlementComponent(hideout);
+                    var settlements = Campaign.Current.CampaignObjectManager.Settlements;
+                    var registered = settlements == null ? new MBList<Settlement>() : new MBList<Settlement>(settlements);
+                    registered.Add(hideoutSettlement);
+                    Campaign.Current.CampaignObjectManager.Settlements = registered;
+                }
+            });
+        }
+
+        string companyId = null!;
         Server.Call(() =>
         {
-            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var ownerParty));
-            ownerParty.ItemRoster.AddToCounts(DefaultItems.Grain, 3);
-        });
+            Assert.True(Server.ObjectManager.TryGetObject<Hideout>(hideoutId, out var hideout));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(hideoutSettlementId, out var hideoutSettlement));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var ownerHero));
+
+            var banditClan = GameObjectCreator.CreateInitializedObject<Clan>();
+            banditClan.Culture = GameObjectCreator.CreateInitializedObject<CultureObject>();
+            var bandits = BanditPartyComponent.CreateBanditParty("brigands_0", banditClan, hideout, false, null, new CampaignVec2(Vec2.Zero, true));
+            bandits.CurrentSettlement = hideoutSettlement;
+
+            var quest = (Quest)AttachQuest(Server, companyTroopCount: 4).IssueQuest;
+            RunBranchAsOwner(ownerHero, quest, LandLordCompanyOfTroubleBranch.CompanyTurnedHostile);
+
+            Assert.True(Server.ObjectManager.TryGetId(quest._companyOfTroubleParty, out companyId));
+        }, CharacterLinks);
         TestEnvironment.FlushCoalescer();
-        var grainBefore = GrainIn(Owner);
 
-        Owner.Call(() =>
-        {
-            var quest = (Quest)AttachQuest(Owner, companyTroopCount: 3).IssueQuest;
-            MakeTheOwnersPartyTheMainParty(Owner);
-
-            quest.TryToStealItemFromPlayer();
-        });
-        TestEnvironment.FlushCoalescer();
-
-        Assert.Single(Owner.NetworkSentMessages.GetMessages<RequestQuestBranch>());
-        Assert.Equal(grainBefore, GrainIn(Owner));
+        Assert.Equal(0, MercenariesIn(Server));
+        Assert.Equal(0, MercenariesIn(Owner));
+        Owner.Call(() => Assert.True(Owner.ObjectManager.TryGetObject<MobileParty>(companyId, out _)));
     }
 
     [Fact]

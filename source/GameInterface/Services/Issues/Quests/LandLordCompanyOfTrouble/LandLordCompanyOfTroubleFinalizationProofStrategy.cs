@@ -40,17 +40,25 @@ internal class LandLordCompanyOfTroubleFinalizationProofStrategy : IFinalization
 
     private static void SellCompany(Quest quest)
     {
+        if (quest._companyOfTroubleParty != null)
+        {
+            Logger.Warning("The mercenaries of {quest} already turned hostile", quest.StringId);
+            return;
+        }
+
         quest.UpdateCompanyTroopCount();
-        if (quest._companyOfTroubleParty != null || quest._companyTroopCount == 0)
+        if (quest._companyTroopCount == 0)
         {
             Logger.Warning("The owner of {quest} has no mercenaries left to sell", quest.StringId);
             return;
         }
 
+        // Vanilla's persuasion price, which the owner's client set from its own count
         quest._demandGold = 1000 + (quest._companyTroopCount * 150);
         quest.persuasion_complete_with_company_of_trouble_on_consequence();
     }
 
+    // Vanilla's CompanyLeftQuestFail without its GameMenu.ExitToLast, which the owner's client already ran
     private static void LetCompanyLeave(Quest quest)
     {
         quest.RelationshipChangeWithQuestGiver = -2;
@@ -60,6 +68,7 @@ internal class LandLordCompanyOfTroubleFinalizationProofStrategy : IFinalization
         quest.CompleteQuestWithFail();
     }
 
+    // Vanilla's CreateCompanyEnemyParty, but the company chases the owner on the map instead of setting _battleWillStart for an immediate battle
     private static void TurnCompanyHostile(Quest quest)
     {
         if (quest._companyOfTroubleParty != null)
@@ -104,5 +113,7 @@ internal class LandLordCompanyOfTroubleFinalizationProofStrategy : IFinalization
                 return;
             }
         }
+
+        Logger.Warning("The owner of {quest} has no food left to steal", quest.StringId);
     }
 }

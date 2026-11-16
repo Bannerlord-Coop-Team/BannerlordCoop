@@ -14,8 +14,6 @@ namespace GameInterface.Services.Issues.Quests.LandLordCompanyOfTrouble;
 
 internal class LandLordCompanyOfTroubleService : ILandLordCompanyOfTroubleService
 {
-    private const string TroubleCharacterId = "company_of_trouble_character";
-
     private readonly IOutcomeDispatcher dispatcher;
     private readonly IIssueOwnerResolver ownerResolver;
 
@@ -27,15 +25,7 @@ internal class LandLordCompanyOfTroubleService : ILandLordCompanyOfTroubleServic
 
     public void RemoveCompanyOf(Quest quest)
     {
-        var company = quest._companyOfTroubleParty;
-        if (company == null)
-        {
-            return;
-        }
-
-        // Cleared first, otherwise destroying it reads as someone else killing the company and fails the quest being ended
-        quest._companyOfTroubleParty = null;
-        GameThread.RunSafe(() => RemoveCompany(company), context: nameof(LandLordCompanyOfTroubleService));
+        GameThread.RunSafe(() => RemoveCompany(quest), context: nameof(LandLordCompanyOfTroubleService));
     }
 
     public void FinalizeIssue(IssueBase issue)
@@ -48,16 +38,16 @@ internal class LandLordCompanyOfTroubleService : ILandLordCompanyOfTroubleServic
         // The field isn't saved and the server never starts the quest, so a loaded save leaves it null
         if (quest._troubleCharacterObject == null)
         {
-            quest._troubleCharacterObject = MBObjectManager.Instance.GetObject<CharacterObject>(TroubleCharacterId);
+            quest._troubleCharacterObject = MBObjectManager.Instance.GetObject<CharacterObject>(Quest.TroubleCharacterObjectStringId);
         }
 
-        if (!ownerResolver.TryResolveOwnerHero(issue, out _))
+        if (!ownerResolver.TryResolveOwnerHero(issue, out var ownerHero))
         {
             RemoveLeftovers(quest);
             return;
         }
 
-        dispatcher.RunAsOwners<Quest>(ownedQuest =>
+        dispatcher.RunAsOwner<Quest>(ownerHero, ownedQuest =>
         {
             if (ownedQuest == quest)
             {
@@ -90,7 +80,7 @@ internal class LandLordCompanyOfTroubleService : ILandLordCompanyOfTroubleServic
 
         foreach (var element in party.MemberRoster.GetTroopRoster())
         {
-            if (element.Character.StringId == TroubleCharacterId)
+            if (element.Character.StringId == Quest.TroubleCharacterObjectStringId)
             {
                 return true;
             }
@@ -102,31 +92,46 @@ internal class LandLordCompanyOfTroubleService : ILandLordCompanyOfTroubleServic
     private static void OnMapEventEnded(Quest quest, MapEvent mapEvent)
     {
         var involvedParties = mapEvent.InvolvedParties.ToList();
-        if (!involvedParties.Contains(PartyBase.MainParty))
-        {
-            return;
-        }
-
         var company = quest._companyOfTroubleParty;
-        if (company == null)
+        var end = ClassifyBattleEnd(
+            ownerInvolved: involvedParties.Contains(PartyBase.MainParty),
+            companyExists: company != null,
+            companyInvolved: company != null && involvedParties.Contains(company.Party),
+            ownerWon: mapEvent.WinningSide == PartyBase.MainParty.Side);
+
+        switch (end)
         {
-            quest.OnMapEventEnded(mapEvent);
-            return;
+            case LandLordCompanyOfTroubleBattleEnd.MercenariesInOwnersParty:
+                quest.OnMapEventEnded(mapEvent);
+                break;
+            case LandLordCompanyOfTroubleBattleEnd.OwnerWon:
+                quest.QuestSuccessWithPlayerDefeatedCompany();
+                break;
+            case LandLordCompanyOfTroubleBattleEnd.OwnerLost:
+                quest.QuestFailWithPlayerDefeatedAgainstCompany();
+                break;
+        }
+    }
+
+    internal static LandLordCompanyOfTroubleBattleEnd ClassifyBattleEnd(bool ownerInvolved, bool companyExists, bool companyInvolved, bool ownerWon)
+    {
+        if (!ownerInvolved)
+        {
+            return LandLordCompanyOfTroubleBattleEnd.Ignored;
         }
 
-        if (!involvedParties.Contains(company.Party))
+        // Before "So be it!" the mercenaries fight in the owner's party, and vanilla checks whether they all died
+        if (!companyExists)
         {
-            return;
+            return LandLordCompanyOfTroubleBattleEnd.MercenariesInOwnersParty;
         }
 
-        if (mapEvent.WinningSide == PartyBase.MainParty.Side)
+        if (!companyInvolved)
         {
-            quest.QuestSuccessWithPlayerDefeatedCompany();
+            return LandLordCompanyOfTroubleBattleEnd.Ignored;
         }
-        else
-        {
-            quest.QuestFailWithPlayerDefeatedAgainstCompany();
-        }
+
+        return ownerWon ? LandLordCompanyOfTroubleBattleEnd.OwnerWon : LandLordCompanyOfTroubleBattleEnd.OwnerLost;
     }
 
     private static void OnPartyDestroyed(Quest quest, MobileParty mobileParty, PartyBase destroyerParty)
@@ -143,13 +148,23 @@ internal class LandLordCompanyOfTroubleService : ILandLordCompanyOfTroubleServic
         quest.CompleteQuestWithFail();
     }
 
-    private static void RemoveCompany(MobileParty company)
+    private static void RemoveCompany(Quest quest)
     {
+        var company = quest._companyOfTroubleParty;
+        if (company == null)
+        {
+            return;
+        }
+
+        // Cleared first, otherwise destroying it reads as someone else killing the company and fails the quest being ended
+        quest._companyOfTroubleParty = null;
+
         if (!company.IsActive)
         {
             return;
         }
 
+        // A party can't be destroyed in the middle of a battle, so it is handed back to the AI as an ordinary bandit party
         if (company.MapEvent != null)
         {
             company.Ai.SetDoNotMakeNewDecisions(false);
@@ -168,16 +183,20 @@ internal class LandLordCompanyOfTroubleService : ILandLordCompanyOfTroubleServic
         foreach (var party in MobileParty.All.ToList())
         {
             var count = party.MemberRoster.GetTroopCount(quest._troubleCharacterObject);
-            if (party != quest._companyOfTroubleParty && count > 0 && !otherQuestParties.Contains(party))
+            if (count == 0)
             {
-                party.MemberRoster.AddToCounts(quest._troubleCharacterObject, -count);
+                continue;
             }
+
+            if (party == quest._companyOfTroubleParty || otherQuestParties.Contains(party))
+            {
+                continue;
+            }
+
+            party.MemberRoster.AddToCounts(quest._troubleCharacterObject, -count);
         }
 
-        if (quest._companyOfTroubleParty != null)
-        {
-            RemoveCompany(quest._companyOfTroubleParty);
-        }
+        RemoveCompany(quest);
     }
 
     private HashSet<MobileParty> OtherQuestParties(Quest quest)

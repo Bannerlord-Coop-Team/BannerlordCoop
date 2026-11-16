@@ -10,6 +10,7 @@ namespace GameInterface.Services.Issues.Quests.LandLordCompanyOfTrouble.Patches;
 [HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 internal class LandLordCompanyOfTroubleAcceptPatch
 {
+    // The server adds the mercenaries to the owner's party, so the owner's client keeps only vanilla's log and notice
     [HarmonyPatch(typeof(Quest), nameof(Quest.QuestAcceptedConsequences))]
     [HarmonyPrefix]
     private static bool QuestAcceptedConsequencesPrefix(Quest __instance)
