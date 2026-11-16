@@ -53,7 +53,7 @@ internal sealed class PlayerPartyInteractionSession
     public HashSet<PlayerPartyInteractionOption> InitiatorOptions { get; } = new HashSet<PlayerPartyInteractionOption>();
     public HashSet<PlayerPartyInteractionOption> InitiatorEnabledOptions { get; } = new HashSet<PlayerPartyInteractionOption>();
     // A record of the responder's last state as built, Leave included, so peace can send it again with Leave back.
-    // Not what the responder may pick, because a Leave pvpBlockLeave hid is still in it.
+    // Not what the responder may pick, because a Leave that pvpBlockLeave hid is still in it.
     public PlayerPartyInteractionPhase LastResponderPhase { get; private set; }
     public PlayerPartyInteractionProposal LastResponderProposal { get; private set; }
     public HashSet<PlayerPartyInteractionOption> LastResponderOptions { get; } = new HashSet<PlayerPartyInteractionOption>();
