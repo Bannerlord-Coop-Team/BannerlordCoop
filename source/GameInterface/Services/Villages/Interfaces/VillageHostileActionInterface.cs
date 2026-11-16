@@ -58,6 +58,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
     private DeferredForceScreen deferredForceScreen;
     // Client-only: a won raid's continuation, waiting for the current encounter to end.
     private ParkedRaidContinuation parkedRaidContinuation;
+    private PlayerEncounter continuationEncounter;
 
     public VillageHostileActionInterface(IMessageBroker messageBroker, IObjectManager objectManager)
     {
@@ -78,6 +79,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         }
         pendingForceTransfers.Clear();
         parkedRaidContinuation = null;
+        continuationEncounter = null;
     }
 
     public void RequestHostileAction(VillageHostileAction action)
@@ -147,6 +149,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
 
     public void BeginHostileActionPresentation(VillageHostileAction action)
     {
+        continuationEncounter = null;
         var encounter = PlayerEncounter.Current;
         if (encounter == null)
         {
@@ -177,9 +180,11 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         GameMenu.SwitchToMenu("encounter");
     }
 
-    public void RecoverRejectedHostileAction(PlayerEncounter encounter, bool finishEncounterOnDenied)
+    public void RecoverRejectedHostileAction()
     {
-        if (!finishEncounterOnDenied || encounter == null || !ReferenceEquals(encounter, PlayerEncounter.Current))
+        var encounter = continuationEncounter;
+        continuationEncounter = null;
+        if (encounter == null || !ReferenceEquals(encounter, PlayerEncounter.Current))
             return;
 
         // Leave a live encounter or simulation alone when a denial races its start.
@@ -237,11 +242,8 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         // The map-event teardown clears both parties before this continuation requests fresh approval.
         PlayerEncounter.Start();
         PlayerEncounter.Current.SetupFields(PartyBase.MainParty, settlement.Party);
-        messageBroker.Publish(this, new VillageHostileActionAttempted(
-            VillageHostileAction.Raid,
-            MobileParty.MainParty,
-            settlement,
-            finishEncounterOnDenied: true));
+        continuationEncounter = PlayerEncounter.Current;
+        messageBroker.Publish(this, new VillageHostileActionAttempted(VillageHostileAction.Raid, MobileParty.MainParty, settlement));
     }
 
     public bool CanStartHostileAction(

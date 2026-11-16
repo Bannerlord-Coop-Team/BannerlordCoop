@@ -394,18 +394,16 @@ public class VillageHostileActionTests : MapEventTestBase
         client.Call(() =>
         {
             Campaign.Current.MapStateData.GameMenuId = "encounter";
-            client.Resolve<IMessageBroker>().Publish(this, new VillageHostileActionAttempted(
-                VillageHostileAction.Raid,
-                Campaign.Current.MainParty,
-                client.GetRegisteredObject<Settlement>(target.SettlementId),
-                finishEncounterOnDenied: true));
+            continuationEncounter.EncounterState = PlayerEncounterState.End;
+            var settlement = client.GetRegisteredObject<Settlement>(target.SettlementId);
+            client.Resolve<IVillageHostileActionInterface>().ParkRaidContinuation(settlement);
+            client.Resolve<IMessageBroker>().Publish(this, new CampaignTick());
         }, MapEventDisabledMethods);
         client.SimulateMessage(Server.NetPeer,
             new NetworkVillageHostileActionDenied(VillageHostileActionDeniedReason.AlreadyInMapEvent));
 
         client.Call(() => Assert.Null(PlayerEncounter.Current),
             MapEventDisabledMethods);
-        Assert.NotSame(encounter, continuationEncounter);
         Assert.Equal(2, client.NetworkSentMessages.GetMessages<NetworkRequestVillageHostileAction>().Count());
     }
 
@@ -3748,7 +3746,8 @@ public class VillageHostileActionTests : MapEventTestBase
     [Fact]
     public void MultiPlayerRaid_BattleSimulationCancel_QueuedAfterClaimRelease_AfterWinningAdvance_IsIgnored()
     {
-        var client = Clients.First();
+        var leaderClient = Clients.First();
+        var joinerClient = Clients.Skip(1).First();
         var hostileAction = CreateHostileActionWithTwoPlayerParties(VillageHostileAction.Raid);
         var ended = new List<MapEvent>();
         Thread advanceQueued = null;
@@ -3759,7 +3758,7 @@ public class VillageHostileActionTests : MapEventTestBase
         Server.Call(() => CampaignEvents.MapEventEnded.AddNonSerializedListener(this, ended.Add));
         try
         {
-            StartBattleSimulation(client, hostileAction);
+            StartBattleSimulation(leaderClient, hostileAction);
             Server.NetworkSentMessages.Clear();
             Server.Call(() =>
             {
@@ -3773,7 +3772,7 @@ public class VillageHostileActionTests : MapEventTestBase
                 {
                     try
                     {
-                        broker.Publish(client.NetPeer,
+                        broker.Publish(leaderClient.NetPeer,
                             new NetworkAdvanceBattleSimulation(hostileAction.MapEventId, 1));
                     }
                     catch (Exception exception)
@@ -3787,7 +3786,7 @@ public class VillageHostileActionTests : MapEventTestBase
                 {
                     try
                     {
-                        broker.Publish(client.NetPeer,
+                        broker.Publish(leaderClient.NetPeer,
                             new NetworkCancelBattleSimulation(hostileAction.MapEventId));
                     }
                     catch (Exception exception)
