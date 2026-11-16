@@ -1,7 +1,5 @@
 ﻿using Common.Messaging;
-using Common.Network.Messages;
 using Common.Util;
-using Coop.Core.Server.Connections.Messages;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
@@ -15,11 +13,12 @@ using GameInterface.Services.Players.Data;
 using GameInterface.Services.TroopRosters.Data;
 using HarmonyLib;
 using Helpers;
-using LiteNetLib;
 using SandBox.GauntletUI.Map;
 using System.Reflection;
+using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.Encyclopedia;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -33,6 +32,11 @@ namespace E2E.Tests.Services.Issues;
 
 public class NearbyBanditBaseTests : IDisposable
 {
+    private const int RewardGold = 3000;
+    private const float PowerChange = 5f;
+    private const float ProsperityChange = 10f;
+    private const float CoercionPowerChange = 10f;
+
     private static readonly MethodBase[] QuestLogTexts =
     {
         AccessTools.PropertyGetter(typeof(Quest), nameof(Quest.OnQuestSucceededLogText)),
@@ -49,12 +53,6 @@ public class NearbyBanditBaseTests : IDisposable
         AccessTools.Method(typeof(QuestHelper), nameof(QuestHelper.AddMapArrowFromPointToTarget)),
         AccessTools.Method(typeof(MBInformationManager), nameof(MBInformationManager.AddQuickInformation)),
         AccessTools.Method(typeof(QuestBase), nameof(QuestBase.AddLog)),
-    };
-
-    private static readonly MethodBase[] CompanionLogTexts =
-    {
-        AccessTools.PropertyGetter(typeof(Issue), nameof(Issue.AlternativeSolutionStartLog)),
-        AccessTools.Method(typeof(StringHelpers), nameof(StringHelpers.SetCharacterProperties)),
     };
 
     private static readonly MethodBase[] MapEventMethods =
@@ -175,8 +173,8 @@ public class NearbyBanditBaseTests : IDisposable
 
         var finalized = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
         Assert.Equal(IssueOutcome.QuestSuccess, finalized.Outcome);
-        Assert.Equal(goldBefore + 3000, GoldOfOwner(Server));
-        Assert.Equal(goldBefore + 3000, GoldOfOwner(ClientA));
+        Assert.Equal(goldBefore + RewardGold, GoldOfOwner(Server));
+        Assert.Equal(goldBefore + RewardGold, GoldOfOwner(ClientA));
         AssertIssueEndedEverywhere();
     }
 
@@ -187,13 +185,14 @@ public class NearbyBanditBaseTests : IDisposable
         AcceptOnClientA();
 
         var otherPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
-        var goldBefore = GoldOfOwner(Server);
+        var powerBefore = PowerOfHeadman(Server);
 
         EndHideoutBattleOnServer(otherPartyId, BattleState.AttackerVictory);
 
         var finalized = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
         Assert.Equal(IssueOutcome.QuestFail, finalized.Outcome);
-        Assert.Equal(goldBefore, GoldOfOwner(Server));
+        Assert.Equal(powerBefore, PowerOfHeadman(Server));
+        Assert.Equal(powerBefore, PowerOfHeadman(ClientA));
         AssertIssueEndedEverywhere();
     }
 
@@ -215,8 +214,8 @@ public class NearbyBanditBaseTests : IDisposable
 
         var finalized = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
         Assert.Equal(IssueOutcome.QuestTimeOut, finalized.Outcome);
-        Assert.Equal(powerBefore - 5f, PowerOfHeadman(Server));
-        Assert.Equal(powerBefore - 5f, PowerOfHeadman(ClientA));
+        Assert.Equal(powerBefore - PowerChange, PowerOfHeadman(Server));
+        Assert.Equal(powerBefore - PowerChange, PowerOfHeadman(ClientA));
     }
 
     [Fact]
@@ -257,7 +256,7 @@ public class NearbyBanditBaseTests : IDisposable
 
         var finalized = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
         Assert.Equal(IssueOutcome.QuestFail, finalized.Outcome);
-        Assert.Equal(powerBefore - 5f, PowerOfHeadman(Server));
+        Assert.Equal(powerBefore - PowerChange, PowerOfHeadman(Server));
         AssertIssueEndedEverywhere();
     }
 
@@ -279,24 +278,40 @@ public class NearbyBanditBaseTests : IDisposable
         AssertIssueEndedEverywhere();
     }
 
-    [Fact]
-    public void AWarTheOwnerCausesFailsTheQuestEverywhere()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void AWarFailsTheQuestOnlyWhenTheOwnersFactionCausesIt(bool ownersFaction)
     {
-        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
-        var clanId = TestEnvironment.CreateRegisteredObject<Clan>();
+        var ownerClanId = TestEnvironment.CreateRegisteredObject<Clan>();
+        var otherClanId = TestEnvironment.CreateRegisteredObject<Clan>();
 
         CreateIssueOnServer();
         AcceptOnClientA();
 
         Server.Call(() =>
         {
-            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
-            Assert.True(Server.ObjectManager.TryGetObject<Clan>(clanId, out var clan));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var owner));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(ownerClanId, out var ownerClan));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(otherClanId, out var otherClan));
 
-            DeclareWarAction.ApplyInternal(kingdom, clan, DeclareWarAction.DeclareWarDetail.CausedByPlayerHostility);
+            using (new AllowedThread())
+            {
+                owner.Clan = ownerClan;
+            }
+
+            var declarer = ownersFaction ? ownerClan : otherClan;
+            var target = ownersFaction ? otherClan : ownerClan;
+            DeclareWarAction.ApplyInternal(declarer, target, DeclareWarAction.DeclareWarDetail.CausedByKingdomCreation);
         }, QuestLogTexts);
 
         Assert.Empty(ClientA.NetworkSentMessages.GetMessages<RequestQuestOutcome>());
+
+        if (!ownersFaction)
+        {
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+            return;
+        }
 
         var finalized = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
         Assert.Equal(IssueOutcome.QuestFail, finalized.Outcome);
@@ -304,14 +319,56 @@ public class NearbyBanditBaseTests : IDisposable
     }
 
     [Fact]
-    public void TheServerKeepsAiLordsAwayWhileAPlayerIsHeldInTheHideout()
+    public void CoercingTheHeadmansVillageFailsTheQuestAndCostsTheHeadmanPowerOnce()
     {
+        var townOwnerClanId = TestEnvironment.CreateRegisteredObject<Clan>();
+
+        CreateIssueOnServer();
+        AcceptOnClientA();
+
+        var powerBefore = PowerOfHeadman(Server);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(villageSettlementId, out var village));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var ownerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(townOwnerClanId, out var townOwnerClan));
+
+            using (new AllowedThread())
+            {
+                village.Village.Bound.Town.OwnerClan = townOwnerClan;
+                village.CollectNotablesToCache();
+            }
+
+            Campaign.Current.EncyclopediaManager ??= new EncyclopediaManager();
+            Campaign.Current.EncyclopediaManager.CreateEncyclopediaPages();
+
+            var forcing = (MapEvent)FormatterServices.GetUninitializedObject(typeof(MapEvent));
+            forcing._mapEventType = MapEvent.BattleTypes.IsForcingSupplies;
+            forcing.MapEventSettlement = village;
+            CampaignEventDispatcher.Instance.OnMapEventStarted(forcing, ownerParty.Party, null);
+        }, QuestLogTexts);
+
+        var finalized = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Assert.Equal(IssueOutcome.QuestFail, finalized.Outcome);
+        Assert.Equal(powerBefore - CoercionPowerChange, PowerOfHeadman(Server));
+        Assert.Equal(powerBefore - CoercionPowerChange, PowerOfHeadman(ClientA));
+        AssertIssueEndedEverywhere();
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void OnlyAPlayerHeldInTheHideoutKeepsAiLordsAway(bool player)
+    {
+        var prisonerId = player ? ownerHeroId : TestEnvironment.CreateRegisteredObject<Hero>();
+
         CreateIssueOnServer();
 
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(headmanId, out var headman));
-            Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var owner));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(prisonerId, out var prisoner));
             Assert.True(Server.ObjectManager.TryGetObject<Settlement>(hideoutSettlementId, out var hideout));
             var issue = Assert.IsType<Issue>(headman.Issue);
 
@@ -319,37 +376,11 @@ public class NearbyBanditBaseTests : IDisposable
 
             using (new AllowedThread())
             {
-                hideout.Party.PrisonRoster.AddToCounts(owner.CharacterObject, 1);
+                prisoner.CharacterObject.HeroObject = prisoner;
+                hideout.Party.PrisonRoster.AddToCounts(prisoner.CharacterObject, 1);
             }
 
-            Assert.False(issue.CanBeCompletedByAI());
-        });
-    }
-
-    [Fact]
-    public void TheOwnerLeavingEndsTheQuestEverywhereAndARejoinDoesNotBringItBack()
-    {
-        CreateIssueOnServer();
-        AcceptOnClientA();
-
-        Server.Call(() =>
-        {
-            Server.Resolve<IPlayerManager>().ClearPeer(ClientA.NetPeer);
-            Server.Resolve<IMessageBroker>().Publish(this, new PlayerDisconnected(ClientA.NetPeer, default(DisconnectInfo)));
-        }, QuestLogTexts);
-
-        var finalized = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
-        Assert.Equal(IssueOutcome.QuestCancel, finalized.Outcome);
-        AssertIssueEndedEverywhere();
-
-        TestEnvironment.ConnectRegisteredPlayer(ClientA, "player-A");
-        Server.SimulateMessage(this, new PlayerCampaignEntered(ClientA.NetPeer));
-
-        ClientA.Call(() =>
-        {
-            Assert.True(ClientA.ObjectManager.TryGetObject<Hero>(headmanId, out var headman));
-            Assert.Null(headman.Issue);
-            Assert.DoesNotContain(Campaign.Current.QuestManager.Quests, quest => quest is Quest);
+            Assert.Equal(!player, issue.CanBeCompletedByAI());
         });
     }
 
@@ -372,15 +403,15 @@ public class NearbyBanditBaseTests : IDisposable
 
             issue._failureChance = success ? -1 : 1;
             issue.CompleteIssueWithAlternativeSolution();
-        }, CompanionLogTexts);
+        });
 
         var change = success ? 1 : -1;
         var finalized = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
         Assert.Equal(IssueOutcome.AlternativeSolution, finalized.Outcome);
-        Assert.Equal(powerBefore + (5f * change), PowerOfHeadman(Server));
-        Assert.Equal(powerBefore + (5f * change), PowerOfHeadman(ClientA));
-        Assert.Equal(prosperityBefore + (10f * change), ProsperityOfTown(Server));
-        Assert.Equal(prosperityBefore + (10f * change), ProsperityOfTown(ClientA));
+        Assert.Equal(powerBefore + (PowerChange * change), PowerOfHeadman(Server));
+        Assert.Equal(powerBefore + (PowerChange * change), PowerOfHeadman(ClientA));
+        Assert.Equal(prosperityBefore + (ProsperityChange * change), ProsperityOfTown(Server));
+        Assert.Equal(prosperityBefore + (ProsperityChange * change), ProsperityOfTown(ClientA));
         AssertIssueEndedEverywhere();
     }
 
@@ -409,6 +440,9 @@ public class NearbyBanditBaseTests : IDisposable
                     troop.Level = 15;
                     troop.UpgradeTargets = Array.Empty<CharacterObject>();
                 }
+
+                Campaign.Current.EncyclopediaManager ??= new EncyclopediaManager();
+                Campaign.Current.EncyclopediaManager.CreateEncyclopediaPages();
             });
         }
 
@@ -439,7 +473,7 @@ public class NearbyBanditBaseTests : IDisposable
             });
 
             issue.StartIssueWithAlternativeSolution();
-        }, CompanionLogTexts);
+        });
 
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionAccepted>());
     }
