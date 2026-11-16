@@ -413,26 +413,14 @@ internal class BattleFinalizeHandler : IHandler
     {
         var settlement = GetRaidFinalizationSettlement(mapEvent);
         var attackers = GetRaidAttackerPlayerParties(mapEvent);
-        var leaderParty = mapEvent.AttackerSide?.LeaderParty?.MobileParty ?? attackers.FirstOrDefault();
-        var leaderPosition = leaderParty != null ? leaderParty.Position : default;
-        var leaderSettlement = leaderParty?.CurrentSettlement;
-        var hasJoiningAttackers = mapEvent.AttackerSide?.Parties.Count(party => party.Party?.MobileParty?.IsPlayerParty() == true) > 1;
+        var leaderParty = mapEvent.AttackerSide?.LeaderParty?.MobileParty;
+        string leaderPartyId = null;
+        if (leaderParty != null)
+            objectManager.TryGetId(leaderParty, out leaderPartyId);
         NetPeer leaderPeer = null;
         if (ShouldContinueRaidAfterVictory(mapEvent, settlement))
-        {
             TryGetRaidLeaderPeer(leaderParty, out leaderPeer);
-            if (leaderPeer != null
-                && playerManager.TryGetPlayer(leaderPeer, out var leader)
-                && attackers.FirstOrDefault(attacker =>
-                    playerManager.TryGetPlayer(attacker, out var attackerPlayer)
-                    && attackerPlayer.ControllerId == leader.ControllerId) is MobileParty controlledLeader)
-            {
-                leaderParty = controlledLeader;
-                leaderPosition = leaderParty.Position;
-                leaderSettlement = leaderParty.CurrentSettlement;
-            }
-        }
-        return new RaidAftermath(settlement, attackers, leaderParty, leaderPosition, leaderSettlement, hasJoiningAttackers, leaderPeer);
+        return new RaidAftermath(settlement, attackers, leaderPartyId, leaderPeer);
     }
 
     private void ApplyRaidAftermath(RaidAftermath aftermath)
@@ -440,15 +428,14 @@ internal class BattleFinalizeHandler : IHandler
         if (aftermath.LeaderPeer != null && objectManager.TryGetIdWithLogging(aftermath.Settlement, out var settlementId))
         {
             // Joiners go to the gate; the leader stays put because it re-requests the raid.
-            MoveRaidAttackersToSettlementGate(
-                aftermath.Attackers.Where(attacker => attacker != aftermath.LeaderParty).ToArray(),
-                aftermath.Settlement);
-            network.Send(aftermath.LeaderPeer, new NetworkPromptRaidContinuation(settlementId));
-            if (aftermath.HasJoiningAttackers)
+            var joiningAttackers = aftermath.Attackers.Where(attacker =>
             {
-                aftermath.LeaderParty.CurrentSettlement = aftermath.LeaderSettlement;
-                aftermath.LeaderParty.Position = aftermath.LeaderPosition;
-            }
+                if (!objectManager.TryGetId(attacker, out var attackerId))
+                    return true;
+                return attackerId != aftermath.LeaderPartyId;
+            }).ToArray();
+            MoveRaidAttackersToSettlementGate(joiningAttackers, aftermath.Settlement);
+            network.Send(aftermath.LeaderPeer, new NetworkPromptRaidContinuation(settlementId));
             return;
         }
 
@@ -457,30 +444,17 @@ internal class BattleFinalizeHandler : IHandler
 
     private sealed class RaidAftermath
     {
-        public RaidAftermath(
-            Settlement settlement,
-            MobileParty[] attackers,
-            MobileParty leaderParty,
-            CampaignVec2 leaderPosition,
-            Settlement leaderSettlement,
-            bool hasJoiningAttackers,
-            NetPeer leaderPeer)
+        public RaidAftermath(Settlement settlement, MobileParty[] attackers, string leaderPartyId, NetPeer leaderPeer)
         {
             Settlement = settlement;
             Attackers = attackers;
-            LeaderParty = leaderParty;
-            LeaderPosition = leaderPosition;
-            LeaderSettlement = leaderSettlement;
-            HasJoiningAttackers = hasJoiningAttackers;
+            LeaderPartyId = leaderPartyId;
             LeaderPeer = leaderPeer;
         }
 
         public Settlement Settlement { get; }
         public MobileParty[] Attackers { get; }
-        public MobileParty LeaderParty { get; }
-        public CampaignVec2 LeaderPosition { get; }
-        public Settlement LeaderSettlement { get; }
-        public bool HasJoiningAttackers { get; }
+        public string LeaderPartyId { get; }
         public NetPeer LeaderPeer { get; }
     }
 
