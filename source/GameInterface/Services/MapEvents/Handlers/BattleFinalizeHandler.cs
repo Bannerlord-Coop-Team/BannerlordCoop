@@ -219,18 +219,26 @@ internal class BattleFinalizeHandler : IHandler
 
     private void LeaveOrFinalizeSharedHideout(NetPeer requester, MapEvent mapEvent, MobileParty party)
     {
-        foreach (var participant in playerManager.Players)
+        if (HasConnectedPlayerOnSameSide(party))
         {
-            if (!playerManager.IsConnected(participant) ||
-                !objectManager.TryGetObject<MobileParty>(participant.MobilePartyId, out var otherParty) ||
-                otherParty == party || otherParty.Party.MapEventSide != party.Party.MapEventSide)
-                continue;
-
             messageBroker.Publish(requester, new PlayerLeaveBattleAttempted(party.Party));
             return;
         }
 
         messageBroker.Publish(this, new MapEventFinalizeAttempted(mapEvent));
+    }
+
+    private bool HasConnectedPlayerOnSameSide(MobileParty party)
+    {
+        foreach (var participant in playerManager.Players)
+        {
+            if (playerManager.IsConnected(participant) &&
+                objectManager.TryGetObject<MobileParty>(participant.MobilePartyId, out var otherParty) &&
+                otherParty != party && otherParty.Party.MapEventSide == party.Party.MapEventSide)
+                return true;
+        }
+
+        return false;
     }
 
     /// <summary>

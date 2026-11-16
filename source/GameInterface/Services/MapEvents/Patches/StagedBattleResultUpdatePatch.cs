@@ -28,8 +28,8 @@ internal static class StagedBattleResultUpdatePatch
         // A captured lord conversation is open; updating now would reopen it every tick.
         if (Campaign.Current.ConversationManager?.IsConversationInProgress == true) return;
 
-        // Custom hideout menus, the siege defeated menu and an empty map have no native menu init
-        // callback to resume the loot flow.
+        // Custom hideout menus, the siege defeated menu and an empty map have no native menu init callback
+        // to resume the loot flow.
         PlayerEncounter.Update();
     }
 

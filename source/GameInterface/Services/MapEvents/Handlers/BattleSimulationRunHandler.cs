@@ -925,6 +925,7 @@ internal class BattleSimulationRunHandler : IHandler
 
         EndSimulationSessionSafe(mapEventId, sim);
 
+        // Release the simulation claim before publishing MapEventFinalizeAttempted so the finalizer observes the released mode.
         var released = ServerBattleModeArbiter.ReleaseSimulation(mapEventId);
 
         messageBroker.Publish(this, new MapEventFinalizeAttempted(sim.MapEvent));

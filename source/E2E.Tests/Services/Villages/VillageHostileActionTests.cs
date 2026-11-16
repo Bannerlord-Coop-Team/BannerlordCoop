@@ -1928,6 +1928,7 @@ public class VillageHostileActionTests : MapEventTestBase
             .ToList();
 
         var raidCompletedCount = 0;
+        Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client.NetPeer);
         if (naturalCompletion)
         {
             var villageTypeId = TestEnvironment.CreateRegisteredObject<VillageType>();
@@ -2013,7 +2014,6 @@ public class VillageHostileActionTests : MapEventTestBase
         var close = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkClosePvpEncounter>());
         Assert.Contains(GetPartyBaseId(mobilePartyId), close.PartyIds);
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPartyLeaveSettlement>());
-        Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client.NetPeer);
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPromptRaidContinuation>());
         AssertHasPlayerEncounter(client, expected: false);
         if (naturalCompletion)
