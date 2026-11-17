@@ -308,8 +308,9 @@ internal class PrisonBreakHandler : IHandler
             behaviorInterface.SetPrisonBreakActive(settlement, data.IsActive);
 
             // Re-run the option conditions so an open dungeon menu greys out or unlocks without being reopened.
+            // Skipped during a mission, the rescuer is still on start_prison_break whose cost condition NREs once the prisoner is released, and MapState refreshes the menu after.
             var menuContext = Campaign.Current.CurrentMenuContext;
-            if (Settlement.CurrentSettlement == settlement && menuContext?.GameMenu != null)
+            if (Mission.Current == null && Settlement.CurrentSettlement == settlement && menuContext?.GameMenu != null)
             {
                 Campaign.Current.GameMenuManager.RefreshMenuOptionConditions(menuContext);
             }
