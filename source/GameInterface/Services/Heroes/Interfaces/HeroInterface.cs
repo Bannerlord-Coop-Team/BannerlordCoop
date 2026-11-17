@@ -397,8 +397,11 @@ internal class HeroInterface : IHeroInterface
         RegisterPartyChildren(party, handles);
     }
 
+    /// <summary>The id prefix the host gives every joined player's hero, and so its character.</summary>
+    internal const string JoinedPlayerIdPrefix = "Player";
+
     private string NewServerStringId<T>(T obj) where T : MBObjectBase
-        => Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<T>(PlayerCharacterTemplate.JoinedPlayerIdPrefix);
+        => Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<T>(JoinedPlayerIdPrefix);
 
     private void RegisterPrimary<T>(T obj, string stringId) where T : MBObjectBase
     {
