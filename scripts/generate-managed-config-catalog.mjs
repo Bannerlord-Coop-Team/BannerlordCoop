@@ -96,7 +96,13 @@ const catalog = { schemaVersion: 2, catalogRevision: digest, contentDigest: dige
 const output = `${JSON.stringify(catalog, null, 2)}\n`;
 if (check) {
   const current = await readFile(outputPath, 'utf8').catch(() => '');
-  if (current.replaceAll('\r\n', '\n') !== output) throw new Error('managed-config-catalog.json is stale; run node scripts/generate-managed-config-catalog.mjs');
+  let currentCatalog;
+  try { currentCatalog = JSON.parse(current.replace(/^\uFEFF/u, '')); } catch { currentCatalog = null; }
+  const generatedCatalog = JSON.parse(output);
+  // Shallow PR checkouts do not retain the metadata commit's history. The content digest is the
+  // reproducible contract check, while the checked-in sourceCommit remains release provenance.
+  if (currentCatalog !== null && generatedCatalog.sourceCommit !== currentCatalog.sourceCommit) generatedCatalog.sourceCommit = currentCatalog.sourceCommit;
+  if (currentCatalog === null || JSON.stringify(currentCatalog) !== JSON.stringify(generatedCatalog)) throw new Error('managed-config-catalog.json is stale; run node scripts/generate-managed-config-catalog.mjs');
 } else {
   await writeFile(outputPath, output, 'utf8');
 }
