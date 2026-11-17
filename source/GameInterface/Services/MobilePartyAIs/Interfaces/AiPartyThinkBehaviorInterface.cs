@@ -50,10 +50,12 @@ public class AiPartyThinkBehaviorInterface : IAiPartyThinkBehaviorInterface
     }
 
     // Vanilla's AiPartyThinkBehavior.OnClanChangedKingdom filter with the main party swapped for a player party.
+    // Another player chasing it is left alone, because its client drives its movement.
     private static void HoldPartiesChasing(MobileParty playerParty, IEnumerable<MobileParty> nearbyParties)
     {
         foreach (var party in nearbyParties)
         {
+            if (party.IsPlayerParty()) continue;
             if (party.MapFaction.IsAtWarWith(playerParty.MapFaction)) continue;
             if (party.ShortTermTargetParty != playerParty) continue;
             if (party.IsCurrentlyUsedByAQuest) continue;
