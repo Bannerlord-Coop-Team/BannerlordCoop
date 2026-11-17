@@ -4,6 +4,7 @@ using Common.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.Interface;
 using System;
+using System.Linq;
 
 namespace GameInterface.Services.Issues.Framework.Registries;
 
@@ -17,14 +18,16 @@ internal class IssueOwnershipSnapshotReceiver : IHandler
     private readonly IIssueOwnershipRegistry ownership;
     private readonly IIssueResolver resolver;
     private readonly IControllerIdProvider controller;
+    private readonly IIssueFinalizationReplay finalization;
 
     public IssueOwnershipSnapshotReceiver(IMessageBroker messageBroker, IIssueOwnershipRegistry ownership,
-        IIssueResolver resolver, IControllerIdProvider controller)
+        IIssueResolver resolver, IControllerIdProvider controller, IIssueFinalizationReplay finalization)
     {
         this.messageBroker = messageBroker;
         this.ownership = ownership;
         this.resolver = resolver;
         this.controller = controller;
+        this.finalization = finalization;
 
         messageBroker.Subscribe<NetworkIssueOwnershipSnapshot>(Handle_NetworkIssueOwnershipSnapshot);
     }
@@ -46,12 +49,22 @@ internal class IssueOwnershipSnapshotReceiver : IHandler
 
     private void Apply(NetworkIssueOwnershipSnapshot snapshot)
     {
-        foreach (var remembered in ownership.GetAll())
+        var owners = snapshot.Owners ?? Array.Empty<IssueOwnershipData>();
+        var rememberedOwners = ownership.GetAll();
+        var droppedBySnapshot = rememberedOwners.Where(remembered => !owners.Any(owner =>
+            owner.IssueOwnerId == remembered.IssueOwnerId && owner.IssueId == remembered.IssueId));
+        foreach (var remembered in droppedBySnapshot)
+        {
+            finalization.ReplayLocalCancel(remembered.IssueOwnerId, remembered.IssueId,
+                remembered.ControllerId == controller.ControllerId);
+        }
+
+        foreach (var remembered in rememberedOwners)
         {
             ownership.Remove(remembered.IssueOwnerId);
         }
 
-        foreach (var owner in snapshot.Owners ?? Array.Empty<IssueOwnershipData>())
+        foreach (var owner in owners)
         {
             ownership.TrySetOwner(owner.IssueOwnerId, owner.IssueId, owner.ControllerId);
             if (resolver.TryResolve(owner.IssueOwnerId, owner.IssueId, out _, out var issue, out _))
