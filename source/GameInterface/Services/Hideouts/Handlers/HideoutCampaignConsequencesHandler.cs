@@ -267,7 +267,11 @@ internal sealed class HideoutCampaignConsequencesHandler : IHandler
 
             case HideoutCampaignConsequence.SetAttackCooldown:
                 if (!settlement.Hideout.IsInfested || !settlement.Hideout.NextPossibleAttackTime.IsPast)
+                {
+                    Logger.Warning("Rejected hideout cooldown for {SettlementId}, it is not infested or already cooling down",
+                        request.SettlementId);
                     return ConsequenceResult.Rejected;
+                }
 
                 settlement.Hideout.SetNextPossibleAttackTime(
                     Campaign.Current.Models.HideoutModel.HideoutHiddenDuration);
@@ -292,14 +296,14 @@ internal sealed class HideoutCampaignConsequencesHandler : IHandler
 
     private void Handle_CommitMapEventResults(MessagePayload<CommitMapEventResults> payload)
     {
+        if (ModInformation.IsClient) return;
+
         var mapEvent = payload.What.MapEvent;
         var settlement = mapEvent.MapEventSettlement;
-        if (ModInformation.IsClient || mapEvent.EventType != MapEvent.BattleTypes.Hideout ||
-            settlement?.IsHideout != true ||
-            (clearRewards.TryGetValue(settlement, out var previous) && previous.MapEvent == mapEvent))
-            return;
+        if (mapEvent.Component is not HideoutEventComponent component || settlement?.IsHideout != true) return;
+        if (clearRewards.TryGetValue(settlement, out var previous) && previous.MapEvent == mapEvent) return;
 
-        var rewards = new ClearRewardSnapshot(settlement) { MapEvent = mapEvent };
+        var rewards = new ClearRewardSnapshot(settlement) { Component = component };
         foreach (var player in playerManager.Players)
         {
             if (objectManager.TryGetObject<Hero>(player.HeroId, out var hero) &&
@@ -322,19 +326,7 @@ internal sealed class HideoutCampaignConsequencesHandler : IHandler
         if (rewards.MapEvent.BattleState != BattleState.AttackerVictory)
             return;
 
-        // Native PlayerEncounter.DoEnd clears the hideout; the dedicated server has no player encounter.
-        foreach (var party in rewards.Settlement.Parties.ToArray())
-        {
-            LeaveSettlementAction.ApplyForParty(party);
-            party.Ai.SetDoNotAttackMainParty(3);
-            if (playerManager.Contains(party))
-            {
-                party.Position = rewards.Settlement.GatePosition;
-                party.SetMoveModeHold();
-            }
-        }
-        rewards.Settlement.IsVisible = false;
-
+        ClearHideout(rewards.Component, rewards.Settlement);
         foreach (var participant in rewards.Participants)
         {
             if (!rewards.ClaimedHeroes.Add(participant.Hero))
@@ -342,6 +334,23 @@ internal sealed class HideoutCampaignConsequencesHandler : IHandler
 
             using var playerContext = new BarterPlayerContext(participant.Hero, participant.Party);
             SetCleanHideoutRelations(participant.Hero, rewards.Settlement);
+        }
+    }
+
+    // Native PlayerEncounter.DoEnd clears the hideout through its component; the dedicated server has no player encounter.
+    private void ClearHideout(HideoutEventComponent component, Settlement hideout)
+    {
+        // Snapshot before the clear, because OnHideoutCleared takes the parties out of Settlement.Parties.
+        var playersInside = hideout.Parties.Where(playerManager.Contains).ToArray();
+        component.OnHideoutCleared(hideout);
+        foreach (var party in playersInside)
+        {
+            // Native leaves army members that dont lead the army inside, and attached parties move with their leader.
+            bool leftOnItsOwn = party.CurrentSettlement == null && party.AttachedTo == null;
+            if (!leftOnItsOwn) continue;
+
+            party.Position = hideout.GatePosition;
+            party.SetMoveModeHold();
         }
     }
 
@@ -492,7 +501,8 @@ internal sealed class HideoutCampaignConsequencesHandler : IHandler
     private sealed class ClearRewardSnapshot
     {
         public Settlement Settlement { get; }
-        public MapEvent MapEvent { get; set; }
+        public HideoutEventComponent Component { get; set; }
+        public MapEvent MapEvent => Component?.MapEvent;
         public List<(Hero Hero, MobileParty Party)> Participants { get; } = new();
         public HashSet<Hero> ClaimedHeroes { get; } = new();
 

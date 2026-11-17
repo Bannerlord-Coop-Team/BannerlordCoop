@@ -25,6 +25,10 @@ internal class PlayerLeaveSettlementPatch
         typeof(EncounterGameMenuBehavior).GetMethod("game_menu_castle_outside_leave_on_consequence", BindingFlags.NonPublic | BindingFlags.Instance),
         typeof(EncounterGameMenuBehavior).GetMethod("army_encounter_leave_on_consequence", BindingFlags.NonPublic | BindingFlags.Instance),
         typeof(HideoutCampaignBehavior).GetMethod("game_menu_hideout_leave_on_consequence", BindingFlags.NonPublic | BindingFlags.Instance),
+        // A client cant finish its hideout raid locally, so the send troops menus leave through the server too.
+        AccessTools.Method(typeof(HideoutCampaignBehavior), nameof(HideoutCampaignBehavior.hideout_send_troops_wait_leave_on_consequence)),
+        AccessTools.Method(typeof(HideoutCampaignBehavior), nameof(HideoutCampaignBehavior.hideout_send_troops_result_success_consequence)),
+        AccessTools.Method(typeof(HideoutCampaignBehavior), nameof(HideoutCampaignBehavior.hideout_send_troops_result_failure_consequence)),
         typeof(VillageHostileActionCampaignBehavior).GetMethod("village_looted_leave_on_consequence", BindingFlags.NonPublic | BindingFlags.Static),
     };
 

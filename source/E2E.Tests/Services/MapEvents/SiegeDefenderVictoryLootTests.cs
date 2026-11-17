@@ -476,12 +476,6 @@ public class SiegeDefenderVictoryLootTests : MapEventTestBase
         }, MapEventDisabledMethods);
     }
 
-    private IReadOnlyList<MethodBase> MapTickDisabledMethods => MapEventDisabledMethods.Concat(new[]
-    {
-        AccessTools.Method(typeof(Campaign), nameof(Campaign.RealTick)),
-        AccessTools.Method(typeof(Campaign), nameof(Campaign.Tick)),
-    }).ToList();
-
     // One campaign map frame: the campaign tick handlers run inside it, the staged result patch after it.
     private static void MapTick() =>
         Game.Current.GameStateManager._gameStates.OfType<MapState>().Last().OnMapModeTick(0.1f);

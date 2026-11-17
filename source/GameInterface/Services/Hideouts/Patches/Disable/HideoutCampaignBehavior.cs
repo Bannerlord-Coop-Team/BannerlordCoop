@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.Hideouts.Handlers;
 using GameInterface.Services.Hideouts.Messages;
+using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -149,20 +150,13 @@ internal class HideoutCampaignBehaviorPatch
         args.optionLeaveType = GameMenuOption.LeaveType.Mission;
         args.IsEnabled = Hero.MainHero?.IsWounded == false;
         return battle?.EventType == MapEvent.BattleTypes.Hideout && !battle.IsFinalized &&
-            battle.BattleState == BattleState.None && (battle.Component as HideoutEventComponent)?.IsSendTroops != true;
+            battle.BattleState == BattleState.None && !battle.IsSendTroopsHideout();
     }
 
     private static void JoinHideout(MenuCallbackArgs args)
     {
         if (ContainerProvider.TryResolve<HideoutRaidHandler>(out var coordinator))
             coordinator.OpenTroopSelection(args, isDirectAssault: true);
-    }
-
-    [HarmonyPatch("hideout_send_troops_result_failure_on_init")]
-    [HarmonyPrefix]
-    private static void HideoutSendTroopsResultFailureOnInit()
-    {
-        PublishConsequence(HideoutCampaignConsequence.SetAttackCooldown);
     }
 
     [HarmonyPatch("game_menu_hideout_place_on_init")]
@@ -181,13 +175,6 @@ internal class HideoutCampaignBehaviorPatch
         if (battle != null && battle.WinningSide == encounter.PlayerSide)
             PublishConsequence(HideoutCampaignConsequence.GrantClearRewards);
         return true;
-    }
-
-    [HarmonyPatch("hideout_send_troops_result_success_consequence")]
-    [HarmonyPrefix]
-    private static void HideoutSendTroopsResultSuccessConsequence()
-    {
-        PublishConsequence(HideoutCampaignConsequence.GrantClearRewards);
     }
 
     // Use coop re-implementation in handler that doesn't use Hero.MainHero
@@ -232,7 +219,7 @@ internal class HideoutCampaignBehaviorPatch
         return false;
     }
 
-    private static void PublishConsequence(HideoutCampaignConsequence consequence, Settlement settlement = null)
+    internal static void PublishConsequence(HideoutCampaignConsequence consequence, Settlement settlement = null)
     {
         if (!ModInformation.IsClient)
             return;
