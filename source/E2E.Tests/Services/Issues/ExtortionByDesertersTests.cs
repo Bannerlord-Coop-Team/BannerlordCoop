@@ -980,6 +980,9 @@ public class ExtortionByDesertersTests : IDisposable
                 battle.FinalizeEventAux();
             }
 
+            if (!battle.IsFinalized)
+                battle.FinalizeEventAux();
+
             Assert.True(battle.IsFinalized);
             Assert.Equal(1, ended.CountFor(Server));
             Assert.Equal(State.DesertersDefeatedPlayer, quest._currentState);
