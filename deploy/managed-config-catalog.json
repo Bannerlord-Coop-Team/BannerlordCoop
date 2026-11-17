@@ -1,0 +1,196 @@
+{
+  "schemaVersion": 1,
+  "catalogRevision": "91a833fb5c5ab595b4e802c467ebc8054d305c5b979b37a6858307d156d2238c",
+  "source": "BannerlordCoop/source/GameInterface/Configuration/ModConfigData.cs",
+  "options": [
+    {
+      "key": "voiceEnabled",
+      "type": "boolean",
+      "default": true
+    },
+    {
+      "key": "battleSize",
+      "type": "integer",
+      "default": 1000
+    },
+    {
+      "key": "fastForwardEnabled",
+      "type": "boolean",
+      "default": true
+    },
+    {
+      "key": "autoPauseEnabled",
+      "type": "boolean",
+      "default": true
+    },
+    {
+      "key": "allowClientTimeControls",
+      "type": "boolean",
+      "default": true
+    },
+    {
+      "key": "clientsCanUseCheats",
+      "type": "boolean",
+      "default": false
+    },
+    {
+      "key": "goldFoodInfluenceChangeInSettlements",
+      "type": "boolean",
+      "default": false
+    },
+    {
+      "key": "goldFoodInfluenceChangeForDisconnectedPlayers",
+      "type": "boolean",
+      "default": false
+    },
+    {
+      "key": "blockAiWarDeclarationsOnOfflinePlayers",
+      "type": "boolean",
+      "default": false
+    },
+    {
+      "key": "playerBattleAiJoinWindowHours",
+      "type": "integer",
+      "default": 6
+    },
+    {
+      "key": "postBattleAiAmnestySeconds",
+      "type": "integer",
+      "default": 0
+    },
+    {
+      "key": "speedLimitWhilePlayersInBattle",
+      "type": "boolean",
+      "default": true
+    },
+    {
+      "key": "ensureUnaffiliatedWanderers",
+      "type": "boolean",
+      "default": true
+    },
+    {
+      "key": "wandererLimit",
+      "type": "integer",
+      "default": 32
+    },
+    {
+      "key": "spawnRateWanderers",
+      "type": "integer",
+      "default": 1
+    },
+    {
+      "key": "wandererLimitScalesWithPlayers",
+      "type": "boolean",
+      "default": false
+    },
+    {
+      "key": "playerKingdomClanTierRequired",
+      "type": "integer",
+      "default": 4
+    },
+    {
+      "key": "coopClansEnabled",
+      "type": "boolean",
+      "default": true
+    },
+    {
+      "key": "smithingStaminaRecoveryOutsideSettlements",
+      "type": "boolean",
+      "default": true
+    },
+    {
+      "key": "smithingStaminaRecoveryMultiplier",
+      "type": "number",
+      "default": 0.6
+    },
+    {
+      "key": "maximumLootersMultiplier",
+      "type": "number",
+      "default": 1
+    },
+    {
+      "key": "looterPartySizeMultiplier",
+      "type": "number",
+      "default": 1
+    },
+    {
+      "key": "enableHeroExecutions",
+      "type": "boolean",
+      "default": false
+    },
+    {
+      "key": "enablePlayerClanMemberExecutions",
+      "type": "boolean",
+      "default": false
+    },
+    {
+      "key": "enablePlayerExecutions",
+      "type": "boolean",
+      "default": false
+    },
+    {
+      "key": "playerWoundedBattleEntry",
+      "type": "boolean",
+      "default": true
+    },
+    {
+      "key": "showPlayerNameplates",
+      "type": "boolean",
+      "default": true
+    },
+    {
+      "key": "kingdomDecisionVoteTimeoutSeconds",
+      "type": "integer",
+      "default": 60
+    },
+    {
+      "key": "preferredBattleHosts",
+      "type": "steamIdList",
+      "default": []
+    },
+    {
+      "key": "pvpBlockLeave",
+      "type": "boolean",
+      "default": false
+    },
+    {
+      "key": "pvpResponseTimerSeconds",
+      "type": "integer",
+      "default": 0
+    },
+    {
+      "key": "warSails",
+      "type": "boolean",
+      "default": false
+    },
+    {
+      "key": "goldFoodInfluenceChangeInBattles",
+      "type": "enum",
+      "values": [
+        "Disabled",
+        "OneDayMax",
+        "Enabled"
+      ],
+      "default": "Disabled"
+    },
+    {
+      "key": "lordDefectionRetries",
+      "type": "enum",
+      "values": [
+        "Vanilla",
+        "NeverExpire",
+        "AlwaysRetry"
+      ],
+      "default": "Vanilla"
+    },
+    {
+      "key": "clansAfterKingdomDestruction",
+      "type": "enum",
+      "values": [
+        "Vanilla",
+        "KeepClans"
+      ],
+      "default": "Vanilla"
+    }
+  ]
+}
