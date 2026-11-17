@@ -1,6 +1,8 @@
 ﻿using Common;
 using GameInterface.Services.Heroes.Extensions;
+using GameInterface.Services.MobileParties.Extensions;
 using HarmonyLib;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -35,7 +37,9 @@ internal class SallyOutsCampaignBehaviorPatches
 
         __instance.CheckSallyOut(settlement, checkForNavalSallyOut: false, out var salliedOut);
 
-        if (!salliedOut && settlement.HasPort && settlement.SiegeEvent.IsBlockadeActive)
+        // A naval sally out takes every defender inside along, and castle blockade battles stay off for players for now
+        bool playerInsideCastle = settlement.IsCastle && settlement.Parties.Any(party => party.IsPlayerParty());
+        if (!salliedOut && settlement.HasPort && settlement.SiegeEvent.IsBlockadeActive && !playerInsideCastle)
         {
             __instance.CheckSallyOut(settlement, checkForNavalSallyOut: true, out _);
         }
