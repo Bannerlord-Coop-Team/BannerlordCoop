@@ -22,7 +22,7 @@ internal class ClientVillageHostileActionHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IVillageHostileActionInterface villageHostileActionInterface;
-    private readonly IHostileActionRequestTracker hostileActionRequestTracker;
+    private readonly IClientVillageHostileActionTracker clientVillageHostileActionTracker;
 
     public ClientVillageHostileActionHandler(
         IMessageBroker messageBroker,
@@ -30,14 +30,14 @@ internal class ClientVillageHostileActionHandler : IHandler
         IObjectManager objectManager,
         IControllerIdProvider controllerIdProvider,
         IVillageHostileActionInterface villageHostileActionInterface,
-        IHostileActionRequestTracker hostileActionRequestTracker)
+        IClientVillageHostileActionTracker clientVillageHostileActionTracker)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.controllerIdProvider = controllerIdProvider;
         this.villageHostileActionInterface = villageHostileActionInterface;
-        this.hostileActionRequestTracker = hostileActionRequestTracker;
+        this.clientVillageHostileActionTracker = clientVillageHostileActionTracker;
 
         messageBroker.Subscribe<VillageHostileActionAttempted>(Handle_VillageHostileActionAttempted);
         messageBroker.Subscribe<NetworkVillageHostileActionStarted>(Handle_NetworkVillageHostileActionStarted);
@@ -63,10 +63,18 @@ internal class ClientVillageHostileActionHandler : IHandler
     {
         var message = payload.What;
 
-        if (!objectManager.TryGetIdWithLogging(message.MobileParty, out var mobilePartyId)) return;
-        if (!objectManager.TryGetIdWithLogging(message.Settlement, out var settlementId)) return;
+        if (!objectManager.TryGetIdWithLogging(message.MobileParty, out var mobilePartyId))
+        {
+            clientVillageHostileActionTracker.CloseDeniedRaidContinuation();
+            return;
+        }
+        if (!objectManager.TryGetIdWithLogging(message.Settlement, out var settlementId))
+        {
+            clientVillageHostileActionTracker.CloseDeniedRaidContinuation();
+            return;
+        }
         // A request is already pending: drop this one, the server still resolves the first.
-        if (!hostileActionRequestTracker.TryBeginRequest())
+        if (!clientVillageHostileActionTracker.TryBeginRequest())
         {
             Logger.Information("Dropping hostile action request: one is already pending");
             return;
@@ -80,7 +88,7 @@ internal class ClientVillageHostileActionHandler : IHandler
         GameThread.RunSafe(
             () =>
             {
-                hostileActionRequestTracker.Complete();
+                clientVillageHostileActionTracker.Complete();
                 villageHostileActionInterface.BeginHostileActionPresentation(payload.What.Action);
             },
             context: nameof(Handle_NetworkVillageHostileActionStarted));
@@ -92,7 +100,7 @@ internal class ClientVillageHostileActionHandler : IHandler
             () =>
             {
                 if (objectManager.TryGetObjectWithLogging<Settlement>(payload.What.SettlementId, out var settlement))
-                    villageHostileActionInterface.ParkRaidContinuation(settlement);
+                    clientVillageHostileActionTracker.ParkRaidContinuation(settlement);
             },
             context: nameof(Handle_NetworkPromptRaidContinuation));
     }
@@ -102,8 +110,7 @@ internal class ClientVillageHostileActionHandler : IHandler
         GameThread.RunSafe(
             () =>
             {
-                hostileActionRequestTracker.Complete();
-                villageHostileActionInterface.CloseDeniedRaidContinuation();
+                clientVillageHostileActionTracker.CloseDeniedRaidContinuation();
             },
             context: nameof(Handle_NetworkVillageHostileActionDenied));
         messageBroker.Publish(this, new SendInformationMessage(GetDeniedMessage(payload.What.Reason)));

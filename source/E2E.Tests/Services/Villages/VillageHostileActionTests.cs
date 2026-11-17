@@ -43,6 +43,7 @@ using GameInterface.Services.Villages.Commands;
 using GameInterface.Services.Villages.Data;
 using GameInterface.Services.Villages.Interfaces;
 using GameInterface.Services.Villages.Messages;
+using GameInterface.Services.Villages;
 using HarmonyLib;
 using Helpers;
 using Missions.Messages;
@@ -396,7 +397,7 @@ public class VillageHostileActionTests : MapEventTestBase
             Campaign.Current.MapStateData.GameMenuId = "encounter";
             continuationEncounter.EncounterState = PlayerEncounterState.End;
             var settlement = client.GetRegisteredObject<Settlement>(target.SettlementId);
-            client.Resolve<IVillageHostileActionInterface>().ParkRaidContinuation(settlement);
+            client.Resolve<IClientVillageHostileActionTracker>().ParkRaidContinuation(settlement);
             client.Resolve<IMessageBroker>().Publish(this, new CampaignTick());
         }, MapEventDisabledMethods);
         client.SimulateMessage(Server.NetPeer,
