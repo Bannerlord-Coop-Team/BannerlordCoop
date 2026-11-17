@@ -690,6 +690,59 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
     }
 
     [Fact]
+    public void VassalProposal_KingdomFillsBeforeTheAnswer_EndsAsKingdomFullOnAllInstances()
+    {
+        var (client1, client2, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
+        SetupResponderKingdomLeader(initiatorPartyId, responderPartyId, initiatorClanTier: 2);
+        var lateClanId = TestEnvironment.CreateRegisteredObject<Clan>();
+        var previousOptions = ModConfigProvider.ModOptions;
+        ModConfigProvider.ModOptions = new ModOptions(new ModOptionsData { MaxClansPerKingdom = 2 });
+        try
+        {
+            RequestInteraction(client1, initiatorPartyId, responderPartyId);
+            var sessionId = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>().Single().SessionId;
+            var initialState = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>().Single(s =>
+                s.SessionId == sessionId &&
+                s.PartyId == initiatorPartyId &&
+                s.Phase == PlayerPartyInteractionPhase.InitialOptions);
+            OpenServiceOptions(client1, initialState);
+            SubmitCurrentDialogOption(client1, PlayerPartyInteractionOption.Vassal);
+
+            // Another clan takes the last place while the ruler is still answering.
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(responderPartyId, out var responderParty));
+                var kingdom = responderParty.LeaderHero.Clan.Kingdom;
+                var lateClan = Server.GetRegisteredObject<Clan>(lateClanId);
+                using (new AllowedThread())
+                {
+                    lateClan._kingdom = kingdom;
+                    kingdom._clans.Add(lateClan);
+                }
+            });
+            Server.NetworkSentMessages.Clear();
+            SubmitOption(client2, sessionId, responderPartyId, PlayerPartyInteractionOption.AcceptProposal);
+
+            var ended = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionEnded>().Single();
+            Assert.Equal(PlayerPartyInteractionOutcomeType.KingdomFull, ended.OutcomeType);
+            foreach (var instance in new[] { Server, client1, client2 })
+            {
+                instance.Call(() =>
+                {
+                    Assert.True(instance.ObjectManager.TryGetObject<PartyBase>(initiatorPartyId, out var initiatorParty));
+                    Assert.True(instance.ObjectManager.TryGetObject<PartyBase>(responderPartyId, out var responderParty));
+                    Assert.Null(initiatorParty.LeaderHero.Clan.Kingdom);
+                    Assert.DoesNotContain(initiatorParty.LeaderHero.Clan, responderParty.LeaderHero.Clan.Kingdom.Clans);
+                });
+            }
+        }
+        finally
+        {
+            ModConfigProvider.ModOptions = previousOptions;
+        }
+    }
+
+    [Fact]
     public void MercenarySelected_ShowsConfirmPromptAndDoesNotNotifyResponder()
     {
         var (client1, client2, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();

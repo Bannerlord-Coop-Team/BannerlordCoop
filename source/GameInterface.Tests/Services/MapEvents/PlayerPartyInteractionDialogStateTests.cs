@@ -142,6 +142,7 @@ public class PlayerPartyInteractionDialogStateTests
     [InlineData(PlayerPartyInteractionVassalUnavailableReason.InitiatorHasNoClan, "You must lead a clan to swear allegiance.")]
     [InlineData(PlayerPartyInteractionVassalUnavailableReason.InitiatorIsInKingdom, "You must leave your current kingdom first.")]
     [InlineData(PlayerPartyInteractionVassalUnavailableReason.InitiatorClanTierTooLow, "Your clan must be at least tier 2 to swear allegiance.")]
+    [InlineData(PlayerPartyInteractionVassalUnavailableReason.KingdomFull, "The other player's kingdom already has the most clans this server allows (0).")]
     public void DisabledVassal_UsesServerUnavailableReason(
         PlayerPartyInteractionVassalUnavailableReason unavailableReason,
         string expectedExplanation)
@@ -162,6 +163,32 @@ public class PlayerPartyInteractionDialogStateTests
 
             Assert.False(PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.Vassal, out var explanation));
             Assert.Equal(expectedExplanation, explanation.ToString());
+        }
+        finally
+        {
+            PlayerPartyInteractionDialogState.Clear("session-1");
+        }
+    }
+
+    [Fact]
+    public void DisabledMercenary_KingdomFull_UsesTheKingdomFullText()
+    {
+        try
+        {
+            PlayerPartyInteractionDialogState.Apply(new NetworkPlayerPartyInteractionState(
+                "session-1",
+                "party-1",
+                "party-2",
+                "RandomPlayer",
+                PlayerPartyInteractionPhase.OfferServices,
+                PlayerPartyInteractionProposal.None,
+                new[] { PlayerPartyInteractionOption.Mercenary },
+                isInitiator: true,
+                enabledOptions: Array.Empty<PlayerPartyInteractionOption>(),
+                mercenaryUnavailableReason: PlayerPartyInteractionMercenaryUnavailableReason.KingdomFull));
+
+            Assert.False(PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.Mercenary, out var explanation));
+            Assert.Equal("The other player's kingdom already has the most clans this server allows (0).", explanation.ToString());
         }
         finally
         {

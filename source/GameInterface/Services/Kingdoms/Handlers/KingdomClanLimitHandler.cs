@@ -5,12 +5,12 @@ using GameInterface.Services.Kingdoms.Messages;
 using GameInterface.Services.ObjectManager;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
-using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Kingdoms.Handlers;
 
 /// <summary>
 /// Tells the player why the server refused their join when the kingdom has maxClansPerKingdom clans.
+/// Only clients receive NetworkKingdomFull, the server sends it to the player who asked.
 /// </summary>
 internal class KingdomClanLimitHandler : IHandler
 {
@@ -36,10 +36,7 @@ internal class KingdomClanLimitHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<Kingdom>(payload.What.KingdomId, out var kingdom)) return;
 
-            var text = new TextObject("{=coop_kingdom_full}{KINGDOM} already has the most clans this server allows ({MAX}).");
-            text.SetTextVariable("KINGDOM", kingdom.Name);
-            text.SetTextVariable("MAX", ModConfigProvider.ModOptions.MaxClansPerKingdom);
-            MBInformationManager.AddQuickInformation(text);
+            MBInformationManager.AddQuickInformation(KingdomClanLimit.GetFullText(kingdom, ModConfigProvider.ModOptions));
         }, context: nameof(KingdomClanLimitHandler));
     }
 }

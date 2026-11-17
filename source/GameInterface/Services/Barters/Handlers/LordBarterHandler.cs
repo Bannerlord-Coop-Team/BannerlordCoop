@@ -794,7 +794,7 @@ internal sealed partial class LordBarterHandler : IHandler
         if (kind == LordBarterKind.JoinKingdomAsClan &&
             kingdomClanLimit.IsFull(targetHero.Clan, targetKingdom, asMercenary: false, ModConfigProvider.ModOptions))
         {
-            reason = $"{targetKingdom.Name} already has the most clans this server allows ({ModConfigProvider.ModOptions.MaxClansPerKingdom}).";
+            reason = KingdomClanLimit.GetFullText(targetKingdom, ModConfigProvider.ModOptions).ToString();
             return false;
         }
         if (kind == LordBarterKind.SafePassage && targetParty?.MobileParty == null)

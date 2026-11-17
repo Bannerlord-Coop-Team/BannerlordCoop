@@ -2,9 +2,11 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using GameInterface.Configuration;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Kingdoms;
+using GameInterface.Services.Kingdoms.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using LiteNetLib;
@@ -94,7 +96,11 @@ internal class MercenaryServiceHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging<Hero>(heroId, out var hero)) return;
         if (!objectManager.TryGetObjectWithLogging<Kingdom>(kingdomId, out var kingdom)) return;
 
-        if (kingdomClanLimit.RefuseIfFull(peer, clan, kingdom, asMercenary: true)) return;
+        if (kingdomClanLimit.IsFull(clan, kingdom, asMercenary: true, ModConfigProvider.ModOptions))
+        {
+            network.Send(peer, new NetworkKingdomFull(kingdomId));
+            return;
+        }
 
         // A ruler hiring another kingdom's mercenary ends its old contract first, as vanilla's
         // conversation_mercenary_response_accept_on_consqequence does. A repeat hire finds it in this kingdom already.

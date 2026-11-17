@@ -94,7 +94,7 @@ public class VassalAndMercenaryOfferCampaignBehaviorInterface : IVassalAndMercen
                 }
                 else if (randomFloat <= VassalAndMercenaryOfferCampaignBehavior.VassalOfferCreationChance && behavior.CanPlayerClanReceiveVassalOffer())
                 {
-                    Kingdom kingdom = Kingdom.All.GetRandomElementWithPredicate(kingdom => VassalKingdomSelectionConditionsHold(playerData.Value, kingdom));
+                    Kingdom kingdom = Kingdom.All.GetRandomElementWithPredicate(kingdom => VassalKingdomSelectionConditionsHold(playerData.Value, clan, kingdom));
                     if (kingdom != null)
                     {
                         CreateVassalOffer(playerData.Key, playerData.Value, kingdom);
@@ -210,7 +210,11 @@ public class VassalAndMercenaryOfferCampaignBehaviorInterface : IVassalAndMercen
             return;
         }
 
-        if (kingdomClanLimit.RefuseIfFull(peer, clan, kingdom, asMercenary: true)) return;
+        if (kingdomClanLimit.IsFull(clan, kingdom, asMercenary: true, ModConfigProvider.ModOptions))
+        {
+            network.Send(peer, new NetworkKingdomFull(kingdomId));
+            return;
+        }
 
         int mercenaryAwardFactorToJoinKingdom = Campaign.Current.Models.MinorFactionsModel.GetMercenaryAwardFactorToJoinKingdom(clan, kingdom, true);
         ChangeKingdomAction.ApplyByJoinFactionAsMercenary(clan, kingdom, default, mercenaryAwardFactorToJoinKingdom);
@@ -246,13 +250,13 @@ public class VassalAndMercenaryOfferCampaignBehaviorInterface : IVassalAndMercen
         PlayerVassalAndMercenaryOfferData[playerHeroId] = new(null, 0, new(), false);
     }
 
-    private bool VassalKingdomSelectionConditionsHold(VassalAndMercenaryOfferData playerData, Kingdom kingdom)
+    private bool VassalKingdomSelectionConditionsHold(VassalAndMercenaryOfferData playerData, Clan clan, Kingdom kingdom)
     {
         if (!objectManager.TryGetIdWithLogging(kingdom, out var kingdomId)) return false;
 
         return !playerData.VassalOffers.ContainsKey(kingdomId)
             && FactionHelper.CanPlayerOfferVassalage(kingdom, out _, out _)
-            && !kingdomClanLimit.IsFull(Clan.PlayerClan, kingdom, asMercenary: false, ModConfigProvider.ModOptions)
+            && !kingdomClanLimit.IsFull(clan, kingdom, asMercenary: false, ModConfigProvider.ModOptions)
             && !kingdom.Leader.IsPrisoner
             && !kingdom.Leader.IsFugitive;
     }

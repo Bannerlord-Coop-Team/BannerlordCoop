@@ -112,8 +112,10 @@ internal class PlayerPartyInteractionOutcomeHandler
         this.kingdomClanLimit = kingdomClanLimit;
     }
 
-    public bool Handle(PlayerPartyInteractionOutcome outcome)
+    // kingdomFull is true when a vassal or mercenary join was refused by maxClansPerKingdom.
+    public bool Handle(PlayerPartyInteractionOutcome outcome, out bool kingdomFull)
     {
+        kingdomFull = false;
         switch (outcome.OutcomeType)
         {
             case PlayerPartyInteractionOutcomeType.TradeAccepted:
@@ -121,9 +123,9 @@ internal class PlayerPartyInteractionOutcomeHandler
             case PlayerPartyInteractionOutcomeType.ClanJoinAccepted:
                 return HandleClanJoinAccepted(outcome);
             case PlayerPartyInteractionOutcomeType.VassalAccepted:
-                return HandleVassalAccepted(outcome);
+                return HandleVassalAccepted(outcome, out kingdomFull);
             case PlayerPartyInteractionOutcomeType.MercenaryAccepted:
-                return HandleMercenaryAccepted(outcome);
+                return HandleMercenaryAccepted(outcome, out kingdomFull);
             case PlayerPartyInteractionOutcomeType.ClanLeft:
             case PlayerPartyInteractionOutcomeType.ClanMemberRemoved:
                 return HandleClanDeparture(outcome);
@@ -261,12 +263,15 @@ internal class PlayerPartyInteractionOutcomeHandler
             objectManager.TryGetObjectWithLogging(otherPartyId, out otherParty);
     }
 
-    private bool HandleVassalAccepted(PlayerPartyInteractionOutcome outcome)
+    private bool HandleVassalAccepted(PlayerPartyInteractionOutcome outcome, out bool kingdomFull)
     {
+        kingdomFull = false;
         try
         {
             bool result = false;
-            RunOnGameThread(() => result = ApplyVassalage(outcome), "Apply player-party vassalage");
+            bool full = false;
+            RunOnGameThread(() => result = ApplyVassalage(outcome, out full), "Apply player-party vassalage");
+            kingdomFull = full;
             return result;
         }
         catch (Exception e)
@@ -280,8 +285,9 @@ internal class PlayerPartyInteractionOutcomeHandler
         }
     }
 
-    private bool ApplyVassalage(PlayerPartyInteractionOutcome outcome)
+    private bool ApplyVassalage(PlayerPartyInteractionOutcome outcome, out bool kingdomFull)
     {
+        kingdomFull = false;
         if (!objectManager.TryGetObject(outcome.InitiatorPartyId, out PartyBase initiatorParty))
         {
             Logger.Warning("Unable to apply player-party vassalage: initiator party not found. PartyId={PartyId}", outcome.InitiatorPartyId);
@@ -313,7 +319,7 @@ internal class PlayerPartyInteractionOutcomeHandler
         }
         if (kingdomClanLimit.IsFull(initiatorClan, targetKingdom, asMercenary: false, ModConfigProvider.ModOptions))
         {
-            Logger.Information("Refused player-party vassalage for clan {ClanId} because kingdom {KingdomId} has maxClansPerKingdom clans", initiatorClan.StringId, targetKingdom.StringId);
+            kingdomFull = true;
             return false;
         }
         if (initiatorClan.Kingdom == targetKingdom)
@@ -429,12 +435,15 @@ internal class PlayerPartyInteractionOutcomeHandler
         return true;
     }
 
-    private bool HandleMercenaryAccepted(PlayerPartyInteractionOutcome outcome)
+    private bool HandleMercenaryAccepted(PlayerPartyInteractionOutcome outcome, out bool kingdomFull)
     {
+        kingdomFull = false;
         try
         {
             bool result = false;
-            RunOnGameThread(() => result = ApplyMercenaryJoin(outcome), "Apply player-party Mercenary join");
+            bool full = false;
+            RunOnGameThread(() => result = ApplyMercenaryJoin(outcome, out full), "Apply player-party Mercenary join");
+            kingdomFull = full;
             return result;
         }
         catch (Exception e)
@@ -448,8 +457,9 @@ internal class PlayerPartyInteractionOutcomeHandler
         }
     }
 
-    private bool ApplyMercenaryJoin(PlayerPartyInteractionOutcome outcome)
+    private bool ApplyMercenaryJoin(PlayerPartyInteractionOutcome outcome, out bool kingdomFull)
     {
+        kingdomFull = false;
         if (!objectManager.TryGetObject(outcome.InitiatorPartyId, out PartyBase initiatorParty))
         {
             Logger.Warning("Unable to apply player-party mercenary: initiator party not found. PartyId={PartyId}", outcome.InitiatorPartyId);
@@ -500,7 +510,7 @@ internal class PlayerPartyInteractionOutcomeHandler
         }
         if (kingdomClanLimit.IsFull(initiatorClan, targetKingdom, asMercenary: true, ModConfigProvider.ModOptions))
         {
-            Logger.Information("Refused player-party mercenary for clan {ClanId} because kingdom {KingdomId} has maxClansPerKingdom clans", initiatorClan.StringId, targetKingdom.StringId);
+            kingdomFull = true;
             return false;
         }
         int awardMultiplier = outcome.MercenaryAwardMultiplier;

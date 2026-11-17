@@ -112,7 +112,8 @@ public enum PlayerPartyInteractionOutcomeType
     MapTrackingStopped,
     Divorced,
     DivorcedAndLeftClan,
-    ProposalWithdrawn
+    ProposalWithdrawn,
+    KingdomFull
 }
 
 public enum PlayerPartyInteractionDeniedReason

@@ -19,6 +19,7 @@ using E2E.Tests.Util;
 using GameInterface.Services.Armies.Messages;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Clans.Patches;
+using GameInterface.Services.Companions.Messages;
 using GameInterface.Services.Entity;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameDebug.Commands;
@@ -625,7 +626,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         Server.PumpGameThread();
     }
     
-    // The kingdom has one clan, its ruler's. A refused player gets the reason, then the usual vassalage refusal.
+    // The kingdom has one clan, its ruler's.
     [Theory]
     [InlineData(2, true)]
     [InlineData(1, false)]
@@ -633,43 +634,104 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     {
         ModConfigProvider.ModOptions = new ModOptions(new ModOptionsData { MaxClansPerKingdom = maxClansPerKingdom });
         var client = Clients.First();
-        var otherClient = Clients.Last();
         var player = CreateSyncedPlayerContext(ControllerId, client);
         var ruler = CreateSyncedPlayerContext("VassalRuler", _ => false);
-        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
-        ConfigureClanInKingdom(ruler.ClanId, kingdomId);
+        var kingdomId = CreateNamedKingdomEverywhere(ruler.ClanId);
         SetClanTierEverywhere(player.ClanId, 2);
         Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer(ControllerId, client.NetPeer));
-        using var notices = new MethodCallRecorder(AccessTools.Method(typeof(MBInformationManager), nameof(MBInformationManager.AddQuickInformation)));
 
         Assert.True(client.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
-        client.SimulateMessage(this, new VassalServiceAccepted(kingdom, grantRewards: false));
+        var shown = RecordQuickInformation(() => client.SimulateMessage(this, new VassalServiceAccepted(kingdom, grantRewards: false)));
 
         var result = Assert.Single(Server.NetworkSentMessages.GetMessages<VassalServiceResult>());
         Assert.Equal(accepted, result.Accepted);
+        Assert.Equal(!accepted, result.KingdomFull);
         if (accepted)
         {
-            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkKingdomFull>());
-            Assert.Equal(0, notices.CountFor(client));
+            Assert.Empty(shown);
             Server.Call(() => AssertVassalMembership(Server, player.ClanId, kingdomId));
             foreach (var instance in Clients)
                 instance.Call(() => AssertVassalMembership(instance, player.ClanId, kingdomId));
             return;
         }
 
-        Assert.Equal(kingdomId, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkKingdomFull>()).KingdomId);
-        Assert.Equal(2, notices.CountFor(client));
-        Assert.Equal(0, notices.CountFor(otherClient));
+        Assert.Equal(FullKingdomText, Assert.Single(shown));
         foreach (var instance in Clients.Append(Server))
         {
             instance.Call(() =>
             {
-                Assert.True(instance.ObjectManager.TryGetObject<Clan>(player.ClanId, out var clan));
-                Assert.True(instance.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var instanceKingdom));
-                Assert.Null(clan.Kingdom);
-                Assert.Single(instanceKingdom.Clans);
+                Assert.Null(instance.GetRegisteredObject<Clan>(player.ClanId).Kingdom);
+                Assert.Single(instance.GetRegisteredObject<Kingdom>(kingdomId).Clans);
             });
         }
+    }
+
+    // A ruler hiring a mercenary clan that serves another kingdom. The old contract has to survive the refusal.
+    [Fact]
+    public void MercenaryServiceAccepted_RulerHiresIntoAFullKingdom_KeepsTheOldContractAndTellsTheRuler()
+    {
+        ModConfigProvider.ModOptions = new ModOptions(new ModOptionsData { MaxClansPerKingdom = 1, CountMercenaries = true });
+        var client = Clients.First();
+        var ruler = CreateSyncedPlayerContext(ControllerId, client);
+        var kingdomId = CreateNamedKingdomEverywhere(ruler.ClanId);
+        var otherRuler = CreateSyncedPlayerContext("OtherRuler", _ => false);
+        var otherKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        ConfigureClanInKingdom(otherRuler.ClanId, otherKingdomId);
+        var mercenary = CreateSyncedPlayerContext("HiredMercenary", _ => false);
+        foreach (var instance in Clients.Append(Server))
+            RemovePlayerRegistration(instance, "HiredMercenary");
+        ConfigureClanInKingdom(mercenary.ClanId, otherKingdomId);
+        foreach (var instance in Clients.Append(Server))
+        {
+            instance.Call(() =>
+            {
+                using (new AllowedThread())
+                    instance.GetRegisteredObject<Clan>(mercenary.ClanId).IsUnderMercenaryService = true;
+            });
+        }
+        Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer(ControllerId, client.NetPeer));
+
+        var shown = RecordQuickInformation(() => client.SimulateMessage(this, new MercenaryServiceAccepted(
+            client.GetRegisteredObject<Kingdom>(kingdomId), 2, client.GetRegisteredObject<Clan>(mercenary.ClanId))));
+
+        Assert.Equal(kingdomId, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkKingdomFull>()).KingdomId);
+        Assert.Equal(FullKingdomText, Assert.Single(shown));
+        foreach (var instance in Clients.Append(Server))
+        {
+            instance.Call(() =>
+            {
+                var mercenaryClan = instance.GetRegisteredObject<Clan>(mercenary.ClanId);
+                Assert.Same(instance.GetRegisteredObject<Kingdom>(otherKingdomId), mercenaryClan.Kingdom);
+                Assert.True(mercenaryClan.IsUnderMercenaryService);
+                Assert.Single(instance.GetRegisteredObject<Kingdom>(kingdomId).Clans);
+            });
+        }
+    }
+
+    // Making a companion a lord founds a new clan in the ruler's kingdom, so a full kingdom refuses it.
+    [Fact]
+    public void ClanNameSelection_RulersKingdomFull_KeepsTheCompanionAndTellsTheRuler()
+    {
+        ModConfigProvider.ModOptions = new ModOptions(new ModOptionsData { MaxClansPerKingdom = 1 });
+        var client = Clients.First();
+        var ruler = CreateSyncedPlayerContext(ControllerId, client);
+        var kingdomId = CreateNamedKingdomEverywhere(ruler.ClanId);
+        var companionId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var fiefId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer(ControllerId, client.NetPeer));
+        Clan companionClan = null;
+        Server.Call(() => companionClan = Server.GetRegisteredObject<Hero>(companionId).Clan);
+
+        var shown = RecordQuickInformation(() => client.Call(() => client.Resolve<INetwork>().SendAll(
+            new DoClanNameSelection(ruler.HeroId, companionId, fiefId, ruler.PartyId, "Companion"))));
+
+        Assert.Equal(kingdomId, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkKingdomFull>()).KingdomId);
+        Assert.Equal(FullKingdomText, Assert.Single(shown));
+        Server.Call(() =>
+        {
+            Assert.Same(companionClan, Server.GetRegisteredObject<Hero>(companionId).Clan);
+            Assert.Single(Server.GetRegisteredObject<Kingdom>(kingdomId).Clans);
+        });
     }
 
     [Fact]
@@ -5660,6 +5722,54 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         }
 
         return npc.ClanId;
+    }
+
+    private const string FullKingdomName = "Vlandia";
+    private const string FullKingdomText = "Vlandia already has the most clans this server allows (1).";
+
+    // A kingdom ruled by the clan on every instance, named so the kingdom full text can be checked.
+    private string CreateNamedKingdomEverywhere(string rulingClanId)
+    {
+        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        ConfigureClanInKingdom(rulingClanId, kingdomId);
+        foreach (var instance in Clients.Append(Server))
+        {
+            instance.Call(() =>
+            {
+                using (new AllowedThread())
+                    instance.GetRegisteredObject<Kingdom>(kingdomId).Name = new TextObject(FullKingdomName);
+            });
+        }
+
+        return kingdomId;
+    }
+
+    private static readonly List<string> quickInformation = new();
+
+    // The quick information texts any instance shows while the action runs.
+    private static List<string> RecordQuickInformation(Action action)
+    {
+        quickInformation.Clear();
+        var harmony = new Harmony($"e2e.kingdom-full.{Guid.NewGuid():N}");
+        harmony.Patch(
+            AccessTools.Method(typeof(MBInformationManager), nameof(MBInformationManager.AddQuickInformation)),
+            prefix: new HarmonyMethod(typeof(PlayerKingdomCreationFlowTests), nameof(RecordQuickInformationPrefix)));
+        try
+        {
+            action();
+            return quickInformation.ToList();
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+            quickInformation.Clear();
+        }
+    }
+
+    private static bool RecordQuickInformationPrefix(TextObject message)
+    {
+        quickInformation.Add(message.ToString());
+        return false;
     }
 
     private static void RemovePlayerRegistration(EnvironmentInstance instance, string controllerId)

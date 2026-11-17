@@ -270,7 +270,7 @@
 
     // Set the most clans one kingdom may have, so one kingdom can't take every clan on a big server.
     // (Default) 0: No limit.
-    // Above 0: The ruling clan counts too. A full kingdom can't take a player as a vassal, and its ruler can't recruit another lord.
+    // Above 0: The ruling clan counts too. A full kingdom can't take a player as a vassal, and its ruler can't recruit another lord or make a companion a lord.
     // The player who asked is told why. Clans already in a kingdom always stay, and new kingdoms and rebellions work as before.
     "maxClansPerKingdom": 0,
 

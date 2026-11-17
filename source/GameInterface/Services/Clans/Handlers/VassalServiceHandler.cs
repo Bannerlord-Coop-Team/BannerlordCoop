@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using GameInterface.Configuration;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.Kingdoms.Messages;
@@ -84,21 +85,23 @@ internal class VassalServiceHandler : IHandler
         GameThread.RunSafe(() =>
         {
             bool accepted = ApplyVassalage(
-                peer,
                 player.ClanId,
                 player.HeroId,
                 payload.What.KingdomId,
-                payload.What.GrantRewards);
+                payload.What.GrantRewards,
+                out bool kingdomFull);
 
             network.Send(peer, new VassalServiceResult(
                 payload.What.KingdomId,
                 accepted,
-                accepted && payload.What.GrantRewards));
+                accepted && payload.What.GrantRewards,
+                kingdomFull));
         }, context: nameof(VassalServiceHandler));
     }
 
-    private bool ApplyVassalage(NetPeer peer, string clanId, string heroId, string kingdomId, bool grantRewards)
+    private bool ApplyVassalage(string clanId, string heroId, string kingdomId, bool grantRewards, out bool kingdomFull)
     {
+        kingdomFull = false;
         if (!objectManager.TryGetObjectWithLogging<Clan>(clanId, out var clan)) return false;
         if (!objectManager.TryGetObjectWithLogging<Hero>(heroId, out var hero)) return false;
         if (!objectManager.TryGetObjectWithLogging<Kingdom>(kingdomId, out var kingdom)) return false;
@@ -109,7 +112,11 @@ internal class VassalServiceHandler : IHandler
             return false;
         }
 
-        if (kingdomClanLimit.RefuseIfFull(peer, clan, kingdom, asMercenary: false)) return false;
+        if (kingdomClanLimit.IsFull(clan, kingdom, asMercenary: false, ModConfigProvider.ModOptions))
+        {
+            kingdomFull = true;
+            return false;
+        }
 
         Kingdom previousKingdom = clan.Kingdom;
 
@@ -178,8 +185,11 @@ internal class VassalServiceHandler : IHandler
         {
             if (!payload.What.Accepted)
             {
-                MBInformationManager.AddQuickInformation(
-                    new TextObject("{=coop_vassalage_rejected}The vassalage agreement could not be completed."));
+                var refusal = new TextObject("{=coop_vassalage_rejected}The vassalage agreement could not be completed.");
+                if (payload.What.KingdomFull && objectManager.TryGetObjectWithLogging<Kingdom>(payload.What.KingdomId, out var fullKingdom))
+                    refusal = KingdomClanLimit.GetFullText(fullKingdom, ModConfigProvider.ModOptions);
+
+                MBInformationManager.AddQuickInformation(refusal);
                 return;
             }
 

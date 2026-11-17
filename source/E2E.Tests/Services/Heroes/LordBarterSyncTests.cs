@@ -1942,7 +1942,7 @@ public class LordBarterSyncTests : MapEventTestBase
 
     /// <summary>
     /// A registered player whose clan belongs to the destination kingdom, and a target leading a clan in
-    /// another kingdom. Set on every instance, like JoinKingdomBarter_Accepted_SynchronizesDestinationKingdomClanList.
+    /// another kingdom. Set on every instance, like JoinKingdomBarter_SynchronizesDestinationKingdomClanList_UnlessItHasMaxClansPerKingdom.
     /// </summary>
     private DefectionFixture CreateDefectionFixture(
         EnvironmentInstance client,

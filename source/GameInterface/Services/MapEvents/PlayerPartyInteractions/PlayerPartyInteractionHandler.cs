@@ -354,7 +354,10 @@ internal class PlayerPartyInteractionHandler : IHandler
             endedInteractionSessionIds.Add(message.SessionId);
             PlayerPartyInteractionDialogState.Clear(message.SessionId);
             trade.End(message.SessionId);
-            ShowOutcomeMessage(message.OutcomeType);
+            if (message.OutcomeType == PlayerPartyInteractionOutcomeType.KingdomFull)
+                ShowKingdomFullMessage(message.ResponderPartyId);
+            else
+                ShowOutcomeMessage(message.OutcomeType);
             var conversationWasOpened = openedConversationSessionIds.Remove(message.SessionId);
 
             var conversationManager = Campaign.Current?.ConversationManager;
@@ -1021,8 +1024,12 @@ internal class PlayerPartyInteractionHandler : IHandler
         }
 
         var outcome = new PlayerPartyInteractionOutcome(session, outcomeType, actorPartyId);
-        var applied = outcomeHandler.Handle(outcome);
-        var finalOutcomeType = applied ? outcomeType : GetFailedOutcome(outcomeType, session.Proposal);
+        var applied = outcomeHandler.Handle(outcome, out var kingdomFull);
+        var finalOutcomeType = outcomeType;
+        if (kingdomFull)
+            finalOutcomeType = PlayerPartyInteractionOutcomeType.KingdomFull;
+        else if (!applied)
+            finalOutcomeType = GetFailedOutcome(outcomeType, session.Proposal);
 
         network.SendAll(new NetworkPlayerPartyInteractionEnded(
             session.SessionId,
@@ -1349,6 +1356,14 @@ internal class PlayerPartyInteractionHandler : IHandler
             return PlayerPartyInteractionOutcomeType.TradeDeclined;
 
         return PlayerPartyInteractionOutcomeType.Left;
+    }
+
+    // The responder's kingdom filled up between the proposal and the answer.
+    private void ShowKingdomFullMessage(string responderPartyId)
+    {
+        var kingdom = objectManager.TryGetObject(responderPartyId, out PartyBase responderParty) ? responderParty.LeaderHero?.Clan?.Kingdom : null;
+        var text = KingdomClanLimit.GetFullText(kingdom, ModConfigProvider.ModOptions);
+        InformationManager.DisplayMessage(new InformationMessage(text.ToString()));
     }
 
     // Tells the local player how the interaction ended.
