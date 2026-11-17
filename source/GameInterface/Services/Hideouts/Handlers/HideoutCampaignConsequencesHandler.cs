@@ -325,7 +325,7 @@ internal sealed class HideoutCampaignConsequencesHandler : IHandler
         if (rewards.MapEvent.BattleState != BattleState.AttackerVictory)
             return;
 
-        ClearHideout(rewards);
+        ClearHideout(rewards.Component, rewards.Settlement);
         foreach (var participant in rewards.Participants)
         {
             if (!rewards.ClaimedHeroes.Add(participant.Hero))
@@ -337,18 +337,18 @@ internal sealed class HideoutCampaignConsequencesHandler : IHandler
     }
 
     // Native PlayerEncounter.DoEnd clears the hideout through its component; the dedicated server has no player encounter.
-    private void ClearHideout(ClearRewardSnapshot rewards)
+    private void ClearHideout(HideoutEventComponent component, Settlement hideout)
     {
         // Snapshot before the clear, because OnHideoutCleared takes the parties out of Settlement.Parties.
-        var playersInside = rewards.Settlement.Parties.Where(playerManager.Contains).ToArray();
-        rewards.Component.OnHideoutCleared(rewards.Settlement);
+        var playersInside = hideout.Parties.Where(playerManager.Contains).ToArray();
+        component.OnHideoutCleared(hideout);
         foreach (var party in playersInside)
         {
             // Native keeps army members that dont lead inside and attached ones move with their leader.
             bool leftOnItsOwn = party.CurrentSettlement == null && party.AttachedTo == null;
             if (!leftOnItsOwn) continue;
 
-            party.Position = rewards.Settlement.GatePosition;
+            party.Position = hideout.GatePosition;
             party.SetMoveModeHold();
         }
     }
