@@ -11,6 +11,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using Missions.Battles;
 using NavalDLC;
+using NavalDLC.ComponentInterfaces;
 using NavalDLC.Missions;
 using NavalDLC.Missions.Deployment;
 using NavalDLC.Missions.Handlers;
@@ -42,7 +43,6 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
     private static readonly ILogger Logger = LogManager.GetLogger<CoopNavalBattleLauncher>();
 
     private readonly IMessageBroker messageBroker;
-    private readonly IBattleNetwork network;
     private readonly IObjectManager objectManager;
     private readonly ICoopBattleBehaviorAttacher behaviorAttacher;
     private readonly IBattleAgentBudget agentBudget;
@@ -62,7 +62,8 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
     private readonly INavalRopeRegistry ropes;
     private readonly INavalShipDamageGate damageGate;
     private readonly INavalPlayerDeploymentSlotTracker deploymentSlot;
-    private readonly INavalLateDeploymentPlanTracker latePlans;
+    private readonly INavalShipBudget shipBudget;
+    private readonly Func<IBattleSession, IBattleShipReplicator, BattleSideEnum, INavalNpcFleetSpawner> npcFleetSpawners;
 #if DEBUG
     private readonly INavalScenarioState scenarioState;
     private readonly INavalDebugHulls debugHulls;
@@ -71,7 +72,6 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
 
     public CoopNavalBattleLauncher(
         IMessageBroker messageBroker,
-        IBattleNetwork network,
         IObjectManager objectManager,
         ICoopBattleBehaviorAttacher behaviorAttacher,
         IBattleAgentBudget agentBudget,
@@ -91,7 +91,9 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         INavalRopeRegistry ropes,
         INavalShipDamageGate damageGate,
         INavalPlayerDeploymentSlotTracker deploymentSlot,
-        INavalLateDeploymentPlanTracker latePlans
+        INavalShipBudget shipBudget,
+        // One AI fleet spawner per battle side, over that battle's session and ship replicator.
+        Func<IBattleSession, IBattleShipReplicator, BattleSideEnum, INavalNpcFleetSpawner> npcFleetSpawners
 #if DEBUG
         , INavalScenarioState scenarioState,
         INavalDebugHulls debugHulls,
@@ -114,14 +116,14 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         this.ropes = ropes;
         this.damageGate = damageGate;
         this.deploymentSlot = deploymentSlot;
-        this.latePlans = latePlans;
+        this.shipBudget = shipBudget;
+        this.npcFleetSpawners = npcFleetSpawners;
         // One battle's copies, shared by the engine that tracks them and the behaviour that steers them.
         this.steeredCopies = steeredCopies;
         shipEngine = shipEngines(steeredCopies);
         this.captureEngine = captureEngine;
         this.servicesFactory = servicesFactory;
         this.messageBroker = messageBroker;
-        this.network = network;
         this.objectManager = objectManager;
         this.behaviorAttacher = behaviorAttacher;
         this.agentBudget = agentBudget;
@@ -161,24 +163,24 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         var deploymentModel = NavalDLCManager.Instance.GameModels.ShipDeploymentModel;
 
         var sideParties = mapEvent.GetMapEventSide(playerSide).Parties;
-        SplitPlayerSideParties(sideParties, PartyBase.MainParty,
-            out var ownMapEventParty, out var ownTeamParties, out var allyTeamParties);
-        var playerParties = GetPlayerParties();
-        deploymentSlot.Rank = NavalPlayerDeploymentSlot.RankOf(
-            sideParties.Select(party => party.Party), PartyBase.MainParty, playerParties.Contains);
-        deploymentSlot.PlayerCount = NavalPlayerDeploymentSlot.PlayerCountOf(
-            sideParties.Select(party => party.Party), playerParties.Contains);
-        deploymentModel.GetShipDeploymentLimitsOfPlayerTeams(ownTeamParties, allyTeamParties,
-            out var ownTeamLimit, out var allyTeamLimit);
+        // The player registry the AI share and the fielder read too, so all three agree on who the side's players are.
+        Func<PartyBase, bool> isPlayerParty = party => playerManager.Contains(party.MobileParty);
+        deploymentSlot.Rank = NavalSideDeploymentSlots.RankOf(
+            sideParties.Select(party => party.Party), PartyBase.MainParty, isPlayerParty);
+        deploymentSlot.PlayerCount = NavalSideDeploymentSlots.PlayerCountOf(sideParties.Select(party => party.Party), isPlayerParty);
+#if DEBUG
+        // The ignore_limits knob turns on vanilla's own switch, set on every launch so a later battle without it has its limits back.
+        ShipDeploymentModel.IgnoreDeploymentLimits = scenarioState.Current is { IgnoreShipLimits: true } scenario && scenario.MapEventId == mapEventId;
+#endif
         var enemyLimit = deploymentModel.GetTeamShipDeploymentLimit(mapEvent.GetMapEventSide(playerSide.GetOppositeSide()).Parties);
 
-        var ownCampaignShips = new MBList<IShipOrigin> { deploymentModel.GetSuitablePlayerShip(ownMapEventParty, ownTeamParties) };
-        deploymentModel.FillShipsOfTeamParties(ownTeamParties, ownTeamLimit, ownCampaignShips);
-        var ownShips = ownCampaignShips.Select(ship => (IShipOrigin)shipSnapshotBuilder.Build((Ship)ship)).ToMBList();
+        // The battle host's AI share of this side subtracts this same fleet, so both come from the budget.
+        var ownFleet = shipBudget.PlayerFleet(sideParties, PartyBase.MainParty);
+        var ownShips = ownFleet.Ships.Select(ship => (IShipOrigin)shipSnapshotBuilder.Build(ship)).ToMBList();
         var captains = OrderOwnCaptains(CoopFieldBattleLauncher.OwnPartyHeroesByPriority(),
             PartyBase.MainParty.LeaderHero?.CharacterObject.StringId, ownShips.Count);
 
-        int deployableOwnShipCount = MathF.Min(ownShips.Count, ownTeamLimit.NetDeploymentLimit);
+        int deployableOwnShipCount = ownFleet.FieldedCount;
         var maxDeployableTroopCountPerTeam = new[]
         {
             deploymentModel.GetMaximumDeployableTroopCountForTeam(ownShips, isPlayerTeam: true),
@@ -187,9 +189,11 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         };
 
         Logger.Information("[NavalBattle] Opening coop naval battle {MapEventId}: side={Side} deploymentRank={Rank}/{PlayerCount} ownShips={ShipCount} " +
-            "hulls={Hulls} captains={Captains} deployable={Deployable} crewCapacity={CrewCapacity}",
+            "hulls={Hulls} captains={Captains} deployable={Deployable} limit={PartiesLimit}/{SkeletalLimit}/{NetLimit} " +
+            "ignoreLimits={IgnoreLimits} crewCapacity={CrewCapacity}",
             mapEventId, playerSide, deploymentSlot.Rank, deploymentSlot.PlayerCount, ownShips.Count, string.Join(",", ownShips.Select(ship => ship.Hull.StringId)),
-            string.Join(",", captains), deployableOwnShipCount, maxDeployableTroopCountPerTeam[0]);
+            string.Join(",", captains), deployableOwnShipCount, ownFleet.PlayerLimit.PartiesLimit, ownFleet.PlayerLimit.SkeletalCrewLimit,
+            ownFleet.PlayerLimit.NetDeploymentLimit, ShipDeploymentModel.IgnoreDeploymentLimits, maxDeployableTroopCountPerTeam[0]);
 
         rec.AtmosphereOnCampaign.NauticalInfo.UsesNavalSimulatedWater = 1;
         var mission = NavalMissionState.OpenNew("NavalBattle", rec, naval =>
@@ -205,8 +209,9 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
                 new NavalShipsLogic(),
                 new NavalFloatsamLogic(),
                 new NavalAgentsLogic(),
+                // The ally limit is the other players' share; only the Order of Battle reads it, to disable the slots they take.
                 new DefaultNavalMissionLogic(ownShips, new MBList<IShipOrigin>(), new MBList<IShipOrigin>(),
-                    ownTeamLimit, allyTeamLimit, enemyLimit),
+                    ownFleet.PlayerLimit, ownFleet.AllyLimit, enemyLimit),
                 new NavalTrajectoryPlanningLogic(),
                 // Must precede the spawn logic: it pulls every troop from the suppliers once, in EarlyStart.
                 new CoopNavalSetupGuard(ownSupplier, playerSide, messageBroker),
@@ -242,7 +247,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         });
 
         behaviorAttacher.Attach(mission);
-        AttachNavalServices(mission, playerSide.GetOppositeSide());
+        AttachNavalServices(mission);
 #if DEBUG
         var debugController = mission.GetMissionBehavior<CoopBattleController>();
         mission.AddMissionBehavior(new NavalCopyProbeLogic(debugController.MissionComponent.ShipRegistry, steeredCopies, steeringKnobs));
@@ -255,37 +260,20 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         return mission;
     }
 
-    // The parties of every connected player that resolve on this client.
-    private HashSet<PartyBase> GetPlayerParties()
-    {
-        var parties = new HashSet<PartyBase>();
-        foreach (var player in playerManager.Players)
-        {
-            if (objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party))
-                parties.Add(party.Party);
-        }
-
-        return parties;
-    }
-
     // The ship services share the attached controller's per-battle session, deployment and mission component.
-    private void AttachNavalServices(Mission mission, BattleSideEnum enemySide)
+    private void AttachNavalServices(Mission mission)
     {
         var context = mission.GetMissionBehavior<CoopBattleController>().Context;
         var services = servicesFactory.Create(context, shipEngine, captureEngine, asyncAgentTick);
-        var npcFleetSpawner = new NavalNpcFleetSpawner(network, messageBroker, context.Session, services.ShipReplicator,
-            shipSnapshotBuilder, objectManager, playerManager, latePlans, new NavalNpcFleetRollback(services.ShipReplicator), enemySide
-#if DEBUG
-            // Read at the eligible attempt, since the scenario can arrive after the mission opens or the host is elected.
-            , () => scenarioState.Current?.MapEventId == context.Session.InstanceId && scenarioState.Current.FailNpcFleet
-#endif
-            );
-        mission.AddMissionBehavior(new CoopNavalBattleBehavior(services, steeredCopies, npcFleetSpawner,
+        // A spawner per side on every client, so either side's attempt has an owner here, also for an AI party joining later.
+        var npcFleets = new[] { BattleSideEnum.Defender, BattleSideEnum.Attacker }
+            .ToDictionary(side => side, side => npcFleetSpawners(context.Session, services.ShipReplicator, side));
+        mission.AddMissionBehavior(new CoopNavalBattleBehavior(services, steeredCopies, npcFleets,
             mission.GetMissionBehavior<NavalShipsLogic>(), tickFailureLogs(), tickFailureLogs(), lateHullDeployment,
             ballistaTargets, missionTracker, foreignHulls, ropes, damageGate, deploymentSlot));
         var tallyReader = new NavalSideTallyReader(shipEngine, services.ConditionStream, services.MigrationReserveFielder);
         mission.AddMissionBehavior(new CoopNavalBattleEndLogic(context.Session, context.Deployment, context.ResultCommitter,
-            npcFleetSpawner, services.HullLedger, tallyReader,
+            npcFleets, services.HullLedger, tallyReader,
             new NavalPlayerHeroGrace(context.Session, context.MissionContext, playerManager, objectManager)));
     }
 
@@ -299,31 +287,6 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
             controller.MissionComponent.ShipRegistry, messageBroker, mapEventId, damageGate));
     }
 #endif
-
-    // Own party only: vanilla GetMapEventPartiesOfPlayerTeams takes the first non-NPC party as the player's,
-    // which is another player's party whenever two players share a side.
-    internal static void SplitPlayerSideParties(
-        MBReadOnlyList<MapEventParty> sideParties,
-        PartyBase ownParty,
-        out MapEventParty ownMapEventParty,
-        out MBList<MapEventParty> ownTeamParties,
-        out MBList<MapEventParty> allyTeamParties)
-    {
-        ownMapEventParty = null;
-        ownTeamParties = new MBList<MapEventParty>();
-        allyTeamParties = new MBList<MapEventParty>();
-        foreach (var party in sideParties)
-        {
-            if (party.Party == ownParty)
-            {
-                ownMapEventParty = party;
-                ownTeamParties.Add(party);
-                continue;
-            }
-
-            allyTeamParties.Add(party);
-        }
-    }
 
     // Vanilla GetOrderedCaptainsForPlayerTeamShips seats each ship's party leader first and fills the rest by
     // priority. With only the own party's ships that is: the leader, then the other own heroes, one per ship.

@@ -7,6 +7,7 @@
 Build armies, manage kingdoms, fight battles, trade, raid settlements, and conquer Calradia together in a shared multiplayer campaign.
 
 [Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3770450698) &nbsp;•&nbsp;
+[Rent a Server](https://bannerlordcoop.com/hosting) &nbsp;•&nbsp;
 [Discord](https://discord.gg/VXqGyT8) &nbsp;•&nbsp;
 [Reddit](https://www.reddit.com/r/BannerlordCoop/) &nbsp;•&nbsp;
 [Support the project](#support-bannerlord-coop)
@@ -27,7 +28,9 @@ Join our [Discord](https://discord.gg/VXqGyT8) for installation help, announceme
 
 ## Hosting
 
-For the best performance and stability, we strongly recommend hosting campaigns through the included **dedicated server**. [The hosting instructions can be found in our Discord through this link.](https://discord.gg/2MRuH9fVVV)
+**Don't want to run a server yourself?** [Rent an official Bannerlord Co-op server](https://bannerlordcoop.com/hosting) from the mod team. It stays on the latest co-op build, takes daily off-host backups, and runs in 12 regions across North America, Europe and Asia-Pacific. You manage it from bannerlordcoop.com.
+
+If you'd rather host it yourself, we strongly recommend running campaigns on the included **dedicated server** for the best performance and stability. [The hosting instructions can be found in our Discord through this link.](https://discord.gg/2MRuH9fVVV)
 
 Steam hosting does not require traditional port forwarding in most cases. Manual network hosting options are also available.
 

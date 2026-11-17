@@ -18,7 +18,8 @@ internal class ClanCachePatches
         // ActualClan sync and the cache message can both apply the same membership change.
         if (__instance.WarPartyComponents.Contains(warPartyComponent)) return false;
 
-        if (ModInformation.IsClient) return CallOriginalPolicy.IsOriginalAllowed();
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (ModInformation.IsClient) return false;
 
         var message = new WarPartyAdded(__instance, warPartyComponent);
         MessageBroker.Instance.Publish(__instance, message);
@@ -31,7 +32,8 @@ internal class ClanCachePatches
     {
         if (!__instance.WarPartyComponents.Contains(warPartyComponent)) return false;
 
-        if (ModInformation.IsClient) return CallOriginalPolicy.IsOriginalAllowed();
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (ModInformation.IsClient) return false;
 
         var message = new WarPartyRemoved(__instance, warPartyComponent);
         MessageBroker.Instance.Publish(__instance, message);
@@ -42,7 +44,8 @@ internal class ClanCachePatches
     [HarmonyPrefix]
     public static bool OnSupporterNotableAddedPrefix(ref Clan __instance, Hero hero)
     {
-        if (ModInformation.IsClient) return CallOriginalPolicy.IsOriginalAllowed();
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (ModInformation.IsClient) return false;
 
         var message = new SupporterNotableAdded(__instance, hero);
         MessageBroker.Instance.Publish(__instance, message);
@@ -53,7 +56,8 @@ internal class ClanCachePatches
     [HarmonyPrefix]
     public static bool OnSupporterNotableRemovedPrefix(ref Clan __instance, Hero hero)
     {
-        if (ModInformation.IsClient) return CallOriginalPolicy.IsOriginalAllowed();
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (ModInformation.IsClient) return false;
 
         var message = new SupporterNotableRemoved(__instance, hero);
         MessageBroker.Instance.Publish(__instance, message);
