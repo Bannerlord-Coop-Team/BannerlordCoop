@@ -60,6 +60,7 @@ internal class PlayerBlockadeHandler : IHandler
             // Castle blockade battles stay off for players until coop's town only blockade paths handle castles
             if (mapEvent.MapEventSettlement?.IsCastle == true)
             {
+                Logger.Information("Lifting the player blockade at castle {SettlementId} instead of asking them to defend it", mapEvent.MapEventSettlement.StringId);
                 LiftBlockade(mapEvent);
                 return;
             }
