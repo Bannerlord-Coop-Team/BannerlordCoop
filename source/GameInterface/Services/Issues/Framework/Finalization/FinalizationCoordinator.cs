@@ -14,6 +14,7 @@ using GameInterface.Services.Players.Data;
 using LiteNetLib;
 using Serilog;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
@@ -48,6 +49,8 @@ internal class FinalizationCoordinator : IHandler, IIssueFinalizationReplay
     private readonly ILordSolutionCoordinator lordSolutions;
     private readonly IQuestSolutionAcceptCoordinator acceptCoordinator;
     private readonly ITextObjectComparer textComparer;
+    private readonly Dictionary<(string IssueOwnerId, string IssueId), NetworkIssueFinalized> pendingFinalizations = new();
+    private readonly HashSet<(string IssueOwnerId, string IssueId)> appliedEndingJournals = new();
 
     public FinalizationCoordinator(
         IMessageBroker messageBroker,
@@ -102,6 +105,8 @@ internal class FinalizationCoordinator : IHandler, IIssueFinalizationReplay
         messageBroker.Unsubscribe<IssueJournalObserved>(Handle_IssueJournalObserved);
         messageBroker.Unsubscribe<NetworkIssueJournal>(Handle_NetworkIssueJournal);
         messageBroker.Unsubscribe<NetworkIssueFinalized>(Handle_NetworkIssueFinalized);
+        pendingFinalizations.Clear();
+        appliedEndingJournals.Clear();
     }
 
     // Client only.
@@ -262,13 +267,49 @@ internal class FinalizationCoordinator : IHandler, IIssueFinalizationReplay
         var data = payload.What;
         GameThread.RunSafe(() =>
         {
-            if (!ownership.TryGetOwner(data.IssueOwnerId, data.IssueId, out var owner) || owner != controller.ControllerId ||
-                !issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out var descriptor)) return;
+            if (!ownership.TryGetOwner(data.IssueOwnerId, data.IssueId, out var owner))
+            {
+                Logger.Debug("Dropping ending journal for {issue}: no owner is registered", data.IssueId);
+                return;
+            }
+
+            if (owner != controller.ControllerId)
+            {
+                Logger.Debug("Dropping ending journal for {issue}: owner is {owner}, this client is {controller}",
+                    data.IssueId, owner, controller.ControllerId);
+                return;
+            }
+
+            if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out var descriptor))
+            {
+                Logger.Debug("Dropping ending journal for {issue}: issue resolver could not find the owner's issue", data.IssueId);
+                return;
+            }
 
             var quest = issue.IssueQuest;
-            if (data.IsQuestJournal && (quest == null ||
-                !Campaign.Current.QuestManager.Quests.Contains(quest))) return;
-            if (!data.IsQuestJournal && (quest != null || issue.IsSolvingWithAlternative)) return;
+            if (data.IsQuestJournal && quest == null)
+            {
+                Logger.Debug("Dropping ending journal for {issue}: owner issue has no quest", data.IssueId);
+                return;
+            }
+
+            if (data.IsQuestJournal && !Campaign.Current.QuestManager.Quests.Contains(quest))
+            {
+                Logger.Debug("Dropping ending journal for {issue}: quest is absent from QuestManager", data.IssueId);
+                return;
+            }
+
+            if (!data.IsQuestJournal && quest != null)
+            {
+                Logger.Debug("Dropping issue journal for {issue}: owner issue still has a quest", data.IssueId);
+                return;
+            }
+
+            if (!data.IsQuestJournal && issue.IsSolvingWithAlternative)
+            {
+                Logger.Debug("Dropping issue journal for {issue}: issue is solving with an alternative", data.IssueId);
+                return;
+            }
 
             using (new AllowedThread())
             using (new QuestJournalReplay())
@@ -313,6 +354,14 @@ internal class FinalizationCoordinator : IHandler, IIssueFinalizationReplay
                             quest._journalEntries.Add(log.ToJournalLog());
                     }
                     CampaignEventDispatcher.Instance.OnQuestLogAdded(quest, true);
+                    var key = (data.IssueOwnerId, data.IssueId);
+                    appliedEndingJournals.Add(key);
+                    if (pendingFinalizations.TryGetValue(key, out var pending))
+                    {
+                        pendingFinalizations.Remove(key);
+                        QueueReplay(data.IssueOwnerId, IsOwnersRunningQuest(data.IssueOwnerId, data.IssueId),
+                            () => ReplayEnding(pending));
+                    }
                 }
                 else
                 {
@@ -436,7 +485,24 @@ internal class FinalizationCoordinator : IHandler, IIssueFinalizationReplay
 
         GameThread.RunSafe(() =>
         {
-            QueueReplay(data.IssueOwnerId, IsOwnersRunningQuest(data.IssueOwnerId, data.IssueId), () => ReplayEnding(data));
+            var key = (data.IssueOwnerId, data.IssueId);
+            if (appliedEndingJournals.Remove(key))
+            {
+                QueueReplay(data.IssueOwnerId, IsOwnersRunningQuest(data.IssueOwnerId, data.IssueId),
+                    () => ReplayEnding(data));
+                return;
+            }
+
+            if (issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out var descriptor) &&
+                issue.IssueQuest != null && descriptor is not ISuppressEndingJournalSnapshotDescriptor)
+            {
+                pendingFinalizations[key] = data;
+                Logger.Debug("Deferring finalization for {issue} until its ending journal arrives", data.IssueId);
+                return;
+            }
+
+            QueueReplay(data.IssueOwnerId, IsOwnersRunningQuest(data.IssueOwnerId, data.IssueId),
+                () => ReplayEnding(data));
         }, context: nameof(FinalizationCoordinator));
     }
 
