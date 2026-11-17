@@ -32,14 +32,14 @@ internal class HideoutResultEncounter : IHideoutResultEncounter
         if (party != mainParty || settlement == null || !IsHoldingResults(encounter))
             return false;
 
-        // Same gate and hold as the settlement close, without finishing the encounter that holds the loot.
+        // Same gate and hold as the settlement close, without finishing the encounter that holds the loot or the send troops result menu.
         using (new AllowedThread())
         {
             mainParty.Position = settlement.GatePosition;
             mainParty.SetMoveModeHold();
         }
 
-        Logger.Debug("Kept hideout encounter {MapEventId} with staged results through replicated settlement leave",
+        Logger.Debug("Kept hideout result encounter {MapEventId} through replicated settlement leave",
             encounter._mapEvent.StringId);
         return true;
     }
