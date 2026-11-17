@@ -12,6 +12,7 @@ namespace GameInterface.Services.Settlements.Patches;
 [HarmonyPatchCategory(GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class CastlePortPatches
 {
+    // Castle menu only, so no settlement check
     [HarmonyPatch(typeof(PlayerTownVisitCampaignBehavior), nameof(PlayerTownVisitCampaignBehavior.game_menu_castle_disembark_on_condition))]
     [HarmonyPostfix]
     public static void CastleDisembarkOnConditionPostfix(ref bool __result)
