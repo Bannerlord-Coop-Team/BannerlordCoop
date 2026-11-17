@@ -22,6 +22,17 @@ namespace Coop.Tests.Missions.Battles;
 [Collection("Mission.Current")]
 public class SiegeMachineSimulationTests : IDisposable
 {
+    [Theory]
+    [InlineData(-0.1f, true, true)]
+    [InlineData(0.1f, true, true)]
+    [InlineData(-0.1f, false, false)]
+    public void DestructionTransitionSnapsSmallBackwardMovementError(
+        float error, bool destructionTransition, bool expected)
+    {
+        Assert.Equal(expected,
+            SiegeMachineStateReplicator.ShouldSnapMovementForDestruction(error, destructionTransition));
+    }
+
     private static readonly List<SynchedMissionObject> PausedSkeletons = new();
     private readonly Harmony harmony = new("coop.tests.siege-machine-simulation");
 

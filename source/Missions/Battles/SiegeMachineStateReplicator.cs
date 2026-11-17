@@ -1688,6 +1688,7 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
 
     private static void Apply(UsableMachine machine, NetworkSiegeMachineState state)
     {
+        bool destructionTransition = state.DestructionState > (machine.DestructionComponent?._currentStateIndex ?? 0);
         // The movement simulator ignores movement echoes (a stale pre-grant broadcast must not
         // fight its own tracker); everyone else eases toward the received distance.
         if (state.MoveDistance >= 0f && !SiegeMissionAuthorityGate.IsMachineSimulatedLocally(machine.Id.Id))
@@ -1702,7 +1703,7 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
                 // (joiner catch-up) and for a real backward correction; small negative error is the easing's
                 // own overshoot and gets left alone.
                 float error = state.MoveDistance - movement.GetTotalDistanceTraveledForPathTracker();
-                if (error > MoveDistanceSnapThreshold || error < -MoveDistanceThreshold)
+                if (ShouldSnapMovementForDestruction(error, destructionTransition))
                 {
                     movement.SetTotalDistanceTraveledForPathTracker(state.MoveDistance);
                     movement.SetTargetFrameForPathTracker();
@@ -1787,6 +1788,9 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             }
         }
     }
+
+    internal static bool ShouldSnapMovementForDestruction(float error, bool destructionTransition)
+        => destructionTransition || error > MoveDistanceSnapThreshold || error < -MoveDistanceThreshold;
 
     private static void ApplyLadderAnimation(SiegeLadder ladder, NetworkSiegeLadderAnimationState state)
     {
