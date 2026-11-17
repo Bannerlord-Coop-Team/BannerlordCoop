@@ -17,7 +17,7 @@ namespace GameInterface.Services.MapEventComponents.Patches;
 [HarmonyPatchCategory(GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class PlayerBlockadePatches
 {
-    // Replace MobileParty.IsMainParty usage so an online player is asked instead of the blockade lifting on its own
+    // Replace MobileParty.IsMainParty usage so the server handler decides an online player's blockade instead of vanilla
     [HarmonyPatch(nameof(BlockadeBattleEventComponent.OnInitialize))]
     [HarmonyPrefix]
     private static bool OnInitializePrefix(BlockadeBattleEventComponent __instance)

@@ -16,7 +16,7 @@ using TaleWorlds.CampaignSystem.Party;
 namespace GameInterface.Services.MapEventComponents.Handlers;
 
 /// <summary>
-/// Asks the player leading an attacked blockade to defend or lift it, and lifts it on the server when they choose to.
+/// Asks the player leading an attacked blockade to defend or lift it, and lifts it on the server when they choose to or it blockades a castle.
 /// </summary>
 internal class PlayerBlockadeHandler : IHandler
 {
@@ -57,6 +57,13 @@ internal class PlayerBlockadeHandler : IHandler
 
         GameThread.EnqueueSafe(() =>
         {
+            // Players cant fight castle blockade battles yet because coop only syncs town blockades (#4605), so lift it instead of asking
+            if (mapEvent.MapEventSettlement?.IsCastle == true)
+            {
+                LiftBlockade(mapEvent);
+                return;
+            }
+
             if (!objectManager.TryGetIdWithLogging(mapEvent, out var mapEventId)) return;
 
             network.SendAll(new NetworkPromptPlayerBlockadeAttacked(mapEventId));
@@ -98,27 +105,35 @@ internal class PlayerBlockadeHandler : IHandler
         {
             if (!objectManager.TryGetObject<MapEvent>(data.MapEventId, out var mapEvent)) return;
 
-            var siegeEvent = mapEvent.DefenderSide.LeaderParty.SiegeEvent;
-            if ((!mapEvent.IsBlockade && !mapEvent.IsBlockadeSallyOut) || siegeEvent == null)
-            {
-                Logger.Warning("Ignoring the blockade lift for {MapEventId} because it is not a battle against a blockade", data.MapEventId);
-                return;
-            }
-
-            // Same as EncounterGameMenuBehavior.lift_players_blockade
-            var settlement = siegeEvent.BesiegedSettlement;
-            var attackerParties = mapEvent.AttackerSide.Parties.ToList();
-            siegeEvent.DeactivateBlockade();
-            mapEvent.FinalizeEvent();
-
-            // Replace PartyBase.MainParty usage, player parties sail in on their own
-            foreach (var attacker in attackerParties)
-            {
-                var party = attacker.Party.MobileParty;
-                if (party == null || party.IsPlayerParty() || party.CurrentSettlement != null || party.AttachedTo != null) continue;
-
-                party.SetMoveGoToSettlement(settlement, MobileParty.NavigationType.Naval, isTargetingThePort: true);
-            }
+            LiftBlockade(mapEvent);
         }, context: nameof(NetworkRequestLiftPlayerBlockade));
+    }
+
+    // Same as EncounterGameMenuBehavior.lift_players_blockade
+    private static void LiftBlockade(MapEvent mapEvent)
+    {
+        var siegeEvent = mapEvent.DefenderSide.LeaderParty.SiegeEvent;
+        bool isLiveBlockadeBattle = (mapEvent.IsBlockade || mapEvent.IsBlockadeSallyOut) && !mapEvent.IsFinalized && siegeEvent != null;
+        if (!isLiveBlockadeBattle)
+        {
+            Logger.Warning("Ignoring the blockade lift for {MapEvent} because it is not a live battle against a blockade", mapEvent);
+            return;
+        }
+
+        var settlement = siegeEvent.BesiegedSettlement;
+        var attackerParties = mapEvent.AttackerSide.Parties.ToList();
+        siegeEvent.DeactivateBlockade();
+        mapEvent.FinalizeEvent();
+
+        // Replace PartyBase.MainParty usage, player parties sail in on their own
+        foreach (var attacker in attackerParties)
+        {
+            var party = attacker.Party.MobileParty;
+            if (party == null || party.IsPlayerParty() || party.CurrentSettlement != null || party.AttachedTo != null) continue;
+
+            party.SetMoveGoToSettlement(settlement, MobileParty.NavigationType.Naval, isTargetingThePort: true);
+        }
+
+        Logger.Information("Lifted the player blockade at {SettlementId}", settlement.StringId);
     }
 }
