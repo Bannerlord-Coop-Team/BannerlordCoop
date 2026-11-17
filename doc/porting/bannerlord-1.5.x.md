@@ -339,8 +339,8 @@ are registered later, at `CampaignReady` (`MapScreen.OnInitialize`), through
   parameters.
 - N executions from one clan cost N penalties, where vanilla charges once per blood feud; per player
   feud state does not exist (#3851), and v1.4.8 also charged each execution.
-- Not done yet: a live session with a listen-server host and two clients, and CI, whose build image
-  still carries v1.4.8 game assemblies.
+- Not done yet: a live session with a listen-server host and two clients. CI builds and tests on the
+  `bannerlordcoop:v1.5.7` image, which every workflow on this branch pins.
 
 ## Porting the dedicated server
 
