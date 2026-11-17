@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
-using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Roster;
 
 namespace GameInterface.Services.Bandits.Commands;
@@ -13,19 +13,19 @@ namespace GameInterface.Services.Bandits.Commands;
 /// <summary>
 /// Spawns a deserter looter party at a settlement through the server's deserter spawn path.
 /// </summary>
-public sealed class SpawnDesertersCommand : ICoopCommand
+public sealed class SpawnDesertersCoopCommand : ICoopCommand
 {
     private const int DefaultTroopCount = 5;
 
     private readonly ICommandObjectResolver resolver;
 
-    public SpawnDesertersCommand(ICommandObjectResolver resolver) => this.resolver = resolver;
+    public SpawnDesertersCoopCommand(ICommandObjectResolver resolver) => this.resolver = resolver;
 
     public string Prefix => "coop.debug.bandits";
 
     public string Name => "spawn_deserters";
 
-    public string Description => "Spawns a deserter looter party (null party template) near a settlement and prints its position.";
+    public string Description => "Spawns a deserter looter party near a settlement and prints its position.";
 
     public CoopCommandSide Side => CoopCommandSide.Server;
 
@@ -38,12 +38,11 @@ public sealed class SpawnDesertersCommand : ICoopCommand
     // Runs DesertersCampaignBehavior.SpawnDesertersParty, as a battle's deserters would, and reports the new party.
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
     {
-        if (!CommandHelpers.IsServerOnlyCommand(out var error, "coop.debug.bandits.spawn_deserters")) return Failed(error);
-        if (!resolver.TryResolveSettlement(args[0], out var settlement, out error)) return Failed(error);
+        if (!resolver.TryResolveSettlement(args[0], out var settlement, out var error)) return Failed(error);
 
         int troopCount = DefaultTroopCount;
-        if (args.Count > 1 && (!int.TryParse(args[1], out troopCount) || troopCount <= 0))
-            return Failed("troop_count must be a positive number.");
+        if (args.Count > 1 && !int.TryParse(args[1], out troopCount)) return Failed("troop_count must be a number.");
+        if (troopCount <= 0) return Failed("troop_count must be positive.");
 
         var behavior = Campaign.Current.GetCampaignBehavior<DesertersCampaignBehavior>();
         if (behavior?.DeserterClan == null) return Failed("The deserters clan is not available.");
@@ -54,10 +53,11 @@ public sealed class SpawnDesertersCommand : ICoopCommand
         var troops = TroopRoster.CreateDummyTroopRoster();
         troops.AddToCounts(troop, troopCount);
 
-        var existing = new HashSet<MobileParty>(MobileParty.All);
-        behavior.SpawnDesertersParty(null, troops, settlement);
+        // SpawnDesertersParty returns nothing, so diff the deserter clan's parties to find the one it created.
+        var existing = new HashSet<WarPartyComponent>(behavior.DeserterClan.WarPartyComponents);
+        behavior.SpawnDesertersParty(mapEvent: null, troops, settlement);
 
-        var party = MobileParty.All.FirstOrDefault(candidate => !existing.Contains(candidate));
+        var party = behavior.DeserterClan.WarPartyComponents.FirstOrDefault(component => !existing.Contains(component))?.MobileParty;
         if (party == null) return Failed("No deserter party was created.");
 
         return new CoopCommandResult(true,

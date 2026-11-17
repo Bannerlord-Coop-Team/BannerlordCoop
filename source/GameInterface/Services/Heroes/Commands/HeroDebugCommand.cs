@@ -591,13 +591,12 @@ public class HeroDebugCommand
         // Adds the battle death mark the way a battle does, leaving the kill to AgingCampaignBehavior.DailyTickHero.
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            if (!CommandHelpers.IsServerOnlyCommand(out var error, "coop.debug.hero.mark_died_in_battle")) return Failed(error);
-            if (!resolver.TryResolveHero(args[0], out var hero, out var heroError)) return Failed(heroError);
+            if (!resolver.TryResolveHero(args[0], out var hero, out var error)) return Failed(error);
             if (!hero.IsPlayerHero() || !hero.IsAlive) return Failed("The hero must be a living registered player.");
             if (hero.DeathMark != KillCharacterAction.KillCharacterActionDetail.None)
                 return Failed($"{hero.Name} already has the death mark {hero.DeathMark}.");
 
-            hero.AddDeathMark(null, KillCharacterAction.KillCharacterActionDetail.DiedInBattle);
+            hero.AddDeathMark(killerHero: null, KillCharacterAction.KillCharacterActionDetail.DiedInBattle);
             return Succeeded($"Player {hero.Name} is marked to die in battle; the next daily tick applies it.");
         }
     }

@@ -107,7 +107,7 @@ public class PlayerTrackCompanionBehaviorInterface : IPlayerTrackCompanionBehavi
     // A scattered companion that joins a player's party is no longer scattered, as vanilla does for the main party.
     public void OnHeroJoinedParty(Hero hero, MobileParty party)
     {
-        if (!party.IsPlayerParty()) return;
+        if (!playerManager.Contains(party)) return;
 
         if (!objectManager.TryGetIdWithLogging(hero, out var companionHeroId)) return;
 
