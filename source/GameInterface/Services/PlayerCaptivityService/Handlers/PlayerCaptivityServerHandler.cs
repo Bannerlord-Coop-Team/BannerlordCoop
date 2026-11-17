@@ -184,9 +184,7 @@ internal class PlayerCaptivityServerHandler : IHandler
 
     private static float PlayerExecutionChance(int mercy, int relation)
     {
-        if (relation >= (mercy * 10) - 50) return 0f;
-
-        return ((-relation * 0.3f) - (mercy * 5f)) * 0.01f;
+        return Math.Max(((-relation * 0.3f) - (mercy * 5f)) * 0.01f, 0f);
     }
 
     // Same release the client's PlayerEncounter.Finish would send through NetworkConversationEnded
