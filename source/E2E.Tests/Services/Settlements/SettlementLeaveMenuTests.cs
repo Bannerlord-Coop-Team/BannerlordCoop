@@ -122,5 +122,20 @@ public class SettlementLeaveMenuTests : IDisposable
         });
     }
 
+    // Vanilla passes the null encounter settlement into the prison break model, which throws while the menu is built.
+    [Fact]
+    public void ScoutKeepCondition_WithoutEncounterSettlement_HidesOption()
+    {
+        environment.Clients.First().Call(() =>
+        {
+            var encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
+            encounter.EncounterSettlementAux = null;
+            Campaign.Current.PlayerEncounter = encounter;
+
+            var args = new MenuCallbackArgs((MenuContext)null, null);
+            Assert.False(ObjectHelper.SkipConstructor<EncounterGameMenuBehavior>().game_menu_castle_outside_scout_keep_on_condition(args));
+        });
+    }
+
     public void Dispose() => environment.Dispose();
 }

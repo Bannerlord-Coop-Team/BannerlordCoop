@@ -48,6 +48,12 @@ namespace GameInterface.Services.Settlements.Patches
 
             return false;
         }
+
+        // v1.5's Scout the keep passes the encounter settlement to the prison break model, which an orphaned castle_outside menu doesn't have.
+        [HarmonyPrefix]
+        [HarmonyPatch(nameof(EncounterGameMenuBehavior.game_menu_castle_outside_scout_keep_on_condition))]
+        public static bool ScoutKeepConditionPrefix(MenuCallbackArgs args) => CheckFortificationEncounterSettlement(args);
+
         [HarmonyPatch("game_menu_army_talk_to_leader_on_consequence")]
         [HarmonyPrefix]
         private static bool ArmyTalkToLeaderConsequencePrefix()
