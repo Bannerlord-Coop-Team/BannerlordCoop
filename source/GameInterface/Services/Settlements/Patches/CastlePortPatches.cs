@@ -6,7 +6,7 @@ using TaleWorlds.CampaignSystem.Settlements;
 namespace GameInterface.Services.Settlements.Patches;
 
 /// <summary>
-/// Hides the castle port menu options on clients, because coop's port and blockade paths only handle towns so far.
+/// Hides the castle port menu options on clients, because coop only syncs town ports and blockades so far (#4605).
 /// </summary>
 [HarmonyPatch]
 [HarmonyPatchCategory(GameInterface.HARMONY_NAVAL_CATEGORY)]

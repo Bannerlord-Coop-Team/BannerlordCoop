@@ -5,7 +5,7 @@ using NavalDLC.ViewModelCollection.Port.PortScreenHandlers;
 namespace Coop.Naval.PortScreen.Patches;
 
 /// <summary>
-/// Hides the port screen's moor and moored ships buttons on clients, because mooring isn't synced yet.
+/// Hides the port screen's moor and moored ships buttons on clients, because mooring isn't synced yet (#4603).
 /// </summary>
 [HarmonyPatch(typeof(PortScreenHandler))]
 [HarmonyPatchCategory(GameInterface.GameInterface.HARMONY_NAVAL_CATEGORY)]

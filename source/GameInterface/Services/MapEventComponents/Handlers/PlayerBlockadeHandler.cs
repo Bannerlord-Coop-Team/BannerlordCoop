@@ -57,7 +57,7 @@ internal class PlayerBlockadeHandler : IHandler
 
         GameThread.EnqueueSafe(() =>
         {
-            // Castle blockade battles stay off for players until coop's town only blockade paths handle castles
+            // Players cant fight castle blockade battles yet because coop only syncs town blockades (#4605), so lift it instead of asking
             if (mapEvent.MapEventSettlement?.IsCastle == true)
             {
                 Logger.Information("Lifting the player blockade at castle {SettlementId} instead of asking them to defend it", mapEvent.MapEventSettlement.StringId);
@@ -106,12 +106,6 @@ internal class PlayerBlockadeHandler : IHandler
         {
             if (!objectManager.TryGetObject<MapEvent>(data.MapEventId, out var mapEvent)) return;
 
-            if ((!mapEvent.IsBlockade && !mapEvent.IsBlockadeSallyOut) || mapEvent.DefenderSide.LeaderParty.SiegeEvent == null)
-            {
-                Logger.Warning("Ignoring the blockade lift for {MapEventId} because it is not a battle against a blockade", data.MapEventId);
-                return;
-            }
-
             LiftBlockade(mapEvent);
         }, context: nameof(NetworkRequestLiftPlayerBlockade));
     }
@@ -120,6 +114,13 @@ internal class PlayerBlockadeHandler : IHandler
     private static void LiftBlockade(MapEvent mapEvent)
     {
         var siegeEvent = mapEvent.DefenderSide.LeaderParty.SiegeEvent;
+        bool isLiveBlockadeBattle = (mapEvent.IsBlockade || mapEvent.IsBlockadeSallyOut) && !mapEvent.IsFinalized && siegeEvent != null;
+        if (!isLiveBlockadeBattle)
+        {
+            Logger.Warning("Ignoring the blockade lift at {SettlementId} because it is not a live battle against a blockade", mapEvent.MapEventSettlement?.StringId);
+            return;
+        }
+
         var settlement = siegeEvent.BesiegedSettlement;
         var attackerParties = mapEvent.AttackerSide.Parties.ToList();
         siegeEvent.DeactivateBlockade();

@@ -37,12 +37,15 @@ namespace GameInterface.Services.Settlements.Patches
         {
             var settlement = PlayerEncounter.EncounterSettlement;
 
-            // Castle blockade battles stay off for players until coop's town only blockade paths handle castles
-            bool isCastleBlockade = ModInformation.IsClient && settlement?.IsCastle == true;
-            if (settlement?.SiegeEvent != null && !isCastleBlockade) return true;
+            // Players cant fight castle blockade battles yet because coop only syncs town blockades (#4605)
+            bool hideAtCastle = ModInformation.IsClient && settlement?.IsCastle == true;
+            if (settlement?.SiegeEvent == null || hideAtCastle)
+            {
+                __result = false;
+                return false;
+            }
 
-            __result = false;
-            return false;
+            return true;
         }
 
         [HarmonyPrefix]
