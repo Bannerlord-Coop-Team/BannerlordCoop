@@ -49,8 +49,10 @@ internal class FinalizationCoordinator : IHandler, IIssueFinalizationReplay
     private readonly ILordSolutionCoordinator lordSolutions;
     private readonly IQuestSolutionAcceptCoordinator acceptCoordinator;
     private readonly ITextObjectComparer textComparer;
+    private readonly IQuestTypeRegistry questTypes;
     private readonly Dictionary<(string IssueOwnerId, string IssueId), NetworkIssueFinalized> pendingFinalizations = new();
     private readonly HashSet<(string IssueOwnerId, string IssueId)> appliedEndingJournals = new();
+    private readonly Dictionary<string, (QuestBase Quest, IQuestTypeDescriptor Descriptor)> rememberedQuests = new();
 
     public FinalizationCoordinator(
         IMessageBroker messageBroker,
@@ -64,7 +66,8 @@ internal class FinalizationCoordinator : IHandler, IIssueFinalizationReplay
         IIssueConversationGuard conversationGuard,
         ILordSolutionCoordinator lordSolutions,
         IQuestSolutionAcceptCoordinator acceptCoordinator,
-        ITextObjectComparer textComparer)
+        ITextObjectComparer textComparer,
+        IQuestTypeRegistry questTypes)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -78,9 +81,12 @@ internal class FinalizationCoordinator : IHandler, IIssueFinalizationReplay
         this.lordSolutions = lordSolutions;
         this.acceptCoordinator = acceptCoordinator;
         this.textComparer = textComparer;
+        this.questTypes = questTypes;
 
         messageBroker.Subscribe<QuestOutcomeRequested>(Handle_QuestOutcomeRequested);
         messageBroker.Subscribe<QuestBranchRequested>(Handle_QuestBranchRequested);
+        messageBroker.Subscribe<QuestAcceptanceStarted>(RememberQuest);
+        messageBroker.Subscribe<QuestJournalChanged>(RememberQuest);
         messageBroker.Subscribe<RequestQuestOutcome>(Handle_RequestQuestOutcome);
         messageBroker.Subscribe<RequestQuestBranch>(Handle_RequestQuestBranch);
         messageBroker.Subscribe<QuestSolutionAcceptedOnServer>(RememberOwnerIdentity);
@@ -96,6 +102,8 @@ internal class FinalizationCoordinator : IHandler, IIssueFinalizationReplay
     {
         messageBroker.Unsubscribe<QuestOutcomeRequested>(Handle_QuestOutcomeRequested);
         messageBroker.Unsubscribe<QuestBranchRequested>(Handle_QuestBranchRequested);
+        messageBroker.Unsubscribe<QuestAcceptanceStarted>(RememberQuest);
+        messageBroker.Unsubscribe<QuestJournalChanged>(RememberQuest);
         messageBroker.Unsubscribe<RequestQuestOutcome>(Handle_RequestQuestOutcome);
         messageBroker.Unsubscribe<RequestQuestBranch>(Handle_RequestQuestBranch);
         messageBroker.Unsubscribe<QuestSolutionAcceptedOnServer>(RememberOwnerIdentity);
@@ -107,6 +115,23 @@ internal class FinalizationCoordinator : IHandler, IIssueFinalizationReplay
         messageBroker.Unsubscribe<NetworkIssueFinalized>(Handle_NetworkIssueFinalized);
         pendingFinalizations.Clear();
         appliedEndingJournals.Clear();
+        rememberedQuests.Clear();
+    }
+
+    private void RememberQuest(MessagePayload<QuestAcceptanceStarted> payload) => RememberQuest(payload.What.Quest);
+
+    private void RememberQuest(MessagePayload<QuestJournalChanged> payload) => RememberQuest(payload.What.Quest);
+
+    private void RememberQuest(QuestBase quest)
+    {
+        if (ModInformation.IsServer || quest == null) return;
+
+        var issue = IssueManager.GetIssueOfQuest(quest);
+        if (issue == null) return;
+
+        questTypes.TryGet(issue.GetType(), out var descriptor);
+
+        rememberedQuests[issue.StringId] = (quest, descriptor);
     }
 
     // Client only.
@@ -285,13 +310,26 @@ internal class FinalizationCoordinator : IHandler, IIssueFinalizationReplay
                 }
 
                 ownerMatched = true;
-                if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out var descriptor))
+                IssueBase issue = null;
+                IQuestTypeDescriptor descriptor = null;
+                QuestBase quest = null;
+                if (issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var resolvedIssue, out var resolvedDescriptor))
+                {
+                    issue = resolvedIssue;
+                    descriptor = resolvedDescriptor;
+                    quest = issue.IssueQuest;
+                }
+                else if (data.IsQuestJournal && rememberedQuests.TryGetValue(data.IssueId, out var remembered))
+                {
+                    descriptor = remembered.Descriptor;
+                    quest = remembered.Quest;
+                }
+                else
                 {
                     Logger.Debug("Dropping ending journal for {issue}: issue resolver could not find the owner's issue", data.IssueId);
                     return;
                 }
 
-                var quest = issue.IssueQuest;
                 if (data.IsQuestJournal && quest == null)
                 {
                     Logger.Debug("Dropping ending journal for {issue}: owner issue has no quest", data.IssueId);
@@ -304,7 +342,7 @@ internal class FinalizationCoordinator : IHandler, IIssueFinalizationReplay
                     return;
                 }
 
-                if (!data.IsQuestJournal && quest != null)
+                if (!data.IsQuestJournal && (quest != null || issue == null))
                 {
                     Logger.Debug("Dropping issue journal for {issue}: owner issue still has a quest", data.IssueId);
                     return;
@@ -516,8 +554,18 @@ internal class FinalizationCoordinator : IHandler, IIssueFinalizationReplay
                 return;
             }
 
-            if (issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out var descriptor) &&
-                issue.IssueQuest != null && descriptor is not ISuppressEndingJournalSnapshotDescriptor)
+            var shouldDefer = false;
+            if (issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out var descriptor))
+            {
+                shouldDefer = issue.IssueQuest != null && descriptor is not ISuppressEndingJournalSnapshotDescriptor;
+            }
+            else if (rememberedQuests.TryGetValue(data.IssueId, out var remembered) &&
+                remembered.Descriptor is not ISuppressEndingJournalSnapshotDescriptor)
+            {
+                shouldDefer = true;
+            }
+
+            if (shouldDefer)
             {
                 pendingFinalizations[key] = data;
                 Logger.Debug("Deferring finalization for {issue} until its ending journal arrives", data.IssueId);
