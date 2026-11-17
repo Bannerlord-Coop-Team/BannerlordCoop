@@ -1,4 +1,5 @@
 ﻿using Common.Logging;
+using GameInterface.Services.PlayerCaptivityService.Patches.Disable;
 using Serilog;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
@@ -8,6 +9,9 @@ namespace GameInterface.Services.Clans;
 /// <summary>
 /// Clears blood feud state a loaded save carries, because the flag belongs to one player clan and coop has several (#3851).
 /// </summary>
+/// <remarks>
+/// Temporary; remove this file, <see cref="Patches.BloodFeudRepairPatch"/> and its registration once #3851 tracks feuds per player.
+/// </remarks>
 internal interface IBloodFeudRepairer
 {
     /// <summary>
@@ -17,15 +21,13 @@ internal interface IBloodFeudRepairer
 }
 
 /// <summary>
-/// Clears the saved feud flag and its execution counters, which only <c>ExecutionCampaignBehavior</c> ever sets.
+/// Clears the saved feud flag and its execution counters, which nothing sets while <see cref="DisableExecutionCampaignBehavior"/> is on.
 /// </summary>
 internal class BloodFeudRepairer : IBloodFeudRepairer
 {
     private static readonly ILogger Logger = LogManager.GetLogger<BloodFeudRepairer>();
 
-    /// <summary>
-    /// Ends every clan's feud with the save's player clan and returns how many clans had one.
-    /// </summary>
+    /// <inheritdoc/>
     public int ClearPlayerFeuds(IEnumerable<Clan> clans)
     {
         int clearedCount = 0;
