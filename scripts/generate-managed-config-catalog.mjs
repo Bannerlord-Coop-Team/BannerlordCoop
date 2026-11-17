@@ -89,7 +89,7 @@ const normalized = options.map(({ key, type, values, default: value, ...metadata
 const digest = createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
 let sourceCommit = 'unknown';
 try {
-  ({ stdout: sourceCommit } = await execFileAsync('git', ['log', '-1', '--format=%H', '--', 'source/GameInterface/Configuration/ModConfigData.cs'], { cwd: root }));
+  ({ stdout: sourceCommit } = await execFileAsync('git', ['log', '-1', '-Spublic bool OmitForOldAgents', '--format=%H', '--', 'source/GameInterface/Configuration/ModConfigData.cs'], { cwd: root }));
   sourceCommit = sourceCommit.trim();
 } catch { /* source checkout may be an archive */ }
 const catalog = { schemaVersion: 2, catalogRevision: digest, contentDigest: digest, sourceCommit, source: 'BannerlordCoop/source/GameInterface/Configuration/ModConfigData.cs', options: normalized };
