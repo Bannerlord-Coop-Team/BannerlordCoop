@@ -565,6 +565,43 @@ public class HeroDebugCommand
         }
     }
 
+    // coop.debug.hero.mark_died_in_battle <player hero>
+    /// <summary>
+    /// Marks a living player hero to die in battle without killing them, so the daily aging tick applies the death.
+    /// </summary>
+    public sealed class HeroMarkDiedInBattleCoopCommand : ICoopCommand
+    {
+        private readonly ICommandObjectResolver resolver;
+
+        public HeroMarkDiedInBattleCoopCommand(ICommandObjectResolver resolver) => this.resolver = resolver;
+
+        public string Prefix => "coop.debug.hero";
+
+        public string Name => "mark_died_in_battle";
+
+        public string Description => "Marks a living player hero to die in battle; the next daily tick kills them.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("hero_id", "Player hero name or id; quote names with spaces."),
+        };
+
+        // Adds the battle death mark the way a battle does, leaving the kill to AgingCampaignBehavior.DailyTickHero.
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!CommandHelpers.IsServerOnlyCommand(out var error, "coop.debug.hero.mark_died_in_battle")) return Failed(error);
+            if (!resolver.TryResolveHero(args[0], out var hero, out var heroError)) return Failed(heroError);
+            if (!hero.IsPlayerHero() || !hero.IsAlive) return Failed("The hero must be a living registered player.");
+            if (hero.DeathMark != KillCharacterAction.KillCharacterActionDetail.None)
+                return Failed($"{hero.Name} already has the death mark {hero.DeathMark}.");
+
+            hero.AddDeathMark(null, KillCharacterAction.KillCharacterActionDetail.DiedInBattle);
+            return Succeeded($"Player {hero.Name} is marked to die in battle; the next daily tick applies it.");
+        }
+    }
+
     // Resolves the target (and optional killer) hero by name or id, then applies the native death action.
     private static CoopCommandResult KillRegisteredHero(ICommandObjectResolver resolver, IObjectManager objectManager, ICoopCommandArgs args, bool requirePlayer)
     {
