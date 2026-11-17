@@ -26,6 +26,11 @@ namespace GameInterface.Services.GameDebug.Interfaces
         private static readonly string VideoPathName = "campaign_intro";
 
         /// <summary>
+        /// True while the skip runs, so the character creation state it pushes does not start a second skip.
+        /// </summary>
+        private bool skipping;
+
+        /// <summary>
         /// Determines if game is currently running the character creation intro.
         /// The character creation into is the first state of character creation.
         /// </summary>
@@ -35,11 +40,6 @@ namespace GameInterface.Services.GameDebug.Interfaces
             return GameStateManager.Current?.ActiveState is VideoPlaybackState videoState &&
                    videoState.VideoPath.Contains(VideoPathName);
         }
-
-        /// <summary>
-        /// True while the skip runs, so the character creation state it pushes does not start a second skip.
-        /// </summary>
-        private bool skipping;
 
         private static bool InCharacterCreation()
         {
@@ -77,7 +77,7 @@ namespace GameInterface.Services.GameDebug.Interfaces
             switch (ChooseSkipEntry(InCharacterCreationIntro(), InCharacterCreation(), skipping))
             {
                 case SkipEntry.Inline:
-                    GameThread.Run(SkipCharacterCreationInternal);
+                    GameThread.RunSafe(SkipCharacterCreationInternal, context: "DEBUG character creation skip");
                     break;
                 case SkipEntry.NextFrame:
                     GameThread.EnqueueSafe(SkipCharacterCreationInternal, "DEBUG character creation skip");
