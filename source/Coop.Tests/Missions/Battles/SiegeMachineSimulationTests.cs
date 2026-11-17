@@ -275,12 +275,9 @@ public class SiegeMachineSimulationTests : IDisposable
         {
             var snapshot = new NetworkSiegeMachineState(machineId, -1f, -1, -1, -1, -1f,
                 false, -1, -1000f, -1000f, stoneAmmo: 7);
-            using var replicator = new SiegeMachineStateReplicator(Mock.Of<IBattleNetwork>(), new TestMessageBroker(),
-                Mock.Of<IBattleSession>(), Mock.Of<INetworkAgentRegistry>(), new HostEpochPolicy(),
-                Mock.Of<IRangedSiegeWeaponPresentation>());
-            var apply = typeof(SiegeMachineStateReplicator).GetMethod("Apply", BindingFlags.Instance | BindingFlags.NonPublic);
+            var apply = typeof(SiegeMachineStateReplicator).GetMethod("Apply", BindingFlags.Static | BindingFlags.NonPublic);
             Assert.NotNull(apply);
-            apply.Invoke(replicator, new object[] { pile, snapshot });
+            apply.Invoke(null, new object[] { pile, snapshot });
             Assert.Equal(expectedAmmo, pile.AmmoCount);
         }
         finally
