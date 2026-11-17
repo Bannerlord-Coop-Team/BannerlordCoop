@@ -110,6 +110,31 @@ public class EndingJournalTests : IDisposable
     }
 
     [Fact]
+    public void EndingJournalSnapshotAppliesAfterLocalQuestFinalization()
+    {
+        var serverQuest = scenario.QuestOf(scenario.Server);
+        var ownerQuest = scenario.QuestOf(scenario.ClientA);
+        scenario.Server.Call(() =>
+        {
+            serverQuest.AddLog(Ending());
+            serverQuest.CompleteQuestWithSuccess();
+        });
+        environment.FlushCoalescer();
+
+        var snapshot = Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueJournal>());
+        scenario.ClientA.Call(() =>
+        {
+            using (new AllowedThread())
+            using (new QuestEndingReplay())
+                ownerQuest.CompleteQuestWithCancel();
+        });
+        scenario.ClientA.SimulateMessage(scenario.Server.NetPeer, scenario.Server.SerializeForWire(snapshot));
+
+        scenario.ClientA.Call(() => Assert.Single(ownerQuest.JournalEntries,
+            log => log.LogText.ToString() == Ending().ToString()));
+    }
+
+    [Fact]
     public void DirectEndingPreservesEveryJournalFieldThroughReplayAndTheSavedArchive()
     {
         var serverQuest = scenario.QuestOf(scenario.Server);
