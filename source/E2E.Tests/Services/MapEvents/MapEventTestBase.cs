@@ -170,9 +170,7 @@ public abstract class MapEventTestBase : IDisposable
 
         var models = Campaign.Current.Models?.GetGameModels().ToList() ?? new List<GameModel>();
         models.Add(new DefaultEncounterModel());
-        var gameModels = new GameModels(models);
-        Game.Current._gameModelManagers[typeof(GameModels)] = gameModels;
-        Campaign.Current._gameModels = gameModels;
+        Campaign.Current._gameModels = new GameModels(models);
     }
 
     // ------------------------------------------------------------------
