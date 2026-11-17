@@ -1,6 +1,7 @@
 ﻿using E2E.Tests.Environment.Instance;
 using HarmonyLib;
 using System.Reflection;
+using TaleWorlds.Library;
 
 namespace E2E.Tests.Util;
 
@@ -9,6 +10,7 @@ internal interface IMethodCallRecorder : IDisposable
     int Count { get; }
     int CountFor(EnvironmentInstance instance);
     string[] MenusFor(EnvironmentInstance instance);
+    string[] TextsFor(EnvironmentInstance instance);
     void Clear();
 }
 
@@ -18,7 +20,7 @@ internal sealed class MethodCallRecorder : IMethodCallRecorder
     private readonly Harmony harmony = new($"test-call-recorder-{Guid.NewGuid()}");
     private readonly bool runOriginal;
     private readonly List<MethodInfo> methods = new();
-    private readonly List<(object? Container, string? MenuId)> calls = new();
+    private readonly List<(object? Container, string? MenuId, string? Text)> calls = new();
 
     public MethodCallRecorder(params MethodInfo[] targets) : this(Priority.Normal, targets) { }
 
@@ -33,8 +35,10 @@ internal sealed class MethodCallRecorder : IMethodCallRecorder
             {
                 ActiveRecorders.Add(method, this);
                 methods.Add(method);
-                var prefix = method.GetParameters().Any(parameter => parameter.Name == "menuId")
-                    ? nameof(RecordMenu) : nameof(RecordCall);
+                var parameters = method.GetParameters();
+                var prefix = parameters.Any(parameter => parameter.Name == "menuId") ? nameof(RecordMenu)
+                    : parameters.Any(parameter => parameter.Name == "message") ? nameof(RecordMessage)
+                    : nameof(RecordCall);
                 harmony.Patch(method, prefix: new HarmonyMethod(typeof(MethodCallRecorder), prefix)
                 {
                     priority = priority,
@@ -58,6 +62,12 @@ internal sealed class MethodCallRecorder : IMethodCallRecorder
             .Select(call => call.MenuId!)
             .ToArray();
 
+    // The text of every message the instance showed, for targets with a message parameter.
+    public string[] TextsFor(EnvironmentInstance instance) =>
+        calls.Where(call => ReferenceEquals(call.Container, instance.Container) && call.Text != null)
+            .Select(call => call.Text!)
+            .ToArray();
+
     public void Clear() => calls.Clear();
 
     public void Dispose()
@@ -71,16 +81,20 @@ internal sealed class MethodCallRecorder : IMethodCallRecorder
         calls.Clear();
     }
 
-    private static bool RecordCall(MethodBase __originalMethod) => Record(__originalMethod, null);
+    private static bool RecordCall(MethodBase __originalMethod) => Record(__originalMethod, null, null);
 
-    private static bool RecordMenu(MethodBase __originalMethod, string menuId) => Record(__originalMethod, menuId);
+    private static bool RecordMenu(MethodBase __originalMethod, string menuId) => Record(__originalMethod, menuId, null);
 
-    private static bool Record(MethodBase method, string? menuId)
+    // An InformationMessage keeps its text in Information, a TextObject prints it.
+    private static bool RecordMessage(MethodBase __originalMethod, object message) =>
+        Record(__originalMethod, null, message is InformationMessage information ? information.Information : message?.ToString());
+
+    private static bool Record(MethodBase method, string? menuId, string? text)
     {
         // The container is restored across network calls; ambient game statics are not.
         GameInterface.ContainerProvider.TryGetContainer(out var container);
         var recorder = ActiveRecorders[method];
-        recorder.calls.Add((container, menuId));
+        recorder.calls.Add((container, menuId, text));
         return recorder.runOriginal;
     }
 }

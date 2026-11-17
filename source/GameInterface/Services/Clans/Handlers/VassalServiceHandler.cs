@@ -114,6 +114,7 @@ internal class VassalServiceHandler : IHandler
 
         if (kingdomClanLimit.IsFull(clan, kingdom, asMercenary: false, ModConfigProvider.ModOptions))
         {
+            Logger.Warning("Rejected vassal service request for clan {ClanId} because kingdom {KingdomId} has maxClansPerKingdom clans", clanId, kingdomId);
             kingdomFull = true;
             return false;
         }

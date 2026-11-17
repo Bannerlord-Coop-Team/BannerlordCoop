@@ -1,9 +1,11 @@
 ﻿using Common.Logging;
 using Common.Messaging;
+using GameInterface.Configuration;
 using GameInterface.Policies;
 using GameInterface.Services.Clans;
 using GameInterface.Services.Companions.Messages;
 using GameInterface.Services.Heroes.Patches;
+using GameInterface.Services.Kingdoms;
 using HarmonyLib;
 using Serilog;
 using System.Collections.Generic;
@@ -30,6 +32,18 @@ internal class CompanionRolesPatches
     {
         // Call original if we call this function
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
+        // A full kingdom takes the refusal line in vanilla's conversation, so the companion doesn't thank the
+        // ruler for a promotion that never happens. The server checks again for a kingdom that fills meanwhile.
+        var kingdom = Hero.MainHero.Clan.Kingdom;
+        if (ContainerProvider.TryResolve<IKingdomClanLimit>(out var kingdomClanLimit) &&
+            kingdomClanLimit.IsFull(null, kingdom, asMercenary: false, ModConfigProvider.ModOptions))
+        {
+            __instance.CurrentBehavior._playerConfirmedTheAction = false;
+            MBInformationManager.AddQuickInformation(KingdomClanLimit.GetFullText(kingdom, ModConfigProvider.ModOptions));
+            Campaign.Current.ConversationManager.ContinueConversation();
+            return false;
+        }
 
         var message = new ClanNameSelectionDone(
             Hero.MainHero,

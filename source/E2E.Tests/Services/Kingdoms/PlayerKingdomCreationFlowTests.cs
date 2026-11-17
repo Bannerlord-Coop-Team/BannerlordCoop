@@ -20,6 +20,7 @@ using GameInterface.Services.Armies.Messages;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Clans.Patches;
 using GameInterface.Services.Companions.Messages;
+using GameInterface.Services.Companions.Patches;
 using GameInterface.Services.Entity;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameDebug.Commands;
@@ -56,6 +57,7 @@ using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.Election;
 using TaleWorlds.CampaignSystem.Encyclopedia;
 using TaleWorlds.CampaignSystem.GameComponents;
@@ -641,21 +643,23 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer(ControllerId, client.NetPeer));
 
         Assert.True(client.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
-        var shown = RecordQuickInformation(() => client.SimulateMessage(this, new VassalServiceAccepted(kingdom, grantRewards: false)));
+        using var notices = new MethodCallRecorder(AccessTools.Method(typeof(MBInformationManager), nameof(MBInformationManager.AddQuickInformation)));
+        client.SimulateMessage(this, new VassalServiceAccepted(kingdom, grantRewards: false));
 
         var result = Assert.Single(Server.NetworkSentMessages.GetMessages<VassalServiceResult>());
         Assert.Equal(accepted, result.Accepted);
         Assert.Equal(!accepted, result.KingdomFull);
         if (accepted)
         {
-            Assert.Empty(shown);
+            Assert.Equal(0, notices.Count);
             Server.Call(() => AssertVassalMembership(Server, player.ClanId, kingdomId));
             foreach (var instance in Clients)
                 instance.Call(() => AssertVassalMembership(instance, player.ClanId, kingdomId));
             return;
         }
 
-        Assert.Equal(FullKingdomText, Assert.Single(shown));
+        Assert.Equal(new[] { FullKingdomText }, notices.TextsFor(client));
+        Assert.Empty(notices.TextsFor(Clients.Last()));
         foreach (var instance in Clients.Append(Server))
         {
             instance.Call(() =>
@@ -691,11 +695,13 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         }
         Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer(ControllerId, client.NetPeer));
 
-        var shown = RecordQuickInformation(() => client.SimulateMessage(this, new MercenaryServiceAccepted(
-            client.GetRegisteredObject<Kingdom>(kingdomId), 2, client.GetRegisteredObject<Clan>(mercenary.ClanId))));
+        using var notices = new MethodCallRecorder(AccessTools.Method(typeof(MBInformationManager), nameof(MBInformationManager.AddQuickInformation)));
+        client.SimulateMessage(this, new MercenaryServiceAccepted(
+            client.GetRegisteredObject<Kingdom>(kingdomId), 2, client.GetRegisteredObject<Clan>(mercenary.ClanId)));
 
         Assert.Equal(kingdomId, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkKingdomFull>()).KingdomId);
-        Assert.Equal(FullKingdomText, Assert.Single(shown));
+        Assert.Equal(new[] { FullKingdomText }, notices.TextsFor(client));
+        Assert.Empty(notices.TextsFor(Clients.Last()));
         foreach (var instance in Clients.Append(Server))
         {
             instance.Call(() =>
@@ -708,30 +714,65 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         }
     }
 
-    // Making a companion a lord founds a new clan in the ruler's kingdom, so a full kingdom refuses it.
+    // The ruler's own client refuses in the conversation, so the companion never thanks them for it.
     [Fact]
-    public void ClanNameSelection_RulersKingdomFull_KeepsTheCompanionAndTellsTheRuler()
+    public void ClanNameSelection_RulersKingdomFull_RefusesInTheConversationAndKeepsTheCompanion()
+    {
+        ModConfigProvider.ModOptions = new ModOptions(new ModOptionsData { MaxClansPerKingdom = 1 });
+        var client = Clients.First();
+        var ruler = CreateSyncedPlayerContext(ControllerId, client);
+        CreateNamedKingdomEverywhere(ruler.ClanId);
+        var (companionId, settlementId, fiefId) = CreateCompanionAndFiefEverywhere(ruler.ClanId);
+        using var notices = new MethodCallRecorder(AccessTools.Method(typeof(MBInformationManager), nameof(MBInformationManager.AddQuickInformation)));
+
+        var behavior = RunClanNameCallback(client, ruler.PartyId, companionId, settlementId);
+
+        Assert.False(behavior._playerConfirmedTheAction);
+        Assert.Empty(client.NetworkSentMessages.GetMessages<DoClanNameSelection>());
+        Assert.Equal(new[] { FullKingdomText }, notices.TextsFor(client));
+        Assert.Empty(notices.TextsFor(Clients.Last()));
+        AssertCompanionAndFiefKept(ruler.ClanId, companionId, fiefId);
+    }
+
+    // A kingdom that fills after the client checked is refused by the server, with the reason sent to the ruler.
+    [Fact]
+    public void ClanNameSelection_KingdomFilledMeanwhile_ServerKeepsTheCompanionAndTellsTheRuler()
     {
         ModConfigProvider.ModOptions = new ModOptions(new ModOptionsData { MaxClansPerKingdom = 1 });
         var client = Clients.First();
         var ruler = CreateSyncedPlayerContext(ControllerId, client);
         var kingdomId = CreateNamedKingdomEverywhere(ruler.ClanId);
-        var companionId = TestEnvironment.CreateRegisteredObject<Hero>();
-        var fiefId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        var (companionId, settlementId, fiefId) = CreateCompanionAndFiefEverywhere(ruler.ClanId);
         Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer(ControllerId, client.NetPeer));
-        Clan companionClan = null;
-        Server.Call(() => companionClan = Server.GetRegisteredObject<Hero>(companionId).Clan);
+        using var notices = new MethodCallRecorder(AccessTools.Method(typeof(MBInformationManager), nameof(MBInformationManager.AddQuickInformation)));
 
-        var shown = RecordQuickInformation(() => client.Call(() => client.Resolve<INetwork>().SendAll(
-            new DoClanNameSelection(ruler.HeroId, companionId, fiefId, ruler.PartyId, "Companion"))));
+        client.Call(() => client.Resolve<INetwork>().SendAll(
+            new DoClanNameSelection(ruler.HeroId, companionId, settlementId, ruler.PartyId, "Companion")));
 
         Assert.Equal(kingdomId, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkKingdomFull>()).KingdomId);
-        Assert.Equal(FullKingdomText, Assert.Single(shown));
-        Server.Call(() =>
-        {
-            Assert.Same(companionClan, Server.GetRegisteredObject<Hero>(companionId).Clan);
-            Assert.Single(Server.GetRegisteredObject<Kingdom>(kingdomId).Clans);
-        });
+        Assert.Equal(new[] { FullKingdomText }, notices.TextsFor(client));
+        Assert.Empty(notices.TextsFor(Clients.Last()));
+        AssertCompanionAndFiefKept(ruler.ClanId, companionId, fiefId);
+    }
+
+    // A ruler with no kingdom founds an independent clan, which the limit never refuses.
+    [Fact]
+    public void ClanNameSelection_RulerWithoutAKingdom_PromotesTheCompanionWithTheLimitOn()
+    {
+        ModConfigProvider.ModOptions = new ModOptions(new ModOptionsData { MaxClansPerKingdom = 1 });
+        var client = Clients.First();
+        var ruler = CreateSyncedPlayerContext(ControllerId, client);
+        var (companionId, settlementId, _) = CreateCompanionAndFiefEverywhere(ruler.ClanId);
+        Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer(ControllerId, client.NetPeer));
+        using var notices = new MethodCallRecorder(AccessTools.Method(typeof(MBInformationManager), nameof(MBInformationManager.AddQuickInformation)));
+
+        var behavior = RunClanNameCallback(client, ruler.PartyId, companionId, settlementId);
+
+        Assert.True(behavior._playerConfirmedTheAction);
+        Assert.Single(client.NetworkSentMessages.GetMessages<DoClanNameSelection>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkKingdomFull>());
+        Assert.Equal(0, notices.Count);
+        Server.Call(() => Assert.Equal(Occupation.Lord, Server.GetRegisteredObject<Hero>(companionId).Occupation));
     }
 
     [Fact]
@@ -5744,33 +5785,97 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         return kingdomId;
     }
 
-    private static readonly List<string> quickInformation = new();
-
-    // The quick information texts any instance shows while the action runs.
-    private static List<string> RecordQuickInformation(Action action)
+    // A companion of the clan and a town the clan owns, on every instance.
+    private (string CompanionId, string SettlementId, string FiefId) CreateCompanionAndFiefEverywhere(string clanId)
     {
-        quickInformation.Clear();
-        var harmony = new Harmony($"e2e.kingdom-full.{Guid.NewGuid():N}");
+        var companionId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var fiefId = TestEnvironment.CreateRegisteredObject<Town>();
+        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        foreach (var instance in Clients.Append(Server))
+        {
+            ConfigureClanFief(instance, clanId, fiefId, settlementId);
+            instance.Call(() =>
+            {
+                using (new AllowedThread())
+                {
+                    var companion = instance.GetRegisteredObject<Hero>(companionId);
+                    companion.SetNewOccupation(Occupation.Wanderer);
+                    companion.CompanionOf = instance.GetRegisteredObject<Clan>(clanId);
+                }
+            });
+        }
+
+        return (companionId, settlementId, fiefId);
+    }
+
+    private void AssertCompanionAndFiefKept(string clanId, string companionId, string fiefId)
+    {
+        foreach (var instance in Clients.Append(Server))
+        {
+            instance.Call(() =>
+            {
+                var clan = instance.GetRegisteredObject<Clan>(clanId);
+                var companion = instance.GetRegisteredObject<Hero>(companionId);
+                Assert.Same(clan, companion.CompanionOf);
+                Assert.NotEqual(Occupation.Lord, companion.Occupation);
+                Assert.Same(clan, instance.GetRegisteredObject<Town>(fiefId).OwnerClan);
+            });
+        }
+    }
+
+    private static CompanionRolesCampaignBehavior CompanionBehaviorOverride;
+
+    // Runs vanilla's clan name callback on the ruler's client, with the companion in the conversation and the town picked.
+    private static CompanionRolesCampaignBehavior RunClanNameCallback(
+        EnvironmentInstance client, string rulerPartyId, string companionId, string settlementId)
+    {
+        var behavior = new CompanionRolesCampaignBehavior();
+        var harmony = new Harmony($"e2e.companion-to-lord.{Guid.NewGuid():N}");
         harmony.Patch(
-            AccessTools.Method(typeof(MBInformationManager), nameof(MBInformationManager.AddQuickInformation)),
-            prefix: new HarmonyMethod(typeof(PlayerKingdomCreationFlowTests), nameof(RecordQuickInformationPrefix)));
+            AccessTools.PropertyGetter(typeof(Hero), nameof(Hero.OneToOneConversationHero)),
+            prefix: new HarmonyMethod(AccessTools.Method(typeof(PlayerKingdomCreationFlowTests), nameof(GetOneToOneConversationHeroPrefix))));
+        harmony.Patch(
+            AccessTools.PropertyGetter(typeof(CompanionRolesCampaignBehavior), nameof(CompanionRolesCampaignBehavior.CurrentBehavior)),
+            prefix: new HarmonyMethod(AccessTools.Method(typeof(PlayerKingdomCreationFlowTests), nameof(GetCompanionBehaviorPrefix))));
+        harmony.Patch(
+            AccessTools.Method(typeof(ConversationManager), nameof(ConversationManager.ContinueConversation)),
+            prefix: new HarmonyMethod(AccessTools.Method(typeof(PlayerKingdomCreationFlowTests), nameof(SkipPrefix))));
         try
         {
-            action();
-            return quickInformation.ToList();
+            client.Call(() =>
+            {
+                var previousMainParty = Campaign.Current.MainParty;
+                Campaign.Current.MainParty = client.GetRegisteredObject<MobileParty>(rulerPartyId);
+                OneToOneConversationHeroOverride = client.GetRegisteredObject<Hero>(companionId);
+                CompanionBehaviorOverride = behavior;
+                behavior._selectedFief = client.GetRegisteredObject<Settlement>(settlementId);
+                behavior._playerConfirmedTheAction = true;
+                try
+                {
+                    Assert.False(CompanionRolesPatches.ClanNameSelectionIsDonePrefix(ref behavior, "Companion"));
+                }
+                finally
+                {
+                    Campaign.Current.MainParty = previousMainParty;
+                }
+            });
+            return behavior;
         }
         finally
         {
             harmony.UnpatchAll(harmony.Id);
-            quickInformation.Clear();
+            OneToOneConversationHeroOverride = null;
+            CompanionBehaviorOverride = null;
         }
     }
 
-    private static bool RecordQuickInformationPrefix(TextObject message)
+    private static bool GetCompanionBehaviorPrefix(ref CompanionRolesCampaignBehavior __result)
     {
-        quickInformation.Add(message.ToString());
+        __result = CompanionBehaviorOverride;
         return false;
     }
+
+    private static bool SkipPrefix() => false;
 
     private static void RemovePlayerRegistration(EnvironmentInstance instance, string controllerId)
     {

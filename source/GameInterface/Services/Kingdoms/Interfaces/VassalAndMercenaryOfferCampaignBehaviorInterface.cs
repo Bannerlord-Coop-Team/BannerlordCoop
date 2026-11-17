@@ -212,6 +212,7 @@ public class VassalAndMercenaryOfferCampaignBehaviorInterface : IVassalAndMercen
 
         if (kingdomClanLimit.IsFull(clan, kingdom, asMercenary: true, ModConfigProvider.ModOptions))
         {
+            Logger.Warning("Rejected mercenary offer for clan {ClanId} because kingdom {KingdomId} has maxClansPerKingdom clans", clan.StringId, kingdomId);
             network.Send(peer, new NetworkKingdomFull(kingdomId));
             return;
         }

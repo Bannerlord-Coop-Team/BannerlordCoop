@@ -8,7 +8,7 @@ namespace GameInterface.Services.Kingdoms;
 // Public because the public VassalAndMercenaryOfferCampaignBehaviorInterface takes it in its constructor.
 public interface IKingdomClanLimit : IGameAbstraction
 {
-    // Whether maxClansPerKingdom refuses the clan joining the kingdom. The clan is null for a new clan made for it.
+    // Whether maxClansPerKingdom refuses the clan joining the kingdom. The clan is null for a new clan made for it, the kingdom null when there is none.
     bool IsFull(Clan clan, Kingdom kingdom, bool asMercenary, ModOptions options);
 }
 
@@ -21,6 +21,8 @@ public class KingdomClanLimit : IKingdomClanLimit
     // mercenary becoming a vassal there starts to count when mercenaries don't.
     public bool IsFull(Clan clan, Kingdom kingdom, bool asMercenary, ModOptions options)
     {
+        // A ruler without a kingdom makes an independent clan, which nothing limits.
+        if (kingdom == null) return false;
         if (options.MaxClansPerKingdom <= 0) return false;
         if (!Counts(asMercenary, options)) return false;
         if (clan?.Kingdom == kingdom && Counts(clan.IsUnderMercenaryService, options)) return false;

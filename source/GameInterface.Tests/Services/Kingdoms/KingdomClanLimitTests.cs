@@ -44,6 +44,12 @@ public class KingdomClanLimitTests
         Assert.Equal(expectedFull, limit.IsFull(clan, kingdom, asMercenary: false, Options(maxClans: 1, countMercenaries)));
     }
 
+    [Fact]
+    public void IsFull_NoKingdom_IsNeverFull()
+    {
+        Assert.False(limit.IsFull(null, null, asMercenary: false, Options(maxClans: 1, countMercenaries: true)));
+    }
+
     private static Kingdom CreateKingdom()
     {
         var kingdom = ObjectHelper.SkipConstructor<Kingdom>();

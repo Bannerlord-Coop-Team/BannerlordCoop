@@ -138,6 +138,7 @@ internal class CompanionRolesHandler : IHandler
             var kingdom = mainHero.Clan.Kingdom;
             if (kingdomClanLimit.IsFull(null, kingdom, asMercenary: false, ModConfigProvider.ModOptions))
             {
+                logger.Warning("Rejected making companion {HeroId} a lord because kingdom {KingdomId} has maxClansPerKingdom clans", data.OneToOneConversationHeroId, kingdom.StringId);
                 if (objectManager.TryGetIdWithLogging(kingdom, out var kingdomId))
                     network.Send(obj.Who as NetPeer, new NetworkKingdomFull(kingdomId));
                 return;
