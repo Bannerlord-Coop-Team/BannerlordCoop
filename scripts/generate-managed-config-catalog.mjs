@@ -40,7 +40,7 @@ const catalog = { schemaVersion: 1, catalogRevision: digest, source: 'Bannerlord
 const output = `${JSON.stringify(catalog, null, 2)}\n`;
 if (check) {
   const current = await readFile(outputPath, 'utf8').catch(() => '');
-  if (current !== output) throw new Error('managed-config-catalog.json is stale; run node scripts/generate-managed-config-catalog.mjs');
+  if (current.replaceAll('\r\n', '\n') !== output) throw new Error('managed-config-catalog.json is stale; run node scripts/generate-managed-config-catalog.mjs');
 } else {
   await writeFile(outputPath, output, 'utf8');
 }
