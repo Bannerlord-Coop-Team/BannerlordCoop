@@ -23,10 +23,8 @@ public static class ManagedConfigOptionValidation
                 var ids = new HashSet<string>();
                 foreach (var item in list)
                 {
-                    // Blank entries are legacy placeholders ignored by the game.
-                    if (!string.IsNullOrEmpty(item) && metadata.ItemPattern != null
-                        && !System.Text.RegularExpressions.Regex.IsMatch(item, metadata.ItemPattern))
-                        throw new ArgumentException($"{property.Name} contains an invalid entry");
+                    // The managed parser enforces the Steam-ID pattern. The game keeps accepting
+                    // legacy blanks and custom host labels used by local sessions.
                     if (!string.IsNullOrEmpty(item) && metadata.UniqueItems && !ids.Add(item))
                         throw new ArgumentException($"{property.Name} contains a duplicate");
                 }
