@@ -115,7 +115,8 @@ namespace GameInterface.Services.GameDebug.Interfaces
             if (currentStage is CharacterCreationCultureStage)
             {
                 var cultures = characterCreationState._characterCreationManager.CharacterCreationContent.GetCultures().ToList();
-                CultureObject culture = cultures[ChooseCultureIndex(cultures.Select(c => c.Name.ToString()).ToList())];
+                var cultureNames = cultures.Select(c => c.Name.ToString()).ToList();
+                CultureObject culture = cultures[ChooseCultureIndex(cultureNames)];
                 characterCreationState._characterCreationManager.CharacterCreationContent.SetSelectedCulture(culture, characterCreationState._characterCreationManager);
                 characterCreationState._characterCreationManager.NextStage();
             }

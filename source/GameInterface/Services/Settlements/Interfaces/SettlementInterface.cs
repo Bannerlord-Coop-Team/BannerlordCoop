@@ -135,7 +135,7 @@ internal class SettlementInterface : ISettlementInterface
 
     public void PartyDisembark(MobileParty party, Settlement settlement)
     {
-        // Same as PlayerTownVisitCampaignBehavior.game_menu_village_disembark_on_consequence
+        // Same as PlayerTownVisitCampaignBehavior.game_menu_disembark_on_consequence
         party.DisembarkToPosition(settlement.GatePosition);
         party.Anchor.Settlement = settlement;
 

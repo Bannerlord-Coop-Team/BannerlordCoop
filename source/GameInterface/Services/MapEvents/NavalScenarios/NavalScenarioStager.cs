@@ -445,7 +445,7 @@ public class NavalScenarioStager : INavalScenarioStager
         if (IsBlockadeLiftedWithoutBattle(attackerPower, blockadePower))
         {
             error = $"the players' sea power {attackerPower:0} is over {LiftBlockadePowerRatio} x the blockade's {blockadePower:0}, so " +
-                "BlockadeBattleMapEvent.CheckLiftingBlockade would lift the blockade with no battle; " +
+                "BlockadeBattleEventComponent.CheckLiftingBlockade would lift the blockade with no battle; " +
                 (isNewSiege ? "raise hulls=n" : $"hulls=n cannot grow {town.StringId}'s existing blockade, pick town=<id> without one");
             return false;
         }

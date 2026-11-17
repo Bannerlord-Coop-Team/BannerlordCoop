@@ -80,8 +80,7 @@ internal class AnchorPointPatches
             !IsArrivalShown(__instance);
         if (fleetJustArrived)
         {
-            ArrivalsShown.Remove(__instance);
-            ArrivalsShown.Add(__instance, new StrongBox<CampaignTime>(__instance.ArrivalTime));
+            ArrivalsShown.GetOrCreateValue(__instance).Value = __instance.ArrivalTime;
             InformationManager.DisplayMessage(new InformationMessage(new TextObject("{=qFAhDtrw}Your fleet has arrived at its destination.").ToString(), new Color(0f, 1f, 0f))
             {
                 SoundEventPath = "event:/ui/panels/panel_call_fleet"

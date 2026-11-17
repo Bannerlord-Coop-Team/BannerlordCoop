@@ -5,7 +5,6 @@ using Helpers;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.ViewModelCollection.ClanManagement.ClanPartyItem;
-using TaleWorlds.CampaignSystem.ViewModelCollection.ClanManagement;
 
 namespace GameInterface.Services.Towns;
 internal class TownSync : IAutoSync
