@@ -135,6 +135,8 @@ public class QuestEndingReplayTests : IDisposable
                 scenario.NotableId, QuestScenario.IssueId, owner ? QuestScenario.ControllerA : QuestScenario.ControllerB));
 
             scenario.ClientA.Resolve<IMessageBroker>().Publish(this,
+                new NetworkIssueJournal(scenario.NotableId, QuestScenario.IssueId, true, Array.Empty<IssueJournalEntry>()));
+            scenario.ClientA.Resolve<IMessageBroker>().Publish(this,
                 new NetworkIssueFinalized(scenario.NotableId, QuestScenario.IssueId, IssueOutcome.QuestCancel));
 
             Assert.Null(giver.Issue);

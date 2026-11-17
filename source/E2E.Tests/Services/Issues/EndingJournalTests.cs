@@ -168,10 +168,17 @@ public class EndingJournalTests : IDisposable
         scenario.ClientA.Call(() =>
         {
             using (new AllowedThread())
-                Campaign.Current.QuestManager.OnQuestFinalized(ownerQuest);
+            {
+                Campaign.Current.QuestManager._quests.Remove(ownerQuest);
+                ownerQuest._questState = QuestBase.QuestStates.Finalized;
+            }
         });
         scenario.ClientA.SimulateMessage(scenario.Server.NetPeer, scenario.Server.SerializeForWire(messages.Journal));
-        scenario.ClientA.Call(() => Assert.Null(scenario.ClientA.GetRegisteredObject<Hero>(scenario.NotableId).Issue));
+        scenario.ClientA.Call(() =>
+        {
+            Assert.Single(ownerQuest.JournalEntries, log => log.LogText.ToString() == Ending().ToString());
+            Assert.Null(scenario.ClientA.GetRegisteredObject<Hero>(scenario.NotableId).Issue);
+        });
     }
 
     [Fact]
