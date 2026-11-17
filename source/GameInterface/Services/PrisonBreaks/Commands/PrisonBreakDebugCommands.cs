@@ -9,7 +9,6 @@ using System.Linq;
 using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
-using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.PrisonBreaks.Commands;
@@ -34,11 +33,13 @@ internal class PrisonBreakDebugCommands
     public sealed class ImprisonHeroCoopCommand : ICoopCommand
     {
         private readonly ICommandObjectResolver resolver;
+        private readonly IPrisonBreakCampaignBehaviorInterface behaviorInterface;
 
-        // Takes the resolver used to look up the settlement and hero by name or id.
-        public ImprisonHeroCoopCommand(ICommandObjectResolver resolver)
+        // Takes the resolver for the settlement and hero lookups and the interface that decides who is held in a prison.
+        public ImprisonHeroCoopCommand(ICommandObjectResolver resolver, IPrisonBreakCampaignBehaviorInterface behaviorInterface)
         {
             this.resolver = resolver;
+            this.behaviorInterface = behaviorInterface;
         }
 
         public string Prefix => "coop.debug.town";
@@ -68,7 +69,7 @@ internal class PrisonBreakDebugCommands
             var settlement = town.Settlement;
             TakePrisonerAction.Apply(settlement.Party, hero);
 
-            if (!settlement.Party.PrisonRoster.Contains(hero.CharacterObject))
+            if (!behaviorInterface.IsHeldIn(hero, settlement))
                 return Failed($"{hero.Name} ({hero.StringId}) did not end up in the {settlement.Name} prison.");
 
             return Succeeded($"{hero.Name} ({hero.StringId}) is now a prisoner in {settlement.Name} ({settlement.StringId}).");
@@ -112,12 +113,14 @@ internal class PrisonBreakDebugCommands
             if (!float.TryParse(args[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var days) || days < 0f)
                 return Failed($"'{args[1]}' is not a number of days of 0 or more.");
 
-            var until = days > 0f ? CampaignTime.DaysFromNow(days) : CampaignTime.Zero;
-            messageBroker.Publish(this, new PrisonBreakCooldownSet(town.Settlement, until));
+            if (days == 0f)
+            {
+                messageBroker.Publish(this, new PrisonBreakCooldownSet(town.Settlement, CampaignTime.Zero));
+                return Succeeded($"{town.Settlement.Name} prison break cooldown cleared.");
+            }
 
-            return Succeeded(days > 0f
-                ? $"{town.Settlement.Name} prison break cooldown set to {days} days."
-                : $"{town.Settlement.Name} prison break cooldown cleared.");
+            messageBroker.Publish(this, new PrisonBreakCooldownSet(town.Settlement, CampaignTime.DaysFromNow(days)));
+            return Succeeded($"{town.Settlement.Name} prison break cooldown set to {days} days.");
         }
     }
 
@@ -150,16 +153,14 @@ internal class PrisonBreakDebugCommands
             new ExpectedArgs("settlement", "Town or castle name or id; quote names with spaces."),
         };
 
-        // Reads the same prison rosters vanilla lists in the prisoner selection.
+        // Lists the settlement and garrison prison heroes, the rosters vanilla offers in the prisoner selection.
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (!resolver.TryResolveTown(args[0], out var town, out var error)) return Failed(error);
 
             var settlement = town.Settlement;
-            var prisoners = settlement.Party.PrisonRoster.GetTroopRoster()
-                .Concat(town.GarrisonParty?.PrisonRoster.GetTroopRoster() ?? Enumerable.Empty<TroopRosterElement>())
-                .Where(element => element.Character.IsHero)
-                .Select(element => $"{element.Character.HeroObject.Name} ({element.Character.HeroObject.StringId})");
+            var prisoners = town.GetPrisonerHeroes()
+                .Select(character => $"{character.HeroObject.Name} ({character.HeroObject.StringId})");
 
             var output = new StringBuilder();
             output.AppendLine($"{settlement.Name} ({settlement.StringId})");

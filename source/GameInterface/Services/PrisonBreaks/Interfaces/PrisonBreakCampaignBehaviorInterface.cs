@@ -18,6 +18,7 @@ namespace GameInterface.Services.PrisonBreaks.Interfaces;
 
 /// <summary>
 /// The server owns the per-settlement cooldowns, clients mirror them and run the prison break mission locally.
+/// Also decides whether a prisoner is still held in a settlement's prisons, the rosters vanilla lists.
 /// </summary>
 public interface IPrisonBreakCampaignBehaviorInterface : IGameAbstraction
 {
