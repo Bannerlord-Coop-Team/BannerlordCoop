@@ -41,7 +41,7 @@ namespace GameInterface.Services.GameDebug.Interfaces
         /// </summary>
         private bool skipping;
 
-        public static bool InCharacterCreation()
+        private static bool InCharacterCreation()
         {
             return GameStateManager.Current?.ActiveState is CharacterCreationState;
         }

@@ -128,7 +128,9 @@ internal class ServerVillageHostileActionHandler : IHandler
                 return;
             }
 
-            if (request.Action != VillageHostileAction.Raid && !villageHostileActionInterface.WillVillageResist(mobileParty, settlement))
+            bool villageGivesIn = request.Action != VillageHostileAction.Raid &&
+                !villageHostileActionInterface.WillVillageResist(mobileParty, settlement);
+            if (villageGivesIn)
             {
                 // The requester is noted first: the outcome announces the transfer pool for that peer.
                 NoteForceTransferRequester(peer, request);

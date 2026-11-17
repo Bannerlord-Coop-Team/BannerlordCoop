@@ -441,7 +441,7 @@ public sealed class NearbyPartyReinforcerTests : IDisposable
 
     private static void LinkSide(MapEventSide side, MapEvent mapEvent, BattleSideEnum missionSide)
     {
-        AccessTools.Field(typeof(MapEventSide), "_mapEvent").SetValue(side, mapEvent);
+        MapEventField.SetValue(side, mapEvent);
         AccessTools.Field(typeof(MapEventSide), "<MissionSide>k__BackingField").SetValue(side, missionSide);
     }
 

@@ -80,7 +80,7 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
     // Each stage is caught on its own, so one broken battle cannot stop the server from starting.
     private void CleanUpLoadedPlayerMapEvent(MapEvent mapEvent)
     {
-        var repaired = TryStage(mapEvent, "party link repair, so its finalize and party release are skipped", () =>
+        var repaired = TryStage(mapEvent, "party link repair", () =>
         {
             var (repairedLinks, removedEntries) = RepairPartySideLinks(mapEvent);
             if (repairedLinks > 0 || removedEntries > 0)
@@ -94,6 +94,7 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
 
             return CollectPlayerMapEventParties(mapEvent);
         }, out var parties);
+        // A failed repair skips the finalize and release, which would act on broken links
         if (!repaired) return;
 
         TryStage(mapEvent, "finalize", () =>

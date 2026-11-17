@@ -259,7 +259,7 @@ public class VillageHostileActionTests : MapEventTestBase
         public VillageResistsScope()
         {
             harmony.Patch(
-                AccessTools.Method(typeof(VillageHostileActionCampaignBehavior), "WillVillageResistHostileAction"),
+                AccessTools.Method(typeof(VillageHostileActionCampaignBehavior), nameof(VillageHostileActionCampaignBehavior.WillVillageResistHostileAction)),
                 prefix: new HarmonyMethod(typeof(VillageResistsScope), nameof(Resists)));
         }
 
