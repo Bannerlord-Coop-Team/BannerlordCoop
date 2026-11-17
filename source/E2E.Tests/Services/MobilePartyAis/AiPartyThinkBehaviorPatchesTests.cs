@@ -1,10 +1,13 @@
 ﻿using E2E.Tests.Services.MapEvents;
+using E2E.Tests.Util;
+using GameInterface.Tests.Utils;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors.AiBehaviors;
-using TaleWorlds.CampaignSystem.GameComponents;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.Core;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Library;
 using Xunit;
 using Xunit.Abstractions;
@@ -12,12 +15,28 @@ using Xunit.Abstractions;
 namespace E2E.Tests.Services.MobilePartyAis;
 
 /// <summary>
-/// Verifies a player clan changing kingdom holds the nearby lords that chased its player parties, like vanilla
-/// does around the main party.
+/// Verifies which parties the server lets run the hourly AI decision tick, and that a player clan changing kingdom
+/// holds the nearby lords that chased its player parties, like vanilla does around the main party.
 /// </summary>
 public class AiPartyThinkBehaviorPatchesTests : MapEventTestBase
 {
     public AiPartyThinkBehaviorPatchesTests(ITestOutputHelper output) : base(output) { }
+
+    [Theory]
+    [InlineData(MapEvent.BattleTypes.Raid)]
+    [InlineData(MapEvent.BattleTypes.Siege)]
+    public void AttackerLeaderInAiOnlyMapEvent_NewTargetFinalizesTheEvent(MapEvent.BattleTypes battleType)
+    {
+        Assert.True(RunAttackerLeaderThinkTick(battleType, withPlayerParty: false));
+    }
+
+    [Theory]
+    [InlineData(MapEvent.BattleTypes.Raid)]
+    [InlineData(MapEvent.BattleTypes.Siege)]
+    public void AttackerLeaderInMapEventWithPlayerParty_DoesNotFinalizeTheEvent(MapEvent.BattleTypes battleType)
+    {
+        Assert.False(RunAttackerLeaderThinkTick(battleType, withPlayerParty: true));
+    }
 
     [Fact]
     public void ClanChangedKingdom_HoldsOnlyLordsNoLongerAtWarThatChaseItsPlayerParties()
@@ -32,7 +51,7 @@ public class AiPartyThinkBehaviorPatchesTests : MapEventTestBase
 
         Server.Call(() =>
         {
-            AddEncounterModel();
+            EnsureEncounterModel();
             var playerParty = Server.GetRegisteredObject<MobileParty>(playerPartyId);
             var clanmateParty = Server.GetRegisteredObject<MobileParty>(clanmatePartyId);
             var aiParty = Server.GetRegisteredObject<MobileParty>(aiPartyId);
@@ -76,16 +95,56 @@ public class AiPartyThinkBehaviorPatchesTests : MapEventTestBase
         }, MapEventDisabledMethods);
     }
 
-    // The harness campaign has no encounter model, which the hold reads for its search radius.
-    private static void AddEncounterModel()
+    /// <summary>
+    /// Runs the real <c>AiPartyThinkBehavior.PartyHourlyAiTick</c> for the attacker leader of a raid or siege
+    /// assault that scores another target, and returns whether the map event got finalized.
+    /// </summary>
+    private bool RunAttackerLeaderThinkTick(MapEvent.BattleTypes battleType, bool withPlayerParty)
     {
-        if (Campaign.Current.Models.EncounterModel != null) return;
+        var context = CreateServerMapEvent();
+        string? playerPartyId = withPlayerParty ? CreatePlayerHeroParty("player").partyId : null;
+        var finalized = false;
 
-        var models = Campaign.Current.Models.GetGameModels().ToList();
-        models.Add(new DefaultEncounterModel());
-        var gameModels = new GameModels(models);
-        Game.Current._gameModelManagers[typeof(GameModels)] = gameModels;
-        Campaign.Current._gameModels = gameModels;
+        // The new target's movement order needs a navigation mesh the test campaign doesn't have.
+        var disabledMethods = MapEventDisabledMethods
+            .Append(AccessTools.Method(typeof(SetPartyAiAction), nameof(SetPartyAiAction.GetActionForVisitingSettlement)))
+            .ToList();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(context.MapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(context.AttackerPartyId, out var attacker));
+
+            mapEvent.SetBattleType(battleType);
+            if (playerPartyId != null)
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(playerPartyId, out var playerParty));
+                playerParty.Party._mapEventSide = mapEvent.DefenderSide;
+                mapEvent.DefenderSide._battleParties.Add(new MapEventParty(playerParty.Party));
+            }
+
+            var otherTarget = GameObjectCreator.CreateInitializedObject<Settlement>();
+            CampaignEvents.AiHourlyTickEvent.AddNonSerializedListener(this, (party, think) =>
+            {
+                if (party != attacker) return;
+                think.AddBehaviorScore((new AIBehaviorData(
+                    otherTarget, AiBehavior.GoToSettlement, MobileParty.NavigationType.Default,
+                    willGatherArmy: false, isFromPort: false, isTargetingPort: false), 1f));
+            });
+
+            try
+            {
+                Assert.Same(attacker.Party, mapEvent.AttackerSide.LeaderParty);
+                new AiPartyThinkBehavior().PartyHourlyAiTick(attacker);
+                finalized = mapEvent.IsFinalized;
+            }
+            finally
+            {
+                CampaignEvents.AiHourlyTickEvent.ClearListeners(this);
+            }
+        }, disabledMethods);
+
+        return finalized;
     }
 
     // Moves a party onto the map next to another party, inside the hold's search radius.

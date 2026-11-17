@@ -21,8 +21,8 @@ internal static class MobilePartyAiDebugCommands
         new CoopCommandResult(false, output, "command_failed");
 
     /// <summary>
-    /// Reports whether the server AI may pick a settlement for a military action, the check that skips a
-    /// settlement whose last attacker the party is barred from attacking.
+    /// Reports whether the server AI may pick a settlement for a military action. Also prints whether an attack
+    /// protection against the settlement's last attacker is active.
     /// </summary>
     public sealed class MilitaryTargetSuitableCoopCommand : ICoopCommand
     {

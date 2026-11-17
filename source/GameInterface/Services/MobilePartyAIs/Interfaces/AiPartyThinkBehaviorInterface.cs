@@ -32,36 +32,38 @@ public class AiPartyThinkBehaviorInterface : IAiPartyThinkBehaviorInterface
         }
     }
 
-    // Collects the parties in the radius vanilla searches around the main party.
-    private static List<MobileParty> FindNearbyParties(MobileParty playerParty)
+    // Walks the parties in the radius vanilla searches around the main party.
+    private static IEnumerable<MobileParty> FindNearbyParties(MobileParty playerParty)
     {
         var radius = Campaign.Current.Models.EncounterModel.GetEncounterJoiningRadius * 4f;
         var searchData = MobileParty.StartFindingLocatablesAroundPosition(playerParty.Position.ToVec2(), radius);
-        var nearbyParties = new List<MobileParty>();
 
         for (var party = MobileParty.FindNextLocatable(ref searchData);
              party != null;
              party = MobileParty.FindNextLocatable(ref searchData))
         {
-            nearbyParties.Add(party);
+            yield return party;
         }
-
-        return nearbyParties;
     }
 
-    // Vanilla's AiPartyThinkBehavior.OnClanChangedKingdom filter with the main party swapped for a player party.
-    // Another player chasing it is left alone, because its client drives its movement.
+    // Holds each nearby party that the filter picks, like vanilla does around the main party.
     private static void HoldPartiesChasing(MobileParty playerParty, IEnumerable<MobileParty> nearbyParties)
     {
         foreach (var party in nearbyParties)
         {
-            if (party.IsPlayerParty()) continue;
-            if (party.MapFaction.IsAtWarWith(playerParty.MapFaction)) continue;
-            if (party.ShortTermTargetParty != playerParty) continue;
-            if (party.IsCurrentlyUsedByAQuest) continue;
-            if (!party.MapFaction.IsKingdomFaction && !party.IsLordParty) continue;
-
-            party.SetMoveModeHold();
+            if (ShouldHoldChaser(party, playerParty)) party.SetMoveModeHold();
         }
+    }
+
+    // Vanilla's AiPartyThinkBehavior.OnClanChangedKingdom filter with the main party swapped for a player party.
+    // Another player chasing it is left alone, because its client drives its movement.
+    private static bool ShouldHoldChaser(MobileParty party, MobileParty playerParty)
+    {
+        if (party.IsPlayerParty()) return false;
+        if (party.MapFaction.IsAtWarWith(playerParty.MapFaction)) return false;
+        if (party.ShortTermTargetParty != playerParty) return false;
+        if (party.IsCurrentlyUsedByAQuest) return false;
+
+        return party.MapFaction.IsKingdomFaction || party.IsLordParty;
     }
 }

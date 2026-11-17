@@ -163,6 +163,18 @@ public abstract class MapEventTestBase : IDisposable
     protected static GauntletMapEventVisual MockMapEventVisual()
         => ObjectHelper.SkipConstructor<GauntletMapEventVisual>();
 
+    // The harness campaign has no encounter model, which distance checks and party searches read.
+    protected static void EnsureEncounterModel()
+    {
+        if (Campaign.Current.Models?.EncounterModel != null) return;
+
+        var models = Campaign.Current.Models?.GetGameModels().ToList() ?? new List<GameModel>();
+        models.Add(new DefaultEncounterModel());
+        var gameModels = new GameModels(models);
+        Game.Current._gameModelManagers[typeof(GameModels)] = gameModels;
+        Campaign.Current._gameModels = gameModels;
+    }
+
     // ------------------------------------------------------------------
     // Parties joining map events
     // ------------------------------------------------------------------
