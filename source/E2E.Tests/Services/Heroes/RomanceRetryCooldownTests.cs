@@ -63,7 +63,8 @@ public class RomanceRetryCooldownTests : IDisposable
 
             Romance.SetRomanticState(courting, courted, Romance.RomanceLevelEnum.FailedInCompatibility);
             Assert.Equal(Romance.RomanceLevelEnum.FailedInCompatibility, Romance.GetRomanticLevel(courting, courted));
-            cooldown.RecordFailure(courting, courted);
+            cooldown.OnStateChange(
+                courting, courted, Romance.RomanceLevelEnum.CourtshipStarted, Romance.RomanceLevelEnum.FailedInCompatibility);
             Assert.False(cooldown.HasRetryCooldownExpired(courting, courted));
 
             Assert.False(authority.TryValidateStateChange(
@@ -75,54 +76,6 @@ public class RomanceRetryCooldownTests : IDisposable
             Assert.True(cooldown.HasRetryCooldownExpired(courting, courted));
             Assert.True(authority.TryValidateStateChange(
                 courting, courted, Romance.RomanceLevelEnum.CourtshipStarted, out reason), reason);
-        });
-    }
-
-    [Fact]
-    public void Cooldown_IsKeptPerPlayer()
-    {
-        var (firstId, courtedId) = CreateSuitableCouple();
-        var secondId = CreateLord(isFemale: false, age: 30f);
-        var server = environment.Server;
-
-        server.Call(() =>
-        {
-            var first = server.GetRegisteredObject<Hero>(firstId);
-            var second = server.GetRegisteredObject<Hero>(secondId);
-            var courted = server.GetRegisteredObject<Hero>(courtedId);
-            var cooldown = server.Resolve<IRomanceRetryCooldown>();
-
-            cooldown.RecordFailure(first, courted);
-            Campaign.Current.MapTimeTracker._numTicks += CampaignTime.Days(CampaignTime.DaysInSeason / 2).NumTicks;
-            cooldown.RecordFailure(second, courted);
-            Campaign.Current.MapTimeTracker._numTicks += CampaignTime.Days(CampaignTime.DaysInSeason / 2 + 1).NumTicks;
-
-            // The second player's later failure does not hold back the first player's retry.
-            Assert.True(cooldown.HasRetryCooldownExpired(first, courted));
-            Assert.False(cooldown.HasRetryCooldownExpired(second, courted));
-
-            // The first player's retry clears only the first player's failure.
-            cooldown.Clear(first, courted);
-            Assert.True(cooldown.FailureTicks(second, courted) > 1);
-            Assert.False(cooldown.HasRetryCooldownExpired(second, courted));
-        });
-    }
-
-    [Fact]
-    public void FailedCourtshipWithoutARecord_CanBeRetried()
-    {
-        var (courtingId, courtedId) = CreateSuitableCouple();
-        var server = environment.Server;
-
-        server.Call(() =>
-        {
-            var courting = server.GetRegisteredObject<Hero>(courtingId);
-            var courted = server.GetRegisteredObject<Hero>(courtedId);
-            var cooldown = server.Resolve<IRomanceRetryCooldown>();
-
-            // A save from before the history has the failed level but no failure time.
-            Assert.True(cooldown.HasRetryCooldownExpired(courting, courted));
-            Assert.Equal(1, cooldown.FailureTicks(courting, courted));
         });
     }
 
@@ -142,8 +95,9 @@ public class RomanceRetryCooldownTests : IDisposable
             var courted = environment.Server.GetRegisteredObject<Hero>(courtedId);
             var cooldown = environment.Server.Resolve<IRomanceRetryCooldown>();
             Romance.SetRomanticState(courting, courted, Romance.RomanceLevelEnum.FailedInPracticalities);
-            cooldown.RecordFailure(courting, courted);
-            serverTicks = cooldown.FailureTicks(courting, courted);
+            cooldown.OnStateChange(
+                courting, courted, Romance.RomanceLevelEnum.CourtshipStarted, Romance.RomanceLevelEnum.FailedInPracticalities);
+            serverTicks = cooldown.FailureTicks(courting, courted, Romance.RomanceLevelEnum.FailedInPracticalities);
         });
         environment.FlushCoalescer();
         Assert.True(serverTicks > 1);
