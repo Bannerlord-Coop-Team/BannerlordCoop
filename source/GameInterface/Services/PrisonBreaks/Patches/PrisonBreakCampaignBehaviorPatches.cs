@@ -2,6 +2,7 @@
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.PrisonBreaks.Interfaces;
 using GameInterface.Services.PrisonBreaks.Messages;
 using HarmonyLib;
 using SandBox.CampaignBehaviors;
@@ -9,6 +10,7 @@ using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.PrisonBreaks.Patches;
 
@@ -65,6 +67,21 @@ internal class PrisonBreakCampaignBehaviorPatches
     [HarmonyPatch(nameof(PrisonBreakCampaignBehavior.game_menu_castle_prison_break_on_consequence))]
     [HarmonyFinalizer]
     private static void ListPrisonersFinalizer() => IsListingPrisoners = false;
+
+    // Other players keep time running, so the chosen prisoner can be freed while this menu is open and vanilla's cost NREs on their null settlement.
+    [HarmonyPatch(nameof(PrisonBreakCampaignBehavior.game_menu_castle_prison_break_on_condition))]
+    [HarmonyPrefix]
+    private static bool StartConditionPrefix(PrisonBreakCampaignBehavior __instance, MenuCallbackArgs args, ref bool __result)
+    {
+        if (!ContainerProvider.TryResolve<IPrisonBreakCampaignBehaviorInterface>(out var behaviorInterface)) return true;
+        if (behaviorInterface.IsHeldIn(__instance._prisonerHero, Settlement.CurrentSettlement)) return true;
+
+        args.optionLeaveType = GameMenuOption.LeaveType.Mission;
+        args.IsEnabled = false;
+        args.Tooltip = GameTexts.FindText("str_coop_prison_break_prisoner_unavailable");
+        __result = true;
+        return false;
+    }
 
     [HarmonyPatch(nameof(PrisonBreakCampaignBehavior.OpenPrisonBreakMission))]
     [HarmonyPrefix]
