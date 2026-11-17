@@ -322,6 +322,7 @@ public class AcceptVisibilityTests : IDisposable
         var scenario = new QuestScenario(TestEnvironment);
         scenario.AttachQuest(Server);
         var quest = scenario.AttachQuest(Owner);
+        IssueBase issue = null!;
         Owner.Call(() => quest.StartQuest());
         Owner.Call(() =>
         {
@@ -334,6 +335,12 @@ public class AcceptVisibilityTests : IDisposable
             Campaign.Current.ConversationManager.SetupAndStartMapConversation(null,
                 new MapConversationAgent(character), new MapConversationAgent(CharacterObject.PlayerCharacter));
             Assert.True(Campaign.Current.ConversationManager.IsConversationInProgress);
+            issue = Owner.GetRegisteredObject<Hero>(scenario.NotableId).Issue;
+            var lordCoordinator = Owner.Resolve<ILordSolutionCoordinator>();
+            var pending = (HashSet<IssueBase>)AccessTools.Field(typeof(LordSolutionCoordinator), "pendingDecisions")!
+                .GetValue(lordCoordinator)!;
+            pending.Add(issue);
+            Assert.True(lordCoordinator.IsDecisionPending(issue));
             Owner.Resolve<IIssueConversationGuard>().RunWhenNotTalkingTo(() => { }, scenario.NotableId);
         }, new[] { AccessTools.Method(typeof(ConversationManager), nameof(ConversationManager.StartNew)) });
 
@@ -354,6 +361,7 @@ public class AcceptVisibilityTests : IDisposable
             Campaign.Current.ConversationManager.EndConversation();
             Assert.True(quest.IsFinalized);
             Assert.DoesNotContain(quest, Campaign.Current.QuestManager.Quests);
+            Assert.False(Owner.Resolve<ILordSolutionCoordinator>().IsDecisionPending(issue));
             if (replacement)
             {
                 Assert.True(Owner.Resolve<IIssueOwnershipRegistry>().TryGetOwner(scenario.NotableId, "replacement_issue", out var controllerId));

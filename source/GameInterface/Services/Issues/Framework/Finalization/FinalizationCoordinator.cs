@@ -45,6 +45,7 @@ internal class FinalizationCoordinator : IHandler, IIssueFinalizationReplay
     private readonly ConditionalWeakTable<IssueBase, NetPeer> ownerPeers = new();
     private readonly object ownerPeersLock = new();
     private readonly IIssueConversationGuard conversationGuard;
+    private readonly ILordSolutionCoordinator lordSolutions;
     private readonly IQuestSolutionAcceptCoordinator acceptCoordinator;
     private readonly ITextObjectComparer textComparer;
 
@@ -58,6 +59,7 @@ internal class FinalizationCoordinator : IHandler, IIssueFinalizationReplay
         IControllerIdProvider controller,
         IAlternativeSolutionCommitments commitments,
         IIssueConversationGuard conversationGuard,
+        ILordSolutionCoordinator lordSolutions,
         IQuestSolutionAcceptCoordinator acceptCoordinator,
         ITextObjectComparer textComparer)
     {
@@ -70,6 +72,7 @@ internal class FinalizationCoordinator : IHandler, IIssueFinalizationReplay
         this.controller = controller;
         this.commitments = commitments;
         this.conversationGuard = conversationGuard;
+        this.lordSolutions = lordSolutions;
         this.acceptCoordinator = acceptCoordinator;
         this.textComparer = textComparer;
 
@@ -439,6 +442,7 @@ internal class FinalizationCoordinator : IHandler, IIssueFinalizationReplay
 
     public void ReplayLocalCancel(string issueOwnerId, string issueId, bool wasOwner)
     {
+        lordSolutions.ClearPending(issueOwnerId, issueId);
         if (!issueResolver.TryResolve(issueOwnerId, issueId, out _, out var issue, out _)) return;
 
         // Capture the issue because a deferred replay may run after a replacement issue arrives.
