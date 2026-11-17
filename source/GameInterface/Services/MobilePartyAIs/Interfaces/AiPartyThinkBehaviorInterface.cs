@@ -28,7 +28,10 @@ public class AiPartyThinkBehaviorInterface : IAiPartyThinkBehaviorInterface
             var playerParty = warPartyComponent.MobileParty;
             if (!playerParty.IsPlayerParty()) continue;
 
-            HoldPartiesChasing(playerParty, FindNearbyParties(playerParty));
+            foreach (var party in FindNearbyParties(playerParty))
+            {
+                if (ShouldHoldChaser(party, playerParty)) party.SetMoveModeHold();
+            }
         }
     }
 
@@ -46,18 +49,9 @@ public class AiPartyThinkBehaviorInterface : IAiPartyThinkBehaviorInterface
         }
     }
 
-    // Holds each nearby party that the filter picks, like vanilla does around the main party.
-    private static void HoldPartiesChasing(MobileParty playerParty, IEnumerable<MobileParty> nearbyParties)
-    {
-        foreach (var party in nearbyParties)
-        {
-            if (ShouldHoldChaser(party, playerParty)) party.SetMoveModeHold();
-        }
-    }
-
     // Vanilla's AiPartyThinkBehavior.OnClanChangedKingdom filter with the main party swapped for a player party.
     // Another player chasing it is left alone, because its client drives its movement.
-    private static bool ShouldHoldChaser(MobileParty party, MobileParty playerParty)
+    internal static bool ShouldHoldChaser(MobileParty party, MobileParty playerParty)
     {
         if (party.IsPlayerParty()) return false;
         if (party.MapFaction.IsAtWarWith(playerParty.MapFaction)) return false;

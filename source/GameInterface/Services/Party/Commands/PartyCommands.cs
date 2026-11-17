@@ -411,7 +411,6 @@ internal class PartyCommands
 
             party.SetMoveEngageParty(target, MobileParty.NavigationType.Default);
             party.RecalculateShortTermBehavior();
-            MessageBroker.Instance.Publish(typeof(PartyCommands), new PartyBehaviorChangeAttempted(party));
 
             return Succeeded($"ENGAGE_PARTY party={party.StringId} " +
                 $"defaultBehavior={party.DefaultBehavior} shortTermBehavior={party.ShortTermBehavior} " +
