@@ -296,9 +296,10 @@ internal sealed class HideoutCampaignConsequencesHandler : IHandler
 
     private void Handle_CommitMapEventResults(MessagePayload<CommitMapEventResults> payload)
     {
+        if (ModInformation.IsClient) return;
+
         var mapEvent = payload.What.MapEvent;
         var settlement = mapEvent.MapEventSettlement;
-        if (ModInformation.IsClient) return;
         if (mapEvent.Component is not HideoutEventComponent component || settlement?.IsHideout != true) return;
         if (clearRewards.TryGetValue(settlement, out var previous) && previous.MapEvent == mapEvent) return;
 
@@ -344,7 +345,7 @@ internal sealed class HideoutCampaignConsequencesHandler : IHandler
         component.OnHideoutCleared(hideout);
         foreach (var party in playersInside)
         {
-            // Native keeps army members that dont lead inside and attached ones move with their leader.
+            // Native leaves army members that dont lead the army inside, and attached parties move with their leader.
             bool leftOnItsOwn = party.CurrentSettlement == null && party.AttachedTo == null;
             if (!leftOnItsOwn) continue;
 
