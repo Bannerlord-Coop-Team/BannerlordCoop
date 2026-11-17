@@ -43,7 +43,7 @@ internal class PlayerCharacterLoadRepairer : IPlayerCharacterLoadRepairer
         var linked = new HashSet<CharacterObject>();
         foreach (Hero hero in heroes)
         {
-            CharacterObject character = hero?.CharacterObject;
+            CharacterObject character = hero.CharacterObject;
             if (character == null || character == template || character.IsReady) continue;
             if (!character.IsOriginalCharacter || !IsJoinedPlayerId(character.StringId)) continue;
 
@@ -56,7 +56,7 @@ internal class PlayerCharacterLoadRepairer : IPlayerCharacterLoadRepairer
         // CreateFrom gives a child of a linked parent the parent's origin, so the child follows it to the template
         foreach (Hero hero in heroes)
         {
-            CharacterObject character = hero?.CharacterObject;
+            CharacterObject character = hero.CharacterObject;
             if (character?._originCharacter != null && linked.Contains(character._originCharacter))
                 character._originCharacter = template;
         }
@@ -81,7 +81,7 @@ internal class PlayerCharacterLoadRepairer : IPlayerCharacterLoadRepairer
         int restored = 0;
         foreach (Hero hero in heroes)
         {
-            CharacterObject character = hero?.CharacterObject;
+            CharacterObject character = hero.CharacterObject;
             if (character == null || character._originCharacter != template) continue;
             if (hero.Culture == null || character._culture == hero.Culture) continue;
 

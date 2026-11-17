@@ -39,7 +39,7 @@ namespace GameInterface.Services.GameDebug.Interfaces
         /// <summary>
         /// True while the skip runs, so the character creation state it pushes does not start a second skip.
         /// </summary>
-        private static bool skipping;
+        private bool skipping;
 
         public static bool InCharacterCreation()
         {

@@ -78,7 +78,10 @@ internal class RomanceRetryCooldown : IRomanceRetryCooldown
         else return 0;
 
         Hero courtedHero = playerHero == person1 ? person2 : person1;
-        return history.TryGetFailure(playerHero, courtedHero, out var failedAt) ? failedAt.NumTicks : 1;
+        if (history.TryGetFailure(playerHero, courtedHero, out var failedAt)) return failedAt.NumTicks;
+
+        // No record: the first tick of the campaign, so the retry is already allowed
+        return 1;
     }
 
     public void RestoreLocalFailure(Hero person1, Hero person2, Romance.RomanceLevelEnum level, long failureTicks)
