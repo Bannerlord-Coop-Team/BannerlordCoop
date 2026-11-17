@@ -86,7 +86,8 @@ internal class MapEventResultsHandler : IHandler
         {
             if (!objectManager.TryGetIdWithLogging(mapEvent, out var mapEventId)) return;
             if (mapEvent.EventType == MapEvent.BattleTypes.Hideout && mapEvent._mapEventResultsApplied) return;
-            // Native ends a won send troops raid without applying results, so it gets no loot or xp.
+            // Native never applies results for a send troops raid, won or lost, so it gets no loot or xp.
+            // The skip stays here, not in Prefix_OnBattleWon, because the hideout clear still records its participants from this event.
             if (mapEvent.IsSendTroopsHideout()) return;
 
             contributionBarrier.Flush(mapEvent);
