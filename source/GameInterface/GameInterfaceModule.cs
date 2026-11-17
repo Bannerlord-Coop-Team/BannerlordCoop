@@ -284,6 +284,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<BanditPartyHomeSettlementRepairer>().As<IBanditPartyHomeSettlementRepairer>().InstancePerDependency();
         builder.RegisterType<DeadHeroCaptivityRepairer>().As<IDeadHeroCaptivityRepairer>().InstancePerDependency();
         builder.RegisterType<WorkshopRepairer>().As<IWorkshopRepairer>().InstancePerDependency();
+        builder.RegisterType<BloodFeudRepairer>().As<IBloodFeudRepairer>().InstancePerDependency();
         builder.RegisterType<MapEventLogger>().As<IMapEventLogger>().SingleInstance();
         builder.RegisterType<TroopRosterLogger>().As<ITroopRosterLogger>().SingleInstance();
         builder.RegisterType<PartySyncPerformanceClock>().As<IPartySyncPerformanceClock>().SingleInstance();
