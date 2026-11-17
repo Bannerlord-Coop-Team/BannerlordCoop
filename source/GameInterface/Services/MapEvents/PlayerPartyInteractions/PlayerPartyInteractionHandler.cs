@@ -21,6 +21,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.BarterSystem;
 using TaleWorlds.CampaignSystem.BarterSystem.Barterables;
@@ -55,6 +56,8 @@ internal class PlayerPartyInteractionHandler : IHandler
         "game_menu_army_talk_to_other_members",
     };
 
+    private static readonly TimeSpan PvpRulesTickInterval = TimeSpan.FromSeconds(1);
+
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
@@ -68,6 +71,7 @@ internal class PlayerPartyInteractionHandler : IHandler
     private readonly IPlayerMapTracking mapTracking;
     private readonly PlayerPartyInteractionOutcomeHandler outcomeHandler;
     private readonly IPlayerPartyTradeContext trade;
+    private readonly IPlayerPartyPvpRules pvpRules;
     private readonly ISendCoalescer sendCoalescer;
 
     private readonly ConcurrentDictionary<string, PlayerPartyInteractionSession> sessionsById = new ConcurrentDictionary<string, PlayerPartyInteractionSession>();
@@ -79,6 +83,10 @@ internal class PlayerPartyInteractionHandler : IHandler
     // Player party id to the map event its close named; a null id closes any hostile encounter start of that party.
     private readonly Dictionary<string, string> closedHostileEncounterMapEventIds = new Dictionary<string, string>();
     private bool presentationTickRegistered;
+    private readonly System.Threading.Timer pvpRulesTimer;
+    private int isDisposed;
+
+    internal Func<DateTime> UtcNow = () => DateTime.UtcNow;
 
     public PlayerPartyInteractionHandler(
         IMessageBroker messageBroker,
@@ -94,6 +102,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         IPlayerDivorceRules playerDivorceRules,
         IPlayerMapTracking mapTracking,
         IPlayerPartyTradeContext trade,
+        IPlayerPartyPvpRules pvpRules,
         // Only the server container registers a send coalescer.
         ISendCoalescer sendCoalescer = null)
     {
@@ -109,6 +118,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         this.playerDivorceRules = playerDivorceRules;
         this.mapTracking = mapTracking;
         this.trade = trade;
+        this.pvpRules = pvpRules;
         this.sendCoalescer = sendCoalescer;
         outcomeHandler = new PlayerPartyInteractionOutcomeHandler(
             objectManager,
@@ -131,10 +141,16 @@ internal class PlayerPartyInteractionHandler : IHandler
         messageBroker.Subscribe<NetworkPlayerPartyTradeOfferUpdated>(Handle_NetworkPlayerPartyTradeOfferUpdated);
         messageBroker.Subscribe<NetworkPlayerPartyTradeAcceptChanged>(Handle_NetworkPlayerPartyTradeAcceptChanged);
         messageBroker.Subscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
+
+        if (ModInformation.IsServer)
+            pvpRulesTimer = new System.Threading.Timer(_ => QueuePvpRulesTick(), null, PvpRulesTickInterval, PvpRulesTickInterval);
     }
 
     public void Dispose()
     {
+        Interlocked.Exchange(ref isDisposed, 1);
+        pvpRulesTimer?.Dispose();
+
         if (presentationTickRegistered && Campaign.Current != null)
             CampaignEvents.TickEvent.ClearListeners(this);
 
@@ -582,6 +598,7 @@ internal class PlayerPartyInteractionHandler : IHandler
 
     private void HandleMercenarySelected(PlayerPartyInteractionSession session, PlayerPartyInteractionOption option)
     {
+        if (session.Proposal != PlayerPartyInteractionProposal.None) return;
         if (!session.InitiatorEnabledOptions.Contains(option)) return;
 
         session.Proposal = PlayerPartyInteractionProposal.Mercenary;
@@ -631,6 +648,7 @@ internal class PlayerPartyInteractionHandler : IHandler
     }
     private void HandleHostileDemandSelected(PlayerPartyInteractionSession session, PlayerPartyInteractionOption option)
     {
+        if (session.Proposal != PlayerPartyInteractionProposal.None) return;
         if (!session.InitiatorEnabledOptions.Contains(option)) return;
 
         session.Proposal = PlayerPartyInteractionProposal.HostileDemand;
@@ -710,7 +728,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         if (option == PlayerPartyInteractionOption.YieldHostileDemand)
         {
             if (session.Proposal != PlayerPartyInteractionProposal.HostileDemand) return;
-            if (!session.HostileDemandConfirmed) return;
+            if (!session.IsResponderTurn()) return;
 
             EndSession(session, PlayerPartyInteractionOutcomeType.HostileDemandYielded);
             return;
@@ -719,7 +737,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         if (option == PlayerPartyInteractionOption.RefuseHostileDemand)
         {
             if (session.Proposal != PlayerPartyInteractionProposal.HostileDemand) return;
-            if (!session.HostileDemandConfirmed) return;
+            if (!session.IsResponderTurn()) return;
 
             EndSession(session, PlayerPartyInteractionOutcomeType.HostileDemandAccepted);
             return;
@@ -729,6 +747,12 @@ internal class PlayerPartyInteractionHandler : IHandler
         {
             if (session.Proposal == PlayerPartyInteractionProposal.HostileDemand && session.HostileDemandConfirmed)
                 return;
+            // pvpBlockLeave took Leave out of what the responder was shown, so the server doesn't take it either.
+            if (session.IsLeaveHidden)
+            {
+                Logger.Warning("Ignored Leave from a responder whose options have no Leave. SessionId={SessionId}", session.SessionId);
+                return;
+            }
 
             EndSession(session, GetLeaveOutcome(session));
             return;
@@ -736,17 +760,14 @@ internal class PlayerPartyInteractionHandler : IHandler
 
         if (option == PlayerPartyInteractionOption.DeclineProposal)
         {
-            if (session.Proposal == PlayerPartyInteractionProposal.None) return;
-            if (session.Proposal == PlayerPartyInteractionProposal.Mercenary && !session.MercenaryConfirmed) return;
+            if (!session.IsResponderTurn()) return;
 
             EndSession(session, GetDeclinedOutcome(session.Proposal));
             return;
         }
 
         if (option != PlayerPartyInteractionOption.AcceptProposal) return;
-
-        if (session.Proposal == PlayerPartyInteractionProposal.None) return;
-        if (session.Proposal == PlayerPartyInteractionProposal.Mercenary && !session.MercenaryConfirmed) return;
+        if (!session.IsResponderTurn()) return;
 
         if (IsMarriageProposal(session.Proposal))
         {
@@ -791,9 +812,7 @@ internal class PlayerPartyInteractionHandler : IHandler
 
     private bool CanProposeMarriage(PlayerPartyInteractionSession session, PlayerPartyInteractionProposal proposal)
     {
-        if (session.IsHostile ||
-            !objectManager.TryGetObjectWithLogging(session.InitiatorPartyId, out PartyBase initiatorParty) ||
-            !objectManager.TryGetObjectWithLogging(session.ResponderPartyId, out PartyBase responderParty)) return false;
+        if (session.IsHostile || !TryGetParties(session, out var initiatorParty, out var responderParty)) return false;
 
         return playerMarriageRules.CanMarry(initiatorParty.LeaderHero, responderParty.LeaderHero) &&
             playerMarriageRules.GetClanJoinUnavailableReason(initiatorParty.LeaderHero, responderParty.LeaderHero,
@@ -809,6 +828,7 @@ internal class PlayerPartyInteractionHandler : IHandler
     {
         var options = Array.Empty<PlayerPartyInteractionOption>();
 
+        session.RecordResponderState(PlayerPartyInteractionPhase.TradeActive, session.Proposal, options, options);
         network.Send(session.InitiatorPeer, CreateInitiatorState(session, PlayerPartyInteractionPhase.TradeActive, session.Proposal, options));
         network.Send(session.ResponderPeer, CreateResponderState(session, PlayerPartyInteractionPhase.TradeActive, session.Proposal, options));
     }
@@ -819,7 +839,10 @@ internal class PlayerPartyInteractionHandler : IHandler
         PlayerPartyInteractionProposal proposal,
         PlayerPartyInteractionOption[] options,
         PlayerPartyInteractionOption[] enabledOptions = null)
-        => network.SendAll(CreateInitiatorState(session, phase, proposal, options, enabledOptions));
+    {
+        session.StateChangedUtc = UtcNow();
+        network.SendAll(CreateInitiatorState(session, phase, proposal, options, enabledOptions));
+    }
 
     private void SendResponderState(
         PlayerPartyInteractionSession session,
@@ -827,7 +850,105 @@ internal class PlayerPartyInteractionHandler : IHandler
         PlayerPartyInteractionProposal proposal,
         PlayerPartyInteractionOption[] options,
         PlayerPartyInteractionOption[] enabledOptions = null)
-        => network.SendAll(CreateResponderState(session, phase, proposal, options, enabledOptions));
+    {
+        enabledOptions ??= options;
+        session.StateChangedUtc = UtcNow();
+        session.RecordResponderState(phase, proposal, options, enabledOptions);
+
+        session.IsLeaveHidden = options.Contains(PlayerPartyInteractionOption.Leave) &&
+            pvpRules.CanBlockLeave(session, ModConfigProvider.ModOptions) && IsAtWarNow(session);
+        if (session.IsLeaveHidden)
+        {
+            options = options.Where(option => option != PlayerPartyInteractionOption.Leave).ToArray();
+            enabledOptions = enabledOptions.Where(option => option != PlayerPartyInteractionOption.Leave).ToArray();
+        }
+
+        network.SendAll(CreateResponderState(session, phase, proposal, options, enabledOptions));
+    }
+
+    // Asked again each time, so peace made during the meeting counts.
+    private bool IsAtWarNow(PlayerPartyInteractionSession session)
+        => TryGetParties(session, out var initiatorParty, out var responderParty) &&
+           AreHostile(initiatorParty, responderParty);
+
+    private bool TryGetParties(PlayerPartyInteractionSession session, out PartyBase initiatorParty, out PartyBase responderParty)
+    {
+        responderParty = null;
+        return objectManager.TryGetObjectWithLogging(session.InitiatorPartyId, out initiatorParty) &&
+               objectManager.TryGetObjectWithLogging(session.ResponderPartyId, out responderParty);
+    }
+
+    private void QueuePvpRulesTick()
+    {
+        if (Volatile.Read(ref isDisposed) != 0 || sessionsById.IsEmpty) return;
+        if (!GameThread.Instance.IsInitialized) return;
+
+        if (!pvpRules.IsEnabled(ModConfigProvider.ModOptions)) return;
+
+        // Read before queueing, so an answer queued behind this tick on a stalled game thread is still on time.
+        var utcNow = UtcNow();
+        GameThread.RunSafe(
+            () =>
+            {
+                if (Volatile.Read(ref isDisposed) == 0)
+                    CheckPvpRules(utcNow);
+            },
+            context: nameof(CheckPvpRules));
+    }
+
+    /// <summary>
+    /// [Server, game thread] Ends meetings whose party no longer resolves, gives Leave back to responders who made
+    /// peace during the meeting, and otherwise ends meetings nobody answered in time.
+    /// </summary>
+    internal void CheckPvpRules(DateTime utcNow)
+    {
+        var modOptions = ModConfigProvider.ModOptions;
+        foreach (var session in sessionsById.Values.ToArray())
+        {
+            // A party that no longer resolves can never answer, so the meeting ends instead of the miss reading as peace.
+            if (!TryGetParties(session, out var initiatorParty, out var responderParty))
+            {
+                Logger.Information(
+                    "Ended player-party interaction because a party no longer resolves. SessionId={SessionId}, Outcome={Outcome}",
+                    session.SessionId, PlayerPartyInteractionOutcomeType.Left);
+                EndSession(session, PlayerPartyInteractionOutcomeType.Left);
+                continue;
+            }
+
+            var atWar = AreHostile(initiatorParty, responderParty);
+            if (!RestoreLeaveAfterPeace(session, modOptions, atWar))
+                EndIfUnanswered(session, utcNow, modOptions, atWar);
+        }
+    }
+
+    // Peace sends no new state, so the hidden Leave goes back from here. Returns whether the state was sent again,
+    // which also restarts the session's clock.
+    private bool RestoreLeaveAfterPeace(PlayerPartyInteractionSession session, ModOptions modOptions, bool atWar)
+    {
+        if (!session.IsLeaveHidden) return false;
+        if (pvpRules.CanBlockLeave(session, modOptions) && atWar) return false;
+
+        SendResponderState(
+            session,
+            session.LastResponderPhase,
+            session.LastResponderProposal,
+            session.LastResponderOptions.ToArray(),
+            session.LastResponderEnabledOptions.ToArray());
+        return true;
+    }
+
+    private void EndIfUnanswered(PlayerPartyInteractionSession session, DateTime utcNow, ModOptions modOptions, bool atWar)
+    {
+        var idleSeconds = pvpRules.GetIdleSeconds(session, modOptions);
+        if (idleSeconds == 0) return;
+        if (utcNow - session.StateChangedUtc < TimeSpan.FromSeconds(idleSeconds)) return;
+
+        var outcome = pvpRules.GetTimeoutOutcome(session, atWar);
+        Logger.Information(
+            "Ended player-party interaction nobody answered for {Seconds} seconds. SessionId={SessionId}, Outcome={Outcome}",
+            idleSeconds, session.SessionId, outcome);
+        EndSession(session, outcome);
+    }
 
     // Builds the dialog state the initiator's client shows.
     private static NetworkPlayerPartyInteractionState CreateInitiatorState(
@@ -965,8 +1086,7 @@ internal class PlayerPartyInteractionHandler : IHandler
 
     private bool CanJoinClan(PlayerPartyInteractionSession session)
     {
-        if (!objectManager.TryGetObjectWithLogging(session.InitiatorPartyId, out PartyBase initiatorParty) ||
-            !objectManager.TryGetObjectWithLogging(session.ResponderPartyId, out PartyBase responderParty)) return false;
+        if (!TryGetParties(session, out var initiatorParty, out var responderParty)) return false;
 
         return clanJoinRules.GetUnavailableReason(initiatorParty.LeaderHero, responderParty.LeaderHero) == ClanJoinUnavailableReason.None;
     }
