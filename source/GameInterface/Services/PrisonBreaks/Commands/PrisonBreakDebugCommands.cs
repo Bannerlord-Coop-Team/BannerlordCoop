@@ -84,12 +84,14 @@ internal class PrisonBreakDebugCommands
     {
         private readonly ICommandObjectResolver resolver;
         private readonly IMessageBroker messageBroker;
+        private readonly IPrisonBreakCampaignBehaviorInterface behaviorInterface;
 
-        // Takes the resolver for the settlement lookup and the broker the cooldown handler listens on.
-        public SetPrisonBreakCooldownCoopCommand(ICommandObjectResolver resolver, IMessageBroker messageBroker)
+        // Takes the resolver for the settlement lookup, the broker the cooldown handler listens on and the interface that reads the cooldown back.
+        public SetPrisonBreakCooldownCoopCommand(ICommandObjectResolver resolver, IMessageBroker messageBroker, IPrisonBreakCampaignBehaviorInterface behaviorInterface)
         {
             this.resolver = resolver;
             this.messageBroker = messageBroker;
+            this.behaviorInterface = behaviorInterface;
         }
 
         public string Prefix => "coop.debug.town";
@@ -106,20 +108,20 @@ internal class PrisonBreakDebugCommands
             new ExpectedArgs("days", "Days until a prison break can start again, 0 clears the cooldown."),
         };
 
-        // Publishes the cooldown so PrisonBreakHandler applies and broadcasts it.
+        // Publishes the cooldown so PrisonBreakHandler applies and broadcasts it, then reads it back because the broker swallows handler failures.
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (!resolver.TryResolveTown(args[0], out var town, out var error)) return Failed(error);
             if (!float.TryParse(args[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var days) || days < 0f)
                 return Failed($"'{args[1]}' is not a number of days of 0 or more.");
 
-            if (days == 0f)
-            {
-                messageBroker.Publish(this, new PrisonBreakCooldownSet(town.Settlement, CampaignTime.Zero));
-                return Succeeded($"{town.Settlement.Name} prison break cooldown cleared.");
-            }
+            var until = days == 0f ? CampaignTime.Zero : CampaignTime.DaysFromNow(days);
+            messageBroker.Publish(this, new PrisonBreakCooldownSet(town.Settlement, until));
 
-            messageBroker.Publish(this, new PrisonBreakCooldownSet(town.Settlement, CampaignTime.DaysFromNow(days)));
+            if (behaviorInterface.IsOnCooldown(town.Settlement) != days > 0f)
+                return Failed($"{town.Settlement.Name} prison break cooldown did not apply, check the server log.");
+            if (days == 0f) return Succeeded($"{town.Settlement.Name} prison break cooldown cleared.");
+
             return Succeeded($"{town.Settlement.Name} prison break cooldown set to {days} days.");
         }
     }
@@ -153,7 +155,7 @@ internal class PrisonBreakDebugCommands
             new ExpectedArgs("settlement", "Town or castle name or id; quote names with spaces."),
         };
 
-        // Lists the settlement and garrison prison heroes, the rosters vanilla offers in the prisoner selection.
+        // Lists the hero prisoners in the settlement and garrison prisons.
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (!resolver.TryResolveTown(args[0], out var town, out var error)) return Failed(error);

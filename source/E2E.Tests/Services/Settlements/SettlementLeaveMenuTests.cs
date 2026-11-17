@@ -132,8 +132,9 @@ public class SettlementLeaveMenuTests : IDisposable
             encounter.EncounterSettlementAux = null;
             Campaign.Current.PlayerEncounter = encounter;
 
+            var behavior = ObjectHelper.SkipConstructor<EncounterGameMenuBehavior>();
             var args = new MenuCallbackArgs((MenuContext)null, null);
-            Assert.False(ObjectHelper.SkipConstructor<EncounterGameMenuBehavior>().game_menu_castle_outside_scout_keep_on_condition(args));
+            Assert.False(behavior.game_menu_castle_outside_scout_keep_on_condition(args));
         });
     }
 

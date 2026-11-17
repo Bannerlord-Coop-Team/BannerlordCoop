@@ -137,7 +137,8 @@ internal class PrisonBreakHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging<Hero>(data.PrisonerId, out var prisoner)) return PrisonBreakStartResult.PrisonerUnavailable;
 
         // A player hero is only controlled by their own player, never as the rescuer's AI prisoner agent.
-        if (prisoner.IsPlayerHero() || !behaviorInterface.IsHeldIn(prisoner, settlement)) return PrisonBreakStartResult.PrisonerUnavailable;
+        if (prisoner.IsPlayerHero()) return PrisonBreakStartResult.PrisonerUnavailable;
+        if (!behaviorInterface.IsHeldIn(prisoner, settlement)) return PrisonBreakStartResult.PrisonerUnavailable;
         if (behaviorInterface.IsOnCooldown(settlement)) return PrisonBreakStartResult.OnCooldown;
 
         int bribeCost;

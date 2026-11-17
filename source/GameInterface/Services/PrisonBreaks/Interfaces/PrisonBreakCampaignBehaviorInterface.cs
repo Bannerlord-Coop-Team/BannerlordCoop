@@ -17,8 +17,7 @@ using TaleWorlds.MountAndBlade;
 namespace GameInterface.Services.PrisonBreaks.Interfaces;
 
 /// <summary>
-/// The server owns the per-settlement cooldowns, clients mirror them and run the prison break mission locally.
-/// Also decides whether a prisoner is still held in a settlement's prisons, the rosters vanilla lists.
+/// Prison break state and eligibility: the server owns the per-settlement cooldowns, clients mirror them and run the mission locally, and both check the prisoner is still held.
 /// </summary>
 public interface IPrisonBreakCampaignBehaviorInterface : IGameAbstraction
 {

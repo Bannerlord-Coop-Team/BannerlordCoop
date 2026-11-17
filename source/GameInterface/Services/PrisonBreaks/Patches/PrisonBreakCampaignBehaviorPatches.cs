@@ -68,7 +68,7 @@ internal class PrisonBreakCampaignBehaviorPatches
     [HarmonyFinalizer]
     private static void ListPrisonersFinalizer() => IsListingPrisoners = false;
 
-    // Other players keep time running, so the chosen prisoner can be freed while this menu is open and vanilla's cost NREs on their null settlement.
+    // Other players keep time running, so the prisoner can be freed while this menu is open, and vanilla's GetPrisonBreakStartCost NREs on a prisoner with no settlement.
     [HarmonyPatch(nameof(PrisonBreakCampaignBehavior.game_menu_castle_prison_break_on_condition))]
     [HarmonyPrefix]
     private static bool StartConditionPrefix(PrisonBreakCampaignBehavior __instance, MenuCallbackArgs args, ref bool __result)
@@ -76,7 +76,9 @@ internal class PrisonBreakCampaignBehaviorPatches
         if (!ContainerProvider.TryResolve<IPrisonBreakCampaignBehaviorInterface>(out var behaviorInterface)) return true;
         if (behaviorInterface.IsHeldIn(__instance._prisonerHero, Settlement.CurrentSettlement)) return true;
 
+        // Same icon vanilla sets before it reads the cost.
         args.optionLeaveType = GameMenuOption.LeaveType.Mission;
+
         args.IsEnabled = false;
         args.Tooltip = GameTexts.FindText("str_coop_prison_break_prisoner_unavailable");
         __result = true;
