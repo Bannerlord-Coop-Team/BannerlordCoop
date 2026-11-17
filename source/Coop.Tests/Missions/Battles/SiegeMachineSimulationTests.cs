@@ -33,6 +33,31 @@ public class SiegeMachineSimulationTests : IDisposable
             SiegeMachineStateReplicator.ShouldSnapMovementForDestruction(error, destructionTransition));
     }
 
+    [Fact]
+    public void DestructionTransitionSnapsRamBeforeApplyingBrokenState()
+    {
+        using var mission = new MissionCurrentScope();
+        var ram = Uninitialized<BatteringRam>();
+        var movement = Uninitialized<SiegeWeaponMovementComponent>();
+        var destruction = Uninitialized<DestructableComponent>();
+        AccessTools.Property(typeof(BatteringRam), nameof(BatteringRam.MovementComponent)).SetValue(ram, movement);
+        AccessTools.Field(typeof(UsableMachine), "<DestructionComponent>k__BackingField").SetValue(ram, destruction);
+        AccessTools.Field(typeof(DestructableComponent), "_currentStateIndex").SetValue(destruction, 0);
+        ramSnapDistance = 12.5f;
+        ramSnapCalls = 0;
+        Stub(AccessTools.Method(typeof(SiegeWeaponMovementComponent), "GetTotalDistanceTraveledForPathTracker"), nameof(RamDistance));
+        Stub(AccessTools.Method(typeof(SiegeWeaponMovementComponent), "SetTotalDistanceTraveledForPathTracker"), nameof(RamSetDistance));
+        Stub(AccessTools.Method(typeof(SiegeWeaponMovementComponent), "SetTargetFrameForPathTracker"), nameof(RamSetTargetFrame));
+
+        var state = new NetworkSiegeMachineState(ram.Id.Id, -1f, 1, -1, -1, ramSnapDistance - 0.1f,
+            false, -1, -1000f, -1000f);
+        var apply = AccessTools.Method(typeof(SiegeMachineStateReplicator), "Apply");
+        apply.Invoke(null, new object[] { ram, state });
+
+        Assert.Equal(1, ramSnapCalls);
+        Assert.Equal(ramSnapDistance - 0.1f, ramSnappedDistance);
+    }
+
     private static readonly List<SynchedMissionObject> PausedSkeletons = new();
     private readonly Harmony harmony = new("coop.tests.siege-machine-simulation");
 
@@ -471,6 +496,11 @@ public class SiegeMachineSimulationTests : IDisposable
     private static bool RamStrikeCount(ref int __result) { ramStrikeReads++; __result = 0; return false; }
     private static bool RamMovementArrived(ref bool __result) { __result = ramMovementArrived; return false; }
     private static bool RamDistance(ref float __result) { __result = 0f; return false; }
+    private static float ramSnapDistance;
+    private static float ramSnappedDistance;
+    private static int ramSnapCalls;
+    private static bool RamSetDistance(float __0) { ramSnappedDistance = __0; return false; }
+    private static bool RamSetTargetFrame() { ramSnapCalls++; return false; }
     private static bool RamMoveToTarget() { ramMovementArrived = true; return false; }
 
     [Theory]
