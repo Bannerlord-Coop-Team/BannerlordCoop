@@ -1,4 +1,5 @@
-﻿using GameInterface.Services.MapEvents;
+﻿using Common;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobilePartyAIs.Interfaces;
 using HarmonyLib;
@@ -9,12 +10,16 @@ using TaleWorlds.CampaignSystem.Party;
 namespace GameInterface.Services.MobilePartyAIs.Patches;
 
 /// <summary>
-/// Adapts <see cref="AiPartyThinkBehavior"/> to co-op player parties. Its listeners are only registered on the
-/// server (<see cref="AiEngagePartyBehaviorPatches"/>).
+/// Runs <see cref="AiPartyThinkBehavior"/> on the server only and adapts it to co-op player parties.
 /// </summary>
 [HarmonyPatch(typeof(AiPartyThinkBehavior))]
 internal class AiPartyThinkBehaviorPatches
 {
+    // Registers the listeners on the server only, which decides for every AI party.
+    [HarmonyPatch(nameof(AiPartyThinkBehavior.RegisterEvents))]
+    [HarmonyPrefix]
+    private static bool RegisterEventsPrefix() => ModInformation.IsServer;
+
     // Skips the hourly AI decision for client-driven player parties, and for AI parties in a player's map event
     // so a siege or raid attacker leader can't pick a new target and finalize the battle under the player.
     [HarmonyPatch(nameof(AiPartyThinkBehavior.PartyHourlyAiTick))]

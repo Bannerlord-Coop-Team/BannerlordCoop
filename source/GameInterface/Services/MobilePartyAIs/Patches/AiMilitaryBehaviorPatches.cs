@@ -1,4 +1,5 @@
-﻿using GameInterface.Services.MapEvents.Patches;
+﻿using Common;
+using GameInterface.Services.MapEvents.Patches;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors.AiBehaviors;
@@ -8,12 +9,17 @@ using TaleWorlds.CampaignSystem.Settlements;
 namespace GameInterface.Services.MobilePartyAIs.Patches;
 
 /// <summary>
-/// Adapts <see cref="AiMilitaryBehavior"/> settlement targeting to co-op player parties and battles. Its listeners
-/// are only registered on the server (<see cref="AiEngagePartyBehaviorPatches"/>).
+/// Runs <see cref="AiMilitaryBehavior"/> on the server only and adapts its settlement targeting to co-op player
+/// parties and battles.
 /// </summary>
 [HarmonyPatch(typeof(AiMilitaryBehavior))]
 internal class AiMilitaryBehaviorPatches
 {
+    // Registers the listeners on the server only, which decides for every AI party.
+    [HarmonyPatch(nameof(AiMilitaryBehavior.RegisterEvents))]
+    [HarmonyPrefix]
+    private static bool RegisterEventsPrefix() => ModInformation.IsServer;
+
     // Vanilla skips a settlement last attacked by the main party while DoNotAttackMainPartyUntil runs. Co-op skips it
     // while any attack protection in DefaultMobilePartyAIModelPatches runs against the last attacker, per party or faction.
     [HarmonyPatch(nameof(AiMilitaryBehavior.CheckIfSettlementIsSuitableForMilitaryAction))]

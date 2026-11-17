@@ -52,12 +52,18 @@ internal static class MobilePartyAiDebugCommands
         // Runs the live AiMilitaryBehavior settlement check, patches included, and prints what it read.
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            if (!resolver.TryResolveMobileParty(args[0], out var party, out var error)) return Failed(error);
-            if (!resolver.TryResolveSettlement(args[1], out var settlement, out error)) return Failed(error);
-            if (!Enum.TryParse(args[2], ignoreCase: true, out Army.ArmyTypes missionType)) return Failed($"Unknown mission type {args[2]}.");
+            if (!resolver.TryResolveMobileParty(args[0], out var party, out var error))
+                return Failed(error);
+
+            if (!resolver.TryResolveSettlement(args[1], out var settlement, out error))
+                return Failed(error);
+
+            if (!Enum.TryParse(args[2], ignoreCase: true, out Army.ArmyTypes missionType))
+                return Failed($"Unknown mission type {args[2]}.");
 
             var behavior = Campaign.Current.GetCampaignBehavior<AiMilitaryBehavior>();
-            if (behavior == null) return Failed("AiMilitaryBehavior is not registered on this campaign.");
+            if (behavior == null)
+                return Failed("AiMilitaryBehavior is not registered on this campaign.");
 
             var lastAttacker = settlement.LastAttackerParty;
             bool attackPrevented = DefaultMobilePartyAIModelPatches.IsAttackPrevented(party, lastAttacker);
