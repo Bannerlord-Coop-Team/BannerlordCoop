@@ -66,6 +66,13 @@ public abstract class MapEventTestBase : IDisposable
         };
     }
 
+    /// <summary>The map event methods plus the campaign tick, which a hand-driven map frame can't run in the harness.</summary>
+    protected IReadOnlyList<MethodBase> MapTickDisabledMethods => MapEventDisabledMethods.Concat(new[]
+    {
+        AccessTools.Method(typeof(Campaign), nameof(Campaign.RealTick)),
+        AccessTools.Method(typeof(Campaign), nameof(Campaign.Tick)),
+    }).ToList();
+
     protected IReadOnlyList<MethodBase> WithoutNetworkDelivery() => MapEventDisabledMethods
         .Append(AccessTools.Method(typeof(TestNetworkRouter), nameof(TestNetworkRouter.SendReliablePayload),
             new[] { typeof(NetPeer), typeof(NetPeer), typeof(byte[]) }))
@@ -1129,11 +1136,7 @@ public abstract class MapEventTestBase : IDisposable
                 Assert.Null(MobileParty.MainParty.MapEvent);
                 Assert.Null(MobileParty.MainParty.CurrentSettlement);
                 Assert.Null(Campaign.Current.CurrentMenuContext);
-            }, MapEventDisabledMethods.Concat(new[]
-            {
-                AccessTools.Method(typeof(Campaign), nameof(Campaign.RealTick)),
-                AccessTools.Method(typeof(Campaign), nameof(Campaign.Tick)),
-            }).ToArray());
+            }, MapTickDisabledMethods);
         }
         finally { harmony.UnpatchAll(harmony.Id); }
     }

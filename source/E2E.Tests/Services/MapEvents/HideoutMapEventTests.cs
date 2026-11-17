@@ -895,24 +895,10 @@ public class HideoutMapEventTests : MapEventTestBase
         {
             var encounter = PlayerEncounter.Current;
             Assert.DoesNotContain(encounter._mapEvent, Campaign.Current.MapEventManager.MapEvents);
-            var states = Game.Current.GameStateManager;
-            var mapState = states.CreateState<MapState>();
-            states._gameStates.Add(mapState);
-            try
-            {
-                mapState.OnMapModeTick(0.1f);
-            }
-            finally
-            {
-                states._gameStates.Remove(mapState);
-            }
+            TickMapOnce();
             Assert.Same(encounter, PlayerEncounter.Current);
             Assert.Equal(PlayerEncounterState.End, encounter.EncounterState);
-        }, MapEventDisabledMethods.Concat(new[]
-        {
-            AccessTools.Method(typeof(Campaign), nameof(Campaign.RealTick)),
-            AccessTools.Method(typeof(Campaign), nameof(Campaign.Tick)),
-        }).ToArray());
+        }, MapTickDisabledMethods);
         client.Call(() => new HideoutCampaignBehavior().hideout_send_troops_result_success_consequence(null),
             MapEventDisabledMethods);
         Server.PumpGameThread();
@@ -1264,6 +1250,22 @@ public class HideoutMapEventTests : MapEventTestBase
     }
 
     private static readonly CampaignVec2 EnteredHideoutPosition = new(new Vec2(5f, 5f), true);
+
+    // Runs one campaign map frame on a map state that is active only for that frame.
+    private static void TickMapOnce()
+    {
+        var states = Game.Current.GameStateManager;
+        var mapState = states.CreateState<MapState>();
+        states._gameStates.Add(mapState);
+        try
+        {
+            mapState.OnMapModeTick(0.1f);
+        }
+        finally
+        {
+            states._gameStates.Remove(mapState);
+        }
+    }
 
     // Puts the minimum number of bandit parties inside the hideout for it to count as infested.
     private static void InfestHideout(Settlement settlement, string partyIdPrefix)
