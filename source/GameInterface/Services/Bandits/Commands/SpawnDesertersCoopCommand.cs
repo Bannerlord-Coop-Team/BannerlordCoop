@@ -32,7 +32,7 @@ public sealed class SpawnDesertersCoopCommand : ICoopCommand
     public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
     {
         new ExpectedArgs("settlement_id", "Settlement name or id; quote names with spaces."),
-        new ExpectedArgs("troop_count", "Basic troops of the settlement culture in the party, 5 by default.", false),
+        new ExpectedArgs("troop_count", "Basic troops of the settlement culture before the looter party size multiplier, 5 by default.", false),
     };
 
     // Runs DesertersCampaignBehavior.SpawnDesertersParty, as a battle's deserters would, and reports the new party.
@@ -57,13 +57,17 @@ public sealed class SpawnDesertersCoopCommand : ICoopCommand
         var existing = new HashSet<WarPartyComponent>(behavior.DeserterClan.WarPartyComponents);
         behavior.SpawnDesertersParty(mapEvent: null, troops, settlement);
 
-        var party = behavior.DeserterClan.WarPartyComponents.FirstOrDefault(component => !existing.Contains(component))?.MobileParty;
-        if (party == null) return Failed("No deserter party was created.");
+        var created = behavior.DeserterClan.WarPartyComponents.FirstOrDefault(component => !existing.Contains(component));
+        if (created?.MobileParty == null) return Failed("No deserter party was created.");
 
-        return new CoopCommandResult(true,
+        var party = created.MobileParty;
+        return Succeeded(
             $"Spawned {party.Name} id={resolver.DisplayId(party)} stringId={party.StringId} " +
             $"position={party.Position.ToVec2()} near {settlement.Name}.");
     }
+
+    // Builds a successful command result.
+    private static CoopCommandResult Succeeded(string output) => new CoopCommandResult(true, output);
 
     // Builds a failed command result with the shared failure code.
     private static CoopCommandResult Failed(string output) => new CoopCommandResult(false, output, "command_failed");
