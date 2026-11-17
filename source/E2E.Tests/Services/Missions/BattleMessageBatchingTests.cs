@@ -77,16 +77,15 @@ public class BattleMessageBatchingTests
             client.Send(controllerId, message);
         }
 
-        Assert.True(
-            logicalPayloads.Max(payload => payload.Length) < ReliableMessageBatcher<string>.DefaultBudgetBytes,
-            $"payload sizes: min={logicalPayloads.Min(payload => payload.Length)} " +
-            $"max={logicalPayloads.Max(payload => payload.Length)} " +
-            $"average={logicalPayloads.Average(payload => payload.Length):F1}");
         Assert.True(relayedPackets.Count < logicalMessageCount);
 
         client.FlushPendingMessages();
 
         Assert.InRange(relayedPackets.Count, 1, 63);
+        // Batches stay within one datagram on the relay hop, so none of them fragments.
+        Assert.All(
+            relayedPackets,
+            packet => Assert.InRange(serializer.Serialize(packet).Length, 1, LiteNetP2PClient.SafeSinglePacketBytes));
         Assert.All(
             relayedPackets,
             packet => Assert.Equal(LiteNetLib.DeliveryMethod.ReliableOrdered, packet.DeliveryMethod));

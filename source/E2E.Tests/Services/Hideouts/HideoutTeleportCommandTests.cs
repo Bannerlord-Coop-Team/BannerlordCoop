@@ -201,8 +201,8 @@ public class HideoutTeleportCommandTests : MapEventTestBase
     {
         var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
         settlement.SetSettlementComponent(GameObjectCreator.CreateInitializedObject<Hideout>());
-        // A new hideout starts hidden, as Hideout.OnInit leaves an authored one (v1.5 keeps the
-        // spotted state on the settlement, which is constructed visible).
+        // A new hideout starts hidden, as Hideout.OnInit leaves an authored one (the spotted state
+        // is on the settlement, which is constructed visible).
         settlement.Hideout.OnInit();
         settlement._name = new TextObject(name);
         settlement._position = entrance;

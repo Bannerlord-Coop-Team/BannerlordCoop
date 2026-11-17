@@ -1,5 +1,4 @@
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.ComponentInterfaces;
+﻿using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
@@ -9,20 +8,17 @@ namespace GameInterface.Services.MobileParties.Extensions;
 public static class PartyBaseVisibilityExtensions
 {
     /// <summary>
-    /// Recomputes one party's fog of war state from <paramref name="fromPosition"/>.
-    /// v1.5 removed <c>PartyBase.UpdateVisibilityAndInspected</c>: visibility is now swept around the
-    /// main party every frame through <see cref="MapVisibilityModel"/>. This keeps the v1.4 entry point
-    /// on top of that model. A party inside a settlement stays hidden unless its leader carries a clan
-    /// banner or it is assaulting the walls, as v1.4 decided; the v1.5 model would keep whatever
-    /// visibility the party already had, which after a join is the server save's "everything visible".
-    /// Settlements only refresh <c>IsInspected</c>: their <c>IsVisible</c> is spotting state in v1.5.
+    /// Recomputes one party's fog of war visibility and inspected state from <paramref name="fromPosition"/> with the map visibility model.
+    /// Inactive parties, and parties in a settlement whose leader has no clan banner, are hidden before the model runs, so garrisons and militia the model would leave as saved don't keep the server save's all-visible state.
     /// </summary>
+    /// <param name="mainPartySeeingRange">The seeing range to use; 0 uses the main party's current range.</param>
     public static void UpdateVisibilityAndInspected(this PartyBase party, CampaignVec2 fromPosition, float mainPartySeeingRange = 0f)
     {
         var model = Campaign.Current?.Models?.MapVisibilityModel;
         if (party == null || model == null) return;
 
-        float seeingRange = mainPartySeeingRange == 0f ? MobileParty.MainParty?.SeeingRange ?? 0f : mainPartySeeingRange;
+        float seeingRange = mainPartySeeingRange;
+        if (seeingRange == 0f) seeingRange = MobileParty.MainParty?.SeeingRange ?? 0f;
         if (seeingRange <= 0f) return;
 
         Vec2[] points = { fromPosition.ToVec2() };
@@ -56,5 +52,8 @@ public static class PartyBaseVisibilityExtensions
         Campaign.Current.TrueSight ||
         mobileParty.CurrentSettlement == null ||
         mobileParty.LeaderHero?.ClanBanner != null ||
-        (mobileParty.MapEvent != null && mobileParty.MapEvent.IsSiegeAssault && mobileParty.Party.Side == BattleSideEnum.Attacker);
+        IsAssaultingWalls(mobileParty);
+
+    private static bool IsAssaultingWalls(MobileParty mobileParty) =>
+        mobileParty.MapEvent != null && mobileParty.MapEvent.IsSiegeAssault && mobileParty.Party.Side == BattleSideEnum.Attacker;
 }

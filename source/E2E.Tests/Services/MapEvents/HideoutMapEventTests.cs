@@ -133,8 +133,8 @@ public class HideoutMapEventTests : MapEventTestBase
             settlement._position = new CampaignVec2(Vec2.Zero, true);
             var hideout = GameObjectCreator.CreateInitializedObject<Hideout>();
             settlement.SetSettlementComponent(hideout);
-            // A new hideout starts hidden, as Hideout.OnInit leaves an authored one (v1.5 keeps the
-            // spotted state on the settlement, which is constructed visible).
+            // A new hideout starts hidden, as Hideout.OnInit leaves an authored one (the spotted state
+            // is on the settlement, which is constructed visible).
             hideout.OnInit();
 
             var requiredBanditParties = System.Math.Max(
@@ -1114,8 +1114,8 @@ public class HideoutMapEventTests : MapEventTestBase
             var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
             settlement._position = new CampaignVec2(Vec2.Zero, true);
             settlement.SetSettlementComponent(GameObjectCreator.CreateInitializedObject<Hideout>());
-            // A new hideout starts hidden, as Hideout.OnInit leaves an authored one (v1.5 keeps the
-            // spotted state on the settlement, which is constructed visible).
+            // A new hideout starts hidden, as Hideout.OnInit leaves an authored one (the spotted state
+            // is on the settlement, which is constructed visible).
             settlement.Hideout.OnInit();
             EnterSettlementAction.ApplyForParty(leader, settlement);
             var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();

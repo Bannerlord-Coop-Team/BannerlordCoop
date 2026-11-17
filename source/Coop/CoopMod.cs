@@ -14,6 +14,7 @@ using Coop.UI.LoadGameUI;
 using GameInterface;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Handlers;
+using GameInterface.Services.Modules.Validators;
 using GameInterface.Services.Chat;
 using GameInterface.Services.Locations;
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
@@ -52,7 +53,13 @@ namespace Coop
 {
     internal class CoopMod : NoHarmonyLoader
     {
-        public static UpdateableList Updateables { get; } = new UpdateableList();
+        public static UpdateableList Updateables => UpdateablesHolder.List;
+
+        // Kept out of CoopMod's type initializer, which runs before the constructor's check for a foreign Common.dll
+        private static class UpdateablesHolder
+        {
+            public static readonly UpdateableList List = new UpdateableList();
+        }
 
         public static CoopartiveMultiplayerExperience Coop;
 
@@ -83,6 +90,19 @@ namespace Coop
             MBDebug.DisableLogging = false;
 
             AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
+
+            // Runs before Coop code uses Common or 0Harmony, the runtime binds same-named files in the game folder instead of ours.
+            // Created directly because the DI container doesn't exist yet.
+            var shadowingFiles = new ShadowedAssemblyDetector().FindShadowingFiles(AppDomain.CurrentDomain.BaseDirectory);
+            if (shadowingFiles.Count > 0)
+            {
+                var message = "Coop can't start because these files in the game folder replace Coop's own copies. " +
+                    "They come from another mod or an old install, move them out and start the game again:\n" +
+                    string.Join("\n", shadowingFiles.Select(file => $"{file} ({FileVersionInfo.GetVersionInfo(file).FileVersion})"));
+                // Same type as the game's own module load error box (Module.HandleSubmoduleLoadError), 16 showed Retry and Cancel
+                TaleWorlds.Library.Debug.ShowMessageBox(message, "Coop", 256u);
+                throw new InvalidOperationException(message);
+            }
 
             // Must be called here (constructor), not in NoHarmonyLoad().
             // Module.LoadSubModules() calls all submodule constructors first, then all
@@ -127,6 +147,15 @@ namespace Coop
             
             SetupLogging();
             var moduleInfoProvider = new TaleWorldsModuleInfoProvider();
+            // The dedicated server sets this itself; without it the module validator refuses NavalDLC on either side.
+            bool navalModuleEnabled = moduleInfoProvider.GetModuleInfos()
+                .Any(module => ModInformation.IsNavalDlcModule(module.Id, module.IsDlc));
+            string navalUnsupportedReason = navalModuleEnabled
+                ? new NavalFeatureFlag().GetUnsupportedReason(System.IO.Path.GetDirectoryName(typeof(CoopMod).Assembly.Location))
+                : null;
+            if (navalUnsupportedReason != null)
+                Logger.Warning("NavalDLC is enabled but {Reason}, so NavalDLC is treated as unsupported", navalUnsupportedReason);
+            ModInformation.IsNavalEnabled = navalModuleEnabled && navalUnsupportedReason == null;
             StartupDiagnosticsSequence.Run(version =>
                 {
                     informationalVersion = version;
@@ -154,7 +183,8 @@ namespace Coop
                     new CoopOptionsStore(),
                     exception => Logger.Warning(
                         exception,
-                        "Unsupported module wwarning preference could not be saved"));
+                        "Unsupported module wwarning preference could not be saved"),
+                    new ModuleValidator());
             }
 
             if (ManagedServerConfig.IsManagedServer)
@@ -197,14 +227,14 @@ namespace Coop
                 logLockHandle = new FileStream(filePath + ".lock", FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None, 1, FileOptions.DeleteOnClose);
                 return true;
             }
-            catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException)
+            catch (IOException)
             {
                 return false;
             }
         }
 
         // Keep only the newest few process-id-suffixed logs. Each dual-client run mints one under a fresh
-        // pid, so unlike the canonical Coop_{postfix}.log (recreated every startup) they would
+        // pid, so unlike the canonical Coop_{postfix}.log (deleted and recreated every startup) they would
         // otherwise pile up unbounded. The canonical file has no pid and isn't matched, so it's never touched.
         private static void PruneProcessSuffixedLogs(string filePostfix)
         {
@@ -243,14 +273,12 @@ namespace Coop
             // process still has open, as long as that handle allows shared delete (Serilog's file sink
             // does), so two same-install clients would silently keep fighting over one file. An exclusive
             // open is the only check that actually fails when someone else already has the file open.
-            var processLogPath = $"Coop_{filePostfix}_{System.Diagnostics.Process.GetCurrentProcess().Id}.log";
             if (!TryClaimExclusive(filePath))
-                filePath = processLogPath;
+                filePath = $"Coop_{filePostfix}_{System.Diagnostics.Process.GetCurrentProcess().Id}.log";
+
+            activeLogFilePath = System.IO.Path.GetFullPath(filePath);
 
             PruneProcessSuffixedLogs(filePostfix);
-
-            // Keep the last session's log one more launch, otherwise a crashed session's log is gone on relaunch.
-            var previousLogKept = PreviousLogFile.TryKeep(filePath, out var previousLogFailure);
 
             try
             {
@@ -261,50 +289,21 @@ namespace Coop
                 // Best effort delete
             }
 
-            // A log file that another program holds open (an editor, a backup tool) makes the sink throw, which
-            // stopped start-up. The log moves to the process-id name instead, and with no file logging still starts.
-            var candidateLogPaths = filePath == processLogPath ? new[] { filePath } : new[] { filePath, processLogPath };
-            var fileSink = LogFileOpener.OpenFirst(
-                candidateLogPaths,
-                path =>
-                {
-                    // An earlier process with the same id can have left this file; the sink would append to it.
-                    if (path != filePath)
-                    {
-                        try { File.Delete(path); }
-                        catch (Exception) { /* best effort, as for the canonical log */ }
-                    }
-
-                    return new SizeLimitedFileSink(
-                        path,
-                        outputTemplate,
-                        maxLogFileSizeBytes,
-                        preservedLogBeginningBytes,
-                        compactedLogFileSizeBytes);
-                },
-                out var openedLogPath,
-                out var logFileFailure);
-
-            activeLogFilePath = openedLogPath == null ? null : System.IO.Path.GetFullPath(openedLogPath);
-
-            var configuration = LogManager.Configuration.Enrich.WithProcessId();
-            //configuration.WriteTo.Debug(outputTemplate: outputTemplate); // Disabled: floods VS Output window causing frame hitching when debugger is attached
-            if (fileSink != null)
-                configuration.WriteTo.Sink(fileSink);
+            LogManager.Configuration
+                .Enrich.WithProcessId()
+                //.WriteTo.Debug(outputTemplate: outputTemplate) // Disabled: floods VS Output window causing frame hitching when debugger is attached
+                .WriteTo.Sink(new SizeLimitedFileSink(
+                    filePath,
+                    outputTemplate,
+                    maxLogFileSizeBytes,
+                    preservedLogBeginningBytes,
+                    compactedLogFileSizeBytes))
 #if DEBUG
-            configuration.MinimumLevel.Debug();
+                .MinimumLevel.Debug();
 #else
-            configuration.MinimumLevel.Information();
+                .MinimumLevel.Information();
 #endif
             Logger = LogManager.GetLogger<CoopMod>();
-
-            if (!previousLogKept)
-                Logger.Warning(previousLogFailure, "Previous log {Path} could not be kept", PreviousLogFile.GetPath(filePath));
-
-            if (fileSink == null)
-                Logger.Warning(logFileFailure, "No log file could be opened ({Paths}); this session writes no log file", string.Join(", ", candidateLogPaths));
-            else if (openedLogPath != filePath)
-                Logger.Warning(logFileFailure, "Log {Path} could not be opened; this session logs to {OpenedPath}", filePath, openedLogPath);
         }
 
         private void CoopLogHeader(IModuleInfoProvider moduleInfoProvider)
@@ -369,13 +368,6 @@ namespace Coop
         {
             try
             {
-                // The reporter refuses to start without a log to attach.
-                if (activeLogFilePath == null)
-                {
-                    Logger.Warning("Crash reporter was not started: this session has no log file");
-                    return;
-                }
-
                 string moduleDirectory = System.IO.Path.GetDirectoryName(
                     Assembly.GetExecutingAssembly().Location);
                 string reporterPath = System.IO.Path.Combine(
@@ -535,20 +527,12 @@ namespace Coop
 #if DEBUG
             if (isAutoConnect && LiveTestControlServer.IsEnabled(Environment.GetCommandLineArgs()))
             {
-                // The live-test control server reads this session's log and refuses to start without one.
-                if (activeLogFilePath == null)
-                {
-                    Logger.Warning("Live-test control was not started: this session has no log file");
-                }
-                else
-                {
-                    liveTestControlServer = new LiveTestControlServer(
-                        isServer,
-                        activeLogFilePath,
-                        isDeferredClientJoin,
-                        () => autoConnectArgumentsValid && Coop.StartAsClient(autoConnectConfiguration));
-                    liveTestControlServer.Start();
-                }
+                liveTestControlServer = new LiveTestControlServer(
+                    isServer,
+                    activeLogFilePath,
+                    isDeferredClientJoin,
+                    () => autoConnectArgumentsValid && Coop.StartAsClient(autoConnectConfiguration));
+                liveTestControlServer.Start();
             }
 #endif
 
@@ -668,7 +652,6 @@ namespace Coop
             liveTestControlServer?.Dispose();
             liveTestControlServer = null;
 #endif
-            if (Logger != null) LogManager.SessionSummary.WriteSummary(Logger, "exit");
             base.OnSubModuleUnloaded();
         }
 
@@ -849,11 +832,15 @@ namespace Coop
         private static void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
         {
             Exception ex = (Exception)e.ExceptionObject;
-            Logger?.Fatal(ex, "Unhandled exception");
-            Logger?.Fatal(ex.StackTrace);
-            if (Logger != null) LogManager.SessionSummary.WriteSummary(Logger, "crash");
-            // The file sink flushes every event; this sends Seq's buffered events, if a Seq server is listening.
-            LogManager.CloseAndFlush(TimeSpan.FromSeconds(1));
+            if (Logger == null)
+            {
+                // Logging isn't set up yet, so keep the exception in the boot log instead of dropping it
+                BootPatches.FileLog($"Unhandled exception before logging was set up: {ex}");
+                return;
+            }
+
+            Logger.Fatal(ex, "Unhandled exception");
+            Logger.Fatal(ex.StackTrace);
             Serilog.Log.CloseAndFlush();
         }
 

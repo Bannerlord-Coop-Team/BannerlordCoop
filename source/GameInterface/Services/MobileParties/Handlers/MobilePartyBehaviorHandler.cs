@@ -78,7 +78,9 @@ internal class MobilePartyBehaviorHandler : IHandler
             return;
 
         data.ForcePosition = obj.What.ForcePosition;
-        data.IsCurrentlyAtSea = obj.What.IsCurrentlyAtSea;
+        // Unforced changes keep the party's own sea state from the snapshot instead of the message's default
+        if (obj.What.ForcePosition)
+            data.IsCurrentlyAtSea = obj.What.IsCurrentlyAtSea;
         data.ResetMovementToHold = obj.What.ResetMovementToHold;
 
         if (ModInformation.IsClient)
@@ -134,6 +136,11 @@ internal class MobilePartyBehaviorHandler : IHandler
 
                 if (ModInformation.IsClient && data.ForcePosition)
                     party.ApplyForcedPosition(data.PartyPosition, data.IsCurrentlyAtSea);
+
+                // A party spawned at sea or one whose transition only ran on the server has no local transition to get there
+                if (ModInformation.IsClient && !data.ForcePosition && !party.IsControlledByThisInstance() &&
+                    !party.IsTransitionInProgress && party.IsCurrentlyAtSea != data.IsCurrentlyAtSea)
+                    party.IsCurrentlyAtSea = data.IsCurrentlyAtSea;
 
                 if (ModInformation.IsClient && data.ResetMovementToHold)
                 {

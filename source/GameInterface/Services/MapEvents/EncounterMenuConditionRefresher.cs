@@ -53,7 +53,20 @@ internal class EncounterMenuConditionRefresher : IEncounterMenuConditionRefreshe
             return;
         }
 
-        Campaign.Current.GameMenuManager.RefreshMenuOptionConditions(menuContext);
+        RebuildMenuOptions(menuContext);
+    }
+
+    // Rebuilds the visible option list, because a condition refresh alone never shows an option hidden at build time.
+    private static void RebuildMenuOptions(MenuContext menuContext)
+    {
+        // An unbound menu builds its options fresh when its view binds, and RefreshMenuOptions needs a handler.
+        if (menuContext.Handler == null)
+        {
+            Campaign.Current.GameMenuManager.RefreshMenuOptionConditions(menuContext);
+            return;
+        }
+
+        Campaign.Current.GameMenuManager.RefreshMenuOptions(menuContext);
     }
 
     internal static bool NeedsEncounterMenuReinit(MapEvent mapEvent)

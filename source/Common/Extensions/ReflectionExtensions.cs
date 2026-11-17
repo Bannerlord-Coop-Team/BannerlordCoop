@@ -15,13 +15,8 @@ public static class ReflectionExtensions
     private const int MaxLoggedTypeNames = 10;
 
     /// <summary>
-    /// Gets all types in an AppDomain
+    /// Gets all types in an AppDomain, skipping the types an assembly cannot load
     /// </summary>
-    /// <remarks>
-    /// When running in tests and some other situations
-    /// reflection throws a ReflectionTypeLoadException,
-    /// Try statement is for mitigation.
-    /// </remarks>
     /// <param name="domain">Domain to get types from</param>
     /// <returns>Enumarable of all domain types</returns>
     public static IEnumerable<Type> GetDomainTypes(this AppDomain domain, string namespacePrefix = null)
@@ -40,13 +35,8 @@ public static class ReflectionExtensions
     }
 
     /// <summary>
-    /// Enumerates one assembly's types, skipping any that cannot be inspected.
+    /// Enumerates one assembly's types under the prefix, skipping any a missing optional dependency makes unreadable.
     /// </summary>
-    /// <remarks>
-    /// Optional dependencies that are not installed make GetTypes throw a
-    /// ReflectionTypeLoadException (use its non-null Types) and make reading
-    /// Namespace on a nested type throw when the enclosing type cannot load.
-    /// </remarks>
     internal static List<Type> FilterLoadableTypes(string assemblyName, Func<Type[]> getTypes, string namespacePrefix)
     {
         namespacePrefix = namespacePrefix ?? string.Empty;
@@ -76,6 +66,8 @@ public static class ReflectionExtensions
         List<Type> result = new List<Type>();
         int skipped = 0;
         List<string> skippedNames = new List<string>();
+        // GetTypes keeps a null for each type it could not load, and reading Namespace throws on a nested type
+        // whose enclosing type cannot load.
         foreach (Type type in candidates)
         {
             if (type == null)
@@ -88,7 +80,7 @@ public static class ReflectionExtensions
             {
                 string typeNamespace = type.Namespace;
                 if (typeNamespace == null) continue;
-                if (typeNamespace.StartsWith(namespacePrefix) == false) continue;
+                if (!typeNamespace.StartsWith(namespacePrefix)) continue;
             }
             catch (Exception)
             {
@@ -113,6 +105,7 @@ public static class ReflectionExtensions
         return result;
     }
 
+    // Names a skipped type for the warning, since FullName can throw on the same broken type.
     private static string SafeName(Type type)
     {
         try
@@ -178,80 +171,6 @@ public static class ReflectionExtensions
         }
 
         return fields;
-    }
-
-    /// <summary>
-    /// Checks if a type is fully serializable
-    /// </summary>
-    /// <param name="type">Type to check serializability</param>
-    /// <returns>True if fully serializable otherwise False</returns>
-    public static bool IsFullySerializable(this Type type)
-    {
-        return IsFullySerializableRecursive(type, new HashSet<Type>());
-    }
-
-    private static bool IsFullySerializableRecursive(Type type, HashSet<Type> handledTypes = null)
-    {
-        bool result = true;
-
-        if (handledTypes == null) handledTypes = new HashSet<Type>();
-
-        if (handledTypes.Contains(type)) return result;
-
-        result &= type.IsSerializable;
-
-        foreach (Type genericType in type.GetGenericArguments())
-        {
-            result &= IsFullySerializableRecursive(genericType);
-            if (result == false) return result;
-        }
-
-        if (type.IsArray) result &= IsFullySerializableRecursive(type.GetElementType());
-
-        return result;
-    }
-
-    /// <summary>
-    /// Castable GetValue Extension
-    /// </summary>
-    /// <typeparam name="T">Value to cast to</typeparam>
-    /// <param name="field">Extended type</param>
-    /// <param name="obj">Object to get value from</param>
-    /// <returns></returns>
-    public static T GetValue<T>(this FieldInfo field, object obj)
-    {
-        return (T)field.GetValue(obj);
-    }
-
-    /// <summary>
-    /// Castable GetValue Extension
-    /// </summary>
-    /// <typeparam name="T">Value to cast to</typeparam>
-    /// <param name="property">Extended type</param>
-    /// <param name="obj">Object to get value from</param>
-    /// <returns></returns>
-    public static T GetValue<T>(this PropertyInfo property, object obj)
-    {
-        return (T)property.GetValue(obj);
-    }
-
-    /// <summary>
-    /// Creates a new delegate with error checking
-    /// </summary>
-    /// <param name="type">Delegate type</param>
-    /// <param name="obj">Instance used to call method</param>
-    /// <param name="method">Method to assign delegate to</param>
-    /// <param name="delegate">Newly created delegate</param>
-    /// <returns>Success status</returns>
-    public static bool TryCreateDelegate(this Type type, object obj, MethodInfo method, out Delegate @delegate)
-    {
-        @delegate = null;
-
-        if (obj == null) return false;
-
-        @delegate = Delegate.CreateDelegate(type, obj, method);
-
-        return true;
     }
 
     private static int seed = 9876;

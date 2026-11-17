@@ -29,8 +29,12 @@ public readonly struct NetworkInitializeNewHero : IEvent
     [ProtoMember(7)]
     public readonly Equipment BattleEquipment;
 
+    [ProtoMember(8)]
+    public readonly string CharacterObjectId;
+
     public NetworkInitializeNewHero(
         string heroId,
+        string characterObjectId,
         TextObject firstName,
         TextObject name,
         string civilianEquipmentId,
@@ -39,6 +43,7 @@ public readonly struct NetworkInitializeNewHero : IEvent
         Equipment battleEquipment)
     {
         HeroId = heroId;
+        CharacterObjectId = characterObjectId;
         FirstName = firstName;
         Name = name;
         CivilianEquipmentId = civilianEquipmentId;

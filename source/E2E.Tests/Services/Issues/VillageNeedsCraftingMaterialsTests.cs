@@ -4,6 +4,7 @@ using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
+using GameInterface.Tests.Utils;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.AcceptCoordination;
 using GameInterface.Services.Issues.Framework.Finalization;
@@ -403,7 +404,7 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
             // Keep the second owner's giver away from the raided village so only the first quest matches.
             secondNotable.Issue.IssueQuest.QuestGiver.StayingInSettlement = otherGiverSettlement;
 
-            // v1.5 raid listeners read the component's own settlement, so use the map event's raid component.
+            // Raid listeners read the component's own settlement, so use the map event's raid component.
             var raid = (RaidEventComponent)VillageMapEvent(Server, settlementId, MapEvent.BattleTypes.Raid).Component;
             var previousMainParty = Campaign.Current.MainParty;
             Campaign.Current.MainParty = null;

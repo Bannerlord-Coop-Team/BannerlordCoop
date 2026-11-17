@@ -39,6 +39,7 @@ public class CoopDeploymentPatchTests
             var patched = harmony.CreateClassProcessor(GetPatchType()).Patch() ?? new List<MethodInfo>();
             Assert.Contains(patched, method => method.Name.Contains("IsPlanMade"));
             Assert.Contains(patched, method => method.Name.Contains("MakeTeamPlans"));
+            Assert.Contains(patched, method => method.Name.Contains("CheckDeployment"));
             var makePlans = AccessTools.Method(typeof(DefaultBattleMissionAgentSpawnLogic), "MakeTeamPlans");
             Assert.Contains(Harmony.GetPatchInfo(makePlans).Finalizers,
                 patch => patch.owner == harmony.Id && patch.PatchMethod.Name == "MakeTeamPlans_Finalizer");

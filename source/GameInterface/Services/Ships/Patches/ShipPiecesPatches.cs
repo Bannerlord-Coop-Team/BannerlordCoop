@@ -8,6 +8,7 @@ using TaleWorlds.CampaignSystem.Naval;
 namespace GameInterface.Services.Ships.Patches;
 
 [HarmonyPatch(typeof(Ship))]
+[HarmonyPatchCategory(GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class ShipPiecesPatches
 {
     [HarmonyPatch(nameof(Ship.InitializeFromTemplate))]
@@ -18,7 +19,7 @@ internal class ShipPiecesPatches
     [HarmonyPostfix]
     private static void Postfix_SetPieceAtSlot(Ship __instance) => PublishPieces(__instance);
 
-    // v1.5 replaced ResetUnlockedUpgradePieces with this setter, which rebuilds or clears the unlocked list.
+    // The setter rebuilds or clears the unlocked list.
     [HarmonyPatch(nameof(Ship.CanHaveUnlockedPieces), MethodType.Setter)]
     [HarmonyPostfix]
     private static void Postfix_SetCanHaveUnlockedPieces(Ship __instance) => PublishPieces(__instance);

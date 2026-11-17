@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.BattleBenchmark;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -50,8 +51,10 @@ public class CoopClient : CoopNetworkBase, ICoopClient
         IMessagePacketHandler messagePacketHandler,
         ICommonSerializer serializer,
         IReliableMessageBatcher<NetPeer> reliableMessageBatcher,
-        CancellationTokenSource sessionCancellation)
-        : base(config, serializer, reliableMessageBatcher, sessionCancellation)
+        CancellationTokenSource sessionCancellation,
+        // Optional so the tests that build this client directly don't need a recorder.
+        IBattleBenchmarkRecorder battleBenchmark = null)
+        : base(config, serializer, reliableMessageBatcher, sessionCancellation, battleBenchmark)
     {
         this.messageBroker = messageBroker;
         this.packetManager = packetManager;
@@ -79,7 +82,9 @@ public class CoopClient : CoopNetworkBase, ICoopClient
     {
         try
         {
-            object received = serializer.Deserialize(reader.GetRemainingBytes());
+            byte[] payload = reader.GetRemainingBytes();
+            object received = serializer.Deserialize(payload);
+            battleBenchmark?.RecordPayloadReceived(received, payload.Length);
 
             if (received is IPacket packet)
             {

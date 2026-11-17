@@ -119,13 +119,7 @@ internal class SiegeAftermathPatches
         leaderParty = null;
         settlement = null;
         if (mapEvent == null) return false;
-
-        var battleSide = (!mapEvent.IsSallyOut && !mapEvent.IsBlockadeSallyOut) ? BattleSideEnum.Attacker : BattleSideEnum.Defender;
-        if ((!mapEvent.IsSiegeAssault && !mapEvent.IsSallyOut && !mapEvent.IsBlockadeSallyOut)
-            || mapEvent.WinningSide != battleSide || mapEvent.MapEventSettlement == null)
-        {
-            return false;
-        }
+        if (!TryGetAftermathSide(mapEvent, out var battleSide)) return false;
 
         var lp = mapEvent.GetMapEventSide(battleSide).LeaderParty?.MobileParty;
         if (lp?.LeaderHero == null || !lp.LeaderHero.IsPlayerHero()) return false;
@@ -133,6 +127,19 @@ internal class SiegeAftermathPatches
         leaderParty = lp;
         settlement = mapEvent.MapEventSettlement;
         return true;
+    }
+
+    // Vanilla's aftermath trigger: a siege assault or sally out at a settlement, won by the attacker
+    // (the defender on a sally out). The out side is the one whose win runs the aftermath.
+    private static bool TryGetAftermathSide(MapEvent mapEvent, out BattleSideEnum aftermathSide)
+    {
+        bool isSallyOut = mapEvent.IsSallyOut || mapEvent.IsBlockadeSallyOut;
+        aftermathSide = isSallyOut ? BattleSideEnum.Defender : BattleSideEnum.Attacker;
+
+        if (!mapEvent.IsSiegeAssault && !isSallyOut) return false;
+        if (mapEvent.WinningSide != aftermathSide) return false;
+
+        return mapEvent.MapEventSettlement != null;
     }
 
     [HarmonyPatch(typeof(SiegeAftermathCampaignBehavior), nameof(SiegeAftermathCampaignBehavior.OnSiegeAftermathApplied))]
@@ -209,12 +216,7 @@ internal class SiegeAftermathPatches
     [HarmonyPrefix]
     private static bool OnMapEventEndedPrefix(SiegeAftermathCampaignBehavior __instance, MapEvent mapEvent)
     {
-        var battleSide = (!mapEvent.IsSallyOut && !mapEvent.IsBlockadeSallyOut) ? BattleSideEnum.Attacker : BattleSideEnum.Defender;
-        if ((!mapEvent.IsSiegeAssault && !mapEvent.IsSallyOut && !mapEvent.IsBlockadeSallyOut)
-            || mapEvent.WinningSide != battleSide || mapEvent.MapEventSettlement == null)
-        {
-            return false;
-        }
+        if (!TryGetAftermathSide(mapEvent, out var battleSide)) return false;
 
         var settlement = mapEvent.MapEventSettlement;
         var winningSide = mapEvent.GetMapEventSide(battleSide);
@@ -251,11 +253,11 @@ internal class SiegeAftermathPatches
                 }
 
                 __instance._playerEncounterAftermathDamagedBuildings.Clear();
-                // v1.5.7 saves this cache, so a client loads the server's last value; vanilla resets it here.
+                // This cache is saved, so a client loads the server's last value; vanilla resets it here.
                 __instance._settlementProsperityCache = -1f;
                 __instance._besiegerParty = leaderParty;
                 __instance._prevSettlementOwnerClan = settlement.OwnerClan;
-                // Vanilla's army-member test (v1.5.4): in an army the player does not lead.
+                // Vanilla's army-member test: in an army the player does not lead.
                 __instance._wasPlayerArmyMember = leaderParty != MobileParty.MainParty
                     && MobileParty.MainParty.Army != null && MobileParty.MainParty.Army.LeaderParty != MobileParty.MainParty;
                 if (ContainerProvider.TryResolve<ISiegeEventInterface>(out var siegeEventInterface))

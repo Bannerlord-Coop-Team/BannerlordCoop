@@ -5,6 +5,7 @@ using GameInterface.Policies;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Messages.Start;
+using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.MobileParties.Extensions;
 using HarmonyLib;
@@ -50,6 +51,15 @@ internal class MapEventSidePatches
         {
             if (ShouldBlockRaidAiIntervention(__instance, party))
                 return false;
+
+            // Walk-in joins set MapEventSide without asking CanPartyJoinBattle
+            var mobileParty = party?.MobileParty;
+            if (mobileParty != null && !mobileParty.IsPlayerParty() && mobileParty.AttachedTo?.MapEventSide != __instance &&
+                InteractionPatches.IsClosedToAiJoins(__instance.MapEvent))
+            {
+                RaidAiInterventionSuppression.BlockJoin(__instance, party);
+                return false;
+            }
 
             return true;
         }

@@ -12,7 +12,8 @@ public enum PlayerPartyInteractionPhase
     HostileDemandConfirm,
     HostileDemandPending,
     MercenaryConfirm,
-    MarriageOptions
+    MarriageOptions,
+    DivorceOptions
 }
 
 public enum PlayerPartyInteractionOption
@@ -40,7 +41,12 @@ public enum PlayerPartyInteractionOption
     MatrilinealMarriage,
     CancelMarriage,
     RequestMapTracking,
-    StopMapTracking
+    StopMapTracking,
+    ProposeDivorce,
+    DivorceStayInClan,
+    DivorceLeaveClan,
+    CancelDivorce,
+    WithdrawProposal
 }
 
 public enum PlayerPartyInteractionVassalUnavailableReason
@@ -101,7 +107,10 @@ public enum PlayerPartyInteractionOutcomeType
     MarriageDeclined,
     MapTrackingAccepted,
     MapTrackingDeclined,
-    MapTrackingStopped
+    MapTrackingStopped,
+    Divorced,
+    DivorcedAndLeftClan,
+    ProposalWithdrawn
 }
 
 public enum PlayerPartyInteractionDeniedReason

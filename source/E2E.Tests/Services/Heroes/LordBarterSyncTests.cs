@@ -32,7 +32,7 @@ using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using Xunit.Abstractions;
-using E2E.Tests.Util;
+using GameInterface.Tests.Utils;
 
 namespace E2E.Tests.Services.Heroes;
 

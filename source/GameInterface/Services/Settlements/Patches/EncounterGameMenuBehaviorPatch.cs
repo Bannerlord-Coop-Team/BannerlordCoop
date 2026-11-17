@@ -27,6 +27,20 @@ namespace GameInterface.Services.Settlements.Patches
         public static bool CastleOutsidePrefix(MenuCallbackArgs args) => Prefix(args);
 
         [HarmonyPrefix]
+        [HarmonyPatch(nameof(EncounterGameMenuBehavior.naval_town_outside_on_init))]
+        public static bool NavalTownOutsidePrefix(MenuCallbackArgs args) => Prefix(args);
+
+        [HarmonyPrefix]
+        [HarmonyPatch(nameof(EncounterGameMenuBehavior.attack_blockade_besieger_side_common_condition))]
+        public static bool AttackBlockadeConditionPrefix(ref bool __result)
+        {
+            if (PlayerEncounter.EncounterSettlement?.SiegeEvent != null) return true;
+
+            __result = false;
+            return false;
+        }
+
+        [HarmonyPrefix]
         [HarmonyPatch("game_menu_town_town_besiege_on_condition")]
         public static bool CheckFortificationEncounterSettlement(MenuCallbackArgs args)
         {

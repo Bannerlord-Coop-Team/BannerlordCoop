@@ -84,8 +84,7 @@ internal class HeirSelectionCampaignBehaviorPatches
         var selected = __instance.CurrentSelectedHero.Hero;
         InformationManager.ShowInquiry(new InquiryData(
             GameTexts.FindText("str_coop_succession_appoint_title").ToString(),
-            GameTexts.FindText("str_coop_clan_experimental_warning") + "\n\n" +
-            GameTexts.FindText("str_coop_succession_appoint_description").SetTextVariable("HERO", selected.Name),
+            GameTexts.FindText("str_coop_succession_appoint_description").SetTextVariable("HERO", selected.Name).ToString(),
             true, true, GameTexts.FindText("str_coop_succession_appoint_button").ToString(),
             GameTexts.FindText("str_cancel").ToString(),
             () => __instance.ExecuteFinalizeHeirSelection(selected), null));

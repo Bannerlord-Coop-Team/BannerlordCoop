@@ -354,7 +354,7 @@ public sealed class NearbyPartyReinforcerTests : IDisposable
         var attachedArmyParty = CreateMobileParty();
         var enemyParty = CreateMobileParty();
         var mapEvent = CreatePlayerBattle(nearbyArmyLeader, enemyParty);
-        // A v1.5 field battle re-places the remaining parties around the side leaders when one leaves;
+        // A field battle re-places the remaining parties around the side leaders when one leaves;
         // this leaderless fixture uses a sally-out, whose component does not, to test only the cleanup.
         mapEvent.SetBattleType(MapEvent.BattleTypes.SallyOut);
         var side = mapEvent.AttackerSide;
@@ -430,11 +430,11 @@ public sealed class NearbyPartyReinforcerTests : IDisposable
         var defenderSide = CreateSide(CreateMapEventParty(enemyParty));
         var mapEvent = (MapEvent)FormatterServices.GetUninitializedObject(typeof(MapEvent));
         SidesField.SetValue(mapEvent, new[] { defenderSide, attackerSide });
-        // v1.5 field battles re-place the remaining parties when one leaves, which walks the sides.
+        // Field battles re-place the remaining parties when one leaves, which walks the sides.
         LinkSide(defenderSide, mapEvent, BattleSideEnum.Defender);
         LinkSide(attackerSide, mapEvent, BattleSideEnum.Attacker);
         mapEvent._state = MapEventState.Wait;
-        // v1.5 reads the battle type through the component, so a map event always has one.
+        // The battle type is read through the component, so a map event always has one.
         mapEvent.SetBattleType(MapEvent.BattleTypes.FieldBattle);
         return mapEvent;
     }

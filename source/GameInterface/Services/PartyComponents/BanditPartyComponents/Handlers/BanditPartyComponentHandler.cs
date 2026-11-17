@@ -102,7 +102,7 @@ internal class BanditPartyComponentHandler : IHandler
 
         if (!objectManager.TryGetIdWithLogging(instance, out var banditPartyComponentId)) return;
         if (!objectManager.TryGetIdWithLogging(initArgs.Clan, out var clanId)) return;
-        // partyTemplate may legitimately be null: v1.5 deserters
+        // partyTemplate may legitimately be null for deserters
         string partyTemplateId = null;
         if (initArgs.PartyTemplate != null && !objectManager.TryGetIdWithLogging(initArgs.PartyTemplate, out partyTemplateId)) return;
 

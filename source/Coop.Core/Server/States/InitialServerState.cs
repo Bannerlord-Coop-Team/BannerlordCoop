@@ -1,8 +1,12 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Registry;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.GameState.Messages;
+using GameInterface.Services.Clans;
+using GameInterface.Services.MapEvents;
+using GameInterface.Services.MobileParties;
 using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
@@ -20,7 +24,9 @@ public class InitialServerState : ServerStateBase
 
     private readonly IMessageBroker messageBroker;
     private readonly IRegistryManager registryManager;
-    private readonly ILoadRepairRunner loadRepairRunner;
+    private readonly IMapEventLoadCleaner mapEventLoadCleaner;
+    private readonly ILeaderlessClanResolver leaderlessClanResolver;
+    private readonly IEmptyLordPartyResetter emptyLordPartyResetter;
     private readonly IModuleValidator moduleValidator;
     private readonly IGameStateInterface gameStateInterface;
     private readonly ILoadingInterface loadingInterface;
@@ -30,7 +36,9 @@ public class InitialServerState : ServerStateBase
         IServerLogic context,
         IMessageBroker messageBroker,
         IRegistryManager registryManager,
-        ILoadRepairRunner loadRepairRunner,
+        IMapEventLoadCleaner mapEventLoadCleaner,
+        ILeaderlessClanResolver leaderlessClanResolver,
+        IEmptyLordPartyResetter emptyLordPartyResetter,
         IModuleInfoProvider moduleInfoProvider,
         IModuleValidator moduleValidator,
         IGameStateInterface gameStateInterface,
@@ -39,7 +47,9 @@ public class InitialServerState : ServerStateBase
     {
         this.messageBroker = messageBroker;
         this.registryManager = registryManager;
-        this.loadRepairRunner = loadRepairRunner;
+        this.mapEventLoadCleaner = mapEventLoadCleaner;
+        this.leaderlessClanResolver = leaderlessClanResolver;
+        this.emptyLordPartyResetter = emptyLordPartyResetter;
         this.moduleValidator = moduleValidator;
         this.gameStateInterface = gameStateInterface;
         this.loadingInterface = loadingInterface;
@@ -54,8 +64,8 @@ public class InitialServerState : ServerStateBase
 
     internal void Handle_CampaignReady(MessagePayload<CampaignReady> payload)
     {
-        // Coop does not support DLC. Warn the host if any is enabled before the server becomes
-        // joinable; clients with DLC enabled are rejected separately during module validation.
+        // Coop supports no DLC other than NavalDLC. Warn the host if another is enabled before the server
+        // becomes joinable; clients with one enabled are rejected separately during module validation.
         if (!moduleValidator.ValidateNoDlc(moduleInfoProvider.GetModuleInfos(), out var dlcError))
         {
             Logger.Error("Hosting with unsupported modules enabled. {error}", dlcError);
@@ -71,7 +81,9 @@ public class InitialServerState : ServerStateBase
 
         loadingInterface.SetLoadingMessage("Hosting Coop Server", "Applying synced object lifetimes...");
         registryManager.PatchLifetimes();
-        loadRepairRunner.RunLoadRepairs();
+        mapEventLoadCleaner.CleanUpLoadedMapEvents();
+        leaderlessClanResolver.RepairLoadedClans();
+        emptyLordPartyResetter.ResetEmptyLordParties();
 
         Logic.SetState<ServerRunningState>();
     }
@@ -80,7 +92,12 @@ public class InitialServerState : ServerStateBase
     {
 #if DEBUG
         loadingInterface.ShowLoadingScreen();
-        gameStateInterface.LoadGame("MP");
+        // The MP dev save predates NavalDLC, so a NavalDLC server loads MP_Naval instead, or starts a new campaign on a machine
+        // that has no MP_Naval save.
+        if (ModInformation.IsNavalEnabled)
+            gameStateInterface.LoadGameOrStartNew("MP_Naval");
+        else
+            gameStateInterface.LoadGame("MP");
 #endif
     }
 

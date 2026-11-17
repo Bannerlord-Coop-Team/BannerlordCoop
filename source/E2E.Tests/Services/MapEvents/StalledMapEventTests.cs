@@ -1,6 +1,6 @@
 ﻿using Common.Util;
 using Coop.Core.Server.Services.Instances;
-using E2E.Tests.Util;
+using GameInterface.Tests.Utils;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Services.MobileParties;
@@ -176,10 +176,8 @@ public class StalledMapEventTests : MapEventTestBase
         }, MapEventDisabledMethods);
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void StalledBattle_InALoadedSave_IsFinalizedOnLoad(bool originalsAllowed)
+    [Fact]
+    public void StalledBattle_InALoadedSave_IsFinalizedOnLoad()
     {
         var context = CreateStalledMapEvent();
 
@@ -187,19 +185,8 @@ public class StalledMapEventTests : MapEventTestBase
         {
             var mapEvent = Server.GetRegisteredObject<MapEvent>(context.MapEventId);
 
-            // Load runs before campaign time moves, so no Update ends it first. Production runs it at
-            // CampaignReady, while the sync policy still allows originals.
-            if (originalsAllowed)
-            {
-                using (new AllowedThread())
-                {
-                    Server.Resolve<IMapEventLoadCleaner>().CleanUpLoadedMapEvents();
-                }
-            }
-            else
-            {
-                Server.Resolve<IMapEventLoadCleaner>().CleanUpLoadedMapEvents();
-            }
+            // Load runs before campaign time moves, so no Update ends it first.
+            Server.Resolve<IMapEventLoadCleaner>().CleanUpLoadedMapEvents();
 
             Assert.Equal(BattleState.AttackerVictory, mapEvent.BattleState);
             Assert.Equal(MapEventState.WaitingRemoval, mapEvent.State);

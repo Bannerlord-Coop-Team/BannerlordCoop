@@ -9,10 +9,13 @@ using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Inventory.Messages;
 using GameInterface.Services.Inventory.TradeSkills.Messages;
 using GameInterface.Services.MobileParties.Messages;
+using GameInterface.Services.NavalDLC.Messages;
 using GameInterface.Services.ObjectManager.Messages;
 using GameInterface.Services.OrderOfBattle.Messages;
 using GameInterface.Services.Smithing.Messages;
 using GameInterface.Services.Save.Interfaces;
+using GameInterface.Services.Ships.Messages;
+using GameInterface.Services.ViewData.Messages;
 using GameInterface.Services.Workshops.Messages;
 
 namespace Coop.Core.Client.Services.Save.Handler;
@@ -69,8 +72,11 @@ internal class SaveDataHandler : IHandler
         messageBroker.Publish(this, new InitializeClientHeroMeetingData(saveDataMessage.HeroMeetingData));
         messageBroker.Publish(this, new InitializeClientAgingData(saveDataMessage.AgingPlayerData));
         messageBroker.Publish(this, new InitializeClientClanFinance(saveDataMessage.ClanFinance));
+        messageBroker.Publish(this, new InitializeClientNavalData(saveDataMessage.NavalPlayerData));
         messageBroker.Publish(this, new InitializeClientOrderOfBattleData(saveDataMessage.OrderOfBattlePlayerData));
+        messageBroker.Publish(this, new InitializeClientViewData(saveDataMessage.ViewDataPlayerData));
         messageBroker.Publish(this, new InitializeClientAttachmentIdMap(saveDataMessage.AttachmentIdMap));
+        messageBroker.Publish(this, new InitializeClientHeldLootShips(saveDataMessage.HeldLootShipIds));
         // Add any other CoopSession data initialisations for clients here
     }
 }

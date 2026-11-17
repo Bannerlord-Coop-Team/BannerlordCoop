@@ -40,4 +40,25 @@ public class NetworkMeleeHitPresentationSerializationTests
         Assert.Equal(original.SoundIndex, result.SoundIndex);
         Assert.Equal(original.ArmorType, result.ArmorType);
     }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(127)]
+    [InlineData(128)]
+    [InlineData(int.MaxValue)]
+    public void NetworkPresentation_RoundTripsShiftedIndices(int index)
+    {
+        var original = new NetworkMeleeHitPresentation(Guid.NewGuid(), false, MeleeHitPresentationKind.Blood, index,
+            new Vec3(1f, 2f, 3f), WeaponClass.OneHandedSword, index, 0.5f, index);
+        var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
+        var packet = MessagePacket.Create(original, serializer);
+
+        var result = Assert.IsType<NetworkMeleeHitPresentation>(serializer.Deserialize<IMessage>(packet.Data));
+
+        Assert.Equal(index, result.CollisionBoneIndex);
+        Assert.Equal(index, result.PhysicsMaterialIndex);
+        Assert.Equal(index, result.SoundIndex);
+    }
 }

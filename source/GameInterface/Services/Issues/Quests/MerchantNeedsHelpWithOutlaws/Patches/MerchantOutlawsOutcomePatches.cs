@@ -33,7 +33,6 @@ internal class MerchantOutlawsOutcomePatches
     {
         if (ModInformation.IsServer)
         {
-            if (ContainerProvider.TryResolve<IMerchantOutlawsProgress>(out var progress)) progress.Send(__instance, final: true);
             return true;
         }
 

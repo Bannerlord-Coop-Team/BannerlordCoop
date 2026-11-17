@@ -4,6 +4,7 @@ using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
+using GameInterface.Tests.Utils;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.AcceptCoordination;
@@ -485,10 +486,11 @@ public class VillageNeedsToolsTests : IDisposable
         Assert.Equal(IssueOutcome.QuestSuccess, finalized.Outcome);
 
         var ending = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkVillageNeedsToolsJournal>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueJournal>());
         Assert.Single(ClientA.InternalMessages.GetMessages<NetworkVillageNeedsToolsJournal>());
         Assert.Empty(ClientB.InternalMessages.GetMessages<NetworkVillageNeedsToolsJournal>());
         Assert.Equal("You brought the promised tools.", ending.Text);
-        Assert.Contains(ownerQuest.JournalEntries, log => log.LogText?.ToString() == ending.Text);
+        Assert.Single(ownerQuest.JournalEntries, log => log.LogText?.ToString() == ending.Text);
 
         TestEnvironment.FlushCoalescer();
         foreach (var instance in Instances)
@@ -675,6 +677,8 @@ public class VillageNeedsToolsTests : IDisposable
                 var issue = (Issue)notable.Issue;
 
                 Assert.True(issue.IsSolvingWithAlternative);
+                Assert.False(issue.IsSolvingWithQuest);
+                Assert.Null(issue.IssueQuest);
                 Assert.Equal(ServerPayment, issue._payment);
                 Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var party));
                 grainBefore[instance] = party.ItemRoster.GetItemNumber(DefaultItems.Grain);
@@ -970,6 +974,17 @@ public class VillageNeedsToolsTests : IDisposable
         var finalized = Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>();
         if (fails) Assert.Equal(IssueOutcome.QuestFail, Assert.Single(finalized).Outcome);
         else Assert.Empty(finalized);
+    }
+
+    [Fact]
+    public void ReceivedServerJournalDoesNotEchoAnOwnerSnapshot()
+    {
+        Accept();
+        var before = ClientA.NetworkSentMessages.GetMessages<RequestQuestJournal>().Count();
+        ClientA.SimulateMessage(Server.NetPeer, new NetworkVillageNeedsToolsJournal(notableId, IssueId, "server progress row"));
+        TestEnvironment.FlushCoalescer();
+        ClientA.Call(() => Assert.Single(QuestOfHere(ClientA).JournalEntries, log => log.LogText.ToString() == "server progress row"));
+        Assert.Empty(ClientA.NetworkSentMessages.GetMessages<RequestQuestJournal>().Skip(before));
     }
 
     private void Accept()

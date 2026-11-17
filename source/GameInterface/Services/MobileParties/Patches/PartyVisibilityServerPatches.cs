@@ -7,7 +7,7 @@ namespace GameInterface.Services.MobileParties.Patches;
 /// <summary>
 /// Parties are always visible on the server, and in debug builds everywhere
 /// (<see cref="DebugPartyVisibility"/>). Release clients keep the native fog of war.
-/// v1.5 removed <c>MobileParty.IsSpotted()</c>; its callers (the party nameplates) read
+/// The party nameplates read
 /// <see cref="MobileParty.IsVisible"/> directly, so the read-time override sits on that getter.
 /// </summary>
 [HarmonyPatch(typeof(MobileParty), nameof(MobileParty.IsVisible), MethodType.Getter)]

@@ -124,7 +124,7 @@ public class BanditPartyComponentTests : SyncTestBase
             var clan = GameObjectCreator.CreateInitializedObject<Clan>();
             var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
 
-            // v1.5 deserter looters are created with a null PartyTemplate
+            // Deserter looters are created with a null PartyTemplate
             var newParty = BanditPartyComponent.CreateLooterParty("TestNullTemplateLooterId", clan, settlement, false, null, position);
 
             Assert.True(server.ObjectManager.TryGetId(newParty, out partyId));

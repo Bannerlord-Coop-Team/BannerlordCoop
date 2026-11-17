@@ -47,7 +47,7 @@ public class ClientLogic : IClientLogic
         }
         set
         {
-            Logger.Information("Client is changing to {state} State", value.GetType().Name);
+            Logger.Debug("Client is changing to {state} State", value.GetType().Name);
 
             _state?.Dispose();
             _state = value;
@@ -76,7 +76,7 @@ public class ClientLogic : IClientLogic
         new Dictionary<Type, Func<IClientState>>
         {
             [typeof(MainMenuState)] = () => new MainMenuState(this, context.MessageBroker, context.Network, context.GameInterface, context.GameStateInterface, context.LoadingInterface, context.JoinAttemptOverlay, context.JoinAttempt, context.CoopFinalizer, context.PatchFailureReport),
-            [typeof(ValidateModuleState)] = () => new ValidateModuleState(this, context.MessageBroker, context.Network, context.ControllerIdProvider, context.CoopFinalizer, context.GameStateInterface, context.ModuleInfoProvider, context.ModuleNameProvider),
+            [typeof(ValidateModuleState)] = () => new ValidateModuleState(this, context.MessageBroker, context.Network, context.ControllerIdProvider, context.CoopFinalizer, context.GameStateInterface, context.ModuleInfoProvider, context.ModuleNameProvider, context.ModuleValidator),
             [typeof(CharacterCreationState)] = () => new CharacterCreationState(this, context.MessageBroker, context.Network, context.HeroInterface, context.RegistryManager, context.ControllerIdProvider, context.LoadingInterface, context.PlayerManager, context.GameStateInterface, context.CoopFinalizer),
             [typeof(ReceivingSavedDataState)] = () => new ReceivingSavedDataState(this, context.MessageBroker, context.LoadingInterface, context.GameStateInterface),
             [typeof(LoadingState)] = () => new LoadingState(this, context.MessageBroker, context.RegistryManager, context.HeroInterface, context.ControllerIdProvider, context.PlayerManager, context.GameStateInterface, context.LoadingInterface),

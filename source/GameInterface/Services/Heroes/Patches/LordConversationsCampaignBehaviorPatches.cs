@@ -70,9 +70,8 @@ internal class LordConversationsCampaignBehaviorPatches
         return false;
     }
 
-    // v1.5 asks before executing, and "Forget It" takes the lord prisoner instead. Vanilla's delegate
-    // calls TakePrisonerAction, which only the server may run, so route it like the capture answer.
-    // Executing still goes through HeroExecutionScenePatch.
+    // "Forget It" takes the lord prisoner through TakePrisonerAction, which only the server may run, so route it
+    // like the capture answer. Executing still goes through HeroExecutionScenePatch.
     [HarmonyPatch(nameof(LordConversationsCampaignBehavior.conversation_talk_lord_defeat_to_lord_capture_and_kill_on_consequence))]
     [HarmonyPrefix]
     public static bool ConversationTalkLordDefeatToLordCaptureAndKillOnConsequencePrefix()

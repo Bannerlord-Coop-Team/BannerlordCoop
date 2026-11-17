@@ -7,6 +7,8 @@ using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.Companions.Messages;
 using GameInterface.Services.MapEvents.Interfaces;
+using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using GameInterface.Services.TroopRosters.Messages;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
@@ -226,12 +228,19 @@ public class CompanionDismissalSyncTests : IDisposable
         string clanId = null;
         string heroId = null;
         string characterId = null;
+        string leaderId = null;
 
         Server.Call(() =>
         {
             var clan = GameObjectCreator.CreateInitializedObject<Clan>();
             var companion = GameObjectCreator.CreateInitializedObject<Hero>();
             MobileParty party = null;
+
+            // The requesting client plays the clan's leader, who may dismiss its companions.
+            var leader = GameObjectCreator.CreateInitializedObject<Hero>();
+            leader.Clan = clan;
+            clan.SetLeader(leader);
+            Assert.True(Server.ObjectManager.TryGetId(leader, out leaderId));
 
             var companionName = new TextObject("Dismissal Test Companion");
             companion.SetName(companionName, companionName);
@@ -253,6 +262,13 @@ public class CompanionDismissalSyncTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetId(companion.CharacterObject, out characterId));
         });
         testEnvironment.FlushCoalescer();
+
+        Server.Call(() =>
+        {
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.AddPlayer(new Player("ClanLeader", leaderId, null, clanId, null)));
+            playerManager.SetPeer("ClanLeader", Clients[0].NetPeer);
+        });
 
         return new CompanionContext(partyId, clanId, heroId, characterId);
     }

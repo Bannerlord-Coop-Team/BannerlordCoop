@@ -17,7 +17,13 @@ switched off, and a server running one cancels any quest a nightly save still ha
 - Rewards, relations and endings are worked out by the server as the owning player. Clients only show the
   result.
 - Settlement ownership changes reach active quests on the server, so vanilla cancellations end the owner's quest.
+- Village Needs Grain Seeds supports direct delivery, timeout, war/crime endings and the funded companion solution;
+  its verification recipe is [here](../../../../doc/automated-testing/headman-needs-grain.md).
 - Quests are not saved between sessions. A quest ends when its player leaves or the server restarts.
+
+Army of Poachers supports direct village battles, negotiation and sending a companion.
+The owner receives its journal and personal rewards; other players may accept separate copies.
+See [the verification recipe](../../../../../doc/automated-testing/quests/army-of-poachers.md).
 
 ## Trying it in game
 

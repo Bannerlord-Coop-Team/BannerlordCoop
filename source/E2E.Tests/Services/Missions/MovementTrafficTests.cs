@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Linq;
 using System.Reflection;
+using Common.BattleBenchmark;
 using Common.Messaging;
 using Common.Network;
 using Common.Network.Session;
@@ -217,6 +218,7 @@ public partial class MovementTrafficTests : MissionTestEnvironment
                 rateController,
                 peer.Resolve<IMovementPriorityScheduler>(),
                 peer.Resolve<IMissionContext>(),
+                peer.Resolve<INavalDeckMovementProbe>(),
                 peer.Resolve<ILocationNpcAuthorityState>());
             handler.Configure(MovementCadenceProfile.Battle);
 
@@ -307,6 +309,7 @@ public partial class MovementTrafficTests : MissionTestEnvironment
                 rateController.Object,
                 peer.Resolve<IMovementPriorityScheduler>(),
                 peer.Resolve<IMissionContext>(),
+                peer.Resolve<INavalDeckMovementProbe>(),
                 peer.Resolve<ILocationNpcAuthorityState>());
 
             Agent locallyControlledAgent = SpawnRider(mock);
@@ -450,6 +453,7 @@ public partial class MovementTrafficTests : MissionTestEnvironment
                 rateController.Object,
                 priorityScheduler,
                 peer.Resolve<IMissionContext>(),
+                peer.Resolve<INavalDeckMovementProbe>(),
                 peer.Resolve<ILocationNpcAuthorityState>());
             Assert.True(registry.TryRegisterAgent(
                 "owner", Guid.NewGuid(), 1, SpawnRider(mock)));
@@ -530,6 +534,7 @@ public partial class MovementTrafficTests : MissionTestEnvironment
                 rateController.Object,
                 priorityScheduler,
                 peer.Resolve<IMissionContext>(),
+                peer.Resolve<INavalDeckMovementProbe>(),
                 peer.Resolve<ILocationNpcAuthorityState>());
             Agent agent = SpawnRider(mock);
             Assert.True(AgentMirror.TryGet(agent, out MirrorAgent mirror));
@@ -608,6 +613,7 @@ public partial class MovementTrafficTests : MissionTestEnvironment
                 rateController.Object,
                 priorityScheduler,
                 peer.Resolve<IMissionContext>(),
+                peer.Resolve<INavalDeckMovementProbe>(),
                 peer.Resolve<ILocationNpcAuthorityState>());
             Agent mainAgent = SpawnRider(mock);
             Agent formationAgent = SpawnRider(mock);
@@ -978,6 +984,7 @@ public partial class MovementTrafficTests : MissionTestEnvironment
                 peer.Resolve<IMovementRateController>(),
                 peer.Resolve<IMovementPriorityScheduler>(),
                 peer.Resolve<IMissionContext>(),
+                peer.Resolve<INavalDeckMovementProbe>(),
                 peer.Resolve<ILocationNpcAuthorityState>());
             var riderMirrors = new List<MirrorAgent>();
 
@@ -1279,6 +1286,51 @@ public partial class MovementTrafficTests : MissionTestEnvironment
         });
     }
 
+    [Fact]
+    public void CompressedMovement_CountsOnReceiveUnderThePacketItCarriesWithTheWireBytes()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+
+        peer.Call(() =>
+        {
+            var mock = CreateMovementMission(fixture, peer);
+            var ids = new ushort[3];
+            var riders = new AgentData[3];
+            var mounts = new AgentMountData[3];
+            for (int i = 0; i < ids.Length; i++)
+            {
+                var rider = SpawnRider(mock);
+                var mount = mock.SpawnMount(rider);
+                Assert.True(AgentMirror.TryGet(rider, out var riderMirror));
+                Assert.True(AgentMirror.TryGet(mount, out var mountMirror));
+                PopulateMovementState(riderMirror, i + 1);
+                PopulateMovementState(mountMirror, i + 1);
+                ids[i] = (ushort)(i + 1);
+                ushort mountId = (ushort)(i + 101);
+                riders[i] = new AgentData(rider, mountId);
+                mounts[i] = new AgentMountData(mount, mountId);
+            }
+
+            var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
+            var compressor = new MovementPacketCompressor(serializer);
+            var recorder = new Mock<IBattleBenchmarkRecorder>();
+            recorder.SetupGet(value => value.IsRecording).Returns(true);
+            using var handler = new CompressedMovementPacketHandler(Mock.Of<IPacketManager>(), compressor, recorder.Object);
+            const string senderControllerId = "76561198000000042";
+            var revisions = new long[] { 1, 2, 3 };
+            byte[] agentWire = compressor.Serialize(new MovementPacket(senderControllerId, ids, riders, senderControllerId, revisions));
+            byte[] mountWire = compressor.Serialize(new MountMovementPacket(senderControllerId, ids, mounts, senderControllerId, revisions));
+
+            foreach (byte[] wire in new[] { agentWire, mountWire })
+                handler.HandlePacket(Server.NetPeer, Assert.IsType<CompressedMovementPacket>(serializer.Deserialize<IPacket>(wire)));
+
+            recorder.Verify(value => value.RecordTypeReceived(typeof(MovementPacket), agentWire.Length), Times.Once);
+            recorder.Verify(value => value.RecordTypeReceived(typeof(MountMovementPacket), mountWire.Length), Times.Once);
+            recorder.Verify(value => value.RecordTypeReceived(It.IsAny<Type>(), It.IsAny<int>()), Times.Exactly(2));
+        });
+    }
+
     private static IPacket AssertFitsAndDispatchesThroughRelay(
         ProtoBufSerializer serializer,
         MovementPacketCompressor compressor,
@@ -1456,11 +1508,15 @@ public partial class MovementTrafficTests : MissionTestEnvironment
             return new byte[Math.Max(1, snapshots) * bytesPerSnapshot];
         }
 
+        public byte[] SerializeSnapshots(IPacket packet, Guid[] snapshotIds) => Serialize(packet);
+
         public bool TryRestore(IPacket packet, out IPacket restored)
         {
             restored = packet;
             return true;
         }
+
+        public int GetSerializedLength(CompressedMovementPacket packet) => throw new NotSupportedException();
     }
 
     private sealed class CountingMovementPacketCompressor : IMovementPacketCompressor
@@ -1480,10 +1536,18 @@ public partial class MovementTrafficTests : MissionTestEnvironment
             return inner.Serialize(packet);
         }
 
+        public byte[] SerializeSnapshots(IPacket packet, Guid[] snapshotIds)
+        {
+            SerializeCalls++;
+            return inner.SerializeSnapshots(packet, snapshotIds);
+        }
+
         public bool TryRestore(IPacket packet, out IPacket restored)
         {
             return inner.TryRestore(packet, out restored);
         }
+
+        public int GetSerializedLength(CompressedMovementPacket packet) => inner.GetSerializedLength(packet);
 
         public void Reset()
         {
@@ -1527,6 +1591,9 @@ public partial class MovementTrafficTests : MissionTestEnvironment
                     : 0d,
                 traffic,
                 includesAuthoritativeAgents);
+
+        public void ReportRecipientBulkSend(string controllerId) =>
+            inner.ReportRecipientBulkSend(controllerId);
 
         public void ReportReceive(
             double queueMilliseconds,

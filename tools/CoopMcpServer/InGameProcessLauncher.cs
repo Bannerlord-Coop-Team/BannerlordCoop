@@ -31,8 +31,10 @@ public sealed class InGameProcessLauncher : IGameProcessLauncher
             UseShellExecute = false,
             WorkingDirectory = Path.GetDirectoryName(profile.Executable),
         };
+        // /suppress_message_boxes: the engine logs a native message box instead of waiting for a click,
+        // so an unattended run never stalls on one (for example "Mod change detected" after a module list change).
         foreach (string argument in new[] { "/singleplayer", "/" + role, "/autoconnect",
-            "/platformId", platformId, "/cooptestrun", runToken })
+            "/platformId", platformId, "/cooptestrun", runToken, "/suppress_message_boxes" })
             info.ArgumentList.Add(argument);
         if (role == "client") info.ArgumentList.Add("/cooptestmanualjoin");
         if (role == "server" && saveName != null)

@@ -12,7 +12,7 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using Xunit.Abstractions;
-using E2E.Tests.Util;
+using GameInterface.Tests.Utils;
 
 namespace E2E.Tests.Services.MapEvents;
 

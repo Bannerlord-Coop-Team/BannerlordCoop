@@ -2,13 +2,10 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using GameInterface.Services.Clans.Data;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Heroes.Extensions;
-using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using Serilog;
-using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem;
 
@@ -21,15 +18,18 @@ internal class ClanPartyItemVMHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly IPartyConfigurationService partyConfiguration;
 
     public ClanPartyItemVMHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
-        INetwork network)
+        INetwork network,
+        IPartyConfigurationService partyConfiguration)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
+        this.partyConfiguration = partyConfiguration;
 
         messageBroker.Subscribe<PartyConfigurationChangedOnSelection>(Handle_PartyConfigurationChangedOnSelection);
         messageBroker.Subscribe<UpdatePartyConfigurationOnSelection>(Handle_UpdatePartyConfigurationOnSelection);
@@ -60,7 +60,7 @@ internal class ClanPartyItemVMHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.LeaderHeroId, out var leader)) return;
             if (leader.IsPlayerHero()) return;
-            PartyConfigurationFlags.Set(leader, obj.What.Flag, obj.What.Value);
+            partyConfiguration.Set(leader, obj.What.Flag, obj.What.Value);
         });
     }
 

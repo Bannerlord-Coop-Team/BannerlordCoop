@@ -1,5 +1,6 @@
 ﻿using GameInterface.Services.Clans.Extensions;
 using HarmonyLib;
+using Common;
 using System.Linq;
 using TaleWorlds.CampaignSystem.Election;
 using TaleWorlds.Library;
@@ -9,6 +10,21 @@ namespace GameInterface.Services.Kingdoms.Patches;
 [HarmonyPatch(typeof(KingdomDecision))]
 internal class KingdomDecisionPatches
 {
+    [HarmonyPatch(nameof(KingdomDecision.NeedsPlayerResolution), MethodType.Getter)]
+    [HarmonyPrefix]
+    private static bool NeedsPlayerResolutionPrefix(KingdomDecision __instance, ref bool __result)
+    {
+        if (ModInformation.IsClient
+            && ContainerProvider.TryResolve<IKingdomDecisionVoteManager>(out var voteManager)
+            && voteManager.IsSubmittedDecision(__instance))
+        {
+            // MapScreen otherwise reopens an overdue vote while the server waits for other clans.
+            __result = false;
+            return false;
+        }
+        return true;
+    }
+
     [HarmonyPatch(nameof(KingdomDecision.ShouldBeCancelled))]
     [HarmonyPrefix]
     private static bool ShouldBeCancelledPrefix(KingdomDecision __instance, ref bool __result)

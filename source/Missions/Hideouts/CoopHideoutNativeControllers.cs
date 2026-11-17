@@ -147,7 +147,7 @@ internal sealed class CoopHideoutAssaultController : HideoutMissionController, I
 internal sealed class CoopHideoutAmbushController : HideoutAmbushMissionController, ICoopHideoutNativeController, IMissionAgentSpawnLogic
 {
     internal const float StealthFailCounterSeconds = 15f;
-    // v1.5 made these base fields readonly (set by the constructor); co-op fills them once it knows the battle.
+    // These base fields are readonly (set by the constructor); co-op fills them once it knows the battle.
     private static readonly AccessTools.FieldRef<HideoutAmbushMissionController, int> InitialHideoutPopulation =
         AccessTools.FieldRefAccess<HideoutAmbushMissionController, int>(nameof(_initialHideoutPopulation));
     private static readonly AccessTools.FieldRef<HideoutAmbushMissionController, int> PlayerTroopCount =
@@ -184,7 +184,7 @@ internal sealed class CoopHideoutAmbushController : HideoutAmbushMissionControll
     public int GetNumberOfPlayerControllableTroops() => coop.Attacker.GetNumberOfPlayerControllableTroops();
     public override void OnCreated() => Mission.DoesMissionRequireCivilianEquipment = false;
     public override void AfterStart() { }
-    // v1.5 calls Mission.OnInitialSpawnCompleted here, which finishes deployment during mission loading,
+    // Vanilla calls Mission.OnInitialSpawnCompleted here, which finishes deployment during mission loading,
     // before the session has a host.
     // CoopHideoutMissionLogic.OnMissionTick stays the single deployment finisher, after the session is ready.
     public override void OnAfterMissionLoadingFinished() { }

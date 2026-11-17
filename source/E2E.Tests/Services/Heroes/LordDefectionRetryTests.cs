@@ -136,7 +136,7 @@ public class LordDefectionRetryTests : IDisposable
     }
 
     /// <summary>
-    /// v1.5.4 expires a refusal by its one-season cooldown instead of pruning the record, so
+    /// A refusal expires by its one-season cooldown instead of pruning the record, so
     /// NeverExpire keeps every attempt in its cooldown.
     /// </summary>
     [Theory]

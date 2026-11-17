@@ -155,26 +155,38 @@ internal class ServerPlayerUnstuck : IServerPlayerUnstuck
         // all, lords and garrisons too, since they can block a town for everyone.
         TryStep(actions, "ended battle release", () =>
         {
-            // Broadcast as each party is released, so a later group that throws can't swallow it. The cleaner
-            // logs a failed broadcast and keeps going, so count the ones that reached the clients.
+            var (releasedParties, failedMapEventIds) = mapEventLoadCleaner.ReleaseEndedMapEventLinks();
             var broadcastCount = 0;
-            var releasedParties = mapEventLoadCleaner.ReleaseEndedMapEventLinks(releasedParty =>
+            foreach (var releasedParty in releasedParties)
             {
                 if (!objectManager.TryGetIdWithLogging(releasedParty, out var releasedPartyId))
-                    return;
+                    continue;
 
-                network.SendAll(new NetworkPartyLeftBattle(releasedPartyId, finishLocalMenus: false));
-                broadcastCount++;
-            });
+                // The party is already released, so a failed send only counts as unreported instead of failing the step.
+                try
+                {
+                    network.SendAll(new NetworkPartyLeftBattle(releasedPartyId, finishLocalMenus: false));
+                    broadcastCount++;
+                }
+                catch (Exception e)
+                {
+                    Logger.Warning(e, "Could not report released party {PartyId} to clients", releasedPartyId);
+                }
+            }
 
-            if (releasedParties.Length == 0)
-                return null;
+            var lines = new List<string>();
+            if (releasedParties.Length > 0)
+                lines.Add($"Released {releasedParties.Length} parties still linked to a battle that already ended.");
 
-            var line = $"Released {releasedParties.Length} parties still linked to a battle that already ended.";
             var unreported = releasedParties.Length - broadcastCount;
-            return unreported == 0
-                ? line
-                : $"{line} Could not tell clients about {unreported} of them, see the server log.";
+            if (unreported > 0)
+                lines.Add($"Could not tell clients about {unreported} of them, see the server log.");
+
+            // The cleaner logs a battle that fails and moves on to the next one, so only this line reports it.
+            if (failedMapEventIds.Length > 0)
+                lines.Add($"Failed ended battle release for map events {string.Join(", ", failedMapEventIds)}, see the server log.");
+
+            return lines.Count == 0 ? null : string.Join(" ", lines);
         });
 
         if (party.Party?.MapEvent != null)

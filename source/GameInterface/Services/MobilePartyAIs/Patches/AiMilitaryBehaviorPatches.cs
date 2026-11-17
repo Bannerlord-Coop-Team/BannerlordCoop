@@ -1,4 +1,6 @@
-﻿using HarmonyLib;
+﻿using GameInterface.Services.MapEvents.Patches;
+using HarmonyLib;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors.AiBehaviors;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -6,7 +8,7 @@ using TaleWorlds.CampaignSystem.Settlements;
 namespace GameInterface.Services.MobilePartyAIs.Patches;
 
 /// <summary>
-/// Makes the last attacker check of <see cref="AiMilitaryBehavior"/> read co-op player parties. Its listeners
+/// Adapts <see cref="AiMilitaryBehavior"/> settlement targeting to co-op player parties and battles. Its listeners
 /// are only registered on the server (<see cref="AiEngagePartyBehaviorPatches"/>).
 /// </summary>
 [HarmonyPatch(typeof(AiMilitaryBehavior))]
@@ -21,5 +23,18 @@ internal class AiMilitaryBehaviorPatches
         if (!__result) return;
 
         __result = !DefaultMobilePartyAIModelPatches.IsAttackPrevented(mobileParty, settlement.LastAttackerParty);
+    }
+
+    // Drops hourly besiege and defend targets whose siege battle is closed to AI joins, otherwise the party walks up
+    // and gets held beside it. Parties already in that siege's camp keep their score so they aren't ejected.
+    [HarmonyPatch(nameof(AiMilitaryBehavior.AiHourlyTick))]
+    [HarmonyPostfix]
+    private static void AiHourlyTickPostfix(MobileParty mobileParty, PartyThinkParams p)
+    {
+        p._aiBehaviorScores.RemoveAll(score =>
+            (score.Item1.AiBehavior == AiBehavior.BesiegeSettlement || score.Item1.AiBehavior == AiBehavior.DefendSettlement) &&
+            score.Item1.Party is Settlement target &&
+            mobileParty.BesiegedSettlement != target &&
+            InteractionPatches.IsSiegeClosedToAiJoins(target));
     }
 }

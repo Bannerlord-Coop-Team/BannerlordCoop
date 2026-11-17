@@ -1,6 +1,7 @@
 ﻿using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Util;
+using GameInterface.Tests.Utils;
 using GameInterface.Services.MapEvents.Interfaces;
 using GameInterface.Services.SiegeEvents.Handlers;
 using GameInterface.Services.SiegeEvents.Interfaces;

@@ -5,12 +5,9 @@ using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
-using Helpers;
 using LiteNetLib;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Actions;
-using TaleWorlds.CampaignSystem.CharacterDevelopment;
 
 namespace GameInterface.Services.Heroes.Handlers;
 
@@ -21,6 +18,7 @@ internal class HeroMeetingHandler : IHandler
     private readonly INetwork network;
     private readonly IPlayerManager playerManager;
     private readonly ISessionHeroMeetingDataInterface sessionHeroMeetingDataInterface;
+    private readonly IHeroRelationsInterface heroRelationsInterface;
 
     private HeroMeetingData heroMeetingData;
 
@@ -29,13 +27,15 @@ internal class HeroMeetingHandler : IHandler
         IObjectManager objectManager,
         INetwork network,
         IPlayerManager playerManager,
-        ISessionHeroMeetingDataInterface sessionHeroMeetingDataInterface)
+        ISessionHeroMeetingDataInterface sessionHeroMeetingDataInterface,
+        IHeroRelationsInterface heroRelationsInterface)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.playerManager = playerManager;
         this.sessionHeroMeetingDataInterface = sessionHeroMeetingDataInterface;
+        this.heroRelationsInterface = heroRelationsInterface;
 
         messageBroker.Subscribe<InitializeClientHeroMeetingData>(Handle);
         messageBroker.Subscribe<PlayerHeroChanged>(Handle);
@@ -110,22 +110,8 @@ internal class HeroMeetingHandler : IHandler
                 meeting.MetHeroId,
                 meeting.LastMeetingTimeTicks);
             if (firstMeeting)
-                ApplyFirstMeetingRelation(playerHero, metHero);
+                heroRelationsInterface.ApplyFirstMeetingRelation(playerHero, metHero);
         }, context: nameof(Handle));
-    }
-
-    // Mirrors v1.5 HeroKnownInformationCampaignBehavior.OnPlayerMetHero, which applies this only for the
-    // server's own main hero: a calculating player hero loses relation with a town notable the first time the
-    // session records that hero meeting them.
-    private static void ApplyFirstMeetingRelation(Hero playerHero, Hero metHero)
-    {
-        if (!metHero.IsNotable || metHero.CurrentSettlement?.IsTown != true) return;
-
-        var relationChange = (int)TraitEffectHelper.GetTraitEffectBonus(
-            playerHero,
-            DefaultPersonalityTraitEffects.CalculatingNotableRelationEffect);
-        if (relationChange != 0)
-            ChangeRelationAction.ApplyRelationChangeBetweenHeroes(playerHero, metHero, relationChange, showQuickNotification: false);
     }
 
     private static void RecordMeeting(

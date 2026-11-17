@@ -1,5 +1,6 @@
 ﻿using GameInterface.Services.Clans.Data;
 using GameInterface.Services.Inventory.Data;
+using GameInterface.Services.MapEvents.Data;
 using GameInterface.Services.TroopRosters.Data;
 using LiteNetLib;
 using System.Collections.Generic;
@@ -19,6 +20,8 @@ internal sealed class PlayerPartyInteractionSession
     public bool IsHostile { get; }
     public PlayerPartyInteractionVassalUnavailableReason VassalUnavailableReason { get; set; }
     public ClanJoinUnavailableReason ClanJoinUnavailableReason { get; set; }
+    public ClanJoinUnavailableReason PatrilinealMarriageUnavailableReason { get; set; }
+    public ClanJoinUnavailableReason MatrilinealMarriageUnavailableReason { get; set; }
     public PlayerPartyInteractionMercenaryUnavailableReason MercenaryUnavailableReason { get; set; }
     public int MercenaryAwardMultiplier { get; set; }
     public PlayerPartyInteractionProposal Proposal { get; set; }
@@ -38,11 +41,12 @@ internal sealed class PlayerPartyInteractionSession
     public TroopRosterElementData[] ResponderOfferedTroops { get; set; } = new TroopRosterElementData[0];
     public bool InitiatorOfferedPeace { get; set; }
     public bool ResponderOfferedPeace { get; set; }
+    public PlayerPartyMarriageOfferData[] InitiatorOfferedMarriages { get; set; } = System.Array.Empty<PlayerPartyMarriageOfferData>();
+    public PlayerPartyMarriageOfferData[] ResponderOfferedMarriages { get; set; } = System.Array.Empty<PlayerPartyMarriageOfferData>();
     public Kingdom TargetKingdom { get; set; }
 
     public HashSet<PlayerPartyInteractionOption> InitiatorOptions { get; } = new HashSet<PlayerPartyInteractionOption>();
     public HashSet<PlayerPartyInteractionOption> InitiatorEnabledOptions { get; } = new HashSet<PlayerPartyInteractionOption>();
-    public PlayerPartyInteractionOption[] ResponderClanOptions { get; set; } = System.Array.Empty<PlayerPartyInteractionOption>();
 
     public PlayerPartyInteractionSession(
         string sessionId,
@@ -81,7 +85,8 @@ internal sealed class PlayerPartyInteractionSession
         int offeredGold,
         string[] offeredFiefs,
         TroopRosterElementData[] offeredPrisoners,
-        bool offeredPeace)
+        bool offeredPeace,
+        PlayerPartyMarriageOfferData[] offeredMarriages)
     {
         if (partyId == InitiatorPartyId)
         {
@@ -91,6 +96,7 @@ internal sealed class PlayerPartyInteractionSession
             InitiatorOfferedFiefs = offeredFiefs ?? new string[0];
             InitiatorOfferedPrisoners = offeredPrisoners ?? new TroopRosterElementData[0];
             InitiatorOfferedPeace = offeredPeace;
+            InitiatorOfferedMarriages = offeredMarriages ?? System.Array.Empty<PlayerPartyMarriageOfferData>();
             return;
         }
 
@@ -102,6 +108,7 @@ internal sealed class PlayerPartyInteractionSession
             ResponderOfferedFiefs = offeredFiefs ?? new string[0];
             ResponderOfferedPrisoners = offeredPrisoners ?? new TroopRosterElementData[0];
             ResponderOfferedPeace = offeredPeace;
+            ResponderOfferedMarriages = offeredMarriages ?? System.Array.Empty<PlayerPartyMarriageOfferData>();
         }
     }
 }

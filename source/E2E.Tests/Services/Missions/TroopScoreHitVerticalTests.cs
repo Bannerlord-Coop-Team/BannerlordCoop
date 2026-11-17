@@ -8,7 +8,6 @@ using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.ComponentInterfaces;
-using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
@@ -203,7 +202,7 @@ public class TroopScoreHitVerticalTests : MissionTestEnvironment
 
         Server.Call(() =>
         {
-            // v1.5.7 hands the captain to the xp model for the captain perk bonus.
+            // The captain goes to the xp model for the captain perk bonus.
             var captain = Server.GetRegisteredObject<CharacterObject>("e2e_captain");
             var xpModel = Assert.IsType<FixedCombatXpModel>(Campaign.Current.Models.CombatXpModel);
             Assert.Same(captain, xpModel.LastCaptain);
@@ -322,7 +321,7 @@ public class TroopScoreHitVerticalTests : MissionTestEnvironment
     {
         var (mapEventId, _) = SetupCoopBattle("attacker", "defender");
 
-        EnsureServerCampaignModels();
+        EnsureServerCampaignModels(ScoreHitXp);
 
         string? partyId = null;
         string? victimId = null;
@@ -377,51 +376,5 @@ public class TroopScoreHitVerticalTests : MissionTestEnvironment
                 Assert.Equal(serverContribution, clientParty.ContributionToBattle);
             });
         }
-    }
-
-    /// <summary>
-    /// The harness boots a <see cref="Campaign"/> without the campaign-start flow that would populate
-    /// <c>Campaign.Models</c>, so give the server the models the native scorer runs through
-    /// (xp-from-hit → troop power + max hitpoints). Clients never run the scorer, so they need none.
-    /// </summary>
-    private void EnsureServerCampaignModels()
-    {
-        Server.Call(() =>
-        {
-            var models = new List<GameModel>
-            {
-                new FixedCombatXpModel(),
-                new DefaultMilitaryPowerModel(),
-                new DefaultCharacterStatsModel(),
-            };
-
-            var gameModels = new GameModels(models);
-            Server.GameInstance.Game._gameModelManagers[typeof(GameModels)] = gameModels;
-            Campaign.Current._gameModels = gameModels;
-        });
-    }
-
-    private sealed class FixedCombatXpModel : CombatXpModel
-    {
-        public override float CaptainRadius => 0f;
-
-        public override SkillObject GetSkillForWeapon(WeaponComponentData weapon, bool isSiegeEngineHit) => null;
-
-        public CharacterObject? LastCaptain { get; private set; }
-
-        public override ExplainedNumber GetXpFromHit(
-            CharacterObject attackerTroop,
-            CharacterObject captain,
-            CharacterObject attackedTroop,
-            PartyBase attackerParty,
-            int damage,
-            bool isFatal,
-            MissionTypeEnum missionType)
-        {
-            LastCaptain = captain;
-            return new ExplainedNumber(ScoreHitXp);
-        }
-
-        public override float GetXpMultiplierFromShotDifficulty(float shotDifficulty) => 1f;
     }
 }

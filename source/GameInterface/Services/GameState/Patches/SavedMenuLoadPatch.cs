@@ -26,7 +26,7 @@ internal class SavedMenuLoadPatch
     private static readonly ILogger Logger = LogManager.GetLogger<SavedMenuLoadPatch>();
 
     // The outside menus whose background init reads Settlement.CurrentSettlement; the first handler is the one in the
-    // crash, and v1.5 moved castle_outside to its own init that reads it too.
+    // crash, and castle_outside has its own init that reads it too.
     private static readonly HashSet<string> OutsideSettlementMenus = FindOutsideSettlementMenus();
 
     private static HashSet<string> FindOutsideSettlementMenus()

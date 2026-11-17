@@ -177,7 +177,7 @@ internal class RecruitmentCampaignBehaviorPatch
 
     /// <summary>
     /// The most mercenaries <paramref name="hero"/> may hire from a town stock of
-    /// <paramref name="availableMercenaries"/>. v1.5 lets a generous hero hire beyond the stock
+    /// <paramref name="availableMercenaries"/>. A generous hero may hire beyond the stock
     /// (Generosity mercenary recruitment trait effect), as the vanilla menu and tavern dialog do.
     /// </summary>
     internal static int GetMercenaryHireLimit(Hero hero, int availableMercenaries)

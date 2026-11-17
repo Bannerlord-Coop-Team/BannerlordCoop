@@ -621,7 +621,7 @@ public partial class PlayerPartyInteractionFlowTests
                 _isPositionCacheValid = true,
             };
             party.Anchor = new AnchorPoint(party) { Position = anchorPosition };
-            // v1.5 AnchorPoint.IsAtSettlement compares the anchor's settlement, which only anchoring at it sets.
+            // AnchorPoint.IsAtSettlement compares the anchor's settlement, which only anchoring at it sets.
             if (anchoredHere) party.Anchor._settlement = settlement;
             Campaign.Current.Models.TroopSacrificeModel = new FixedTroopSacrificeModel(30);
         });

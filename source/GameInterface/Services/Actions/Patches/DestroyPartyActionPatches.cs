@@ -25,12 +25,10 @@ internal class DestroyPartyActionPatches
                 }
                 CampaignEventDispatcher.Instance.OnMobilePartyDestroyed(destroyedParty, destroyerParty);
                 CampaignEventDispatcher.Instance.OnMapInteractableDestroyed(destroyedParty.Party);
-                // v1.5 detaches a party destroyed mid-battle from its side before removing it. Server only:
+                // Detaches a party destroyed mid-battle from its side before removing it. Server only:
                 // the side removal replicates from there, and a client copy could finalize the event locally.
-                if (ModInformation.IsServer &&
-                    destroyedParty.MapEvent != null &&
-                    !destroyedParty.MapEvent.IsFinalized &&
-                    !destroyedParty.IsCurrentlyUsedByAQuest)
+                bool isInUnfinishedBattle = destroyedParty.MapEvent != null && !destroyedParty.MapEvent.IsFinalized;
+                if (ModInformation.IsServer && isInUnfinishedBattle && !destroyedParty.IsCurrentlyUsedByAQuest)
                 {
                     destroyedParty.MapEventSide = null;
                 }

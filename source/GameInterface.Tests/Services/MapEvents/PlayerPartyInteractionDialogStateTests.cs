@@ -2,6 +2,9 @@
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
 using GameInterface.Tests.Services.SiegeEvents;
 using System;
+using System.IO;
+using System.Xml;
+using TaleWorlds.Core;
 using Xunit;
 
 namespace GameInterface.Tests.Services.MapEvents;
@@ -77,8 +80,13 @@ public class PlayerPartyInteractionDialogStateTests
     [Fact]
     public void WaitingForResponse_UsesStableText()
     {
+        var previousTexts = GameTexts._gameTextManager;
         try
         {
+            GameTexts._gameTextManager = new GameTextManager();
+            var strings = new XmlDocument();
+            strings.Load(Path.Combine(AppContext.BaseDirectory, "global_strings.xml"));
+            GameTexts._gameTextManager.LoadFromXML(strings);
             PlayerPartyInteractionDialogState.Apply(new NetworkPlayerPartyInteractionState(
                 "session-1",
                 "party-1",
@@ -89,11 +97,12 @@ public class PlayerPartyInteractionDialogStateTests
                 Array.Empty<PlayerPartyInteractionOption>(),
                 isInitiator: true));
 
-            Assert.Equal("Awaiting response from RandomPlayer...", PlayerPartyInteractionDialogState.GetDialogText());
+            Assert.Equal("Awaiting response from RandomPlayer... (Esc to cancel)", PlayerPartyInteractionDialogState.GetDialogText());
         }
         finally
         {
             PlayerPartyInteractionDialogState.Clear("session-1");
+            GameTexts._gameTextManager = previousTexts;
         }
     }
 

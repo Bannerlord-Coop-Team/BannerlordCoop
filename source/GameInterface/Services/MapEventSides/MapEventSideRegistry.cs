@@ -59,7 +59,7 @@ internal class MapEventSideRegistry : AutoRegistryBase<MapEventSide>
 
         obj._nearbyPartiesAddedToPlayerMapEvent = new MBList<MobileParty>();
 
-        // v1.5 added the simulation ship lists, which only the skipped constructor and OnLoad create;
+        // Only the skipped constructor and OnLoad create the simulation ship lists;
         // MakeReadyForSimulation clears SimulationShipList.
         obj.OnLoad();
     }

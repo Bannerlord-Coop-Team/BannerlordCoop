@@ -7,6 +7,7 @@ using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Heroes.Extensions;
 
@@ -29,6 +30,10 @@ public static class HeroExtensions
 
         return PlayerManager.TryGetControlledObjectInfo(hero, out var _);
     }
+
+    /// <summary>A player governor counts as present in the town they govern, wherever they are.</summary>
+    public static Settlement GetGovernorSettlement(this Hero hero)
+        => hero.IsPlayerHero() && hero.GovernorOf != null ? hero.GovernorOf.Settlement : hero.CurrentSettlement;
 
     /// <summary>
     /// Check to see if the Hero is controlled by this client or server.

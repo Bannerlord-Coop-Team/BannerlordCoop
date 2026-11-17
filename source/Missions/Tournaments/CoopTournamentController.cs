@@ -1884,11 +1884,12 @@ public class CoopTournamentController : CoopMissionController
             out weapon);
     }
 
-    private static bool RuntimeWeaponMatches(MissionWeapon current, MissionWeapon canonical) =>
+    // Only a tableau item shows its banner, and replayed missiles arrive without one.
+    internal static bool RuntimeWeaponMatches(MissionWeapon current, MissionWeapon canonical) =>
         current.Item == canonical.Item &&
         current.ItemModifier == canonical.ItemModifier &&
         current.RawDataForNetwork == canonical.RawDataForNetwork &&
-        current.Banner?.Serialize() == canonical.Banner?.Serialize();
+        (current.Item?.IsUsingTableau != true || current.Banner?.Serialize() == canonical.Banner?.Serialize());
 
     private void ApplyRuntimeTeamScores(NetworkTournamentRuntimeState state)
     {

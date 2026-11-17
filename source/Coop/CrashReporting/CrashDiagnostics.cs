@@ -1,5 +1,4 @@
-﻿using Common.Logging;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using TaleWorlds.Engine;
@@ -19,18 +18,12 @@ namespace Coop.CrashReporting
         private static string role = "unknown";
         private static string phase = "boot";
 
-        // Created in Initialize rather than a field initializer: LogManager builds its logger on
-        // the first GetLogger, so resolving one before CoopMod configures logging would drop
-        // the file sink and minimum level for the whole process.
-        private static PhaseChangeLog phaseLog;
-
         internal static void Initialize(string buildValue, string roleValue)
         {
             lock (SyncRoot)
             {
                 build = buildValue;
                 role = roleValue;
-                phaseLog = new PhaseChangeLog(LogManager.GetLogger(typeof(CrashDiagnostics)));
                 Rebuild();
             }
         }
@@ -49,7 +42,6 @@ namespace Coop.CrashReporting
                     DateTime.UtcNow,
                     value));
                 Rebuild();
-                phaseLog?.Report(value);
             }
         }
 

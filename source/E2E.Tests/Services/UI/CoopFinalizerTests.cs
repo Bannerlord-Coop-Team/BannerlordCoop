@@ -12,6 +12,7 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.Modules;
+using GameInterface.Services.Modules.Validators;
 using GameInterface.Services.UI.Interfaces;
 using Moq;
 using System.Collections.Concurrent;
@@ -247,7 +248,8 @@ public class CoopFinalizerTests
                 Finalizer,
                 Mock.Of<IGameStateInterface>(),
                 Mock.Of<IModuleInfoProvider>(),
-                Mock.Of<IModuleNameProvider>());
+                Mock.Of<IModuleNameProvider>(),
+                new ModuleValidator());
             logic.SetupGet(value => value.State).Returns(state);
             logic.Setup(value => value.Disconnect()).Callback(() => state.Disconnect());
             LoadingScreen.ShowLoadingScreen("Joining", "Validating modules...");

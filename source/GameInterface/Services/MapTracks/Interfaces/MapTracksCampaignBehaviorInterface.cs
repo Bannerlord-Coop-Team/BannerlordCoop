@@ -615,7 +615,6 @@ public class MapTracksCampaignBehaviorInterface : IMapTracksCampaignBehaviorInte
     {
         ExplainedNumber explainedNumber = new ExplainedNumber(0f, false, null);
         SkillHelper.AddSkillBonusForParty(DefaultSkillEffects.TrackingRadius, playerParty, ref explainedNumber);
-        // v1.5 perks carry their own land/naval applicability, checked against the party's environment.
         PerkHelper.AddPerkBonusForParty(DefaultPerks.Scouting.Ranger, playerParty, true, ref explainedNumber);
         return explainedNumber.ResultNumber;
     }

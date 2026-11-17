@@ -24,9 +24,6 @@ public interface IObjectManager
     /// <returns>True if stored, false if not</returns>
     bool Contains(string id);
 
-    /// <summary>The number of registered ids</summary>
-    int Count { get; }
-
     /// <summary>
     /// Attempts to get an object's StringId from the object itself
     /// </summary>
@@ -316,8 +313,6 @@ public class ObjectManager : IObjectManager
 
         return idObjs.ContainsKey(id);
     }
-
-    public int Count => idObjs.Count;
 
     public bool TryGetId(object obj, out string id)
     {

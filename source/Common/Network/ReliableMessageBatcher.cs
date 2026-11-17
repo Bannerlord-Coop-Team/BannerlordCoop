@@ -9,11 +9,14 @@ namespace Common.Network;
 /// <summary>Batches reliable messages independently for each logical destination.</summary>
 public interface IReliableMessageBatcher<TDestination> where TDestination : class
 {
-    int BudgetBytes { get; }
     event Action<AggregateMessagePacket, int> AggregateSent;
+    /// <param name="maxPacketBytes">
+    /// Largest reliable payload one datagram carries on the destination's current route; batches stay within it.
+    /// </param>
     void Send(
         TDestination destination,
         byte[] messagePayload,
+        int maxPacketBytes,
         Action<TDestination, byte[]> sendReliableOrdered);
     void SendImmediate(
         TDestination destination,
@@ -41,53 +44,44 @@ public class ReliableMessageBatcher<TDestination> : IReliableMessageBatcher<TDes
     where TDestination : class
 {
     /// <summary>
-    /// Leaves room for the aggregate envelope and LiteNetLib framing within its discovered MTU.
+    /// Upper bound on the <see cref="ProtoBufSerializer"/> wrapper around an aggregate's messages field: two tags,
+    /// the type id and the length, each varint at most 5 bytes.
     /// </summary>
-    public const int DefaultBudgetBytes = 1200;
+    internal const int EnvelopeHeaderBytes = 12;
 
     private sealed class DestinationBuffer
     {
         public readonly object Lock = new object();
-        public readonly MessageAggregationBuffer Buffer;
-
-        public DestinationBuffer(int budgetBytes)
-        {
-            Buffer = new MessageAggregationBuffer(budgetBytes);
-        }
+        public readonly MessageAggregationBuffer Buffer = new MessageAggregationBuffer();
     }
 
     private readonly ICommonSerializer serializer;
     private readonly ConcurrentDictionary<TDestination, DestinationBuffer> pendingMessages =
         new ConcurrentDictionary<TDestination, DestinationBuffer>();
 
-    public int BudgetBytes { get; }
     public event Action<AggregateMessagePacket, int> AggregateSent;
 
     public ReliableMessageBatcher(ICommonSerializer serializer)
-        : this(serializer, DefaultBudgetBytes)
-    {
-    }
-
-    public ReliableMessageBatcher(ICommonSerializer serializer, int budgetBytes)
     {
         if (serializer == null) throw new ArgumentNullException(nameof(serializer));
-        if (budgetBytes <= 0) throw new ArgumentOutOfRangeException(nameof(budgetBytes));
 
         this.serializer = serializer;
-        BudgetBytes = budgetBytes;
     }
 
     public void Send(
         TDestination destination,
         byte[] messagePayload,
+        int maxPacketBytes,
         Action<TDestination, byte[]> sendReliableOrdered)
     {
         ValidateSend(destination, messagePayload, sendReliableOrdered);
 
+        int maxFramedBytes = maxPacketBytes - EnvelopeHeaderBytes;
         DestinationBuffer destinationBuffer = GetBuffer(destination);
         lock (destinationBuffer.Lock)
         {
-            if (messagePayload.Length >= BudgetBytes)
+            // Too big for an envelope on this route, so it goes bare after whatever is already buffered.
+            if (MessageAggregationBuffer.GetFramedLength(messagePayload) > maxFramedBytes)
             {
                 SendDrainedBatch(
                     destination,
@@ -99,7 +93,7 @@ public class ReliableMessageBatcher<TDestination> : IReliableMessageBatcher<TDes
 
             SendDrainedBatch(
                 destination,
-                destinationBuffer.Buffer.Append(messagePayload),
+                destinationBuffer.Buffer.Append(messagePayload, maxFramedBytes),
                 sendReliableOrdered);
         }
     }
@@ -211,7 +205,7 @@ public class ReliableMessageBatcher<TDestination> : IReliableMessageBatcher<TDes
     {
         return pendingMessages.GetOrAdd(
             destination,
-            _ => new DestinationBuffer(BudgetBytes));
+            _ => new DestinationBuffer());
     }
 
     private void SendDrainedBatch(

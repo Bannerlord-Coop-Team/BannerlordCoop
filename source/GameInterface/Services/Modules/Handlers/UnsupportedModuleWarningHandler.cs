@@ -3,6 +3,7 @@ using System.Linq;
 using System.Text.Json.Serialization;
 using System.Xml.Linq;
 using TaleWorlds.Library;
+using GameInterface.Services.Modules.Validators;
 using GameInterface.Services.UI.CoopOptions;
 
 namespace GameInterface.Services.Modules.Handlers;
@@ -26,7 +27,8 @@ public class UnsupportedModuleWarningHandler
     private readonly IModuleNameProvider moduleNameProvider;
     private readonly ICoopOptionsStore optionsStore;
     private readonly Action<Exception> reportError;
-    
+    private readonly IModuleValidator moduleValidator;
+
     private bool optionsLoaded;
     private bool warningsSuppressed; 
     private bool modulesEvaluated;
@@ -37,13 +39,15 @@ public class UnsupportedModuleWarningHandler
         IModuleInfoProvider moduleInfoProvider,
         IModuleNameProvider moduleNameProvider,
         ICoopOptionsStore optionsStore,
-        Action<Exception> reportError)
+        Action<Exception> reportError,
+        IModuleValidator moduleValidator)
     {
         this.moduleInfoProvider = moduleInfoProvider ?? throw new ArgumentNullException(nameof(moduleInfoProvider));
         if (moduleNameProvider == null) throw new ArgumentNullException(nameof(moduleNameProvider));
         this.moduleNameProvider = moduleNameProvider;
         this.optionsStore = optionsStore ?? throw new ArgumentNullException(nameof(optionsStore));
         this.reportError = reportError;
+        this.moduleValidator = moduleValidator;
     }
 
     public void TryShowPrompt(bool canShow, Action<InquiryData> showInquiry)
@@ -156,7 +160,8 @@ public class UnsupportedModuleWarningHandler
         return $"{name} ({module.Id})";
     }
 
-    private static bool IsUnsupported(ModuleInfo module)
+    // Whether a module belongs in the warning; the validator decides which DLC is unsupported.
+    private bool IsUnsupported(ModuleInfo module)
     {
         if (IsCoopVariant(module))
         {
@@ -170,7 +175,7 @@ public class UnsupportedModuleWarningHandler
             return false;
         }
 
-        return !module.IsOfficial || module.IsDlc;
+        return !module.IsOfficial || moduleValidator.IsUnsupportedDlc(module);
     }
 
     private static bool IsCoopVariant(ModuleInfo module, string moduleId = null)

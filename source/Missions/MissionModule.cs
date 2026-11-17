@@ -1,11 +1,15 @@
 ﻿using Autofac;
+using Common;
+using Common.BattleBenchmark;
 using Common.Commands;
 using Common.Logging;
 using Common.Network.Session;
+using Common.Serialization;
 using GameInterface;
 using GameInterface.Services.Locations;
 using GameInterface.Services.Hideouts;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.Modules;
 using GameInterface.Services.Tournaments;
 using GameInterface.Services.Time.UI;
 using GameInterface.Services.UI.PlayerNameplates;
@@ -14,6 +18,7 @@ using Missions.Agents.Handlers;
 using Missions.Agents.Patches;
 using Missions.Agents.Voice;
 using Missions.Battles;
+using Missions.Battles.Benchmark;
 using Missions.Data;
 #if DEBUG
 using Missions.Diagnostics;
@@ -29,6 +34,8 @@ using Missions.Tournaments;
 using Missions.Tournaments.Spectators;
 using System;
 using System.Collections.Generic;
+using System.IO;
+using Assembly = System.Reflection.Assembly;
 
 namespace Missions;
 
@@ -56,9 +63,12 @@ public class MissionModule : Module
             .As<ISiegeInteractionDebugBehavior>().InstancePerDependency();
         builder.RegisterType<AgentHitSoundFixtureHandler>().As<IAgentHitSoundFixtureHandler>()
             .SingleInstance().AutoActivate();
+        builder.RegisterType<HeroCombatFixture>().As<IHeroCombatFixture>().SingleInstance().AutoActivate();
 #endif
         builder.RegisterType<ReceivePathDiagnostics>().As<IReceivePathDiagnostics>().InstancePerDependency();
         builder.RegisterType<SiegeGateHitApplier>().As<ISiegeGateHitApplier>().InstancePerDependency();
+        builder.RegisterType<RangedSiegeWeaponPresentation>().As<IRangedSiegeWeaponPresentation>().InstancePerDependency();
+        builder.RegisterType<MissionObjectPath>().As<IMissionObjectPath>().InstancePerDependency();
         base.Load(builder);
 
         // The container is one co-op session; child scopes own only transient mission graphs.
@@ -74,6 +84,10 @@ public class MissionModule : Module
             .As<ICoopCommand>()
             .InstancePerDependency();
 
+        builder.RegisterType<BattleBenchmarkRecorder>().As<IBattleBenchmarkRecorder>().SingleInstance();
+        builder.RegisterType<BattleBenchmarkProcessSampler>().As<IBattleBenchmarkProcessSampler>().InstancePerDependency();
+        builder.RegisterType<BattleBenchmarkMissionProbe>().As<IBattleBenchmarkMissionProbe>().InstancePerDependency();
+        builder.RegisterType<JsonFileIO>().As<IJsonFileIO>().InstancePerDependency();
         builder.RegisterType<LiteNetP2PClient>().As<IBattleNetwork>().SingleInstance();
         builder.RegisterType<MovementPacketCompressor>()
             .As<IMovementPacketCompressor>()
@@ -89,6 +103,9 @@ public class MissionModule : Module
             .InstancePerDependency();
         builder.RegisterType<MovementTrafficBudgetFactory>()
             .As<IMovementTrafficBudgetFactory>()
+            .InstancePerDependency();
+        builder.RegisterType<MovementRouteBackoff>()
+            .As<IMovementRouteBackoff>()
             .InstancePerDependency();
         builder.RegisterType<MovementBatchSender>()
             .As<IMovementBatchSender>()
@@ -139,6 +156,10 @@ public class MissionModule : Module
         // fresh CoopMissionController, which pulls a fresh ICoopMissionComponent and a fresh set of sync
         // handlers — so no agent/registry state from a previous mission leaks into the next.
         builder.RegisterType<CoopMissionComponent>().As<ICoopMissionComponent>().InstancePerDependency();
+        // Per mission component, so hull identities never leak into the next mission.
+        builder.RegisterType<NetworkShipRegistry>().As<INetworkShipRegistry>().InstancePerDependency();
+        builder.RegisterType<BattleTeamResolver>().As<IBattleTeamResolver>().InstancePerDependency();
+        builder.RegisterType<BattlePlayerPartyResolver>().As<IBattlePlayerPartyResolver>().InstancePerDependency();
         builder.RegisterType<GuardedHitWindow>()
             .As<IGuardedHitWindow>()
             .InstancePerDependency();
@@ -204,6 +225,14 @@ public class MissionModule : Module
         builder.RegisterType<CoopBattleBehaviorAttacher>()
             .As<ICoopBattleBehaviorAttacher>()
             .SingleInstance();
+        builder.RegisterType<PreferredBattleHosts>()
+            .As<IPreferredBattleHosts>()
+            .InstancePerDependency();
+        // Holds the elections BattleHostHandler has not run yet, so it lives as long as that handler: one per
+        // session container, which keeps each E2E game instance's holds apart.
+        builder.RegisterType<PreferredBattleHostHold>()
+            .As<IPreferredBattleHostHold>()
+            .SingleInstance();
         builder.RegisterType<BattleSizeProvider>()
             .As<IBattleSizeProvider>()
             .InstancePerDependency();
@@ -244,6 +273,10 @@ public class MissionModule : Module
         // Battle host election: elects on the server, stores the broadcast on clients, AutoActivated so it
         // subscribes up front on both. The assignment store itself (IBattleHostRegistry) is registered by
         // GameInterfaceModule — its handlers gate finalizes/conclusions on it too.
+#if DEBUG
+        builder.RegisterType<Diagnostics.MissionInspection>().As<Diagnostics.IMissionInspection>().InstancePerDependency();
+#endif
+        builder.RegisterType<BattleHostSuccession>().As<IBattleHostSuccession>().InstancePerDependency();
         builder.RegisterType<BattleHostHandler>()
             .AsSelf()
             .SingleInstance()
@@ -270,6 +303,7 @@ public class MissionModule : Module
         // Slots spawned agents into their team formation so vanilla's formation markers/order-targeting see
         // them. Injected into the battle spawn sub-services (stateless, so transient lifetime is moot).
         builder.RegisterType<AgentFormationAssigner>().As<IAgentFormationAssigner>().InstancePerDependency();
+        builder.RegisterType<BattleAgentFader>().As<IBattleAgentFader>().InstancePerDependency();
         builder.RegisterType<PuppetMountStateRepairer>()
             .As<IPuppetMountStateRepairer>()
             .InstancePerDependency();
@@ -281,8 +315,10 @@ public class MissionModule : Module
         //builder.RegisterType<NetworkMissileRegistry>().As<INetworkMissileRegistry>().InstancePerDependency();
         builder.RegisterType<NetworkWorldItemRegistry>().As<INetworkWorldItemRegistry>().SingleInstance();
         builder.RegisterType<MissileHandler>().As<IMissileHandler>().InstancePerDependency();
+        builder.RegisterType<MissileOrientationCodec>().As<IMissileOrientationCodec>().InstancePerDependency();
         builder.RegisterType<MissilePickupArbiter>().As<IMissilePickupArbiter>().InstancePerDependency();
         builder.RegisterType<AgentEquipmentApplier>().As<IAgentEquipmentApplier>().InstancePerDependency();
+        builder.RegisterType<NavalDeckMovementProbe>().As<INavalDeckMovementProbe>().InstancePerDependency();
         builder.RegisterType<AgentMovementHandler>().As<IAgentMovementHandler>().InstancePerDependency();
         builder.RegisterType<AgentVisualActionAccessor>()
             .As<IAgentVisualActionAccessor>()

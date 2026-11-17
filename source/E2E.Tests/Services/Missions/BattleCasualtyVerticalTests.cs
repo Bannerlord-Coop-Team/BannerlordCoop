@@ -1,9 +1,14 @@
 using Common.Messaging;
 using E2E.Tests.Environment;
+using E2E.Tests.Util;
+using GameInterface.Services.Armies.Messages;
 using GameInterface.Services.MapEventParties.Messages;
+using GameInterface.Services.MapEvents.Messages;
 using Missions.Messages;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using Xunit;
 using Xunit.Abstractions;
@@ -56,6 +61,42 @@ public class BattleCasualtyVerticalTests : MissionTestEnvironment
             Assert.Equal(1, CountLive(party.Troops, troop)); // one killed in the authoritative roster
             Assert.Equal(casualtiesBefore + 1, mapEvent.DefenderSide.TroopCasualties);
         });
+    }
+
+    [Fact]
+    public void ClientArmyJoinReplay_SendsNoRostersToServer()
+    {
+        var (mapEventId, partyIds) = SetupCoopBattle("attacker", "defender");
+
+        string joinerId = null!;
+        string armyId = null!;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyIds[0], out var leader));
+            var army = new Army(GameObjectCreator.CreateInitializedObject<Kingdom>(), leader, Army.ArmyTypes.Raider);
+            Assert.True(Server.ObjectManager.TryGetId(army, out armyId));
+            var joiner = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            Assert.True(Server.ObjectManager.TryGetId(joiner, out joinerId));
+        }, MapEventDisabledMethods);
+        RegisterAsPlayerParty("joiner", CreateRegisteredObject<Hero>(), joinerId);
+
+        foreach (var instance in Clients) instance.NetworkSentMessages.Clear();
+
+        // A player joining an army from the encounter menu. Every client replays the merge (ArmyHandler) under
+        // AllowedThread, which attaches the party to the battling leader and runs the native AddPartyInternal there.
+        Server.SimulateMessage(Clients.First().NetPeer, new NetworkAddMobilePartyInArmy(armyId, joinerId, true));
+
+        foreach (var instance in Clients)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(joinerId, out var joiner));
+                Assert.Same(mapEvent.AttackerSide, joiner.Party.MapEventSide);
+            });
+            Assert.Empty(instance.NetworkSentMessages.GetMessages<NetworkUpdateMapEventParty>());
+            Assert.Empty(instance.NetworkSentMessages.GetMessages<NetworkAddInvolvedParties>());
+        }
     }
 
     private static int CountLive(FlattenedTroopRoster roster, CharacterObject troop)

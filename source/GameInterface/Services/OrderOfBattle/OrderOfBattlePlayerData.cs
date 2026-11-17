@@ -5,8 +5,7 @@ using System.Collections.Generic;
 namespace GameInterface.Services.OrderOfBattle;
 
 /// <summary>
-/// OrderOfBattleCampaignBehavior holds the order of battle for only one player
-/// Support for NavalOrderOfBattleCampaignBehavior to be added in warsails branch
+/// OrderOfBattleCampaignBehavior and NavalOrderOfBattleCampaignBehavior hold the order of battle for only one player
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
 public class OrderOfBattlePlayerData

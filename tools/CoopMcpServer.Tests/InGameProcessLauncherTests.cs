@@ -32,6 +32,31 @@ public sealed class InGameProcessLauncherTests
         Assert.DoesNotContain("/coopowner", info.ArgumentList);
     }
 
+    [Theory]
+    [InlineData("Bannerlord.Harmony", true)]
+    [InlineData("Sandbox_Core-2", true)]
+    [InlineData("..", false)]
+    [InlineData(".Hidden", false)]
+    [InlineData("Trailing.", false)]
+    [InlineData("A..B", false)]
+    [InlineData("A/B", false)]
+    public void ModuleIdsMayBeDottedButNeverNameAFolderOutsideModules(string module, bool accepted)
+    {
+        Assert.Equal(accepted, LaunchProfile.IsModuleId(module));
+    }
+
+    // A native message box (the shader cache's "Mod change detected", a shader compile error) waits for a click and
+    // stalls an unattended run. The engine's own launch flag logs those boxes instead of showing them.
+    [Theory]
+    [InlineData("server")]
+    [InlineData("client")]
+    public void EveryRoleLogsNativeMessageBoxesInsteadOfShowingThem(string role)
+    {
+        var info = new InGameProcessLauncher(new OwnedProcessFactory()).CreateStartInfo(
+            new LaunchProfile { Executable = @"C:\Game Folder\Bannerlord.exe" }, role, "identity", "token");
+        Assert.Contains("/suppress_message_boxes", info.ArgumentList);
+    }
+
     [Fact]
     public void DuplicatePlatformIdsAreRejectedBeforeLaunch()
     {

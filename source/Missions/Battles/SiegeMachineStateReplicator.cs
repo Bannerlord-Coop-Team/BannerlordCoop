@@ -74,6 +74,7 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
     private readonly IBattleSession session;
     private readonly INetworkAgentRegistry agentRegistry;
     private readonly IHostEpochPolicy hostEpochPolicy;
+    private readonly IRangedSiegeWeaponPresentation weaponPresentation;
 
     // Machine cache + last broadcast state per machine id / deactivated ids (peers).
     // Game-thread only; reset when the mission changes (MissionObjectIds recycle across missions).
@@ -121,13 +122,14 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
     private int trackedObjectCount;
     private float pollTimer;
 
-    public SiegeMachineStateReplicator(IBattleNetwork network, IMessageBroker messageBroker, IBattleSession session, INetworkAgentRegistry agentRegistry, IHostEpochPolicy hostEpochPolicy)
+    public SiegeMachineStateReplicator(IBattleNetwork network, IMessageBroker messageBroker, IBattleSession session, INetworkAgentRegistry agentRegistry, IHostEpochPolicy hostEpochPolicy, IRangedSiegeWeaponPresentation weaponPresentation)
     {
         this.network = network;
         this.messageBroker = messageBroker;
         this.session = session;
         this.agentRegistry = agentRegistry;
         this.hostEpochPolicy = hostEpochPolicy;
+        this.weaponPresentation = weaponPresentation;
 
         messageBroker.Subscribe<NetworkSiegeMachineState>(Handle_NetworkMachineState);
         messageBroker.Subscribe<NetworkSiegeLadderAnimationState>(Handle_NetworkLadderAnimationState);
@@ -1915,29 +1917,7 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         if (peerWeaponState.TryGetValue(id, out var previous) && previous == weaponState) return;
         peerWeaponState[id] = weaponState;
 
-        var skeletons = rangedWeapon.SkeletonOwnerObjects;
-        if (skeletons == null) return;
-
-        switch ((RangedSiegeWeapon.WeaponState)weaponState)
-        {
-            case RangedSiegeWeapon.WeaponState.Reloading:
-            {
-                var animations = rangedWeapon.SetUpAnimations;
-                for (int i = 0; i < skeletons.Length; i++)
-                {
-                    if (skeletons[i] == null) continue;
-                    if (skeletons[i].GameEntity.IsSkeletonAnimationPaused())
-                        skeletons[i].ResumeSkeletonAnimationSynched();
-                    else if (animations != null && i < animations.Length && !string.IsNullOrEmpty(animations[i]))
-                        skeletons[i].SetAnimationAtChannelSynched(animations[i], 0);
-                }
-                break;
-            }
-            case RangedSiegeWeapon.WeaponState.ReloadingPaused:
-                foreach (var skeleton in skeletons)
-                    skeleton?.PauseSkeletonAnimationSynched();
-                break;
-        }
+        weaponPresentation.PlayWeaponStateAnimation(rangedWeapon, (RangedSiegeWeapon.WeaponState)weaponState);
     }
 
     public void CatchUpJoiner(string controllerId)

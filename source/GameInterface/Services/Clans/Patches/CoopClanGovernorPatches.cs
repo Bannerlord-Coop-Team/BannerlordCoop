@@ -89,7 +89,7 @@ internal class CoopClanGovernorPatches
     public static IEnumerable<CodeInstruction> GovernorBonusTranspiler(IEnumerable<CodeInstruction> instructions)
     {
         var currentSettlement = AccessTools.PropertyGetter(typeof(Hero), nameof(Hero.CurrentSettlement));
-        var governorSettlement = AccessTools.Method(typeof(CoopClanGovernorPatches), nameof(GetGovernorSettlement));
+        var governorSettlement = AccessTools.Method(typeof(HeroExtensions), nameof(HeroExtensions.GetGovernorSettlement));
         foreach (var instruction in instructions)
         {
             if (instruction.Calls(currentSettlement))
@@ -111,8 +111,6 @@ internal class CoopClanGovernorPatches
     public static IEnumerable<CodeInstruction> GovernorConstructionTranspiler(IEnumerable<CodeInstruction> instructions)
         => GovernorBonusTranspiler(instructions);
 
-    // v1.5 personality trait effects that apply only while the governor is in town. Each of these
-    // methods reads CurrentSettlement once, on the governor.
     [HarmonyPatch(typeof(DefaultBuildingConstructionModel), nameof(DefaultBuildingConstructionModel.GetBoostCost))]
     [HarmonyTranspiler]
     public static IEnumerable<CodeInstruction> GovernorBoostCostTranspiler(IEnumerable<CodeInstruction> instructions)
@@ -143,8 +141,4 @@ internal class CoopClanGovernorPatches
     [HarmonyTranspiler]
     public static IEnumerable<CodeInstruction> GovernorRebellionTranspiler(IEnumerable<CodeInstruction> instructions)
         => GovernorBonusTranspiler(instructions);
-
-    /// <summary>A player governor counts as present in the town they govern, wherever they are.</summary>
-    internal static Settlement GetGovernorSettlement(Hero hero)
-        => hero.IsPlayerHero() && hero.GovernorOf != null ? hero.GovernorOf.Settlement : hero.CurrentSettlement;
 }

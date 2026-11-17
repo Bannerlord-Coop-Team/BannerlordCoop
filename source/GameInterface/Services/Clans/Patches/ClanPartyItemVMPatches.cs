@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using GameInterface.Services.Clans.Data;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.MobileParties.Extensions;
@@ -13,11 +13,6 @@ using TaleWorlds.Core;
 
 namespace GameInterface.Services.Clans.Patches;
 
-/// <summary>
-/// v1.5 made <see cref="ClanPartyItemVM"/> abstract: a row is either an existing party
-/// (<see cref="ClanPartyItemWithPartyVM"/>) or a hero whose party is still to be created
-/// (<see cref="ClanPartyItemWithHeroVM"/>), and each implements the patched members.
-/// </summary>
 [HarmonyPatch]
 internal class ClanPartyItemVMUpdatePropertiesPatch
 {
@@ -41,7 +36,6 @@ internal class ClanPartyItemVMUpdatePropertiesPatch
         __instance.IsChangeLeaderVisible &= canManage;
         __instance.IsChangeLeaderEnabled &= canManage;
         if (!canManage) __instance.ChangeLeaderHint.HintText = managementHint;
-        // v1.5 replaced the party behavior selector with per-leader command toggles.
         __instance.AreCommandControlsVisible &= canManage;
         __instance.AreNavalControlsVisible &= canManage;
         __instance.CanUseActions &= canManage || canAssignRoles;
@@ -110,10 +104,12 @@ internal class ClanPartyItemVMPatches
 
     private static bool RequestPartyConfiguration(ClanPartyItemVM instance, PartyConfigurationFlag flag, bool value)
     {
+        if (!ContainerProvider.TryResolve<IPartyConfigurationService>(out var partyConfiguration)) return true;
+
         Hero leader = instance.Leader;
         if (leader == null) return false;
         if (!CoopClanPermissions.CanManageParty(instance.Party?.MobileParty)) return false;
-        if (PartyConfigurationFlags.Get(leader, flag) == value) return false;
+        if (partyConfiguration.Get(leader, flag) == value) return false;
 
         MessageBroker.Instance.Publish(instance, new PartyConfigurationChangedOnSelection(leader, flag, value));
         return false;

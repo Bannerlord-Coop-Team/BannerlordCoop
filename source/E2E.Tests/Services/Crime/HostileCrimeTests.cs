@@ -65,7 +65,7 @@ public class HostileCrimeTests : SyncTestBase
         foreach (var client in Clients) client.PumpGameThread();
         Server.Resolve<TestNetworkRouter>().ReceiveContext = TestNetworkReceiveContext.PollerThread;
 
-        // v1.5 scales crime gain by the acting hero's honor (CrimeModel.GetEffectiveCrimeChange,
+        // Crime gain scales with the acting hero's honor (CrimeModel.GetEffectiveCrimeChange,
         // honor_crime_increase_slow: no change at Honor 1, -40% at Honor -1), so the first player
         // gains the full 10 per coercion and the second player 6.
         Coerce(first);

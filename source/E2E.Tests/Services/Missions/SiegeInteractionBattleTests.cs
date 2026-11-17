@@ -6,6 +6,7 @@ using Common.Network.Messages;
 using Common.Util;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
+using GameInterface.Tests.Utils;
 using GameInterface;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Extensions;
@@ -606,7 +607,7 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
                 client.Resolve<INetwork>(),
                 client.Resolve<IMapEventLogger>(),
                 client.Resolve<IBattleMissionInitializerResolver>(),
-                null!);
+                null!, Mock.Of<IBattleHostRetentionPolicy>());
 
             try
             {
@@ -718,7 +719,7 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
                 parties[3].Party.MapEventSide = mapEvent.DefenderSide;
             }
 
-            // v1.5 derives the battle type from the component and never allows a null one: an ambush
+            // The battle type comes from the component, which can't be null: an ambush
             // gets its real component here, every other interaction type is stamped on each replica below.
             if (isSiegeAmbush)
                 mapEvent.Component = new SiegeAmbushEventComponent(mapEvent);
@@ -758,6 +759,7 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
         var defenderHeroId = CreateRegisteredObject<Hero>();
         RegisterAsPlayerParty("attacker", attackerHeroId, partyIds[0]);
         RegisterAsPlayerParty("defender", defenderHeroId, partyIds[1]);
+        OpenAiJoinWindow(mapEventId!);
 
         var clients = Clients.ToArray();
         SetControllerId(clients[0], "attacker");
@@ -824,7 +826,7 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
         instance.Call(() =>
         {
             Assert.True(instance.ObjectManager.TryGetObject<MapEvent>(context.MapEventId, out var mapEvent));
-            // v1.5 reports an ambush as its own battle type instead of an untyped event with an ambush component.
+            // An ambush is its own battle type, not an untyped event with an ambush component.
             Assert.Equal(isSiegeAmbush ? MapEvent.BattleTypes.SiegeAmbush : eventType, mapEvent.EventType);
             Assert.Equal(isSiegeAmbush, mapEvent.IsSiegeAmbush);
             Assert.Equal(AttackerPlayerTroops + AttackerAiTroops, mapEvent.AttackerSide.TroopCount);
@@ -878,7 +880,7 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
                 client.Resolve<INetwork>(),
                 client.Resolve<IMapEventLogger>(),
                 resolver,
-                null!);
+                null!, Mock.Of<IBattleHostRetentionPolicy>());
 
             try
             {
@@ -917,7 +919,7 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
         {
             Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
-            // v1.5 reads the battle type from the component and never allows a null one, so the
+            // The battle type comes from the component, which can't be null, so the
             // join runs through a temporary field battle component instead of a null component.
             var interactionComponent = mapEvent.Component;
             mapEvent.SetBattleType(MapEvent.BattleTypes.FieldBattle);
@@ -925,8 +927,6 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
             mapEvent.RestoreComponent(interactionComponent);
             var mapEventParty = mapEvent.GetMapEventSide(side).Parties.Last(value => value.Party == party.Party);
             Assert.True(Server.ObjectManager.TryGetId(mapEventParty, out mapEventPartyId));
-            Server.Resolve<IMessageBroker>().Publish(this,
-                new MapEventInvolvedPartiesAdded(mapEvent, new[] { mapEventParty }));
         }, MapEventDisabledMethods);
 
         Assert.NotNull(mapEventPartyId);

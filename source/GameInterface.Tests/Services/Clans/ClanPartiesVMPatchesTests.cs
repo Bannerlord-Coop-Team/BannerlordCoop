@@ -166,7 +166,7 @@ public class ClanPartiesVMPatchesTests
 
     private static ClanPartyItemVM CreatePartyItem(MobileParty party)
     {
-        // v1.5 made ClanPartyItemVM abstract; an existing party's row is a ClanPartyItemWithPartyVM.
+        // ClanPartyItemVM is abstract; an existing party's row is a ClanPartyItemWithPartyVM.
         var item = ObjectHelper.SkipConstructor<ClanPartyItemWithPartyVM>();
         AccessTools.Field(typeof(ClanPartyItemVM), "<Party>k__BackingField").SetValue(item, party.Party);
         return item;

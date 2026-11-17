@@ -14,6 +14,8 @@ public abstract class MockNetworkBase : INetwork
     private readonly IPacketManager packetManager;
     private readonly ICommonSerializer serializer;
     private readonly IReliableMessageBatcher<NetPeer> reliableMessageBatcher;
+    // Mock peers skip the NetPeer constructor, so use what a freshly connected real peer reports.
+    private static readonly int MaxReliablePayloadBytes = NetConstants.InitialMtu - NetConstants.ChanneledHeaderSize;
     public static int InstanceCount = 0;
 
     public MockNetworkBase(
@@ -65,7 +67,7 @@ public abstract class MockNetworkBase : INetwork
         {
             // Production only treats the IMessage overload as a reliable-ordered barrier. A caller
             // passing an already-framed MessagePacket keeps the normal aggregation behavior.
-            reliableMessageBatcher.Send(netPeer, messagePacket.Data, SendReliablePayload);
+            reliableMessageBatcher.Send(netPeer, messagePacket.Data, MaxReliablePayloadBytes, SendReliablePayload);
             return;
         }
 
@@ -152,14 +154,14 @@ public abstract class MockNetworkBase : INetwork
             return;
         }
 
-        reliableMessageBatcher.Send(recipient, packet.Data, SendReliablePayload);
+        reliableMessageBatcher.Send(recipient, packet.Data, MaxReliablePayloadBytes, SendReliablePayload);
     }
 
     private void SendPacket(NetPeer recipient, IPacket packet)
     {
         if (packet is MessagePacket messagePacket)
         {
-            reliableMessageBatcher.Send(recipient, messagePacket.Data, SendReliablePayload);
+            reliableMessageBatcher.Send(recipient, messagePacket.Data, MaxReliablePayloadBytes, SendReliablePayload);
             return;
         }
 

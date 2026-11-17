@@ -4,26 +4,36 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.Clans.Extensions;
+using GameInterface.Services.Entity;
 using GameInterface.Services.Kingdoms.Messages;
+using GameInterface.Services.Kingdoms.Patches;
+using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Services.MobileParties.Messages;
+using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using Helpers;
 using LiteNetLib;
+using SandBox.GauntletUI;
 using Serilog;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Election;
+using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
+using TaleWorlds.ScreenSystem;
 
 namespace GameInterface.Services.Kingdoms.Handlers;
 
 /// <summary>
-/// Handler for <see cref="Kingdom"/> messages
+/// Handler for <see cref="Kingdom"/> messages on both the server and the client
 /// </summary>
 public class KingdomHandler : IHandler
 {
@@ -37,6 +47,13 @@ public class KingdomHandler : IHandler
     private readonly IKingdomInterface kingdomInterface;
     private readonly IKingdomCreator kingdomCreator;
     private readonly IKingdomDecisionDataConverter decisionDataConverter;
+    private readonly IControllerIdProvider controllerIdProvider;
+    private readonly IKingdomCreationSettlementTracker settlementTracker;
+    // Server side, keyed by the creating controller
+    private readonly Dictionary<string, PendingSettlementRestore> pendingKingdomCreationSettlements = new();
+    // Client side, for this client's own kingdom creation
+    private PendingSettlementRestore? pendingKingdomCreationSettlement;
+    private readonly HashSet<Type> warnedDecisionTypes = new();
 
     public KingdomHandler(
         IMessageBroker messageBroker,
@@ -47,7 +64,9 @@ public class KingdomHandler : IHandler
         IKingdomMembershipState kingdomMembershipState,
         IKingdomInterface kingdomInterface,
         IKingdomCreator kingdomCreator,
-        IKingdomDecisionDataConverter decisionDataConverter)
+        IKingdomDecisionDataConverter decisionDataConverter,
+        IControllerIdProvider controllerIdProvider,
+        IKingdomCreationSettlementTracker settlementTracker)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -58,6 +77,8 @@ public class KingdomHandler : IHandler
         this.kingdomInterface = kingdomInterface;
         this.kingdomCreator = kingdomCreator;
         this.decisionDataConverter = decisionDataConverter;
+        this.controllerIdProvider = controllerIdProvider;
+        this.settlementTracker = settlementTracker;
         messageBroker.Subscribe<AddDecision>(HandleAddDecision);
         messageBroker.Subscribe<RemoveDecision>(HandleRemoveDecision);
         messageBroker.Subscribe<ChangeKingdomPolicy>(HandleChangeKingdomPolicy);
@@ -72,6 +93,38 @@ public class KingdomHandler : IHandler
         messageBroker.Subscribe<ChangeKingdomName>(HandleChangeKingdomName);
         messageBroker.Subscribe<GiftSettlementOwnership>(HandleGiftSettlementOwnership);
         messageBroker.Subscribe<NetworkGiftSettlementOwnership>(HandleNetworkGiftSettlementOwnership);
+
+        messageBroker.Subscribe<DecisionAdded>(HandleLocalDecisionAdded);
+        messageBroker.Subscribe<NetworkAddDecision>(HandleNetworkAddDecision);
+
+        // Server side
+        messageBroker.Subscribe<DecisionRemoved>(HandleLocalDecisionRemoved);
+        messageBroker.Subscribe<KingdomPolicyChanged>(HandleLocalKingdomPolicyChanged);
+        messageBroker.Subscribe<NetworkRequestKingdomDecisionVote>(HandleNetworkRequestKingdomDecisionVote);
+        messageBroker.Subscribe<KingdomDecisionVoteChanged>(HandleLocalKingdomDecisionVoteChanged);
+        messageBroker.Subscribe<KingdomDecisionRoundStatusChanged>(HandleLocalKingdomDecisionRoundStatusChanged);
+        messageBroker.Subscribe<KingdomDecisionResolved>(HandleLocalKingdomDecisionResolved);
+        messageBroker.Subscribe<NetworkRequestCreateKingdom>(HandleNetworkRequestCreateKingdom);
+        messageBroker.Subscribe<NetworkRequestChangeKingdomName>(HandleNetworkRequestChangeKingdomName);
+        messageBroker.Subscribe<KingdomNameChanged>(HandleLocalKingdomNameChanged);
+        messageBroker.Subscribe<PeaceOfferPendingStatusChanged>(Handle_PeaceOfferPendingStatusChanged);
+        messageBroker.Subscribe<AllianceOfferPendingStatusChanged>(Handle_AllianceOfferPendingStatusChanged);
+
+        // Client side
+        messageBroker.Subscribe<NetworkRemoveDecision>(HandleNetworkRemoveDecision);
+        messageBroker.Subscribe<NetworkChangeKingdomPolicy>(HandleNetworkChangeKingdomPolicy);
+        messageBroker.Subscribe<NetworkChangeKingdomDecisionVote>(HandleNetworkChangeKingdomDecisionVote);
+        messageBroker.Subscribe<NetworkKingdomDecisionRoundStatus>(HandleNetworkKingdomDecisionRoundStatus);
+        messageBroker.Subscribe<NetworkKingdomDecisionResolved>(HandleNetworkKingdomDecisionResolved);
+        messageBroker.Subscribe<NetworkPlayerKingdomCreated>(HandleNetworkPlayerKingdomCreated);
+        messageBroker.Subscribe<KingdomDecisionVoteRequested>(HandleKingdomDecisionVoteRequested);
+        messageBroker.Subscribe<KingdomCreationRequested>(HandleKingdomCreationRequested);
+        messageBroker.Subscribe<DestroyKingdom>(HandleDestroyKingdom);
+        messageBroker.Subscribe<RulingClanChanged>(HandleRulingClanChanged);
+        messageBroker.Subscribe<KingdomNameChangeRequested>(HandleKingdomNameChangeRequested);
+        messageBroker.Subscribe<NetworkKingdomNameChanged>(HandleNetworkKingdomNameChanged);
+        messageBroker.Subscribe<NetworkPeaceOfferPendingStatusChanged>(Handle_NetworkPeaceOfferPendingStatusChanged);
+        messageBroker.Subscribe<NetworkAllianceOfferPendingStatusChanged>(Handle_NetworkAllianceOfferPendingStatusChanged);
     }
 
     private void HandleCreateKingdom(MessagePayload<CreateKingdom> obj)
@@ -329,6 +382,11 @@ public class KingdomHandler : IHandler
     private void HandlePlayerKingdomCreated(MessagePayload<PlayerKingdomCreated> obj)
     {
         var payload = obj.What;
+
+        if (ModInformation.IsServer)
+        {
+            SendPlayerKingdomCreated(payload);
+        }
 
         GameThread.RunSafe(() =>
         {
@@ -653,6 +711,638 @@ public class KingdomHandler : IHandler
         });
     }
 
+    private void HandleLocalDecisionAdded(MessagePayload<DecisionAdded> obj)
+    {
+        var payload = obj.What;
+
+        if (!TryGetKingdomId(payload.Kingdom, out var kingdomId)) return;
+
+        if (ModInformation.IsClient)
+        {
+            var clientData = decisionDataConverter.Convert(payload.Decision);
+            network.SendAll(new NetworkAddDecision(kingdomId, clientData, payload.IgnoreInfluenceCost, payload.RandomNumber));
+            return;
+        }
+
+        // KingdomInterface already resolved an unsupported type on the server, so clients have nothing to add.
+        if (!decisionDataConverter.IsSupported(payload.Decision))
+        {
+            Type decisionType = payload.Decision.GetType();
+            if (warnedDecisionTypes.Add(decisionType))
+            {
+                Logger.Warning(
+                    "Kingdom decision type {DecisionType} is not synced, so the server AI decides it instead of a player vote; " +
+                    "a compat mod can sync it with KingdomDecisionTypeRegistry.Register",
+                    decisionType.FullName);
+            }
+            return;
+        }
+
+        var data = decisionDataConverter.Convert(payload.Decision);
+        var message = new NetworkAddDecision(kingdomId, data, payload.IgnoreInfluenceCost, payload.RandomNumber);
+        network.SendAll(message);
+    }
+
+    private void HandleNetworkAddDecision(MessagePayload<NetworkAddDecision> obj)
+    {
+        var payload = obj.What;
+
+        // The server relays a decision to clients, and a client sends its own proposals to the server.
+        if (ModInformation.IsClient)
+        {
+            GameThread.RunSafe(() =>
+            {
+                if (!ShouldApplyNetworkDecision(payload.KingdomId)) return;
+
+                var clientMessage = new AddDecision(payload.KingdomId, payload.Data, payload.IgnoreInfluenceCost, payload.RandomNumber);
+                messageBroker.Publish(this, clientMessage);
+            }, context: nameof(HandleNetworkAddDecision));
+            return;
+        }
+
+        var sender = obj.Who;
+
+        // Apply and relay on the game thread together, so a cancel there can never reach clients before the add.
+        GameThread.RunSafe(() =>
+        {
+            messageBroker.Publish(
+                this,
+                new AddDecision(payload.KingdomId, payload.Data, payload.IgnoreInfluenceCost, payload.RandomNumber));
+
+            var message = new NetworkAddDecision(
+                payload.KingdomId,
+                payload.Data,
+                payload.IgnoreInfluenceCost,
+                payload.RandomNumber);
+
+            if (sender is NetPeer peer)
+            {
+                network.SendAllBut(peer, message);
+                return;
+            }
+
+            network.SendAll(message);
+        }, context: nameof(HandleNetworkAddDecision));
+    }
+
+    private bool TryGetKingdomId(Kingdom kingdom, out string kingdomId)
+    {
+        return objectManager.TryGetIdWithLogging(kingdom, out kingdomId);
+    }
+
+    private static bool TryCreatePendingSettlementRestore(
+        string partyId,
+        string settlementId,
+        out PendingSettlementRestore pending)
+    {
+        pending = default;
+        if (string.IsNullOrWhiteSpace(partyId) || string.IsNullOrWhiteSpace(settlementId)) return false;
+
+        pending = new PendingSettlementRestore(partyId, settlementId);
+        return true;
+    }
+
+    private bool TryGetSettlement(string settlementId, out Settlement settlement)
+    {
+        return objectManager.TryGetObjectWithLogging(settlementId, out settlement);
+    }
+
+    private bool TryGetSettlementId(Settlement settlement, out string settlementId)
+    {
+        return objectManager.TryGetIdWithLogging(settlement, out settlementId);
+    }
+
+    // --- Server side ---
+
+    private void HandleNetworkRequestCreateKingdom(MessagePayload<NetworkRequestCreateKingdom> obj)
+    {
+        var payload = obj.What;
+        var partyId = payload.PartyId;
+        if (obj.Who is not NetPeer peer) return;
+        if (!playerManager.TryGetCurrentController(peer, out var controllerId)) return;
+
+        if (string.IsNullOrWhiteSpace(partyId) && playerManager.TryGetPlayer(controllerId, out var player))
+        {
+            partyId = player.MobilePartyId;
+        }
+
+        if (TryCreatePendingSettlementRestore(partyId, payload.SettlementId, out var pending))
+        {
+            pendingKingdomCreationSettlements[controllerId] = pending;
+            settlementTracker.Track(pending.PartyId, pending.SettlementId);
+        }
+
+        RunKingdomMutation(() =>
+        {
+            RestoreCreatingPartySettlement(partyId, payload.SettlementId);
+        });
+
+        messageBroker.Publish(this, new CreateKingdom(controllerId, payload.KingdomName, payload.CultureId));
+    }
+
+    private void HandleNetworkRequestChangeKingdomName(MessagePayload<NetworkRequestChangeKingdomName> obj)
+    {
+        if (obj.Who is not NetPeer peer) return;
+        if (!playerManager.TryGetPlayer(peer, out var player)) return;
+
+        var payload = obj.What;
+        messageBroker.Publish(this, new ChangeKingdomName(player.ControllerId, payload.KingdomId, payload.Name));
+    }
+
+    private void SendPlayerKingdomCreated(PlayerKingdomCreated payload)
+    {
+        TryGetPlayerSettlementContext(payload.ControllerId, out var partyId, out var settlementId);
+
+        if ((string.IsNullOrWhiteSpace(partyId) || string.IsNullOrWhiteSpace(settlementId)) &&
+            pendingKingdomCreationSettlements.TryGetValue(payload.ControllerId, out var pending))
+        {
+            partyId = pending.PartyId;
+            settlementId = pending.SettlementId;
+        }
+
+        RunKingdomMutation(() =>
+        {
+            RestoreCreatingPartySettlement(partyId, settlementId);
+            settlementTracker.Complete(partyId);
+            pendingKingdomCreationSettlements.Remove(payload.ControllerId);
+        });
+
+        var message = new NetworkPlayerKingdomCreated(
+            payload.ControllerId,
+            payload.KingdomId,
+            payload.KingdomName,
+            payload.ClanId,
+            partyId,
+            settlementId,
+            payload.CultureId);
+        network.SendAll(message);
+    }
+
+    private void HandleLocalKingdomNameChanged(MessagePayload<KingdomNameChanged> obj)
+    {
+        if (ModInformation.IsClient) return;
+        var payload = obj.What;
+
+        // Broadcasts the notification to all clients
+        network.SendAll(new NetworkKingdomNameChanged(payload.KingdomId));
+    }
+
+    private void RestoreCreatingPartySettlement(string partyId, string settlementId)
+    {
+        if (string.IsNullOrWhiteSpace(partyId) || string.IsNullOrWhiteSpace(settlementId)) return;
+        if (!objectManager.TryGetObject<MobileParty>(partyId, out var party)) return;
+        if (!TryGetSettlement(settlementId, out var settlement)) return;
+        settlementTracker.TrackParty(party, partyId, settlement, settlementId);
+        if (party.CurrentSettlement == settlement) return;
+
+        RunKingdomMutation(() =>
+        {
+            using (new AllowedThread())
+            {
+                try
+                {
+                    party.CurrentSettlement = settlement;
+                }
+                catch (NullReferenceException)
+                {
+                    party.SetCurrentSettlementDirectly(settlement);
+                }
+            }
+        });
+
+        if (!objectManager.TryGetHandleWithLogging(settlement, out var settlementHandle)) return;
+        if (!objectManager.TryGetHandleWithLogging(party, out var partyHandle)) return;
+        network.SendAll(new NetworkPartyEnterSettlement(settlementHandle, partyHandle));
+    }
+
+    private bool TryGetPlayerSettlementContext(
+        string controllerId,
+        out string partyId,
+        out string settlementId)
+    {
+        partyId = null;
+        settlementId = null;
+
+        if (!playerManager.TryGetPlayer(controllerId, out var player)) return false;
+        if (!objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party)) return false;
+        if (party.CurrentSettlement == null) return false;
+        if (!TryGetSettlementId(party.CurrentSettlement, out settlementId)) return false;
+
+        partyId = player.MobilePartyId;
+        return true;
+    }
+
+    private void HandleLocalKingdomDecisionResolved(MessagePayload<KingdomDecisionResolved> obj)
+    {
+        if (ModInformation.IsClient) return;
+        var payload = obj.What;
+
+        var message = new NetworkKingdomDecisionResolved(
+            payload.KingdomId,
+            payload.DecisionIndex,
+            payload.OutcomeIndex,
+            payload.IsPlayerDecision,
+            payload.OutcomeKey,
+            payload.NotificationText);
+        network.SendAll(message);
+    }
+
+    private void HandleLocalKingdomDecisionVoteChanged(MessagePayload<KingdomDecisionVoteChanged> obj)
+    {
+        if (ModInformation.IsClient) return;
+        var payload = obj.What;
+
+        var message = new NetworkChangeKingdomDecisionVote(payload.ClanId, payload.VoteData);
+        network.SendAll(message);
+    }
+
+    private void HandleLocalKingdomDecisionRoundStatusChanged(MessagePayload<KingdomDecisionRoundStatusChanged> obj)
+    {
+        if (ModInformation.IsClient) return;
+        network.SendAll(new NetworkKingdomDecisionRoundStatus(obj.What.Status));
+    }
+
+    private void HandleNetworkRequestKingdomDecisionVote(MessagePayload<NetworkRequestKingdomDecisionVote> obj)
+    {
+        var payload = obj.What;
+        if (obj.Who is not NetPeer peer) return;
+        if (!playerManager.TryGetCurrentController(peer, out var controllerId)) return;
+
+        // Interim support changes arrive while a player is still choosing, so only a confirmed vote is
+        // reported here.
+        if (payload.VoteData != null && payload.VoteData.IsFinal)
+        {
+            Logger.Information(
+                "Received kingdom decision vote from controller {ControllerId} for {KingdomId} " +
+                "decision {DecisionIndex}; final {IsFinal}",
+                controllerId,
+                payload.VoteData.KingdomId,
+                payload.VoteData.DecisionIndex,
+                payload.VoteData.IsFinal);
+        }
+
+        messageBroker.Publish(this, new ChangeKingdomDecisionVote(controllerId, payload.VoteData));
+    }
+
+    private void HandleLocalKingdomPolicyChanged(MessagePayload<KingdomPolicyChanged> obj)
+    {
+        if (ModInformation.IsClient) return;
+        var payload = obj.What;
+
+        if (!objectManager.TryGetIdWithLogging(payload.Kingdom, out var kingdomId)) return;
+        if (!objectManager.TryGetIdWithLogging(payload.Policy, out var policyId)) return;
+
+        var message = new NetworkChangeKingdomPolicy(kingdomId, policyId, payload.IsAdd);
+        network.SendAll(message);
+    }
+
+    private void HandleLocalDecisionRemoved(MessagePayload<DecisionRemoved> obj)
+    {
+        if (ModInformation.IsClient) return;
+        var payload = obj.What;
+
+        if (!objectManager.TryGetIdWithLogging(payload.Kingdom, out var kingdomId)) return;
+
+        var message = new NetworkRemoveDecision(kingdomId, payload.Index);
+        network.SendAll(message);
+    }
+
+    private void Handle_PeaceOfferPendingStatusChanged(MessagePayload<PeaceOfferPendingStatusChanged> payload)
+    {
+        if (ModInformation.IsClient) return;
+        var obj = payload.What;
+        if (!objectManager.TryGetIdWithLogging(obj.RequestingKingdom, out var requestingKingdomId)) return;
+        if (!objectManager.TryGetIdWithLogging(obj.TargetKingdom, out var targetKingdomId)) return;
+        PeaceOfferPendingRegistry.Set(obj.RequestingKingdom.StringId, obj.TargetKingdom.StringId, obj.IsPending);
+        network.SendAll(new NetworkPeaceOfferPendingStatusChanged(requestingKingdomId, targetKingdomId, obj.IsPending));
+    }
+
+    private void Handle_AllianceOfferPendingStatusChanged(MessagePayload<AllianceOfferPendingStatusChanged> payload)
+    {
+        if (ModInformation.IsClient) return;
+        var obj = payload.What;
+        if (!objectManager.TryGetIdWithLogging(obj.RequestingKingdom, out var requestingKingdomId)) return;
+        if (!objectManager.TryGetIdWithLogging(obj.TargetKingdom, out var targetKingdomId)) return;
+        AllianceOfferPendingRegistry.Set(obj.RequestingKingdom.StringId, obj.TargetKingdom.StringId, obj.IsPending);
+        network.SendAll(new NetworkAllianceOfferPendingStatusChanged(requestingKingdomId, targetKingdomId, obj.IsPending));
+    }
+
+    // --- Client side ---
+
+    private void HandleKingdomCreationRequested(MessagePayload<KingdomCreationRequested> obj)
+    {
+        if (ModInformation.IsServer) return;
+        var payload = obj.What;
+        pendingKingdomCreationSettlement = CapturePendingSettlementRestore();
+        string partyId = null;
+        string settlementId = null;
+        if (pendingKingdomCreationSettlement.HasValue)
+        {
+            partyId = pendingKingdomCreationSettlement.Value.PartyId;
+            settlementId = pendingKingdomCreationSettlement.Value.SettlementId;
+            settlementTracker.Track(partyId, settlementId);
+            RestoreSettlementContext(pendingKingdomCreationSettlement.Value, notifyServer: false);
+        }
+
+        var message = new NetworkRequestCreateKingdom(
+            payload.KingdomName,
+            payload.CultureId,
+            partyId,
+            settlementId);
+        network.SendAll(message);
+    }
+
+    private void HandleKingdomNameChangeRequested(MessagePayload<KingdomNameChangeRequested> obj)
+    {
+        if (ModInformation.IsServer) return;
+        var payload = obj.What;
+
+        if (!TryGetKingdomId(payload.Kingdom, out var kingdomId)) return;
+
+        var message = new NetworkRequestChangeKingdomName(kingdomId, payload.Name);
+        network.SendAll(message);
+    }
+
+    private void HandleNetworkKingdomNameChanged(MessagePayload<NetworkKingdomNameChanged> obj)
+    {
+        var kingdomId = obj.What.KingdomId;
+
+        GameThread.RunSafe(() =>
+        {
+            if (ScreenManager.TopScreen is not GauntletKingdomScreen kingdomScreen) return;
+
+            var dataSource = kingdomScreen.DataSource;
+            if (dataSource == null) return;
+
+            if (!objectManager.TryGetObject(kingdomId, out Kingdom kingdom)) return;
+
+            if (!ReferenceEquals(dataSource.Kingdom, kingdom)) return;
+
+            dataSource.OnRefresh();
+            dataSource.RefreshValues();
+        }, context: nameof(KingdomHandler));
+    }
+
+    private void HandleNetworkPlayerKingdomCreated(MessagePayload<NetworkPlayerKingdomCreated> obj)
+    {
+        var payload = obj.What;
+        var message = new PlayerKingdomCreated(
+            payload.ControllerId,
+            payload.KingdomId,
+            payload.KingdomName,
+            payload.ClanId,
+            payload.CultureId);
+        messageBroker.Publish(this, message);
+
+        RunKingdomMutation(() =>
+        {
+            if (payload.ControllerId == controllerIdProvider.ControllerId)
+            {
+                RestorePendingSettlementAfterKingdomCreation(payload.PartyId, payload.SettlementId);
+            }
+            else if (TryCreatePendingSettlementRestore(payload.PartyId, payload.SettlementId, out var notificationRestore))
+            {
+                RestoreSettlementContext(notificationRestore, notifyServer: false);
+                ClearRemoteSettlementRestore(notificationRestore);
+            }
+        });
+    }
+
+    private PendingSettlementRestore? CapturePendingSettlementRestore()
+    {
+        var party = ResolveCreatingPlayerParty();
+        var settlement = GetPartyCurrentSettlement(party)
+            ?? GetCurrentSettlement()
+            ?? GetEncounterSettlement();
+
+        if (party == null || settlement == null) return null;
+        if (!objectManager.TryGetIdWithLogging(party, out var partyId)) return null;
+        if (!TryGetSettlementId(settlement, out var settlementId)) return null;
+
+        settlementTracker.TrackParty(party, partyId, settlement, settlementId);
+        return new PendingSettlementRestore(partyId, settlementId);
+    }
+
+    private static Settlement GetPartyCurrentSettlement(MobileParty party)
+    {
+        try
+        {
+            return party?.CurrentSettlement;
+        }
+        catch (NullReferenceException)
+        {
+            return null;
+        }
+    }
+
+    private static Settlement GetCurrentSettlement()
+    {
+        try
+        {
+            return Settlement.CurrentSettlement;
+        }
+        catch (NullReferenceException)
+        {
+            return null;
+        }
+    }
+
+    private static Settlement GetEncounterSettlement()
+    {
+        try
+        {
+            return PlayerEncounter.EncounterSettlement;
+        }
+        catch (NullReferenceException)
+        {
+            return null;
+        }
+    }
+
+    private MobileParty ResolveCreatingPlayerParty()
+    {
+        if (playerManager.TryGetPlayer(controllerIdProvider.ControllerId, out var player) &&
+            objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party))
+        {
+            return party;
+        }
+
+        try
+        {
+            return MobileParty.MainParty;
+        }
+        catch (NullReferenceException)
+        {
+            return null;
+        }
+    }
+
+    private void RestorePendingSettlementAfterKingdomCreation(string partyId, string settlementId)
+    {
+        var pending = pendingKingdomCreationSettlement;
+        pendingKingdomCreationSettlement = null;
+
+        if (!pending.HasValue &&
+            TryCreatePendingSettlementRestore(partyId, settlementId, out var notificationPending))
+        {
+            pending = notificationPending;
+        }
+
+        if (!pending.HasValue)
+        {
+            return;
+        }
+
+        RunKingdomMutation(() =>
+        {
+            RestoreSettlementContext(pending.Value, notifyServer: true);
+            settlementTracker.Complete(pending.Value.PartyId);
+        });
+    }
+
+    private void RestoreSettlementContext(PendingSettlementRestore pending, bool notifyServer)
+    {
+        if (!objectManager.TryGetObject<MobileParty>(pending.PartyId, out var party)) return;
+        if (!TryGetSettlement(pending.SettlementId, out var settlement)) return;
+
+        settlementTracker.TrackParty(party, pending.PartyId, settlement, pending.SettlementId);
+
+        bool restoredSettlement = party.CurrentSettlement != settlement;
+        if (restoredSettlement)
+        {
+            EnsurePartySettlement(party, settlement);
+        }
+
+        bool needsEncounter = PlayerEncounter.Current == null;
+        if (notifyServer && (restoredSettlement || needsEncounter))
+        {
+            messageBroker.Publish(this, new StartSettlementEncounterAttempted(party, settlement));
+        }
+    }
+
+    private void ClearRemoteSettlementRestore(PendingSettlementRestore pending)
+    {
+        if (objectManager.TryGetObject<MobileParty>(pending.PartyId, out var party))
+        {
+            settlementTracker.Clear(party, pending.PartyId);
+            return;
+        }
+
+        settlementTracker.Clear(null, pending.PartyId);
+    }
+
+    private static void EnsurePartySettlement(MobileParty party, Settlement settlement)
+    {
+        if (party.CurrentSettlement == settlement) return;
+
+        RunKingdomMutation(() =>
+        {
+            using (new AllowedThread())
+            {
+                party.CurrentSettlement = settlement;
+            }
+        });
+    }
+
+    private void HandleKingdomDecisionVoteRequested(MessagePayload<KingdomDecisionVoteRequested> obj)
+    {
+        if (ModInformation.IsServer) return;
+        var payload = obj.What;
+        var message = new NetworkRequestKingdomDecisionVote(payload.VoteData);
+        network.SendAll(message);
+    }
+
+    private void HandleNetworkKingdomDecisionResolved(MessagePayload<NetworkKingdomDecisionResolved> obj)
+    {
+        var payload = obj.What;
+        var message = new ApplyKingdomDecisionResolved(
+            payload.KingdomId,
+            payload.DecisionIndex,
+            payload.OutcomeIndex,
+            payload.IsPlayerDecision,
+            payload.OutcomeKey,
+            payload.NotificationText);
+        messageBroker.Publish(this, message);
+    }
+
+    private void HandleNetworkChangeKingdomDecisionVote(MessagePayload<NetworkChangeKingdomDecisionVote> obj)
+    {
+        var payload = obj.What;
+        var message = new ApplyKingdomDecisionVote(payload.ClanId, payload.VoteData);
+        messageBroker.Publish(this, message);
+    }
+
+    private void HandleNetworkKingdomDecisionRoundStatus(MessagePayload<NetworkKingdomDecisionRoundStatus> obj)
+    {
+        messageBroker.Publish(this, new ApplyKingdomDecisionRoundStatus(obj.What.Status));
+    }
+
+    private void HandleNetworkChangeKingdomPolicy(MessagePayload<NetworkChangeKingdomPolicy> obj)
+    {
+        var payload = obj.What;
+        var message = new ChangeKingdomPolicy(payload.KingdomId, payload.PolicyId, payload.IsAdd);
+        messageBroker.Publish(this, message);
+    }
+
+    private void HandleNetworkRemoveDecision(MessagePayload<NetworkRemoveDecision> obj)
+    {
+        var payload = obj.What;
+        var message = new RemoveDecision(payload.KingdomId, payload.Index);
+        messageBroker.Publish(this, message);
+    }
+
+    private bool ShouldApplyNetworkDecision(string kingdomId)
+    {
+        if (string.IsNullOrWhiteSpace(kingdomId)) return false;
+        if (!objectManager.TryGetObject(kingdomId, out Kingdom kingdom)) return true;
+        if (!playerManager.TryGetPlayer(controllerIdProvider.ControllerId, out var player)) return true;
+        if (string.IsNullOrWhiteSpace(player.HeroId)) return false;
+        if (!objectManager.TryGetObject(player.HeroId, out Hero hero)) return false;
+
+        return hero.Clan?.Kingdom == kingdom;
+    }
+
+    private void HandleDestroyKingdom(MessagePayload<DestroyKingdom> obj)
+    {
+        if (ModInformation.IsServer) return;
+        if (!objectManager.TryGetIdWithLogging(obj.What.Kingdom, out var kingdomId)) return;
+
+        network.SendAll(new NetworkDestroyKingdom(kingdomId));
+    }
+
+    private void HandleRulingClanChanged(MessagePayload<RulingClanChanged> obj)
+    {
+        if (ModInformation.IsServer) return;
+        if (!objectManager.TryGetIdWithLogging(obj.What.Kingdom, out var kingdomId)) return;
+        if (!objectManager.TryGetIdWithLogging(obj.What.Clan, out var clanId)) return;
+
+        network.SendAll(new NetworkRulingClanChanged(kingdomId, clanId));
+    }
+
+    private void Handle_NetworkPeaceOfferPendingStatusChanged(MessagePayload<NetworkPeaceOfferPendingStatusChanged> payload)
+    {
+        if (ModInformation.IsServer) return;
+        var obj = payload.What;
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.RequestingKingdomId, out var requestingKingdom)) return;
+            if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.TargetKingdomId, out var targetKingdom)) return;
+            PeaceOfferPendingRegistry.Set(requestingKingdom.StringId, targetKingdom.StringId, obj.IsPending);
+        });
+    }
+
+    private void Handle_NetworkAllianceOfferPendingStatusChanged(MessagePayload<NetworkAllianceOfferPendingStatusChanged> payload)
+    {
+        if (ModInformation.IsServer) return;
+        var obj = payload.What;
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.RequestingKingdomId, out var requestingKingdom)) return;
+            if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.TargetKingdomId, out var targetKingdom)) return;
+            AllianceOfferPendingRegistry.Set(requestingKingdom.StringId, targetKingdom.StringId, obj.IsPending);
+        });
+    }
+
     public void Dispose()
     {
         messageBroker.Unsubscribe<AddDecision>(HandleAddDecision);
@@ -669,5 +1359,47 @@ public class KingdomHandler : IHandler
         messageBroker.Unsubscribe<ChangeKingdomName>(HandleChangeKingdomName);
         messageBroker.Unsubscribe<GiftSettlementOwnership>(HandleGiftSettlementOwnership);
         messageBroker.Unsubscribe<NetworkGiftSettlementOwnership>(HandleNetworkGiftSettlementOwnership);
+
+        messageBroker.Unsubscribe<DecisionAdded>(HandleLocalDecisionAdded);
+        messageBroker.Unsubscribe<NetworkAddDecision>(HandleNetworkAddDecision);
+
+        messageBroker.Unsubscribe<DecisionRemoved>(HandleLocalDecisionRemoved);
+        messageBroker.Unsubscribe<KingdomPolicyChanged>(HandleLocalKingdomPolicyChanged);
+        messageBroker.Unsubscribe<NetworkRequestKingdomDecisionVote>(HandleNetworkRequestKingdomDecisionVote);
+        messageBroker.Unsubscribe<KingdomDecisionVoteChanged>(HandleLocalKingdomDecisionVoteChanged);
+        messageBroker.Unsubscribe<KingdomDecisionRoundStatusChanged>(HandleLocalKingdomDecisionRoundStatusChanged);
+        messageBroker.Unsubscribe<KingdomDecisionResolved>(HandleLocalKingdomDecisionResolved);
+        messageBroker.Unsubscribe<NetworkRequestCreateKingdom>(HandleNetworkRequestCreateKingdom);
+        messageBroker.Unsubscribe<NetworkRequestChangeKingdomName>(HandleNetworkRequestChangeKingdomName);
+        messageBroker.Unsubscribe<KingdomNameChanged>(HandleLocalKingdomNameChanged);
+        messageBroker.Unsubscribe<PeaceOfferPendingStatusChanged>(Handle_PeaceOfferPendingStatusChanged);
+        messageBroker.Unsubscribe<AllianceOfferPendingStatusChanged>(Handle_AllianceOfferPendingStatusChanged);
+
+        messageBroker.Unsubscribe<NetworkRemoveDecision>(HandleNetworkRemoveDecision);
+        messageBroker.Unsubscribe<NetworkChangeKingdomPolicy>(HandleNetworkChangeKingdomPolicy);
+        messageBroker.Unsubscribe<NetworkChangeKingdomDecisionVote>(HandleNetworkChangeKingdomDecisionVote);
+        messageBroker.Unsubscribe<NetworkKingdomDecisionRoundStatus>(HandleNetworkKingdomDecisionRoundStatus);
+        messageBroker.Unsubscribe<NetworkKingdomDecisionResolved>(HandleNetworkKingdomDecisionResolved);
+        messageBroker.Unsubscribe<NetworkPlayerKingdomCreated>(HandleNetworkPlayerKingdomCreated);
+        messageBroker.Unsubscribe<KingdomDecisionVoteRequested>(HandleKingdomDecisionVoteRequested);
+        messageBroker.Unsubscribe<KingdomCreationRequested>(HandleKingdomCreationRequested);
+        messageBroker.Unsubscribe<DestroyKingdom>(HandleDestroyKingdom);
+        messageBroker.Unsubscribe<RulingClanChanged>(HandleRulingClanChanged);
+        messageBroker.Unsubscribe<KingdomNameChangeRequested>(HandleKingdomNameChangeRequested);
+        messageBroker.Unsubscribe<NetworkKingdomNameChanged>(HandleNetworkKingdomNameChanged);
+        messageBroker.Unsubscribe<NetworkPeaceOfferPendingStatusChanged>(Handle_NetworkPeaceOfferPendingStatusChanged);
+        messageBroker.Unsubscribe<NetworkAllianceOfferPendingStatusChanged>(Handle_NetworkAllianceOfferPendingStatusChanged);
+    }
+
+    private readonly struct PendingSettlementRestore
+    {
+        public readonly string PartyId;
+        public readonly string SettlementId;
+
+        public PendingSettlementRestore(string partyId, string settlementId)
+        {
+            PartyId = partyId;
+            SettlementId = settlementId;
+        }
     }
 }

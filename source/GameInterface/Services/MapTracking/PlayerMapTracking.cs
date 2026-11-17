@@ -75,7 +75,7 @@ internal class PlayerMapTracking : IPlayerMapTracking
         if (trackers == null || player == null) return;
         if (!objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party)) return;
 
-        // v1.5 Refresh removes the tracker of a party that is no longer tracked and adds one for an eligible party
+        // Refresh removes the tracker of a party that is no longer tracked and adds one for an eligible party
         trackers.Refresh(party);
     }
 

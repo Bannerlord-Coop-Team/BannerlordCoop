@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using E2E.Tests.Util;
+using GameInterface.Tests.Utils;
 using GameInterface.Services.Barters;
 using GameInterface.Services.Hideouts;
 using GameInterface.Services.MapEvents.Extensions;
