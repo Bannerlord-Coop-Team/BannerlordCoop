@@ -31,6 +31,9 @@ namespace GameInterface.Serialization.External
         protected override void UnpackInternal()
         {
             base.UnpackFields();
+
+            // The cached totals are excluded above, so rebuild them from _data like vanilla's DeserializeFrom does
+            Object.CalculateCachedStats();
         }
     }
 }
