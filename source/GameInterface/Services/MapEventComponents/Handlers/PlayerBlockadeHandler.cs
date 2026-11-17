@@ -60,8 +60,8 @@ internal class PlayerBlockadeHandler : IHandler
             // Players cant fight castle blockade battles yet because coop only syncs town blockades (#4605), so lift it instead of asking
             if (mapEvent.MapEventSettlement?.IsCastle == true)
             {
-                Logger.Information("Lifting the player blockade at castle {SettlementId} instead of asking them to defend it", mapEvent.MapEventSettlement.StringId);
-                LiftBlockade(mapEvent);
+                if (TryLiftBlockade(mapEvent))
+                    Logger.Information("Lifted the player blockade at castle {SettlementId} instead of asking them to defend it", mapEvent.MapEventSettlement.StringId);
                 return;
             }
 
@@ -106,19 +106,19 @@ internal class PlayerBlockadeHandler : IHandler
         {
             if (!objectManager.TryGetObject<MapEvent>(data.MapEventId, out var mapEvent)) return;
 
-            LiftBlockade(mapEvent);
+            TryLiftBlockade(mapEvent);
         }, context: nameof(NetworkRequestLiftPlayerBlockade));
     }
 
-    // Same as EncounterGameMenuBehavior.lift_players_blockade
-    private static void LiftBlockade(MapEvent mapEvent)
+    // Same as EncounterGameMenuBehavior.lift_players_blockade, returns false when the battle already ended
+    private static bool TryLiftBlockade(MapEvent mapEvent)
     {
         var siegeEvent = mapEvent.DefenderSide.LeaderParty.SiegeEvent;
         bool isLiveBlockadeBattle = (mapEvent.IsBlockade || mapEvent.IsBlockadeSallyOut) && !mapEvent.IsFinalized && siegeEvent != null;
         if (!isLiveBlockadeBattle)
         {
             Logger.Warning("Ignoring the blockade lift at {SettlementId} because it is not a live battle against a blockade", mapEvent.MapEventSettlement?.StringId);
-            return;
+            return false;
         }
 
         var settlement = siegeEvent.BesiegedSettlement;
@@ -134,5 +134,7 @@ internal class PlayerBlockadeHandler : IHandler
 
             party.SetMoveGoToSettlement(settlement, MobileParty.NavigationType.Naval, isTargetingThePort: true);
         }
+
+        return true;
     }
 }

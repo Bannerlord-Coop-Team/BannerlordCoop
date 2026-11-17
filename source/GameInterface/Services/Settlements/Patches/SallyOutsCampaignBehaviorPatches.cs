@@ -49,6 +49,7 @@ internal class SallyOutsCampaignBehaviorPatches
     {
         if (!settlement.HasPort || !settlement.SiegeEvent.IsBlockadeActive) return false;
 
-        return !settlement.IsCastle || !settlement.Parties.Any(party => party.IsPlayerParty());
+        bool playerInsideCastle = settlement.IsCastle && settlement.Parties.Any(party => party.IsPlayerParty());
+        return !playerInsideCastle;
     }
 }

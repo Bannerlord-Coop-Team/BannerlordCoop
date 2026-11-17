@@ -22,18 +22,24 @@ internal class CastlePortPatches
     // Shared by the town, castle and village menus
     [HarmonyPatch(typeof(PlayerTownVisitCampaignBehavior), nameof(PlayerTownVisitCampaignBehavior.game_menu_set_sail_leave_on_condition))]
     [HarmonyPostfix]
-    public static void SetSailLeaveOnConditionPostfix(ref bool __result) => HideAtCastle(ref __result);
+    public static void SetSailLeaveOnConditionPostfix(ref bool __result)
+    {
+        if (IsClientAtCastle()) __result = false;
+    }
 
     [HarmonyPatch(typeof(EncounterGameMenuBehavior), nameof(EncounterGameMenuBehavior.menu_defender_siege_break_out_from_port_on_condition))]
     [HarmonyPostfix]
-    public static void BreakOutFromPortOnConditionPostfix(ref bool __result) => HideAtCastle(ref __result);
+    public static void BreakOutFromPortOnConditionPostfix(ref bool __result)
+    {
+        if (IsClientAtCastle()) __result = false;
+    }
 
     [HarmonyPatch(typeof(EncounterGameMenuBehavior), nameof(EncounterGameMenuBehavior.menu_sally_out_from_port_on_condition))]
     [HarmonyPostfix]
-    public static void SallyOutFromPortOnConditionPostfix(ref bool __result) => HideAtCastle(ref __result);
-
-    private static void HideAtCastle(ref bool result)
+    public static void SallyOutFromPortOnConditionPostfix(ref bool __result)
     {
-        if (ModInformation.IsClient && Settlement.CurrentSettlement?.IsCastle == true) result = false;
+        if (IsClientAtCastle()) __result = false;
     }
+
+    private static bool IsClientAtCastle() => ModInformation.IsClient && Settlement.CurrentSettlement?.IsCastle == true;
 }
