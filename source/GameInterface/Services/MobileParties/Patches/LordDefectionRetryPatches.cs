@@ -23,10 +23,9 @@ namespace GameInterface.Services.MobileParties.Patches;
 ///                                 task whose final refusal line is shown.
 ///
 /// Vanilla never prunes attempts by age, so expiry is the cooldown alone. Patching the gate alone cannot
-/// work, because the pre-gate already answered. AlwaysRetry
-/// therefore has to drop this lord's attempt records before a new conversation - and it must drop ALL of
-/// them, not just the unsuccessful ones, because the score counts successes and every persuasion OPTION
-/// records its own attempt. The gate itself must keep running so a fresh failure can select its refusal line.
+/// work, because the pre-gate already answered. AlwaysRetry therefore has to drop this lord's attempt
+/// records before a new conversation - and it must drop ALL of them, not just the unsuccessful ones,
+/// because the score counts successes and every persuasion OPTION records its own attempt. The gate itself must keep running so a fresh failure can select its refusal line.
 ///
 ///   Vanilla     - unchanged: vanilla's own week/season rules apply (default, matches singleplayer)
 ///   NeverExpire - the gate blocks while ANY unsuccessful attempt survives, and attempts never leave

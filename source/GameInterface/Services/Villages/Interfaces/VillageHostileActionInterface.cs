@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.GameDebug.Messages;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
@@ -373,7 +374,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
 
         if (!FactionManager.IsAtWarAgainstFaction(mobileParty.MapFaction, settlement.MapFaction))
         {
-            using (new global::GameInterface.Services.Heroes.Patches.MainHeroSubstitutionScope(mobileParty.LeaderHero, mobileParty))
+            using (new MainHeroSubstitutionScope(mobileParty.LeaderHero, mobileParty))
                 DeclareWarAction.ApplyByPlayerHostility(mobileParty.MapFaction, settlement.MapFaction);
         }
     }
@@ -385,7 +386,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
     /// </summary>
     public bool WillVillageResist(MobileParty mobileParty, Settlement settlement)
     {
-        using (new global::GameInterface.Services.Heroes.Patches.MainHeroSubstitutionScope(mobileParty.LeaderHero, mobileParty))
+        using (new MainHeroSubstitutionScope(mobileParty.LeaderHero, mobileParty))
             return VillageHostileActionCampaignBehavior.WillVillageResistHostileAction(settlement);
     }
 
