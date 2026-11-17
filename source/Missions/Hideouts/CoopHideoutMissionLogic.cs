@@ -20,9 +20,6 @@ namespace Missions.Hideouts;
 
 internal sealed class CoopHideoutMissionLogic : MissionLogic
 {
-    // The dark tint native HideoutAmbushMissionController gives agents in stealth equipment.
-    private const uint StealthClothingColor = 4279111698u;
-
     private readonly IBattleNetwork network;
     private readonly IMessageBroker broker;
     private readonly IMissionContext missionContext;
@@ -222,8 +219,8 @@ internal sealed class CoopHideoutMissionLogic : MissionLogic
         var equipment = (agent.Character as CharacterObject)?.HeroObject?.StealthEquipment;
         if (equipment == null || equipment.IsEmpty()) return;
 
-        agent.SetClothingColor1(StealthClothingColor);
-        agent.SetClothingColor2(StealthClothingColor);
+        agent.SetClothingColor1(CampaignData.StealthColor1);
+        agent.SetClothingColor2(CampaignData.StealthColor2);
         using (new TransientEquipmentSyncScope())
             agent.UpdateSpawnEquipmentAndRefreshVisuals(equipment);
     }
