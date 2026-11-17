@@ -22,17 +22,6 @@ namespace Coop.Tests.Missions.Battles;
 [Collection("Mission.Current")]
 public class SiegeMachineSimulationTests : IDisposable
 {
-    [Theory]
-    [InlineData(-0.1f, true, true)]
-    [InlineData(0.1f, true, true)]
-    [InlineData(-0.1f, false, false)]
-    public void DestructionTransitionSnapsSmallBackwardMovementError(
-        float error, bool destructionTransition, bool expected)
-    {
-        Assert.Equal(expected,
-            SiegeMachineStateReplicator.ShouldSnapMovementForDestruction(error, destructionTransition));
-    }
-
     [Fact]
     public void DestructionTransitionSnapsRamBeforeApplyingBrokenState()
     {
@@ -45,17 +34,29 @@ public class SiegeMachineSimulationTests : IDisposable
         AccessTools.Field(typeof(DestructableComponent), "_currentStateIndex").SetValue(destruction, 0);
         ramSnapDistance = 12.5f;
         ramSnapCalls = 0;
-        Stub(AccessTools.Method(typeof(SiegeWeaponMovementComponent), "GetTotalDistanceTraveledForPathTracker"), nameof(RamDistance));
+        ramDestructionCalls = 0;
+        ramSnappedBeforeDestruction = false;
+        var broker = new TestMessageBroker();
+        using var replicator = new SiegeMachineStateReplicator(Mock.Of<IBattleNetwork>(), broker,
+            Mock.Of<IBattleSession>(), Mock.Of<INetworkAgentRegistry>(), new HostEpochPolicy(),
+            Mock.Of<IRangedSiegeWeaponPresentation>());
+        Stub(AccessTools.Method(typeof(SiegeWeaponMovementComponent), "GetTotalDistanceTraveledForPathTracker"), nameof(RamDistanceAtSnap));
         Stub(AccessTools.Method(typeof(SiegeWeaponMovementComponent), "SetTotalDistanceTraveledForPathTracker"), nameof(RamSetDistance));
         Stub(AccessTools.Method(typeof(SiegeWeaponMovementComponent), "SetTargetFrameForPathTracker"), nameof(RamSetTargetFrame));
+        Stub(AccessTools.Method(typeof(DestructableComponent), "SetDestructionLevel"), nameof(RamSetDestructionLevel));
+        Stub(AccessTools.Method(typeof(SiegeMachineStateReplicator), "SyncMissionSiegeWeaponHealth"), nameof(SkipSyncHealth));
 
-        var state = new NetworkSiegeMachineState(ram.Id.Id, -1f, 1, -1, -1, ramSnapDistance - 0.1f,
+        var state = new NetworkSiegeMachineState(ram.Id.Id, 100f, 1, -1, -1, -1f,
             false, -1, -1000f, -1000f);
-        var apply = AccessTools.Method(typeof(SiegeMachineStateReplicator), "Apply");
-        apply.Invoke(null, new object[] { ram, state });
+        var apply = AccessTools.Method(typeof(SiegeMachineStateReplicator), "ApplyMachineState");
+        ReadField<Dictionary<int, float>>(replicator, "lastAppliedMoveDistance")[ram.Id.Id] = ramSnapDistance - 0.1f;
+        ramSnapCalls = 0;
+        apply.Invoke(replicator, new object[] { ram, state });
 
         Assert.Equal(1, ramSnapCalls);
         Assert.Equal(ramSnapDistance - 0.1f, ramSnappedDistance);
+        Assert.Equal(1, ramDestructionCalls);
+        Assert.True(ramSnappedBeforeDestruction);
     }
 
     private static readonly List<SynchedMissionObject> PausedSkeletons = new();
@@ -274,9 +275,12 @@ public class SiegeMachineSimulationTests : IDisposable
         {
             var snapshot = new NetworkSiegeMachineState(machineId, -1f, -1, -1, -1, -1f,
                 false, -1, -1000f, -1000f, stoneAmmo: 7);
-            var apply = typeof(SiegeMachineStateReplicator).GetMethod("Apply", BindingFlags.Static | BindingFlags.NonPublic);
+            using var replicator = new SiegeMachineStateReplicator(Mock.Of<IBattleNetwork>(), new TestMessageBroker(),
+                Mock.Of<IBattleSession>(), Mock.Of<INetworkAgentRegistry>(), new HostEpochPolicy(),
+                Mock.Of<IRangedSiegeWeaponPresentation>());
+            var apply = typeof(SiegeMachineStateReplicator).GetMethod("Apply", BindingFlags.Instance | BindingFlags.NonPublic);
             Assert.NotNull(apply);
-            apply.Invoke(null, new object[] { pile, snapshot });
+            apply.Invoke(replicator, new object[] { pile, snapshot });
             Assert.Equal(expectedAmmo, pile.AmmoCount);
         }
         finally
@@ -496,11 +500,21 @@ public class SiegeMachineSimulationTests : IDisposable
     private static bool RamStrikeCount(ref int __result) { ramStrikeReads++; __result = 0; return false; }
     private static bool RamMovementArrived(ref bool __result) { __result = ramMovementArrived; return false; }
     private static bool RamDistance(ref float __result) { __result = 0f; return false; }
+    private static bool RamDistanceAtSnap(ref float __result) { __result = ramSnapDistance; return false; }
     private static float ramSnapDistance;
     private static float ramSnappedDistance;
     private static int ramSnapCalls;
+    private static int ramDestructionCalls;
+    private static bool ramSnappedBeforeDestruction;
     private static bool RamSetDistance(float __0) { ramSnappedDistance = __0; return false; }
     private static bool RamSetTargetFrame() { ramSnapCalls++; return false; }
+    private static bool RamSetDestructionLevel()
+    {
+        ramDestructionCalls++;
+        ramSnappedBeforeDestruction = ramSnapCalls > 0;
+        return false;
+    }
+    private static bool SkipSyncHealth() => false;
     private static bool RamMoveToTarget() { ramMovementArrived = true; return false; }
 
     [Theory]

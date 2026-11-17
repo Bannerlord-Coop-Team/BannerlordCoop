@@ -81,6 +81,7 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
     private readonly List<UsableMachine> machines = new List<UsableMachine>();
     private readonly Dictionary<int, UsableMachine> machinesById = new Dictionary<int, UsableMachine>();
     private readonly Dictionary<int, NetworkSiegeMachineState> lastSent = new Dictionary<int, NetworkSiegeMachineState>();
+    private readonly Dictionary<int, float> lastAppliedMoveDistance = new Dictionary<int, float>();
     private readonly Dictionary<int, NetworkSiegeLadderAnimationState> lastSentLadderAnimations =
         new Dictionary<int, NetworkSiegeLadderAnimationState>();
     private readonly HashSet<int> deactivated = new HashSet<int>();
@@ -206,6 +207,7 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             ClearMangonelLoads();
             ClearMangonelPickups();
             lastSent.Clear();
+            lastAppliedMoveDistance.Clear();
             lastSentLadderAnimations.Clear();
             deactivated.Clear();
             pendingByMachineId.Clear();
@@ -1348,7 +1350,7 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             SiegeMissionAuthorityGate.SuppressCapture = true;
             try
             {
-                Apply(machine, pending.Value);
+                ApplyMachineState(machine, pending.Value);
             }
             finally
             {
@@ -1501,7 +1503,7 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             SiegeMissionAuthorityGate.SuppressCapture = true;
             try
             {
-                Apply(machine, stateToApply);
+                ApplyMachineState(machine, stateToApply);
             }
             finally
             {
@@ -1686,11 +1688,21 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         Drop,
     }
 
-    private static void Apply(UsableMachine machine, NetworkSiegeMachineState state)
+    private void ApplyMachineState(UsableMachine machine, NetworkSiegeMachineState state)
+        => ApplyState(machine, state, lastAppliedMoveDistance);
+
+    private static void ApplyState(
+        UsableMachine machine,
+        NetworkSiegeMachineState state,
+        Dictionary<int, float> lastAppliedMoveDistance)
     {
-        bool destructionTransition = state.DestructionState > (machine.DestructionComponent?._currentStateIndex ?? 0);
         // The movement simulator ignores movement echoes (a stale pre-grant broadcast must not
         // fight its own tracker); everyone else eases toward the received distance.
+        if (state.MoveDistance >= 0f)
+        {
+            lastAppliedMoveDistance[machine.Id.Id] = state.MoveDistance;
+        }
+
         if (state.MoveDistance >= 0f && !SiegeMissionAuthorityGate.IsMachineSimulatedLocally(machine.Id.Id))
         {
             var movement = (machine as BatteringRam)?.MovementComponent ?? (machine as SiegeTower)?.MovementComponent;
@@ -1703,7 +1715,7 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
                 // (joiner catch-up) and for a real backward correction; small negative error is the easing's
                 // own overshoot and gets left alone.
                 float error = state.MoveDistance - movement.GetTotalDistanceTraveledForPathTracker();
-                if (ShouldSnapMovementForDestruction(error, destructionTransition))
+                if (ShouldSnapMovement(error))
                 {
                     movement.SetTotalDistanceTraveledForPathTracker(state.MoveDistance);
                     movement.SetTargetFrameForPathTracker();
@@ -1784,13 +1796,29 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             // matching vanilla's local destruction path.
             if (state.DestructionState > destruction._currentStateIndex)
             {
+                if (lastAppliedMoveDistance.TryGetValue(machine.Id.Id, out float moveDistance))
+                {
+                    var movement = (machine as BatteringRam)?.MovementComponent
+                        ?? (machine as SiegeTower)?.MovementComponent;
+                    if (movement != null)
+                    {
+                        // Snap before the broken entity is created because it uses the ram's tracker frame.
+                        movement.SetTotalDistanceTraveledForPathTracker(moveDistance);
+                        movement.SetTargetFrameForPathTracker();
+                    }
+                }
                 destruction.SetDestructionLevel(state.DestructionState, -1, 0f, TaleWorlds.Library.Vec3.Zero, TaleWorlds.Library.Vec3.Zero);
             }
         }
     }
 
-    internal static bool ShouldSnapMovementForDestruction(float error, bool destructionTransition)
-        => destructionTransition || error > MoveDistanceSnapThreshold || error < -MoveDistanceThreshold;
+    private static void Apply(UsableMachine machine, NetworkSiegeMachineState state)
+    {
+        ApplyState(machine, state, new Dictionary<int, float>());
+    }
+
+    internal static bool ShouldSnapMovement(float error)
+        => error > MoveDistanceSnapThreshold || error < -MoveDistanceThreshold;
 
     private static void ApplyLadderAnimation(SiegeLadder ladder, NetworkSiegeLadderAnimationState state)
     {
