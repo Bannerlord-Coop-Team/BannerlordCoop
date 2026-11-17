@@ -1,4 +1,5 @@
 ﻿using Common;
+using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Initialization;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
@@ -38,7 +39,7 @@ internal static class StagedBattleResultUpdatePatch
         (mapEvent.IsHideoutBattle || (mapEvent.IsSiegeAssault && encounter.PlayerSide == BattleSideEnum.Defender)) &&
         MapEventInitializationBarrier.IsBattleResultEncounter(encounter);
 
-    // Whether a held encounter has loot to resume; send troops only gets a winner on success, ending on its result menu.
-    internal static bool HasLootToResume(PlayerEncounter encounter) =>
-        HoldsBattleResultEncounter(encounter) && encounter._mapEvent.Component is not HideoutEventComponent { IsSendTroops: true };
+    // A held send troops encounter waits on its result menu, because the server commits no loot for it.
+    private static bool HasLootToResume(PlayerEncounter encounter) =>
+        HoldsBattleResultEncounter(encounter) && !encounter._mapEvent.IsSendTroopsHideout();
 }

@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.MapEvents.Data;
+using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.MapEvents.Interfaces;
 using GameInterface.Services.MapEvents.Messages.Leave;
@@ -85,8 +86,7 @@ internal class MapEventResultsHandler : IHandler
         {
             if (!objectManager.TryGetIdWithLogging(mapEvent, out var mapEventId)) return;
             if (mapEvent.EventType == MapEvent.BattleTypes.Hideout && mapEvent._mapEventResultsApplied) return;
-            // Send troops only gets a winner when it succeeds, and native ends that at End without applying results.
-            if (mapEvent.Component is HideoutEventComponent { IsSendTroops: true }) return;
+            if (mapEvent.IsSendTroopsHideout()) return;
 
             contributionBarrier.Flush(mapEvent);
             mapEventResultsInterface.CalculateAndCommitMapEventResults(mapEvent, out NetworkPlayerLootData networkPlayerLootData);
