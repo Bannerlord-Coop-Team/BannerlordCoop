@@ -120,7 +120,8 @@ internal class PrisonBreakDebugCommands
             var until = clearing ? CampaignTime.Zero : CampaignTime.DaysFromNow(days);
             messageBroker.Publish(this, new PrisonBreakCooldownSet(settlement, until));
 
-            if (behaviorInterface.IsOnCooldown(settlement) == clearing)
+            bool expectOnCooldown = !clearing;
+            if (behaviorInterface.IsOnCooldown(settlement) != expectOnCooldown)
                 return Failed($"{settlement.Name} prison break cooldown did not apply, check the server log.");
             if (clearing) return Succeeded($"{settlement.Name} prison break cooldown cleared.");
 
