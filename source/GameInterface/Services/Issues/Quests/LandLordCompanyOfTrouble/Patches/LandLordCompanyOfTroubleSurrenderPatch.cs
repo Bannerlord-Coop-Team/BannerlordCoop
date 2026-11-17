@@ -13,12 +13,12 @@ internal class LandLordCompanyOfTroubleSurrenderPatch
     [HarmonyPostfix]
     private static void SurrenderConditionPostfix(ref bool __result)
     {
-        if (!__result || !ContainerProvider.TryResolve<ILandLordCompanyOfTroubleService>(out var service))
+        if (!__result || !ContainerProvider.TryResolve<ILandLordCompanyOfTroubleMercenaries>(out var mercenaries))
         {
             return;
         }
 
-        if (service.CarriesCompanyMercenaries(MobileParty.ConversationParty))
+        if (mercenaries.CarriesCompanyMercenaries(MobileParty.ConversationParty))
         {
             __result = false;
         }

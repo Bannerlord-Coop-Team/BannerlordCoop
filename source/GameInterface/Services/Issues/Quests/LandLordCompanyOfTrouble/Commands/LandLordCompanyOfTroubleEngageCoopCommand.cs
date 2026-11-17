@@ -7,11 +7,11 @@ namespace GameInterface.Services.Issues.Quests.LandLordCompanyOfTrouble.Commands
 
 internal sealed class LandLordCompanyOfTroubleEngageCoopCommand : ICoopCommand
 {
-    private readonly ILandLordCompanyOfTroubleService service;
+    private readonly ILandLordCompanyOfTroubleMercenaries mercenaries;
 
-    public LandLordCompanyOfTroubleEngageCoopCommand(ILandLordCompanyOfTroubleService service)
+    public LandLordCompanyOfTroubleEngageCoopCommand(ILandLordCompanyOfTroubleMercenaries mercenaries)
     {
-        this.service = service;
+        this.mercenaries = mercenaries;
     }
 
     public string Prefix => "coop.debug.issues.company_of_trouble";
@@ -32,7 +32,7 @@ internal sealed class LandLordCompanyOfTroubleEngageCoopCommand : ICoopCommand
             return Failed("This client has no main party");
         }
 
-        var company = MobileParty.All.FirstOrDefault(party => party.IsActive && party.IsBandit && service.CarriesCompanyMercenaries(party));
+        var company = MobileParty.All.FirstOrDefault(party => party.IsActive && party.IsBandit && mercenaries.CarriesCompanyMercenaries(party));
         if (company == null)
         {
             return Failed("No hostile company on the map");

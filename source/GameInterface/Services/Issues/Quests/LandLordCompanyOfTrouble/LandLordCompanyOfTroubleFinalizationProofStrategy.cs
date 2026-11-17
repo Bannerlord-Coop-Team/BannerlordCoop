@@ -8,7 +8,7 @@ using Quest = TaleWorlds.CampaignSystem.Issues.LandLordCompanyOfTroubleIssueBeha
 
 namespace GameInterface.Services.Issues.Quests.LandLordCompanyOfTrouble;
 
-internal class LandLordCompanyOfTroubleFinalizationProofStrategy : IFinalizationProofStrategy
+internal class LandLordCompanyOfTroubleFinalizationProofStrategy : IFinalizationProofStrategy, IOwnerPartyRequiredFinalizationProofStrategy
 {
     private static readonly ILogger Logger = LogManager.GetLogger<LandLordCompanyOfTroubleFinalizationProofStrategy>();
 

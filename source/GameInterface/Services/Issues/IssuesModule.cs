@@ -59,6 +59,9 @@ internal class IssuesModule : Module
         builder.RegisterType<LandLordCompanyOfTroubleService>()
             .As<ILandLordCompanyOfTroubleService>()
             .InstancePerDependency();
+        builder.RegisterType<LandLordCompanyOfTroubleMercenaries>()
+            .As<ILandLordCompanyOfTroubleMercenaries>()
+            .InstancePerDependency();
         builder.RegisterType<EscortProgress>().As<IEscortProgress>().InstancePerDependency();
         builder.RegisterType<EscortOwnerParty>().As<IEscortOwnerParty>().InstancePerDependency();
         builder.RegisterType<QuestEventRelay>().As<IQuestEventRelay>().InstancePerDependency();

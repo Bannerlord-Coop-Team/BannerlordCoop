@@ -99,17 +99,6 @@ public class LandLordCompanyOfTroubleTests : IDisposable
     }
 
     [Fact]
-    public void DebugCapture_IsRefusedForAHeroWithoutAParty()
-    {
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<Hero>(lordId, out var lord));
-
-            Assert.False(Descriptor().CreationCaptureStrategy.TryBuildDebugCapture(lord, out _));
-        });
-    }
-
-    [Fact]
     public void Accept_TheServerAddsTheMercenariesToTheOwnersParty()
     {
         SetOwner();

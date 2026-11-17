@@ -79,8 +79,13 @@ internal class LandLordCompanyOfTroubleBranchPatches
             return true;
         }
 
+        if (MobileParty.MainParty.ItemRoster.TotalFood <= 0)
+        {
+            return false;
+        }
+
         // The mercenaries left the party when they turned hostile, so nobody is left to steal
-        if (MobileParty.MainParty.ItemRoster.TotalFood <= 0 || !MobileParty.MainParty.MemberRoster.Contains(__instance._troubleCharacterObject))
+        if (!MobileParty.MainParty.MemberRoster.Contains(__instance._troubleCharacterObject))
         {
             return false;
         }

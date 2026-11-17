@@ -1,7 +1,5 @@
 ﻿using Common;
-using Common.Logging;
 using GameInterface.Services.Issues.Framework.Interface;
-using Serilog;
 using System;
 using TaleWorlds.CampaignSystem.Issues;
 using Quest = TaleWorlds.CampaignSystem.Issues.LandLordCompanyOfTroubleIssueBehavior.LandLordCompanyOfTroubleIssueQuest;
@@ -10,8 +8,6 @@ namespace GameInterface.Services.Issues.Quests.LandLordCompanyOfTrouble;
 
 internal class LandLordCompanyOfTroubleQuestSolutionAcceptStrategy : IQuestSolutionAcceptStrategy
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<LandLordCompanyOfTroubleQuestSolutionAcceptStrategy>();
-
     private readonly IIssueOwnerResolver ownerResolver;
 
     public LandLordCompanyOfTroubleQuestSolutionAcceptStrategy(IIssueOwnerResolver ownerResolver)
@@ -28,10 +24,9 @@ internal class LandLordCompanyOfTroubleQuestSolutionAcceptStrategy : IQuestSolut
             return;
         }
 
-        if (!ownerResolver.TryResolveOwnerHero(issue, out var ownerHero))
+        if (!ownerResolver.TryResolveOwnerHero(issue, out var ownerHero) || ownerHero.PartyBelongedTo == null)
         {
-            Logger.Error("{issue} was accepted but has no owning player to give the mercenaries to", issue.StringId);
-            return;
+            throw new InvalidOperationException($"{issue.StringId} was accepted without an owning party to give the mercenaries to");
         }
 
         ownerHero.PartyBelongedTo.MemberRoster.AddToCounts(quest._troubleCharacterObject, quest._companyTroopCount);

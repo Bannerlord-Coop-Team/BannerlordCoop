@@ -28,9 +28,6 @@ internal interface ILandLordCompanyOfTroubleService
 
     // Server: fails an owner's quest when someone other than the owner destroys the hostile company
     void OnMobilePartyDestroyed(MobileParty mobileParty, PartyBase destroyerParty);
-
-    // Owner's client: whether a party other than the local main party carries company mercenaries, a hostile company or another player's
-    bool CarriesCompanyMercenaries(MobileParty party);
 }
 
 internal class LandLordCompanyOfTroubleService : ILandLordCompanyOfTroubleService
@@ -46,6 +43,7 @@ internal class LandLordCompanyOfTroubleService : ILandLordCompanyOfTroubleServic
 
     public void RemoveCompanyOf(Quest quest)
     {
+        // Already on the game thread, this only adds the catch so a failed cleanup doesn't throw into the vanilla code ending the quest
         GameThread.RunSafe(() => RemoveCompany(quest), context: nameof(LandLordCompanyOfTroubleService));
     }
 
@@ -91,24 +89,6 @@ internal class LandLordCompanyOfTroubleService : ILandLordCompanyOfTroubleServic
         }
 
         dispatcher.RunAsOwners<Quest>(quest => OnPartyDestroyed(quest, mobileParty, destroyerParty));
-    }
-
-    public bool CarriesCompanyMercenaries(MobileParty party)
-    {
-        if (party == null || party == MobileParty.MainParty)
-        {
-            return false;
-        }
-
-        foreach (var element in party.MemberRoster.GetTroopRoster())
-        {
-            if (element.Character.StringId == Quest.TroubleCharacterObjectStringId)
-            {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     private static void OnMapEventEnded(Quest quest, MapEvent mapEvent)
