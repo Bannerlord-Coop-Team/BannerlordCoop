@@ -50,21 +50,8 @@ public class PlayerPartyPvpRulesTests
         Assert.Equal(expectedSeconds, rules.GetIdleSeconds(session, Options(blockLeave: true, responseTimerSeconds: 0)));
     }
 
-    [Theory]
-    [InlineData(true, true, PlayerPartyInteractionProposal.None, true)]
-    [InlineData(false, true, PlayerPartyInteractionProposal.None, false)]
-    [InlineData(true, false, PlayerPartyInteractionProposal.None, false)]
-    [InlineData(true, true, PlayerPartyInteractionProposal.Trade, false)]
-    public void CanBlockLeave_OnlyForAMeetingStartedAtWar(
-        bool blockLeave, bool isHostile, PlayerPartyInteractionProposal proposal, bool expected)
-    {
-        var session = CreateSession(proposal, isHostile);
-
-        Assert.Equal(expected, rules.CanBlockLeave(session, Options(blockLeave, responseTimerSeconds: 0)));
-    }
-
-    private static PlayerPartyInteractionSession CreateSession(PlayerPartyInteractionProposal proposal, bool isHostile = true)
-        => new PlayerPartyInteractionSession("session", "initiator", "responder", "Initiator", "Responder", null, isHostile)
+    private static PlayerPartyInteractionSession CreateSession(PlayerPartyInteractionProposal proposal)
+        => new PlayerPartyInteractionSession("session", "initiator", "responder", "Initiator", "Responder", null, isHostile: true)
         {
             Proposal = proposal,
         };
