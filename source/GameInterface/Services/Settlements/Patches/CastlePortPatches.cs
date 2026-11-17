@@ -28,6 +28,7 @@ internal class CastlePortPatches
         if (IsClientAtCastle()) __result = false;
     }
 
+    // menu_siege_strategies is shared by town and castle sieges
     [HarmonyPatch(typeof(EncounterGameMenuBehavior), nameof(EncounterGameMenuBehavior.menu_defender_siege_break_out_from_port_on_condition))]
     [HarmonyPostfix]
     public static void BreakOutFromPortOnConditionPostfix(ref bool __result)
