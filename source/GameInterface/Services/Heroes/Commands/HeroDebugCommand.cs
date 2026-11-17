@@ -506,11 +506,13 @@ public class HeroDebugCommand
     {
         private readonly ICommandObjectResolver resolver;
         private readonly IObjectManager objectManager;
+        private readonly IPlayerManager playerManager;
 
-        public HeroKillPlayerCoopCommand(ICommandObjectResolver resolver, IObjectManager objectManager)
+        public HeroKillPlayerCoopCommand(ICommandObjectResolver resolver, IObjectManager objectManager, IPlayerManager playerManager)
         {
             this.resolver = resolver;
             this.objectManager = objectManager;
+            this.playerManager = playerManager;
         }
 
         public string Prefix => "coop.debug.hero";
@@ -531,7 +533,7 @@ public class HeroDebugCommand
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (!CommandHelpers.IsServerOnlyCommand(out var error, "coop.debug.hero.kill_player")) return Failed(error);
-            return KillRegisteredHero(resolver, objectManager, args, requirePlayer: true);
+            return KillRegisteredHero(resolver, objectManager, playerManager, args, requirePlayer: true);
         }
     }
 
@@ -539,11 +541,13 @@ public class HeroDebugCommand
     {
         private readonly ICommandObjectResolver resolver;
         private readonly IObjectManager objectManager;
+        private readonly IPlayerManager playerManager;
 
-        public HeroKillNpcCoopCommand(ICommandObjectResolver resolver, IObjectManager objectManager)
+        public HeroKillNpcCoopCommand(ICommandObjectResolver resolver, IObjectManager objectManager, IPlayerManager playerManager)
         {
             this.resolver = resolver;
             this.objectManager = objectManager;
+            this.playerManager = playerManager;
         }
 
         public string Prefix => "coop.debug.hero";
@@ -561,16 +565,16 @@ public class HeroDebugCommand
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (!CommandHelpers.IsServerOnlyCommand(out var error, "coop.debug.hero.kill_npc")) return Failed(error);
-            return KillRegisteredHero(resolver, objectManager, args, requirePlayer: false);
+            return KillRegisteredHero(resolver, objectManager, playerManager, args, requirePlayer: false);
         }
     }
 
     // Resolves the target (and optional killer) hero by name or id, then applies the native death action.
-    private static CoopCommandResult KillRegisteredHero(ICommandObjectResolver resolver, IObjectManager objectManager, ICoopCommandArgs args, bool requirePlayer)
+    private static CoopCommandResult KillRegisteredHero(ICommandObjectResolver resolver, IObjectManager objectManager, IPlayerManager playerManager, ICoopCommandArgs args, bool requirePlayer)
     {
         if (!resolver.TryResolveHero(args[0], out var hero, out var heroError))
             return Failed(heroError);
-        if (hero.IsPlayerHero() != requirePlayer || !hero.IsAlive)
+        if (playerManager.Contains(hero) != requirePlayer || !hero.IsAlive)
             return Failed(requirePlayer ? "The hero must be a living registered player." : "The hero must be a living registered NPC.");
 
         KillCharacterAction.KillCharacterActionDetail detail;
@@ -598,13 +602,12 @@ public class HeroDebugCommand
 
         Hero actor = null;
         MobileParty party = null;
-        if (!requirePlayer && (!ContainerProvider.TryResolve<IPlayerManager>(out var players) ||
-            !players.TryGetPlayer(args[2], out var player) ||
+        if (!requirePlayer && (!playerManager.TryGetPlayer(args[2], out var player) ||
             !objectManager.TryGetObject(player.HeroId, out actor) ||
             !objectManager.TryGetObject(player.MobilePartyId, out party)))
             return Failed("The acting player's registered hero and party are required.");
         if (!requirePlayer && detail == KillCharacterAction.KillCharacterActionDetail.Executed &&
-            killer.IsPlayerHero() && killer != actor)
+            playerManager.Contains(killer) && killer != actor)
             return Failed("A player execution killer must match the acting controller's hero.");
 
         // An execution runs outside the substitution, as ExecuteTroopHandler runs a player's: the action

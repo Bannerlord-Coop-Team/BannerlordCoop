@@ -58,7 +58,7 @@ public sealed class SpawnDesertersCoopCommand : ICoopCommand
         behavior.SpawnDesertersParty(mapEvent: null, troops, settlement);
 
         var created = behavior.DeserterClan.WarPartyComponents.FirstOrDefault(component => !existing.Contains(component));
-        if (created?.MobileParty == null) return Failed("No deserter party was created.");
+        if (created == null) return Failed("No deserter party was created.");
 
         var party = created.MobileParty;
         return Succeeded(
