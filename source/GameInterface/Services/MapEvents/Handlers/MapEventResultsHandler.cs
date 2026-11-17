@@ -86,6 +86,7 @@ internal class MapEventResultsHandler : IHandler
         {
             if (!objectManager.TryGetIdWithLogging(mapEvent, out var mapEventId)) return;
             if (mapEvent.EventType == MapEvent.BattleTypes.Hideout && mapEvent._mapEventResultsApplied) return;
+            // Native ends a won send troops raid without applying results, so it gets no loot or xp.
             if (mapEvent.IsSendTroopsHideout()) return;
 
             contributionBarrier.Flush(mapEvent);

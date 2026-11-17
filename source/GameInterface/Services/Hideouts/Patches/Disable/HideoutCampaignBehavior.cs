@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.Hideouts.Handlers;
 using GameInterface.Services.Hideouts.Messages;
+using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -149,7 +150,7 @@ internal class HideoutCampaignBehaviorPatch
         args.optionLeaveType = GameMenuOption.LeaveType.Mission;
         args.IsEnabled = Hero.MainHero?.IsWounded == false;
         return battle?.EventType == MapEvent.BattleTypes.Hideout && !battle.IsFinalized &&
-            battle.BattleState == BattleState.None && (battle.Component as HideoutEventComponent)?.IsSendTroops != true;
+            battle.BattleState == BattleState.None && !battle.IsSendTroopsHideout();
     }
 
     private static void JoinHideout(MenuCallbackArgs args)
