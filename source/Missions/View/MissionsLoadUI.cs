@@ -176,12 +176,10 @@ namespace Missions.View
             this.IsLoadingSaves = false;
             */
 
-            // Save loading is async; block so SaveGroups is populated
-            // before FilterSaveGames runs. LoadSavesAsync reads the files and
-            // RefreshSaves (normally run from OnTick) builds the groups.
+            // Save loading is async; block so the files are read, then tick once so vanilla builds
+            // SaveGroups now instead of on the next frame, because FilterSaveGames reads them below.
             base.LoadSavesAsync().GetAwaiter().GetResult();
-            RefreshSaves();
-            IsRefreshingSaves = false;
+            OnTick(0f);
             FilterSaveGames();
 
             //RefreshValues();

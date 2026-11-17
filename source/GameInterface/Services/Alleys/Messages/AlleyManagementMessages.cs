@@ -73,12 +73,30 @@ public readonly struct AlleyAcquiredRequested : IEvent
     public readonly Hero Owner;
     public readonly Hero Overseer;
     public readonly TroopRoster Garrison;
-    public AlleyAcquiredRequested(Alley alley, Hero owner, Hero overseer, TroopRoster garrison)
+    /// <summary>Who held the alley when the player started the fight, even if another take over reached this client during the fight or the troop screen.</summary>
+    public readonly Hero PreviousOwner;
+    public AlleyAcquiredRequested(Alley alley, Hero owner, Hero overseer, TroopRoster garrison, Hero previousOwner)
     {
         Alley = alley;
         Owner = owner;
         Overseer = overseer;
         Garrison = garrison;
+        PreviousOwner = previousOwner;
+    }
+}
+
+/// <summary>Player won the alley fight and chose to leave the alley empty instead of taking it over.</summary>
+public readonly struct AlleyClearedRequested : IEvent
+{
+    public readonly Alley Alley;
+    public readonly Hero Clearer;
+    /// <summary>Who held the alley when the player started the fight, even if another gang took it since.</summary>
+    public readonly Hero GangOwner;
+    public AlleyClearedRequested(Alley alley, Hero clearer, Hero gangOwner)
+    {
+        Alley = alley;
+        Clearer = clearer;
+        GangOwner = gangOwner;
     }
 }
 
@@ -95,12 +113,34 @@ public readonly struct RequestAcquireAlley : ICommand
     public readonly string OverseerId;
     [ProtoMember(4)]
     public readonly TroopRosterElementData[] Garrison;
-    public RequestAcquireAlley(string alleyId, string ownerId, string overseerId, TroopRosterElementData[] garrison)
+    /// <summary>The owner the sender saw holding the alley before the take over, the beaten gang leader after a fight.</summary>
+    [ProtoMember(5)]
+    public readonly string PreviousOwnerId;
+    public RequestAcquireAlley(string alleyId, string ownerId, string overseerId, TroopRosterElementData[] garrison, string previousOwnerId)
     {
         AlleyId = alleyId;
         OwnerId = ownerId;
         OverseerId = overseerId;
         Garrison = garrison;
+        PreviousOwnerId = previousOwnerId;
+    }
+}
+
+[ProtoContract(SkipConstructor = true)]
+public readonly struct RequestClearAlley : ICommand
+{
+    [ProtoMember(1)]
+    public readonly string AlleyId;
+    [ProtoMember(2)]
+    public readonly string ClearerId;
+    /// <summary>The gang leader the client saw owning the alley when it chose to leave it empty.</summary>
+    [ProtoMember(3)]
+    public readonly string GangOwnerId;
+    public RequestClearAlley(string alleyId, string clearerId, string gangOwnerId)
+    {
+        AlleyId = alleyId;
+        ClearerId = clearerId;
+        GangOwnerId = gangOwnerId;
     }
 }
 

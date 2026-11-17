@@ -97,7 +97,8 @@ internal class HeroRelationsInterface : IHeroRelationsInterface
     // player hero loses relation with a town notable here, the first time the session records them meeting.
     public void ApplyFirstMeetingRelation(Hero playerHero, Hero metHero)
     {
-        if (!metHero.IsNotable || metHero.CurrentSettlement?.IsTown != true) return;
+        if (!metHero.IsNotable) return;
+        if (metHero.CurrentSettlement?.IsTown != true) return;
 
         var relationChange = (int)TraitEffectHelper.GetTraitEffectBonus(
             playerHero,

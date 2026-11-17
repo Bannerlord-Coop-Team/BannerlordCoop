@@ -10,7 +10,8 @@ namespace GameInterface.Services.Ships.Patches;
 /// <summary>
 /// Replaces vanilla's PartyBase.MainParty checks on ships and keeps clients from writing server-owned piece state.
 /// </summary>
-[HarmonyPatch]
+[HarmonyPatch(typeof(Ship))]
+[HarmonyPatchCategory(GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class ShipMainPartyPatches
 {
     /// <summary>
@@ -20,7 +21,9 @@ internal class ShipMainPartyPatches
     [HarmonyPrefix]
     public static bool CanHaveUnlockedPiecesSetterPrefix(Ship __instance)
     {
-        return !(ModInformation.IsClient && IsManaged(__instance));
+        if (ModInformation.IsClient && IsManaged(__instance)) return false;
+
+        return true;
     }
 
     /// <summary>

@@ -2,6 +2,7 @@ using E2E.Tests.Environment;
 using E2E.Tests.Util;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using Xunit.Abstractions;
@@ -51,6 +52,42 @@ public class PartyDestructionTests : IDisposable
         foreach (var client in TestEnvironment.Clients)
         {
             Assert.False(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var _));
+        }
+    }
+
+    [Fact]
+    public void ServerRemoveParty_DestroysAnchorOnAllClients()
+    {
+        // Arrange
+        var server = TestEnvironment.Server;
+
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+
+        string? anchorId = null;
+        server.Call(() =>
+        {
+            Assert.True(server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(server.ObjectManager.TryGetId(party.Anchor, out anchorId));
+        });
+
+        foreach (var client in TestEnvironment.Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject<AnchorPoint>(anchorId, out var _));
+        }
+
+        // Act
+        server.Call(() =>
+        {
+            Assert.True(server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            party.RemoveParty();
+        });
+
+        // Assert
+        Assert.False(server.ObjectManager.TryGetObject<AnchorPoint>(anchorId, out var _));
+
+        foreach (var client in TestEnvironment.Clients)
+        {
+            Assert.False(client.ObjectManager.TryGetObject<AnchorPoint>(anchorId, out var _));
         }
     }
 

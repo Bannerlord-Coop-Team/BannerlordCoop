@@ -3,6 +3,7 @@ using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Players;
@@ -35,6 +36,7 @@ public class ArmyNeedsSuppliesWarDeclaredTests : IDisposable
     private readonly string armyPartyId;
     private readonly string playerClanId;
     private readonly string ownerHeroId;
+    private readonly string otherHeroId;
     private readonly StubIssuePreconditions preconditions = new(typeof(Issue));
 
     private E2ETestEnvironment TestEnvironment { get; }
@@ -54,7 +56,7 @@ public class ArmyNeedsSuppliesWarDeclaredTests : IDisposable
         playerClanId = TestEnvironment.CreateRegisteredObject<Clan>();
 
         ownerHeroId = RegisterPlayer(ClientA, "player-A");
-        RegisterPlayer(ClientB, "player-B");
+        otherHeroId = RegisterPlayer(ClientB, "player-B");
 
         foreach (var instance in Instances)
         {
@@ -79,19 +81,7 @@ public class ArmyNeedsSuppliesWarDeclaredTests : IDisposable
     [InlineData(DeclareWarAction.DeclareWarDetail.CausedByPlayerHostility, IssueOutcome.QuestFail)]
     public void AWarDeclaredOnTheServerEndsTheQuestEverywhere(DeclareWarAction.DeclareWarDetail detail, IssueOutcome outcome)
     {
-        foreach (var instance in Instances)
-        {
-            instance.Call(() =>
-            {
-                Assert.True(instance.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var ownerHero));
-                Assert.True(instance.ObjectManager.TryGetObject<Clan>(playerClanId, out var playerClan));
-
-                using (new AllowedThread())
-                {
-                    ownerHero.Clan = playerClan;
-                }
-            });
-        }
+        PutTheOwnerInThePlayerClan();
 
         Server.Call(() =>
         {
@@ -119,6 +109,37 @@ public class ArmyNeedsSuppliesWarDeclaredTests : IDisposable
         {
             Assert.False(Server.Resolve<IIssueOwnershipRegistry>().TryGetOwner(lordId, IssueId, out _));
         });
+    }
+
+    // #3986: the war is declared while another player is the server's main hero, so only the owner's
+    // substitution scope (OutcomeDispatcher.RunAsOwners) can make the crime rating check read the owner's rating.
+    [Theory]
+    [InlineData(61f, 0f, IssueOutcome.QuestFail)]
+    [InlineData(0f, 61f, IssueOutcome.QuestCancel)]
+    public void ACrimeRatingWarIsJudgedOnTheQuestOwnersRating(float ownerRating, float otherRating, IssueOutcome outcome)
+    {
+        PutTheOwnerInThePlayerClan();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(playerClanId, out var playerClan));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(otherHeroId, out var otherHero));
+
+            var players = Server.Resolve<IPlayerManager>();
+            Assert.True(players.TryGetPlayer("player-A", out var owner));
+            Assert.True(players.TryGetPlayer("player-B", out var other));
+            owner.CrimeRatings[kingdomId] = ownerRating;
+            other.CrimeRatings[kingdomId] = otherRating;
+
+            using (new MainHeroSubstitutionScope(otherHero, otherHero.PartyBelongedTo))
+            {
+                DeclareWarAction.ApplyInternal(kingdom, playerClan, DeclareWarAction.DeclareWarDetail.CausedByCrimeRatingChange);
+            }
+        }, WarLogTexts);
+
+        var finalized = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Assert.Equal(outcome, finalized.Outcome);
     }
 
     [Fact]
@@ -166,6 +187,23 @@ public class ArmyNeedsSuppliesWarDeclaredTests : IDisposable
         }, WarLogTexts);
 
         Assert.Equal(1, calls.CountFor(Server));
+    }
+
+    private void PutTheOwnerInThePlayerClan()
+    {
+        foreach (var instance in Instances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var ownerHero));
+                Assert.True(instance.ObjectManager.TryGetObject<Clan>(playerClanId, out var playerClan));
+
+                using (new AllowedThread())
+                {
+                    ownerHero.Clan = playerClan;
+                }
+            });
+        }
     }
 
     private string RegisterPlayer(EnvironmentInstance client, string controllerId)

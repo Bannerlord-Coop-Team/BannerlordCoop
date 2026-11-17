@@ -146,7 +146,8 @@ public sealed class MockMission
     public static bool ForShell(Mission shell, out MockMission mock) => ByShell.TryGetValue(shell, out mock);
 
     /// <summary>While true, each <see cref="SpawnAgent"/> also mints a linked horse — models the engine
-    /// spawning a cavalry rider's mount implicitly (from its equipment) inside the same SpawnAgent call.</summary>
+    /// spawning a cavalry rider's mount implicitly (from its equipment) inside the same SpawnAgent call. A build with
+    /// NoHorses gets no horse, as the engine clears the horse slots of its spawn equipment.</summary>
     public bool SpawnMounted { get; set; }
 
     /// <summary>While true, mirrors the engine's clone of overridden equipment inside SpawnAgent.</summary>
@@ -185,7 +186,7 @@ public sealed class MockMission
             InitialPlayerAgent = agent;
             InitialPlayerBuildCount++;
         }
-        if (SpawnMounted) SpawnMount(agent);
+        if (SpawnMounted && !buildData.AgentNoHorses) SpawnMount(agent);
         return agent;
     }
 

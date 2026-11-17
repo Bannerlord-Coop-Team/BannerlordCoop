@@ -895,14 +895,47 @@ public class BattleReserveReconnectScopeTests : MissionTestEnvironment
     }
 
     /// <summary>
-    /// BR-054: a player retreats from the mission, then drops from the campaign with its party still in the MapEvent. Its
-    /// reserve was withdrawn, so the drop hands nothing to the host, and its return re-enters with the whole party re-flattened.
+    /// BR-054 in the R41a order: a player retreats from the mission, then drops from the campaign with its party still in
+    /// the MapEvent. Its reserve was withdrawn, so the drop hands nothing to the host, and its return re-enters with the
+    /// whole party re-flattened.
     /// </summary>
     [Fact]
     [Trait("Requirement", "BR-054")]
     public void RetreatedPlayerDisconnecting_KeepsItsPartyOutOfTheHostsReserveScope()
     {
         var (mapEventId, partyIds) = SetupCoopBattle("host-ctrl", "returner-ctrl");
+        AssertDepartureKeepsThePartyFromTheHost(mapEventId, partyIds, departure: () =>
+        {
+            DepartBattle("returner-ctrl", mapEventId, wasRetreat: true);
+            DisconnectFromMapEvent("returner-ctrl", mapEventId);
+        });
+    }
+
+    /// <summary>
+    /// D4: at sea a mid-battle disconnect withdraws the party like a retreat, whichever of the campaign drop and the mission
+    /// departure the server sees first, so the host never fields it and a returning player gets a full, fresh reserve.
+    /// </summary>
+    [Theory]
+    [Trait("Requirement", "BR-054")]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void NavalDisconnect_WithdrawsThePartyReserve_AndTheReturnerGetsAFullOne(bool campaignDropFirst)
+    {
+        var (mapEventId, partyIds) = SetupCoopBattle("host-ctrl", "returner-ctrl");
+        Server.Call(() => Server.GetRegisteredObject<MapEvent>(mapEventId).Position =
+            new CampaignVec2(TaleWorlds.Library.Vec2.Zero, isOnLand: false));
+        AssertDepartureKeepsThePartyFromTheHost(mapEventId, partyIds, departure: () =>
+        {
+            if (campaignDropFirst) DisconnectFromMapEvent("returner-ctrl", mapEventId);
+            DepartBattle("returner-ctrl", mapEventId, wasRetreat: false);
+            if (!campaignDropFirst) DisconnectFromMapEvent("returner-ctrl", mapEventId);
+        });
+    }
+
+    // Both connected players enter, the returner fields part of its reserve, departs and goes offline; the host is never
+    // handed its party, and the returner's re-entry grant after it reconnects carries its whole party from a reset pointer.
+    private void AssertDepartureKeepsThePartyFromTheHost(string mapEventId, string[] partyIds, Action departure)
+    {
         var clients = Clients.ToArray();
         var host = clients[0];
         var returner = clients[1];
@@ -925,8 +958,7 @@ public class BattleReserveReconnectScopeTests : MissionTestEnvironment
             int hostBaseline = FeedBaseline(host, mapEventId);
             int expansionBaseline = host.InternalMessages.GetMessages<NetworkBattleReserveOwnershipExpanded>()
                 .Count(message => message.MapEventId == mapEventId);
-            DepartBattle("returner-ctrl", mapEventId, wasRetreat: true);
-            DisconnectFromMapEvent("returner-ctrl", mapEventId);
+            departure();
             Server.Call(() => players.ClearPeer(returner.NetPeer));
             RequestOwnedReserves(host, mapEventId, "host-ctrl");
 

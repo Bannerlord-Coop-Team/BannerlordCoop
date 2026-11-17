@@ -22,8 +22,8 @@ namespace GameInterface.Services.MobileParties.Patches;
 ///                                 ONE WEEK old. The active persuasion also reuses it to choose the failed
 ///                                 task whose final refusal line is shown.
 ///
-/// Attempts are never removed by vanilla any more (the yearly prune is gone), so expiry is the cooldown
-/// alone. Patching the gate alone cannot work, because the pre-gate already answered. AlwaysRetry
+/// Vanilla never prunes attempts by age, so expiry is the cooldown alone. Patching the gate alone cannot
+/// work, because the pre-gate already answered. AlwaysRetry
 /// therefore has to drop this lord's attempt records before a new conversation - and it must drop ALL of
 /// them, not just the unsuccessful ones, because the score counts successes and every persuasion OPTION
 /// records its own attempt. The gate itself must keep running so a fresh failure can select its refusal line.

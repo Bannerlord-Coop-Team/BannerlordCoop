@@ -27,7 +27,7 @@ public sealed class LaunchSchemaFixture : IMemoryCommitProbe, IBridgeBuildInspec
         var settings = new CoopMcpServerSettings
         {
             ArtifactDirectory = directory,
-            Profiles = new() { ["fixture"] = new LaunchProfile { Executable = executable } },
+            Profiles = new() { ["fixture"] = new LaunchProfile { Executable = executable, ExternalServer = scenario == "external-server" } },
         };
         return new RunOrchestrator(settings, this, this, new IncrementalLogReader(),
             new LaunchPreflight(this, this), new SaveCatalog(this));

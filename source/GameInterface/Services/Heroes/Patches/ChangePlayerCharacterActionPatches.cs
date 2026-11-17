@@ -1,20 +1,23 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.PartyVisuals.Interfaces;
 using HarmonyLib;
-using SandBox.GauntletUI.Map;
-using SandBox.View.Map;
-using SandBox.ViewModelCollection.Nameplate;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
-using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.Heroes.Patches;
 
+/// <summary>
+/// Replaces the native player-character switch so coop can keep the switched-into party alive.
+/// </summary>
 [HarmonyPatch(typeof(ChangePlayerCharacterAction))]
 internal class ChangePlayerCharacterActionPatches
 {
+    /// <summary>
+    /// Switches the local main hero and party, then redraws the map against the new hero.
+    /// </summary>
     [HarmonyPatch("Apply")]
     private static bool Prefix(Hero hero)
     {
@@ -28,32 +31,13 @@ internal class ChangePlayerCharacterActionPatches
         // player whose party is empty (0 members) or only holds a wounded leader would have
         // their party destroyed and the character deleted.
         MobileParty targetHeroParty = hero.PartyBelongedTo;
-        AnchorPoint anchor = new AnchorPoint(MobileParty.MainParty.Anchor);
-        bool isCurrentlyAtSea = MobileParty.MainParty.IsCurrentlyAtSea;
         Game.Current.PlayerTroop = hero.CharacterObject;
-
         CampaignEventDispatcher.Instance.OnBeforePlayerCharacterChanged(mainHero, hero);
         Campaign.Current.OnPlayerCharacterChanged(out var isMainPartyChanged);
-        if (mainParty.Ships.Count > 0 && isMainPartyChanged)
-        {
-            Ship ship = ((mainParty.MemberRoster.TotalManCount <= 1 || !isCurrentlyAtSea) ? null : mainParty.Ships.MinBy((Ship x) => x.HitPoints));
-            for (int num = mainParty.Ships.Count - 1; num >= 0; num--)
-            {
-                if (mainParty.Ships[num] != ship)
-                {
-                    ChangeShipOwnerAction.ApplyByTransferring(PartyBase.MainParty, mainParty.Ships[num]);
-                }
-            }
-        }
 
         if (mainParty.IsTransitionInProgress)
         {
             mainParty.CancelNavigationTransition();
-        }
-
-        if (MobileParty.MainParty.Ships.Count > 0 && !MobileParty.MainParty.Anchor.IsValid && !MobileParty.MainParty.IsCurrentlyAtSea)
-        {
-            MobileParty.MainParty.SetAnchor(anchor);
         }
 
         if (mainParty != MobileParty.MainParty && mainParty.IsActive && mainParty != targetHeroParty)
@@ -78,21 +62,11 @@ internal class ChangePlayerCharacterActionPatches
         PartyBase.MainParty.SetVisualAsDirty();
         mainParty.Party.SetVisualAsDirty();
 
-        // Nameplate relations were initialized against the save's previous main hero. The native VM
-        // does not listen for player-character changes, so refresh its cached friendly/enemy state now.
-        RefreshSettlementNameplateRelations();
+        // Map markers and nameplates were drawn against the previous main hero, and the native views
+        // do not listen for player-character changes, so redraw their friendly/enemy state now.
+        if (ContainerProvider.TryResolve<IMapStanceVisualsInterface>(out var stanceVisuals))
+            stanceVisuals.RedrawStanceVisuals(previousFaction: mainHero.MapFaction);
 
         return false;
-    }
-
-    private static void RefreshSettlementNameplateRelations()
-    {
-        var nameplates = MapScreen.Instance?.GetMapView<GauntletMapSettlementNameplateView>()?._dataSource;
-        RefreshSettlementNameplateRelations(nameplates);
-    }
-
-    internal static void RefreshSettlementNameplateRelations(SettlementNameplatesVM nameplates)
-    {
-        nameplates?.RefreshRelationsOfNameplates();
     }
 }

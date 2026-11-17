@@ -51,7 +51,7 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
             .Returns((string controllerId) => controllerId == "host");
         network.Setup(n => n.SendAll(It.IsAny<IMessage>())).Callback<IMessage>(sentToAll.Add);
 
-        sut = new SiegeMachineStateReplicator(network.Object, broker, session.Object, agentRegistry.Object, new HostEpochPolicy());
+        sut = new SiegeMachineStateReplicator(network.Object, broker, session.Object, agentRegistry.Object, new HostEpochPolicy(), Mock.Of<IRangedSiegeWeaponPresentation>());
     }
 
     // ------------------------------------------------------------------
@@ -185,7 +185,8 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
             joinerBroker,
             joinerSession.Object,
             new Mock<INetworkAgentRegistry>().Object,
-            new HostEpochPolicy());
+            new HostEpochPolicy(),
+            Mock.Of<IRangedSiegeWeaponPresentation>());
 
         InvokeSetMachineAuthority(machineId, "remote-a");
         var authorityA = Assert.IsType<NetworkSiegeMachineAuthority>(Assert.Single(sentToAll));

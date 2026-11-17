@@ -14,17 +14,20 @@ public class ClanMembersVMFactory : IClanMembersVMFactory
 {
     private readonly IClanMemberGrouping grouping;
     private readonly IClanLeaveRules leaveRules;
+    private readonly IPlayerDivorceRules divorceRules;
     private readonly IMessageBroker messageBroker;
 
-    public ClanMembersVMFactory(IClanMemberGrouping grouping, IClanLeaveRules leaveRules, IMessageBroker messageBroker)
+    public ClanMembersVMFactory(IClanMemberGrouping grouping, IClanLeaveRules leaveRules,
+        IPlayerDivorceRules divorceRules, IMessageBroker messageBroker)
     {
         this.grouping = grouping;
         this.leaveRules = leaveRules;
+        this.divorceRules = divorceRules;
         this.messageBroker = messageBroker;
     }
 
     public ClanMembersVM Create(Action onRefresh, Action<Hero> showHeroOnMap)
     {
-        return new CoopClanMembersVM(onRefresh, showHeroOnMap, grouping, leaveRules, messageBroker);
+        return new CoopClanMembersVM(onRefresh, showHeroOnMap, grouping, leaveRules, divorceRules, messageBroker);
     }
 }

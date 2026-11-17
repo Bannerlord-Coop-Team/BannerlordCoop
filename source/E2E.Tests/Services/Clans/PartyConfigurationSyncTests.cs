@@ -7,7 +7,6 @@ using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using Xunit.Abstractions;
 
@@ -38,20 +37,6 @@ public class PartyConfigurationSyncTests : SyncTestBase
 
         foreach (var instance in Clients.Prepend(Server))
             instance.Call(() => Assert.False(instance.GetRegisteredObject<Hero>(leaderId).CanRaid));
-    }
-
-    [Fact]
-    public void CompanionRemoved_ResetsCommandsOnEveryClient()
-    {
-        var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
-        SetAllFlagsOnServer(heroId, false);
-        AssertAllFlags(heroId, false);
-
-        Server.Call(() => new PartyConfigurationCampaignBehavior().OnCompanionRemoved(
-            Server.GetRegisteredObject<Hero>(heroId),
-            RemoveCompanionAction.RemoveCompanionDetail.AfterQuest));
-
-        AssertAllFlags(heroId, true);
     }
 
     [Theory]

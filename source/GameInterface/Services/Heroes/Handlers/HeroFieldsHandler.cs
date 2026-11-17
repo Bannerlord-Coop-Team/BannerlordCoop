@@ -130,6 +130,15 @@ namespace GameInterface.Services.Heroes.Handlers
                 // Update caches
                 using (new AllowedThread())
                 {
+                    // ChangeState would list a stub that still waits for its CharacterObject, the CharacterObject sync lists it by this state
+                    if (instance._characterObject == null)
+                    {
+                        var oldState = instance._heroState;
+                        instance._heroState = (Hero.CharacterStates)data.HeroState;
+                        instance._clan?.OnHeroChangedState(instance, oldState);
+                        return;
+                    }
+
                     instance.ChangeState((Hero.CharacterStates)data.HeroState);
                 }
             });
@@ -144,6 +153,11 @@ namespace GameInterface.Services.Heroes.Handlers
                 if (!objectManager.TryGetObjectWithLogging<CharacterObject>(data.CharacterObjectId, out var character)) return;
 
                 instance._characterObject = character;
+
+                // A client stub from HeroRegistry.OnClientCreated joins the campaign hero lists only now.
+                // OnHeroAdded, not AddHero, because AddHero would give the already registered hero a new id
+                if (!Hero.AllAliveHeroes.Contains(instance) && !Hero.DeadOrDisabledHeroes.Contains(instance))
+                    Campaign.Current?.CampaignObjectManager?.OnHeroAdded(instance);
             });
         }
 

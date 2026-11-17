@@ -5,12 +5,15 @@ using E2E.Tests.Environment.Instance;
 using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.MapEvents.TroopSupply.Messages;
 using GameInterface.Services.Players;
+using Missions.Messages;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
+using TaleWorlds.Library;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -205,6 +208,52 @@ public class BattleTroopHealthAuthorizationTests : MissionTestEnvironment
             Assert.Equal(37f, current.Single(entry => entry.CharacterId == entries[0].CharacterId).Health);
             Assert.Equal(64f, current.Single(entry => entry.CharacterId == entries[1].CharacterId).Health);
         });
+    }
+
+    // R41a fix-loop C2: at sea the host that reported its result stays host when it leaves, so nobody is left to answer the
+    // health snapshot a withdrawal waits on from it. Its departure completes that withdrawal, and a later entrant's grant is
+    // not held behind it.
+    [Fact]
+    public void KeptNavalHostLeaving_CompletesTheWithdrawalWaitingOnIt_AndTheNextGrantGoesOut()
+    {
+        var (battleId, _) = SetupCoopBattle("host", "owner", "successor");
+        var host = Clients.First();
+        var owner = Clients.ElementAt(1);
+        var successor = Clients.ElementAt(2);
+        string partyId = null;
+        Server.Call(() =>
+        {
+            // The owner is offline when the host is elected, so the host's grant takes its party.
+            var players = Server.Resolve<IPlayerManager>();
+            players.SetPeer("host", host.NetPeer);
+            players.SetPeer("successor", successor.NetPeer);
+            var mapEvent = Server.GetRegisteredObject<MapEvent>(battleId);
+            mapEvent.Position = new CampaignVec2(Vec2.Zero, isOnLand: false);
+            var party = mapEvent.DefenderSide.Parties[0];
+            party.Party.MemberRoster.Clear();
+            party.Party.MemberRoster.AddToCounts(Server.CreateRegisteredObject<CharacterObject>("owner_troop"), 2);
+            party.Update();
+            Assert.True(Server.ObjectManager.TryGetId(party, out partyId));
+        }, MapEventDisabledMethods);
+        EnterBattle(host, battleId);
+        EnterBattle(successor, battleId);
+        Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer("owner", owner.NetPeer));
+        EnterBattle(owner, battleId);
+        Server.Call(() => Server.Resolve<IMessageBroker>().Publish(this,
+            new BattleResolvedStateRecorded(battleId, BattleState.DefenderVictory)));
+        DepartBattle("owner", battleId, wasRetreat: true);
+        var request = Server.NetworkSentMessages.GetMessages<NetworkRequestBattleTroopHealth>().Last();
+        Assert.Contains(partyId, request.PartyIds);
+
+        DepartBattle("host", battleId, wasRetreat: true);
+
+        AssertHost(Server, battleId, "host", "successor");
+        Assert.Contains(Server.NetworkSentMessages.GetMessages<NetworkBattleTroopHealthCollected>(),
+            collected => collected.PartyIds.Contains(partyId));
+        int reserveCount = Server.NetworkSentMessages.GetMessageCount<NetworkBattleTroopReserve>();
+        EnterBattle(owner, battleId);
+        Assert.True(Server.NetworkSentMessages.GetMessageCount<NetworkBattleTroopReserve>() > reserveCount,
+            "the returner's grant waited on a withdrawal the kept host can never answer");
     }
 
     [Fact]

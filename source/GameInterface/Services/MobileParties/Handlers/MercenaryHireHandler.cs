@@ -102,7 +102,6 @@ internal class MercenaryHireHandler : IHandler
             : Campaign.Current.Models.PartyWageModel.GetTroopRecruitmentCost(mercenaryData.TroopType, mainHero).RoundedResultNumber;
         int goldAmount = GetMercenaryHireGoldAmount(data.Count, unitPrice);
         bool availableTroopMatches = mercenaryData?.TroopType == mercenaryTroop;
-        // v1.5 lets a generous hero hire past the listed stock.
         int availableCount = 0;
         if (mercenaryData != null)
         {

@@ -9,6 +9,7 @@ using GameInterface.CoopSessionData;
 using GameInterface.Services.CampaignService.Interfaces;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Ships;
 using ProtoBuf;
 using Serilog;
 using System;
@@ -34,11 +35,13 @@ public class TransferSaveState : ConnectionStateBase
         IConnectionMessageQueue connectionMessageQueue,
         ISendCoalescer coalescer,
         IAttachmentIdMapper attachmentIdMapper,
-        IServerOptionsProvider serverOptionsProvider)
+        IServerOptionsProvider serverOptionsProvider,
+        ILootShipHold lootShipHold)
         : base(connectionLogic)
     {
         GameSaveDataPacket snapshot = default;
         bool snapshotCreated = false;
+        string[] heldLootShipIds = Array.Empty<string>();
 
         GameThread.Run(() =>
         {
@@ -67,6 +70,9 @@ public class TransferSaveState : ConnectionStateBase
                     Logger.Error(ex, "Failed to broadcast the join save start");
                 }
 
+                // A held loot ship has no owner, so neither the save nor the id map would carry it to the joining client
+                heldLootShipIds = lootShipHold.AttachForJoinSnapshot();
+
                 var saveResults = saveInterface.SaveCurrentGame();
 
                 // Disconnect peer on failure — before touching Data, which a failed snapshot may leave null.
@@ -91,10 +97,13 @@ public class TransferSaveState : ConnectionStateBase
                     Clone(coopSessionProvider.CoopSession?.InventoryPlayerData),
                     Clone(coopSessionProvider.CoopSession?.HeroMeetingData),
                     Clone(coopSessionProvider.CoopSession?.AgingPlayerData),
+                    Clone(coopSessionProvider.CoopSession?.NavalPlayerData),
                     attachmentIdMapper.BuildServerMap(),
                     serverOptionsProvider.GetServerOptions(),
                     Clone(coopSessionProvider.CoopSession?.ClanFinance),
-                    Clone(coopSessionProvider.CoopSession?.OrderOfBattlePlayerData));
+                    Clone(coopSessionProvider.CoopSession?.OrderOfBattlePlayerData),
+                    heldLootShipIds,
+                    Clone(coopSessionProvider.CoopSession?.ViewDataPlayerData));
 
                 // Start holding this peer's broadcasts now that the snapshot has been taken. The whole save
                 // runs in a blocking GameThread.Run call issued from the network thread, so the poller is
@@ -106,6 +115,15 @@ public class TransferSaveState : ConnectionStateBase
             }
             finally
             {
+                try
+                {
+                    lootShipHold.DetachFromJoinSnapshot(heldLootShipIds);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, "Failed to detach the held loot ships after the join save");
+                }
+
                 try
                 {
                     messageBroker.Publish(this, new GameSaveStateChanged(false));
@@ -163,10 +181,13 @@ public class TransferSaveState : ConnectionStateBase
                 chunkIndex == 0 ? snapshot.InventoryPlayerData : null,
                 chunkIndex == 0 ? snapshot.HeroMeetingData : null,
                 chunkIndex == 0 ? snapshot.AgingPlayerData : null,
+                chunkIndex == 0 ? snapshot.NavalPlayerData : null,
                 chunkIndex == 0 ? snapshot.AttachmentIdMap : null,
                 chunkIndex == 0 ? snapshot.ServerOptions : null,
                 chunkIndex == 0 ? snapshot.ClanFinance : null,
-                chunkIndex == 0 ? snapshot.OrderOfBattlePlayerData : null);
+                chunkIndex == 0 ? snapshot.OrderOfBattlePlayerData : null,
+                chunkIndex == 0 ? snapshot.HeldLootShipIds : null,
+                chunkIndex == 0 ? snapshot.ViewDataPlayerData : null);
 
             network.SendImmediate(ConnectionLogic.Peer, chunkPacket);
         }

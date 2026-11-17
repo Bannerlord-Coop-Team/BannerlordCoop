@@ -5,6 +5,8 @@ using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.SceneInformationPopupTypes;
+using TaleWorlds.Core;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Heroes.Patches;
 
@@ -32,6 +34,22 @@ internal class HeroExecutionScenePatch
         }
         __instance._runAffirmativeActionAtClose = false;
 
+        return false;
+    }
+
+    [HarmonyPatch(nameof(HeroExecutionSceneNotificationData.GetExecuteTroopDescriptionText))]
+    [HarmonyPrefix]
+    public static bool GetExecuteTroopDescriptionTextPrefix(Hero dyingHero, ref TextObject __result)
+    {
+        __result = dyingHero.Clan == null ? null : GameTexts.FindText("str_execute_prisoner_desc_blood_feud");
+        return false;
+    }
+
+    [HarmonyPatch(nameof(HeroExecutionSceneNotificationData.GetExecuteTroopHintText))]
+    [HarmonyPrefix]
+    public static bool GetExecuteTroopHintTextPrefix(ref TextObject __result)
+    {
+        __result = TextObject.GetEmpty();
         return false;
     }
 }

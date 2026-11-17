@@ -138,6 +138,58 @@ public class ShipSyncTests : SyncTestBase
     }
 
     [Fact]
+    public void Server_ProducedShipWithMaxHitPointsUpgrade_SyncsHitPoints()
+    {
+        SetShipHullLimits();
+        SetUpgradePieceMaxHitPointsBonus();
+
+        string producedShipId = null;
+        float serverHitPoints = 0f;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject(shipId, out Ship templateShip));
+            Assert.True(Server.ObjectManager.TryGetObject(upgradePieceId, out ShipUpgradePiece piece));
+            Assert.True(Server.ObjectManager.TryGetObject(shipOwnerId, out PartyBase owner));
+
+            // Same order as ShipProductionCampaignBehavior.CreateShip and its OnShipOwnerChanged repair
+            var ship = new Ship(templateShip.ShipHull);
+            ship.EquipUpgradePiece("slot1", piece);
+            ChangeShipOwnerAction.ApplyByProduction(owner, ship);
+            RepairShipAction.ApplyForFree(ship);
+
+            Assert.True(ship.HitPoints > 100f);
+            serverHitPoints = ship.HitPoints;
+            Assert.True(Server.ObjectManager.TryGetId(ship, out producedShipId));
+        });
+
+        AssertClientHitPoints(producedShipId, serverHitPoints);
+    }
+
+    [Fact]
+    public void Server_ExistingShipGainsMaxHitPointsUpgrade_SyncsHitPoints()
+    {
+        SetShipHullLimits();
+        SetUpgradePieceMaxHitPointsBonus();
+
+        float serverHitPoints = 0f;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject(shipId, out Ship ship));
+            Assert.True(Server.ObjectManager.TryGetObject(upgradePieceId, out ShipUpgradePiece piece));
+            ship.HitPoints = ship.MaxHitPoints;
+
+            // ShipUpgradeCampaignBehavior.UpgradeShip equips through EquipUpgradePiece
+            ship.EquipUpgradePiece("slot1", piece);
+            RepairShipAction.ApplyForFree(ship);
+
+            Assert.True(ship.HitPoints > 100f);
+            serverHitPoints = ship.HitPoints;
+        });
+
+        AssertClientHitPoints(shipId, serverHitPoints);
+    }
+
+    [Fact]
     public void Server_DestroyShipAction_UnregistersShip()
     {
         Server.Call(() =>
@@ -261,6 +313,29 @@ public class ShipSyncTests : SyncTestBase
         Assert.True(instance.ObjectManager.TryGetObject(shipId, out Ship ship));
         ship.ShipHull.MaxHitPoints = 100;
         ship.ShipHull.MaxSailHitPoints = 100;
+    }
+
+    // Piece stats are template data every machine loads the same, like fore_battlement_lvl1's +5%
+    private void SetUpgradePieceMaxHitPointsBonus()
+    {
+        foreach (var instance in Clients.Prepend(Server))
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject(upgradePieceId, out ShipUpgradePiece piece));
+                piece.MaxHitPointsBonusMultiplier = 0.05f;
+            });
+        }
+    }
+
+    private void AssertClientHitPoints(string id, float expected)
+    {
+        foreach (var client in Clients)
+        {
+            client.PumpGameThread();
+            Assert.True(client.ObjectManager.TryGetObject(id, out Ship ship));
+            Assert.Equal(expected, ship.HitPoints);
+        }
     }
 
     // Only the server knows the party is a player, so clients can only get the unlocked list from the server

@@ -39,6 +39,7 @@ public class SteamTunnelHost : ISessionTunnelHost, ISessionTunnelIdentityResolve
     private readonly Dictionary<IPEndPoint, ulong> remoteSteamIds = new Dictionary<IPEndPoint, ulong>();
     private readonly byte[] serverBuffer = new byte[SteamTunnel.MaxDatagramBytes];
     private readonly byte[] steamBuffer = new byte[SteamTunnel.MaxDatagramBytes];
+    private readonly byte[] droppableBuffer = new byte[SteamTunnel.MaxDatagramBytes];
 
     // Rebuilt under the gate whenever the peer set changes, so the 2ms pump tick reads a
     // stable array without taking the lock.
@@ -80,6 +81,19 @@ public class SteamTunnelHost : ISessionTunnelHost, ISessionTunnelIdentityResolve
             steamId = 0;
             return false;
         }
+    }
+
+    /// <summary>Reads the delivery health of the accepted connection from one remote peer.</summary>
+    public bool TryGetPeerHealth(ulong remoteSteamId, out RouteHealth health)
+    {
+        foreach (var peer in peerSnapshot)
+        {
+            if (peer.Value.RemoteSteamId == remoteSteamId)
+                return transport.TryGetConnectionHealth(peer.Key, out health);
+        }
+
+        health = default;
+        return false;
     }
 
     public void Start(int serverPort)
@@ -133,9 +147,13 @@ public class SteamTunnelHost : ISessionTunnelHost, ISessionTunnelIdentityResolve
         if (!listening) return;
         listening = false;
 
+        // Wait out any in-flight pump tick first, so neither closing the listener (which closes its
+        // accepted connections inside Steam) nor the socket teardown below can race a receive, send or describe.
+        // A connection arriving meanwhile is refused because listening is already false.
+        bool pumpStopped = poller?.StopAndWait(TimeSpan.FromSeconds(1)) ?? true;
+        if (!pumpStopped)
+            Logger.Warning("Steam tunnel host pump did not stop within 1s; closing the listener anyway");
         transport.StopListening();
-        // Wait out any in-flight pump tick so the socket teardown below can't race it.
-        poller?.StopAndWait(TimeSpan.FromSeconds(1));
 
         KeyValuePair<uint, TunnelPeer>[] remaining;
         uint[] pending;
@@ -313,11 +331,17 @@ public class SteamTunnelHost : ISessionTunnelHost, ISessionTunnelIdentityResolve
         {
             if (length == 0) continue;
 
-            bool droppable = SteamTunnel.IsDroppableDatagram(serverBuffer, length);
-            if (!transport.SendDatagram(connection, serverBuffer, length, droppable))
+            // The park slot is free here, so the reliable lane is split straight into it.
+            SteamTunnel.SplitByLane(serverBuffer, length, droppableBuffer, out int droppableLength,
+                peer.PendingDatagram, out int reliableLength);
+            if (droppableLength > 0)
             {
-                Array.Copy(serverBuffer, peer.PendingDatagram, length);
-                peer.PendingLength = length;
+                transport.SendDatagram(connection, droppableBuffer, droppableLength, droppable: true);
+            }
+
+            if (reliableLength > 0 && !transport.SendDatagram(connection, peer.PendingDatagram, reliableLength, droppable: false))
+            {
+                peer.PendingLength = reliableLength;
                 return;
             }
         }

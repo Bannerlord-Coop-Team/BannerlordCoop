@@ -22,17 +22,7 @@ internal class KingdomManagerPatches
         {
             kingdom.Banner = new Banner(Clan.PlayerClan.Banner);
         }
-        // The throne goes to the most influential clan that may rule, if any.
-        float num = float.MinValue;
-        Clan clan = null;
-        foreach (Clan clan2 in kingdom.Clans)
-        {
-            if (clan2 != rulingClan && Campaign.Current.Models.DiplomacyModel.IsClanEligibleToBecomeRuler(clan2) && clan2.Influence > num)
-            {
-                num = clan2.Influence;
-                clan = clan2;
-            }
-        }
+        Clan clan = FindSuccessorClan(kingdom);
         if (clan != null)
         {
             MessageBroker.Instance.Publish(__instance, new RulingClanChanged(kingdom, clan));
@@ -45,5 +35,22 @@ internal class KingdomManagerPatches
         }
         MessageBroker.Instance.Publish(__instance, new DestroyKingdom(kingdom));
         return false;
+    }
+
+    // The throne goes to the most influential other clan that may rule, or null when none may.
+    internal static Clan FindSuccessorClan(Kingdom kingdom)
+    {
+        Clan successor = null;
+        float highestInfluence = float.MinValue;
+        foreach (Clan candidate in kingdom.Clans)
+        {
+            if (candidate == kingdom.RulingClan) continue;
+            if (!Campaign.Current.Models.DiplomacyModel.IsClanEligibleToBecomeRuler(candidate)) continue;
+            if (candidate.Influence <= highestInfluence) continue;
+
+            highestInfluence = candidate.Influence;
+            successor = candidate;
+        }
+        return successor;
     }
 }

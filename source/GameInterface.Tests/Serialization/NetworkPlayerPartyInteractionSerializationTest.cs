@@ -1,4 +1,5 @@
 ﻿using GameInterface.Services.Inventory.Data;
+using GameInterface.Services.MapEvents.Data;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
 using GameInterface.Services.TroopRosters.Data;
@@ -62,8 +63,6 @@ public class NetworkPlayerPartyInteractionSerializationTest
             mercenaryAwardMultiplier: 12,
             initiatorAcceptedTrade: true,
             responderAcceptedTrade: false,
-            partyItems: new[] { new ItemRosterElementData(new ItemObjectData("party-item", null, itemModifierNull: true), 3) },
-            otherPartyItems: new[] { new ItemRosterElementData(new ItemObjectData("other-item", null, itemModifierNull: true), 4) },
             enabledOptions: new[] { PlayerPartyInteractionOption.AcceptProposal },
             isHostile: true,
             mercenaryUnavailableReason: PlayerPartyInteractionMercenaryUnavailableReason.InitiatorClanTierTooLow,
@@ -86,12 +85,6 @@ public class NetworkPlayerPartyInteractionSerializationTest
         Assert.Equal(original.MercenaryAwardMultiplier, result.MercenaryAwardMultiplier);
         Assert.Equal(original.MercenaryUnavailableReason, result.MercenaryUnavailableReason);
         Assert.Equal(original.ClanJoinUnavailableReason, result.ClanJoinUnavailableReason);
-        Assert.Single(result.PartyItems);
-        Assert.Equal("party-item", result.PartyItems[0].ItemObjectData.ItemObjectId);
-        Assert.Equal(3, result.PartyItems[0].Amount);
-        Assert.Single(result.OtherPartyItems);
-        Assert.Equal("other-item", result.OtherPartyItems[0].ItemObjectData.ItemObjectId);
-        Assert.Equal(4, result.OtherPartyItems[0].Amount);
     }
 
     [Theory]
@@ -164,7 +157,8 @@ public class NetworkPlayerPartyInteractionSerializationTest
             offeredGold: 25,
             offeredFiefs: new[] { "fief-1" },
             offeredPrisoners: new[] { new TroopRosterElementData(2, 1, 0, 0) },
-            offeredPeace: true);
+            offeredPeace: true,
+            offeredMarriages: new[] { new PlayerPartyMarriageOfferData("hero-1", "spouse-1") });
 
         var result = RoundTrip(original);
 
@@ -180,6 +174,9 @@ public class NetworkPlayerPartyInteractionSerializationTest
         Assert.Single(result.OfferedPrisoners);
         Assert.Equal(2u, result.OfferedPrisoners[0].CharacterId);
         Assert.True(result.OfferedPeace);
+        Assert.Single(result.OfferedMarriages);
+        Assert.Equal("hero-1", result.OfferedMarriages[0].HeroId);
+        Assert.Equal("spouse-1", result.OfferedMarriages[0].SpouseId);
     }
 
     [Fact]

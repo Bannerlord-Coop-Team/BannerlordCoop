@@ -11,6 +11,7 @@ using TaleWorlds.CampaignSystem.Naval;
 namespace GameInterface.Services.Ships.Patches;
 
 [HarmonyPatch]
+[HarmonyPatchCategory(GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class ShipLifetimePatches
 {
     private static readonly ILogger Logger = LogManager.GetLogger<ShipLifetimePatches>();

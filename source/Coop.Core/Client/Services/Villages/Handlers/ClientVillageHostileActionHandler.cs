@@ -62,7 +62,11 @@ internal class ClientVillageHostileActionHandler : IHandler
     private void Handle_NetworkVillageHostileActionStarted(MessagePayload<NetworkVillageHostileActionStarted> payload)
     {
         GameThread.RunSafe(
-            () => villageHostileActionInterface.BeginHostileActionPresentation(payload.What.Action),
+            () =>
+            {
+                if (payload.What.Unresisted) villageHostileActionInterface.ReturnToVillageMenu();
+                else villageHostileActionInterface.BeginHostileActionPresentation(payload.What.Action);
+            },
             context: nameof(Handle_NetworkVillageHostileActionStarted));
     }
 

@@ -1,6 +1,6 @@
 ﻿using Common.Util;
 using Coop.Core.Server.Services.Instances;
-using E2E.Tests.Util;
+using GameInterface.Tests.Utils;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Services.MobileParties;

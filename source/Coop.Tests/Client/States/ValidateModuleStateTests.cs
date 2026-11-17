@@ -11,6 +11,7 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.Modules;
+using GameInterface.Services.Modules.Validators;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.UI.Interfaces;
 using LiteNetLib;
@@ -23,8 +24,10 @@ using Xunit.Abstractions;
 
 namespace Coop.Tests.Client.States
 {
+    [Collection(ModInformationRoleCollection.Name)]
     public class ValidateModuleStateTests : IDisposable
     {
+        private readonly bool previousNavalDlc = ModInformation.IsNavalEnabled;
         private readonly IClientLogic clientLogic;
         private readonly NetPeer serverPeer;
         private readonly ClientTestComponent clientComponent;
@@ -44,6 +47,7 @@ namespace Coop.Tests.Client.States
             // the logic (and thus the current state) so that timer is torn down with the test instead of
             // lingering and firing TimeoutValidation on a stale state after the test has finished.
             clientLogic.Dispose();
+            ModInformation.IsNavalEnabled = previousNavalDlc;
         }
 
         [Fact]
@@ -114,6 +118,55 @@ namespace Coop.Tests.Client.States
                 clientComponent.TestMessageBroker.GetMessagesFromType<SendPopupMessage>());
             Assert.Contains("Incompatible co-op mod build", popup.Text);
             Assert.Contains("Update the co-op mod on both sides", popup.Text);
+        }
+
+        // The same build string can come from a build without TESTER or CoopNavalDlc, or with the naval assemblies deleted.
+        [Fact]
+        public void NetworkModuleVersionsValidated_NavalIncapableClient_RefusesWithTheReason()
+        {
+            var validateState = StateWithNavalDlc(navalEnabled: false);
+
+            validateState.Handle_NetworkModuleVersionsValidated(new MessagePayload<NetworkModuleVersionsValidated>(
+                this, new NetworkModuleVersionsValidated(true, null)));
+
+            Assert.Empty(clientComponent.TestNetwork.GetPeerMessages(serverPeer).OfType<NetworkClientValidate>());
+            var notice = Assert.Single(clientComponent.TestMessageBroker.GetMessagesFromType<SendInformationMessage>());
+            Assert.Contains("a DLC this co-op build can't run", notice.Text);
+        }
+
+        // A client that can run War Sails joins a War Sails server as before.
+        [Fact]
+        public void NetworkModuleVersionsValidated_NavalCapableClient_ContinuesValidation()
+        {
+            var validateState = StateWithNavalDlc(navalEnabled: true);
+
+            validateState.Handle_NetworkModuleVersionsValidated(new MessagePayload<NetworkModuleVersionsValidated>(
+                this, new NetworkModuleVersionsValidated(true, null)));
+
+            Assert.Single(clientComponent.TestNetwork.GetPeerMessages(serverPeer).OfType<NetworkClientValidate>());
+            Assert.Empty(clientComponent.TestMessageBroker.GetMessagesFromType<SendInformationMessage>());
+        }
+
+        // Builds the state for a client with NavalDLC loaded, with War Sails on or off.
+        private ValidateModuleState StateWithNavalDlc(bool navalEnabled)
+        {
+            var modules = new[] { new ModuleInfo(ModInformation.NavalDlcModuleId, true, true, default) };
+            var moduleInfoProvider = new Mock<IModuleInfoProvider>();
+            moduleInfoProvider.Setup(provider => provider.GetModuleInfos()).Returns(modules);
+            ModInformation.IsNavalEnabled = navalEnabled;
+
+            var validateState = new ValidateModuleState(
+                clientLogic,
+                clientComponent.TestMessageBroker,
+                clientComponent.TestNetwork,
+                clientComponent.Container.Resolve<IControllerIdProvider>(),
+                Mock.Of<ICoopFinalizer>(),
+                Mock.Of<IGameStateInterface>(),
+                moduleInfoProvider.Object,
+                clientComponent.Container.Resolve<IModuleNameProvider>(),
+                new ModuleValidator());
+            ((ClientLogic)clientLogic).State = validateState;
+            return validateState;
         }
 
         [Fact]
@@ -188,7 +241,8 @@ namespace Coop.Tests.Client.States
                 coopFinalizer.Object,
                 gameStateInterface.Object,
                 clientComponent.Container.Resolve<IModuleInfoProvider>(),
-                clientComponent.Container.Resolve<IModuleNameProvider>());
+                clientComponent.Container.Resolve<IModuleNameProvider>(),
+                clientComponent.Container.Resolve<IModuleValidator>());
             ((ClientLogic)clientLogic).State = validateState;
 
             using var gameThreadBlocked = new ManualResetEventSlim(false);

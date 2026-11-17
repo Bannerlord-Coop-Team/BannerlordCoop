@@ -1,4 +1,5 @@
-﻿using GameInterface.Registry.Auto;
+﻿using Common.Util;
+using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Utils;
 using HarmonyLib;
@@ -53,10 +54,22 @@ internal class ShipRegistry : AutoRegistryBase<Ship>
         // Initialise the dictionary by creating it and dirtying the version number
         ReflectionUtils.SetPrivateField(typeof(Ship), nameof(Ship._shipPieces), obj, new Dictionary<string, ShipUpgradePiece>());
         obj.UpdateVersionNo();
+
+        using (new AllowedThread())
+        {
+            obj.IsTradeable = true;
+        }
     }
 
     public override void OnClientDestroyed(Ship obj, string id)
     {
+        // DestroyShipAction clears the owner, but its patched copy is compiled before the Owner sync patch is
+        // applied, and v1.5's smaller Owner setter can be inlined into it, so that owner change never reaches
+        // the clients. Clearing it here also takes the ship off the owner's ship list.
+        using (new AllowedThread())
+        {
+            obj.Owner = null;
+        }
     }
 
     public override void OnServerCreated(Ship obj, string id)

@@ -10,6 +10,7 @@ using Coop.Core.Server.Services.SiegeEvents.Messages;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Services.MapEvents;
 using E2E.Tests.Util;
+using GameInterface.Tests.Utils;
 using GameInterface.Configuration;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Extensions;
@@ -769,7 +770,7 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
                 Server.Resolve<INetwork>(),
                 Server.Resolve<IMapEventLogger>(),
                 Server.Resolve<IBattleMissionInitializerResolver>(),
-                null!);
+                null!, Server.Resolve<IBattleHostRetentionPolicy>());
 
             Assert.True(handler.RemoveWoundedNonInitiatorParties(mapEvent, initiatingPartyId));
         }, disabledMethods);
@@ -830,7 +831,7 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
                 Server.Resolve<INetwork>(),
                 Server.Resolve<IMapEventLogger>(),
                 Server.Resolve<IBattleMissionInitializerResolver>(),
-                null!);
+                null!, Server.Resolve<IBattleHostRetentionPolicy>());
 
             Assert.True(handler.RemoveWoundedNonInitiatorParties(mapEvent, initiatingPartyId));
         }, disabledMethods);

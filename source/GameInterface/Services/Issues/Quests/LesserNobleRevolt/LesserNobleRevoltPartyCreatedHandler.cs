@@ -1,6 +1,8 @@
 ﻿using Common;
 using Common.Messaging;
+using Common.Util;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
 using TaleWorlds.Localization;
@@ -48,6 +50,8 @@ internal sealed class LesserNobleRevoltPartyCreatedHandler : IHandler
                 return;
             }
 
+            using var replay = new AllowedThread();
+            using var journalReplay = new QuestJournalReplay();
             quest._lesserNobleParty = party;
             if (!quest.IsTracked(party))
             {

@@ -59,6 +59,9 @@ internal class DisconnectHandler : IHandler
             case "JoinReplayAppliedTimeout":
                 return "Joining the campaign timed out while synchronizing.\n" +
                        "The server stopped this join to keep the campaign responsive. Please try again.";
+            case "JoinBaselineLimit":
+                return "Joining the campaign failed because it could not be synchronized after repeated attempts.\n" +
+                       "Make sure your mods and save match the server's, then try again.";
             case "JoinReplayQueueLimit":
                 return "Joining the campaign stopped because its synchronization queue exceeded the safety limit.\n" +
                        "Please try again.";

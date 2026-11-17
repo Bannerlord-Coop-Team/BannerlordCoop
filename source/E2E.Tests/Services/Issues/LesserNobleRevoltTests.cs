@@ -1053,6 +1053,66 @@ public sealed class LesserNobleRevoltTests : IDisposable
     }
 
     [Fact]
+    public void ReceivedSupportCannotEchoAnOlderValueOverTheServersNewerProgress()
+    {
+        const string issueId = "issue_lesser_noble_received_progress";
+        var server = testEnvironment.Server;
+        var (owner, _) = RegisterOwnerAndObserver(issueId);
+        var villageId = testEnvironment.CreateRegisteredObject<Settlement>();
+        foreach (var instance in new[] { server, owner })
+        {
+            instance.Call(() =>
+            {
+                var quest = QuestOf(instance);
+                quest._discreteLog = new JournalLog(new CampaignTime(123L), new TextObject("Support"),
+                    new TextObject("Support"), instance == server ? 2 : 0, 20, LogType.Discreate);
+                quest._journalEntries.Add(quest._discreteLog);
+            });
+        }
+        var before = owner.NetworkSentMessages.GetMessages<RequestQuestJournal>().Count();
+        // The first server notification arrives while its authoritative support has already reached two.
+        SendVisit(issueId, "player-A", villageId, 1);
+        testEnvironment.FlushCoalescer();
+        owner.Call(() => Assert.Equal(1, QuestOf(owner)._discreteLog.CurrentProgress));
+        Assert.Equal(before, owner.NetworkSentMessages.GetMessages<RequestQuestJournal>().Count());
+        server.Call(() =>
+        {
+            Assert.Equal(2, QuestOf(server)._discreteLog.CurrentProgress);
+            server.Resolve<IOutcomeDispatcher>().RunAsOwners<Quest>(
+                quest => quest.CompleteQuestWithCancel(new TextObject("Support ended")));
+        });
+        testEnvironment.FlushCoalescer();
+        owner.Call(() =>
+        {
+            var archive = Campaign.Current.LogEntryHistory.FindLastGameActionLog<JournalLogEntry>(
+                entry => entry.RelatedHero == owner.GetRegisteredObject<Hero>(giverId));
+            Assert.NotNull(archive);
+            Assert.True(archive.IsEnded());
+            Assert.Equal(2, Assert.Single(archive.GetEntries(), log => log.TaskName?.ToString() == "Support").CurrentProgress);
+        });
+    }
+
+    [Fact]
+    public void ReceivedPartyCreatesItsNativeStageWithoutReflectingHistory()
+    {
+        const string issueId = "issue_lesser_noble_received_party";
+        var server = testEnvironment.Server;
+        var (owner, _) = RegisterOwnerAndObserver(issueId);
+        var partyId = testEnvironment.CreateRegisteredObject<MobileParty>();
+        var before = owner.NetworkSentMessages.GetMessages<RequestQuestJournal>().Count();
+        server.Call(() => server.Resolve<INetwork>().SendAll(
+            new NetworkLesserNobleRevoltPartyCreated(giverId, issueId, "player-A", partyId)));
+        testEnvironment.FlushCoalescer();
+        owner.Call(() =>
+        {
+            var quest = QuestOf(owner);
+            Assert.NotNull(quest._discreteLog);
+            Assert.Contains(quest._discreteLog, quest.JournalEntries);
+        });
+        Assert.Equal(before, owner.NetworkSentMessages.GetMessages<RequestQuestJournal>().Count());
+    }
+
+    [Fact]
     public void OwnerPartyCreated_AttachesTheServerPartyToTheOwningQuest()
     {
         const string issueId = "issue_lesser_noble";

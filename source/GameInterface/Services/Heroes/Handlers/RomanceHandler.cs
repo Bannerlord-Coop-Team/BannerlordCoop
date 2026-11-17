@@ -32,19 +32,22 @@ internal class RomanceHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly IPlayerManager playerManager;
     private readonly IRomanceAuthority romanceAuthority;
+    private readonly IRomanceRetryCooldown retryCooldown;
 
     public RomanceHandler(
         IMessageBroker messageBroker,
         INetwork network,
         IObjectManager objectManager,
         IPlayerManager playerManager,
-        IRomanceAuthority romanceAuthority)
+        IRomanceAuthority romanceAuthority,
+        IRomanceRetryCooldown retryCooldown)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.playerManager = playerManager;
         this.romanceAuthority = romanceAuthority;
+        this.retryCooldown = retryCooldown;
 
         messageBroker.Subscribe<AllGameObjectsRegistered>(Handle_AllGameObjectsRegistered);
         messageBroker.Subscribe<RomanticStateChangeRequested>(Handle_RomanticStateChangeRequested);
@@ -125,11 +128,19 @@ internal class RomanceHandler : IHandler
                 return;
             }
 
+            var currentLevel = Romance.GetRomanticLevel(playerHero, targetHero);
             if (!TryApplyClientStateFields(playerHero, targetHero, request, out reason))
             {
                 Reject(peer, reason);
                 return;
             }
+
+            // Before the change, so the snapshot that the change sends carries the cooldown.
+            if (RomanceTransitionRules.IsFailedCourtship(currentLevel) &&
+                requestedLevel == Romance.RomanceLevelEnum.CourtshipStarted)
+                retryCooldown.Clear(playerHero, targetHero);
+            else if (RomanceTransitionRules.IsFailedCourtship(requestedLevel))
+                retryCooldown.RecordFailure(playerHero, targetHero);
 
             ChangeRomanticStateAction.Apply(playerHero, targetHero, requestedLevel);
         }, context: nameof(Handle_NetworkRequestRomanceStateChange));
@@ -248,10 +259,22 @@ internal class RomanceHandler : IHandler
                 state.Level,
                 state.ProgressToNextLevel,
                 state.LastVisit,
-                state.ScoreFromPersuasion));
+                state.ScoreFromPersuasion,
+                RomanceTransitionRules.IsFailedCourtship(state.Level) &&
+                TrySplitCouple(state.Person1, state.Person2, out var player, out var courted)
+                    ? retryCooldown.FailureTicks(player, courted)
+                    : 0));
         }
 
         return result.ToArray();
+    }
+
+    // A courtship is between a player's hero and a hero no player controls.
+    private static bool TrySplitCouple(Hero person1, Hero person2, out Hero playerHero, out Hero courtedHero)
+    {
+        playerHero = person1.IsPlayerHero() ? person1 : person2.IsPlayerHero() ? person2 : null;
+        courtedHero = playerHero == person1 ? person2 : person1;
+        return playerHero != null;
     }
 
     private void ApplySnapshot(RomanceStateData[] snapshot)
@@ -296,6 +319,13 @@ internal class RomanceHandler : IHandler
                 romanticState.ProgressToNextLevel = state.Data.ProgressToNextLevel;
                 romanticState.LastVisit = state.Data.LastVisit;
                 romanticState.ScoreFromPersuasion = state.Data.ScoreFromPersuasion;
+
+                // Vanilla's attempt list has no player, so a client keeps only its own hero's failures.
+                var mainHero = Hero.MainHero;
+                if (mainHero != null && RomanceTransitionRules.IsFailedCourtship(romanticState.Level) &&
+                    (state.Person1 == mainHero || state.Person2 == mainHero))
+                    retryCooldown.RestoreLocalFailure(
+                        state.Person1 == mainHero ? state.Person2 : state.Person1, state.Data.FailedAtTicks);
             }
         }
     }

@@ -11,7 +11,7 @@ internal class EmptyClanPartiesCampaignBehaviorPatches
 {
     [HarmonyPatch(nameof(EmptyClanPartiesCampaignBehavior.RegisterEvents))]
     [HarmonyPrefix]
-    private static bool RegisterEventsPrefix() => ModInformation.IsServer;
+    private static bool RegisterEventsPrefix() => false;
 
     [HarmonyPatch(nameof(EmptyClanPartiesCampaignBehavior.GetEmptyClanPartyLeaders))]
     [HarmonyPrefix]

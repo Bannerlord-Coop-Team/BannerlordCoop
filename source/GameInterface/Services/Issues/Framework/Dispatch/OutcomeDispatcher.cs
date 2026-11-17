@@ -140,11 +140,19 @@ internal class OutcomeDispatcher : IOutcomeDispatcher
             return false;
         }
 
+        if (!issue.IssueOwner.IsAlive)
+        {
+            issue.CompleteIssueWithCancel();
+            return false;
+        }
+
         if (!ownerResolver.TryResolveOwnerHero(issue, out var ownerHero))
         {
             Logger.Error("Alternative solution of {issue} has no owning player, it is tried again tomorrow", issue.StringId);
             return false;
         }
+
+        if (ownerHero.PartyBelongedTo == null) return false;
 
         var scope = new MainHeroSubstitutionScope(ownerHero, ownerHero.PartyBelongedTo);
 
@@ -220,6 +228,16 @@ internal class OutcomeDispatcher : IOutcomeDispatcher
 
     public void RunAsOwners<TQuest>(Action<TQuest> listener) where TQuest : QuestBase
     {
+        RunAsOwners(listener, _ => true);
+    }
+
+    public void RunAsOwner<TQuest>(Hero owner, Action<TQuest> listener) where TQuest : QuestBase
+    {
+        RunAsOwners(listener, ownerHero => ownerHero == owner);
+    }
+
+    private void RunAsOwners<TQuest>(Action<TQuest> listener, Func<Hero, bool> isOwnerIncluded) where TQuest : QuestBase
+    {
         if (ModInformation.IsClient)
         {
             return;
@@ -238,6 +256,8 @@ internal class OutcomeDispatcher : IOutcomeDispatcher
                     Logger.Warning("{issue} has a running quest but no owning player", issue.StringId);
                     continue;
                 }
+
+                if (!isOwnerIncluded(ownerHero)) continue;
 
                 using (new MainHeroSubstitutionScope(ownerHero, ownerHero.PartyBelongedTo))
                 {

@@ -195,6 +195,20 @@ public class SteamMissionBridge : ISteamMissionBridge
     public bool TryGetRemoteSteamId(IPEndPoint endpoint, out ulong remoteSteamId)
         => host.TryGetRemoteSteamId(endpoint, out remoteSteamId);
 
+    // The lower-id peer dials and the other accepts, so the connection is in one of two places.
+    public bool TryGetRouteHealth(ulong remoteSteamId, out RouteHealth health)
+    {
+        SteamTunnelClient client;
+        lock (gate)
+        {
+            clients.TryGetValue(remoteSteamId, out client);
+        }
+
+        return client != null
+            ? client.TryGetHealth(out health)
+            : host.TryGetPeerHealth(remoteSteamId, out health);
+    }
+
     public void Stop()
     {
         lock (lifecycleGate)

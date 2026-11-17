@@ -1,9 +1,11 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Towns.Data;
 using GameInterface.Services.Towns.Messages;
 using GameInterface.Services.Towns.Patches;
 using Serilog;
+using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -44,7 +46,10 @@ namespace GameInterface.Services.Towns.Handlers
                 return;
             }
 
-            var sellLogs = obj.LogList.Select(log =>
+            // Protobuf doesn't serialize an empty array, so a cleared sell log arrives as null
+            var logList = obj.LogList ?? Array.Empty<SellLogData>();
+
+            var sellLogs = logList.Select(log =>
             {
                 if (objectManager.TryGetObject(log.CategoryID, out ItemCategory itemCategory) == false)
                 {

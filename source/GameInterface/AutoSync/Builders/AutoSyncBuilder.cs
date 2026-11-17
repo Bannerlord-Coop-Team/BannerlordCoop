@@ -117,6 +117,13 @@ public class AutoSyncBuilder
             assemblies.Add(Assembly.Load(asm.FullName));
         }
 
+        // A target method can live in an assembly GameInterface doesnt reference, such as NavalDLC
+        assemblies.AddRange(autoSyncRegistry.Registrations.Values
+            .SelectMany(item => item.TargetMethods.Concat(item.CategorizedTargetMethods.Values.SelectMany(methods => methods)))
+            .Select(method => method.DeclaringType.Assembly)
+            .Distinct()
+            .ToList());
+
         var syntaxTrees = autoSyncRegistry.Registrations
             .SelectMany(registration => autoSyncPatchBuilder.Build(registration.Key, registration.Value))
             .Append(autoSyncAssemblyInfoBuilder.Build(assemblies.Select(a => a.GetName().Name))).ToList();

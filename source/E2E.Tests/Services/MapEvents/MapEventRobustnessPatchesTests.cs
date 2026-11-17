@@ -1,5 +1,6 @@
 ﻿using Common.Util;
 using E2E.Tests.Environment.Instance;
+using GameInterface.Services.MapEvents.PlayerPartyInteractions;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using Xunit;
@@ -78,6 +79,33 @@ public class MapEventRobustnessPatchesTests : MapEventTestBase
             Assert.NotNull(restored);
             Assert.Empty(restored._mapEventParties);
         }, MapEventDisabledMethods);
+    }
+
+    [Theory]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    public void Client_HostileEncounterRestart_KeepsTheRegisteredTroopUpgradeTracker(bool finalized, bool expectRestored)
+    {
+        var context = CreateServerMapEvent();
+        var client = Clients.First();
+
+        client.Call(() =>
+        {
+            var mapEvent = GetMapEvent(client, context.MapEventId);
+            var tracker = mapEvent.TroopUpgradeTracker;
+            Assert.NotNull(tracker);
+
+            using (new AllowedThread())
+            {
+                // What vanilla RemoveInvolvedPartyInternal does when the restart's LeaveBattle drops MainParty.
+                mapEvent.TroopUpgradeTracker = null;
+                if (finalized) mapEvent.State = MapEventState.WaitingRemoval;
+                PlayerPartyInteractionHandler.RestoreTroopUpgradeTracker(mapEvent, tracker);
+            }
+
+            if (expectRestored) Assert.Same(tracker, mapEvent.TroopUpgradeTracker);
+            else Assert.Null(mapEvent.TroopUpgradeTracker);
+        });
     }
 
     private static MapEvent GetMapEvent(EnvironmentInstance instance, string mapEventId)

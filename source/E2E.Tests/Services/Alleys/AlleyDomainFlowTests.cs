@@ -188,6 +188,9 @@ public class AlleyDomainFlowTests : AlleyTestEnvironment
         var scenario = CreateAlleyDomainScenario();
         var ownerClient = Clients.First();
         string overseerCharacterId = GetCharacterId(scenario.OverseerHeroId);
+        // The overseer has to be in the owner's clan.
+        Server.Call(() => Server.GetRegisteredObject<Hero>(scenario.OverseerHeroId).Clan =
+            Server.GetRegisteredObject<Hero>(scenario.OwnerHeroId).Clan);
 
         AcquireAlley(
             ownerClient,
@@ -363,12 +366,18 @@ public class AlleyDomainFlowTests : AlleyTestEnvironment
         var scenario = CreateAlleyDomainScenario();
         var ownerClient = Clients.First();
         string overseerCharacterId = GetCharacterId(scenario.OverseerHeroId);
+        // The overseer has to be in the owner's clan.
+        Server.Call(() => Server.GetRegisteredObject<Hero>(scenario.OverseerHeroId).Clan =
+            Server.GetRegisteredObject<Hero>(scenario.OwnerHeroId).Clan);
 
         AcquireAlley(
             ownerClient,
             scenario,
             scenario.OverseerHeroId,
             new TroopRosterElementData(CharacterHandle(overseerCharacterId), 1, 0, 0));
+        Server.Call(() => Assert.Equal(Server.GetRegisteredObject<Hero>(scenario.OwnerHeroId),
+            Server.GetRegisteredObject<Alley>(scenario.PlayerAlleyId).Owner));
+        Assert.Equal(scenario.OverseerHeroId, GetManagementData(scenario.PlayerAlleyId).OverseerId);
 
         KillHero(scenario.OverseerHeroId);
 

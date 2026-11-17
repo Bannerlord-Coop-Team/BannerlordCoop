@@ -29,6 +29,18 @@ public interface IReinforcementFielder : IDisposable
 
     /// <summary>[Game thread] Field queued migration reserves as battle capacity becomes available.</summary>
     void Tick();
+
+    /// <summary>
+    /// [Game thread] Hands over a side's queued migration reserve to a mission that fields it itself, as a naval battle does
+    /// on its hulls; troops a late replay already brought in are left out.
+    /// </summary>
+    IReadOnlyList<CoopAgentOrigin> TakeMigrationReserve(BattleSideEnum side);
+
+    /// <summary>
+    /// [Game thread] Removes recovered troops a late replay brought in after they were taken, reading the live agents
+    /// once for the whole batch, so a mission still holding them does not field them twice. Returns how many it removed.
+    /// </summary>
+    int RemoveLateReplayed(List<CoopAgentOrigin> origins);
 }
 
 /// <inheritdoc cref="IReinforcementFielder"/>
@@ -336,8 +348,10 @@ public class ReinforcementFielder : IReinforcementFielder
             defenderOwnedTarget, activeOwnedDefenders, targets.Defenders, activeDefenders);
         int attackerAvailable = AvailableRecoverySlots(
             attackerOwnedTarget, activeOwnedAttackers, targets.Attackers, activeAttackers);
-        int spawned = FieldRecoverySide(BattleSideEnum.Defender, defenderAvailable, joinedFormations);
-        spawned += FieldRecoverySide(BattleSideEnum.Attacker, attackerAvailable, joinedFormations);
+        int spawned = FieldRecoverySide(BattleSideEnum.Defender, defenderAvailable, joinedFormations,
+            spawnLogic.GetSpawnHorses(BattleSideEnum.Defender));
+        spawned += FieldRecoverySide(BattleSideEnum.Attacker, attackerAvailable, joinedFormations,
+            spawnLogic.GetSpawnHorses(BattleSideEnum.Attacker));
 
         ChargeFormations(joinedFormations, out var delegated, out var keptPlayerOrders, out var chargedNew);
 
@@ -381,7 +395,9 @@ public class ReinforcementFielder : IReinforcementFielder
     // Round-robin by party so every missing army party gets represented before one large reserve consumes the
     // whole side's active allocation. Exhausted parties leave the queue; the rest refill future casualty slots.
     // joinedFormations maps each formation this batch reached to whether it was empty before the batch.
-    private int FieldRecoverySide(BattleSideEnum side, int available, Dictionary<Formation, bool> joinedFormations)
+    // sideSpawnsHorses is the side's native spawn setting: a siege assault spawns everyone on foot (#4650).
+    private int FieldRecoverySide(BattleSideEnum side, int available, Dictionary<Formation, bool> joinedFormations,
+        bool sideSpawnsHorses)
     {
         if (available <= 0) return 0;
 
@@ -408,7 +424,7 @@ public class ReinforcementFielder : IReinforcementFielder
             // recovery queues persist, so the next Tick resumes fielding as removals free capacity. An empty
             // queue (null next) skips the check so the exhausted party is still cleaned up below.
             var nextOrigin = recovery.Origins.Count > 0 ? recovery.Origins.Peek() : null;
-            if (nextOrigin != null && !agentBudget.HasCapacityFor(Mission.Current, SlotsForOrigin(nextOrigin))) break;
+            if (nextOrigin != null && !agentBudget.HasCapacityFor(Mission.Current, SlotsForOrigin(nextOrigin, sideSpawnsHorses))) break;
 
             var origin = recovery.Origins.Count > 0 ? recovery.Origins.Dequeue() : null;
             bool exhausted = recovery.Origins.Count == 0;
@@ -420,7 +436,7 @@ public class ReinforcementFielder : IReinforcementFielder
             }
             else if (origin != null)
             {
-                var agent = SpawnReinforcementTroop(Mission.Current, team, origin);
+                var agent = SpawnReinforcementTroop(Mission.Current, team, origin, sideSpawnsHorses);
                 var formation = agent?.Formation;
                 if (formation != null)
                     RecordJoinedFormation(joinedFormations, formation, formation.CountOfUnits);
@@ -443,6 +459,38 @@ public class ReinforcementFielder : IReinforcementFielder
         return spawned;
     }
 
+    public IReadOnlyList<CoopAgentOrigin> TakeMigrationReserve(BattleSideEnum side)
+    {
+        if (side != BattleSideEnum.Attacker && side != BattleSideEnum.Defender) return Array.Empty<CoopAgentOrigin>();
+
+        var parties = recoveryParties[(int)side];
+        var origins = new List<CoopAgentOrigin>();
+        foreach (var recovery in parties)
+        {
+            recoveryPartyIds.Remove(recovery.PartyId);
+            // As in FieldRecoverySide: a party that left this host's reserve scope (its owner came back) is not fielded here.
+            if (!recovery.Supplier.ContainsParty(recovery.PartyId)) continue;
+
+            foreach (var origin in recovery.Origins)
+            {
+                if (!HasLivePartySeed(recovery.PartyId, origin.UniqueSeed)) origins.Add(origin);
+            }
+        }
+
+        parties.Clear();
+        recoveryCursors[(int)side] = 0;
+        return origins;
+    }
+
+    /// <inheritdoc/>
+    public int RemoveLateReplayed(List<CoopAgentOrigin> origins)
+    {
+        if (origins.Count == 0) return 0;
+
+        var live = new HashSet<(string PartyId, int TroopSeed)>(LivePartySeeds());
+        return origins.RemoveAll(origin => live.Contains((origin.MapEventPartyId, origin.UniqueSeed)));
+    }
+
     // Only the first add records, right after it, so a count of 1 means the formation was empty before the
     // batch. The host's own hero counts as a unit.
     internal static void RecordJoinedFormation(
@@ -452,7 +500,18 @@ public class ReinforcementFielder : IReinforcementFielder
             joinedFormations.Add(formation, countAfterAdd <= 1);
     }
 
+    // Whether an active registered agent carries this recovered troop's party and seed, stopping at the first match.
     private bool HasLivePartySeed(string partyId, int troopSeed)
+    {
+        foreach (var liveSeed in LivePartySeeds())
+        {
+            if (liveSeed.PartyId == partyId && liveSeed.TroopSeed == troopSeed) return true;
+        }
+        return false;
+    }
+
+    // The party and seed of every active registered agent, the one rule land and naval recovery both dedup against.
+    private IEnumerable<(string PartyId, int TroopSeed)> LivePartySeeds()
     {
         foreach (var controllerId in coopMissionComponent.AgentRegistry.GetControllerIds())
         {
@@ -460,11 +519,9 @@ public class ReinforcementFielder : IReinforcementFielder
             {
                 if (info.Agent == null || !info.Agent.IsActive()) continue;
                 var attribution = casualties.GetOrDefault(info.AgentId);
-                if (attribution.MapEventPartyId == partyId && attribution.TroopSeed == troopSeed)
-                    return true;
+                yield return (attribution.MapEventPartyId, attribution.TroopSeed);
             }
         }
-        return false;
     }
 
     /// <summary>Joint active troop targets using the same battle-size allocation as native Init.</summary>
@@ -522,9 +579,10 @@ public class ReinforcementFielder : IReinforcementFielder
 
     // BR-110: render slots a reinforcement origin consumes when spawned — a mounted troop spawns a rider and a
     // horse (2), everyone else 1. The shared budget reads the same equipment SpawnReinforcementTroop spawns
-    // from; a null origin keeps its historical rider-only cost (call sites never pass one).
-    private int SlotsForOrigin(CoopAgentOrigin origin)
-        => origin == null ? 1 : agentBudget.SlotsForOrigin(origin);
+    // from; a null origin keeps its historical rider-only cost (call sites never pass one). A side that spawns
+    // no horses spawns the rider alone, as MissionSpawnCapacityPatch charges the native drip.
+    private int SlotsForOrigin(CoopAgentOrigin origin, bool sideSpawnsHorses)
+        => origin == null || !sideSpawnsHorses ? 1 : agentBudget.SlotsForOrigin(origin);
 
     /// <summary>What a fielding batch does with a formation its troops joined.</summary>
     internal enum JoinedFormationAction
@@ -587,7 +645,7 @@ public class ReinforcementFielder : IReinforcementFielder
 
     // [Host, game thread] Spawn one reinforcement troop AI-controlled. With no InitialPosition set, the engine
     // positions it at the side's reinforcement spawn frame; we then drop it into its troop-class formation.
-    private Agent SpawnReinforcementTroop(Mission mission, Team team, CoopAgentOrigin origin)
+    private Agent SpawnReinforcementTroop(Mission mission, Team team, CoopAgentOrigin origin, bool sideSpawnsHorses)
     {
         var character = (CharacterObject)origin.Troop;
         var equipment = character.IsHero ? character.HeroObject.BattleEquipment : character.Equipment;
@@ -600,6 +658,8 @@ public class ReinforcementFielder : IReinforcementFielder
         buildData.BodyProperties(character.GetBodyPropertiesMax());
         buildData.Controller(AgentControllerType.AI);
         buildData.IsReinforcement(true);
+        // As native GetAgentBuildDataToSpawnTroop: the engine then clears the horse slots of the spawn equipment.
+        buildData.NoHorses(!sideSpawnsHorses);
         buildData.ClothingColor1(origin.FactionColor);
         buildData.ClothingColor2(origin.FactionColor2);
 

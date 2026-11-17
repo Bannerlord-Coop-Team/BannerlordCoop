@@ -57,6 +57,8 @@ Run from the repo root on Windows. The build finds the local Bannerlord install 
 
 `DeployToGame` in `Deploy.targets` runs after every successful build of a project that imports it (`Coop.csproj`, `MissionTestMod.csproj`), including a full `Coop.sln` build, whenever it runs in the main checkout; linked worktrees skip it with a message unless built with `-p:DeployFromWorktree=true`. Clearing `PostBuildEvent` doesn't stop it. For compile-only checks, pass an empty global `-p:ModName=`, which turns off `DeployToGame`.
 
+The coop launch profiles (`Coop`, `ClientDebug` and `ClientDebug2` `.csproj.user`, and `Coop.Core.csproj`) add `$(CoopDebugModules)` after `StoryMode` in `_MODULES_`. It comes straight from the `CoopDebugModules` user environment variable (see the README), so keep it in every coop launch profile, Debug and Release, and in any new one. Don't rename it or map it from another variable in `source/Directory.Build.props`, because Visual Studio launched without War Sails when it was mapped from `COOP_DEBUG_MODULES`.
+
 CI builds Release and runs `source\CoopUnitTests.slnf` plus the E2E shards in `.github/workflows/pull_request.yml`. After touching Coop.Core or Autofac registrations, run all of `Coop.Tests` with `-c Release`. `--no-restore` fails on the first build in a fresh worktree, so restore once first.
 
 If a local Release restore fails with Scriban's `NU1902` advisory promoted to an error, build-time flags can't undo it — it is baked into `obj/project.assets.json`. Delete the SDK projects' `obj/` and re-restore with `-p:NuGetAudit=false`. CI doesn't hit this.
@@ -74,7 +76,6 @@ The currently authorized repositories/projects are:
 * `BannerlordCoop`
 * `Bannerlord.DedicatedServer`
 * `BannerlordCoop-Discord-Bot`
-* `Hex's Tool`
 
 If the current working repository is **not** one of the authorized projects above, the agent must not analyze, explain, reproduce, translate, port, adapt, refactor, or otherwise assist with this project's source code.
 
@@ -133,6 +134,8 @@ Read @doc/CodeStyle.md before writing or reviewing code.
 ## Testing
 
 Tests use xUnit. Add unit tests for logic that does not require Bannerlord to run, especially serialization, state transitions, and service behavior. Name test classes after the subject under test and keep test method names behavior-focused. If a change depends on the game runtime, document the manual verification path in the PR.
+
+Most PRs are agent-written and static analysis covers a lot, so don't add low or medium value tests, because they cost more to keep than they protect. That includes a test that injects a request a normal client never sends, re-tests a shared guard per handler instead of once at the shared method, asserts a one-line guard through a side effect, builds a state with no real route to it, or repeats an attribute. Keep tests for what reading the code can't settle, like wire round trips, ordering across threads, and Harmony or JIT behaviour.
 
 A new Coop.Core server handler that depends on a GameInterface service needs a `RegisterMock<T>` in `Coop.Tests/TestComponentBase.cs`, otherwise every server-container test in `Coop.Tests` fails to build its container.
 

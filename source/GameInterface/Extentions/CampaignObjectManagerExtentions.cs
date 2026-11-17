@@ -6,7 +6,7 @@ using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Extentions
 {
-    internal static class CampaignObjectManagerExtentions
+    public static class CampaignObjectManagerExtentions
     {
         public static List<MobileParty> GetPlayerMobileParties(this CampaignObjectManager campaignObjectManager)
         {

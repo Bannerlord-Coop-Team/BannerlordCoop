@@ -1,4 +1,5 @@
 ﻿using Common.Logging;
+using Common.Messaging;
 using Common.Network;
 using Missions.Messages;
 using Serilog;
@@ -18,7 +19,10 @@ public interface IBattleResultCommitter
     /// <summary>Remember the host's resolved state until this client's deployment is safe to conclude.</summary>
     void AcceptResolvedState(BattleState battleState);
 
-    /// <summary>Report the remembered state at the current host epoch, if one exists.</summary>
+    /// <summary>
+    /// Report the remembered state at the current host epoch, if one exists. The server keeps each member's last report, so
+    /// a state already reported at this epoch is not sent again; a new epoch (host migration) reports again.
+    /// </summary>
     void ReportAcceptedResult();
 
     /// <summary>Get the resolved state for a late joiner's mesh catch-up.</summary>
@@ -34,13 +38,18 @@ public class BattleResultCommitter : IBattleResultCommitter
     private readonly IBattleNetwork battleNetwork;
     private readonly INetwork relayNetwork;
     private readonly IBattleSession session;
+    private readonly IMessageBroker messageBroker;
     private BattleState resolvedState;
+    private BattleState reportedState;
+    private int reportedEpoch;
 
-    public BattleResultCommitter(IBattleNetwork battleNetwork, INetwork relayNetwork, IBattleSession session)
+    public BattleResultCommitter(IBattleNetwork battleNetwork, INetwork relayNetwork, IBattleSession session,
+        IMessageBroker messageBroker)
     {
         this.battleNetwork = battleNetwork;
         this.relayNetwork = relayNetwork;
         this.session = session;
+        this.messageBroker = messageBroker;
     }
 
     public void ReportResolvedResult(MissionResult result)
@@ -76,22 +85,41 @@ public class BattleResultCommitter : IBattleResultCommitter
 
     public void ReportAcceptedResult()
     {
+#if DEBUG
+        // Retain the accepted result so turning the fixture off can report it normally.
+        if (session.DebugWithholdCompletion) return;
+#endif
         if (!session.HasInstance || !TryGetResolvedState(out var battleState))
             return;
 
-        Logger.Information("[BattleSync] Reporting resolved mission result {State} for instance {Instance}",
-            battleState, session.InstanceId);
-        relayNetwork.SendAll(new NetworkBattleResultReady(session.InstanceId, battleState, session.HostEpoch));
+        int hostEpoch = session.HostEpoch;
+        lock (resolvedStateGate)
+        {
+            if (IsAlreadyReported(reportedState, reportedEpoch, battleState, hostEpoch)) return;
+
+            reportedState = battleState;
+            reportedEpoch = hostEpoch;
+        }
+
+        Logger.Information("[BattleSync] Reporting resolved mission result {State} for instance {Instance} at host epoch {Epoch}",
+            battleState, session.InstanceId, hostEpoch);
+        // Publish is synchronous and catches subscriber exceptions, so their reports go out first and can't block this one.
+        messageBroker.Publish(this, new BattleResultReporting(session.InstanceId));
+        relayNetwork.SendAll(new NetworkBattleResultReady(session.InstanceId, battleState, hostEpoch));
 
         if (session.IsLocalHost)
         {
             battleNetwork.SendAll(new NetworkBattleResultSnapshot(
                 session.InstanceId,
                 session.OwnControllerId,
-                session.HostEpoch,
+                hostEpoch,
                 battleState));
         }
     }
+
+    // Whether the same state was already reported at this host epoch.
+    private static bool IsAlreadyReported(BattleState reportedState, int reportedEpoch, BattleState battleState, int hostEpoch)
+        => IsSupportedResultState(reportedState) && reportedState == battleState && reportedEpoch == hostEpoch;
 
     public bool TryGetResolvedState(out BattleState battleState)
     {

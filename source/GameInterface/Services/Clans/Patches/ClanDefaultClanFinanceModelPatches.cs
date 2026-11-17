@@ -19,7 +19,7 @@ internal class DefaultClanFinanceModelPatches
     [HarmonyPrefix]
     public static bool AddExpenseFromLeaderPartyPrefix(DefaultClanFinanceModel __instance, Clan clan, ExplainedNumber goldChange, bool applyWithdrawals, ref int __result)
     {
-        ContainerProvider.TryResolve<IDefaultClanFinanceModelInterface>(out var financeModelInterface);
+        if (!ContainerProvider.TryResolve<IDefaultClanFinanceModelInterface>(out var financeModelInterface)) return true;
 
         __result = financeModelInterface.AddExpenseFromLeaderParty(__instance, clan, goldChange, applyWithdrawals);
 
@@ -30,7 +30,7 @@ internal class DefaultClanFinanceModelPatches
     [HarmonyPrefix]
     public static bool CalculateClanIncomeInternalPrefix(DefaultClanFinanceModel __instance, Clan clan, ref ExplainedNumber goldChange, bool applyWithdrawals = false, bool includeDetails = false)
     {
-        ContainerProvider.TryResolve<IDefaultClanFinanceModelInterface>(out var financeModelInterface);
+        if (!ContainerProvider.TryResolve<IDefaultClanFinanceModelInterface>(out var financeModelInterface)) return true;
 
         financeModelInterface.CalculateClanIncomeInternal(__instance, clan, ref goldChange, applyWithdrawals, includeDetails);
 
@@ -44,7 +44,7 @@ internal class DefaultClanFinanceModelPatches
         // Calculate for non-player clans normally
         if (clan == null || !clan.IsPlayerClan()) return true;
 
-        ContainerProvider.TryResolve<IDefaultClanFinanceModelInterface>(out var financeModelInterface);
+        if (!ContainerProvider.TryResolve<IDefaultClanFinanceModelInterface>(out var financeModelInterface)) return true;
 
         financeModelInterface.CalculateClanExpensesForPlayerClan(__instance, clan, ref goldChange, applyWithdrawals, includeDetails);
 
@@ -82,7 +82,7 @@ internal class DefaultClanFinanceModelPatches
             return false;
         }
 
-        ContainerProvider.TryResolve<IDefaultClanFinanceModelInterface>(out var financeModelInterface);
+        if (!ContainerProvider.TryResolve<IDefaultClanFinanceModelInterface>(out var financeModelInterface)) return true;
 
         __result = financeModelInterface.AddPartyExpense(__instance, party, clan, goldChange, applyWithdrawals);
 
@@ -95,7 +95,7 @@ internal class DefaultClanFinanceModelPatches
     {
         if (clan.Leader?.Clan != clan) return false;
 
-        ContainerProvider.TryResolve<IClanFinance>(out var finance);
+        if (!ContainerProvider.TryResolve<IClanFinance>(out var finance)) return true;
 
         return finance.CanChangeGold(clan.Leader);
     }

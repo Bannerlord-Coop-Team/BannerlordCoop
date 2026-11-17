@@ -1,6 +1,7 @@
 ﻿using Common;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Services.MapEvents.Patches;
 using HarmonyLib;
 using System.Collections.Generic;
 using System.Linq;
@@ -172,18 +173,24 @@ internal class DefaultMobilePartyAIModelPatches
     // The radius GetBestInitiativeBehavior searches around the attacker, wider for sea patrols and port defenders.
     private static float NearbyPartySearchRadius(MobileParty mobileParty)
     {
+        const float SeaPatrolRadiusMultiplier = 5f;
+        const float DefaultRadiusMultiplier = 3f;
+
         var joiningRadius = Campaign.Current.Models.EncounterModel.GetEncounterJoiningRadius;
-        if (mobileParty.DefaultBehavior == AiBehavior.DefendSettlement && mobileParty.IsCurrentlyAtSea && mobileParty.IsTargetingPort)
+
+        bool isPortDefenderAtSea = mobileParty.DefaultBehavior == AiBehavior.DefendSettlement && mobileParty.IsCurrentlyAtSea && mobileParty.IsTargetingPort;
+        if (isPortDefenderAtSea)
             return joiningRadius * (Campaign.Current.Models.MobilePartyAIModel.SettlementDefendingNearbyPartyCheckRadius + 1f);
 
-        if (mobileParty.DefaultBehavior == AiBehavior.PatrolAroundPoint && mobileParty.IsCurrentlyAtSea && !mobileParty.AiBehaviorTarget.IsOnLand)
-            return joiningRadius * 5f;
+        bool isSeaPatrol = mobileParty.DefaultBehavior == AiBehavior.PatrolAroundPoint && mobileParty.IsCurrentlyAtSea && !mobileParty.AiBehaviorTarget.IsOnLand;
+        if (isSeaPatrol)
+            return joiningRadius * SeaPatrolRadiusMultiplier;
 
-        return joiningRadius * 3f;
+        return joiningRadius * DefaultRadiusMultiplier;
     }
 
     // Vanilla's stronger main party check and the skips it runs before it, read for an active player party.
-    private static bool IsStrongerPlayerParty(MobileParty party, MobileParty mobileParty, MobileParty enemyParty)
+    internal static bool IsStrongerPlayerParty(MobileParty party, MobileParty mobileParty, MobileParty enemyParty)
     {
         if (!party.IsActive || !party.IsPlayerParty()) return false;
         if (party.BesiegedSettlement != null && party.MapFaction == mobileParty.MapFaction) return false;
@@ -215,6 +222,10 @@ internal class DefaultMobilePartyAIModelPatches
         // Don't consider attacking a party that is held in a conversation with a player; the interaction guard
         // would block the attack anyway, and this keeps the AI from chasing an unattackable target.
         if (ConversationPartyHold.IsInPlayerConversation(targetParty))
+            __result = false;
+
+        // A player battle closed to AI joins is ignored, otherwise the attacker walks up and gets held beside it.
+        if (InteractionPatches.IsClosedToAiJoins(targetParty.MapEvent))
             __result = false;
     }
     [HarmonyPatch(typeof(DefaultMobilePartyAIModel))]
