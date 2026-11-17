@@ -15,7 +15,9 @@ internal class NavalDLCShipDistributionModelPatches
     [HarmonyPostfix]
     public static void CanSendShipToPartyPostfix(ref bool __result, Ship ship, MobileParty mobileParty)
     {
+        if (!__result || !mobileParty.IsPlayerParty()) return;
+
         // Like vanilla's MainParty check, a player only gets ships another player sends, not ships the clan's AI hands out
-        __result = __result && (!mobileParty.IsPlayerParty() || ship.Owner.IsPlayerParty());
+        __result = ship.Owner.IsPlayerParty();
     }
 }
