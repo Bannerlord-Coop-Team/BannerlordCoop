@@ -338,7 +338,7 @@ are registered later, at `CampaignReady` (`MapScreen.OnInitialize`), through
 - `CoopTroopSupplier.OnTroopScoreHit` is an empty method nothing calls, still with the v1.5.6
   parameters.
 - N executions from one clan cost N penalties, where vanilla charges once per blood feud; per player
-  feud state does not exist (#3819), and v1.4.8 also charged each execution.
+  feud state does not exist (#3851), and v1.4.8 also charged each execution.
 - Not done yet: a live session with a listen-server host and two clients, and CI, whose build image
   still carries v1.4.8 game assemblies.
 
