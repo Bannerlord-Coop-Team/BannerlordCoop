@@ -1,5 +1,4 @@
 ﻿using Common.Messaging;
-using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.UI.Notifications.Messages;
@@ -42,7 +41,7 @@ public class PlayerTrackCompanionBehaviorInterface : IPlayerTrackCompanionBehavi
 
     public void OnHeroTeleportationRequested(Hero hero, MobileParty party, TeleportationDetail detail)
     {
-        if (!hero.IsPlayerCompanion || !party.IsPlayerParty()) return;
+        if (!hero.IsPlayerCompanion || !playerManager.Contains(party)) return;
 
         if (detail != TeleportationDetail.DelayedTeleportToParty) return;
 
@@ -63,8 +62,6 @@ public class PlayerTrackCompanionBehaviorInterface : IPlayerTrackCompanionBehavi
 
     public void SettlementEntered(MobileParty party, Settlement settlement)
     {
-        if (!party.IsPlayerParty()) return;
-
         if (!playerManager.TryGetPlayer(party, out var player)) return;
 
         foreach (var companionHeroId in sessionScatteredCompanionsInterface.GetScatteredCompanions(player.HeroId))
