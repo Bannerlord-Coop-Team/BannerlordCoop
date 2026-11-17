@@ -166,16 +166,8 @@ internal class ServerPlayerUnstuck : IServerPlayerUnstuck
                 if (!objectManager.TryGetIdWithLogging(releasedParty, out var releasedPartyId))
                     continue;
 
-                // The party is already released, so a failed send only counts as unreported instead of failing the step.
-                try
-                {
-                    network.SendAll(new NetworkPartyLeftBattle(releasedPartyId, finishLocalMenus: false));
-                    broadcastCount++;
-                }
-                catch (Exception e)
-                {
-                    Logger.Warning(e, "Could not report released party {PartyId} to clients", releasedPartyId);
-                }
+                network.SendAll(new NetworkPartyLeftBattle(releasedPartyId, finishLocalMenus: false));
+                broadcastCount++;
             }
 
             var lines = new List<string>();
