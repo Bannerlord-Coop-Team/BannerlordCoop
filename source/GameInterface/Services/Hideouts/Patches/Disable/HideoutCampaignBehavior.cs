@@ -218,7 +218,7 @@ internal class HideoutCampaignBehaviorPatch
         return false;
     }
 
-    private static void PublishConsequence(HideoutCampaignConsequence consequence, Settlement settlement = null)
+    internal static void PublishConsequence(HideoutCampaignConsequence consequence, Settlement settlement = null)
     {
         if (!ModInformation.IsClient)
             return;

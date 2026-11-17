@@ -1,6 +1,6 @@
 ﻿using Common;
-using Common.Messaging;
 using GameInterface.Policies;
+using GameInterface.Services.Hideouts.Patches.Disable;
 using GameInterface.Services.Hideouts.Messages;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -18,8 +18,9 @@ internal class HideoutCooldownPatches
     {
         if (ModInformation.IsServer || CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-        MessageBroker.Instance.Publish(__instance, new HideoutCampaignConsequenceRequested(
-            __instance.Settlement, HideoutCampaignConsequence.SetAttackCooldown));
+        // A raid mission's cooldown was already set by the server when it started, so a lost fight has nothing to send.
+        if (__instance.NextPossibleAttackTime.IsPast)
+            HideoutCampaignBehaviorPatch.PublishConsequence(HideoutCampaignConsequence.SetAttackCooldown, __instance.Settlement);
         return false;
     }
 }

@@ -267,7 +267,11 @@ internal sealed class HideoutCampaignConsequencesHandler : IHandler
 
             case HideoutCampaignConsequence.SetAttackCooldown:
                 if (!settlement.Hideout.IsInfested || !settlement.Hideout.NextPossibleAttackTime.IsPast)
+                {
+                    Logger.Warning("Rejected hideout cooldown for {SettlementId}, it is not infested or already cooling down",
+                        request.SettlementId);
                     return ConsequenceResult.Rejected;
+                }
 
                 settlement.Hideout.SetNextPossibleAttackTime(
                     Campaign.Current.Models.HideoutModel.HideoutHiddenDuration);
