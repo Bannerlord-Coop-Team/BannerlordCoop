@@ -5,11 +5,14 @@ using Common.Network;
 using E2E.Tests.Util;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
+using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
+using GameInterface.Services.MapEvents.Participation;
 using GameInterface.Services.Players;
 using Moq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using Xunit;
 using Xunit.Abstractions;
@@ -71,5 +74,33 @@ public class BattleSimulationCompletionTests : MapEventTestBase
 
         foreach (var instance in Clients.Append(Server))
             instance.Call(() => Assert.False(instance.ObjectManager.TryGetObject<MapEvent>(context.MapEventId, out _)));
+    }
+
+    [Fact]
+    public void RetreatedPlayerStartsSimulation_AndWins_StillReceivesWinnerLoot()
+    {
+        var context = CreateServerMapEvent();
+        var client = Clients.First();
+        RegisterAsPlayerParty("1", TestEnvironment.CreateRegisteredObject<Hero>(), context.AttackerPartyId);
+        Server.Resolve<IPlayerManager>().SetPeer("1", client.NetPeer);
+
+        Server.Call(() =>
+        {
+            var mapEvent = Server.GetRegisteredObject<MapEvent>(context.MapEventId);
+            var playerParty = Server.GetRegisteredObject<MobileParty>(context.AttackerPartyId);
+            Server.Resolve<IRetreatedMapEventPartyTracker>().MarkRetreated(mapEvent, playerParty.Party);
+
+            Server.Resolve<IMessageBroker>().Publish(client.NetPeer, new NetworkBattleStartRequest(
+                System.Guid.NewGuid().ToString(), (int)BattleStartMode.Simulation,
+                context.MapEventId, context.AttackerPartyId));
+            Assert.True(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleStartReply>()).Accepted);
+            mapEvent.BattleState = BattleState.AttackerVictory;
+            for (var update = 0; update < MaxAdvancesToFinish && !mapEvent.IsFinalized; update++)
+                Server.Resolve<IMessageBroker>().Publish(client.NetPeer,
+                    new NetworkAdvanceBattleSimulation(context.MapEventId, 1));
+
+            var results = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkCommitMapEventResults>());
+            Assert.Contains(results.PlayerMapEventPartyId, results.PlayerLootData.LootedItems.Keys);
+        }, MapEventDisabledMethods);
     }
 }

@@ -13,6 +13,7 @@ using System.Collections;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using GameInterface.Services.MapEvents.Messages.Start;
+using GameInterface.Services.MapEvents.Participation;
 using Common.Util;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -224,7 +225,8 @@ public class RaidLootWarningFixtureTests
         {
             using var broker = new MessageBroker();
             using var handler = subscribed ? new BattleSimulationRunHandler(broker, new Mock<INetwork>().Object,
-                new Mock<IObjectManager>().Object, new MapEventLogger(new Mock<IObjectManager>().Object), new Mock<IPlayerManager>().Object) : null;
+                new Mock<IObjectManager>().Object, new MapEventLogger(new Mock<IObjectManager>().Object), new Mock<IPlayerManager>().Object,
+                new Mock<IRetreatedMapEventPartyTracker>().Object) : null;
             var session = CreateSession();
             session.Prepare(() => { });
             session.Capture(session.Campaign, session.Party, session.Settlement, ObjectHelper.SkipConstructor<MapEvent>(), "event-a");
@@ -252,7 +254,8 @@ public class RaidLootWarningFixtureTests
         {
             using var broker = new MessageBroker();
             using var handler = new BattleSimulationRunHandler(broker, new Mock<INetwork>().Object,
-                new Mock<IObjectManager>().Object, new MapEventLogger(new Mock<IObjectManager>().Object), new Mock<IPlayerManager>().Object);
+                new Mock<IObjectManager>().Object, new MapEventLogger(new Mock<IObjectManager>().Object), new Mock<IPlayerManager>().Object,
+                new Mock<IRetreatedMapEventPartyTracker>().Object);
             var session = CreateSession();
             session.Prepare(() => { });
             session.Capture(session.Campaign, session.Party, session.Settlement, ObjectHelper.SkipConstructor<MapEvent>(), "event-a");
