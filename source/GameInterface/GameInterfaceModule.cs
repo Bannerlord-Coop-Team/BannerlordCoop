@@ -114,6 +114,7 @@ public class GameInterfaceModule : Module
         typeof(ShipUpgradePieceRegistry),
         typeof(BlockadeBattleEventComponentRegistry),
         typeof(LootShipHoldHandler),
+        typeof(NavalNpcFleetAttemptHandler),
         typeof(LootShipsHandler),
         typeof(ShipPiecesHandler),
         typeof(PlayerRaftHandler),
@@ -226,6 +227,7 @@ public class GameInterfaceModule : Module
             foreach (var registry in NavalOnlyTypes.Where(RegistryModule.IsAutoRegistry))
                 builder.RegisterType(registry).AsSelf().SingleInstance().AutoActivate();
             builder.RegisterType<BattleShipFateLedger>().As<IBattleShipFateLedger>().SingleInstance();
+            builder.RegisterType<NavalNpcFleetAttemptTracker>().As<INavalNpcFleetAttemptTracker>().SingleInstance();
             builder.RegisterType<BattleShipFateApplier>().As<IBattleShipFateApplier>().InstancePerDependency();
         }
         // Stays registered while naval is off: MapEventResultsInterface, shared with land battles, takes it.

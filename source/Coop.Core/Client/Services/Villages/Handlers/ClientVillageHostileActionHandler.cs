@@ -1,4 +1,5 @@
-using Common;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Entity;
@@ -6,33 +7,41 @@ using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Villages.Data;
 using GameInterface.Services.Villages.Interfaces;
+using GameInterface.Services.Villages;
 using GameInterface.Services.Villages.Messages;
+using TaleWorlds.CampaignSystem.Settlements;
+using Serilog;
 
 namespace Coop.Core.Client.Services.Villages.Handlers;
 
 internal class ClientVillageHostileActionHandler : IHandler
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<ClientVillageHostileActionHandler>();
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IVillageHostileActionInterface villageHostileActionInterface;
+    private readonly IHostileActionRequestTracker hostileActionRequestTracker;
 
     public ClientVillageHostileActionHandler(
         IMessageBroker messageBroker,
         INetwork network,
         IObjectManager objectManager,
         IControllerIdProvider controllerIdProvider,
-        IVillageHostileActionInterface villageHostileActionInterface)
+        IVillageHostileActionInterface villageHostileActionInterface,
+        IHostileActionRequestTracker hostileActionRequestTracker)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.controllerIdProvider = controllerIdProvider;
         this.villageHostileActionInterface = villageHostileActionInterface;
+        this.hostileActionRequestTracker = hostileActionRequestTracker;
 
         messageBroker.Subscribe<VillageHostileActionAttempted>(Handle_VillageHostileActionAttempted);
         messageBroker.Subscribe<NetworkVillageHostileActionStarted>(Handle_NetworkVillageHostileActionStarted);
+        messageBroker.Subscribe<NetworkPromptRaidContinuation>(Handle_NetworkPromptRaidContinuation);
         messageBroker.Subscribe<NetworkVillageHostileActionDenied>(Handle_NetworkVillageHostileActionDenied);
         messageBroker.Subscribe<NetworkVillageHostileActionCooldowns>(Handle_NetworkVillageHostileActionCooldowns);
         messageBroker.Subscribe<NetworkAuthorizeForceTransfer>(Handle_NetworkAuthorizeForceTransfer);
@@ -43,6 +52,7 @@ internal class ClientVillageHostileActionHandler : IHandler
     {
         messageBroker.Unsubscribe<VillageHostileActionAttempted>(Handle_VillageHostileActionAttempted);
         messageBroker.Unsubscribe<NetworkVillageHostileActionStarted>(Handle_NetworkVillageHostileActionStarted);
+        messageBroker.Unsubscribe<NetworkPromptRaidContinuation>(Handle_NetworkPromptRaidContinuation);
         messageBroker.Unsubscribe<NetworkVillageHostileActionDenied>(Handle_NetworkVillageHostileActionDenied);
         messageBroker.Unsubscribe<NetworkVillageHostileActionCooldowns>(Handle_NetworkVillageHostileActionCooldowns);
         messageBroker.Unsubscribe<NetworkAuthorizeForceTransfer>(Handle_NetworkAuthorizeForceTransfer);
@@ -55,6 +65,12 @@ internal class ClientVillageHostileActionHandler : IHandler
 
         if (!objectManager.TryGetIdWithLogging(message.MobileParty, out var mobilePartyId)) return;
         if (!objectManager.TryGetIdWithLogging(message.Settlement, out var settlementId)) return;
+        // A request is already pending: drop this one, the server still resolves the first.
+        if (!hostileActionRequestTracker.TryBeginRequest())
+        {
+            Logger.Information("Dropping hostile action request: one is already pending");
+            return;
+        }
 
         network.SendAll(new NetworkRequestVillageHostileAction(message.Action, mobilePartyId, settlementId, controllerIdProvider.ControllerId));
     }
@@ -64,14 +80,33 @@ internal class ClientVillageHostileActionHandler : IHandler
         GameThread.RunSafe(
             () =>
             {
+                hostileActionRequestTracker.Complete();
                 if (payload.What.Unresisted) villageHostileActionInterface.ReturnToVillageMenu();
                 else villageHostileActionInterface.BeginHostileActionPresentation(payload.What.Action);
             },
             context: nameof(Handle_NetworkVillageHostileActionStarted));
     }
 
+    private void Handle_NetworkPromptRaidContinuation(MessagePayload<NetworkPromptRaidContinuation> payload)
+    {
+        GameThread.RunSafe(
+            () =>
+            {
+                if (objectManager.TryGetObjectWithLogging<Settlement>(payload.What.SettlementId, out var settlement))
+                    villageHostileActionInterface.ParkRaidContinuation(settlement);
+            },
+            context: nameof(Handle_NetworkPromptRaidContinuation));
+    }
+
     private void Handle_NetworkVillageHostileActionDenied(MessagePayload<NetworkVillageHostileActionDenied> payload)
     {
+        GameThread.RunSafe(
+            () =>
+            {
+                hostileActionRequestTracker.Complete();
+                villageHostileActionInterface.CloseDeniedRaidContinuation();
+            },
+            context: nameof(Handle_NetworkVillageHostileActionDenied));
         messageBroker.Publish(this, new SendInformationMessage(GetDeniedMessage(payload.What.Reason)));
     }
 

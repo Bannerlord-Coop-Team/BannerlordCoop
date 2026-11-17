@@ -86,7 +86,7 @@ internal class ServerVillageHostileActionHandler : IHandler
             return;
         }
 
-        GameThread.RunSafe(() => TryStartHostileAction(peer, request), blocking: true, context: nameof(Handle_NetworkRequestVillageHostileAction));
+        GameThread.RunSafe(() => TryStartHostileAction(peer, request), context: nameof(Handle_NetworkRequestVillageHostileAction));
     }
 
     private bool TryValidateRequester(string controllerId, string mobilePartyId)
