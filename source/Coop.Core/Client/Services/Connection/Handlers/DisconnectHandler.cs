@@ -1,6 +1,7 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using Coop.Core.Client.Messages;
+using Coop.Core.Client.States;
 using Coop.Core.Common;
 using GameInterface.Services.GameState.Interfaces;
 using LiteNetLib;
@@ -16,12 +17,14 @@ internal class DisconnectHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly ICoopFinalizer coopFinalizer;
     private readonly IGameStateInterface gameStateInterface;
+    private readonly IClientLogic clientLogic;
 
-    public DisconnectHandler(IMessageBroker messageBroker, ICoopFinalizer coopFinalizer, IGameStateInterface gameStateInterface)
+    public DisconnectHandler(IMessageBroker messageBroker, ICoopFinalizer coopFinalizer, IGameStateInterface gameStateInterface, IClientLogic clientLogic)
     {
         this.messageBroker = messageBroker;
         this.coopFinalizer = coopFinalizer;
         this.gameStateInterface = gameStateInterface;
+        this.clientLogic = clientLogic;
         messageBroker.Subscribe<NetworkDisconnected>(Handle);
     }
 
@@ -40,7 +43,12 @@ internal class DisconnectHandler : IHandler
 
         try
         {
-            gameStateInterface.GoToMainMenu();
+            // A session has no campaign to end, so its state asks the mod to end its mission.
+            if (clientLogic.State is SessionState)
+                clientLogic.Disconnect();
+            else
+                gameStateInterface.GoToMainMenu();
+
             coopFinalizer.Finalize(message);
         }
         catch (OperationCanceledException)

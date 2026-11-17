@@ -114,16 +114,19 @@ internal class PlayerPartyVisibilityHandler : IHandler
 
         var peer = payload.What.PlayerId;
 
-        if (!TryResolveParty(peer, out var player, out var party))
-        {
-            // Not every disconnect belongs to a player mid-campaign so a miss can be expected, not an error
-            return;
-        }
+        // Not every disconnect belongs to a player mid-campaign so a miss can be expected, not an error
+        if (!playerManager.TryGetPlayer(peer, out var player)) return;
+
+        // A session player has no party, so only the party work is skipped for it.
+        MobileParty party = null;
+        if (player.MobilePartyId != null && !objectManager.TryGetObjectWithLogging(player.MobilePartyId, out party)) return;
 
         // playerManager's peer link is only needed to resolve the party above, drop it now regardless
         // of what happens below, so a stale peer never resolves to the wrong party
         playerManager.ClearPeer(peer);
         messageBroker.Publish(this, new PlayerConnectionStateChanged());
+
+        if (party == null) return;
 
         GameThread.RunSafe(() =>
         {
@@ -403,15 +406,6 @@ internal class PlayerPartyVisibilityHandler : IHandler
             !objectManager.TryGetHandleWithLogging(party, out var mobilePartyHandle)) return;
 
         network.SendAll(new NetworkCreatePartyVisual(visualId, visualHandle, mobilePartyHandle));
-    }
-
-    private bool TryResolveParty(NetPeer peer, out Player player, out MobileParty party)
-    {
-        player = null;
-        party = null;
-
-        return playerManager.TryGetPlayer(peer, out player) &&
-            objectManager.TryGetObjectWithLogging(player.MobilePartyId, out party);
     }
 
     private bool TryGetPlayer(MobileParty party, out Player player)

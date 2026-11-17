@@ -1,5 +1,6 @@
 ﻿using Common.Network;
 using Coop.Core.Common.Configuration;
+using GameInterface.Services.Sessions.Messages;
 using GameInterface.Services.UI;
 using Common.Network.Session;
 using System;
@@ -20,6 +21,8 @@ public static class ServerLaunchArguments
     public const string OwnerArgument = "/coopowner";
     public const string PasswordArgument = "/cooppassword";
     public const string VisibilityArgument = "/coopvisibility";
+    public const string SessionModArgument = "/coopsessionmod";
+    public const string SessionPayloadArgument = "/coopsessionpayload";
 
     /// <summary>Reads real argv tokens; a bare flag retains the normal client/server defaults.</summary>
     public static bool TryParseAutoConnect(IReadOnlyList<string> args, out bool requested, out NetworkConfig configuration)
@@ -84,6 +87,78 @@ public static class ServerLaunchArguments
         }
 
         return string.Join(" ", tokens.Select(QuoteArgument));
+    }
+
+    /// <summary>
+    /// Builds the command line of a campaign-free session server: the managed server arguments with the mod id and
+    /// its opaque payload (base64) in place of a save.
+    /// </summary>
+    public static string BuildSessionServerArguments(IReadOnlyList<string> moduleIds, string modId, byte[] payload,
+        int ownerProcessId, string password, ServerVisibility visibility)
+    {
+        if (modId == null) throw new ArgumentNullException(nameof(modId));
+        if (moduleIds == null) throw new ArgumentNullException(nameof(moduleIds));
+        if (!Enum.IsDefined(typeof(ServerVisibility), visibility))
+            throw new ArgumentOutOfRangeException(nameof(visibility));
+        if (payload != null && payload.Length > AttemptHostSession.MaxPayloadBytes)
+            throw new ArgumentOutOfRangeException(nameof(payload));
+
+        var tokens = new List<string>
+        {
+            "/singleplayer",
+            "/server",
+            BuildModuleList(moduleIds),
+            SessionModArgument,
+            modId,
+            SessionPayloadArgument,
+            Convert.ToBase64String(payload ?? Array.Empty<byte>()),
+            OwnerArgument,
+            ownerProcessId.ToString(CultureInfo.InvariantCulture),
+            VisibilityArgument,
+            FormatVisibility(visibility),
+        };
+
+        if (!string.IsNullOrEmpty(password))
+        {
+            tokens.Add(PasswordArgument);
+            tokens.Add(password);
+        }
+
+        return string.Join(" ", tokens.Select(QuoteArgument));
+    }
+
+    /// <summary>Reads the session tokens of <see cref="BuildSessionServerArguments"/>; true only with a mod id and a valid payload.</summary>
+    public static bool TryParseSession(IReadOnlyList<string> args, out string modId, out byte[] payload, out int ownerProcessId)
+    {
+        modId = null;
+        payload = Array.Empty<byte>();
+        ownerProcessId = 0;
+        bool payloadValid = true;
+
+        for (int i = 0; i < args.Count; i++)
+        {
+            if (IsToken(args[i], SessionModArgument) && i + 1 < args.Count)
+            {
+                modId = args[++i];
+            }
+            else if (IsToken(args[i], SessionPayloadArgument) && i + 1 < args.Count)
+            {
+                try
+                {
+                    payload = Convert.FromBase64String(args[++i]);
+                }
+                catch (FormatException)
+                {
+                    payloadValid = false;
+                }
+            }
+            else if (IsToken(args[i], OwnerArgument) && i + 1 < args.Count)
+            {
+                int.TryParse(args[++i], NumberStyles.Integer, CultureInfo.InvariantCulture, out ownerProcessId);
+            }
+        }
+
+        return !string.IsNullOrEmpty(modId) && payloadValid;
     }
 
     /// <summary>Formats the module ids as the engine's <c>_MODULES_*A*B*_MODULES_</c> launch token.</summary>

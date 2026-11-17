@@ -26,6 +26,9 @@ namespace Missions.Battles;
 /// </summary>
 public interface IBattleInstanceLifecycle : IDisposable
 {
+    /// <summary>Connect to the P2P instance <paramref name="instanceId"/> and announce the entry to the server. Once per mission.</summary>
+    void Enter(string instanceId);
+
     /// <summary>
     /// Tear the instance down on mission end: optionally announce an unresolved battle retreat, end the spawn gate, clear this battle's troop suppliers,
     /// announce MissionLeft over the relay, stop the mesh socket, and clear the battle agent registry and
@@ -111,18 +114,27 @@ public class BattleInstanceLifecycle : IBattleInstanceLifecycle
             return;
         }
 
-        // OpenBattleMission can fire more than once around an encounter; connect once per mission.
-        if (!session.TryBegin(mapEventId)) return;
+        Enter(mapEventId);
+    }
 
-        Logger.Information("[BattleSync] Requesting P2P battle instance mapEvent={MapEventId}", mapEventId);
+    /// <summary>
+    /// Connects to the P2P instance and announces the entry to the server. The campaign battle calls it from
+    /// <c>PlayerEnteredBattle</c>; a campaign-free session calls it with its session id.
+    /// </summary>
+    public void Enter(string instanceId)
+    {
+        // OpenBattleMission can fire more than once around an encounter; connect once per mission.
+        if (!session.TryBegin(instanceId)) return;
+
+        Logger.Information("[BattleSync] Requesting P2P battle instance mapEvent={MapEventId}", instanceId);
 
         worldItemRegistry.Clear();
         network.Start();
-        network.ConnectToInstance(mapEventId);
+        network.ConnectToInstance(instanceId);
         coopMissionComponent.AgentRegistry.Clear();
 
-        relayNetwork.SendAll(new NetworkMissionEntered(session.OwnControllerId, mapEventId));
-        Logger.Information("[Relay] Announced MissionEntered for battle instance {Instance}", mapEventId);
+        relayNetwork.SendAll(new NetworkMissionEntered(session.OwnControllerId, instanceId));
+        Logger.Information("[Relay] Announced MissionEntered for battle instance {Instance}", instanceId);
     }
 
     public void Leave(bool wasRetreat)

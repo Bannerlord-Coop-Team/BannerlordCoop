@@ -33,6 +33,9 @@ public interface IGameStateInterface : IGameAbstraction
     /// </summary>
     void LoadGameOrStartNew(string saveName);
     void EndGame();
+
+    /// <summary>Closes the game process. A campaign-free session server calls it once its session is over.</summary>
+    void QuitApplication();
 }
 
 internal class GameStateInterface : IGameStateInterface
@@ -200,6 +203,11 @@ internal class GameStateInterface : IGameStateInterface
     {
         MBGameManager.StartNewGame(new SandBoxGameManager(loadResult));
         MouseManager.ShowCursor(false);
+    }
+
+    public void QuitApplication()
+    {
+        GameThread.RunSafe(Utilities.QuitGame, context: nameof(QuitApplication));
     }
 
     public void EndGame()

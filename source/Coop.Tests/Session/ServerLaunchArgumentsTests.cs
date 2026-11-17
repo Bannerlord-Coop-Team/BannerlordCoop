@@ -1,4 +1,4 @@
-using Common.Network;
+﻿using Common.Network;
 using Common.Network.Session;
 using Coop.Core.Common.Session;
 using Xunit;
@@ -304,5 +304,46 @@ public class ServerLaunchArgumentsTests
             new[] { "Native", "Coop" }, "My Save", 42, string.Empty);
 
         Assert.DoesNotContain(ServerLaunchArguments.PasswordArgument, built);
+    }
+
+    private static string[] Tokens(string built) => new[] { "Bannerlord.exe" }.Concat(built.Split(' ')).ToArray();
+
+    [Fact]
+    public void SessionArguments_RoundTrip()
+    {
+        var payload = new byte[] { 0, 1, 2, 250, 255 };
+        string built = ServerLaunchArguments.BuildSessionServerArguments(
+            new[] { "Native", "Coop" }, "TAOM.LongDefeat", payload, 42, null, ServerVisibility.FriendsOnly);
+
+        Assert.True(ServerLaunchArguments.TryParseSession(Tokens(built), out var modId, out var parsedPayload, out var owner));
+        Assert.Equal("TAOM.LongDefeat", modId);
+        Assert.Equal(payload, parsedPayload);
+        Assert.Equal(42, owner);
+        Assert.Contains("/server", built);
+    }
+
+    [Fact]
+    public void SessionArguments_CampaignTryParseIsFalse()
+    {
+        string built = ServerLaunchArguments.BuildSessionServerArguments(
+            new[] { "Native", "Coop" }, "TAOM.LongDefeat", new byte[] { 1 }, 42, "pw", ServerVisibility.Public);
+
+        Assert.False(ServerLaunchArguments.TryParse(Tokens(built), out var saveName, out _));
+        Assert.Null(saveName);
+    }
+
+    [Fact]
+    public void TryParseSession_BadBase64_False()
+    {
+        var args = new[] { "Bannerlord.exe", ServerLaunchArguments.SessionModArgument, "mod",
+            ServerLaunchArguments.SessionPayloadArgument, "***not base64***", ServerLaunchArguments.OwnerArgument, "7" };
+
+        Assert.False(ServerLaunchArguments.TryParseSession(args, out _, out _, out _));
+    }
+
+    [Fact]
+    public void TryParseSession_WithoutSessionTokens_False()
+    {
+        Assert.False(ServerLaunchArguments.TryParseSession(new[] { "Bannerlord.exe", "/server" }, out _, out _, out _));
     }
 }

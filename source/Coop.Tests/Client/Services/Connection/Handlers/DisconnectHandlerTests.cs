@@ -1,12 +1,15 @@
 ﻿using Common;
 using Common.Tests.Utils;
+using Coop.Core.Client;
 using Coop.Core.Client.Messages;
+using Coop.Core.Client.States;
 using Coop.Core.Client.Services.Connection.Handlers;
 using Coop.Core.Common;
 using Coop.Core.Common.Services.Connection.Messages;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.UI.Interfaces;
+using GameInterface.Services.Sessions.Messages;
 using LiteNetLib;
 using Moq;
 using System;
@@ -124,6 +127,26 @@ public class DisconnectHandlerTests
         Assert.Single(messageBroker.GetMessagesFromType<EndCoopMode>());
     }
 
+    [Fact]
+    public void SessionClient_LeavesThroughTheSessionState()
+    {
+        using var messageBroker = new TestMessageBroker();
+        var gameState = new Mock<IGameStateInterface>(MockBehavior.Strict);
+        var logic = new Mock<IClientLogic>();
+        logic.SetupProperty(value => value.Session, new JoinedSessionInfo("session:abc", "test.mod", null));
+        var state = new SessionState(
+            logic.Object, messageBroker, Mock.Of<ILoadingInterface>(), Mock.Of<ICoopFinalizer>());
+        logic.Setup(value => value.State).Returns(state);
+        logic.Setup(value => value.Disconnect()).Callback(state.Disconnect);
+        using var handler = new DisconnectHandler(messageBroker, Mock.Of<ICoopFinalizer>(), gameState.Object, logic.Object);
+
+        messageBroker.Publish(handler, ServerDisconnect("ServerRestarting"));
+        GameThread.Run(() => { }, blocking: true);
+
+        // The strict game state would throw on GoToMainMenu, which does nothing without a campaign.
+        Assert.Single(messageBroker.GetMessagesFromType<SessionMissionEndRequested>());
+    }
+
     private const string RestartingMessage = "The server is restarting. Try again in a few minutes.";
 
     private static NetworkDisconnected ServerDisconnect(string serverReason) =>
@@ -134,7 +157,7 @@ public class DisconnectHandlerTests
     {
         var gameState = new Mock<IGameStateInterface>();
         gameState.Setup(value => value.GoToMainMenu()).Callback(goToMainMenu);
-        using var handler = new DisconnectHandler(messageBroker, finalizer, gameState.Object);
+        using var handler = new DisconnectHandler(messageBroker, finalizer, gameState.Object, Mock.Of<IClientLogic>());
 
         // The network poller publishes the disconnect inside its session.
         using (GameThread.ActivateCancellation(session.Token))
@@ -159,7 +182,8 @@ public class DisconnectHandlerTests
         using var handler = new DisconnectHandler(
             messageBroker,
             finalizer.Object,
-            gameState.Object);
+            gameState.Object,
+            Mock.Of<IClientLogic>());
 
         messageBroker.Publish(
             handler,

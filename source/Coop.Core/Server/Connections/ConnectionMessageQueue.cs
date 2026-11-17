@@ -102,6 +102,12 @@ public interface IConnectionMessageQueue
     /// <summary>Stops progress tracking after the client applies the ordered join tail.</summary>
     void CompleteCatchUp(NetPeer peer);
 
+    /// <summary>
+    /// Opens a peer that never loads a save (a campaign-free session member) so per-peer sends reach it.
+    /// A stopped peer stays stopped.
+    /// </summary>
+    void MarkLive(NetPeer peer);
+
     /// <summary>Clears a failed join's replay and keeps later broadcasts isolated until disconnect.</summary>
     int AbortCatchUp(NetPeer peer);
 }
@@ -441,6 +447,16 @@ internal sealed class ConnectionMessageQueue : IConnectionMessageQueue, IDisposa
         {
             if (channel.Phase != Phase.Open) return;
             channel.Phase = Phase.Live;
+        }
+    }
+
+    public void MarkLive(NetPeer peer)
+    {
+        var channel = channels.GetOrAdd(peer, _ => new PeerChannel());
+
+        lock (channel.Gate)
+        {
+            if (channel.Phase != Phase.Stopped) channel.Phase = Phase.Live;
         }
     }
 

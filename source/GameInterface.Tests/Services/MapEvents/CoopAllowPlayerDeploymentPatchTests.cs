@@ -37,6 +37,15 @@ public class CoopAllowPlayerDeploymentPatchTests
         RunInSallyOut(BattleSideEnum.Attacker, model => Assert.True(model.CanPlayerSideDeployWithOrderOfBattle()));
     }
 
+    [Fact]
+    public void SessionWithNoCampaign_HasNoLocalHeroOnField()
+    {
+        // A campaign-free session has no Hero.MainHero: the getter throws on a non-campaign player troop.
+        var localHeroOnField = AccessTools.Method(typeof(CoopAllowPlayerDeploymentPatch), "LocalPlayerHeroOnField");
+
+        Assert.False((bool)localHeroOnField.Invoke(null, null));
+    }
+
     private static void RunInSallyOut(BattleSideEnum playerSide, Action<SandboxBattleInitializationModel> act)
     {
         var harmony = new Harmony("tests.coop-allow-player-deployment");

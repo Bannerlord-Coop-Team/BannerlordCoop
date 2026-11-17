@@ -75,7 +75,7 @@ public class JoinPeerTerminatorTests
         finalizer.InSequence(sequence).Setup(value => value.SetCloseText(expectedMessage));
         gameState.InSequence(sequence).Setup(value => value.GoToMainMenu());
         finalizer.InSequence(sequence).Setup(value => value.Finalize(expectedMessage));
-        using var handler = new DisconnectHandler(broker, finalizer.Object, gameState.Object);
+        using var handler = new DisconnectHandler(broker, finalizer.Object, gameState.Object, Mock.Of<IClientLogic>());
 
         var config = new Mock<INetworkConfig>();
         config.SetupGet(value => value.DisconnectTimeout).Returns(TimeSpan.FromSeconds(5));

@@ -87,6 +87,8 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
     // States that arrived before their MissionObject registered (catch-up during a peer's scene load);
     // re-applied once the object appears. Keyed by machine id, latest state wins.
     private readonly Dictionary<int, NetworkSiegeMachineState> pendingByMachineId = new Dictionary<int, NetworkSiegeMachineState>();
+    // Resets stamped with a host epoch this peer has not reached yet; applied when it arrives.
+    private readonly Dictionary<int, NetworkSiegeMachineReset> pendingResetsByMachineId = new();
     private readonly Dictionary<int, NetworkSiegeMachineAuthority> pendingStoneHandoffs = new();
     private readonly Dictionary<int, NetworkSiegeLadderAnimationState> pendingLadderAnimationsById =
         new Dictionary<int, NetworkSiegeLadderAnimationState>();
@@ -132,6 +134,7 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         this.weaponPresentation = weaponPresentation;
 
         messageBroker.Subscribe<NetworkSiegeMachineState>(Handle_NetworkMachineState);
+        messageBroker.Subscribe<NetworkSiegeMachineReset>(Handle_NetworkMachineReset);
         messageBroker.Subscribe<NetworkSiegeLadderAnimationState>(Handle_NetworkLadderAnimationState);
         messageBroker.Subscribe<NetworkSiegeMachineClaim>(Handle_NetworkMachineClaim);
         messageBroker.Subscribe<NetworkSiegeMachineAuthority>(Handle_NetworkMachineAuthority);
@@ -147,6 +150,7 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
     public void Dispose()
     {
         messageBroker.Unsubscribe<NetworkSiegeMachineState>(Handle_NetworkMachineState);
+        messageBroker.Unsubscribe<NetworkSiegeMachineReset>(Handle_NetworkMachineReset);
         messageBroker.Unsubscribe<NetworkSiegeLadderAnimationState>(Handle_NetworkLadderAnimationState);
         messageBroker.Unsubscribe<NetworkSiegeMachineClaim>(Handle_NetworkMachineClaim);
         messageBroker.Unsubscribe<NetworkSiegeMachineAuthority>(Handle_NetworkMachineAuthority);
@@ -209,6 +213,7 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             lastSentLadderAnimations.Clear();
             deactivated.Clear();
             pendingByMachineId.Clear();
+            pendingResetsByMachineId.Clear();
             pendingStoneHandoffs.Clear();
             pendingLadderAnimationsById.Clear();
             peerWeaponState.Clear();
@@ -330,9 +335,20 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
     {
         if (MachineStatesEqual(state.MachineId, state)) return;
 
+        // The reset goes first on the same ordered channel, so every peer gets it before the lower state.
+        if (lastSent.TryGetValue(state.MachineId, out var previous) && IsRepair(previous, state))
+            network.SendAll(new NetworkSiegeMachineReset(state.MachineId, GetSnapshotAuthorityEpoch(state.MachineId), session.OwnControllerId));
+
         lastSent[state.MachineId] = state;
         network.SendAll(Stamp(state));
     }
+
+    // Only DestructableComponent.Reset moves a broken machine back to state 0 cleanly. A hit that computes state 0
+    // sets it, then throws in ReplaceEntityWithBrokenEntity, which leaves the host's own machine broken; that is not
+    // mirrored. A hit after a heal can lower the state to any value above 0; not a repair. The host's real state
+    // follows every reset, so a peer ends at the host's hit points.
+    internal static bool IsRepair(NetworkSiegeMachineState previous, NetworkSiegeMachineState current) =>
+        current.DestructionState == 0 && (previous.DestructionState > 0 || previous.HitPoints == 0f);
 
     private bool MachineStatesEqual(int machineId, NetworkSiegeMachineState state)
     {
@@ -1285,6 +1301,7 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
     // buffer only fills from received states, so a client that receives none skips it.
     private void DrainPendingMachineStates()
     {
+        DrainPendingResets();
         DrainPendingStoneHandoffs();
         DrainPendingGeneralMachineStates();
         DrainPendingLadderAnimationStates();
@@ -1452,6 +1469,83 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         {
             moveDistance = tower.MovementComponent._pathTracker.TotalDistanceTraveled;
             hasArrived = tower.HasArrivedAtTarget;
+        }
+    }
+
+    private void Handle_NetworkMachineReset(MessagePayload<NetworkSiegeMachineReset> payload)
+    {
+        var obj = payload.What;
+        GameThread.RunSafe(() =>
+        {
+            if (Mission.Current == null) return;
+            if (DropStaleHostEpoch(obj.HostEpoch, nameof(NetworkSiegeMachineReset))) return;
+
+            // First, so a mission change clears the buffers before this reset is kept, not after.
+            RefreshMachineCache();
+            // Decide on the same key as a state message (ClassifySnapshotAuthority): once the machine's authority for
+            // this epoch is recorded, the states after this reset apply at once, so the reset must apply at once too.
+            bool fromHost = IsResetFromHost(obj, out bool authorityRecorded);
+
+            // A promoted host's reset can arrive before its host assignment (server broadcasts race the mesh):
+            // keep it until that epoch is ours. A late reset from an older host is already dropped by the watermark above.
+            bool ahead = !fromHost && !authorityRecorded && obj.HostEpoch > session.HostEpoch;
+            if (!fromHost && !ahead) return;
+
+            // A buffered state predates the reset (same ordered channel); the post-reset state follows it.
+            pendingByMachineId.Remove(obj.MachineId);
+            peerWeaponState.Remove(obj.MachineId);
+            if (ahead)
+            {
+                pendingResetsByMachineId[obj.MachineId] = obj;
+                return;
+            }
+
+            pendingResetsByMachineId.Remove(obj.MachineId);
+            ApplyResetToMachine(obj.MachineId);
+        });
+    }
+
+    // Runs before the buffered states drain, so a deferred reset still lands before the state that follows it.
+    private void DrainPendingResets()
+    {
+        if (pendingResetsByMachineId.Count == 0) return;
+
+        int localEpoch = session.HostEpoch;
+        foreach (var reset in new List<NetworkSiegeMachineReset>(pendingResetsByMachineId.Values))
+        {
+            bool fromHost = IsResetFromHost(reset, out bool authorityRecorded);
+            if (!fromHost && !authorityRecorded && reset.HostEpoch > localEpoch) continue;
+
+            pendingResetsByMachineId.Remove(reset.MachineId);
+            if (fromHost) ApplyResetToMachine(reset.MachineId);
+        }
+    }
+
+    // The same key a state message uses (ClassifySnapshotAuthority): the machine's recorded authority for the
+    // reset's epoch when there is one, else the session's current host.
+    private bool IsResetFromHost(NetworkSiegeMachineReset reset, out bool authorityRecorded)
+    {
+        authorityRecorded = authorityRevisions.ContainsKey(reset.MachineId)
+            && GetAuthorityEpoch(reset.MachineId) == reset.HostEpoch;
+        return authorityRecorded
+            ? GetAuthorityHostController(reset.MachineId) == (reset.SenderControllerId ?? string.Empty)
+            : reset.HostEpoch == session.HostEpoch && session.IsHostController(reset.SenderControllerId);
+    }
+
+    private void ApplyResetToMachine(int machineId)
+    {
+        RefreshMachineCache();
+        // An unregistered machine is still loading from the scene, so it is already intact.
+        if (!machinesById.TryGetValue(machineId, out var machine)) return;
+
+        SiegeMissionAuthorityGate.SuppressCapture = true;
+        try
+        {
+            ApplyReset(machine);
+        }
+        finally
+        {
+            SiegeMissionAuthorityGate.SuppressCapture = false;
         }
     }
 
@@ -1786,6 +1880,33 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
                 destruction.SetDestructionLevel(state.DestructionState, -1, 0f, TaleWorlds.Library.Vec3.Zero, TaleWorlds.Library.Vec3.Zero);
             }
         }
+    }
+
+    // [Peer, game thread] The native mission reset for one machine, as Mission.ResetMissionObjects runs it.
+    private static void ApplyReset(UsableMachine machine)
+    {
+        if (machine is CastleGate gate)
+        {
+            // The gate's reset runs its destructible's reset first (CastleGate.OnMissionReset).
+            gate.OnMissionReset();
+            // Vanilla AfterMissionStart does this too; the reset leaves the navmesh faces OnDestroyed enabled.
+            gate.SetAutoOpenState(gate.AutoOpen);
+            return;
+        }
+
+        machine.DestructionComponent?.OnMissionReset();
+        if (machine is SiegeTower tower)
+        {
+            // Mid-mission, the tower reset would show its target wall broken; walls are not this message's state.
+            bool? wallShown = tower._nonDestroyedWallEntity?.GetVisibilityExcludeParents();
+            bool? brokenWallShown = tower._destroyedWallEntity?.GetVisibilityExcludeParents();
+            tower.OnMissionReset();
+            if (wallShown is bool shown) tower._nonDestroyedWallEntity.SetVisibilityExcludeParents(shown);
+            if (brokenWallShown is bool brokenShown) tower._destroyedWallEntity.SetVisibilityExcludeParents(brokenShown);
+            return;
+        }
+
+        machine.OnMissionReset();
     }
 
     private static void ApplyLadderAnimation(SiegeLadder ladder, NetworkSiegeLadderAnimationState state)

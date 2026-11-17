@@ -243,6 +243,11 @@
       <Project>{E12F967C-1CC9-4E4D-8D8F-5029E0BA96EE}</Project>
       <Name>Missions</Name>
     </ProjectReference>
+    <!-- Session mission services (campaign-free sessions); always shipped. -->
+    <ProjectReference Include="..\Missions.Sessions\Missions.Sessions.csproj">
+      <Project>{5B6E1F0A-3C2D-4E8B-9A71-6D0C4F2E8B13}</Project>
+      <Name>Missions.Sessions</Name>
+    </ProjectReference>
     <!-- Naval battle services; registered by NavalAssemblyModule only while NavalDLC is active. Shipped only when CoopNavalDlc is true. -->
     <ProjectReference Include="..\Missions.Naval\Missions.Naval.csproj" Condition="'$(CoopNavalDlc)' == 'true'">
       <Project>{D0EA26DD-7462-4D93-9895-C5E243954F95}</Project>

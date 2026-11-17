@@ -19,6 +19,7 @@ using Coop.Core.Server.Connections;
 using Coop.Core.Server.Policies;
 using Coop.Core.Server.Services.Instances;
 using Coop.Core.Server.Services.Instances.Handlers;
+using Coop.Core.Server.Services.Instances.Sessions;
 using Coop.Core.Server.Services.Kingdoms;
 using Coop.Core.Server.Services.MobileParties;
 using Coop.Core.Server.Services.Save;
@@ -35,6 +36,7 @@ using GameInterface.Policies;
 using GameInterface.Services.Missions;
 using LiteNetLib;
 using Missions;
+using Missions.Sessions;
 using System;
 using System.Runtime.CompilerServices;
 
@@ -69,6 +71,7 @@ public class ServerModule : CommonModule
         // here. The client-only pieces (mesh client, location/battle controllers) stay lazy: nothing on the
         // server resolves IBattleNetwork, so no P2P socket is opened. See MissionModule for what activates.
         builder.RegisterModule<MissionModule>();
+        builder.RegisterModule<SessionMissionModule>();
 
         builder.RegisterType<ServerContext>().AsSelf().InstancePerLifetimeScope();
         builder.RegisterType<ServerLogic>().As<IServerLogic>().As<ILogic>().InstancePerLifetimeScope();
@@ -97,6 +100,12 @@ public class ServerModule : CommonModule
         builder.RegisterType<ConnectionMessageQueue>().As<IConnectionMessageQueue>().InstancePerLifetimeScope().AutoActivate();
         builder.RegisterType<SteamBanList>().As<ISteamBanList>().InstancePerDependency();
 
+        builder.RegisterType<SessionHostRegistry>()
+            .As<ISessionHostRegistry>()
+            .SingleInstance();
+        builder.RegisterType<SessionDefinitionStore>()
+            .As<ISessionDefinitionStore>()
+            .SingleInstance();
         builder.RegisterType<MissionManager>()
             .As<IMissionManager>()
             .As<IMissionMembershipRegistry>()

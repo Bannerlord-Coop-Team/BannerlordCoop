@@ -669,6 +669,121 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
     }
 
     [Fact]
+    public void MachineReset_FromTheHost_DiscardsTheBufferedState()
+    {
+        broker.Publish(this, MachineState(machineId: 30, hostEpoch: LocalEpoch));
+        DrainGameThread();
+        Assert.True(PendingStates().ContainsKey(30));
+
+        broker.Publish(this, new NetworkSiegeMachineReset(30, LocalEpoch, "host"));
+        DrainGameThread();
+
+        Assert.False(PendingStates().ContainsKey(30));
+    }
+
+    [Fact]
+    public void MachineReset_WithAStaleEpoch_IsDropped()
+    {
+        broker.Publish(this, MachineState(machineId: 31, hostEpoch: LocalEpoch));
+        DrainGameThread();
+
+        broker.Publish(this, new NetworkSiegeMachineReset(31, LocalEpoch - 1, "host"));
+        DrainGameThread();
+
+        Assert.True(PendingStates().ContainsKey(31));
+    }
+
+    [Fact]
+    public void MachineReset_FromANonHost_IsDropped()
+    {
+        broker.Publish(this, MachineState(machineId: 32, hostEpoch: LocalEpoch));
+        DrainGameThread();
+
+        broker.Publish(this, new NetworkSiegeMachineReset(32, LocalEpoch, "peer"));
+        DrainGameThread();
+
+        Assert.True(PendingStates().ContainsKey(32));
+    }
+
+    [Fact]
+    public void MachineReset_AheadOfTheHostAssignment_WaitsForItsEpoch_AndKeepsTheLaterState()
+    {
+        broker.Publish(this, new NetworkSiegeMachineReset(33, LocalEpoch + 1, "promoted-host"));
+        DrainGameThread();
+        broker.Publish(this, MachineState(33, LocalEpoch + 1, senderControllerId: "promoted-host", authorityRevision: 0));
+        DrainGameThread();
+
+        Assert.True(PendingResets().ContainsKey(33));
+
+        session.SetupGet(s => s.HostEpoch).Returns(LocalEpoch + 1);
+        session.Setup(s => s.IsHostController(It.IsAny<string>()))
+            .Returns((string controllerId) => controllerId == "promoted-host");
+        InvokePrivate("DrainPendingMachineStates");
+
+        Assert.Empty(PendingResets());
+        Assert.Equal("promoted-host", PendingStates()[33].SenderControllerId);
+    }
+
+    // A promoted host sends its authority before its reset. States after the reset apply against that recorded
+    // authority at once, so the reset must apply at once too, or it lands later and overwrites them.
+    [Fact]
+    public void MachineReset_FromTheRecordedAuthorityHost_AppliesBeforeTheHostAssignment()
+    {
+        broker.Publish(this, new NetworkSiegeMachineAuthority(33, "promoted-host", hostEpoch: LocalEpoch + 1,
+            authorityRevision: 1, senderControllerId: "promoted-host"));
+        DrainGameThread();
+        broker.Publish(this, new NetworkSiegeMachineReset(33, LocalEpoch + 1, "promoted-host"));
+        DrainGameThread();
+
+        Assert.Empty(PendingResets());
+    }
+
+    [Fact]
+    public void MachineReset_FromAPeerThatIsNotTheRecordedAuthorityHost_IsDropped()
+    {
+        broker.Publish(this, new NetworkSiegeMachineAuthority(33, "promoted-host", hostEpoch: LocalEpoch + 1,
+            authorityRevision: 1, senderControllerId: "promoted-host"));
+        DrainGameThread();
+        broker.Publish(this, new NetworkSiegeMachineReset(33, LocalEpoch + 1, "other-peer"));
+        DrainGameThread();
+
+        Assert.Empty(PendingResets());
+    }
+
+    [Fact]
+    public void BufferedMachineReset_AppliesWhenItsHostsAuthorityArrives()
+    {
+        broker.Publish(this, new NetworkSiegeMachineReset(33, LocalEpoch + 1, "promoted-host"));
+        DrainGameThread();
+        Assert.True(PendingResets().ContainsKey(33));
+
+        broker.Publish(this, new NetworkSiegeMachineAuthority(33, "promoted-host", hostEpoch: LocalEpoch + 1,
+            authorityRevision: 1, senderControllerId: "promoted-host"));
+        DrainGameThread();
+
+        Assert.Empty(PendingResets());
+    }
+
+    // Two migrations in a row: messages from different hosts are not ordered against each other. The accepted-epoch
+    // watermark (HostEpochPolicy) drops the older reset.
+    [Fact]
+    public void MachineReset_FromAnOlderHost_DoesNotReplaceTheNewerBufferedResetOrItsState()
+    {
+        broker.Publish(this, new NetworkSiegeMachineReset(33, LocalEpoch + 2, "newest-host"));
+        DrainGameThread();
+        broker.Publish(this, MachineState(33, LocalEpoch + 2, senderControllerId: "newest-host", authorityRevision: 0));
+        DrainGameThread();
+        broker.Publish(this, new NetworkSiegeMachineReset(33, LocalEpoch + 1, "older-host"));
+        DrainGameThread();
+
+        Assert.Equal(LocalEpoch + 2, PendingResets()[33].HostEpoch);
+        Assert.Equal("newest-host", PendingStates()[33].SenderControllerId);
+    }
+
+    private Dictionary<int, NetworkSiegeMachineReset> PendingResets()
+        => GetField<Dictionary<int, NetworkSiegeMachineReset>>(sut, "pendingResetsByMachineId");
+
+    [Fact]
     [Trait("Requirement", "BR-102")]
     public void UnstampedAndAheadMachineStates_AreAccepted()
     {
@@ -997,6 +1112,54 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
         Assert.NotNull(method);
         method!.Invoke(sut, Array.Empty<object>());
     }
+
+    [Theory]
+    [InlineData(0f, 2, 450f, 0, true)]
+    [InlineData(0f, 0, 450f, 0, true)]
+    [InlineData(450f, 1, 450f, 0, true)]
+    [InlineData(200f, 2, 450f, 0, true)]
+    [InlineData(450f, 1, 300f, 0, true)] // a reset, then a hit before the next poll
+    [InlineData(300f, 3, 300f, 2, false)]
+    [InlineData(450f, 0, 200f, 1, false)]
+    [InlineData(200f, 1, 0f, 2, false)]
+    [InlineData(200f, 1, 450f, 1, false)]
+    public void HostStateChange_SendsResetOnlyForARepair(
+        float fromHp, int fromState, float toHp, int toState, bool expectReset)
+    {
+        const int machineId = 21;
+        session.SetupGet(s => s.IsLocalHost).Returns(true);
+
+        InvokeBroadcastMachineStateIfChanged(MachineState(machineId, fromHp, fromState));
+        sentToAll.Clear();
+        InvokeBroadcastMachineStateIfChanged(MachineState(machineId, toHp, toState));
+
+        if (!expectReset)
+        {
+            Assert.IsType<NetworkSiegeMachineState>(Assert.Single(sentToAll));
+            return;
+        }
+
+        Assert.Equal(2, sentToAll.Count);
+        var reset = Assert.IsType<NetworkSiegeMachineReset>(sentToAll[0]);
+        Assert.Equal(machineId, reset.MachineId);
+        Assert.Equal(LocalEpoch, reset.HostEpoch);
+        Assert.Equal("us", reset.SenderControllerId);
+        var state = Assert.IsType<NetworkSiegeMachineState>(sentToAll[1]);
+        Assert.Equal(toState, state.DestructionState);
+    }
+
+    private static NetworkSiegeMachineState MachineState(int machineId, float hitPoints, int destructionState) =>
+        new NetworkSiegeMachineState(
+            machineId,
+            hitPoints: hitPoints,
+            destructionState: destructionState,
+            gateState: -1,
+            ladderState: -1,
+            moveDistance: -1f,
+            hasArrived: false,
+            weaponState: -1,
+            aimDirection: -1000f,
+            aimReleaseAngle: -1000f);
 
     private void InvokeSetMachineAuthority(int machineId, string controllerId)
     {

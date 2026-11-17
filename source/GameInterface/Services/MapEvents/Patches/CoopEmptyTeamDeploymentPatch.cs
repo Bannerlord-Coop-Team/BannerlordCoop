@@ -7,6 +7,7 @@ using Newtonsoft.Json;
 using HarmonyLib;
 using System.Collections.Generic;
 using System.Reflection.Emit;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.MountAndBlade;
 
 namespace GameInterface.Services.MapEvents.Patches;
@@ -91,7 +92,8 @@ internal class CoopEmptyTeamDeploymentPatch
     [HarmonyPostfix]
     private static void IsPlanMade_Postfix(Team team, ref bool __result)
     {
-        if (!__result && !_inMakeTeamPlans
+        // A campaign-free session has no map event, so the mod's mission plans its own teams.
+        if (!__result && !_inMakeTeamPlans && Campaign.Current != null
             && BattleSpawnConfig.Enabled && BattleSpawnGate.IsCoopBattleActive
             && IsForeignTeam(team))
         {

@@ -409,6 +409,35 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
         Assert.Single(broker.GetMessagesFromType<PlayerConnectionStateChanged>());
     }
 
+    [Fact]
+    public void PlayerDisconnected_SessionPlayerWithoutAParty_ClearsThePeerWithoutLookingUpAParty()
+    {
+        var peer = (NetPeer)FormatterServices.GetUninitializedObject(typeof(NetPeer));
+        var player = new Player("SessionOne", null, null, null, null);
+        var playerManager = new Mock<IPlayerManager>();
+        playerManager
+            .Setup(manager => manager.TryGetPlayer(peer, out player))
+            .Returns(true);
+        var objectManager = new Mock<IObjectManager>();
+
+        var broker = new TestMessageBroker();
+        using var handler = new PlayerPartyVisibilityHandler(
+            broker,
+            playerManager.Object,
+            Mock.Of<IConnectionCollection>(),
+            objectManager.Object,
+            Mock.Of<INetwork>(),
+            Mock.Of<ISiegeEventInterface>());
+
+        broker.Publish(this, new PlayerDisconnected(peer, default));
+
+        playerManager.Verify(manager => manager.ClearPeer(peer), Times.Once);
+        Assert.Single(broker.GetMessagesFromType<PlayerConnectionStateChanged>());
+        // A real lookup of a null id logs an error.
+        MobileParty? looked = null;
+        objectManager.Verify(manager => manager.TryGetObjectWithLogging(It.IsAny<string>(), out looked), Times.Never);
+    }
+
     private static (Mock<IPlayerManager>, Mock<IConnectionCollection>, Mock<IObjectManager>)
         CreateReleaseMocks(
             Player player,

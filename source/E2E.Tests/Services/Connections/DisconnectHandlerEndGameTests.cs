@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Tests.Utils;
 using Common.Util;
+using Coop.Core.Client;
 using Coop.Core.Client.Messages;
 using Coop.Core.Client.Services.Connection.Handlers;
 using Coop.Core.Common;
@@ -152,7 +153,7 @@ public class DisconnectHandlerEndGameTests
                 DuringEndGame?.Invoke();
                 order.Enqueue("EndGame");
             }, Array.Empty<SaveGameFileInfo>, _ => { }, Mock.Of<INavalSaveCompatibility>(), Mock.Of<ILoadingInterface>());
-            handler = new DisconnectHandler(Broker, new CoopFinalizer(Broker, loadingScreen.Object), gameState);
+            handler = new DisconnectHandler(Broker, new CoopFinalizer(Broker, loadingScreen.Object), gameState, Mock.Of<IClientLogic>());
         }
 
         /// <summary>Delivers the disconnect on a worker inside the session, as the network poller does.</summary>

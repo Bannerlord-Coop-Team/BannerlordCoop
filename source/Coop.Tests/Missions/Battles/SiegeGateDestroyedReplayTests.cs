@@ -26,6 +26,10 @@ public class SiegeGateDestroyedReplayTests : IDisposable
     private static ScriptComponentBehavior replayAttacker;
     private static int replayDamage;
     private static int hitAnimations;
+    private static int gateResets;
+    private static int destructibleResets;
+    private static int destructionLevelCalls;
+    private static readonly System.Collections.Generic.List<bool> autoOpenStates = new();
 
     private readonly Harmony harmony = new("coop.tests.siege-gate-destroyed-replay");
 
@@ -36,8 +40,15 @@ public class SiegeGateDestroyedReplayTests : IDisposable
         replayAttacker = null;
         replayDamage = -1;
         hitAnimations = 0;
+        gateResets = 0;
+        destructibleResets = 0;
+        destructionLevelCalls = 0;
+        autoOpenStates.Clear();
+        Stub(AccessTools.Method(typeof(CastleGate), nameof(CastleGate.SetAutoOpenState)), nameof(RecordAutoOpenState));
         Stub(AccessTools.Method(typeof(ScriptComponentBehavior), "CacheEditableFieldsForAllScriptComponents"), nameof(Skip));
         Stub(AccessTools.Method(typeof(CastleGate), "OnDestroyed"), nameof(RecordDestroyedReplay));
+        Stub(AccessTools.Method(typeof(CastleGate), "OnMissionReset"), nameof(RecordGateReset));
+        Stub(AccessTools.Method(typeof(DestructableComponent), "OnMissionReset"), nameof(RecordDestructibleReset));
         Stub(AccessTools.Method(typeof(DestructableComponent), nameof(DestructableComponent.SetDestructionLevel)),
             nameof(RecordDestructionLevel));
         Stub(AccessTools.Method(typeof(SynchedMissionObject), nameof(SynchedMissionObject.SetAnimationAtChannelSynched),
@@ -67,6 +78,27 @@ public class SiegeGateDestroyedReplayTests : IDisposable
 
         ApplySnapshot(gate, 0f, DestroyedStateIndex);
         Assert.Equal(1, destroyedReplays);
+    }
+
+    [Fact]
+    public void PeerReset_DestroyedGate_RunsTheGateResetOnceAndAcceptsTheNextDestruction()
+    {
+        var gate = CreateGate(MaxHitPoints);
+        ApplySnapshot(gate, 0f, DestroyedStateIndex);
+        Assert.Equal(1, destroyedReplays);
+
+        var applyReset = AccessTools.Method(typeof(SiegeMachineStateReplicator), "ApplyReset");
+        Assert.NotNull(applyReset);
+        applyReset.Invoke(null, new object[] { gate });
+        ApplySnapshot(gate, MaxHitPoints, 0);
+        ApplySnapshot(gate, 0f, DestroyedStateIndex);
+
+        Assert.Equal(1, gateResets);
+        // The gate's reset leaves the navmesh faces its destruction enabled.
+        Assert.Equal(new[] { gate.AutoOpen }, autoOpenStates);
+        Assert.Equal(0, destructibleResets);
+        Assert.Equal(2, destroyedReplays);
+        Assert.Equal(2, destructionLevelCalls);
     }
 
     [Theory]
@@ -224,7 +256,29 @@ public class SiegeGateDestroyedReplayTests : IDisposable
 
     private static bool RecordDestructionLevel(DestructableComponent __instance, int state)
     {
+        destructionLevelCalls++;
         AccessTools.Field(typeof(DestructableComponent), "_currentStateIndex").SetValue(__instance, state);
+        return false;
+    }
+
+    // Stand-in for DestructableComponent.Reset: the native body needs scene entities.
+    private static bool RecordAutoOpenState(bool isEnabled)
+    {
+        autoOpenStates.Add(isEnabled);
+        return false;
+    }
+
+    private static bool RecordGateReset(CastleGate __instance)
+    {
+        gateResets++;
+        AccessTools.Field(typeof(DestructableComponent), "_hitPoint").SetValue(__instance.DestructionComponent, MaxHitPoints);
+        AccessTools.Field(typeof(DestructableComponent), "_currentStateIndex").SetValue(__instance.DestructionComponent, 0);
+        return false;
+    }
+
+    private static bool RecordDestructibleReset()
+    {
+        destructibleResets++;
         return false;
     }
 

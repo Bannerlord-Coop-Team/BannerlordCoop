@@ -106,7 +106,8 @@ internal class ClanFinanceHandler : IHandler
     {
         GameThread.RunSafe(() =>
         {
-            var players = playerManager.Players;
+            // A session player has no hero, so it has no clan finances.
+            var players = playerManager.Players.Where(player => player.HeroId != null).ToArray();
             var disconnectedHeroes = players.Where(player => !playerManager.IsConnected(player))
                 .Select(player => player.HeroId).ToArray();
 
