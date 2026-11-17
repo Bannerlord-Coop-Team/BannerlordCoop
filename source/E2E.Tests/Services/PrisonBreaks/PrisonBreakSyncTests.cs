@@ -214,7 +214,7 @@ public class PrisonBreakSyncTests : IDisposable
     {
         var fixture = CreateFixture();
 
-        // The server holds the full prisoner state the client mirrors live, which the harness doesn't fully relay.
+        // Runs on the server because the harness doesnt relay Hero.ChangeState or the prisoner's CurrentSettlement to clients.
         Server.Call(() =>
         {
             var (playerHero, settlement, prisoner) = Resolve(Server, fixture);
