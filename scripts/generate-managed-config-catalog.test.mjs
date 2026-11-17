@@ -15,6 +15,16 @@ test('generated catalog carries bounds, channel availability and list constraint
   assert.equal(byKey.get('preferredBattleHosts').uniqueItems, true);
   assert.equal(byKey.get('preferredBattleHosts').itemPattern, '^[0-9]{17}$');
   for (const option of catalog.options) assert.notEqual(option.default, undefined, `${option.key} has no default`);
+  assert.equal(catalog.schemaVersion, 2);
+  assert.match(catalog.sourceCommit, /^[0-9a-f]{40}$/u);
+  assert.match(catalog.contentDigest, /^[0-9a-f]{64}$/u);
+  for (const option of catalog.options) {
+    if (option.type === 'enum') assert.ok(option.values.includes(option.default), `${option.key} default is not an enum member`);
+    if (option.type === 'integer' || option.type === 'number') {
+      if (option.min !== undefined) assert.ok(option.default >= option.min, `${option.key} default is below min`);
+      if (option.max !== undefined) assert.ok(option.default <= option.max, `${option.key} default is above max`);
+    }
+  }
 });
 
 test('generator check rejects stale output', async () => {

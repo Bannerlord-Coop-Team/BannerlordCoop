@@ -1,8 +1,54 @@
-﻿using Newtonsoft.Json;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using System;
 using System.Collections.Generic;
 
 namespace GameInterface.Configuration;
+
+[AttributeUsage(AttributeTargets.Property, AllowMultiple = false)]
+public sealed class ManagedConfigOptionAttribute : Attribute
+{
+    public bool Stable { get; set; } = true;
+    public string AvailableSince { get; set; } = "0.1.7";
+    public double Min { get; set; } = double.NaN;
+    public double Max { get; set; } = double.NaN;
+    public int MaxItems { get; set; } = -1;
+    public string ItemPattern { get; set; }
+    public bool UniqueItems { get; set; }
+    public string ForbiddenRanges { get; set; }
+    public bool OmitForOldAgents { get; set; }
+}
+
+public static class ManagedConfigOptionValidation
+{
+    public static void Validate(ModOptionsData options)
+    {
+        foreach (var property in typeof(ModOptionsData).GetProperties())
+        {
+            var metadata = (ManagedConfigOptionAttribute)Attribute.GetCustomAttribute(property, typeof(ManagedConfigOptionAttribute));
+            var value = property.GetValue(options);
+            if (metadata == null || value == null) continue;
+            if (!double.IsNaN(metadata.Min) && Convert.ToDouble(value) < metadata.Min)
+                throw new ArgumentException($"{property.Name} is below its minimum");
+            if (!double.IsNaN(metadata.Max) && Convert.ToDouble(value) > metadata.Max)
+                throw new ArgumentException($"{property.Name} is above its maximum");
+            if (value is IList<string> list)
+            {
+                if (metadata.MaxItems >= 0 && list.Count > metadata.MaxItems)
+                    throw new ArgumentException($"{property.Name} has too many entries");
+                var ids = new HashSet<string>();
+                foreach (var item in list)
+                {
+                    if (metadata.ItemPattern != null && !System.Text.RegularExpressions.Regex.IsMatch(item, metadata.ItemPattern))
+                        throw new ArgumentException($"{property.Name} contains an invalid entry");
+                    if (metadata.UniqueItems && !ids.Add(item)) throw new ArgumentException($"{property.Name} contains a duplicate");
+                }
+            }
+            if (metadata.ForbiddenRanges == "1-9" && Convert.ToDouble(value) is >= 1 and <= 9)
+                throw new ArgumentException($"{property.Name} is in a forbidden range");
+        }
+    }
+}
 
 /// <summary>
 /// THE mod-config.json schema: one explicit property per key — the class IS the
@@ -68,75 +114,110 @@ public enum DifficultyLevel
 
 public sealed class ModOptionsData
 {
+    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7", OmitForOldAgents = true)]
     public bool? VoiceEnabled { get; set; }
 
+    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7", Min = 200, Max = 12000, OmitForOldAgents = true)]
     public int? BattleSize { get; set; }
 
+    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7")]
     public bool? FastForwardEnabled { get; set; }
 
+    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7")]
     public bool? AutoPauseEnabled { get; set; }
 
+    [ManagedConfigOption(Stable = false, AvailableSince = "0.1.8", OmitForOldAgents = true)]
     public bool? AllowClientTimeControls { get; set; }
 
+    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7")]
     public bool? ClientsCanUseCheats { get; set; }
 
+    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7")]
     public bool? GoldFoodInfluenceChangeInSettlements { get; set; }
 
+    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7")]
     public GoldFoodChangeMode? GoldFoodInfluenceChangeInBattles { get; set; }
 
+    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7")]
     public bool? GoldFoodInfluenceChangeForDisconnectedPlayers { get; set; }
 
+    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7", OmitForOldAgents = true)]
     public bool? BlockAiWarDeclarationsOnOfflinePlayers { get; set; }
 
+    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7", Min = 0, Max = 8760)]
     public int? PlayerBattleAiJoinWindowHours { get; set; }
 
+    [ManagedConfigOption(Stable = false, AvailableSince = "0.1.8", Min = 0, Max = 86400, OmitForOldAgents = true)]
     public int? PostBattleAiAmnestySeconds { get; set; }
 
+    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7")]
     public bool? SpeedLimitWhilePlayersInBattle { get; set; }
 
+    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7", OmitForOldAgents = true)]
     public bool? EnsureUnaffiliatedWanderers { get; set; }
 
+    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7", Min = 0, Max = 1000)]
     public int? WandererLimit { get; set; }
 
+    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7", Min = 0, Max = 100, OmitForOldAgents = true)]
     public int? SpawnRateWanderers { get; set; }
 
+    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7")]
     public bool? WandererLimitScalesWithPlayers { get; set; }
 
+    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7", Min = 0, Max = 6)]
     public int? PlayerKingdomClanTierRequired { get; set; }
 
+    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7", OmitForOldAgents = true)]
     public bool? CoopClansEnabled { get; set; }
 
+    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7")]
     public bool? SmithingStaminaRecoveryOutsideSettlements { get; set; }
 
+    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7", Min = 0, Max = 100)]
     public float? SmithingStaminaRecoveryMultiplier { get; set; }
 
+    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7", Min = 0, Max = 100)]
     public float? MaximumLootersMultiplier { get; set; }
 
+    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7", Min = 0, Max = 100)]
     public float? LooterPartySizeMultiplier { get; set; }
 
+    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7")]
     public LordDefectionRetryMode? LordDefectionRetries { get; set; }
   
+    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7")]
     public bool? EnableHeroExecutions { get; set; }
 
+    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7")]
     public bool? EnablePlayerClanMemberExecutions { get; set; }
 
+    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7", OmitForOldAgents = true)]
     public bool? EnablePlayerExecutions { get; set; }
     
+    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7", OmitForOldAgents = true)]
     public bool? PlayerWoundedBattleEntry { get; set; }
 
+    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7", OmitForOldAgents = true)]
     public bool? ShowPlayerNameplates { get; set; }
 
+    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7", Min = 1, Max = 86400, OmitForOldAgents = true)]
     public int? KingdomDecisionVoteTimeoutSeconds { get; set; }
 
+    [ManagedConfigOption(Stable = false, AvailableSince = "0.1.8", OmitForOldAgents = true)]
     public ClansAfterKingdomDestructionMode? ClansAfterKingdomDestruction { get; set; }
 
+    [ManagedConfigOption(Stable = false, AvailableSince = "0.1.8", MaxItems = 32, ItemPattern = "^[0-9]{17}$", UniqueItems = true, OmitForOldAgents = true)]
     public List<string> PreferredBattleHosts { get; set; }
 
+    [ManagedConfigOption(Stable = false, AvailableSince = "0.1.8", OmitForOldAgents = true)]
     public bool? PvpBlockLeave { get; set; }
 
+    [ManagedConfigOption(Stable = false, AvailableSince = "0.1.8", Min = 0, Max = 86400, ForbiddenRanges = "1-9", OmitForOldAgents = true)]
     public int? PvpResponseTimerSeconds { get; set; }
 
     /// <summary>Whether a dedicated server runs War Sails (NavalDLC) co-op. It parses the file itself; declared so the key isn't reported as unknown.</summary>
+    [ManagedConfigOption(Stable = false, AvailableSince = "0.1.8", OmitForOldAgents = true)]
     public bool? WarSails { get; set; }
 
     [JsonExtensionData]

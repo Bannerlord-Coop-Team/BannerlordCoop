@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 import { createHash } from 'node:crypto';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -9,25 +11,7 @@ const sourcePath = path.join(root, 'source', 'GameInterface', 'Configuration', '
 const defaultsPath = path.join(root, 'deploy', 'mod-config.default.json');
 const outputPath = path.join(root, 'deploy', 'managed-config-catalog.json');
 const check = process.argv.includes('--check');
-
-const OPTION_METADATA = Object.freeze({
-  voiceEnabled: { stable: true }, battleSize: { stable: true, min: 200, max: 12_000 }, fastForwardEnabled: { stable: true },
-  autoPauseEnabled: { stable: true }, allowClientTimeControls: { stable: false }, clientsCanUseCheats: { stable: true },
-  goldFoodInfluenceChangeInSettlements: { stable: true }, goldFoodInfluenceChangeInBattles: { stable: true },
-  goldFoodInfluenceChangeForDisconnectedPlayers: { stable: true }, blockAiWarDeclarationsOnOfflinePlayers: { stable: true },
-  playerBattleAiJoinWindowHours: { stable: true, min: 0, max: 8_760 }, postBattleAiAmnestySeconds: { stable: false, min: 0, max: 86_400 },
-  speedLimitWhilePlayersInBattle: { stable: true }, ensureUnaffiliatedWanderers: { stable: true }, wandererLimit: { stable: true, min: 0, max: 1_000 },
-  spawnRateWanderers: { stable: true, min: 0, max: 100 }, wandererLimitScalesWithPlayers: { stable: true },
-  playerKingdomClanTierRequired: { stable: true, min: 0, max: 6 }, coopClansEnabled: { stable: true },
-  smithingStaminaRecoveryOutsideSettlements: { stable: true }, smithingStaminaRecoveryMultiplier: { stable: true, min: 0, max: 100 },
-  maximumLootersMultiplier: { stable: true, min: 0, max: 100 }, looterPartySizeMultiplier: { stable: true, min: 0, max: 100 },
-  lordDefectionRetries: { stable: true }, enableHeroExecutions: { stable: true }, enablePlayerClanMemberExecutions: { stable: true },
-  enablePlayerExecutions: { stable: true }, playerWoundedBattleEntry: { stable: true }, showPlayerNameplates: { stable: true },
-  kingdomDecisionVoteTimeoutSeconds: { stable: true, min: 1, max: 86_400 }, clansAfterKingdomDestruction: { stable: false },
-  preferredBattleHosts: { stable: false, maxItems: 32, itemPattern: '^[0-9]{17}$', uniqueItems: true },
-  pvpBlockLeave: { stable: false }, pvpResponseTimerSeconds: { stable: false, min: 0, max: 86_400, forbiddenRanges: [[1, 9]] },
-  warSails: { stable: false },
-});
+const execFileAsync = promisify(execFile);
 
 const source = await readFile(sourcePath, 'utf8');
 const defaultsText = await readFile(defaultsPath, 'utf8');
@@ -35,29 +19,80 @@ const defaults = JSON.parse(defaultsText.replace(/^\uFEFF/u, '').replaceAll(/\/\
 const block = source.match(/public sealed class ModOptionsData\s*\{(?<body>[\s\S]*?)\n\}/u)?.groups?.body;
 if (block === undefined) throw new Error('ModOptionsData was not found');
 
+const enumValues = new Map();
+for (const match of source.matchAll(/public\s+enum\s+(?<name>[A-Za-z0-9_]+)\s*\{(?<body>[\s\S]*?)\n\}/gu)) {
+  const body = match.groups.body.replaceAll(/\/\/[^\n]*|\/\*[\s\S]*?\*\//gu, '');
+  enumValues.set(match.groups.name, [...new Set([...body.matchAll(/^\s*(?<value>[A-Z][A-Za-z0-9_]*)\s*,?/gmu)].map((entry) => entry.groups.value))]);
+}
+
+function parseAttribute(text, key) {
+  const attribute = text.match(/\[ManagedConfigOption\((?<args>[^\n]*)\)\]/u)?.groups?.args;
+  if (attribute === undefined) throw new Error(`${key} is missing ManagedConfigOption metadata`);
+  const result = {};
+  for (const pair of attribute.split(',').map((item) => item.trim()).filter(Boolean)) {
+    const match = pair.match(/^(?<name>[A-Za-z][A-Za-z0-9_]*)\s*=\s*(?<value>.+)$/u);
+    if (match === null) throw new Error(`Invalid ManagedConfigOption argument for ${key}: ${pair}`);
+    const name = ({ Stable: 'stable', AvailableSince: 'availableSince', Min: 'min', Max: 'max', MaxItems: 'maxItems', ItemPattern: 'itemPattern', UniqueItems: 'uniqueItems', ForbiddenRanges: 'forbiddenRanges', OmitForOldAgents: 'omitForOldAgents' })[match.groups.name];
+    if (name === undefined) throw new Error(`Unknown ManagedConfigOption field for ${key}: ${match.groups.name}`);
+    const raw = match.groups.value.trim();
+    if (/^".*"$/u.test(raw)) result[name] = raw.slice(1, -1);
+    else if (raw === 'true' || raw === 'false') result[name] = raw === 'true';
+    else if (/^-?\d+(?:\.\d+)?$/u.test(raw)) result[name] = Number(raw);
+    else throw new Error(`Unsupported ManagedConfigOption value for ${key}: ${raw}`);
+    if (name === 'forbiddenRanges') {
+      const [from, to] = String(result[name]).split('-').map(Number);
+      if (!Number.isSafeInteger(from) || !Number.isSafeInteger(to)) throw new Error(`Invalid forbidden range for ${key}`);
+      result[name] = [[from, to]];
+    }
+  }
+  return result;
+}
+
+function validateDefault(option) {
+  const value = option.default;
+  if (option.type === 'boolean' && typeof value !== 'boolean') throw new Error(`Default for ${option.key} is not boolean`);
+  if (option.type === 'integer' && (!Number.isSafeInteger(value))) throw new Error(`Default for ${option.key} is not an integer`);
+  if (option.type === 'number' && (typeof value !== 'number' || !Number.isFinite(value))) throw new Error(`Default for ${option.key} is not numeric`);
+  if (option.type === 'enum' && (!option.values?.includes(value))) throw new Error(`Default for ${option.key} is not an enum member`);
+  if (option.type === 'steamIdList' && (!Array.isArray(value) || value.some((item) => typeof item !== 'string'))) throw new Error(`Default for ${option.key} is not a string list`);
+  if (option.min !== undefined && value < option.min) throw new Error(`Default for ${option.key} is below its minimum`);
+  if (option.max !== undefined && value > option.max) throw new Error(`Default for ${option.key} is above its maximum`);
+  if (option.maxItems !== undefined && value.length > option.maxItems) throw new Error(`Default for ${option.key} exceeds maxItems`);
+  if (option.uniqueItems === true && new Set(value).size !== value.length) throw new Error(`Default for ${option.key} is not unique`);
+  if (option.itemPattern !== undefined && value.some((item) => !new RegExp(option.itemPattern, 'u').test(item))) throw new Error(`Default for ${option.key} violates itemPattern`);
+}
+
 const options = [];
-for (const match of block.matchAll(/^\s*public\s+(?<type>bool|int|float|double|List<string>)\??\s+(?<name>[A-Z][A-Za-z0-9]*)\s*\{\s*get;\s*set;\s*\}/gmu)) {
+for (const match of block.matchAll(/(?<attributes>(?:^\s*\[ManagedConfigOption\([^\n]+\)\]\s*\r?\n)*)^\s*public\s+(?<type>bool|int|float|double|List\s*<\s*string\s*>)\??\s+(?<name>[A-Z][A-Za-z0-9]*)\s*\{\s*get;\s*set;\s*\}/gmu)) {
   const key = match.groups.name[0].toLowerCase() + match.groups.name.slice(1);
-  const type = match.groups.type === 'List<string>' ? 'steamIdList'
+  const type = match.groups.type.replaceAll(/\s/gu, '') === 'List<string>' ? 'steamIdList'
     : match.groups.type === 'bool' ? 'boolean'
       : match.groups.type === 'int' ? 'integer' : 'number';
   const value = defaults.modOptions?.[key];
   if (value === undefined) throw new Error(`Default is missing for ${key}`);
-  options.push({ key, type, ...OPTION_METADATA[key], default: value });
+  const metadata = parseAttribute(match.groups.attributes, key);
+  options.push({ key, type, ...metadata, default: value });
 }
-for (const match of block.matchAll(/^\s*public\s+(?<type>[A-Z][A-Za-z0-9_]*)\??\s+(?<name>[A-Z][A-Za-z0-9]*)\s*\{\s*get;\s*set;\s*\}/gmu)) {
+for (const match of block.matchAll(/(?<attributes>(?:^\s*\[ManagedConfigOption\([^\n]+\)\]\s*\r?\n)*)^\s*public\s+(?<type>[A-Z][A-Za-z0-9_]*)\??\s+(?<name>[A-Z][A-Za-z0-9]*)\s*\{\s*get;\s*set;\s*\}/gmu)) {
   if (options.some((option) => option.key === match.groups.name[0].toLowerCase() + match.groups.name.slice(1))) continue;
   const key = match.groups.name[0].toLowerCase() + match.groups.name.slice(1);
   const value = defaults.modOptions?.[key];
   if (value === undefined) throw new Error(`Default is missing for ${key}`);
-  options.push({ key, type: 'enum', values: key === 'goldFoodInfluenceChangeInBattles' ? ['Disabled', 'OneDayMax', 'Enabled'] : key === 'lordDefectionRetries' ? ['Vanilla', 'NeverExpire', 'AlwaysRetry'] : key === 'clansAfterKingdomDestruction' ? ['Vanilla', 'KeepClans'] : undefined, ...OPTION_METADATA[key], default: value });
+  const metadata = parseAttribute(match.groups.attributes, key);
+  const values = enumValues.get(match.groups.type);
+  if (values === undefined) throw new Error(`Enum declaration is missing for ${match.groups.type}`);
+  options.push({ key, type: 'enum', values, ...metadata, default: value });
 }
-if (options.some((option) => option.values === undefined && option.type === 'enum')) throw new Error(`An enum option needs an explicit value catalog: ${options.filter((option) => option.values === undefined && option.type === 'enum').map((option) => option.key).join(', ')}`);
-const normalized = options.map(({ key, type, values, default: value, ...metadata }) => ({
-  key, type, ...metadata, ...(values === undefined ? {} : { values }), default: value,
-}));
+for (const option of options) validateDefault(option);
+if (options.length === 0) throw new Error('No managed options were found');
+const normalized = options.map(({ key, type, values, default: value, ...metadata }) => ({ key, type, ...metadata, ...(values === undefined ? {} : { values }), default: value }));
 const digest = createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
-const catalog = { schemaVersion: 1, catalogRevision: digest, source: 'BannerlordCoop/source/GameInterface/Configuration/ModConfigData.cs', options: normalized };
+let sourceCommit = 'unknown';
+try {
+  ({ stdout: sourceCommit } = await execFileAsync('git', ['log', '-1', '--format=%H', '--', 'source/GameInterface/Configuration/ModConfigData.cs'], { cwd: root }));
+  sourceCommit = sourceCommit.trim();
+} catch { /* source checkout may be an archive */ }
+const catalog = { schemaVersion: 2, catalogRevision: digest, contentDigest: digest, sourceCommit, source: 'BannerlordCoop/source/GameInterface/Configuration/ModConfigData.cs', options: normalized };
 const output = `${JSON.stringify(catalog, null, 2)}\n`;
 if (check) {
   const current = await readFile(outputPath, 'utf8').catch(() => '');
