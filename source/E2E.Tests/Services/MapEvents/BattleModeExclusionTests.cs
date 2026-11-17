@@ -9,6 +9,7 @@ using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages.Start;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.MapEvents;
@@ -29,9 +30,11 @@ public class BattleModeExclusionTests : MapEventTestBase
     public BattleModeExclusionTests(ITestOutputHelper output) : base(output) { }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void SimulationStart_OnlyAnAcceptedParticipantReleasesBattleInvulnerability(bool missionClaimed)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public void SimulationStart_OnlyAnAcceptedParticipantReleasesBattleInvulnerability(bool missionClaimed, bool noHealthyTroops)
     {
         var battle = CreateServerMapEvent();
         var client = Clients.First();
@@ -42,6 +45,11 @@ public class BattleModeExclusionTests : MapEventTestBase
         {
             Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
             mapEvent.IsInvulnerable = true;
+            if (noHealthyTroops)
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(battle.DefenderPartyId, out var requestingParty));
+                requestingParty.MemberRoster.Clear();
+            }
             if (missionClaimed) Assert.True(ServerBattleModeArbiter.TryClaimMission(battle.MapEventId));
         });
         try
@@ -58,7 +66,7 @@ public class BattleModeExclusionTests : MapEventTestBase
                 instance.Call(() =>
                 {
                     Assert.True(instance.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
-                    Assert.Equal(missionClaimed, mapEvent.IsInvulnerable);
+                    Assert.Equal(missionClaimed || noHealthyTroops, mapEvent.IsInvulnerable);
                 });
             }
         }

@@ -190,8 +190,9 @@ internal class BattleSimulationRunHandler : IHandler
 
             MapEventHostileActionConsequences.Apply(mapEvent, attackerParty.Party, "battle simulation attack");
 
-            // Quests like Caravan Ambush set invulnerability; the client encounter menu cannot clear the server's copy.
-            mapEvent.IsInvulnerable = false;
+            // Match vanilla MenuHelper.EncounterOrderAttackCondition: only a valid player attack clears protection.
+            if (CanPlayerAttack(mapEvent, attackerParty))
+                mapEvent.IsInvulnerable = false;
 
             // v1: simulate the full participating troop count (null), not the player's selected subset.
             var previousObserver = mapEvent.BattleObserver;
@@ -274,6 +275,14 @@ internal class BattleSimulationRunHandler : IHandler
                 LeaveOrFinalizeCancelledSimulation(requestingPeer, simulation.MapEvent);
             mapEventLogger.DebugMapEvent(simulation.MapEvent, "Battle simulation cancelled by initiating client");
         }, context: nameof(Handle_NetworkCancelBattleSimulation));
+    }
+
+    private static bool CanPlayerAttack(MapEvent mapEvent, MobileParty attackerParty)
+    {
+        var eventParty = mapEvent.FindMapEventParty(attackerParty.Party, out var side);
+        return eventParty != null && mapEvent.HasTroopsOnBothSides() &&
+            mapEvent.GetLeaderParty(side.MissionSide.GetOppositeSide()) != null &&
+            attackerParty.Party.NumberOfHealthyMembers > 0;
     }
 
     private bool TryGetRequestingParticipant(
