@@ -1075,14 +1075,6 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
         siegeEvent.BesiegerCamp._leaderParty = siegeLeader;
     }
 
-    // The harness campaign has no game models, and the arrival distance check reads the encounter model.
-    private static void EnsureEncounterModel()
-    {
-        if (Campaign.Current.Models?.EncounterModel != null) return;
-
-        Campaign.Current._gameModels = new GameModels(new List<GameModel> { new DefaultEncounterModel() });
-    }
-
     // Puts the party at the settlement's gate or port, engaging it the way the map AI leaves it on arrival.
     private static void EngageSettlement(MobileParty party, Settlement settlement, bool atSea)
     {

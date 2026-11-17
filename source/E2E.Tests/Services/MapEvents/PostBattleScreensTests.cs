@@ -355,14 +355,4 @@ public class PostBattleScreensTests : MapEventTestBase, IDisposable
         });
         return canEngage;
     }
-
-    // The harness campaign has no encounter model, and the interaction distance check reads it.
-    private static void EnsureEncounterModel()
-    {
-        if (Campaign.Current.Models.EncounterModel != null) return;
-
-        var models = Campaign.Current.Models.GetGameModels().ToList();
-        models.Add(new DefaultEncounterModel());
-        Campaign.Current._gameModels = new GameModels(models);
-    }
 }
