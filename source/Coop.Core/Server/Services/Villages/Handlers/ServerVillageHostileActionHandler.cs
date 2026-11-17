@@ -134,6 +134,7 @@ internal class ServerVillageHostileActionHandler : IHandler
             {
                 // The requester is noted first: the outcome announces the transfer pool for that peer.
                 NoteForceTransferRequester(peer, request);
+                // Sent before the outcome, so the client is back in the village menu before the transfer is authorized
                 network.Send(peer, new NetworkVillageHostileActionStarted(
                     request.Action, request.MobilePartyId, request.SettlementId, unresisted: true));
                 villageHostileActionInterface.ApplyUnresistedForceAction(mobileParty, settlement, request.Action);

@@ -91,11 +91,10 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
                     removedEntries,
                     mapEvent.StringId);
             }
-
-            return CollectPlayerMapEventParties(mapEvent);
-        }, out var parties);
+        });
         // A failed repair skips the finalize and release, which would act on broken links
         if (!repaired) return;
+        if (!TryStage(mapEvent, "party collection", () => CollectPlayerMapEventParties(mapEvent), out var parties)) return;
 
         TryStage(mapEvent, "finalize", () =>
         {
