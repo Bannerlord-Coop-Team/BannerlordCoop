@@ -60,8 +60,7 @@ internal class PlayerBlockadeHandler : IHandler
             // Players cant fight castle blockade battles yet because coop only syncs town blockades (#4605), so lift it instead of asking
             if (mapEvent.MapEventSettlement?.IsCastle == true)
             {
-                if (TryLiftBlockade(mapEvent))
-                    Logger.Information("Lifted the player blockade at castle {SettlementId} instead of asking them to defend it", mapEvent.MapEventSettlement.StringId);
+                LiftBlockade(mapEvent);
                 return;
             }
 
@@ -106,19 +105,19 @@ internal class PlayerBlockadeHandler : IHandler
         {
             if (!objectManager.TryGetObject<MapEvent>(data.MapEventId, out var mapEvent)) return;
 
-            TryLiftBlockade(mapEvent);
+            LiftBlockade(mapEvent);
         }, context: nameof(NetworkRequestLiftPlayerBlockade));
     }
 
-    // Same as EncounterGameMenuBehavior.lift_players_blockade, returns false when the battle already ended
-    private static bool TryLiftBlockade(MapEvent mapEvent)
+    // Same as EncounterGameMenuBehavior.lift_players_blockade
+    private static void LiftBlockade(MapEvent mapEvent)
     {
         var siegeEvent = mapEvent.DefenderSide.LeaderParty.SiegeEvent;
         bool isLiveBlockadeBattle = (mapEvent.IsBlockade || mapEvent.IsBlockadeSallyOut) && !mapEvent.IsFinalized && siegeEvent != null;
         if (!isLiveBlockadeBattle)
         {
-            Logger.Warning("Ignoring the blockade lift at {SettlementId} because it is not a live battle against a blockade", mapEvent.MapEventSettlement?.StringId);
-            return false;
+            Logger.Warning("Ignoring the blockade lift for {MapEvent} because it is not a live battle against a blockade", mapEvent);
+            return;
         }
 
         var settlement = siegeEvent.BesiegedSettlement;
@@ -135,6 +134,6 @@ internal class PlayerBlockadeHandler : IHandler
             party.SetMoveGoToSettlement(settlement, MobileParty.NavigationType.Naval, isTargetingThePort: true);
         }
 
-        return true;
+        Logger.Information("Lifted the player blockade at {SettlementId}", settlement.StringId);
     }
 }
