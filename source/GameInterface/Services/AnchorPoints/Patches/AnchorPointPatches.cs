@@ -19,6 +19,12 @@ namespace GameInterface.Services.AnchorPoints.Patches;
 [HarmonyPatchCategory(GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class AnchorPointPatches
 {
+    // The arrival time each anchor's player was last told about, so the arrival message shows once per trip
+    private static readonly ConditionalWeakTable<AnchorPoint, StrongBox<CampaignTime>> ArrivalsShown = new ConditionalWeakTable<AnchorPoint, StrongBox<CampaignTime>>();
+
+    private static bool IsArrivalShown(AnchorPoint anchorPoint) =>
+        ArrivalsShown.TryGetValue(anchorPoint, out var shown) && shown.Value == anchorPoint.ArrivalTime;
+
     // v1.5 has no SetPosition or ResetMoveTarget: the Position and Settlement setters and ResetPosition move the anchor
     [HarmonyPatch(nameof(AnchorPoint.Position), MethodType.Setter)]
     [HarmonyPrefix]
@@ -70,10 +76,11 @@ internal class AnchorPointPatches
     {
         if (ModInformation.IsServer) return true;
 
-        if (__instance.ArrivalTime != CampaignTime.Zero && __instance.ArrivalTime.IsPast && !IsArrivalShown(__instance))
+        bool fleetJustArrived = __instance.ArrivalTime != CampaignTime.Zero && __instance.ArrivalTime.IsPast &&
+            !IsArrivalShown(__instance);
+        if (fleetJustArrived)
         {
-            ArrivalsShown.Remove(__instance);
-            ArrivalsShown.Add(__instance, new StrongBox<CampaignTime>(__instance.ArrivalTime));
+            ArrivalsShown.GetOrCreateValue(__instance).Value = __instance.ArrivalTime;
             InformationManager.DisplayMessage(new InformationMessage(new TextObject("{=qFAhDtrw}Your fleet has arrived at its destination.").ToString(), new Color(0f, 1f, 0f))
             {
                 SoundEventPath = "event:/ui/panels/panel_call_fleet"
@@ -85,11 +92,6 @@ internal class AnchorPointPatches
 
         return false;
     }
-
-    private static readonly ConditionalWeakTable<AnchorPoint, StrongBox<CampaignTime>> ArrivalsShown = new ConditionalWeakTable<AnchorPoint, StrongBox<CampaignTime>>();
-
-    private static bool IsArrivalShown(AnchorPoint anchorPoint) =>
-        ArrivalsShown.TryGetValue(anchorPoint, out var shown) && shown.Value == anchorPoint.ArrivalTime;
 
     [HarmonyPatch(nameof(AnchorPoint.ArrivalTime), MethodType.Setter)]
     [HarmonyPostfix]

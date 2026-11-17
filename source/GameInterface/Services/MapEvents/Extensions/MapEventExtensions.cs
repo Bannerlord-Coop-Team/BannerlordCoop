@@ -9,6 +9,10 @@ namespace GameInterface.Services.MapEvents.Extensions;
 
 public static class MapEventExtensions
 {
+    /// <summary>Whether this map event uses the siege-style join flow.</summary>
+    public static bool IsSiegeStyleJoin(this MapEvent mapEvent)
+        => mapEvent.IsSiegeAssault || mapEvent.IsSallyOut;
+
     /// <summary>Whether the battle's results were calculated or applied, after which no battle report may change what they read.</summary>
     public static bool HasCalculatedResults(this MapEvent mapEvent)
         => mapEvent._mapEventResultsCalculated || mapEvent._mapEventResultsApplied;

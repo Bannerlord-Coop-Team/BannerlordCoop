@@ -94,7 +94,8 @@ public class RansomOfferCampaignBehaviorInterface : IRansomOfferCampaignBehavior
             if (!ValidatePlayerHeroId(playerHeroId, out var playerData, out var playerHero)) return;
             if (!objectManager.TryGetIdWithLogging(hero, out var heroId)) return;
 
-            if (playerData.CurrentRansomHeroId == null && playerHero.PartyBelongedTo?.IsInNavalAutoTravel == false)
+            var playerParty = playerHero.PartyBelongedTo;
+            if (playerData.CurrentRansomHeroId == null && playerParty != null && !playerParty.IsInNavalAutoTravel)
             {
                 float chanceToDisplayRansomOffer = (!playerData.HeroIdsWithDeclinedRansomOffers.Contains(heroId)) ? 0.2f : 0.12f;
                 if (MBRandom.RandomFloat < chanceToDisplayRansomOffer)

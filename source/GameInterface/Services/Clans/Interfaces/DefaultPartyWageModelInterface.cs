@@ -102,14 +102,14 @@ public class DefaultPartyWageModelInterface : IDefaultPartyWageModelInterface
         var buildingEffects = new ExplainedNumber(1f, false, null);
         HandleGarrisonParty(__instance, mobileParty, infantryWage, archersWage, cavalryWage, ref result, ref buildingEffects);
 
-        var leaderClan = mobileParty.LeaderHero?.Clan;
-        var militaryCoronaeValue = (leaderClan?.Kingdom != null && !leaderClan.IsUnderMercenaryService && leaderClan.Kingdom.ActivePolicies.Contains(DefaultPolicies.MilitaryCoronae)) ? 0.1f : 0f;
-
         AddPerkFactor(mobileParty, DefaultPerks.Trade.SwordForBarter, caravanGuardsWage, true, ref result);
         AddPerkFactor(mobileParty, DefaultPerks.Steward.Contractors, mercenariesWage, false, ref result);
         AddPerkFactor(mobileParty, DefaultPerks.Trade.MercenaryConnections, mercenariesWage, true, ref result);
 
-        result.AddFactor(militaryCoronaeValue, DefaultPolicies.MilitaryCoronae.Name);
+        var leaderClan = mobileParty.LeaderHero?.Clan;
+        bool hasMilitaryCoronae = leaderClan?.Kingdom != null && !leaderClan.IsUnderMercenaryService &&
+            leaderClan.Kingdom.ActivePolicies.Contains(DefaultPolicies.MilitaryCoronae);
+        result.AddFactor(hasMilitaryCoronae ? 0.1f : 0f, DefaultPolicies.MilitaryCoronae.Name);
         result.AddFactor(buildingEffects.ResultNumber - 1f, __instance._buildingEffects);
 
         AddOtherFactors(mobileParty, ref result);

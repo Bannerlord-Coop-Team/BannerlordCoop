@@ -610,9 +610,8 @@ public class HeroDebugCommand
             playerManager.Contains(killer) && killer != actor)
             return Failed("A player execution killer must match the acting controller's hero.");
 
-        // An execution runs outside the substitution, as ExecuteTroopHandler runs a player's: the action
-        // replacement charges the killer's trait penalty itself, and vanilla ExecutionCampaignBehavior would
-        // see a substituted Hero.MainHero as the killer and charge it a second time.
+        // An execution runs outside the substitution, as ExecuteTroopHandler runs a player's, and the action
+        // replacement charges the killer's trait penalty itself.
         var substitute = !requirePlayer && detail != KillCharacterAction.KillCharacterActionDetail.Executed;
         using (substitute ? new MainHeroSubstitutionScope(actor, party) : null)
         {

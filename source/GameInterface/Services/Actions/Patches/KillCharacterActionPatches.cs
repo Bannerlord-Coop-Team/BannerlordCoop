@@ -166,9 +166,9 @@ internal class KillCharacterActionPatches
         return false;
     }
 
-    // ExecutionCampaignBehavior only charges this when the killer is Hero.MainHero, so a player's execution is charged here.
-    // Blood feuds are not multiplayer-aware yet (#3851), so no feud is started and every execution is charged.
-    internal static void ApplyExecutionTraitPenalty(Hero victim, Hero killer, KillCharacterAction.KillCharacterActionDetail actionDetail)
+    // DisableExecutionCampaignBehavior turns vanilla's charge off until #3851 tracks feuds per player, so every
+    // player execution is charged here, and no feud is started.
+    private static void ApplyExecutionTraitPenalty(Hero victim, Hero killer, KillCharacterAction.KillCharacterActionDetail actionDetail)
     {
         if (actionDetail != KillCharacterAction.KillCharacterActionDetail.Executed) return;
         if (victim.Clan == null || killer?.Clan == null) return;

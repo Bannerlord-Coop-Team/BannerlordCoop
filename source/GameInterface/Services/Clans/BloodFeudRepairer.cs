@@ -10,7 +10,9 @@ namespace GameInterface.Services.Clans;
 /// Clears blood feud state a loaded save carries, because the flag belongs to one player clan and coop has several (#3851).
 /// </summary>
 /// <remarks>
-/// Temporary; remove this file, <see cref="Patches.BloodFeudRepairPatch"/> and its registration once #3851 tracks feuds per player.
+/// Temporary; once #3851 tracks feuds per player, remove this file, <see cref="Patches.BloodFeudRepairPatch"/>, its registration
+/// and <c>DisableExecutionCampaignBehavior</c>, and revisit <c>KillCharacterActionPatches.ApplyExecutionTraitPenalty</c> and the
+/// two text prefixes in <c>HeroExecutionScenePatch</c>, which treat every execution as a feud.
 /// </remarks>
 internal interface IBloodFeudRepairer
 {

@@ -1,4 +1,6 @@
-﻿using GameInterface.Services.Clans;
+﻿using GameInterface.Services.CharacterObjects;
+using GameInterface.Services.Clans;
+using GameInterface.Services.Heroes.RomanceFlow;
 using GameInterface.Services.UI.CoopOptions.Providers.UITab;
 using Autofac;
 using Autofac.Core;
@@ -19,7 +21,6 @@ using GameInterface.Services.Bandits;
 using GameInterface.Services.Barters;
 using GameInterface.Services.BugReporting;
 using GameInterface.Services.Chat;
-using GameInterface.Services.Clans;
 using GameInterface.Services.Entity;
 using GameInterface.Services.GameDebug.Metrics;
 using GameInterface.Services.GameMenus;
@@ -114,6 +115,7 @@ public class GameInterfaceModule : Module
         typeof(ShipUpgradePieceRegistry),
         typeof(BlockadeBattleEventComponentRegistry),
         typeof(LootShipHoldHandler),
+        typeof(NavalNpcFleetAttemptHandler),
         typeof(LootShipsHandler),
         typeof(ShipPiecesHandler),
         typeof(PlayerRaftHandler),
@@ -172,10 +174,8 @@ public class GameInterfaceModule : Module
         builder.RegisterType<BinaryPackageFactory>().As<IBinaryPackageFactory>().SingleInstance();
         builder.RegisterType<ControllerIdProvider>().As<IControllerIdProvider>().SingleInstance();
         builder.RegisterType<TimeControlModeConverter>().As<ITimeControlModeConverter>().SingleInstance();
-        builder.RegisterType<Services.Heroes.RomanceFlow.RomanceRetryHistory>()
-            .As<Services.Heroes.RomanceFlow.IRomanceRetryHistory>().SingleInstance();
-        builder.RegisterType<Services.Heroes.RomanceFlow.RomanceRetryCooldown>()
-            .As<Services.Heroes.RomanceFlow.IRomanceRetryCooldown>().InstancePerDependency();
+        builder.RegisterType<RomanceRetryHistory>().As<IRomanceRetryHistory>().SingleInstance();
+        builder.RegisterType<RomanceRetryCooldown>().As<IRomanceRetryCooldown>().InstancePerDependency();
         builder.RegisterType<Services.Crime.CrimeRatingService>().As<Services.Crime.ICrimeRatingService>().InstancePerDependency();
         builder.RegisterType<PlayerManager>().As<IPlayerManager>().SingleInstance();
         builder.RegisterType<HideoutPreparation>().As<IHideoutPreparation>().InstancePerDependency();
@@ -226,6 +226,7 @@ public class GameInterfaceModule : Module
             foreach (var registry in NavalOnlyTypes.Where(RegistryModule.IsAutoRegistry))
                 builder.RegisterType(registry).AsSelf().SingleInstance().AutoActivate();
             builder.RegisterType<BattleShipFateLedger>().As<IBattleShipFateLedger>().SingleInstance();
+            builder.RegisterType<NavalNpcFleetAttemptTracker>().As<INavalNpcFleetAttemptTracker>().SingleInstance();
             builder.RegisterType<BattleShipFateApplier>().As<IBattleShipFateApplier>().InstancePerDependency();
         }
         // Stays registered while naval is off: MapEventResultsInterface, shared with land battles, takes it.
@@ -285,6 +286,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<DeadHeroCaptivityRepairer>().As<IDeadHeroCaptivityRepairer>().InstancePerDependency();
         builder.RegisterType<WorkshopRepairer>().As<IWorkshopRepairer>().InstancePerDependency();
         builder.RegisterType<BloodFeudRepairer>().As<IBloodFeudRepairer>().InstancePerDependency();
+        builder.RegisterType<PlayerCharacterLoadRepairer>().As<IPlayerCharacterLoadRepairer>().InstancePerDependency();
         builder.RegisterType<MapEventLogger>().As<IMapEventLogger>().SingleInstance();
         builder.RegisterType<TroopRosterLogger>().As<ITroopRosterLogger>().SingleInstance();
         builder.RegisterType<PartySyncPerformanceClock>().As<IPartySyncPerformanceClock>().SingleInstance();

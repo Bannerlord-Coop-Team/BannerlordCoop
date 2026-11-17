@@ -10,29 +10,9 @@ namespace GameInterface.Services.MobileParties.Patches;
 /// recruitment attempts.
 /// </summary>
 /// <remarks>
-/// Vanilla keeps TWO independent rules, and the one that reaches the player first is not the one
-/// that looks like the gate:
-///
-///   <c>conversation_lord_from_ruling_clan_on_condition</c> - the PRE-GATE, and the real blocker. It
-///                                 refuses while the lord has an unsuccessful attempt that is still in
-///                                 its cooldown (<c>IsPersuiasionAttemptInCooldown</c>, ONE SEASON),
-///                                 unless the score says to retry or skip to the barter.
-///                                 It returns before CanAttemptToPersuade is ever consulted.
-///   <c>CanAttemptToPersuade</c> - the GATE. Refuses while a matching unsuccessful attempt is less than
-///                                 ONE WEEK old. The active persuasion also reuses it to choose the failed
-///                                 task whose final refusal line is shown.
-///
-/// Vanilla never prunes attempts by age, so expiry is the cooldown alone. Patching the gate alone cannot
-/// work, because the pre-gate already answered. AlwaysRetry
-/// therefore has to drop this lord's attempt records before a new conversation - and it must drop ALL of
-/// them, not just the unsuccessful ones, because the score counts successes and every persuasion OPTION
-/// records its own attempt. The gate itself must keep running so a fresh failure can select its refusal line.
-///
-///   Vanilla     - unchanged: vanilla's own week/season rules apply (default, matches singleplayer)
-///   NeverExpire - the gate blocks while ANY unsuccessful attempt survives, and attempts never leave
-///                 their cooldown
-///   AlwaysRetry - the pre-gate's records are cleared before each conversation, so the lord can be asked
-///                 again at once while fresh failures still complete normally
+/// Vanilla's pre-gate, <c>conversation_lord_from_ruling_clan_on_condition</c>, refuses for a season after a failed
+/// attempt before <c>CanAttemptToPersuade</c> runs, so AlwaysRetry clears all of the lord's attempts before a
+/// conversation: the score counts successes too, and each persuasion option records its own attempt.
 /// </remarks>
 internal static class LordDefectionRetryPatches
 {

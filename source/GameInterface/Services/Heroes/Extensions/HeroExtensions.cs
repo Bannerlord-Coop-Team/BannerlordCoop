@@ -3,8 +3,10 @@ using Common.Logging;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.Players;
+using Helpers;
 using Serilog;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -33,7 +35,22 @@ public static class HeroExtensions
 
     /// <summary>A player governor counts as present in the town they govern, wherever they are.</summary>
     public static Settlement GetGovernorSettlement(this Hero hero)
-        => hero.IsPlayerHero() && hero.GovernorOf != null ? hero.GovernorOf.Settlement : hero.CurrentSettlement;
+    {
+        if (hero.IsPlayerHero() && hero.GovernorOf != null) return hero.GovernorOf.Settlement;
+
+        return hero.CurrentSettlement;
+    }
+
+    /// <summary>
+    /// The most mercenaries <paramref name="hero"/> may hire from a town stock of
+    /// <paramref name="availableMercenaries"/>. A generous hero may hire beyond the stock, as the vanilla menu and tavern dialog allow.
+    /// </summary>
+    public static int GetMercenaryHireLimit(this Hero hero, int availableMercenaries)
+    {
+        var limit = new ExplainedNumber(availableMercenaries);
+        TraitEffectHelper.ApplyTraitEffect(hero, DefaultPersonalityTraitEffects.GenerosityMercenaryRecruitmentEffect, ref limit);
+        return limit.RoundedResultNumber;
+    }
 
     /// <summary>
     /// Check to see if the Hero is controlled by this client or server.

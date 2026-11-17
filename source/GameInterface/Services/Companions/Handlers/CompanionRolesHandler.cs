@@ -34,8 +34,6 @@ internal class CompanionRolesHandler : IHandler
 {
     private static readonly ILogger logger = LogManager.GetLogger<CompanionRolesHandler>();
 
-    private const int NewClanPartyMinimumSize = 33;
-
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
@@ -159,7 +157,7 @@ internal class CompanionRolesHandler : IHandler
                     mobileParty.ActualClan = clan;
                     mobileParty.Party.SetVisualAsDirty();
                 }
-                int missing = NewClanPartyMinimumSize - mobileParty.MemberRoster.TotalManCount;
+                int missing = CompanionRolesCampaignBehavior.CompanionBecomingVassalPartySizeTarget - mobileParty.MemberRoster.TotalManCount;
                 if (missing > 0)
                 {
                     int basic = missing / 2;

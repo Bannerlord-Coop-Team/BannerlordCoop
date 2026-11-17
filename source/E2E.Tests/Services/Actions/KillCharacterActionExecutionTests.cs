@@ -1,4 +1,4 @@
-using Common.Util;
+﻿using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Services.MapEvents;
 using E2E.Tests.Util;

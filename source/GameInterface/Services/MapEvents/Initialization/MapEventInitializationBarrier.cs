@@ -511,13 +511,18 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         bool matchesDeferredSimulation = cleanup != null &&
             ReferenceEquals(encounter, cleanup.Encounter) &&
             ReferenceEquals(encounter?.BattleSimulation, cleanup.BattleSimulation);
+        bool playerWon = mapEvent.WinningSide == encounter?.PlayerSide;
         if (encounter?.EncounterState != PlayerEncounterState.End ||
             encounter.BattleSimulation == null ||
             (!matchesDeferredSimulation &&
-                (mapEvent.WinningSide == encounter.PlayerSide || !References(encounter, mapEvent))))
+                (playerWon || !References(encounter, mapEvent))))
         {
             return false;
         }
+
+        // A deferred win also reaches here; a winning raid keeps its references so native loot-end can continue it.
+        if (IsStagedRaidSimulationResult(encounter))
+            return false;
 
         if (PlayerCaptivity.IsCaptive)
         {
@@ -529,7 +534,9 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
             return true;
         }
 
-        // Mirror vanilla's simulated-defeat branch before detaching the destroyed map event.
+        // Leave must not reuse battle references whose party sides were already removed.
+        encounter._mapEvent = null;
+        encounter.BattleSimulation = null;
         encounter.EncounterState = PlayerEncounterState.Begin;
         GameMenu.SwitchToMenu("encounter");
         return true;
@@ -613,6 +620,12 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
                 return false;
         }
     }
+
+    internal static bool IsStagedRaidSimulationResult(PlayerEncounter encounter) =>
+        encounter?._mapEvent is MapEvent mapEvent &&
+        mapEvent.IsRaidHostileAction() &&
+        encounter.BattleSimulation != null &&
+        mapEvent.WinningSide == encounter.PlayerSide;
 
     private static MapEvent GetPlayerEncounterBattle()
     {

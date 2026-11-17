@@ -62,7 +62,7 @@ public class MainPartyAnchorViewPatchesTests
             nameof(AnchorVisualManager.CanPlayerHaveAnchor),
             typeof(AnchorVisualManager),
             typeof(AnchorVisualManagerPatches),
-            "CanPartyHaveAnchorPrefix",
+            "CanPlayerHaveAnchorPrefix",
             () => manager.OnAnchorPositionUpdated());
 
         Assert.Null(exception);

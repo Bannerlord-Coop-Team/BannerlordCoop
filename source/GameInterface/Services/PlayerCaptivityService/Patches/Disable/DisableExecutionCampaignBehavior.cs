@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 

@@ -14,7 +14,7 @@ internal class MapEventComponentSync : IAutoSync
         autoSyncBuilder.AddField(AccessTools.Field(typeof(HideoutEventComponent), nameof(HideoutEventComponent.IsSendTroops)));
 
         // The battle settlement, the battle type and the siege outcome live on the components
-        // (MapEventSettlement, _mapEventType, _keepSiegeEvent), not on MapEvent.
+        // (MapEventSettlement, _eventType, _keepSiegeEvent), not on MapEvent.
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MapEventComponent), nameof(MapEventComponent.MapEventSettlement)));
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(HideoutEventComponent), nameof(HideoutEventComponent.InitialHideoutPopulation)));
         autoSyncBuilder.AddField(AccessTools.Field(typeof(SiegeAssaultEventComponent), nameof(SiegeAssaultEventComponent._eventType)));
