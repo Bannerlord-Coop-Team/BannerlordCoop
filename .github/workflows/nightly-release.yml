@@ -396,7 +396,9 @@ jobs:
             }
           }
 
+      # The signing identity only trusts development, so a dry run from another ref packages unsigned binaries.
       - name: Azure login
+        if: github.ref == 'refs/heads/development'
         uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
@@ -404,6 +406,7 @@ jobs:
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Sign module binaries
+        if: github.ref == 'refs/heads/development'
         uses: azure/artifact-signing-action@c7ab2a863ab5f9a846ddb8265964877ef296ee82 # v2
         with:
           endpoint: ${{ vars.SIGNING_ENDPOINT }}
@@ -416,6 +419,7 @@ jobs:
           timestamp-digest: SHA256
 
       - name: Verify signatures
+        if: github.ref == 'refs/heads/development'
         shell: pwsh
         run: |
           $binaries = @(Get-ChildItem 'release-stage\Coop\bin\Win64_Shipping_Client\*' -Include '*.dll', '*.exe')
@@ -645,6 +649,9 @@ jobs:
           set -eu
           {
             printf 'Built `%s` at `%s` for %s, sha256 `%s`.\n\n' "$FILE_NAME" "$HEAD_SHA" "$RELEASE_DATE" "$ARCHIVE_SHA256"
+            if [ "$GITHUB_REF" != 'refs/heads/development' ]; then
+              printf 'Not signed, because the signing identity only trusts development.\n\n'
+            fi
             if [ "$DRY_RUN" = 'true' ]; then
               printf 'Dry run: the dedicated-server client input and the Patron client archive were not published.\n'
             elif [ "$OVERWRITE" != 'true' ]; then
