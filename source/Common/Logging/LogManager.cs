@@ -4,6 +4,7 @@ using Serilog.Core;
 using Serilog.Events;
 using System;
 using System.Collections.Concurrent;
+using System.Threading.Tasks;
 
 namespace Common.Logging;
 
@@ -35,6 +36,24 @@ public static class LogManager
 
 	// For static classes, which cannot be used as the generic type argument above.
 	public static ILogger GetLogger(Type type) => SourceLoggers.GetOrAdd(type.FullName, CreateSourceLogger);
+
+	// Disposes the configured logger every source logger forwards to, flushing Seq's buffer within the limit; only call it
+	// when the process ends, because later events are dropped.
+	public static void CloseAndFlush(TimeSpan limit)
+	{
+		// Never build the logger only to dispose it.
+		if (!_logger.IsValueCreated || _logger.Value is not IDisposable disposable) return;
+
+		// With no Seq server listening, the Seq sink takes about 8 s to give up its last send, so the wait has a limit.
+		try
+		{
+			Task.Run(disposable.Dispose).Wait(limit);
+		}
+		catch (AggregateException)
+		{
+			// The process is ending and a sink that threw while closing has nowhere left to log.
+		}
+	}
 
 	private static ILogger CreateSourceLogger(string source)
 	{
