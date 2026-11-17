@@ -237,8 +237,10 @@ are registered later, at `CampaignReady` (`MapScreen.OnInitialize`), through
 
 ## Known gaps
 
-- Blood feuds and empty clan parties are keyed on the local main hero and player clan. They run on
-  the server only and are not multiplayer-aware yet (blood feuds: #3819).
+- Blood feuds are keyed on the player clan, so executions are disabled (`DisableExecutionCampaignBehavior`)
+  and saved feuds are cleared on load (`BloodFeudRepairPatch`) until #3851 tracks them per player.
+- Empty clan parties are keyed on the local main hero. They run on the server only and are not
+  multiplayer-aware yet.
 - Naval (War Sails) content stays unsupported, including the set sail and disembark leave paths.
 - v1.5 leaves a `BattleWreckage` after a field battle with a winner and at least 15 casualties: a battle
   site on land, a wreckage at sea. `BattleWreckageCampaignBehavior` is disabled on the server and on
@@ -336,7 +338,7 @@ are registered later, at `CampaignReady` (`MapScreen.OnInitialize`), through
 - `CoopTroopSupplier.OnTroopScoreHit` is an empty method nothing calls, still with the v1.5.6
   parameters.
 - N executions from one clan cost N penalties, where vanilla charges once per blood feud; per player
-  feud state does not exist (#3819), and v1.4.8 also charged each execution.
+  feud state does not exist (#3851), and v1.4.8 also charged each execution.
 - Not done yet: a live session with a listen-server host and two clients, and CI, whose build image
   still carries v1.4.8 game assemblies.
 
