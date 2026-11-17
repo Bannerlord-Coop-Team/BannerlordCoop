@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "catalogRevision": "d1261866e62085cfec1b837a201b4ada90b873668cb409f61650c17d393f1771",
   "contentDigest": "d1261866e62085cfec1b837a201b4ada90b873668cb409f61650c17d393f1771",
-  "sourceCommit": "b61dc37cfb118157aefd12eec9c237e3dcaa077d",
+  "sourceCommit": "d8a3c6dcce1d9b452f4af9262f5a16da01ddf13a",
   "source": "BannerlordCoop/source/GameInterface/Configuration/ModConfigData.cs",
   "options": [
     {
