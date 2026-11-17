@@ -23,7 +23,7 @@ namespace Coop.Tests.Missions.Battles;
 public class SiegeMachineSimulationTests : IDisposable
 {
     [Fact]
-    public void DestructionTransitionSnapsRamBeforeApplyingBrokenState()
+    public void DestructionTransitionSnapsAndStopsRamBeforeApplyingBrokenState()
     {
         using var mission = new MissionCurrentScope();
         var ram = Uninitialized<BatteringRam>();
@@ -35,6 +35,7 @@ public class SiegeMachineSimulationTests : IDisposable
         ramSnapDistance = 12.5f;
         ramSnapCalls = 0;
         ramDestructionCalls = 0;
+        ramResetDistanceErrorCalls = 0;
         ramSnappedBeforeDestruction = false;
         var broker = new TestMessageBroker();
         using var replicator = new SiegeMachineStateReplicator(Mock.Of<IBattleNetwork>(), broker,
@@ -42,6 +43,7 @@ public class SiegeMachineSimulationTests : IDisposable
             Mock.Of<IRangedSiegeWeaponPresentation>());
         Stub(AccessTools.Method(typeof(SiegeWeaponMovementComponent), "GetTotalDistanceTraveledForPathTracker"), nameof(RamDistanceAtSnap));
         Stub(AccessTools.Method(typeof(SiegeWeaponMovementComponent), "SetTotalDistanceTraveledForPathTracker"), nameof(RamSetDistance));
+        Stub(AccessTools.Method(typeof(SiegeWeaponMovementComponent), "SetDistanceTraveledAsClient"), nameof(RamResetDistanceError));
         Stub(AccessTools.Method(typeof(SiegeWeaponMovementComponent), "SetTargetFrameForPathTracker"), nameof(RamSetTargetFrame));
         Stub(AccessTools.Method(typeof(DestructableComponent), "SetDestructionLevel"), nameof(RamSetDestructionLevel));
         Stub(AccessTools.Method(typeof(SiegeMachineStateReplicator), "SyncMissionSiegeWeaponHealth"), nameof(SkipSyncHealth));
@@ -55,6 +57,8 @@ public class SiegeMachineSimulationTests : IDisposable
 
         Assert.Equal(1, ramSnapCalls);
         Assert.Equal(ramSnapDistance - 0.1f, ramSnappedDistance);
+        Assert.Equal(1, ramResetDistanceErrorCalls);
+        Assert.Equal(ramSnapDistance - 0.1f, ramResetDistanceErrorDistance);
         Assert.Equal(1, ramDestructionCalls);
         Assert.True(ramSnappedBeforeDestruction);
     }
@@ -502,8 +506,16 @@ public class SiegeMachineSimulationTests : IDisposable
     private static float ramSnappedDistance;
     private static int ramSnapCalls;
     private static int ramDestructionCalls;
+    private static int ramResetDistanceErrorCalls;
+    private static float ramResetDistanceErrorDistance;
     private static bool ramSnappedBeforeDestruction;
     private static bool RamSetDistance(float __0) { ramSnappedDistance = __0; return false; }
+    private static bool RamResetDistanceError(float __0)
+    {
+        ramResetDistanceErrorCalls++;
+        ramResetDistanceErrorDistance = __0;
+        return false;
+    }
     private static bool RamSetTargetFrame() { ramSnapCalls++; return false; }
     private static bool RamSetDestructionLevel()
     {

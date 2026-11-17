@@ -1802,14 +1802,21 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
                         ?? (machine as SiegeTower)?.MovementComponent;
                     if (movement != null)
                     {
-                        // Snap before the broken entity is created because it uses the ram's tracker frame.
-                        movement.SetTotalDistanceTraveledForPathTracker(moveDistance);
-                        movement.SetTargetFrameForPathTracker();
+                        // Snap and stop before the broken entity is created because it uses the ram's tracker frame.
+                        StopMovementAtDestruction(movement, moveDistance);
                     }
                 }
                 destruction.SetDestructionLevel(state.DestructionState, -1, 0f, TaleWorlds.Library.Vec3.Zero, TaleWorlds.Library.Vec3.Zero);
             }
         }
+    }
+
+    private static void StopMovementAtDestruction(SiegeWeaponMovementComponent movement, float moveDistance)
+    {
+        movement.SetTotalDistanceTraveledForPathTracker(moveDistance);
+        movement.SetDistanceTraveledAsClient(moveDistance);
+        movement.CurrentSpeed = 0f;
+        movement.SetTargetFrameForPathTracker();
     }
 
     private static void Apply(UsableMachine machine, NetworkSiegeMachineState state)
