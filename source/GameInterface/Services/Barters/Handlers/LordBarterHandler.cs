@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using Common.Network.Coalescing;
 using Common.Network.Messages;
+using GameInterface.Configuration;
 using GameInterface.Services.Barters.Messages;
 using GameInterface.Services.Barters.Patches;
 using GameInterface.Services.CampaignService.Statistics.Interfaces;
@@ -45,6 +46,7 @@ internal sealed partial class LordBarterHandler : IHandler
     private readonly ISafePassagePartyResolver safePassagePartyResolver;
     private readonly ISiegeEventInterface siegeEventInterface;
     private readonly IStatisticsCampaignBehaviorInterface statisticsInterface;
+    private readonly IKingdomClanLimit kingdomClanLimit;
     private readonly ISendCoalescer sendCoalescer;
     private readonly Dictionary<NetPeer, LordBarterAuthorization> authorizations =
         new Dictionary<NetPeer, LordBarterAuthorization>();
@@ -63,6 +65,7 @@ internal sealed partial class LordBarterHandler : IHandler
         ISafePassagePartyResolver safePassagePartyResolver,
         ISiegeEventInterface siegeEventInterface,
         IStatisticsCampaignBehaviorInterface statisticsInterface,
+        IKingdomClanLimit kingdomClanLimit,
         ISendCoalescer sendCoalescer = null)
     {
         this.messageBroker = messageBroker;
@@ -76,6 +79,7 @@ internal sealed partial class LordBarterHandler : IHandler
         this.safePassagePartyResolver = safePassagePartyResolver;
         this.siegeEventInterface = siegeEventInterface;
         this.statisticsInterface = statisticsInterface;
+        this.kingdomClanLimit = kingdomClanLimit;
         this.sendCoalescer = sendCoalescer;
         messageBroker.Subscribe<NetworkAuthorizeLordBarter>(HandleAuthorization);
         messageBroker.Subscribe<NetworkCancelLordBarterAuthorization>(HandleAuthorizationCanceled);
@@ -787,6 +791,12 @@ internal sealed partial class LordBarterHandler : IHandler
         if (kind == LordBarterKind.JoinKingdomAsClan &&
             !CanAuthorizeKind(null, playerHero, targetHero, request, targetKingdom, out reason))
             return false;
+        if (kind == LordBarterKind.JoinKingdomAsClan &&
+            kingdomClanLimit.IsFull(targetHero.Clan, targetKingdom, asMercenary: false, ModConfigProvider.ModOptions))
+        {
+            reason = $"{targetKingdom.Name} already has the most clans this server allows ({ModConfigProvider.ModOptions.MaxClansPerKingdom}).";
+            return false;
+        }
         if (kind == LordBarterKind.SafePassage && targetParty?.MobileParty == null)
         {
             reason = "The safe-passage party is no longer available.";

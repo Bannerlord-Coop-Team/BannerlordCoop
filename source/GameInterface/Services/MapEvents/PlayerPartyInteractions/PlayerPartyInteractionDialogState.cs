@@ -1,5 +1,6 @@
 ﻿using Common.Logging;
 using Common.Messaging;
+using GameInterface.Configuration;
 using GameInterface.Services.Clans;
 using GameInterface.Services.Clans.Data;
 using GameInterface.Services.MapEvents.Messages.Conversation;
@@ -162,6 +163,9 @@ public static class PlayerPartyInteractionDialogState
             case PlayerPartyInteractionVassalUnavailableReason.InitiatorClanTierTooLow:
                 explanation = new TextObject("{=coop_player_party_interaction_vassal_requires_tier_two}Your clan must be at least tier 2 to swear allegiance.");
                 return true;
+            case PlayerPartyInteractionVassalUnavailableReason.KingdomFull:
+                explanation = KingdomFullExplanation();
+                return true;
             default:
                 explanation = null;
                 return false;
@@ -205,6 +209,13 @@ public static class PlayerPartyInteractionDialogState
         _ => (null, null)
     };
 
+    private static TextObject KingdomFullExplanation()
+    {
+        var explanation = new TextObject("{=coop_player_party_interaction_kingdom_full}The other player's kingdom already has the most clans this server allows ({MAX}).");
+        explanation.SetTextVariable("MAX", ModConfigProvider.ModOptions.MaxClansPerKingdom);
+        return explanation;
+    }
+
     private static bool TryGetMercenaryUnavailableExplanation(out TextObject explanation)
     {
         switch(currentState.MercenaryUnavailableReason)
@@ -239,6 +250,9 @@ public static class PlayerPartyInteractionDialogState
                 return true;
             case PlayerPartyInteractionMercenaryUnavailableReason.IncompatibleWars:
                 explanation = new TextObject("{=coop_player_party_interaction_mercenary_incompatible_wars}You are at war with a faction the other player's kingdom is not at war with.");
+                return true;
+            case PlayerPartyInteractionMercenaryUnavailableReason.KingdomFull:
+                explanation = KingdomFullExplanation();
                 return true;
             default:
                 explanation = null;

@@ -625,6 +625,53 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         Server.PumpGameThread();
     }
     
+    // The kingdom has one clan, its ruler's. A refused player gets the reason, then the usual vassalage refusal.
+    [Theory]
+    [InlineData(2, true)]
+    [InlineData(1, false)]
+    public void VassalServiceAccepted_KingdomWithMaxClansPerKingdom_RefusesThePlayerWithTheReason(int maxClansPerKingdom, bool accepted)
+    {
+        ModConfigProvider.ModOptions = new ModOptions(new ModOptionsData { MaxClansPerKingdom = maxClansPerKingdom });
+        var client = Clients.First();
+        var otherClient = Clients.Last();
+        var player = CreateSyncedPlayerContext(ControllerId, client);
+        var ruler = CreateSyncedPlayerContext("VassalRuler", _ => false);
+        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        ConfigureClanInKingdom(ruler.ClanId, kingdomId);
+        SetClanTierEverywhere(player.ClanId, 2);
+        Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer(ControllerId, client.NetPeer));
+        using var notices = new MethodCallRecorder(AccessTools.Method(typeof(MBInformationManager), nameof(MBInformationManager.AddQuickInformation)));
+
+        Assert.True(client.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+        client.SimulateMessage(this, new VassalServiceAccepted(kingdom, grantRewards: false));
+
+        var result = Assert.Single(Server.NetworkSentMessages.GetMessages<VassalServiceResult>());
+        Assert.Equal(accepted, result.Accepted);
+        if (accepted)
+        {
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkKingdomFull>());
+            Assert.Equal(0, notices.CountFor(client));
+            Server.Call(() => AssertVassalMembership(Server, player.ClanId, kingdomId));
+            foreach (var instance in Clients)
+                instance.Call(() => AssertVassalMembership(instance, player.ClanId, kingdomId));
+            return;
+        }
+
+        Assert.Equal(kingdomId, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkKingdomFull>()).KingdomId);
+        Assert.Equal(2, notices.CountFor(client));
+        Assert.Equal(0, notices.CountFor(otherClient));
+        foreach (var instance in Clients.Append(Server))
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Clan>(player.ClanId, out var clan));
+                Assert.True(instance.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var instanceKingdom));
+                Assert.Null(clan.Kingdom);
+                Assert.Single(instanceKingdom.Clans);
+            });
+        }
+    }
+
     [Fact]
     public void VassalServiceAccepted_DuringSettlementLocationConversation_JoinsKingdomAndReleasesConversationLock()
     {

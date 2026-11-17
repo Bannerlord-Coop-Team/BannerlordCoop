@@ -27,19 +27,22 @@ internal class VassalServiceHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly IPlayerManager playerManager;
+    private readonly IKingdomClanLimit kingdomClanLimit;
 
     public VassalServiceHandler(
         IMessageBroker messageBroker,
         IKingdomMembershipState kingdomMembershipState,
         IObjectManager objectManager,
         INetwork network,
-        IPlayerManager playerManager)
+        IPlayerManager playerManager,
+        IKingdomClanLimit kingdomClanLimit)
     {
         this.messageBroker = messageBroker;
         this.kingdomMembershipState = kingdomMembershipState;
         this.objectManager = objectManager;
         this.network = network;
         this.playerManager = playerManager;
+        this.kingdomClanLimit = kingdomClanLimit;
 
         messageBroker.Subscribe<VassalServiceAccepted>(HandleVassalServiceAccepted);
         messageBroker.Subscribe<RequestVassalService>(HandleRequestVassalService);
@@ -81,6 +84,7 @@ internal class VassalServiceHandler : IHandler
         GameThread.RunSafe(() =>
         {
             bool accepted = ApplyVassalage(
+                peer,
                 player.ClanId,
                 player.HeroId,
                 payload.What.KingdomId,
@@ -93,7 +97,7 @@ internal class VassalServiceHandler : IHandler
         }, context: nameof(VassalServiceHandler));
     }
 
-    private bool ApplyVassalage(string clanId, string heroId, string kingdomId, bool grantRewards)
+    private bool ApplyVassalage(NetPeer peer, string clanId, string heroId, string kingdomId, bool grantRewards)
     {
         if (!objectManager.TryGetObjectWithLogging<Clan>(clanId, out var clan)) return false;
         if (!objectManager.TryGetObjectWithLogging<Hero>(heroId, out var hero)) return false;
@@ -104,6 +108,8 @@ internal class VassalServiceHandler : IHandler
             Logger.Warning("Rejected vassal service request for clan {ClanId} because it is no longer eligible", clanId);
             return false;
         }
+
+        if (kingdomClanLimit.RefuseIfFull(peer, clan, kingdom, asMercenary: false)) return false;
 
         Kingdom previousKingdom = clan.Kingdom;
 

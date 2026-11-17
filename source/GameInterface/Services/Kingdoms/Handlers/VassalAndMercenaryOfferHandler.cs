@@ -5,6 +5,7 @@ using GameInterface.Services.Kingdoms.Interfaces;
 using GameInterface.Services.Kingdoms.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using LiteNetLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 
@@ -75,7 +76,7 @@ internal class VassalAndMercenaryOfferHandler : IHandler
         {
             if (!playerManager.IsSenderControllingHero(obj.Who, data.MainHeroId)) return;
 
-            vassalAndMercenaryOfferCampaignBehaviorInterface.AcceptMercenaryOffer(data.MainHeroId, data.KingdomId);
+            vassalAndMercenaryOfferCampaignBehaviorInterface.AcceptMercenaryOffer(data.MainHeroId, data.KingdomId, obj.Who as NetPeer);
         });
     }
 

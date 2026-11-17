@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Network;
+using GameInterface.Configuration;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.Clans.Extensions;
 using GameInterface.Services.Heroes.Patches;
@@ -27,7 +28,7 @@ public interface IVassalAndMercenaryOfferCampaignBehaviorInterface : IGameAbstra
     void OnWarDeclared(IFaction faction1, IFaction faction2);
     void OnHeroRelationChanged(Hero effectiveHero, Hero effectiveHeroGainedRelationWith);
     void OnKingdomDestroyed(Kingdom destroyedKingdom);
-    void AcceptMercenaryOffer(string playerHeroId, string kingdomId);
+    void AcceptMercenaryOffer(string playerHeroId, string kingdomId, NetPeer peer);
     void DeclineOffer(string playerHeroId, string kingdomId);
     void AddNewPlayerHeroId(string playerHeroId, NetPeer peer);
 }
@@ -39,17 +40,20 @@ public class VassalAndMercenaryOfferCampaignBehaviorInterface : IVassalAndMercen
     private readonly ICoopSessionProvider coopSessionProvider;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly IKingdomClanLimit kingdomClanLimit;
 
     private Dictionary<string, VassalAndMercenaryOfferData> PlayerVassalAndMercenaryOfferData => coopSessionProvider.CoopSession.InteractionsPlayerData.PlayerVassalAndMercenaryOfferData;
 
     public VassalAndMercenaryOfferCampaignBehaviorInterface(
         ICoopSessionProvider coopSessionProvider,
         IObjectManager objectManager,
-        INetwork network)
+        INetwork network,
+        IKingdomClanLimit kingdomClanLimit)
     {
         this.coopSessionProvider = coopSessionProvider;
         this.objectManager = objectManager;
         this.network = network;
+        this.kingdomClanLimit = kingdomClanLimit;
     }
 
     public void DailyTick()
@@ -80,7 +84,9 @@ public class VassalAndMercenaryOfferCampaignBehaviorInterface : IVassalAndMercen
                 float randomFloat = MBRandom.RandomFloat;
                 if (randomFloat <= VassalAndMercenaryOfferCampaignBehavior.MercenaryOfferCreationChance && behavior.CanPlayerClanReceiveMercenaryOffer())
                 {
-                    Kingdom kingdom = Kingdom.All.GetRandomElementWithPredicate(behavior.MercenaryKingdomSelectionConditionsHold);
+                    Kingdom kingdom = Kingdom.All.GetRandomElementWithPredicate(kingdom =>
+                        behavior.MercenaryKingdomSelectionConditionsHold(kingdom) &&
+                        !kingdomClanLimit.IsFull(clan, kingdom, asMercenary: true, ModConfigProvider.ModOptions));
                     if (kingdom != null)
                     {
                         CreateMercenaryOffer(playerData.Key, playerData.Value, kingdom);
@@ -186,7 +192,7 @@ public class VassalAndMercenaryOfferCampaignBehaviorInterface : IVassalAndMercen
         }
     }
 
-    public void AcceptMercenaryOffer(string playerHeroId, string kingdomId)
+    public void AcceptMercenaryOffer(string playerHeroId, string kingdomId, NetPeer peer)
     {
         if (!ValidatePlayerHeroId(playerHeroId, out var playerData, out var playerHero)) return;
 
@@ -203,6 +209,8 @@ public class VassalAndMercenaryOfferCampaignBehaviorInterface : IVassalAndMercen
             Logger.Warning("Rejected mercenary offer because clan {ClanId} already belongs to a kingdom", clan.StringId);
             return;
         }
+
+        if (kingdomClanLimit.RefuseIfFull(peer, clan, kingdom, asMercenary: true)) return;
 
         int mercenaryAwardFactorToJoinKingdom = Campaign.Current.Models.MinorFactionsModel.GetMercenaryAwardFactorToJoinKingdom(clan, kingdom, true);
         ChangeKingdomAction.ApplyByJoinFactionAsMercenary(clan, kingdom, default, mercenaryAwardFactorToJoinKingdom);
@@ -244,6 +252,7 @@ public class VassalAndMercenaryOfferCampaignBehaviorInterface : IVassalAndMercen
 
         return !playerData.VassalOffers.ContainsKey(kingdomId)
             && FactionHelper.CanPlayerOfferVassalage(kingdom, out _, out _)
+            && !kingdomClanLimit.IsFull(Clan.PlayerClan, kingdom, asMercenary: false, ModConfigProvider.ModOptions)
             && !kingdom.Leader.IsPrisoner
             && !kingdom.Leader.IsFugitive;
     }
