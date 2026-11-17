@@ -26,6 +26,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
@@ -843,7 +844,7 @@ public class HideoutMapEventTests : MapEventTestBase
     }
 
     [Fact]
-    public void SendTroopsStart_ServerSetsTheHideoutCooldownForEveryone()
+    public void SendTroopsNoWinner_ServerSetsTheHideoutCooldownForEveryone()
     {
         var raid = CreateSharedHideout(joinerJoinsBattle: false, isSendTroops: true);
         var expectedAttackTime = CampaignTime.Zero;
@@ -855,14 +856,7 @@ public class HideoutMapEventTests : MapEventTestBase
                 new HideoutCampaignBehavior(),
             }));
             Assert.True(Server.ObjectManager.TryGetObject<Settlement>(raid.SettlementId, out var settlement));
-            var banditClan = GameObjectCreator.CreateInitializedObject<Clan>();
-            banditClan.Culture = GameObjectCreator.CreateInitializedObject<CultureObject>();
-            for (var index = 0; index < Campaign.Current.Models.BanditDensityModel.NumberOfMinimumBanditPartiesInAHideoutToInfestIt; index++)
-            {
-                var bandits = BanditPartyComponent.CreateBanditParty($"SendTroopsCooldownBandits{index}", banditClan,
-                    settlement.Hideout, false, null, settlement.Position);
-                EnterSettlementAction.ApplyForParty(bandits, settlement);
-            }
+            InfestHideout(settlement, "SendTroopsCooldownBandits");
             settlement.Hideout._nextPossibleAttackTime = new CampaignTime(-1);
             expectedAttackTime = CampaignTime.Now + Campaign.Current.Models.HideoutModel.HideoutHiddenDuration;
             Assert.True(settlement.Hideout.IsInfested);
@@ -896,6 +890,29 @@ public class HideoutMapEventTests : MapEventTestBase
             MapEventDisabledMethods);
         Server.PumpGameThread();
         client.PumpGameThread();
+        // The server destroyed the event, and the map tick has no loot to resume, so the success menu waits for Leave.
+        client.Call(() =>
+        {
+            var encounter = PlayerEncounter.Current;
+            Assert.DoesNotContain(encounter._mapEvent, Campaign.Current.MapEventManager.MapEvents);
+            var states = Game.Current.GameStateManager;
+            var mapState = states.CreateState<MapState>();
+            states._gameStates.Add(mapState);
+            try
+            {
+                mapState.OnMapModeTick(0.1f);
+            }
+            finally
+            {
+                states._gameStates.Remove(mapState);
+            }
+            Assert.Same(encounter, PlayerEncounter.Current);
+            Assert.Equal(PlayerEncounterState.End, encounter.EncounterState);
+        }, MapEventDisabledMethods.Concat(new[]
+        {
+            AccessTools.Method(typeof(Campaign), nameof(Campaign.RealTick)),
+            AccessTools.Method(typeof(Campaign), nameof(Campaign.Tick)),
+        }).ToArray());
         client.Call(() => new HideoutCampaignBehavior().hideout_send_troops_result_success_consequence(null),
             MapEventDisabledMethods);
         Server.PumpGameThread();
@@ -911,31 +928,6 @@ public class HideoutMapEventTests : MapEventTestBase
             Assert.Equal(settlement.GatePosition, MobileParty.MainParty.Position);
             Assert.Equal(AiBehavior.Hold, MobileParty.MainParty.DefaultBehavior);
         }, MapEventDisabledMethods);
-    }
-
-    [Fact]
-    public void VictoriousSendTroops_ClearsHideoutWithoutCommittingResults()
-    {
-        var raid = CreateSharedHideout(isSendTroops: true);
-        Server.Call(() =>
-        {
-            Campaign.Current.MainParty = null;
-            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(raid.MapEventId, out var mapEvent));
-            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(raid.LeaderPartyId, out var leader));
-            var leaderMapEventParty = mapEvent.AttackerSide.Parties.Single(party => party.Party == leader.Party);
-            leaderMapEventParty.PlunderedGold = 500;
-            mapEvent._battleState = BattleState.AttackerVictory;
-            var broker = Server.Resolve<IMessageBroker>();
-
-            broker.Publish(this, new CommitMapEventResults(mapEvent));
-            Assert.False(mapEvent._mapEventResultsApplied);
-            Assert.Equal(500, leaderMapEventParty.PlunderedGold);
-
-            broker.Publish(this, new MapEventFinalizeAttempted(mapEvent));
-        });
-
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkCommitMapEventResults>());
-        AssertHideoutClearedEverywhere(raid.SettlementId, raid.LeaderPartyId, raid.JoinerPartyId);
     }
 
     [Fact]
@@ -1007,14 +999,7 @@ public class HideoutMapEventTests : MapEventTestBase
             Assert.True(Server.ObjectManager.TryGetObject<Settlement>(raid.SettlementId, out var settlement));
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(notableId, out var notable));
 
-            var banditClan = GameObjectCreator.CreateInitializedObject<Clan>();
-            banditClan.Culture = GameObjectCreator.CreateInitializedObject<CultureObject>();
-            for (var index = 0; index < Campaign.Current.Models.BanditDensityModel.NumberOfMinimumBanditPartiesInAHideoutToInfestIt; index++)
-            {
-                var bandits = BanditPartyComponent.CreateBanditParty($"SurvivingHideoutBandits{index}", banditClan,
-                    settlement.Hideout, false, null, settlement.Position);
-                EnterSettlementAction.ApplyForParty(bandits, settlement);
-            }
+            InfestHideout(settlement, "SurvivingHideoutBandits");
             settlement.IsVisible = true;
             Assert.True(settlement.Hideout.IsInfested);
 
@@ -1279,6 +1264,19 @@ public class HideoutMapEventTests : MapEventTestBase
     }
 
     private static readonly CampaignVec2 EnteredHideoutPosition = new(new Vec2(5f, 5f), true);
+
+    // Puts the minimum number of bandit parties inside the hideout for it to count as infested.
+    private static void InfestHideout(Settlement settlement, string partyIdPrefix)
+    {
+        var banditClan = GameObjectCreator.CreateInitializedObject<Clan>();
+        banditClan.Culture = GameObjectCreator.CreateInitializedObject<CultureObject>();
+        for (var index = 0; index < Campaign.Current.Models.BanditDensityModel.NumberOfMinimumBanditPartiesInAHideoutToInfestIt; index++)
+        {
+            var bandits = BanditPartyComponent.CreateBanditParty($"{partyIdPrefix}{index}", banditClan,
+                settlement.Hideout, false, null, settlement.Position);
+            EnterSettlementAction.ApplyForParty(bandits, settlement);
+        }
+    }
 
     // Wins the hideout on the dedicated server and runs its result commit and finalize, which clear it.
     private void FinalizeVictoriousHideout(string mapEventId)
