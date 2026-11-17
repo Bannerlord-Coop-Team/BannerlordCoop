@@ -93,6 +93,30 @@ test('the guard resolves calendar dates across spring forward and the Central cu
   await assert.rejects(resolveDate('2026-03-09T05:30:00Z', '03/08/2026'), /YYYY-MM-DD/);
 });
 
+async function resolveCommit(ref, dryRun, status) {
+  const sha = 'a'.repeat(40);
+  const github = { rest: { repos: {
+    getCommit: async () => ({ data: { sha } }),
+    compareCommits: async ({ base, head }) => {
+      assert.deepEqual([base, head], [sha, 'development']);
+      return { data: { status } };
+    },
+  } } };
+  return runScript('Resolve Coop commit', {
+    github,
+    process: { env: { COOP_REF: ref, DRY_RUN: String(dryRun) } },
+    context: { sha: published.head_sha, repo: { owner: 'owner', repo: 'repo' } },
+  });
+}
+
+test('only a commit on development can be published, while a dry run builds any ref', async () => {
+  assert.equal((await resolveCommit('', false)).outputs.coop_sha, published.head_sha);
+  assert.equal((await resolveCommit('v0.1.7', false, 'ahead')).outputs.coop_sha, 'a'.repeat(40));
+  assert.equal((await resolveCommit('development', false, 'identical')).outputs.coop_sha, 'a'.repeat(40));
+  await assert.rejects(resolveCommit('feature', false, 'diverged'), /only be built as a dry run/);
+  assert.equal((await resolveCommit('feature', true, 'diverged')).outputs.coop_sha, 'a'.repeat(40));
+});
+
 test('build metadata uses the guard date even if the build crosses another cutoff', async () => {
   const { outputs } = await resolveDate('2026-03-09T05:30:00Z');
   assert.match(workflow, /release_date: \$\{\{ steps\.due\.outputs\.release_date \}\}/);
