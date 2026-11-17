@@ -34,7 +34,7 @@ internal class PrisonBreakPrisonerPatches
         }
     }
 
-    // Runs after vanilla switched to a result menu, so an aborted mission's start menu wins.
+    // Runs after vanilla switched to a result menu, so an aborted mission returns to the keep or dungeon menu it was staged from.
     [HarmonyPatch(typeof(PrisonBreakMissionController), nameof(PrisonBreakMissionController.OnEndMission))]
     [HarmonyPostfix]
     private static void OnEndMissionPostfix(PrisonBreakMissionController __instance)

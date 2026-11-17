@@ -115,14 +115,16 @@ internal class PrisonBreakDebugCommands
             if (!float.TryParse(args[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var days) || days < 0f)
                 return Failed($"'{args[1]}' is not a number of days of 0 or more.");
 
-            var until = days == 0f ? CampaignTime.Zero : CampaignTime.DaysFromNow(days);
-            messageBroker.Publish(this, new PrisonBreakCooldownSet(town.Settlement, until));
+            var settlement = town.Settlement;
+            bool clearing = days == 0f;
+            var until = clearing ? CampaignTime.Zero : CampaignTime.DaysFromNow(days);
+            messageBroker.Publish(this, new PrisonBreakCooldownSet(settlement, until));
 
-            if (behaviorInterface.IsOnCooldown(town.Settlement) != days > 0f)
-                return Failed($"{town.Settlement.Name} prison break cooldown did not apply, check the server log.");
-            if (days == 0f) return Succeeded($"{town.Settlement.Name} prison break cooldown cleared.");
+            if (behaviorInterface.IsOnCooldown(settlement) == clearing)
+                return Failed($"{settlement.Name} prison break cooldown did not apply, check the server log.");
+            if (clearing) return Succeeded($"{settlement.Name} prison break cooldown cleared.");
 
-            return Succeeded($"{town.Settlement.Name} prison break cooldown set to {days} days.");
+            return Succeeded($"{settlement.Name} prison break cooldown set to {days} days.");
         }
     }
 
@@ -155,7 +157,7 @@ internal class PrisonBreakDebugCommands
             new ExpectedArgs("settlement", "Town or castle name or id; quote names with spaces."),
         };
 
-        // Lists the hero prisoners in the settlement and garrison prisons.
+        // Prints the hero prisoners in the settlement and garrison prisons, the cooldown and whether a break is running.
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (!resolver.TryResolveTown(args[0], out var town, out var error)) return Failed(error);
