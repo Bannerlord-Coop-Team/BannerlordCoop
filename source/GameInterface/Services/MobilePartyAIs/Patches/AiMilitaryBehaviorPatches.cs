@@ -26,9 +26,8 @@ internal class AiMilitaryBehaviorPatches
     [HarmonyPostfix]
     private static void CheckIfSettlementIsSuitableForMilitaryActionPostfix(Settlement settlement, MobileParty mobileParty, ref bool __result)
     {
-        if (!__result) return;
-
-        __result = !DefaultMobilePartyAIModelPatches.IsAttackPrevented(mobileParty, settlement.LastAttackerParty);
+        if (__result && DefaultMobilePartyAIModelPatches.IsAttackPrevented(mobileParty, settlement.LastAttackerParty))
+            __result = false;
     }
 
     // Drops hourly besiege and defend targets whose siege battle is closed to AI joins, otherwise the party walks up
