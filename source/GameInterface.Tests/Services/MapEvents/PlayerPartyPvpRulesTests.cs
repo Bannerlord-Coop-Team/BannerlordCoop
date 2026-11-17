@@ -51,7 +51,7 @@ public class PlayerPartyPvpRulesTests
     }
 
     private static PlayerPartyInteractionSession CreateSession(PlayerPartyInteractionProposal proposal)
-        => new PlayerPartyInteractionSession("session", "initiator", "responder", "Initiator", "Responder", null, isHostile: true)
+        => new PlayerPartyInteractionSession("session", "initiator", "responder", "Initiator", "Responder", null)
         {
             Proposal = proposal,
         };
