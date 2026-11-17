@@ -7,15 +7,8 @@ using TaleWorlds.CampaignSystem.Settlements;
 namespace GameInterface.Tests.Utils;
 
 /// <summary>
-/// <see cref="MapEvent.EventType"/> comes from <see cref="MapEvent.Component"/>, which also keeps
-/// <see cref="MapEvent.MapEventSettlement"/>, so tests give the map event a component of the matching type.
-/// <list type="bullet">
-/// <item>A map event without a component yet (built by hand, before it is committed) gets a
-/// real component from its constructor, assigned through the synchronized property, the way the
-/// factories create them, so it registers and replicates with the event.</item>
-/// <item>A map event that already has one is re-stamped locally: the new component is written to the
-/// property's backing field, so like the old field write the change stays on that instance.</item>
-/// </list>
+/// <see cref="MapEvent.EventType"/> and <see cref="MapEvent.MapEventSettlement"/> come from the map event's component,
+/// so tests give the map event a component of the matching type.
 /// </summary>
 public static class MapEventTestExtensions
 {
@@ -34,12 +27,14 @@ public static class MapEventTestExtensions
         if (previous?.GetBattleType() == battleType)
             return;
 
+        // A new event gets a real component through the synced property, so it registers and replicates as the factories' do
         if (previous == null)
         {
             mapEvent.Component = Create(mapEvent, battleType, construct: true);
             return;
         }
 
+        // An event that has one is re-stamped through the backing field, so the change stays on this instance
         MapEventComponent component = Create(mapEvent, battleType, construct: false);
         ComponentMapEventField(component) = mapEvent;
         ComponentSettlementField(component) = previous.MapEventSettlement;

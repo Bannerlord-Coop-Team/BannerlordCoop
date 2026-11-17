@@ -26,6 +26,11 @@ namespace GameInterface.Services.GameDebug.Interfaces
         private static readonly string VideoPathName = "campaign_intro";
 
         /// <summary>
+        /// True while the skip runs, so the character creation state it pushes does not start a second skip.
+        /// </summary>
+        private bool skipping;
+
+        /// <summary>
         /// Determines if game is currently running the character creation intro.
         /// The character creation into is the first state of character creation.
         /// </summary>
@@ -36,12 +41,7 @@ namespace GameInterface.Services.GameDebug.Interfaces
                    videoState.VideoPath.Contains(VideoPathName);
         }
 
-        /// <summary>
-        /// True while the skip runs, so the character creation state it pushes does not start a second skip.
-        /// </summary>
-        private static bool skipping;
-
-        public static bool InCharacterCreation()
+        private static bool InCharacterCreation()
         {
             return GameStateManager.Current?.ActiveState is CharacterCreationState;
         }
@@ -77,7 +77,7 @@ namespace GameInterface.Services.GameDebug.Interfaces
             switch (ChooseSkipEntry(InCharacterCreationIntro(), InCharacterCreation(), skipping))
             {
                 case SkipEntry.Inline:
-                    GameThread.Run(SkipCharacterCreationInternal);
+                    GameThread.RunSafe(SkipCharacterCreationInternal, context: "DEBUG character creation skip");
                     break;
                 case SkipEntry.NextFrame:
                     GameThread.EnqueueSafe(SkipCharacterCreationInternal, "DEBUG character creation skip");
@@ -115,7 +115,8 @@ namespace GameInterface.Services.GameDebug.Interfaces
             if (currentStage is CharacterCreationCultureStage)
             {
                 var cultures = characterCreationState._characterCreationManager.CharacterCreationContent.GetCultures().ToList();
-                CultureObject culture = cultures[ChooseCultureIndex(cultures.Select(c => c.Name.ToString()).ToList())];
+                var cultureNames = cultures.Select(c => c.Name.ToString()).ToList();
+                CultureObject culture = cultures[ChooseCultureIndex(cultureNames)];
                 characterCreationState._characterCreationManager.CharacterCreationContent.SetSelectedCulture(culture, characterCreationState._characterCreationManager);
                 characterCreationState._characterCreationManager.NextStage();
             }

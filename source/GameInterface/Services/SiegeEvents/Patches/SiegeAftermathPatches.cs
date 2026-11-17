@@ -130,7 +130,7 @@ internal class SiegeAftermathPatches
     }
 
     // Vanilla's aftermath trigger: a siege assault or sally out at a settlement, won by the attacker
-    // (the defender on a sally out). The out side is the one whose win runs the aftermath.
+    // (the defender on a sally out). aftermathSide is the side whose win runs the aftermath.
     private static bool TryGetAftermathSide(MapEvent mapEvent, out BattleSideEnum aftermathSide)
     {
         bool isSallyOut = mapEvent.IsSallyOut || mapEvent.IsBlockadeSallyOut;

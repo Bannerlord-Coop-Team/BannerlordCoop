@@ -17,7 +17,7 @@ using TaleWorlds.MountAndBlade;
 namespace GameInterface.Services.PrisonBreaks.Interfaces;
 
 /// <summary>
-/// The server owns the per-settlement cooldowns, clients mirror them and run the prison break mission locally.
+/// Prison break state and eligibility: the server owns the per-settlement cooldowns, clients mirror them and run the mission locally, and both check the prisoner is still held.
 /// </summary>
 public interface IPrisonBreakCampaignBehaviorInterface : IGameAbstraction
 {
@@ -26,6 +26,7 @@ public interface IPrisonBreakCampaignBehaviorInterface : IGameAbstraction
     void SetCooldown(Settlement settlement, CampaignTime until);
     bool IsPrisonBreakActive(Settlement settlement);
     void SetPrisonBreakActive(Settlement settlement, bool isActive);
+    bool IsHeldIn(Hero prisoner, Settlement settlement);
     void OpenPrisonBreakMission(Settlement settlement, Hero prisoner);
     void CancelPrisonBreak(PrisonBreakStartResult result);
     void AbortPrisonBreakMission(Hero prisoner);
@@ -72,6 +73,15 @@ public class PrisonBreakCampaignBehaviorInterface : IPrisonBreakCampaignBehavior
     {
         if (isActive) activeSettlements.Add(settlement);
         else activeSettlements.Remove(settlement);
+    }
+
+    // True when the hero is a prisoner in the settlement's or its garrison's prison, the rosters vanilla lists.
+    public bool IsHeldIn(Hero prisoner, Settlement settlement)
+    {
+        if (prisoner == null || settlement == null || !prisoner.IsPrisoner) return false;
+
+        return settlement.Party.PrisonRoster.Contains(prisoner.CharacterObject) ||
+            settlement.Town?.GarrisonParty?.PrisonRoster.Contains(prisoner.CharacterObject) == true;
     }
 
     public void OpenPrisonBreakMission(Settlement settlement, Hero prisoner)

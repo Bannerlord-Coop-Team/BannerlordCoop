@@ -36,7 +36,7 @@ internal class AnchorVisualManagerPatches
     // The server's removed main party has no anchor, which vanilla never expects, so it can't have an anchor visual
     [HarmonyPatch(nameof(AnchorVisualManager.CanPlayerHaveAnchor))]
     [HarmonyPrefix]
-    private static bool CanPartyHaveAnchorPrefix(ref bool __result)
+    private static bool CanPlayerHaveAnchorPrefix(ref bool __result)
     {
         if (Campaign.Current?.MainParty?.Anchor != null) return true;
 

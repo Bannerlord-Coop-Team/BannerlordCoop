@@ -1,4 +1,4 @@
-using E2E.Tests.Environment.MockEngine;
+﻿using E2E.Tests.Environment.MockEngine;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.TroopSupply;
 using HarmonyLib;

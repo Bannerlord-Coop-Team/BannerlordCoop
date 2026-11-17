@@ -37,6 +37,7 @@ internal class HeroExecutionScenePatch
         return false;
     }
 
+    // Every execution reads as a blood feud until #3851 tracks feuds per player
     [HarmonyPatch(nameof(HeroExecutionSceneNotificationData.GetExecuteTroopDescriptionText))]
     [HarmonyPrefix]
     public static bool GetExecuteTroopDescriptionTextPrefix(Hero dyingHero, ref TextObject __result)

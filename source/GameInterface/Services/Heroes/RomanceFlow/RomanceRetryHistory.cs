@@ -24,7 +24,7 @@ internal interface IRomanceRetryHistory
 
 internal class RomanceRetryHistory : IRomanceRetryHistory
 {
-    internal const string FailuresKey = "coop_romance_failed_courtships";
+    private const string FailuresKey = "coop_romance_failed_courtships";
 
     private readonly Dictionary<string, long> failureTicks = new();
 

@@ -47,6 +47,16 @@ public class BattleTroopReserveBuilderAuthorityTests
     }
 
     [Fact]
+    public void AiPartyInPlayerLedArmy_AtSea_FieldedByHost_WhilePlayersKeepTheirOwnParties()
+    {
+        // At sea the host fields every AI party on the ally team, a player-led army's members included.
+        Assert.Null(BattleTroopReserveBuilder.ResolveOwningController(partyOwnerController: null, armyLeaderController: "playerA",
+            atSea: true));
+        Assert.Equal("playerB", BattleTroopReserveBuilder.ResolveOwningController(partyOwnerController: "playerB",
+            armyLeaderController: "playerA", atSea: true));
+    }
+
+    [Fact]
     public void AiPartyWithNoPlayerArmy_FieldedByHost()
     {
         // No owning player and no player-led army -> null, i.e. the host fields it (enemy, or independent allied AI).

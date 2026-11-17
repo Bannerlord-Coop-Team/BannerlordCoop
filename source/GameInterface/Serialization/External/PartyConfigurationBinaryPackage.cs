@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Serialization.External

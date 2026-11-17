@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.GameDebug.Messages;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
@@ -57,6 +58,10 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
     private readonly ConditionalWeakTable<MapEvent, AppliedForceActionOutcomeState> appliedForceActionOutcomes = new ConditionalWeakTable<MapEvent, AppliedForceActionOutcomeState>();
     private readonly object deferredForceScreenGate = new object();
     private DeferredForceScreen deferredForceScreen;
+    // Client-only: a won raid's continuation, waiting for the current encounter to end.
+    private ParkedRaidContinuation parkedRaidContinuation;
+    // Client-only: the encounter a continuation request opened; finished if the server denies it.
+    private PlayerEncounter continuationEncounter;
 
     public VillageHostileActionInterface(IMessageBroker messageBroker, IObjectManager objectManager)
     {
@@ -76,6 +81,8 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
             deferredForceScreen = null;
         }
         pendingForceTransfers.Clear();
+        parkedRaidContinuation = null;
+        continuationEncounter = null;
     }
 
     public void RequestHostileAction(VillageHostileAction action)
@@ -145,6 +152,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
 
     public void BeginHostileActionPresentation(VillageHostileAction action)
     {
+        continuationEncounter = null;
         var encounter = PlayerEncounter.Current;
         if (encounter == null)
         {
@@ -173,6 +181,72 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         }
 
         GameMenu.SwitchToMenu("encounter");
+    }
+
+    public void CloseDeniedRaidContinuation()
+    {
+        var encounter = continuationEncounter;
+        continuationEncounter = null;
+        if (encounter == null || !ReferenceEquals(encounter, PlayerEncounter.Current))
+            return;
+
+        // Leave a live encounter or simulation alone when a denial races its start.
+        if (encounter._mapEvent != null || encounter.BattleSimulation != null)
+            return;
+
+        encounter._stateHandled = true;
+        PlayerEncounter.LeaveEncounter = true;
+        PlayerEncounter.Finish(true);
+    }
+
+    public void ParkRaidContinuation(Settlement settlement)
+    {
+        // Presented from Handle_CampaignTick once the result screens are done and the encounter has ended.
+        parkedRaidContinuation = new ParkedRaidContinuation(settlement, PlayerEncounter.Current);
+    }
+
+    private void PresentParkedRaidContinuation()
+    {
+        var parked = parkedRaidContinuation;
+        if (parked == null)
+            return;
+
+        var settlement = parked.Settlement;
+
+        if (PlayerCaptivity.IsCaptive)
+        {
+            parkedRaidContinuation = null;
+            Logger.Information("Dropping parked raid continuation for {SettlementId}: captive", settlement.StringId);
+            return;
+        }
+
+        var encounter = PlayerEncounter.Current;
+        bool encounterReplaced = encounter != null && parked.Encounter != null &&
+            !ReferenceEquals(encounter, parked.Encounter);
+        if (encounterReplaced)
+        {
+            parkedRaidContinuation = null;
+            Logger.Information("Dropping parked raid continuation for {SettlementId}: encounter replaced", settlement.StringId);
+            return;
+        }
+
+        bool encounterStillOpen = MobileParty.MainParty?.MapEvent != null ||
+            (encounter != null && encounter.EncounterState != PlayerEncounterState.End);
+        if (encounterStillOpen)
+            return;
+
+        parkedRaidContinuation = null;
+
+        StartRaidContinuationEncounter(settlement);
+    }
+
+    private void StartRaidContinuationEncounter(Settlement settlement)
+    {
+        // The map-event teardown clears both parties before this continuation requests fresh approval.
+        PlayerEncounter.Start();
+        PlayerEncounter.Current.SetupFields(PartyBase.MainParty, settlement.Party);
+        continuationEncounter = PlayerEncounter.Current;
+        messageBroker.Publish(this, new VillageHostileActionAttempted(VillageHostileAction.Raid, MobileParty.MainParty, settlement));
     }
 
     public bool CanStartHostileAction(
@@ -300,7 +374,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
 
         if (!FactionManager.IsAtWarAgainstFaction(mobileParty.MapFaction, settlement.MapFaction))
         {
-            using (new global::GameInterface.Services.Heroes.Patches.MainHeroSubstitutionScope(mobileParty.LeaderHero, mobileParty))
+            using (new MainHeroSubstitutionScope(mobileParty.LeaderHero, mobileParty))
                 DeclareWarAction.ApplyByPlayerHostility(mobileParty.MapFaction, settlement.MapFaction);
         }
     }
@@ -312,7 +386,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
     /// </summary>
     public bool WillVillageResist(MobileParty mobileParty, Settlement settlement)
     {
-        using (new global::GameInterface.Services.Heroes.Patches.MainHeroSubstitutionScope(mobileParty.LeaderHero, mobileParty))
+        using (new MainHeroSubstitutionScope(mobileParty.LeaderHero, mobileParty))
             return VillageHostileActionCampaignBehavior.WillVillageResistHostileAction(settlement);
     }
 
@@ -880,6 +954,8 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         if (ModInformation.IsServer) return;
         if (IsInMission()) return;
 
+        PresentParkedRaidContinuation();
+
         // Always open the earned screen and let the server consume decide. A
         // gone pool is reported at Done time by the commit validation.
         if (!TryTakeParkedForceTransferScreen(out var pool))
@@ -937,6 +1013,18 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
     private static bool IsInMission()
     {
         return MissionState.Current != null || Mission.Current != null;
+    }
+
+    private sealed class ParkedRaidContinuation
+    {
+        public ParkedRaidContinuation(Settlement settlement, PlayerEncounter encounter)
+        {
+            Settlement = settlement;
+            Encounter = encounter;
+        }
+
+        public Settlement Settlement { get; }
+        public PlayerEncounter Encounter { get; }
     }
 
     private sealed class DeferredForceScreen

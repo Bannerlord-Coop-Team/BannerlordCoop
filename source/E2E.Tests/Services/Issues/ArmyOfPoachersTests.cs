@@ -441,7 +441,7 @@ public class ArmyOfPoachersTests : IDisposable
             locations._locations.Add("village_center", new Location("village_center", new TextObject("Village center"),
                 new TextObject("Village center"), 0, false, false, "true", "true", "true", "true",
                 new[] { "", "test_village_center", "", "" }, locations));
-            AccessTools.Property(typeof(Settlement), nameof(Settlement.LocationComplex)).SetValue(village, locations);
+            village.LocationComplex = locations;
             var battle = MapEventBattleFactory.CreateMapEvent(player.Party, poachers.Party, default);
             var initializer = new PoachersBattleMissionInitializer();
             Assert.True(initializer.CanHandle(battle));

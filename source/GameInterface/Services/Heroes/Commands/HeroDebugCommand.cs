@@ -506,11 +506,13 @@ public class HeroDebugCommand
     {
         private readonly ICommandObjectResolver resolver;
         private readonly IObjectManager objectManager;
+        private readonly IPlayerManager playerManager;
 
-        public HeroKillPlayerCoopCommand(ICommandObjectResolver resolver, IObjectManager objectManager)
+        public HeroKillPlayerCoopCommand(ICommandObjectResolver resolver, IObjectManager objectManager, IPlayerManager playerManager)
         {
             this.resolver = resolver;
             this.objectManager = objectManager;
+            this.playerManager = playerManager;
         }
 
         public string Prefix => "coop.debug.hero";
@@ -531,7 +533,7 @@ public class HeroDebugCommand
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (!CommandHelpers.IsServerOnlyCommand(out var error, "coop.debug.hero.kill_player")) return Failed(error);
-            return KillRegisteredHero(resolver, objectManager, args, requirePlayer: true);
+            return KillRegisteredHero(resolver, objectManager, playerManager, args, requirePlayer: true);
         }
     }
 
@@ -539,11 +541,13 @@ public class HeroDebugCommand
     {
         private readonly ICommandObjectResolver resolver;
         private readonly IObjectManager objectManager;
+        private readonly IPlayerManager playerManager;
 
-        public HeroKillNpcCoopCommand(ICommandObjectResolver resolver, IObjectManager objectManager)
+        public HeroKillNpcCoopCommand(ICommandObjectResolver resolver, IObjectManager objectManager, IPlayerManager playerManager)
         {
             this.resolver = resolver;
             this.objectManager = objectManager;
+            this.playerManager = playerManager;
         }
 
         public string Prefix => "coop.debug.hero";
@@ -561,16 +565,16 @@ public class HeroDebugCommand
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (!CommandHelpers.IsServerOnlyCommand(out var error, "coop.debug.hero.kill_npc")) return Failed(error);
-            return KillRegisteredHero(resolver, objectManager, args, requirePlayer: false);
+            return KillRegisteredHero(resolver, objectManager, playerManager, args, requirePlayer: false);
         }
     }
 
     // Resolves the target (and optional killer) hero by name or id, then applies the native death action.
-    private static CoopCommandResult KillRegisteredHero(ICommandObjectResolver resolver, IObjectManager objectManager, ICoopCommandArgs args, bool requirePlayer)
+    private static CoopCommandResult KillRegisteredHero(ICommandObjectResolver resolver, IObjectManager objectManager, IPlayerManager playerManager, ICoopCommandArgs args, bool requirePlayer)
     {
         if (!resolver.TryResolveHero(args[0], out var hero, out var heroError))
             return Failed(heroError);
-        if (hero.IsPlayerHero() != requirePlayer || !hero.IsAlive)
+        if (playerManager.Contains(hero) != requirePlayer || !hero.IsAlive)
             return Failed(requirePlayer ? "The hero must be a living registered player." : "The hero must be a living registered NPC.");
 
         KillCharacterAction.KillCharacterActionDetail detail;
@@ -598,18 +602,16 @@ public class HeroDebugCommand
 
         Hero actor = null;
         MobileParty party = null;
-        if (!requirePlayer && (!ContainerProvider.TryResolve<IPlayerManager>(out var players) ||
-            !players.TryGetPlayer(args[2], out var player) ||
+        if (!requirePlayer && (!playerManager.TryGetPlayer(args[2], out var player) ||
             !objectManager.TryGetObject(player.HeroId, out actor) ||
             !objectManager.TryGetObject(player.MobilePartyId, out party)))
             return Failed("The acting player's registered hero and party are required.");
         if (!requirePlayer && detail == KillCharacterAction.KillCharacterActionDetail.Executed &&
-            killer.IsPlayerHero() && killer != actor)
+            playerManager.Contains(killer) && killer != actor)
             return Failed("A player execution killer must match the acting controller's hero.");
 
-        // An execution runs outside the substitution, as ExecuteTroopHandler runs a player's: the action
-        // replacement charges the killer's trait penalty itself, and vanilla ExecutionCampaignBehavior would
-        // see a substituted Hero.MainHero as the killer and charge it a second time.
+        // An execution runs outside the substitution, as ExecuteTroopHandler runs a player's, and the action
+        // replacement charges the killer's trait penalty itself.
         var substitute = !requirePlayer && detail != KillCharacterAction.KillCharacterActionDetail.Executed;
         using (substitute ? new MainHeroSubstitutionScope(actor, party) : null)
         {
@@ -617,6 +619,47 @@ public class HeroDebugCommand
             KillCharacterAction.ApplyByDeathMarkForced(hero, true);
         }
         return Succeeded($"{(requirePlayer ? "Player" : "NPC")} {hero.Name} was killed with detail {detail}.");
+    }
+
+    // coop.debug.hero.mark_died_in_battle <player hero>
+    /// <summary>
+    /// Marks a living player hero to die in battle without killing them, so the daily aging tick applies the death.
+    /// </summary>
+    public sealed class HeroMarkDiedInBattleCoopCommand : ICoopCommand
+    {
+        private readonly ICommandObjectResolver resolver;
+        private readonly IPlayerManager playerManager;
+
+        public HeroMarkDiedInBattleCoopCommand(ICommandObjectResolver resolver, IPlayerManager playerManager)
+        {
+            this.resolver = resolver;
+            this.playerManager = playerManager;
+        }
+
+        public string Prefix => "coop.debug.hero";
+
+        public string Name => "mark_died_in_battle";
+
+        public string Description => "Marks a living player hero to die in battle; the next daily tick kills them.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("hero_id", "Player hero name or id; quote names with spaces."),
+        };
+
+        // Adds the battle death mark the way a battle does, leaving the kill to AgingCampaignBehavior.DailyTickHero.
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!resolver.TryResolveHero(args[0], out var hero, out var error)) return Failed(error);
+            if (!playerManager.Contains(hero) || !hero.IsAlive) return Failed("The hero must be a living registered player.");
+            if (hero.DeathMark != KillCharacterAction.KillCharacterActionDetail.None)
+                return Failed($"{hero.Name} already has the death mark {hero.DeathMark}.");
+
+            hero.AddDeathMark(killerHero: null, KillCharacterAction.KillCharacterActionDetail.DiedInBattle);
+            return Succeeded($"Player {hero.Name} is marked to die in battle; the next daily tick applies it.");
+        }
     }
 
     public sealed class HeroIllDaysCoopCommand : ICoopCommand
