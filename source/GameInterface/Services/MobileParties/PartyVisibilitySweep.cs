@@ -1,4 +1,5 @@
 using Common;
+using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -8,6 +9,8 @@ namespace GameInterface.Services.MobileParties;
 public interface IPartyVisibilitySweep
 {
     void RebuildAroundMainParty();
+
+    void HideAll(IEnumerable<MobileParty> parties);
 }
 
 /// <summary>
@@ -16,8 +19,9 @@ public interface IPartyVisibilitySweep
 /// Loading a save restores each party's persisted visibility verbatim, and the native per-tick
 /// sweep (<c>CampaignTickCacheDataStore.UpdateVisibilitiesAroundMainParty</c>) only re-evaluates
 /// parties within seeing range of the main party — visibility is sticky everywhere else. A joining
-/// client loads the server's transferred save, where <see cref="Patches.PartyVisibilityOnServerPatch"/>
-/// keeps every party visible, so without this pass the whole map stays revealed for the client.
+/// release client loads the server's transferred save with every party hidden (<see cref="HideAll"/>
+/// clears the server's forced visibility on load), so this pass reveals the parties in range of the
+/// local main party.
 /// </summary>
 internal sealed class PartyVisibilitySweep : IPartyVisibilitySweep
 {
@@ -37,7 +41,7 @@ internal sealed class PartyVisibilitySweep : IPartyVisibilitySweep
         // recomputed — besieging/raiding parties read their settlement's IsInspected, and attached
         // army followers copy their leader's visibility. So: settlements, then army leaders and
         // unattached parties, then attached followers. A follower swept before its leader would
-        // keep the server save's stale visibility.
+        // copy the leader's old visibility.
         foreach (var settlement in Settlement.All)
         {
             settlement.Party.UpdateVisibilityAndInspected(mainParty.Position);
@@ -53,6 +57,16 @@ internal sealed class PartyVisibilitySweep : IPartyVisibilitySweep
         {
             if (!IsAttachedFollower(mobileParty)) continue;
             mobileParty.Party.UpdateVisibilityAndInspected(mainParty.Position);
+        }
+    }
+
+    public void HideAll(IEnumerable<MobileParty> parties)
+    {
+        if (ModInformation.IsServer || DebugPartyVisibility.ForceAllVisible) return;
+
+        foreach (var party in parties)
+        {
+            party._isVisible = false;
         }
     }
 

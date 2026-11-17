@@ -236,6 +236,10 @@ connection to the **campaign server** is unexpectedly lost.
 The campaign server shall detect the disconnection and is responsible for notifying the battle
 mission's remaining participants (including the mission host).
 
+A mission host with a successor waiting is considered lost after 15 seconds without traffic to the
+campaign server, instead of the 60 seconds any other connection gets, so hosting migrates (BR-014)
+before the battle stalls for long.
+
 Loss of peer-to-peer connectivity within the mission mesh alone, while the player's server
 connection remains, does not constitute disconnection from the mission.
 

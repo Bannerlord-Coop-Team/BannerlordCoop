@@ -11,15 +11,6 @@ public sealed class CoopCommandDescriptor
         string prefix,
         string name,
         string description,
-        IExpectedArgs[] expectedArgs)
-        : this(prefix, name, description, expectedArgs, CoopCommandSide.Both)
-    {
-    }
-
-    internal CoopCommandDescriptor(
-        string prefix,
-        string name,
-        string description,
         IExpectedArgs[] expectedArgs,
         CoopCommandSide side)
     {
