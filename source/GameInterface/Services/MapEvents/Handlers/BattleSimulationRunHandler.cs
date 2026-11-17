@@ -6,6 +6,7 @@ using Common.Network.Messages;
 using Common.Util;
 using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Logging;
+using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MapEventSides.Messages;
@@ -214,9 +215,12 @@ internal class BattleSimulationRunHandler : IHandler
                 ServerBattleModeArbiter.Release(mapEventId);
 
             if (unsupportedHostileAction)
-                network.Send(requestingPeer, new NetworkBattleSimulationFinished(mapEventId));
-            else
-                network.Send(requestingPeer, new NetworkBattleStartReply(payload.What.RequestId, false));
+            {
+                // Reset the requester client from its tentative simulation state before the rejected start reply.
+                network.Send(requestingPeer, new NetworkBattleSimulationCancelled(mapEventId));
+                network.Send(requestingPeer, new NetworkBattleModeSet(mapEventId, (int)BattleStartMode.Unclaimed));
+            }
+            network.Send(requestingPeer, new NetworkBattleStartReply(payload.What.RequestId, false));
             return;
         }
 
@@ -233,7 +237,7 @@ internal class BattleSimulationRunHandler : IHandler
     }
 
     /// <summary>
-    ///  Cancels an unfinished simulation when requested by the client currently doing it.
+    /// Cancels an unfinished simulation for the client pacing it and retreats: a side leader finalizes the event, a joiner leaves it.
     /// </summary>
     private void Handle_NetworkCancelBattleSimulation(MessagePayload<NetworkCancelBattleSimulation> payload)
     {
@@ -257,19 +261,18 @@ internal class BattleSimulationRunHandler : IHandler
                 Logger.Warning("Peer attempted to cancel a battle simulation it does not own. MapEventId={MapEventId}", mapEventId);
                 return;
             }
-            activeSimulations.Remove(mapEventId);
         }
         
-        GameThread.RunCleanupSafe(() => EndSimulationSession(simulation), then: () =>
+        GameThread.RunCleanupSafe(() =>
         {
-            if (ServerBattleModeArbiter.ReleaseSimulation(mapEventId))
-            {
-                network.SendAll(new NetworkBattleSimulationCancelled(mapEventId));
-                network.SendAll(new NetworkBattleModeSet(mapEventId, (int)BattleStartMode.Unclaimed));
-            }
+            var releasedClaim = CancelSimulationSession(mapEventId, simulation);
+            // only the cancel that released the claim owns the retreat, so a repeated cancel does nothing
+            if (releasedClaim)
+                LeaveOrFinalizeCancelledSimulation(requestingPeer, simulation.MapEvent);
             mapEventLogger.DebugMapEvent(simulation.MapEvent, "Battle simulation cancelled by initiating client");
         }, context: nameof(Handle_NetworkCancelBattleSimulation));
     }
+
     private bool TryGetRequestingParticipant(
         NetPeer requester,
         NetworkBattleStartRequest request,
@@ -322,13 +325,8 @@ internal class BattleSimulationRunHandler : IHandler
 
             if (sim.MapEvent.IsUnsupportedMultiPlayerHostileAction())
             {
-                EndSimulationSession(sim);
-                lock (simLock)
-                {
-                    activeSimulations.Remove(mapEventId);
-                }
+                CancelSimulationSession(mapEventId, sim);
 
-                network.SendAll(new NetworkBattleSimulationFinished(mapEventId));
                 mapEventLogger.DebugMapEvent(sim.MapEvent, "Stopped hostile-action battle simulation because an unsupported hostile-action player party joined");
                 return;
             }
@@ -422,10 +420,6 @@ internal class BattleSimulationRunHandler : IHandler
         }
 #endif
         var maxRounds = payload.What.MaxRounds;
-        var finished = false;
-        NetworkBattleSimulationLoot lootMessage = default;
-        var hasLoot = false;
-
         GameThread.RunSafe(() =>
         {
 #if DEBUG
@@ -438,8 +432,7 @@ internal class BattleSimulationRunHandler : IHandler
 #if DEBUG
                 if (observation != null) observation.SimulationAdvanceStage = "unsupported-hostile-action";
 #endif
-                EndSimulationSession(sim);
-                finished = true;
+                CancelSimulationSession(mapEventId, sim);
                 return;
             }
 
@@ -486,25 +479,13 @@ internal class BattleSimulationRunHandler : IHandler
             if (sim.MapEvent.HasWinner)
             {
 #if DEBUG
-                if (observation != null) observation.SimulationAdvanceStage = "capture-loot";
+                if (observation != null) observation.SimulationAdvanceStage = "complete-session";
 #endif
-                // Capture the casualties and winner contributions before tearing the simulation down so the
-                // winning client can re-run the native loot flow locally and open its loot screen.
-                if (PlayerWonSimulation(sim.MapEvent))
-                {
-                    lootMessage = new NetworkBattleSimulationLoot(
-                        mapEventId,
-                        sim.MapEvent.BattleState,
-                        CollectDefeatedCasualties(sim.MapEvent),
-                        CollectWinnerContributions(sim.MapEvent));
-                    hasLoot = true;
-                }
-
+                CompleteSimulationSession(mapEventId, sim);
+                mapEventLogger.DebugMapEvent(sim.MapEvent, "Server-side battle simulation finished. BattleState={BattleState}", sim.MapEvent.BattleState);
 #if DEBUG
-                if (observation != null) observation.SimulationAdvanceStage = "end-session";
+                if (observation != null) observation.SimulationAdvanceStage = "completed";
 #endif
-                EndSimulationSession(sim);
-                finished = true;
             }
 #if DEBUG
             }
@@ -516,29 +497,6 @@ internal class BattleSimulationRunHandler : IHandler
 #endif
         }, blocking: true, context: nameof(Handle_NetworkAdvanceBattleSimulation));
 
-        if (finished)
-        {
-#if DEBUG
-            if (observation != null) observation.SimulationAdvanceStage = "publish-finished";
-#endif
-            lock (simLock)
-            {
-                activeSimulations.Remove(mapEventId);
-            }
-
-            mapEventLogger.DebugMapEvent(sim.MapEvent, "Server-side battle simulation finished. BattleState={BattleState}", sim.MapEvent.BattleState);
-
-            // Loot first so the client applies it before the finish closes the playback. Broadcast: every
-            // winning-side player (the pacer or a joiner) needs the loot flow; each client applies it only
-            // if its own party is among the winners.
-            if (hasLoot)
-                network.SendAll(lootMessage);
-
-            network.SendAll(new NetworkBattleSimulationFinished(mapEventId));
-#if DEBUG
-            if (observation != null) observation.SimulationAdvanceStage = "completed";
-#endif
-        }
 #if DEBUG
         }
         catch (Exception exception)
@@ -775,15 +733,14 @@ internal class BattleSimulationRunHandler : IHandler
         {
             if (!BattleSimulationReplay.IsActiveFor(payload.What.MapEventId)) return;
 
-            bool isSpectator = BattleSimulationReplay.IsSpectator;
             var encounter = PlayerEncounter.Current;
             var simulation = encounter?.BattleSimulation;
+            var mapState = Game.Current?.GameStateManager?.ActiveState as MapState;
+            bool mapStateOwnsSimulation = simulation != null && mapState?._battleSimulation == simulation;
             
             BattleSimulationReplay.ConfirmCancellation(payload.What.MapEventId);
 
-            if (!isSpectator) return;
-
-            if (Game.Current?.GameStateManager?.ActiveState is MapState mapState ) 
+            if (mapStateOwnsSimulation)
                 mapState.EndBattleSimulation();
 
             if (encounter != null && ReferenceEquals(encounter.BattleSimulation, simulation))
@@ -898,32 +855,129 @@ internal class BattleSimulationRunHandler : IHandler
             foreach (var entry in orphaned)
             {
                 var sim = entry.Value;
-
-                // No client left to pace the playback, so resolve whatever remains and let the battle
-                // reach its decision (casualties still sync to the other clients via the troop-roster
-                // patches) instead of leaving the map event half-simulated.
-                int rounds = 0;
-                while (rounds < MaxSimulationRounds && !sim.MapEvent.HasWinner)
-                {
-                    rounds++;
-                    sim.MapEvent.SimulatePlayerEncounterBattle();
-                }
-
-                EndSimulationSession(sim);
-                mapEventLogger.DebugMapEvent(sim.MapEvent, "Battle simulation client disconnected; finished server-side. BattleState={BattleState}", sim.MapEvent.BattleState);
-
-                // Tell the spectators the simulation is over, otherwise they stay stuck in the spectator window now
-                // that the pacing client (which would have driven it to completion) is gone.
-                network.SendAll(new NetworkBattleSimulationFinished(entry.Key));
-            }
-        }, then: () =>
-        {
-            lock (simLock)
-            {
-                foreach (var entry in orphaned)
-                    activeSimulations.Remove(entry.Key);
+                ResolveRemainingRounds(entry.Key, sim);
+                FinishOrphanedSimulation(entry.Key, sim);
             }
         }, context: nameof(Handle_PlayerDisconnected));
+    }
+
+    private void ResolveRemainingRounds(string mapEventId, ActiveSimulation sim)
+    {
+        // No client left to pace the playback, so resolve whatever remains and let the battle reach its decision.
+        try
+        {
+            int rounds = 0;
+            while (rounds < MaxSimulationRounds && !sim.MapEvent.HasWinner)
+            {
+                rounds++;
+                sim.MapEvent.SimulatePlayerEncounterBattle();
+            }
+        }
+        catch (Exception exception)
+        {
+            Logger.Error(exception, "Battle simulation disconnect cleanup could not resolve another round for {MapEventId}", mapEventId);
+        }
+    }
+
+    private void FinishOrphanedSimulation(string mapEventId, ActiveSimulation sim)
+    {
+        if (sim.MapEvent.HasWinner)
+        {
+            CompleteSimulationSession(mapEventId, sim);
+            mapEventLogger.DebugMapEvent(sim.MapEvent,
+                "Battle simulation client disconnected; finished server-side. BattleState={BattleState}",
+                sim.MapEvent.BattleState);
+        }
+        else
+        {
+            CancelSimulationSession(mapEventId, sim);
+            mapEventLogger.DebugMapEvent(sim.MapEvent,
+                "Battle simulation client disconnected; cancelled unfinished session. BattleState={BattleState}",
+                sim.MapEvent.BattleState);
+        }
+    }
+
+    /// <summary>
+    /// [Server, main thread] Complete a simulation that reached a winner: send the winner loot while the
+    /// event is still registered, end the session, then let <see cref="BattleFinalizeHandler"/> finalize it
+    /// (dedupe, encounter close, won-raid continuation) before telling every client the playback is over.
+    /// </summary>
+    private void CompleteSimulationSession(string mapEventId, ActiveSimulation sim)
+    {
+        lock (simLock)
+            activeSimulations.Remove(mapEventId);
+
+        if (PlayerWonSimulation(sim.MapEvent))
+        {
+            try
+            {
+                // Send loot while the event is still registered so clients can resolve its id.
+                network.SendAll(new NetworkBattleSimulationLoot(
+                    mapEventId,
+                    sim.MapEvent.BattleState,
+                    CollectDefeatedCasualties(sim.MapEvent),
+                    CollectWinnerContributions(sim.MapEvent)));
+            }
+            catch (Exception exception)
+            {
+                Logger.Error(exception, "Failed to capture battle simulation completion data for {MapEventId}", mapEventId);
+            }
+        }
+
+        EndSimulationSessionSafe(mapEventId, sim);
+
+        // Release before the finalize publish; TryMarkFinalized releases the same claim inline, which would leave released false.
+        var released = ServerBattleModeArbiter.ReleaseSimulation(mapEventId);
+
+        messageBroker.Publish(this, new MapEventFinalizeAttempted(sim.MapEvent));
+        if (released)
+            network.SendAll(new NetworkBattleModeSet(mapEventId, (int)BattleStartMode.Unclaimed));
+        network.SendAll(new NetworkBattleSimulationFinished(mapEventId));
+    }
+
+    // A simulation leader ends the event while a joiner only removes its own party.
+    private void LeaveOrFinalizeCancelledSimulation(NetPeer requester, MapEvent mapEvent)
+    {
+        if (!playerManager.TryGetPlayer(requester, out var player) ||
+            !objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party) ||
+            party.MapEvent != mapEvent)
+            return;
+
+        if (party.Party.MapEventSide?.LeaderParty == party.Party)
+            messageBroker.Publish(this, new MapEventFinalizeAttempted(mapEvent));
+        else
+            messageBroker.Publish(requester, new PlayerLeaveBattleAttempted(party.Party));
+    }
+
+    /// <summary>
+    /// [Server, main thread] End an unfinished session; when this call released the simulation claim,
+    /// tell every client it was cancelled. True when the claim was released here.
+    /// </summary>
+    private bool CancelSimulationSession(string mapEventId, ActiveSimulation sim)
+    {
+        lock (simLock)
+            activeSimulations.Remove(mapEventId);
+
+        EndSimulationSessionSafe(mapEventId, sim);
+
+        if (!ServerBattleModeArbiter.ReleaseSimulation(mapEventId))
+            return false;
+
+        network.SendAll(new NetworkBattleSimulationCancelled(mapEventId));
+        network.SendAll(new NetworkBattleModeSet(mapEventId, (int)BattleStartMode.Unclaimed));
+        return true;
+    }
+
+    private static void EndSimulationSessionSafe(string mapEventId, ActiveSimulation sim)
+    {
+        try
+        {
+            EndSimulationSession(sim);
+        }
+        catch (Exception exception)
+        {
+            Logger.Error(exception, "Failed to end battle simulation session for {MapEventId}", mapEventId);
+        }
     }
 
     /// <summary>
@@ -933,6 +987,10 @@ internal class BattleSimulationRunHandler : IHandler
     /// </summary>
     private static void EndSimulationSession(ActiveSimulation sim)
     {
+        // A cancel queued behind a completed advance arrives after the finalize tore the sides down.
+        if (sim.MapEvent.IsFinalized)
+            return;
+
         foreach (var side in sim.MapEvent._sides)
         {
             sim.MapEvent.CommitXpGains();

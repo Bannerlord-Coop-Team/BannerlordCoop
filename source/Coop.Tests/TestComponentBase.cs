@@ -18,6 +18,7 @@ using GameInterface.Registry.Auto;
 using GameInterface.Services.CampaignService.Interfaces;
 using GameInterface.Services.Chat;
 using GameInterface.Services.Voice;
+using GameInterface.Services.Villages;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.MapTracking;
@@ -175,6 +176,7 @@ internal abstract class TestComponentBase
         RegisterMock<IRaidAiInterventionConfigInterface>(builder);
         RegisterMock<ITacticalUnitSymbolsConfigInterface>(builder);
         RegisterMock<IVillageHostileActionInterface>(builder);
+        RegisterMock<IHostileActionRequestTracker>(builder);
         RegisterMock<IIssueOwnershipRegistry>(builder);
         RegisterMock<IQuestFeatureFlag>(builder);
         RegisterMock<IEducationCampaignBehaviorInterface>(builder);
