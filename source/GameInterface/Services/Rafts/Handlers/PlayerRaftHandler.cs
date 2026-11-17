@@ -60,14 +60,14 @@ internal class PlayerRaftHandler : IHandler
     private void Handle_OccupancyChanged(MessagePayload<PartyOccupancyChanged> obj)
     {
         var party = obj.What.MobileParty;
-        // Published on the game thread, and only a raft needs the frame queued below.
+        // Already on the game thread, so filter now and only queue a frame for a raft
         if (!party.IsInRaftState) return;
 
         // A raft's AI is off, so leaving a battle or its post battle screens would hold it at sea for good.
-        // A finished battle resumes once the screens close, so its move isn't sent twice.
         // Queued for a later frame, because the battle leave holds the party right after clearing its side.
         GameThread.EnqueueSafe(() =>
         {
+            // A finished battle resumes once the screens close, so its move isn't sent twice
             if (postBattleScreens.IsInScreens(party)) return;
 
             raftFleetInterface.ResumeRaft(party);

@@ -20,7 +20,8 @@ namespace GameInterface.Services.Rafts.Interfaces;
 
 /// <summary>
 /// Server-only: strands a player's party released from captivity at sea and keeps its fleet until it washes ashore or
-/// leaves its raft at sea, and lands a party left on a raft or marked at sea while it stands on land.
+/// leaves its raft at sea, sends a raft at sea toward shore again after its move was lost, and lands a party left on a
+/// raft or marked at sea while it stands on land.
 /// </summary>
 public interface IPlayerRaftFleetInterface : IGameAbstraction
 {
@@ -44,6 +45,8 @@ public interface IPlayerRaftFleetInterface : IGameAbstraction
     /// client. Returns false for a party that isn't a raft free at sea.
     /// </summary>
     bool ResumeRaft(MobileParty party);
+
+    /// <summary>
     /// Lands a party that stands on land but is still on a raft or marked at sea, ends its raft state, gives back its fleet
     /// and holds it there on every client. Returns false for a parked party, a party at sea, or one neither on a raft nor
     /// marked at sea.
@@ -136,7 +139,10 @@ public class PlayerRaftFleetInterface : IPlayerRaftFleetInterface
 
     public bool ResumeRaft(MobileParty party)
     {
-        if (!party.IsInRaftState || !party.IsCurrentlyAtSea || party.MapEvent != null || party.CurrentSettlement != null) return false;
+        if (!party.IsInRaftState || !party.IsCurrentlyAtSea) return false;
+        // Leaving the battle resumes it through PartyOccupancyChanged
+        if (party.MapEvent != null) return false;
+        if (party.CurrentSettlement != null) return false;
 
         party.MovePartyToTheClosestLand();
         messageBroker.Publish(this, new PartyBehaviorChangeAttempted(party, forcePosition: true, isCurrentlyAtSea: party.IsCurrentlyAtSea));

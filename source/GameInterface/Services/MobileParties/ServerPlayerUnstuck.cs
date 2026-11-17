@@ -30,8 +30,9 @@ internal interface IServerPlayerUnstuck
 {
     /// <summary>
     /// Force-applies every applicable exit for the player's registered party and hero, releases every
-    /// party (not only the player's) still linked to a battle that already ended, ends battles left with no
-    /// healthy troops on one side, ends the raft state of a party stranded on land, then moves a free party
+    /// party (not only the player's) still linked to a battle that already ended, sends a raft at sea toward
+    /// shore again, takes the party out of its battle, ends battles left with no healthy troops on one side,
+    /// ends the raft state of a party stranded on land, then moves a free party
     /// off a map spot it cannot move from, each step guarded independently, and sends the result to the
     /// player's connection when it has one. Runs on the game thread.
     /// </summary>

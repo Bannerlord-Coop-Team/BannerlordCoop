@@ -4,11 +4,18 @@ using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Services.MobileParties.Messages;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Services.MapEvents;
+using E2E.Tests.Util;
+using GameInterface.Services.Heroes.Interfaces;
+using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.MapEvents.Messages.Conversation;
+using GameInterface.Services.MobileParties.Handlers;
 using GameInterface.Services.MobileParties.Messages.Unstuck;
+using GameInterface.Services.Players.Data;
+using HarmonyLib;
 using Moq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameComponents;
+using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -112,6 +119,33 @@ public class PlayerRaftResumeTests : MapEventTestBase
         Assert.Single(ForcedUpdates());
     }
 
+    // A reload sets the raft state straight into its field, so only the switch to the player reopens the raft menu.
+    [Fact]
+    public void SwitchToPlayer_PartyOnRaft_OpensTheRaftMenu()
+    {
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        using var menuRecorder = new MethodCallRecorder(Priority.First,
+            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu), new[] { typeof(string) }));
+
+        Client.Call(() =>
+        {
+            var party = Client.GetRegisteredObject<MobileParty>(partyId);
+            var hero = party.LeaderHero;
+            Assert.True(Client.ObjectManager.TryGetId(hero, out var heroId));
+            Assert.True(Client.ObjectManager.TryGetId(hero.Clan, out var clanId));
+            Assert.True(Client.ObjectManager.TryGetId(hero.CharacterObject, out var characterId));
+            party._isInRaftState = true;
+
+            Client.Resolve<IHeroInterface>().SwitchToPlayer(new Player(ControllerId, heroId, partyId, clanId, characterId));
+        }, new[]
+        {
+            AccessTools.Method(typeof(InteractionsInitializationHandler), "Handle", new[] { typeof(MessagePayload<PlayerHeroChanged>) }),
+        });
+        Client.PumpGameThread();
+
+        Assert.Equal(new[] { "player_raft_state" }, menuRecorder.MenusFor(Client));
+    }
+
     // Sets the party on a raft at sea on the server, over a fake mesh whose closest reachable land is the shore.
     private void PutOnRaftAtSea(string partyId) => Server.Call(() =>
     {
@@ -122,6 +156,7 @@ public class PlayerRaftResumeTests : MapEventTestBase
             .Returns(Shore);
         Campaign.Current._mapSceneWrapper = mapScene.Object;
 
+        // MovePartyToTheClosestLand reads Campaign.Current.Models.PartyNavigationModel, which the harness campaign doesnt have
         var models = Campaign.Current.Models.GetGameModels().ToList();
         models.Add(new DefaultPartyNavigationModel());
         var gameModels = new GameModels(models);
