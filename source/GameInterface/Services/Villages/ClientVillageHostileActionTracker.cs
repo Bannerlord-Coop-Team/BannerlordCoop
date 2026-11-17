@@ -16,14 +16,17 @@ using TaleWorlds.MountAndBlade;
 
 namespace GameInterface.Services.Villages;
 
-public interface IClientVillageHostileActionTracker : IGameAbstraction
+public interface IClientVillageHostileActionTracker
 {
     bool TryBeginRequest();
     void Complete();
+    /// <summary>[Client, game thread] Park a raid continuation until the current encounter ends.</summary>
     void ParkRaidContinuation(Settlement settlement);
+    /// <summary>[Client, game thread] The hostile-action request was denied; close the continuation encounter it opened.</summary>
     void CloseDeniedRaidContinuation();
 }
 
+// Tracks client hostile-action requests and raid continuations for one lifetime scope.
 internal sealed class ClientVillageHostileActionTracker : IClientVillageHostileActionTracker, IDisposable
 {
     private static readonly ILogger Logger = LogManager.GetLogger<ClientVillageHostileActionTracker>();
@@ -35,7 +38,7 @@ internal sealed class ClientVillageHostileActionTracker : IClientVillageHostileA
 
     public ClientVillageHostileActionTracker(IMessageBroker messageBroker)
     {
-        this.messageBroker = messageBroker ?? throw new ArgumentNullException(nameof(messageBroker));
+        this.messageBroker = messageBroker;
         messageBroker.Subscribe<CampaignTick>(Handle_CampaignTick);
     }
 
@@ -67,12 +70,12 @@ internal sealed class ClientVillageHostileActionTracker : IClientVillageHostileA
 
     public void CloseDeniedRaidContinuation()
     {
-        pending = false;
         var encounter = continuationEncounter;
         continuationEncounter = null;
         if (encounter == null || !ReferenceEquals(encounter, PlayerEncounter.Current))
             return;
 
+        // Leave a live encounter or simulation alone when a denial races its start.
         if (encounter._mapEvent != null || encounter.BattleSimulation != null)
             return;
 
@@ -89,6 +92,7 @@ internal sealed class ClientVillageHostileActionTracker : IClientVillageHostileA
     private void Handle_CampaignTick(MessagePayload<CampaignTick> payload)
     {
         if (ModInformation.IsServer || IsInMission()) return;
+        if (pending) return;
 
         var parked = parkedRaidContinuation;
         if (parked == null) return;
@@ -102,18 +106,26 @@ internal sealed class ClientVillageHostileActionTracker : IClientVillageHostileA
         }
 
         var encounter = PlayerEncounter.Current;
-        if (encounter != null && parked.Encounter != null && !ReferenceEquals(encounter, parked.Encounter))
+        bool encounterReplaced = encounter != null && parked.Encounter != null && !ReferenceEquals(encounter, parked.Encounter);
+        if (encounterReplaced)
         {
             parkedRaidContinuation = null;
             Logger.Information("Dropping parked raid continuation for {SettlementId}: encounter replaced", settlement.StringId);
             return;
         }
 
-        if (MobileParty.MainParty?.MapEvent != null ||
-            (encounter != null && encounter.EncounterState != PlayerEncounterState.End))
+        bool encounterStillOpen = MobileParty.MainParty?.MapEvent != null ||
+            (encounter != null && encounter.EncounterState != PlayerEncounterState.End);
+        if (encounterStillOpen)
             return;
 
         parkedRaidContinuation = null;
+        StartRaidContinuationEncounter(settlement);
+    }
+
+    private void StartRaidContinuationEncounter(Settlement settlement)
+    {
+        // The map-event teardown clears both parties before this continuation requests fresh approval.
         PlayerEncounter.Start();
         PlayerEncounter.Current.SetupFields(PartyBase.MainParty, settlement.Party);
         continuationEncounter = PlayerEncounter.Current;

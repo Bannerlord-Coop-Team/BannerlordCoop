@@ -111,6 +111,7 @@ internal class ClientVillageHostileActionHandler : IHandler
             () =>
             {
                 clientVillageHostileActionTracker.CloseDeniedRaidContinuation();
+                clientVillageHostileActionTracker.Complete();
             },
             context: nameof(Handle_NetworkVillageHostileActionDenied));
         messageBroker.Publish(this, new SendInformationMessage(GetDeniedMessage(payload.What.Reason)));

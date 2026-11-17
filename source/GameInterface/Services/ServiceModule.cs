@@ -5,7 +5,6 @@ using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Alleys.Handlers;
 using GameInterface.Services.Locations.Conversations;
-using GameInterface.Services.Villages;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -61,10 +60,7 @@ internal class ServiceModule : Module
             {
                 Logger.Verbose("Registering {type} GameInterface Service", type.Name);
 
-                if (type == typeof(ClientVillageHostileActionTracker))
-                    builder.RegisterType(type).As(interfaceToRegister).InstancePerLifetimeScope();
-                else
-                    builder.RegisterType(type).As(interfaceToRegister).SingleInstance();
+                builder.RegisterType(type).As(interfaceToRegister).SingleInstance();
             }
             else
             {
