@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.ObjectManager;
@@ -105,7 +106,7 @@ internal class MercenaryHireHandler : IHandler
         int availableCount = 0;
         if (mercenaryData != null)
         {
-            availableCount = RecruitmentCampaignBehaviorPatch.GetMercenaryHireLimit(mainHero, mercenaryData.Number);
+            availableCount = mainHero.GetMercenaryHireLimit(mercenaryData.Number);
         }
 
         // The server stock may tick while a client is still in the tavern conversation. Reject those

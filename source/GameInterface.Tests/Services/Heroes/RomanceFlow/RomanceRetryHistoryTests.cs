@@ -1,6 +1,5 @@
-using Common.Util;
+﻿using Common.Util;
 using GameInterface.Services.Heroes.RomanceFlow;
-using HarmonyLib;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using Xunit;
@@ -64,20 +63,6 @@ public class RomanceRetryHistoryTests
 
         Assert.False(history.TryGetFailure(first, courted, out _));
         Assert.True(history.TryGetFailure(second, courted, out _));
-    }
-
-    [Fact]
-    public void SavePatch_TargetsTheVanillaRomanceBehavior()
-    {
-        var harmony = new Harmony("coop.tests.romance.retry-save");
-        try
-        {
-            Assert.NotEmpty(harmony.CreateClassProcessor(typeof(RomanceRetryHistorySavePatch)).Patch());
-        }
-        finally
-        {
-            harmony.UnpatchAll(harmony.Id);
-        }
     }
 
     private sealed class TestDataStore : IDataStore

@@ -32,7 +32,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
-      should_publish: ${{ steps.decide.outputs.should_publish }}
       release_date: ${{ steps.due.outputs.release_date }}
     steps:
       - name: Resolve due nightly date
@@ -62,82 +61,9 @@ jobs:
             }
             core.setOutput('release_date', releaseDate);
 
-      - name: Keep a late scheduled nightly from overwriting a published one
-        id: decide
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
-        env:
-          RELEASE_DATE: ${{ steps.due.outputs.release_date }}
-        with:
-          script: |
-            const releaseDate = process.env.RELEASE_DATE;
-            const cutoffMinutes = (23 * 60) + 57;
-            function centralDateParts(instant) {
-              const parts = new Intl.DateTimeFormat('en-US', {
-                timeZone: 'America/Chicago',
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit',
-                hourCycle: 'h23',
-              }).formatToParts(instant);
-              const values = new Map(parts.map((part) => [part.type, part.value]));
-              return {
-                year: values.get('year'),
-                month: values.get('month'),
-                day: values.get('day'),
-                hour: Number(values.get('hour')),
-                minute: Number(values.get('minute')),
-              };
-            }
-            function belongsToNightlyReleaseWindow(timestamp, date) {
-              const instant = new Date(timestamp);
-              if (!Number.isFinite(instant.getTime())) return false;
-              const values = centralDateParts(instant);
-              const localDate = `${values.year}-${values.month}-${values.day}`;
-              const next = new Date(`${date}T12:00:00.000Z`);
-              next.setUTCDate(next.getUTCDate() + 1);
-              const nextDate = next.toISOString().slice(0, 10);
-              const localMinutes = (values.hour * 60) + values.minute;
-              return (
-                (localDate === date && localMinutes >= cutoffMinutes)
-                || (localDate === nextDate && localMinutes < cutoffMinutes)
-              );
-            }
-            if (context.eventName !== 'schedule') {
-              core.setOutput('should_publish', 'true');
-              return;
-            }
-            if (!/^\d{4}-\d{2}-\d{2}$/.test(releaseDate)) {
-              throw new Error('Due nightly date is invalid');
-            }
-            const response = await github.rest.actions.listWorkflowRuns({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              workflow_id: 'nightly-release.yml',
-              branch: 'development',
-              per_page: 30,
-            });
-            const published = response.data.workflow_runs.find((run) =>
-              run.id !== context.runId
-              && run.status === 'completed'
-              && run.conclusion === 'success'
-              && (
-                belongsToNightlyReleaseWindow(run.created_at, releaseDate)
-                || belongsToNightlyReleaseWindow(run.updated_at, releaseDate)
-              ));
-            if (published) {
-              core.info(
-                `Scheduled nightly for ${releaseDate} will not overwrite ${published.html_url} (${published.event}).`,
-              );
-              core.setOutput('should_publish', 'false');
-              return;
-            }
-            core.setOutput('should_publish', 'true');
-
   build:
     needs: guard
-    if: github.ref == 'refs/heads/development' && needs.guard.outputs.should_publish == 'true'
+    if: github.ref == 'refs/heads/development'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     container:

@@ -582,7 +582,11 @@ public class ReinforcementFielder : IReinforcementFielder
     // from; a null origin keeps its historical rider-only cost (call sites never pass one). A side that spawns
     // no horses spawns the rider alone, as MissionSpawnCapacityPatch charges the native drip.
     private int SlotsForOrigin(CoopAgentOrigin origin, bool sideSpawnsHorses)
-        => origin == null || !sideSpawnsHorses ? 1 : agentBudget.SlotsForOrigin(origin);
+    {
+        if (origin == null || !sideSpawnsHorses) return 1;
+
+        return agentBudget.SlotsForOrigin(origin);
+    }
 
     /// <summary>What a fielding batch does with a formation its troops joined.</summary>
     internal enum JoinedFormationAction

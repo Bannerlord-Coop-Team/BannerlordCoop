@@ -38,7 +38,7 @@ internal class KingdomManagerPatches
     }
 
     // The throne goes to the most influential other clan that may rule, or null when none may.
-    internal static Clan FindSuccessorClan(Kingdom kingdom)
+    private static Clan FindSuccessorClan(Kingdom kingdom)
     {
         Clan successor = null;
         float highestInfluence = float.MinValue;

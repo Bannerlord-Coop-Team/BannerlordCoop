@@ -75,7 +75,8 @@ public class VassalAndMercenaryOfferCampaignBehaviorInterface : IVassalAndMercen
                     continue;
                 }
 
-                if (playerHero.IsPrisoner || playerHero.PartyBelongedTo?.IsInNavalAutoTravel != false) continue;
+                var playerParty = playerHero.PartyBelongedTo;
+                if (playerHero.IsPrisoner || playerParty == null || playerParty.IsInNavalAutoTravel) continue;
 
                 float randomFloat = MBRandom.RandomFloat;
                 if (randomFloat <= VassalAndMercenaryOfferCampaignBehavior.MercenaryOfferCreationChance && behavior.CanPlayerClanReceiveMercenaryOffer())

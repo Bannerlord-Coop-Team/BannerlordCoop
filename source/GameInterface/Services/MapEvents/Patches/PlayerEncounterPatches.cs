@@ -266,9 +266,10 @@ internal class PlayerEncounterPatches
 
         // Same as vanilla, leave a village but stay in a fortification, then restart the settlement encounter
         var currentSettlement = mainParty.CurrentSettlement;
-        if (RecoverEncounterWithoutMapEvent(
+        bool recovered = RecoverEncounterWithoutMapEvent(
             encounter,
-            forcePlayerOutFromSettlement: currentSettlement?.IsFortification == false) && currentSettlement != null)
+            forcePlayerOutFromSettlement: currentSettlement?.IsFortification == false);
+        if (recovered && currentSettlement != null)
         {
             EncounterManager.StartSettlementEncounter(mainParty, currentSettlement);
         }

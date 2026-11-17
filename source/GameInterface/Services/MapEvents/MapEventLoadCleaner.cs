@@ -80,13 +80,21 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
     // Each stage is caught on its own, so one broken battle cannot stop the server from starting.
     private void CleanUpLoadedPlayerMapEvent(MapEvent mapEvent)
     {
-        (MobileParty[] InvolvedMobileParties, Army[] PlayerLedArmies, MobileParty[] ReleasedArmyParties) parties = default;
-
-        var repaired = TryStage(mapEvent, "party link repair, so its finalize and party release are skipped", () =>
+        var repaired = TryStage(mapEvent, "party link repair", () =>
         {
-            RepairPartySideLinks(mapEvent);
-            parties = CollectPlayerMapEventParties(mapEvent);
-        });
+            var (repairedLinks, removedEntries) = RepairPartySideLinks(mapEvent);
+            if (repairedLinks > 0 || removedEntries > 0)
+            {
+                logger.Warning(
+                    "Repaired {RepairedLinkCount} party-side links and removed {RemovedEntryCount} stale or duplicate participants from loaded map event {MapEventId} before finalization",
+                    repairedLinks,
+                    removedEntries,
+                    mapEvent.StringId);
+            }
+
+            return CollectPlayerMapEventParties(mapEvent);
+        }, out var parties);
+        // A failed repair skips the finalize and release, which would act on broken links
         if (!repaired) return;
 
         TryStage(mapEvent, "finalize", () =>
@@ -95,27 +103,36 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
             FinalizeOrRepairEvent(mapEvent);
         });
 
-        TryStage(mapEvent, "party release", () =>
-            ReleasePlayerMapEventParties(mapEvent, parties.InvolvedMobileParties, parties.PlayerLedArmies, parties.ReleasedArmyParties));
+        TryStage(mapEvent, "party release", () => ReleasePlayerMapEventParties(mapEvent, parties));
     }
 
     // Runs one cleanup stage of a loaded player battle and logs its failure instead of throwing.
-    private bool TryStage(MapEvent mapEvent, string stage, Action action)
+    private bool TryStage<T>(MapEvent mapEvent, string stage, Func<T> action, out T result)
     {
         try
         {
-            action();
+            result = action();
             return true;
         }
         catch (Exception e)
         {
             logger.Error(e, "Loaded player map event {MapEventId} failed its {Stage}", mapEvent.StringId, stage);
+            result = default;
             return false;
         }
     }
 
+    private bool TryStage(MapEvent mapEvent, string stage, Action action) =>
+        TryStage(mapEvent, stage, () => { action(); return true; }, out _);
+
+    // The parties a loaded player battle releases: those that fought, the player-led armies and their members.
+    private sealed record PlayerMapEventParties(
+        MobileParty[] InvolvedMobileParties,
+        Army[] PlayerLedArmies,
+        MobileParty[] ReleasedArmyParties);
+
     // Collected before the finalize detaches the parties, so the release still knows which ones fought.
-    private static (MobileParty[] InvolvedMobileParties, Army[] PlayerLedArmies, MobileParty[] ReleasedArmyParties) CollectPlayerMapEventParties(MapEvent mapEvent)
+    private static PlayerMapEventParties CollectPlayerMapEventParties(MapEvent mapEvent)
     {
         var involvedMobileParties = mapEvent.InvolvedParties
             .Where(party => party.IsMobile && party.MobileParty.IsActive)
@@ -132,7 +149,7 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
             .Distinct()
             .ToArray();
 
-        return (involvedMobileParties, playerLedArmies, releasedArmyParties);
+        return new PlayerMapEventParties(involvedMobileParties, playerLedArmies, releasedArmyParties);
     }
 
     // The event's sides can list a party that holds no link to it; detaching releases that party as well.
@@ -147,13 +164,9 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
         return linkedParties.Concat(sideParties).Distinct().ToArray();
     }
 
-    private void ReleasePlayerMapEventParties(
-        MapEvent mapEvent,
-        MobileParty[] involvedMobileParties,
-        Army[] playerLedArmies,
-        MobileParty[] releasedArmyParties)
+    private void ReleasePlayerMapEventParties(MapEvent mapEvent, PlayerMapEventParties parties)
     {
-        foreach (var army in playerLedArmies)
+        foreach (var army in parties.PlayerLedArmies)
         {
             logger.Information(
                 "Dispersing loaded player-led army {ArmyName} released from map event {MapEventId}",
@@ -162,12 +175,12 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
             armyDisbander.Disband(army, Army.ArmyDispersionReason.Unknown);
         }
 
-        foreach (var mobileParty in involvedMobileParties.Concat(releasedArmyParties).Distinct())
+        foreach (var mobileParty in parties.InvolvedMobileParties.Concat(parties.ReleasedArmyParties).Distinct())
         {
             if (!mobileParty.IsActive || mobileParty.IsPlayerParty())
                 continue;
 
-            if (releasedArmyParties.Contains(mobileParty) &&
+            if (parties.ReleasedArmyParties.Contains(mobileParty) &&
                 TrySetReleasedPartySettlementObjective(mobileParty, out var settlement))
             {
                 logger.Information(
@@ -444,15 +457,6 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
 
             membership.Key._mapEventSide = membership.Value;
             repairedLinks++;
-        }
-
-        if (repairedLinks > 0 || removedEntries > 0)
-        {
-            logger.Warning(
-                "Repaired {RepairedLinkCount} party-side links and removed {RemovedEntryCount} stale or duplicate participants from loaded map event {MapEventId} before finalization",
-                repairedLinks,
-                removedEntries,
-                mapEvent.StringId);
         }
 
         return (repairedLinks, removedEntries);

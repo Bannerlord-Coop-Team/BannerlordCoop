@@ -16,6 +16,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Settlements.Interfaces;
 using GameInterface.Services.SiegeEvents.Patches;
+using GameInterface.Services.Villages.Messages;
 using LiteNetLib;
 using Serilog;
 using System;
@@ -93,7 +94,6 @@ internal class BattleFinalizeHandler : IHandler
         messageBroker.Subscribe<MapEventFinalizeAttempted>(Handle_MapEventFinalizeAttempted);
         messageBroker.Subscribe<NetworkMapEventFinalizeAttempted>(Handle_NetworkMapEventFinalizeAttempted);
         messageBroker.Subscribe<NetworkMapEventFinalized>(Handle_NetworkMapEventFinalized);
-        messageBroker.Subscribe<NetworkRaidBattleResetToVillage>(Handle_NetworkRaidBattleResetToVillage);
         messageBroker.Subscribe<MapEventConcluded>(Handle_MapEventConcluded);
         messageBroker.Subscribe<AuthoritativeSiegeAmbushCompletionRequested>(Handle_AuthoritativeSiegeAmbushCompletionRequested);
     }
@@ -103,7 +103,6 @@ internal class BattleFinalizeHandler : IHandler
         messageBroker.Unsubscribe<MapEventFinalizeAttempted>(Handle_MapEventFinalizeAttempted);
         messageBroker.Unsubscribe<NetworkMapEventFinalizeAttempted>(Handle_NetworkMapEventFinalizeAttempted);
         messageBroker.Unsubscribe<NetworkMapEventFinalized>(Handle_NetworkMapEventFinalized);
-        messageBroker.Unsubscribe<NetworkRaidBattleResetToVillage>(Handle_NetworkRaidBattleResetToVillage);
         messageBroker.Unsubscribe<MapEventConcluded>(Handle_MapEventConcluded);
         messageBroker.Unsubscribe<AuthoritativeSiegeAmbushCompletionRequested>(Handle_AuthoritativeSiegeAmbushCompletionRequested);
     }
@@ -177,9 +176,6 @@ internal class BattleFinalizeHandler : IHandler
         if (MapEventConfig.Debug)
             mapEventLogger.DebugMapEvent(mapEvent, "Handling network map event finalize attempted. Finalizing map event.");
 
-        if (TryFinalizeRaidDefenderVictoryToVillage(mapEvent))
-            return;
-
         var playerPartyIds = FinalizeAndCollectPlayers(mapEvent);
 
         // Tell every involved player party to close its encounter menu through the same path. The legacy
@@ -215,22 +211,34 @@ internal class BattleFinalizeHandler : IHandler
                 return;
             }
 
-            foreach (var participant in playerManager.Players)
-            {
-                if (!playerManager.IsConnected(participant) ||
-                    !objectManager.TryGetObject<MobileParty>(participant.MobilePartyId, out var otherParty) ||
-                    otherParty == party || otherParty.Party.MapEventSide != party.Party.MapEventSide)
-                    continue;
-
-                handled = true;
-                messageBroker.Publish(requester, new PlayerLeaveBattleAttempted(party.Party));
-                return;
-            }
-
             handled = true;
-            messageBroker.Publish(this, new MapEventFinalizeAttempted(mapEvent));
+            LeaveOrFinalizeSharedHideout(requester, mapEvent, party);
         }, blocking: true, context: nameof(TryLeaveSharedHideout));
         return handled;
+    }
+
+    private void LeaveOrFinalizeSharedHideout(NetPeer requester, MapEvent mapEvent, MobileParty party)
+    {
+        if (HasConnectedPlayerOnSameSide(party))
+        {
+            messageBroker.Publish(requester, new PlayerLeaveBattleAttempted(party.Party));
+            return;
+        }
+
+        messageBroker.Publish(this, new MapEventFinalizeAttempted(mapEvent));
+    }
+
+    private bool HasConnectedPlayerOnSameSide(MobileParty party)
+    {
+        foreach (var participant in playerManager.Players)
+        {
+            if (playerManager.IsConnected(participant) &&
+                objectManager.TryGetObject<MobileParty>(participant.MobilePartyId, out var otherParty) &&
+                otherParty != party && otherParty.Party.MapEventSide == party.Party.MapEventSide)
+                return true;
+        }
+
+        return false;
     }
 
     /// <summary>
@@ -359,8 +367,7 @@ internal class BattleFinalizeHandler : IHandler
         var excludedIds = CollectExcludedPlayerPartyIds(mapEvent);
         if (excludedIds.Count > 0)
             playerPartyIds = playerPartyIds.Where(id => !excludedIds.Contains(id)).ToArray();
-        var raidSettlement = GetRaidFinalizationSettlement(mapEvent);
-        var raidAttackers = GetRaidAttackerPlayerParties(mapEvent);
+        var raidAftermath = CaptureRaidAftermath(mapEvent);
 
         // A winning inside defender is kept off the close above, but nothing seats it on the siege-defeated
         // menu: the server tears the SiegeEvent/MapEvent down via replication, bypassing vanilla's local
@@ -395,13 +402,81 @@ internal class BattleFinalizeHandler : IHandler
 
         using (CreateHideoutFinalizeContext(mapEvent))
             mapEvent.FinalizeEventAux();
-        MoveRaidAttackersToSettlementGate(raidAttackers, raidSettlement);
+        ApplyRaidAftermath(raidAftermath);
 
         // After the destroy (same game thread, so behind it on the reliable-ordered channel).
         if (!string.IsNullOrEmpty(defenderVictorySettlementId))
             network.SendAll(new NetworkPromptSiegeDefenderVictory(defenderVictorySettlementId, defenderVictoryPartyIds));
 
         return playerPartyIds;
+    }
+
+    private RaidAftermath CaptureRaidAftermath(MapEvent mapEvent)
+    {
+        var settlement = GetRaidFinalizationSettlement(mapEvent);
+        var attackers = GetRaidAttackerPlayerParties(mapEvent);
+        var leaderParty = mapEvent.AttackerSide?.LeaderParty?.MobileParty;
+        NetPeer leaderPeer = null;
+        bool continuesRaid = ShouldContinueRaidAfterVictory(mapEvent, settlement)
+            && TryGetRaidLeaderPeer(leaderParty, out leaderPeer);
+        return new RaidAftermath(settlement, attackers, leaderParty, leaderPeer, continuesRaid);
+    }
+
+    private void ApplyRaidAftermath(RaidAftermath aftermath)
+    {
+        if (aftermath.ContinuesRaid && objectManager.TryGetIdWithLogging(aftermath.Settlement, out var settlementId))
+        {
+            // Joiners go to the gate; the leader stays put because it re-requests the raid.
+            var joiningAttackers = aftermath.Attackers.Where(attacker => attacker != aftermath.LeaderParty).ToArray();
+            MoveRaidAttackersToSettlementGate(joiningAttackers, aftermath.Settlement);
+            network.Send(aftermath.LeaderPeer, new NetworkPromptRaidContinuation(settlementId));
+            return;
+        }
+
+        MoveRaidAttackersToSettlementGate(aftermath.Attackers, aftermath.Settlement);
+    }
+
+    private sealed class RaidAftermath
+    {
+        public RaidAftermath(Settlement settlement, MobileParty[] attackers, MobileParty leaderParty, NetPeer leaderPeer, bool continuesRaid)
+        {
+            Settlement = settlement;
+            Attackers = attackers;
+            LeaderParty = leaderParty;
+            LeaderPeer = leaderPeer;
+            ContinuesRaid = continuesRaid;
+        }
+
+        public Settlement Settlement { get; }
+        public MobileParty[] Attackers { get; }
+        public MobileParty LeaderParty { get; }
+        public NetPeer LeaderPeer { get; }
+        public bool ContinuesRaid { get; }
+    }
+
+    private bool TryGetRaidLeaderPeer(MobileParty leaderParty, out NetPeer leaderPeer)
+    {
+        leaderPeer = null;
+        return leaderParty != null
+            && playerManager.TryGetPlayer(leaderParty, out var leader)
+            && playerManager.TryGetPeer(leader.ControllerId, out leaderPeer);
+    }
+
+    private static bool ShouldContinueRaidAfterVictory(MapEvent mapEvent, Settlement raidSettlement)
+    {
+        if (!mapEvent.IsRaidHostileAction())
+            return false;
+
+        if (!IsAttackerVictory(mapEvent))
+            return false;
+
+        if (raidSettlement?.Village == null)
+            return false;
+
+        if (raidSettlement.SettlementHitPoints <= 0f || raidSettlement.Village.VillageState == Village.VillageStates.Looted)
+            return false;
+
+        return true;
     }
 
     private bool TryMarkFinalized(MapEvent mapEvent)
@@ -417,7 +492,7 @@ internal class BattleFinalizeHandler : IHandler
             finalizedMapEvents.Add(mapEvent, FinalizedMarker);
         }
 
-        // The battle is over - release the mode claim so a later, unrelated battle on this event starts unclaimed.
+        // Release before FinalizeEventAux so the mode claim is gone before callbacks can start a later battle.
         if (objectManager.TryGetId(mapEvent, out var mapEventIdForRelease))
             ServerBattleModeArbiter.Release(mapEventIdForRelease);
 
@@ -471,155 +546,6 @@ internal class BattleFinalizeHandler : IHandler
 
         return ids?.ToArray() ?? Array.Empty<string>();
     }
-    private bool TryFinalizeRaidDefenderVictoryToVillage(MapEvent mapEvent)
-    {
-        var shouldReset = false;
-        string[] playerPartyIds = null;
-        string settlementId = null;
-
-        GameThread.RunSafe(
-            () =>
-            {
-                if (!ShouldResetRaidDefenderVictoryToVillage(mapEvent))
-                    return;
-
-                var settlement = mapEvent.MapEventSettlement;
-                if (!objectManager.TryGetIdWithLogging(settlement, out settlementId))
-                    return;
-
-                if (!TryMarkFinalized(mapEvent))
-                    return;
-
-                try
-                {
-                    var involvedParties = CollectInvolvedParties(mapEvent);
-                    playerPartyIds = MapEventPlayerPartyCollector.CollectPartyIds(mapEvent, objectManager);
-
-                    reserveBuilder.ForgetMapEvent(mapEvent);
-                    mapEvent.FinalizeEventAux();
-                    ClearMapEventBackReferences(involvedParties);
-                    ResetRaidSettlementState(settlement);
-                    ReturnPlayerPartiesToSettlement(playerPartyIds, settlement);
-                    shouldReset = true;
-                }
-                finally
-                {
-                    if (!mapEvent.IsFinalized)
-                        UnmarkFinalized(mapEvent);
-                }
-            },
-            blocking: true,
-            context: nameof(TryFinalizeRaidDefenderVictoryToVillage));
-
-        if (!shouldReset)
-            return false;
-
-        network.SendAll(new NetworkRaidBattleResetToVillage(playerPartyIds, settlementId));
-        return true;
-    }
-
-    private void Handle_NetworkRaidBattleResetToVillage(MessagePayload<NetworkRaidBattleResetToVillage> payload)
-    {
-        if (ModInformation.IsServer) return;
-
-        var message = payload.What;
-
-        GameThread.RunSafe(
-            () =>
-            {
-                if (Campaign.Current == null) return;
-                if (!objectManager.TryGetId(MobileParty.MainParty?.Party, out var myPartyId)) return;
-                if (message.PartyIds == null || message.PartyIds.Length == 0) return;
-                if (Array.IndexOf(message.PartyIds, myPartyId) < 0) return;
-                if (!objectManager.TryGetObjectWithLogging<Settlement>(message.SettlementId, out var settlement)) return;
-
-                BattleModeRegistry.End();
-                ResetLocalRaidBattleToVillage(settlement);
-            },
-            context: nameof(Handle_NetworkRaidBattleResetToVillage));
-    }
-
-    private void ResetLocalRaidBattleToVillage(Settlement settlement)
-    {
-        var mainParty = MobileParty.MainParty;
-        if (mainParty == null)
-            return;
-
-        using (new AllowedThread())
-        {
-            mainParty.Party._mapEventSide = null;
-
-            if (PlayerEncounter.Current != null)
-                PlayerEncounter.Finish(false);
-
-            if (mainParty.CurrentSettlement != settlement)
-                settlementInterface.PartyEnterSettlement(mainParty, settlement);
-
-            ResetRaidSettlementState(settlement);
-            settlementInterface.StartSettlementEncounter(mainParty, settlement);
-        }
-
-        mainParty.SetMoveModeHold();
-        GameMenu.SwitchToMenu("village");
-    }
-
-    private void ReturnPlayerPartiesToSettlement(string[] playerPartyIds, Settlement settlement)
-    {
-        foreach (var playerPartyId in playerPartyIds ?? Array.Empty<string>())
-        {
-            if (!objectManager.TryGetObject<PartyBase>(playerPartyId, out var party))
-                continue;
-
-            var mobileParty = party.MobileParty;
-            if (mobileParty == null || mobileParty.CurrentSettlement == settlement)
-                continue;
-
-            settlementInterface.PartyEnterSettlement(mobileParty, settlement);
-        }
-    }
-
-    private static PartyBase[] CollectInvolvedParties(MapEvent mapEvent)
-    {
-        if (mapEvent?.AttackerSide == null || mapEvent.DefenderSide == null)
-            return Array.Empty<PartyBase>();
-
-        return mapEvent.InvolvedParties.Where(party => party != null).ToArray();
-    }
-
-    private static void ClearMapEventBackReferences(PartyBase[] parties)
-    {
-        foreach (var party in parties)
-        {
-            if (party?.MapEventSide != null)
-                party._mapEventSide = null;
-        }
-    }
-
-    private static bool ShouldResetRaidDefenderVictoryToVillage(MapEvent mapEvent)
-    {
-        if (!mapEvent.IsRaidHostileAction())
-            return false;
-
-        if (!IsAttackerVictory(mapEvent))
-            return false;
-
-        var settlement = mapEvent.MapEventSettlement;
-        if (settlement?.Village == null)
-            return false;
-
-        if (settlement.SettlementHitPoints <= 0f || settlement.Village.VillageState == Village.VillageStates.Looted)
-            return false;
-
-        return true;
-    }
-
-    private static void ResetRaidSettlementState(Settlement settlement)
-    {
-        if (settlement?.Village == null)
-            return;
-
-        settlement.Village.VillageState = Village.VillageStates.Normal;
-    }
 
     private static bool IsAttackerVictory(MapEvent mapEvent)
     {
@@ -639,7 +565,7 @@ internal class BattleFinalizeHandler : IHandler
                 activeRaid.IsRaidHostileAction() && !activeRaid.IsFinalized)
                 return;
 
-            // A late reply cannot identify or close the new village encounter opened by a raid reset.
+            // A late reply cannot identify or close the new village encounter opened by a raid continuation.
             if (ModInformation.IsClient && PlayerEncounter.Battle == null && mainParty?.CurrentSettlement?.IsVillage == true)
                 return;
 
