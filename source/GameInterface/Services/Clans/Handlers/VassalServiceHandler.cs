@@ -120,7 +120,7 @@ internal class VassalServiceHandler : IHandler
         {
             Logger.Warning("Rejected vassal service request for clan {ClanId} because kingdom {KingdomId} has maxClansPerKingdom clans", clanId, kingdomId);
             // An invitation from the kingdom can't be taken any more, so it doesn't come back at the next meeting or reconnect.
-            offers.CancelOffer(heroId, kingdomId);
+            offers.CancelVassalOffer(heroId, kingdomId);
             kingdomFull = true;
             return false;
         }
@@ -165,6 +165,8 @@ internal class VassalServiceHandler : IHandler
             clan,
             publishCollectionChanges: true,
             republishExistingCollections: true);
+        // A mercenary becoming a vassal can take the last place without a kingdom change event.
+        offers.WithdrawOffersIfFull(kingdom);
         if (!kingdom.Clans.Contains(clan))
         {
             Logger.Error("Vassal service did not add clan {ClanId} to kingdom {KingdomId} collections", clanId, kingdomId);

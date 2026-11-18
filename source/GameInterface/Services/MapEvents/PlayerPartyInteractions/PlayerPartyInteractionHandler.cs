@@ -8,6 +8,7 @@ using Common.Util;
 using GameInterface.Configuration;
 using GameInterface.Services.Clans;
 using GameInterface.Services.Kingdoms;
+using GameInterface.Services.Kingdoms.Interfaces;
 using GameInterface.Services.MapTracking;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Conversation;
@@ -105,6 +106,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         IPlayerPartyTradeContext trade,
         IPlayerPartyPvpRules pvpRules,
         IKingdomClanLimit kingdomClanLimit,
+        IVassalAndMercenaryOfferCampaignBehaviorInterface offers,
         // Only the server container registers a send coalescer.
         ISendCoalescer sendCoalescer = null)
     {
@@ -131,7 +133,8 @@ internal class PlayerPartyInteractionHandler : IHandler
             playerMarriageRules,
             playerDivorceRules,
             mapTracking,
-            kingdomClanLimit);
+            kingdomClanLimit,
+            offers);
 
         messageBroker.Subscribe<NetworkPlayerPartyInteractionStarted>(Handle_NetworkPlayerPartyInteractionStarted);
         messageBroker.Subscribe<NetworkPlayerPartyInteractionState>(Handle_NetworkPlayerPartyInteractionState);
@@ -1366,7 +1369,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         return PlayerPartyInteractionOutcomeType.Left;
     }
 
-    // The host's kingdom filled up between the proposal and the answer.
+    // The kingdom that refused the proposal filled up between the proposal and the answer.
     private void ShowKingdomFullMessage(string fullKingdomId)
     {
         var kingdom = objectManager.TryGetObjectWithLogging<Kingdom>(fullKingdomId, out var fullKingdom) ? fullKingdom : null;

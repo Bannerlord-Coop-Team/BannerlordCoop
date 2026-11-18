@@ -765,6 +765,19 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
                 SubmitCurrentDialogOption(client1, PlayerPartyInteractionOption.Vassal);
             }
 
+            // One replica has the responder in another kingdom, so the notice has to name the kingdom that refused.
+            var otherKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+            client1.Call(() =>
+            {
+                Assert.True(client1.ObjectManager.TryGetObject<PartyBase>(responderPartyId, out var responderParty));
+                using (new AllowedThread())
+                {
+                    var otherKingdom = client1.GetRegisteredObject<Kingdom>(otherKingdomId);
+                    otherKingdom.Name = new TextObject("Other");
+                    responderParty.LeaderHero.Clan._kingdom = otherKingdom;
+                }
+            });
+
             Server.Call(() =>
             {
                 Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(responderPartyId, out var responderParty));
@@ -792,7 +805,8 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
                     Assert.True(instance.ObjectManager.TryGetObject<PartyBase>(initiatorPartyId, out var initiatorParty));
                     Assert.True(instance.ObjectManager.TryGetObject<PartyBase>(responderPartyId, out var responderParty));
                     Assert.Null(initiatorParty.LeaderHero.Clan.Kingdom);
-                    Assert.DoesNotContain(initiatorParty.LeaderHero.Clan, responderParty.LeaderHero.Clan.Kingdom.Clans);
+                    if (instance != client1)
+                        Assert.DoesNotContain(initiatorParty.LeaderHero.Clan, responderParty.LeaderHero.Clan.Kingdom.Clans);
                 });
             }
 

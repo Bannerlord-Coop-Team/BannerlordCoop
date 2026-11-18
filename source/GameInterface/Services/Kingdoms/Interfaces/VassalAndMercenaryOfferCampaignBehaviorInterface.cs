@@ -30,8 +30,10 @@ public interface IVassalAndMercenaryOfferCampaignBehaviorInterface : IGameAbstra
     void OnKingdomDestroyed(Kingdom destroyedKingdom);
     void AcceptMercenaryOffer(string playerHeroId, string kingdomId, NetPeer peer);
     void DeclineOffer(string playerHeroId, string kingdomId);
-    // Withdraws the kingdom's vassal or mercenary offer to the player, and tells their client.
-    void CancelOffer(string playerHeroId, string kingdomId);
+    // Withdraws only the kingdom's vassal invitation to the player.
+    void CancelVassalOffer(string playerHeroId, string kingdomId);
+    // Withdraws the offers a kingdom still has out to players it can no longer take under maxClansPerKingdom.
+    void WithdrawOffersIfFull(Kingdom kingdom);
     void AddNewPlayerHeroId(string playerHeroId, NetPeer peer);
 }
 
@@ -128,7 +130,7 @@ public class VassalAndMercenaryOfferCampaignBehaviorInterface : IVassalAndMercen
     public void OnClanChangedKingdom(Clan clan, Kingdom newKingdom, ChangeKingdomAction.ChangeKingdomActionDetail detail)
     {
         if (newKingdom == null) return;
-        CancelOffersFromFullKingdom(newKingdom);
+        WithdrawOffersIfFull(newKingdom);
         if (!clan.IsPlayerClan()) return;
         if (!objectManager.TryGetIdWithLogging(newKingdom, out var newKingdomId)) return;
 
@@ -200,8 +202,15 @@ public class VassalAndMercenaryOfferCampaignBehaviorInterface : IVassalAndMercen
     {
         if (!ValidatePlayerHeroId(playerHeroId, out var playerData, out var playerHero)) return;
 
-        // The offer the player answered expired or was cancelled before the response arrived
-        if (playerData.CurrentMercenaryOfferKingdomId != kingdomId) return;
+        // The offer the player answered expired or was cancelled before the response arrived. A click already on its
+        // way when the kingdom took its last clan still gets the reason.
+        if (playerData.CurrentMercenaryOfferKingdomId != kingdomId)
+        {
+            if (objectManager.TryGetObject<Kingdom>(kingdomId, out var withdrawnKingdom) &&
+                kingdomClanLimit.IsFull(playerHero.Clan, withdrawnKingdom, asMercenary: true, ModConfigProvider.ModOptions))
+                network.Send(peer, new NetworkKingdomFull(kingdomId));
+            return;
+        }
 
         if (!objectManager.TryGetObjectWithLogging<Kingdom>(kingdomId, out var kingdom)) return;
 
@@ -232,29 +241,49 @@ public class VassalAndMercenaryOfferCampaignBehaviorInterface : IVassalAndMercen
         ClearKingdomOffer(playerData, kingdomId);
     }
 
-    public void CancelOffer(string playerHeroId, string kingdomId)
+    public void CancelVassalOffer(string playerHeroId, string kingdomId)
     {
         if (!PlayerVassalAndMercenaryOfferData.TryGetValue(playerHeroId, out var playerData)) return;
 
-        CancelOffer(playerHeroId, playerData, kingdomId);
+        WithdrawOffer(playerHeroId, playerData, kingdomId, mercenary: false);
     }
 
-    // A kingdom that just took its last clan can't take a player it still has an offer out to.
-    private void CancelOffersFromFullKingdom(Kingdom kingdom)
+    public void WithdrawOffersIfFull(Kingdom kingdom)
     {
         if (!objectManager.TryGetIdWithLogging(kingdom, out var kingdomId)) return;
 
         foreach (var playerData in PlayerVassalAndMercenaryOfferData)
-        {
-            if (!objectManager.TryGetObjectWithLogging<Hero>(playerData.Key, out var playerHero)) continue;
+            WithdrawFullOffers(playerData.Key, playerData.Value, kingdom, kingdomId);
+    }
 
-            bool fullForMercenary = playerData.Value.CurrentMercenaryOfferKingdomId == kingdomId &&
-                kingdomClanLimit.IsFull(playerHero.Clan, kingdom, asMercenary: true, ModConfigProvider.ModOptions);
-            bool fullForVassal = playerData.Value.VassalOffers.ContainsKey(kingdomId) &&
-                kingdomClanLimit.IsFull(playerHero.Clan, kingdom, asMercenary: false, ModConfigProvider.ModOptions);
-            if (fullForMercenary || fullForVassal)
-                CancelOffer(playerData.Key, playerData.Value, kingdomId);
+    private void WithdrawFullOffers(string playerHeroId, VassalAndMercenaryOfferData playerData, Kingdom kingdom, string kingdomId)
+    {
+        if (!objectManager.TryGetObjectWithLogging<Hero>(playerHeroId, out var playerHero)) return;
+
+        if (playerData.CurrentMercenaryOfferKingdomId == kingdomId &&
+            kingdomClanLimit.IsFull(playerHero.Clan, kingdom, asMercenary: true, ModConfigProvider.ModOptions))
+            WithdrawOffer(playerHeroId, playerData, kingdomId, mercenary: true);
+        if (playerData.VassalOffers.ContainsKey(kingdomId) &&
+            kingdomClanLimit.IsFull(playerHero.Clan, kingdom, asMercenary: false, ModConfigProvider.ModOptions))
+            WithdrawOffer(playerHeroId, playerData, kingdomId, mercenary: false);
+    }
+
+    // The client's cancel clears every offer from the kingdom, so it only goes out once none is left.
+    private void WithdrawOffer(string playerHeroId, VassalAndMercenaryOfferData playerData, string kingdomId, bool mercenary)
+    {
+        if (mercenary)
+        {
+            if (playerData.CurrentMercenaryOfferKingdomId != kingdomId) return;
+            playerData.CurrentMercenaryOfferKingdomId = null;
+            playerData.CurrentMercenaryOfferDateNumTicks = 0;
         }
+        else if (!playerData.VassalOffers.Remove(kingdomId))
+        {
+            return;
+        }
+
+        if (playerData.CurrentMercenaryOfferKingdomId == kingdomId || playerData.VassalOffers.ContainsKey(kingdomId)) return;
+        network.SendAll(new NetworkVassalOrMercenaryOfferCancelled(playerHeroId, kingdomId));
     }
 
     public void AddNewPlayerHeroId(string playerHeroId, NetPeer peer)
@@ -264,6 +293,15 @@ public class VassalAndMercenaryOfferCampaignBehaviorInterface : IVassalAndMercen
             // Offer notifications only live on the client, so a rejoining player needs pending offers sent again
             if (ModInformation.IsServer && peer != null)
             {
+                // A kingdom that filled while the player was away can't take them, so its offers aren't sent again.
+                var offeredKingdomIds = playerData.VassalOffers.Keys.Append(playerData.CurrentMercenaryOfferKingdomId)
+                    .Where(id => id != null).Distinct().ToList();
+                foreach (var offeredKingdomId in offeredKingdomIds)
+                {
+                    if (objectManager.TryGetObjectWithLogging<Kingdom>(offeredKingdomId, out var offeredKingdom))
+                        WithdrawFullOffers(playerHeroId, playerData, offeredKingdom, offeredKingdomId);
+                }
+
                 if (playerData.CurrentMercenaryOfferKingdomId != null)
                 {
                     network.Send(peer, new NetworkMercenaryOfferSent(playerHeroId, playerData.CurrentMercenaryOfferKingdomId));

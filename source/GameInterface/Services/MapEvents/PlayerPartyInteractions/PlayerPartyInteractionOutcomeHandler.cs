@@ -5,6 +5,7 @@ using GameInterface.Services.Clans;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.Kingdoms;
+using GameInterface.Services.Kingdoms.Interfaces;
 using GameInterface.Services.MapEvents.Data;
 using GameInterface.Services.MapTracking;
 using GameInterface.Services.ObjectManager;
@@ -91,6 +92,7 @@ internal class PlayerPartyInteractionOutcomeHandler
     private readonly IPlayerDivorceRules playerDivorceRules;
     private readonly IPlayerMapTracking mapTracking;
     private readonly IKingdomClanLimit kingdomClanLimit;
+    private readonly IVassalAndMercenaryOfferCampaignBehaviorInterface offers;
 
     public PlayerPartyInteractionOutcomeHandler(
         IObjectManager objectManager,
@@ -100,7 +102,8 @@ internal class PlayerPartyInteractionOutcomeHandler
         IPlayerMarriageRules playerMarriageRules,
         IPlayerDivorceRules playerDivorceRules,
         IPlayerMapTracking mapTracking,
-        IKingdomClanLimit kingdomClanLimit)
+        IKingdomClanLimit kingdomClanLimit,
+        IVassalAndMercenaryOfferCampaignBehaviorInterface offers)
     {
         this.objectManager = objectManager;
         this.kingdomMembershipState = kingdomMembershipState;
@@ -110,6 +113,7 @@ internal class PlayerPartyInteractionOutcomeHandler
         this.playerDivorceRules = playerDivorceRules;
         this.mapTracking = mapTracking;
         this.kingdomClanLimit = kingdomClanLimit;
+        this.offers = offers;
     }
 
     // kingdomFull is true when a vassal or mercenary join was refused by maxClansPerKingdom.
@@ -361,6 +365,8 @@ internal class PlayerPartyInteractionOutcomeHandler
             initiatorClan,
             publishCollectionChanges: true,
             republishExistingCollections: true);
+        // A mercenary becoming a vassal can take the last place without a kingdom change event.
+        offers.WithdrawOffersIfFull(targetKingdom);
         if (!targetKingdom.Clans.Contains(initiatorClan))
         {
             Logger.Error("Vassal service did not add clan {ClanId} to kingdom {KingdomId} collections", initiatorClan, targetKingdom);
