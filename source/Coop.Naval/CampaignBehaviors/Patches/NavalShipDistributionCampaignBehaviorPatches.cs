@@ -25,6 +25,7 @@ internal class NavalShipDistributionCampaignBehaviorPatches
     {
         if (ModInformation.IsClient) return false;
 
+        // Vanilla v1.3.7 still distributes a destroyed player clan caravan's ships, so caravans keep the vanilla path
         if (party.IsCaravan) return true;
 
         // Vanilla's Clan.PlayerClan check only knows one player clan, so run it only for non-player clans
