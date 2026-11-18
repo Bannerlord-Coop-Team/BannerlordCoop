@@ -13,6 +13,8 @@ using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Configuration;
 using GameInterface.CoopSessionData;
+using GameInterface.Services.Kingdoms.Data;
+using GameInterface.Services.Kingdoms.Messages;
 using GameInterface.Services.Bandits.Messages;
 using GameInterface.Services.Barters;
 using GameInterface.Services.Barters.Messages;
@@ -1220,6 +1222,50 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
                 Assert.Contains(initiatorClan, responderKingdom.Clans);
                 Assert.False(initiatorClan.IsUnderMercenaryService);
             });
+        }
+    }
+
+    // A mercenary of the kingdom swearing allegiance in a meeting starts to count and takes the last place without a
+    // kingdom change, so the invitation the kingdom still has out to another player is withdrawn there.
+    [Fact]
+    public void VassalProposalAsMercenary_TakingTheLastPlace_WithdrawsTheKingdomsOtherInvitations()
+    {
+        var (client1, client2, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
+        SetupResponderKingdomLeaderAndInitiatorParty(initiatorPartyId, responderPartyId, initiatorClanTier: 2);
+        var invitedHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var previousOptions = ModConfigProvider.ModOptions;
+        ModConfigProvider.ModOptions = new ModOptions(new ModOptionsData { MaxClansPerKingdom = 2 });
+        try
+        {
+            string kingdomId = null;
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(responderPartyId, out var responderParty));
+                Assert.True(Server.ObjectManager.TryGetId(responderParty.LeaderHero.Clan.Kingdom, out kingdomId));
+                Server.Resolve<ICoopSessionProvider>().CoopSession.InteractionsPlayerData.PlayerVassalAndMercenaryOfferData[invitedHeroId] =
+                    new VassalAndMercenaryOfferData(null, 0, new Dictionary<string, long> { [kingdomId] = CampaignTime.Now.NumTicks }, false);
+            });
+
+            RequestInteraction(client1, initiatorPartyId, responderPartyId);
+            var sessionId = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>().Single().SessionId;
+            var initialState = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>().Single(s =>
+                s.SessionId == sessionId &&
+                s.PartyId == initiatorPartyId &&
+                s.Phase == PlayerPartyInteractionPhase.InitialOptions);
+            OpenServiceOptions(client1, initialState);
+            SubmitCurrentDialogOption(client1, PlayerPartyInteractionOption.Vassal);
+            Server.NetworkSentMessages.Clear();
+            SubmitOption(client2, sessionId, responderPartyId, PlayerPartyInteractionOption.AcceptProposal);
+
+            Assert.Equal(PlayerPartyInteractionOutcomeType.VassalAccepted,
+                Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionEnded>().Single().OutcomeType);
+            var cancelled = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkVassalOrMercenaryOfferCancelled>());
+            Assert.Equal(invitedHeroId, cancelled.PlayerHeroId);
+            Assert.Equal(kingdomId, cancelled.KingdomId);
+        }
+        finally
+        {
+            ModConfigProvider.ModOptions = previousOptions;
         }
     }
 

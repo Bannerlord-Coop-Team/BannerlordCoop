@@ -164,8 +164,6 @@ internal class CompanionRolesHandler : IHandler
             { 
                 int randomBannerIdForNewClan = companionRolesCampaignBehavior.GetRandomBannerIdForNewClan();
                 Clan clan = Clan.CreateCompanionToLordClan(oneToOneConversationHero, selectedFief, textObject, randomBannerIdForNewClan);
-                // The new clan joins without a kingdom change event, so offers the kingdom can no longer take are withdrawn here.
-                if (kingdom != null) offers.WithdrawOffersIfFull(kingdom);
                 if (oneToOneConversationHero.PartyBelongedTo == mainParty)
                 {
                     mainParty.MemberRoster.AddToCounts(oneToOneConversationHero.CharacterObject, -1, false, 0, 0, true, -1);
@@ -192,6 +190,10 @@ internal class CompanionRolesHandler : IHandler
             {
                 ResolvedMainHeroContext.ResolvedMainHero = null;
             }
+
+            // Vanilla sets the new clan's Kingdom directly, which fires no kingdom change event, so offers the kingdom can no
+            // longer take are withdrawn here, once the promotion is done.
+            offers.WithdrawOffersIfFull(kingdom);
         });
     }
 

@@ -886,6 +886,33 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     }
 
     // The clan that takes a kingdom's last place withdraws the offers the kingdom still has out.
+    // A player who rejoins after the kingdom filled gets neither of its offers again, and one cancel withdraws both.
+    [Fact]
+    public void Reconnect_OffersFromAFullKingdom_AreWithdrawnNotResent()
+    {
+        ModConfigProvider.ModOptions = new ModOptions(new ModOptionsData { MaxClansPerKingdom = 1, CountMercenaries = true });
+        var client = Clients.First();
+        var player = CreateSyncedPlayerContext(ControllerId, client);
+        var ruler = CreateSyncedPlayerContext("OfferRuler", _ => false);
+        var kingdomId = CreateNamedKingdomEverywhere(ruler.ClanId);
+        Server.Call(() => ServerOffers()[player.HeroId] = new VassalAndMercenaryOfferData(
+            kingdomId, CampaignTime.Now.NumTicks, new Dictionary<string, long> { [kingdomId] = CampaignTime.Now.NumTicks }, false));
+        Server.NetworkSentMessages.Clear();
+
+        Server.Call(() => Server.Resolve<IVassalAndMercenaryOfferCampaignBehaviorInterface>().AddNewPlayerHeroId(player.HeroId, client.NetPeer));
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkMercenaryOfferSent>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkVassalOfferSent>());
+        var cancelled = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkVassalOrMercenaryOfferCancelled>());
+        Assert.Equal(player.HeroId, cancelled.PlayerHeroId);
+        Assert.Equal(kingdomId, cancelled.KingdomId);
+        Server.Call(() =>
+        {
+            Assert.Null(ServerOffers()[player.HeroId].CurrentMercenaryOfferKingdomId);
+            Assert.Empty(ServerOffers()[player.HeroId].VassalOffers);
+        });
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
