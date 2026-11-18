@@ -106,7 +106,7 @@ internal class PortScreenHandlerInterface : IPortScreenHandlerInterface
             shipFigureheadInfo.Ship.ChangeFigurehead(shipFigureheadInfo.Figurehead);
         }
         SendShipsToClan(changes, changes.RightOwner);
-        ResetAnchorIfNoShips(changes.MainParty);
+        anchorPointInterface.ResetAnchorIfNoShips(changes.MainParty);
         if (changes.LeftOwner.IsSettlement)
         {
             anchorPointInterface.AnchorUnanchoredFleet(changes.MainParty, changes.LeftOwner.Settlement);
@@ -145,7 +145,7 @@ internal class PortScreenHandlerInterface : IPortScreenHandlerInterface
         }
         SendShipsToClan(changes);
         RenameShips(changes);
-        ResetAnchorIfNoShips(changes.MainParty);
+        anchorPointInterface.ResetAnchorIfNoShips(changes.MainParty);
     }
 
     private void ConfirmManageFleet(PortScreenChanges changes)
@@ -166,7 +166,7 @@ internal class PortScreenHandlerInterface : IPortScreenHandlerInterface
         }
         RenameShips(changes, mainParty);
         SendShipsToClan(changes, mainParty);
-        ResetAnchorIfNoShips(changes.MainParty);
+        anchorPointInterface.ResetAnchorIfNoShips(changes.MainParty);
     }
 
     private void ConfirmManageOtherFleet(PortScreenChanges changes)
@@ -184,10 +184,10 @@ internal class PortScreenHandlerInterface : IPortScreenHandlerInterface
 
             ChangeShipOwnerAction.ApplyByTransferring(changes.RightOwner, ship);
         }
-        ResetAnchorIfNoShips(changes.MainParty);
+        anchorPointInterface.ResetAnchorIfNoShips(changes.MainParty);
         if (changes.RightOwner.IsMobile)
         {
-            ResetAnchorIfNoShips(changes.RightOwner.MobileParty);
+            anchorPointInterface.ResetAnchorIfNoShips(changes.RightOwner.MobileParty);
         }
         RenameShips(changes);
     }
@@ -212,14 +212,6 @@ internal class PortScreenHandlerInterface : IPortScreenHandlerInterface
             if (owner != null && shipToSend.Owner != owner) continue;
 
             campaignBehavior.SendShipToClan(shipToSend, changes.PlayerClan);
-        }
-    }
-
-    private static void ResetAnchorIfNoShips(MobileParty party)
-    {
-        if (party.Ships.Count == 0 && party.Anchor.IsValid)
-        {
-            party.Anchor.ResetPosition();
         }
     }
 
