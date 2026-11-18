@@ -1,8 +1,10 @@
 ﻿#if DEBUG
 using Common.Commands;
+using NavalDLC.Missions.Objects;
 using Newtonsoft.Json;
 using System;
 using System.Globalization;
+using System.Linq;
 using RopeState = NavalDLC.Missions.Objects.UsableMachines.ShipAttachmentMachine.ShipAttachment.ShipAttachmentState;
 
 namespace Missions.Naval;
@@ -58,6 +60,9 @@ public sealed class NavalRopeCutCoopCommand : ICoopCommand
             && attachment.State != RopeState.BridgeThrown && attachment.State != RopeState.BridgeConnected))
             return new CoopCommandResult(false, "The station needs a live attached rope or plank to cut.", "command_failed");
 
+        if (IsBlockedByEnemies(own))
+            return new CoopCommandResult(false, "Vanilla blocks cut loose while an enemy is on this hull or one of its bridges.", "command_failed");
+
         bool hold = args.Count == 2;
         if (hold && !ropes.HoldRemoval(source))
             return new CoopCommandResult(false, "Wait for rope_status to show this live generation published, with no removal held.", "command_failed");
@@ -75,6 +80,16 @@ public sealed class NavalRopeCutCoopCommand : ICoopCommand
             cutUtc = DateTime.UtcNow,
             removalHeld = hold,
         }));
+    }
+
+    /// <summary>Mirrors vanilla's MissionGauntletShipControlView.GetIsCutLooseBlockedFromNearbyEnemies, evaluated here because this client owns the hull.</summary>
+    private static bool IsBlockedByEnemies(MissionShip own)
+    {
+        if (own.ShipOrder.IsEnemyOnShip) return true;
+
+        var side = own.BattleSide;
+        return own.AttachmentMachines.Any(machine => machine.CurrentAttachment?.EnemySideAgentsOnTheBridge(side) == true)
+            || own.AttachmentPointMachines.Any(point => point.CurrentAttachment?.EnemySideAgentsOnTheBridge(side) == true);
     }
 }
 #endif
