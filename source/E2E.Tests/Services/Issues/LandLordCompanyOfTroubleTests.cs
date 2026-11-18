@@ -776,7 +776,7 @@ public class LandLordCompanyOfTroubleTests : IDisposable
     {
         var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
         mapEvent.MapEventVisual = ObjectHelper.SkipConstructor<GauntletMapEventVisual>();
-        mapEvent.Initialize(attacker.Party, defender.Party, new FieldBattleEventComponent(mapEvent), MapEvent.BattleTypes.FieldBattle);
+        mapEvent.Initialize(attacker.Party, defender.Party, new FieldBattleEventComponent(mapEvent));
         mapEvent.MapEventVisual = null;
         return mapEvent;
     }
