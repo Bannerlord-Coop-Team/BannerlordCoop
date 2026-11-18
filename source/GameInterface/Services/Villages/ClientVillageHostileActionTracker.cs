@@ -19,10 +19,10 @@ public interface IClientVillageHostileActionTracker
     bool TryBeginRequest();
     /// <summary>[Client, game thread] Clear the pending latch and continuation encounter.</summary>
     void Complete();
+    /// <summary>[Client, game thread] End a denied request by releasing the latch before closing its continuation encounter.</summary>
+    void CompleteDenied();
     /// <summary>[Client, game thread] Park a raid continuation until the current encounter ends.</summary>
     void ParkRaidContinuation(Settlement settlement);
-    /// <summary>[Client, game thread] The hostile-action request was denied; close the continuation encounter it opened.</summary>
-    void CloseDeniedRaidContinuation();
 }
 
 // Tracks client hostile-action requests and raid continuations for one lifetime scope.
@@ -64,10 +64,10 @@ internal sealed class ClientVillageHostileActionTracker : IClientVillageHostileA
         continuationEncounter = null;
     }
 
-    public void CloseDeniedRaidContinuation()
+    public void CompleteDenied()
     {
         var encounter = continuationEncounter;
-        continuationEncounter = null;
+        Complete();
         if (encounter == null || !ReferenceEquals(encounter, PlayerEncounter.Current))
             return;
 
@@ -87,7 +87,7 @@ internal sealed class ClientVillageHostileActionTracker : IClientVillageHostileA
 
     private void Handle_CampaignTick(MessagePayload<CampaignTick> payload)
     {
-        if (IsInMission()) return;
+        if (MissionState.Current != null || Mission.Current != null) return;
         // Wait for the pending reply, otherwise TryBeginRequest drops the continuation's request.
         if (pending) return;
 
@@ -127,11 +127,6 @@ internal sealed class ClientVillageHostileActionTracker : IClientVillageHostileA
         PlayerEncounter.Current.SetupFields(PartyBase.MainParty, settlement.Party);
         continuationEncounter = PlayerEncounter.Current;
         messageBroker.Publish(this, new VillageHostileActionAttempted(VillageHostileAction.Raid, MobileParty.MainParty, settlement));
-    }
-
-    private static bool IsInMission()
-    {
-        return MissionState.Current != null || Mission.Current != null;
     }
 
     private sealed class ParkedRaidContinuation

@@ -103,8 +103,7 @@ internal class ClientVillageHostileActionHandler : IHandler
         GameThread.RunSafe(
             () =>
             {
-                clientVillageHostileActionTracker.CloseDeniedRaidContinuation();
-                clientVillageHostileActionTracker.Complete();
+                clientVillageHostileActionTracker.CompleteDenied();
             },
             context: nameof(Handle_NetworkVillageHostileActionDenied));
         messageBroker.Publish(this, new SendInformationMessage(GetDeniedMessage(payload.What.Reason)));

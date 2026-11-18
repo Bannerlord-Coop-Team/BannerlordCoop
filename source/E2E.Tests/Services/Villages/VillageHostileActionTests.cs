@@ -483,7 +483,9 @@ public class VillageHostileActionTests : MapEventTestBase
         EnableHeadlessEncounterFinish(client);
         SetMockPlayerEncounter(client);
         var router = client.Resolve<TestNetworkRouter>();
+        // Hold the server's reply so the continuation parks while the first request is still pending.
         router.AutoDrainReady = false;
+        router.PauseLink(Server.NetPeer, client.NetPeer);
         try
         {
             client.Call(() =>
@@ -518,10 +520,14 @@ public class VillageHostileActionTests : MapEventTestBase
             Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestVillageHostileAction>());
 
             client.SimulateMessage(Server.NetPeer,
-                new NetworkVillageHostileActionDenied(VillageHostileActionDeniedReason.AlreadyInMapEvent));
+                new NetworkVillageHostileActionDenied(VillageHostileActionDeniedReason.AlreadyInMapEvent),
+                markGameThread: false);
+            client.PumpGameThread();
 
             client.Call(() =>
             {
+                Assert.Same(continuationEncounter, PlayerEncounter.Current);
+                Assert.Equal("encounter", Campaign.Current.MapStateData.GameMenuId);
                 client.Resolve<IMessageBroker>().Publish(this, new CampaignTick());
             }, MapEventDisabledMethods);
 
@@ -534,6 +540,7 @@ public class VillageHostileActionTests : MapEventTestBase
         }
         finally
         {
+            router.ResumeLink(Server.NetPeer, client.NetPeer);
             router.AutoDrainReady = true;
         }
     }
