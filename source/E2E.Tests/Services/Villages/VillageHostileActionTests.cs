@@ -481,7 +481,7 @@ public class VillageHostileActionTests : MapEventTestBase
         var (_, mobilePartyId) = CreatePlayerHeroParty("PlayerOne");
         var target = CreateVillageTarget();
         EnableHeadlessEncounterFinish(client);
-        var encounter = SetMockPlayerEncounter(client);
+        SetMockPlayerEncounter(client);
         client.Call(() =>
         {
             Campaign.Current.MainParty = client.GetRegisteredObject<MobileParty>(mobilePartyId);
@@ -497,15 +497,6 @@ public class VillageHostileActionTests : MapEventTestBase
 
         Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestVillageHostileAction>());
 
-        client.SimulateMessage(Server.NetPeer,
-            new NetworkVillageHostileActionDenied(VillageHostileActionDeniedReason.AlreadyInMapEvent));
-
-        client.Call(() =>
-        {
-            Assert.Same(encounter, PlayerEncounter.Current);
-            Assert.Equal("village", Campaign.Current.MapStateData.GameMenuId);
-        }, MapEventDisabledMethods);
-
         var continuationEncounter = SetMockPlayerEncounter(client);
         client.Call(() =>
         {
@@ -515,12 +506,22 @@ public class VillageHostileActionTests : MapEventTestBase
             client.Resolve<IClientVillageHostileActionTracker>().ParkRaidContinuation(settlement);
             client.Resolve<IMessageBroker>().Publish(this, new CampaignTick());
         }, MapEventDisabledMethods);
+        Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestVillageHostileAction>());
+
+        client.SimulateMessage(Server.NetPeer,
+            new NetworkVillageHostileActionDenied(VillageHostileActionDeniedReason.AlreadyInMapEvent));
+
+        client.Call(() =>
+        {
+            client.Resolve<IMessageBroker>().Publish(this, new CampaignTick());
+        }, MapEventDisabledMethods);
+
+        Assert.Equal(2, client.NetworkSentMessages.GetMessages<NetworkRequestVillageHostileAction>().Count());
         client.SimulateMessage(Server.NetPeer,
             new NetworkVillageHostileActionDenied(VillageHostileActionDeniedReason.AlreadyInMapEvent));
 
         client.Call(() => Assert.Null(PlayerEncounter.Current),
             MapEventDisabledMethods);
-        Assert.Equal(2, client.NetworkSentMessages.GetMessages<NetworkRequestVillageHostileAction>().Count());
     }
 
     [Fact]

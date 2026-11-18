@@ -63,17 +63,9 @@ internal class ClientVillageHostileActionHandler : IHandler
     {
         var message = payload.What;
 
-        if (!objectManager.TryGetIdWithLogging(message.MobileParty, out var mobilePartyId))
-        {
-            clientVillageHostileActionTracker.CloseDeniedRaidContinuation();
-            return;
-        }
-        if (!objectManager.TryGetIdWithLogging(message.Settlement, out var settlementId))
-        {
-            clientVillageHostileActionTracker.CloseDeniedRaidContinuation();
-            return;
-        }
-        // A request is already pending: drop this one, the server still resolves the first.
+        if (!objectManager.TryGetIdWithLogging(message.MobileParty, out var mobilePartyId)) return;
+        if (!objectManager.TryGetIdWithLogging(message.Settlement, out var settlementId)) return;
+        // A request is already pending, the server still resolves the first.
         if (!clientVillageHostileActionTracker.TryBeginRequest())
         {
             Logger.Information("Dropping hostile action request: one is already pending");

@@ -1,10 +1,7 @@
-﻿using Common;
-using Common.Messaging;
+﻿using Common.Messaging;
 using Common.Logging;
-using Common.Util;
 using GameInterface.Services.Villages.Data;
 using GameInterface.Services.PlayerCaptivityService.Messages;
-using GameInterface.Services.Villages.Interfaces;
 using GameInterface.Services.Villages.Messages;
 using Serilog;
 using System;
@@ -18,7 +15,9 @@ namespace GameInterface.Services.Villages;
 
 public interface IClientVillageHostileActionTracker
 {
+    /// <summary>[Client, game thread] Begin tracking a hostile-action request if none is pending.</summary>
     bool TryBeginRequest();
+    /// <summary>[Client, game thread] Clear the pending latch and continuation encounter.</summary>
     void Complete();
     /// <summary>[Client, game thread] Park a raid continuation until the current encounter ends.</summary>
     void ParkRaidContinuation(Settlement settlement);
@@ -32,9 +31,11 @@ internal sealed class ClientVillageHostileActionTracker : IClientVillageHostileA
     private static readonly ILogger Logger = LogManager.GetLogger<ClientVillageHostileActionTracker>();
 
     private readonly IMessageBroker messageBroker;
-    private bool pending;
+    // A won raid's continuation, waiting for the current encounter to end.
     private ParkedRaidContinuation parkedRaidContinuation;
+    // The encounter a continuation request opened, finished if the server denies it.
     private PlayerEncounter continuationEncounter;
+    private bool pending;
 
     public ClientVillageHostileActionTracker(IMessageBroker messageBroker)
     {
@@ -52,12 +53,7 @@ internal sealed class ClientVillageHostileActionTracker : IClientVillageHostileA
 
     public bool TryBeginRequest()
     {
-        if (pending)
-        {
-            if (continuationEncounter != null)
-                CloseDeniedRaidContinuation();
-            return false;
-        }
+        if (pending) return false;
         pending = true;
         return true;
     }
@@ -91,7 +87,8 @@ internal sealed class ClientVillageHostileActionTracker : IClientVillageHostileA
 
     private void Handle_CampaignTick(MessagePayload<CampaignTick> payload)
     {
-        if (ModInformation.IsServer || IsInMission()) return;
+        if (IsInMission()) return;
+        // Wait for the pending reply, otherwise TryBeginRequest drops the continuation's request.
         if (pending) return;
 
         var parked = parkedRaidContinuation;
