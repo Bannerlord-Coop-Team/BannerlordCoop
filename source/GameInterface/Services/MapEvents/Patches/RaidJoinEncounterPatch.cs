@@ -23,12 +23,13 @@ internal class RaidJoinEncounterConditionPatch
         yield return AccessTools.Method(typeof(EncounterGameMenuBehavior), "game_menu_join_encounter_help_defenders_on_condition");
     }
 
-    // Vanilla's join conditions throw when there is no encountered battle, before the server sets the encounter up
-    // and after it closes. The option is greyed instead while there is none.
+    // Greys the join option while vanilla's condition would throw, before the server sets the battle up on this
+    // client or after the encounter closes.
     [HarmonyPrefix]
     private static bool Prefix(MenuCallbackArgs args, ref bool __result)
     {
-        if (ModInformation.IsServer || PlayerEncounterExtensions.GetEncounteredBattleOrNull() != null) return true;
+        if (ModInformation.IsServer) return true;
+        if (HasLeaderParties(PlayerEncounterExtensions.GetEncounteredBattleOrNull())) return true;
 
         __result = false;
         if (args != null)
@@ -38,6 +39,10 @@ internal class RaidJoinEncounterConditionPatch
         }
         return false;
     }
+
+    // Vanilla reads the leader of the side not being joined, and a client's sides and leaders arrive after the battle.
+    private static bool HasLeaderParties(MapEvent battle) =>
+        battle?.AttackerSide?.LeaderParty != null && battle.DefenderSide?.LeaderParty != null;
 
     [HarmonyPostfix]
     private static void Postfix(MethodBase __originalMethod, MenuCallbackArgs args, ref bool __result)
