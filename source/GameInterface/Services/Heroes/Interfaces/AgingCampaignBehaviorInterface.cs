@@ -69,9 +69,10 @@ public class AgingCampaignBehaviorInterface : IAgingCampaignBehaviorInterface
 
         if (hero.IsAlive && hero.CanDie(KillCharacterAction.KillCharacterActionDetail.DiedOfOldAge))
         {
-            if (hero.DeathMark != KillCharacterAction.KillCharacterActionDetail.None
-                && CanApplyDeathMark(hero)
-                && (hero.PartyBelongedTo == null || (hero.PartyBelongedTo.MapEvent == null && hero.PartyBelongedTo.SiegeEvent == null)))
+            var deathMark = hero.DeathMark;
+            bool hasDeathMarkToApply = deathMark != KillCharacterAction.KillCharacterActionDetail.None && deathMark != KillCharacterAction.KillCharacterActionDetail.ExecutionAfterMapEvent;
+            bool isInBattleOrSiege = hero.PartyBelongedTo?.MapEvent != null || hero.PartyBelongedTo?.SiegeEvent != null;
+            if (hasDeathMarkToApply && CanApplyDeathMark(hero) && !isInBattleOrSiege)
             {
                 KillCharacterAction.ApplyByDeathMark(hero, false);
             }

@@ -17,6 +17,10 @@ public static class MapEventExtensions
     public static bool HasCalculatedResults(this MapEvent mapEvent)
         => mapEvent._mapEventResultsCalculated || mapEvent._mapEventResultsApplied;
 
+    /// <summary>Whether the battle is a send troops hideout raid.</summary>
+    public static bool IsSendTroopsHideout(this MapEvent mapEvent)
+        => mapEvent.Component is HideoutEventComponent { IsSendTroops: true };
+
     /// <summary>
     /// Finds a party's MapEventParty on either side of the event, without going through PartiesOnSide(side) —
     /// safe to call even after the party's own MapEventSide has already been nulled elsewhere.

@@ -166,7 +166,7 @@ internal sealed partial class LordBarterHandler
                 playerParty,
                 attackProtectionEnds);
             party.SetMoveModeHold();
-            party.IgnoreForHours(32f);
+            party.Ai.ForceDefaultBehaviorUpdate();
             party.Ai.SetInitiative(0f, 0.8f, 8f);
         }
 

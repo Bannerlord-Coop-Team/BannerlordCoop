@@ -1,6 +1,6 @@
 ﻿using Common.Util;
 using Coop.Core.Server.Services.Instances;
-using E2E.Tests.Util;
+using GameInterface.Tests.Utils;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Services.MobileParties;
@@ -270,8 +270,8 @@ public class StalledMapEventTests : MapEventTestBase
 
                 if (battleType.HasValue)
                 {
-                    mapEvent._mapEventType = battleType.Value;
-                    mapEvent.MapEventSettlement = Server.GetRegisteredObject<Settlement>(settlementId);
+                    mapEvent.SetBattleType(battleType.Value);
+                    mapEvent.SetMapEventSettlement(Server.GetRegisteredObject<Settlement>(settlementId));
                 }
 
                 mapEvent.FirstUpdateIsDone = true;
