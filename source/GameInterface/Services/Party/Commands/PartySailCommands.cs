@@ -121,6 +121,9 @@ public class PartySailCommands
             if (!party.IsCurrentlyAtSea)
                 return Failed($"{party.StringId} is not at sea, set sail first.");
 
+            if (party.IsInRaftState)
+                return Failed($"{party.StringId} is on a raft, it sails to shore until it washes up.");
+
             // Same call as vanilla SettlementVisual.OnMapClick for a port reached by sea
             party.SetMoveGoToSettlement(port, MobileParty.NavigationType.Naval, isTargetingThePort: true);
             // The server's movement patches don't send a client-owned party's order, so publish it like SettlementInterface.PartySetSail does
