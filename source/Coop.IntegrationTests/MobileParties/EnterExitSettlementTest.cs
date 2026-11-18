@@ -495,7 +495,7 @@ namespace Coop.IntegrationTests.MobileParties
         }
 
         [Fact]
-        public void SetSailLeave_SetsSailFromLeftSettlement_OnServer()
+        public void SetSailLeave_LeavesAndSetsSailInOneCall_OnServer()
         {
             var client1 = TestEnvironment.Clients.First();
             var party = ObjectHelper.SkipConstructor<MobileParty>();
