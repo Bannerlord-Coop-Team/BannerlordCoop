@@ -21,7 +21,15 @@ internal class NavalShipDistributionCampaignBehaviorPatches
 
     [HarmonyPatch(nameof(NavalShipDistributionCampaignBehavior.OnMobilePartyDestroyed))]
     [HarmonyPrefix]
-    public static bool OnMobilePartyDestroyedPrefix() => ModInformation.IsServer;
+    public static bool OnMobilePartyDestroyedPrefix(MobileParty party)
+    {
+        if (ModInformation.IsClient) return false;
+
+        if (party.IsCaravan) return true;
+
+        // Vanilla's Clan.PlayerClan check only knows one player clan, so run it only for non-player clans
+        return !party.ActualClan.IsPlayerClan();
+    }
 
     [HarmonyPatch(nameof(NavalShipDistributionCampaignBehavior.RecoverGoldFromRemainingShipsAfterDistribution))]
     [HarmonyPrefix]

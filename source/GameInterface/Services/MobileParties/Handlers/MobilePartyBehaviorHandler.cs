@@ -103,6 +103,16 @@ internal class MobilePartyBehaviorHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging(data.MobilePartyId, out MobileParty party))
                 return;
 
+            // Vanilla ignores orders on a raft, so keep the server's move to shore and resend it when the owner's order differs
+            if (ModInformation.IsServer && IsOwnerOrderDuringRaft(party, data))
+            {
+                bool ownerOrderDiffers = data.DefaultBehavior != party.DefaultBehavior || data.TargetPosition != party.TargetPosition;
+                // No requester on the resend, otherwise the owner reads it as its own echo and keeps its stale order
+                if (ownerOrderDiffers)
+                    PublishAuthoritativeBehavior(party, originControllerId: null, forcePosition: false, resetMovementToHold: false);
+                return;
+            }
+
             bool isSelfEcho = ModInformation.IsClient &&
                 party.IsControlledByThisInstance() &&
                 !string.IsNullOrEmpty(data.OriginControllerId) &&
@@ -173,7 +183,7 @@ internal class MobilePartyBehaviorHandler : IHandler
 
             if (ModInformation.IsServer)
             {
-                PublishAuthoritativeBehavior(party, data);
+                PublishAuthoritativeBehavior(party, data.OriginControllerId, data.ForcePosition, data.ResetMovementToHold);
 
                 // A player order is the moment a frozen server copy shows: free it before it is ticked.
                 partyNavigationRepair.TryRepairForOrder(party);
@@ -182,7 +192,7 @@ internal class MobilePartyBehaviorHandler : IHandler
             if (attachedParties != null)
             {
                 foreach (var attachedParty in attachedParties)
-                    PublishForcedPosition(attachedParty);
+                    PublishAuthoritativeBehavior(attachedParty, originControllerId: null, forcePosition: true, resetMovementToHold: false);
             }
         };
 
@@ -192,27 +202,20 @@ internal class MobilePartyBehaviorHandler : IHandler
             GameThread.RunSafe(apply, context: nameof(MobilePartyBehaviorHandler));
     }
 
-    private void PublishForcedPosition(MobileParty party)
-    {
-        if (!mobilePartyBehaviorSnapshot.TryCreate(
-                party,
-                out PartyBehaviorUpdateData data))
-            return;
+    // Server-authored updates such as debug teleports leave the origin null and apply as usual
+    private static bool IsOwnerOrderDuringRaft(MobileParty party, PartyBehaviorUpdateData data) =>
+        party.IsInRaftState && !string.IsNullOrEmpty(data.OriginControllerId);
 
-        data.ForcePosition = true;
-        messageBroker.Publish(this, new PartyBehaviorUpdated(ref data));
-    }
-
-    private void PublishAuthoritativeBehavior(MobileParty party, PartyBehaviorUpdateData request)
+    private void PublishAuthoritativeBehavior(MobileParty party, string originControllerId, bool forcePosition, bool resetMovementToHold)
     {
         if (!mobilePartyBehaviorSnapshot.TryCreate(
                 party,
                 out PartyBehaviorUpdateData authoritativeData))
             return;
 
-        authoritativeData.OriginControllerId = request.OriginControllerId;
-        authoritativeData.ForcePosition = request.ForcePosition;
-        authoritativeData.ResetMovementToHold = request.ResetMovementToHold;
+        authoritativeData.OriginControllerId = originControllerId;
+        authoritativeData.ForcePosition = forcePosition;
+        authoritativeData.ResetMovementToHold = resetMovementToHold;
         messageBroker.Publish(this, new PartyBehaviorUpdated(ref authoritativeData));
     }
 
