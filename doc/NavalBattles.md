@@ -677,12 +677,14 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
     visible. The latest host time that arrived during loading (a late joiner gets one at once) is used as the start
     instead; the mission timer stands during loading (`TickLoading` doesn't tick the mission, `FinishMissionLoading`
     ticks it twice by 1 ms), so the latest sample is the freshest.
-  - The battle host writes its own clock and sends it every second (`NetworkBattleWaterTime`, host-epoch stamped) and at
-    once to a peer entering the battle. From `AfterStart` on, a client's written time never runs backwards: a host time
-    more than 2 s of mission time (20 water units) ahead jumps forward, at once for the first host time and the first
-    after a host change, otherwise only when all of the last 3 samples are that far ahead. Everything else is slewed
-    at 75% to 125% speed toward a target smoothed (0.3 per sample) toward the largest offset of the last 3 samples
-    (transit only makes an offset look smaller).
+  - The battle host writes its own clock and sends it every second (`NetworkBattleWaterTime`, host-epoch and battle
+    instance stamped, so a sample from another battle is dropped) and at once to a peer entering the battle. From
+    `AfterStart` on, a client's written time never runs backwards. A host time more than 2 s of mission time (20 water
+    units) ahead jumps forward at once for the first host time, the first after a host change, and any time before the
+    local mission clock has first moved. After that the water never jumps mid-battle: when all of the last 3 samples
+    are that far ahead, the gap is caught up at up to double speed, logging one `[NavalSync]` line. Everything else is
+    slewed at 75% to 125% speed toward a target smoothed (0.3 per sample) toward the largest offset of the last 3
+    samples (transit only makes an offset look smaller).
   - A promoted host keeps its current offset, so it continues from its own water time. Election ignores water time, so
     a promoted member may never have heard the old host (a joiner still on its 0 start). On a host change
     (`BattleHostMigrated`) every client therefore sends its own time to the new host once, and the host jumps forward to
