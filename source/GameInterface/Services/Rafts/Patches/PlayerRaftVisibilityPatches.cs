@@ -25,22 +25,15 @@ internal class PlayerRaftVisibilityPatches
     private static void RefreshDynamicPropertiesPostfix(PartyNameplateVM __instance, bool __state)
     {
         var party = __instance.Party;
-        var showAgain = ShouldShowAgain(
-            wasVisible: __state,
-            isVisible: __instance._isVisibleOnMapBind,
-            isInArmy: __instance._isInArmyBind,
-            isInSettlement: __instance._isInSettlementBind,
-            isInNavalAutoTravel: party.IsInNavalAutoTravel);
+        // Vanilla's army and settlement hides still apply to a raft
+        var hiddenOnlyForNavalAutoTravel = __state && !__instance._isVisibleOnMapBind &&
+            !__instance._isInArmyBind && !__instance._isInSettlementBind && party.IsInNavalAutoTravel;
 
-        if (!showAgain) return;
+        if (!hiddenOnlyForNavalAutoTravel) return;
         if (!IsOtherPlayersRaft(party, MobileParty.MainParty)) return;
 
         __instance._isVisibleOnMapBind = true;
     }
-
-    // True when this refresh hid a visible nameplate only because the party is in naval auto travel (a raft or a ferry); vanilla's army and settlement hides still apply
-    internal static bool ShouldShowAgain(bool wasVisible, bool isVisible, bool isInArmy, bool isInSettlement, bool isInNavalAutoTravel) =>
-        wasVisible && !isVisible && !isInArmy && !isInSettlement && isInNavalAutoTravel;
 
     [HarmonyPatch(typeof(PartyBase), "TaleWorlds.CampaignSystem.Map.IInteractablePoint.CanPartyInteract")]
     [HarmonyPostfix]
