@@ -1,7 +1,7 @@
 ﻿using Common;
+using GameInterface.Services.AnchorPoints.Interfaces;
 using GameInterface.Services.PartyBases.Extensions;
 using HarmonyLib;
-using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Naval;
@@ -26,12 +26,11 @@ internal class ChangeShipOwnerActionPatches
         // Vanilla trades the gold with the clan leader, which is only the player when they lead their clan
         if (owner.IsSettlement && newOwner.IsPlayerParty())
         {
+            if (!ContainerProvider.TryResolve<IAnchorPointInterface>(out var anchorPointInterface)) return true;
+
             int tradeValue = (int)Campaign.Current.Models.ShipCostModel.GetShipTradeValue(ship, owner, newOwner);
             GiveGoldAction.ApplyBetweenCharacters(newOwner.LeaderHero, null, tradeValue);
-            if (newOwner.Ships.Any() && !newOwner.MobileParty.Anchor.IsValid)
-            {
-                newOwner.MobileParty.Anchor.Settlement = owner.Settlement;
-            }
+            anchorPointInterface.AnchorUnanchoredFleet(newOwner.MobileParty, owner.Settlement);
         }
         else if (owner.IsPlayerParty())
         {

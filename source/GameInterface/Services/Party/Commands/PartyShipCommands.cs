@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Commands;
 using Common.Logging;
+using GameInterface.Services.AnchorPoints.Interfaces;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.MobileParties.Extensions;
@@ -39,6 +40,14 @@ public class PartyShipCommands
     /// <summary>Gives a party one new ship through the vanilla production path, anchoring a first fleet at the port it is in.</summary>
     public sealed class AddShipCoopCommand : ICoopCommand
     {
+        private readonly IAnchorPointInterface anchorPointInterface;
+
+        /// <summary>Uses the anchor point interface a ship purchase anchors a fleet through.</summary>
+        public AddShipCoopCommand(IAnchorPointInterface anchorPointInterface)
+        {
+            this.anchorPointInterface = anchorPointInterface;
+        }
+
         public string Prefix => "coop.debug.party";
 
         public string Name => "add_ship";
@@ -74,11 +83,8 @@ public class PartyShipCommands
 
             // Like vanilla's naval.add_ship cheat, otherwise production leaves a first fleet unanchored and the port shows no shipyard
             var mobileParty = party.MobileParty; // null for a settlement's own PartyBase
-            var port = mobileParty?.CurrentSettlement;
-            var isFirstFleetInPort = port != null && port.HasPort &&
-                !mobileParty.IsCurrentlyAtSea && !mobileParty.Anchor.IsValid;
-            if (isFirstFleetInPort)
-                mobileParty.Anchor.Settlement = port;
+            if (mobileParty is { IsCurrentlyAtSea: false, CurrentSettlement: { HasPort: true } port })
+                anchorPointInterface.AnchorUnanchoredFleet(mobileParty, port);
 
             var shipId = DescribeId(objectManager, ship);
             var anchor = mobileParty?.Anchor.Settlement?.StringId ?? "none";
