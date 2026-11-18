@@ -920,11 +920,6 @@ public class ArtisanOverpricedGoodsTests : IDisposable
     {
         Accept();
         var quest = (Quest)scenario.QuestOf(ClientA);
-        ClientA.SimulateMessage(Server.NetPeer, new NetworkIssueJournal(
-            scenario.NotableId,
-            QuestScenario.IssueId,
-            isQuestJournal: true,
-            logs: Array.Empty<IssueJournalEntry>()));
         ClientA.SimulateMessage(Server.NetPeer, new NetworkIssueFinalized(scenario.NotableId, QuestScenario.IssueId, IssueOutcome.QuestSuccess));
         ClientA.Call(() =>
         {

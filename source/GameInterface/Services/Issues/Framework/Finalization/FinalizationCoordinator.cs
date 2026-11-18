@@ -52,7 +52,6 @@ internal class FinalizationCoordinator : IHandler, IIssueFinalizationReplay
     private readonly IQuestTypeRegistry questTypes;
     private readonly Dictionary<(string IssueOwnerId, string IssueId), NetworkIssueFinalized> pendingFinalizations = new();
     private readonly HashSet<(string IssueOwnerId, string IssueId)> appliedEndingJournals = new();
-    private readonly HashSet<QuestBase> retainedFinalizedQuests = new();
     private readonly Dictionary<string, (QuestBase Quest, IQuestTypeDescriptor Descriptor)> rememberedQuests = new();
 
     public FinalizationCoordinator(
@@ -116,7 +115,6 @@ internal class FinalizationCoordinator : IHandler, IIssueFinalizationReplay
         messageBroker.Unsubscribe<NetworkIssueFinalized>(Handle_NetworkIssueFinalized);
         pendingFinalizations.Clear();
         appliedEndingJournals.Clear();
-        retainedFinalizedQuests.Clear();
         rememberedQuests.Clear();
     }
 
@@ -340,14 +338,8 @@ internal class FinalizationCoordinator : IHandler, IIssueFinalizationReplay
 
                 if (data.IsQuestJournal && !Campaign.Current.QuestManager.Quests.Contains(quest))
                 {
-                    if (quest.IsOngoing)
-                    {
-                        Logger.Debug("Dropping ending journal for {issue}: ongoing quest is absent from QuestManager", data.IssueId);
-                        return;
-                    }
-
-                    Logger.Debug("Applying ending journal for {issue}: finalized quest is absent from QuestManager", data.IssueId);
-                    retainedFinalizedQuests.Add(quest);
+                    Logger.Debug("Dropping ending journal for {issue}: quest is absent from QuestManager", data.IssueId);
+                    return;
                 }
 
                 if (!data.IsQuestJournal && (quest != null || issue == null))
@@ -619,12 +611,11 @@ internal class FinalizationCoordinator : IHandler, IIssueFinalizationReplay
 
     private void ReplayEnding(IssueBase issue, IssueOutcome outcome, bool isOwner)
     {
-        var retainFinalizedOwnerQuest = isOwner && issue?.IssueQuest is { } quest && retainedFinalizedQuests.Remove(quest);
         using (new AllowedThread())
         using (new QuestEndingReplay())
         using (new QuestJournalReplay())
         {
-            Replay(issue, outcome, isOwner, retainFinalizedOwnerQuest);
+            Replay(issue, outcome, isOwner);
         }
     }
 
@@ -706,13 +697,12 @@ internal class FinalizationCoordinator : IHandler, IIssueFinalizationReplay
         TryCompleteQuest(quest, outcome, log);
     }
 
-    private static void Replay(IssueBase issue, IssueOutcome outcome, bool isOwner, bool retainFinalizedOwnerQuest = false)
+    private static void Replay(IssueBase issue, IssueOutcome outcome, bool isOwner)
     {
         var quest = issue.IssueQuest;
 
-        if (quest != null && (!isOwner || !Campaign.Current.QuestManager.Quests.Contains(quest)) && !retainFinalizedOwnerQuest)
+        if (quest != null && (!isOwner || !Campaign.Current.QuestManager.Quests.Contains(quest)))
         {
-            Logger.Debug("Detaching quest {quest} during finalization replay because it is not in QuestManager", quest.StringId);
             // Discard mirror bookkeeping without running task cancellation or quest gameplay hooks.
             quest.ClearRelatedFields();
             quest._questState = QuestBase.QuestStates.Finalized;
@@ -727,10 +717,6 @@ internal class FinalizationCoordinator : IHandler, IIssueFinalizationReplay
             issue.IssueQuest = null;
             issue.IsTriedToSolveBefore = false;
             quest = null;
-        }
-        else if (retainFinalizedOwnerQuest)
-        {
-            Logger.Debug("Retaining finalized owner quest {quest} during finalization replay", quest.StringId);
         }
 
         if (!isOwner && quest == null)

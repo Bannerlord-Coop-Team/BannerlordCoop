@@ -486,11 +486,6 @@ public class EscortMerchantCaravanTests : IDisposable
             Owner.SimulateMessage(Server.NetPeer, state, markGameThread: false);
             Owner.SimulateMessage(Server.NetPeer,
                 new NetworkIssueFinalized(scenario.NotableId, QuestScenario.IssueId, IssueOutcome.QuestCancel), markGameThread: false);
-            Owner.SimulateMessage(Server.NetPeer, new NetworkIssueJournal(
-                scenario.NotableId,
-                QuestScenario.IssueId,
-                isQuestJournal: true,
-                logs: Array.Empty<IssueJournalEntry>()), markGameThread: false);
             Assert.False(quest.IsFinalized);
             Assert.True(Owner.PendingGameThreadActionCount >= 3);
             Owner.PumpGameThread();
