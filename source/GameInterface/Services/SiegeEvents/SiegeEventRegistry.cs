@@ -33,9 +33,11 @@ internal class SiegeEventRegistry : AutoRegistryBase<SiegeEvent>
         AccessTools.Method(typeof(SiegeEvent), nameof(SiegeEvent.FinalizeSiegeEvent))
     };
 
+    // Settlement.AfterLoad ends a siege whose camp lost its leader party, which stays listed until the next tick;
+    // registering it would give a joining client an id for a siege the server no longer runs.
     public override void RegisterAllObjects()
     {
-        foreach (var siegeEvent in SiegeContainerLookup.ActiveSieges())
+        foreach (var siegeEvent in SiegeContainerLookup.UnendedSieges())
         {
             RegisterExistingObject(siegeEvent.BesiegedSettlement.StringId, siegeEvent);
         }

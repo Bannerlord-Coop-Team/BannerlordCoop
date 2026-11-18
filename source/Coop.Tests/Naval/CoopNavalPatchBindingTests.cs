@@ -24,6 +24,8 @@ public class CoopNavalPatchBindingTests
         AccessTools.Method(typeof(NavalTransitionCampaignBehaviorPatches), nameof(NavalTransitionCampaignBehaviorPatches.SetSailConsequencePrefix)),
         AccessTools.Method(typeof(RaftStateCampaignBehaviorPatches), nameof(RaftStateCampaignBehaviorPatches.PlayerRaftStateContinueOnConsequencePrefix)),
         AccessTools.Method(typeof(NavalDLCFigureheadCampaignBehaviorPatches), "OnFigureheadUnlockedPrefix"),
+        // Naval incidents stay off on both sides until they're synced (#4731)
+        AccessTools.Method(typeof(NavalIncidentsCampaignBehaviourPatches), nameof(NavalIncidentsCampaignBehaviourPatches.TryInvokeIncidentPrefix)),
     };
 
     public static IEnumerable<object[]> PatchClasses => AccessTools.GetTypesFromAssembly(typeof(CoopNavalModule).Assembly)

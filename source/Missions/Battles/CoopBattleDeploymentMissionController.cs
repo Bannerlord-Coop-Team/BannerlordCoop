@@ -4,7 +4,7 @@ namespace Missions.Battles;
 
 /// <summary>
 /// Coop <see cref="BattleDeploymentMissionController"/> that defers the native one-time team/command setup
-/// (<c>SetupTeams</c>, which grants player command via <c>OnTeamDeployed</c>) until the spawn handler has sized the
+/// (<c>SetupTeams</c>, which grants player command via <c>OnBattleSideSpawned</c>) until the spawn handler has sized the
 /// sides. Native runs it on the first tick regardless of troops; in coop a late reserve would run it against empty
 /// teams with a null <c>Agent.Main</c> and latch the player commanding nothing. Gating on
 /// <see cref="CoopBattleMissionSpawnHandler.IsSized"/> holds it until the troops and hero have spawned; the on-time

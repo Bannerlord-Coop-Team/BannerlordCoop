@@ -68,6 +68,13 @@ public abstract class MapEventTestBase : IDisposable
         };
     }
 
+    /// <summary>The map event methods plus the campaign tick, which a hand-driven map frame can't run in the harness.</summary>
+    protected IReadOnlyList<MethodBase> MapTickDisabledMethods => MapEventDisabledMethods.Concat(new[]
+    {
+        AccessTools.Method(typeof(Campaign), nameof(Campaign.RealTick)),
+        AccessTools.Method(typeof(Campaign), nameof(Campaign.Tick)),
+    }).ToList();
+
     protected IReadOnlyList<MethodBase> WithoutNetworkDelivery() => MapEventDisabledMethods
         .Append(AccessTools.Method(typeof(TestNetworkRouter), nameof(TestNetworkRouter.SendReliablePayload),
             new[] { typeof(NetPeer), typeof(NetPeer), typeof(byte[]) }))
@@ -101,8 +108,7 @@ public abstract class MapEventTestBase : IDisposable
             mapEvent.Initialize(
                 attackerParty.Party,
                 defenderParty.Party,
-                new FieldBattleEventComponent(mapEvent),
-                MapEvent.BattleTypes.FieldBattle);
+                new FieldBattleEventComponent(mapEvent));
             mapEvent.MapEventVisual = null;
 
             if (commit && !Campaign.Current.MapEventManager.MapEvents.Contains(mapEvent))
@@ -165,6 +171,16 @@ public abstract class MapEventTestBase : IDisposable
     /// </summary>
     protected static GauntletMapEventVisual MockMapEventVisual()
         => ObjectHelper.SkipConstructor<GauntletMapEventVisual>();
+
+    // The harness campaign has no encounter model, which distance checks and party searches read.
+    protected static void EnsureEncounterModel()
+    {
+        if (Campaign.Current.Models?.EncounterModel != null) return;
+
+        var models = Campaign.Current.Models?.GetGameModels().ToList() ?? new List<GameModel>();
+        models.Add(new DefaultEncounterModel());
+        Campaign.Current._gameModels = new GameModels(models);
+    }
 
     // ------------------------------------------------------------------
     // Parties joining map events
@@ -450,7 +466,7 @@ public abstract class MapEventTestBase : IDisposable
             // attacker = captor (winner), defender = player party (loser)
             var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
             mapEvent.MapEventVisual = MockMapEventVisual();
-            mapEvent.Initialize(captorParty.Party, playerParty.Party);
+            mapEvent.Initialize(captorParty.Party, playerParty.Party, new FieldBattleEventComponent(mapEvent));
 
             mapEvent.CaptureDefeatedPartyMembers(mapEvent.AttackerSide.Parties, mapEvent.DefenderSide.Parties);
         }, disabledMethods);
@@ -505,7 +521,7 @@ public abstract class MapEventTestBase : IDisposable
             // MapEvent (and its sides) to the clients, so the committing client can resolve and finish it.
             var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
             mapEvent.MapEventVisual = MockMapEventVisual();
-            mapEvent.Initialize(captorParty.Party, playerParty.Party);
+            mapEvent.Initialize(captorParty.Party, playerParty.Party, new FieldBattleEventComponent(mapEvent));
 
             Assert.True(Server.ObjectManager.TryGetId(mapEvent, out mapEventId));
         }, MapEventDisabledMethods);
@@ -576,9 +592,9 @@ public abstract class MapEventTestBase : IDisposable
             var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
             mapEvent.MapEventVisual = MockMapEventVisual();
             if (playersAreAttackers)
-                mapEvent.Initialize(loserParties[0].Party, captorParty.Party);
+                mapEvent.Initialize(loserParties[0].Party, captorParty.Party, new FieldBattleEventComponent(mapEvent));
             else
-                mapEvent.Initialize(captorParty.Party, loserParties[0].Party);
+                mapEvent.Initialize(captorParty.Party, loserParties[0].Party, new FieldBattleEventComponent(mapEvent));
 
             var losingSide = playersAreAttackers ? mapEvent.AttackerSide : mapEvent.DefenderSide;
             for (int i = 1; i < loserParties.Length; i++)
@@ -1142,11 +1158,7 @@ public abstract class MapEventTestBase : IDisposable
                 Assert.Null(MobileParty.MainParty.MapEvent);
                 Assert.Null(MobileParty.MainParty.CurrentSettlement);
                 Assert.Null(Campaign.Current.CurrentMenuContext);
-            }, MapEventDisabledMethods.Concat(new[]
-            {
-                AccessTools.Method(typeof(Campaign), nameof(Campaign.RealTick)),
-                AccessTools.Method(typeof(Campaign), nameof(Campaign.Tick)),
-            }).ToArray());
+            }, MapTickDisabledMethods);
         }
         finally { harmony.UnpatchAll(harmony.Id); }
     }

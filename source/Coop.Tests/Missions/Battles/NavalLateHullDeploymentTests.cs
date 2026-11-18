@@ -16,7 +16,7 @@ public class NavalLateHullDeploymentTests
     public void Target_VanillaDeploymentPassExists()
     {
         Assert.NotNull(AccessTools.DeclaredMethod(typeof(MissionShip), nameof(MissionShip.OnDeploymentFinished)));
-        Assert.NotNull(AccessTools.DeclaredMethod(typeof(RangedSiegeWeaponAi), nameof(RangedSiegeWeaponAi.InitializeThreatSeeker)));
+        Assert.NotNull(AccessTools.DeclaredMethod(typeof(RangedSiegeWeaponAi), nameof(RangedSiegeWeaponAi.ResetThreatSeeker)));
     }
 
     // A formation noted twice is checked once; one without a formation AI is left alone, and the next tick starts empty.

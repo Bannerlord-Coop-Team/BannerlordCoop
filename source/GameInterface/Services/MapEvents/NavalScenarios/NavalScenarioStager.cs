@@ -436,7 +436,7 @@ public class NavalScenarioStager : INavalScenarioStager
         var player = players[0];
         if (!TryFindBlockade(config, players, hull, log, out var town, out var besieger, out bool isNewSiege, out error)) return false;
 
-        // BlockadeBattleMapEvent.OnInitialize lifts the blockade with no battle when the attackers are this much stronger.
+        // BlockadeBattleEventComponent.OnInitialize lifts the blockade with no battle when the attackers are this much stronger.
         float attackerPower = players.Sum(party =>
             party.Party.GetCustomStrength(BattleSideEnum.Attacker, MapEvent.PowerCalculationContext.SeaBattle));
         float blockadePower = town.SiegeEvent.BesiegerCamp.GetInvolvedPartiesForEventType(MapEvent.BattleTypes.BlockadeBattle)
@@ -445,7 +445,7 @@ public class NavalScenarioStager : INavalScenarioStager
         if (IsBlockadeLiftedWithoutBattle(attackerPower, blockadePower))
         {
             error = $"the players' sea power {attackerPower:0} is over {LiftBlockadePowerRatio} x the blockade's {blockadePower:0}, so " +
-                "BlockadeBattleMapEvent.CheckLiftingBlockade would lift the blockade with no battle; " +
+                "BlockadeBattleEventComponent.CheckLiftingBlockade would lift the blockade with no battle; " +
                 (isNewSiege ? "raise hulls=n" : $"hulls=n cannot grow {town.StringId}'s existing blockade, pick town=<id> without one");
             return false;
         }

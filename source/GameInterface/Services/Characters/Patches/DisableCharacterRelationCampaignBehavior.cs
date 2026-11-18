@@ -22,17 +22,6 @@ internal class DisableCharacterRelationCampaignBehavior
 [HarmonyPatch(typeof(CharacterRelationCampaignBehavior))]
 internal class CharacterRelationCampaignBehaviorPatches
 {
-    [HarmonyPatch(nameof(CharacterRelationCampaignBehavior.OnHeroKilled))]
-    [HarmonyPrefix]
-    public static bool OnHeroKilledPrefix(Hero victim, Hero killer, KillCharacterAction.KillCharacterActionDetail detail, bool showNotification = true)
-    {
-        if (!ContainerProvider.TryResolve<ICharacterRelationCampaignBehaviorInterface>(out var characterRelationBehaviorInterface)) return true;
-
-        characterRelationBehaviorInterface.OnHeroKilled(victim, killer, detail, showNotification);
-
-        return false;
-    }
-
     [HarmonyPatch(nameof(CharacterRelationCampaignBehavior.OnPrisonerDonatedToSettlement))]
     [HarmonyPrefix]
     public static bool OnPrisonerDonatedToSettlementPrefix(MobileParty donatingParty, FlattenedTroopRoster donatedPrisoners, Settlement donatedSettlement)
