@@ -46,6 +46,14 @@ internal class ChangeShipOwnerActionPatches
         ship.Owner = newOwner;
         owner.MobileParty?.SetNavalVisualAsDirty();
         newOwner.MobileParty?.SetNavalVisualAsDirty();
+
+        bool canHaveUpgradePiece = false;
+        CampaignEventDispatcher.Instance.CanHaveUnlockedUpgradePiece(ship, changeDetail, ref canHaveUpgradePiece);
+        if (ship.CanHaveUnlockedPieces != canHaveUpgradePiece)
+        {
+            ship.CanHaveUnlockedPieces = canHaveUpgradePiece;
+        }
+
         CampaignEventDispatcher.Instance.OnShipOwnerChanged(ship, owner, changeDetail);
 
         return false;
