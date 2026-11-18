@@ -1,7 +1,6 @@
 ﻿using Common;
 using Common.Messaging;
 using GameInterface.Services.Heroes.HeirSelection.Messages;
-using GameInterface.Services.MapEvents;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players.Messages;
@@ -16,13 +15,11 @@ internal class PlayerRaftHandler : IHandler
 {
     private readonly IMessageBroker messageBroker;
     private readonly IPlayerRaftFleetInterface raftFleetInterface;
-    private readonly PostBattleScreens postBattleScreens;
 
-    public PlayerRaftHandler(IMessageBroker messageBroker, IPlayerRaftFleetInterface raftFleetInterface, PostBattleScreens postBattleScreens)
+    public PlayerRaftHandler(IMessageBroker messageBroker, IPlayerRaftFleetInterface raftFleetInterface)
     {
         this.messageBroker = messageBroker;
         this.raftFleetInterface = raftFleetInterface;
-        this.postBattleScreens = postBattleScreens;
 
         messageBroker.Subscribe<PlayerPartyReleasedFromCaptivity>(Handle);
         messageBroker.Subscribe<PlayerCharacterChangedOnServer>(Handle_PlayerCharacterChanged);
@@ -66,13 +63,7 @@ internal class PlayerRaftHandler : IHandler
 
         // A raft's AI is off, so leaving a battle or its post battle screens would hold it at sea for good.
         // Queued for a later frame, because the battle leave sets the party to hold right after clearing its side, which would cancel the move to shore.
-        GameThread.EnqueueSafe(() =>
-        {
-            // A finished battle resumes once the screens close, so its move isn't sent twice
-            if (postBattleScreens.IsInScreens(party)) return;
-
-            raftFleetInterface.ResumeRaft(party);
-        });
+        GameThread.EnqueueSafe(() => raftFleetInterface.ResumeRaft(party));
     }
 
     private void Handle_PlayerCharacterChanged(MessagePayload<PlayerCharacterChangedOnServer> obj)

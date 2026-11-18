@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using GameInterface.CoopSessionData;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.NavalDLC;
@@ -60,21 +61,23 @@ public interface IPlayerRaftFleetInterface : IGameAbstraction
     void OnPlayerCharacterChanged(Hero newPlayerHero, MobileParty newMainParty);
 }
 
-public class PlayerRaftFleetInterface : IPlayerRaftFleetInterface
+internal class PlayerRaftFleetInterface : IPlayerRaftFleetInterface
 {
     private readonly ICoopSessionProvider coopSessionProvider;
     private readonly IObjectManager objectManager;
     private readonly IPlayerManager playerManager;
     private readonly IMessageBroker messageBroker;
+    private readonly PostBattleScreens postBattleScreens;
 
     private Dictionary<string, PlayerCachedFleetData> PlayerCachedFleets => coopSessionProvider.CoopSession.NavalPlayerData.PlayerCachedFleets;
 
-    public PlayerRaftFleetInterface(ICoopSessionProvider coopSessionProvider, IObjectManager objectManager, IPlayerManager playerManager, IMessageBroker messageBroker)
+    public PlayerRaftFleetInterface(ICoopSessionProvider coopSessionProvider, IObjectManager objectManager, IPlayerManager playerManager, IMessageBroker messageBroker, PostBattleScreens postBattleScreens)
     {
         this.coopSessionProvider = coopSessionProvider;
         this.objectManager = objectManager;
         this.playerManager = playerManager;
         this.messageBroker = messageBroker;
+        this.postBattleScreens = postBattleScreens;
     }
 
     public void StrandAfterRelease(MobileParty party)
@@ -140,8 +143,9 @@ public class PlayerRaftFleetInterface : IPlayerRaftFleetInterface
     public bool ResumeRaft(MobileParty party)
     {
         if (!party.IsInRaftState || !party.IsCurrentlyAtSea) return false;
-        // Leaving the battle resumes it through PartyOccupancyChanged
+        // Leaving the battle or its post battle screens resumes it through PartyOccupancyChanged
         if (party.MapEvent != null) return false;
+        if (postBattleScreens.IsInScreens(party)) return false;
         if (party.CurrentSettlement != null) return false;
 
         party.MovePartyToTheClosestLand();
