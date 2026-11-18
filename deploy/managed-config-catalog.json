@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "catalogRevision": "d1261866e62085cfec1b837a201b4ada90b873668cb409f61650c17d393f1771",
-  "contentDigest": "d1261866e62085cfec1b837a201b4ada90b873668cb409f61650c17d393f1771",
+  "catalogRevision": "e7b67121ffb256d0f5417e3ed488c22ed2b35f7d3e0d314f42c7f02691789b69",
+  "contentDigest": "e7b67121ffb256d0f5417e3ed488c22ed2b35f7d3e0d314f42c7f02691789b69",
   "sourceCommit": "d8a3c6dcce1d9b452f4af9262f5a16da01ddf13a",
   "source": "BannerlordCoop/source/GameInterface/Configuration/ModConfigData.cs",
   "options": [
@@ -228,7 +228,6 @@
       "type": "integer",
       "stable": true,
       "availableSince": "0.1.7",
-      "min": 1,
       "max": 86400,
       "omitForOldAgents": true,
       "default": 60

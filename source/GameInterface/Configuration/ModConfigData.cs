@@ -170,7 +170,7 @@ public sealed class ModOptionsData
     [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7", OmitForOldAgents = true)]
     public bool? ShowPlayerNameplates { get; set; }
 
-    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7", Min = 1, Max = 86400, OmitForOldAgents = true)]
+    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7", Max = 86400, OmitForOldAgents = true)]
     public int? KingdomDecisionVoteTimeoutSeconds { get; set; }
 
     [ManagedConfigOption(Stable = false, AvailableSince = "0.1.8", OmitForOldAgents = true)]
