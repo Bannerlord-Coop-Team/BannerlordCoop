@@ -12,10 +12,10 @@ internal class NearbyBanditBaseQuestSolutionAcceptStrategy : IQuestSolutionAccep
 
     public void Apply(IssueBase issue, byte[] captured)
     {
-        // NearbyBanditBaseQuestAcceptedPatch leaves spotting out on the client, AutoSync sends this write there
+        // NearbyBanditBaseQuestAcceptedPatch only shows the hideout on the owner, AutoSync sends this write to every client
         if (ModInformation.IsServer && issue is Issue banditBaseIssue)
         {
-            banditBaseIssue.TargetHideout.Hideout.IsSpotted = true;
+            banditBaseIssue.TargetHideout.IsVisible = true;
         }
     }
 }

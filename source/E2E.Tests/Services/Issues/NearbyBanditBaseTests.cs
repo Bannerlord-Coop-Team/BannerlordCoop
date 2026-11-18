@@ -145,9 +145,23 @@ public class NearbyBanditBaseTests : IDisposable
     }
 
     [Fact]
-    public void AcceptingSpotsTheHideoutOnTheServerAndEveryClient()
+    public void AcceptingShowsTheHideoutOnTheServerAndEveryClient()
     {
         CreateIssueOnServer();
+
+        foreach (var instance in Instances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Settlement>(hideoutSettlementId, out var hideout));
+
+                using (new AllowedThread())
+                {
+                    hideout.IsVisible = false;
+                }
+            });
+        }
+
         AcceptOnClientA();
 
         foreach (var instance in Instances)
@@ -155,7 +169,7 @@ public class NearbyBanditBaseTests : IDisposable
             instance.Call(() =>
             {
                 Assert.True(instance.ObjectManager.TryGetObject<Settlement>(hideoutSettlementId, out var hideout));
-                Assert.True(hideout.Hideout.IsSpotted);
+                Assert.True(hideout.IsVisible);
             });
         }
     }
@@ -219,7 +233,7 @@ public class NearbyBanditBaseTests : IDisposable
     }
 
     [Fact]
-    public void TheOwnersAcceptStartsTheQuestWithoutSpottingTheHideoutOnTheClient()
+    public void TheOwnersAcceptStartsTheQuestAndShowsTheHideoutOnTheClient()
     {
         CreateIssueOnServer();
 
@@ -233,14 +247,13 @@ public class NearbyBanditBaseTests : IDisposable
 
             using (new AllowedThread())
             {
-                hideout.Hideout.IsSpotted = false;
+                hideout.IsVisible = false;
             }
 
             quest.OnQuestAccepted();
 
             Assert.Contains(quest, Campaign.Current.QuestManager.Quests);
             Assert.True(hideout.IsVisible);
-            Assert.False(hideout.Hideout.IsSpotted);
         }, QuestAcceptedMethods);
     }
 
