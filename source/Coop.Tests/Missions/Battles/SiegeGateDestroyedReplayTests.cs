@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Messaging;
 using HarmonyLib;
+using Missions;
 using Missions.Battles;
 using Missions.Messages;
 using Moq;
@@ -194,7 +195,7 @@ public class SiegeGateDestroyedReplayTests : IDisposable
         }
     }
 
-    private static void ApplySnapshot(CastleGate gate, float hitPoints, int destructionState, int gateState = -1)
+    private void ApplySnapshot(CastleGate gate, float hitPoints, int destructionState, int gateState = -1)
     {
         var state = new NetworkSiegeMachineState(GateId, hitPoints, destructionState, gateState, -1, -1f,
             false, -1, -1000f, -1000f, hostEpoch: 1, senderControllerId: "host");

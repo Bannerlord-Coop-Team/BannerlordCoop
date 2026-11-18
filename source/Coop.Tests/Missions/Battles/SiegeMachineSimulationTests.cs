@@ -36,9 +36,11 @@ public class SiegeMachineSimulationTests : IDisposable
         AccessTools.Field(typeof(UsableMachine), "<DestructionComponent>k__BackingField").SetValue(ram, destruction);
         AccessTools.Field(typeof(DestructableComponent), "_currentStateIndex").SetValue(destruction, 0);
         ramSnapDistance = 12.5f;
+        ramSnappedDistance = 0f;
         ramSnapCalls = 0;
         ramDestructionCalls = 0;
         ramResetDistanceErrorCalls = 0;
+        ramResetDistanceErrorDistance = 0f;
         ramSnappedBeforeDestruction = false;
         var broker = new TestMessageBroker();
         using var replicator = new SiegeMachineStateReplicator(Mock.Of<IBattleNetwork>(), broker,
