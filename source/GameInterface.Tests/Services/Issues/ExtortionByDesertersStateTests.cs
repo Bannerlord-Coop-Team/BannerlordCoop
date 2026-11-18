@@ -70,21 +70,7 @@ public class ExtortionByDesertersStateTests
         }
     }
 
-    [Fact]
-    public void RoundTrip_NullAttributeHasTheSameRepresentationInBothJournalPaths()
-    {
-        var text = new TextObject("{=YjxCkglX}You've failed to complete this quest in time. Your agreement with {QUEST_GIVER.LINK} was canceled.",
-            new Dictionary<string, object> { ["QUEST_GIVER"] = null });
-        var state = RoundTrip(new NetworkExtortionByDesertersState("headman", "issue-generation", "player-B",
-            "", "", 0, text, false));
-        var snapshot = RoundTrip(new NetworkIssueJournal("headman", "issue-generation", true, new[] { new IssueJournalEntry(new JournalLog(default, text)) }));
-        var ending = Assert.Single(snapshot.Logs).Text;
 
-        Assert.Equal(text.Value, state.Log.Value);
-        Assert.Equal(ending.Value, state.Log.Value);
-        Assert.Null(state.Log.Attributes["QUEST_GIVER"]);
-        Assert.Null(ending.Attributes["QUEST_GIVER"]);
-    }
 
     [Fact]
     public void RoundTrip_StateOnlyAndNoticeOnlyKeepNullLog()

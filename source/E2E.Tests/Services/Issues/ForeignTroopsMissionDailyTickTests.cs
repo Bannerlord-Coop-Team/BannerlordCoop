@@ -2,6 +2,7 @@
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.Issues.Framework.Interface;
+using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.Localization;
@@ -71,6 +72,20 @@ public class ForeignTroopsMissionDailyTickTests : IDisposable
             Assert.True(issue.IsSolvingWithAlternative);
             var journal = Assert.Single(issue.JournalEntries);
             Assert.Equal(1, journal.CurrentProgress);
+        });
+    }
+
+    [Fact]
+    public void TheDailyTickAddsTheReturnEntryToThisPlayersTroopsMission()
+    {
+        scenario.ClientA.Call(() =>
+        {
+            var issue = SendTroops(scenario.ClientA, owner: QuestScenario.ControllerA, withJournal: true, troopsStartReturningToday: true);
+
+            Campaign.Current.IssueManager.DailyTick();
+
+            Assert.True(issue.IsSolvingWithAlternative);
+            Assert.Contains(issue.JournalEntries, entry => entry.LogText?.ToString() == "Your men should be on their way.");
         });
     }
 

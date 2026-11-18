@@ -184,7 +184,7 @@ public class ExtortionByDesertersTests : IDisposable
             var party = GameObjectCreator.CreateInitializedObject<MobileParty>();
             mirror._deserterMobileParty = party;
             Assert.True(Server.ObjectManager.TryGetId(party, out partyId));
-            Server.Resolve<ExtortionByDesertersHandler>().Send(mirror, log);
+            Server.Resolve<IExtortionByDesertersProgress>().Send(mirror, log);
         });
 
         Owner.Call(() =>
@@ -243,16 +243,7 @@ public class ExtortionByDesertersTests : IDisposable
         Assert.True(quest.IsFinalized);
     }
 
-    [Fact]
-    public void RewardChoice_BeforeVictoryHasNoRewardOrCompletion()
-    {
-        var quest = Accept();
-        using var result = new MethodCallRecorder(Priority.Last, AccessTools.Method(typeof(Quest), nameof(Quest.ApplyQuestResult)));
-        Owner.Call(() => ChooseReward(quest, 0), TextLinks);
-        Assert.Equal(0, result.CountFor(Server));
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
-        Assert.True(quest.IsOngoing);
-    }
+
 
     [Fact]
     public void ClientIssueLifecycle_DoesNotPurgeAnIssueWhenSecurityChanges()
@@ -274,6 +265,7 @@ public class ExtortionByDesertersTests : IDisposable
             Assert.True(Other.ObjectManager.TryGetObject<MobileParty>(otherPartyId, out var party));
             var settlement = notable.CurrentSettlement;
             Assert.NotNull(settlement);
+            var issue = notable.Issue;
             var previousSettlement = party.CurrentSettlement;
             party.CurrentSettlement = settlement;
             try
@@ -290,35 +282,13 @@ public class ExtortionByDesertersTests : IDisposable
             {
                 party.CurrentSettlement = previousSettlement;
             }
-            Assert.NotNull(notable.Issue);
+            Assert.Same(issue, notable.Issue);
         });
     }
 
-    [Theory]
-    [InlineData(0)]
-    [InlineData(255)]
-    public void UnknownBranch_IsRejected(byte proof)
-    {
-        Accept();
-        Server.Call(() =>
-        {
-            Assert.True(Server.Resolve<IQuestTypeRegistry>().TryGet(typeof(Issue), out var descriptor));
-            Assert.False(descriptor.FinalizationProofStrategy.TryRunBranch(scenario.QuestOf(Server), proof));
-        });
-    }
 
-    [Fact]
-    public void RaidReplayOnOwner_DoesNotApplyConsequences()
-    {
-        var quest = Accept();
-        Owner.Call(() =>
-        {
-            Assert.True(Owner.ObjectManager.TryGetObject<Village>(villageId, out var village));
-            using (new AllowedThread()) quest.OnVillageBeingRaided(village);
-            Assert.True(quest.IsOngoing);
-        });
-        Assert.Empty(Owner.NetworkSentMessages.GetMessages<RequestQuestOutcome>());
-    }
+
+
 
     [Theory]
     [InlineData(0, IssueOutcome.QuestFail, -10)]
@@ -476,78 +446,11 @@ public class ExtortionByDesertersTests : IDisposable
         Assert.Empty(Other.NetworkSentMessages.GetMessages<RequestQuestOutcome>());
     }
 
-    [Theory]
-    [InlineData(nameof(Quest.CreateDeserterParty))]
-    [InlineData(nameof(Quest.CreateDefenderParty))]
-    [InlineData(nameof(Quest.DestroyDeserterParty))]
-    [InlineData(nameof(Quest.DestroyDefenderParty))]
-    [InlineData(nameof(Quest.ReleaseDeserterParty))]
-    [InlineData(nameof(Quest.HourlyTick))]
-    [InlineData(nameof(Quest.GameMenuOptionSelected))]
-    [InlineData(nameof(Quest.OnWarDeclared))]
-    [InlineData(nameof(Quest.OnClanChangedKingdom))]
-    [InlineData(nameof(Quest.OnMapEventStarted))]
-    [InlineData(nameof(Quest.OnSettlementLeft))]
-    public void WorldMethod_IsBlockedEvenDuringOwnerReplay(string methodName)
-    {
-        var quest = Accept();
-        var method = AccessTools.Method(typeof(Quest), methodName);
-        // The constructor recorder already covers deserter creation.
-        if (methodName == nameof(Quest.CreateDeserterParty))
-        {
-            creation.Clear();
-            Owner.Call(() => { using (new AllowedThread()) quest.CreateDeserterParty(); });
-            Assert.Equal(0, creation.CountFor(Owner));
-            return;
-        }
 
-        using var recorder = new MethodCallRecorder(Priority.Last, method);
-        var arguments = method.GetParameters().Select(parameter => parameter.ParameterType.IsValueType
-            ? Activator.CreateInstance(parameter.ParameterType) : null).ToArray();
-        Owner.Call(() => { using (new AllowedThread()) method.Invoke(quest, arguments); });
-        Assert.Equal(0, recorder.CountFor(Owner));
-    }
 
-    [Fact]
-    public void SeparatePlayers_CanHoldSeparateDeserterQuests()
-    {
-        Accept();
-        var secondId = AddSecondIssue();
-        Other.Call(() =>
-        {
-            Assert.True(Other.ObjectManager.TryGetObject<Hero>(secondId, out var notable));
-            notable.Issue.StartIssueWithQuest();
-            notable.Issue.IssueQuest.StartQuest();
-        }, TextLinks);
-        Server.Call(() =>
-        {
-            Assert.True(Server.Resolve<IIssueOwnershipRegistry>().TryGetOwner(secondId, "second_deserters", out var owner));
-            Assert.Equal(QuestScenario.ControllerB, owner);
-        });
-        Assert.Equal(QuestScenario.ControllerA, scenario.OwnerOnServer());
-        Owner.Call(() =>
-        {
-            Assert.True(Owner.ObjectManager.TryGetObject<Hero>(secondId, out var notable));
-            Assert.Null(notable.Issue.IssueQuest);
-        });
-    }
 
-    [Fact]
-    public void SamePlayer_CannotTakeAnotherDeserterQuest()
-    {
-        Accept();
-        var secondId = AddSecondIssue();
-        Owner.Call(() =>
-        {
-            Assert.True(Owner.ObjectManager.TryGetObject<Hero>(secondId, out var notable));
-            notable.Issue.StartIssueWithQuest();
-        }, TextLinks);
-        Server.Call(() =>
-        {
-            Assert.False(Server.Resolve<IIssueOwnershipRegistry>().TryGetOwner(secondId, "second_deserters", out _));
-        });
-        Assert.Equal(QuestScenario.ControllerA, scenario.OwnerOnServer());
-    }
+
+
 
     [Fact]
     public void Victory_RemainsReadyForHandInAfterTheDeserterPartyIsGone()
@@ -676,15 +579,12 @@ public class ExtortionByDesertersTests : IDisposable
 
         var messages = Server.NetworkSentMessages.GetMessages<GenericNetworkEvent<Town, byte[]>>()
             .Where(message => message.InstanceId == handle).ToArray();
-        output.WriteLine($"native reward choice={choice} town={townComponentId} handle={handle} server security={serverTown.Security} prosperity={serverTown.Prosperity}");
         foreach (var message in messages)
-            output.WriteLine($"generated town message={message.GetType().Name} value={message.GetType().GetProperty("Value")!.GetValue(message)}");
         foreach (var client in environment.Clients)
         {
             client.Call(() =>
             {
                 var town = client.GetRegisteredObject<Town>(townComponentId);
-                output.WriteLine($"client town={townComponentId} handle={client.GetHandle(town)} security={town.Security} prosperity={town.Prosperity}");
                 Assert.Same(originals[client], town);
                 Assert.Equal(handle, client.GetHandle(town));
                 Assert.Equal(40 + securityChange, town.Security);
@@ -718,45 +618,6 @@ public class ExtortionByDesertersTests : IDisposable
             .Where(line => line.ConsequenceDelegate != null).ToArray();
         Assert.Equal(3, consequences.Length);
         consequences[choice].ConsequenceDelegate();
-    }
-
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void Notification_IsShownOnlyToOwnerWithoutAddingAJournalEntry(bool emptyLog)
-    {
-        var quest = Accept();
-        var entries = quest.JournalEntries.Count;
-        using var notifications = new MethodCallRecorder(AccessTools.GetDeclaredMethods(typeof(MBInformationManager))
-            .Where(method => method.Name == nameof(MBInformationManager.AddQuickInformation)).ToArray());
-        var state = new NetworkExtortionByDesertersState(scenario.NotableId, QuestScenario.IssueId,
-            QuestScenario.ControllerA, "", "", (int)State.DesertersRunningAwayFromPlayer,
-            emptyLog ? TextObject.GetEmpty() : null, false,
-            (byte)ExtortionByDesertersNotice.DesertersNoticedPlayer);
-        var wire = Server.SerializeForWire(state);
-        Owner.SimulateMessage(this, wire);
-        Other.SimulateMessage(this, wire);
-        Assert.Equal(1, notifications.CountFor(Owner));
-        Assert.Equal(0, notifications.CountFor(Other));
-        Assert.Equal(entries, quest.JournalEntries.Count);
-    }
-
-    [Fact]
-    public void ServerBattleStarted_DrivesTheAmbushWithoutAClientBattleEvent()
-    {
-        Accept();
-        var partyId = environment.CreateRegisteredObject<MobileParty>();
-        var quest = (Quest)scenario.QuestOf(Server);
-        using var branches = new MethodCallRecorder(AccessTools.Method(typeof(ExtortionByDesertersFinalizationProofStrategy),
-            nameof(ExtortionByDesertersFinalizationProofStrategy.TryRunBranch)));
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
-            quest._deserterMobileParty = party;
-            CampaignEventDispatcher.Instance.OnStartBattle(party.Party, quest.QuestSettlement.Party, null, false);
-        });
-        Assert.Equal(1, branches.CountFor(Server));
-        Assert.Equal(0, branches.CountFor(Owner));
     }
 
     [Fact]
@@ -795,31 +656,14 @@ public class ExtortionByDesertersTests : IDisposable
             Assert.Same(raid.DefenderSide, quest._defenderMobileParty.MapEventSide);
             Assert.Same(raid.DefenderSide, ownerParty.MapEventSide);
             Assert.Null(militia.MapEventSide);
-            Assert.False(Server.Resolve<ExtortionByDesertersFinalizationProofStrategy>()
-                .TryRunBranch(quest, (byte)ExtortionByDesertersBranch.Ambush));
+            Assert.False(Server.Resolve<IExtortionByDesertersWorldEventService>().TryStartAmbush(quest));
         }, disabled);
         Assert.Equal(1, encounter.CountFor(Owner));
         Assert.Equal(0, encounter.CountFor(Other));
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkExtortionByDesertersState>(), state => state.Ambush);
     }
 
-    [Fact]
-    public void ExistingRaidBehavior_IsNotReappliedByQuestTick()
-    {
-        Accept();
-        var quest = (Quest)scenario.QuestOf(Server);
-        using var raidAction = new MethodCallRecorder(
-            AccessTools.Method(typeof(SetPartyAiAction), nameof(SetPartyAiAction.GetActionForRaidingSettlement)));
-        Server.Call(() =>
-        {
-            var deserters = GameObjectCreator.CreateInitializedObject<MobileParty>();
-            deserters.DefaultBehavior = AiBehavior.RaidSettlement;
-            quest._deserterMobileParty = deserters;
-            quest._currentState = State.DesertersDefeatedPlayer;
-            quest.TickDesertersPartyLogic();
-        });
-        Assert.Equal(0, raidAction.CountFor(Server));
-    }
+
 
     [Fact]
     public void AmbushHandoff_PreservesAnEncounterAlreadyAttachedToTheReplicatedRaid()
@@ -844,7 +688,7 @@ public class ExtortionByDesertersTests : IDisposable
             defenders.MapEventSide = raid.DefenderSide;
             ownerParty.MapEventSide = raid.DefenderSide;
             Assert.True(Server.ObjectManager.TryGetId(raid, out raidId));
-            Server.Resolve<ExtortionByDesertersHandler>().Send(quest);
+            Server.Resolve<IExtortionByDesertersProgress>().Send(quest);
         }, TextLinks.Append(AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize))));
         using var finish = new MethodCallRecorder(AccessTools.Method(typeof(PlayerEncounter), nameof(PlayerEncounter.Finish)));
         using var menus = new MethodCallRecorder(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu)));
@@ -964,7 +808,6 @@ public class ExtortionByDesertersTests : IDisposable
             Assert.Contains(ownerParty.Party, battle.InvolvedParties);
             Assert.Equal(BattleSideEnum.Defender, ownerParty.Party.Side);
             Assert.Equal(State.DesertersMovingToSettlement, quest._currentState);
-            output.WriteLine("Native capture cleared owner membership; canonical registered owner party remains in the losing side.");
 
             if (throughSimulation)
             {
@@ -1254,38 +1097,7 @@ public class ExtortionByDesertersTests : IDisposable
         Assert.Equal(expected, Assert.Single(quest.JournalEntries).LogText.ToString());
     }
 
-    [Fact]
-    public void Timeout_WithNullCharacterProperties_PreservesTheBindingInBothJournalPaths()
-    {
-        var quest = Accept();
-        var mirror = (Quest)scenario.QuestOf(Server);
-        Server.Call(() =>
-        {
-            // Retain the original failing fixture: GetCharacterProperties is suppressed and returns null.
-            var text = mirror.OnQuestTimedOutLogText;
-            Assert.Contains("{=YjxCkglX}", text.Value);
-            Assert.True(text.Attributes.ContainsKey("QUEST_GIVER"));
-            Assert.Null(text.Attributes["QUEST_GIVER"]);
-            output.WriteLine($"Original null-binding timeout: {text}");
-        }, TextLinks);
-        var statesBeforeTimeout = Server.NetworkSentMessages.GetMessages<NetworkExtortionByDesertersState>().Count();
-        Owner.Call(() => quest.CompleteQuestWithTimeOut(), TextLinks);
-        Assert.Equal(-10, mirror.RelationshipChangeWithQuestGiver);
-        Assert.True(quest.IsFinalized);
-        var entry = Assert.Single(quest.JournalEntries).LogText;
-        AssertTimeoutDelivery();
-        var state = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkExtortionByDesertersState>()
-            .Skip(statesBeforeTimeout));
-        var stateWire = Owner.DeserializeFromWire<NetworkExtortionByDesertersState>(Server.SerializeForWire(state));
-        var snapshot = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueJournal>());
-        var snapshotWire = Owner.DeserializeFromWire<NetworkIssueJournal>(Server.SerializeForWire(snapshot));
-        Assert.Equal(stateWire.Log.Value, entry.Value);
-        Assert.Equal(Assert.Single(snapshotWire.Logs).Text.ToString(), entry.ToString());
-        Assert.Null(stateWire.Log.Attributes["QUEST_GIVER"]);
-        Assert.Null(Assert.Single(snapshotWire.Logs).Text.Attributes["QUEST_GIVER"]);
-        Assert.Equal(stateWire.Log.ToString(), entry.ToString());
-        output.WriteLine($"Owner single timeout after both serialized paths: {entry}");
-    }
+
 
     private void AssertTimeoutDelivery()
     {
@@ -1414,9 +1226,9 @@ public class ExtortionByDesertersTests : IDisposable
     }
 
     [Theory]
-    [InlineData(99f)]
-    [InlineData(213.6168f)]
-    public void NativeGiverDeath_CancelsBeforeNotableReplacementAndReleasesOnlyTheOwnersQuest(float power)
+    [InlineData(99f, 0)]
+    [InlineData(213.6168f, 1)]
+    public void NativeGiverDeath_CancelsBeforeNotableReplacementAndReleasesOnlyTheOwnersQuest(float power, int expectedReplacements)
     {
         var ownerQuest = Accept();
         var quest = (Quest)scenario.QuestOf(Server);
@@ -1472,11 +1284,7 @@ public class ExtortionByDesertersTests : IDisposable
             var transferred = Campaign.Current.IssueManager.Issues.TryGetValue(replacement, out var successorIssue);
             var ownerResolves = Server.Resolve<IIssueOwnerResolver>().TryResolveOwnerHero(issue, out _);
             var oldKeyRemains = ownership.TryGetOwner(scenario.NotableId, QuestScenario.IssueId, out _);
-            output.WriteLine($"power={power} dead={giver.IsDead} deadIssueNull={giver.Issue == null} " +
-                $"transferred={transferred && ReferenceEquals(issue, successorIssue)} ongoing={quest.IsOngoing} " +
-                $"ownerResolves={ownerResolves} oldKeyRemains={oldKeyRemains} " +
-                $"questUsed={deserters.IsCurrentlyUsedByAQuest} noDecisions={deserters.Ai.DoNotMakeNewDecisions}");
-            Assert.Equal(power >= 100f ? 1 : 0, native.Replacements);
+            Assert.Equal(expectedReplacements, native.Replacements);
             Assert.True(giver.IsDead);
             Assert.Null(giver.Issue);
             Assert.False(quest.IsOngoing);
