@@ -4,6 +4,7 @@ using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Initialization;
 using HarmonyLib;
+using Helpers;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -319,6 +320,8 @@ public class EncounterSurrenderOptionTests : MapEventTestBase
                 LeaveOnlyHeroInRoster(allyParty.MemberRoster, allyHero);
             }
             Assert.Equal(1, allyParty.Party.NumberOfHealthyMembers);
+            Assert.True(MenuHelper.EncounterOrderAttackCondition(new MenuCallbackArgs((MenuContext)null, null)),
+                "native counts the ally's player hero");
 
             var (shown, _) = InvokeOrderAttackCondition();
 
@@ -515,12 +518,9 @@ public class EncounterSurrenderOptionTests : MapEventTestBase
     /// outright because native counts an emptied hero element as a troop.</summary>
     private static void LeaveOnlyHeroInRoster(TroopRoster roster, Hero hero)
     {
-        for (int i = roster.Count - 1; i >= 0; i--)
-        {
-            var element = roster.GetElementCopyAtIndex(i);
-            roster.AddToCountsAtIndex(i, -element.Number, -element.WoundedNumber, xpChange: 0, removeDepleted: true);
-        }
+        roster.Clear();
 
+        // AddToCounts would sync the seed even on an allowed thread, see SeedPartyTroopOnAll.
         roster.AddNewElement(hero.CharacterObject, -1);
         roster.AddToCountsAtIndex(roster.FindIndexOfTroop(hero.CharacterObject), 1, woundedCountChange: 0, xpChange: 0, removeDepleted: false);
     }
