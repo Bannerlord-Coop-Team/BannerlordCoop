@@ -10,6 +10,7 @@ using GameInterface;
 using GameInterface.AutoSync;
 using GameInterface.CoopSessionData;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.AnchorPoints.Interfaces;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Interfaces;
@@ -33,6 +34,7 @@ public class CoopNavalModuleTests
         builder.RegisterInstance(Mock.Of<INetwork>());
         builder.RegisterInstance(Mock.Of<ICoopSessionProvider>());
         builder.RegisterInstance(Mock.Of<IPlayerMessageInterface>());
+        builder.RegisterInstance(Mock.Of<IAnchorPointInterface>());
         builder.RegisterInstance(Mock.Of<IPlayerManager>());
         builder.RegisterInstance(Mock.Of<ILogger>());
         builder.RegisterInstance(Mock.Of<IAutoRegistryFactory>());
