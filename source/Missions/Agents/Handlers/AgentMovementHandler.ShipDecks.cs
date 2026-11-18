@@ -7,20 +7,20 @@ using TaleWorlds.MountAndBlade;
 
 namespace Missions.Agents.Handlers;
 
-/// <summary>Naval movement: deck-relative poses for agents on a hull, and no world movement for agents seated at a ship station.</summary>
+/// <summary>Naval movement: deck-relative poses for agents on a hull, and no movement for agents seated at a ship station.</summary>
 public partial class AgentMovementHandler
 {
     public INavalDeckMovementProbe DeckMovementProbe { get; }
 
     private IShipDeckSeam shipDeck;
     private IShipStationSeats stationSeats;
-    private long deckStamped, deckAccepted, deckRejected, seatedWithheld;
+    private long deckStamped, deckAccepted, deckRejected, seatedWithheld, seatedIgnored;
 
     public void ConfigureShipDeck(IShipDeckSeam seam)
     {
         shipDeck = seam;
         DeckMovementProbe.Reset();
-        deckStamped = deckAccepted = deckRejected = seatedWithheld = 0;
+        deckStamped = deckAccepted = deckRejected = seatedWithheld = seatedIgnored = 0;
         _interpolator.ConfigureNavalDeck(seam == null ? null : seam.TryResolveDeckFrame);
     }
 
@@ -109,6 +109,7 @@ public partial class AgentMovementHandler
         accepted = deckAccepted,
         rejected = deckRejected,
         seatedWithheld,
+        seatedIgnored,
         sendProbe = DeckMovementProbe.Inspect(totalSimulationTime),
         interpolator = _interpolator.InspectNavalDeck(),
     };
