@@ -124,7 +124,7 @@ public class PartySailCommands
 
             // Same call as vanilla SettlementVisual.OnMapClick for a port reached by sea
             party.SetMoveGoToSettlement(port, MobileParty.NavigationType.Naval, isTargetingThePort: true);
-            // The owner only moves once this order reaches it, so send it like set_sail does instead of relying on the movement patch
+            // The server's movement patches don't send a client-owned party's order, so publish it like SettlementInterface.PartySetSail does
             messageBroker.Publish(this, new PartyBehaviorChangeAttempted(party));
 
             return Succeeded($"{party.StringId} is sailing to {port.StringId}.");
