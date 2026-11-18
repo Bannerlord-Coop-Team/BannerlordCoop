@@ -1,9 +1,11 @@
+using Common.Util;
 using HarmonyLib;
-using System.Reflection;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.GameState;
+using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.Core;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.MapEvents;
@@ -41,33 +43,31 @@ public class EncounterJoinOptionTests : MapEventTestBase
         }, MapEventDisabledMethods);
     }
 
-    /// <summary>Only an encounter that is not set up yet is greyed; any other failure in the join condition still
-    /// surfaces.</summary>
-    [Fact]
-    public void JoinCondition_OtherExceptions_StillSurface()
+    /// <summary>A client's map event sides and their leader parties arrive after the battle itself, and vanilla
+    /// reads the leader of the side not being joined.</summary>
+    [Theory]
+    [InlineData(HelpAttackersCondition, BattleSideEnum.Defender)]
+    [InlineData(HelpDefendersCondition, BattleSideEnum.Attacker)]
+    public void JoinCondition_BeforeLeaderPartyArrives_IsRefusedInsteadOfThrowing(string conditionName, BattleSideEnum unsetSide)
     {
         var client = Clients.First();
         var ctx = CreateServerMapEvent();
         SetMockPlayerEncounter(client, ctx.AttackerPartyId, ctx.MapEventId);
 
-        var condition = AccessTools.Method(typeof(EncounterGameMenuBehavior), HelpAttackersCondition);
-        var harmony = new Harmony(nameof(JoinCondition_OtherExceptions_StillSurface));
-        harmony.Patch(condition, prefix: new HarmonyMethod(typeof(EncounterJoinOptionTests), nameof(ThrowUnrelated)) { priority = Priority.First });
-        try
+        client.Call(() =>
         {
-            client.Call(() =>
-            {
-                var error = Assert.Throws<TargetInvocationException>(() => InvokeJoinCondition(HelpAttackersCondition));
-                Assert.IsType<InvalidOperationException>(error.InnerException);
-            }, MapEventDisabledMethods);
-        }
-        finally
-        {
-            harmony.UnpatchAll(harmony.Id);
-        }
-    }
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(ctx.MapEventId, out var mapEvent));
+            Assert.Same(mapEvent, PlayerEncounter.EncounteredBattle);
+            using (new AllowedThread())
+                mapEvent.GetMapEventSide(unsetSide).LeaderParty = null;
 
-    private static bool ThrowUnrelated() => throw new InvalidOperationException("unrelated condition failure");
+            var (shown, args) = InvokeJoinCondition(conditionName);
+
+            Assert.False(shown);
+            Assert.False(args.IsEnabled);
+            Assert.Equal("Waiting for the server to set up the battle.", args.Tooltip?.ToString());
+        }, MapEventDisabledMethods);
+    }
 
     [Theory]
     [InlineData(HelpAttackersCondition)]
