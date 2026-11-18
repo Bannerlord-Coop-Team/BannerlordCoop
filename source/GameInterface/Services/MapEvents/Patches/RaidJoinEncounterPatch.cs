@@ -16,10 +16,13 @@ namespace GameInterface.Services.MapEvents.Patches;
 [HarmonyPatch]
 internal class RaidJoinEncounterPatch
 {
+    private const string HelpAttackersConsequence = nameof(EncounterGameMenuBehavior.game_menu_join_encounter_help_attackers_on_consequence);
+    private const string HelpDefendersConsequence = nameof(EncounterGameMenuBehavior.game_menu_join_encounter_help_defenders_on_consequence);
+
     private static IEnumerable<MethodBase> TargetMethods()
     {
-        yield return AccessTools.Method(typeof(EncounterGameMenuBehavior), "game_menu_join_encounter_help_attackers_on_consequence");
-        yield return AccessTools.Method(typeof(EncounterGameMenuBehavior), "game_menu_join_encounter_help_defenders_on_consequence");
+        yield return AccessTools.Method(typeof(EncounterGameMenuBehavior), HelpAttackersConsequence);
+        yield return AccessTools.Method(typeof(EncounterGameMenuBehavior), HelpDefendersConsequence);
     }
 
     [HarmonyPrefix]
@@ -33,9 +36,7 @@ internal class RaidJoinEncounterPatch
         if (!mapEvent.IsRaidHostileAction() || mainParty == null)
             return true;
 
-        if (!TryGetJoinSide(__originalMethod, out var side))
-            return true;
-
+        var side = __originalMethod.Name == HelpAttackersConsequence ? BattleSideEnum.Attacker : BattleSideEnum.Defender;
         if (mapEvent.IsActiveSlowVillageRaid() && side == BattleSideEnum.Attacker)
         {
             GameMenu.SwitchToMenu("raid_occupied");
@@ -69,23 +70,5 @@ internal class RaidJoinEncounterPatch
         }
 
         GameMenu.SwitchToMenu("encounter");
-    }
-
-    private static bool TryGetJoinSide(MethodBase method, out BattleSideEnum side)
-    {
-        if (method?.Name == "game_menu_join_encounter_help_attackers_on_consequence")
-        {
-            side = BattleSideEnum.Attacker;
-            return true;
-        }
-
-        if (method?.Name == "game_menu_join_encounter_help_defenders_on_consequence")
-        {
-            side = BattleSideEnum.Defender;
-            return true;
-        }
-
-        side = BattleSideEnum.None;
-        return false;
     }
 }

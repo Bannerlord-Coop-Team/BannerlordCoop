@@ -7,7 +7,6 @@ using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.MapEvents;
-using TaleWorlds.Core;
 using TaleWorlds.Localization;
 
 namespace GameInterface.Services.MapEvents.Patches;
@@ -19,11 +18,12 @@ namespace GameInterface.Services.MapEvents.Patches;
 internal class JoinEncounterConditionPatch
 {
     private const string HelpAttackersCondition = nameof(EncounterGameMenuBehavior.game_menu_join_encounter_help_attackers_on_condition);
+    private const string HelpDefendersCondition = nameof(EncounterGameMenuBehavior.game_menu_join_encounter_help_defenders_on_condition);
 
     private static IEnumerable<MethodBase> TargetMethods()
     {
         yield return AccessTools.Method(typeof(EncounterGameMenuBehavior), HelpAttackersCondition);
-        yield return AccessTools.Method(typeof(EncounterGameMenuBehavior), nameof(EncounterGameMenuBehavior.game_menu_join_encounter_help_defenders_on_condition));
+        yield return AccessTools.Method(typeof(EncounterGameMenuBehavior), HelpDefendersCondition);
     }
 
     // Refuses the join option while vanilla's condition would throw, before the server sets the battle up on this
