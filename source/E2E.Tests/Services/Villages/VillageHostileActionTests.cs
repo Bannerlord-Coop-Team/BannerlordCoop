@@ -15,6 +15,7 @@ using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Services.MapEvents;
 using E2E.Tests.Util;
+using GameInterface.Tests.Utils;
 using GameInterface.Policies;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Entity;
@@ -142,6 +143,7 @@ public class VillageHostileActionTests : MapEventTestBase
         RegisterPeer(client, "PlayerOne");
         var (_, mobilePartyId) = CreatePlayerHeroParty("PlayerOne");
         var target = CreateVillageTarget();
+        using var resists = new VillageResistsScope();
 
         Server.NetworkSentMessages.Clear();
 
@@ -156,6 +158,119 @@ public class VillageHostileActionTests : MapEventTestBase
         var result = ConsumeApprovedMapEventStart(mobilePartyId, target.SettlementPartyId, HostileActionFlags(action));
         Assert.True(result.Approved);
         Assert.Equal(VillageHostileActionDeniedReason.Invalid, result.Reason);
+    }
+
+    // v1.5: a village with no defenders gives in. Vanilla applies a coercion (crime and relations, no war)
+    // and the outcome a won battle gives, so the server does the same without a map event (#4587).
+    [Theory]
+    [InlineData(VillageHostileAction.ForceVolunteers)]
+    [InlineData(VillageHostileAction.ForceSupplies)]
+    public void ClientRequestForceAction_VillageWithoutDefenders_GivesInWithoutWarOrBattle(VillageHostileAction action)
+    {
+        var client = Clients.First();
+        RegisterPeer(client, "PlayerOne");
+        var (_, mobilePartyId) = CreatePlayerHeroParty("PlayerOne");
+        var target = CreateVillageTarget();
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var mobileParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
+            mobileParty.LeaderHero.Gold = 0;
+            settlement.SettlementHitPoints = 1f;
+        });
+
+        var expectedCoercion = action == VillageHostileAction.ForceSupplies
+            ? nameof(BeHostileAction.ApplyMinorCoercionHostileAction)
+            : nameof(BeHostileAction.ApplyMajorCoercionHostileAction);
+        using var coercion = new MethodCallRecorder(AccessTools.Method(typeof(BeHostileAction), expectedCoercion));
+        using var encounter = new MethodCallRecorder(
+            AccessTools.Method(typeof(BeHostileAction), nameof(BeHostileAction.ApplyEncounterHostileAction)));
+        using var skills = new MethodCallRecorder(
+            AccessTools.Method(typeof(SkillLevelingManager), nameof(SkillLevelingManager.OnForceSupplies)),
+            AccessTools.Method(typeof(SkillLevelingManager), nameof(SkillLevelingManager.OnForceVolunteers)));
+
+        Server.NetworkSentMessages.Clear();
+
+        RequestHostileAction(client, action, mobilePartyId, target.SettlementId);
+
+        var started = Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionStarted>().Single();
+        Assert.Equal(action, started.Action);
+        Assert.True(started.Unresisted);
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionDenied>());
+        Assert.Equal(1, coercion.CountFor(Server));
+        Assert.Equal(0, encounter.CountFor(Server));
+        Assert.Equal(1, skills.CountFor(Server));
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkDeclareWar>());
+        AssertCooldownBroadcast(target.SettlementId);
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
+            Assert.Equal(0.2f, settlement.SettlementHitPoints, 3);
+        });
+        if (action == VillageHostileAction.ForceSupplies)
+            AssertForceSuppliesGoldAndHitPointsOutcome(Server, mobilePartyId, target.SettlementId);
+
+        Assert.False(ConsumeApprovedMapEventStart(mobilePartyId, target.SettlementPartyId, HostileActionFlags(action)).Approved);
+    }
+
+    // With healthy militia vanilla's check compares the village with MobileParty.MainParty, which the server
+    // does not have of its own, so the check runs as the requesting party (#4587).
+    [Fact]
+    public void ClientRequestForceAction_VillageWithHealthyMilitia_RunsTheRealCheckAndStartsABattle()
+    {
+        var client = Clients.First();
+        RegisterPeer(client, "PlayerOne");
+        var (_, mobilePartyId) = CreatePlayerHeroParty("PlayerOne");
+        var target = CreateVillageTarget();
+        var militiaPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var militiaTroopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(militiaPartyId, out var militia));
+            Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(militiaTroopId, out var troop));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
+            using (new AllowedThread())
+            {
+                MilitiaPartyComponent.ConvertPartyToMilitiaParty(militia, settlement);
+                militia.MemberRoster.AddToCounts(troop, 50);
+            }
+
+            Assert.Same(militia, settlement.MilitiaPartyComponent?.MobileParty);
+            Campaign.Current.MainParty = null;
+        });
+
+        Server.NetworkSentMessages.Clear();
+
+        RequestHostileAction(client, VillageHostileAction.ForceVolunteers, mobilePartyId, target.SettlementId);
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionDenied>());
+        var started = Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionStarted>().Single();
+        Assert.False(started.Unresisted);
+        var result = ConsumeApprovedMapEventStart(
+            mobilePartyId, target.SettlementPartyId, HostileActionFlags(VillageHostileAction.ForceVolunteers));
+        Assert.True(result.Approved);
+        Server.Call(() => Assert.Null(MobileParty.MainParty));
+    }
+
+    // The test village has no militia, which vanilla's check reads as no resistance.
+    private sealed class VillageResistsScope : IDisposable
+    {
+        private readonly Harmony harmony = new($"e2e.village-resists.{Guid.NewGuid():N}");
+
+        public VillageResistsScope()
+        {
+            harmony.Patch(
+                AccessTools.Method(typeof(VillageHostileActionCampaignBehavior), nameof(VillageHostileActionCampaignBehavior.WillVillageResistHostileAction)),
+                prefix: new HarmonyMethod(typeof(VillageResistsScope), nameof(Resists)));
+        }
+
+        public void Dispose() => harmony.UnpatchAll(harmony.Id);
+
+        private static bool Resists(ref bool __result)
+        {
+            __result = true;
+            return false;
+        }
     }
 
     [Fact]
@@ -1268,8 +1383,8 @@ public class VillageHostileActionTests : MapEventTestBase
             Game.Current.GameStateManager._gameStates.Add(mapState);
         }, MapEventDisabledMethods);
 
-        InstallResultScreenPatches(out var harmony, out var visualPatch, out var menus);
-        var result = new CompletedRaidSimulation(client, context, encounter, troopId, itemId, this, harmony, visualPatch, menus);
+        InstallResultScreenPatches(out var harmony, out var menus);
+        var result = new CompletedRaidSimulation(client, context, encounter, troopId, itemId, this, harmony, menus);
         try
         {
             Server.Call(() => CampaignEvents.MapEventEnded.AddNonSerializedListener(this, result.Ended.Add));
@@ -1349,7 +1464,6 @@ public class VillageHostileActionTests : MapEventTestBase
 
     private static void InstallResultScreenPatches(
         out Harmony lootScreens,
-        out Harmony visual,
         out MethodCallRecorder menus)
     {
         lootScreens = new Harmony($"raid-result-ui.{Guid.NewGuid()}");
@@ -1360,12 +1474,6 @@ public class VillageHostileActionTests : MapEventTestBase
         menus = new MethodCallRecorder(Priority.First,
             AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu)),
             AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu)));
-        visual = new Harmony($"raid-continuation-visual.{Guid.NewGuid()}");
-        var initialize = AccessTools.Method(typeof(MapEvent), nameof(MapEvent.Initialize),
-            new[] { typeof(PartyBase), typeof(PartyBase), typeof(MapEventComponent), typeof(MapEvent.BattleTypes) });
-        visual.Patch(initialize,
-            prefix: new HarmonyMethod(typeof(VillageHostileActionTests), nameof(ProvideHeadlessVisual)),
-            postfix: new HarmonyMethod(typeof(VillageHostileActionTests), nameof(ClearHeadlessVisual)));
     }
 
     private void AdvanceSimulationUntilFinished(EnvironmentInstance pacer, string mapEventId)
@@ -1416,7 +1524,6 @@ public class VillageHostileActionTests : MapEventTestBase
     {
         private readonly VillageHostileActionTests test;
         private Harmony lootScreens;
-        private Harmony visual;
         private MethodCallRecorder menus;
 
         public CompletedRaidSimulation(
@@ -1427,7 +1534,6 @@ public class VillageHostileActionTests : MapEventTestBase
             string itemId,
             VillageHostileActionTests test,
             Harmony lootScreens,
-            Harmony visual,
             MethodCallRecorder menus)
         {
             Client = client;
@@ -1437,7 +1543,6 @@ public class VillageHostileActionTests : MapEventTestBase
             ItemId = itemId;
             this.test = test;
             this.lootScreens = lootScreens;
-            this.visual = visual;
             this.menus = menus;
         }
 
@@ -1452,7 +1557,6 @@ public class VillageHostileActionTests : MapEventTestBase
 
         public void Dispose()
         {
-            visual?.UnpatchAll(visual.Id);
             lootScreens?.UnpatchAll(lootScreens.Id);
             menus?.Dispose();
             test.Server.Call(() => CampaignEvents.MapEventEnded.ClearListeners(test));
@@ -2592,8 +2696,7 @@ public class VillageHostileActionTests : MapEventTestBase
             mapEvent.Initialize(
                 mobileParty.Party,
                 settlement.Party,
-                new RaidEventComponent(mapEvent),
-                MapEvent.BattleTypes.Raid);
+                new RaidEventComponent(mapEvent));
 
             Assert.True(mapEvent.IsUnopposedVillageRaid());
             Assert.Equal(TimeControlEnum.Play_2x, Server.Resolve<ITimeControlInterface>().GetTimeControl());
@@ -2603,9 +2706,10 @@ public class VillageHostileActionTests : MapEventTestBase
     }
 
     [Theory]
-    [InlineData(0.5f, Village.VillageStates.Normal)]
-    [InlineData(0f, Village.VillageStates.Looted)]
-    public void CleanUpLoadedMapEvents_EndedAiRaid_ResetsVillageState(float hitPoints, Village.VillageStates expectedState)
+    [InlineData(0.5f, Village.VillageStates.Normal, false)]
+    [InlineData(0f, Village.VillageStates.Looted, false)]
+    [InlineData(0.5f, Village.VillageStates.Normal, true)]
+    public void CleanUpLoadedMapEvents_EndedAiRaid_ResetsVillageState(float hitPoints, Village.VillageStates expectedState, bool savedOnV148)
     {
         // a save where an AI raid already left the map event manager but still links its parties
         var aiRaiderMobilePartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
@@ -2620,6 +2724,14 @@ public class VillageHostileActionTests : MapEventTestBase
             var mapEvent = CreateHostileActionMapEvent(aiRaiderParty.Party, settlement.Party, VillageHostileAction.Raid);
             Campaign.Current.MapEventManager._mapEvents.Remove(mapEvent);
             Assert.Equal(Village.VillageStates.BeingRaided, settlement.Village.VillageState);
+
+            if (savedOnV148)
+            {
+                // A v1.4.8 save has no component settlement, and an unlisted event also gets no back-reference,
+                // because AfterLoad only refills them for listed events
+                mapEvent.Component.MapEvent = null!;
+                mapEvent.SetMapEventSettlement(null!);
+            }
 
             Server.Resolve<IMapEventLoadCleaner>().CleanUpLoadedMapEvents();
 
@@ -4752,10 +4864,6 @@ public class VillageHostileActionTests : MapEventTestBase
             client.Resolve<IControllerIdProvider>().ControllerId)), disabledMethods);
     }
 
-    private static void ProvideHeadlessVisual(MapEvent __instance) => __instance.MapEventVisual = MockMapEventVisual();
-
-    private static void ClearHeadlessVisual(MapEvent __instance) => __instance.MapEventVisual = null;
-
     private static void SetMapEventCreationTimeout(EnvironmentInstance instance, TimeSpan timeout)
     {
         instance.Call(() =>
@@ -4896,27 +5004,23 @@ public class VillageHostileActionTests : MapEventTestBase
         mapEvent.MapEventVisual = MockMapEventVisual();
 
         MapEventComponent component;
-        MapEvent.BattleTypes battleType;
         switch (action)
         {
             case VillageHostileAction.Raid:
                 component = new RaidEventComponent(mapEvent);
-                battleType = MapEvent.BattleTypes.Raid;
                 break;
             case VillageHostileAction.ForceVolunteers:
                 component = new ForceVolunteersEventComponent(mapEvent);
-                battleType = (MapEvent.BattleTypes)3;
                 break;
             case VillageHostileAction.ForceSupplies:
                 component = new ForceSuppliesEventComponent(mapEvent);
-                battleType = (MapEvent.BattleTypes)4;
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(action), action, null);
         }
 
-        mapEvent.Initialize(attacker, defender, component, battleType);
-        mapEvent.MapEventSettlement = defender.Settlement;
+        mapEvent.Initialize(attacker, defender, component);
+        mapEvent.SetMapEventSettlement(defender.Settlement);
         mapEvent.Position = defender.Position;
         mapEvent.State = MapEventState.Wait;
 

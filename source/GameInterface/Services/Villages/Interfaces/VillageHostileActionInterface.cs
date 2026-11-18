@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.GameDebug.Messages;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
@@ -21,6 +22,7 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
@@ -299,10 +301,43 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
 
         if (!FactionManager.IsAtWarAgainstFaction(mobileParty.MapFaction, settlement.MapFaction))
         {
-            using (new global::GameInterface.Services.Heroes.Patches.MainHeroSubstitutionScope(mobileParty.LeaderHero, mobileParty))
+            using (new MainHeroSubstitutionScope(mobileParty.LeaderHero, mobileParty))
                 DeclareWarAction.ApplyByPlayerHostility(mobileParty.MapFaction, settlement.MapFaction);
         }
     }
+
+    /// <summary>
+    /// Vanilla's test: a village resists only with healthy militia or enough friendly parties. With healthy
+    /// militia it compares the village with <see cref="MobileParty.MainParty"/>, which the server does not have
+    /// of its own, so the test runs as the requesting party.
+    /// </summary>
+    public bool WillVillageResist(MobileParty mobileParty, Settlement settlement)
+    {
+        using (new MainHeroSubstitutionScope(mobileParty.LeaderHero, mobileParty))
+            return VillageHostileActionCampaignBehavior.WillVillageResistHostileAction(settlement);
+    }
+
+    /// <summary>
+    /// v1.5: a village with no defenders gives in. The attacker gains crime rating and loses relations, as
+    /// in vanilla's no-resist consequences, and no war starts. The outcome is the one a won battle gives.
+    /// </summary>
+    public void ApplyUnresistedForceAction(MobileParty mobileParty, Settlement settlement, VillageHostileAction action)
+    {
+        switch (action)
+        {
+            case VillageHostileAction.ForceSupplies:
+                BeHostileAction.ApplyMinorCoercionHostileAction(mobileParty.Party, settlement.Party);
+                ApplyForceSuppliesOutcome(mobileParty, settlement, attacked: false);
+                break;
+            case VillageHostileAction.ForceVolunteers:
+                BeHostileAction.ApplyMajorCoercionHostileAction(mobileParty.Party, settlement.Party);
+                ApplyForceVolunteersOutcome(mobileParty, settlement);
+                break;
+        }
+    }
+
+    /// <summary>Vanilla's no-resist consequences return to the village menu before the loot screen.</summary>
+    public void ReturnToVillageMenu() => GameMenu.SwitchToMenu("village");
 
     public void ApplyForceActionOutcome(MapEvent mapEvent, VillageHostileAction action)
     {
@@ -334,7 +369,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
                 ApplyForceVolunteersOutcome(attacker, settlement);
                 break;
             case VillageHostileAction.ForceSupplies:
-                ApplyForceSuppliesOutcome(attacker, settlement, mapEvent);
+                ApplyForceSuppliesOutcome(attacker, settlement, attacked: true);
                 break;
         }
     }
@@ -488,7 +523,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         }
     }
 
-    private void ApplyForceSuppliesOutcome(MobileParty mobileParty, Settlement settlement, MapEvent mapEvent)
+    private void ApplyForceSuppliesOutcome(MobileParty mobileParty, Settlement settlement, bool attacked)
     {
         var village = settlement.Village;
         var rewardUnits = ComputeSuppliesRewardUnits(village.Hearth);
@@ -542,7 +577,9 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         {
             settlement.SettlementHitPoints *= 0.2f;
         }
-        SkillLevelingManager.OnForceSupplies(mobileParty, lootedItems, !mapEvent.IsPlayerMapEvent);
+        // v1.5 passes attacked: true after a won map event and false when the village gave in
+        // (v1.4.8 had the flag inverted).
+        SkillLevelingManager.OnForceSupplies(mobileParty, lootedItems, attacked);
 
         AuthorizeAndAnnounceTransfer(
             VillageHostileAction.ForceSupplies,
@@ -558,7 +595,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         var village = settlement.Village;
         var recruitCount = ComputeVolunteerCount(
             village.Hearth,
-            mobileParty.HasPerk(DefaultPerks.Roguery.InBestLight, false),
+            mobileParty.HasPerk(DefaultPerks.Roguery.InBestLight),
             settlement.Notables.Count);
 
         var troop = settlement.Culture?.BasicTroop;
@@ -1246,7 +1283,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         int recruitedPrisonerCount,
         int goldChange,
         int influenceChange,
-        int moraleChange,
+        float moraleChange,
         bool applyReleasedAndTakenActions,
         string donationSettlementId,
         IEnumerable<(uint fromId, uint toId, int number)> upgradedTroops,
@@ -1323,7 +1360,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         // The loot screen offers no legitimate gold, influence, or morale source:
         // troop upgrades are blocked up front while a force screen is open (see
         // the ValidateCommand patch), so any such delta is rejected here.
-        if (goldChange != 0 || influenceChange != 0 || moraleChange != 0)
+        if (goldChange != 0 || influenceChange != 0 || moraleChange != 0f)
         {
             error = "gold/influence/morale change is not zero";
             return false;

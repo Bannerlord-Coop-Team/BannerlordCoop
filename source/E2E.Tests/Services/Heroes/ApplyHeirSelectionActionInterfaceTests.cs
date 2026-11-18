@@ -42,7 +42,7 @@ public class ApplyHeirSelectionActionInterfaceTests : SyncTestBase
             var originalParty = Server.GetRegisteredObject<MobileParty>(originalPartyId);
             GiveShip(originalParty, weakShipId, 20f);
             GiveShip(originalParty, strongShipId, 80f);
-            originalParty.Anchor.SetPosition(SeaPosition(OriginalAnchor));
+            originalParty.Anchor.Position = SeaPosition(OriginalAnchor);
             originalParty.Anchor.SetLastUsedDisembarkPosition(new CampaignVec2(OriginalDisembark, true));
         });
     }
@@ -57,7 +57,7 @@ public class ApplyHeirSelectionActionInterfaceTests : SyncTestBase
                 Server.GetRegisteredObject<MobileParty>(originalPartyId), heirParty);
 
             Assert.Equal(OriginalAnchor, heirParty.Anchor.Position.ToVec2());
-            Assert.Equal(OriginalDisembark, heirParty.Anchor.GetLastUsedDisembarkPosition().ToVec2());
+            Assert.Equal(OriginalDisembark, heirParty.Anchor._lastUsedDisembarkPosition.ToVec2());
         });
 
         AssertShipOwners(weakShipOwnerId: heirPartyId, strongShipOwnerId: heirPartyId);
@@ -105,7 +105,7 @@ public class ApplyHeirSelectionActionInterfaceTests : SyncTestBase
         Server.Call(() =>
         {
             var heirParty = Server.GetRegisteredObject<MobileParty>(heirPartyId);
-            heirParty.Anchor.SetPosition(SeaPosition(heirAnchor));
+            heirParty.Anchor.Position = SeaPosition(heirAnchor);
 
             Server.Resolve<IApplyHeirSelectionActionInterface>().TransferFleetToHeir(
                 Server.GetRegisteredObject<MobileParty>(originalPartyId), heirParty);

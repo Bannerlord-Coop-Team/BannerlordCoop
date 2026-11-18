@@ -43,7 +43,7 @@ jobs:
       packages: read
 
     container:
-      image: ghcr.io/bannerlord-coop-team/bannerlordcoop:latest
+      image: ghcr.io/bannerlord-coop-team/bannerlordcoop:v1.5.7
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -88,7 +88,7 @@ jobs:
       packages: read
 
     container:
-      image: ghcr.io/bannerlord-coop-team/bannerlordcoop:latest
+      image: ghcr.io/bannerlord-coop-team/bannerlordcoop:v1.5.7
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -169,7 +169,7 @@ jobs:
       packages: read
 
     container:
-      image: ghcr.io/bannerlord-coop-team/bannerlordcoop:latest
+      image: ghcr.io/bannerlord-coop-team/bannerlordcoop:v1.5.7
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}

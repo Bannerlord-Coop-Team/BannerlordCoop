@@ -10,6 +10,7 @@ using SandBox;
 using Serilog;
 using System;
 using System.Linq;
+using TaleWorlds.CampaignSystem.AdvancedStartOptions;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
@@ -166,7 +167,7 @@ internal class GameStateInterface : IGameStateInterface
     // Starts a new sandbox campaign; game thread only.
     private static void StartNewCampaign()
     {
-        MBGameManager.StartNewGame(new SandBoxGameManager(() => new Campaign(CampaignGameMode.Campaign)));
+        MBGameManager.StartNewGame(new SandBoxGameManager(() => new Campaign(CampaignGameMode.Campaign, new AdvancedStartOptionsData())));
     }
 
     private static void ForceLoadSave(SaveGameFileInfo save)

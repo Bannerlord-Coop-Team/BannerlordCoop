@@ -63,6 +63,13 @@ internal class ShipRegistry : AutoRegistryBase<Ship>
 
     public override void OnClientDestroyed(Ship obj, string id)
     {
+        // DestroyShipAction clears the owner, but its patched copy is compiled before the Owner sync patch is
+        // applied, and v1.5's smaller Owner setter can be inlined into it, so that owner change never reaches
+        // the clients. Clearing it here also takes the ship off the owner's ship list.
+        using (new AllowedThread())
+        {
+            obj.Owner = null;
+        }
     }
 
     public override void OnServerCreated(Ship obj, string id)

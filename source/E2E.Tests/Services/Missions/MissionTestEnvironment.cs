@@ -141,7 +141,7 @@ public class MissionTestEnvironment : E2ETestEnvironment
 
             var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
             mapEvent.MapEventVisual = ObjectHelper.SkipConstructor<GauntletMapEventVisual>();
-            mapEvent.Initialize(parties[0].Party, parties[1].Party);
+            mapEvent.Initialize(parties[0].Party, parties[1].Party, new FieldBattleEventComponent(mapEvent));
 
             // Any additional players reinforce the attacker side (coop allies).
             for (int i = 2; i < parties.Length; i++)
@@ -306,9 +306,12 @@ public class MissionTestEnvironment : E2ETestEnvironment
         });
     }
 
-    private sealed class FixedCombatXpModel : CombatXpModel
+    protected sealed class FixedCombatXpModel : CombatXpModel
     {
         private readonly int xpPerHit;
+
+        /// <summary>The captain of the last hit, which v1.5.7 hands to the model for the captain perk bonus.</summary>
+        public CharacterObject? LastCaptain { get; private set; }
 
         public FixedCombatXpModel(int xpPerHit) => this.xpPerHit = xpPerHit;
 
@@ -323,8 +326,11 @@ public class MissionTestEnvironment : E2ETestEnvironment
             PartyBase attackerParty,
             int damage,
             bool isFatal,
-            MissionTypeEnum missionType) =>
-            new ExplainedNumber(xpPerHit);
+            MissionTypeEnum missionType)
+        {
+            LastCaptain = captain;
+            return new ExplainedNumber(xpPerHit);
+        }
 
         public override float GetXpMultiplierFromShotDifficulty(float shotDifficulty) => 1f;
     }

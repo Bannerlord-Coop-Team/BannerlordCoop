@@ -30,7 +30,7 @@ public readonly struct PartyDoneLogicAttempted : IEvent
     public readonly PartyBase LeftParty;
     public readonly int PartyGoldChangeAmount;
     public readonly int PartyInfluenceChangeAmount;
-    public readonly int PartyMoraleChangeAmount;
+    public readonly float PartyMoraleChangeAmount;
     public readonly bool DoNotApplyGoldTransactions;
     public readonly PartyScreenHelper.PartyScreenMode PartyScreenMode;
     public readonly bool ApplyReleasedAndTakenPrisonerActions;
@@ -56,7 +56,7 @@ public readonly struct PartyDoneLogicAttempted : IEvent
         PartyBase leftParty,
         int partyGoldChangeAmount,
         int partyInfluenceChangeAmount,
-        int partyMoraleChangeAmount,
+        float partyMoraleChangeAmount,
         bool doNotApplyGoldTransactions,
         PartyScreenHelper.PartyScreenMode partyScreenMode,
         bool applyReleasedAndTakenPrisonerActions = false,
