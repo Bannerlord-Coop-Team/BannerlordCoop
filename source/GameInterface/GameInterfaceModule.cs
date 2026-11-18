@@ -56,6 +56,8 @@ using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.MapEventComponents;
 using GameInterface.Services.AnchorPoints.Handlers;
 using GameInterface.Services.MapEventComponents.Handlers;
+using GameInterface.Services.Ferries.Handlers;
+using GameInterface.Services.Ferries.Interfaces;
 using GameInterface.Services.Rafts.Commands;
 using GameInterface.Services.Rafts.Handlers;
 using GameInterface.Services.Rafts.Interfaces;
@@ -124,6 +126,8 @@ public class GameInterfaceModule : Module
         typeof(SiegeBlockadeHandler),
         typeof(PlayerRaftFleetInterface),
         typeof(RaftDebugCommands.StrandOnRaftCoopCommand),
+        typeof(PlayerFerryHandler),
+        typeof(PlayerFerryInterface),
 #if DEBUG
         typeof(NavalScenarioClientHandler),
         typeof(NavalScenarioRejoinHandler),

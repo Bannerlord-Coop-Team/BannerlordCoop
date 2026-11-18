@@ -20,7 +20,8 @@ namespace GameInterface.Services.Rafts.Interfaces;
 
 /// <summary>
 /// Server-only: strands a player's party released from captivity at sea and keeps its fleet until it washes ashore or
-/// leaves its raft at sea, and lands a party left on a raft or marked at sea while it stands on land.
+/// leaves its raft at sea, and lands a party left on a raft or marked at sea while it stands on land. A ferry keeps the
+/// fleet of a player it carries the same way.
 /// </summary>
 public interface IPlayerRaftFleetInterface : IGameAbstraction
 {
@@ -30,7 +31,12 @@ public interface IPlayerRaftFleetInterface : IGameAbstraction
     void StrandAfterRelease(MobileParty party);
 
     /// <summary>
-    /// Gives a party that washed ashore back the fleet it had when it was stranded.
+    /// Takes a player party's fleet and keeps it, with the anchor, until <see cref="ReturnFleet"/>.
+    /// </summary>
+    void CacheFleet(MobileParty party);
+
+    /// <summary>
+    /// Gives a party that washed ashore or got off a ferry back the fleet that was kept for it.
     /// </summary>
     void ReturnFleet(MobileParty party);
 
@@ -75,39 +81,42 @@ public class PlayerRaftFleetInterface : IPlayerRaftFleetInterface
         if (!party.IsCurrentlyAtSea || party.IsInRaftState) return;
 
         // Same as RaftStateCampaignBehavior.player_raft_state_after_prisoner_on_consequence
-        if (party.Ships.Count > 0)
-        {
-            if (!playerManager.TryGetPlayer(party, out var player)) return;
-
-            // Cached before the ships are removed, same as vanilla
-            var anchorPosition = party.Anchor.Position;
-            var disembarkPosition = party.Anchor._lastUsedDisembarkPosition;
-
-            // Vanilla adds to the ships still cached from an earlier stranding instead of replacing them
-            var ships = PlayerCachedFleets.TryGetValue(player.HeroId, out var cachedFleet) && cachedFleet.Ships != null
-                ? new List<CachedShipData>(cachedFleet.Ships)
-                : new List<CachedShipData>();
-            for (int i = party.Ships.Count - 1; i >= 0; i--)
-            {
-                var ship = party.Ships[i];
-                ships.Add(CreateShipData(ship));
-                ship.Owner = null;
-
-                // The fleet is rebuilt from its cached data, so the ownerless ship is unregistered everywhere
-                messageBroker.Publish(this, new InstanceDestroyed<Ship>(ship));
-            }
-
-            PlayerCachedFleets[player.HeroId] = new PlayerCachedFleetData(
-                ships,
-                anchorPosition.X,
-                anchorPosition.Y,
-                anchorPosition.IsOnLand,
-                disembarkPosition.X,
-                disembarkPosition.Y,
-                disembarkPosition.IsOnLand);
-        }
+        CacheFleet(party);
 
         RaftStateChangeAction.ActivateRaftStateForParty(party);
+    }
+
+    public void CacheFleet(MobileParty party)
+    {
+        if (party.Ships.Count == 0) return;
+        if (!playerManager.TryGetPlayer(party, out var player)) return;
+
+        // Cached before the ships are removed, same as vanilla
+        var anchorPosition = party.Anchor.Position;
+        var disembarkPosition = party.Anchor._lastUsedDisembarkPosition;
+
+        // Vanilla adds to the ships still cached from an earlier stranding instead of replacing them
+        var ships = PlayerCachedFleets.TryGetValue(player.HeroId, out var cachedFleet) && cachedFleet.Ships != null
+            ? new List<CachedShipData>(cachedFleet.Ships)
+            : new List<CachedShipData>();
+        for (int i = party.Ships.Count - 1; i >= 0; i--)
+        {
+            var ship = party.Ships[i];
+            ships.Add(CreateShipData(ship));
+            ship.Owner = null;
+
+            // The fleet is rebuilt from its cached data, so the ownerless ship is unregistered everywhere
+            messageBroker.Publish(this, new InstanceDestroyed<Ship>(ship));
+        }
+
+        PlayerCachedFleets[player.HeroId] = new PlayerCachedFleetData(
+            ships,
+            anchorPosition.X,
+            anchorPosition.Y,
+            anchorPosition.IsOnLand,
+            disembarkPosition.X,
+            disembarkPosition.Y,
+            disembarkPosition.IsOnLand);
     }
 
     public void ReturnFleet(MobileParty party)
@@ -168,6 +177,9 @@ public class PlayerRaftFleetInterface : IPlayerRaftFleetInterface
 
     public void OnPlayerCharacterChanged(Hero newPlayerHero, MobileParty newMainParty)
     {
+        // A rejoin mid ferry trip is at sea with no ships, and the ferry gives the kept fleet back on arrival
+        if (newMainParty.IsInFerryState) return;
+
         // Same as RaftStateCampaignBehavior.OnPlayerCharacterChanged, which drops the cached anchor instead of using it
         if (newMainParty.IsCurrentlyAtSea && !newMainParty.IsInRaftState && !newMainParty.HasNavalNavigationCapability && newMainParty.IsActive)
         {

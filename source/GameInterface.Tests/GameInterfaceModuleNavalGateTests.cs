@@ -15,6 +15,9 @@ using GameInterface.Services.MapEvents.NavalScenarios;
 #endif
 using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.PartyVisuals.Patches;
+using GameInterface.Services.Ferries.Handlers;
+using GameInterface.Services.Ferries.Interfaces;
+using GameInterface.Services.Ferries.Patches;
 using GameInterface.Services.Rafts.Commands;
 using GameInterface.Services.Rafts.Handlers;
 using GameInterface.Services.Rafts.Interfaces;
@@ -68,6 +71,8 @@ public sealed class GameInterfaceModuleNavalGateTests : IDisposable
         typeof(SiegeBlockadeHandler),
         typeof(PlayerRaftFleetInterface),
         typeof(RaftDebugCommands.StrandOnRaftCoopCommand),
+        typeof(PlayerFerryHandler),
+        typeof(PlayerFerryInterface),
         typeof(BattleShipFateLedger),
         typeof(BattleShipFateApplier),
         typeof(NavalNpcFleetAttemptTracker),
@@ -96,6 +101,7 @@ public sealed class GameInterfaceModuleNavalGateTests : IDisposable
         typeof(ShipPiecesPatches),
         typeof(PlayerRaftFleetPatches),
         typeof(PlayerRaftVisibilityPatches),
+        typeof(PlayerFerryStatePatches),
         typeof(AnchorPointPatches),
         typeof(AnchorPointMenuRefreshPatch),
         typeof(PlayerLandSeaTransitionPatches),

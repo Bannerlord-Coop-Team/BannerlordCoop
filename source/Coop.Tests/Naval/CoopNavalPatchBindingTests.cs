@@ -23,6 +23,8 @@ public class CoopNavalPatchBindingTests
         AccessTools.Method(typeof(ClanFleetManagementCampaignBehaviorPatches), nameof(ClanFleetManagementCampaignBehaviorPatches.HourlyTickPrefix)),
         AccessTools.Method(typeof(NavalTransitionCampaignBehaviorPatches), nameof(NavalTransitionCampaignBehaviorPatches.SetSailConsequencePrefix)),
         AccessTools.Method(typeof(RaftStateCampaignBehaviorPatches), nameof(RaftStateCampaignBehaviorPatches.PlayerRaftStateContinueOnConsequencePrefix)),
+        AccessTools.Method(typeof(FerryCampaignBehaviorPatches), nameof(FerryCampaignBehaviorPatches.GameMenuFerryTargetOnConsequencePrefix)),
+        AccessTools.Method(typeof(FerryCampaignBehaviorPatches), nameof(FerryCampaignBehaviorPatches.PlayerFerryStateEndContinueOnConsequencePrefix)),
         AccessTools.Method(typeof(NavalDLCFigureheadCampaignBehaviorPatches), "OnFigureheadUnlockedPrefix"),
         // Naval incidents stay off on both sides until they're synced (#4731)
         AccessTools.Method(typeof(NavalIncidentsCampaignBehaviourPatches), nameof(NavalIncidentsCampaignBehaviourPatches.TryInvokeIncidentPrefix)),

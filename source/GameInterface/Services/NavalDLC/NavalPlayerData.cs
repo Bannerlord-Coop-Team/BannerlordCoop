@@ -9,6 +9,7 @@ namespace GameInterface.Services.NavalDLC;
 /// NavalDLCFigureheadCampaignBehavior._lastFigureheadLootTime assumes only one player loots figureheads
 /// ClanFleetManagementCampaignBehavior._sentTroops assumes only one player sends troops away with ships
 /// RaftStateCampaignBehavior._playerCachedShips and _cachedAnchorPoint assumes only one player has cached ships that can be restored
+/// Campaign.PlayerDataForNavalAutoTravel assumes only one player takes a ferry
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
 public class NavalPlayerData
@@ -29,15 +30,21 @@ public class NavalPlayerData
     [ProtoMember(4)]
     public Dictionary<string, PlayerCachedFleetData> PlayerCachedFleets { get; }
 
+    // Dictionary<PlayerHeroId, DepartureVillageId> for players on a ferry
+    [ProtoMember(6)]
+    public Dictionary<string, string> PlayerFerryDepartures { get; }
+
     public NavalPlayerData(
         Dictionary<string, List<string>> playerUnlockedFigureHeads,
         Dictionary<string, long> playerLastFigureheadLootTimes,
         Dictionary<string, List<SentTroopsData>> playerSentTroops,
-        Dictionary<string, PlayerCachedFleetData> playerCachedFleets)
+        Dictionary<string, PlayerCachedFleetData> playerCachedFleets,
+        Dictionary<string, string> playerFerryDepartures = null)
     {
         PlayerUnlockedFigureHeads = playerUnlockedFigureHeads ?? new();
         PlayerLastFigureheadLootTimes = playerLastFigureheadLootTimes ?? new();
         PlayerSentTroops = playerSentTroops ?? new();
         PlayerCachedFleets = playerCachedFleets ?? new();
+        PlayerFerryDepartures = playerFerryDepartures ?? new();
     }
 }
