@@ -133,14 +133,14 @@ internal class BattleModeEncounterOptionsPatch
 
         if (SimulationStartConditions.Contains(name))
         {
+            // Native counts other players' heroes, but the server keeps them out of the simulation.
+            if (__result && MobileParty.MainParty?.MapEventSide is { } playerSide && playerSide.CountSimulationTroops() <= 0)
+                __result = false;
+
             EnableAlliedSimulationForIncapacitatedPlayer(__0, __result);
 
             if (name == OrderAttackCondition && !__result && ShouldShowClientSiegeAttackOption())
                 __result = TryApplyClientSiegeOrderAttackOptionState(__0);
-
-            // Native counts other players' heroes, but the server keeps them out of the simulation.
-            if (__result && MobileParty.MainParty?.MapEventSide is { } playerSide && playerSide.CountSimulationTroops() <= 0)
-                __result = false;
         }
 
         if (name == AttackCondition && !__result && ShouldShowClientSiegeAttackOption())
@@ -329,7 +329,7 @@ internal class BattleModeEncounterOptionsPatch
         if (mapEvent == null || !mapEvent.IsFieldBattle || mapEvent.IsNavalMapEvent || mapEvent.MapEventSettlement != null)
             return;
 
-        // Native only shows the option when the side counts troops; the postfix gate removes the player heroes among them.
+        // Without a side the troop count in Postfix couldn't run, so keep native's disabled option.
         if (MobileParty.MainParty.MapEventSide == null) return;
         if (IsEnemyTemporarilyProtected()) return;
 
