@@ -1,13 +1,12 @@
 ﻿using Common;
 using Common.Messaging;
-using Common.Network;
 using GameInterface.AutoSync;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.Issues.Quests.ExtortionByDeserters;
 using GameInterface.Services.Issues.Quests.ExtortionByDeserters.Patches;
 using GameInterface.Services.Issues.Quests.ExtortionByDeserters.Messages;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Players;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
@@ -23,16 +22,13 @@ namespace GameInterface.Services.Issues.Quests.ExtortionByDeserters.Handlers;
 internal class ExtortionByDesertersHandler : IHandler
 {
     private readonly IMessageBroker broker;
-    private readonly INetwork network;
     private readonly IObjectManager objects;
     private readonly IIssueResolver issues;
-    private readonly IIssueOwnerResolver owners;
     private readonly IControllerIdProvider controller;
-    private readonly IPlayerManager players;
     private readonly IIssueConversationGuard conversationGuard;
 
-    public ExtortionByDesertersHandler(IMessageBroker broker, INetwork network, IObjectManager objects,
-        IIssueResolver issues, IIssueOwnerResolver owners, IControllerIdProvider controller, IPlayerManager players,
+    public ExtortionByDesertersHandler(IMessageBroker broker, IObjectManager objects,
+        IIssueResolver issues, IControllerIdProvider controller,
         IAutoSyncPatchCollector patchCollector, IQuestFeatureFlag questFeatureFlag,
         IIssueConversationGuard conversationGuard)
     {
@@ -40,50 +36,18 @@ internal class ExtortionByDesertersHandler : IHandler
         {
             // Compile these callers after AutoSync so they cannot inline unpatched setters.
             var prefix = AccessTools.Method(typeof(ExtortionByDesertersServerMethodsPatch), nameof(ExtortionByDesertersServerMethodsPatch.Prefix));
-            patchCollector.AddPrefix(AccessTools.Method(typeof(Quest), nameof(Quest.CreateDeserterParty)), prefix);
-            patchCollector.AddPrefix(AccessTools.Method(typeof(Quest), nameof(Quest.CreateDefenderParty)), prefix);
-            patchCollector.AddPrefix(AccessTools.Method(typeof(Quest), nameof(Quest.ReleaseDeserterParty)), prefix);
-            patchCollector.AddPrefix(AccessTools.Method(typeof(Quest), nameof(Quest.ApplyQuestResult)),
-                AccessTools.Method(typeof(ExtortionByDesertersRewardPatches), nameof(ExtortionByDesertersRewardPatches.ApplyQuestResultPrefix)));
+            foreach (var method in ExtortionByDesertersServerMethodsPatch.TargetMethods()) patchCollector.AddPrefix(method, prefix);
         }
 
         this.broker = broker;
-        this.network = network;
         this.objects = objects;
         this.issues = issues;
-        this.owners = owners;
         this.controller = controller;
-        this.players = players;
         this.conversationGuard = conversationGuard;
         broker.Subscribe<NetworkExtortionByDesertersState>(Handle);
     }
 
     public void Dispose() => broker.Unsubscribe<NetworkExtortionByDesertersState>(Handle);
-
-    public void Send(Quest quest, TextObject log = null, bool ambush = false,
-        ExtortionByDesertersNotice notice = ExtortionByDesertersNotice.None)
-    {
-        if (ModInformation.IsClient)
-        {
-            return;
-        }
-
-        var issue = IssueManager.GetIssueOfQuest(quest);
-        if (issue == null || !objects.TryGetIdWithLogging(issue.IssueOwner, out var ownerId) ||
-            !owners.TryGetOwnerControllerId(issue, out var controllerId) ||
-            !players.TryGetPeer(controllerId, out var peer))
-        {
-            return;
-        }
-
-        var deserterId = string.Empty;
-        var defenderId = string.Empty;
-        if (quest._deserterMobileParty != null && !objects.TryGetIdWithLogging(quest._deserterMobileParty, out deserterId)) return;
-        if (quest._defenderMobileParty != null && !objects.TryGetIdWithLogging(quest._defenderMobileParty, out defenderId)) return;
-
-        network.Send(peer, new NetworkExtortionByDesertersState(ownerId, issue.StringId, controllerId,
-            deserterId, defenderId, (int)quest._currentState, log, ambush, (byte)notice));
-    }
 
     private void Handle(MessagePayload<NetworkExtortionByDesertersState> payload)
     {
@@ -93,49 +57,63 @@ internal class ExtortionByDesertersHandler : IHandler
             return;
         }
 
-        GameThread.RunSafe(() => conversationGuard.RunInOrder(() =>
+        GameThread.RunSafe(() => conversationGuard.RunInOrder(() => Apply(data), data.IssueOwnerId),
+            context: nameof(ExtortionByDesertersHandler));
+    }
+
+    private void Apply(NetworkExtortionByDesertersState data)
+    {
+        if (!issues.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _) ||
+            !(issue.IssueQuest is Quest quest) || !TryResolveParties(data, out var deserters, out var defenders))
         {
-            if (!issues.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _) ||
-                !(issue.IssueQuest is Quest quest)) return;
+            return;
+        }
 
-            MobileParty deserters = null;
-            MobileParty defenders = null;
-            if (!string.IsNullOrEmpty(data.DeserterId) && !objects.TryGetObjectWithLogging(data.DeserterId, out deserters)) return;
-            if (!string.IsNullOrEmpty(data.DefenderId) && !objects.TryGetObjectWithLogging(data.DefenderId, out defenders)) return;
+        BindParties(quest, deserters, defenders, (State)data.State);
+        if (!TextObject.IsNullOrEmpty(data.Log)) quest.AddLog(data.Log);
+        ShowNotice(quest, (ExtortionByDesertersNotice)data.Notice);
+        if (data.Ambush && deserters != null && defenders != null && quest.IsOngoing) quest.StartAmbushEncounter();
+    }
 
-            if (quest._deserterMobileParty != null && quest._deserterMobileParty != deserters &&
-                quest.IsTracked(quest._deserterMobileParty)) quest.RemoveTrackedObject(quest._deserterMobileParty);
+    private bool TryResolveParties(NetworkExtortionByDesertersState data, out MobileParty deserters, out MobileParty defenders)
+    {
+        deserters = null;
+        defenders = null;
+        return (string.IsNullOrEmpty(data.DeserterId) || objects.TryGetObjectWithLogging(data.DeserterId, out deserters)) &&
+            (string.IsNullOrEmpty(data.DefenderId) || objects.TryGetObjectWithLogging(data.DefenderId, out defenders));
+    }
 
-            if (deserters != null && quest._deserterMobileParty != deserters)
-            {
-                quest.AddTrackedObject(deserters);
-            }
+    private static void BindParties(Quest quest, MobileParty deserters, MobileParty defenders, State state)
+    {
+        if (quest._deserterMobileParty != null && quest._deserterMobileParty != deserters &&
+            quest.IsTracked(quest._deserterMobileParty))
+        {
+            quest.RemoveTrackedObject(quest._deserterMobileParty);
+        }
+        if (deserters != null && quest._deserterMobileParty != deserters) quest.AddTrackedObject(deserters);
+        quest._deserterMobileParty = deserters;
+        quest._defenderMobileParty = defenders;
+        quest._currentState = state;
+        if (state == State.DesertersAreDefeated)
+        {
+            if (!quest.IsTracked(quest.QuestGiver)) quest.AddTrackedObject(quest.QuestGiver);
+            if (!quest.IsTracked(quest.QuestSettlement)) quest.AddTrackedObject(quest.QuestSettlement);
+        }
+    }
 
-            quest._deserterMobileParty = deserters;
-            quest._defenderMobileParty = defenders;
-            quest._currentState = (State)data.State;
-            if (quest._currentState == State.DesertersAreDefeated)
-            {
-                if (!quest.IsTracked(quest.QuestGiver)) quest.AddTrackedObject(quest.QuestGiver);
-                if (!quest.IsTracked(quest.QuestSettlement)) quest.AddTrackedObject(quest.QuestSettlement);
-            }
-            if (!TextObject.IsNullOrEmpty(data.Log)) quest.AddLog(data.Log);
-            switch ((ExtortionByDesertersNotice)data.Notice)
-            {
-                case ExtortionByDesertersNotice.DesertersNoticedPlayer:
-                    MBInformationManager.AddQuickInformation(quest.OnDesertersNoticedPlayerNotificationText, 0, Hero.MainHero.CharacterObject);
-                    break;
-                case ExtortionByDesertersNotice.PlayerLeftVillage:
-                    MBInformationManager.AddQuickInformation(quest.OnPlayerLeftQuestSettlementNotificationText, 0, quest.QuestGiver.CharacterObject);
-                    break;
-                case ExtortionByDesertersNotice.DesertersDefeated:
-                    MBInformationManager.AddQuickInformation(quest.OnPlayerDefeatedDesertersNotificationText, 0, quest.QuestGiver.CharacterObject);
-                    break;
-            }
-            if (data.Ambush && deserters != null && defenders != null && quest.IsOngoing)
-            {
-                quest.StartAmbushEncounter();
-            }
-        }, data.IssueOwnerId), context: nameof(ExtortionByDesertersHandler));
+    private static void ShowNotice(Quest quest, ExtortionByDesertersNotice notice)
+    {
+        switch (notice)
+        {
+            case ExtortionByDesertersNotice.DesertersNoticedPlayer:
+                MBInformationManager.AddQuickInformation(quest.OnDesertersNoticedPlayerNotificationText, 0, Hero.MainHero.CharacterObject);
+                break;
+            case ExtortionByDesertersNotice.PlayerLeftVillage:
+                MBInformationManager.AddQuickInformation(quest.OnPlayerLeftQuestSettlementNotificationText, 0, quest.QuestGiver.CharacterObject);
+                break;
+            case ExtortionByDesertersNotice.DesertersDefeated:
+                MBInformationManager.AddQuickInformation(quest.OnPlayerDefeatedDesertersNotificationText, 0, quest.QuestGiver.CharacterObject);
+                break;
+        }
     }
 }

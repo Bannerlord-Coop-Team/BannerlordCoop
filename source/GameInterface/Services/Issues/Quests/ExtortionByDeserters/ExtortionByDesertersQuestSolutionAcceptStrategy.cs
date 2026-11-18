@@ -1,7 +1,6 @@
-﻿using Common;
-using GameInterface.Services.Issues.Quests.ExtortionByDeserters.Handlers;
+﻿using System;
+using Common;
 using GameInterface.Services.Issues.Framework.Interface;
-using System;
 using TaleWorlds.CampaignSystem.Issues;
 using Quest = TaleWorlds.CampaignSystem.Issues.ExtortionByDesertersIssueBehavior.ExtortionByDesertersIssueQuest;
 
@@ -10,11 +9,11 @@ namespace GameInterface.Services.Issues.Quests.ExtortionByDeserters;
 /// <summary>The server's constructor creates the party, then binds the owner's quest to it.</summary>
 internal class ExtortionByDesertersQuestSolutionAcceptStrategy : IQuestSolutionAcceptStrategy
 {
-    private readonly Func<ExtortionByDesertersHandler> sync;
+    private readonly IExtortionByDesertersProgress progress;
 
-    public ExtortionByDesertersQuestSolutionAcceptStrategy(Func<ExtortionByDesertersHandler> sync)
+    public ExtortionByDesertersQuestSolutionAcceptStrategy(IExtortionByDesertersProgress progress)
     {
-        this.sync = sync;
+        this.progress = progress;
     }
 
     public byte[] Capture(IssueBase issue) => Array.Empty<byte>();
@@ -23,7 +22,7 @@ internal class ExtortionByDesertersQuestSolutionAcceptStrategy : IQuestSolutionA
     {
         if (ModInformation.IsServer && issue.IssueQuest is Quest quest)
         {
-            sync().Send(quest);
+            progress.Send(quest);
         }
     }
 }

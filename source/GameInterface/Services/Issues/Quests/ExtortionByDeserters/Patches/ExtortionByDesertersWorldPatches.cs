@@ -1,5 +1,6 @@
 ﻿using Common;
 using GameInterface.Services.Issues.Quests.ExtortionByDeserters.Handlers;
+using GameInterface.Services.Issues.Quests.ExtortionByDeserters;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Quests.ExtortionByDeserters.Messages;
 using HarmonyLib;
@@ -8,13 +9,13 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using Quest = TaleWorlds.CampaignSystem.Issues.ExtortionByDesertersIssueBehavior.ExtortionByDesertersIssueQuest;
-using State = TaleWorlds.CampaignSystem.Issues.ExtortionByDesertersIssueBehavior.ExtortionByDesertersIssueQuest.ExtortionByDesertersQuestState;
 
 namespace GameInterface.Services.Issues.Quests.ExtortionByDeserters.Patches;
 
@@ -34,8 +35,8 @@ internal class ExtortionByDesertersWorldPatches
         Run(quest =>
         {
             if (attackerParty == quest._deserterMobileParty?.Party &&
-                ContainerProvider.TryResolve<ExtortionByDesertersFinalizationProofStrategy>(out var proof))
-                proof.TryRunBranch(quest, (byte)ExtortionByDesertersBranch.Ambush);
+                ContainerProvider.TryResolve<IExtortionByDesertersWorldEventService>(out var service))
+                service.TryStartAmbush(quest);
         });
     }
 
@@ -58,8 +59,8 @@ internal class ExtortionByDesertersWorldPatches
             if (!__state.Contains(quest)) return;
             if (quest._deserterBattleFinalizedForTheFirstTime)
             {
-                if (ContainerProvider.TryResolve<ExtortionByDesertersFinalizationProofStrategy>(out var proof))
-                    proof.TryRunBranch(quest, (byte)ExtortionByDesertersBranch.BattleCleanup);
+                if (ContainerProvider.TryResolve<IExtortionByDesertersWorldEventService>(out var service))
+                    service.TryCleanupBattle(quest);
             }
             // A battle without the owner destroys its losers only after OnMapEventEnded. Another player's victory
             // must not leave the quest pointing at a destroyed party, but survivors keep raiding as in vanilla.
@@ -79,22 +80,9 @@ internal class ExtortionByDesertersWorldPatches
     [HarmonyPrefix]
     private static bool MapStartedPrefix(Quest __instance, MapEvent mapEvent, PartyBase attackerParty, PartyBase defenderParty)
     {
-        if (ModInformation.IsClient || Hero.MainHero.PartyBelongedTo == null) return false;
-        if (attackerParty == PartyBase.MainParty)
-        {
-            if (mapEvent.IsFieldBattle && defenderParty.IsMobile &&
-                defenderParty.MobileParty.HomeSettlement == __instance.QuestSettlement &&
-                defenderParty != __instance._deserterMobileParty?.Party)
-            {
-                __instance.CompleteQuestWithFail(__instance.OnQuestFailed3LogText);
-                __instance.ApplyQuestResult(__instance._questResultFail3);
-            }
-            else if (QuestHelper.CheckMinorMajorCoercion(__instance, mapEvent, attackerParty))
-            {
-                QuestHelper.ApplyGenericMinorMajorCoercionConsequences(__instance, mapEvent);
-            }
-        }
-        return false;
+        // Server decisions use the injected quest service instead of a static Harmony body.
+        return ContainerProvider.TryResolve<IExtortionByDesertersWorldEventService>(out var service) &&
+            service.ApplyMapEventStarted(__instance, mapEvent, attackerParty, defenderParty);
     }
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnSettlementLeft))]
@@ -113,16 +101,8 @@ internal class ExtortionByDesertersWorldPatches
     [HarmonyPrefix]
     private static bool LeftPrefix(Quest __instance, MobileParty party, Settlement settlement)
     {
-        if (ModInformation.IsClient || Hero.MainHero.PartyBelongedTo == null) return false;
-        var deserters = __instance._deserterMobileParty;
-        var raid = settlement.Party.MapEvent;
-        if (party.IsMainParty && settlement == __instance.QuestSettlement && deserters != null &&
-            raid?.IsRaid == true && raid.AttackerSide.LeaderParty == deserters.Party)
-        {
-            __instance.ApplyQuestResult(__instance._questResultFail2);
-            __instance.CompleteQuestWithFail(__instance.OnQuestFailed2LogText);
-        }
-        return false;
+        return ContainerProvider.TryResolve<IExtortionByDesertersWorldEventService>(out var service) &&
+            service.ApplySettlementLeft(__instance, party, settlement);
     }
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnVillageBeingRaided))]
@@ -145,119 +125,26 @@ internal class ExtortionByDesertersWorldPatches
     [HarmonyPrefix]
     private static bool MapEventEndedPrefix(Quest __instance, MapEvent mapEvent)
     {
-        var deserters = __instance._deserterMobileParty;
-        if (ModInformation.IsClient || deserters == null || !mapEvent.InvolvedParties.Contains(deserters.Party)) return false;
-
-        // Native capture clears the hero's membership before this battle callback runs.
-        if (!ContainerProvider.TryResolve<IIssueManagerLifecycleService>(out var lifecycle) ||
-            !lifecycle.TryResolveMainHeroParty(out var owner)) return false;
-        // Like vanilla, a battle without the owner, such as the village militia's, leaves the quest alone here;
-        // the FinalizeEventAux postfix cancels it if the deserters were destroyed.
-        if (!mapEvent.InvolvedParties.Contains(owner)) return false;
-
-        __instance._deserterBattleFinalizedForTheFirstTime = true;
-        if (mapEvent.WinningSide == owner.Side)
-        {
-            __instance._currentState = State.DesertersAreDefeated;
-            __instance.AddLog(__instance.OnDeserterPartyDefeatedLogText);
-        }
-        else
-        {
-            SetRaidBehaviorIfNeeded(deserters, __instance.QuestSettlement);
-            __instance._currentState = State.DesertersDefeatedPlayer;
-        }
-        Sync(__instance, __instance._currentState == State.DesertersAreDefeated
-            ? ExtortionByDesertersNotice.DesertersDefeated : ExtortionByDesertersNotice.None);
-        return false;
+        // The owner party comes from the issue resolver, unlike vanilla's MainParty.
+        return ContainerProvider.TryResolve<IExtortionByDesertersWorldEventService>(out var service) &&
+            service.ApplyMapEventEnded(__instance, mapEvent);
     }
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnVillageBeingRaided))]
     [HarmonyPrefix]
     private static bool RaidPrefix(Quest __instance, Village village)
     {
-        if (ModInformation.IsClient || village.Settlement != __instance.QuestSettlement) return false;
-        var attacker = village.Settlement.Party.MapEvent?.AttackerSide.LeaderParty;
-        if (attacker == null) return false;
-        if (attacker == __instance._deserterMobileParty?.Party)
-        {
-            if (Hero.MainHero.PartyBelongedTo?.CurrentSettlement == village.Settlement) return false;
-            __instance.ApplyQuestResult(__instance._questResultFail2);
-            __instance.CompleteQuestWithFail(__instance.OnQuestFailed2LogText);
-        }
-        else if (attacker == Hero.MainHero.PartyBelongedTo?.Party)
-        {
-            __instance.ApplyQuestResult(__instance._questResultFail3);
-            __instance.CompleteQuestWithFail(__instance.OnQuestFailed3LogText);
-        }
-        else
-        {
-            __instance.CompleteQuestWithCancel(__instance.OnQuestCancel2LogText);
-        }
-        return false;
+        return ContainerProvider.TryResolve<IExtortionByDesertersWorldEventService>(out var service) &&
+            service.ApplyVillageBeingRaided(__instance, village);
     }
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.TickDesertersPartyLogic))]
     [HarmonyPrefix]
     private static bool TickPrefix(Quest __instance)
     {
-        if (ModInformation.IsClient || !__instance.IsOngoing) return false;
-        if (__instance._currentState == State.DesertersAreDefeated) return false;
-        var deserters = __instance._deserterMobileParty;
-        if (deserters == null || !deserters.IsActive)
-        {
-            __instance.CompleteQuestWithCancel();
-            return false;
-        }
-        if (deserters.MapEvent != null)
-        {
-            // The server's unstarted quest cannot depend on a client BattleStarted listener.
-            if (ContainerProvider.TryResolve<ExtortionByDesertersFinalizationProofStrategy>(out var proof))
-                proof.TryRunBranch(__instance, (byte)ExtortionByDesertersBranch.Ambush);
-            return false;
-        }
-
-        var ownerParty = Hero.MainHero.PartyBelongedTo;
-        if (ownerParty == null && __instance._currentState != State.DesertersDefeatedPlayer) return false;
-
-        switch (__instance._currentState)
-        {
-            case State.DesertersMovingToSettlement:
-                if (ownerParty.CurrentSettlement == __instance.QuestSettlement)
-                {
-                    SetRaidBehaviorIfNeeded(deserters, __instance.QuestSettlement);
-                }
-                else if (deserters.Position.Distance(ownerParty.Position) <= deserters.SeeingRange * 0.8f)
-                {
-                    __instance.HandleDesertersRunningAway();
-                    __instance._currentState = State.DesertersRunningAwayFromPlayer;
-                    __instance._desertersRunAwayTimeoutTime = CampaignTime.HoursFromNow(10f);
-                    Sync(__instance, ExtortionByDesertersNotice.DesertersNoticedPlayer);
-                }
-                else if (!__instance._playerAwayFromSettlementNotificationSent)
-                {
-                    __instance._playerAwayFromSettlementNotificationSent = true;
-                    Sync(__instance, ExtortionByDesertersNotice.PlayerLeftVillage);
-                }
-                break;
-            case State.DesertersRunningAwayFromPlayer:
-                if (deserters.Position.Distance(ownerParty.Position) > ownerParty.SeeingRange + 3f)
-                {
-                    __instance.ApplyQuestResult(__instance._questResultFail1);
-                    __instance.CompleteQuestWithFail(__instance.OnQuestFailed1LogText);
-                }
-                else if (__instance._desertersRunAwayTimeoutTime.IsPast)
-                {
-                    __instance.DestroyDeserterParty();
-                    __instance.ApplyQuestResult(__instance._questResultFail1);
-                    __instance.CompleteQuestWithFail(__instance.OnQuestFailed1LogText);
-                }
-                else __instance.HandleDesertersRunningAway();
-                break;
-            case State.DesertersDefeatedPlayer:
-                SetRaidBehaviorIfNeeded(deserters, __instance.QuestSettlement);
-                break;
-        }
-        return false;
+        // The server runs the quest tick for the owner, while clients only replay progress.
+        return ContainerProvider.TryResolve<IExtortionByDesertersWorldEventService>(out var service) &&
+            service.ApplyTick(__instance);
     }
 
     private static void Run(Action<Quest> listener)
@@ -265,19 +152,4 @@ internal class ExtortionByDesertersWorldPatches
         if (ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher)) dispatcher.RunAsOwners(listener);
     }
 
-    private static void Sync(Quest quest, ExtortionByDesertersNotice notice = ExtortionByDesertersNotice.None)
-    {
-        if (ContainerProvider.TryResolve<ExtortionByDesertersHandler>(out var sync)) sync.Send(quest, notice: notice);
-    }
-
-    private static void SetRaidBehaviorIfNeeded(MobileParty deserters, Settlement settlement)
-    {
-        if (deserters.DefaultBehavior == AiBehavior.RaidSettlement)
-        {
-            return;
-        }
-
-        SetPartyAiAction.GetActionForRaidingSettlement(deserters, settlement,
-            MobileParty.NavigationType.Default, false, false);
-    }
 }

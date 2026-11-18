@@ -18,6 +18,7 @@ using GameInterface.Services.Issues.Quests.VillageNeedsTools;
 using System;
 using GameInterface.Services.Issues.Quests.RevenueFarming;
 using GameInterface.Services.Issues.Quests.EscortMerchantCaravan;
+using GameInterface.Services.Issues.Quests.ExtortionByDeserters;
 
 namespace GameInterface.Services.Issues;
 
@@ -39,9 +40,9 @@ internal class IssuesModule : Module
         builder.Register(context => context.Resolve<AlternativeSolutionCommitments>()).As<IAlternativeSolutionCommitments>();
         builder.Register(context => context.Resolve<AlternativeSolutionPicker>()).As<IAlternativeSolutionPicker>();
         builder.RegisterType<IssueAcceptPreconditions>().As<IIssueAcceptPreconditions>().InstancePerDependency();
-        builder.RegisterType<OutcomeDispatcher>().As<IOutcomeDispatcher>().InstancePerLifetimeScope();
-        builder.RegisterType<IssueManagerLifecycleService>()
-            .As<IIssueManagerLifecycleService>()
+        builder.RegisterType<OutcomeDispatcher>().As<IOutcomeDispatcher>().SingleInstance();
+        builder.RegisterType<IssueOwnerParty>()
+            .As<IIssueOwnerParty>()
             .InstancePerDependency();
         builder.RegisterType<ArtisanProductsProgress>().As<IArtisanProductsProgress>().InstancePerDependency();
         builder.RegisterType<HeadmanHerdCleanup>().As<IHeadmanHerdCleanup>().SingleInstance();
@@ -50,6 +51,8 @@ internal class IssuesModule : Module
         builder.RegisterType<IssueConversationTracker>().As<IIssueConversationTracker>().SingleInstance();
         builder.RegisterType<IssueConversationGuard>().As<IIssueConversationGuard>().SingleInstance();
         builder.RegisterType<MerchantOutlawsProgress>().As<IMerchantOutlawsProgress>().InstancePerLifetimeScope();
+        builder.RegisterType<ExtortionByDesertersProgress>().As<IExtortionByDesertersProgress>().InstancePerLifetimeScope();
+        builder.RegisterType<ExtortionByDesertersWorldEventService>().As<IExtortionByDesertersWorldEventService>().InstancePerLifetimeScope();
         builder.RegisterType<MerchantOutlawsHourlyTick>().As<IMerchantOutlawsHourlyTick>().InstancePerDependency();
         builder.Register(context => context.Resolve<LordSolutionCoordinator>()).As<ILordSolutionCoordinator>();
         builder.Register(context => context.Resolve<QuestSolutionAcceptCoordinator>()).As<IQuestSolutionAcceptCoordinator>();

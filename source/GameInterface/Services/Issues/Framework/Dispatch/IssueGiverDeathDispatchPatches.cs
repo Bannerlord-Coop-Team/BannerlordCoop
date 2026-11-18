@@ -1,4 +1,5 @@
-﻿using GameInterface.Services.Issues.Framework.Interface;
+﻿using Common;
+using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
 using System;
 using TaleWorlds.CampaignSystem;
@@ -11,6 +12,21 @@ namespace GameInterface.Services.Issues.Framework.Dispatch;
 [HarmonyPatch]
 internal class IssueGiverDeathDispatchPatches
 {
+    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnHeroKilled))]
+    [HarmonyPrefix]
+    private static void DispatchGiverDeathBeforeVanilla(
+        Hero victim,
+        Hero killer,
+        TaleWorlds.CampaignSystem.Actions.KillCharacterAction.KillCharacterActionDetail detail,
+        bool showNotification)
+    {
+        // The server cancels the giver's quest before vanilla replaces the notable.
+        if (ModInformation.IsServer && victim?.Issue?.IssueQuest is { IsOngoing: true })
+        {
+            Campaign.Current.IssueManager.OnHeroKilled(victim, killer, detail, showNotification);
+        }
+    }
+
     [HarmonyPatch(typeof(IssueManager), nameof(IssueManager.OnHeroKilled))]
     [HarmonyPrefix]
     private static bool Prefix(Hero victim, out IDisposable __state)

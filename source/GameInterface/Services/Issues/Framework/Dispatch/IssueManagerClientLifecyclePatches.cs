@@ -19,32 +19,6 @@ internal static class IssueManagerClientLifecyclePatches
         yield return AccessTools.Method(typeof(IssueManager), nameof(IssueManager.OnCharacterPortraitPopUpOpened));
     }
 
-    [HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
-    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnHeroKilled))]
-    private static class HeroKilledPatch
-    {
-        [HarmonyPrefix]
-        private static void DispatcherPrefix(
-            Hero victim,
-            Hero killer,
-            TaleWorlds.CampaignSystem.Actions.KillCharacterAction.KillCharacterActionDetail detail,
-            bool showNotification)
-        {
-            if (ModInformation.IsServer && victim?.Issue?.IssueQuest is { IsOngoing: true })
-            {
-                Campaign.Current.IssueManager.OnHeroKilled(victim, killer, detail, showNotification);
-            }
-        }
-    }
-
     [HarmonyPrefix]
-    private static bool Prefix()
-    {
-        if (ModInformation.IsServer)
-        {
-            return true;
-        }
-
-        return false;
-    }
+    private static bool Prefix() => ModInformation.IsServer;
 }

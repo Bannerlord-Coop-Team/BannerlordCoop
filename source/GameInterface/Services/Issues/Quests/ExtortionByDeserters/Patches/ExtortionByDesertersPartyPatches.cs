@@ -1,5 +1,7 @@
 ﻿using Common;
 using Common.Util;
+using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.Issues.Quests.ExtortionByDeserters;
 using HarmonyLib;
 using Helpers;
 using System.Collections.Generic;
@@ -12,6 +14,7 @@ using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
+using TaleWorlds.Localization;
 using Quest = TaleWorlds.CampaignSystem.Issues.ExtortionByDesertersIssueBehavior.ExtortionByDesertersIssueQuest;
 
 namespace GameInterface.Services.Issues.Quests.ExtortionByDeserters.Patches;
@@ -33,6 +36,7 @@ internal class ExtortionByDesertersPartyPatches
     [HarmonyPrefix]
     private static bool StartAmbushEncounterPrefix(Quest __instance)
     {
+        // The server starts the ambush from the world service, and the owner's client opens it from the Ambush state.
         var raid = __instance._deserterMobileParty?.MapEvent;
         if (ModInformation.IsServer || raid == null || __instance._defenderMobileParty == null ||
             MobileParty.MainParty.MapEvent != raid) return false;
@@ -76,6 +80,17 @@ internal class ExtortionByDesertersPartyPatches
     {
         if (ModInformation.IsServer && __instance.IssueQuest is Quest quest && quest.IsOngoing) quest.OnFinalize();
     }
+
+    [HarmonyPatch(typeof(QuestBase), nameof(QuestBase.AddLog), new[] { typeof(TextObject), typeof(bool) })]
+    [HarmonyPrefix]
+    private static void AddLogPrefix(QuestBase __instance, TextObject text)
+    {
+        if (ModInformation.IsServer && __instance is Quest quest &&
+            ContainerProvider.TryResolve<IExtortionByDesertersProgress>(out var progress))
+        {
+            progress.Send(quest, text);
+        }
+    }
 }
 
 /// <summary>These world methods must stay server-only even during client replay.</summary>
@@ -83,8 +98,13 @@ internal class ExtortionByDesertersPartyPatches
 [HarmonyPatch]
 internal class ExtortionByDesertersServerMethodsPatch
 {
-    private static IEnumerable<MethodBase> TargetMethods()
+    internal static IEnumerable<MethodBase> TargetMethods()
     {
+        yield return AccessTools.Method(typeof(Quest), nameof(Quest.CreateDeserterParty));
+        yield return AccessTools.Method(typeof(Quest), nameof(Quest.CreateDefenderParty));
+        yield return AccessTools.Method(typeof(Quest), nameof(Quest.ReleaseDeserterParty));
+        yield return AccessTools.Method(typeof(Quest), nameof(Quest.ApplyQuestResult));
+        yield return AccessTools.Method(typeof(Quest), nameof(Quest.OnTimedOut));
         yield return AccessTools.Method(typeof(Quest), nameof(Quest.DestroyDeserterParty));
         yield return AccessTools.Method(typeof(Quest), nameof(Quest.DestroyDefenderParty));
         yield return AccessTools.Method(typeof(Quest), nameof(Quest.HourlyTick));
