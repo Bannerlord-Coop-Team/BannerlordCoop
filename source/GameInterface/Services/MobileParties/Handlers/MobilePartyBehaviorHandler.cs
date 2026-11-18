@@ -206,7 +206,10 @@ internal class MobilePartyBehaviorHandler : IHandler
         if (!mobilePartyBehaviorSnapshot.TryCreate(
                 party,
                 out PartyBehaviorUpdateData authoritativeData))
+        {
+            Logger.Warning("Failed to snapshot the authoritative behavior of {PartyId}, clients get no update", party.StringId);
             return;
+        }
 
         authoritativeData.OriginControllerId = originControllerId;
         authoritativeData.ForcePosition = forcePosition;
