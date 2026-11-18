@@ -11,10 +11,9 @@ using Xunit.Abstractions;
 namespace E2E.Tests.Services.MapEvents;
 
 /// <summary>
-/// The join encounter options ("Help the attackers" / "Help the defenders") can be refreshed on a client while
-/// its encounter is still being set up and has no encountered party yet. Native and coop both read
-/// <c>PlayerEncounter.EncounteredBattle</c> there, which dereferences that party, so the refresh must refuse the
-/// option instead of throwing out of the menu.
+/// The join encounter options ("Help the attackers" / "Help the defenders") can be refreshed on a client before
+/// the server has set the battle up there, with no encountered party or a side with no leader party yet. Native
+/// <c>PlayerEncounter.EncounteredBattle</c> and the leader reads throw then, so the refresh must refuse the option.
 /// </summary>
 public class EncounterJoinOptionTests : MapEventTestBase
 {

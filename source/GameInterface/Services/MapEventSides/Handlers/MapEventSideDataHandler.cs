@@ -207,9 +207,7 @@ internal class MapEventSideDataHandler : IHandler
         if (encounter == null)
             return;
 
-        var encounterMapEvent = encounter._mapEvent ?? encounter.GetEncounteredBattleOrNull() ??
-            MapEvent.PlayerMapEvent;
-        if (encounterMapEvent != mapEvent)
+        if (encounter.GetBattleOrPlayerMapEvent() != mapEvent)
             return;
 
         if (Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId != "raiding_village")

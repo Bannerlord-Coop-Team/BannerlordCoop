@@ -50,8 +50,18 @@ public static class PlayerEncounterExtensions
     /// <summary>
     /// Checks if the encounter is attached to, simulating, or facing the given map event.
     /// </summary>
-    public static bool ReferencesMapEvent(this PlayerEncounter playerEncounter, MapEvent mapEvent) =>
-        playerEncounter?._mapEvent == mapEvent ||
-        playerEncounter?.BattleSimulation?.MapEvent == mapEvent ||
-        playerEncounter.GetEncounteredBattleOrNull() == mapEvent;
+    public static bool ReferencesMapEvent(this PlayerEncounter playerEncounter, MapEvent mapEvent)
+    {
+        if (playerEncounter == null) return false;
+
+        return playerEncounter._mapEvent == mapEvent ||
+            playerEncounter.BattleSimulation?.MapEvent == mapEvent ||
+            playerEncounter.GetEncounteredBattleOrNull() == mapEvent;
+    }
+
+    /// <summary>
+    /// The encounter's own map event, else the battle it faces, else the main party's battle.
+    /// </summary>
+    public static MapEvent GetBattleOrPlayerMapEvent(this PlayerEncounter playerEncounter) =>
+        playerEncounter._mapEvent ?? playerEncounter.GetEncounteredBattleOrNull() ?? MapEvent.PlayerMapEvent;
 }
