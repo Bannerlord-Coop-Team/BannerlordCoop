@@ -24,14 +24,15 @@ internal class PlayerRaftVisibilityPatches
     [HarmonyPostfix]
     private static void RefreshDynamicPropertiesPostfix(PartyNameplateVM __instance, bool __state)
     {
-        bool hiddenByThisRefresh = __state && !__instance._isVisibleOnMapBind;
-        if (!hiddenByThisRefresh) return;
-        // Vanilla's army and settlement hides still apply to a raft
-        if (__instance._isInArmyBind || __instance._isInSettlementBind) return;
+        if (!ShouldShowAgain(__state, __instance._isVisibleOnMapBind, __instance._isInArmyBind, __instance._isInSettlementBind)) return;
         if (!IsOtherPlayersRaft(__instance.Party, MobileParty.MainParty)) return;
 
         __instance._isVisibleOnMapBind = true;
     }
+
+    // Only a nameplate this refresh hid comes back, and vanilla's army and settlement hides still apply to a raft
+    internal static bool ShouldShowAgain(bool wasVisible, bool isVisible, bool isInArmy, bool isInSettlement) =>
+        wasVisible && !isVisible && !isInArmy && !isInSettlement;
 
     [HarmonyPatch(typeof(PartyBase), "TaleWorlds.CampaignSystem.Map.IInteractablePoint.CanPartyInteract")]
     [HarmonyPostfix]
