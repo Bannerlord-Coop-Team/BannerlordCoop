@@ -3,7 +3,11 @@ using Common.Messaging;
 using GameInterface.Services.Heroes.HeirSelection.Messages;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.PlayerCaptivityService.Messages;
+using GameInterface.Services.Players.Messages;
 using GameInterface.Services.Rafts.Interfaces;
+using GameInterface.Services.UI.Messages;
+using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Rafts.Handlers;
 
@@ -19,12 +23,47 @@ internal class PlayerRaftHandler : IHandler
 
         messageBroker.Subscribe<PlayerPartyReleasedFromCaptivity>(Handle);
         messageBroker.Subscribe<PlayerCharacterChangedOnServer>(Handle_PlayerCharacterChanged);
+        messageBroker.Subscribe<PartyOccupancyChanged>(Handle_OccupancyChanged);
+        messageBroker.Subscribe<PlayerPartyRestoredOnReconnect>(Handle_PartyRestoredOnReconnect);
+        messageBroker.Subscribe<SwitchedPlayer>(Handle_SwitchedPlayer);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<PlayerPartyReleasedFromCaptivity>(Handle);
         messageBroker.Unsubscribe<PlayerCharacterChangedOnServer>(Handle_PlayerCharacterChanged);
+        messageBroker.Unsubscribe<PartyOccupancyChanged>(Handle_OccupancyChanged);
+        messageBroker.Unsubscribe<PlayerPartyRestoredOnReconnect>(Handle_PartyRestoredOnReconnect);
+        messageBroker.Unsubscribe<SwitchedPlayer>(Handle_SwitchedPlayer);
+    }
+
+    // The move to shore a raft got while its party was parked offline doesn't survive, so start it again once the party is back
+    private void Handle_PartyRestoredOnReconnect(MessagePayload<PlayerPartyRestoredOnReconnect> obj)
+    {
+        raftFleetInterface.ResumeRaft(obj.What.PlayerParty);
+    }
+
+    private void Handle_SwitchedPlayer(MessagePayload<SwitchedPlayer> obj)
+    {
+        // [Client] SwitchToPlayer publishes this after setting the main party.
+        // The save loads the raft state straight into its field, so the setter patch that opens the raft menu never runs
+        GameThread.RunSafe(() =>
+        {
+            if (!MobileParty.MainParty.IsInRaftState) return;
+
+            GameMenu.ActivateGameMenu("player_raft_state");
+        });
+    }
+
+    private void Handle_OccupancyChanged(MessagePayload<PartyOccupancyChanged> obj)
+    {
+        var party = obj.What.MobileParty;
+        // Already on the game thread, so filter now and only queue a frame for a raft
+        if (!party.IsInRaftState) return;
+
+        // A raft's AI is off, so leaving a battle or its post battle screens would hold it at sea for good.
+        // Queued for a later frame, because the battle leave sets the party to hold right after clearing its side, which would cancel the move to shore.
+        GameThread.EnqueueSafe(() => raftFleetInterface.ResumeRaft(party));
     }
 
     private void Handle_PlayerCharacterChanged(MessagePayload<PlayerCharacterChangedOnServer> obj)
