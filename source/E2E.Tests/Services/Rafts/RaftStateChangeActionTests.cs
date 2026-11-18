@@ -34,22 +34,35 @@ public class RaftStateChangeActionTests : SyncTestBase
             () => RaftStateChangeAction.ActivateRaftStateForParty(Server.GetRegisteredObject<MobileParty>(partyId)),
             RaftDisabledMethods);
 
-        AssertAiDisabledEverywhere(true);
+        AssertRaftStateEverywhere(true);
+
+        // The client gate is queued by RaftSync instead of an attribute, so a client's own landing must leave its raft alone
+        var client = Clients.First();
+        client.Call(() => RaftStateChangeAction.DeactivateRaftStateForParty(client.GetRegisteredObject<MobileParty>(partyId)));
+
+        AssertRaftStateEverywhere(true);
 
         Server.Call(() => RaftStateChangeAction.DeactivateRaftStateForParty(Server.GetRegisteredObject<MobileParty>(partyId)));
 
-        AssertAiDisabledEverywhere(false);
+        AssertRaftStateEverywhere(false);
     }
 
-    // Checks the server's and every client's copy of the party's AI against the expected disabled state.
-    private void AssertAiDisabledEverywhere(bool expected)
+    // Checks the server's and every client's copy of the party's raft and AI state against the expected raft state.
+    private void AssertRaftStateEverywhere(bool expected)
     {
-        Server.Call(() => Assert.Equal(expected, Server.GetRegisteredObject<MobileParty>(partyId).Ai.IsDisabled));
+        Server.Call(() => AssertRaftState(expected, Server.GetRegisteredObject<MobileParty>(partyId)));
 
         foreach (var client in Clients)
         {
             client.PumpGameThread();
-            client.Call(() => Assert.Equal(expected, client.GetRegisteredObject<MobileParty>(partyId).Ai.IsDisabled));
+            client.Call(() => AssertRaftState(expected, client.GetRegisteredObject<MobileParty>(partyId)));
         }
+    }
+
+    // A rafting party has its AI disabled and a landed one has it enabled.
+    private static void AssertRaftState(bool expected, MobileParty party)
+    {
+        Assert.Equal(expected, party.IsInRaftState);
+        Assert.Equal(expected, party.Ai.IsDisabled);
     }
 }
