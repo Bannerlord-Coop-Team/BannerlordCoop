@@ -103,6 +103,14 @@ internal class MobilePartyBehaviorHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging(data.MobilePartyId, out MobileParty party))
                 return;
 
+            if (ModInformation.IsServer && party.IsInNavalAutoTravel)
+            {
+                // Vanilla takes no orders during naval auto travel, so an owner order sent before it saw its raft gets the one-shot move to shore back
+                if (data.DefaultBehavior != party.DefaultBehavior || data.TargetPosition != party.TargetPosition)
+                    messageBroker.Publish(this, new PartyBehaviorChangeAttempted(party));
+                return;
+            }
+
             bool isSelfEcho = ModInformation.IsClient &&
                 party.IsControlledByThisInstance() &&
                 !string.IsNullOrEmpty(data.OriginControllerId) &&
