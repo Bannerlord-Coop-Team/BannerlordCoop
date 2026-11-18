@@ -59,8 +59,8 @@ public sealed class NavalBoatswainCoopCommand : ICoopCommand
         objectManager.TryGetId(hero, out var heroId);
         var output = new StringBuilder();
         output.AppendLine(string.Format(CultureInfo.InvariantCulture,
-            "NAVAL_BOATSWAIN party={0} hero={1} level={2} xp={3:R} learningRate={4:R} prepared={5}",
-            args[0], heroId, hero.GetSkillValue(skill), developer.GetSkillXp(skill), developer.GetFocusFactor(skill), prepare));
+            "NAVAL_BOATSWAIN party={0} hero={1} level={2} prepared={3}",
+            args[0], heroId, hero.GetSkillValue(skill), prepare));
         foreach (var ship in party.Ships)
         {
             objectManager.TryGetId(ship, out var shipId);

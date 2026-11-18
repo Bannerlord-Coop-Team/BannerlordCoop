@@ -43,6 +43,7 @@ internal class ChangeShipOwnerActionPatches
             return true;
         }
 
+        // Same as the end of vanilla ChangeShipOwnerAction.ApplyInternal from here
         ship.Owner = newOwner;
         owner.MobileParty?.SetNavalVisualAsDirty();
         newOwner.MobileParty?.SetNavalVisualAsDirty();
