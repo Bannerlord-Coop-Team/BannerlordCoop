@@ -26,7 +26,7 @@ public class SailToCoopCommandTests : MapEventTestBase
     /// <summary>Passes the test output to the environment.</summary>
     public SailToCoopCommandTests(ITestOutputHelper output) : base(output) { }
 
-    // The server doesn't send a client-owned party's own order, so the command has to reach the owner and the other clients itself
+    // The port order, its IsTargetingPort flag and naval navigation reach every machine, the client that owns the party included
     [Fact]
     public void SailTo_OrdersThePartyIntoThePortOnEveryMachine()
     {
@@ -48,9 +48,10 @@ public class SailToCoopCommandTests : MapEventTestBase
         });
         TestEnvironment.FlushCoalescer();
 
+        var sailTo = ResolveCommand<PartySailCommands.SailToCoopCommand>(Server);
+        var args = new CoopCommandArgsFactory().FromValues(new[] { ControllerId, portId });
         CoopCommandResult result = null!;
-        Server.Call(() => result = RunWithNaval(() => ResolveCommand<PartySailCommands.SailToCoopCommand>(Server)
-            .ProcessCommand(new CoopCommandArgsFactory().FromValues(new[] { ControllerId, portId }))));
+        Server.Call(() => result = RunWithNaval(() => sailTo.ProcessCommand(args)));
         TestEnvironment.FlushCoalescer();
 
         Assert.True(result.Succeeded, result.Output);
