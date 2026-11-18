@@ -36,14 +36,14 @@ public class PartyShipCommands
 
     // coop.debug.party.add_ship PlayerOne northern_light_ship
     // coop.debug.party.add_ship lord_1_17_party_1 northern_light_ship
-    /// <summary>Gives a player's or an AI party one new ship through the vanilla production ownership path.</summary>
+    /// <summary>Gives a party one new ship through the vanilla production path, anchoring a first fleet at the port it is in.</summary>
     public sealed class AddShipCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.party";
 
         public string Name => "add_ship";
 
-        public string Description => "Gives a player's or an AI party one new ship of the given War Sails hull.";
+        public string Description => "Gives a player's or an AI party one new ship of the given War Sails hull; a first fleet anchors at the port the party is in.";
 
         public CoopCommandSide Side => CoopCommandSide.Server;
 
@@ -72,10 +72,19 @@ public class PartyShipCommands
             var ship = new Ship(hull);
             ChangeShipOwnerAction.ApplyByProduction(party, ship);
 
+            // Like vanilla's naval.add_ship cheat, otherwise production leaves a first fleet unanchored and the port shows no shipyard
+            var mobileParty = party.MobileParty; // null for a settlement's own PartyBase
+            var port = mobileParty?.CurrentSettlement;
+            var isFirstFleetInPort = mobileParty != null && port != null && port.HasPort &&
+                !mobileParty.IsCurrentlyAtSea && !mobileParty.Anchor.IsValid;
+            if (isFirstFleetInPort)
+                mobileParty.Anchor.Settlement = port;
+
             var shipId = DescribeId(objectManager, ship);
-            Logger.Information("Added {HullId} ship {ShipId} to party {PartyId} (asked for {Query})",
-                hullId, shipId, party.Id, args[0]);
-            return Succeeded($"Added {hullId} {shipId} to {party.Id} (ships={party.Ships.Count}).");
+            var anchor = mobileParty?.Anchor.Settlement?.StringId ?? "none";
+            Logger.Information("Added {HullId} ship {ShipId} to party {PartyId} (asked for {Query}), fleet anchored at {Anchor}",
+                hullId, shipId, party.Id, args[0], anchor);
+            return Succeeded($"Added {hullId} {shipId} to {party.Id} (ships={party.Ships.Count}, anchor={anchor}).");
         }
     }
 
@@ -238,8 +247,8 @@ public class PartyShipCommands
     // coop.debug.naval.fleet
     // coop.debug.naval.fleet MobileParty_southern_pirates_13
     /// <summary>
-    /// Lists the campaign id, HP, sail HP and owner of every ship of a party on this machine; with no party, the main party on
-    /// a client and every player's party on the server.
+    /// Lists the campaign id, HP, sail HP, owner and unlocked upgrade pieces of every ship of a party on this machine; with no
+    /// party, the main party on a client and every player's party on the server.
     /// </summary>
     public sealed class NavalFleetCoopCommand : ICoopCommand
     {
@@ -247,7 +256,7 @@ public class PartyShipCommands
 
         public string Name => "fleet";
 
-        public string Description => "Lists a party's ships with their id, hit points, sail hit points and owner on this machine.";
+        public string Description => "Lists a party's ships with their id, hit points, sail hit points, owner and unlocked upgrade pieces on this machine.";
 
         public CoopCommandSide Side => CoopCommandSide.Both;
 
@@ -280,15 +289,18 @@ public class PartyShipCommands
         }
     }
 
-    // One line per party: its id and ship count, then each ship's registry id, hit points, sail hit points and owner.
+    // One line per party: its id and ship count, then each ship.
     private static string DescribeFleet(IObjectManager objectManager, PartyBase party)
     {
-        var ships = party.Ships
-            .Select(ship => $"{DescribeId(objectManager, ship)} hp={ship.HitPoints:0.#}/{ship.MaxHitPoints:0} " +
-                $"sail={ship.SailHitPoints:0.#}/{ship.MaxSailHitPoints:0} owner={ship.Owner?.Id ?? "none"}")
-            .ToArray();
+        var ships = party.Ships.Select(ship => DescribeShip(objectManager, ship)).ToArray();
         return $"{party.Id} ships={ships.Length}" + (ships.Length == 0 ? "" : ": " + string.Join(", ", ships));
     }
+
+    // A ship's registry id, hit points, sail hit points, owner and unlocked upgrade pieces.
+    private static string DescribeShip(IObjectManager objectManager, Ship ship) =>
+        $"{DescribeId(objectManager, ship)} hp={ship.HitPoints:0.#}/{ship.MaxHitPoints:0} " +
+        $"sail={ship.SailHitPoints:0.#}/{ship.MaxSailHitPoints:0} owner={ship.Owner?.Id ?? "none"} " +
+        $"can_unlock={ship.CanHaveUnlockedPieces} unlocked={ship.UnlockedUpgradePieces?.Count ?? 0}";
 #endif
 
     // A controller id names the player's party; any other id is a registered MobileParty or PartyBase, a campaign party id,
