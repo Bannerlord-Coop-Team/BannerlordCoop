@@ -833,7 +833,7 @@
     coop_location="house_1"
     coop_spawn_tag="npc_common"
     coop_dialogue="marabanın marbası"
-    coop_enabled="true">
+    coop_enabled="false">
     <face>
       <face_key_template value="BodyProperty.townsman_vlandia" />
     </face>
