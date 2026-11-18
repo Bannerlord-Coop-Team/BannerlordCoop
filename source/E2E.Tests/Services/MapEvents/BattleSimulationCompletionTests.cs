@@ -2,14 +2,19 @@
 using System.Linq;
 using Common.Messaging;
 using Common.Network;
+using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
+using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
+using GameInterface.Services.MapEvents.Participation;
 using GameInterface.Services.Players;
+using Missions.Messages;
 using Moq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using Xunit;
 using Xunit.Abstractions;
@@ -38,10 +43,7 @@ public class BattleSimulationCompletionTests : MapEventTestBase
 
         Server.Call(() =>
         {
-            Server.Resolve<IMessageBroker>().Publish(client.NetPeer, new NetworkBattleStartRequest(
-                System.Guid.NewGuid().ToString(), (int)BattleStartMode.Simulation,
-                context.MapEventId, context.AttackerPartyId));
-            Assert.True(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleStartReply>()).Accepted);
+            StartAcceptedSimulation(client, context);
             var mapEvent = Server.GetRegisteredObject<MapEvent>(context.MapEventId);
             mapEvent.BattleState = BattleState.AttackerVictory;
             var ended = new List<MapEvent>();
@@ -49,9 +51,7 @@ public class BattleSimulationCompletionTests : MapEventTestBase
             try
             {
                 Server.NetworkSentMessages.Clear();
-                for (var update = 0; update < MaxAdvancesToFinish; update++)
-                    Server.Resolve<IMessageBroker>().Publish(client.NetPeer,
-                        new NetworkAdvanceBattleSimulation(context.MapEventId, 1));
+                AdvanceSimulation(client, context.MapEventId);
 
                 Assert.True(mapEvent.IsFinalized);
                 Assert.Same(mapEvent, Assert.Single(ended));
@@ -71,5 +71,38 @@ public class BattleSimulationCompletionTests : MapEventTestBase
 
         foreach (var instance in Clients.Append(Server))
             instance.Call(() => Assert.False(instance.ObjectManager.TryGetObject<MapEvent>(context.MapEventId, out _)));
+    }
+
+    [Fact]
+    public void RetreatedPlayerStartsSimulation_AndWins_StillReceivesWinnerLoot()
+    {
+        var context = CreateServerMapEvent();
+        var client = Clients.First();
+        RegisterAsPlayerParty("1", TestEnvironment.CreateRegisteredObject<Hero>(), context.AttackerPartyId);
+        Server.Resolve<IPlayerManager>().SetPeer("1", client.NetPeer);
+
+        Server.Call(() =>
+        {
+            var mapEvent = Server.GetRegisteredObject<MapEvent>(context.MapEventId);
+            var playerParty = Server.GetRegisteredObject<MobileParty>(context.AttackerPartyId).Party;
+            Server.Resolve<IMessageBroker>().Publish(this, new BattlePartyRetreated("1", context.MapEventId));
+            Assert.True(Server.Resolve<IRetreatedMapEventPartyTracker>().IsRetreated(mapEvent, playerParty));
+
+            StartAcceptedSimulation(client, context);
+
+            mapEvent.BattleState = BattleState.AttackerVictory;
+            AdvanceSimulation(client, context.MapEventId);
+
+            var results = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkCommitMapEventResults>());
+            // Only parties kept in the winners get a loot entry, even when it's empty.
+            Assert.Contains(results.PlayerMapEventPartyId, results.PlayerLootData.LootedItems.Keys);
+        }, MapEventDisabledMethods);
+    }
+
+    /// <summary>Sends <see cref="MaxAdvancesToFinish"/> one-round advances from the client, enough for a decided battle to finish.</summary>
+    private void AdvanceSimulation(EnvironmentInstance client, string mapEventId)
+    {
+        for (var update = 0; update < MaxAdvancesToFinish; update++)
+            Server.Resolve<IMessageBroker>().Publish(client.NetPeer, new NetworkAdvanceBattleSimulation(mapEventId, 1));
     }
 }
