@@ -603,8 +603,7 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
     private static bool References(PlayerEncounter encounter, MapEvent mapEvent) =>
         encounter?._mapEvent == mapEvent ||
         encounter?.BattleSimulation?.MapEvent == mapEvent ||
-        GetPlayerEncounterBattle() == mapEvent ||
-        PlayerEncounterExtensions.GetEncounteredBattleOrNull() == mapEvent;
+        encounter.GetEncounteredBattleOrNull() == mapEvent;
 
     internal static bool IsBattleResultEncounter(PlayerEncounter encounter)
     {
@@ -627,18 +626,6 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         mapEvent.IsRaidHostileAction() &&
         encounter.BattleSimulation != null &&
         mapEvent.WinningSide == encounter.PlayerSide;
-
-    private static MapEvent GetPlayerEncounterBattle()
-    {
-        try
-        {
-            return PlayerEncounter.Battle;
-        }
-        catch (NullReferenceException)
-        {
-            return null;
-        }
-    }
 
     private static void ForceCloseCurrentEncounterMenu()
     {

@@ -69,31 +69,6 @@ public class EncounterJoinOptionTests : MapEventTestBase
         }, MapEventDisabledMethods);
     }
 
-    [Theory]
-    [InlineData(HelpAttackersCondition)]
-    [InlineData(HelpDefendersCondition)]
-    public void RaidJoinPostfix_BeforeEncounteredPartyIsSet_LeavesOptionUnchanged(string conditionName)
-    {
-        var client = Clients.First();
-        SetMockPlayerEncounter(client);
-
-        client.Call(() =>
-        {
-            var originalMethod = AccessTools.Method(typeof(EncounterGameMenuBehavior), conditionName);
-            var patchType = AccessTools.TypeByName("GameInterface.Services.MapEvents.Patches.RaidJoinEncounterConditionPatch");
-            var postfix = AccessTools.Method(patchType, "Postfix");
-            Assert.NotNull(originalMethod);
-            Assert.NotNull(postfix);
-
-            var args = new MenuCallbackArgs((MenuContext)null, null) { IsEnabled = true };
-            var invocationArgs = new object[] { originalMethod, args, true };
-            postfix.Invoke(null, invocationArgs);
-
-            Assert.True((bool)invocationArgs[2]);
-            Assert.True(args.IsEnabled);
-        }, MapEventDisabledMethods);
-    }
-
     /// <summary>Runs the real (Harmony patched) join condition in the calling instance's scope.</summary>
     private static (bool shown, MenuCallbackArgs args) InvokeJoinCondition(string conditionName)
     {

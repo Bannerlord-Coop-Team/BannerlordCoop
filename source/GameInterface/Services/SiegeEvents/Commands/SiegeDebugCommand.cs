@@ -1207,7 +1207,7 @@ public class SiegeDebugCommand
                 var menu = Campaign.Current?.CurrentMenuContext?.GameMenu;
                 var joinOption = menu?.MenuOptions.FirstOrDefault(option => option.IdString == "join_encounter_help_attackers");
                 if (PlayerEncounter.Current == null || PlayerEncounter.EncounterSettlement != settlement ||
-                    PlayerEncounterExtensions.GetEncounteredBattleOrNull() != mapEvent || PartyBase.MainParty.MapEvent != null ||
+                    PlayerEncounter.Current.GetEncounteredBattleOrNull() != mapEvent || PartyBase.MainParty.MapEvent != null ||
                     menu?.StringId != "join_encounter" || joinOption == null ||
                     !menu.GetMenuOptionConditionsHold(Game.Current, Campaign.Current.CurrentMenuContext,
                         menu.MenuOptions.ToList().IndexOf(joinOption)) || !joinOption.IsEnabled)

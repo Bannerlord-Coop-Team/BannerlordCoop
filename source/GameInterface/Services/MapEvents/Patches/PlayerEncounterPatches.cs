@@ -247,7 +247,7 @@ internal class PlayerEncounterPatches
             return false;
         }
 
-        if (encounter._mapEvent != null || PlayerEncounterExtensions.GetEncounteredBattleOrNull() != null)
+        if (encounter._mapEvent != null || encounter.GetEncounteredBattleOrNull() != null)
             return true;
 
         var mainParty = MobileParty.MainParty;

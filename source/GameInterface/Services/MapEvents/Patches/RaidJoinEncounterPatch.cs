@@ -23,20 +23,17 @@ internal class RaidJoinEncounterConditionPatch
         yield return AccessTools.Method(typeof(EncounterGameMenuBehavior), "game_menu_join_encounter_help_defenders_on_condition");
     }
 
-    // Greys the join option while vanilla's condition would throw, before the server sets the battle up on this
+    // Refuses the join option while vanilla's condition would throw, before the server sets the battle up on this
     // client or after the encounter closes.
     [HarmonyPrefix]
     private static bool Prefix(MenuCallbackArgs args, ref bool __result)
     {
         if (ModInformation.IsServer) return true;
-        if (HasLeaderParties(PlayerEncounterExtensions.GetEncounteredBattleOrNull())) return true;
+        if (HasLeaderParties(PlayerEncounter.Current.GetEncounteredBattleOrNull())) return true;
 
         __result = false;
-        if (args != null)
-        {
-            args.IsEnabled = false;
-            args.Tooltip = BattleModeEncounterOptionsPatch.BattleNotReadyTooltip;
-        }
+        args.IsEnabled = false;
+        args.Tooltip = BattleModeEncounterOptionsPatch.BattleNotReadyTooltip;
         return false;
     }
 
@@ -47,11 +44,7 @@ internal class RaidJoinEncounterConditionPatch
     [HarmonyPostfix]
     private static void Postfix(MethodBase __originalMethod, MenuCallbackArgs args, ref bool __result)
     {
-        var mapEvent = PlayerEncounterExtensions.GetEncounteredBattleOrNull();
-        if (mapEvent == null)
-            return;
-
-        if (!mapEvent.IsActiveSlowVillageRaid())
+        if (!PlayerEncounter.Current.GetEncounteredBattleOrNull().IsActiveSlowVillageRaid())
             return;
 
         if (!RaidJoinEncounterPatch.TryGetJoinSide(__originalMethod, out var side) ||
@@ -81,7 +74,7 @@ internal class RaidJoinEncounterPatch
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         if (ModInformation.IsServer) return true;
 
-        var mapEvent = PlayerEncounter.EncounteredBattle;
+        var mapEvent = PlayerEncounter.Current.GetEncounteredBattleOrNull();
         var mainParty = MobileParty.MainParty?.Party;
         if (!mapEvent.IsRaidHostileAction() || mainParty == null)
             return true;

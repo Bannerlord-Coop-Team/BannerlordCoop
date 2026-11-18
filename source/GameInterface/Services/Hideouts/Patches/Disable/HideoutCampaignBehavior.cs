@@ -146,7 +146,7 @@ internal class HideoutCampaignBehaviorPatch
 
     private static bool CanJoinHideout(MenuCallbackArgs args)
     {
-        var battle = Settlement.CurrentSettlement?.Party.MapEvent ?? PlayerEncounterExtensions.GetEncounteredBattleOrNull();
+        var battle = Settlement.CurrentSettlement?.Party.MapEvent ?? PlayerEncounter.Current.GetEncounteredBattleOrNull();
         args.optionLeaveType = GameMenuOption.LeaveType.Mission;
         args.IsEnabled = Hero.MainHero?.IsWounded == false;
         return battle?.EventType == MapEvent.BattleTypes.Hideout && !battle.IsFinalized &&
@@ -267,7 +267,7 @@ internal class HideoutJoinEncounterOptionsPatch
     {
         if (ModInformation.IsServer) return true;
 
-        var battle = PlayerEncounterExtensions.GetEncounteredBattleOrNull();
+        var battle = PlayerEncounter.Current.GetEncounteredBattleOrNull();
         if (battle == null || !battle.IsHideoutBattle) return true;
 
         // Hideouts join through the shared troop selection.

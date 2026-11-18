@@ -37,10 +37,13 @@ public static class PlayerEncounterExtensions
     /// Null safe copy of native <see cref="PlayerEncounter.EncounteredBattle"/>, which throws while an encounter is
     /// still being set up and after it closes.
     /// </summary>
-    public static MapEvent GetEncounteredBattleOrNull()
+    public static MapEvent GetEncounteredBattleOrNull(this PlayerEncounter playerEncounter)
     {
-        var party = PlayerEncounter.Current?._encounteredParty;
-        return party?.MapEvent ??
-            (party?.IsSettlement == true ? party.SiegeEvent?.BesiegerCamp?.LeaderParty?.MapEvent : null);
+        var party = playerEncounter?._encounteredParty;
+        if (party == null) return null;
+        if (party.MapEvent != null) return party.MapEvent;
+        if (!party.IsSettlement) return null;
+
+        return party.SiegeEvent?.BesiegerCamp?.LeaderParty?.MapEvent;
     }
 }

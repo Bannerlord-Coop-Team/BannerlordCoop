@@ -127,12 +127,9 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
             return true;
 
         var encounter = PlayerEncounter.Current;
-        var battle = GetPlayerEncounterBattle();
-        var encounteredBattle = PlayerEncounterExtensions.GetEncounteredBattleOrNull();
         if (encounter?._mapEvent == mapEvent ||
             encounter?.BattleSimulation?.MapEvent == mapEvent ||
-            battle == mapEvent ||
-            encounteredBattle == mapEvent)
+            encounter.GetEncounteredBattleOrNull() == mapEvent)
             return true;
 
         var party = mainParty.Party;
@@ -229,18 +226,6 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
         return PlayerEncounter.Current != null ||
                Campaign.Current?.CurrentMenuContext != null ||
                mapState?.AtMenu == true;
-    }
-
-    private static MapEvent GetPlayerEncounterBattle()
-    {
-        try
-        {
-            return PlayerEncounter.Battle;
-        }
-        catch (NullReferenceException)
-        {
-            return null;
-        }
     }
 
     private void ForceCloseCurrentEncounterMenu()
