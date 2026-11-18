@@ -8,6 +8,7 @@ using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
+using GameInterface.Services.MapEvents.Participation;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.ObjectManager;
@@ -54,6 +55,7 @@ internal class BattleSimulationRunHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly IMapEventLogger mapEventLogger;
     private readonly IPlayerManager playerManager;
+    private readonly IRetreatedMapEventPartyTracker retreatedPartyTracker;
 
     private sealed class ActiveSimulation
     {
@@ -71,13 +73,15 @@ internal class BattleSimulationRunHandler : IHandler
         INetwork network,
         IObjectManager objectManager,
         IMapEventLogger mapEventLogger,
-        IPlayerManager playerManager)
+        IPlayerManager playerManager,
+        IRetreatedMapEventPartyTracker retreatedPartyTracker)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.mapEventLogger = mapEventLogger;
         this.playerManager = playerManager;
+        this.retreatedPartyTracker = retreatedPartyTracker;
 
         messageBroker.Subscribe<RequestAdvanceBattleSimulation>(Handle_RequestAdvanceBattleSimulation);
         messageBroker.Subscribe<RequestCancelBattleSimulation>(Handle_RequestCancelBattleSimulation);
@@ -210,6 +214,9 @@ internal class BattleSimulationRunHandler : IHandler
                     PreviousObserver = previousObserver,
                 };
             }
+
+            // Simulating is fighting the battle again, so an earlier mission retreat must not cost the requester the loot.
+            retreatedPartyTracker.MarkReentered(mapEvent, attackerParty.Party);
             setupAccepted = true;
         }, blocking: true, context: nameof(Handle_NetworkBattleStartRequest));
 

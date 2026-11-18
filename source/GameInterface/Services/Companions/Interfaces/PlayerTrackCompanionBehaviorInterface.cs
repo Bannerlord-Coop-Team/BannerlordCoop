@@ -1,5 +1,4 @@
 ﻿using Common.Messaging;
-using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.UI.Notifications.Messages;
@@ -18,6 +17,7 @@ public interface IPlayerTrackCompanionBehaviorInterface : IGameAbstraction
     void CompanionAdded(Hero companion);
     void CompanionRemoved(Hero companion);
     void OnMobilePartyCreated(MobileParty mobileParty);
+    void OnHeroJoinedParty(Hero hero, MobileParty party);
 }
 
 public class PlayerTrackCompanionBehaviorInterface : IPlayerTrackCompanionBehaviorInterface
@@ -41,7 +41,7 @@ public class PlayerTrackCompanionBehaviorInterface : IPlayerTrackCompanionBehavi
 
     public void OnHeroTeleportationRequested(Hero hero, MobileParty party, TeleportationDetail detail)
     {
-        if (!hero.IsPlayerCompanion || !party.IsPlayerParty()) return;
+        if (!hero.IsPlayerCompanion || !playerManager.Contains(party)) return;
 
         if (detail != TeleportationDetail.DelayedTeleportToParty) return;
 
@@ -62,8 +62,6 @@ public class PlayerTrackCompanionBehaviorInterface : IPlayerTrackCompanionBehavi
 
     public void SettlementEntered(MobileParty party, Settlement settlement)
     {
-        if (!party.IsPlayerParty()) return;
-
         if (!playerManager.TryGetPlayer(party, out var player)) return;
 
         foreach (var companionHeroId in sessionScatteredCompanionsInterface.GetScatteredCompanions(player.HeroId))
@@ -99,6 +97,16 @@ public class PlayerTrackCompanionBehaviorInterface : IPlayerTrackCompanionBehavi
         if (!mobileParty.LeaderHero.IsPlayerCompanion) return;
 
         if (!objectManager.TryGetIdWithLogging(mobileParty.LeaderHero, out var companionHeroId)) return;
+
+        sessionScatteredCompanionsInterface.RemoveScatteredCompanion(companionHeroId);
+    }
+
+    // A scattered companion that joins a player's party is no longer scattered, as vanilla does for the main party.
+    public void OnHeroJoinedParty(Hero hero, MobileParty party)
+    {
+        if (!playerManager.Contains(party)) return;
+
+        if (!objectManager.TryGetIdWithLogging(hero, out var companionHeroId)) return;
 
         sessionScatteredCompanionsInterface.RemoveScatteredCompanion(companionHeroId);
     }

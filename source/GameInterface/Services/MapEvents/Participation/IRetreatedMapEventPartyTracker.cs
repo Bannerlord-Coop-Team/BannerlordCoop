@@ -7,6 +7,7 @@ namespace GameInterface.Services.MapEvents.Participation;
 public interface IRetreatedMapEventPartyTracker
 {
     void MarkRetreated(MapEvent mapEvent, PartyBase party);
+    /// <summary>Clears the mark when the party fights again, by re-entering the mission or starting a simulation.</summary>
     void MarkReentered(MapEvent mapEvent, PartyBase party);
     bool IsRetreated(MapEvent mapEvent, PartyBase party);
     void Clear(MapEvent mapEvent);

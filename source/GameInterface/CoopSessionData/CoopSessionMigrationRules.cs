@@ -57,6 +57,8 @@ internal static class CoopSessionMigrationRules
 
         PreserveWithMigration.Add(AccessTools.Property(typeof(ViewDataPlayerData), nameof(ViewDataPlayerData.PlayerViewData)));
 
+        PreserveWithMigration.Add(AccessTools.Property(typeof(HeroMeetingData), nameof(HeroMeetingData.PlayerLastMeetingTimes)));
+
         /// Define fields that should have their data cleared
         ClearWithMigration.Add(AccessTools.Property(typeof(CaravansPlayerData), nameof(CaravansPlayerData.PlayerTradeRumorTakenCaravans)));
 
@@ -72,8 +74,6 @@ internal static class CoopSessionMigrationRules
         ClearWithMigration.Add(AccessTools.Property(typeof(TradePlayerData), nameof(TradePlayerData.PlayerTradeRumors)));
         ClearWithMigration.Add(AccessTools.Property(typeof(TradePlayerData), nameof(TradePlayerData.PlayerEnteredSettlements)));
         ClearWithMigration.Add(AccessTools.Property(typeof(TradePlayerData), nameof(TradePlayerData.PlayerSettlementBribePaid)));
-
-        ClearWithMigration.Add(AccessTools.Property(typeof(HeroMeetingData), nameof(HeroMeetingData.PlayerLastMeetingTimes)));
 
         ClearWithMigration.Add(AccessTools.Property(typeof(AgingPlayerData), nameof(AgingPlayerData.PlayerIsIllDays)));
         ClearWithMigration.Add(AccessTools.Property(typeof(AgingPlayerData), nameof(AgingPlayerData.PlayerSuccessions)));
