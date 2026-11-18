@@ -62,10 +62,9 @@ public class PartySailCommands
             if (!party.HasNavalNavigationCapability || !party.Anchor.IsAtSettlement(port))
                 return Failed($"{party.StringId} has no ships anchored at {port.StringId}.");
 
-            // Same two calls ServerSettlementExitEnterHandler makes when a party sets sail, without its leave reply and encounter-leave event.
+            // Same call ServerSettlementExitEnterHandler makes when a party sets sail, without its leave reply and encounter-leave event.
             // The replicated leave also closes the owner's port menu.
-            settlementInterface.PartyLeaveSettlement(party);
-            settlementInterface.PartySetSail(party, port);
+            settlementInterface.PartyLeaveAndSetSail(party);
 
             return Succeeded($"{party.StringId} set sail from {port.StringId} with {party.Ships.Count} ship(s).");
         }

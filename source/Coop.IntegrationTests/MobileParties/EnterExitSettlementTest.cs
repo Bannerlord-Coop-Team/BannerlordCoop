@@ -511,8 +511,8 @@ namespace Coop.IntegrationTests.MobileParties
                 Assert.Single(client1.NetworkSentMessages.GetMessages<NetworkRequestEndSettlementEncounter>()).LeaveType);
 
             var serverSettlementInterface = TestEnvironment.Server.Resolve<Mock<ISettlementInterface>>();
-            serverSettlementInterface.Verify(s => s.PartyLeaveSettlement(party), Times.Once);
-            serverSettlementInterface.Verify(s => s.PartySetSail(party, settlement), Times.Once);
+            serverSettlementInterface.Verify(s => s.PartyLeaveAndSetSail(party), Times.Once);
+            serverSettlementInterface.Verify(s => s.PartyLeaveSettlement(party), Times.Never);
             serverSettlementInterface.Verify(s => s.PartyDisembark(party, settlement), Times.Never);
         }
 
@@ -537,7 +537,7 @@ namespace Coop.IntegrationTests.MobileParties
             Assert.Equal(SettlementLeaveType.Disembark,
                 Assert.Single(client1.NetworkSentMessages.GetMessages<NetworkRequestEndSettlementEncounter>()).LeaveType);
             Assert.Equal(new[] { "disembark", "leave" }, calls);
-            serverSettlementInterface.Verify(s => s.PartySetSail(party, settlement), Times.Never);
+            serverSettlementInterface.Verify(s => s.PartyLeaveAndSetSail(party), Times.Never);
         }
 
         private void RegisterPartyForClient(
