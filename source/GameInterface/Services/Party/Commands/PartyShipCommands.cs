@@ -75,11 +75,12 @@ public class PartyShipCommands
             // Like vanilla's naval.add_ship cheat, otherwise production leaves a first fleet unanchored and the port shows no shipyard
             var mobileParty = party.MobileParty;
             var port = mobileParty?.CurrentSettlement;
-            if (port != null && port.HasPort && !mobileParty.IsCurrentlyAtSea && !mobileParty.Anchor.IsValid)
+            var isFirstFleetInPort = port != null && port.HasPort && !mobileParty.IsCurrentlyAtSea && !mobileParty.Anchor.IsValid;
+            if (isFirstFleetInPort)
                 mobileParty.Anchor.Settlement = port;
 
             var shipId = DescribeId(objectManager, ship);
-            var anchor = mobileParty?.Anchor?.Settlement?.StringId ?? "none";
+            var anchor = mobileParty?.Anchor.Settlement?.StringId ?? "none";
             Logger.Information("Added {HullId} ship {ShipId} to party {PartyId} (asked for {Query}), fleet anchored at {Anchor}",
                 hullId, shipId, party.Id, args[0], anchor);
             return Succeeded($"Added {hullId} {shipId} to {party.Id} (ships={party.Ships.Count}, anchor={anchor}).");
@@ -287,16 +288,18 @@ public class PartyShipCommands
         }
     }
 
-    // One line per party: its id and ship count, then each ship's registry id, hit points, sail hit points, owner and unlocked pieces.
+    // One line per party: its id and ship count, then each ship.
     private static string DescribeFleet(IObjectManager objectManager, PartyBase party)
     {
-        var ships = party.Ships
-            .Select(ship => $"{DescribeId(objectManager, ship)} hp={ship.HitPoints:0.#}/{ship.MaxHitPoints:0} " +
-                $"sail={ship.SailHitPoints:0.#}/{ship.MaxSailHitPoints:0} owner={ship.Owner?.Id ?? "none"} " +
-                $"can_unlock={ship.CanHaveUnlockedPieces} unlocked={ship.UnlockedUpgradePieces?.Count ?? 0}")
-            .ToArray();
+        var ships = party.Ships.Select(ship => DescribeShip(objectManager, ship)).ToArray();
         return $"{party.Id} ships={ships.Length}" + (ships.Length == 0 ? "" : ": " + string.Join(", ", ships));
     }
+
+    // A ship's registry id, hit points, sail hit points, owner and unlocked upgrade pieces.
+    private static string DescribeShip(IObjectManager objectManager, Ship ship) =>
+        $"{DescribeId(objectManager, ship)} hp={ship.HitPoints:0.#}/{ship.MaxHitPoints:0} " +
+        $"sail={ship.SailHitPoints:0.#}/{ship.MaxSailHitPoints:0} owner={ship.Owner?.Id ?? "none"} " +
+        $"can_unlock={ship.CanHaveUnlockedPieces} unlocked={ship.UnlockedUpgradePieces?.Count ?? 0}";
 #endif
 
     // A controller id names the player's party; any other id is a registered MobileParty or PartyBase, a campaign party id,
