@@ -152,7 +152,7 @@ public class HitWeaponHeroOnlyTests : MissionTestEnvironment
     [Fact]
     public void NetworkTroopScoreHit_RoundTripsNullWeapon()
     {
-        var original = new NetworkTroopScoreHit("party", "attacker", "victim", damage: 30, isFatal: true, isSimulatedHit: false, attackerWeapon: null);
+        var original = new NetworkTroopScoreHit("party", "attacker", "victim", damage: 30, isFatal: true, isSimulatedHit: false, attackerWeapon: null, captainId: null);
 
         var result = RoundTrip(original);
 
@@ -269,7 +269,8 @@ public class HitWeaponHeroOnlyTests : MissionTestEnvironment
             damage: 30,
             isFatal: true,
             isSimulatedHit: false,
-            new WeaponComponentData(null, weaponClass, default)));
+            new WeaponComponentData(null, weaponClass, default),
+            captain: null));
     }
 
     private void PublishHitReward(EnvironmentInstance client, Battle battle, bool attackerIsHero, WeaponClass weaponClass)

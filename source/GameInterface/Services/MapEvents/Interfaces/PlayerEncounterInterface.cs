@@ -36,10 +36,6 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
 
     private readonly ISiegeEventInterface siegeEventInterface;
 
-    public PlayerEncounterInterface() : this(null)
-    {
-    }
-
     public PlayerEncounterInterface(ISiegeEventInterface siegeEventInterface)
     {
         this.siegeEventInterface = siegeEventInterface;
@@ -160,7 +156,6 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
 
     private void EndPlayerEncounter(PlayerEncounter playerEncounter)
     {
-        //playerEncounter.DoEnd(); // Default implementation's function. Might have some logic we need later
         playerEncounter._stateHandled = true;
 
         // a won siege's leader gets the aftermath choice and an army member the leader's pick, like vanilla DoEnd

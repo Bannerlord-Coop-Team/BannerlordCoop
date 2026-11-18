@@ -96,6 +96,14 @@
     // false: Auto pause is disabled. The game will still automatically pause for clients catching up and when there are no players online.
     "autoPauseEnabled": true,
 
+    // Toggle players being able to pause or change the game speed
+    // (Default) true: Any player can pause, play or fast forward.
+    // false: Only the host (the server console or the dedicated server manager) can pause or change the speed.
+    // The game still pauses by itself when players join or catch up, when nobody is online and for auto pause.
+    // Players can't resume those pauses themselves. The pauses for catching up and auto pause end on their own,
+    // but after the pause for nobody online the host has to start the game again.
+    "allowClientTimeControls": true,
+
     // Toggle clients being able to use cheats
     // Vanilla bannerlord commands are always disabled on clients but this disables cheating in troops, equipment, teleporting etc.
     // Default is false.
@@ -200,9 +208,9 @@
 
     // How long a lord remembers refusing to defect to your kingdom.
     // Vanilla records each failed persuasion and refuses that lord until the
-    // record expires after one in-game year. Only the machine that ran the
+    // refusal cools down after one in-game season. Only the machine that ran the
     // conversation records it, so co-op has to decide what a client's list means.
-    // (Default) "Vanilla":     a refusal blocks that lord for one in-game year, as in singleplayer.
+    // (Default) "Vanilla":     a refusal blocks that lord for one in-game season, as in singleplayer.
     // "NeverExpire": a refusal blocks that lord for the rest of the session.
     // "AlwaysRetry": a refusal never blocks; you can ask the same lord again straight away.
     "lordDefectionRetries": "Vanilla",
@@ -245,6 +253,20 @@
     // (Default) []: The first player to finish loading hosts the battle.
     // e.g. ["76561198000000001", "76561198000000002"]
     "preferredBattleHosts": [],
+
+    // Stop a player caught by an enemy player from leaving.
+    // (Default) false: The caught player can pick "I must leave now." whenever the meeting offers it.
+    // true: When the two players' factions are at war as the meeting starts, the caught player isn't offered "I must leave now." and the server ignores it.
+    // A trade can still be cancelled, and Leave comes back if the two make peace during the meeting, except while answering a hostile demand, which never offers Leave.
+    // If the other player then does nothing for 30 seconds (or pvpResponseTimerSeconds when set), the caught player goes free.
+    "pvpBlockLeave": false,
+
+    // Set how many real seconds a player has to answer in a meeting with another player.
+    // (Default) 0: Off. A player can wait as long as they like, except that with pvpBlockLeave on a caught player goes free after the other player does nothing for 30 seconds.
+    // Above 0: A caught player who doesn't answer a demand in time gets the battle, as if they picked refuse, while the two are at war.
+    // Any other unanswered meeting just ends, so the timer never starts a war. A player who caught someone and does nothing for this long lets them go.
+    // Values from 1 to 9 count as 10. The time starts again after every answer. Trades are never timed.
+    "pvpResponseTimerSeconds": 0,
 
     // Toggle War Sails (NavalDLC) co-op on a dedicated server. War Sails is not officially supported yet.
     // Only the dedicated server reads this. Hosting in game and joining follow the launcher's NavalDLC setting.

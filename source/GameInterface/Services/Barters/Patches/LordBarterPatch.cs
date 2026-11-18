@@ -118,8 +118,8 @@ internal static class LordBarterPatch
     // client-side (GainRawXpPatch/SetSkillXpPatch/ChangeSkillLevelPatch) and the server never runs
     // the dialogue, so it was simply lost. Ship the per-attempt outcomes so the server can award it.
     //
-    // Vanilla re-awards every surviving successful attempt against this lord (the list is only pruned
-    // after an in-game year), so we reproduce that rather than sending just this conversation's - but
+    // Vanilla re-awards every surviving successful attempt against this lord (the list keeps them until
+    // the lord defects), so we reproduce that rather than sending just this conversation's - but
     // cap it, because the list is client-owned. 8 = one clean conversation's 4 reservation types,
     // doubled.
     internal const int MaxDefectionPersuasionOutcomes = 8;

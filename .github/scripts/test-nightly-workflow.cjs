@@ -50,26 +50,13 @@ function actionsApi(runs) {
   } } };
 }
 
-test('the late 11-03 run does not republish over dispatch 41615577213', async () => {
-  const github = actionsApi([published]);
-  const { outputs } = await runScript('Keep a late scheduled nightly from overwriting a published one', {
-    github, process: { env: { RELEASE_DATE: '2026-11-02' } },
-  });
-  assert.equal(outputs.should_publish, 'false');
-  assert.equal(github.calls[0].status, undefined);
-});
-
-test('both listings ignore incomplete or unsuccessful runs locally', async () => {
+test('the previous client lookup ignores incomplete or unsuccessful runs locally', async () => {
   const runs = [
     { ...published, id: 1, status: 'in_progress', conclusion: null },
     { ...published, id: 2, conclusion: 'failure' },
     { ...published, id: 3, conclusion: 'cancelled' },
   ];
   const github = actionsApi(runs);
-  const { outputs } = await runScript('Keep a late scheduled nightly from overwriting a published one', {
-    github, process: { env: { RELEASE_DATE: '2026-11-02' } },
-  });
-  assert.equal(outputs.should_publish, 'true');
   const previous = await runScript('Find previous nightly commit', { github });
   assert.equal(previous.result, '');
   assert.deepEqual(github.jobIds, []);
@@ -92,7 +79,7 @@ async function resolveDate(now, requested = '') {
   });
 }
 
-test('the guard resolves calendar dates across spring forward and the Central cutoff', async () => {
+test('prepare resolves calendar dates across spring forward and the Central cutoff', async () => {
   for (const [now, expected] of [
     ['2026-03-09T05:30:00Z', '2026-03-08'],
     ['2026-11-06T05:56:59Z', '2026-11-04'],
@@ -106,11 +93,42 @@ test('the guard resolves calendar dates across spring forward and the Central cu
   await assert.rejects(resolveDate('2026-03-09T05:30:00Z', '03/08/2026'), /YYYY-MM-DD/);
 });
 
-test('build metadata uses the guard date even if the build crosses another cutoff', async () => {
+const coopSha = 'c'.repeat(40);
+
+test('a publishing run refuses coop_ref before resolving it', async () => {
+  const github = { rest: { repos: { getCommit: async () => { throw new Error('coop_ref was resolved'); } } } };
+  await assert.rejects(runScript('Resolve Coop commit', {
+    github,
+    process: { env: { COOP_REF: 'development', PUBLISH: 'true' } },
+    context: { sha: coopSha, repo: { owner: 'owner', repo: 'repo' } },
+  }), /only builds in a dry run/);
+});
+
+async function resolveGameVersion(csproj) {
+  async function getContent({ path: file, ref }) {
+    assert.deepEqual([file, ref], ['source/Coop/Coop.csproj', coopSha]);
+    return { data: { content: Buffer.from(csproj).toString('base64') } };
+  }
+  return runScript("Resolve the commit's game version", {
+    github: { rest: { repos: { getContent } } },
+    Buffer,
+    process: { env: { COOP_SHA: coopSha } },
+    context: { repo: { owner: 'owner', repo: 'repo' } },
+  });
+}
+
+test('the game version is read from the real Coop project file', async () => {
+  const csproj = fs.readFileSync(path.join(__dirname, '../../source/Coop/Coop.csproj'), 'utf8');
+  const { outputs } = await resolveGameVersion(csproj);
+  assert.match(outputs.game_version, /^v\d+\.\d+\.\d+$/);
+  await assert.rejects(resolveGameVersion('<Project></Project>'), /no vX\.Y\.Z GameVersion/);
+});
+
+test('build metadata uses the prepared date even if the build crosses another cutoff', async () => {
   const { outputs } = await resolveDate('2026-03-09T05:30:00Z');
   assert.match(workflow, /release_date: \$\{\{ steps\.due\.outputs\.release_date \}\}/);
   const build = step('Build release metadata');
-  assert.match(build, /RELEASE_DATE: \$\{\{ needs\.guard\.outputs\.release_date \}\}/);
+  assert.match(build, /RELEASE_DATE: \$\{\{ needs\.prepare\.outputs\.release_date \}\}/);
   const shell = build.split('        run: |\n')[1].replace(/^ {10}/gm, '');
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'nightly-date-'));
   const output = path.join(temp, 'output');
@@ -119,7 +137,7 @@ test('build metadata uses the guard date even if the build crosses another cutof
     const result = spawnSync(bash, ['-c', `date() { echo 'build must not resolve the date again' >&2; return 1; }\ngit() { printf '%s\\n' "$GITHUB_SHA"; }\n${shell}`], {
       encoding: 'utf8', windowsHide: true,
       env: { ...process.env, RELEASE_DATE: outputs.release_date, PREVIOUS_SHA: '',
-        GITHUB_SHA: published.head_sha, GITHUB_OUTPUT: output.replaceAll('\\', '/') },
+        GITHUB_SHA: published.head_sha, COOP_SHA: published.head_sha, GITHUB_OUTPUT: output.replaceAll('\\', '/') },
     });
     assert.equal(result.status, 0, result.stderr || String(result.error));
     const values = Object.fromEntries(fs.readFileSync(output, 'utf8').trim().split('\n').map((line) => line.split('=')));
