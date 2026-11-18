@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using Coop.Naval.CoopSession.Interfaces;
 using Coop.Naval.CoopSession.Messages;
+using Coop.Naval.PortScreen.Interfaces;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.NavalDLC;
 using GameInterface.Services.NavalDLC.Messages;
@@ -25,6 +26,7 @@ internal class NavalInitializationHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly ISessionNavalPlayerDataInterface sessionNavalPlayerDataInterface;
+    private readonly IPortMooringInterface portMooringInterface;
 
     private NavalPlayerData navalPlayerData;
 
@@ -32,12 +34,14 @@ internal class NavalInitializationHandler : IHandler
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
-        ISessionNavalPlayerDataInterface sessionNavalPlayerDataInterface)
+        ISessionNavalPlayerDataInterface sessionNavalPlayerDataInterface,
+        IPortMooringInterface portMooringInterface)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.sessionNavalPlayerDataInterface = sessionNavalPlayerDataInterface;
+        this.portMooringInterface = portMooringInterface;
 
         messageBroker.Subscribe<InitializeClientNavalData>(Handle);
         messageBroker.Subscribe<PlayerHeroChanged>(Handle);
@@ -65,6 +69,7 @@ internal class NavalInitializationHandler : IHandler
 
         Campaign.Current.UnlockedFigureheadsByMainHero = GetUnlockedFigureheads(playerHeroId);
         figureheadCampaignBehavior._lastFigureheadLootTime = GetLastFigureheadLootTime(playerHeroId);
+        portMooringInterface.KeepOnlyClanMooredShips(navalPlayerData, obj.What.NewHero.Clan);
 
         network.SendAll(new NetworkInitializeServerNavalDataKeys(playerHeroId));
     }

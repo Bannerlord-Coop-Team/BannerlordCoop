@@ -28,11 +28,16 @@ internal class PortScreenHandlerInterface : IPortScreenHandlerInterface
 {
     private readonly IPlayerMessageInterface playerMessageInterface;
     private readonly IPortTransactionPricer portTransactionPricer;
+    private readonly IPortMooringInterface portMooringInterface;
 
-    public PortScreenHandlerInterface(IPlayerMessageInterface playerMessageInterface, IPortTransactionPricer portTransactionPricer)
+    public PortScreenHandlerInterface(
+        IPlayerMessageInterface playerMessageInterface,
+        IPortTransactionPricer portTransactionPricer,
+        IPortMooringInterface portMooringInterface)
     {
         this.playerMessageInterface = playerMessageInterface;
         this.portTransactionPricer = portTransactionPricer;
+        this.portMooringInterface = portMooringInterface;
     }
 
     public void OnConfirmChanges(PortScreenMode mode, PortScreenChanges changes)
@@ -70,6 +75,12 @@ internal class PortScreenHandlerInterface : IPortScreenHandlerInterface
 
             ChangeShipOwnerAction.ApplyByTrade(changes.RightOwner, ship);
         }
+        foreach (Ship ship in changes.ShipsToRetrieveFromStash)
+        {
+            if (portMooringInterface.TryRetrieveShip(changes.MainHero, changes.MainParty, changes.LeftOwner.Settlement, ship)) continue;
+
+            playerMessageInterface.SendInformationMessageToHero(changes.MainHero, $"The {ship.Name} could not be taken back from {changes.LeftOwner.Settlement}.");
+        }
         foreach (Ship ship in changes.ShipsToRepair)
         {
             if (ship.Owner != changes.RightOwner) continue;
@@ -103,6 +114,12 @@ internal class PortScreenHandlerInterface : IPortScreenHandlerInterface
             shipFigureheadInfo.Ship.ChangeFigurehead(shipFigureheadInfo.Figurehead);
         }
         SendShipsToClan(changes, changes.RightOwner);
+        foreach (Ship ship in changes.ShipsToStash)
+        {
+            if (portMooringInterface.TryMoorShip(changes.MainHero, changes.MainParty, changes.LeftOwner.Settlement, ship)) continue;
+
+            playerMessageInterface.SendInformationMessageToHero(changes.MainHero, $"The {ship.Name} could not be moored at {changes.LeftOwner.Settlement}.");
+        }
         ResetAnchorIfNoShips(changes.MainParty);
         if (changes.MainParty.Ships.Count > 0 && !changes.MainParty.Anchor.IsValid && changes.LeftOwner.IsSettlement)
         {
