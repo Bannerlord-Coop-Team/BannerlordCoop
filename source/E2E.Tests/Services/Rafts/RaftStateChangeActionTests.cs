@@ -14,49 +14,38 @@ public class RaftStateChangeActionTests : SyncTestBase
 {
     private readonly string partyId;
 
-    /// <summary>Creates a registered party on every instance.</summary>
-    public RaftStateChangeActionTests(ITestOutputHelper output) : base(output)
-    {
-        partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
-    }
-
-    // A party loaded on a raft has its AI disabled everywhere, and landing must enable it on its owner, otherwise it never moves again
-    [Fact]
-    public void DeactivateRaftState_EnablesTheAiOnClients()
-    {
-        Server.Call(() =>
-        {
-            var party = Server.GetRegisteredObject<MobileParty>(partyId);
-            party.Ai.DisableAi();
-            party.IsInRaftState = true;
-        });
-        AssertClientsAiDisabled(true);
-
-        Server.Call(() => RaftStateChangeAction.DeactivateRaftStateForParty(Server.GetRegisteredObject<MobileParty>(partyId)));
-
-        AssertClientsAiDisabled(false);
-    }
-
-    // Starting a raft disables the AI, which the owner's client needs too so its orders are ignored like vanilla
-    [Fact]
-    public void ActivateRaftState_DisablesTheAiOnClients()
-    {
-        Server.Call(
-            () => RaftStateChangeAction.ActivateRaftStateForParty(Server.GetRegisteredObject<MobileParty>(partyId)),
-            RaftDisabledMethods);
-
-        AssertClientsAiDisabled(true);
-    }
-
     // Raft activation moves the party to the closest land, which needs the navigation mesh
     private static readonly MethodBase[] RaftDisabledMethods =
     {
         AccessTools.Method(typeof(MobileParty), nameof(MobileParty.MovePartyToTheClosestLand)),
     };
 
-    // Checks every client's copy of the party's AI against the expected disabled state.
-    private void AssertClientsAiDisabled(bool expected)
+    /// <summary>Creates a registered party on every instance.</summary>
+    public RaftStateChangeActionTests(ITestOutputHelper output) : base(output)
     {
+        partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+    }
+
+    // Starting a raft disables the AI so the owner's orders are ignored like vanilla, and landing must enable it again, otherwise it never moves
+    [Fact]
+    public void RaftState_ActivateThenDeactivate_SyncsTheAiEverywhere()
+    {
+        Server.Call(
+            () => RaftStateChangeAction.ActivateRaftStateForParty(Server.GetRegisteredObject<MobileParty>(partyId)),
+            RaftDisabledMethods);
+
+        AssertAiDisabledEverywhere(true);
+
+        Server.Call(() => RaftStateChangeAction.DeactivateRaftStateForParty(Server.GetRegisteredObject<MobileParty>(partyId)));
+
+        AssertAiDisabledEverywhere(false);
+    }
+
+    // Checks the server's and every client's copy of the party's AI against the expected disabled state.
+    private void AssertAiDisabledEverywhere(bool expected)
+    {
+        Server.Call(() => Assert.Equal(expected, Server.GetRegisteredObject<MobileParty>(partyId).Ai.IsDisabled));
+
         foreach (var client in Clients)
         {
             client.PumpGameThread();
