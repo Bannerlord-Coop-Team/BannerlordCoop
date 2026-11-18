@@ -11,8 +11,8 @@ using TaleWorlds.MountAndBlade;
 namespace Missions.Battles;
 
 /// <summary>
-/// [Game thread] Reports what the battle did to the campaign ship of each hull this client simulates: HP, sail HP, sinking and
-/// mitigated damage. Sinking goes out at once, other changes at most every 2 s; removals, results and mission end flush the rest.
+/// [Game thread] Reports what the battle did to the campaign ship of each hull this client simulates: HP, sail HP and sinking.
+/// Sinking goes out at once, other changes at most every 2 s; removals, results and mission end flush the rest.
 /// </summary>
 public interface IBattleShipFateReporter
 {

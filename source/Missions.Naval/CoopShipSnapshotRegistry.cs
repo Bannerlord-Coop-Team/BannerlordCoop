@@ -23,31 +23,19 @@ public interface ICoopShipSnapshotRegistry
 /// <summary>One per client container; the keys are weak, so a snapshot leaves with its mission.</summary>
 internal class CoopShipSnapshotRegistry : ICoopShipSnapshotRegistry
 {
-    private readonly ConditionalWeakTable<Ship, Entry> snapshots = new ConditionalWeakTable<Ship, Entry>();
+    private readonly ConditionalWeakTable<Ship, string> snapshots = new ConditionalWeakTable<Ship, string>();
 
     /// <inheritdoc/>
-    public void Add(Ship ship, string campaignShipId) => snapshots.Add(ship, new Entry(campaignShipId));
+    public void Add(Ship ship, string campaignShipId) => snapshots.Add(ship, campaignShipId);
 
     /// <inheritdoc/>
     public bool Contains(Ship ship) => ship != null && snapshots.TryGetValue(ship, out _);
 
     /// <inheritdoc/>
     public string CampaignShipIdOf(Ship ship) =>
-        ship != null && snapshots.TryGetValue(ship, out var entry) ? entry.CampaignShipId : null;
+        ship != null && snapshots.TryGetValue(ship, out var campaignShipId) ? campaignShipId : null;
 
     /// <summary>[Any thread] Whether the ship is a snapshot in the client container patches resolve from; false when none resolves.</summary>
     internal static bool IsSnapshotHere(Ship ship, out ICoopShipSnapshotRegistry snapshots) =>
         ContainerProvider.TryResolve(out snapshots) && snapshots.Contains(ship);
-
-    // What the weak table holds for one snapshot: its campaign ship's registry id.
-    private sealed class Entry
-    {
-        // Takes the campaign ship's registry id, null when the source had none.
-        public Entry(string campaignShipId)
-        {
-            CampaignShipId = campaignShipId;
-        }
-
-        public string CampaignShipId { get; }
-    }
 }

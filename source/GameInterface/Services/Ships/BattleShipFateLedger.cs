@@ -13,7 +13,6 @@ public interface IBattleShipFateLedger
 {
     /// <summary>
     /// Holds <paramref name="fate"/> unless the ship's held fate is newer by host epoch, then revision; a sunk ship stays sunk.
-    /// Its mitigated damage adds to the ship's total either way.
     /// </summary>
     void Record(string mapEventId, BattleShipFate fate, int hostEpoch, long revision);
 
