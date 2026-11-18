@@ -11,7 +11,6 @@ using Common.Serialization;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
-using GameInterface.Configuration;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.Bandits.Messages;
 using GameInterface.Services.Barters;
@@ -2378,158 +2377,6 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
 
         AssertHostileEncounterTornDown(client1, initiatorPartyId);
         AssertHostileEncounterTornDown(client2, responderPartyId);
-    }
-
-    [Fact]
-    public void PvpBlockLeave_AtWar_HidesAndIgnoresResponderLeave_UntilPeaceGivesItBack()
-    {
-        var (client1, client2, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
-        var (initiatorClanId, responderClanId) = MakePartiesHostile(initiatorPartyId, responderPartyId);
-
-        WithPvpRules(blockLeave: true, responseTimerSeconds: 0, () =>
-        {
-            var handler = Server.Resolve<PlayerPartyInteractionHandler>();
-            var start = DateTime.UtcNow;
-            Server.Call(() => handler.UtcNow = () => start);
-
-            RequestInteraction(client1, initiatorPartyId, responderPartyId);
-            var sessionId = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>().Single().SessionId;
-            var responderState = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>().Single(s => s.PartyId == responderPartyId);
-            Assert.Equal(PlayerPartyInteractionPhase.WaitingForProposal, responderState.Phase);
-            Assert.Empty(responderState.Options);
-
-            Server.NetworkSentMessages.Clear();
-            SubmitOption(client2, sessionId, responderPartyId, PlayerPartyInteractionOption.Leave);
-            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionEnded>());
-
-            Server.Call(() =>
-            {
-                Assert.True(Server.ObjectManager.TryGetObject<Clan>(initiatorClanId, out var initiatorClan));
-                Assert.True(Server.ObjectManager.TryGetObject<Clan>(responderClanId, out var responderClan));
-                MakePeaceAction.Apply(initiatorClan, responderClan);
-                handler.CheckPvpRules(start);
-            });
-            var peaceState = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>().Single();
-            Assert.Equal(responderPartyId, peaceState.PartyId);
-            Assert.Equal(PlayerPartyInteractionPhase.WaitingForProposal, peaceState.Phase);
-            Assert.Equal(new[] { PlayerPartyInteractionOption.Leave }, peaceState.Options);
-            Assert.Equal(new[] { PlayerPartyInteractionOption.Leave }, peaceState.EnabledOptions);
-
-            SubmitOption(client2, sessionId, responderPartyId, PlayerPartyInteractionOption.Leave);
-            Assert.Equal(
-                PlayerPartyInteractionOutcomeType.Left,
-                Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionEnded>().Single().OutcomeType);
-        });
-    }
-
-    [Theory]
-    [InlineData(true, false, false, 30, PlayerPartyInteractionOutcomeType.Left)]
-    [InlineData(true, true, false, 30, PlayerPartyInteractionOutcomeType.HostileDemandAccepted)]
-    [InlineData(false, true, false, 30, PlayerPartyInteractionOutcomeType.Left)]
-    [InlineData(true, false, true, 0, PlayerPartyInteractionOutcomeType.Left)]
-    public void PvpRules_EndMeetingNobodyAnswered_After30Seconds_WithBattleOnlyForADemandAtWar(
-        bool atWar,
-        bool demandConfirmed,
-        bool blockLeave,
-        int responseTimerSeconds,
-        PlayerPartyInteractionOutcomeType expectedOutcome)
-    {
-        var (client1, client2, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
-        if (atWar)
-            MakePartiesHostile(initiatorPartyId, responderPartyId);
-        else
-            AssignDistinctClans(initiatorPartyId, responderPartyId);
-
-        WithPvpRules(blockLeave, responseTimerSeconds, () =>
-        {
-            // Held, so every state stamp and the server's own tick read the same time.
-            var handler = Server.Resolve<PlayerPartyInteractionHandler>();
-            var start = DateTime.UtcNow;
-            Server.Call(() => handler.UtcNow = () => start);
-
-            RequestInteraction(client1, initiatorPartyId, responderPartyId);
-            var sessionId = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>().Single().SessionId;
-            if (demandConfirmed)
-            {
-                SubmitOption(client1, sessionId, initiatorPartyId, PlayerPartyInteractionOption.HostileDemand);
-                SubmitOption(client1, sessionId, initiatorPartyId, PlayerPartyInteractionOption.ConfirmHostileDemand);
-            }
-
-            SetMainParty(client1, initiatorPartyId);
-            SetMainParty(client2, responderPartyId);
-            Server.NetworkSentMessages.Clear();
-
-            Server.Call(() => handler.CheckPvpRules(start.AddSeconds(29)), MapEventDisabledMethods);
-            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionEnded>());
-
-            Server.Call(() => handler.CheckPvpRules(start.AddSeconds(30)), MapEventDisabledMethods);
-            Assert.Equal(expectedOutcome, Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionEnded>().Single().OutcomeType);
-            Assert.Equal(
-                expectedOutcome == PlayerPartyInteractionOutcomeType.HostileDemandAccepted ? 1 : 0,
-                Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyHostileEncounterStarted>().Count());
-            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkDeclareWar>());
-        });
-    }
-
-    [Fact]
-    public void PvpResponseTimer_StartsAgainAfterAnAnswer()
-    {
-        var (client1, client2, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
-        MakePartiesHostile(initiatorPartyId, responderPartyId);
-
-        WithPvpRules(blockLeave: false, responseTimerSeconds: 30, () =>
-        {
-            var handler = Server.Resolve<PlayerPartyInteractionHandler>();
-            var start = DateTime.UtcNow;
-            Server.Call(() => handler.UtcNow = () => start);
-
-            RequestInteraction(client1, initiatorPartyId, responderPartyId);
-            var sessionId = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>().Single().SessionId;
-            SetMainParty(client1, initiatorPartyId);
-            SetMainParty(client2, responderPartyId);
-
-            Server.Call(() => handler.UtcNow = () => start.AddSeconds(20));
-            SubmitOption(client1, sessionId, initiatorPartyId, PlayerPartyInteractionOption.HostileDemand);
-            SubmitOption(client1, sessionId, initiatorPartyId, PlayerPartyInteractionOption.ConfirmHostileDemand);
-            Server.NetworkSentMessages.Clear();
-
-            Server.Call(() => handler.CheckPvpRules(start.AddSeconds(30)), MapEventDisabledMethods);
-            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionEnded>());
-
-            Server.Call(() => handler.CheckPvpRules(start.AddSeconds(50)), MapEventDisabledMethods);
-            Assert.Equal(
-                PlayerPartyInteractionOutcomeType.HostileDemandAccepted,
-                Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionEnded>().Single().OutcomeType);
-        });
-    }
-
-    [Fact]
-    public void PvpRules_EndMeetingAsLeft_WhenAPartyNoLongerResolves()
-    {
-        var (client1, _, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
-        MakePartiesHostile(initiatorPartyId, responderPartyId);
-
-        WithPvpRules(blockLeave: true, responseTimerSeconds: 0, () =>
-        {
-            var handler = Server.Resolve<PlayerPartyInteractionHandler>();
-            var start = DateTime.UtcNow;
-            Server.Call(() => handler.UtcNow = () => start);
-
-            RequestInteraction(client1, initiatorPartyId, responderPartyId);
-            Server.NetworkSentMessages.Clear();
-
-            Server.Call(() =>
-            {
-                Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(responderPartyId, out var responderParty));
-                Assert.True(Server.ObjectManager.Remove(responderParty));
-                handler.CheckPvpRules(start);
-            });
-
-            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>());
-            Assert.Equal(
-                PlayerPartyInteractionOutcomeType.Left,
-                Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionEnded>().Single().OutcomeType);
-        });
     }
 
     [Fact]
@@ -6141,24 +5988,6 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
         });
 
         return (initiatorClanId, responderClanId);
-    }
-
-    private static void WithPvpRules(bool blockLeave, int responseTimerSeconds, Action test)
-    {
-        var previousOptions = ModConfigProvider.ModOptions;
-        ModConfigProvider.ModOptions = new ModOptions(new ModOptionsData
-        {
-            PvpBlockLeave = blockLeave,
-            PvpResponseTimerSeconds = responseTimerSeconds,
-        });
-        try
-        {
-            test();
-        }
-        finally
-        {
-            ModConfigProvider.ModOptions = previousOptions;
-        }
     }
 
     private static void InvokeAddBarterGroups(BarterData barterData)

@@ -3,7 +3,6 @@ using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.MapEvents.Data;
 using GameInterface.Services.TroopRosters.Data;
 using LiteNetLib;
-using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 
@@ -45,19 +44,9 @@ internal sealed class PlayerPartyInteractionSession
     public PlayerPartyMarriageOfferData[] InitiatorOfferedMarriages { get; set; } = System.Array.Empty<PlayerPartyMarriageOfferData>();
     public PlayerPartyMarriageOfferData[] ResponderOfferedMarriages { get; set; } = System.Array.Empty<PlayerPartyMarriageOfferData>();
     public Kingdom TargetKingdom { get; set; }
-    // When either player was last sent a state, the pvpResponseTimerSeconds clock counts from here.
-    public DateTime StateChangedUtc { get; set; }
-    // Whether pvpBlockLeave took Leave out of the responder's last state.
-    public bool IsLeaveHidden { get; set; }
 
     public HashSet<PlayerPartyInteractionOption> InitiatorOptions { get; } = new HashSet<PlayerPartyInteractionOption>();
     public HashSet<PlayerPartyInteractionOption> InitiatorEnabledOptions { get; } = new HashSet<PlayerPartyInteractionOption>();
-    // A record of the responder's last state as built, Leave included, so peace can send it again with Leave back.
-    // Not what the responder may pick, because a Leave that pvpBlockLeave hid is still in it.
-    public PlayerPartyInteractionPhase LastResponderPhase { get; private set; }
-    public PlayerPartyInteractionProposal LastResponderProposal { get; private set; }
-    public HashSet<PlayerPartyInteractionOption> LastResponderOptions { get; } = new HashSet<PlayerPartyInteractionOption>();
-    public HashSet<PlayerPartyInteractionOption> LastResponderEnabledOptions { get; } = new HashSet<PlayerPartyInteractionOption>();
 
     public PlayerPartyInteractionSession(
         string sessionId,
@@ -88,36 +77,6 @@ internal sealed class PlayerPartyInteractionSession
 
     public bool IsInitiator(string partyId)
         => partyId == InitiatorPartyId;
-
-    // The responder has a proposal to answer, so the server takes their answer and the timer waits on them.
-    public bool IsResponderTurn()
-    {
-        switch (Proposal)
-        {
-            case PlayerPartyInteractionProposal.None:
-                return false;
-            case PlayerPartyInteractionProposal.HostileDemand:
-                return HostileDemandConfirmed;
-            case PlayerPartyInteractionProposal.Mercenary:
-                return MercenaryConfirmed;
-            default:
-                return true;
-        }
-    }
-
-    public void RecordResponderState(
-        PlayerPartyInteractionPhase phase,
-        PlayerPartyInteractionProposal proposal,
-        PlayerPartyInteractionOption[] options,
-        PlayerPartyInteractionOption[] enabledOptions)
-    {
-        LastResponderPhase = phase;
-        LastResponderProposal = proposal;
-        LastResponderOptions.Clear();
-        LastResponderOptions.UnionWith(options);
-        LastResponderEnabledOptions.Clear();
-        LastResponderEnabledOptions.UnionWith(enabledOptions);
-    }
 
     public void SetTradeOffer(
         string partyId,

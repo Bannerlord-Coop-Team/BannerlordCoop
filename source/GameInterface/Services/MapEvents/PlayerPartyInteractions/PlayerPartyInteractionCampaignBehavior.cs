@@ -81,19 +81,6 @@ public class PlayerPartyInteractionCampaignBehavior : CampaignBehaviorBase
             PlayerPartyDialogPriority,
             null);
 
-        // pvpBlockLeave can leave a waiting responder with no answer, and a click on a dialog without answers
-        // continues it, which ends the conversation unless a partner line follows.
-        starter.AddDialogLine(
-            "coop_player_party_interaction_responder_wait_line",
-            ResponderToken,
-            ResponderToken,
-            "{=coop_player_party_interaction_responder}{COOP_PLAYER_PARTY_INTERACTION_TEXT}",
-            () => IsPhase(PlayerPartyInteractionPhase.WaitingForProposal) &&
-                  !PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.Leave),
-            null,
-            PlayerPartyDialogPriority,
-            null);
-
         starter.AddDialogLine(
             "coop_player_party_interaction_initiator_wait_line",
             InitiatorWaitToken,

@@ -1216,34 +1216,4 @@
       </EquipmentRoster>
     </Equipments>
   </NPCCharacter>
-  <NPCCharacter
-    id="coop_fixed_npc_dbfb78b5"
-    name="{=!}Almus"
-    default_group="Infantry"
-    level="1"
-    is_female="false"
-    is_hero="false"
-    is_template="false"
-    occupation="Townsfolk"
-    culture="Culture.khuzait"
-    is_hidden_encyclopedia="true"
-    coop_settlement="town_K3"
-    coop_location="tavern"
-    coop_spawn_tag="npc_common"
-    coop_dialogue="MujjOO&apos;nun Mekanına Hoş Geldin."
-    coop_enabled="true">
-    <face>
-      <face_key_template value="BodyProperty.townsman_khuzait" />
-    </face>
-    <skills />
-    <Equipments>
-      <EquipmentRoster civilian="true">
-        <equipment slot="Head" id="Item.segmented_skullcap_over_padded_cloth" />
-        <equipment slot="Cape" id="Item.empire_cape_a" />
-        <equipment slot="Body" id="Item.aserai_archer_armor" />
-        <equipment slot="Gloves" id="Item.lordly_padded_mitten" />
-        <equipment slot="Leg" id="Item.strapped_mail_chausses" />
-      </EquipmentRoster>
-    </Equipments>
-  </NPCCharacter>
 </NPCCharacters>
