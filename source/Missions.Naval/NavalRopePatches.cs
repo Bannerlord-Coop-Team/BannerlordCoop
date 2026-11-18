@@ -11,6 +11,7 @@ using System.Reflection.Emit;
 using System.Threading;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
+using TaleWorlds.MountAndBlade;
 using Attachment = NavalDLC.Missions.Objects.UsableMachines.ShipAttachmentMachine.ShipAttachment;
 using Joint = NavalDLC.Missions.Objects.UsableMachines.ShipAttachmentMachine.ShipAttachmentJoint;
 using ForceMode = TaleWorlds.Engine.GameEntityPhysicsExtensions.ForceMode;
@@ -77,6 +78,46 @@ internal class RopeBreakCheckPatch
     [HarmonyPrefix]
     private static bool Prefix(Attachment __instance) =>
         !ContainerProvider.TryResolve<INavalRopeRegistry>(out var ropes) || ropes.AllowOwnerDecision(__instance);
+}
+
+// War Sails breaks a rope when a weapon destroys the fabric part at its attachment point. A replica rope breaks only as
+// its owner's state applies, so a hit on one here is dropped until hits reach the owner (#4607).
+[HarmonyPatch(typeof(DestructableComponent), nameof(DestructableComponent.OnHit))]
+[HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
+internal class RopeReplicaHitPatch
+{
+    private static readonly AccessTools.FieldRef<DestructableComponent, DestructableComponent.OnHitTakenWithImpactDelegate> ImpactHandlers =
+        AccessTools.FieldRefAccess<DestructableComponent, DestructableComponent.OnHitTakenWithImpactDelegate>("OnHitTakenWithImpact");
+
+    // Answers a dropped hit as vanilla answers a hit on a disabled part: no damage, nothing reported.
+    [HarmonyPrefix]
+    private static bool Prefix(DestructableComponent __instance, int inflictedDamage, ref bool reportDamage, ref float modifiedDamage,
+        ref float fireDamage, ref float modifiedFireDamage, ref bool __result)
+    {
+        if (!ContainerProvider.TryResolve<INavalRopeRegistry>(out var ropes) || AllowsHit(__instance, ropes)) return true;
+
+        reportDamage = false;
+        modifiedDamage = inflictedDamage;
+        fireDamage = -1f;
+        modifiedFireDamage = -1f;
+        __result = true;
+        return false;
+    }
+
+    // False only for the fabric part of an attachment point that holds another owner's rope.
+    internal static bool AllowsHit(DestructableComponent part, INavalRopeRegistry ropes)
+    {
+        var handlers = ImpactHandlers(part);
+        if (handlers == null) return true;
+
+        foreach (var handler in handlers.GetInvocationList())
+        {
+            if (handler.Target is ShipAttachmentPointMachine point && point._shipAttachmentPointMachineDestructableComponent == part)
+                return point.CurrentAttachment == null || !ropes.IsReplica(point.CurrentAttachment);
+        }
+
+        return true;
+    }
 }
 
 // A replica plank flies on its owner's clock.

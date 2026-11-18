@@ -11,6 +11,7 @@ using GameInterface.Services.Party.Patches;
 using GameInterface.Services.TroopRosters.Data;
 using GameInterface.Services.TroopRosters.Interfaces;
 using GameInterface.Utils.Commands;
+using Helpers;
 using SandBox.GauntletUI;
 using Serilog;
 using System.Collections.Generic;
@@ -367,6 +368,55 @@ internal class PartyCommands
                 resetMovementToHold: false));
 
         return Succeeded($"Teleported {party.StringId} to {settlement.StringId} gate at {party.Position.X:R},{party.Position.Y:R}.");
+    }
+
+    /// <summary>
+    /// Orders an AI party to engage another party right away, so live tests can stage a lord chasing a player party.
+    /// </summary>
+    public sealed class EngagePartyCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.mobile_party";
+
+        public string Name => "engage_party";
+
+        public string Description => "Orders an AI party to engage another party and reports its short term target.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("party_id", "AI mobile party name or id; quote names with spaces."),
+            new ExpectedArgs("target_party_id", "Target mobile party name or id; quote names with spaces."),
+        };
+
+        private readonly ICommandObjectResolver resolver;
+
+        // Takes the resolver that turns command arguments into game objects.
+        public EngagePartyCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
+        // Sets the engage order and its short term behavior so the party targets the other party at once.
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!resolver.TryResolveMobileParty(args[0], out var party, out var error))
+                return Failed(error);
+
+            if (!resolver.TryResolveMobileParty(args[1], out var target, out error))
+                return Failed(error);
+
+            if (party.IsPlayerParty())
+                return Failed($"Party {party.StringId} is a player party, its client drives it.");
+
+            party.SetMoveEngageParty(target, MobileParty.NavigationType.Default);
+            party.RecalculateShortTermBehavior();
+
+            return Succeeded($"ENGAGE_PARTY party={party.StringId} " +
+                $"defaultBehavior={party.DefaultBehavior} shortTermBehavior={party.ShortTermBehavior} " +
+                $"shortTermTarget={party.ShortTermTargetParty?.StringId ?? "none"} " +
+                $"atWar={party.MapFaction.IsAtWarWith(target.MapFaction)}");
+        }
     }
 
     /// <summary>
@@ -965,6 +1015,81 @@ internal class PartyCommands
 
             return Succeeded($"Buffed {party.Name} ({party.StringId}): {party.MemberRoster.TotalManCount} troops, max morale, boosted speed and party-size limit, {foodTypes} food type(s) x500");
         }
+    }
+
+    // coop.debug.mobile_party.fill_cavalry MobileParty_player_1
+    /// <summary>
+    /// Fills a party up to its size limit with the top-tier cavalry and horse archers of its leader's culture,
+    /// falling back to imperial ones for a culture without any (e.g. nords).
+    /// </summary>
+    public sealed class FillCavalryCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.mobile_party";
+
+        public string Name => "fill_cavalry";
+
+        public string Description => "Fills a party to its size limit with cavalry and horse archers of its leader's culture, or imperial ones.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("party_id", "Mobile party name or id; quote names with spaces.", true),
+        };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public FillCavalryCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient) return Failed("Command can only be run on the server.");
+            if (!resolver.TryResolveMobileParty(args[0], out var party, out var error)) return Failed(error);
+
+            var leader = party.LeaderHero;
+            if (leader == null) return Failed($"{party.Name} ({party.StringId}) has no leader hero.");
+
+            var troops = GetBestMountedTroops(leader.Culture);
+            if (troops.Length == 0) troops = GetBestMountedTroops(MBObjectManager.Instance.GetObject<CultureObject>("empire"));
+            if (troops.Length == 0) return Failed($"No cavalry found for {leader.Culture?.Name} or the empire culture.");
+
+            int toAdd = party.Party.PartySizeLimit - party.MemberRoster.TotalManCount;
+            if (toAdd <= 0) return Failed($"{party.Name} is already at or over its limit of {party.Party.PartySizeLimit}.");
+
+            var added = new List<string>();
+            for (int i = 0; i < troops.Length; i++)
+            {
+                // Splits evenly, with the remainder going to the first troop.
+                int count = (toAdd / troops.Length) + (i == 0 ? toAdd % troops.Length : 0);
+                party.MemberRoster.AddToCounts(troops[i], count);
+                added.Add($"{count} {troops[i].StringId}");
+            }
+
+            return Succeeded($"Added {string.Join(", ", added)} to {party.Name} ({party.StringId}): " +
+                $"{party.MemberRoster.TotalManCount}/{party.Party.PartySizeLimit} members.");
+        }
+    }
+
+    // Highest-tier cavalry and horse archer in the culture's basic and elite troop trees; empty when the culture has neither.
+    private static CharacterObject[] GetBestMountedTroops(CultureObject culture)
+    {
+        if (culture == null) return Array.Empty<CharacterObject>();
+
+        var tree = new[] { culture.BasicTroop, culture.EliteBasicTroop }
+            .Where(baseTroop => baseTroop != null)
+            .SelectMany(baseTroop => CharacterHelper.GetTroopTree(baseTroop))
+            .ToList();
+
+        return new[] { FormationClass.Cavalry, FormationClass.HorseArcher }
+            .Select(formation => tree
+                .Where(troop => troop.DefaultFormationClass == formation)
+                .OrderByDescending(troop => troop.Tier)
+                .FirstOrDefault())
+            .Where(troop => troop != null)
+            .ToArray();
     }
 
     // coop.debug.mobileparty.declare_war

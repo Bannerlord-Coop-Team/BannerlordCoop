@@ -1,4 +1,5 @@
-﻿using GameInterface.Services.Players;
+﻿using GameInterface.Services.MapEvents.Extensions;
+using GameInterface.Services.Players;
 using GameInterface.Services.ObjectManager;
 using System;
 using System.Linq;
@@ -46,7 +47,7 @@ internal sealed class HideoutPreparation : IHideoutPreparation
     {
         var battle = settlement?.Party.MapEvent;
         if (battle?.IsHideoutBattle == true && !battle.IsFinalized && battle.BattleState == BattleState.None &&
-            (battle.Component as HideoutEventComponent)?.IsSendTroops != true)
+            !battle.IsSendTroopsHideout())
             return HideoutEntryState.Join;
 
         var preparing = GetPreparingParty(settlement);

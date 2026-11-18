@@ -10,32 +10,9 @@ namespace GameInterface.Services.MobileParties.Patches;
 /// recruitment attempts.
 /// </summary>
 /// <remarks>
-/// Vanilla keeps THREE independent rules, and the one that reaches the player first is not the one
-/// that looks like the gate:
-///
-///   <c>conversation_lord_from_ruling_clan_on_condition</c> - the PRE-GATE, and the real blocker. When
-///                                 the accumulated score is below <c>_maximumScoreCap</c> it refuses on
-///                                 <c>Any(a =&gt; a.PersuadedHero == OneToOneConversationHero)</c> and
-///                                 answers "You have tried to persuade me before." That predicate checks
-///                                 neither AGE nor SUCCESS, so a single prior attempt blocks forever, and
-///                                 it returns before CanAttemptToPersuade is ever consulted.
-///   <c>CanAttemptToPersuade</c> - the GATE. Refuses while a matching unsuccessful attempt is less than
-///                                 ONE WEEK old. The active persuasion also reuses it to choose the failed
-///                                 task whose final refusal line is shown.
-///   <c>RemoveOldAttempts</c>    - housekeeping on the daily tick, dropping records over a YEAR old. The
-///                                 only thing that ever removes an attempt, so it is what eventually
-///                                 releases the pre-gate.
-///
-/// Patching the gate alone cannot work, because the pre-gate already answered. AlwaysRetry therefore has
-/// to drop this lord's attempt records before a new conversation - and it must drop ALL of them, not just
-/// the unsuccessful ones, because the pre-gate's predicate ignores success and every persuasion OPTION
-/// records its own attempt. The gate itself must keep running so a fresh failure can select its refusal line.
-///
-///   Vanilla     - unchanged: vanilla's own week/year rules apply (default, matches singleplayer)
-///   NeverExpire - the gate blocks while ANY unsuccessful attempt survives, and the prune is suppressed
-///                 so one always does
-///   AlwaysRetry - the pre-gate's records are cleared before each conversation, so the lord can be asked
-///                 again at once while fresh failures still complete normally
+/// Vanilla's pre-gate, <c>conversation_lord_from_ruling_clan_on_condition</c>, refuses for a season after a failed
+/// attempt before <c>CanAttemptToPersuade</c> runs, so AlwaysRetry clears all of the lord's attempts before a
+/// conversation: the score counts successes too, and each persuasion option records its own attempt.
 /// </remarks>
 internal static class LordDefectionRetryPatches
 {
@@ -124,24 +101,21 @@ internal static class LordDefectionRetryPatches
     }
 
     /// <summary>
-    /// The yearly prune. Only NeverExpire suppresses it, to keep the records its gate depends on.
+    /// Keeps every refusal in its cooldown for <see cref="LordDefectionRetryMode.NeverExpire"/>, so the
+    /// pre-gate keeps answering with it for the rest of the session.
     /// </summary>
-    /// <remarks>
-    /// This is the ONLY prefix on OnDailyTick. DisableLordDefectionCampaignBehavior used to add a second
-    /// one returning <c>ModInformation.IsServer</c>, and because Harmony skips the original as soon as any
-    /// prefix returns false, that one silently won on clients: the prune never ran there, and since the
-    /// pre-gate is released only by a record being removed, a refusal lasted the whole session no matter
-    /// which mode was configured. Blocking it bought nothing - OnDailyTick's entire body is a call to
-    /// RemoveOldAttempts, which prunes the client's own local list and replicates nothing.
-    /// </remarks>
     [HarmonyPatch(typeof(LordDefectionCampaignBehavior),
-        nameof(LordDefectionCampaignBehavior.OnDailyTick))]
-    internal class OnDailyTickPatch
+        nameof(LordDefectionCampaignBehavior.IsPersuiasionAttemptInCooldown))]
+    internal class IsPersuasionAttemptInCooldownPatch
     {
         [HarmonyPrefix]
-        private static bool Prefix()
+        private static bool Prefix(ref bool __result)
         {
-            return ModConfigProvider.ModOptions.LordDefectionRetries != LordDefectionRetryMode.NeverExpire;
+            if (ModConfigProvider.ModOptions.LordDefectionRetries != LordDefectionRetryMode.NeverExpire)
+                return true;
+
+            __result = true;
+            return false;
         }
     }
 }

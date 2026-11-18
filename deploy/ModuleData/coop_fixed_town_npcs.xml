@@ -833,7 +833,7 @@
     coop_location="house_1"
     coop_spawn_tag="npc_common"
     coop_dialogue="marabanın marbası"
-    coop_enabled="true">
+    coop_enabled="false">
     <face>
       <face_key_template value="BodyProperty.townsman_vlandia" />
     </face>
@@ -1068,6 +1068,181 @@
         <equipment slot="Body" id="Item.aserai_full_scale_armor_on_chain" />
         <equipment slot="Gloves" id="Item.lamellar_plate_gauntlets" />
         <equipment slot="Leg" id="Item.lamellar_plate_boots" />
+      </EquipmentRoster>
+    </Equipments>
+  </NPCCharacter>
+  <NPCCharacter
+    id="coop_fixed_npc_27103307"
+    name="{=!}Tibby the Cupbearer"
+    default_group="Infantry"
+    level="1"
+    is_female="false"
+    is_hero="false"
+    is_template="false"
+    occupation="Townsfolk"
+    culture="Culture.empire"
+    is_hidden_encyclopedia="true"
+    coop_settlement="town_EN1"
+    coop_location="lordshall"
+    coop_spawn_tag="npc_common"
+    coop_dialogue="Greetings! I am Tibby the Cupbearer, son of Tibby the cupbearer. I come from a long line of Cupbearers. If there is a cup that needs borne, my family will answer the call without failure."
+    coop_enabled="true">
+    <face>
+      <face_key_template value="BodyProperty.townsman_empire" />
+    </face>
+    <skills />
+    <Equipments>
+      <EquipmentRoster civilian="true">
+        <equipment slot="Head" id="Item.sturgian_crown" />
+        <equipment slot="Body" id="Item.fine_town_tunic" />
+        <equipment slot="Leg" id="Item.fine_town_boots" />
+      </EquipmentRoster>
+    </Equipments>
+  </NPCCharacter>
+  <NPCCharacter
+    id="coop_fixed_npc_c22fae78"
+    name="{=!}Peter"
+    default_group="Infantry"
+    level="1"
+    is_female="false"
+    is_hero="false"
+    is_template="false"
+    occupation="Townsfolk"
+    culture="Culture.empire"
+    is_hidden_encyclopedia="true"
+    coop_settlement="town_S5"
+    coop_location="tavern"
+    coop_spawn_tag="npc_common"
+    coop_dialogue="You uncultured swine! What&apos;re you lookin&apos; at, ya hockey puck?"
+    coop_enabled="true">
+    <face>
+      <face_key_template value="BodyProperty.townsman_empire" />
+    </face>
+    <skills />
+    <Equipments>
+      <EquipmentRoster civilian="true">
+        <equipment slot="Head" id="Item.thinhide_coif" />
+        <equipment slot="Cape" id="Item.leopard_pelt" />
+        <equipment slot="Body" id="Item.layered_robe" />
+        <equipment slot="Gloves" id="Item.buttoned_leather_bracers" />
+        <equipment slot="Leg" id="Item.battania_fur_boots" />
+      </EquipmentRoster>
+    </Equipments>
+  </NPCCharacter>
+  <NPCCharacter
+    id="coop_fixed_npc_32b3b885"
+    name="{=!}Can Olcar"
+    default_group="Infantry"
+    level="1"
+    is_female="true"
+    is_hero="false"
+    is_template="false"
+    occupation="Townsfolk"
+    culture="Culture.aserai"
+    is_hidden_encyclopedia="true"
+    coop_settlement="town_EW3"
+    coop_location="tavern"
+    coop_spawn_tag="npc_common"
+    coop_dialogue="Her vuruş 10 kuruş"
+    coop_enabled="true">
+    <face>
+      <face_key_template value="BodyProperty.townswoman_aserai" />
+    </face>
+    <skills />
+    <Equipments>
+      <EquipmentRoster civilian="true">
+        <equipment slot="Head" id="Item.aserai_female_civil_hscarf_b" />
+        <equipment slot="Leg" id="Item.highland_boots" />
+      </EquipmentRoster>
+    </Equipments>
+  </NPCCharacter>
+  <NPCCharacter
+    id="coop_fixed_npc_3f23347c"
+    name="{=!}Alfredo"
+    default_group="Infantry"
+    level="1"
+    is_female="false"
+    is_hero="false"
+    is_template="false"
+    occupation="Townsfolk"
+    culture="Culture.empire"
+    is_hidden_encyclopedia="true"
+    coop_settlement="town_ES5"
+    coop_location="arena"
+    coop_spawn_tag="npc_common"
+    coop_dialogue="SOUP SOUP SOUP SOUP SOUP SOUP SOUP"
+    coop_enabled="true">
+    <face>
+      <face_key_template value="BodyProperty.townsman_empire" />
+    </face>
+    <skills />
+    <Equipments>
+      <EquipmentRoster civilian="true">
+        <equipment slot="Head" id="Item.head_scarf" />
+        <equipment slot="Cape" id="Item.battanian_leather_shoulder_a" />
+        <equipment slot="Body" id="Item.steppe_dress" />
+        <equipment slot="Gloves" id="Item.northern_plated_gloves" />
+        <equipment slot="Leg" id="Item.decorated_imperial_boots" />
+      </EquipmentRoster>
+    </Equipments>
+  </NPCCharacter>
+  <NPCCharacter
+    id="coop_fixed_npc_56ea02ce"
+    name="{=!}Austonius Santonius"
+    default_group="Infantry"
+    level="1"
+    is_female="false"
+    is_hero="false"
+    is_template="false"
+    occupation="Townsfolk"
+    culture="Culture.empire"
+    is_hidden_encyclopedia="true"
+    coop_settlement="town_ES1"
+    coop_location="tavern"
+    coop_spawn_tag="npc_common"
+    coop_dialogue="I dont know and I dont care to know you"
+    coop_enabled="true">
+    <face>
+      <face_key_template value="BodyProperty.townsman_empire" />
+    </face>
+    <skills />
+    <Equipments>
+      <EquipmentRoster civilian="true">
+        <equipment slot="Head" id="Item.kettle_helmet_over_padded_cap" />
+        <equipment slot="Cape" id="Item.imperial_lamellar_shoulders" />
+        <equipment slot="Body" id="Item.imperial_lamellar" />
+        <equipment slot="Gloves" id="Item.guarded_padded_vambrace" />
+        <equipment slot="Leg" id="Item.mail_cavalier_boots" />
+      </EquipmentRoster>
+    </Equipments>
+  </NPCCharacter>
+  <NPCCharacter
+    id="coop_fixed_npc_dbfb78b5"
+    name="{=!}Almus"
+    default_group="Infantry"
+    level="1"
+    is_female="false"
+    is_hero="false"
+    is_template="false"
+    occupation="Townsfolk"
+    culture="Culture.khuzait"
+    is_hidden_encyclopedia="true"
+    coop_settlement="town_K3"
+    coop_location="tavern"
+    coop_spawn_tag="npc_common"
+    coop_dialogue="MujjOO&apos;nun Mekanına Hoş Geldin."
+    coop_enabled="true">
+    <face>
+      <face_key_template value="BodyProperty.townsman_khuzait" />
+    </face>
+    <skills />
+    <Equipments>
+      <EquipmentRoster civilian="true">
+        <equipment slot="Head" id="Item.segmented_skullcap_over_padded_cloth" />
+        <equipment slot="Cape" id="Item.empire_cape_a" />
+        <equipment slot="Body" id="Item.aserai_archer_armor" />
+        <equipment slot="Gloves" id="Item.lordly_padded_mitten" />
+        <equipment slot="Leg" id="Item.strapped_mail_chausses" />
       </EquipmentRoster>
     </Equipments>
   </NPCCharacter>

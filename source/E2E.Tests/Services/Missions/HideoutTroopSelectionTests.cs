@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using E2E.Tests.Util;
+using GameInterface.Tests.Utils;
 using GameInterface.Services.Barters;
 using GameInterface.Services.Hideouts;
 using GameInterface.Services.MapEvents.Extensions;
@@ -328,8 +329,8 @@ public class HideoutTroopSelectionTests : MissionTestEnvironment
         Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
         var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
         settlement.SetSettlementComponent(GameObjectCreator.CreateInitializedObject<Hideout>());
-        mapEvent.MapEventSettlement = settlement;
-        mapEvent._mapEventType = MapEvent.BattleTypes.Hideout;
+        mapEvent.SetMapEventSettlement(settlement);
+        mapEvent.SetBattleType(MapEvent.BattleTypes.Hideout);
         return (settlement, mapEvent, Server.Resolve<IHideoutTroopSelection>());
     }
 

@@ -79,8 +79,8 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
 
         bool localBattleSimulationWasInvolved = PlayerEncounter.Current?.BattleSimulation?.MapEvent == obj;
         bool localPartyWasInvolved = IsLocalPartyInMapEvent(obj);
-        bool hasStagedResults = localPartyWasInvolved &&
-            StagedBattleResultUpdatePatch.HasStagedResults(PlayerEncounter.Current);
+        bool holdsBattleResultEncounter = localPartyWasInvolved &&
+            StagedBattleResultUpdatePatch.HoldsBattleResultEncounter(PlayerEncounter.Current);
         if (localPartyWasInvolved) CaptureMainPartyBattleRewards(obj);
         if (localPartyWasInvolved && obj.IsRaid)
             Campaign.Current.GetCampaignBehavior<ViewDataTrackerCampaignBehavior>()?._plunderItems.Clear();
@@ -95,9 +95,9 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
             return;
         }
 
-        // A hideout or siege assault defender who already left the mission still needs to collect the
-        // server's staged loot, which StagedBattleResultUpdatePatch resumes on the next map tick.
-        if (!hasStagedResults)
+        // A hideout or siege assault defender who already left the mission keeps its encounter for the server's
+        // staged loot, which StagedBattleResultUpdatePatch resumes, or for the send troops result menu.
+        if (!holdsBattleResultEncounter)
             CloseDestroyedMapEventEncounterIfNeeded(obj, id, localPartyWasInvolved);
     }
 
@@ -303,6 +303,7 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
 
     public override void OnServerDestroyed(MapEvent obj, string id)
     {
+        ServerBattleModeArbiter.Release(id);
         initializationBarrier.DestroyGraph(obj);
     }
 }

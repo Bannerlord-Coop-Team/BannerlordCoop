@@ -4,6 +4,7 @@ using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
+using GameInterface.Tests.Utils;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.AcceptCoordination;
 using GameInterface.Services.Issues.Framework.Finalization;
@@ -403,8 +404,8 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
             // Keep the second owner's giver away from the raided village so only the first quest matches.
             secondNotable.Issue.IssueQuest.QuestGiver.StayingInSettlement = otherGiverSettlement;
 
-            var raid = (RaidEventComponent)RuntimeHelpers.GetUninitializedObject(typeof(RaidEventComponent));
-            raid.MapEvent = VillageMapEvent(Server, settlementId, MapEvent.BattleTypes.Raid);
+            // Raid listeners read the component's own settlement, so use the map event's raid component.
+            var raid = (RaidEventComponent)VillageMapEvent(Server, settlementId, MapEvent.BattleTypes.Raid).Component;
             var previousMainParty = Campaign.Current.MainParty;
             Campaign.Current.MainParty = null;
 
@@ -675,8 +676,7 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
                     }
                     break;
                 case "raid":
-                    var raid = (RaidEventComponent)RuntimeHelpers.GetUninitializedObject(typeof(RaidEventComponent));
-                    raid.MapEvent = VillageMapEvent(ClientA, settlementId, MapEvent.BattleTypes.Raid);
+                    var raid = (RaidEventComponent)VillageMapEvent(ClientA, settlementId, MapEvent.BattleTypes.Raid).Component;
                     quest.OnRaidCompleted(BattleSideEnum.Attacker, raid);
                     break;
                 case "coercion":
@@ -707,8 +707,8 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
         Assert.True(instance.ObjectManager.TryGetObject<Settlement>(targetSettlementId, out var village));
 
         var mapEvent = (MapEvent)RuntimeHelpers.GetUninitializedObject(typeof(MapEvent));
-        mapEvent._mapEventType = type;
-        mapEvent.MapEventSettlement = village;
+        mapEvent.SetBattleType(type);
+        mapEvent.SetMapEventSettlement(village);
         return mapEvent;
     }
 

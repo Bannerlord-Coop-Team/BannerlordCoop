@@ -11,7 +11,6 @@ using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
-using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.Companions.Handlers;
@@ -150,15 +149,17 @@ internal class PerkResetCampaignBehaviorHandler : IHandler
             {
                 int index = (i + num) % companionsCount;
                 Hero targetCompanion = playerClan.Companions[index];
-                if ((targetCompanion.PartyBelongedTo?.MapEvent) == null)
-                {
-                    Settlement currentSettlement = targetCompanion.CurrentSettlement;
-                    if ((currentSettlement?.Party.MapEvent) == null && !Campaign.Current.IssueManager.IssueSolvingCompanionList.Contains(targetCompanion))
-                    {
-                        KillCharacterAction.ApplyByRemove(targetCompanion, true, true);
-                        return;
-                    }
-                }
+
+                bool canBeReleased = true;
+                CampaignEventDispatcher.Instance.CanHeroBeReleased(targetCompanion, ref canBeReleased);
+                if (!canBeReleased) continue;
+                if (targetCompanion.PartyBelongedTo?.MapEvent != null) continue;
+                if (targetCompanion.PartyBelongedToAsPrisoner != null) continue;
+                if (targetCompanion.CurrentSettlement?.Party.MapEvent != null) continue;
+                if (Campaign.Current.IssueManager.IssueSolvingCompanionList.Contains(targetCompanion)) continue;
+
+                KillCharacterAction.ApplyByRemove(targetCompanion, true, true);
+                return;
             }
         });
     }

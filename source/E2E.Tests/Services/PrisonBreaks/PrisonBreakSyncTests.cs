@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using Common.Util;
 using Common.Network;
 using Common.Network.Messages;
 using E2E.Tests.Environment;
@@ -17,6 +18,9 @@ using SandBox.CampaignBehaviors;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
@@ -200,6 +204,35 @@ public class PrisonBreakSyncTests : IDisposable
                 Assert.False(client.Resolve<IPrisonBreakCampaignBehaviorInterface>().IsPrisonBreakActive(settlement));
             });
         }
+    }
+
+    // Vanilla's Start condition reads the bribe cost off the prisoner's settlement, which a released prisoner no longer has.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void StartCondition_PrisonerReleasedWhileMenuOpen_DisablesStart(bool released)
+    {
+        var fixture = CreateFixture();
+
+        // Runs on the server because the harness doesnt relay Hero.ChangeState or the prisoner's CurrentSettlement to clients.
+        Server.Call(() =>
+        {
+            var (playerHero, settlement, prisoner) = Resolve(Server, fixture);
+            if (released) EndCaptivityAction.ApplyByReleasedByChoice(prisoner);
+
+            var encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
+            encounter.EncounterSettlementAux = settlement;
+            Campaign.Current.PlayerEncounter = encounter;
+            var behavior = Campaign.Current.GetCampaignBehavior<PrisonBreakCampaignBehavior>();
+            behavior._prisonerHero = prisoner;
+
+            var args = new MenuCallbackArgs((MenuContext)null, null);
+            using (new MainHeroSubstitutionScope(playerHero, playerHero.PartyBelongedTo))
+            {
+                Assert.True(behavior.game_menu_castle_prison_break_on_condition(args));
+            }
+            Assert.Equal(!released, args.IsEnabled);
+        });
     }
 
     [Fact]

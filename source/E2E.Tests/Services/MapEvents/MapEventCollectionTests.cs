@@ -7,6 +7,7 @@ using Common.Util;
 using Coop.Core.Server.Connections.Messages;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
+using GameInterface.Services.Entity;
 using GameInterface.Services.Players;
 using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.MapEvents.Initialization;
@@ -16,6 +17,8 @@ using GameInterface.Services.MapEvents.Patches;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
 using Xunit.Abstractions;
 
@@ -187,6 +190,53 @@ public class MapEventCollectionTests : MapEventTestBase
         client.Call(() => Assert.Same(
             Get<PartyBase>(client, partyId),
             Get<MapEventParty>(client, mapEventPartyId).Party));
+    }
+
+    [Fact]
+    public void Client_FieldJoin_AttachesReplicatedBattleToJoinedPlayerEncounter()
+    {
+        var staged = CreateServerMapEvent();
+        var (_, partyId) = CreatePlayerHeroParty("PlayerTwo");
+        var client = Clients.First();
+        string partyBaseId = null;
+
+        TestEnvironment.ConnectRegisteredPlayer(client, "PlayerTwo");
+        client.Resolve<IControllerIdProvider>().SetControllerId("PlayerTwo");
+        client.NetworkSentMessages.Clear();
+
+        client.Call(() =>
+        {
+            var mapEvent = Get<MapEvent>(client, staged.MapEventId);
+            var party = Get<MobileParty>(client, partyId);
+            Campaign.Current.MainParty = party;
+            PlayerEncounter.Start();
+            var encounter = PlayerEncounter.Current;
+            encounter._encounteredParty = mapEvent.DefenderSide.LeaderParty;
+            encounter.IsJoinedBattle = true;
+            Assert.True(client.ObjectManager.TryGetId(party.Party, out partyBaseId));
+            // Stages the live joiner after the join option: a joined encounter with no _mapEvent.
+            // The side write is intercepted into NetworkRequestJoinBattle instead of attaching locally.
+            party.Party.MapEventSide = mapEvent.DefenderSide;
+            Assert.Null(PlayerEncounter.Battle);
+        }, WithoutNetworkDelivery());
+
+        var request = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestJoinBattle>());
+        Assert.Equal(staged.MapEventId, request.MapEventId);
+        Assert.Equal(partyBaseId, request.PartyId);
+        Assert.Equal(BattleSideEnum.Defender, request.Side);
+
+        Server.NetworkSentMessages.Clear();
+        Server.Call(() => Server.SimulateMessage(client.NetPeer, request), MapEventDisabledMethods);
+        Assert.True(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkJoinBattleReply>()).Accepted);
+        var authoritativeAdd = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAddBattleParty>());
+
+        client.SimulateMessage(Server.NetPeer, authoritativeAdd);
+
+        client.Call(() =>
+        {
+            var mapEvent = Get<MapEvent>(client, staged.MapEventId);
+            Assert.Same(mapEvent, PlayerEncounter.Battle);
+        });
     }
 
     [Fact]

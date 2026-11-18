@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.GameDebug.Messages;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
@@ -21,6 +22,7 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
@@ -56,6 +58,10 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
     private readonly ConditionalWeakTable<MapEvent, AppliedForceActionOutcomeState> appliedForceActionOutcomes = new ConditionalWeakTable<MapEvent, AppliedForceActionOutcomeState>();
     private readonly object deferredForceScreenGate = new object();
     private DeferredForceScreen deferredForceScreen;
+    // Client-only: a won raid's continuation, waiting for the current encounter to end.
+    private ParkedRaidContinuation parkedRaidContinuation;
+    // Client-only: the encounter a continuation request opened; finished if the server denies it.
+    private PlayerEncounter continuationEncounter;
 
     public VillageHostileActionInterface(IMessageBroker messageBroker, IObjectManager objectManager)
     {
@@ -75,6 +81,8 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
             deferredForceScreen = null;
         }
         pendingForceTransfers.Clear();
+        parkedRaidContinuation = null;
+        continuationEncounter = null;
     }
 
     public void RequestHostileAction(VillageHostileAction action)
@@ -144,6 +152,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
 
     public void BeginHostileActionPresentation(VillageHostileAction action)
     {
+        continuationEncounter = null;
         var encounter = PlayerEncounter.Current;
         if (encounter == null)
         {
@@ -172,6 +181,72 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         }
 
         GameMenu.SwitchToMenu("encounter");
+    }
+
+    public void CloseDeniedRaidContinuation()
+    {
+        var encounter = continuationEncounter;
+        continuationEncounter = null;
+        if (encounter == null || !ReferenceEquals(encounter, PlayerEncounter.Current))
+            return;
+
+        // Leave a live encounter or simulation alone when a denial races its start.
+        if (encounter._mapEvent != null || encounter.BattleSimulation != null)
+            return;
+
+        encounter._stateHandled = true;
+        PlayerEncounter.LeaveEncounter = true;
+        PlayerEncounter.Finish(true);
+    }
+
+    public void ParkRaidContinuation(Settlement settlement)
+    {
+        // Presented from Handle_CampaignTick once the result screens are done and the encounter has ended.
+        parkedRaidContinuation = new ParkedRaidContinuation(settlement, PlayerEncounter.Current);
+    }
+
+    private void PresentParkedRaidContinuation()
+    {
+        var parked = parkedRaidContinuation;
+        if (parked == null)
+            return;
+
+        var settlement = parked.Settlement;
+
+        if (PlayerCaptivity.IsCaptive)
+        {
+            parkedRaidContinuation = null;
+            Logger.Information("Dropping parked raid continuation for {SettlementId}: captive", settlement.StringId);
+            return;
+        }
+
+        var encounter = PlayerEncounter.Current;
+        bool encounterReplaced = encounter != null && parked.Encounter != null &&
+            !ReferenceEquals(encounter, parked.Encounter);
+        if (encounterReplaced)
+        {
+            parkedRaidContinuation = null;
+            Logger.Information("Dropping parked raid continuation for {SettlementId}: encounter replaced", settlement.StringId);
+            return;
+        }
+
+        bool encounterStillOpen = MobileParty.MainParty?.MapEvent != null ||
+            (encounter != null && encounter.EncounterState != PlayerEncounterState.End);
+        if (encounterStillOpen)
+            return;
+
+        parkedRaidContinuation = null;
+
+        StartRaidContinuationEncounter(settlement);
+    }
+
+    private void StartRaidContinuationEncounter(Settlement settlement)
+    {
+        // The map-event teardown clears both parties before this continuation requests fresh approval.
+        PlayerEncounter.Start();
+        PlayerEncounter.Current.SetupFields(PartyBase.MainParty, settlement.Party);
+        continuationEncounter = PlayerEncounter.Current;
+        messageBroker.Publish(this, new VillageHostileActionAttempted(VillageHostileAction.Raid, MobileParty.MainParty, settlement));
     }
 
     public bool CanStartHostileAction(
@@ -299,10 +374,43 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
 
         if (!FactionManager.IsAtWarAgainstFaction(mobileParty.MapFaction, settlement.MapFaction))
         {
-            using (new global::GameInterface.Services.Heroes.Patches.MainHeroSubstitutionScope(mobileParty.LeaderHero, mobileParty))
+            using (new MainHeroSubstitutionScope(mobileParty.LeaderHero, mobileParty))
                 DeclareWarAction.ApplyByPlayerHostility(mobileParty.MapFaction, settlement.MapFaction);
         }
     }
+
+    /// <summary>
+    /// Vanilla's test: a village resists only with healthy militia or enough friendly parties. With healthy
+    /// militia it compares the village with <see cref="MobileParty.MainParty"/>, which the server does not have
+    /// of its own, so the test runs as the requesting party.
+    /// </summary>
+    public bool WillVillageResist(MobileParty mobileParty, Settlement settlement)
+    {
+        using (new MainHeroSubstitutionScope(mobileParty.LeaderHero, mobileParty))
+            return VillageHostileActionCampaignBehavior.WillVillageResistHostileAction(settlement);
+    }
+
+    /// <summary>
+    /// v1.5: a village with no defenders gives in. The attacker gains crime rating and loses relations, as
+    /// in vanilla's no-resist consequences, and no war starts. The outcome is the one a won battle gives.
+    /// </summary>
+    public void ApplyUnresistedForceAction(MobileParty mobileParty, Settlement settlement, VillageHostileAction action)
+    {
+        switch (action)
+        {
+            case VillageHostileAction.ForceSupplies:
+                BeHostileAction.ApplyMinorCoercionHostileAction(mobileParty.Party, settlement.Party);
+                ApplyForceSuppliesOutcome(mobileParty, settlement, attacked: false);
+                break;
+            case VillageHostileAction.ForceVolunteers:
+                BeHostileAction.ApplyMajorCoercionHostileAction(mobileParty.Party, settlement.Party);
+                ApplyForceVolunteersOutcome(mobileParty, settlement);
+                break;
+        }
+    }
+
+    /// <summary>Vanilla's no-resist consequences return to the village menu before the loot screen.</summary>
+    public void ReturnToVillageMenu() => GameMenu.SwitchToMenu("village");
 
     public void ApplyForceActionOutcome(MapEvent mapEvent, VillageHostileAction action)
     {
@@ -334,7 +442,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
                 ApplyForceVolunteersOutcome(attacker, settlement);
                 break;
             case VillageHostileAction.ForceSupplies:
-                ApplyForceSuppliesOutcome(attacker, settlement, mapEvent);
+                ApplyForceSuppliesOutcome(attacker, settlement, attacked: true);
                 break;
         }
     }
@@ -488,7 +596,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         }
     }
 
-    private void ApplyForceSuppliesOutcome(MobileParty mobileParty, Settlement settlement, MapEvent mapEvent)
+    private void ApplyForceSuppliesOutcome(MobileParty mobileParty, Settlement settlement, bool attacked)
     {
         var village = settlement.Village;
         var rewardUnits = ComputeSuppliesRewardUnits(village.Hearth);
@@ -542,7 +650,9 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         {
             settlement.SettlementHitPoints *= 0.2f;
         }
-        SkillLevelingManager.OnForceSupplies(mobileParty, lootedItems, !mapEvent.IsPlayerMapEvent);
+        // v1.5 passes attacked: true after a won map event and false when the village gave in
+        // (v1.4.8 had the flag inverted).
+        SkillLevelingManager.OnForceSupplies(mobileParty, lootedItems, attacked);
 
         AuthorizeAndAnnounceTransfer(
             VillageHostileAction.ForceSupplies,
@@ -558,7 +668,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         var village = settlement.Village;
         var recruitCount = ComputeVolunteerCount(
             village.Hearth,
-            mobileParty.HasPerk(DefaultPerks.Roguery.InBestLight, false),
+            mobileParty.HasPerk(DefaultPerks.Roguery.InBestLight),
             settlement.Notables.Count);
 
         var troop = settlement.Culture?.BasicTroop;
@@ -844,6 +954,8 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         if (ModInformation.IsServer) return;
         if (IsInMission()) return;
 
+        PresentParkedRaidContinuation();
+
         // Always open the earned screen and let the server consume decide. A
         // gone pool is reported at Done time by the commit validation.
         if (!TryTakeParkedForceTransferScreen(out var pool))
@@ -901,6 +1013,18 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
     private static bool IsInMission()
     {
         return MissionState.Current != null || Mission.Current != null;
+    }
+
+    private sealed class ParkedRaidContinuation
+    {
+        public ParkedRaidContinuation(Settlement settlement, PlayerEncounter encounter)
+        {
+            Settlement = settlement;
+            Encounter = encounter;
+        }
+
+        public Settlement Settlement { get; }
+        public PlayerEncounter Encounter { get; }
     }
 
     private sealed class DeferredForceScreen
@@ -1246,7 +1370,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         int recruitedPrisonerCount,
         int goldChange,
         int influenceChange,
-        int moraleChange,
+        float moraleChange,
         bool applyReleasedAndTakenActions,
         string donationSettlementId,
         IEnumerable<(uint fromId, uint toId, int number)> upgradedTroops,
@@ -1323,7 +1447,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         // The loot screen offers no legitimate gold, influence, or morale source:
         // troop upgrades are blocked up front while a force screen is open (see
         // the ValidateCommand patch), so any such delta is rejected here.
-        if (goldChange != 0 || influenceChange != 0 || moraleChange != 0)
+        if (goldChange != 0 || influenceChange != 0 || moraleChange != 0f)
         {
             error = "gold/influence/morale change is not zero";
             return false;

@@ -140,6 +140,24 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment, IDisp
     protected void DropConnection(NavalPeer departed)
     {
         departed.Instance.Call(departed.Network.Stop);
+        DisconnectOnServer(departed);
+    }
+
+    /// <summary>
+    /// <paramref name="departed"/>'s server link drops first: the server's departure reaches <paramref name="survivors"/>, which
+    /// apply it in a tick, and only then do their mesh links to it time out.
+    /// </summary>
+    protected void DropConnectionServerFirst(NavalPeer departed, IEnumerable<NavalPeer> survivors)
+    {
+        DisconnectOnServer(departed);
+        foreach (var peer in survivors)
+            peer.Tick();
+        departed.Instance.Call(departed.Network.Stop);
+    }
+
+    /// <summary>The server's link to <paramref name="departed"/> drops, its mesh left as it is, and its disconnect path runs.</summary>
+    private void DisconnectOnServer(NavalPeer departed)
+    {
         Server.Call(() => Server.SimulateMessage(this, new PlayerDisconnected(departed.Instance.NetPeer, default)),
             VictoryConclusionDisabledMethods());
         Server.PumpGameThread();
@@ -256,6 +274,17 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment, IDisp
             departed.Instance.Call(departed.Network.Stop);
             foreach (var peer in Peers)
                 peer.Instance.Call(() => peer.Broker.Publish(peer, new MissionPeerLeft(departed.Id, MapEventId)));
+        }
+
+        /// <summary>
+        /// <paramref name="crashed"/>'s process dies: what it still had in flight on the mesh never arrives and it sends nothing
+        /// more, while its peers' links to it stay up until their own timeout stops its mesh. Returns the deliveries lost.
+        /// </summary>
+        public int Crash(NavalPeer crashed)
+        {
+            crashed.Network.RouteMessages = false;
+            crashed.Network.RoutePackets = false;
+            return mesh.Cancel(crashed.Network);
         }
 
         /// <summary>Tells every other client on the mesh that <paramref name="entered"/> joined, as the mission lifecycle does.</summary>
@@ -618,7 +647,8 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment, IDisp
 
         /// <summary>
         /// [Battle host] An AI party's hull, registered and announced through the replicator; with a
-        /// <paramref name="formationIndex"/> it takes that formation of the side's main team, as the NPC fleet spawner does.
+        /// <paramref name="formationIndex"/> it takes that formation of the team the NPC fleet fielder picks for the side: the
+        /// side's main team, or its ally team on this client's own side.
         /// </summary>
         public Guid FieldAiHull(BattleSideEnum side, Vec3 position, string mapEventPartyId, int? formationIndex = null,
             string? campaignShipId = null)
@@ -627,7 +657,7 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment, IDisp
             Call(() =>
             {
                 var team = formationIndex == null ? null
-                    : side == BattleSideEnum.Attacker ? Mission.AttackerTeam.Shell : Mission.DefenderTeam.Shell;
+                    : Instance.Resolve<IBattleTeamResolver>().ResolveAiFleetTeam(side);
                 var hull = Engine.Field(side, position, formationIndex ?? 0, team);
                 hull.CampaignShipId = campaignShipId;
                 shipId = Ships.RegisterNpcHull(hull.Hull, hull.Formation!, mapEventPartyId);

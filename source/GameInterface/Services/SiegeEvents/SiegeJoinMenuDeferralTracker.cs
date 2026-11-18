@@ -1,4 +1,5 @@
 ﻿using Common;
+using GameInterface.Services.MapEvents.Extensions;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -35,7 +36,7 @@ internal sealed class SiegeJoinMenuDeferralTracker : ISiegeJoinMenuDeferralTrack
     /// <summary>Records a siege assault or sally-out join request.</summary>
     public void Arm(MapEvent mapEvent, PartyBase joiningParty)
     {
-        if (!mapEvent.IsSiegeAssault && !mapEvent.IsSallyOut)
+        if (!mapEvent.IsSiegeStyleJoin())
             return;
 
         pendingMapEvent = mapEvent;
