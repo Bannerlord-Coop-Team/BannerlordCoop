@@ -15,6 +15,7 @@ namespace GameInterface.Serialization.External
         {
             "<VersionNo>k__BackingField",
             "<TotalValue>k__BackingField",
+            "<TradeGoodsTotalValue>k__BackingField",
             "<TotalFood>k__BackingField",
             "<NumberOfPackAnimals>k__BackingField",
             "<NumberOfMounts>k__BackingField",
