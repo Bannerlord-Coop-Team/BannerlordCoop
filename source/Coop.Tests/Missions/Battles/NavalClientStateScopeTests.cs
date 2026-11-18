@@ -110,7 +110,7 @@ public class NavalClientStateScopeTests
 
     // A ship snapshot belongs to the client that built it, so another client's campaign gates treat that ship as a campaign ship.
     [Fact]
-    public void SnapshotPatch_ReadsTheActiveClientsSnapshots()
+    public void IsSnapshotHere_ReadsTheActiveClientsSnapshots()
     {
         using var builder = BuildClient();
         using var other = BuildClient();

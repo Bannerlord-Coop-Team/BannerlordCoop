@@ -23,7 +23,7 @@ public sealed class NavalBoatswainCoopCommand : ICoopCommand
 
     public string Prefix => "coop.debug.naval";
     public string Name => "boatswain";
-    public string Description => "Reads a party's effective First Mate XP and ship HP; prepare sets Boatswain to 100 and raises focus to 5 on the server before battle.";
+    public string Description => "Reads a party's effective First Mate skill and ship HP; prepare sets Boatswain to 100 and raises focus to 5 on the server before battle.";
     public CoopCommandSide Side => CoopCommandSide.Both;
     public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
     {
@@ -31,7 +31,7 @@ public sealed class NavalBoatswainCoopCommand : ICoopCommand
         new ExpectedArgs("prepare", "Optional: stage skill-based hull damage reduction before battle, server only.", false),
     };
 
-    /// <summary>Prepares only on the campaign authority; reads never mutate XP or campaign ships.</summary>
+    /// <summary>Prepares only on the campaign authority; reads change no campaign state.</summary>
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
     {
         if (args == null || args.Count < 1 || args.Count > 2 || string.IsNullOrWhiteSpace(args[0]) ||

@@ -26,8 +26,8 @@ public class RaftMoveToShoreTests : MapEventTestBase
     public RaftMoveToShoreTests(ITestOutputHelper output) : base(output) { }
 
     /// <summary>
-    /// Live run A check 5: a hold the owner sent while setting sail reached the server after the raft's order, so the raft
-    /// never moved. The server keeps the order and every machine ends up heading for the shore.
+    /// A hold the owner sent while setting sail reached the server after the raft's order, so the raft never moved. The
+    /// server keeps the order and every machine ends up heading for the shore.
     /// </summary>
     [Fact]
     public void OwnerHoldSentBeforeTheRaft_KeepsTheMoveToShoreEverywhere()

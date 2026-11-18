@@ -25,7 +25,7 @@ internal class NavalShipDistributionCampaignBehaviorPatches
     {
         if (ModInformation.IsClient) return false;
 
-        // Replace Clan.PlayerClan usage, vanilla skips a destroyed player clan party unless it's a caravan
+        // Vanilla's Clan.PlayerClan check only knows one player clan, so skip every coop player clan's destroyed party unless it's a caravan
         return !party.ActualClan.IsPlayerClan() || party.IsCaravan;
     }
 
