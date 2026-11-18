@@ -139,7 +139,7 @@ internal class BattleModeEncounterOptionsPatch
                 __result = TryApplyClientSiegeOrderAttackOptionState(__0);
 
             // Native counts other players' heroes, but the server keeps them out of the simulation.
-            if (__result && MobileParty.MainParty?.MapEventSide is { } playerSide && playerSide.CountSimulationTroops() == 0)
+            if (__result && MobileParty.MainParty?.MapEventSide is { } playerSide && playerSide.CountSimulationTroops() <= 0)
                 __result = false;
         }
 
@@ -329,24 +329,13 @@ internal class BattleModeEncounterOptionsPatch
         if (mapEvent == null || !mapEvent.IsFieldBattle || mapEvent.IsNavalMapEvent || mapEvent.MapEventSettlement != null)
             return;
 
-        if (!HasHealthyAlliedParty(MobileParty.MainParty.MapEventSide)) return;
+        // The main party has nobody healthy, so whatever the side counts is the allies'.
+        var playerSide = MobileParty.MainParty.MapEventSide;
+        if (playerSide == null || playerSide.CountSimulationTroops() <= 0) return;
         if (IsEnemyTemporarilyProtected()) return;
 
         args.IsEnabled = true;
         args.Tooltip = TooltipHelper.GetSendTroopsPowerContextTooltipForMapEvent();
-    }
-
-    private static bool HasHealthyAlliedParty(MapEventSide side)
-    {
-        if (side == null) return false;
-
-        foreach (var party in side.Parties)
-        {
-            if (party.Party != PartyBase.MainParty && party.Party.CountSimulationTroops() > 0)
-                return true;
-        }
-
-        return false;
     }
 
     private static bool IsEnemyTemporarilyProtected()

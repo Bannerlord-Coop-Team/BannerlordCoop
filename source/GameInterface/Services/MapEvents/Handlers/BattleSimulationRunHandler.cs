@@ -193,7 +193,7 @@ internal class BattleSimulationRunHandler : IHandler
             }
 
             // Player heroes stay out of simulations, so a side of only player heroes would lose before any fighting.
-            if (requesterSide.CountSimulationTroops() == 0)
+            if (requesterSide.CountSimulationTroops() <= 0)
             {
                 Logger.Warning("Rejecting battle simulation for map event {MapEventId}: the requester's side has no troops to simulate", mapEventId);
                 return;
