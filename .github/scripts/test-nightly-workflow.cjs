@@ -93,49 +93,51 @@ test('the guard resolves calendar dates across spring forward and the Central cu
   await assert.rejects(resolveDate('2026-03-09T05:30:00Z', '03/08/2026'), /YYYY-MM-DD/);
 });
 
-async function resolveCommit(ref, dryRun, status) {
-  const sha = 'a'.repeat(40);
-  const github = { rest: { repos: {
-    getCommit: async () => ({ data: { sha } }),
-    compareCommits: async ({ base, head }) => {
-      assert.deepEqual([base, head], [sha, 'development']);
-      return { data: { status } };
-    },
-  } } };
+const developmentHead = published.head_sha;
+const otherSha = 'a'.repeat(40);
+
+async function resolveCommit(ref, { dryRun = false, sha = otherSha } = {}) {
+  const github = { rest: { repos: { getCommit: async () => ({ data: { sha } }) } } };
   return runScript('Resolve Coop commit', {
     github,
     process: { env: { COOP_REF: ref, DRY_RUN: String(dryRun) } },
-    context: { sha: published.head_sha, repo: { owner: 'owner', repo: 'repo' } },
+    context: { sha: developmentHead, repo: { owner: 'owner', repo: 'repo' } },
   });
 }
 
-test('only a commit on development can be published, while a dry run builds any ref', async () => {
-  assert.equal((await resolveCommit('', false)).outputs.coop_sha, published.head_sha);
-  assert.equal((await resolveCommit('v0.1.7', false, 'ahead')).outputs.coop_sha, 'a'.repeat(40));
-  assert.equal((await resolveCommit('development', false, 'identical')).outputs.coop_sha, 'a'.repeat(40));
-  await assert.rejects(resolveCommit('feature', false, 'diverged'), /only be built as a dry run/);
-  assert.equal((await resolveCommit('feature', true, 'diverged')).outputs.coop_sha, 'a'.repeat(40));
+test('a publishing run builds only the development head, while a dry run builds any ref', async () => {
+  assert.equal((await resolveCommit('')).outputs.coop_sha, developmentHead);
+  assert.equal((await resolveCommit('development', { sha: developmentHead })).outputs.coop_sha, developmentHead);
+  await assert.rejects(resolveCommit('v0.1.7'), /only be built as a dry run/);
+  assert.equal((await resolveCommit('bannerlord-1.5.x', { dryRun: true })).outputs.coop_sha, otherSha);
 });
 
-test('the build image follows the game version of the commit being built', async () => {
-  const project = (version) => ({ rest: { repos: { getContent: async ({ path: file, ref }) => {
-    assert.deepEqual([file, ref], ['source/Coop/Coop.csproj', published.head_sha]);
-    return { data: { content: Buffer.from(`<Project>\n    <GameVersion>${version}</GameVersion>\n</Project>`).toString('base64') } };
-  } } } });
-  const resolve = (version) => runScript("Resolve the CI image for the commit's game version", {
-    github: project(version), Buffer,
-    process: { env: { COOP_SHA: published.head_sha } },
+async function resolveGameVersion(csproj) {
+  async function getContent({ path: file, ref }) {
+    assert.deepEqual([file, ref], ['source/Coop/Coop.csproj', developmentHead]);
+    return { data: { content: Buffer.from(csproj).toString('base64') } };
+  }
+  return runScript("Resolve the commit's game version", {
+    github: { rest: { repos: { getContent } } },
+    Buffer,
+    process: { env: { COOP_SHA: developmentHead } },
     context: { repo: { owner: 'owner', repo: 'repo' } },
   });
-  assert.equal((await resolve('v1.5.7')).outputs.ci_image, 'ghcr.io/bannerlord-coop-team/bannerlordcoop:v1.5.7');
-  await assert.rejects(resolve('latest'), /no GameVersion/);
+}
+
+test('the game version is read from the real Coop project file', async () => {
+  const csproj = fs.readFileSync(path.join(__dirname, '../../source/Coop/Coop.csproj'), 'utf8');
+  const { outputs } = await resolveGameVersion(csproj);
+  assert.match(outputs.game_version, /^v\d+\.\d+\.\d+$/);
+  assert.ok(csproj.includes(`<GameVersion>${outputs.game_version}</GameVersion>`));
+  await assert.rejects(resolveGameVersion('<Project></Project>'), /no vX\.Y\.Z GameVersion/);
 });
 
 test('build metadata uses the guard date even if the build crosses another cutoff', async () => {
   const { outputs } = await resolveDate('2026-03-09T05:30:00Z');
   assert.match(workflow, /release_date: \$\{\{ steps\.due\.outputs\.release_date \}\}/);
   const build = step('Build release metadata');
-  assert.match(build, /RELEASE_DATE: \$\{\{ needs\.guard\.outputs\.release_date \}\}/);
+  assert.match(build, /RELEASE_DATE: \$\{\{ needs\.prepare\.outputs\.release_date \}\}/);
   const shell = build.split('        run: |\n')[1].replace(/^ {10}/gm, '');
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'nightly-date-'));
   const output = path.join(temp, 'output');

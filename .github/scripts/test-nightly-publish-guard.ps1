@@ -9,8 +9,10 @@ if (-not $workflow.Contains('nightly/client.json')) { throw 'Legacy client manif
 $match = [regex]::Match($workflow, '(?ms)      - name: Skip scheduled overwrite of a completed nightly publication.*?\n        run: \|\r?\n(.*?)(?=\r?\n      - name:)')
 if (-not $match.Success) { throw 'Nightly publish guard was not found' }
 $guardText = $match.Groups[1].Value -replace '(?m)^ {10}', ''
-$guardText = $guardText.Replace("& (Join-Path `$PWD 'rclone.exe')", 'Invoke-TestRclone')
+$guardText = $guardText.Replace("Join-Path `$PWD 'rclone.exe'", "'Invoke-TestRclone'")
+$guardText = $guardText.Replace('Invoke-WebRequest', 'Invoke-TestWebRequest')
 if ($guardText.Contains('rclone.exe')) { throw 'Unmocked rclone invocation in nightly publish guard' }
+if (-not $guardText.Contains('Invoke-TestWebRequest')) { throw 'Unmocked pointer request in nightly publish guard' }
 $guard = [scriptblock]::Create($guardText)
 
 $invalidationMatch = [regex]::Match($workflow, '(?ms)      - name: Invalidate the legacy client manifest.*?\n        run: \|\r?\n(.*?)(?=\r?\n      - name:)')
@@ -21,8 +23,8 @@ if (-not $invalidationText.Contains('Retaining the previous legacy client manife
     throw 'Legacy client retention guard was not found'
 }
 
-function Invoke-WebRequest {
-    param([string]$Uri, [switch]$SkipHttpErrorCheck, [int]$TimeoutSec)
+function Invoke-TestWebRequest {
+    param([string]$Uri, [switch]$SkipHttpErrorCheck, [int]$TimeoutSec, [int]$MaximumRetryCount, [int]$RetryIntervalSec)
     if ($Uri -ne 'https://pointer.test/nightly/release.json' -or -not $SkipHttpErrorCheck) { throw 'Unexpected pointer request' }
     $script:commands += 'pointer'
     return [pscustomobject]@{ StatusCode = $script:scenario.PointerStatus; Content = $script:scenario.Pointer }
@@ -30,9 +32,14 @@ function Invoke-WebRequest {
 
 function Invoke-TestRclone {
     param([string]$Command, [string]$Source, [string]$Destination)
-    if ($Command -ne 'copyto') { throw "Unexpected storage command: $Command" }
-    if ($Source -ne "patron:test-nightlies/nightly/publications/$($script:scenario.Sha256)/release.json") { throw 'Unexpected manifest source' }
+    if ($Source -ne "patron:test-nightlies/$($script:scenario.PointerKey)") { throw 'Unexpected manifest source' }
     $script:commands += $Command
+    if ($Command -eq 'lsf') {
+        $global:LASTEXITCODE = $script:scenario.ListExit
+        if ($script:scenario.Expired) { return }
+        return 'release.json'
+    }
+    if ($Command -ne 'copyto') { throw "Unexpected storage command: $Command" }
     $global:LASTEXITCODE = $script:scenario.DownloadExit
     if ($script:scenario.WriteFile) {
         [IO.File]::WriteAllText($Destination, $script:scenario.Manifest, [Text.UTF8Encoding]::new($false))
@@ -45,13 +52,15 @@ function Get-TestSha256([string]$Text) {
 }
 
 $cases = @(
-    @{ Name = 'no paired publication'; PointerStatus = 404; Expected = 'true' },
+    @{ Name = 'no paired publication'; PointerStatus = 404; StopsBeforeDownload = $true; Expected = 'true' },
     @{ Name = 'older nightly'; Expected = 'true' },
     @{ Name = 'already published'; Manifest = '{"releaseDate":"2026-10-01"}'; Expected = 'false' },
-    @{ Name = 'manual dispatch'; Event = 'workflow_dispatch'; Expected = 'true' },
-    @{ Name = 'pointer unavailable'; PointerStatus = 503; Error = 'Published nightly pointer lookup failed' },
-    @{ Name = 'invalid pointer JSON'; Pointer = '{'; Error = '*' },
-    @{ Name = 'pointer to another key'; PointerKey = 'nightly/release.json'; Error = 'Published nightly pointer is invalid' },
+    @{ Name = 'manual dispatch'; Event = 'workflow_dispatch'; StopsBeforeDownload = $true; Expected = 'true' },
+    @{ Name = 'expired manifest'; Expired = $true; StopsBeforeDownload = $true; Expected = 'true' },
+    @{ Name = 'expired manifest reported as not found'; Expired = $true; ListExit = 3; StopsBeforeDownload = $true; Expected = 'true' },
+    @{ Name = 'pointer unavailable'; PointerStatus = 503; StopsBeforeDownload = $true; Error = 'Published nightly pointer lookup failed with HTTP 503' },
+    @{ Name = 'pointer without a manifest key'; PointerKey = ''; StopsBeforeDownload = $true; Error = 'Published nightly pointer is invalid' },
+    @{ Name = 'manifest lookup failed'; ListExit = 10; StopsBeforeDownload = $true; Error = 'Published nightly manifest lookup failed' },
     @{ Name = 'download failed'; DownloadExit = 10; WriteFile = $false; Error = 'Published nightly manifest download failed' },
     @{ Name = 'successful download without file'; WriteFile = $false; Error = 'Published nightly manifest download failed' },
     @{ Name = 'changed manifest'; Sha256 = ('0' * 64); Error = 'Published nightly manifest checksum mismatch' },
@@ -68,13 +77,11 @@ try {
     $env:RELEASE_DATE = '2026-10-01'
     $env:NIGHTLY_POINTER_URL = 'https://pointer.test/nightly/release.json'
     foreach ($case in $cases) {
-        $script:scenario = @{ Event = 'schedule'; PointerStatus = 200; DownloadExit = 0; WriteFile = $true; Manifest = '{"releaseDate":"2026-09-30"}' }
+        $script:scenario = @{ Event = 'schedule'; PointerStatus = 200; ListExit = 0; DownloadExit = 0; WriteFile = $true; Manifest = '{"releaseDate":"2026-09-30"}' }
         foreach ($key in $case.Keys) { $script:scenario[$key] = $case[$key] }
         if (-not $script:scenario.Sha256) { $script:scenario.Sha256 = Get-TestSha256 $script:scenario.Manifest }
-        if (-not $script:scenario.PointerKey) { $script:scenario.PointerKey = "nightly/publications/$($script:scenario.Sha256)/release.json" }
-        if (-not $script:scenario.Pointer) {
-            $script:scenario.Pointer = @{ manifest = @{ key = $script:scenario.PointerKey; sha256 = $script:scenario.Sha256 } } | ConvertTo-Json -Compress
-        }
+        if ($null -eq $script:scenario.PointerKey) { $script:scenario.PointerKey = "nightly/publications/$($script:scenario.Sha256)/release.json" }
+        $script:scenario.Pointer = @{ manifest = @{ key = $script:scenario.PointerKey; sha256 = $script:scenario.Sha256 } } | ConvertTo-Json -Compress
         $script:commands = @()
         $caseRoot = Join-Path $testRoot ([guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $caseRoot | Out-Null
@@ -93,7 +100,7 @@ try {
             if ($outputs[-1] -ne "overwrite=$($case.Expected)") { throw "$($case.Name): unexpected overwrite decision" }
         }
         if ($case.Event -eq 'workflow_dispatch' -and $script:commands.Count -gt 0) { throw "$($case.Name): unexpected lookup" }
-        if (($case.PointerStatus -or $case.PointerKey) -and $script:commands -contains 'copyto') { throw "$($case.Name): unexpected download" }
+        if ($case.StopsBeforeDownload -and $script:commands -contains 'copyto') { throw "$($case.Name): unexpected download" }
         Write-Host "PASS: $($case.Name)"
     }
     Write-Host 'PASS: legacy client manifest is retained until replacement publication'
