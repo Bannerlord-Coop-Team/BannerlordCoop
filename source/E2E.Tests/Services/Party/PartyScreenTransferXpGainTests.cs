@@ -18,7 +18,7 @@ using Xunit.Abstractions;
 namespace E2E.Tests.Services.Party;
 
 /// <summary>
-/// A server xp gain on a troop the player moved out of an open party screen, through the client refresher's replay,
+/// A server xp or wound change on a troop the player moved out of an open party screen, through the client refresher's replay,
 /// the Done commit and the server replay, plus server changes that shrink or remove a moved stack and the troop
 /// manager popup's save and restore around a replay. The screen binds the real party rosters like vanilla manage troops.
 /// </summary>
@@ -73,6 +73,35 @@ public class PartyScreenTransferXpGainTests : IDisposable
 
         Done(fixture, logic);
         AssertServerKeepsTotalXp(fixture, new RosterState((1, ServerXp), (-1, -1)));
+    }
+
+    // A heal or wound on a stack the player moved out follows the moved troops to the server on Done (#4563).
+    [Theory]
+    [InlineData(30, 0, 20, 15, 10, 10, 20, 5)]
+    [InlineData(22, 22, 22, 21, -1, -1, 22, 21)]
+    public void ServerWoundChangeAfterTransfer_ReachesTheMovedTroopsOnDone(
+        int troops, int wounded, int moved, int serverWounded,
+        int rightNumber, int rightWounded, int leftNumber, int leftWounded)
+    {
+        var fixture = CreateFixture(troopCount: troops);
+        SetServerWounded(fixture, wounded);
+        var logic = OpenPartyScreen(fixture);
+        Transfer(fixture, logic, PartyScreenLogic.PartyRosterSide.Right, count: moved, woundedCount: wounded == troops ? moved : 0);
+
+        SetServerWounded(fixture, serverWounded);
+        Done(fixture, logic);
+
+        Server.Call(() =>
+        {
+            var (right, left, troop) = Resolve(Server, fixture);
+            int rightIndex = right.MemberRoster.FindIndexOfTroop(troop);
+            int leftIndex = left.MemberRoster.FindIndexOfTroop(troop);
+            Assert.Equal((rightNumber, rightWounded), rightIndex < 0
+                ? (-1, -1)
+                : (right.MemberRoster.GetElementNumber(rightIndex), right.MemberRoster.GetElementWoundedNumber(rightIndex)));
+            Assert.Equal((leftNumber, leftWounded),
+                (left.MemberRoster.GetElementNumber(leftIndex), left.MemberRoster.GetElementWoundedNumber(leftIndex)));
+        });
     }
 
     [Fact]
@@ -253,14 +282,15 @@ public class PartyScreenTransferXpGainTests : IDisposable
         PartyScreenLogic logic,
         PartyScreenLogic.PartyRosterSide fromSide,
         int count = 1,
-        bool otherTroop = false)
+        bool otherTroop = false,
+        int woundedCount = 0)
     {
         Client.Call(() =>
         {
             var (_, _, troop) = Resolve(Client, fixture);
             if (otherTroop) Assert.True(Client.ObjectManager.TryGetObject(fixture.OtherTroopId, out troop));
             var command = new PartyScreenLogic.PartyCommand();
-            command.FillForTransferTroop(fromSide, PartyScreenLogic.TroopType.Member, troop, count, 0, -1);
+            command.FillForTransferTroop(fromSide, PartyScreenLogic.TroopType.Member, troop, count, woundedCount, -1);
             // Like PartyCharacterVM.ApplyTransfer, which runs on an allowed thread and then drops emptied rows.
             using (new AllowedThread())
             {
@@ -287,6 +317,17 @@ public class PartyScreenTransferXpGainTests : IDisposable
             Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var hero));
             Client.SimulateMessage(this, PartyScreenLogicPatches.CreateCommitAttempted(
                 logic, hero, Helpers.PartyScreenHelper.PartyScreenMode.Normal, isDonating: false, forceTransferId: null));
+        });
+        TestEnvironment.FlushCoalescer();
+    }
+
+    private void SetServerWounded(TransferFixture fixture, int wounded)
+    {
+        Server.Call(() =>
+        {
+            var (right, _, troop) = Resolve(Server, fixture);
+            int current = right.MemberRoster.GetElementWoundedNumber(right.MemberRoster.FindIndexOfTroop(troop));
+            right.MemberRoster.AddToCounts(troop, 0, false, wounded - current);
         });
         TestEnvironment.FlushCoalescer();
     }
