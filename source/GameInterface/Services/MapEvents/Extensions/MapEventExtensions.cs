@@ -21,6 +21,20 @@ public static class MapEventExtensions
     public static bool IsSendTroopsHideout(this MapEvent mapEvent)
         => mapEvent.Component is HideoutEventComponent { IsSendTroops: true };
 
+    /// <summary>Healthy troops the side can send into an auto-resolve, skipping parties on rafts like the native order-attack condition.</summary>
+    public static int CountSimulationTroops(this MapEventSide side)
+    {
+        var count = 0;
+        foreach (var mapEventParty in side.Parties)
+        {
+            if (mapEventParty.Party.MobileParty?.IsInRaftState == true) continue;
+
+            count += mapEventParty.Party.CountSimulationTroops();
+        }
+
+        return count;
+    }
+
     /// <summary>
     /// Finds a party's MapEventParty on either side of the event, without going through PartiesOnSide(side) —
     /// safe to call even after the party's own MapEventSide has already been nulled elsewhere.

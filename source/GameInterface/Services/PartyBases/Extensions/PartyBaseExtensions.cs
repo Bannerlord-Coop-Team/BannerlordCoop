@@ -1,4 +1,5 @@
-﻿using GameInterface.Services.MobileParties.Extensions;
+﻿using GameInterface.Services.Heroes.Extensions;
+using GameInterface.Services.MobileParties.Extensions;
 using SandBox.View.Map.Managers;
 using SandBox.View.Map.Visuals;
 using TaleWorlds.CampaignSystem.Party;
@@ -21,6 +22,26 @@ public static class PartyBaseExtensions
         if (party?.MobileParty == null) return false;
 
         return party.MobileParty.IsPlayerParty();
+    }
+
+    /// <summary>Healthy members that can fight in an auto-resolve; player heroes stay out of it like the native main hero.</summary>
+    public static int CountSimulationTroops(this PartyBase party)
+    {
+        var count = 0;
+        foreach (var element in party.MemberRoster.GetTroopRoster())
+        {
+            if (!element.Character.IsHero)
+            {
+                count += element.Number - element.WoundedNumber;
+                continue;
+            }
+
+            var hero = element.Character.HeroObject;
+            if (!hero.IsWounded && !hero.IsPlayerHero())
+                count++;
+        }
+
+        return count;
     }
 
     public static string GetPartyName(this PartyBase party)

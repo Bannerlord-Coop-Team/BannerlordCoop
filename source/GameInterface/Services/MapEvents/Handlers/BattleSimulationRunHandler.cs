@@ -192,6 +192,14 @@ internal class BattleSimulationRunHandler : IHandler
                 return;
             }
 
+            // Player heroes stay out of simulations, so a side of only player heroes would lose before any fighting.
+            mapEvent.FindMapEventParty(attackerParty.Party, out var requesterSide);
+            if (requesterSide.CountSimulationTroops() == 0)
+            {
+                Logger.Warning("Rejecting battle simulation for map event {MapEventId}: the requester's side has no troops to simulate", mapEventId);
+                return;
+            }
+
             MapEventHostileActionConsequences.Apply(mapEvent, attackerParty.Party, "battle simulation attack");
 
             // v1: simulate the full participating troop count (null), not the player's selected subset.

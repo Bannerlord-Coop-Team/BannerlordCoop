@@ -1,7 +1,9 @@
 ﻿using Common;
 using Common.Logging;
 using GameInterface.Configuration;
+using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Initialization;
+using GameInterface.Services.PartyBases.Extensions;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Helpers;
@@ -135,6 +137,10 @@ internal class BattleModeEncounterOptionsPatch
 
             if (name == OrderAttackCondition && !__result && ShouldShowClientSiegeAttackOption())
                 __result = TryApplyClientSiegeOrderAttackOptionState(__0);
+
+            // Native counts other players' heroes, but the server keeps them out of the simulation.
+            if (__result && MobileParty.MainParty?.MapEventSide?.CountSimulationTroops() == 0)
+                __result = false;
         }
 
         if (name == AttackCondition && !__result && ShouldShowClientSiegeAttackOption())
@@ -278,19 +284,10 @@ internal class BattleModeEncounterOptionsPatch
 
         MenuHelper.CheckEnemyAttackableHonorably(args);
 
-        var orderableTroops = 0;
-        foreach (var party in playerSide.Parties)
-        {
-            if (party.Party.IsMobile && party.Party.MobileParty.IsInRaftState)
-                continue;
-
-            orderableTroops += CountOrderableTroops(party.Party);
-        }
-
-        if (orderableTroops <= 0)
+        if (playerSide.CountSimulationTroops() <= 0)
             return false;
 
-        if (!MobileParty.MainParty.IsInRaftState && CountOrderableTroops(PartyBase.MainParty) > 0)
+        if (!MobileParty.MainParty.IsInRaftState && PartyBase.MainParty.CountSimulationTroops() > 0)
         {
             MBTextManager.SetTextVariable(
                 "SEND_TROOPS_TEXT",
@@ -317,25 +314,6 @@ internal class BattleModeEncounterOptionsPatch
         }
 
         return true;
-    }
-
-    private static int CountOrderableTroops(PartyBase party)
-    {
-        var count = 0;
-        foreach (var element in party.MemberRoster.GetTroopRoster())
-        {
-            if (element.Character.IsHero)
-            {
-                if (element.Character != CharacterObject.PlayerCharacter && !element.Character.HeroObject.IsWounded)
-                    count++;
-            }
-            else
-            {
-                count += element.Number - element.WoundedNumber;
-            }
-        }
-
-        return count;
     }
 
     /// <summary>Native uses the empty main party's morale to disable "Leave it to the others" even when healthy
