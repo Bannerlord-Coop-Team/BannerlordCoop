@@ -1,6 +1,9 @@
-﻿using HarmonyLib;
+﻿using Common;
+using Common.Messaging;
+using HarmonyLib;
 using Missions.Battles;
 using Missions.Messages;
+using Moq;
 using System;
 using System.Reflection;
 using System.Runtime.Serialization;
@@ -28,6 +31,7 @@ public class SiegeGateDestroyedReplayTests : IDisposable
     private static int hitAnimations;
 
     private readonly Harmony harmony = new("coop.tests.siege-gate-destroyed-replay");
+    private readonly SiegeMachineStateReplicator replicator;
 
     public SiegeGateDestroyedReplayTests()
     {
@@ -36,6 +40,9 @@ public class SiegeGateDestroyedReplayTests : IDisposable
         replayAttacker = null;
         replayDamage = -1;
         hitAnimations = 0;
+        replicator = new SiegeMachineStateReplicator(Mock.Of<IBattleNetwork>(), Mock.Of<IMessageBroker>(),
+            Mock.Of<IBattleSession>(), Mock.Of<INetworkAgentRegistry>(), new HostEpochPolicy(),
+            Mock.Of<IRangedSiegeWeaponPresentation>());
         Stub(AccessTools.Method(typeof(ScriptComponentBehavior), "CacheEditableFieldsForAllScriptComponents"), nameof(Skip));
         Stub(AccessTools.Method(typeof(CastleGate), "OnDestroyed"), nameof(RecordDestroyedReplay));
         Stub(AccessTools.Method(typeof(DestructableComponent), nameof(DestructableComponent.SetDestructionLevel)),
@@ -49,7 +56,11 @@ public class SiegeGateDestroyedReplayTests : IDisposable
             new[] { typeof(int), typeof(Vec3), typeof(bool), typeof(bool), typeof(int), typeof(int) }), nameof(Skip));
     }
 
-    public void Dispose() => harmony.UnpatchAll(harmony.Id);
+    public void Dispose()
+    {
+        replicator.Dispose();
+        harmony.UnpatchAll(harmony.Id);
+    }
 
     [Fact]
     public void PeerSnapshot_FirstDestroyedTransition_ReplaysCastleGateOnDestroyedOnce()
@@ -187,7 +198,7 @@ public class SiegeGateDestroyedReplayTests : IDisposable
     {
         var state = new NetworkSiegeMachineState(GateId, hitPoints, destructionState, gateState, -1, -1f,
             false, -1, -1000f, -1000f, hostEpoch: 1, senderControllerId: "host");
-        ApplySnapshotMethod.Invoke(null, new object[] { gate, state });
+        ApplySnapshotMethod.Invoke(replicator, new object[] { gate, state });
     }
 
     private static NetworkGateHit CosmeticHit() => new NetworkGateHit(GateId, 15, 350, "ram-owner", 1, 0);

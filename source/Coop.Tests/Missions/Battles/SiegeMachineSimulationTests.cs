@@ -22,8 +22,11 @@ namespace Coop.Tests.Missions.Battles;
 [Collection("Mission.Current")]
 public class SiegeMachineSimulationTests : IDisposable
 {
-    [Fact]
-    public void DestructionTransitionSnapsAndStopsRamBeforeApplyingBrokenState()
+    [Theory]
+    [InlineData(false, 1, 1)]
+    [InlineData(true, 0, 0)]
+    public void DestructionTransitionSnapsOnlyRemoteRamBeforeApplyingBrokenState(
+        bool localSimulator, int expectedSnapCalls, int expectedResetDistanceErrorCalls)
     {
         using var mission = new MissionCurrentScope();
         var ram = Uninitialized<BatteringRam>();
@@ -48,19 +51,32 @@ public class SiegeMachineSimulationTests : IDisposable
         Stub(AccessTools.Method(typeof(DestructableComponent), "SetDestructionLevel"), nameof(RamSetDestructionLevel));
         Stub(AccessTools.Method(typeof(SiegeMachineStateReplicator), "SyncMissionSiegeWeaponHealth"), nameof(SkipSyncHealth));
 
-        var state = new NetworkSiegeMachineState(ram.Id.Id, 100f, 1, -1, -1, -1f,
+        var movementState = new NetworkSiegeMachineState(ram.Id.Id, 100f, 0, -1, -1, 12.4f,
             false, -1, -1000f, -1000f);
-        var apply = AccessTools.Method(typeof(SiegeMachineStateReplicator), "ApplyMachineState");
-        ReadField<Dictionary<int, float>>(replicator, "lastAppliedMoveDistance")[ram.Id.Id] = ramSnapDistance - 0.1f;
-        ramSnapCalls = 0;
-        apply.Invoke(replicator, new object[] { ram, state });
+        var destructionState = new NetworkSiegeMachineState(ram.Id.Id, 100f, 1, -1, -1, -1f,
+            false, -1, -1000f, -1000f);
+        var apply = AccessTools.Method(typeof(SiegeMachineStateReplicator), "Apply");
+        bool previousHost = SiegeMissionAuthorityGate.IsLocalAuthority;
+        SiegeMissionAuthorityGate.IsLocalAuthority = false;
+        SiegeMissionAuthorityGate.SetClaimedMachines(
+            localSimulator ? new HashSet<int> { ram.Id.Id } : new HashSet<int>(), new HashSet<int>());
+        try
+        {
+            apply.Invoke(replicator, new object[] { ram, movementState });
+            apply.Invoke(replicator, new object[] { ram, destructionState });
 
-        Assert.Equal(1, ramSnapCalls);
-        Assert.Equal(ramSnapDistance - 0.1f, ramSnappedDistance);
-        Assert.Equal(1, ramResetDistanceErrorCalls);
-        Assert.Equal(ramSnapDistance - 0.1f, ramResetDistanceErrorDistance);
-        Assert.Equal(1, ramDestructionCalls);
-        Assert.True(ramSnappedBeforeDestruction);
+            Assert.Equal(expectedSnapCalls, ramSnapCalls);
+            Assert.Equal(localSimulator ? 0f : 12.4f, ramSnappedDistance);
+            Assert.Equal(expectedResetDistanceErrorCalls, ramResetDistanceErrorCalls);
+            if (!localSimulator) Assert.Equal(12.4f, ramResetDistanceErrorDistance);
+            Assert.Equal(1, ramDestructionCalls);
+            Assert.Equal(!localSimulator, ramSnappedBeforeDestruction);
+        }
+        finally
+        {
+            SiegeMissionAuthorityGate.IsLocalAuthority = previousHost;
+            SiegeMissionAuthorityGate.ResetClaimedMachines();
+        }
     }
 
     private static readonly List<SynchedMissionObject> PausedSkeletons = new();
@@ -269,6 +285,9 @@ public class SiegeMachineSimulationTests : IDisposable
 #pragma warning disable SYSLIB0050
         var pile = (ManagedStonePile)FormatterServices.GetUninitializedObject(typeof(ManagedStonePile));
 #pragma warning restore SYSLIB0050
+        using var replicator = new SiegeMachineStateReplicator(Mock.Of<IBattleNetwork>(), new TestMessageBroker(),
+            Mock.Of<IBattleSession>(), Mock.Of<INetworkAgentRegistry>(), new HostEpochPolicy(),
+            Mock.Of<IRangedSiegeWeaponPresentation>());
         pile.SetAmmo(6);
         int machineId = pile.Id.Id;
         bool previousHost = SiegeMissionAuthorityGate.IsLocalAuthority;
@@ -279,9 +298,9 @@ public class SiegeMachineSimulationTests : IDisposable
         {
             var snapshot = new NetworkSiegeMachineState(machineId, -1f, -1, -1, -1, -1f,
                 false, -1, -1000f, -1000f, stoneAmmo: 7);
-            var apply = typeof(SiegeMachineStateReplicator).GetMethod("Apply", BindingFlags.Static | BindingFlags.NonPublic);
+            var apply = AccessTools.Method(typeof(SiegeMachineStateReplicator), "Apply");
             Assert.NotNull(apply);
-            apply.Invoke(null, new object[] { pile, snapshot });
+            apply.Invoke(replicator, new object[] { pile, snapshot });
             Assert.Equal(expectedAmmo, pile.AmmoCount);
         }
         finally

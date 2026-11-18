@@ -1350,7 +1350,7 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             SiegeMissionAuthorityGate.SuppressCapture = true;
             try
             {
-                ApplyMachineState(machine, pending.Value);
+                Apply(machine, pending.Value);
             }
             finally
             {
@@ -1503,7 +1503,7 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             SiegeMissionAuthorityGate.SuppressCapture = true;
             try
             {
-                ApplyMachineState(machine, stateToApply);
+                Apply(machine, stateToApply);
             }
             finally
             {
@@ -1688,24 +1688,21 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         Drop,
     }
 
-    private void ApplyMachineState(UsableMachine machine, NetworkSiegeMachineState state)
-        => ApplyState(machine, state, lastAppliedMoveDistance);
-
-    private static void ApplyState(
-        UsableMachine machine,
-        NetworkSiegeMachineState state,
-        Dictionary<int, float> lastAppliedMoveDistance)
+    private void Apply(UsableMachine machine, NetworkSiegeMachineState state)
     {
+        bool isMachineSimulatedLocally = SiegeMissionAuthorityGate.IsMachineSimulatedLocally(machine.Id.Id);
+        var movement = (machine as BatteringRam)?.MovementComponent
+            ?? (machine as SiegeTower)?.MovementComponent;
+
         // The movement simulator ignores movement echoes (a stale pre-grant broadcast must not
         // fight its own tracker); everyone else eases toward the received distance.
-        if (state.MoveDistance >= 0f)
+        if (state.MoveDistance >= 0f && !isMachineSimulatedLocally)
         {
             lastAppliedMoveDistance[machine.Id.Id] = state.MoveDistance;
         }
 
-        if (state.MoveDistance >= 0f && !SiegeMissionAuthorityGate.IsMachineSimulatedLocally(machine.Id.Id))
+        if (state.MoveDistance >= 0f && !isMachineSimulatedLocally)
         {
-            var movement = (machine as BatteringRam)?.MovementComponent ?? (machine as SiegeTower)?.MovementComponent;
             if (movement != null)
             {
                 // Vanilla MP's steady-state client recipe (MissionNetworkComponent's siege machine movement
@@ -1796,15 +1793,11 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             // matching vanilla's local destruction path.
             if (state.DestructionState > destruction._currentStateIndex)
             {
-                if (lastAppliedMoveDistance.TryGetValue(machine.Id.Id, out float moveDistance))
+                // Snap the authoritative distance before the broken entity is created because it uses the tracker's frame.
+                if (!isMachineSimulatedLocally && movement != null
+                    && lastAppliedMoveDistance.TryGetValue(machine.Id.Id, out float moveDistance))
                 {
-                    var movement = (machine as BatteringRam)?.MovementComponent
-                        ?? (machine as SiegeTower)?.MovementComponent;
-                    if (movement != null)
-                    {
-                        // Snap and stop before the broken entity is created because it uses the ram's tracker frame.
-                        StopMovementAtDestruction(movement, moveDistance);
-                    }
+                    StopMovementAtDestruction(movement, moveDistance);
                 }
                 destruction.SetDestructionLevel(state.DestructionState, -1, 0f, TaleWorlds.Library.Vec3.Zero, TaleWorlds.Library.Vec3.Zero);
             }
@@ -1814,14 +1807,10 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
     private static void StopMovementAtDestruction(SiegeWeaponMovementComponent movement, float moveDistance)
     {
         movement.SetTotalDistanceTraveledForPathTracker(moveDistance);
+        // Clear the client easing error after snapping the tracker.
         movement.SetDistanceTraveledAsClient(moveDistance);
         movement.CurrentSpeed = 0f;
         movement.SetTargetFrameForPathTracker();
-    }
-
-    private static void Apply(UsableMachine machine, NetworkSiegeMachineState state)
-    {
-        ApplyState(machine, state, new Dictionary<int, float>());
     }
 
     internal static bool ShouldSnapMovement(float error)
