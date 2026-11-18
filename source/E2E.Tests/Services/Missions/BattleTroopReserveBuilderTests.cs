@@ -293,9 +293,6 @@ public class BattleTroopReserveBuilderTests : MissionTestEnvironment
             var mapEventParty = mapEvent.DefenderSide.Parties.Last(party => party.Party == lateParty.Party);
             mapEventParty.Update();
             Assert.True(Server.ObjectManager.TryGetId(mapEventParty, out lateMapEventPartyId));
-
-            Server.Resolve<IMessageBroker>().Publish(this,
-                new MapEventInvolvedPartiesAdded(mapEvent, new[] { mapEventParty }));
         }, MapEventDisabledMethods);
 
         var hostFeeds = host.InternalMessages.GetMessages<NetworkBattleTroopReserve>()

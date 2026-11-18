@@ -40,7 +40,7 @@ internal class ArmyManagementCalculationPatches
                 {
                     MobileParty mobileParty2 = warPartyComponent.MobileParty;
                     Hero leaderHero = mobileParty2.LeaderHero;
-                    if (mobileParty2.IsLordParty && mobileParty2.Army == null && mobileParty2 != mobileParty && leaderHero != null && !mobileParty2.IsPlayerParty() && leaderHero != leaderHero.MapFaction.Leader && !mobileParty2.Ai.DoNotMakeNewDecisions)
+                    if (mobileParty2.IsLordParty && mobileParty2.Army == null && mobileParty2 != mobileParty && leaderHero != null && !mobileParty2.IsPlayerParty() && leaderHero != leaderHero.MapFaction.Leader && leaderHero.CanJoinArmy && !mobileParty2.Ai.DoNotMakeNewDecisions)
                     {
                         Settlement currentSettlement = mobileParty2.CurrentSettlement;
                         if (((currentSettlement != null) ? currentSettlement.SiegeEvent : null) == null && !mobileParty2.IsDisbanding && (float)mobileParty2.GetNumDaysForFoodToLast() > Campaign.Current.Models.ArmyManagementCalculationModel.MinimumNeededFoodInDaysToCallToArmy && mobileParty2.PartySizeRatio > Campaign.Current.Models.ArmyManagementCalculationModel.AIMobilePartySizeRatioToCallToArmy && leaderHero.CanLeadParty() && !mobileParty2.IsInRaftState && mobileParty2.MapEvent == null && mobileParty2.BesiegedSettlement == null)

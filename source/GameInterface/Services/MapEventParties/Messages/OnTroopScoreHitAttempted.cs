@@ -20,8 +20,10 @@ public readonly struct OnTroopScoreHitAttempted : IEvent
     public readonly bool IsFatal;
     public readonly bool IsSimulatedHit;
     public readonly WeaponComponentData AttackerWeapon;
+    // The attacker's formation captain, null when it has none. Feeds the captain perk bonus of the xp model.
+    public readonly CharacterObject Captain;
 
-    public OnTroopScoreHitAttempted(MapEventParty mapEventParty, CharacterObject attackingTroop, CharacterObject attackedTroop, int damage, bool isFatal, bool isSimulatedHit, WeaponComponentData attackerWeapon)
+    public OnTroopScoreHitAttempted(MapEventParty mapEventParty, CharacterObject attackingTroop, CharacterObject attackedTroop, int damage, bool isFatal, bool isSimulatedHit, WeaponComponentData attackerWeapon, CharacterObject captain)
     {
         MapEventParty = mapEventParty;
         AttackingTroop = attackingTroop;
@@ -30,5 +32,6 @@ public readonly struct OnTroopScoreHitAttempted : IEvent
         IsFatal = isFatal;
         IsSimulatedHit = isSimulatedHit;
         AttackerWeapon = attackerWeapon;
+        Captain = captain;
     }
 }

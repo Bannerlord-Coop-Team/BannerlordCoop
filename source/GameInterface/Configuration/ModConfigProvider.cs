@@ -1,4 +1,5 @@
 ﻿using ProtoBuf;
+using System.Collections.Generic;
 
 namespace GameInterface.Configuration;
 
@@ -80,6 +81,14 @@ public readonly struct ModOptions
     public readonly ClansAfterKingdomDestructionMode ClansAfterKingdomDestruction { get; } = ClansAfterKingdomDestructionMode.Vanilla;
     [ProtoMember(29)]
     public readonly int PostBattleAiAmnestySeconds { get; } = 0;
+    [ProtoMember(30)]
+    public readonly List<string> PreferredBattleHosts { get; } = new();
+    [ProtoMember(31)]
+    public readonly bool PvpBlockLeave { get; } = false;
+    [ProtoMember(32)]
+    public readonly int PvpResponseTimerSeconds { get; } = 0;
+    [ProtoMember(33)]
+    public readonly bool AllowClientTimeControls { get; } = true;
 
     public ModOptions(ModOptions previous, bool voiceEnabled)
     {
@@ -92,6 +101,7 @@ public readonly struct ModOptions
         VoiceEnabled = modOptionsData.VoiceEnabled ?? VoiceEnabled;
         FastForwardEnabled = modOptionsData.FastForwardEnabled ?? FastForwardEnabled;
         AutoPauseEnabled = modOptionsData.AutoPauseEnabled ?? AutoPauseEnabled;
+        AllowClientTimeControls = modOptionsData.AllowClientTimeControls ?? AllowClientTimeControls;
         ClientsCanUseCheats = modOptionsData.ClientsCanUseCheats ?? ClientsCanUseCheats;
         GoldFoodInfluenceChangeInSettlements = modOptionsData.GoldFoodInfluenceChangeInSettlements ?? GoldFoodInfluenceChangeInSettlements;
         GoldFoodInfluenceChangeInBattles = modOptionsData.GoldFoodInfluenceChangeInBattles ?? GoldFoodInfluenceChangeInBattles;
@@ -118,5 +128,8 @@ public readonly struct ModOptions
         PlayerWoundedBattleEntry = modOptionsData.PlayerWoundedBattleEntry ?? PlayerWoundedBattleEntry;
         KingdomDecisionVoteTimeoutSeconds = modOptionsData.KingdomDecisionVoteTimeoutSeconds ?? KingdomDecisionVoteTimeoutSeconds;
         ClansAfterKingdomDestruction = modOptionsData.ClansAfterKingdomDestruction ?? ClansAfterKingdomDestruction;
+        PreferredBattleHosts = modOptionsData.PreferredBattleHosts?.FindAll(id => id != null) ?? PreferredBattleHosts;
+        PvpBlockLeave = modOptionsData.PvpBlockLeave ?? PvpBlockLeave;
+        PvpResponseTimerSeconds = modOptionsData.PvpResponseTimerSeconds ?? PvpResponseTimerSeconds;
     }
 }

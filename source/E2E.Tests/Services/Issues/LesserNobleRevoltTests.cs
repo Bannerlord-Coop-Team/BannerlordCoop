@@ -209,7 +209,7 @@ public sealed class LesserNobleRevoltTests : IDisposable
             Assert.True(server.ObjectManager.TryGetObject<MobileParty>(defenderPartyId, out var defender));
             var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
             mapEvent.MapEventVisual = ObjectHelper.SkipConstructor<GauntletMapEventVisual>();
-            mapEvent.Initialize(attacker.Party, defender.Party, new FieldBattleEventComponent(mapEvent), MapEvent.BattleTypes.FieldBattle);
+            mapEvent.Initialize(attacker.Party, defender.Party, new FieldBattleEventComponent(mapEvent));
             mapEvent.MapEventVisual = null;
             if (!Campaign.Current.MapEventManager.MapEvents.Contains(mapEvent))
             {
