@@ -329,9 +329,8 @@ internal class BattleModeEncounterOptionsPatch
         if (mapEvent == null || !mapEvent.IsFieldBattle || mapEvent.IsNavalMapEvent || mapEvent.MapEventSettlement != null)
             return;
 
-        // The main party has nobody healthy, so whatever the side counts is the allies'.
-        var playerSide = MobileParty.MainParty.MapEventSide;
-        if (playerSide == null || playerSide.CountSimulationTroops() <= 0) return;
+        // Native only shows the option when the side counts troops; the postfix gate removes the player heroes among them.
+        if (MobileParty.MainParty.MapEventSide == null) return;
         if (IsEnemyTemporarilyProtected()) return;
 
         args.IsEnabled = true;
