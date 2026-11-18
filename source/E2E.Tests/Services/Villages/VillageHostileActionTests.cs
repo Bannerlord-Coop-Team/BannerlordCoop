@@ -482,46 +482,60 @@ public class VillageHostileActionTests : MapEventTestBase
         var target = CreateVillageTarget();
         EnableHeadlessEncounterFinish(client);
         SetMockPlayerEncounter(client);
-        client.Call(() =>
+        var router = client.Resolve<TestNetworkRouter>();
+        router.AutoDrainReady = false;
+        try
         {
-            Campaign.Current.MainParty = client.GetRegisteredObject<MobileParty>(mobilePartyId);
-            var mobileParty = Campaign.Current.MainParty;
-            var settlement = client.GetRegisteredObject<Settlement>(target.SettlementId);
-            mobileParty._currentSettlement = settlement;
-            Campaign.Current.MapStateData.GameMenuId = "village";
-            client.Resolve<IMessageBroker>().Publish(this, new VillageHostileActionAttempted(
-                VillageHostileAction.Raid,
-                mobileParty,
-                settlement));
-        }, MapEventDisabledMethods);
+            client.Call(() =>
+            {
+                Campaign.Current.MainParty = client.GetRegisteredObject<MobileParty>(mobilePartyId);
+                var mobileParty = Campaign.Current.MainParty;
+                var settlement = client.GetRegisteredObject<Settlement>(target.SettlementId);
+                mobileParty._currentSettlement = settlement;
+                Campaign.Current.MapStateData.GameMenuId = "village";
+                client.Resolve<IMessageBroker>().Publish(this, new VillageHostileActionAttempted(
+                    VillageHostileAction.Raid,
+                    mobileParty,
+                    settlement));
+            }, MapEventDisabledMethods);
 
-        Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestVillageHostileAction>());
+            Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestVillageHostileAction>());
+            Assert.Equal(1, router.DrainReady());
+            Assert.Single(Server.NetworkSentMessages.Messages.Where(message =>
+                message is NetworkVillageHostileActionStarted or NetworkVillageHostileActionDenied));
+            Assert.Empty(client.InternalMessages.GetMessages<NetworkVillageHostileActionStarted>());
+            Assert.Empty(client.InternalMessages.GetMessages<NetworkVillageHostileActionDenied>());
 
-        var continuationEncounter = SetMockPlayerEncounter(client);
-        client.Call(() =>
+            var continuationEncounter = SetMockPlayerEncounter(client);
+            client.Call(() =>
+            {
+                Campaign.Current.MapStateData.GameMenuId = "encounter";
+                continuationEncounter.EncounterState = PlayerEncounterState.End;
+                var settlement = client.GetRegisteredObject<Settlement>(target.SettlementId);
+                client.Resolve<IClientVillageHostileActionTracker>().ParkRaidContinuation(settlement);
+                client.Resolve<IMessageBroker>().Publish(this, new CampaignTick());
+            }, MapEventDisabledMethods);
+            Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestVillageHostileAction>());
+
+            client.SimulateMessage(Server.NetPeer,
+                new NetworkVillageHostileActionDenied(VillageHostileActionDeniedReason.AlreadyInMapEvent));
+
+            client.Call(() =>
+            {
+                client.Resolve<IMessageBroker>().Publish(this, new CampaignTick());
+            }, MapEventDisabledMethods);
+
+            Assert.Equal(2, client.NetworkSentMessages.GetMessages<NetworkRequestVillageHostileAction>().Count());
+            client.SimulateMessage(Server.NetPeer,
+                new NetworkVillageHostileActionDenied(VillageHostileActionDeniedReason.AlreadyInMapEvent));
+
+            client.Call(() => Assert.Null(PlayerEncounter.Current),
+                MapEventDisabledMethods);
+        }
+        finally
         {
-            Campaign.Current.MapStateData.GameMenuId = "encounter";
-            continuationEncounter.EncounterState = PlayerEncounterState.End;
-            var settlement = client.GetRegisteredObject<Settlement>(target.SettlementId);
-            client.Resolve<IClientVillageHostileActionTracker>().ParkRaidContinuation(settlement);
-            client.Resolve<IMessageBroker>().Publish(this, new CampaignTick());
-        }, MapEventDisabledMethods);
-        Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestVillageHostileAction>());
-
-        client.SimulateMessage(Server.NetPeer,
-            new NetworkVillageHostileActionDenied(VillageHostileActionDeniedReason.AlreadyInMapEvent));
-
-        client.Call(() =>
-        {
-            client.Resolve<IMessageBroker>().Publish(this, new CampaignTick());
-        }, MapEventDisabledMethods);
-
-        Assert.Equal(2, client.NetworkSentMessages.GetMessages<NetworkRequestVillageHostileAction>().Count());
-        client.SimulateMessage(Server.NetPeer,
-            new NetworkVillageHostileActionDenied(VillageHostileActionDeniedReason.AlreadyInMapEvent));
-
-        client.Call(() => Assert.Null(PlayerEncounter.Current),
-            MapEventDisabledMethods);
+            router.AutoDrainReady = true;
+        }
     }
 
     [Fact]
