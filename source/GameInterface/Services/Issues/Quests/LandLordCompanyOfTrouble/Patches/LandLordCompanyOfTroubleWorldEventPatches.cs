@@ -22,6 +22,11 @@ internal static class LandLordCompanyOfTroubleWorldEventPatches
     private static void MobilePartyDestroyed(MobileParty mobileParty, PartyBase destroyerParty) =>
         Run(service => service.OnMobilePartyDestroyed(mobileParty, destroyerParty));
 
+    // Vanilla removes the mercenaries from the main party, so it only runs on the server inside the owner's scope while the owner still has a party
+    [HarmonyPatch(typeof(Quest), nameof(Quest.OnFinalize))]
+    [HarmonyPrefix]
+    private static bool FinalizePrefix() => ModInformation.IsServer && MobileParty.MainParty != null;
+
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnFinalize))]
     [HarmonyPostfix]
     private static void FinalizePostfix(Quest __instance) => Run(service => service.RemoveCompanyOf(__instance));
@@ -41,10 +46,18 @@ internal static class LandLordCompanyOfTroubleWorldEventPatches
     [HarmonyPrefix]
     private static bool MapEventStartedPrefix() => ModInformation.IsServer;
 
-    // Vanilla removes the mercenaries from the main party here, the server removes them from the owner's party when it has one
-    [HarmonyPatch(typeof(Quest), nameof(Quest.OnFinalize))]
+    // A captive owner has no mercenaries left, and vanilla's count check would then reopen the company menu over the prisoner menu every hour
+    [HarmonyPatch(typeof(Quest), nameof(Quest.HourlyTick))]
     [HarmonyPrefix]
-    private static bool FinalizePrefix() => ModInformation.IsServer && MobileParty.MainParty != null;
+    private static bool HourlyTickPrefix(Quest __instance)
+    {
+        if (ModInformation.IsServer)
+        {
+            return true;
+        }
+
+        return !Hero.MainHero.IsPrisoner && MobileParty.MainParty.MemberRoster.Contains(__instance._troubleCharacterObject);
+    }
 
     private static void Run(Action<ILandLordCompanyOfTroubleService> action)
     {

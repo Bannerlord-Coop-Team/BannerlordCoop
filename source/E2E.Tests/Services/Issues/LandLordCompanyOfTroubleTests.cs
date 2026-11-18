@@ -40,6 +40,7 @@ public class LandLordCompanyOfTroubleTests : IDisposable
     private const string OwnerControllerId = "player-A";
     private const string OtherIssueId = "issue_company_of_trouble_2";
     private const string OtherControllerId = "player-B";
+    private const int RewardGold = 500;
 
     private static readonly MethodBase[] CharacterLinks = AccessTools.GetDeclaredMethods(typeof(StringHelpers))
         .Where(method => method.Name == nameof(StringHelpers.SetCharacterProperties))
@@ -210,7 +211,7 @@ public class LandLordCompanyOfTroubleTests : IDisposable
             MBObjectManager.Instance.RegisterObject(troop);
 
             var issue = AttachQuest(Server, companyTroopCount: 4);
-            ((Quest)issue.IssueQuest)._troubleCharacterObject = null;
+            LoseTheUnsavedTroubleCharacterLikeALoadedSave((Quest)issue.IssueQuest);
 
             issue.IssueFinalized();
         });
@@ -271,7 +272,7 @@ public class LandLordCompanyOfTroubleTests : IDisposable
         EndFightOnServer(companyPartyId, BattleState.AttackerVictory);
         TestEnvironment.FlushCoalescer();
 
-        Assert.Equal(500, GoldOfOwner() - goldBefore);
+        Assert.Equal(RewardGold, GoldOfOwner() - goldBefore);
         Assert.Equal(5, quest.RelationshipChangeWithQuestGiver);
         Assert.Equal(1, questEndings.Count);
     }
@@ -311,6 +312,34 @@ public class LandLordCompanyOfTroubleTests : IDisposable
         EndFightOnServer(companyPartyId, BattleState.DefenderVictory);
 
         Assert.Equal(-2, quest.RelationshipChangeWithQuestGiver);
+        Assert.Equal(1, questEndings.Count);
+    }
+
+    [Fact]
+    public void LosingABattleAsAPrisoner_WithTheMercenariesGone_PaysTheOwnerAndSucceeds()
+    {
+        var enemyPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        SetOwner();
+        var goldBefore = GoldOfOwner();
+        Quest quest = null!;
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var ownerHero));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(enemyPartyId, out var enemy));
+            quest = (Quest)AttachQuest(Server, companyTroopCount: 3).IssueQuest;
+
+            using (new AllowedThread())
+            {
+                ownerHero._partyBelongedTo = null;
+                ownerHero.PartyBelongedToAsPrisoner = enemy.Party;
+            }
+        });
+        EndFightOnServer(enemyPartyId, BattleState.DefenderVictory);
+        TestEnvironment.FlushCoalescer();
+
+        Assert.Equal(RewardGold, GoldOfOwner() - goldBefore);
+        Assert.Equal(5, quest.RelationshipChangeWithQuestGiver);
         Assert.Equal(1, questEndings.Count);
     }
 
@@ -489,9 +518,11 @@ public class LandLordCompanyOfTroubleTests : IDisposable
         var otherLordId = TestEnvironment.CreateRegisteredObject<Hero>();
         var otherHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
         var otherPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var otherCompanyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         GiveMercenaries(4);
         GiveTheLordTheIssue(Server, otherLordId, OtherIssueId);
         var otherMercenaries = 0;
+        var otherCompanyMercenaries = 0;
 
         Server.Call(() =>
         {
@@ -499,6 +530,7 @@ public class LandLordCompanyOfTroubleTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(otherLordId, out var otherLord));
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(otherHeroId, out var otherHero));
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(otherPartyId, out var otherParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(otherCompanyId, out var otherCompany));
             Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(lordId, out var lord));
 
@@ -508,18 +540,23 @@ public class LandLordCompanyOfTroubleTests : IDisposable
             }
 
             otherParty.MemberRoster.AddToCounts(troop, 3);
-            AttachQuest(otherLord, troop, companyTroopCount: 3);
+            otherCompany.MemberRoster.AddToCounts(troop, 2);
+            var otherQuest = (Quest)AttachQuest(otherLord, troop, companyTroopCount: 3).IssueQuest;
+            otherQuest._companyOfTroubleParty = otherCompany;
+            otherCompany.SetPartyUsedByQuest(true);
             Assert.True(Server.Resolve<IIssueOwnershipRegistry>().TrySetOwner(otherLordId, OtherIssueId, OtherControllerId));
             AttachQuest(Server, companyTroopCount: 4);
 
             lord.Issue.IssueFinalized();
 
             otherMercenaries = otherParty.MemberRoster.GetTroopCount(troop);
+            otherCompanyMercenaries = otherCompany.MemberRoster.GetTroopCount(troop);
         });
         Server.PumpGameThread();
 
         Assert.Equal(0, MercenariesIn(Server));
         Assert.Equal(3, otherMercenaries);
+        Assert.Equal(2, otherCompanyMercenaries);
     }
 
     [Fact]
@@ -534,7 +571,7 @@ public class LandLordCompanyOfTroubleTests : IDisposable
         EndFightOnServer(enemyPartyId, BattleState.AttackerVictory);
         TestEnvironment.FlushCoalescer();
 
-        Assert.Equal(500, GoldOfOwner() - goldBefore);
+        Assert.Equal(RewardGold, GoldOfOwner() - goldBefore);
         Assert.Equal(5, quest.RelationshipChangeWithQuestGiver);
         Assert.Equal(1, questEndings.Count);
     }
@@ -663,7 +700,7 @@ public class LandLordCompanyOfTroubleTests : IDisposable
             {
                 troop.StringId = troopStringId;
                 bandits.MemberRoster.AddToCounts(troop, 4);
-                bandits._isInRaftState = true;
+                MakeVanillaSurrenderWithoutItsOwnChecks(bandits);
                 Campaign.Current.MainParty = ownerParty;
                 Campaign.Current.ConversationManager._conversationParty = bandits;
             }
@@ -672,6 +709,16 @@ public class LandLordCompanyOfTroubleTests : IDisposable
         });
 
         return surrenders;
+    }
+
+    private static void MakeVanillaSurrenderWithoutItsOwnChecks(MobileParty bandits)
+    {
+        bandits._isInRaftState = true;
+    }
+
+    private static void LoseTheUnsavedTroubleCharacterLikeALoadedSave(Quest quest)
+    {
+        quest._troubleCharacterObject = null;
     }
 
     private bool CompanyDialogOpens(string conversationPartyId)
@@ -734,15 +781,13 @@ public class LandLordCompanyOfTroubleTests : IDisposable
         return mapEvent;
     }
 
-    private int GoldOfOwner() => GoldOfOwnerOn(Server);
-
-    private int GoldOfOwnerOn(EnvironmentInstance instance)
+    private int GoldOfOwner()
     {
         var gold = 0;
 
-        instance.Call(() =>
+        Server.Call(() =>
         {
-            Assert.True(instance.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var ownerHero));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var ownerHero));
             gold = ownerHero.Gold;
         });
 
@@ -831,7 +876,7 @@ public class LandLordCompanyOfTroubleTests : IDisposable
         quest._companyTroopCount = companyTroopCount;
         quest._questState = QuestBase.QuestStates.Ongoing;
         AccessTools.Field(typeof(QuestBase), nameof(QuestBase._journalEntries)).SetValue(quest, new MBList<JournalLog>());
-        AccessTools.Field(typeof(QuestBase), nameof(QuestBase.RewardGold)).SetValue(quest, 500);
+        AccessTools.Field(typeof(QuestBase), nameof(QuestBase.RewardGold)).SetValue(quest, RewardGold);
 
         lord.Issue.IssueQuest = quest;
         return lord.Issue;

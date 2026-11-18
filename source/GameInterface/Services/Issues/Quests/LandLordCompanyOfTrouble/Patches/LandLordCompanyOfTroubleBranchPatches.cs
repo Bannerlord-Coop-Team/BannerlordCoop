@@ -51,7 +51,7 @@ internal class LandLordCompanyOfTroubleBranchPatches
         return false;
     }
 
-    // The line kept is vanilla's UI part, the server spawns the company from the owner's mercenaries
+    // The server spawns the company from the owner's mercenaries, the client leaves the company menu because the fight now happens on the map
     [HarmonyPatch(typeof(Quest), nameof(Quest.CreateCompanyEnemyParty))]
     [HarmonyPrefix]
     private static bool CompanyTurnedHostilePrefix(Quest __instance)

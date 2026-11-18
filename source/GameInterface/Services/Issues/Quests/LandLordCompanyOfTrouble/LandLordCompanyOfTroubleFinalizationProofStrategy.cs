@@ -73,7 +73,7 @@ internal class LandLordCompanyOfTroubleFinalizationProofStrategy : IFinalization
         quest.CompleteQuestWithFail();
     }
 
-    // Vanilla's CreateCompanyEnemyParty, but the company chases the owner on the map instead of setting _battleWillStart for an immediate battle
+    // Vanilla's CreateCompanyEnemyParty, which still sets _battleWillStart, but only the client's menu reads it, so the company chases the owner on the map instead
     private static void TurnCompanyHostile(Quest quest)
     {
         if (quest._companyOfTroubleParty != null)

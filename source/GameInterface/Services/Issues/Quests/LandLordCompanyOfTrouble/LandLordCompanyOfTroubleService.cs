@@ -1,5 +1,8 @@
 ﻿using Common;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -34,11 +37,15 @@ internal class LandLordCompanyOfTroubleService : ILandLordCompanyOfTroubleServic
 {
     private readonly IOutcomeDispatcher dispatcher;
     private readonly IIssueOwnerResolver ownerResolver;
+    private readonly IPlayerManager players;
+    private readonly IObjectManager objectManager;
 
-    public LandLordCompanyOfTroubleService(IOutcomeDispatcher dispatcher, IIssueOwnerResolver ownerResolver)
+    public LandLordCompanyOfTroubleService(IOutcomeDispatcher dispatcher, IIssueOwnerResolver ownerResolver, IPlayerManager players, IObjectManager objectManager)
     {
         this.dispatcher = dispatcher;
         this.ownerResolver = ownerResolver;
+        this.players = players;
+        this.objectManager = objectManager;
     }
 
     public void RemoveCompanyOf(Quest quest)
@@ -91,22 +98,30 @@ internal class LandLordCompanyOfTroubleService : ILandLordCompanyOfTroubleServic
         dispatcher.RunAsOwners<Quest>(quest => OnPartyDestroyed(quest, mobileParty, destroyerParty));
     }
 
-    private static void OnMapEventEnded(Quest quest, MapEvent mapEvent)
+    private void OnMapEventEnded(Quest quest, MapEvent mapEvent)
     {
-        var company = quest._companyOfTroubleParty;
-        var owner = Hero.MainHero;
-
-        // Losing to the company takes the owner prisoner, which leaves them without a party when the battle ends
-        if (owner?.PartyBelongedTo == null)
+        if (MobileParty.MainParty != null)
         {
-            if (company != null && owner?.PartyBelongedToAsPrisoner == company.Party)
-            {
-                quest.QuestFailWithPlayerDefeatedAgainstCompany();
-            }
-
+            EndAfterBattle(quest, mapEvent);
             return;
         }
 
+        // Losing a battle takes the owner prisoner, which leaves them without a party, so the party they fought with stands in
+        var owner = Hero.MainHero;
+        if (!players.TryGetPlayer(owner, out var player) || !objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var ownerParty))
+        {
+            return;
+        }
+
+        using (new MainHeroSubstitutionScope(owner, ownerParty))
+        {
+            EndAfterBattle(quest, mapEvent);
+        }
+    }
+
+    private static void EndAfterBattle(Quest quest, MapEvent mapEvent)
+    {
+        var company = quest._companyOfTroubleParty;
         var involvedParties = mapEvent.InvolvedParties.ToList();
         var end = ClassifyBattleEnd(
             ownerInvolved: involvedParties.Contains(PartyBase.MainParty),
