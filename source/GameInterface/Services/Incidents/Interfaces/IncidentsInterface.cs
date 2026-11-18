@@ -19,11 +19,10 @@ public class IncidentsInterface : IIncidentsInterface
 {
     public bool TryPrepareIncidentText(Incident incident, long activeIncidentSeed)
     {
-        var incidentsBehavior = Campaign.Current?.GetCampaignBehavior<IncidentsCampaignBehaviour>();
-        if (incidentsBehavior == null) return false;
+        if (Campaign.Current?.GetCampaignBehavior<IncidentsCampaignBehaviour>() == null) return false;
 
         // Same seed the server rolled with, so the text names the same targets the server applies effects to
-        incidentsBehavior._activeIncidentSeed = activeIncidentSeed;
+        Campaign.Current.IncidentManager._activeIncidentSeed = activeIncidentSeed;
 
         return incident.CanIncidentBeInvoked();
     }
@@ -32,11 +31,10 @@ public class IncidentsInterface : IIncidentsInterface
     {
         incidentOutcomes = new List<TextObject>();
 
-        var incidentsBehavior = Campaign.Current?.GetCampaignBehavior<IncidentsCampaignBehaviour>();
-        if (incidentsBehavior == null) return false;
+        if (Campaign.Current?.GetCampaignBehavior<IncidentsCampaignBehaviour>() == null) return false;
 
-        // Vanilla conditions and effects pick their targets with the behaviour's seed, so use the one this player's incident was rolled with
-        incidentsBehavior._activeIncidentSeed = activeIncidentSeed;
+        // Vanilla conditions and effects pick their targets with the incident manager's seed, so use the one this player's incident was rolled with
+        Campaign.Current.IncidentManager._activeIncidentSeed = activeIncidentSeed;
 
         using (new MainHeroSubstitutionScope(mainHero, mainParty))
         {

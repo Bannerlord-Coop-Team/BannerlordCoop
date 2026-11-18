@@ -518,6 +518,7 @@ public class CoopClanFlowTests : MapEventTestBase, IDisposable
             heir.SetBirthDay(CampaignTime.YearsFromNow(-20));
             heir.Father = original;
             heir.Clan = original.Clan;
+            heir.CanRaid = false;
             Get<MobileParty>(Server, player.MobilePartyId).MemberRoster.AddToCounts(heir.CharacterObject, 1);
             Server.Resolve<IHeirSelectionCampaignBehaviorInterface>().PrepareSuccession(original);
             original.AddDeathMark(null, KillCharacterAction.KillCharacterActionDetail.DiedInBattle);
@@ -538,6 +539,8 @@ public class CoopClanFlowTests : MapEventTestBase, IDisposable
                 var heir = Get<Hero>(instance, heirId);
                 Assert.Same(heir, Get<MobileParty>(instance, player.MobilePartyId).LeaderHero);
                 Assert.Equal(leaderDies, heir.Clan.Leader == heir);
+                // The new player character's party commands are reset.
+                Assert.True(heir.CanRaid);
             });
         }
         if (!leaderDies)

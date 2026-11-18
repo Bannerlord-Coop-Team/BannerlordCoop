@@ -32,19 +32,22 @@ internal class RomanceHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly IPlayerManager playerManager;
     private readonly IRomanceAuthority romanceAuthority;
+    private readonly IRomanceRetryCooldown retryCooldown;
 
     public RomanceHandler(
         IMessageBroker messageBroker,
         INetwork network,
         IObjectManager objectManager,
         IPlayerManager playerManager,
-        IRomanceAuthority romanceAuthority)
+        IRomanceAuthority romanceAuthority,
+        IRomanceRetryCooldown retryCooldown)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.playerManager = playerManager;
         this.romanceAuthority = romanceAuthority;
+        this.retryCooldown = retryCooldown;
 
         messageBroker.Subscribe<AllGameObjectsRegistered>(Handle_AllGameObjectsRegistered);
         messageBroker.Subscribe<RomanticStateChangeRequested>(Handle_RomanticStateChangeRequested);
@@ -125,11 +128,15 @@ internal class RomanceHandler : IHandler
                 return;
             }
 
+            var currentLevel = Romance.GetRomanticLevel(playerHero, targetHero);
             if (!TryApplyClientStateFields(playerHero, targetHero, request, out reason))
             {
                 Reject(peer, reason);
                 return;
             }
+
+            // Before the change, so the snapshot that the change sends carries the cooldown.
+            retryCooldown.OnStateChange(playerHero, targetHero, currentLevel, requestedLevel);
 
             ChangeRomanticStateAction.Apply(playerHero, targetHero, requestedLevel);
         }, context: nameof(Handle_NetworkRequestRomanceStateChange));
@@ -248,7 +255,8 @@ internal class RomanceHandler : IHandler
                 state.Level,
                 state.ProgressToNextLevel,
                 state.LastVisit,
-                state.ScoreFromPersuasion));
+                state.ScoreFromPersuasion,
+                retryCooldown.FailureTicks(state.Person1, state.Person2, state.Level)));
         }
 
         return result.ToArray();
@@ -296,6 +304,7 @@ internal class RomanceHandler : IHandler
                 romanticState.ProgressToNextLevel = state.Data.ProgressToNextLevel;
                 romanticState.LastVisit = state.Data.LastVisit;
                 romanticState.ScoreFromPersuasion = state.Data.ScoreFromPersuasion;
+                retryCooldown.RestoreLocalFailure(state.Person1, state.Person2, romanticState.Level, state.Data.FailedAtTicks);
             }
         }
     }
