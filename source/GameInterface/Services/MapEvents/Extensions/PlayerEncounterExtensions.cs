@@ -63,5 +63,5 @@ public static class PlayerEncounterExtensions
     /// The encounter's own map event, else the battle it faces, else the main party's battle.
     /// </summary>
     public static MapEvent GetBattleOrPlayerMapEvent(this PlayerEncounter playerEncounter) =>
-        playerEncounter._mapEvent ?? playerEncounter.GetEncounteredBattleOrNull() ?? MapEvent.PlayerMapEvent;
+        playerEncounter?._mapEvent ?? playerEncounter.GetEncounteredBattleOrNull() ?? MapEvent.PlayerMapEvent;
 }

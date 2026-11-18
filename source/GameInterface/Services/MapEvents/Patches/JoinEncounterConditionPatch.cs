@@ -18,10 +18,12 @@ namespace GameInterface.Services.MapEvents.Patches;
 [HarmonyPatch]
 internal class JoinEncounterConditionPatch
 {
+    private const string HelpAttackersCondition = nameof(EncounterGameMenuBehavior.game_menu_join_encounter_help_attackers_on_condition);
+
     private static IEnumerable<MethodBase> TargetMethods()
     {
-        yield return AccessTools.Method(typeof(EncounterGameMenuBehavior), "game_menu_join_encounter_help_attackers_on_condition");
-        yield return AccessTools.Method(typeof(EncounterGameMenuBehavior), "game_menu_join_encounter_help_defenders_on_condition");
+        yield return AccessTools.Method(typeof(EncounterGameMenuBehavior), HelpAttackersCondition);
+        yield return AccessTools.Method(typeof(EncounterGameMenuBehavior), nameof(EncounterGameMenuBehavior.game_menu_join_encounter_help_defenders_on_condition));
     }
 
     // Refuses the join option while vanilla's condition would throw, before the server sets the battle up on this
@@ -30,7 +32,9 @@ internal class JoinEncounterConditionPatch
     private static bool Prefix(MenuCallbackArgs args, ref bool __result)
     {
         if (ModInformation.IsServer) return true;
-        if (HasLeaderParties(PlayerEncounter.Current.GetEncounteredBattleOrNull())) return true;
+
+        var battle = PlayerEncounter.Current.GetEncounteredBattleOrNull();
+        if (HasLeaderParties(battle)) return true;
 
         __result = false;
         args.IsEnabled = false;
@@ -46,14 +50,8 @@ internal class JoinEncounterConditionPatch
     [HarmonyPostfix]
     private static void Postfix(MethodBase __originalMethod, MenuCallbackArgs args, ref bool __result)
     {
-        if (!PlayerEncounter.Current.GetEncounteredBattleOrNull().IsActiveSlowVillageRaid())
-            return;
-
-        if (!RaidJoinEncounterPatch.TryGetJoinSide(__originalMethod, out var side) ||
-            side == BattleSideEnum.Defender)
-        {
-            return;
-        }
+        if (__originalMethod.Name != HelpAttackersCondition) return;
+        if (!PlayerEncounter.Current.GetEncounteredBattleOrNull().IsActiveSlowVillageRaid()) return;
 
         __result = false;
         args.IsEnabled = false;

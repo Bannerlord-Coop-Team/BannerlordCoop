@@ -51,7 +51,7 @@ public class EncounterJoinOptionTests : MapEventTestBase
     {
         var client = Clients.First();
         var ctx = CreateServerMapEvent();
-        SetMockPlayerEncounter(client, ctx.AttackerPartyId, ctx.MapEventId);
+        SetMockPlayerEncounter(client, ctx.AttackerPartyId);
 
         client.Call(() =>
         {

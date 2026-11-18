@@ -71,17 +71,15 @@ internal class RaidJoinEncounterPatch
         GameMenu.SwitchToMenu("encounter");
     }
 
-    internal static bool TryGetJoinSide(MethodBase method, out BattleSideEnum side)
+    private static bool TryGetJoinSide(MethodBase method, out BattleSideEnum side)
     {
-        if (method?.Name == "game_menu_join_encounter_help_attackers_on_consequence" ||
-            method?.Name == "game_menu_join_encounter_help_attackers_on_condition")
+        if (method?.Name == "game_menu_join_encounter_help_attackers_on_consequence")
         {
             side = BattleSideEnum.Attacker;
             return true;
         }
 
-        if (method?.Name == "game_menu_join_encounter_help_defenders_on_consequence" ||
-            method?.Name == "game_menu_join_encounter_help_defenders_on_condition")
+        if (method?.Name == "game_menu_join_encounter_help_defenders_on_consequence")
         {
             side = BattleSideEnum.Defender;
             return true;
