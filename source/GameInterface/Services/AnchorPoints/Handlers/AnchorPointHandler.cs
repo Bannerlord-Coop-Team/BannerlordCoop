@@ -8,8 +8,6 @@ using GameInterface.Services.Players;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.Library;
-using TaleWorlds.Localization;
 
 namespace GameInterface.Services.AnchorPoints.Handlers;
 
@@ -37,9 +35,6 @@ internal class AnchorPointHandler : IHandler
         messageBroker.Subscribe<CallFleetRequested>(Handle_CallFleetRequested);
         messageBroker.Subscribe<NetworkCallFleet>(Handle_NetworkCallFleet);
 
-        messageBroker.Subscribe<FleetArrived>(Handle_FleetArrived);
-        messageBroker.Subscribe<NetworkNotifyFleetArrived>(Handle_NetworkNotifyFleetArrived);
-
         messageBroker.Subscribe<EmbarkAtAnchorRequested>(Handle_EmbarkAtAnchorRequested);
         messageBroker.Subscribe<NetworkEmbarkAtAnchor>(Handle_NetworkEmbarkAtAnchor);
     }
@@ -48,9 +43,6 @@ internal class AnchorPointHandler : IHandler
     {
         messageBroker.Unsubscribe<CallFleetRequested>(Handle_CallFleetRequested);
         messageBroker.Unsubscribe<NetworkCallFleet>(Handle_NetworkCallFleet);
-
-        messageBroker.Unsubscribe<FleetArrived>(Handle_FleetArrived);
-        messageBroker.Unsubscribe<NetworkNotifyFleetArrived>(Handle_NetworkNotifyFleetArrived);
 
         messageBroker.Unsubscribe<EmbarkAtAnchorRequested>(Handle_EmbarkAtAnchorRequested);
         messageBroker.Unsubscribe<NetworkEmbarkAtAnchor>(Handle_NetworkEmbarkAtAnchor);
@@ -112,30 +104,6 @@ internal class AnchorPointHandler : IHandler
             if (anchor.IsAtSettlement(settlement) || (anchor.IsMovingToPoint && anchor.IsTargetingSettlement(settlement))) return;
 
             anchor.CallFleet(settlement);
-        });
-    }
-
-    private void Handle_FleetArrived(MessagePayload<FleetArrived> obj)
-    {
-        if (!objectManager.TryGetIdWithLogging(obj.What.MobileParty, out var mobilePartyId)) return;
-
-        network.SendAll(new NetworkNotifyFleetArrived(mobilePartyId));
-    }
-
-    private void Handle_NetworkNotifyFleetArrived(MessagePayload<NetworkNotifyFleetArrived> obj)
-    {
-        var data = obj.What;
-
-        GameThread.RunSafe(() =>
-        {
-            if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.MobilePartyId, out var mobileParty)) return;
-            if (mobileParty != MobileParty.MainParty) return;
-
-            // Same message vanilla AnchorPoint.HourlyTick shows for MobileParty.MainParty
-            InformationManager.DisplayMessage(new InformationMessage(new TextObject("{=qFAhDtrw}Your fleet has arrived at its destination.").ToString(), new Color(0f, 1f, 0f))
-            {
-                SoundEventPath = "event:/ui/panels/panel_call_fleet"
-            });
         });
     }
 }

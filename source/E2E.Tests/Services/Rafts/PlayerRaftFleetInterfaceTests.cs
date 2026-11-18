@@ -43,7 +43,7 @@ public class PlayerRaftFleetInterfaceTests : SyncTestBase
             Assert.False(party.IsInRaftState);
             Assert.False(CachedFleets().ContainsKey(heroId));
             Assert.False(party.Anchor.IsValid);
-            Assert.Equal(new Vec2(11f, 21f), party.Anchor.GetLastUsedDisembarkPosition().ToVec2());
+            Assert.Equal(new Vec2(11f, 21f), party.Anchor._lastUsedDisembarkPosition.ToVec2());
         });
         foreach (var client in Clients)
         {
@@ -208,7 +208,7 @@ public class PlayerRaftFleetInterfaceTests : SyncTestBase
             Assert.Same(Server.GetRegisteredObject<ShipUpgradePiece>(fleet.PieceId), ship.GetPieceAtSlot("slot1"));
 
             Assert.Equal(new Vec2(30f, 40f), party.Anchor.Position.ToVec2());
-            Assert.Equal(new Vec2(31f, 41f), party.Anchor.GetLastUsedDisembarkPosition().ToVec2());
+            Assert.Equal(new Vec2(31f, 41f), party.Anchor._lastUsedDisembarkPosition.ToVec2());
         }, RaftDisabledMethods);
 
         foreach (var client in Clients)
@@ -283,7 +283,7 @@ public class PlayerRaftFleetInterfaceTests : SyncTestBase
             Assert.True(Server.ObjectManager.TryGetId(ship, out returnedShipId));
             Assert.Same(Server.GetRegisteredObject<ShipHull>(fleet.HullId), ship.ShipHull);
             Assert.Equal(new Vec2(30f, 40f), party.Anchor.Position.ToVec2());
-            Assert.Equal(new Vec2(31f, 41f), party.Anchor.GetLastUsedDisembarkPosition().ToVec2());
+            Assert.Equal(new Vec2(31f, 41f), party.Anchor._lastUsedDisembarkPosition.ToVec2());
         }, RaftDisabledMethods);
 
         foreach (var client in Clients)
@@ -361,7 +361,7 @@ public class PlayerRaftFleetInterfaceTests : SyncTestBase
             Assert.True(Server.ObjectManager.TryGetId(ship, out shipId));
 
             party._isCurrentlyAtSea = true;
-            party.Anchor.SetPosition(new CampaignVec2(new Vec2(30f, 40f), false));
+            party.Anchor.Position = new CampaignVec2(new Vec2(30f, 40f), false);
             party.Anchor.SetLastUsedDisembarkPosition(new CampaignVec2(new Vec2(31f, 41f), true));
         });
 

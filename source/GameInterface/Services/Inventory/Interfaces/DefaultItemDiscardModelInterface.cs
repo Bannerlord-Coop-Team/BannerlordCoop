@@ -49,11 +49,11 @@ public class DefaultItemDiscardModelInterface : IDefaultItemDiscardModelInterfac
         bool result = false;
         if (item.HasWeaponComponent)
         {
-            result = playerParty.HasPerk(DefaultPerks.Steward.GivingHands, false);
+            result = playerParty.HasPerk(DefaultPerks.Steward.GivingHands);
         }
         else if (item.HasArmorComponent)
         {
-            result = playerParty.HasPerk(DefaultPerks.Steward.PaidInPromise, true);
+            result = playerParty.HasPerk(DefaultPerks.Steward.PaidInPromise, checkSecondaryRole: true);
         }
         return result;
     }

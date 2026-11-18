@@ -97,7 +97,7 @@ internal class CraftingCampaignBehaviorTownOrderHandler : IHandler
             if (!craftingCampaignBehaviorInterface.TryGetCraftingBehavior(out var craftingBehavior)) return;
 
             // Replace TaleWorlds implementation for server
-            float townOrderDifficulty = CraftingCampaignBehavior.GetTownOrderDifficulty(obj.OrderOwner.CurrentSettlement.Town, obj.OrderSlot);
+            float townOrderDifficulty = CraftingCampaignBehavior.GetTownOrderDifficulty(obj.Town, obj.OrderSlot);
             int pieceTier = (int)townOrderDifficulty / 50;
             CraftingTemplate randomElement = CraftingTemplate.All.GetRandomElement<CraftingTemplate>();
             string nextTownOrderId = craftingBehavior.GetNextTownOrderId();
@@ -111,7 +111,7 @@ internal class CraftingCampaignBehaviorTownOrderHandler : IHandler
                 order.PreCraftedWeaponDesignItem.StringId = nextTownOrderId;
             }
 
-            craftingBehavior._craftingOrders[obj.OrderOwner.CurrentSettlement.Town].AddTownOrder(order);
+            craftingBehavior._craftingOrders[obj.Town].AddTownOrder(order);
 
             SendTownOrderCreated(obj, order, randomElement, pieceTier, nextTownOrderId);
         });
@@ -123,6 +123,7 @@ internal class CraftingCampaignBehaviorTownOrderHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(randomElement, out var randomElementId)) return;
 
         if (!objectManager.TryGetIdWithLogging(craftingOrder, out var craftingOrderId)) return;
+        if (!objectManager.TryGetIdWithLogging(obj.Town, out var townId)) return;
 
         // Send to clients from server
         NetworkCreateTownOrder message = new(
@@ -130,7 +131,8 @@ internal class CraftingCampaignBehaviorTownOrderHandler : IHandler
             craftingOrderId,
             randomElementId,
             pieceTier,
-            nextTownOrderId
+            nextTownOrderId,
+            townId
         );
         network.SendAll(message);
     }
@@ -143,6 +145,7 @@ internal class CraftingCampaignBehaviorTownOrderHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging(obj.RandomElementId, out CraftingTemplate randomElement)) return;
             if (!objectManager.TryGetObjectWithLogging(obj.OrderOwnerId, out Hero orderOwner)) return;
             if (!objectManager.TryGetObjectWithLogging(obj.CraftingOrderId, out CraftingOrder craftingOrder)) return;
+            if (!objectManager.TryGetObjectWithLogging(obj.TownId, out Town town)) return;
 
             using (new AllowedThread())
             {
@@ -152,11 +155,11 @@ internal class CraftingCampaignBehaviorTownOrderHandler : IHandler
                 craftingOrder._preCraftedWeaponDesignItemData = new CraftingCampaignBehavior.CraftedItemInitializationData(craftingOrder.WeaponDesignTemplate, craftingOrder.PreCraftedWeaponDesignItem.Name, craftingOrder.OrderOwner.Culture);
 
                 // Replace TaleWorlds implementation
-                craftingBehavior._craftingOrders[orderOwner.CurrentSettlement.Town].AddTownOrder(craftingOrder);
+                craftingBehavior._craftingOrders[town].AddTownOrder(craftingOrder);
             }
 
             // Need to refresh client weapon designs for potential new orders while in CraftingState
-            MessageBroker.Instance.Publish(this, new RefreshWeaponDesignVM(orderOwner.CurrentSettlement.Town));
+            MessageBroker.Instance.Publish(this, new RefreshWeaponDesignVM(town));
         });
     }
 
