@@ -14,7 +14,6 @@ public class ModConfigProvider
 
     public static void LoadModConfig(ModOptionsData modOptionsData)
     {
-        ManagedConfigOptionValidation.Validate(modOptionsData);
         ModOptions = new(modOptionsData);
     }
 }
