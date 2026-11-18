@@ -25,7 +25,12 @@ internal class PlayerRaftVisibilityPatches
     private static void RefreshDynamicPropertiesPostfix(PartyNameplateVM __instance, bool __state)
     {
         var party = __instance.Party;
-        if (!ShouldShowAgain(__state, __instance._isVisibleOnMapBind, __instance._isInArmyBind, __instance._isInSettlementBind, party.IsInNavalAutoTravel)) return;
+        if (!ShouldShowAgain(
+            wasVisible: __state,
+            isVisible: __instance._isVisibleOnMapBind,
+            isInArmy: __instance._isInArmyBind,
+            isInSettlement: __instance._isInSettlementBind,
+            isInNavalAutoTravel: party.IsInNavalAutoTravel)) return;
         if (!IsOtherPlayersRaft(party, MobileParty.MainParty)) return;
 
         __instance._isVisibleOnMapBind = true;
