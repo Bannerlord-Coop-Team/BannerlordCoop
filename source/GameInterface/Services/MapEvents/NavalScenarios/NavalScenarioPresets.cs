@@ -80,8 +80,11 @@ public sealed class NavalScenarioPreset
     /// <summary>How the scenario's map event starts.</summary>
     public NavalScenarioEntry Entry { get; set; }
 
-    /// <summary>The nearest friendly AI lord party joins the players' side with a ship.</summary>
+    /// <summary>The nearest friendly AI lord party joins the players' side with <see cref="AlliedShips"/> ships.</summary>
     public bool AlliedNpc { get; set; }
+
+    /// <summary>How many ships the allied lord of <see cref="AlliedNpc"/> is topped up to; 0 without one.</summary>
+    public int AlliedShips { get; set; }
 
     /// <summary>The second player retreats through Tab and Retreat <c>delay</c> seconds after its deployment.</summary>
     public bool RetreatSecondPlayer { get; set; }
@@ -99,6 +102,9 @@ public static class NavalScenarioPresets
     public const int MaxShipsPerPlayer = 4;
 
     public const int MaxEnemyHulls = 8;
+
+    /// <summary>Vanilla's cap on a side's ships, which the allied lord's fleet shares with the players.</summary>
+    public const int MaxAlliedShips = 8;
 
     /// <summary>The most troops reserve=n puts beyond a party's crew capacity.</summary>
     public const int MaxReserveTroops = 200;
@@ -213,6 +219,7 @@ public static class NavalScenarioPresets
             Name = "allied_npc",
             Description = "vs_pirates plus a friendly AI lord party with a ship on the players' side.",
             AlliedNpc = true,
+            AlliedShips = 1,
         },
         new NavalScenarioPreset
         {

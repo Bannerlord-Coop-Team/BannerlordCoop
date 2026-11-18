@@ -7,6 +7,7 @@ using E2E.Tests.Environment.Instance;
 using E2E.Tests.Environment.MockEngine;
 using E2E.Tests.Services.MapEvents;
 using E2E.Tests.Util;
+using GameInterface.Tests.Utils;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEventSides.Messages;
@@ -194,7 +195,7 @@ public class SiegeDisconnectTests : SiegeTestBase
             instance.Call(() =>
             {
                 Assert.True(instance.ObjectManager.TryGetObject<MapEvent>(mapEvent.MapEventId, out var activeMapEvent));
-                activeMapEvent._mapEventType = MapEvent.BattleTypes.Siege;
+                activeMapEvent.SetBattleType(MapEvent.BattleTypes.Siege);
             });
         }
         ConfigureStaleSiegeMenu(
@@ -341,8 +342,8 @@ public class SiegeDisconnectTests : SiegeTestBase
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(bystanderPartyId, out var bystander));
 
             var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
-            mapEvent._mapEventType = MapEvent.BattleTypes.Siege;
-            mapEvent.MapEventSettlement = siegeEvent.BesiegedSettlement;
+            mapEvent.SetBattleType(MapEvent.BattleTypes.Siege);
+            mapEvent.SetMapEventSettlement(siegeEvent.BesiegedSettlement);
 
             var defenderSide = new MapEventSide(
                 mapEvent,

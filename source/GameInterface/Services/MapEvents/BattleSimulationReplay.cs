@@ -69,12 +69,6 @@ internal static class BattleSimulationReplay
     /// <summary>True while a playback is active for the given map event (initiator or spectator).</summary>
     public static bool IsActiveFor(string id) => mapEventId != null && mapEventId == id;
 
-    /// <summary>
-    /// A spectator watches a simulation another player started: it replays the server's streamed rounds but does
-    /// not pace the simulation (only the initiating client requests advances).
-    /// </summary>
-    public static bool IsSpectator => isSpectator;
-
     /// <summary>Begin a fresh playback for the given map event.</summary>
     public static void Begin(string id, bool spectator = false)
     {

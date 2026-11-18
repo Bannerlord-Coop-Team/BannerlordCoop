@@ -315,7 +315,7 @@ public class ClientSettlementExitEnterHandler : IHandler
                 settlementInterface.PartyLeaveSettlement(party);
             }
 
-            // Staged hideout loot lives on the encounter, so closing it here would discard the loot.
+            // Staged hideout loot and the send troops result menu live on the encounter, so closing it here would drop them.
             if (hideoutResultEncounter.TryKeepThroughLeave(party))
                 return;
 

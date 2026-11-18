@@ -1,6 +1,7 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using Coop.Core.Server.Services.Time.Messages;
+using GameInterface.Configuration;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Messages;
 using LiteNetLib;
@@ -35,6 +36,15 @@ public class TimeHandler : IHandler
     internal void Handle_NetworkRequestTimeSpeedChange(MessagePayload<NetworkRequestTimeSpeedChange> obj)
     {
         var peer = obj.Who as NetPeer;
+
+        if (!ModConfigProvider.ModOptions.AllowClientTimeControls)
+        {
+            Logger.Information(
+                "Ignored time control from peer={PeerId} mode={RequestedMode} because allowClientTimeControls is off",
+                peer?.Id,
+                obj.What.NewControlMode);
+            return;
+        }
 
         Logger.Information(
             "Peer requested time control: peer={PeerId} mode={RequestedMode}",

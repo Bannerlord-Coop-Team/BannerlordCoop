@@ -1,9 +1,7 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.PartyVisuals.Interfaces;
 using HarmonyLib;
-using SandBox.GauntletUI.Map;
-using SandBox.View.Map;
-using SandBox.ViewModelCollection.Nameplate;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
@@ -11,9 +9,15 @@ using TaleWorlds.Core;
 
 namespace GameInterface.Services.Heroes.Patches;
 
+/// <summary>
+/// Replaces the native player-character switch so coop can keep the switched-into party alive.
+/// </summary>
 [HarmonyPatch(typeof(ChangePlayerCharacterAction))]
 internal class ChangePlayerCharacterActionPatches
 {
+    /// <summary>
+    /// Switches the local main hero and party, then redraws the map against the new hero.
+    /// </summary>
     [HarmonyPatch("Apply")]
     private static bool Prefix(Hero hero)
     {
@@ -58,21 +62,11 @@ internal class ChangePlayerCharacterActionPatches
         PartyBase.MainParty.SetVisualAsDirty();
         mainParty.Party.SetVisualAsDirty();
 
-        // Nameplate relations were initialized against the save's previous main hero. The native VM
-        // does not listen for player-character changes, so refresh its cached friendly/enemy state now.
-        RefreshSettlementNameplateRelations();
+        // Map markers and nameplates were drawn against the previous main hero, and the native views
+        // do not listen for player-character changes, so redraw their friendly/enemy state now.
+        if (ContainerProvider.TryResolve<IMapStanceVisualsInterface>(out var stanceVisuals))
+            stanceVisuals.RedrawStanceVisuals(previousFaction: mainHero.MapFaction);
 
         return false;
-    }
-
-    private static void RefreshSettlementNameplateRelations()
-    {
-        var nameplates = MapScreen.Instance?.GetMapView<GauntletMapSettlementNameplateView>()?._dataSource;
-        RefreshSettlementNameplateRelations(nameplates);
-    }
-
-    internal static void RefreshSettlementNameplateRelations(SettlementNameplatesVM nameplates)
-    {
-        nameplates?.RefreshRelationsOfNameplates();
     }
 }

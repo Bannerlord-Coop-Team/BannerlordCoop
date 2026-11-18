@@ -93,4 +93,17 @@ internal class PlayerTrackCompanionBehaviorPatches
 
         return false;
     }
+
+    [HarmonyPatch(nameof(PlayerTrackCompanionBehavior.OnHeroJoinedParty))]
+    [HarmonyPrefix]
+    public static bool OnHeroJoinedPartyPrefix(Hero hero, MobileParty party)
+    {
+        if (ModInformation.IsClient) return false;
+
+        if (!ContainerProvider.TryResolve<IPlayerTrackCompanionBehaviorInterface>(out var playerTrackCompanionBehaviorInterface)) return true;
+
+        playerTrackCompanionBehaviorInterface.OnHeroJoinedParty(hero, party);
+
+        return false;
+    }
 }

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Same knob as E2E.Tests/e2e.runsettings: no tiered promotion, so Linux CI can't drop a live Harmony stub mid-test. -->
+<RunSettings>
+  <RunConfiguration>
+    <EnvironmentVariables>
+      <DOTNET_TC_CallCounting>0</DOTNET_TC_CallCounting>
+    </EnvironmentVariables>
+  </RunConfiguration>
+</RunSettings>
