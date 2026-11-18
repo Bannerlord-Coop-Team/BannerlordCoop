@@ -101,7 +101,7 @@ jobs:
             core.setOutput('coop_sha', commit.sha);
 
       - name: Resolve the commit's game version
-        # It picks the CI image, which is tagged per game version, and the DependentVersion stamped into SubModule.xml.
+        # The game version picks the CI image tag and the DependentVersion stamped into SubModule.xml.
         id: game
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
@@ -483,12 +483,12 @@ jobs:
 
           $entries = @(Get-ChildItem -LiteralPath transfer)
           if ($entries.Count -ne 1 -or $entries[0].Name -ne 'Coop.7z' -or $entries[0].PSIsContainer) {
-            throw 'Signed client input layout is invalid'
+            throw 'Client input layout is invalid'
           }
           $archiveBytes = [long]$entries[0].Length
-          if ($archiveBytes -le 0) { throw 'Signed client input size is invalid' }
+          if ($archiveBytes -le 0) { throw 'Client input size is invalid' }
           $archiveSha256 = (Get-FileHash $entries[0].FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-          if ($archiveSha256 -notmatch '^[a-f0-9]{64}$') { throw 'Signed client input checksum is invalid' }
+          if ($archiveSha256 -notmatch '^[a-f0-9]{64}$') { throw 'Client input checksum is invalid' }
           $clientKey = "nightly/clients/$($env:HEAD_SHA)/$archiveSha256/Coop.7z"
 
           New-Item -ItemType Directory -Path artifact | Out-Null
@@ -572,14 +572,15 @@ jobs:
           $manifestKey = [string]$pointer.manifest.key
           $manifestSha256 = [string]$pointer.manifest.sha256
           $expectedKey = "nightly/publications/$manifestSha256/release.json"
-          if ($manifestSha256 -notmatch '^[a-f0-9]{64}$' -or $manifestKey -ne $expectedKey) { throw 'Published nightly pointer is invalid' }
+          $knownPointer = $pointer.version -eq 1 -and $pointer.kind -eq 'bannerlordcoop-nightly-pointer'
+          if (-not $knownPointer -or $manifestSha256 -notmatch '^[a-f0-9]{64}$' -or $manifestKey -ne $expectedKey) { throw 'Published nightly pointer is invalid' }
 
-          # The bucket lifecycle can expire the manifest before the pointer is rewritten.
           $env:RCLONE_CONFIG_PATRON_ENDPOINT = "https://$env:R2_ACCOUNT_ID.r2.cloudflarestorage.com"
           $rclone = Join-Path $PWD 'rclone.exe'
           $listing = & $rclone lsf "patron:$env:R2_NIGHTLY_BUCKET/$manifestKey" --s3-no-check-bucket --retries 3 --low-level-retries 10
-          # rclone exits 3 or 4 for a missing path, or 0 with nothing listed, depending on the backend.
-          if (-not $listing -and $LASTEXITCODE -in 0, 3, 4) {
+          # The bucket lifecycle can expire the manifest before the pointer is rewritten; rclone then exits 3 or 4, or 0 with nothing listed.
+          $manifestExpired = -not $listing -and $LASTEXITCODE -in 0, 3, 4
+          if ($manifestExpired) {
             Write-Host "::warning::The nightly pointer names $manifestKey, which has expired, so no paired nightly is complete."
             return
           }
