@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.ObjectManager;
@@ -102,7 +103,11 @@ internal class MercenaryHireHandler : IHandler
             : Campaign.Current.Models.PartyWageModel.GetTroopRecruitmentCost(mercenaryData.TroopType, mainHero).RoundedResultNumber;
         int goldAmount = GetMercenaryHireGoldAmount(data.Count, unitPrice);
         bool availableTroopMatches = mercenaryData?.TroopType == mercenaryTroop;
-        int availableCount = mercenaryData?.Number ?? 0;
+        int availableCount = 0;
+        if (mercenaryData != null)
+        {
+            availableCount = mainHero.GetMercenaryHireLimit(mercenaryData.Number);
+        }
 
         // The server stock may tick while a client is still in the tavern conversation. Reject those
         // stale requests against the current server stock, then publish the latest stock back below.

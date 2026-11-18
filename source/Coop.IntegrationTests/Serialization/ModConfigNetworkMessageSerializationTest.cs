@@ -87,6 +87,8 @@ namespace Coop.IntegrationTests.Serialization
                 BlockAiWarDeclarationsOnOfflinePlayers = true,
                 ClansAfterKingdomDestruction = ClansAfterKingdomDestructionMode.KeepClans,
                 PreferredBattleHosts = new List<string> { "76561198000000002", "76561198000000001" },
+                PvpBlockLeave = true,
+                PvpResponseTimerSeconds = 30,
             });
 
             var copy = RoundTrip(new NetworkLoadModConfig(options)).ModOptions;
@@ -113,6 +115,8 @@ namespace Coop.IntegrationTests.Serialization
             Assert.True(copy.BlockAiWarDeclarationsOnOfflinePlayers);
             Assert.Equal(ClansAfterKingdomDestructionMode.KeepClans, copy.ClansAfterKingdomDestruction);
             Assert.Equal(new[] { "76561198000000002", "76561198000000001" }, copy.PreferredBattleHosts);
+            Assert.True(copy.PvpBlockLeave);
+            Assert.Equal(30, copy.PvpResponseTimerSeconds);
 
             // Keys the operator left absent still resolve to the documented defaults, not to zero.
             Assert.True(copy.FastForwardEnabled);

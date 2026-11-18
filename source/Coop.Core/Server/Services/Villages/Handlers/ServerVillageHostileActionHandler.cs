@@ -128,6 +128,24 @@ internal class ServerVillageHostileActionHandler : IHandler
                 return;
             }
 
+            bool villageGivesIn = request.Action != VillageHostileAction.Raid &&
+                !villageHostileActionInterface.WillVillageResist(mobileParty, settlement);
+            if (villageGivesIn)
+            {
+                // The requester is noted first: the outcome announces the transfer pool for that peer.
+                NoteForceTransferRequester(peer, request);
+                // Sent before the outcome, so the client is back in the village menu before the transfer is authorized
+                network.Send(peer, new NetworkVillageHostileActionStarted(
+                    request.Action, request.MobilePartyId, request.SettlementId, unresisted: true));
+                villageHostileActionInterface.ApplyUnresistedForceAction(mobileParty, settlement, request.Action);
+                Logger.Information(
+                    "Applied unresisted hostile action {Action} (Party={PartyId}, Settlement={SettlementId})",
+                    request.Action,
+                    request.MobilePartyId,
+                    request.SettlementId);
+                return;
+            }
+
             if (request.Action == VillageHostileAction.Raid)
                 KickOtherPlayersOutOfVillage(request.ControllerId, mobileParty, settlement);
 

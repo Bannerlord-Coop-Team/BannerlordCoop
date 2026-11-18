@@ -9,7 +9,8 @@ namespace GameInterface.Services.Hideouts
     {
         public HideoutSync(AutoSyncRegistry autoSyncBuilder)
         {
-            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hideout), nameof(Hideout.IsSpotted)));
+            // A hideout is spotted when its settlement is visible.
+            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.IsVisible)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Hideout), nameof(Hideout._nextPossibleAttackTime)));
         }
     }

@@ -137,7 +137,7 @@ internal class LordConversationsWandererPatches
             && Settlement.CurrentSettlement == null
             && CharacterObject.OneToOneConversationCharacter.HeroObject.CompanionOf != Clan.PlayerClan
             && FactionManager.IsNeutralWithFaction(Hero.OneToOneConversationHero.MapFaction, Hero.MainHero.MapFaction)
-            && !MobileParty.MainParty.IsInRaftState;
+            && !MobileParty.MainParty.IsInNavalAutoTravel;
 
         return false;
     }

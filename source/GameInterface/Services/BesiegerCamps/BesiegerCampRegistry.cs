@@ -29,9 +29,10 @@ internal class BesiegerCampRegistry : AutoRegistryBase<BesiegerCamp>
         AccessTools.Method(typeof(BesiegerCamp), nameof(BesiegerCamp.FinalizeSiegeEvent))
     };
 
+    // Skips an ended siege that is still listed until the next tick, as SiegeEventRegistry does.
     public override void RegisterAllObjects()
     {
-        foreach (var siegeEvent in SiegeContainerLookup.ActiveSieges())
+        foreach (var siegeEvent in SiegeContainerLookup.UnendedSieges())
         {
             var camp = siegeEvent.BesiegerCamp;
             if (camp == null) continue;

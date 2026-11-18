@@ -891,6 +891,7 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
                 ?? aftermathBehavior._prevSettlementOwnerClan
                 ?? settlement.OwnerClan;
             aftermathBehavior._wasPlayerArmyMember = false;
+            aftermathBehavior._settlementProsperityCache = -1f;
         }
 
         using (new AllowedThread())

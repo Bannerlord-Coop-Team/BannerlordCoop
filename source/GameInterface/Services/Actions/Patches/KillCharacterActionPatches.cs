@@ -120,13 +120,7 @@ internal class KillCharacterActionPatches
             ChangeGovernorAction.RemoveGovernorOf(victim);
         }
 
-        if ((actionDetail == KillCharacterAction.KillCharacterActionDetail.Executed || actionDetail == KillCharacterAction.KillCharacterActionDetail.ExecutionAfterMapEvent) && killer != null && killer.IsPlayerHero() && victim.Clan != null && victim.GetTraitLevel(DefaultTraits.Honor) >= 0)
-        {
-            using (new MainHeroSubstitutionScope(killer, killer.PartyBelongedTo))
-            {
-                TraitLevelingHelper.OnLordExecuted();
-            }
-        }
+        ApplyExecutionTraitPenalty(victim, killer, actionDetail);
 
         if (victim.Clan != null && !victim.Clan.IsEliminated && !victim.Clan.IsBanditFaction && !victim.Clan.IsPlayerClan())
         {
@@ -170,6 +164,20 @@ internal class KillCharacterActionPatches
         }
 
         return false;
+    }
+
+    // DisableExecutionCampaignBehavior turns vanilla's charge off until #3851 tracks feuds per player, so every
+    // player execution is charged here, and no feud is started.
+    private static void ApplyExecutionTraitPenalty(Hero victim, Hero killer, KillCharacterAction.KillCharacterActionDetail actionDetail)
+    {
+        if (actionDetail != KillCharacterAction.KillCharacterActionDetail.Executed) return;
+        if (victim.Clan == null || killer?.Clan == null) return;
+        if (!killer.IsPlayerHero()) return;
+
+        using (new MainHeroSubstitutionScope(killer, killer.PartyBelongedTo))
+        {
+            TraitLevelingHelper.OnBloodFeudStarted(victim);
+        }
     }
 
     public static void HandleKingdomLeaderDeath(Hero victim)

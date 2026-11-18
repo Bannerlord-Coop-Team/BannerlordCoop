@@ -1,4 +1,5 @@
 ﻿using SandBox.Conversation.MissionLogics;
+using HarmonyLib;
 using SandBox;
 using SandBox.Missions;
 using SandBox.Missions.MissionLogics;
@@ -146,6 +147,11 @@ internal sealed class CoopHideoutAssaultController : HideoutMissionController, I
 internal sealed class CoopHideoutAmbushController : HideoutAmbushMissionController, ICoopHideoutNativeController, IMissionAgentSpawnLogic
 {
     internal const float StealthFailCounterSeconds = 15f;
+    // These base fields are readonly (set by the constructor); co-op fills them once it knows the battle.
+    private static readonly AccessTools.FieldRef<HideoutAmbushMissionController, int> InitialHideoutPopulation =
+        AccessTools.FieldRefAccess<HideoutAmbushMissionController, int>(nameof(_initialHideoutPopulation));
+    private static readonly AccessTools.FieldRef<HideoutAmbushMissionController, int> PlayerTroopCount =
+        AccessTools.FieldRefAccess<HideoutAmbushMissionController, int>(nameof(_playerTroopCount));
     private readonly CoopHideoutMissionLogic coop;
     private bool locationListenerRegistered;
 
@@ -178,6 +184,10 @@ internal sealed class CoopHideoutAmbushController : HideoutAmbushMissionControll
     public int GetNumberOfPlayerControllableTroops() => coop.Attacker.GetNumberOfPlayerControllableTroops();
     public override void OnCreated() => Mission.DoesMissionRequireCivilianEquipment = false;
     public override void AfterStart() { }
+    // Vanilla calls Mission.OnInitialSpawnCompleted here, which finishes deployment during mission loading,
+    // before the session has a host.
+    // CoopHideoutMissionLogic.OnMissionTick stays the single deployment finisher, after the session is ready.
+    public override void OnAfterMissionLoadingFinished() { }
     public override void OnMissionTick(float dt) { }
 
     public void Initialize(bool authority, bool migration)
@@ -190,10 +200,10 @@ internal sealed class CoopHideoutAmbushController : HideoutAmbushMissionControll
             InitializeMission();
         _isMissionInitialized = true;
         _troopsInitialized = true;
-        _initialHideoutPopulation = coop.InitialPopulation;
+        InitialHideoutPopulation(this) = coop.InitialPopulation;
         if (!authority) return;
 
-        _playerTroopCount = coop.Attacker.NumTroopsNotSupplied;
+        PlayerTroopCount(this) = coop.Attacker.NumTroopsNotSupplied;
         InitializeTroops();
         if (!locationListenerRegistered)
         {
@@ -245,7 +255,7 @@ internal sealed class CoopHideoutAmbushController : HideoutAmbushMissionControll
     {
         _bossAgent = boss;
         _enemyTeam = Mission.DefenderTeam;
-        _initialHideoutPopulation = initialPopulation;
+        InitialHideoutPopulation(this) = initialPopulation;
         _battleResolved = phase == HideoutPhase.Resolved;
         _currentHideoutMissionState = phase switch
         {
