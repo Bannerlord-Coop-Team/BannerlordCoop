@@ -250,8 +250,8 @@ public class VassalAndMercenaryOfferCampaignBehaviorInterface : IVassalAndMercen
 
     public void WithdrawOffersIfFull(Kingdom kingdom)
     {
-        // Without a limit, or for a ruler without a kingdom, nothing is ever full.
-        if (kingdom == null || ModConfigProvider.ModOptions.MaxClansPerKingdom <= 0) return;
+        // A kingdom with room for another clan has no offer to withdraw.
+        if (!kingdomClanLimit.IsFull(null, kingdom, asMercenary: false, ModConfigProvider.ModOptions)) return;
         if (!objectManager.TryGetIdWithLogging(kingdom, out var kingdomId)) return;
 
         foreach (var playerData in PlayerVassalAndMercenaryOfferData)

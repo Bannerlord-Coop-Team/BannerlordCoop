@@ -1232,7 +1232,7 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
     {
         var (client1, client2, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
         SetupResponderKingdomLeaderAndInitiatorParty(initiatorPartyId, responderPartyId, initiatorClanTier: 2);
-        var invitedHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var (invitedHeroId, _) = CreatePlayerHeroParty("InvitedPlayer");
         var previousOptions = ModConfigProvider.ModOptions;
         ModConfigProvider.ModOptions = new ModOptions(new ModOptionsData { MaxClansPerKingdom = 2 });
         try
@@ -1262,6 +1262,8 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
             var cancelled = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkVassalOrMercenaryOfferCancelled>());
             Assert.Equal(invitedHeroId, cancelled.PlayerHeroId);
             Assert.Equal(kingdomId, cancelled.KingdomId);
+            Server.Call(() => Assert.Empty(
+                Server.Resolve<ICoopSessionProvider>().CoopSession.InteractionsPlayerData.PlayerVassalAndMercenaryOfferData[invitedHeroId].VassalOffers));
         }
         finally
         {

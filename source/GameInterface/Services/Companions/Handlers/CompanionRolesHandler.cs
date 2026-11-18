@@ -160,10 +160,11 @@ internal class CompanionRolesHandler : IHandler
             // Hero.MainHero which is different on the server compared to the client. Wrapped in try/finally so the static fields
             // are always cleared even if something below throws
             ResolvedMainHeroContext.ResolvedMainHero = mainHero;
+            Clan clan = null;
             try
             { 
                 int randomBannerIdForNewClan = companionRolesCampaignBehavior.GetRandomBannerIdForNewClan();
-                Clan clan = Clan.CreateCompanionToLordClan(oneToOneConversationHero, selectedFief, textObject, randomBannerIdForNewClan);
+                clan = Clan.CreateCompanionToLordClan(oneToOneConversationHero, selectedFief, textObject, randomBannerIdForNewClan);
                 if (oneToOneConversationHero.PartyBelongedTo == mainParty)
                 {
                     mainParty.MemberRoster.AddToCounts(oneToOneConversationHero.CharacterObject, -1, false, 0, 0, true, -1);
@@ -189,11 +190,11 @@ internal class CompanionRolesHandler : IHandler
             finally
             {
                 ResolvedMainHeroContext.ResolvedMainHero = null;
-            }
 
-            // Vanilla sets the new clan's Kingdom directly, which fires no kingdom change event, so offers the kingdom can no
-            // longer take are withdrawn here, once the promotion is done.
-            offers.WithdrawOffersIfFull(kingdom);
+                // Vanilla sets the new clan's Kingdom directly, which fires no kingdom change event, so once the clan exists
+                // the offers the kingdom can no longer take are withdrawn, even when a later step of the promotion threw.
+                if (clan != null) offers.WithdrawOffersIfFull(kingdom);
+            }
         });
     }
 
