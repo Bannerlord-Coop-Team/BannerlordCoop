@@ -245,8 +245,8 @@ public class PartyShipCommands
     // coop.debug.naval.fleet
     // coop.debug.naval.fleet MobileParty_southern_pirates_13
     /// <summary>
-    /// Lists the campaign id, HP, sail HP and owner of every ship of a party on this machine; with no party, the main party on
-    /// a client and every player's party on the server.
+    /// Lists the campaign id, HP, sail HP, owner and unlocked upgrade pieces of every ship of a party on this machine; with no
+    /// party, the main party on a client and every player's party on the server.
     /// </summary>
     public sealed class NavalFleetCoopCommand : ICoopCommand
     {
@@ -254,7 +254,7 @@ public class PartyShipCommands
 
         public string Name => "fleet";
 
-        public string Description => "Lists a party's ships with their id, hit points, sail hit points and owner on this machine.";
+        public string Description => "Lists a party's ships with their id, hit points, sail hit points, owner and unlocked upgrade pieces on this machine.";
 
         public CoopCommandSide Side => CoopCommandSide.Both;
 
@@ -287,12 +287,13 @@ public class PartyShipCommands
         }
     }
 
-    // One line per party: its id and ship count, then each ship's registry id, hit points, sail hit points and owner.
+    // One line per party: its id and ship count, then each ship's registry id, hit points, sail hit points, owner and unlocked pieces.
     private static string DescribeFleet(IObjectManager objectManager, PartyBase party)
     {
         var ships = party.Ships
             .Select(ship => $"{DescribeId(objectManager, ship)} hp={ship.HitPoints:0.#}/{ship.MaxHitPoints:0} " +
-                $"sail={ship.SailHitPoints:0.#}/{ship.MaxSailHitPoints:0} owner={ship.Owner?.Id ?? "none"}")
+                $"sail={ship.SailHitPoints:0.#}/{ship.MaxSailHitPoints:0} owner={ship.Owner?.Id ?? "none"} " +
+                $"can_unlock={ship.CanHaveUnlockedPieces} unlocked={ship.UnlockedUpgradePieces?.Count ?? 0}")
             .ToArray();
         return $"{party.Id} ships={ships.Length}" + (ships.Length == 0 ? "" : ": " + string.Join(", ", ships));
     }
