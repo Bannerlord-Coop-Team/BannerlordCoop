@@ -267,131 +267,116 @@ internal class FinalizationCoordinator : IHandler, IIssueFinalizationReplay
         var data = payload.What;
         GameThread.RunSafe(() =>
         {
-            var key = (data.IssueOwnerId, data.IssueId);
-            var ownerMatched = false;
-            try
+            if (!ownership.TryGetOwner(data.IssueOwnerId, data.IssueId, out var owner))
             {
-                if (!ownership.TryGetOwner(data.IssueOwnerId, data.IssueId, out var owner))
-                {
-                    Logger.Debug("Dropping ending journal for {issue}: no owner is registered", data.IssueId);
-                    return;
-                }
+                Logger.Debug("Dropping ending journal for {issue}: no owner is registered", data.IssueId);
+                return;
+            }
 
-                if (owner != controller.ControllerId)
-                {
-                    Logger.Debug("Dropping ending journal for {issue}: owner is {owner}, this client is {controller}",
-                        data.IssueId, owner, controller.ControllerId);
-                    return;
-                }
+            if (owner != controller.ControllerId)
+            {
+                Logger.Debug("Dropping ending journal for {issue}: owner is {owner}, this client is {controller}",
+                    data.IssueId, owner, controller.ControllerId);
+                return;
+            }
 
-                ownerMatched = true;
-                if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out var descriptor))
-                {
-                    Logger.Debug("Dropping ending journal for {issue}: issue resolver could not find the owner's issue", data.IssueId);
-                    return;
-                }
+            if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out var descriptor))
+            {
+                Logger.Debug("Dropping ending journal for {issue}: issue resolver could not find the owner's issue", data.IssueId);
+                return;
+            }
 
-                var quest = issue.IssueQuest;
-                if (data.IsQuestJournal && quest == null)
-                {
-                    Logger.Debug("Dropping ending journal for {issue}: owner issue has no quest", data.IssueId);
-                    return;
-                }
+            var quest = issue.IssueQuest;
+            if (data.IsQuestJournal && quest == null)
+            {
+                Logger.Debug("Dropping ending journal for {issue}: owner issue has no quest", data.IssueId);
+                return;
+            }
 
-                if (data.IsQuestJournal && !Campaign.Current.QuestManager.Quests.Contains(quest))
-                {
-                    Logger.Debug("Dropping ending journal for {issue}: quest is absent from QuestManager", data.IssueId);
-                    return;
-                }
+            if (data.IsQuestJournal && !Campaign.Current.QuestManager.Quests.Contains(quest))
+            {
+                Logger.Debug("Dropping ending journal for {issue}: quest is absent from QuestManager", data.IssueId);
+                return;
+            }
 
-                if (!data.IsQuestJournal && quest != null)
-                {
-                    Logger.Debug("Dropping issue journal for {issue}: owner issue still has a quest", data.IssueId);
-                    return;
-                }
+            if (!data.IsQuestJournal && quest != null)
+            {
+                Logger.Debug("Dropping issue journal for {issue}: owner issue still has a quest", data.IssueId);
+                return;
+            }
 
-                if (!data.IsQuestJournal && issue.IsSolvingWithAlternative)
-                {
-                    Logger.Debug("Dropping issue journal for {issue}: issue is solving with an alternative", data.IssueId);
-                    return;
-                }
+            if (!data.IsQuestJournal && issue.IsSolvingWithAlternative)
+            {
+                Logger.Debug("Dropping issue journal for {issue}: issue is solving with an alternative", data.IssueId);
+                return;
+            }
 
-                using (new AllowedThread())
-                using (new QuestJournalReplay())
+            using (new AllowedThread())
+            using (new QuestJournalReplay())
+            {
+                if (quest != null)
                 {
-                    if (quest != null)
+                    var logs = data.Logs ?? Array.Empty<IssueJournalEntry>();
+                    if (descriptor is ISpecializedEndingJournalDescriptor)
                     {
-                        var logs = data.Logs ?? Array.Empty<IssueJournalEntry>();
-                        if (descriptor is ISpecializedEndingJournalDescriptor)
+                        var remaining = quest.JournalEntries.ToList();
+                        foreach (var log in logs)
                         {
-                            var remaining = quest.JournalEntries.ToList();
-                            foreach (var log in logs)
-                            {
-                                var matches = remaining.Where(existing =>
+                            var matches = remaining.Where(existing =>
+                                existing.Type == log.Type && existing.Range == log.Range &&
+                                textComparer.SameText(existing.LogText, log.Text) && textComparer.SameText(existing.TaskName, log.TaskName)).ToArray();
+                            if (matches.Length == 0)
+                                matches = remaining.Where(existing =>
                                     existing.Type == log.Type && existing.Range == log.Range &&
-                                    textComparer.SameText(existing.LogText, log.Text) && textComparer.SameText(existing.TaskName, log.TaskName)).ToArray();
-                                if (matches.Length == 0)
-                                    matches = remaining.Where(existing =>
-                                        existing.Type == log.Type && existing.Range == log.Range &&
-                                        textComparer.SameKey(existing.LogText, log.Text) && textComparer.SameKey(existing.TaskName, log.TaskName)).ToArray();
-                                var existing = matches.FirstOrDefault(entry => entry.LogTime.NumTicks == log.Time.NumTicks);
-                                if (existing == null && matches.Length == 1) existing = matches[0];
-                                if (existing == null && matches.Length > 0)
-                                {
-                                    Logger.Warning("Ambiguous specialized journal row for {issue}; using journal order", data.IssueId);
-                                    existing = matches[0];
-                                }
-                                if (existing != null)
-                                {
-                                    existing.UpdateCurrentProgress(Math.Max(existing.CurrentProgress, log.Progress));
-                                    remaining.Remove(existing);
-                                }
-                                else if (matches.Length == 0)
-                                {
-                                    quest._journalEntries.Add(log.ToJournalLog());
-                                }
+                                    textComparer.SameKey(existing.LogText, log.Text) && textComparer.SameKey(existing.TaskName, log.TaskName)).ToArray();
+                            var existing = matches.FirstOrDefault(entry => entry.LogTime.NumTicks == log.Time.NumTicks);
+                            if (existing == null && matches.Length == 1) existing = matches[0];
+                            if (existing == null && matches.Length > 0)
+                            {
+                                Logger.Warning("Ambiguous specialized journal row for {issue}; using journal order", data.IssueId);
+                                existing = matches[0];
+                            }
+                            if (existing != null)
+                            {
+                                existing.UpdateCurrentProgress(Math.Max(existing.CurrentProgress, log.Progress));
+                                remaining.Remove(existing);
+                            }
+                            else if (matches.Length == 0)
+                            {
+                                quest._journalEntries.Add(log.ToJournalLog());
                             }
                         }
-                        else
-                        {
-                            quest._journalEntries.Clear();
-                            foreach (var log in logs)
-                                quest._journalEntries.Add(log.ToJournalLog());
-                        }
-                        CampaignEventDispatcher.Instance.OnQuestLogAdded(quest, true);
                     }
                     else
                     {
-                        var existing = issue.JournalEntries.Where(log => log.LogText != null)
-                            .GroupBy(log => log.LogText.ToString()).ToDictionary(group => group.Key, group => group.Count());
-                        foreach (var log in data.Logs ?? Array.Empty<IssueJournalEntry>())
-                        {
-                            if (log.Text == null) continue;
-                            var logKey = log.Text.ToString();
-                            if (existing.TryGetValue(logKey, out var count) && count > 0) existing[logKey] = count - 1;
-                            else issue.AddLog(log.ToJournalLog());
-                        }
+                        quest._journalEntries.Clear();
+                        foreach (var log in logs)
+                            quest._journalEntries.Add(log.ToJournalLog());
+                    }
+                    CampaignEventDispatcher.Instance.OnQuestLogAdded(quest, true);
+                    var key = (data.IssueOwnerId, data.IssueId);
+                    appliedEndingJournals.Add(key);
+                    if (pendingFinalizations.TryGetValue(key, out var pending))
+                    {
+                        pendingFinalizations.Remove(key);
+                        QueueReplay(data.IssueOwnerId, IsOwnersRunningQuest(data.IssueOwnerId, data.IssueId),
+                            () => ReplayEnding(pending));
+                    }
+                }
+                else
+                {
+                    var existing = issue.JournalEntries.Where(log => log.LogText != null)
+                        .GroupBy(log => log.LogText.ToString()).ToDictionary(group => group.Key, group => group.Count());
+                    foreach (var log in data.Logs ?? Array.Empty<IssueJournalEntry>())
+                    {
+                        if (log.Text == null) continue;
+                        var key = log.Text.ToString();
+                        if (existing.TryGetValue(key, out var count) && count > 0) existing[key] = count - 1;
+                        else issue.AddLog(log.ToJournalLog());
                     }
                 }
             }
-            finally
-            {
-                if (ownerMatched)
-                {
-                    appliedEndingJournals.Add(key);
-                    ReleasePendingFinalization(key);
-                }
-            }
         }, context: nameof(FinalizationCoordinator));
-    }
-
-    private void ReleasePendingFinalization((string IssueOwnerId, string IssueId) key)
-    {
-        if (!pendingFinalizations.TryGetValue(key, out var pending)) return;
-
-        pendingFinalizations.Remove(key);
-        QueueReplay(key.IssueOwnerId, IsOwnersRunningQuest(key.IssueOwnerId, key.IssueId),
-            () => ReplayEnding(pending));
     }
 
     // Server only.
@@ -501,14 +486,6 @@ internal class FinalizationCoordinator : IHandler, IIssueFinalizationReplay
         GameThread.RunSafe(() =>
         {
             var key = (data.IssueOwnerId, data.IssueId);
-            if (!ownership.TryGetOwner(data.IssueOwnerId, data.IssueId, out var owner) ||
-                owner != controller.ControllerId)
-            {
-                QueueReplay(data.IssueOwnerId, IsOwnersRunningQuest(data.IssueOwnerId, data.IssueId),
-                    () => ReplayEnding(data));
-                return;
-            }
-
             if (appliedEndingJournals.Remove(key))
             {
                 QueueReplay(data.IssueOwnerId, IsOwnersRunningQuest(data.IssueOwnerId, data.IssueId),

@@ -137,59 +137,28 @@ public class EndingJournalTests : IDisposable
     [Fact]
     public void EndingJournalSnapshotAfterFinalizedMessageAppliesToTheOwner()
     {
+        var serverQuest = scenario.QuestOf(scenario.Server);
         var ownerQuest = scenario.QuestOf(scenario.ClientA);
-        var messages = CompleteServerEndingWithoutDelivery();
+        scenario.Server.Resolve<TestNetworkRouter>().AutoDrainReady = false;
+        scenario.Server.Call(() =>
+        {
+            serverQuest.AddLog(Ending());
+            serverQuest.CompleteQuestWithSuccess();
+        });
+        environment.FlushCoalescer();
+
+        var finalized = Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        var snapshot = Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueJournal>());
         scenario.ClientA.Call(() =>
         {
             using (new AllowedThread()) ownerQuest._journalEntries.Clear();
             Assert.Empty(ownerQuest.JournalEntries);
         });
-        scenario.ClientA.SimulateMessage(scenario.Server.NetPeer, messages.Finalized);
-        scenario.ClientA.SimulateMessage(scenario.Server.NetPeer, scenario.Server.SerializeForWire(messages.Journal));
+        scenario.ClientA.SimulateMessage(scenario.Server.NetPeer, finalized);
+        scenario.ClientA.SimulateMessage(scenario.Server.NetPeer, scenario.Server.SerializeForWire(snapshot));
 
         scenario.ClientA.Call(() => Assert.Single(ownerQuest.JournalEntries,
             log => log.LogText.ToString() == Ending().ToString()));
-    }
-
-    [Fact]
-    public void NonOwnerFinalizationDoesNotWaitForOwnerJournal()
-    {
-        var messages = CompleteServerEndingWithoutDelivery();
-        scenario.ClientB.SimulateMessage(scenario.Server.NetPeer, messages.Finalized);
-        scenario.ClientB.Call(() => Assert.Null(scenario.ClientB.GetRegisteredObject<Hero>(scenario.NotableId).Issue));
-    }
-
-    [Fact]
-    public void DroppedOwnerJournalStillReleasesFinalization()
-    {
-        var messages = CompleteServerEndingWithoutDelivery();
-        scenario.ClientA.SimulateMessage(scenario.Server.NetPeer, messages.Finalized);
-        var ownerQuest = scenario.QuestOf(scenario.ClientA);
-        scenario.ClientA.Call(() =>
-        {
-            using (new AllowedThread())
-                Campaign.Current.QuestManager.OnQuestFinalized(ownerQuest);
-        });
-        scenario.ClientA.SimulateMessage(scenario.Server.NetPeer, scenario.Server.SerializeForWire(messages.Journal));
-        scenario.ClientA.Call(() => Assert.Null(scenario.ClientA.GetRegisteredObject<Hero>(scenario.NotableId).Issue));
-    }
-
-    [Fact]
-    public void EndingJournalSnapshotBeforeFinalizedMessageStillFinalizesTheOwner()
-    {
-        var messages = CompleteServerEndingWithoutDelivery();
-        var ownerQuest = scenario.QuestOf(scenario.ClientA);
-        scenario.ClientA.Call(() =>
-        {
-            using (new AllowedThread()) ownerQuest._journalEntries.Clear();
-        });
-        scenario.ClientA.SimulateMessage(scenario.Server.NetPeer, scenario.Server.SerializeForWire(messages.Journal));
-        scenario.ClientA.SimulateMessage(scenario.Server.NetPeer, messages.Finalized);
-        scenario.ClientA.Call(() =>
-        {
-            Assert.Single(ownerQuest.JournalEntries, log => log.LogText.ToString() == Ending().ToString());
-            Assert.Null(scenario.ClientA.GetRegisteredObject<Hero>(scenario.NotableId).Issue);
-        });
     }
 
     [Fact]
@@ -910,21 +879,6 @@ public class EndingJournalTests : IDisposable
             Assert.True(archive.IsEnded());
             Assert.Single(archive.GetEntries(), log => log.LogText.ToString() == Ending().ToString());
         });
-    }
-
-    private (NetworkIssueFinalized Finalized, NetworkIssueJournal Journal) CompleteServerEndingWithoutDelivery()
-    {
-        var serverQuest = scenario.QuestOf(scenario.Server);
-        scenario.Server.Resolve<TestNetworkRouter>().AutoDrainReady = false;
-        scenario.Server.Call(() =>
-        {
-            serverQuest.AddLog(Ending());
-            serverQuest.CompleteQuestWithSuccess();
-        });
-        environment.FlushCoalescer();
-        return (
-            Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()),
-            Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueJournal>()));
     }
 
     private static TextObject Ending() => new TextObject("{=3985-test-ending}Ended for {REASON}: {COUNT}")
