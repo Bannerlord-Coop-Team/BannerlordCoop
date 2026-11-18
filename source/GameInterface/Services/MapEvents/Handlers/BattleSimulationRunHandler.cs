@@ -192,9 +192,6 @@ internal class BattleSimulationRunHandler : IHandler
                 return;
             }
 
-            // Simulating is fighting the battle again, so an earlier mission retreat must not cost the requester the loot.
-            retreatedPartyTracker.MarkReentered(mapEvent, attackerParty.Party);
-
             MapEventHostileActionConsequences.Apply(mapEvent, attackerParty.Party, "battle simulation attack");
 
             // v1: simulate the full participating troop count (null), not the player's selected subset.
@@ -213,6 +210,9 @@ internal class BattleSimulationRunHandler : IHandler
                     PreviousObserver = previousObserver,
                 };
             }
+
+            // Simulating is fighting the battle again, so an earlier mission retreat must not cost the requester the loot.
+            retreatedPartyTracker.MarkReentered(mapEvent, attackerParty.Party);
             setupAccepted = true;
         }, blocking: true, context: nameof(Handle_NetworkBattleStartRequest));
 

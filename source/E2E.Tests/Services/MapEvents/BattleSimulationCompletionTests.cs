@@ -2,6 +2,7 @@
 using System.Linq;
 using Common.Messaging;
 using Common.Network;
+using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
@@ -41,10 +42,7 @@ public class BattleSimulationCompletionTests : MapEventTestBase
 
         Server.Call(() =>
         {
-            Server.Resolve<IMessageBroker>().Publish(client.NetPeer, new NetworkBattleStartRequest(
-                System.Guid.NewGuid().ToString(), (int)BattleStartMode.Simulation,
-                context.MapEventId, context.AttackerPartyId));
-            Assert.True(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleStartReply>()).Accepted);
+            StartAcceptedSimulation(client, context);
             var mapEvent = Server.GetRegisteredObject<MapEvent>(context.MapEventId);
             mapEvent.BattleState = BattleState.AttackerVictory;
             var ended = new List<MapEvent>();
@@ -52,9 +50,7 @@ public class BattleSimulationCompletionTests : MapEventTestBase
             try
             {
                 Server.NetworkSentMessages.Clear();
-                for (var update = 0; update < MaxAdvancesToFinish; update++)
-                    Server.Resolve<IMessageBroker>().Publish(client.NetPeer,
-                        new NetworkAdvanceBattleSimulation(context.MapEventId, 1));
+                AdvanceSimulation(client, context.MapEventId);
 
                 Assert.True(mapEvent.IsFinalized);
                 Assert.Same(mapEvent, Assert.Single(ended));
@@ -90,17 +86,29 @@ public class BattleSimulationCompletionTests : MapEventTestBase
             var playerParty = Server.GetRegisteredObject<MobileParty>(context.AttackerPartyId);
             Server.Resolve<IRetreatedMapEventPartyTracker>().MarkRetreated(mapEvent, playerParty.Party);
 
-            Server.Resolve<IMessageBroker>().Publish(client.NetPeer, new NetworkBattleStartRequest(
-                System.Guid.NewGuid().ToString(), (int)BattleStartMode.Simulation,
-                context.MapEventId, context.AttackerPartyId));
-            Assert.True(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleStartReply>()).Accepted);
+            StartAcceptedSimulation(client, context);
+
             mapEvent.BattleState = BattleState.AttackerVictory;
-            for (var update = 0; update < MaxAdvancesToFinish && !mapEvent.IsFinalized; update++)
-                Server.Resolve<IMessageBroker>().Publish(client.NetPeer,
-                    new NetworkAdvanceBattleSimulation(context.MapEventId, 1));
+            AdvanceSimulation(client, context.MapEventId);
 
             var results = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkCommitMapEventResults>());
             Assert.Contains(results.PlayerMapEventPartyId, results.PlayerLootData.LootedItems.Keys);
         }, MapEventDisabledMethods);
+    }
+
+    /// <summary>Requests a simulation of the context's battle for the client's attacker party and asserts the server accepts it.</summary>
+    private void StartAcceptedSimulation(EnvironmentInstance client, MapEventContext context)
+    {
+        Server.Resolve<IMessageBroker>().Publish(client.NetPeer, new NetworkBattleStartRequest(
+            System.Guid.NewGuid().ToString(), (int)BattleStartMode.Simulation,
+            context.MapEventId, context.AttackerPartyId));
+        Assert.True(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleStartReply>()).Accepted);
+    }
+
+    /// <summary>Sends the client's simulation advances, more than a decided battle needs to finish.</summary>
+    private void AdvanceSimulation(EnvironmentInstance client, string mapEventId)
+    {
+        for (var update = 0; update < MaxAdvancesToFinish; update++)
+            Server.Resolve<IMessageBroker>().Publish(client.NetPeer, new NetworkAdvanceBattleSimulation(mapEventId, 1));
     }
 }
