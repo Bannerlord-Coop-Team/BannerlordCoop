@@ -4,7 +4,7 @@ namespace GameInterface.Services.Rafts.Patches;
 
 /// <summary>
 /// Only the server starts or ends a raft; clients get the synced IsInRaftState.
-/// Applied by <see cref="MobilePartyAIs.MobilePartyAiRegistry"/>, not by attribute.
+/// Applied by <see cref="RaftSync"/>, not by attribute.
 /// </summary>
 internal static class RaftStateChangeActionPatches
 {
