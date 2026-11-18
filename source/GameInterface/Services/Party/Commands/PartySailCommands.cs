@@ -1,7 +1,5 @@
 ﻿using Common;
 using Common.Commands;
-using Common.Messaging;
-using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.Settlements.Interfaces;
 using GameInterface.Services.Villages.Commands;
 using GameInterface.Utils.Commands;
@@ -75,13 +73,11 @@ public class PartySailCommands
     /// <summary>Orders a player's party at sea into a port, the same order a map click on that port gives.</summary>
     public sealed class SailToCoopCommand : ICoopCommand
     {
-        private readonly IMessageBroker messageBroker;
         private readonly ICommandObjectResolver resolver;
 
-        /// <summary>Uses the broker to send the order to the owner and the resolver to find the port by id or name.</summary>
-        public SailToCoopCommand(IMessageBroker messageBroker, ICommandObjectResolver resolver)
+        /// <summary>Uses the resolver to find the port by id or name.</summary>
+        public SailToCoopCommand(ICommandObjectResolver resolver)
         {
-            this.messageBroker = messageBroker;
             this.resolver = resolver;
         }
 
@@ -99,7 +95,7 @@ public class PartySailCommands
             new ExpectedArgs("settlement", "The settlement with a port to sail into, by id or name.", true),
         };
 
-        /// <summary>Sets the party's move order to the port and sends it to every client, the owner included.</summary>
+        /// <summary>Sets the party's move order to the port; the movement patches replicate it to every client.</summary>
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (!ModInformation.IsNavalEnabled)
@@ -123,8 +119,6 @@ public class PartySailCommands
 
             // Same call as vanilla SettlementVisual.OnMapClick for a port reached by sea
             party.SetMoveGoToSettlement(port, MobileParty.NavigationType.Naval, isTargetingThePort: true);
-            // The owner only moves once this order reaches it, so send it like set_sail does instead of relying on the movement patch
-            messageBroker.Publish(this, new PartyBehaviorChangeAttempted(party));
 
             return Succeeded($"{party.StringId} is sailing to {port.StringId}.");
         }
