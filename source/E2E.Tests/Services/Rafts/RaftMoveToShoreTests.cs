@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using Common.Util;
 using E2E.Tests.Services.MapEvents;
+using GameInterface.Services.Entity;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using TaleWorlds.CampaignSystem;
@@ -32,6 +33,8 @@ public class RaftMoveToShoreTests : MapEventTestBase
     public void OwnerHoldSentBeforeTheRaft_KeepsTheMoveToShoreEverywhere()
     {
         var (_, partyId) = CreatePlayerHeroParty(ControllerId);
+        // An owning client takes the self-echo path, so a resend carrying its origin id would keep its stale hold
+        Clients.First().Resolve<IControllerIdProvider>().SetControllerId(ControllerId);
         Server.Call(() =>
         {
             var party = Server.GetRegisteredObject<MobileParty>(partyId);
@@ -77,14 +80,14 @@ public class RaftMoveToShoreTests : MapEventTestBase
         Server.Call(() =>
         {
             var hold = new PartyBehaviorUpdateData(
-                Compact(partyId, typeof(MobileParty)),
-                AiBehavior.Hold,
-                null,
-                RaftPosition,
-                RaftPosition,
-                AiBehavior.Hold,
-                RaftPosition,
-                MobileParty.NavigationType.None)
+                mobilePartyId: Compact(partyId, typeof(MobileParty)),
+                newAiBehavior: AiBehavior.Hold,
+                interactablePointId: null,
+                bestTargetPoint: RaftPosition,
+                partyPosition: RaftPosition,
+                defaultBehavior: AiBehavior.Hold,
+                targetPosition: RaftPosition,
+                desiredAiNavigationType: MobileParty.NavigationType.None)
             {
                 OriginControllerId = ControllerId,
                 PartyMoveMode = MoveModeType.Hold,
