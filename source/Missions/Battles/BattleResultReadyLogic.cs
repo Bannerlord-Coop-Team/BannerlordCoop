@@ -79,7 +79,6 @@ public class BattleResultReadyLogic : MissionLogic
 
     // The server finalized this battle mid mission (a peace decision, say), so no result can be applied to it any more.
     // MissionEnded is already true while the scoreboard waits on other results, so skip only a mission tearing down.
-    // Mission is null once the finalized mission removed this behavior, which can happen before the queued action runs.
     private void Handle_NetworkEndBattleMission(MessagePayload<NetworkEndBattleMission> payload)
     {
         if (payload.What.MapEventId != session.InstanceId)
@@ -87,6 +86,7 @@ public class BattleResultReadyLogic : MissionLogic
 
         GameThread.RunSafe(() =>
         {
+            // Mission is null once the finalized mission removed this behavior, which can happen before this action runs.
             if (Mission == null ||
                 payload.What.MapEventId != session.InstanceId ||
                 Mission.CurrentState == Mission.State.EndingNextFrame ||
