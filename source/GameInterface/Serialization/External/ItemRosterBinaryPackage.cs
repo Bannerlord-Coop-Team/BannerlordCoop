@@ -15,6 +15,7 @@ namespace GameInterface.Serialization.External
         {
             "<VersionNo>k__BackingField",
             "<TotalValue>k__BackingField",
+            "<TradeGoodsTotalValue>k__BackingField",
             "<TotalFood>k__BackingField",
             "<NumberOfPackAnimals>k__BackingField",
             "<NumberOfMounts>k__BackingField",
@@ -31,6 +32,9 @@ namespace GameInterface.Serialization.External
         protected override void UnpackInternal()
         {
             base.UnpackFields();
+
+            // The cached totals are excluded above, so rebuild them from _data like vanilla's DeserializeFrom does
+            Object.CalculateCachedStats();
         }
     }
 }

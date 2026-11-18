@@ -176,7 +176,7 @@ internal class KingdomCreator : IKingdomCreator
         kingdom.InformalName = kingdomName;
         kingdom.Culture = culture;
         kingdom.EncyclopediaText = TextObject.GetEmpty();
-        kingdom.EncyclopediaTitle = kingdomName;
+        kingdom.FormalName = kingdomName;
         kingdom.EncyclopediaRulerTitle = TextObject.GetEmpty();
         kingdom._isEliminated = false;
     }
