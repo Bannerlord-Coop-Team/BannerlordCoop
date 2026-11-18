@@ -294,6 +294,44 @@ public class EncounterSurrenderOptionTests : MapEventTestBase
         }, MapEventDisabledMethods);
     }
 
+    /// <summary>The server keeps player heroes out of the auto-resolve, so an ally holding only its player hero
+    /// would lose the simulation on the first round. Native counts that hero, coop must hide the option.</summary>
+    [Fact]
+    public void IncapacitatedDefender_WithOnlyPlayerHeroAlly_CannotLeaveBattleToOthers()
+    {
+        var (ctx, client) = SetupIncapacitatedDefenderInBattle(
+            withHealthyAllyOnSide: false,
+            effectiveMorale: 0f);
+        var (allyHeroId, allyPartyId) = CreatePlayerHeroParty("PlayerTwo");
+        JoinServerPartyToSide(ctx.MapEventId, allyPartyId, BattleSideEnum.Defender);
+        SetDefenderPlayerEncounter(client, ctx);
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Hero>(allyHeroId, out var allyHero));
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(allyPartyId, out var allyParty));
+
+            using (new AllowedThread())
+            {
+                // Native counts any hero element, even an emptied one, so drop the builders' NPC lord leaders.
+                PartyBase.MainParty.MemberRoster.RemoveZeroCounts();
+                var roster = allyParty.MemberRoster;
+                for (int i = roster.Count - 1; i >= 0; i--)
+                {
+                    var element = roster.GetElementCopyAtIndex(i);
+                    roster.AddToCountsAtIndex(i, -element.Number, -element.WoundedNumber, 0, true);
+                }
+                roster.AddNewElement(allyHero.CharacterObject, -1);
+                roster.AddToCountsAtIndex(roster.FindIndexOfTroop(allyHero.CharacterObject), 1, 0, 0, false);
+            }
+            Assert.Equal(1, allyParty.Party.NumberOfHealthyMembers);
+
+            var (shown, _) = InvokeOrderAttackCondition();
+
+            Assert.False(shown);
+        }, MapEventDisabledMethods);
+    }
+
     /// <summary>The existing mission claim still takes precedence over the allied-force exception.</summary>
     [Fact]
     public void IncapacitatedDefender_WithHealthyAlliedParty_CannotSimulateWhileMissionOwnsEvent()
