@@ -91,13 +91,15 @@ public class IncidentsCampaignBehaviourInterfaceTests
         Assert.Empty(sentMessages);
     }
 
-    [Fact]
-    public void TryInvokeIncident_LeavingBattleWhileInMission_DoesNotRollYet()
+    [Theory]
+    [InlineData(TriggerId.LeavingBattle)]
+    [InlineData("LeavingNavalBattle")]
+    public void TryInvokeIncident_LeavingBattleWhileInMission_DoesNotRollYet(string battleTrigger)
     {
         // The held roll running later comes from OnHourlyTick, which needs ContainerProvider-resolved player parties
         missionMembership.Setup(registry => registry.IsControllerInMission(player.ControllerId)).Returns(true);
 
-        incidentsInterface.TryInvokeIncident(player, playerParty, playerHero, new IncidentTrigger(TriggerId.LeavingBattle));
+        incidentsInterface.TryInvokeIncident(player, playerParty, playerHero, new IncidentTrigger(battleTrigger));
 
         sessionData.Verify(data => data.TryGetPendingIncident(It.IsAny<string>(), out It.Ref<string>.IsAny), Times.Never);
         sessionData.Verify(data => data.SetActiveIncidentSeed(It.IsAny<string>(), It.IsAny<long>()), Times.Never);

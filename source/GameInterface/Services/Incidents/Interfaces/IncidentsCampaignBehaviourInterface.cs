@@ -48,8 +48,14 @@ public class IncidentsCampaignBehaviourInterface : IIncidentsCampaignBehaviourIn
 {
     private static readonly ILogger Logger = LogManager.GetLogger<IncidentsCampaignBehaviourInterface>();
 
+    // NavalIncidentsCampaignBehaviour.IncidentTrigger ids, which GameInterface can't reference
+    private const string LeavingPort = "LeavingPort";
+    private const string LeavingEncounterAtSea = "LeavingEncounterAtSea";
+    private const string LeavingNavalBattle = "LeavingNavalBattle";
+
     private static readonly IncidentTrigger EnteringSettlementTriggers = new IncidentTrigger(TriggerId.EnteringCastle, TriggerId.EnteringTown, TriggerId.EnteringVillage);
-    private static readonly IncidentTrigger LeavingSettlementTriggers = new IncidentTrigger(TriggerId.LeavingTown, TriggerId.LeavingVillage, TriggerId.LeavingCastle);
+    private static readonly IncidentTrigger LeavingSettlementTriggers = new IncidentTrigger(TriggerId.LeavingTown, TriggerId.LeavingVillage, TriggerId.LeavingCastle, LeavingPort);
+    private static readonly IncidentTrigger BattleTriggers = new IncidentTrigger(TriggerId.LeavingBattle, LeavingNavalBattle);
 
     private readonly IPlayerManager playerManager;
     private readonly ISessionIncidentsPlayerDataInterface sessionIncidentsPlayerDataInterface;
@@ -57,7 +63,7 @@ public class IncidentsCampaignBehaviourInterface : IIncidentsCampaignBehaviourIn
     private readonly INetwork network;
     private readonly IMissionMembershipRegistry missionMembershipRegistry;
 
-    private readonly HashSet<string> heldBattleRollHeroIds = new();
+    private readonly Dictionary<string, IncidentTrigger> heldBattleRolls = new();
     private readonly Dictionary<string, PlayerBattleEndedLogEntry> playerBattleLogs = new();
 
     public IncidentsCampaignBehaviourInterface(
@@ -84,10 +90,10 @@ public class IncidentsCampaignBehaviourInterface : IIncidentsCampaignBehaviourIn
             if (!playerManager.TryGetPlayer(playerParty, out var player)) continue;
 
             // Roll for players whose battle ended while they were still in its mission once they've left it
-            if (heldBattleRollHeroIds.Contains(player.HeroId) && !IsInMission(player))
+            if (heldBattleRolls.TryGetValue(player.HeroId, out var heldTrigger) && !IsInMission(player))
             {
-                heldBattleRollHeroIds.Remove(player.HeroId);
-                TryInvokeIncident(player, playerParty, partyLeader, new IncidentTrigger(TriggerId.LeavingBattle));
+                heldBattleRolls.Remove(player.HeroId);
+                TryInvokeIncident(player, playerParty, partyLeader, heldTrigger);
                 continue;
             }
 
@@ -118,6 +124,10 @@ public class IncidentsCampaignBehaviourInterface : IIncidentsCampaignBehaviourIn
             {
                 TryInvokeIncident(player, mainParty, mainHero, new IncidentTrigger(TriggerId.LeavingVillage));
             }
+            if (gameMenuId == "port_menu" && optionId == "sail_option")
+            {
+                TryInvokeIncident(player, mainParty, mainHero, new IncidentTrigger(LeavingPort));
+            }
         }
     }
 
@@ -147,38 +157,44 @@ public class IncidentsCampaignBehaviourInterface : IIncidentsCampaignBehaviourIn
 
     public void OnMapEventEnded(MapEvent mapEvent)
     {
-        if (!mapEvent.ContainsPlayerParty() || mapEvent.IsNavalMapEvent) return;
+        if (!mapEvent.ContainsPlayerParty()) return;
 
         // Vanilla only rolls for a winning player, so only the winning side's player parties are checked below
         if (!mapEvent.HasWinner) return;
 
-        if ((mapEvent.IsFieldBattle || mapEvent.IsHideoutBattle) && !mapEvent.AttackerSide.IsSurrendered && !mapEvent.DefenderSide.IsSurrendered)
+        // NavalIncidentsCampaignBehaviour rolls for a naval field battle, IncidentsCampaignBehaviour for a land one that no side surrendered
+        bool isNavalBattle = mapEvent.IsNavalMapEvent && mapEvent.IsFieldBattle;
+        bool isLandBattle = !mapEvent.IsNavalMapEvent && (mapEvent.IsFieldBattle || mapEvent.IsHideoutBattle) &&
+            !mapEvent.AttackerSide.IsSurrendered && !mapEvent.DefenderSide.IsSurrendered;
+        if (!isNavalBattle && !isLandBattle) return;
+
+        var trigger = new IncidentTrigger(isNavalBattle ? LeavingNavalBattle : TriggerId.LeavingBattle);
+        foreach (var playerParty in mapEvent.GetPlayerPartiesOnSide(mapEvent.WinningSide))
         {
-            foreach (var playerParty in mapEvent.GetPlayerPartiesOnSide(mapEvent.WinningSide))
-            {
-                var party = playerParty.Party?.MobileParty;
-                if (party == null) continue;
+            var party = playerParty.Party?.MobileParty;
+            if (party == null) continue;
 
-                var partyLeader = party.LeaderHero;
-                if (partyLeader == null) continue;
+            var partyLeader = party.LeaderHero;
+            if (partyLeader == null) continue;
 
-                if (!playerManager.TryGetPlayer(party, out var player)) continue;
+            if (!playerManager.TryGetPlayer(party, out var player)) continue;
 
-                playerBattleLogs[player.HeroId] = CreateBattleLog(mapEvent, party, partyLeader);
+            if (isLandBattle) playerBattleLogs[player.HeroId] = CreateBattleLog(mapEvent, party, partyLeader);
 
-                if (party.RandomFloatWithSeed((uint)CampaignTime.Now.ToMinutes) >= Campaign.Current.Models.IncidentModel.GetIncidentTriggerGlobalProbability()) continue;
+            if (party.RandomFloatWithSeed((uint)CampaignTime.Now.ToMinutes) >= Campaign.Current.Models.IncidentModel.GetIncidentTriggerGlobalProbability()) continue;
 
-                TryInvokeIncident(player, party, partyLeader, new IncidentTrigger(TriggerId.LeavingBattle));
-            }
+            TryInvokeIncident(player, party, partyLeader, trigger);
         }
     }
 
     public void ConversationEnded(Player player, MobileParty mainParty, Hero mainHero)
     {
-        if (mainParty.CurrentSettlement != null || mainParty.IsCurrentlyAtSea) return;
+        if (mainParty.CurrentSettlement != null) return;
         if (mainParty.RandomFloatWithSeed((uint)CampaignTime.Now.ToMinutes) >= Campaign.Current.Models.IncidentModel.GetIncidentTriggerGlobalProbability()) return;
 
-        TryInvokeIncident(player, mainParty, mainHero, new IncidentTrigger(TriggerId.LeavingEncounter));
+        // NavalIncidentsCampaignBehaviour rolls for leaving an encounter at sea, IncidentsCampaignBehaviour for one on land
+        var trigger = new IncidentTrigger(mainParty.IsCurrentlyAtSea ? LeavingEncounterAtSea : TriggerId.LeavingEncounter);
+        TryInvokeIncident(player, mainParty, mainHero, trigger);
     }
 
     public void OnHeirSelectionOver(string playerHeroId)
@@ -220,9 +236,9 @@ public class IncidentsCampaignBehaviourInterface : IIncidentsCampaignBehaviourIn
     public void TryInvokeIncident(Player player, MobileParty playerParty, Hero playerHero, IncidentTrigger trigger)
     {
         // Hold the roll for a battle that ends before its player has left the mission
-        if (trigger.HasTrigger(TriggerId.LeavingBattle) && IsInMission(player))
+        if (trigger.HasTrigger(BattleTriggers) && IsInMission(player))
         {
-            heldBattleRollHeroIds.Add(player.HeroId);
+            heldBattleRolls[player.HeroId] = trigger;
             return;
         }
 
