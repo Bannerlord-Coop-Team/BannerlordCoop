@@ -192,8 +192,7 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
 - The mission never spawns the party's campaign `Ship`. `CoopShipSnapshotBuilder` builds a detached copy (same owner, hull,
   pieces and damage) and the mission damages that (`Missions.Naval/CoopShipSnapshotBuilder.cs`).
 - `CoopShipSnapshotPatches` keeps snapshot HP writes out of Jordan's campaign ship sync, keeps `DestroyShipAction` from
-  running on a snapshot at 0 HP, and grants no Boatswain XP for snapshot damage; it sums the damage the ship's upgrades
-  mitigated instead, for the fate report.
+  running on a snapshot at 0 HP.
 - So the mission never writes a campaign ship. What happened to it reaches the campaign only through the ship fates the
   server applies; see section 3.
 - Each hull's spawn record carries the object-manager id of the campaign ship it stands for (`CampaignShipId`,
@@ -519,7 +518,7 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
 - **Written back (M6).** Vanilla writes naval damage into the campaign ship on every hit and destroys a ship at 0 HP
   (`Ship.OnShipDamaged`). Coop reports it and applies it at fixed points instead:
   - The client that simulates a hull (its owner, or the battle host for AI hulls) reports the campaign ship's fate: HP,
-    sail HP, sunk (sinking or 0 HP) and the damage mitigated since its last report (`BattleShipFateReporter`,
+    sail HP and sunk when sinking or at 0 HP (`BattleShipFateReporter`,
     `NetworkBattleShipFates` over the relay). A sinking hull reports at once, other changes at most every 2 s, and a
     removed hull, the mission's end (`NavalShipsLogic.MissionEndEvent`, before `MissionLeft`) and every result report
     (the committer publishes `BattleResultReporting` just before `NetworkBattleResultReady`) flush the rest;
@@ -530,8 +529,8 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
     first one replaces the held fate; an owner taking its own ship back clears the record. The newest by host epoch then
     revision wins, a sunk ship stays sunk, and fates are dropped once the results were calculated.
   - `IBattleShipFateApplier` writes them with patches live, never under `AllowedThread`, so every write replicates:
-    the owner's Boatswain gets the summed mitigated damage once (vanilla's 0.1 XP per point), then a sunk ship goes
-    through `DestroyShipAction` and any other ship takes its battle HP and sail HP. `OnShipDamaged` is not called again.
+    a sunk ship goes through `DestroyShipAction` and any other ship takes its battle HP and sail HP. `OnShipDamaged` is
+    not called again; War Sails v1.3.7 grants no Boatswain XP from ship damage, so there is nothing to forward.
   - It applies at a member's departure (its party's ships and the ships it captured, so a rejoin reads them; a ship of its
     party that another player captured stays held, since a capture changes no campaign owner and the prize leaves with its
     captor, R46), when the
@@ -552,8 +551,8 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   the rest (`LootShipsHandler`) work after the finalize. The same handler then releases the hold; a held ship nobody
   took is destroyed when its looter disconnects or its party is removed, or after a 2 hour fallback for a loot screen that
   never closes (the ship screen comes after the troop and item loot and any conversations).
-- **Server log (Information, `[NavalSync]`, one line per ship).** The applier logs `Ship <id> of <party> grants its Boatswain
-  XP for <n> mitigated damage`, `Ship <id> of <party> sank in battle; destroying it (hp, sail)` and `Ship <id> of <party>
+- **Server log (Information, `[NavalSync]`, one line per ship).** The applier logs
+  `Ship <id> of <party> sank in battle; destroying it (hp, sail)` and `Ship <id> of <party>
   keeps its battle condition: hp <old> -> <new>, sail <old> -> <new>`. The loot path logs `Loot ship <id> of <loser> went to no
   winner; destroying it` (at the destroy in `MapEventResultsInterface.LootDefeatedPartyShips`), and the hold logs
   `Holding loot ship`, `Released loot ship <id> held for <looter>: taken by <party> | discarded ...` and
@@ -568,7 +567,7 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
 | G1 Beat a pirate fleet to a natural end, with ship weapons | Natural end done and live-passed (R40 A, B1, B2). Weapons live-passed in R41a-2 W1 (ballistas for 156 s, no crash). | `vs_pirates`, `sinking`, `fleet`, `migration`, `weapons=n`; `NavalNaturalEndScenarioTests`, `NavalShipWeaponScenarioTests`, `NavalVsPiratesScenarioTests` |
 | G2 Ramming and boarding between any two hulls | In progress (M10a): copies are steered dynamic bodies (D3 option B) and collide with own hulls; contact and ram damage route to the owner, and only the rammer's owner runs the ram's damage tick. Not live yet. | `ramming`, `boarding`; `NavalCopySteeringTests`, `NavalDamageRoundTripScenarioTests` |
 | G3 Retreat, leave or disconnect without breaking the battle | Retreat and leave live-passed in R41a (A, B, C). Disconnect is a leave (D4); hard drops of a non-host and of the host live-passed in R41a-2 (D, E). Done: the R41a-2 W2 and S fixes and the departure order (parked N of N, then withdrew N) live-passed in R41a-3. | `retreat`, `migration who=nonhost`; `NavalDepartureScenarioTests`, `BattleReserveReconnectScopeTests` |
-| G4 Results match vanilla | Done in code (M6), not live yet (R45): battle HP, sail HP, sunk ships and Boatswain XP are written back, and loot ships survive the losing party's finalize. In-mission capture replicates (authority-confirmed, in place, PvP included), not live yet (R46). Disengage loot (M6c) is pending. | `NavalShipFateScenarioTests`, `NavalCaptureScenarioTests`, `LootShipHoldTests`, `BattleShipFateReporterTests`, `BattleShipFateLedgerTests`, `BattleShipCaptureReplicatorTests` |
+| G4 Results match vanilla | Done in code (M6), not live yet (R45): battle HP, sail HP and sunk ships are written back, and loot ships survive the losing party's finalize. In-mission capture replicates (authority-confirmed, in place, PvP included), not live yet (R46). Disengage loot (M6c) is pending. | `NavalShipFateScenarioTests`, `NavalCaptureScenarioTests`, `LootShipHoldTests`, `BattleShipFateReporterTests`, `BattleShipFateLedgerTests`, `BattleShipCaptureReplicatorTests` |
 | G5 Battles from real campaign play | Presets done (WP4), never live. | `encounter`, `blockade`; preset unit tests |
 | G6 AI allies, 3+ players per side | Allied AI fleets done in code (M11 phase 1), not live yet: the battle host fields them on the ally team with what the players leave of the side's 8 ships, and a player who joins after the attempt caps its fleet against the recorded attempt (phase 2). 3 players are E2E-covered; live runs had 2 clients. | `allied_npc`; 3-client E2E scenarios |
 | G7 Join or rejoin mid-battle shows the true state | Late-join catch-up done (records, condition, weapon, seats); `late_join` live-passed in R39. A rejoin is a late join with a fresh reserve (D4), live-passed in R41a-2 (D, E) and R41a-3 (W2, D, E); a late joiner's dropped host hull record (R41a-2 E) is fixed in E2E, its member hold not hit live yet. | `late_join`, `migration`; `NavalLateJoinScenarioTests`, `NavalDepartureScenarioTests` |
@@ -599,7 +598,7 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
 | M10a ram and contact (steered copies) | in progress, R42 next |
 | M10w water clock sync (shared battle wave time) | done, live-verified in R45 |
 | M10b plank crossing and melee | pending, needs M10a |
-| M6 results parity (fates, Boatswain XP, loot hold) | done in code, R45 next |
+| M6 results parity (fates, loot hold) | done in code, R45 next |
 | M6 in-mission capture | done in code, R46 next |
 | M6c disengage parity | pending |
 | M11 allied fleets | phase 1 done in code, not live yet |
@@ -727,9 +726,8 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   - the PvP loser's ships vanish (R39).
 - **Ship fate limits (M6).** A hard drop loses up to 2 s of HP changes (a sink always goes out at once). The ships of an
   AI party that a non-host player fields with its own team are refused, since only the host may report AI ships. A
-  fate that arrives after the results were calculated is dropped. A reporter counts a fate's mitigated damage as sent, so
-  the Boatswain XP of a fate the server refuses (an old host's at a stale epoch, a sender already out of the battle) is
-  lost; its HP and sunk state come back with the next fate, since those are absolute.
+  fate that arrives after the results were calculated is dropped. A fate the server refuses (an old host's at a stale
+  epoch, a sender already out of the battle) comes back with the next one, since HP and sunk state are absolute.
 - **A client that joins while loot ships are held lacks them.** A held ship has no owner, and the save reaches ships only
   through a party's ships, so a client joining or rejoining while someone's loot screen is open never loads it. If the
   looter then takes it, the `Owner` write can't resolve there and the looter's fleet is one ship short on that client
@@ -948,7 +946,7 @@ For item 25, pair only the same instance, full ship id and unchanged authority, 
 | `weapon_probe start <at-water-seconds> [seconds]`, `weapon_probe status`, `weapon_probe stop` | client | DEBUG read-only shared-clock samples of every ship weapon across migration, plus successful replay, applied state and actual animation-call events. Default duration 60 s, maximum 300 s; emits `NAVAL_WEAPON` JSON. |
 | `roll start <ship-id-prefix> <at-water-seconds> [seconds]`, `roll status`, `roll stop` | client | DEBUG read-only paired roll probe. Run on both clients for the same hull and future interval. Default duration 60 s, maximum 300 s. Logs `NAVAL_ROLL` JSON header/sample/end records; status retains the stop reason and local means. |
 | `scenario_status` | client | Preset steps, knobs (`entry`, `ram`, `reserve` and `drop` included) and `battle.hulls[]` with owner, AI flag, weapon and ram. |
-| `server_hp` | server and client | Prints `NAVAL_SERVER_HP` JSON with each retained battle instance and campaign ship id, pending hull/sail HP, sunk flag, mitigated damage, report host epoch/revision, captor and capture sequence. Read-only and needs no server mission or party. `awaitingCaptureReport=true` means the retained HP predates the new authority's first accepted report; epoch/revision are null then. Null HP means no pending fate for that capture, not zero HP; `awaitingCaptureReport` is also null because an applied fate is no longer retained. An empty array means no retained reports or captures. These are accepted reports waiting for campaign apply, not instantaneous mission HP: routed hits and `shipDamage.drops`/`deferred` exist only on the battle clients. On a client prints `NAVAL_CLIENT_HP` with instance, network ship id, campaign ship id, local HP and authority, so reports can be matched across all machines. Compare after the 2 s fate-report interval and delivery using campaign ship ids; applied fates leave this ledger. |
+| `server_hp` | server and client | Prints `NAVAL_SERVER_HP` JSON with each retained battle instance and campaign ship id, pending hull/sail HP, sunk flag, report host epoch/revision, captor and capture sequence. Read-only and needs no server mission or party. `awaitingCaptureReport=true` means the retained HP predates the new authority's first accepted report; epoch/revision are null then. Null HP means no pending fate for that capture, not zero HP; `awaitingCaptureReport` is also null because an applied fate is no longer retained. An empty array means no retained reports or captures. These are accepted reports waiting for campaign apply, not instantaneous mission HP: routed hits and `shipDamage.drops`/`deferred` exist only on the battle clients. On a client prints `NAVAL_CLIENT_HP` with instance, network ship id, campaign ship id, local HP and authority, so reports can be matched across all machines. Compare after the 2 s fate-report interval and delivery using campaign ship ids; applied fates leave this ledger. |
 | `inspect [summary\|brief]` | client | `summary` (or `brief`) prints a `NAVAL_INSPECT_SUMMARY` header (instance, own id, host, epoch, deployment, hull count, the deck puppets' last/max deck error, DEBUG `copyOnCopy`) and one line per hull: the 8-digit id that the hull commands take, hull type, owner (`(npc)` for an AI hull), authority, HP, sail HP, `afloat`/`sinking`/`sunk`, `copy=own\|steered\|written`, and in DEBUG the copy's drift mean/max and `fatesSent`. Without it, the full JSON: session, host epoch, hull streams (per hull `followsHost`, `captor`, `captureSequence`, `orphan`, `side`, `formation`), `shipCapture` (`captureRequests`, `captureRejections` by reason, `captureExpired`, `pendingRequests` with `waitedSeconds`, and `applied`: `capturesApplied`, `recordsApplied`, `confirmsDropped`, `duplicateConfirms`, `captureConflicts`, `heldConfirms`), `ships[].captureTimer`, damage, weapons, decks, stations, AI fleet, end tally, agents, ships; DEBUG adds `copyProbe`: steering knobs, drift (against the owner's estimated current pose, the latest sample moved on by its age without the lead) and correction per copy, `oscillations10s`/`oscillationsTotal` (sign changes of the along-heading position error to the target, low-passed over the steering's `tau`, outside a 0.1 m deadband; the raw error flips at each sample arrival as the target jumps by the owner's frame-time jitter times its speed, R43), `targetJump` (how far the target moved at each sample arrival), steering cost (`steerMeanMs`, `steerP99Ms`, `steerMaxMs`) with `gcCollections10s` per generation, contact counters, the deck puppets' `maxDeckError` (the largest hull-frame puppet-to-target error, skipping a teleport's or a new deck placement's sample, counted in `deckSamplesSkipped`), `rams[]` (`hasRam` per hull) and the ram counters (`ramDropped`, `ramPuppetsSpared`); and `ships[].fatesSent`, the campaign ship fates this client sent for the hull (M6). |
 | `fleet [party]` | server and client | Lists each ship of a party on this machine: its id, HP, sail HP and owner. `party` is a controller id, a `MobileParty`/`PartyBase` id, or a party or leader name or id (`Player`, `Player3325`; player parties first, then lord parties), on clients too; without it, the main party on a client and every player's party on the server. Run it before and after a battle on every machine. |
 | `finish_loot [take=<ship>[,<ship>...]\|none\|all]` | client | Finishes the open post-battle loot screens with their own buttons: the party screen takes every troop and prisoner then Done, the inventory takes every item then Done, the ship screen selects and takes each chosen ship (a `Ship_...` id, with or without `Ship_`, or a unique prefix of one) then Confirm, leaving the rest (`take` defaults to `none`). Each confirmation is answered yes. So `PortScreenChangesHandler` takes the ships and `OnPlayerLootShipEnd` sends `NetworkDiscardLootShips`, which releases the M6 loot hold. The next screen usually opens on a later frame, so run it again until it reports no loot screen. Still manual: the captured-lord conversation (`FreeOrCapturePrisonerHeroes`) before the party screen. |
@@ -1005,27 +1003,9 @@ Run `coop.debug.naval.scenario vs_pirates hulls=3 weapons=1 testclient1 testclie
 `retreat`, `encounter`, `blockade` (`GameInterface/Services/MapEvents/NavalScenarios/NavalScenarioPresets.cs`).
 
 For R53 item 34, damage reduction comes from the effective First Mate's Boatswain skill, not a hull upgrade
-(`NavalDLCCampaignShipDamageModel.GetShipDamage` and `NavalSkillEffects.ShipDamageReduction`). Vanilla grants
-`0.1 * max(rawDamage - finalDamage, 0)` base XP to that hero; learning rate changes the observed XP increase.
-The mission accumulates this mitigation and the server awards it through M6 when applying the battle's fates.
-
-1. On the server, use `coop.debug.mobileparty.list` to find the player's registered party id. The R52 fixture used
-   `MobileParty_Player` and `MobileParty_Player563`; substitute the id returned by that lookup if the save differs.
-2. Before staging, run `coop.debug.naval.boatswain MobileParty_Player prepare` on the server. It prepares the
-   effective First Mate, which may be a companion, and prints that hero's registry id. Also run
-   `coop.debug.naval.boatswain MobileParty_Player563 prepare` for the second player. Record both XP baselines.
-3. Run `coop.debug.naval.scenario migration delay=60 reconnect=10 who=nonhost` on the server. When deployed,
-   run `coop.debug.naval.inspect summary` on the nonhost player's client, then `coop.debug.naval.damage` with
-   that client's own hull id and amount `100`. At the staged skill of 100, the damage probe reports 75 final
-   damage and 25 mitigated damage. Record the actual hull HP before the scenario disconnects the nonhost.
-4. After rejoin, run `coop.debug.naval.inspect summary` on both clients. The rejoined hull must retain its recorded
-   damaged HP; damage it again with `100` on its current authority to exercise the second fate report too.
-5. Run `coop.debug.naval.win` on the current battle host and finish the post-battle screens on every client.
-   Run `coop.debug.naval.boatswain MobileParty_Player` and `coop.debug.naval.boatswain MobileParty_Player563` on the server and their owning clients.
-   Compare the same hero's
-   XP against step 2 and campaign ship HP against its last mission HP. Expect an XP increase on both machines,
-   matching ship HP, and one server `grants its Boatswain XP` log for the summed mitigation. Read again without
-   fighting or repairing: XP must stay unchanged. Do not run `prepare` between the baseline and final readings.
+(`NavalDLCCampaignShipDamageModel.GetShipDamage` and `NavalSkillEffects.ShipDamageReduction`). War Sails v1.3.7 dropped
+the Boatswain XP vanilla granted for that mitigation (`NavalSkillLevellingManager.OnShipDamaged`), so coop forwards none;
+`coop.debug.naval.boatswain <partyId>` still reads the First Mate's XP and ship HP.
 
 `encounter` takes scenario players off a raft first (a player released at sea is on one, and `PlayerRaftVisibilityPatches`
 turns an engage order on a player's raft into `GoToPoint`; R41b P4), as landing would: the raft ends, the raft's `DisableAi`

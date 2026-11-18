@@ -7,17 +7,14 @@ namespace GameInterface.Tests.Services.Ships;
 public class BattleShipFateTests
 {
     [Theory]
-    [InlineData("Ship_1", 500f, 200f, 10f, true)]
-    [InlineData("Ship_1", 0f, 0f, 0f, true)]
-    [InlineData(null, 500f, 200f, 0f, false)]
-    [InlineData("", 500f, 200f, 0f, false)]
-    [InlineData("Ship_1", float.NaN, 200f, 0f, false)]
-    [InlineData("Ship_1", 500f, float.PositiveInfinity, 0f, false)]
-    [InlineData("Ship_1", 500f, 200f, float.NaN, false)]
-    [InlineData("Ship_1", 500f, 200f, -1f, false)]
-    public void IsValid_OnlyForANamedShipWithFiniteValuesAndNoNegativeMitigatedDamage(string? shipId, float hitPoints,
-        float sailHitPoints, float mitigatedDamage, bool expected)
+    [InlineData("Ship_1", 500f, 200f, true)]
+    [InlineData("Ship_1", 0f, 0f, true)]
+    [InlineData(null, 500f, 200f, false)]
+    [InlineData("", 500f, 200f, false)]
+    [InlineData("Ship_1", float.NaN, 200f, false)]
+    [InlineData("Ship_1", 500f, float.PositiveInfinity, false)]
+    public void IsValid_OnlyForANamedShipWithFiniteValues(string? shipId, float hitPoints, float sailHitPoints, bool expected)
     {
-        Assert.Equal(expected, new BattleShipFate(shipId, hitPoints, sailHitPoints, sunk: false, mitigatedDamage).IsValid);
+        Assert.Equal(expected, new BattleShipFate(shipId, hitPoints, sailHitPoints, sunk: false).IsValid);
     }
 }

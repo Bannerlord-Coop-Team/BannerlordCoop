@@ -61,16 +61,9 @@ public class BattleShipFateLedger : IBattleShipFateLedger
         }
 
         var candidate = new HeldFate(fate, hostEpoch, revision);
-        if (!ships.TryGetValue(fate.CampaignShipId, out var held))
-        {
-            ships.Add(fate.CampaignShipId, candidate);
-            return;
-        }
+        if (ships.TryGetValue(fate.CampaignShipId, out var held) && !candidate.Supersedes(held)) return;
 
-        // Each report carries the damage mitigated since the reporter's last one, so every report adds to the total.
-        float mitigatedDamage = held.Fate.MitigatedDamage + fate.MitigatedDamage;
-        var kept = candidate.Supersedes(held) ? candidate : held;
-        ships[fate.CampaignShipId] = new HeldFate(kept.Fate.WithMitigatedDamage(mitigatedDamage), kept.HostEpoch, kept.Revision);
+        ships[fate.CampaignShipId] = candidate;
     }
 
     // Copies the retained reports, including captures still waiting for their first new-authority report.
@@ -95,7 +88,6 @@ public class BattleShipFateLedger : IBattleShipFateLedger
                     hitPoints = held?.Fate.HitPoints,
                     sailHitPoints = held?.Fate.SailHitPoints,
                     sunk = held?.Fate.Sunk,
-                    mitigatedDamage = held?.Fate.MitigatedDamage,
                     hostEpoch = awaitingCaptureReport ? null : held?.HostEpoch,
                     revision = awaitingCaptureReport ? null : held?.Revision,
                     captor = capture?.Captor,
