@@ -1,9 +1,28 @@
 {
   "schemaVersion": 2,
-  "catalogRevision": "e7b67121ffb256d0f5417e3ed488c22ed2b35f7d3e0d314f42c7f02691789b69",
-  "contentDigest": "e7b67121ffb256d0f5417e3ed488c22ed2b35f7d3e0d314f42c7f02691789b69",
+  "catalogRevision": "f92d6ab74369914f3284fe54bc5233e12a0e7488651d97e8420726b3ae9b084f",
+  "contentDigest": "f92d6ab74369914f3284fe54bc5233e12a0e7488651d97e8420726b3ae9b084f",
   "sourceCommit": "d8a3c6dcce1d9b452f4af9262f5a16da01ddf13a",
   "source": "BannerlordCoop/source/GameInterface/Configuration/ModConfigData.cs",
+  "oldAgentOmittedKeys": [
+    "voiceEnabled",
+    "battleSize",
+    "allowClientTimeControls",
+    "blockAiWarDeclarationsOnOfflinePlayers",
+    "postBattleAiAmnestySeconds",
+    "ensureUnaffiliatedWanderers",
+    "spawnRateWanderers",
+    "coopClansEnabled",
+    "enablePlayerExecutions",
+    "playerWoundedBattleEntry",
+    "showPlayerNameplates",
+    "kingdomDecisionVoteTimeoutSeconds",
+    "preferredBattleHosts",
+    "pvpBlockLeave",
+    "pvpResponseTimerSeconds",
+    "warSails",
+    "clansAfterKingdomDestruction"
+  ],
   "options": [
     {
       "key": "voiceEnabled",
@@ -258,10 +277,11 @@
       "availableSince": "0.1.8",
       "min": 0,
       "max": 86400,
-      "forbiddenRanges": [
+      "coerceRanges": [
         [
           1,
-          9
+          9,
+          10
         ]
       ],
       "omitForOldAgents": true,

@@ -15,7 +15,7 @@ public sealed class ManagedConfigOptionAttribute : Attribute
     public int MaxItems { get; set; } = -1;
     public string ItemPattern { get; set; }
     public bool UniqueItems { get; set; }
-    public string ForbiddenRanges { get; set; }
+    public string CoerceRanges { get; set; }
     public bool OmitForOldAgents { get; set; }
 }
 
@@ -182,7 +182,7 @@ public sealed class ModOptionsData
     [ManagedConfigOption(Stable = false, AvailableSince = "0.1.8", OmitForOldAgents = true)]
     public bool? PvpBlockLeave { get; set; }
 
-    [ManagedConfigOption(Stable = false, AvailableSince = "0.1.8", Min = 0, Max = 86400, ForbiddenRanges = "1-9", OmitForOldAgents = true)]
+    [ManagedConfigOption(Stable = false, AvailableSince = "0.1.8", Min = 0, Max = 86400, CoerceRanges = "1-9=10", OmitForOldAgents = true)]
     public int? PvpResponseTimerSeconds { get; set; }
 
     /// <summary>Whether a dedicated server runs War Sails (NavalDLC) co-op. It parses the file itself; declared so the key isn't reported as unknown.</summary>

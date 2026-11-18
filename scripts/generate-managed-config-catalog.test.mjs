@@ -10,7 +10,7 @@ test('generated catalog carries bounds, channel availability and list constraint
   assert.deepEqual(byKey.get('clansAfterKingdomDestruction').values, ['Vanilla', 'KeepClans']);
   assert.equal(byKey.get('clansAfterKingdomDestruction').stable, false);
   assert.equal(byKey.get('kingdomDecisionVoteTimeoutSeconds').min, undefined);
-  assert.deepEqual(byKey.get('pvpResponseTimerSeconds').forbiddenRanges, [[1, 9]]);
+  assert.deepEqual(byKey.get('pvpResponseTimerSeconds').coerceRanges, [[1, 9, 10]]);
   assert.deepEqual(byKey.get('preferredBattleHosts').maxItems, 32);
   assert.equal(byKey.get('preferredBattleHosts').uniqueItems, true);
   assert.equal(byKey.get('preferredBattleHosts').itemPattern, '^[0-9]{17}$');

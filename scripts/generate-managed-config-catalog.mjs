@@ -32,17 +32,19 @@ function parseAttribute(text, key) {
   for (const pair of attribute.split(',').map((item) => item.trim()).filter(Boolean)) {
     const match = pair.match(/^(?<name>[A-Za-z][A-Za-z0-9_]*)\s*=\s*(?<value>.+)$/u);
     if (match === null) throw new Error(`Invalid ManagedConfigOption argument for ${key}: ${pair}`);
-    const name = ({ Stable: 'stable', AvailableSince: 'availableSince', Min: 'min', Max: 'max', MaxItems: 'maxItems', ItemPattern: 'itemPattern', UniqueItems: 'uniqueItems', ForbiddenRanges: 'forbiddenRanges', OmitForOldAgents: 'omitForOldAgents' })[match.groups.name];
+    const name = ({ Stable: 'stable', AvailableSince: 'availableSince', Min: 'min', Max: 'max', MaxItems: 'maxItems', ItemPattern: 'itemPattern', UniqueItems: 'uniqueItems', CoerceRanges: 'coerceRanges', OmitForOldAgents: 'omitForOldAgents' })[match.groups.name];
     if (name === undefined) throw new Error(`Unknown ManagedConfigOption field for ${key}: ${match.groups.name}`);
     const raw = match.groups.value.trim();
     if (/^".*"$/u.test(raw)) result[name] = raw.slice(1, -1);
     else if (raw === 'true' || raw === 'false') result[name] = raw === 'true';
     else if (/^-?\d+(?:\.\d+)?$/u.test(raw)) result[name] = Number(raw);
     else throw new Error(`Unsupported ManagedConfigOption value for ${key}: ${raw}`);
-    if (name === 'forbiddenRanges') {
-      const [from, to] = String(result[name]).split('-').map(Number);
-      if (!Number.isSafeInteger(from) || !Number.isSafeInteger(to)) throw new Error(`Invalid forbidden range for ${key}`);
-      result[name] = [[from, to]];
+    if (name === 'coerceRanges') {
+      const matchRange = String(result[name]).match(/^(?<from>-?\d+)-(?<to>-?\d+)=(?<value>-?\d+)$/u);
+      if (matchRange === null) throw new Error(`Invalid coercion range for ${key}`);
+      const range = [Number(matchRange.groups.from), Number(matchRange.groups.to), Number(matchRange.groups.value)];
+      if (range.some(part => !Number.isSafeInteger(part)) || range[0] > range[1]) throw new Error(`Invalid coercion range for ${key}`);
+      result[name] = [range];
     }
   }
   return result;
@@ -92,7 +94,8 @@ try {
   ({ stdout: sourceCommit } = await execFileAsync('git', ['log', '-1', '-Spublic bool OmitForOldAgents', '--format=%H', '--', 'source/GameInterface/Configuration/ModConfigData.cs'], { cwd: root }));
   sourceCommit = sourceCommit.trim();
 } catch { /* source checkout may be an archive */ }
-const catalog = { schemaVersion: 2, catalogRevision: digest, contentDigest: digest, sourceCommit, source: 'BannerlordCoop/source/GameInterface/Configuration/ModConfigData.cs', options: normalized };
+const oldAgentOmittedKeys = normalized.filter(option => option.omitForOldAgents === true).map(option => option.key);
+const catalog = { schemaVersion: 2, catalogRevision: digest, contentDigest: digest, sourceCommit, source: 'BannerlordCoop/source/GameInterface/Configuration/ModConfigData.cs', oldAgentOmittedKeys, options: normalized };
 const output = `${JSON.stringify(catalog, null, 2)}\n`;
 if (check) {
   const current = await readFile(outputPath, 'utf8').catch(() => '');
