@@ -17,7 +17,7 @@ public class PartySailCommands
         new CoopCommandResult(false, output, "command_failed");
 
     // coop.debug.naval.set_sail PlayerOne
-    /// <summary>Sets sail from the port a player's party is in, through the same server steps as the port menu's Set sail.</summary>
+    /// <summary>Sets sail from the port a player's party is in, through the server's leave and set sail calls.</summary>
     public sealed class SetSailCoopCommand : ICoopCommand
     {
         private readonly ISettlementInterface settlementInterface;
@@ -54,14 +54,14 @@ public class PartySailCommands
             if (port == null || !port.HasPort)
                 return Failed($"{party.StringId} is not in a settlement with a port.");
 
-            // Same rule as vanilla NavalTransitionCampaignBehavior.GetIsSetSailEnabled
+            // These two checks are vanilla NavalTransitionCampaignBehavior.GetIsSetSailEnabled
             if (party.Army != null && party.Army.LeaderParty != party)
                 return Failed($"{party.StringId} is following an army and can't set sail.");
-
             if (!party.HasNavalNavigationCapability || !party.Anchor.IsAtSettlement(port))
                 return Failed($"{party.StringId} has no ships anchored at {port.StringId}.");
 
-            // Same steps as ServerSettlementExitEnterHandler's SetSail leave; the replicated leave also closes the owner's port menu
+            // The leave and set sail calls of ServerSettlementExitEnterHandler's SetSail leave, without its encounter-leave event;
+            // the replicated leave also closes the owner's port menu
             settlementInterface.PartyLeaveSettlement(party);
             settlementInterface.PartySetSail(party, port);
 
@@ -110,7 +110,11 @@ public class PartySailCommands
             if (!port.HasPort)
                 return Failed($"{port.StringId} has no port.");
 
-            if (!party.IsCurrentlyAtSea || party.CurrentSettlement != null)
+            // Vanilla EnterSettlementAction keeps a party with no land navigation at sea inside a port
+            if (party.CurrentSettlement != null)
+                return Failed($"{party.StringId} is in {party.CurrentSettlement.StringId}, set sail first.");
+
+            if (!party.IsCurrentlyAtSea)
                 return Failed($"{party.StringId} is not at sea, set sail first.");
 
             // Same call as vanilla SettlementVisual.OnMapClick for a port reached by sea
