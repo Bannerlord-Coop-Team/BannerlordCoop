@@ -7,6 +7,7 @@ using GameInterface;
 using GameInterface.Services.Issues.Framework.AcceptCoordination;
 using GameInterface.Services.Issues.Quests.CaravanAmbush;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Heroes.Patches;
 using HarmonyLib;
 using Helpers;
 using TaleWorlds.CampaignSystem;
@@ -140,14 +141,29 @@ public class CaravanAmbushAcceptTests
                 Assert.True(server.ObjectManager.TryGetId(quest._banditParty, out actualBanditId));
                 Assert.DoesNotContain(quest, Campaign.Current.QuestManager.Quests);
             });
+            Quest ownerQuest = null!;
             owner.Call(() =>
             {
-                var quest = Assert.IsType<Quest>(scenario.QuestOf(owner));
-                Assert.Same(owner.GetRegisteredObject<MobileParty>(actualBanditId), quest._banditParty);
-                Assert.Contains(quest, Campaign.Current.QuestManager.Quests);
-                Assert.Equal("S4kpdrgw", Assert.Single(quest.JournalEntries).LogText.GetID());
+                ownerQuest = Assert.IsType<Quest>(scenario.QuestOf(owner));
+                Assert.Same(owner.GetRegisteredObject<MobileParty>(actualBanditId), ownerQuest._banditParty);
+                Assert.Contains(ownerQuest, Campaign.Current.QuestManager.Quests);
+                Assert.Equal("S4kpdrgw", Assert.Single(ownerQuest.JournalEntries).LogText.GetID());
             });
-            other.Call(() => Assert.Null(other.GetRegisteredObject<Hero>(scenario.NotableId).Issue.IssueQuest));
+            server.Call(() =>
+            {
+                var quest = Assert.IsType<Quest>(scenario.QuestOf(server));
+                var ownerHero = server.GetRegisteredObject<Hero>(scenario.OwnerHeroId);
+                quest._isCaravanSaved = true;
+                using (new MainHeroSubstitutionScope(ownerHero, ownerHero.PartyBelongedTo))
+                    quest.OnQuestSucceeded();
+            });
+            environment.FlushCoalescer();
+            owner.Call(() =>
+            {
+                Assert.Equal(2, ownerQuest.JournalEntries.Count);
+                Assert.Contains("defeated the large group of bandits", ownerQuest.JournalEntries.Last().LogText.ToString());
+            });
+            other.Call(() => Assert.Null(other.GetRegisteredObject<Hero>(scenario.NotableId).Issue));
             Assert.Single(owner.InternalMessages.GetMessages<NetworkCaravanAmbushProgress>());
             Assert.Empty(other.InternalMessages.GetMessages<NetworkCaravanAmbushProgress>());
             Assert.Single(server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAccepted>());
