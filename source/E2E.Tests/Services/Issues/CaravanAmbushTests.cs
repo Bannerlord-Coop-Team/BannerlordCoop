@@ -764,7 +764,7 @@ public class CaravanAmbushTests : IDisposable
         var quest = QuestOf(Server);
         var battle = GameObjectCreator.CreateInitializedObject<MapEvent>();
         battle.MapEventVisual = ObjectHelper.SkipConstructor<GauntletMapEventVisual>();
-        battle.Initialize(attacker.Party, quest._banditParty.Party, new FieldBattleEventComponent(battle), MapEvent.BattleTypes.FieldBattle);
+        battle.Initialize(attacker.Party, quest._banditParty.Party, new FieldBattleEventComponent(battle));
         battle.MapEventVisual = null;
         // Keep the caravan on the winning side, as it is in a rescued ambush battle.
         if (caravanOnWinningSide) quest._caravanParty.Party.MapEventSide = battle.AttackerSide;
