@@ -11,6 +11,7 @@ using GameInterface.Services.Party.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.TroopRosters.Data;
+using GameInterface.Tests.Utils;
 using HarmonyLib;
 using Helpers;
 using SandBox.GauntletUI.Map;
@@ -357,8 +358,8 @@ public class NearbyBanditBaseTests : IDisposable
             Campaign.Current.EncyclopediaManager.CreateEncyclopediaPages();
 
             var forcing = (MapEvent)FormatterServices.GetUninitializedObject(typeof(MapEvent));
-            forcing._mapEventType = MapEvent.BattleTypes.IsForcingSupplies;
-            forcing.MapEventSettlement = village;
+            forcing.SetBattleType(MapEvent.BattleTypes.IsForcingSupplies);
+            forcing.SetMapEventSettlement(village);
             CampaignEventDispatcher.Instance.OnMapEventStarted(forcing, ownerParty.Party, null);
         }, QuestLogTexts);
 
@@ -573,7 +574,7 @@ public class NearbyBanditBaseTests : IDisposable
 
             var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
             mapEvent.MapEventVisual = ObjectHelper.SkipConstructor<GauntletMapEventVisual>();
-            mapEvent.Initialize(attacker.Party, hideout.Party, new HideoutEventComponent(mapEvent, false), MapEvent.BattleTypes.Hideout);
+            mapEvent.Initialize(attacker.Party, hideout.Party, new HideoutEventComponent(mapEvent, false));
             mapEvent.MapEventVisual = null;
             mapEvent._battleState = battleState;
 
