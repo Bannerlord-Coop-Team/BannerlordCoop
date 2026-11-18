@@ -1,4 +1,5 @@
 ﻿using GameInterface.Services.Alleys;
+using GameInterface.Services.BloodFeuds;
 using GameInterface.Services.CampaignService.Statistics;
 using GameInterface.Services.Caravans;
 using GameInterface.Services.Clans;
@@ -44,6 +45,7 @@ public interface ICoopSession
     StatisticsPlayerData StatisticsPlayerData { get; }
     IncidentsPlayerData IncidentsPlayerData { get; }
     ViewDataPlayerData ViewDataPlayerData { get; }
+    BloodFeudPlayerData BloodFeudPlayerData { get; }
 }
 
 [ProtoContract(SkipConstructor = true)]
@@ -102,6 +104,8 @@ public class CoopSession : ICoopSession
     public NavalPlayerData NavalPlayerData { get; }
     [ProtoMember(18)]
     public ViewDataPlayerData ViewDataPlayerData { get; }
+    [ProtoMember(19)]
+    public BloodFeudPlayerData BloodFeudPlayerData { get; }
 
     public CoopSession(
         string uniqueGameId,
@@ -121,7 +125,8 @@ public class CoopSession : ICoopSession
         OrderOfBattlePlayerData orderOfBattlePlayerData = null,
         StatisticsPlayerData statisticsPlayerData = null,
         IncidentsPlayerData incidentsPlayerData = null,
-        ViewDataPlayerData viewDataPlayerData = null)
+        ViewDataPlayerData viewDataPlayerData = null,
+        BloodFeudPlayerData bloodFeudPlayerData = null)
     {
         UniqueGameId = uniqueGameId;
         Players = players;
@@ -141,5 +146,6 @@ public class CoopSession : ICoopSession
         StatisticsPlayerData = statisticsPlayerData ?? new StatisticsPlayerData(new());
         IncidentsPlayerData = incidentsPlayerData ?? new IncidentsPlayerData(new(), new(), new(), new(), new());
         ViewDataPlayerData = viewDataPlayerData ?? new ViewDataPlayerData(new());
+        BloodFeudPlayerData = bloodFeudPlayerData ?? new BloodFeudPlayerData(new(), new(), new(), new());
     }
 }
