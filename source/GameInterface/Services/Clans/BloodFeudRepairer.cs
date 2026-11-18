@@ -1,5 +1,5 @@
 ﻿using Common.Logging;
-using GameInterface.Services.PlayerCaptivityService.Patches.Disable;
+using GameInterface.Services.BloodFeuds.Interfaces;
 using Serilog;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
@@ -7,12 +7,11 @@ using TaleWorlds.CampaignSystem;
 namespace GameInterface.Services.Clans;
 
 /// <summary>
-/// Clears blood feud state a loaded save carries, because the flag belongs to one player clan and coop has several (#3851).
+/// Clears blood feud state a loaded save carries, because the flag belongs to one player clan and coop has several.
 /// </summary>
 /// <remarks>
-/// Temporary; once #3851 tracks feuds per player, remove this file, <see cref="Patches.BloodFeudRepairPatch"/>, its registration
-/// and <c>DisableExecutionCampaignBehavior</c>, and revisit <c>KillCharacterActionPatches.ApplyExecutionTraitPenalty</c> and the
-/// two text prefixes in <c>HeroExecutionScenePatch</c>, which treat every execution as a feud.
+/// <see cref="IExecutionCampaignBehaviorInterface"/> keeps each player's feuds in the co-op session and each client applies its
+/// own player's after the load, so the save's own feuds would only be another player clan's.
 /// </remarks>
 internal interface IBloodFeudRepairer
 {
@@ -23,7 +22,7 @@ internal interface IBloodFeudRepairer
 }
 
 /// <summary>
-/// Clears the saved feud flag and its execution counters, which nothing sets while <see cref="DisableExecutionCampaignBehavior"/> is on.
+/// Clears the saved feud flag and its execution counters, which the server never sets.
 /// </summary>
 internal class BloodFeudRepairer : IBloodFeudRepairer
 {

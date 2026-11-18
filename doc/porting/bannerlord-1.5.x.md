@@ -77,7 +77,8 @@ epic #3836 tracks the v1.5 work that remains. Each port commit body lists its ch
 
 - Executions moved into `ExecutionCampaignBehavior` with a blood feud system, and
   `CharacterRelationCampaignBehavior` no longer handles hero deaths. `ExecutionCampaignBehavior` runs
-  on the server only (`DisableExecutionCampaignBehavior.cs`).
+  on the server only with its blood feuds kept per player in the co-op session
+  (`ExecutionCampaignBehaviorInterface.cs`), and each client mirrors its own feuds into its clans.
 - Several vanilla methods co-op re-implements changed; the port follows them (stealth equipment in
   heir selection, aging and execution marks, kingdom discontinuation, companion removal, companion
   party top-up, execution scenes, blood feud prisoner sales).
@@ -161,7 +162,7 @@ every role (below).
   (`ShipMainPartyPatches.cs`, `ShipPiecesPatches.cs`).
 - `TraitLevelingHelper.OnLordExecuted` is gone; the honor and mercy loss comes from
   `ExecutionCampaignBehavior` starting a blood feud for the main hero, so the `KillCharacterAction`
-  replacement charges a player killer itself (`ApplyExecutionTraitPenalty`).
+  replacement charges a player killer itself, once per feud (`ApplyExecutionTraitPenalty`).
 - `MapTrackerManager.Refresh(party)` adds or removes the tracker (`PlayerMapTracking.cs`).
   `castle_outside` has its own `castle_outside_on_init`, which `SavedMenuLoadPatch.cs` also reads.
 - `MapEventSide` gained ship lists created by field initializers and `OnLoad`, so
@@ -237,8 +238,8 @@ are registered later, at `CampaignReady` (`MapScreen.OnInitialize`), through
 
 ## Known gaps
 
-- Blood feuds are keyed on the player clan, so executions are disabled (`DisableExecutionCampaignBehavior`)
-  and saved feuds are cleared on load (`BloodFeudRepairPatch`) until #3851 tracks them per player.
+- `MarriageOfferCampaignBehavior` and `DiplomaticBartersBehavior` read `Clan.HasBloodFeudWithPlayer` on the
+  server, where it stays false because feuds are kept per player (`ExecutionCampaignBehaviorInterface`).
 - Empty clan parties are keyed on the local main hero. They run on the server only and are not
   multiplayer-aware yet.
 - Naval (War Sails) content stays unsupported, including the set sail and disembark leave paths.
@@ -337,8 +338,6 @@ are registered later, at `CampaignReady` (`MapScreen.OnInitialize`), through
   `LocationPointUseLifecycle`); it needs a two-client tavern check.
 - `CoopTroopSupplier.OnTroopScoreHit` is an empty method nothing calls, still with the v1.5.6
   parameters.
-- N executions from one clan cost N penalties, where vanilla charges once per blood feud; per player
-  feud state does not exist (#3851), and v1.4.8 also charged each execution.
 - Not done yet: a live session with a listen-server host and two clients. CI builds and tests on the
   `bannerlordcoop:v1.5.7` image, which every workflow on this branch pins.
 
