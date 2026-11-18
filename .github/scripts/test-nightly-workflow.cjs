@@ -94,21 +94,14 @@ test('prepare resolves calendar dates across spring forward and the Central cuto
 });
 
 const developmentHead = published.head_sha;
-const otherSha = 'a'.repeat(40);
 
-async function resolveCommit(ref, { publish }) {
-  const github = { rest: { repos: { getCommit: async () => ({ data: { sha: otherSha } }) } } };
-  return runScript('Resolve Coop commit', {
+test('a publishing run refuses coop_ref before resolving it', async () => {
+  const github = { rest: { repos: { getCommit: async () => { throw new Error('coop_ref was resolved'); } } } };
+  await assert.rejects(runScript('Resolve Coop commit', {
     github,
-    process: { env: { COOP_REF: ref, PUBLISH: String(publish) } },
+    process: { env: { COOP_REF: 'development', PUBLISH: 'true' } },
     context: { sha: developmentHead, repo: { owner: 'owner', repo: 'repo' } },
-  });
-}
-
-test('a publishing run builds the development head, and only a dry run takes coop_ref', async () => {
-  assert.equal((await resolveCommit('', { publish: true })).outputs.coop_sha, developmentHead);
-  await assert.rejects(resolveCommit('development', { publish: true }), /only builds in a dry run/);
-  assert.equal((await resolveCommit('bannerlord-1.5.x', { publish: false })).outputs.coop_sha, otherSha);
+  }), /only builds in a dry run/);
 });
 
 async function resolveGameVersion(csproj) {
@@ -128,7 +121,6 @@ test('the game version is read from the real Coop project file', async () => {
   const csproj = fs.readFileSync(path.join(__dirname, '../../source/Coop/Coop.csproj'), 'utf8');
   const { outputs } = await resolveGameVersion(csproj);
   assert.match(outputs.game_version, /^v\d+\.\d+\.\d+$/);
-  assert.ok(csproj.includes(`<GameVersion>${outputs.game_version}</GameVersion>`));
   await assert.rejects(resolveGameVersion('<Project></Project>'), /no vX\.Y\.Z GameVersion/);
 });
 

@@ -9,6 +9,7 @@ if (-not $workflow.Contains('nightly/client.json')) { throw 'Legacy client manif
 $match = [regex]::Match($workflow, '(?ms)      - name: Skip scheduled overwrite of a completed nightly publication.*?\n        run: \|\r?\n(.*?)(?=\r?\n      - name:)')
 if (-not $match.Success) { throw 'Nightly publish guard was not found' }
 $guardText = $match.Groups[1].Value -replace '(?m)^ {10}', ''
+# The guard calls & $rclone, so naming the mock there routes both lsf and copyto to Invoke-TestRclone.
 $guardText = $guardText.Replace("Join-Path `$PWD 'rclone.exe'", "'Invoke-TestRclone'")
 $guardText = $guardText.Replace('Invoke-WebRequest', 'Invoke-TestWebRequest')
 if ($guardText.Contains('rclone.exe')) { throw 'Unmocked rclone invocation in nightly publish guard' }
