@@ -1,4 +1,5 @@
 name: Nightly Release
+run-name: ${{ inputs.dry_run == true && 'Nightly Release (dry run)' || 'Nightly Release' }}
 
 on:
   schedule:
@@ -10,6 +11,15 @@ on:
         description: Due nightly date (YYYY-MM-DD). Leave empty to use the current 11:57 PM Central cutoff.
         required: false
         type: string
+      coop_ref:
+        description: Coop branch, tag or commit to build in a dry run. A publishing run always builds the head of development.
+        required: false
+        type: string
+      dry_run:
+        description: Build and package without publishing anything. Binaries are signed only when dispatched from development.
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   actions: read
@@ -17,7 +27,8 @@ permissions:
   packages: read
 
 concurrency:
-  group: nightly-release
+  # A dry run gets its own group, so it never cancels or waits on a publishing run.
+  group: ${{ inputs.dry_run == true && format('nightly-release-dry-run-{0}', github.run_id) || 'nightly-release' }}
   # Dispatch cancels an in-flight scheduled run. A late cron waits, then refuses to overwrite.
   cancel-in-progress: ${{ github.event_name != 'schedule' }}
 
@@ -25,15 +36,28 @@ env:
   R2_PRIVATE_BUCKET: bannerlordcoop-build-inputs
   R2_NIGHTLY_BUCKET: bannerlordcoop-patron-nightlies
   NIGHTLY_GATEWAY_ORIGIN: https://bannerlordcoop-nightly-gateway.garrett-luskey.workers.dev
+  # The dedicated-server nightly writes this pointer last, once the paired client and server are both published (R2_NIGHTLY_BASE_URL in its package-nightly.yml).
+  NIGHTLY_POINTER_URL: https://pub-bf6bfe4b880e4d1b83f4b09b10419f78.r2.dev/nightly/release.json
+  PUBLISH: ${{ github.ref == 'refs/heads/development' && inputs.dry_run != true }}
+  # The signing identity only trusts runs dispatched from development, so a dry run dispatched from another branch packages unsigned binaries, whatever coop_ref it builds.
+  SIGN: ${{ github.ref == 'refs/heads/development' }}
 
 jobs:
-  guard:
-    if: github.ref == 'refs/heads/development'
+  prepare:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
       release_date: ${{ steps.due.outputs.release_date }}
+      coop_sha: ${{ steps.coop.outputs.coop_sha }}
+      game_version: ${{ steps.game.outputs.game_version }}
     steps:
+      # A publishing run starts only from development and a dry run from any branch; every later job stops with this one.
+      - name: Refuse to publish from a branch other than development
+        if: github.ref != 'refs/heads/development' && inputs.dry_run != true
+        run: |
+          echo "::error::A publishing run starts only from development. Dispatch $GITHUB_REF_NAME with dry_run=true instead."
+          exit 1
+
       - name: Resolve due nightly date
         id: due
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
@@ -61,13 +85,47 @@ jobs:
             }
             core.setOutput('release_date', releaseDate);
 
+      - name: Resolve Coop commit
+        # A publishing run builds what the cron would, the development head, so the next run's changelog base stays right.
+        id: coop
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        env:
+          COOP_REF: ${{ inputs.coop_ref }}
+        with:
+          script: |
+            const ref = process.env.COOP_REF;
+            if (!ref) {
+              core.setOutput('coop_sha', context.sha);
+              return;
+            }
+            if (process.env.PUBLISH === 'true') {
+              throw new Error('coop_ref only builds in a dry run, because a publishing run builds the head of development');
+            }
+            const { data: commit } = await github.rest.repos.getCommit({ ...context.repo, ref });
+            core.info(`Building ${ref} at ${commit.sha}`);
+            core.setOutput('coop_sha', commit.sha);
+
+      - name: Resolve the commit's game version
+        # The game version picks the CI image tag and the DependentVersion stamped into SubModule.xml.
+        id: game
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        env:
+          COOP_SHA: ${{ steps.coop.outputs.coop_sha }}
+        with:
+          script: |
+            const path = 'source/Coop/Coop.csproj';
+            const { data: project } = await github.rest.repos.getContent({ ...context.repo, path, ref: process.env.COOP_SHA });
+            const csproj = Buffer.from(project.content, 'base64').toString('utf8');
+            const gameVersion = csproj.match(/<GameVersion>(v\d+\.\d+\.\d+)<\/GameVersion>/)?.[1];
+            if (!gameVersion) throw new Error(`${path} has no vX.Y.Z GameVersion`);
+            core.setOutput('game_version', gameVersion);
+
   build:
-    needs: guard
-    if: github.ref == 'refs/heads/development'
+    needs: prepare
     runs-on: ubuntu-latest
     timeout-minutes: 30
     container:
-      image: ghcr.io/bannerlord-coop-team/bannerlordcoop:v1.5.7
+      image: ghcr.io/bannerlord-coop-team/bannerlordcoop:${{ needs.prepare.outputs.game_version }}
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -84,10 +142,10 @@ jobs:
       unsigned_sha256: ${{ steps.handoff.outputs.unsigned_sha256 }}
 
     steps:
-      - name: Checkout development
+      - name: Checkout Coop commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ needs.prepare.outputs.coop_sha }}
           fetch-depth: 0
 
       - name: Trust checkout directory
@@ -150,11 +208,13 @@ jobs:
 
       - name: Build release module
         working-directory: source
+        env:
+          COOP_SHA: ${{ needs.prepare.outputs.coop_sha }}
         run: |
           dotnet build Coop/Coop.csproj \
             -c Release \
             -p:CustomAfterMicrosoftCommonTargets="$RUNNER_TEMP/net472/build/Microsoft.NETFramework.ReferenceAssemblies.net472.targets" \
-            -p:SourceRevisionId="$GITHUB_SHA" \
+            -p:SourceRevisionId="$COOP_SHA" \
             -p:IncludeSourceRevisionInInformationalVersion=true \
             -p:ModName= \
             -p:CoopTesterBuild=true \
@@ -165,14 +225,15 @@ jobs:
         id: release
         env:
           PREVIOUS_SHA: ${{ steps.previous.outputs.result }}
-          RELEASE_DATE: ${{ needs.guard.outputs.release_date }}
+          RELEASE_DATE: ${{ needs.prepare.outputs.release_date }}
+          COOP_SHA: ${{ needs.prepare.outputs.coop_sha }}
         run: |
           set -eu
           printf '%s\n' "$RELEASE_DATE" | grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
           release_date=$RELEASE_DATE
           display_date="${RELEASE_DATE#*-}-${RELEASE_DATE%%-*}"
           file_name="Coop $display_date.7z"
-          head_sha=$(git rev-parse HEAD)
+          head_sha=$COOP_SHA
           base_sha="$PREVIOUS_SHA"
           if [ -z "$base_sha" ] || ! git merge-base --is-ancestor "$base_sha" "$head_sha"; then
             base_sha=
@@ -184,6 +245,7 @@ jobs:
       - name: Stage module
         env:
           RELEASE_DATE: ${{ steps.release.outputs.release_date }}
+          GAME_VERSION: ${{ needs.prepare.outputs.game_version }}
         run: |
           set -eu
           module=release-stage/Coop
@@ -206,11 +268,9 @@ jobs:
           cp -R UIMovies/. "$module/GUI/Prefabs/"
 
           coop_version=$(sed -n 's/.*<CoopVersion>\([^<]*\)<\/CoopVersion>.*/\1/p' source/Directory.Build.props)
-          game_version=$(sed -n 's/.*<GameVersion>\([^<]*\)<\/GameVersion>.*/\1/p' source/Coop/Coop.csproj)
           nightly_module_id=CoopNightly
           nightly_module_name="Bannerlord Co-op Nightly $RELEASE_DATE"
           test -n "$coop_version"
-          test -n "$game_version"
           # shellcheck disable=SC2016
           sed \
             -e "s/<Name value=\"Bannerlord Co-op\"\/>/<Name value=\"$nightly_module_name\"\/>/g" \
@@ -218,7 +278,7 @@ jobs:
             -e 's/<Module Id="CoopNightly"\/>/<Module Id="Coop"\/>/' \
             -e 's/${main_class}/CoopMod/g' \
             -e "s/\${version}/v$coop_version/g" \
-            -e "s/\${game_version}/$game_version/g" \
+            -e "s/\${game_version}/$GAME_VERSION/g" \
             deploy/SubModule.xml > "$module/SubModule.xml"
           normalized_submodule=$(mktemp)
           trap 'rm -f "$normalized_submodule"' EXIT
@@ -226,7 +286,13 @@ jobs:
           test "$(grep -Fc "<Name value=\"$nightly_module_name\"/>" "$normalized_submodule")" -eq 2
           grep -Fqx "    <Id value=\"$nightly_module_id\"/>" "$normalized_submodule"
           grep -Fqx '        <Module Id="Coop"/>' "$normalized_submodule"
-          ! grep -Fq '<Module Id="CoopNightly"/>' "$normalized_submodule"
+          # set -e ignores a command negated with !, so these absence checks compare counts.
+          test "$(grep -Fc '<Module Id="CoopNightly"/>' "$normalized_submodule")" -eq 0
+          test "$(grep -Fc '${game_version}' "$normalized_submodule")" -eq 0
+          # grep -c exits 1 on no match and set -e checks an assignment's exit, so the count needs || true.
+          stamped=$(grep -Fc "DependentVersion=\"$GAME_VERSION\"" "$normalized_submodule" || true)
+          test "$stamped" -gt 0
+          echo "Stamped DependentVersion=\"$GAME_VERSION\" on $stamped game modules"
 
       - name: Package private unsigned handoff
         id: handoff
@@ -362,6 +428,7 @@ jobs:
           }
 
       - name: Azure login
+        if: env.SIGN == 'true'
         uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
@@ -369,6 +436,7 @@ jobs:
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Sign module binaries
+        if: env.SIGN == 'true'
         uses: azure/artifact-signing-action@c7ab2a863ab5f9a846ddb8265964877ef296ee82 # v2
         with:
           endpoint: ${{ vars.SIGNING_ENDPOINT }}
@@ -381,6 +449,7 @@ jobs:
           timestamp-digest: SHA256
 
       - name: Verify signatures
+        if: env.SIGN == 'true'
         shell: pwsh
         run: |
           $binaries = @(Get-ChildItem 'release-stage\Coop\bin\Win64_Shipping_Client\*' -Include '*.dll', '*.exe')
@@ -392,7 +461,7 @@ jobs:
           if ($invalid.Count -gt 0) { throw "$($invalid.Count) of $($binaries.Count) binaries are not validly signed" }
           Write-Host "Verified Authenticode signatures on $($binaries.Count) binaries"
 
-      - name: Package signed module
+      - name: Package module
         shell: bash
         run: |
           set -eu
@@ -402,7 +471,7 @@ jobs:
           release_size=$(stat -c %s transfer/Coop.7z)
           test "$release_size" -gt 0
 
-      - name: Validate and describe signed client input
+      - name: Validate and describe client input
         id: artifact
         shell: pwsh
         env:
@@ -413,7 +482,6 @@ jobs:
           WORKFLOW_RUN_ID: ${{ github.run_id }}
         run: |
           $ErrorActionPreference = 'Stop'
-          if ($env:GITHUB_REF -ne 'refs/heads/development') { throw 'Nightly publication requires development' }
           if ($env:RELEASE_DATE -notmatch '^[0-9]{4}-[0-9]{2}-[0-9]{2}$') { throw 'Release date is invalid' }
           if ($env:HEAD_SHA -notmatch '^[a-f0-9]{40}$') { throw 'Head SHA is invalid' }
           if ($env:BASE_SHA -and $env:BASE_SHA -notmatch '^[a-f0-9]{40}$') { throw 'Base SHA is invalid' }
@@ -423,12 +491,12 @@ jobs:
 
           $entries = @(Get-ChildItem -LiteralPath transfer)
           if ($entries.Count -ne 1 -or $entries[0].Name -ne 'Coop.7z' -or $entries[0].PSIsContainer) {
-            throw 'Signed client input layout is invalid'
+            throw 'Client input layout is invalid'
           }
           $archiveBytes = [long]$entries[0].Length
-          if ($archiveBytes -le 0) { throw 'Signed client input size is invalid' }
+          if ($archiveBytes -le 0) { throw 'Client input size is invalid' }
           $archiveSha256 = (Get-FileHash $entries[0].FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-          if ($archiveSha256 -notmatch '^[a-f0-9]{64}$') { throw 'Signed client input checksum is invalid' }
+          if ($archiveSha256 -notmatch '^[a-f0-9]{64}$') { throw 'Client input checksum is invalid' }
           $clientKey = "nightly/clients/$($env:HEAD_SHA)/$archiveSha256/Coop.7z"
 
           New-Item -ItemType Directory -Path artifact | Out-Null
@@ -501,23 +569,38 @@ jobs:
           'overwrite=true' | Add-Content $env:GITHUB_OUTPUT
           if ($env:GITHUB_EVENT_NAME -ne 'schedule') { return }
           if ($env:RELEASE_DATE -notmatch '^[0-9]{4}-[0-9]{2}-[0-9]{2}$') { throw 'Release date is invalid' }
-          $env:RCLONE_CONFIG_PATRON_ENDPOINT = "https://$env:R2_ACCOUNT_ID.r2.cloudflarestorage.com"
-          $metadataJson = & (Join-Path $PWD 'rclone.exe') lsjson "patron:$env:R2_NIGHTLY_BUCKET" --recursive --files-only --include '/nightly/release.json' --max-depth 2 --no-modtime --no-mimetype --s3-no-check-bucket --retries 3 --low-level-retries 10 --quiet
-          if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace(($metadataJson -join "`n"))) { throw 'Published nightly manifest lookup failed' }
-          if (-not ($metadataJson -join "`n").TrimStart().StartsWith('[')) { throw 'Published nightly manifest lookup failed' }
-          $entries = ($metadataJson -join "`n") | ConvertFrom-Json
-          if ($null -eq $entries -or $entries.Count -eq 0) {
-            Write-Host 'No published nightly manifest exists yet.'
+          # The DS pointer names the last completed paired manifest.
+          $response = Invoke-WebRequest -Uri $env:NIGHTLY_POINTER_URL -SkipHttpErrorCheck -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5
+          if ($response.StatusCode -eq 404) {
+            Write-Host "::warning::No paired nightly pointer was found at $env:NIGHTLY_POINTER_URL, so the overwrite guard is skipped."
             return
           }
-          $entries = @($entries)
-          if ($entries.Count -ne 1 -or $entries[0].Path -ne 'nightly/release.json') { throw 'Published nightly manifest lookup failed' }
-          $metadata = $entries[0]
-          if ($metadata.IsDir -or $metadata.Size -le 0 -or $metadata.Size -gt 4096) { throw 'Published nightly manifest size is invalid' }
+          if ($response.StatusCode -ne 200) { throw "Published nightly pointer lookup failed with HTTP $($response.StatusCode)" }
+          $pointer = $response.Content | ConvertFrom-Json
+          $manifestKey = [string]$pointer.manifest.key
+          $manifestSha256 = [string]$pointer.manifest.sha256
+          $expectedKey = "nightly/publications/$manifestSha256/release.json"
+          $knownPointer = $pointer.version -eq 1 -and $pointer.kind -eq 'bannerlordcoop-nightly-pointer'
+          # Only the content-addressed key is trusted, otherwise a missing loose key would read as an expired manifest below.
+          $contentAddressedKey = $manifestSha256 -match '^[a-f0-9]{64}$' -and $manifestKey -eq $expectedKey
+          if (-not ($knownPointer -and $contentAddressedKey)) { throw 'Published nightly pointer is invalid' }
+
+          $env:RCLONE_CONFIG_PATRON_ENDPOINT = "https://$env:R2_ACCOUNT_ID.r2.cloudflarestorage.com"
+          $rclone = Join-Path $PWD 'rclone.exe'
+          $listing = & $rclone lsf "patron:$env:R2_NIGHTLY_BUCKET/$manifestKey" --s3-no-check-bucket --retries 3 --low-level-retries 10
+          # The bucket lifecycle can expire the manifest before the pointer is rewritten; rclone then exits 3 (directory not found), 4 (file not found), or 0 with nothing listed.
+          $manifestExpired = -not $listing -and $LASTEXITCODE -in 0, 3, 4
+          if ($manifestExpired) {
+            Write-Host "::warning::The nightly pointer names $manifestKey, which has expired, so no paired nightly is complete."
+            return
+          }
+          if ($LASTEXITCODE -ne 0) { throw 'Published nightly manifest lookup failed' }
+
+          # Compare the paired manifest's date with the due date.
           $manifest = Join-Path $env:RUNNER_TEMP 'published-release.json'
-          & (Join-Path $PWD 'rclone.exe') copyto "patron:$env:R2_NIGHTLY_BUCKET/nightly/release.json" $manifest --s3-no-check-bucket --retries 3 --low-level-retries 10 --quiet
+          & $rclone copyto "patron:$env:R2_NIGHTLY_BUCKET/$manifestKey" $manifest --s3-no-check-bucket --retries 3 --low-level-retries 10 --quiet
           if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $manifest -PathType Leaf)) { throw 'Published nightly manifest download failed' }
-          if ((Get-Item -LiteralPath $manifest).Length -ne $metadata.Size) { throw 'Published nightly manifest size is invalid' }
+          if ((Get-FileHash $manifest -Algorithm SHA256).Hash.ToLowerInvariant() -ne $manifestSha256) { throw 'Published nightly manifest checksum mismatch' }
           $published = Get-Content -LiteralPath $manifest -Raw -Encoding utf8 | ConvertFrom-Json
           if ([string]$published.releaseDate -notmatch '^[0-9]{4}-[0-9]{2}-[0-9]{2}$') { throw 'Published nightly manifest release date is invalid' }
           if ([string]$published.releaseDate -eq $env:RELEASE_DATE) {
@@ -532,7 +615,7 @@ jobs:
           Write-Host 'Retaining the previous legacy client manifest until the immutable client archive is published.'
 
       - name: Publish dedicated-server client input
-        if: steps.published.outputs.overwrite == 'true'
+        if: steps.published.outputs.overwrite == 'true' && env.PUBLISH == 'true'
         shell: bash
         env:
           RCLONE_CONFIG_PRIVATE_TYPE: s3
@@ -563,8 +646,9 @@ jobs:
           ./rclone.exe copyto artifact/manifest.json "private:$R2_PRIVATE_BUCKET/$prefix/manifest.json" \
             --s3-no-check-bucket --retries 3 --low-level-retries 10 --quiet
 
+      # Find previous nightly commit matches this step by name, so a dry run must leave it skipped, never succeeded.
       - name: Publish client archive to private Patron R2
-        if: steps.published.outputs.overwrite == 'true'
+        if: steps.published.outputs.overwrite == 'true' && env.PUBLISH == 'true'
         shell: bash
         env:
           RCLONE_CONFIG_PATRON_TYPE: s3
@@ -594,6 +678,34 @@ jobs:
           # The legacy alias is written only after the immutable archive read-back succeeds.
           ./rclone.exe copyto artifact/client-release.json "patron:$R2_NIGHTLY_BUCKET/nightly/client.json" \
             --s3-no-check-bucket --retries 3 --low-level-retries 10 --quiet
+
+      - name: Summarize the nightly run
+        shell: bash
+        env:
+          OVERWRITE: ${{ steps.published.outputs.overwrite }}
+          RELEASE_DATE: ${{ needs.build.outputs.release_date }}
+          HEAD_SHA: ${{ needs.build.outputs.head_sha }}
+          FILE_NAME: ${{ needs.build.outputs.file_name }}
+          ARCHIVE_SHA256: ${{ steps.artifact.outputs.archive_sha256 }}
+        run: |
+          set -eu
+          {
+            printf 'Built `%s` at `%s` for %s, sha256 `%s`.\n\n' "$FILE_NAME" "$HEAD_SHA" "$RELEASE_DATE" "$ARCHIVE_SHA256"
+            if [ "$SIGN" != 'true' ]; then
+              printf 'Not signed, because the signing identity only trusts runs dispatched from development.\n\n'
+            fi
+            if [ "$PUBLISH" != 'true' ]; then
+              printf 'Dry run: the dedicated-server client input and the Patron client archive were not published.\n'
+            elif [ "$OVERWRITE" != 'true' ]; then
+              printf 'The %s nightly was already published, so this run published nothing.\n' "$RELEASE_DATE"
+            else
+              # The dedicated server pairs with a published client by run id, so the summary names the dispatch that completes it.
+              printf 'Package the paired dedicated server with:\n\n```\n'
+              printf 'gh workflow run package-nightly.yml -R %s/BannerlordCoop.DedicatedServer --ref main -f coop_run_id=%s -f coop_head_sha=%s -f release_date=%s -f test=false\n' \
+                "$GITHUB_REPOSITORY_OWNER" "$GITHUB_RUN_ID" "$HEAD_SHA" "$RELEASE_DATE"
+              printf '```\n'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
 
   cleanup-private-handoff:
     needs: [build, sign-and-publish]
