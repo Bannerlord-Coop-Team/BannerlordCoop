@@ -1,5 +1,6 @@
 ﻿using Coop.Naval.PortScreen.Data;
 using GameInterface.Services;
+using GameInterface.Services.AnchorPoints.Interfaces;
 using GameInterface.Services.Players.Interfaces;
 using NavalDLC.CampaignBehaviors;
 using TaleWorlds.CampaignSystem;
@@ -28,11 +29,13 @@ internal class PortScreenHandlerInterface : IPortScreenHandlerInterface
 {
     private readonly IPlayerMessageInterface playerMessageInterface;
     private readonly IPortTransactionPricer portTransactionPricer;
+    private readonly IAnchorPointInterface anchorPointInterface;
 
-    public PortScreenHandlerInterface(IPlayerMessageInterface playerMessageInterface, IPortTransactionPricer portTransactionPricer)
+    public PortScreenHandlerInterface(IPlayerMessageInterface playerMessageInterface, IPortTransactionPricer portTransactionPricer, IAnchorPointInterface anchorPointInterface)
     {
         this.playerMessageInterface = playerMessageInterface;
         this.portTransactionPricer = portTransactionPricer;
+        this.anchorPointInterface = anchorPointInterface;
     }
 
     public void OnConfirmChanges(PortScreenMode mode, PortScreenChanges changes)
@@ -104,9 +107,9 @@ internal class PortScreenHandlerInterface : IPortScreenHandlerInterface
         }
         SendShipsToClan(changes, changes.RightOwner);
         ResetAnchorIfNoShips(changes.MainParty);
-        if (changes.MainParty.Ships.Count > 0 && !changes.MainParty.Anchor.IsValid && changes.LeftOwner.IsSettlement)
+        if (changes.LeftOwner.IsSettlement)
         {
-            changes.MainParty.Anchor.Settlement = changes.LeftOwner.Settlement;
+            anchorPointInterface.AnchorUnanchoredFleet(changes.MainParty, changes.LeftOwner.Settlement);
         }
     }
     
