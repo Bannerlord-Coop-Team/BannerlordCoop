@@ -8,12 +8,11 @@ using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
-using GameInterface.Services.MapEvents.Participation;
 using GameInterface.Services.Players;
+using Missions.Messages;
 using Moq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
-using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using Xunit;
 using Xunit.Abstractions;
@@ -82,12 +81,10 @@ public class BattleSimulationCompletionTests : MapEventTestBase
 
         Server.Call(() =>
         {
-            var mapEvent = Server.GetRegisteredObject<MapEvent>(context.MapEventId);
-            var playerParty = Server.GetRegisteredObject<MobileParty>(context.AttackerPartyId);
-            Server.Resolve<IRetreatedMapEventPartyTracker>().MarkRetreated(mapEvent, playerParty.Party);
-
+            Server.Resolve<IMessageBroker>().Publish(this, new BattlePartyRetreated("1", context.MapEventId));
             StartAcceptedSimulation(client, context);
 
+            var mapEvent = Server.GetRegisteredObject<MapEvent>(context.MapEventId);
             mapEvent.BattleState = BattleState.AttackerVictory;
             AdvanceSimulation(client, context.MapEventId);
 
