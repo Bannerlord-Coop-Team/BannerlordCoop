@@ -5,6 +5,8 @@ using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.MapEventParties;
+using GameInterface.Services.MapEvents.Handlers;
+using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.Party.Data;
 using GameInterface.Services.Party.Messages;
 using GameInterface.Services.PlayerCaptivityService.Messages;
@@ -323,6 +325,16 @@ public abstract class MapEventTestBase : IDisposable
         RegisterAsPlayerParty(controllerId, heroId, partyId);
 
         return (heroId, partyId);
+    }
+
+    /// <summary>Requests a simulation of the context's battle for the client's attacker party and asserts the server accepts it.</summary>
+    protected void StartAcceptedSimulation(EnvironmentInstance client, MapEventContext context)
+    {
+        var requestId = System.Guid.NewGuid().ToString();
+        Server.Resolve<IMessageBroker>().Publish(client.NetPeer, new NetworkBattleStartRequest(
+            requestId, (int)BattleStartMode.Simulation, context.MapEventId, context.AttackerPartyId));
+        Assert.True(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleStartReply>(),
+            reply => reply.RequestId == requestId).Accepted);
     }
 
     /// <summary>
