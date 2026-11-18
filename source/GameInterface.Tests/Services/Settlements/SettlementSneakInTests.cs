@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Policies;
+using GameInterface.Services.BloodFeuds.Interfaces;
 using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Interfaces;
@@ -128,7 +129,8 @@ public class SettlementSneakInTests
                 network.Object,
                 messageBroker,
                 playerManager.Object,
-                conversationPartyTracker);
+                conversationPartyTracker,
+                new Mock<IExecutionCampaignBehaviorInterface>().Object);
 
             using (ContainerProvider.UseContainerThreadSafe(container))
             {
