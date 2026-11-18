@@ -16,7 +16,7 @@ using TaleWorlds.CampaignSystem.Party;
 namespace GameInterface.Services.MapEventComponents.Handlers;
 
 /// <summary>
-/// Asks the player leading an attacked blockade to defend or lift it, and lifts it on the server when they choose to or it blockades a castle.
+/// Asks the player leading an attacked blockade to defend or lift it, and lifts it on the server when they choose to.
 /// </summary>
 internal class PlayerBlockadeHandler : IHandler
 {
@@ -57,13 +57,6 @@ internal class PlayerBlockadeHandler : IHandler
 
         GameThread.EnqueueSafe(() =>
         {
-            // Players cant fight castle blockade battles yet because coop only syncs town blockades (#4605), so lift it instead of asking
-            if (mapEvent.MapEventSettlement?.IsCastle == true)
-            {
-                LiftBlockade(mapEvent);
-                return;
-            }
-
             if (!objectManager.TryGetIdWithLogging(mapEvent, out var mapEventId)) return;
 
             network.SendAll(new NetworkPromptPlayerBlockadeAttacked(mapEventId));

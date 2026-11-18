@@ -18,7 +18,7 @@ internal class EncounterGameMenuModelPatches
     [HarmonyPostfix]
     private static void Postfix(ref string __result)
     {
-        if (ModInformation.IsServer || (__result != "join_encounter" && __result != "naval_town_outside") || PlayerEncounter.Current != null)
+        if (ModInformation.IsServer || (__result != "join_encounter" && __result != "naval_town_outside" && __result != "naval_castle_outside") || PlayerEncounter.Current != null)
             return;
 
         var mainParty = MobileParty.MainParty;

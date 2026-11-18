@@ -110,7 +110,6 @@ public sealed class GameInterfaceModuleNavalGateTests : IDisposable
         typeof(SiegeBlockadePatches),
         typeof(MobilePartyBlockadeAnchorPatches),
         typeof(NavalMobilePartyVisualManagerPatches),
-        typeof(CastlePortPatches),
 #if DEBUG
         typeof(NavalEngageResetTracePatch),
 #endif
