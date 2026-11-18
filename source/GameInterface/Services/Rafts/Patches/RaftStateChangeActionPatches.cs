@@ -12,7 +12,8 @@ namespace GameInterface.Services.Rafts.Patches;
 internal class RaftStateChangeActionPatches
 {
     /// <summary>
-    /// Skips the action on clients, where vanilla's FinishNavigationTransitionInternal would end the raft of the party it lands.
+    /// Skips the action on clients, otherwise a client's own landing transition (FinishNavigationTransitionInternal) ends the
+    /// party's raft locally.
     /// </summary>
     [HarmonyPatch(nameof(RaftStateChangeAction.ApplyInternal))]
     [HarmonyPrefix]

@@ -103,6 +103,7 @@ internal class MobilePartyBehaviorHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging(data.MobilePartyId, out MobileParty party))
                 return;
 
+            // Vanilla ignores orders on a raft, so keep the server's move to shore and resend it when the owner's order differs
             if (ModInformation.IsServer && IsOwnerOrderDuringRaft(party, data))
             {
                 bool ownerOrderDiffers = data.DefaultBehavior != party.DefaultBehavior || data.TargetPosition != party.TargetPosition;
@@ -201,8 +202,7 @@ internal class MobilePartyBehaviorHandler : IHandler
             GameThread.RunSafe(apply, context: nameof(MobilePartyBehaviorHandler));
     }
 
-    // Vanilla ignores orders on a raft, so the server drops any owner order while the party is rafted and keeps its move to shore.
-    // Server-authored updates such as debug teleports leave the origin null and apply as usual.
+    // Server-authored updates such as debug teleports leave the origin null and apply as usual
     private static bool IsOwnerOrderDuringRaft(MobileParty party, PartyBehaviorUpdateData data) =>
         party.IsInRaftState && !string.IsNullOrEmpty(data.OriginControllerId);
 
