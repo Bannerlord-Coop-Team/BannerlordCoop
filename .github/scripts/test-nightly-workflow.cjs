@@ -79,7 +79,7 @@ async function resolveDate(now, requested = '') {
   });
 }
 
-test('the guard resolves calendar dates across spring forward and the Central cutoff', async () => {
+test('prepare resolves calendar dates across spring forward and the Central cutoff', async () => {
   for (const [now, expected] of [
     ['2026-03-09T05:30:00Z', '2026-03-08'],
     ['2026-11-06T05:56:59Z', '2026-11-04'],
@@ -96,20 +96,19 @@ test('the guard resolves calendar dates across spring forward and the Central cu
 const developmentHead = published.head_sha;
 const otherSha = 'a'.repeat(40);
 
-async function resolveCommit(ref, { dryRun = false, sha = otherSha } = {}) {
-  const github = { rest: { repos: { getCommit: async () => ({ data: { sha } }) } } };
+async function resolveCommit(ref, { publish }) {
+  const github = { rest: { repos: { getCommit: async () => ({ data: { sha: otherSha } }) } } };
   return runScript('Resolve Coop commit', {
     github,
-    process: { env: { COOP_REF: ref, DRY_RUN: String(dryRun) } },
+    process: { env: { COOP_REF: ref, PUBLISH: String(publish) } },
     context: { sha: developmentHead, repo: { owner: 'owner', repo: 'repo' } },
   });
 }
 
-test('a publishing run builds only the development head, while a dry run builds any ref', async () => {
-  assert.equal((await resolveCommit('')).outputs.coop_sha, developmentHead);
-  assert.equal((await resolveCommit('development', { sha: developmentHead })).outputs.coop_sha, developmentHead);
-  await assert.rejects(resolveCommit('v0.1.7'), /only be built as a dry run/);
-  assert.equal((await resolveCommit('bannerlord-1.5.x', { dryRun: true })).outputs.coop_sha, otherSha);
+test('a publishing run builds the development head, and only a dry run takes coop_ref', async () => {
+  assert.equal((await resolveCommit('', { publish: true })).outputs.coop_sha, developmentHead);
+  await assert.rejects(resolveCommit('development', { publish: true }), /only builds in a dry run/);
+  assert.equal((await resolveCommit('bannerlord-1.5.x', { publish: false })).outputs.coop_sha, otherSha);
 });
 
 async function resolveGameVersion(csproj) {
@@ -133,7 +132,7 @@ test('the game version is read from the real Coop project file', async () => {
   await assert.rejects(resolveGameVersion('<Project></Project>'), /no vX\.Y\.Z GameVersion/);
 });
 
-test('build metadata uses the guard date even if the build crosses another cutoff', async () => {
+test('build metadata uses the prepared date even if the build crosses another cutoff', async () => {
   const { outputs } = await resolveDate('2026-03-09T05:30:00Z');
   assert.match(workflow, /release_date: \$\{\{ steps\.due\.outputs\.release_date \}\}/);
   const build = step('Build release metadata');

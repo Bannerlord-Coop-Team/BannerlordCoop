@@ -12,7 +12,7 @@ on:
         required: false
         type: string
       coop_ref:
-        description: Coop branch, tag or commit to build. Leave empty to build the dispatch ref. A publishing run must name the head of development.
+        description: Coop branch, tag or commit to build in a dry run. A publishing run always builds the head of development.
         required: false
         type: string
       dry_run:
@@ -38,7 +38,9 @@ env:
   NIGHTLY_GATEWAY_ORIGIN: https://bannerlordcoop-nightly-gateway.garrett-luskey.workers.dev
   # The dedicated-server nightly writes this pointer last, once the paired client and server are both published (R2_NIGHTLY_BASE_URL in its package-nightly.yml).
   NIGHTLY_POINTER_URL: https://pub-bf6bfe4b880e4d1b83f4b09b10419f78.r2.dev/nightly/release.json
-  DRY_RUN: ${{ inputs.dry_run == true }}
+  PUBLISH: ${{ github.ref == 'refs/heads/development' && inputs.dry_run != true }}
+  # The signing identity only trusts runs dispatched from development, so a dry run dispatched from another branch packages unsigned binaries, whatever coop_ref it builds.
+  SIGN: ${{ github.ref == 'refs/heads/development' }}
 
 jobs:
   prepare:
@@ -90,11 +92,10 @@ jobs:
               core.setOutput('coop_sha', context.sha);
               return;
             }
-            const { data: commit } = await github.rest.repos.getCommit({ ...context.repo, ref });
-            const isDevelopmentHead = commit.sha === context.sha;
-            if (process.env.DRY_RUN !== 'true' && !isDevelopmentHead) {
-              throw new Error(`coop_ref ${ref} (${commit.sha}) is not the development head ${context.sha}, so it can only be built as a dry run`);
+            if (process.env.PUBLISH === 'true') {
+              throw new Error('coop_ref only builds in a dry run, because a publishing run builds the head of development');
             }
+            const { data: commit } = await github.rest.repos.getCommit({ ...context.repo, ref });
             core.info(`Building ${ref} at ${commit.sha}`);
             core.setOutput('coop_sha', commit.sha);
 
@@ -276,9 +277,11 @@ jobs:
           test "$(grep -Fc "<Name value=\"$nightly_module_name\"/>" "$normalized_submodule")" -eq 2
           grep -Fqx "    <Id value=\"$nightly_module_id\"/>" "$normalized_submodule"
           grep -Fqx '        <Module Id="Coop"/>' "$normalized_submodule"
-          ! grep -Fq '<Module Id="CoopNightly"/>' "$normalized_submodule"
-          ! grep -Fq '${game_version}' "$normalized_submodule"
-          stamped=$(grep -Fc "DependentVersion=\"$GAME_VERSION\"" "$normalized_submodule")
+          # set -e ignores a command negated with !, so these absence checks compare counts.
+          test "$(grep -Fc '<Module Id="CoopNightly"/>' "$normalized_submodule")" -eq 0
+          test "$(grep -Fc '${game_version}' "$normalized_submodule")" -eq 0
+          stamped=$(grep -Fc "DependentVersion=\"$GAME_VERSION\"" "$normalized_submodule" || true)
+          test "$stamped" -gt 0
           echo "Stamped DependentVersion=\"$GAME_VERSION\" on $stamped game modules"
 
       - name: Package private unsigned handoff
@@ -344,9 +347,6 @@ jobs:
     needs: build
     runs-on: windows-latest
     timeout-minutes: 25
-    env:
-      # The signing identity only trusts development, so a dry run from another ref packages unsigned binaries.
-      SIGN: ${{ github.ref == 'refs/heads/development' }}
     permissions:
       id-token: write
       contents: read
@@ -426,7 +426,6 @@ jobs:
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Sign module binaries
-        id: sign
         if: env.SIGN == 'true'
         uses: azure/artifact-signing-action@c7ab2a863ab5f9a846ddb8265964877ef296ee82 # v2
         with:
@@ -560,6 +559,7 @@ jobs:
           'overwrite=true' | Add-Content $env:GITHUB_OUTPUT
           if ($env:GITHUB_EVENT_NAME -ne 'schedule') { return }
           if ($env:RELEASE_DATE -notmatch '^[0-9]{4}-[0-9]{2}-[0-9]{2}$') { throw 'Release date is invalid' }
+          # The DS pointer names the last completed paired manifest.
           $response = Invoke-WebRequest -Uri $env:NIGHTLY_POINTER_URL -SkipHttpErrorCheck -TimeoutSec 30 -MaximumRetryCount 3 -RetryIntervalSec 5
           if ($response.StatusCode -eq 404) {
             Write-Host 'No paired nightly has been published yet.'
@@ -569,7 +569,9 @@ jobs:
           $pointer = $response.Content | ConvertFrom-Json
           $manifestKey = [string]$pointer.manifest.key
           $manifestSha256 = [string]$pointer.manifest.sha256
-          if (-not $manifestKey -or $manifestSha256 -notmatch '^[a-f0-9]{64}$') { throw 'Published nightly pointer is invalid' }
+          if ($manifestSha256 -notmatch '^[a-f0-9]{64}$' -or $manifestKey -ne "nightly/publications/$manifestSha256/release.json") { throw 'Published nightly pointer is invalid' }
+
+          # The bucket lifecycle can expire the manifest before the pointer is rewritten.
           $env:RCLONE_CONFIG_PATRON_ENDPOINT = "https://$env:R2_ACCOUNT_ID.r2.cloudflarestorage.com"
           $rclone = Join-Path $PWD 'rclone.exe'
           $listing = & $rclone lsf "patron:$env:R2_NIGHTLY_BUCKET/$manifestKey" --s3-no-check-bucket --retries 3 --low-level-retries 10
@@ -579,6 +581,8 @@ jobs:
             return
           }
           if ($LASTEXITCODE -ne 0) { throw 'Published nightly manifest lookup failed' }
+
+          # Compare the paired manifest's date with the due date.
           $manifest = Join-Path $env:RUNNER_TEMP 'published-release.json'
           & $rclone copyto "patron:$env:R2_NIGHTLY_BUCKET/$manifestKey" $manifest --s3-no-check-bucket --retries 3 --low-level-retries 10 --quiet
           if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $manifest -PathType Leaf)) { throw 'Published nightly manifest download failed' }
@@ -597,7 +601,7 @@ jobs:
           Write-Host 'Retaining the previous legacy client manifest until the immutable client archive is published.'
 
       - name: Publish dedicated-server client input
-        if: steps.published.outputs.overwrite == 'true' && env.DRY_RUN != 'true'
+        if: steps.published.outputs.overwrite == 'true' && env.PUBLISH == 'true'
         shell: bash
         env:
           RCLONE_CONFIG_PRIVATE_TYPE: s3
@@ -629,8 +633,7 @@ jobs:
             --s3-no-check-bucket --retries 3 --low-level-retries 10 --quiet
 
       - name: Publish client archive to private Patron R2
-        id: publish
-        if: steps.published.outputs.overwrite == 'true' && env.DRY_RUN != 'true'
+        if: steps.published.outputs.overwrite == 'true' && env.PUBLISH == 'true'
         shell: bash
         env:
           RCLONE_CONFIG_PATRON_TYPE: s3
@@ -665,8 +668,7 @@ jobs:
       - name: Summarize the dedicated-server pairing
         shell: bash
         env:
-          SIGNED: ${{ steps.sign.outcome == 'success' }}
-          PUBLISHED: ${{ steps.publish.outcome == 'success' }}
+          OVERWRITE: ${{ steps.published.outputs.overwrite }}
           RELEASE_DATE: ${{ needs.build.outputs.release_date }}
           HEAD_SHA: ${{ needs.build.outputs.head_sha }}
           FILE_NAME: ${{ needs.build.outputs.file_name }}
@@ -675,12 +677,12 @@ jobs:
           set -eu
           {
             printf 'Built `%s` at `%s` for %s, sha256 `%s`.\n\n' "$FILE_NAME" "$HEAD_SHA" "$RELEASE_DATE" "$ARCHIVE_SHA256"
-            if [ "$SIGNED" != 'true' ]; then
-              printf 'Not signed, because the signing identity only trusts development.\n\n'
+            if [ "$SIGN" != 'true' ]; then
+              printf 'Not signed, because the signing identity only trusts runs dispatched from development.\n\n'
             fi
-            if [ "$DRY_RUN" = 'true' ]; then
+            if [ "$PUBLISH" != 'true' ]; then
               printf 'Dry run: the dedicated-server client input and the Patron client archive were not published.\n'
-            elif [ "$PUBLISHED" != 'true' ]; then
+            elif [ "$OVERWRITE" != 'true' ]; then
               printf 'The %s nightly was already published, so this run published nothing.\n' "$RELEASE_DATE"
             else
               printf 'Package the paired dedicated server with:\n\n```\n'

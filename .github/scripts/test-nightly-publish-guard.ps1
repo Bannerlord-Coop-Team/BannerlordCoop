@@ -60,7 +60,8 @@ $cases = @(
     @{ Name = 'expired manifest reported as not found'; Expired = $true; ListExit = 3; StopsBeforeDownload = $true; Expected = 'true' },
     @{ Name = 'pointer unavailable'; PointerStatus = 503; StopsBeforeDownload = $true; Error = 'Published nightly pointer lookup failed with HTTP 503' },
     @{ Name = 'pointer without a manifest key'; PointerKey = ''; StopsBeforeDownload = $true; Error = 'Published nightly pointer is invalid' },
-    @{ Name = 'manifest lookup failed'; ListExit = 10; StopsBeforeDownload = $true; Error = 'Published nightly manifest lookup failed' },
+    @{ Name = 'pointer to another key'; PointerKey = 'nightly/release.json'; StopsBeforeDownload = $true; Error = 'Published nightly pointer is invalid' },
+    @{ Name = 'manifest lookup failed'; Expired = $true; ListExit = 10; StopsBeforeDownload = $true; Error = 'Published nightly manifest lookup failed' },
     @{ Name = 'download failed'; DownloadExit = 10; WriteFile = $false; Error = 'Published nightly manifest download failed' },
     @{ Name = 'successful download without file'; WriteFile = $false; Error = 'Published nightly manifest download failed' },
     @{ Name = 'changed manifest'; Sha256 = ('0' * 64); Error = 'Published nightly manifest checksum mismatch' },
@@ -80,6 +81,7 @@ try {
         $script:scenario = @{ Event = 'schedule'; PointerStatus = 200; ListExit = 0; DownloadExit = 0; WriteFile = $true; Manifest = '{"releaseDate":"2026-09-30"}' }
         foreach ($key in $case.Keys) { $script:scenario[$key] = $case[$key] }
         if (-not $script:scenario.Sha256) { $script:scenario.Sha256 = Get-TestSha256 $script:scenario.Manifest }
+        # An empty key is a case of its own, so only a key the case left out gets the default.
         if ($null -eq $script:scenario.PointerKey) { $script:scenario.PointerKey = "nightly/publications/$($script:scenario.Sha256)/release.json" }
         $script:scenario.Pointer = @{ manifest = @{ key = $script:scenario.PointerKey; sha256 = $script:scenario.Sha256 } } | ConvertTo-Json -Compress
         $script:commands = @()
