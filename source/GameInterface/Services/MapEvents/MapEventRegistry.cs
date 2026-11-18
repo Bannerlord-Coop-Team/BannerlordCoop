@@ -126,10 +126,7 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
         if (mainParty.MapEvent == mapEvent)
             return true;
 
-        var encounter = PlayerEncounter.Current;
-        if (encounter?._mapEvent == mapEvent ||
-            encounter?.BattleSimulation?.MapEvent == mapEvent ||
-            encounter.GetEncounteredBattleOrNull() == mapEvent)
+        if (PlayerEncounter.Current.ReferencesMapEvent(mapEvent))
             return true;
 
         var party = mainParty.Party;

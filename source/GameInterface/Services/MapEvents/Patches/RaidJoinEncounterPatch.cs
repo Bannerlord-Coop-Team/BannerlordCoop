@@ -15,7 +15,7 @@ using TaleWorlds.Localization;
 namespace GameInterface.Services.MapEvents.Patches;
 
 [HarmonyPatch]
-internal class RaidJoinEncounterConditionPatch
+internal class JoinEncounterConditionPatch
 {
     private static IEnumerable<MethodBase> TargetMethods()
     {
@@ -41,6 +41,7 @@ internal class RaidJoinEncounterConditionPatch
     private static bool HasLeaderParties(MapEvent battle) =>
         battle?.AttackerSide?.LeaderParty != null && battle.DefenderSide?.LeaderParty != null;
 
+    // Refuses helping the attackers of an active slow village raid; it also runs after the prefix refused.
     [HarmonyPostfix]
     private static void Postfix(MethodBase __originalMethod, MenuCallbackArgs args, ref bool __result)
     {

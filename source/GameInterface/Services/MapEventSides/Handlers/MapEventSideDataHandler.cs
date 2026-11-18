@@ -203,10 +203,11 @@ internal class MapEventSideDataHandler : IHandler
         if (MobileParty.MainParty?.MapEvent != mapEvent)
             return;
 
-        if (PlayerEncounter.Current == null)
+        var encounter = PlayerEncounter.Current;
+        if (encounter == null)
             return;
 
-        var encounterMapEvent = PlayerEncounter.Battle ?? PlayerEncounter.Current.GetEncounteredBattleOrNull() ??
+        var encounterMapEvent = encounter._mapEvent ?? encounter.GetEncounteredBattleOrNull() ??
             MapEvent.PlayerMapEvent;
         if (encounterMapEvent != mapEvent)
             return;

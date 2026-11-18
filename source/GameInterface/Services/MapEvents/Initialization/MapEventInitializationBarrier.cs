@@ -516,7 +516,7 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         if (encounter?.EncounterState != PlayerEncounterState.End ||
             encounter.BattleSimulation == null ||
             (!matchesDeferredSimulation &&
-                (playerWon || !References(encounter, mapEvent))))
+                (playerWon || !encounter.ReferencesMapEvent(mapEvent))))
         {
             return false;
         }
@@ -576,7 +576,7 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
             return false;
         }
 
-        if (!References(encounter, mapEvent) && !ReferenceEquals(encounter, cleanup?.Encounter))
+        if (!encounter.ReferencesMapEvent(mapEvent) && !ReferenceEquals(encounter, cleanup?.Encounter))
             return false;
 
         if (IsBattleResultEncounter(encounter))
@@ -599,11 +599,6 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         ForceCloseCurrentEncounterMenu();
         return true;
     }
-
-    private static bool References(PlayerEncounter encounter, MapEvent mapEvent) =>
-        encounter?._mapEvent == mapEvent ||
-        encounter?.BattleSimulation?.MapEvent == mapEvent ||
-        encounter.GetEncounteredBattleOrNull() == mapEvent;
 
     internal static bool IsBattleResultEncounter(PlayerEncounter encounter)
     {

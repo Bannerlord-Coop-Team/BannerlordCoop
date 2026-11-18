@@ -46,4 +46,12 @@ public static class PlayerEncounterExtensions
 
         return party.SiegeEvent?.BesiegerCamp?.LeaderParty?.MapEvent;
     }
+
+    /// <summary>
+    /// Checks if the encounter is attached to, simulating, or facing the given map event.
+    /// </summary>
+    public static bool ReferencesMapEvent(this PlayerEncounter playerEncounter, MapEvent mapEvent) =>
+        playerEncounter?._mapEvent == mapEvent ||
+        playerEncounter?.BattleSimulation?.MapEvent == mapEvent ||
+        playerEncounter.GetEncounteredBattleOrNull() == mapEvent;
 }
