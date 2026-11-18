@@ -1,6 +1,10 @@
 ﻿using E2E.Tests.Environment.MockEngine;
+using E2E.Tests.Util;
+using System.Runtime.CompilerServices;
 using TaleWorlds.Core;
+using TaleWorlds.Engine;
 using TaleWorlds.Library;
+using TaleWorlds.MountAndBlade;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Missions.Naval;
@@ -79,6 +83,7 @@ public class NavalDuelScenarioTests : NavalBattleTestEnvironment
         var crewOnB = b.RegisterAgent(crewId, "A");
         battle.CommitAll();
         battle.TickAll();
+        b.Engine.PlaceAgent(crewOnB, b.Ship(hullA).Hull);
         var oarOnA = a.Hull(hullA).Station("oar");
         a.UseStation(crewOnA, oarOnA, inUse: true);
         Assert.Same(crewOnB, b.Hull(hullA).SeatedAt("oar"));
@@ -123,6 +128,7 @@ public class NavalDuelScenarioTests : NavalBattleTestEnvironment
         var crewOnB = b.RegisterAgent(crewId, "A");
         battle.CommitAll();
         battle.TickAll();
+        b.Engine.PlaceAgent(crewOnB, b.Ship(hullA).Hull);
         a.Engine.WalksIn.Add(crewOnA);
         var oarOnA = a.Hull(hullA).Station("oar");
         a.UseStation(crewOnA, oarOnA, inUse: true);
@@ -167,6 +173,7 @@ public class NavalDuelScenarioTests : NavalBattleTestEnvironment
         var crewOnB = b.RegisterAgent(crewId, "A");
         battle.CommitAll();
         battle.TickAll();
+        b.Engine.PlaceAgent(crewOnB, b.Ship(hullA).Hull);
         a.Engine.WalksIn.Add(crewOnA);
 
         // Each of B's ticks is one frame, so the use's frame is the only settle pass before the engine moves the copy.
@@ -187,4 +194,145 @@ public class NavalDuelScenarioTests : NavalBattleTestEnvironment
         Assert.True((onA.Position - onA.StationFrame.origin).DistanceSquared(spawnOffset) < 1e-8f, $"owner sits at {onA.Position}");
         Assert.True((onB.Position - onB.StationFrame.origin).DistanceSquared(spawnOffset) < 1e-8f, $"copy sits at {onB.Position}");
     }
+
+    private const string HookKey = "4:attachment_machine_holder/28:attachment_point_machine_nested/3:pilot";
+
+    // A's crew mans a hook while B's copy of it is let go by vanilla's hook, as it does once the copy can no longer play the hook's
+    // action. B seats the copy again while A holds the seat: back on the hook from the water, where it stands when still on deck.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Duel_ACopysHookmanLetGoLocally_IsReseatedOnTheHullOnlyWhenItFellOff(bool fellOff)
+    {
+        using var battle = StartNavalBattle(new[] { ("A", BattleSideEnum.Attacker), ("B", BattleSideEnum.Defender) });
+        var a = battle["A"];
+        var b = battle["B"];
+        var hullA = battle.FieldPlayerHull(a, new Vec3(0f, 0f, 0f));
+        battle.FieldPlayerHull(b, new Vec3(0f, 300f, 0f));
+        var crewId = Guid.NewGuid();
+        var crewOnA = a.RegisterAgent(crewId, "A");
+        var crewOnB = b.RegisterAgent(crewId, "A");
+        battle.CommitAll();
+        battle.TickAll();
+        var copyOfA = b.Hull(hullA);
+        copyOfA.Hook(HookKey);
+        b.Engine.PlaceAgent(crewOnB, copyOfA.Hull);
+        a.UseStation(crewOnA, a.Hull(hullA).Hook(HookKey), inUse: true);
+        Assert.Same(crewOnB, copyOfA.SeatedAt(HookKey));
+
+        if (fellOff) b.Engine.Overboard(crewOnB);
+        copyOfA.Seats.Clear();
+        b.Tick();
+
+        Assert.Same(crewOnB, copyOfA.SeatedAt(HookKey));
+        Assert.Same(copyOfA, b.Engine.DeckOf(crewOnB));
+        if (!fellOff)
+        {
+            Assert.Empty(b.Engine.SeatPlacements);
+            return;
+        }
+
+        var placement = Assert.Single(b.Engine.SeatPlacements);
+        Assert.Same(crewOnB, placement.Agent);
+        Assert.True(placement.Position.DistanceSquared(copyOfA.Frame.origin + FakeNavalShipEngine.StationOffset) < 1e-8f,
+            $"B put its copy at {placement.Position}");
+    }
+
+    // B's copy of A's crew member is in the water when A seats it, or falls in while seated, and vanilla keeps it seated there.
+    // B puts it back on the station while A holds the seat: a hook at its station, an oar at its rower's spawn placement.
+    [Theory]
+    [InlineData(true, true)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(false, false)]
+    public void Duel_ACopyOffItsHullWhileItsOwnerKeepsItSeated_IsPutBackOnTheStation(bool atHook, bool offBeforeTheSeat)
+    {
+        using var battle = StartNavalBattle(new[] { ("A", BattleSideEnum.Attacker), ("B", BattleSideEnum.Defender) });
+        var a = battle["A"];
+        var b = battle["B"];
+        var hullA = battle.FieldPlayerHull(a, new Vec3(0f, 0f, 0f));
+        battle.FieldPlayerHull(b, new Vec3(0f, 300f, 0f));
+        var crewId = Guid.NewGuid();
+        var crewOnA = a.RegisterAgent(crewId, "A");
+        var crewOnB = b.RegisterAgent(crewId, "A");
+        battle.CommitAll();
+        battle.TickAll();
+        var copyOfA = b.Hull(hullA);
+        string key = atHook ? HookKey : "oar";
+        if (atHook) copyOfA.Hook(key);
+        var stationOnA = atHook ? a.Hull(hullA).Hook(key) : a.Hull(hullA).Station(key);
+        if (!offBeforeTheSeat) b.Engine.PlaceAgent(crewOnB, copyOfA.Hull);
+
+        a.UseStation(crewOnA, stationOnA, inUse: true);
+        b.Tick();
+        if (!offBeforeTheSeat)
+        {
+            Assert.Empty(b.Engine.SeatPlacements);
+            b.Engine.Overboard(crewOnB);
+        }
+
+        b.Ticks(3);
+
+        Assert.Same(crewOnB, copyOfA.SeatedAt(key));
+        var placement = Assert.Single(b.Engine.SeatPlacements);
+        var station = copyOfA.Frame.origin + FakeNavalShipEngine.StationOffset;
+        var spot = atHook ? station : station + FakeNavalShipEngine.SitDownDisplacement;
+        Assert.Same(crewOnB, placement.Agent);
+        Assert.True(placement.Position.DistanceSquared(spot) < 1e-8f, $"B put its copy at {placement.Position}, the spot is {spot}");
+        Assert.Same(copyOfA.Hull, b.Engine.GetSupportHull(crewOnB));
+    }
+
+#if COOP_NAVAL
+    private static readonly Vec3 HookOffset = new(-3f, 6f, 2f);
+
+    // A's crew mans a grappling hook, whose seat vanilla only position-locks, and A's hull gets under way. B keeps its copy of
+    // the crew walking to the hook on the moved hull, otherwise the copy walks to where the hook was and off the side.
+    [Fact]
+    public void Duel_ACopysHookmanAsItsHullGetsUnderWay_IsKeptAtTheHook()
+    {
+        using var battle = StartNavalBattle(new[] { ("A", BattleSideEnum.Attacker), ("B", BattleSideEnum.Defender) });
+        var a = battle["A"];
+        var b = battle["B"];
+        var hullA = battle.FieldPlayerHull(a, new Vec3(0f, 0f, 0f));
+        battle.FieldPlayerHull(b, new Vec3(0f, 300f, 0f));
+        var crewId = Guid.NewGuid();
+        var crewOnA = a.RegisterAgent(crewId, "A");
+        var crewOnB = b.RegisterAgent(crewId, "A");
+        battle.CommitAll();
+        battle.TickAll();
+        var copyOfA = b.Hull(hullA);
+        var hookOnB = MissionTestObjects.CreateStandingPoint<HookStandingPoint>();
+        hookOnB.Hull = copyOfA;
+        // As ShipAttachmentMachine.OnDeploymentFinished leaves a hook's pilot seat.
+        hookOnB.LockUserFrames = false;
+        hookOnB.LockUserPositions = true;
+        copyOfA.Stations[(HookKey, 0)] = hookOnB;
+        copyOfA.Hooks.Add(hookOnB);
+        b.Engine.PlaceAgent(crewOnB, copyOfA.Hull);
+        b.Engine.Pin = ((global::Missions.Naval.NavalShipEngine)RuntimeHelpers.GetUninitializedObject(
+            typeof(global::Missions.Naval.NavalShipEngine))).PinToStation;
+
+        a.UseStation(crewOnA, a.Hull(hullA).Hook(HookKey), inUse: true);
+        Assert.Same(crewOnB, copyOfA.SeatedAt(HookKey));
+        a.Hull(hullA).Frame = new MatrixFrame(Mat3.Identity, new Vec3(20f, 0f, 0f));
+        battle.TickAll(3);
+
+        Assert.Equal(20f, copyOfA.Frame.origin.x, 3);
+        Assert.True(AgentMirror.TryGet(crewOnB, out var copy));
+        var hook = copyOfA.Frame.TransformToParent(HookOffset).AsVec2;
+        Assert.True(copy.LastTargetPosition.DistanceSquared(hook) < 1e-6f,
+            $"B's copy walks to {copy.LastTargetPosition}, the hook is at {hook}");
+        Assert.Same(crewOnB, copyOfA.SeatedAt(HookKey));
+    }
+
+    /// <summary>A hook's pilot seat on a fake hull: its user frame rides the hull's current frame, as a prefab point's does.</summary>
+    private sealed class HookStandingPoint : StandingPoint
+    {
+        public FakeHull Hull { get; set; } = null!;
+
+        // The seat at its offset on the hull's current frame.
+        public override WorldFrame GetUserFrameForAgent(Agent agent) => new(Hull.Frame.rotation,
+            new WorldPosition(UIntPtr.Zero, Hull.Frame.TransformToParent(HookOffset)));
+    }
+#endif
 }

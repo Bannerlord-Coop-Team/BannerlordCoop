@@ -1,4 +1,4 @@
-using Common.Network;
+﻿using Common.Network;
 
 namespace Common.Tests.Network;
 
@@ -15,7 +15,7 @@ public class MessageAggregationBufferTests
 
         Assert.Null(buffer.Append(Payload(40), Budget));
         Assert.Null(buffer.Append(Payload(40), Budget));
-        Assert.False(buffer.IsEmpty);
+        Assert.Equal(2, buffer.Drain().Count);
     }
 
     [Fact]
@@ -74,7 +74,6 @@ public class MessageAggregationBufferTests
     {
         var buffer = new MessageAggregationBuffer();
 
-        Assert.True(buffer.IsEmpty);
         Assert.Null(buffer.Drain());
     }
 
@@ -85,7 +84,6 @@ public class MessageAggregationBufferTests
 
         buffer.Append(Payload(90), Budget);
         Assert.NotNull(buffer.Drain());
-        Assert.True(buffer.IsEmpty);
 
         // A fresh batch gets the full budget again.
         Assert.Null(buffer.Append(Payload(90), Budget));

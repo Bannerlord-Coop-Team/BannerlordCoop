@@ -5,9 +5,11 @@ using Common.Serialization;
 using Common.Util;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
+using GameInterface.Services.CharacterObjects;
 using GameInterface.Services.Heroes.Data;
 using GameInterface.Services.Issues.Framework.Gating;
 using GameInterface.Services.MobileParties;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyBases.Extensions;
@@ -154,6 +156,9 @@ internal class HeroInterface : IHeroInterface
                         .DeserializeCompressed<HeroBinaryPackage>(bytes)
                         .Unpack<Hero>(binaryPackageFactory);
 
+                    // Host and client copies get the same template; the host's save carries it for the refill after a load (#4675)
+                    PlayerCharacterTemplate.Link(hero.CharacterObject, PlayerCharacterTemplate.Find());
+
                     assignNetworkIds(hero);
 
                     if (setupHero)
@@ -234,11 +239,11 @@ internal class HeroInterface : IHeroInterface
             playerParty.Party.SetAsCameraFollowParty();
         }
 
-        // The transferred host save carries the server's always-visible party state
-        // (PartyVisibilityServerPatches) and the native load path never rebuilds fog of war
-        // (Campaign.GameInitTick only runs for new campaigns), so distant parties and their battle
-        // icons would stay revealed forever. Queued so it runs once the campaign state is entered
-        // and the hero switched to above is the local main party.
+        // On a release client the transferred host save loads with every party hidden
+        // (TransferredPartyVisibilityPatch) and the native load path never rebuilds fog of war
+        // (Campaign.GameInitTick only runs for new campaigns), so nearby parties would stay hidden.
+        // Queued so it runs once the campaign state is entered and the hero switched to above is the
+        // local main party.
         GameThread.RunSafe(partyVisibilitySweep.RebuildAroundMainParty);
         MessageBroker.Instance.Publish(player, new SwitchedPlayer());
     }
@@ -392,8 +397,11 @@ internal class HeroInterface : IHeroInterface
         RegisterPartyChildren(party, handles);
     }
 
+    /// <summary>The id prefix the host gives every joined player's hero, and so its character.</summary>
+    internal const string JoinedPlayerIdPrefix = "Player";
+
     private string NewServerStringId<T>(T obj) where T : MBObjectBase
-        => Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<T>("Player");
+        => Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<T>(JoinedPlayerIdPrefix);
 
     private void RegisterPrimary<T>(T obj, string stringId) where T : MBObjectBase
     {

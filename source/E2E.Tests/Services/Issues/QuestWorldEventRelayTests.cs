@@ -1,7 +1,9 @@
-﻿using Common.Util;
+﻿using E2E.Tests.Util;
+using Common.Util;
 using E2E.Tests.Environment;
 using GameInterface.Services.Issues.Framework.Dispatch;
 using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Tests.Utils;
 using HarmonyLib;
 using System.Collections.Concurrent;
 using System.Linq;
@@ -40,7 +42,7 @@ public class QuestWorldEventRelayTests : IDisposable
         {
             var quest = AttachListenerQuest();
             var mapEvent = (MapEvent)RuntimeHelpers.GetUninitializedObject(typeof(MapEvent));
-            mapEvent._mapEventType = battleType;
+            mapEvent.SetBattleType(battleType);
 
             // Isolate the relay from unrelated dispatcher listeners that require a fully staged battle.
             typeof(QuestWorldEventRelayPatches).GetMethod("OnMapEventStartedPostfix", BindingFlags.Static | BindingFlags.NonPublic)!

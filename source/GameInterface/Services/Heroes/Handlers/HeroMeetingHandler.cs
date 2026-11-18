@@ -18,6 +18,7 @@ internal class HeroMeetingHandler : IHandler
     private readonly INetwork network;
     private readonly IPlayerManager playerManager;
     private readonly ISessionHeroMeetingDataInterface sessionHeroMeetingDataInterface;
+    private readonly IHeroRelationsInterface heroRelationsInterface;
 
     private HeroMeetingData heroMeetingData;
 
@@ -26,13 +27,15 @@ internal class HeroMeetingHandler : IHandler
         IObjectManager objectManager,
         INetwork network,
         IPlayerManager playerManager,
-        ISessionHeroMeetingDataInterface sessionHeroMeetingDataInterface)
+        ISessionHeroMeetingDataInterface sessionHeroMeetingDataInterface,
+        IHeroRelationsInterface heroRelationsInterface)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.playerManager = playerManager;
         this.sessionHeroMeetingDataInterface = sessionHeroMeetingDataInterface;
+        this.heroRelationsInterface = heroRelationsInterface;
 
         messageBroker.Subscribe<InitializeClientHeroMeetingData>(Handle);
         messageBroker.Subscribe<PlayerHeroChanged>(Handle);
@@ -99,13 +102,15 @@ internal class HeroMeetingHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (payload.Who is not NetPeer peer || !playerManager.TryGetPlayer(peer, out var player)) return;
-            if (!objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out _)) return;
-            if (!objectManager.TryGetObjectWithLogging<Hero>(meeting.MetHeroId, out _)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out var playerHero)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(meeting.MetHeroId, out var metHero)) return;
 
-            sessionHeroMeetingDataInterface.RecordMeeting(
+            var firstMeeting = sessionHeroMeetingDataInterface.RecordMeeting(
                 player.HeroId,
                 meeting.MetHeroId,
                 meeting.LastMeetingTimeTicks);
+            if (firstMeeting)
+                heroRelationsInterface.ApplyFirstMeetingRelation(playerHero, metHero);
         }, context: nameof(Handle));
     }
 

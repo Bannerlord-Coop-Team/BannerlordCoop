@@ -9,9 +9,17 @@ namespace GameInterface.Services.MapEvents.Extensions;
 
 public static class MapEventExtensions
 {
+    /// <summary>Whether this map event uses the siege-style join flow.</summary>
+    public static bool IsSiegeStyleJoin(this MapEvent mapEvent)
+        => mapEvent.IsSiegeAssault || mapEvent.IsSallyOut;
+
     /// <summary>Whether the battle's results were calculated or applied, after which no battle report may change what they read.</summary>
     public static bool HasCalculatedResults(this MapEvent mapEvent)
         => mapEvent._mapEventResultsCalculated || mapEvent._mapEventResultsApplied;
+
+    /// <summary>Whether the battle is a send troops hideout raid.</summary>
+    public static bool IsSendTroopsHideout(this MapEvent mapEvent)
+        => mapEvent.Component is HideoutEventComponent { IsSendTroops: true };
 
     /// <summary>
     /// Finds a party's MapEventParty on either side of the event, without going through PartiesOnSide(side) —

@@ -294,6 +294,7 @@ public class ModConfigTests : IDisposable
 
         Assert.True(options.FastForwardEnabled);
         Assert.True(options.AutoPauseEnabled);
+        Assert.True(options.AllowClientTimeControls);
         Assert.False(options.ClientsCanUseCheats);
         Assert.False(options.GoldFoodInfluenceChangeInSettlements);
         Assert.Equal(GoldFoodChangeMode.Disabled, options.GoldFoodInfluenceChangeInBattles);
@@ -317,6 +318,8 @@ public class ModConfigTests : IDisposable
         Assert.False(options.BlockAiWarDeclarationsOnOfflinePlayers);
         Assert.Equal(ClansAfterKingdomDestructionMode.Vanilla, options.ClansAfterKingdomDestruction);
         Assert.Empty(options.PreferredBattleHosts);
+        Assert.False(options.PvpBlockLeave);
+        Assert.Equal(0, options.PvpResponseTimerSeconds);
     }
 
     /// <summary>

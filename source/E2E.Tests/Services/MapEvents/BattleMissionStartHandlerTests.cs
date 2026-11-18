@@ -24,6 +24,7 @@ using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
 using Xunit.Abstractions;
+using GameInterface.Tests.Utils;
 
 namespace E2E.Tests.Services.MapEvents;
 
@@ -68,7 +69,7 @@ public class BattleMissionStartHandlerTests : MapEventTestBase
         {
             Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEvent.MapEventId, out var clientBattle));
             if (isHideout)
-                clientBattle._mapEventType = MapEvent.BattleTypes.Hideout;
+                clientBattle.SetBattleType(MapEvent.BattleTypes.Hideout);
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(nonInitiatingPartyId, out var localParty));
             var previousMainParty = Campaign.Current.MainParty;
             Campaign.Current.MainParty = localParty;
@@ -194,8 +195,8 @@ public class BattleMissionStartHandlerTests : MapEventTestBase
                 campaign.Models.LocationModel = Mock.Of<LocationModel>();
                 campaign.Models.DifficultyModel = Mock.Of<DifficultyModel>();
                 campaign.Models.MapWeatherModel = Mock.Of<MapWeatherModel>();
-                battle._mapEventType = MapEvent.BattleTypes.Siege;
-                battle.MapEventSettlement = settlement;
+                battle.SetBattleType(MapEvent.BattleTypes.Siege);
+                battle.SetMapEventSettlement(settlement);
                 settlement.LocationComplex = new LocationComplex();
                 settlement.LocationComplex._locations.Add("center", new Location(
                     "center", new TextObject("castle"), new TextObject("gate"), 0, false, false,

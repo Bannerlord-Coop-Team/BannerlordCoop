@@ -129,16 +129,8 @@ internal class KingdomInterface : IKingdomInterface
         if (!hasEligiblePlayerClan)
         {
             CoopKingdomElection election = new CoopKingdomElection(kingdomDecision, randomFloat);
-            if (isSupported)
-            {
-                election.StartElectionCoop();
-            }
-            else
-            {
-                // An online player clan still counts as a supporter, which would leave the AI waiting for a vote
-                // that can never be cast.
-                election.StartElectionWithoutPlayerCoop();
-            }
+            // Human rulers still count as native player supporters when no co-op vote can be taken.
+            election.StartElectionWithoutPlayerCoop();
             return election.RandomFloat;
         }
         kingdom._unresolvedDecisions.Add(kingdomDecision);

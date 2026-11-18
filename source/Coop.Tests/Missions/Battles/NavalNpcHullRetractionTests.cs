@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using Common.Network;
 using Missions;
 using Missions.Battles;
 using Missions.Messages;
@@ -8,14 +9,15 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using Xunit;
 #if COOP_NAVAL
-using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Players;
+#if DEBUG
+using GameInterface.Services.MapEvents.NavalScenarios;
+#endif
 using Missions.Naval;
-using TaleWorlds.Core;
 #endif
 
 namespace Coop.Tests.Missions.Battles;
@@ -28,7 +30,8 @@ public class NavalNpcHullRetractionTests
     private const string Peer = "peer";
 
     // A failed attempt's hulls were already announced, so peers hear they leave with their crew, and here the crew withdraws
-    // a tick after it is parked, before the hull goes (R33).
+    // a tick after it is parked, before the hull goes (R33). They never fought for the side, so the side counts no departure
+    // (M11 A5), which would keep its retreat once its other hulls are gone.
     [Fact]
     public void RetractNpcHulls_TellsPeersTheCrewLeaves_ThenWithdrawsTheCrewAndRemovesTheHull()
     {
@@ -40,6 +43,7 @@ public class NavalNpcHullRetractionTests
         var order = new List<string>();
         harness.Engine.Setup(e => e.WithdrawAgent(crew)).Callback(() => order.Add("withdraw"));
         harness.Engine.Setup(e => e.RemoveHull(hull)).Callback(() => order.Add("remove"));
+        harness.Engine.Setup(e => e.SideOf(hull)).Returns(BattleSideEnum.Defender);
         harness.LiveHulls.Add(hull);
         var shipId = harness.Replicator.RegisterNpcHull(hull, null, "MapEventParty_7");
 
@@ -49,9 +53,11 @@ public class NavalNpcHullRetractionTests
         harness.Replicator.Tick(0.1f);
 
         harness.Network.Verify(n => n.SendAll(It.Is<NetworkShipRemoved>(removed => removed.ShipId == shipId
-            && removed.OwnerControllerId == Own && removed.MissionEnding)), Times.Once);
+            && removed.OwnerControllerId == Own && removed.Reason == ShipRemovalReason.Retracted && removed.MissionEnding)),
+            Times.Once);
         Assert.Equal(new[] { "withdraw", "remove" }, order);
         Assert.Equal(ShipLifecycle.Removed, harness.Registry.StateOf(shipId));
+        Assert.Equal(0, harness.Fixture.Ledger.DepartedHulls(BattleSideEnum.Defender));
     }
 
     // Vanilla's removal event comes after the registry dropped the ship, so it announces nothing a second time.
@@ -153,7 +159,7 @@ public class NavalNpcHullRetractionTests
         harness.Network.Setup(n => n.SendAll(It.IsAny<NetworkNpcFleetAttempted>()))
             .Callback<IMessage>(message => sent.Add(((NetworkNpcFleetAttempted)message).Failed ? "failed" : "fielded"));
 
-        spawner.AttemptFleet(work =>
+        harness.Attempt(spawner, work =>
         {
             foreach (var hull in hulls)
             {
@@ -165,7 +171,7 @@ public class NavalNpcHullRetractionTests
         });
 
         Assert.Equal(new[] { "removed:0" }, sent);
-        Assert.Equal(BattleSideEnum.None, spawner.FailedSide);
+        Assert.False(spawner.AttemptFailed);
 
         spawner.Tick();
         harness.Replicator.Tick(0.1f);
@@ -173,7 +179,7 @@ public class NavalNpcHullRetractionTests
         spawner.Tick();
 
         Assert.Equal(new[] { "removed:0", "removed:1", "failed" }, sent);
-        Assert.Equal(BattleSideEnum.Defender, spawner.FailedSide);
+        Assert.True(spawner.AttemptFailed);
         Assert.Equal(hulls, removed);
         Assert.Empty(harness.LiveHulls);
     }
@@ -217,10 +223,26 @@ public class NavalNpcHullRetractionTests
         }
 
 #if COOP_NAVAL
+        // The fielder the spawner hands its attempt to.
+        public Mock<INavalNpcFleetFielder> Fielder { get; } = new Mock<INavalNpcFleetFielder>();
+
         // The battle's AI fleet spawner, taking a failed attempt back through the real rollback and this replicator.
-        public NavalNpcFleetSpawner Spawner() => new NavalNpcFleetSpawner(Network.Object, new MessageBroker(), Session.Object,
-            Replicator, Mock.Of<ICoopShipSnapshotBuilder>(), Mock.Of<IObjectManager>(), Mock.Of<IPlayerManager>(),
-            Mock.Of<INavalLateDeploymentPlanTracker>(), new NavalNpcFleetRollback(Replicator), BattleSideEnum.Defender);
+        public NavalNpcFleetSpawner Spawner() => new NavalNpcFleetSpawner(Network.Object, Mock.Of<INetwork>(), new MessageBroker(), Session.Object,
+            Replicator, BattleSideEnum.Defender, (_, _) => Fielder.Object,
+            replicator => new NavalNpcFleetRollback(replicator)
+#if DEBUG
+            , Mock.Of<INavalScenarioState>()
+#endif
+            );
+
+        // Makes one attempt of the spawner whose fielder does what the given step does with the attempt's work.
+        public void Attempt(NavalNpcFleetSpawner spawner, Func<NavalNpcFleetAttemptWork, string> field)
+        {
+            Fielder.Setup(f => f.Field(It.IsAny<Mission>(), It.IsAny<BattleSideEnum>(), It.IsAny<NavalNpcReserve>(),
+                    It.IsAny<NavalNpcFleetAttemptWork>()))
+                .Returns<Mission, BattleSideEnum, NavalNpcReserve, NavalNpcFleetAttemptWork>((_, _, _, work) => field(work));
+            spawner.AttemptFleet(null, default);
+        }
 #endif
     }
 }

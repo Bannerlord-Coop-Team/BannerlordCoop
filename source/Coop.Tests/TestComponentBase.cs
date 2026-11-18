@@ -18,6 +18,7 @@ using GameInterface.Registry.Auto;
 using GameInterface.Services.CampaignService.Interfaces;
 using GameInterface.Services.Chat;
 using GameInterface.Services.Voice;
+using GameInterface.Services.Villages;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.MapTracking;
@@ -162,9 +163,11 @@ internal abstract class TestComponentBase
         RegisterMock<IBattleHostRetentionPolicy>(builder);
         RegisterMock<IBattleTroopLedger>(builder);
         RegisterMock<IRetreatedMapEventPartyTracker>(builder);
-        // ServerBattleShipFateHandler (ServerModule, auto-activated) holds and applies naval ship fates through these.
+        // ServerBattleShipFateHandler (ServerModule, auto-activated) holds and applies naval ship fates through these, and
+        // ServerNavalNpcFleetAttemptHandler records the AI fleet attempts in the tracker.
         RegisterMock<IBattleShipFateLedger>(builder);
         RegisterMock<IBattleShipFateApplier>(builder);
+        RegisterMock<INavalNpcFleetAttemptTracker>(builder);
         // LocationHostHandler (MissionModule, auto-activated) needs its registry the same way.
         RegisterMock<ILocationHostRegistry>(builder);
         // AgentHitSoundFixtureHandler (MissionModule, auto-activated in DEBUG) needs the args factory,
@@ -173,6 +176,7 @@ internal abstract class TestComponentBase
         RegisterMock<IRaidAiInterventionConfigInterface>(builder);
         RegisterMock<ITacticalUnitSymbolsConfigInterface>(builder);
         RegisterMock<IVillageHostileActionInterface>(builder);
+        RegisterMock<IHostileActionRequestTracker>(builder);
         RegisterMock<IIssueOwnershipRegistry>(builder);
         RegisterMock<IQuestFeatureFlag>(builder);
         RegisterMock<IEducationCampaignBehaviorInterface>(builder);

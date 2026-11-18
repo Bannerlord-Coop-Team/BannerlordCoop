@@ -225,12 +225,15 @@ internal class SmithingCommands
 
             if (!resolver.TryResolveHero(strings[0], out var hero, out var error)) return Failed(error);
 
+            var town = hero.CurrentSettlement?.Town;
+            if (town == null || !town.IsTown) return Failed(hero.Name + " is not in a town.");
+
             for (int i = 0; i < 6; i++)
             {
-                Campaign.Current.GetCampaignBehavior<CraftingCampaignBehavior>().CreateTownOrder(hero, i);
+                Campaign.Current.GetCampaignBehavior<CraftingCampaignBehavior>().CreateTownOrder(town, hero, i);
             }
 
-            return Succeeded("Orders have been added for " + hero.Name + " in " + hero.CurrentSettlement.Town.Name.ToString());
+            return Succeeded("Orders have been added for " + hero.Name + " in " + town.Name.ToString());
         }
     }
 

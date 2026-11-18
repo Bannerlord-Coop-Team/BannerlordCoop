@@ -12,6 +12,9 @@ using Quest = TaleWorlds.CampaignSystem.Issues.MerchantArmyOfPoachersIssueBehavi
 
 internal class PoachersBattleMissionInitializer : IBattleMissionInitializer
 {
+    // v1.5.7 StartQuestBattle opens the village center with this scene level, as a raid battle does.
+    private const string LandRaidSceneLevel = "land_raid";
+
     public int Priority => 200;
 
     public bool CanHandle(MapEvent mapEvent) => FindQuest(mapEvent) != null;
@@ -31,7 +34,7 @@ internal class PoachersBattleMissionInitializer : IBattleMissionInitializer
             DamageToFriendsMultiplier = Campaign.Current.Models.DifficultyModel.GetPlayerTroopsReceivedDamageMultiplier(),
             DamageFromPlayerToFriendsMultiplier = Campaign.Current.Models.DifficultyModel.GetPlayerTroopsReceivedDamageMultiplier(),
             TerrainType = (int)Campaign.Current.MapSceneWrapper.GetFaceTerrainType(mapEvent.Position.Face),
-            SceneLevels = "",
+            SceneLevels = LandRaidSceneLevel,
             DoNotUseLoadingScreen = false,
             DecalAtlasGroup = (int)DecalAtlasGroup.Battle,
             RandomTerrainSeed = randomTerrainSeed,

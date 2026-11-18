@@ -137,7 +137,8 @@ internal class PrisonBreakHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging<Hero>(data.PrisonerId, out var prisoner)) return PrisonBreakStartResult.PrisonerUnavailable;
 
         // A player hero is only controlled by their own player, never as the rescuer's AI prisoner agent.
-        if (prisoner.IsPlayerHero() || !IsHeldIn(prisoner, settlement)) return PrisonBreakStartResult.PrisonerUnavailable;
+        if (prisoner.IsPlayerHero()) return PrisonBreakStartResult.PrisonerUnavailable;
+        if (!behaviorInterface.IsHeldIn(prisoner, settlement)) return PrisonBreakStartResult.PrisonerUnavailable;
         if (behaviorInterface.IsOnCooldown(settlement)) return PrisonBreakStartResult.OnCooldown;
 
         int bribeCost;
@@ -254,7 +255,7 @@ internal class PrisonBreakHandler : IHandler
             if (!succeeded) return;
 
             // The prisoner may have been ransomed or moved while the mission ran.
-            if (!IsHeldIn(prisoner, settlement))
+            if (!behaviorInterface.IsHeldIn(prisoner, settlement))
             {
                 Logger.Warning("Prison break freed {PrisonerId} but they are no longer held in {SettlementId}",
                     prisonerId, settlementId);
@@ -392,7 +393,7 @@ internal class PrisonBreakHandler : IHandler
 
             if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) &&
                 objectManager.TryGetObject<Hero>(prisonerId, out var prisoner) &&
-                IsHeldIn(prisoner, settlement)) continue;
+                behaviorInterface.IsHeldIn(prisoner, settlement)) continue;
 
             Logger.Debug("Prisoner {PrisonerId} left {SettlementId} during a prison break", prisonerId, settlementId);
 
@@ -411,13 +412,5 @@ internal class PrisonBreakHandler : IHandler
 
             behaviorInterface.AbortPrisonBreakMission(prisoner);
         });
-    }
-
-    private static bool IsHeldIn(Hero prisoner, Settlement settlement)
-    {
-        if (settlement == null || !prisoner.IsPrisoner) return false;
-
-        return settlement.Party.PrisonRoster.Contains(prisoner.CharacterObject) ||
-            settlement.Town?.GarrisonParty?.PrisonRoster.Contains(prisoner.CharacterObject) == true;
     }
 }
