@@ -27,7 +27,8 @@ public class ServerTelemetryReporterTests
             sessionCancellation,
             TimeSpan.FromMilliseconds(20),
             () => startedAt,
-            () => "41fa0000000000000000000000000000");
+            () => "41fa0000000000000000000000000000",
+            TimeSpan.FromMilliseconds(40));
 
         messageBroker.Publish(this, new ConnectedPlayersChanged(5));
         await Task.Delay(60);
@@ -47,6 +48,30 @@ public class ServerTelemetryReporterTests
             Assert.Equal(startedAt, status.StartedAt);
             Assert.Equal(5, status.PlayerCount);
         });
+    }
+
+    [Fact]
+    public async Task UnchangedStatusSkipsIntermediateHeartbeatAndRefreshesLatestObservation()
+    {
+        var messageBroker = new TestMessageBroker();
+        var uploader = new RecordingTelemetryUploader(expectedReports: 2);
+        using var sessionCancellation = new CancellationTokenSource();
+        using var reporter = new ServerTelemetryReporter(
+            messageBroker,
+            uploader,
+            sessionCancellation,
+            TimeSpan.FromMilliseconds(20),
+            () => DateTime.UtcNow,
+            () => "51fa0000000000000000000000000000",
+            TimeSpan.FromMilliseconds(80));
+
+        messageBroker.Publish(this, new ConnectedPlayersChanged(3));
+        messageBroker.Publish(this, new ServerListening());
+        await uploader.ExpectedReportsReceived.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+        Assert.Equal(2, uploader.Statuses.Count);
+        await Task.Delay(35);
+        Assert.Equal(2, uploader.Statuses.Count);
     }
 
     private sealed class RecordingTelemetryUploader : IServerTelemetryUploader

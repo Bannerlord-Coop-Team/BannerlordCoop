@@ -21,12 +21,14 @@ public class ServerTelemetryReporter : IServerTelemetryReporter
 {
     private static readonly ILogger Logger = LogManager.GetLogger<ServerTelemetryReporter>();
     internal static readonly TimeSpan ReportInterval = TimeSpan.FromSeconds(60);
+    internal static readonly TimeSpan UnchangedRefreshInterval = TimeSpan.FromMinutes(2);
 
     private readonly IMessageBroker messageBroker;
     private readonly IServerTelemetryUploader uploader;
     private readonly CancellationTokenSource cancellation;
     private readonly Func<DateTime> getUtcNow;
     private readonly Func<string> createSessionId;
+    private readonly TimeSpan unchangedRefreshInterval;
     private readonly object reportGate = new object();
     private readonly Timer reportTimer;
 
@@ -35,6 +37,8 @@ public class ServerTelemetryReporter : IServerTelemetryReporter
     private int playerCount;
     private bool started;
     private bool disposed;
+    private ServerTelemetryStatus lastUploadedStatus;
+    private DateTime lastUploadedAt;
 
     public ServerTelemetryReporter(
         IMessageBroker messageBroker,
@@ -56,7 +60,8 @@ public class ServerTelemetryReporter : IServerTelemetryReporter
         CancellationTokenSource sessionCancellation,
         TimeSpan reportInterval,
         Func<DateTime> getUtcNow,
-        Func<string> createSessionId)
+        Func<string> createSessionId,
+        TimeSpan? unchangedRefreshInterval = null)
     {
         if (messageBroker == null) throw new ArgumentNullException(nameof(messageBroker));
         if (uploader == null) throw new ArgumentNullException(nameof(uploader));
@@ -65,11 +70,14 @@ public class ServerTelemetryReporter : IServerTelemetryReporter
             throw new ArgumentOutOfRangeException(nameof(reportInterval));
         if (getUtcNow == null) throw new ArgumentNullException(nameof(getUtcNow));
         if (createSessionId == null) throw new ArgumentNullException(nameof(createSessionId));
+        if (unchangedRefreshInterval.HasValue && unchangedRefreshInterval.Value <= TimeSpan.Zero)
+            throw new ArgumentOutOfRangeException(nameof(unchangedRefreshInterval));
 
         this.messageBroker = messageBroker;
         this.uploader = uploader;
         this.getUtcNow = getUtcNow;
         this.createSessionId = createSessionId;
+        this.unchangedRefreshInterval = unchangedRefreshInterval ?? UnchangedRefreshInterval;
         cancellation = CancellationTokenSource.CreateLinkedTokenSource(sessionCancellation.Token);
 
         reportTimer = new Timer(reportInterval.TotalMilliseconds) { AutoReset = false };
@@ -110,6 +118,14 @@ public class ServerTelemetryReporter : IServerTelemetryReporter
                 ModInformation.Commit,
                 startedAt,
                 Volatile.Read(ref playerCount));
+            var now = getUtcNow().ToUniversalTime();
+            if (lastUploadedStatus != null
+                && IsSameObservation(lastUploadedStatus, status)
+                && now - lastUploadedAt < unchangedRefreshInterval)
+            {
+                reportTimer.Start();
+                return;
+            }
         }
 
         _ = UploadAndScheduleNextAsync(status);
@@ -120,6 +136,17 @@ public class ServerTelemetryReporter : IServerTelemetryReporter
         try
         {
             var result = await uploader.UploadAsync(status, cancellation.Token).ConfigureAwait(false);
+            if (result.Uploaded)
+            {
+                lock (reportGate)
+                {
+                    if (!disposed)
+                    {
+                        lastUploadedStatus = status;
+                        lastUploadedAt = getUtcNow().ToUniversalTime();
+                    }
+                }
+            }
             if (!result.Uploaded && result.EndpointConfigured)
             {
                 Logger.Warning("Reporting server telemetry failed: {Details}", result.Details);
@@ -140,6 +167,13 @@ public class ServerTelemetryReporter : IServerTelemetryReporter
             }
         }
     }
+
+    private static bool IsSameObservation(ServerTelemetryStatus left, ServerTelemetryStatus right) =>
+        left.SessionId == right.SessionId
+        && left.ModVersion == right.ModVersion
+        && left.Commit == right.Commit
+        && left.StartedAt == right.StartedAt
+        && left.PlayerCount == right.PlayerCount;
 
     public void Dispose()
     {
