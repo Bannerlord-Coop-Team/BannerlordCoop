@@ -24,7 +24,7 @@ internal class TownOrdersPatches
 
     [HarmonyPatch(nameof(CraftingCampaignBehavior.CreateTownOrder))]
     [HarmonyPrefix]
-    public static bool CreateTownOrderPrefix(ref CraftingCampaignBehavior __instance, Hero orderOwner, int orderSlot)
+    public static bool CreateTownOrderPrefix(ref CraftingCampaignBehavior __instance, Town town, Hero orderOwner, int orderSlot)
     {
         // Call original if we call this function
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
@@ -33,7 +33,7 @@ internal class TownOrdersPatches
         if (ModInformation.IsClient) return false;
 
         // Publish message with data for clients
-        var message = new TownOrderCreated(orderOwner, orderSlot);
+        var message = new TownOrderCreated(town, orderOwner, orderSlot);
         MessageBroker.Instance.Publish(__instance, message);
 
         // Skip original
@@ -72,7 +72,7 @@ internal class TownOrdersPatches
         if (mblist.Count > 0)
         {
             targetHero = mblist.GetRandomElement<Hero>();
-            __instance.CreateTownOrder(targetHero, difficultyLevel); // Call includes TownOrderCreated message from patch to update clients
+            __instance.CreateTownOrder(town, targetHero, difficultyLevel); // Call includes TownOrderCreated message from patch to update clients
         }
 
         // Remove previous order from objectManager

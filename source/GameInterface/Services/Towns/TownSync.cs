@@ -4,7 +4,7 @@ using GameInterface.Services.Buildings.Handlers;
 using Helpers;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.CampaignSystem.ViewModelCollection.ClanManagement;
+using TaleWorlds.CampaignSystem.ViewModelCollection.ClanManagement.ClanPartyItem;
 
 namespace GameInterface.Services.Towns;
 internal class TownSync : IAutoSync
@@ -47,6 +47,6 @@ internal class TownSync : IAutoSync
         AutoSyncRegistry.AddTargetMethod(typeof(Town), AccessTools.Method(typeof(RebellionsCampaignBehavior), nameof(RebellionsCampaignBehavior.ApplyRebellionConsequencesToSettlement)));
         AutoSyncRegistry.AddTargetMethod(typeof(Town), AccessTools.Method(typeof(RebellionsCampaignBehavior), nameof(RebellionsCampaignBehavior.CheckAndSetTownRebelliousState)));
         AutoSyncRegistry.AddTargetMethod(typeof(Town), AccessTools.Method(typeof(RebellionsCampaignBehavior), nameof(RebellionsCampaignBehavior.OnGameLoaded)));
-        AutoSyncRegistry.AddTargetMethod(typeof(Town), AccessTools.Method(typeof(ClanPartyItemVM), nameof(ClanPartyItemVM.OnAutoRecruitChanged)));
+        AutoSyncRegistry.AddTargetMethod(typeof(Town), AccessTools.Method(typeof(ClanPartyItemWithPartyVM), nameof(ClanPartyItemWithPartyVM.OnAutoRecruitChanged)));
     }
 }

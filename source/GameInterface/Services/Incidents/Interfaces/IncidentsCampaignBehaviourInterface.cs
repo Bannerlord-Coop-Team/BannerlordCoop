@@ -21,7 +21,8 @@ using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
-using IncidentTrigger = TaleWorlds.CampaignSystem.CampaignBehaviors.IncidentsCampaignBehaviour.IncidentTrigger;
+using IncidentTrigger = TaleWorlds.CampaignSystem.Incidents.Incident.IncidentTrigger;
+using TriggerId = TaleWorlds.CampaignSystem.CampaignBehaviors.IncidentsCampaignBehaviour.IncidentTrigger;
 
 namespace GameInterface.Services.Incidents.Interfaces;
 
@@ -37,7 +38,7 @@ public interface IIncidentsCampaignBehaviourInterface : IGameAbstraction
     void OnSettlementLeft(MobileParty mobileParty);
     void OnIncidentResolved(string playerHeroId, string incidentId, CampaignTime incidentCooldown);
     void AddPlayerKeys(string playerHeroId);
-    void TryInvokeIncident(Player player, MobileParty playerParty, Hero playerHero, IncidentsCampaignBehaviour.IncidentTrigger trigger);
+    void TryInvokeIncident(Player player, MobileParty playerParty, Hero playerHero, IncidentTrigger trigger);
     void ResendPendingIncident(Player player);
     List<Incident> GetDebugInvokableIncidents(Player player, MobileParty playerParty, Hero playerHero);
     bool TryDebugInvokeIncident(Player player, MobileParty playerParty, Hero playerHero, Incident incident, out string error);
@@ -47,8 +48,8 @@ public class IncidentsCampaignBehaviourInterface : IIncidentsCampaignBehaviourIn
 {
     private static readonly ILogger Logger = LogManager.GetLogger<IncidentsCampaignBehaviourInterface>();
 
-    private const IncidentTrigger EnteringSettlementTriggers = IncidentTrigger.EnteringCastle | IncidentTrigger.EnteringTown | IncidentTrigger.EnteringVillage;
-    private const IncidentTrigger LeavingSettlementTriggers = IncidentTrigger.LeavingTown | IncidentTrigger.LeavingVillage | IncidentTrigger.LeavingSettlement;
+    private static readonly IncidentTrigger EnteringSettlementTriggers = new IncidentTrigger(TriggerId.EnteringCastle, TriggerId.EnteringTown, TriggerId.EnteringVillage);
+    private static readonly IncidentTrigger LeavingSettlementTriggers = new IncidentTrigger(TriggerId.LeavingTown, TriggerId.LeavingVillage, TriggerId.LeavingCastle);
 
     private readonly IPlayerManager playerManager;
     private readonly ISessionIncidentsPlayerDataInterface sessionIncidentsPlayerDataInterface;
@@ -86,14 +87,14 @@ public class IncidentsCampaignBehaviourInterface : IIncidentsCampaignBehaviourIn
             if (heldBattleRollHeroIds.Contains(player.HeroId) && !IsInMission(player))
             {
                 heldBattleRollHeroIds.Remove(player.HeroId);
-                TryInvokeIncident(player, playerParty, partyLeader, IncidentTrigger.LeavingBattle);
+                TryInvokeIncident(player, playerParty, partyLeader, new IncidentTrigger(TriggerId.LeavingBattle));
                 continue;
             }
 
-            float randomChance = playerParty.RandomFloatWithSeed((uint)CampaignTime.Now.NumTicks);
+            float randomChance = playerParty.RandomFloatWithSeed((uint)CampaignTime.Now.ToMinutes);
             if (playerParty.SiegeEvent != null && randomChance < Campaign.Current.Models.IncidentModel.GetIncidentTriggerProbabilityDuringSiege())
             {
-                TryInvokeIncident(player, playerParty, partyLeader, IncidentTrigger.DuringSiege);
+                TryInvokeIncident(player, playerParty, partyLeader, new IncidentTrigger(TriggerId.DuringSiege));
                 continue;
             }
 
@@ -103,19 +104,19 @@ public class IncidentsCampaignBehaviourInterface : IIncidentsCampaignBehaviourIn
 
     public void OnGameMenuOptionSelected(Player player, MobileParty mainParty, Hero mainHero, string gameMenuId, string optionId)
     {
-        if (mainParty.RandomFloatWithSeed((uint)CampaignTime.Now.NumTicks) < Campaign.Current.Models.IncidentModel.GetIncidentTriggerGlobalProbability())
+        if (mainParty.RandomFloatWithSeed((uint)CampaignTime.Now.ToMinutes) < Campaign.Current.Models.IncidentModel.GetIncidentTriggerGlobalProbability())
         {
             if (gameMenuId == "town" && optionId == "town_leave")
             {
-                TryInvokeIncident(player, mainParty, mainHero, IncidentTrigger.LeavingTown | IncidentTrigger.LeavingSettlement);
+                TryInvokeIncident(player, mainParty, mainHero, new IncidentTrigger(TriggerId.LeavingTown));
             }
             if (gameMenuId == "castle" && optionId == "leave")
             {
-                TryInvokeIncident(player, mainParty, mainHero, IncidentTrigger.LeavingCastle | IncidentTrigger.LeavingSettlement);
+                TryInvokeIncident(player, mainParty, mainHero, new IncidentTrigger(TriggerId.LeavingCastle));
             }
             if (gameMenuId == "village" && optionId == "leave")
             {
-                TryInvokeIncident(player, mainParty, mainHero, IncidentTrigger.LeavingVillage | IncidentTrigger.LeavingSettlement);
+                TryInvokeIncident(player, mainParty, mainHero, new IncidentTrigger(TriggerId.LeavingVillage));
             }
         }
     }
@@ -124,21 +125,21 @@ public class IncidentsCampaignBehaviourInterface : IIncidentsCampaignBehaviourIn
     {
         if (!sessionIncidentsPlayerDataInterface.CanInvokeSettlementEvent(player.HeroId)) return;
 
-        if (mainParty.RandomFloatWithSeed((uint)CampaignTime.Now.NumTicks) < Campaign.Current.Models.IncidentModel.GetIncidentTriggerGlobalProbability())
+        if (mainParty.RandomFloatWithSeed((uint)CampaignTime.Now.ToMinutes) < Campaign.Current.Models.IncidentModel.GetIncidentTriggerGlobalProbability())
         {
             if (menuContextId == "town")
             {
-                TryInvokeIncident(player, mainParty, mainHero, IncidentTrigger.EnteringTown);
+                TryInvokeIncident(player, mainParty, mainHero, new IncidentTrigger(TriggerId.EnteringTown));
                 sessionIncidentsPlayerDataInterface.SetCanInvokeSettlementEvent(player.HeroId, false);
             }
             if (menuContextId == "village")
             {
-                TryInvokeIncident(player, mainParty, mainHero, IncidentTrigger.EnteringVillage);
+                TryInvokeIncident(player, mainParty, mainHero, new IncidentTrigger(TriggerId.EnteringVillage));
                 sessionIncidentsPlayerDataInterface.SetCanInvokeSettlementEvent(player.HeroId, false);
             }
             if (menuContextId == "castle")
             {
-                TryInvokeIncident(player, mainParty, mainHero, IncidentTrigger.EnteringCastle);
+                TryInvokeIncident(player, mainParty, mainHero, new IncidentTrigger(TriggerId.EnteringCastle));
                 sessionIncidentsPlayerDataInterface.SetCanInvokeSettlementEvent(player.HeroId, false);
             }
         }
@@ -165,19 +166,19 @@ public class IncidentsCampaignBehaviourInterface : IIncidentsCampaignBehaviourIn
 
                 playerBattleLogs[player.HeroId] = CreateBattleLog(mapEvent, party, partyLeader);
 
-                if (party.RandomFloatWithSeed((uint)CampaignTime.Now.NumTicks) >= Campaign.Current.Models.IncidentModel.GetIncidentTriggerGlobalProbability()) continue;
+                if (party.RandomFloatWithSeed((uint)CampaignTime.Now.ToMinutes) >= Campaign.Current.Models.IncidentModel.GetIncidentTriggerGlobalProbability()) continue;
 
-                TryInvokeIncident(player, party, partyLeader, IncidentTrigger.LeavingBattle);
+                TryInvokeIncident(player, party, partyLeader, new IncidentTrigger(TriggerId.LeavingBattle));
             }
         }
     }
 
     public void ConversationEnded(Player player, MobileParty mainParty, Hero mainHero)
     {
-        if (mainParty.CurrentSettlement == null && mainParty.RandomFloatWithSeed((uint)CampaignTime.Now.NumTicks) < Campaign.Current.Models.IncidentModel.GetIncidentTriggerGlobalProbability())
-        {
-            TryInvokeIncident(player, mainParty, mainHero, IncidentTrigger.LeavingEncounter);
-        }
+        if (mainParty.CurrentSettlement != null || mainParty.IsCurrentlyAtSea) return;
+        if (mainParty.RandomFloatWithSeed((uint)CampaignTime.Now.ToMinutes) >= Campaign.Current.Models.IncidentModel.GetIncidentTriggerGlobalProbability()) return;
+
+        TryInvokeIncident(player, mainParty, mainHero, new IncidentTrigger(TriggerId.LeavingEncounter));
     }
 
     public void OnHeirSelectionOver(string playerHeroId)
@@ -202,24 +203,24 @@ public class IncidentsCampaignBehaviourInterface : IIncidentsCampaignBehaviourIn
 
     public void OnIncidentResolved(string playerHeroId, string incidentId, CampaignTime incidentCooldown)
     {
-        if (!TryGetIncidentsBehavior(out var incidentsBehavior)) return;
+        if (!IsIncidentsBehaviorAvailable()) return;
 
         sessionIncidentsPlayerDataInterface.AddIncidentOnCooldown(playerHeroId, incidentId, CampaignTime.Now + incidentCooldown);
-        sessionIncidentsPlayerDataInterface.SetGlobalCooldown(playerHeroId, CampaignTime.Now + incidentsBehavior.GetCooldownTime());
+        sessionIncidentsPlayerDataInterface.SetGlobalCooldown(playerHeroId, CampaignTime.Now + Campaign.Current.IncidentManager.GetCooldownTime());
     }
 
     // Matches vanilla OnNewGameCreated, so a new character can't get an incident straight away
     public void AddPlayerKeys(string playerHeroId)
     {
-        if (!TryGetIncidentsBehavior(out var incidentsBehavior)) return;
+        if (!IsIncidentsBehaviorAvailable()) return;
 
-        sessionIncidentsPlayerDataInterface.AddPlayerKeys(playerHeroId, CampaignTime.Now + incidentsBehavior.GetCooldownTime());
+        sessionIncidentsPlayerDataInterface.AddPlayerKeys(playerHeroId, CampaignTime.Now + Campaign.Current.IncidentManager.GetCooldownTime());
     }
 
     public void TryInvokeIncident(Player player, MobileParty playerParty, Hero playerHero, IncidentTrigger trigger)
     {
         // Hold the roll for a battle that ends before its player has left the mission
-        if (trigger == IncidentTrigger.LeavingBattle && IsInMission(player))
+        if (trigger.HasTrigger(TriggerId.LeavingBattle) && IsInMission(player))
         {
             heldBattleRollHeroIds.Add(player.HeroId);
             return;
@@ -231,19 +232,19 @@ public class IncidentsCampaignBehaviourInterface : IIncidentsCampaignBehaviourIn
         if (sessionIncidentsPlayerDataInterface.TryGetPendingIncident(player.HeroId, out _)) return;
 
         // Run vanilla checks for invoking incidents
-        bool isEnteringSettlement = (trigger & EnteringSettlementTriggers) != 0;
+        bool isEnteringSettlement = trigger.HasTrigger(EnteringSettlementTriggers);
         if (isEnteringSettlement && (playerParty.CurrentSettlement == null || playerParty.CurrentSettlement.IsSettlementBusy(this))) return;
 
-        bool isLeavingSettlement = (trigger & LeavingSettlementTriggers) != 0;
+        bool isLeavingSettlement = trigger.HasTrigger(LeavingSettlementTriggers);
         if (isLeavingSettlement && playerParty.LastVisitedSettlement.IsSettlementBusy(this)) return;
 
         if (sessionIncidentsPlayerDataInterface.IsOnGlobalCooldown(player.HeroId)) return;
 
-        if (!TryGetIncidentsBehavior(out var incidentsBehavior)) return;
+        if (!IsIncidentsBehaviorAvailable()) return;
 
         sessionIncidentsPlayerDataInterface.CheckIncidentsOnCooldown(player.HeroId);
 
-        RollActiveIncidentSeed(player.HeroId, incidentsBehavior);
+        RollActiveIncidentSeed(player.HeroId);
 
         var occurableEventsForTrigger = EvaluateAsPlayer(player, playerParty, playerHero, () => GetOccurableEventsForTrigger(player.HeroId, trigger));
         if (occurableEventsForTrigger.Count > 0)
@@ -266,10 +267,10 @@ public class IncidentsCampaignBehaviourInterface : IIncidentsCampaignBehaviourIn
     public List<Incident> GetDebugInvokableIncidents(Player player, MobileParty playerParty, Hero playerHero)
     {
         List<Incident> incidents = new();
-        if (!TryGetIncidentsBehavior(out var incidentsBehavior)) return incidents;
+        if (!IsIncidentsBehaviorAvailable()) return incidents;
 
-        // Only the behaviour's seed, so listing doesn't replace the stored seed of a pending incident
-        incidentsBehavior._activeIncidentSeed = CampaignTime.Now.NumTicks;
+        // Only the manager's seed, so listing doesn't replace the stored seed of a pending incident
+        Campaign.Current.IncidentManager._activeIncidentSeed = CampaignTime.Now.NumTicks;
 
         return EvaluateAsPlayer(player, playerParty, playerHero, () =>
         {
@@ -308,13 +309,13 @@ public class IncidentsCampaignBehaviourInterface : IIncidentsCampaignBehaviourIn
             return false;
         }
 
-        if (!TryGetIncidentsBehavior(out var incidentsBehavior))
+        if (!IsIncidentsBehaviorAvailable())
         {
             error = "IncidentsCampaignBehaviour is unavailable";
             return false;
         }
 
-        RollActiveIncidentSeed(player.HeroId, incidentsBehavior);
+        RollActiveIncidentSeed(player.HeroId);
 
         if (!EvaluateAsPlayer(player, playerParty, playerHero, incident.CanIncidentBeInvoked))
         {
@@ -343,12 +344,12 @@ public class IncidentsCampaignBehaviourInterface : IIncidentsCampaignBehaviourIn
         return missionMembershipRegistry?.IsControllerInMission(player.ControllerId) == true;
     }
 
-    // Vanilla conditions and effects pick their targets with the behaviour's seed, so evaluate them with this player's seed
-    private void RollActiveIncidentSeed(string playerHeroId, IncidentsCampaignBehaviour incidentsBehavior)
+    // Vanilla conditions and effects pick their targets with the incident manager's seed, so evaluate them with this player's seed
+    private void RollActiveIncidentSeed(string playerHeroId)
     {
         long activeIncidentSeed = CampaignTime.Now.NumTicks;
         sessionIncidentsPlayerDataInterface.SetActiveIncidentSeed(playerHeroId, activeIncidentSeed);
-        incidentsBehavior._activeIncidentSeed = activeIncidentSeed;
+        Campaign.Current.IncidentManager._activeIncidentSeed = activeIncidentSeed;
     }
 
     // Same entry vanilla CommentOnEndPlayerBattleBehavior logs, which reads the player's side from PlayerEncounter.Current
@@ -401,7 +402,7 @@ public class IncidentsCampaignBehaviourInterface : IIncidentsCampaignBehaviourIn
             if (!objectManager.TryGetIdWithLogging(incident, out var incidentId)) continue;
             if (sessionIncidentsPlayerDataInterface.IsIncidentOnCooldown(playerHeroId, incidentId)) continue;
 
-            if ((incident.Trigger & trigger) != 0 && incident.CanIncidentBeInvoked())
+            if (incident.Trigger.HasTrigger(trigger) && incident.CanIncidentBeInvoked())
             {
                 list.Add(incident);
             }
@@ -422,10 +423,10 @@ public class IncidentsCampaignBehaviourInterface : IIncidentsCampaignBehaviourIn
         network.Send(peer, message);
     }
 
-    private bool TryGetIncidentsBehavior(out IncidentsCampaignBehaviour incidentsCampaignBehavior)
+    // Incidents are rolled only while the campaign runs the vanilla behaviour that triggers them
+    private bool IsIncidentsBehaviorAvailable()
     {
-        incidentsCampaignBehavior = Campaign.Current?.GetCampaignBehavior<IncidentsCampaignBehaviour>();
-        if (incidentsCampaignBehavior != null) return true;
+        if (Campaign.Current?.GetCampaignBehavior<IncidentsCampaignBehaviour>() != null) return true;
 
         Logger.Debug("Skipping incidents campaign behavior update because the campaign behavior is unavailable.");
         return false;

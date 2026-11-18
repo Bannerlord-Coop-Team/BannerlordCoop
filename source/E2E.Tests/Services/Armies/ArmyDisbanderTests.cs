@@ -10,6 +10,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Localization;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Armies;
@@ -130,6 +131,90 @@ public class ArmyDisbanderTests : MapEventTestBase
             Assert.Null(follower.Army);
             Assert.True(Assert.Single(dispersals));
             Assert.Equal("army_dispersed", Campaign.Current.GameMenuManager.NextGameMenuId);
+        }, MapEventDisabledMethods);
+    }
+
+    [Fact]
+    public void ArmyListingAPartyTwice_DisbandsWithoutThrowing()
+    {
+        Server.Call(() =>
+        {
+            // A dedicated server's main party is in no army, so vanilla's notification reads the army name of
+            // any removed party whose army is already null
+            Campaign.Current.MainParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var leader = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var follower = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            follower.Party.SetCustomName(new TextObject("follower"));
+            var army = new Army(GameObjectCreator.CreateInitializedObject<Kingdom>(), leader, Army.ArmyTypes.Raider);
+            follower.Army = army;
+            follower.AttachedTo = leader;
+            army._parties.Add(follower);
+            var removals = new List<MobileParty>();
+
+            ObjectHelper.SkipConstructor<DefaultNotificationsCampaignBehavior>().RegisterEvents();
+            CampaignEvents.PartyRemovedFromArmyEvent.AddNonSerializedListener(this, removals.Add);
+
+            Server.Resolve<IArmyDisbander>().Disband(army, Army.ArmyDispersionReason.Unknown);
+
+            Assert.Null(follower.Army);
+            Assert.Single(removals, follower);
+        }, MapEventDisabledMethods);
+    }
+
+    [Fact]
+    public void ArmyStillListingAPartyOfAnotherArmy_DisbandsWithoutTakingItFromThatArmy()
+    {
+        Server.Call(() =>
+        {
+            Campaign.Current.MainParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var kingdom = GameObjectCreator.CreateInitializedObject<Kingdom>();
+            var oldLeader = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var newLeader = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var follower = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var oldArmy = new Army(kingdom, oldLeader, Army.ArmyTypes.Raider);
+            var newArmy = new Army(kingdom, newLeader, Army.ArmyTypes.Raider);
+            follower.Army = newArmy;
+            follower.AttachedTo = newLeader;
+            oldArmy._parties.Add(follower);
+
+            ObjectHelper.SkipConstructor<DefaultNotificationsCampaignBehavior>().RegisterEvents();
+            var disbander = Server.Resolve<IArmyDisbander>();
+
+            disbander.Disband(oldArmy, Army.ArmyDispersionReason.Unknown);
+
+            Assert.Same(newArmy, follower.Army);
+            Assert.Same(newLeader, follower.AttachedTo);
+            Assert.Contains(follower, newArmy.Parties);
+
+            disbander.Disband(newArmy, Army.ArmyDispersionReason.Unknown);
+
+            Assert.Null(follower.Army);
+        }, MapEventDisabledMethods);
+    }
+
+    [Fact]
+    public void StaleArmyEntryStillAttachedToItsLeader_IsDetachedAndKeepsItsArmy()
+    {
+        Server.Call(() =>
+        {
+            Campaign.Current.MainParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var kingdom = GameObjectCreator.CreateInitializedObject<Kingdom>();
+            var oldLeader = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var newLeader = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var follower = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var oldArmy = new Army(kingdom, oldLeader, Army.ArmyTypes.Raider);
+            var newArmy = new Army(kingdom, newLeader, Army.ArmyTypes.Raider);
+            follower.Army = newArmy;
+            follower.AttachedTo = oldLeader;
+            oldArmy._parties.Add(follower);
+
+            ObjectHelper.SkipConstructor<DefaultNotificationsCampaignBehavior>().RegisterEvents();
+
+            Server.Resolve<IArmyDisbander>().Disband(oldArmy, Army.ArmyDispersionReason.Unknown);
+
+            Assert.Same(newArmy, follower.Army);
+            Assert.Null(follower.AttachedTo);
+            Assert.Contains(follower, newArmy.Parties);
         }, MapEventDisabledMethods);
     }
 }

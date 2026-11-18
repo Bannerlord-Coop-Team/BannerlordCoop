@@ -50,5 +50,28 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Assert.Equal(itemRoster.Count, newRoster.Count);
             Assert.Equal(newRoster.ToString(), itemRoster.ToString());
         }
+
+        [Fact]
+        public void ItemRoster_Unpack_RebuildsCachedFood()
+        {
+            ItemObject grain = MBObjectManager.Instance.CreateObject<ItemObject>();
+            grain.IsFood = true;
+            grain.Value = 10;
+            ItemRoster itemRoster = new ItemRoster
+            {
+                new ItemRosterElement(new EquipmentElement(grain), 3)
+            };
+            var factory = container.Resolve<IBinaryPackageFactory>();
+            ItemRosterBinaryPackage package = new ItemRosterBinaryPackage(itemRoster, factory);
+            package.Pack();
+
+            byte[] bytes = BinaryPackageSerializer.Serialize(package);
+            var returnedPackage = (ItemRosterBinaryPackage)BinaryPackageSerializer.Deserialize(bytes);
+            ItemRoster newRoster = returnedPackage.Unpack<ItemRoster>(container.Resolve<IBinaryPackageFactory>());
+
+            Assert.Equal(3, newRoster.TotalFood);
+            Assert.Equal(1, newRoster.FoodVariety);
+            Assert.Equal(30, newRoster.TotalValue);
+        }
     }
 }

@@ -82,7 +82,7 @@ internal class TickPatches
         if (ModInformation.IsClient) return false;
 
         // Replace vanilla functionality
-        ContainerProvider.TryResolve<ICraftingCampaignBehaviorInterface>(out var craftingCampaignBehaviorInterface);
+        if (!ContainerProvider.TryResolve<ICraftingCampaignBehaviorInterface>(out var craftingCampaignBehaviorInterface)) return true;
         craftingCampaignBehaviorInterface.DailyTickSettlement(__instance, settlement);
 
         return false;

@@ -59,10 +59,10 @@ public class MainPartyAnchorViewPatchesTests
         var manager = ObjectHelper.SkipConstructor<AnchorVisualManager>();
 
         var exception = RunWithAnchorlessMainParty(
-            nameof(AnchorVisualManager.CanPartyHaveAnchor),
+            nameof(AnchorVisualManager.CanPlayerHaveAnchor),
             typeof(AnchorVisualManager),
             typeof(AnchorVisualManagerPatches),
-            "CanPartyHaveAnchorPrefix",
+            "CanPlayerHaveAnchorPrefix",
             () => manager.OnAnchorPositionUpdated());
 
         Assert.Null(exception);

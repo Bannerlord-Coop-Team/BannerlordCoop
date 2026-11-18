@@ -4,11 +4,14 @@ using GameInterface.Services.AnchorPoints.Messages;
 using GameInterface.Services.GameMenus;
 using GameInterface.Services.MobileParties.Extensions;
 using HarmonyLib;
+using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Library;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Services.AnchorPoints.Patches;
 
@@ -16,13 +19,24 @@ namespace GameInterface.Services.AnchorPoints.Patches;
 [HarmonyPatchCategory(GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class AnchorPointPatches
 {
-    [HarmonyPatch(nameof(AnchorPoint.SetPosition))]
-    [HarmonyPrefix]
-    public static bool SetPositionPrefix() => ModInformation.IsServer;
+    // The arrival time each anchor's player was last told about, so the arrival message shows once per trip
+    private static readonly ConditionalWeakTable<AnchorPoint, StrongBox<CampaignTime>> ArrivalsShown = new ConditionalWeakTable<AnchorPoint, StrongBox<CampaignTime>>();
 
-    [HarmonyPatch(nameof(AnchorPoint.ResetMoveTarget))]
+    private static bool IsArrivalShown(AnchorPoint anchorPoint) =>
+        ArrivalsShown.TryGetValue(anchorPoint, out var shown) && shown.Value == anchorPoint.ArrivalTime;
+
+    // v1.5 has no SetPosition or ResetMoveTarget: the Position and Settlement setters and ResetPosition move the anchor
+    [HarmonyPatch(nameof(AnchorPoint.Position), MethodType.Setter)]
     [HarmonyPrefix]
-    public static bool ResetMoveTargetPrefix() => ModInformation.IsServer;
+    public static bool PositionSetterPrefix() => ModInformation.IsServer;
+
+    [HarmonyPatch(nameof(AnchorPoint.Settlement), MethodType.Setter)]
+    [HarmonyPrefix]
+    public static bool SettlementSetterPrefix() => ModInformation.IsServer;
+
+    [HarmonyPatch(nameof(AnchorPoint.ResetPosition))]
+    [HarmonyPrefix]
+    public static bool ResetPositionPrefix() => ModInformation.IsServer;
 
     [HarmonyPatch(nameof(AnchorPoint.SetLastUsedDisembarkPosition))]
     [HarmonyPrefix]
@@ -53,49 +67,30 @@ internal class AnchorPointPatches
         return false;
     }
 
-    [HarmonyPatch(nameof(AnchorPoint.HourlyTick))]
+    // Campaign.Tick calls this for MobileParty.MainParty only, so the server never runs it for a player's fleet.
+    // A client keeps the synced ArrivalTime, tells its player once when the fleet arrives and tracks the fleet on the map,
+    // which vanilla does in the Position and Settlement setters that only run on the server.
+    [HarmonyPatch(nameof(AnchorPoint.TryUpdatePlayerAnchorInfo))]
     [HarmonyPrefix]
-    public static bool HourlyTickPrefix(AnchorPoint __instance, ref bool __state)
+    public static bool TryUpdatePlayerAnchorInfoPrefix(AnchorPoint __instance)
     {
-        if (ModInformation.IsClient) return false;
+        if (ModInformation.IsServer) return true;
 
-        __state = __instance.ArrivalTime != CampaignTime.Zero && __instance.ArrivalTime.IsPast;
-
-        return true;
-    }
-
-    [HarmonyPatch(nameof(AnchorPoint.HourlyTick))]
-    [HarmonyPostfix]
-    public static void HourlyTickPostfix(AnchorPoint __instance, bool __state)
-    {
-        // Vanilla only notifies MobileParty.MainParty, which the server doesn't have
-        if (__state && __instance.Owner.IsPlayerParty())
+        bool fleetJustArrived = __instance.ArrivalTime != CampaignTime.Zero && __instance.ArrivalTime.IsPast &&
+            !IsArrivalShown(__instance);
+        if (fleetJustArrived)
         {
-            MessageBroker.Instance.Publish(__instance, new FleetArrived(__instance.Owner));
-        }
-    }
-
-    [HarmonyPatch(nameof(AnchorPoint.Position), MethodType.Setter)]
-    [HarmonyPostfix]
-    public static void PositionSetterPostfix(AnchorPoint __instance)
-    {
-        if (!IsLocalMainPartyAnchor(__instance)) return;
-
-        // Vanilla SetPosition tracks the main party's fleet on the map, which clients don't run
-        var visualTrackerManager = Campaign.Current.VisualTrackerManager;
-        if (__instance.IsValid)
-        {
-            if (!visualTrackerManager.CheckTracked(__instance))
+            ArrivalsShown.GetOrCreateValue(__instance).Value = __instance.ArrivalTime;
+            InformationManager.DisplayMessage(new InformationMessage(new TextObject("{=qFAhDtrw}Your fleet has arrived at its destination.").ToString(), new Color(0f, 1f, 0f))
             {
-                visualTrackerManager.RegisterObject(__instance);
-            }
-        }
-        else if (visualTrackerManager.CheckTracked(__instance))
-        {
-            visualTrackerManager.RemoveTrackedObject(__instance, false);
+                SoundEventPath = "event:/ui/panels/panel_call_fleet"
+            });
+            RefreshCurrentMenu();
         }
 
-        RefreshCurrentMenu();
+        __instance.UpdateAnchorVisualTrackers();
+
+        return false;
     }
 
     [HarmonyPatch(nameof(AnchorPoint.ArrivalTime), MethodType.Setter)]

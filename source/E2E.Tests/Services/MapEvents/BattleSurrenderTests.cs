@@ -5,6 +5,7 @@ using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
+using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
 using HarmonyLib;
@@ -21,6 +22,7 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using Xunit;
 using Xunit.Abstractions;
+using GameInterface.Tests.Utils;
 
 namespace E2E.Tests.Services.MapEvents;
 
@@ -56,7 +58,7 @@ public class BattleSurrenderTests : MapEventTestBase
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(setup.ctx.MapEventId, out var battle));
-            battle._mapEventType = MapEvent.BattleTypes.Hideout;
+            battle.SetBattleType(MapEvent.BattleTypes.Hideout);
             Server.Resolve<IBattleHostRegistry>().Set(setup.ctx.MapEventId,
                 new BattleHostAssignment("1", new[] { "2" }, 2));
             Assert.True(ServerBattleModeArbiter.TryClaimMission(setup.ctx.MapEventId));
@@ -409,7 +411,10 @@ public class BattleSurrenderTests : MapEventTestBase
     {
         var setup = SetupTwoOpposingPlayersInBattle();
 
-        // A healthy ally party fights on the recipient's (defender) side.
+        // A healthy ally party fights on the recipient's (defender) side. The players registered after Initialize, so
+        // open the AI join window a live player battle would have, otherwise the server blocks the ally's join.
+        Server.Call(() => InteractionPatches.OpenAiJoinWindowAndPublish(
+            Server.GetRegisteredObject<MapEvent>(setup.ctx.MapEventId), () => { }));
         var allyPartyId = JoinNewServerPartyToSide(setup.ctx.MapEventId, BattleSideEnum.Defender);
         var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
         SeedPartyTroopOnAll(allyPartyId, troopId, 3);
