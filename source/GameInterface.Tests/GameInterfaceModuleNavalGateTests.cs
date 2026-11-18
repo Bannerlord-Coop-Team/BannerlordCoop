@@ -19,6 +19,7 @@ using GameInterface.Services.Rafts.Commands;
 using GameInterface.Services.Rafts.Handlers;
 using GameInterface.Services.Rafts.Interfaces;
 using GameInterface.Services.Rafts.Patches;
+using GameInterface.Services.Settlements.Patches;
 using GameInterface.Services.Ships;
 using GameInterface.Services.Ships.Figureheads;
 using GameInterface.Services.Ships.Handlers;
@@ -56,7 +57,7 @@ public sealed class GameInterfaceModuleNavalGateTests : IDisposable
         typeof(FigureheadRegistry),
         typeof(ShipSlotRegistry),
         typeof(ShipUpgradePieceRegistry),
-        typeof(BlockadeBattleMapEventRegistry),
+        typeof(BlockadeBattleEventComponentRegistry),
         typeof(LootShipHoldHandler),
         typeof(NavalNpcFleetAttemptHandler),
         typeof(LootShipsHandler),
@@ -109,6 +110,7 @@ public sealed class GameInterfaceModuleNavalGateTests : IDisposable
         typeof(SiegeBlockadePatches),
         typeof(MobilePartyBlockadeAnchorPatches),
         typeof(NavalMobilePartyVisualManagerPatches),
+        typeof(CastlePortPatches),
 #if DEBUG
         typeof(NavalEngageResetTracePatch),
 #endif

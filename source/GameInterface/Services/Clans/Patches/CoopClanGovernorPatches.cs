@@ -1,11 +1,9 @@
 ﻿using HarmonyLib;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection.Emit;
 using GameInterface.Services.Heroes.Extensions;
 using Helpers;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.ViewModelCollection;
@@ -82,34 +80,4 @@ internal class CoopClanGovernorPatches
         __result = (GameTexts.FindText("str_clan_assign_governor"), body);
         return false;
     }
-
-    [HarmonyPatch(typeof(PerkHelper), nameof(PerkHelper.AddPerkBonusForTown))]
-    [HarmonyTranspiler]
-    public static IEnumerable<CodeInstruction> GovernorBonusTranspiler(IEnumerable<CodeInstruction> instructions)
-    {
-        var currentSettlement = AccessTools.PropertyGetter(typeof(Hero), nameof(Hero.CurrentSettlement));
-        var governorSettlement = AccessTools.Method(typeof(CoopClanGovernorPatches), nameof(GetGovernorSettlement));
-        foreach (var instruction in instructions)
-        {
-            if (instruction.Calls(currentSettlement))
-            {
-                instruction.opcode = OpCodes.Call;
-                instruction.operand = governorSettlement;
-            }
-            yield return instruction;
-        }
-    }
-
-    [HarmonyPatch(typeof(PerkHelper), nameof(PerkHelper.GetPerkValueForTown))]
-    [HarmonyTranspiler]
-    public static IEnumerable<CodeInstruction> GovernorPerkValueTranspiler(IEnumerable<CodeInstruction> instructions)
-        => GovernorBonusTranspiler(instructions);
-
-    [HarmonyPatch(typeof(DefaultBuildingConstructionModel), nameof(DefaultBuildingConstructionModel.CalculateDailyConstructionPowerInternal))]
-    [HarmonyTranspiler]
-    public static IEnumerable<CodeInstruction> GovernorConstructionTranspiler(IEnumerable<CodeInstruction> instructions)
-        => GovernorBonusTranspiler(instructions);
-
-    private static Settlement GetGovernorSettlement(Hero hero)
-        => hero.IsPlayerHero() && hero.GovernorOf != null ? hero.GovernorOf.Settlement : hero.CurrentSettlement;
 }

@@ -2,6 +2,7 @@
 using E2E.Tests.Util;
 using GameInterface.Services.Armies;
 using GameInterface.Services.Armies.Messages;
+using GameInterface.Services.MobileParties.Extensions;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -55,7 +56,7 @@ public class ArmyDestructionTests : IDisposable
             Assert.True(server.ObjectManager.TryGetObject<Army>(armyId, out var army));
 
             DisbandArmyAction.ApplyByObjectiveFinished(army);
-        }, new[] { AccessTools.Method(typeof(PartyBase), nameof(PartyBase.UpdateVisibilityAndInspected)) });
+        }, new[] { AccessTools.Method(typeof(PartyBaseVisibilityExtensions), nameof(PartyBaseVisibilityExtensions.UpdateVisibilityAndInspected)) });
 
         // Assert
         Assert.False(server.ObjectManager.TryGetObject<Army>(armyId, out var _));

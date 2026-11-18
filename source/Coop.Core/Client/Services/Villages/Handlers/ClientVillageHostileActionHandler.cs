@@ -81,7 +81,8 @@ internal class ClientVillageHostileActionHandler : IHandler
             () =>
             {
                 hostileActionRequestTracker.Complete();
-                villageHostileActionInterface.BeginHostileActionPresentation(payload.What.Action);
+                if (payload.What.Unresisted) villageHostileActionInterface.ReturnToVillageMenu();
+                else villageHostileActionInterface.BeginHostileActionPresentation(payload.What.Action);
             },
             context: nameof(Handle_NetworkVillageHostileActionStarted));
     }

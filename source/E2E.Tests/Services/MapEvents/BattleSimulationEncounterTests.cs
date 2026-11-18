@@ -117,10 +117,7 @@ public class BattleSimulationEncounterTests : MapEventTestBase
             Server.Call(() =>
             {
                 CampaignEvents.MapEventEnded.AddNonSerializedListener(this, ended.Add);
-                Server.Resolve<IMessageBroker>().Publish(client.NetPeer, new NetworkBattleStartRequest(
-                    System.Guid.NewGuid().ToString(), (int)BattleStartMode.Simulation,
-                    context.MapEventId, context.AttackerPartyId));
-                Assert.True(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleStartReply>()).Accepted);
+                StartAcceptedSimulation(client, context);
                 Server.GetRegisteredObject<MapEvent>(context.MapEventId).BattleState = BattleState.DefenderVictory;
                 Server.Resolve<IMessageBroker>().Publish(client.NetPeer, new NetworkAdvanceBattleSimulation(context.MapEventId, 1));
                 Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleSimulationFinished>());
@@ -168,10 +165,7 @@ public class BattleSimulationEncounterTests : MapEventTestBase
         Server.Call(() =>
         {
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, ended.Add);
-            Server.Resolve<IMessageBroker>().Publish(client.NetPeer, new NetworkBattleStartRequest(
-                System.Guid.NewGuid().ToString(), (int)BattleStartMode.Simulation,
-                context.MapEventId, context.AttackerPartyId));
-            Assert.True(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleStartReply>()).Accepted);
+            StartAcceptedSimulation(client, context);
         }, MapEventDisabledMethods);
 
         try
@@ -239,10 +233,7 @@ public class BattleSimulationEncounterTests : MapEventTestBase
         Server.Resolve<IPlayerManager>().SetPeer("1", client.NetPeer);
         Server.Call(() =>
         {
-            Server.Resolve<IMessageBroker>().Publish(client.NetPeer, new NetworkBattleStartRequest(
-                System.Guid.NewGuid().ToString(), (int)BattleStartMode.Simulation,
-                context.MapEventId, context.AttackerPartyId));
-            Assert.True(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleStartReply>()).Accepted);
+            StartAcceptedSimulation(client, context);
         }, MapEventDisabledMethods);
 
         client.Call(() =>

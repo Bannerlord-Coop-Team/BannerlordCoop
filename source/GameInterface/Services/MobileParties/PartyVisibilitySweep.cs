@@ -1,4 +1,5 @@
 using Common;
+using GameInterface.Services.MobileParties.Extensions;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
@@ -71,7 +72,7 @@ internal sealed class PartyVisibilitySweep : IPartyVisibilitySweep
     }
 
     /// <summary>
-    /// Mirrors the attached-party check in the native <c>PartyBase.CalculateVisibilityAndInspected</c>,
+    /// Mirrors the attached-party check in the native <c>MapVisibilityModel.GetMobilePartyVisibilityAndInspectedState</c>,
     /// which short-circuits these parties to their army leader's current visibility.
     /// </summary>
     private static bool IsAttachedFollower(MobileParty mobileParty) =>
