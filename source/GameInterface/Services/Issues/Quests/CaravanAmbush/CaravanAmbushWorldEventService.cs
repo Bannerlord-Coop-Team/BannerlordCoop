@@ -4,6 +4,7 @@ using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
@@ -40,6 +41,13 @@ internal class CaravanAmbushWorldEventService : ICaravanAmbushWorldEventService
     {
         // Vanilla's vicinity check reads MainParty, which is only the owner's when the owner has a party.
         var skipsVicinityCheck = quest._caravanParty?.MapEvent != null || quest._isCaravanSaved;
+        if (quest._caravanParty != null && quest._banditParty != null && !skipsVicinityCheck &&
+            quest._caravanParty.Position.DistanceSquared(quest._banditParty.Position) <=
+            Campaign.Current.Models.EncounterModel.GetEncounterJoiningRadius * 2.2f)
+        {
+            EncounterManager.StartPartyEncounter(quest._banditParty.Party, quest._caravanParty.Party);
+            return;
+        }
         if (Hero.MainHero.PartyBelongedTo != null || skipsVicinityCheck) quest.HourlyTick();
     });
 

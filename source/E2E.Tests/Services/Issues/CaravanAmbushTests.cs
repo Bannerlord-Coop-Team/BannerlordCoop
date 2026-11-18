@@ -605,6 +605,30 @@ public class CaravanAmbushTests : IDisposable
         }
     }
 
+    [Fact]
+    public void OwnerWithoutAPartyStillStartsTheCaravanAmbushEncounter()
+    {
+        Server.Call(() =>
+        {
+            BindParties();
+            var quest = QuestOf(Server);
+            var owner = PlayerHero(QuestScenario.ControllerA);
+            var captorParty = PlayerHero(QuestScenario.ControllerB).PartyBelongedTo;
+            owner.PartyBelongedToAsPrisoner = captorParty.Party;
+            using (new AllowedThread()) owner.PartyBelongedTo = null;
+            Assert.Null(owner.PartyBelongedTo);
+
+            var caravan = quest._caravanParty;
+            var bandits = quest._banditParty;
+            bandits.Position = caravan.Position + new CampaignVec2(new TaleWorlds.Library.Vec2(0.1f, 0.1f), isOnLand: true);
+            CampaignEventDispatcher.Instance.HourlyTick();
+
+            Assert.True(quest.IsOngoing);
+            Assert.Same(caravan.MapEvent, bandits.MapEvent);
+            Assert.NotNull(caravan.MapEvent);
+        });
+    }
+
     private static bool SkipEscortBehavior() => false;
 
     [Fact]
