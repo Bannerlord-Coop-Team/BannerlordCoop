@@ -92,6 +92,7 @@ public class BattleSimulationCompletionTests : MapEventTestBase
             AdvanceSimulation(client, context.MapEventId);
 
             var results = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkCommitMapEventResults>());
+            // Only parties kept in the winners get a loot entry, even when it's empty.
             Assert.Contains(results.PlayerMapEventPartyId, results.PlayerLootData.LootedItems.Keys);
         }, MapEventDisabledMethods);
     }
