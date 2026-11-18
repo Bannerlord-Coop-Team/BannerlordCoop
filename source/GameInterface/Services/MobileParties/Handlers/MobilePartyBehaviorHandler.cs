@@ -104,11 +104,10 @@ internal class MobilePartyBehaviorHandler : IHandler
                 return;
 
             // Vanilla ignores orders on a raft, so keep the server's move to shore and resend it when the owner's order differs
-            if (ModInformation.IsServer && IsOwnerOrderDuringRaft(party, data))
+            if (ModInformation.IsServer && IsOwnerOrderDuringRaft(party.IsInRaftState, data.OriginControllerId))
             {
-                bool ownerOrderDiffers = data.DefaultBehavior != party.DefaultBehavior || data.TargetPosition != party.TargetPosition;
                 // No requester on the resend, otherwise the owner reads it as its own echo and keeps its stale order
-                if (ownerOrderDiffers)
+                if (OwnerOrderDiffers(data, party.DefaultBehavior, party.TargetPosition))
                     PublishAuthoritativeBehavior(party, originControllerId: null, forcePosition: false, resetMovementToHold: false);
                 return;
             }
@@ -202,10 +201,6 @@ internal class MobilePartyBehaviorHandler : IHandler
             GameThread.RunSafe(apply, context: nameof(MobilePartyBehaviorHandler));
     }
 
-    // Server-authored updates such as debug teleports leave the origin null and apply as usual
-    private static bool IsOwnerOrderDuringRaft(MobileParty party, PartyBehaviorUpdateData data) =>
-        party.IsInRaftState && !string.IsNullOrEmpty(data.OriginControllerId);
-
     private void PublishAuthoritativeBehavior(MobileParty party, string originControllerId, bool forcePosition, bool resetMovementToHold)
     {
         if (!mobilePartyBehaviorSnapshot.TryCreate(
@@ -218,6 +213,14 @@ internal class MobilePartyBehaviorHandler : IHandler
         authoritativeData.ResetMovementToHold = resetMovementToHold;
         messageBroker.Publish(this, new PartyBehaviorUpdated(ref authoritativeData));
     }
+
+    // Server-authored updates such as debug teleports leave the origin null and apply as usual
+    internal static bool IsOwnerOrderDuringRaft(bool isInRaftState, string originControllerId) =>
+        isInRaftState && !string.IsNullOrEmpty(originControllerId);
+
+    // Whether the owner asked for a different behavior or target than the server's raft move to shore
+    internal static bool OwnerOrderDiffers(PartyBehaviorUpdateData data, AiBehavior defaultBehavior, CampaignVec2 targetPosition) =>
+        data.DefaultBehavior != defaultBehavior || data.TargetPosition != targetPosition;
 
     internal static bool TrySelectBehaviorUpdate(
         bool isSelfEcho,
