@@ -57,6 +57,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
     private long nextForceTransferSeq;
     private readonly ConditionalWeakTable<MapEvent, AppliedForceActionOutcomeState> appliedForceActionOutcomes = new ConditionalWeakTable<MapEvent, AppliedForceActionOutcomeState>();
     private readonly object deferredForceScreenGate = new object();
+    // Client-only deferred loot screen stays here until #4780 moves it into a client tracker.
     private DeferredForceScreen deferredForceScreen;
 
     public VillageHostileActionInterface(IMessageBroker messageBroker, IObjectManager objectManager)

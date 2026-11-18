@@ -519,6 +519,7 @@ public class VillageHostileActionTests : MapEventTestBase
             }, MapEventDisabledMethods);
             Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestVillageHostileAction>());
 
+            // Deliver the first denial through the queued game-thread path so the pending latch is released before the tick.
             client.SimulateMessage(Server.NetPeer,
                 new NetworkVillageHostileActionDenied(VillageHostileActionDeniedReason.AlreadyInMapEvent),
                 markGameThread: false);
