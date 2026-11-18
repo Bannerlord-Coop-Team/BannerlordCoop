@@ -24,7 +24,9 @@ internal class PlayerRaftVisibilityPatches
     [HarmonyPostfix]
     private static void RefreshDynamicPropertiesPostfix(PartyNameplateVM __instance, bool __state)
     {
-        if (!__state || __instance._isVisibleOnMapBind) return;
+        bool hiddenByThisRefresh = __state && !__instance._isVisibleOnMapBind;
+        if (!hiddenByThisRefresh) return;
+        // Vanilla's army and settlement hides still apply to a raft
         if (__instance._isInArmyBind || __instance._isInSettlementBind) return;
         if (!IsOtherPlayersRaft(__instance.Party, MobileParty.MainParty)) return;
 
