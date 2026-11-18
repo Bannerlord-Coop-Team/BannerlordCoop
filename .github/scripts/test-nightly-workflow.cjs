@@ -93,26 +93,26 @@ test('prepare resolves calendar dates across spring forward and the Central cuto
   await assert.rejects(resolveDate('2026-03-09T05:30:00Z', '03/08/2026'), /YYYY-MM-DD/);
 });
 
-const developmentHead = published.head_sha;
+const coopSha = 'c'.repeat(40);
 
 test('a publishing run refuses coop_ref before resolving it', async () => {
   const github = { rest: { repos: { getCommit: async () => { throw new Error('coop_ref was resolved'); } } } };
   await assert.rejects(runScript('Resolve Coop commit', {
     github,
     process: { env: { COOP_REF: 'development', PUBLISH: 'true' } },
-    context: { sha: developmentHead, repo: { owner: 'owner', repo: 'repo' } },
+    context: { sha: coopSha, repo: { owner: 'owner', repo: 'repo' } },
   }), /only builds in a dry run/);
 });
 
 async function resolveGameVersion(csproj) {
   async function getContent({ path: file, ref }) {
-    assert.deepEqual([file, ref], ['source/Coop/Coop.csproj', developmentHead]);
+    assert.deepEqual([file, ref], ['source/Coop/Coop.csproj', coopSha]);
     return { data: { content: Buffer.from(csproj).toString('base64') } };
   }
   return runScript("Resolve the commit's game version", {
     github: { rest: { repos: { getContent } } },
     Buffer,
-    process: { env: { COOP_SHA: developmentHead } },
+    process: { env: { COOP_SHA: coopSha } },
     context: { repo: { owner: 'owner', repo: 'repo' } },
   });
 }
@@ -137,7 +137,7 @@ test('build metadata uses the prepared date even if the build crosses another cu
     const result = spawnSync(bash, ['-c', `date() { echo 'build must not resolve the date again' >&2; return 1; }\ngit() { printf '%s\\n' "$GITHUB_SHA"; }\n${shell}`], {
       encoding: 'utf8', windowsHide: true,
       env: { ...process.env, RELEASE_DATE: outputs.release_date, PREVIOUS_SHA: '',
-        GITHUB_SHA: published.head_sha, GITHUB_OUTPUT: output.replaceAll('\\', '/') },
+        GITHUB_SHA: published.head_sha, COOP_SHA: published.head_sha, GITHUB_OUTPUT: output.replaceAll('\\', '/') },
     });
     assert.equal(result.status, 0, result.stderr || String(result.error));
     const values = Object.fromEntries(fs.readFileSync(output, 'utf8').trim().split('\n').map((line) => line.split('=')));

@@ -52,6 +52,9 @@ function Get-TestSha256([string]$Text) {
     return ([BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash($bytes)) -replace '-', '').ToLowerInvariant()
 }
 
+# Each case overrides these; Sha256 and PointerKey follow the manifest unless a case sets them.
+$defaultScenario = @{ Event = 'schedule'; PointerStatus = 200; PointerVersion = 1; ListExit = 0; DownloadExit = 0; WriteFile = $true; Manifest = '{"releaseDate":"2026-09-30"}' }
+
 $cases = @(
     @{ Name = 'no paired publication'; PointerStatus = 404; StopsBeforeDownload = $true; Expected = 'true' },
     @{ Name = 'older nightly'; Expected = 'true' },
@@ -80,7 +83,7 @@ try {
     $env:RELEASE_DATE = '2026-10-01'
     $env:NIGHTLY_POINTER_URL = 'https://pointer.test/nightly/release.json'
     foreach ($case in $cases) {
-        $script:scenario = @{ Event = 'schedule'; PointerStatus = 200; PointerVersion = 1; ListExit = 0; DownloadExit = 0; WriteFile = $true; Manifest = '{"releaseDate":"2026-09-30"}' }
+        $script:scenario = $defaultScenario.Clone()
         foreach ($key in $case.Keys) { $script:scenario[$key] = $case[$key] }
         if (-not $script:scenario.Sha256) { $script:scenario.Sha256 = Get-TestSha256 $script:scenario.Manifest }
         if (-not $script:scenario.PointerKey) { $script:scenario.PointerKey = "nightly/publications/$($script:scenario.Sha256)/release.json" }
