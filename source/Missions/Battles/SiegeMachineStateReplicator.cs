@@ -320,13 +320,7 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
                 && lastSent.TryGetValue(machineId, out var previous)
                 && state.DestructionState > previous.DestructionState)
             {
-                float moveDistance = state.MoveDistance;
-                if (moveDistance < 0f)
-                    moveDistance = lastAppliedMoveDistance.TryGetValue(machineId, out var appliedMoveDistance)
-                        ? appliedMoveDistance
-                        : -1f;
-                if (moveDistance < 0f && movement != null)
-                    moveDistance = movement.GetTotalDistanceTraveledForPathTracker();
+                float moveDistance = ResolveDestructionMoveDistance(state, machineId, movement);
 
                 ApplyDestructionTransition(machine, movement, moveDistance);
                 if (isHost && !simulatedLocally && moveDistance >= 0f)
@@ -1812,13 +1806,7 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             if (state.DestructionState > destruction._currentStateIndex)
             {
                 // Snap and stop the movement before the broken entity is created because it uses the tracker's frame.
-                float moveDistance = state.MoveDistance;
-                if (moveDistance < 0f)
-                    moveDistance = lastAppliedMoveDistance.TryGetValue(machine.Id.Id, out var appliedMoveDistance)
-                        ? appliedMoveDistance
-                        : -1f;
-                if (moveDistance < 0f && movement != null)
-                    moveDistance = movement.GetTotalDistanceTraveledForPathTracker();
+                float moveDistance = ResolveDestructionMoveDistance(state, machine.Id.Id, movement);
                 ApplyDestructionTransition(machine, movement, moveDistance);
                 destruction.SetDestructionLevel(state.DestructionState, -1, 0f, TaleWorlds.Library.Vec3.Zero, TaleWorlds.Library.Vec3.Zero);
             }
@@ -1832,6 +1820,20 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             state.HasStoneAmmo ? state.StoneAmmo : -1, state.SenderControllerId, state.AuthorityRevision,
             state.HasMangonelAmmo ? state.MangonelAmmo : -1);
 
+    private float ResolveDestructionMoveDistance(
+        NetworkSiegeMachineState state, int machineId, SiegeWeaponMovementComponent movement)
+    {
+        float moveDistance = state.MoveDistance;
+        if (moveDistance < 0f)
+            moveDistance = lastAppliedMoveDistance.TryGetValue(machineId, out var appliedMoveDistance)
+                ? appliedMoveDistance
+                : -1f;
+        if (moveDistance < 0f && movement != null)
+            moveDistance = movement.GetTotalDistanceTraveledForPathTracker();
+        return moveDistance;
+    }
+
+    // Vanilla stops users only off-client, and replicated SetDestructionLevel does not raise OnDestroyed.
     private static void ApplyDestructionTransition(
         UsableMachine machine, SiegeWeaponMovementComponent movement, float moveDistance)
     {
