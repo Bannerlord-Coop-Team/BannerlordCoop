@@ -23,7 +23,7 @@ public sealed class NavalBoatswainCoopCommand : ICoopCommand
 
     public string Prefix => "coop.debug.naval";
     public string Name => "boatswain";
-    public string Description => "Reads a party's effective First Mate skill and ship HP; prepare sets Boatswain to 100 and raises focus to 5 on the server before battle.";
+    public string Description => "Reads a party's effective First Mate skill and ship HP; prepare sets Boatswain to 100 on the server before battle.";
     public CoopCommandSide Side => CoopCommandSide.Both;
     public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
     {
@@ -48,13 +48,9 @@ public sealed class NavalBoatswainCoopCommand : ICoopCommand
         if (hero == null) return Failed("The party has no effective First Mate.");
 
         var skill = NavalSkills.Boatswain;
-        var developer = hero.HeroDeveloper;
+        // SkillHelper uses the effective First Mate's Boatswain skill, no ship upgrade is required.
         if (prepare)
-        {
-            // SkillHelper uses the effective First Mate's Boatswain skill, no ship upgrade is required.
-            if (developer.GetFocus(skill) < 5) developer.AddFocus(skill, 5 - developer.GetFocus(skill), false);
-            developer.SetInitialSkillLevel(skill, 100);
-        }
+            hero.HeroDeveloper.SetInitialSkillLevel(skill, 100);
 
         objectManager.TryGetId(hero, out var heroId);
         var output = new StringBuilder();

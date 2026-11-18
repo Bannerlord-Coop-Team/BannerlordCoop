@@ -201,7 +201,7 @@ internal class MobilePartyBehaviorHandler : IHandler
             GameThread.RunSafe(apply, context: nameof(MobilePartyBehaviorHandler));
     }
 
-    // Vanilla ignores orders on a raft, so the server drops an owner's order that predates the raft and keeps its move to shore.
+    // Vanilla ignores orders on a raft, so the server drops any owner order while the party is rafted and keeps its move to shore.
     // Server-authored updates such as debug teleports leave the origin null and apply as usual.
     private static bool IsOwnerOrderDuringRaft(MobileParty party, PartyBehaviorUpdateData data) =>
         party.IsInRaftState && !string.IsNullOrEmpty(data.OriginControllerId);

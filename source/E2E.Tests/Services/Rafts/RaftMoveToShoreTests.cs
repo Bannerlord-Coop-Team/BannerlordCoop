@@ -53,7 +53,7 @@ public class RaftMoveToShoreTests : MapEventTestBase
             client.PumpGameThread();
             client.Call(() =>
             {
-                // The owner's leave from the port holds its party locally after it already got the raft's order
+                // Every client holds the party locally after the raft's order, like the owner's leave from the port, so the resend has to reach them all
                 using (new AllowedThread())
                     client.GetRegisteredObject<MobileParty>(partyId).SetMoveModeHold();
             });

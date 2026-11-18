@@ -95,9 +95,9 @@ public class BattleShipFateReporter : IBattleShipFateReporter
         {
             if (!session.IsOwn(ship.CurrentAuthority) || engine.IsHullRemoved(ship.Hull)) continue;
 
-            reports.TryGetValue(ship.ShipId, out var report);
             var fate = ReadFate(ship.Hull);
             if (fate == null) continue;
+            reports.TryGetValue(ship.ShipId, out var report);
             if (report?.Last != null && (report.Last.Sunk || !Differs(report.Last, fate))) continue;
 
             changed.Add(new PendingFate(ship.ShipId, fate));
