@@ -56,7 +56,6 @@ using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.MapEventComponents;
 using GameInterface.Services.AnchorPoints.Handlers;
 using GameInterface.Services.MapEventComponents.Handlers;
-using GameInterface.Services.Rafts;
 using GameInterface.Services.Rafts.Commands;
 using GameInterface.Services.Rafts.Handlers;
 using GameInterface.Services.Rafts.Interfaces;
@@ -119,7 +118,6 @@ public class GameInterfaceModule : Module
         typeof(NavalNpcFleetAttemptHandler),
         typeof(LootShipsHandler),
         typeof(ShipPiecesHandler),
-        typeof(RaftSync),
         typeof(PlayerRaftHandler),
         typeof(AnchorPointHandler),
         typeof(PlayerBlockadeHandler),

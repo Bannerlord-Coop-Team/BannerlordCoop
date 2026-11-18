@@ -36,7 +36,7 @@ public class RaftStateChangeActionTests : SyncTestBase
 
         AssertRaftStateEverywhere(isRafting: true);
 
-        // A client's own landing must leave its raft alone, which also checks that the gate RaftSync queues without an attribute gets applied
+        // A client's own landing must leave its raft alone
         var client = Clients.First();
         client.Call(() => RaftStateChangeAction.DeactivateRaftStateForParty(client.GetRegisteredObject<MobileParty>(partyId)));
 
