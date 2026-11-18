@@ -82,12 +82,12 @@ public sealed class NavalRopeCutCoopCommand : ICoopCommand
         }));
     }
 
-    /// <summary>Vanilla's v1.3.6 cut-loose rule from the ship order bar, evaluated here because this client owns the hull.</summary>
+    /// <summary>Mirrors vanilla's MissionGauntletShipControlView.GetIsCutLooseBlockedFromNearbyEnemies, evaluated here because this client owns the hull.</summary>
     private static bool IsBlockedByEnemies(MissionShip own)
     {
         if (own.ShipOrder.IsEnemyOnShip) return true;
 
-        var side = own.Team.Side;
+        var side = own.BattleSide;
         return own.AttachmentMachines.Any(machine => machine.CurrentAttachment?.EnemySideAgentsOnTheBridge(side) == true)
             || own.AttachmentPointMachines.Any(point => point.CurrentAttachment?.EnemySideAgentsOnTheBridge(side) == true);
     }
