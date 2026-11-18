@@ -1,5 +1,6 @@
 ﻿using Common.PacketHandlers;
 using GameInterface.Services.Alleys;
+using GameInterface.Services.BloodFeuds;
 using GameInterface.Services.CampaignService.Data;
 using GameInterface.Services.Caravans;
 using GameInterface.Services.Clans;
@@ -92,6 +93,9 @@ public readonly struct GameSaveDataPacket : IPacket
     [ProtoMember(18)]
     public readonly ViewDataPlayerData ViewDataPlayerData;
 
+    [ProtoMember(19)]
+    public readonly BloodFeudPlayerData BloodFeudPlayerData;
+
     public GameSaveDataPacket(
         byte[] gameSaveData,
         string campaignID,
@@ -110,7 +114,8 @@ public readonly struct GameSaveDataPacket : IPacket
         Dictionary<string, ClanFinanceSettings> clanFinance = null,
         OrderOfBattlePlayerData orderOfBattlePlayerData = null,
         string[] heldLootShipIds = null,
-        ViewDataPlayerData viewDataPlayerData = null)
+        ViewDataPlayerData viewDataPlayerData = null,
+        BloodFeudPlayerData bloodFeudPlayerData = null)
     {
         GameSaveData = gameSaveData;
         CampaignID = campaignID;
@@ -130,5 +135,6 @@ public readonly struct GameSaveDataPacket : IPacket
         OrderOfBattlePlayerData = orderOfBattlePlayerData;
         HeldLootShipIds = heldLootShipIds;
         ViewDataPlayerData = viewDataPlayerData;
+        BloodFeudPlayerData = bloodFeudPlayerData;
     }
 }

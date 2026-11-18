@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using GameInterface.CoopSessionData.Messages;
 using GameInterface.Services.Alleys.Messages;
+using GameInterface.Services.BloodFeuds.Messages;
 using GameInterface.Services.Caravans.Messages;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Inventory.Messages;
@@ -58,5 +59,6 @@ internal class CoopSessionUpdateHandler : IHandler
         messageBroker.Publish(this, new InitializeClientNavalData(session.NavalPlayerData));
         messageBroker.Publish(this, new InitializeClientOrderOfBattleData(session.OrderOfBattlePlayerData));
         messageBroker.Publish(this, new InitializeClientViewData(session.ViewDataPlayerData));
+        messageBroker.Publish(this, new InitializeClientBloodFeudData(session.BloodFeudPlayerData));
     }
 }
