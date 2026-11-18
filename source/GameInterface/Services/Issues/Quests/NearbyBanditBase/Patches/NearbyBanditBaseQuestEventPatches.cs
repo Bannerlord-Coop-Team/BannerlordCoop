@@ -15,15 +15,7 @@ internal class NearbyBanditBaseQuestEventPatches
 {
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnMapEventEnded))]
     [HarmonyPostfix]
-    private static void MapEventEndedPostfix(MapEvent mapEvent)
-    {
-        if (!mapEvent.IsHideoutBattle)
-        {
-            return;
-        }
-
-        RunAsOwners(quest => quest.OnMapEventEnded(mapEvent));
-    }
+    private static void MapEventEndedPostfix(MapEvent mapEvent) => RunAsOwners(quest => quest.OnMapEventEnded(mapEvent));
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnHideoutDeactivated))]
     [HarmonyPostfix]
