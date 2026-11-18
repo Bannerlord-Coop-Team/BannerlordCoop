@@ -1,6 +1,6 @@
-# Extortion by Deserters
+﻿# Extortion by Deserters
 
-Live testing is pending. Use the lane assigned by the supervisor, with a dedicated server and two clients. All state-changing setup and world actions originate on the server; clients perform their own dialogue and read-only inspection. Do not assign battle winners or completed quest states as gameplay evidence.
+Live testing uses a dedicated server and two clients. All state-changing setup and world actions originate on the server; clients perform their own dialogue and read-only inspection. Do not assign battle winners or completed quest states as gameplay evidence.
 
 Use Polisia (`village_ES1_2`), Tegresos (`village_ES1_3`) and Erebulos (`village_ES1_4`), bound to Danustica (`town_ES1`). Find the current save's headmen and player identities with `coop.debug.issues.list_types`, `coop.debug.town.list_towns` and the existing issue setup/inspection commands before choosing the givers. The quest-specific eligibility is vanilla's headman/village offer, town security, relation, war and troop checks. The per-player duplicate check belongs to the framework.
 
@@ -17,5 +17,3 @@ The three reward choices use the promised payment shown in dialogue. Full paymen
 7. Let the twelve-day quest deadline expire. Declare war, change the owner's clan/kingdom so the giver becomes hostile, attack a village party, and exercise inherited giver death/captivity/cancellation conditions where vanilla exposes them. Verify each applicable cancellation/failure and cleanup once.
 8. Choose the companion solution through dialogue and the troop picker. Check invalid tier/count and companion skill choices, then success and failure, casualties and experience, normal troop return and deferred return while the owner cannot receive troops. Only the owning player gets the returned troops, payment and personal log.
 9. Disconnect the owner, and separately save and restart the server, while waiting, fleeing, during the ambush and after battle victory. The framework dismisses the quest; the server releases the deserters as an ordinary bandit party and removes the temporary defenders, leaving no quest-flagged party. After reconnecting, the owner has no quest and the other client is unchanged. A companion mission survives the owner's disconnect and is dismissed with its companion freed when the server restarts.
-
-The retained historical branch matrix under ignored `artifacts/IssueToPr` is source research, not proof that any of these flows passed. Record unavailable branches as unverified.

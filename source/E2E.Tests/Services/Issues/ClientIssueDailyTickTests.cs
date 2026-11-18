@@ -5,20 +5,20 @@ using GameInterface.Services.Issues.Framework.Interface;
 using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Localization;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Issues;
 
-public class ForeignTroopsMissionDailyTickTests : IDisposable
+public class ClientIssueDailyTickTests : IDisposable
 {
     private const int ReturnDays = 5;
 
     private readonly QuestScenario scenario;
-
     private E2ETestEnvironment TestEnvironment { get; }
 
-    public ForeignTroopsMissionDailyTickTests(ITestOutputHelper output)
+    public ClientIssueDailyTickTests(ITestOutputHelper output)
     {
         TestEnvironment = new E2ETestEnvironment(output);
         scenario = new QuestScenario(TestEnvironment);
@@ -85,7 +85,8 @@ public class ForeignTroopsMissionDailyTickTests : IDisposable
             Campaign.Current.IssueManager.DailyTick();
 
             Assert.True(issue.IsSolvingWithAlternative);
-            Assert.Contains(issue.JournalEntries, entry => entry.LogText?.ToString() == "Your men should be on their way.");
+            Assert.Single(issue.JournalEntries, entry => entry.LogText?.ToString() == "Your men should be on their way.");
+            Assert.Equal(1, issue.JournalEntries[0].CurrentProgress);
         });
     }
 

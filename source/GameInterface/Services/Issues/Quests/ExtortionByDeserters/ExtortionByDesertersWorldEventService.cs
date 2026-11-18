@@ -1,8 +1,11 @@
 ﻿using Common;
-using GameInterface.Services.Issues.Quests.ExtortionByDeserters.Handlers;
+using Common.Util;
 using GameInterface.Services.Issues.Framework.Interface;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.Conversation;
+using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Party;
 using GameInterface.Services.Issues.Quests.ExtortionByDeserters.Messages;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -20,11 +23,12 @@ internal interface IExtortionByDesertersWorldEventService
 {
     bool TryStartAmbush(Quest quest);
     bool TryCleanupBattle(Quest quest);
-    bool ApplyMapEventStarted(Quest quest, MapEvent mapEvent, PartyBase attacker, PartyBase defender);
-    bool ApplySettlementLeft(Quest quest, MobileParty party, Settlement settlement);
-    bool ApplyMapEventEnded(Quest quest, MapEvent mapEvent);
-    bool ApplyVillageBeingRaided(Quest quest, Village village);
-    bool ApplyTick(Quest quest);
+    void StartAmbushEncounter(Quest quest);
+    void ApplyMapEventStarted(Quest quest, MapEvent mapEvent, PartyBase attacker, PartyBase defender);
+    void ApplySettlementLeft(Quest quest, MobileParty party, Settlement settlement);
+    void ApplyMapEventEnded(Quest quest, MapEvent mapEvent);
+    void ApplyVillageBeingRaided(Quest quest, Village village);
+    void ApplyTick(Quest quest);
 }
 
 internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesertersWorldEventService
@@ -43,12 +47,12 @@ internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesert
         var party = quest._deserterMobileParty;
         var raid = party?.MapEvent;
         var ownerParty = Hero.MainHero.PartyBelongedTo;
-        if (ownerParty == null || raid?.IsRaid != true || raid.HasWinner || raid.IsFinalized ||
-            raid.AttackerSide.LeaderParty != party.Party ||
-            raid.DefenderSide.LeaderParty != quest.QuestSettlement.Party ||
-            ownerParty.CurrentSettlement != quest.QuestSettlement ||
-            (ownerParty.MapEvent != null && ownerParty.MapEvent != raid) ||
-            quest._defenderMobileParty != null)
+        var isQuestRaid = raid?.IsRaid == true && !raid.HasWinner && !raid.IsFinalized &&
+            raid.AttackerSide.LeaderParty == party?.Party &&
+            raid.DefenderSide.LeaderParty == quest.QuestSettlement.Party;
+        var ownerCanDefend = ownerParty?.CurrentSettlement == quest.QuestSettlement &&
+            (ownerParty.MapEvent == null || ownerParty.MapEvent == raid);
+        if (!isQuestRaid || !ownerCanDefend || quest._defenderMobileParty != null)
         {
             return false;
         }
@@ -62,14 +66,45 @@ internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesert
             quest.QuestSettlement.MilitiaPartyComponent.MobileParty.MapEventSide = null;
         }
 
-        progress.Send(quest, ambush: true);
+        progress.Send(quest, notice: ExtortionByDesertersNotice.Ambush);
         return true;
+    }
+
+    public void StartAmbushEncounter(Quest quest)
+    {
+        var raid = quest._deserterMobileParty?.MapEvent;
+        if (ModInformation.IsServer || raid == null || quest._defenderMobileParty == null ||
+            MobileParty.MainParty.MapEvent != raid) return;
+
+        using (new AllowedThread())
+        {
+            if (PlayerEncounter.Battle != raid)
+            {
+                if (PlayerEncounter.Current != null)
+                {
+                    PlayerEncounter.Current._mapEvent = null;
+                    PlayerEncounter.Finish(forcePlayerOutFromSettlement: false);
+                }
+                PlayerEncounter.Start();
+            }
+
+            PlayerEncounter.Init();
+            var leader = ConversationHelper.GetConversationCharacterPartyLeader(quest._deserterMobileParty.Party);
+            var player = new ConversationCharacterData(CharacterObject.PlayerCharacter, PartyBase.MainParty, noHorse: true);
+            var deserter = new ConversationCharacterData(leader, quest._deserterMobileParty.Party, noHorse: true);
+            GameMenu.ActivateGameMenu("encounter_meeting");
+            CampaignMapConversation.OpenConversation(player, deserter);
+        }
     }
 
     public bool TryCleanupBattle(Quest quest)
     {
         if (!quest._deserterBattleFinalizedForTheFirstTime)
         {
+            if (quest.IsOngoing && quest._deserterMobileParty?.IsActive == false)
+            {
+                quest.CompleteQuestWithCancel();
+            }
             return false;
         }
 
@@ -86,9 +121,9 @@ internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesert
         return true;
     }
 
-    public bool ApplyMapEventStarted(Quest quest, MapEvent mapEvent, PartyBase attacker, PartyBase defender)
+    public void ApplyMapEventStarted(Quest quest, MapEvent mapEvent, PartyBase attacker, PartyBase defender)
     {
-        if (ModInformation.IsClient || Hero.MainHero.PartyBelongedTo == null) return false;
+        if (ModInformation.IsClient || Hero.MainHero.PartyBelongedTo == null) return;
         if (attacker == PartyBase.MainParty)
         {
             if (mapEvent.IsFieldBattle && defender.IsMobile &&
@@ -104,12 +139,11 @@ internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesert
             }
         }
 
-        return false;
     }
 
-    public bool ApplySettlementLeft(Quest quest, MobileParty party, Settlement settlement)
+    public void ApplySettlementLeft(Quest quest, MobileParty party, Settlement settlement)
     {
-        if (ModInformation.IsClient || Hero.MainHero.PartyBelongedTo == null) return false;
+        if (ModInformation.IsClient || Hero.MainHero.PartyBelongedTo == null) return;
         var deserters = quest._deserterMobileParty;
         var raid = settlement.Party.MapEvent;
         if (party.IsMainParty && settlement == quest.QuestSettlement && deserters != null &&
@@ -119,18 +153,21 @@ internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesert
             quest.CompleteQuestWithFail(quest.OnQuestFailed2LogText);
         }
 
-        return false;
+        if (quest.IsOngoing && party == Hero.MainHero.PartyBelongedTo && settlement == quest.QuestSettlement)
+        {
+            quest.TickDesertersPartyLogic();
+        }
     }
 
-    public bool ApplyMapEventEnded(Quest quest, MapEvent mapEvent)
+    public void ApplyMapEventEnded(Quest quest, MapEvent mapEvent)
     {
         var deserters = quest._deserterMobileParty;
-        if (ModInformation.IsClient || deserters == null || !mapEvent.InvolvedParties.Contains(deserters.Party)) return false;
-        if (!ownerParty.TryGetOwnerParty(IssueManager.GetIssueOfQuest(quest), out var owner)) return false;
-        if (!mapEvent.InvolvedParties.Contains(owner)) return false;
+        if (ModInformation.IsClient || deserters == null || !mapEvent.InvolvedParties.Contains(deserters.Party)) return;
+        if (!ownerParty.TryGetOwnerParty(IssueManager.GetIssueOfQuest(quest), out var owner)) return;
+        if (!mapEvent.InvolvedParties.Contains(owner.Party)) return;
 
         quest._deserterBattleFinalizedForTheFirstTime = true;
-        if (mapEvent.WinningSide == owner.Side)
+        if (mapEvent.WinningSide == owner.Party.Side)
         {
             quest._currentState = State.DesertersAreDefeated;
             quest.AddLog(quest.OnDeserterPartyDefeatedLogText);
@@ -143,17 +180,17 @@ internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesert
             progress.Send(quest);
         }
 
-        return false;
     }
 
-    public bool ApplyVillageBeingRaided(Quest quest, Village village)
+    public void ApplyVillageBeingRaided(Quest quest, Village village)
     {
-        if (ModInformation.IsClient || village.Settlement != quest.QuestSettlement) return false;
+        if (ModInformation.IsClient || village.Settlement != quest.QuestSettlement) return;
         var attacker = village.Settlement.Party.MapEvent?.AttackerSide.LeaderParty;
-        if (attacker == null) return false;
+        if (attacker == null) return;
         if (attacker == quest._deserterMobileParty?.Party)
         {
-            if (Hero.MainHero.PartyBelongedTo?.CurrentSettlement == village.Settlement) return false;
+            // Unlike vanilla's PlayerEncounter check, use the owner's substituted party.
+            if (Hero.MainHero.PartyBelongedTo?.CurrentSettlement == village.Settlement) return;
             quest.ApplyQuestResult(quest._questResultFail2);
             quest.CompleteQuestWithFail(quest.OnQuestFailed2LogText);
         }
@@ -164,33 +201,41 @@ internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesert
         }
         else
         {
+            // Vanilla applies an all-zero cancel result here. The branch has no consequences to apply.
             quest.CompleteQuestWithCancel(quest.OnQuestCancel2LogText);
         }
-
-        return false;
     }
 
-    public bool ApplyTick(Quest quest)
+    public void ApplyTick(Quest quest)
     {
-        if (ModInformation.IsClient || !quest.IsOngoing || quest._currentState == State.DesertersAreDefeated) return false;
+        if (ModInformation.IsClient || !quest.IsOngoing || quest._currentState == State.DesertersAreDefeated) return;
         var deserters = quest._deserterMobileParty;
         if (deserters == null || !deserters.IsActive)
         {
             quest.CompleteQuestWithCancel();
-            return false;
+            return;
         }
         if (deserters.MapEvent != null)
         {
             TryStartAmbush(quest);
-            return false;
+            return;
+        }
+
+        if (quest._currentState == State.DesertersDefeatedPlayer)
+        {
+            SetRaidBehaviorIfNeeded(deserters, quest.QuestSettlement);
+            return;
         }
 
         var owner = Hero.MainHero.PartyBelongedTo;
-        if (owner == null && quest._currentState != State.DesertersDefeatedPlayer) return false;
+        if (owner == null) return;
         switch (quest._currentState)
         {
             case State.DesertersMovingToSettlement:
-                if (owner.CurrentSettlement == quest.QuestSettlement) SetRaidBehaviorIfNeeded(deserters, quest.QuestSettlement);
+                if (owner.CurrentSettlement == quest.QuestSettlement)
+                {
+                    SetRaidBehaviorIfNeeded(deserters, quest.QuestSettlement);
+                }
                 else if (deserters.Position.Distance(owner.Position) <= deserters.SeeingRange * 0.8f)
                 {
                     quest.HandleDesertersRunningAway();
@@ -218,12 +263,7 @@ internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesert
                 }
                 else quest.HandleDesertersRunningAway();
                 break;
-            case State.DesertersDefeatedPlayer:
-                SetRaidBehaviorIfNeeded(deserters, quest.QuestSettlement);
-                break;
         }
-
-        return false;
     }
 
     internal static void SetRaidBehaviorIfNeeded(MobileParty deserters, Settlement settlement)

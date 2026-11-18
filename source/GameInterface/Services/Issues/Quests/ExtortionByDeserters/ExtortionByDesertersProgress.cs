@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Network;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Quests.ExtortionByDeserters.Messages;
@@ -13,7 +13,7 @@ namespace GameInterface.Services.Issues.Quests.ExtortionByDeserters;
 
 internal interface IExtortionByDesertersProgress
 {
-    void Send(Quest quest, TextObject log = null, bool ambush = false,
+    void Send(Quest quest, TextObject log = null,
         ExtortionByDesertersNotice notice = ExtortionByDesertersNotice.None);
 }
 
@@ -33,7 +33,7 @@ internal sealed class ExtortionByDesertersProgress : IExtortionByDesertersProgre
         this.network = network;
     }
 
-    public void Send(Quest quest, TextObject log = null, bool ambush = false,
+    public void Send(Quest quest, TextObject log = null,
         ExtortionByDesertersNotice notice = ExtortionByDesertersNotice.None)
     {
         if (ModInformation.IsClient)
@@ -55,6 +55,6 @@ internal sealed class ExtortionByDesertersProgress : IExtortionByDesertersProgre
         if (quest._defenderMobileParty != null && !objects.TryGetIdWithLogging(quest._defenderMobileParty, out defenderId)) return;
 
         network.Send(peer, new NetworkExtortionByDesertersState(ownerId, issue.StringId, controllerId,
-            deserterId, defenderId, (int)quest._currentState, log, ambush, (byte)notice));
+            deserterId, defenderId, (int)quest._currentState, log, (byte)notice));
     }
 }

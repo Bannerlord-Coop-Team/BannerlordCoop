@@ -10,6 +10,7 @@ internal enum ExtortionByDesertersNotice : byte
     DesertersNoticedPlayer,
     PlayerLeftVillage,
     DesertersDefeated,
+    Ambush,
 }
 
 /// <summary>Owner-only quest progress, sent after the referenced world objects.</summary>
@@ -23,11 +24,10 @@ public readonly struct NetworkExtortionByDesertersState : ICommand
     [ProtoMember(5)] public readonly string DefenderId;
     [ProtoMember(6)] public readonly int State;
     [ProtoMember(7)] public readonly TextObject Log;
-    [ProtoMember(8)] public readonly bool Ambush;
     [ProtoMember(9)] public readonly byte Notice;
 
     public NetworkExtortionByDesertersState(string issueOwnerId, string issueId, string controllerId,
-        string deserterId, string defenderId, int state, TextObject log, bool ambush, byte notice = 0)
+        string deserterId, string defenderId, int state, TextObject log, byte notice = 0)
     {
         IssueOwnerId = issueOwnerId;
         IssueId = issueId;
@@ -36,7 +36,6 @@ public readonly struct NetworkExtortionByDesertersState : ICommand
         DefenderId = defenderId;
         State = state;
         Log = log;
-        Ambush = ambush;
         Notice = notice;
     }
 }

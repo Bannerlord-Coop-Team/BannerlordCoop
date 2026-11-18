@@ -23,7 +23,7 @@ internal class IssueOwnerParty : IIssueOwnerParty
         this.owners = owners;
     }
 
-    public bool TryGetOwnerParty(IssueBase issue, out PartyBase party)
+    public bool TryGetOwnerParty(IssueBase issue, out MobileParty party)
     {
         party = null;
         if (!owners.TryGetOwnerControllerId(issue, out var controller) ||
@@ -33,7 +33,7 @@ internal class IssueOwnerParty : IIssueOwnerParty
             return false;
         }
 
-        party = ownerParty.Party;
+        party = ownerParty;
         return true;
     }
 }

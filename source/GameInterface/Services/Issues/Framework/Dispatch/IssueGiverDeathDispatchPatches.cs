@@ -20,7 +20,7 @@ internal class IssueGiverDeathDispatchPatches
         TaleWorlds.CampaignSystem.Actions.KillCharacterAction.KillCharacterActionDetail detail,
         bool showNotification)
     {
-        // The server cancels the giver's quest before vanilla replaces the notable.
+        // The server cancels the giver's quest before vanilla replaces the notable. The dispatcher calls it again, but the quest is already cancelled or the retry guard skips it.
         if (ModInformation.IsServer && victim?.Issue?.IssueQuest is { IsOngoing: true })
         {
             Campaign.Current.IssueManager.OnHeroKilled(victim, killer, detail, showNotification);

@@ -34,35 +34,7 @@ internal class ExtortionByDesertersPartyPatches
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.StartAmbushEncounter))]
     [HarmonyPrefix]
-    private static bool StartAmbushEncounterPrefix(Quest __instance)
-    {
-        // The server starts the ambush from the world service, and the owner's client opens it from the Ambush state.
-        var raid = __instance._deserterMobileParty?.MapEvent;
-        if (ModInformation.IsServer || raid == null || __instance._defenderMobileParty == null ||
-            MobileParty.MainParty.MapEvent != raid) return false;
-
-        // Adopt the server's raid; vanilla's full ambush method would add client-created battle parties.
-        using (new AllowedThread())
-        {
-            // Finishing an encounter already using this raid would finalize its battle locally.
-            if (PlayerEncounter.Battle != raid)
-            {
-                if (PlayerEncounter.Current != null)
-                {
-                    PlayerEncounter.Current._mapEvent = null;
-                    PlayerEncounter.Finish(forcePlayerOutFromSettlement: false);
-                }
-                PlayerEncounter.Start();
-            }
-            PlayerEncounter.Init();
-            var leader = ConversationHelper.GetConversationCharacterPartyLeader(__instance._deserterMobileParty.Party);
-            var player = new ConversationCharacterData(CharacterObject.PlayerCharacter, PartyBase.MainParty, noHorse: true);
-            var deserter = new ConversationCharacterData(leader, __instance._deserterMobileParty.Party, noHorse: true);
-            GameMenu.ActivateGameMenu("encounter_meeting");
-            CampaignMapConversation.OpenConversation(player, deserter);
-        }
-        return false;
-    }
+    private static bool StartAmbushEncounterPrefix() => false;
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnBattleStarted))]
     [HarmonyPrefix]

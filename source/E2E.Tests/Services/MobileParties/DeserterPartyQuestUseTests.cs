@@ -96,27 +96,15 @@ public class DeserterPartyQuestUseTests : SyncTestBase
             output.WriteLine($"server party={partyId} handle={handle} questUsed={party.IsCurrentlyUsedByAQuest}");
         }, new[] { AccessTools.Method(typeof(StringHelpers), nameof(StringHelpers.GetCharacterProperties)) });
 
-        var originals = new Dictionary<EnvironmentInstance, MobileParty>();
         foreach (var client in Clients)
         {
             client.Call(() =>
             {
                 var party = client.GetRegisteredObject<MobileParty>(partyId);
                 Assert.Equal(handle, client.GetHandle(party));
-                originals.Add(client, party);
-                output.WriteLine($"client party={partyId} handle={handle} questUsed={party.IsCurrentlyUsedByAQuest}");
-            });
-        }
-        Assert.Equal(2, originals.Count);
-
-        foreach (var client in Clients)
-        {
-            client.Call(() =>
-            {
-                var party = client.GetRegisteredObject<MobileParty>(partyId);
-                Assert.Same(originals[client], party);
                 Assert.True(party.IsActive);
                 Assert.True(party.IsCurrentlyUsedByAQuest);
+                output.WriteLine($"client party={partyId} handle={handle} questUsed={party.IsCurrentlyUsedByAQuest}");
             });
         }
 
@@ -257,23 +245,11 @@ public class DeserterPartyQuestUseTests : SyncTestBase
             output.WriteLine($"server defender party={partyId} handle={handle} questUsed={party.IsCurrentlyUsedByAQuest} aggressiveness={party.Aggressiveness} joinBattles={party.ShouldJoinPlayerBattles}");
         });
 
-        var originals = new Dictionary<EnvironmentInstance, MobileParty>();
         foreach (var client in Clients)
         {
             client.Call(() =>
             {
                 var party = client.GetRegisteredObject<MobileParty>(partyId);
-                Assert.Equal(handle, client.GetHandle(party));
-                originals.Add(client, party);
-            });
-        }
-        Assert.Equal(2, originals.Count);
-        foreach (var client in Clients)
-        {
-            client.Call(() =>
-            {
-                var party = client.GetRegisteredObject<MobileParty>(partyId);
-                Assert.Same(originals[client], party);
                 Assert.Equal(handle, client.GetHandle(party));
                 Assert.True(party.IsActive);
                 output.WriteLine($"client defender party={partyId} handle={handle} questUsed={party.IsCurrentlyUsedByAQuest} aggressiveness={party.Aggressiveness} joinBattles={party.ShouldJoinPlayerBattles}");

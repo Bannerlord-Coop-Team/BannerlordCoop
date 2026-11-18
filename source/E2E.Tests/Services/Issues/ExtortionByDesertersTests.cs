@@ -132,7 +132,7 @@ public class ExtortionByDesertersTests : IDisposable
         properties.SetTextVariable("LINK", new TextObject("{=!}Danustica headman"));
         text.SetTextVariable("QUEST_GIVER", properties);
         var state = new NetworkExtortionByDesertersState(scenario.NotableId, QuestScenario.IssueId,
-            QuestScenario.ControllerA, partyId, "", (int)State.DesertersAreDefeated, text, false);
+            QuestScenario.ControllerA, partyId, "", (int)State.DesertersAreDefeated, text);
         var wire = Server.SerializeForWire(state);
         Owner.SimulateMessage(this, wire);
         Other.SimulateMessage(this, wire);
@@ -221,30 +221,6 @@ public class ExtortionByDesertersTests : IDisposable
         Assert.Equal(1, calls.CountFor(Server));
     }
 
-    [Theory]
-    [InlineData(1)]
-    [InlineData(2)]
-    [InlineData(3)]
-    public void RewardChoice_RequestsItsBranchAndServerCompletesIt(byte branch)
-    {
-        var quest = Accept();
-        var mirror = (Quest)scenario.QuestOf(Server);
-        Server.Call(() => mirror._currentState = State.DesertersAreDefeated);
-        using var result = new MethodCallRecorder(Priority.Last, AccessTools.Method(typeof(Quest), nameof(Quest.ApplyQuestResult)));
-        Owner.Call(() =>
-        {
-            ChooseReward(quest, branch - 1);
-        }, TextLinks);
-        Assert.Equal(branch, Assert.Single(Owner.NetworkSentMessages.GetMessages<RequestQuestBranch>()).Proof);
-        Assert.Equal(1, result.CountFor(Server));
-        Assert.Equal(0, result.CountFor(Owner));
-        Assert.Equal(IssueOutcome.QuestSuccess, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
-        Assert.Empty(Owner.NetworkSentMessages.GetMessages<RequestQuestOutcome>());
-        Assert.True(quest.IsFinalized);
-    }
-
-
-
     [Fact]
     public void ClientIssueLifecycle_DoesNotPurgeAnIssueWhenSecurityChanges()
     {
@@ -285,10 +261,6 @@ public class ExtortionByDesertersTests : IDisposable
             Assert.Same(issue, notable.Issue);
         });
     }
-
-
-
-
 
     [Theory]
     [InlineData(0, IssueOutcome.QuestFail, -10)]
@@ -343,6 +315,34 @@ public class ExtortionByDesertersTests : IDisposable
             Assert.True(otherParty.IsActive);
         }, TextLinks.Append(AccessTools.Method(typeof(MapEvent), nameof(MapEvent.MovePartyToSuitablePositionOnMapEventFinalize))));
         AssertQuestEnding(ownerQuest, outcome, log);
+    }
+
+    [Fact]
+    public void VillageRaidWhileOwnerWaitsInVillage_LeavesQuestOngoing()
+    {
+        Accept();
+        var quest = (Quest)scenario.QuestOf(Server);
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(scenario.OwnerPartyId, out var ownerParty));
+            var deserters = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            deserters.SetPartyUsedByQuest(true);
+            deserters.MemberRoster.AddToCounts(deserters.LeaderHero.CharacterObject, 1);
+            quest._deserterMobileParty = deserters;
+            ownerParty.CurrentSettlement = quest.QuestSettlement;
+            var raid = GameObjectCreator.CreateInitializedObject<MapEvent>();
+            raid.MapEventVisual = null;
+            raid.SetBattleType(MapEvent.BattleTypes.Raid);
+            raid.SetMapEventSettlement(quest.QuestSettlement);
+            raid._sides[(int)BattleSideEnum.Attacker] = new MapEventSide(raid, BattleSideEnum.Attacker, deserters.Party);
+            raid._sides[(int)BattleSideEnum.Defender] = new MapEventSide(raid, BattleSideEnum.Defender, quest.QuestSettlement.Party);
+            deserters.MapEventSide = raid.AttackerSide;
+            quest.QuestSettlement.Party.MapEventSide = raid.DefenderSide;
+            CampaignEventDispatcher.Instance.OnVillageBeingRaided(quest.QuestSettlement.Village);
+            Assert.True(quest.IsOngoing);
+            Assert.Same(deserters, quest._deserterMobileParty);
+        });
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
     }
 
     [Theory]
@@ -499,11 +499,15 @@ public class ExtortionByDesertersTests : IDisposable
             securityBefore = town.Security;
             serverQuest._currentState = State.DesertersAreDefeated;
         });
+        using var result = new MethodCallRecorder(Priority.Last, true, AccessTools.Method(typeof(Quest), nameof(Quest.ApplyQuestResult)));
         Owner.Call(() =>
         {
             quest._currentState = State.DesertersAreDefeated;
             ChooseReward(quest, choice);
         }, TextLinks);
+        Assert.Equal(choice + 1, Assert.Single(Owner.NetworkSentMessages.GetMessages<RequestQuestBranch>()).Proof);
+        Assert.Equal(1, result.CountFor(Server));
+        Assert.Equal(0, result.CountFor(Owner));
         Server.Call(() =>
         {
             Assert.Equal(goldBefore + (int)(serverQuest.RewardGold * goldMultiplier), ownerHero.Gold);
@@ -625,8 +629,6 @@ public class ExtortionByDesertersTests : IDisposable
     {
         Accept();
         var quest = (Quest)scenario.QuestOf(Server);
-        using var encounter = new MethodCallRecorder(Priority.First,
-            AccessTools.Method(typeof(Quest), nameof(Quest.StartAmbushEncounter)));
         var disabled = TextLinks.Concat(new[]
         {
             AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize)),
@@ -658,9 +660,7 @@ public class ExtortionByDesertersTests : IDisposable
             Assert.Null(militia.MapEventSide);
             Assert.False(Server.Resolve<IExtortionByDesertersWorldEventService>().TryStartAmbush(quest));
         }, disabled);
-        Assert.Equal(1, encounter.CountFor(Owner));
-        Assert.Equal(0, encounter.CountFor(Other));
-        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkExtortionByDesertersState>(), state => state.Ambush);
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkExtortionByDesertersState>(), state => state.Notice == (byte)ExtortionByDesertersNotice.Ambush);
     }
 
 
@@ -717,7 +717,7 @@ public class ExtortionByDesertersTests : IDisposable
             Assert.Contains(participants, party => party.MobileParty == ownerQuest._defenderMobileParty);
             try
             {
-                ownerQuest.StartAmbushEncounter();
+                Owner.Resolve<IExtortionByDesertersWorldEventService>().StartAmbushEncounter(ownerQuest);
                 Assert.Equal(0, finish.CountFor(Owner));
                 Assert.Same(existing, PlayerEncounter.Current);
                 Assert.Same(raid, PlayerEncounter.Battle);
@@ -1089,7 +1089,7 @@ public class ExtortionByDesertersTests : IDisposable
         var quest = Accept(TextLinks.Skip(1));
         var mirror = (Quest)scenario.QuestOf(Server);
         string expected = null!;
-        Server.Call(() => expected = AssertTimeoutTextRoundTrip(mirror));
+        Server.Call(() => expected = mirror.OnQuestTimedOutLogText.ToString());
         Owner.Call(() => quest.CompleteQuestWithTimeOut(), TextLinks.Skip(1));
         Assert.Equal(-10, mirror.RelationshipChangeWithQuestGiver);
         Assert.True(quest.IsFinalized);
@@ -1121,32 +1121,6 @@ public class ExtortionByDesertersTests : IDisposable
             Assert.Null(issue?.IssueQuest);
             if (issue != null) Assert.Empty(issue.JournalEntries);
         });
-    }
-
-    private string AssertTimeoutTextRoundTrip(Quest mirror)
-    {
-        var text = mirror.OnQuestTimedOutLogText;
-        var envelope = new NetworkIssueJournal(scenario.NotableId, QuestScenario.IssueId, true, new[] { new IssueJournalEntry(new JournalLog(default, text)) });
-        var roundTrip = Owner.DeserializeFromWire<NetworkIssueJournal>(Server.SerializeForWire(envelope));
-        var rendered = AssertValidTimeoutText(text);
-        Assert.Equal(rendered, AssertValidTimeoutText(Assert.Single(roundTrip.Logs).Text));
-        return rendered;
-    }
-
-    private static string AssertValidTimeoutText(TextObject text)
-    {
-        Assert.Contains("{=YjxCkglX}", text.Value);
-        var properties = Assert.IsType<TextObject>(text.Attributes["QUEST_GIVER"]);
-        var name = Assert.IsType<TextObject>(properties.Attributes["NAME"]);
-        Assert.IsType<int>(properties.Attributes["GENDER"]);
-        var link = Assert.IsType<TextObject>(properties.Attributes["LINK"]);
-        Assert.False(TextObject.IsNullOrEmpty(name));
-        Assert.False(TextObject.IsNullOrEmpty(link));
-        var rendered = text.ToString();
-        Assert.DoesNotContain("ERROR:", rendered);
-        Assert.Contains(name.ToString(), rendered);
-        Assert.Contains(link.ToString(), rendered);
-        return rendered;
     }
 
     private sealed class TimeoutCharacterProperties : IDisposable

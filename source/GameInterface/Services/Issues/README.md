@@ -1,4 +1,4 @@
-# Quests and issues in co-op
+﻿# Quests and issues in co-op
 
 Vanilla issues and quests assume one player. This folder is the shared code that lets several players
 use them in one campaign. Only quest types that have been wired up here run. Every other vanilla issue
@@ -24,6 +24,8 @@ switched off, and a server running one cancels any quest a nightly save still ha
 Army of Poachers supports direct village battles, negotiation and sending a companion.
 The owner receives its journal and personal rewards; other players may accept separate copies.
 See [the verification recipe](../../../../../doc/automated-testing/quests/army-of-poachers.md).
+
+Extortion by Deserters supports the owner's village ambush, battle, reward branches and companion solution. See [the verification recipe](../../../../doc/automated-testing/extortion-by-deserters.md).
 
 ## Trying it in game
 

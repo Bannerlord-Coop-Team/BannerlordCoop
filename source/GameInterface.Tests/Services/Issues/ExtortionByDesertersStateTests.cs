@@ -18,25 +18,20 @@ public class ExtortionByDesertersStateTests
 
     public ExtortionByDesertersStateTests() => new SurrogateCollection();
 
-    [Theory]
-    [InlineData(0, "", "", false)]
-    [InlineData(1, "deserters", "", false)]
-    [InlineData(2, "deserters", "defenders", true)]
-    [InlineData(3, "", "", false)]
-    public void RoundTrip_PreservesOwnerAndProgress(int state, string deserters, string defenders, bool ambush)
+    [Fact]
+    public void RoundTrip_PreservesOwnerAndProgress()
     {
         var sent = new NetworkExtortionByDesertersState("headman", "issue-generation", "player-A",
-            deserters, defenders, state, new TextObject("{=!}quest progress"), ambush, 3);
+            "deserters", "defenders", 2, new TextObject("{=!}quest progress"), (byte)ExtortionByDesertersNotice.Ambush);
         var received = RoundTrip(sent);
         Assert.Equal("headman", received.IssueOwnerId);
         Assert.Equal("issue-generation", received.IssueId);
         Assert.Equal("player-A", received.ControllerId);
-        Assert.Equal(deserters, received.DeserterId);
-        Assert.Equal(defenders, received.DefenderId);
-        Assert.Equal(state, received.State);
+        Assert.Equal("deserters", received.DeserterId);
+        Assert.Equal("defenders", received.DefenderId);
+        Assert.Equal(2, received.State);
         Assert.Equal("{=!}quest progress", received.Log.Value);
-        Assert.Equal(ambush, received.Ambush);
-        Assert.Equal(3, received.Notice);
+        Assert.Equal((byte)ExtortionByDesertersNotice.Ambush, received.Notice);
     }
 
     [Fact]
@@ -54,7 +49,7 @@ public class ExtortionByDesertersStateTests
         var text = new TextObject("{=YjxCkglX}You've failed to complete this quest in time. Your agreement with {QUEST_GIVER.LINK} was canceled.");
         text.SetTextVariable("QUEST_GIVER", properties);
         var state = RoundTrip(new NetworkExtortionByDesertersState("headman", "issue-generation", "player-B",
-            "", "", 0, text, false));
+            "", "", 0, text));
         var snapshot = RoundTrip(new NetworkIssueJournal("headman", "issue-generation", true, new[] { new IssueJournalEntry(new JournalLog(default, text)) }));
 
         foreach (var log in new[] { state.Log, Assert.Single(snapshot.Logs).Text })
@@ -75,10 +70,10 @@ public class ExtortionByDesertersStateTests
     [Fact]
     public void RoundTrip_StateOnlyAndNoticeOnlyKeepNullLog()
     {
-        foreach (byte notice in new byte[] { 0, 1, 2, 3 })
+        foreach (byte notice in new byte[] { 0 })
         {
             var state = RoundTrip(new NetworkExtortionByDesertersState("headman", "issue-generation", "player-B",
-                "deserters", "", 1, null, false, notice));
+                "deserters", "", 1, null, notice));
             Assert.Null(state.Log);
             Assert.Equal(notice, state.Notice);
         }

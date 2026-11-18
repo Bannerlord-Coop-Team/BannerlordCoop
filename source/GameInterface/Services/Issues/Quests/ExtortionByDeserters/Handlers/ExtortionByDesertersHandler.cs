@@ -26,11 +26,12 @@ internal class ExtortionByDesertersHandler : IHandler
     private readonly IIssueResolver issues;
     private readonly IControllerIdProvider controller;
     private readonly IIssueConversationGuard conversationGuard;
+    private readonly IExtortionByDesertersWorldEventService worldEvents;
 
     public ExtortionByDesertersHandler(IMessageBroker broker, IObjectManager objects,
         IIssueResolver issues, IControllerIdProvider controller,
         IAutoSyncPatchCollector patchCollector, IQuestFeatureFlag questFeatureFlag,
-        IIssueConversationGuard conversationGuard)
+        IIssueConversationGuard conversationGuard, IExtortionByDesertersWorldEventService worldEvents)
     {
         if (questFeatureFlag.IsEnabled)
         {
@@ -44,6 +45,7 @@ internal class ExtortionByDesertersHandler : IHandler
         this.issues = issues;
         this.controller = controller;
         this.conversationGuard = conversationGuard;
+        this.worldEvents = worldEvents;
         broker.Subscribe<NetworkExtortionByDesertersState>(Handle);
     }
 
@@ -72,7 +74,11 @@ internal class ExtortionByDesertersHandler : IHandler
         BindParties(quest, deserters, defenders, (State)data.State);
         if (!TextObject.IsNullOrEmpty(data.Log)) quest.AddLog(data.Log);
         ShowNotice(quest, (ExtortionByDesertersNotice)data.Notice);
-        if (data.Ambush && deserters != null && defenders != null && quest.IsOngoing) quest.StartAmbushEncounter();
+        if (data.Notice == (byte)ExtortionByDesertersNotice.Ambush &&
+            deserters != null && defenders != null && quest.IsOngoing)
+        {
+            worldEvents.StartAmbushEncounter(quest);
+        }
     }
 
     private bool TryResolveParties(NetworkExtortionByDesertersState data, out MobileParty deserters, out MobileParty defenders)
