@@ -117,6 +117,20 @@ test('only a commit on development can be published, while a dry run builds any 
   assert.equal((await resolveCommit('feature', true, 'diverged')).outputs.coop_sha, 'a'.repeat(40));
 });
 
+test('the build image follows the game version of the commit being built', async () => {
+  const project = (version) => ({ rest: { repos: { getContent: async ({ path: file, ref }) => {
+    assert.deepEqual([file, ref], ['source/Coop/Coop.csproj', published.head_sha]);
+    return { data: { content: Buffer.from(`<Project>\n    <GameVersion>${version}</GameVersion>\n</Project>`).toString('base64') } };
+  } } } });
+  const resolve = (version) => runScript("Resolve the CI image for the commit's game version", {
+    github: project(version), Buffer,
+    process: { env: { COOP_SHA: published.head_sha } },
+    context: { repo: { owner: 'owner', repo: 'repo' } },
+  });
+  assert.equal((await resolve('v1.5.7')).outputs.ci_image, 'ghcr.io/bannerlord-coop-team/bannerlordcoop:v1.5.7');
+  await assert.rejects(resolve('latest'), /no GameVersion/);
+});
+
 test('build metadata uses the guard date even if the build crosses another cutoff', async () => {
   const { outputs } = await resolveDate('2026-03-09T05:30:00Z');
   assert.match(workflow, /release_date: \$\{\{ steps\.due\.outputs\.release_date \}\}/);

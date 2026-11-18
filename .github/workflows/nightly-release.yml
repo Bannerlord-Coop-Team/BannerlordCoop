@@ -47,6 +47,7 @@ jobs:
     outputs:
       release_date: ${{ steps.due.outputs.release_date }}
       coop_sha: ${{ steps.coop.outputs.coop_sha }}
+      ci_image: ${{ steps.image.outputs.ci_image }}
     steps:
       - name: Resolve due nightly date
         id: due
@@ -99,12 +100,25 @@ jobs:
             core.info(`Building ${ref} at ${commit.sha}`);
             core.setOutput('coop_sha', commit.sha);
 
+      - name: Resolve the CI image for the commit's game version
+        # The CI image is tagged per game version, so a commit builds against the game assemblies it targets.
+        id: image
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        env:
+          COOP_SHA: ${{ steps.coop.outputs.coop_sha }}
+        with:
+          script: |
+            const { data: project } = await github.rest.repos.getContent({ ...context.repo, path: 'source/Coop/Coop.csproj', ref: process.env.COOP_SHA });
+            const gameVersion = Buffer.from(project.content, 'base64').toString('utf8').match(/<GameVersion>(v\d+\.\d+\.\d+)<\/GameVersion>/)?.[1];
+            if (!gameVersion) throw new Error('source/Coop/Coop.csproj has no GameVersion');
+            core.setOutput('ci_image', `ghcr.io/bannerlord-coop-team/bannerlordcoop:${gameVersion}`);
+
   build:
     needs: guard
     runs-on: ubuntu-latest
     timeout-minutes: 30
     container:
-      image: ghcr.io/bannerlord-coop-team/bannerlordcoop:latest
+      image: ${{ needs.guard.outputs.ci_image }}
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
