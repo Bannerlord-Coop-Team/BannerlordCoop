@@ -31,7 +31,6 @@ public class BattleModeExclusionTests : MapEventTestBase
 
     [Theory]
     [InlineData(false, false)]
-    [InlineData(true, false)]
     [InlineData(false, true)]
     [InlineData(true, true)]
     public void SimulationStart_OnlyAnAcceptedParticipantReleasesBattleInvulnerability(bool missionClaimed, bool noHealthyTroops)

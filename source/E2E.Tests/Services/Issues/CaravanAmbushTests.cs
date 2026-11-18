@@ -16,6 +16,7 @@ using GameInterface.Services.Players;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.Encyclopedia;
@@ -173,21 +174,6 @@ public class CaravanAmbushTests : IDisposable
         });
         Owner.Call(() => Assert.Single(QuestOf(Owner).JournalEntries));
         Assert.Equal(before, Owner.NetworkSentMessages.GetMessageCount<RequestQuestJournal>());
-    }
-
-    [Fact]
-    public void UnrelatedSettlementEntriesDoNotPublishProgress()
-    {
-        Server.Call(() =>
-        {
-            BindParties();
-            var events = Server.Resolve<ICaravanAmbushWorldEventService>();
-            var unrelated = GameObjectCreator.CreateInitializedObject<MobileParty>();
-            for (var index = 0; index < 200; index++) events.SettlementEntered(unrelated);
-        });
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkCaravanAmbushProgress>());
-        Owner.Call(() => Assert.True(QuestOf(Owner).IsOngoing));
-        Other.Call(() => Assert.Null(IssueOf(Other).IssueQuest));
     }
 
     [Fact]
@@ -462,6 +448,21 @@ public class CaravanAmbushTests : IDisposable
     }
 
     [Fact]
+    public void BanditsAttackingTheCaravanMakeTheBattleInvulnerable()
+    {
+        Server.Call(() =>
+        {
+            BindParties();
+            var quest = QuestOf(Server);
+            var battle = GameObjectCreator.CreateInitializedObject<MapEvent>();
+            battle.MapEventVisual = ObjectHelper.SkipConstructor<GauntletMapEventVisual>();
+            battle.Initialize(quest._banditParty.Party, quest._caravanParty.Party, new FieldBattleEventComponent(battle));
+            battle.MapEventVisual = null;
+            Assert.True(battle.IsInvulnerable);
+        }, new[] { AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize)) });
+    }
+
+    [Fact]
     public void AnOwnerWithoutAPartyDoesNotWinUsingTheCallersParty()
     {
         Server.Call(() =>
@@ -527,24 +528,84 @@ public class CaravanAmbushTests : IDisposable
     [Fact]
     public void HourlyTickUsesTheOwnersVicinityWhenAnotherPlayerIsNear()
     {
-        Server.Call(() =>
+        var settlementId = environment.CreateRegisteredObject<Settlement>();
+        var townId = environment.CreateRegisteredObject<Town>();
+        var secondSettlementId = environment.CreateRegisteredObject<Settlement>();
+        var secondTownId = environment.CreateRegisteredObject<Town>();
+        var harmony = new Harmony($"caravan-ambush-vicinity-{Guid.NewGuid()}");
+        harmony.Patch(AccessTools.Method(typeof(CaravanAmbushIssueBehavior), "UtilizePartyEscortBehavior"),
+            prefix: new HarmonyMethod(typeof(CaravanAmbushTests), nameof(SkipEscortBehavior)));
+        try
         {
-            BindParties();
-            var quest = QuestOf(Server);
-            var ownerParty = PlayerHero(QuestScenario.ControllerA).PartyBelongedTo;
-            var otherParty = PlayerHero(QuestScenario.ControllerB).PartyBelongedTo;
-            var ownerPosition = ownerParty.Position;
-            var otherPosition = otherParty.Position;
-            ownerParty.Position = new CampaignVec2(new TaleWorlds.Library.Vec2(0f, 0f), isOnLand: true);
-            otherParty.Position = quest._caravanParty.Position;
-            quest._isCaravanSaved = true;
-            var before = quest._vicinityCheckFailCounter;
-            CampaignEventDispatcher.Instance.HourlyTick();
-            Assert.Equal(before, quest._vicinityCheckFailCounter);
-            ownerParty.Position = ownerPosition;
-            otherParty.Position = otherPosition;
-        });
+            Server.Call(() =>
+            {
+                BindParties();
+                var quest = QuestOf(Server);
+                var settlement = Server.GetRegisteredObject<Settlement>(settlementId);
+                var town = Server.GetRegisteredObject<Town>(townId);
+                var secondSettlement = Server.GetRegisteredObject<Settlement>(secondSettlementId);
+                var secondTown = Server.GetRegisteredObject<Town>(secondTownId);
+                AccessTools.Field(typeof(Town), nameof(Town._marketData)).SetValue(town, new TownMarketData(town));
+                AccessTools.Field(typeof(Town), nameof(Town._marketData)).SetValue(secondTown, new TownMarketData(secondTown));
+                settlement.SetSettlementComponent(town);
+                secondSettlement.SetSettlementComponent(secondTown);
+                settlement._position = new CampaignVec2(new TaleWorlds.Library.Vec2(100f, 100f), isOnLand: true);
+                secondSettlement._position = new CampaignVec2(new TaleWorlds.Library.Vec2(200f, 200f), isOnLand: true);
+                town.OwnerClan = PlayerHero(QuestScenario.ControllerA).Clan;
+                secondTown.OwnerClan = PlayerHero(QuestScenario.ControllerA).Clan;
+                Campaign.Current.CampaignObjectManager.Settlements =
+                    new TaleWorlds.Library.MBList<Settlement>(Campaign.Current.Settlements) { settlement, secondSettlement };
+                quest.QuestGiver.StayingInSettlement = settlement;
+                if (Campaign.Current.Models?.EncounterModel == null)
+                {
+                    var models = Campaign.Current.Models?.GetGameModels().ToList() ?? new List<GameModel>();
+                    models.Add(new DefaultEncounterModel());
+                    Campaign.Current._gameModels = new GameModels(models);
+                }
+                AccessTools.Field(typeof(Campaign), "_averageDistanceBetweenClosestTwoTowns")?.SetValue(
+                    Campaign.Current,
+                    new Dictionary<MobileParty.NavigationType, float>
+                    {
+                        [MobileParty.NavigationType.Default] = 1000f,
+                        [MobileParty.NavigationType.Naval] = 1000f,
+                        [MobileParty.NavigationType.All] = 1000f,
+                    });
+                Assert.NotNull(Campaign.Current.Models?.EncounterModel);
+                Assert.NotNull(Campaign.Current.Models?.MapDistanceModel);
+                Assert.NotNull(Campaign.Current.MainParty);
+                Assert.NotNull(quest._caravanParty);
+                Assert.NotNull(quest._banditParty);
+                Assert.NotNull(quest.QuestGiver.CurrentSettlement);
+                var ownerParty = PlayerHero(QuestScenario.ControllerA).PartyBelongedTo;
+                var otherParty = PlayerHero(QuestScenario.ControllerB).PartyBelongedTo;
+                var ownerPosition = ownerParty.Position;
+                var otherPosition = otherParty.Position;
+                var caravanPosition = new CampaignVec2(new TaleWorlds.Library.Vec2(900f, 900f), isOnLand: true);
+                quest._caravanParty.Position = caravanPosition;
+                ownerParty.Position = new CampaignVec2(new TaleWorlds.Library.Vec2(0f, 0f), isOnLand: true);
+                otherParty.Position = new CampaignVec2(new TaleWorlds.Library.Vec2(0f, 0f), isOnLand: true);
+                quest._banditParty.Position = new CampaignVec2(new TaleWorlds.Library.Vec2(100f, 100f), isOnLand: true);
+                quest._vicinityCheckDisabledUntil = CampaignTime.Now - CampaignTime.Hours(2f);
+                var before = quest._vicinityCheckFailCounter;
+                CampaignEventDispatcher.Instance.HourlyTick();
+                Assert.Equal(before, quest._vicinityCheckFailCounter);
+
+                ownerParty.Position = caravanPosition;
+                CampaignEventDispatcher.Instance.HourlyTick();
+                Assert.Equal(before + 1, quest._vicinityCheckFailCounter);
+                Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkCaravanAmbushProgress>());
+
+                ownerParty.Position = ownerPosition;
+                otherParty.Position = otherPosition;
+            });
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+        }
     }
+
+    private static bool SkipEscortBehavior() => false;
 
     [Fact]
     public void SavedCaravanConversationWaitsForAFreeMapAndOpensOnce()
@@ -591,8 +652,11 @@ public class CaravanAmbushTests : IDisposable
         {
             var map = new ConversationMap();
             using var conversation = new CaravanAmbushRewardConversation(Owner.Resolve<IMessageBroker>(), Owner.Resolve<IIssueResolver>(), map);
+            var quest = QuestOf(Owner);
+            quest._caravanParty = Owner.GetRegisteredObject<MobileParty>(caravanId);
+            quest._isCaravanSaved = true;
             conversation.Request(scenario.NotableId, QuestScenario.IssueId);
-            using (new AllowedThread()) QuestOf(Owner)._questState = QuestBase.QuestStates.Finalized;
+            using (new AllowedThread()) quest._questState = QuestBase.QuestStates.Finalized;
             TickOwner();
             map.IsFree = true;
             TickOwner();

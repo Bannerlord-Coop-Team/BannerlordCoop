@@ -28,6 +28,7 @@ internal class CaravanAmbushPatches
     private static bool Accepted(Quest __instance)
     {
         if (ModInformation.IsServer) return true;
+        // The server spawns both parties, so the owner only starts the quest and adds the first log if progress hasnt sent it.
         __instance.StartQuest();
         if (__instance.JournalEntries.Count == 0) __instance.AddLog(__instance.CaravanAmbushIssueQuestActivatedLogText);
         return false;
@@ -35,7 +36,7 @@ internal class CaravanAmbushPatches
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.HandlePartyAiAfterCompletion))]
     [HarmonyPrefix]
-    // Party cleanup is centralized in ICaravanAmbushWorldEventService.End.
+    // Vanilla HandlePartyAiAfterCompletion calls are replaced by Release and ReleaseParty in CaravanAmbushWorldEventService.
     private static bool Release() => false;
 
     [HarmonyPatch(typeof(QuestBase), nameof(QuestBase.FinalizeQuest))]

@@ -13,7 +13,12 @@ internal class CaravanAmbushFinalizationProofStrategy : IFinalizationProofStrate
     public bool TryRunBranch(QuestBase quest, byte proof)
     {
         if (!(quest is Quest caravan) || proof != (byte)CaravanAmbushBranch.CollectReward) return false;
-        if (!caravan.IsOngoing || !caravan._isCaravanSaved || caravan._caravanParty == null || Hero.MainHero.PartyBelongedTo == null)
+        if (Hero.MainHero.PartyBelongedTo == null)
+        {
+            Logger.Warning("Owner has no party for caravan reward {QuestId}", caravan.StringId);
+            return true;
+        }
+        if (!caravan.IsOngoing || !caravan._isCaravanSaved || caravan._caravanParty == null)
         {
             Logger.Warning("Skipping late caravan reward for quest {QuestId}", caravan.StringId);
             return true;

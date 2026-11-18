@@ -58,6 +58,7 @@ internal class CaravanAmbushRewardConversation : ICaravanAmbushRewardConversatio
         }
         if (!quest._isCaravanSaved || quest._caravanParty == null || !quest._caravanParty.IsActive) return;
         if (!map.IsOwnerFreeOnMap()) return;
+        // Clear first so an open that throws isnt retried every tick.
         pendingConversation = null;
         if (!map.TryOpen(quest._caravanParty)) pendingConversation = data;
     }
