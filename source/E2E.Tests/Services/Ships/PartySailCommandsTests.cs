@@ -141,7 +141,7 @@ public class PartySailCommandsTests : MapEventTestBase
     private static T ResolveCommand<T>(EnvironmentInstance instance) where T : ICoopCommand =>
         instance.Resolve<IEnumerable<ICoopCommand>>().OfType<T>().Single();
 
-    // sail_to refuses to run without NavalDLC, which the test process doesn't load.
+    // set_sail and sail_to refuse to run without NavalDLC, which the test process doesn't load.
     private static CoopCommandResult RunWithNaval(Func<CoopCommandResult> run)
     {
         bool originalNavalEnabled = ModInformation.IsNavalEnabled;

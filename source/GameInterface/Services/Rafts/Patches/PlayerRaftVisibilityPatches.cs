@@ -19,7 +19,7 @@ internal class PlayerRaftVisibilityPatches
     [HarmonyPrefix]
     private static void RefreshDynamicPropertiesPrefix(PartyNameplateVM __instance, out bool __state) => __state = __instance._isVisibleOnMapBind;
 
-    // Vanilla hides the nameplate of every party in naval auto travel that isn't the main party, so show other players' rafts again
+    // Vanilla hides the nameplate of every non-main party in naval auto travel (a raft or a ferry), so show other players' rafts again
     [HarmonyPatch(typeof(PartyNameplateVM), nameof(PartyNameplateVM.RefreshDynamicProperties))]
     [HarmonyPostfix]
     private static void RefreshDynamicPropertiesPostfix(PartyNameplateVM __instance, bool __state)
@@ -38,7 +38,7 @@ internal class PlayerRaftVisibilityPatches
         __instance._isVisibleOnMapBind = true;
     }
 
-    // Only the naval auto travel hide this refresh applied comes back, and vanilla's army and settlement hides still apply to a raft
+    // True when this refresh hid a visible nameplate only because the party is in naval auto travel (a raft or a ferry); vanilla's army and settlement hides still apply
     internal static bool ShouldShowAgain(bool wasVisible, bool isVisible, bool isInArmy, bool isInSettlement, bool isInNavalAutoTravel) =>
         wasVisible && !isVisible && !isInArmy && !isInSettlement && isInNavalAutoTravel;
 
