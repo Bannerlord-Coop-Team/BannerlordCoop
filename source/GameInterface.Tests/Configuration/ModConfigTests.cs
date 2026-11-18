@@ -318,6 +318,8 @@ public class ModConfigTests : IDisposable
         Assert.False(options.BlockAiWarDeclarationsOnOfflinePlayers);
         Assert.Equal(ClansAfterKingdomDestructionMode.Vanilla, options.ClansAfterKingdomDestruction);
         Assert.Empty(options.PreferredBattleHosts);
+        Assert.False(options.PvpBlockLeave);
+        Assert.Equal(0, options.PvpResponseTimerSeconds);
     }
 
     /// <summary>
