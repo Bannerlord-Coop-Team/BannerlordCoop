@@ -10,7 +10,7 @@ using TaleWorlds.CampaignSystem.Party;
 
 namespace Coop.Naval.Commands;
 
-/// <summary>Stages real Boatswain damage reduction and reads the campaign XP and ship HP used by M6 validation.</summary>
+/// <summary>Stages real Boatswain damage reduction and reads the First Mate's skill and the party's ship HP.</summary>
 public sealed class NavalBoatswainCoopCommand : ICoopCommand
 {
     private readonly IObjectManager objectManager;
