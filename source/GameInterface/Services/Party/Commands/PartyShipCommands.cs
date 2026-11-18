@@ -36,14 +36,14 @@ public class PartyShipCommands
 
     // coop.debug.party.add_ship PlayerOne northern_light_ship
     // coop.debug.party.add_ship lord_1_17_party_1 northern_light_ship
-    /// <summary>Gives a player's or an AI party one new ship through the vanilla production ownership path.</summary>
+    /// <summary>Gives a party one new ship through the vanilla production path, anchoring a first fleet at the port it is in.</summary>
     public sealed class AddShipCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.party";
 
         public string Name => "add_ship";
 
-        public string Description => "Gives a player's or an AI party one new ship of the given War Sails hull.";
+        public string Description => "Gives a player's or an AI party one new ship of the given War Sails hull; a first fleet anchors at the port the party is in.";
 
         public CoopCommandSide Side => CoopCommandSide.Server;
 
@@ -72,10 +72,17 @@ public class PartyShipCommands
             var ship = new Ship(hull);
             ChangeShipOwnerAction.ApplyByProduction(party, ship);
 
+            // Like vanilla's naval.add_ship cheat, otherwise production leaves a first fleet unanchored and the port shows no shipyard
+            var mobileParty = party.MobileParty;
+            var port = mobileParty?.CurrentSettlement;
+            if (port != null && port.HasPort && !mobileParty.IsCurrentlyAtSea && !mobileParty.Anchor.IsValid)
+                mobileParty.Anchor.Settlement = port;
+
             var shipId = DescribeId(objectManager, ship);
-            Logger.Information("Added {HullId} ship {ShipId} to party {PartyId} (asked for {Query})",
-                hullId, shipId, party.Id, args[0]);
-            return Succeeded($"Added {hullId} {shipId} to {party.Id} (ships={party.Ships.Count}).");
+            var anchor = mobileParty?.Anchor?.Settlement?.StringId ?? "none";
+            Logger.Information("Added {HullId} ship {ShipId} to party {PartyId} (asked for {Query}), fleet anchored at {Anchor}",
+                hullId, shipId, party.Id, args[0], anchor);
+            return Succeeded($"Added {hullId} {shipId} to {party.Id} (ships={party.Ships.Count}, anchor={anchor}).");
         }
     }
 
