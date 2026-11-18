@@ -36,6 +36,8 @@ it once the user agrees:
 
 ### Server authority
 
+- **Guard repeated behavior orders.** A quest behavior that runs hourly can reset an already active order and resend state every tick. Check the current behavior before issuing the order, like `SetRaidBehaviorIfNeeded`. (#3797)
+- **Reuse shared lifecycle patches.** A quest-specific patch for a shared `IssueManager` callback can diverge from existing filters. Route the behavior through the existing patch instead. (#3797)
 - **Cancellation must keep the troop owner's context.** `IssueCancellationCoordinator` holds a blocked
   cancellation until that owner has a party and the troops can return, then retries hourly. Do not let vanilla
   queue those troops globally or persist the session's pending set. The generic cancel dispatch leaves an
