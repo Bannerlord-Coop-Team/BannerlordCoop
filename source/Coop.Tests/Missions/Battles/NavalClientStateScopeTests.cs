@@ -120,10 +120,10 @@ public class NavalClientStateScopeTests
         try
         {
             using (ContainerProvider.UseContainerThreadSafe(other))
-                Assert.False(CoopShipSnapshotRegistry.IsSnapshotHere(ship, out _));
+                Assert.False(CoopShipSnapshotRegistry.IsSnapshotHere(ship));
 
             using (ContainerProvider.UseContainerThreadSafe(builder))
-                Assert.True(CoopShipSnapshotRegistry.IsSnapshotHere(ship, out _));
+                Assert.True(CoopShipSnapshotRegistry.IsSnapshotHere(ship));
         }
         finally
         {

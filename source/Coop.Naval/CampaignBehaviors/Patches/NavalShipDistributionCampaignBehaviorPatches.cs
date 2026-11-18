@@ -25,8 +25,10 @@ internal class NavalShipDistributionCampaignBehaviorPatches
     {
         if (ModInformation.IsClient) return false;
 
-        // Vanilla's Clan.PlayerClan check only knows one player clan, so skip every coop player clan's destroyed party unless it's a caravan
-        return !party.ActualClan.IsPlayerClan() || party.IsCaravan;
+        if (party.IsCaravan) return true;
+
+        // Vanilla's Clan.PlayerClan check only knows one player clan, so run it only for non-player clans
+        return !party.ActualClan.IsPlayerClan();
     }
 
     [HarmonyPatch(nameof(NavalShipDistributionCampaignBehavior.RecoverGoldFromRemainingShipsAfterDistribution))]

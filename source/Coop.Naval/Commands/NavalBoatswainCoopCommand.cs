@@ -48,7 +48,7 @@ public sealed class NavalBoatswainCoopCommand : ICoopCommand
         if (hero == null) return Failed("The party has no effective First Mate.");
 
         var skill = NavalSkills.Boatswain;
-        // SkillHelper uses the effective First Mate's Boatswain skill, no ship upgrade is required.
+        // The damage model's NavalSkillEffects.ShipDamageReduction reads the effective First Mate's Boatswain skill, so no ship upgrade is needed
         if (prepare)
             hero.HeroDeveloper.SetInitialSkillLevel(skill, 100);
 

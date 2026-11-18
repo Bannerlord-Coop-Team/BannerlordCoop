@@ -36,6 +36,6 @@ internal class CoopShipSnapshotRegistry : ICoopShipSnapshotRegistry
         ship != null && snapshots.TryGetValue(ship, out var campaignShipId) ? campaignShipId : null;
 
     /// <summary>[Any thread] Whether the ship is a snapshot in the client container patches resolve from; false when none resolves.</summary>
-    internal static bool IsSnapshotHere(Ship ship, out ICoopShipSnapshotRegistry snapshots) =>
-        ContainerProvider.TryResolve(out snapshots) && snapshots.Contains(ship);
+    internal static bool IsSnapshotHere(Ship ship) =>
+        ContainerProvider.TryResolve<ICoopShipSnapshotRegistry>(out var snapshots) && snapshots.Contains(ship);
 }

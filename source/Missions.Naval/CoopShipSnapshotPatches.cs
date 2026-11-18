@@ -16,7 +16,7 @@ internal class SnapshotShipDestroyPatch
 {
     // Skips the destroy for a snapshot; campaign ships run it.
     [HarmonyPrefix]
-    private static bool Prefix(Ship ship) => !CoopShipSnapshotRegistry.IsSnapshotHere(ship, out _);
+    private static bool Prefix(Ship ship) => !CoopShipSnapshotRegistry.IsSnapshotHere(ship);
 }
 
 // Mission damage and condition sync write a snapshot's hit points, which the campaign ship sync would log as a client
@@ -38,7 +38,7 @@ internal class SnapshotShipHitPointsSyncScopePatch
     private static void Prefix(Ship __instance, out IDisposable __state)
     {
         __state = null;
-        if (!CoopShipSnapshotRegistry.IsSnapshotHere(__instance, out _)) return;
+        if (!CoopShipSnapshotRegistry.IsSnapshotHere(__instance)) return;
 
         __state = CallOriginalPolicy.AllowOriginalsForCurrentOperation();
     }
