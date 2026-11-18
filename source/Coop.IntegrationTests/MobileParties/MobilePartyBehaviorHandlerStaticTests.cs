@@ -91,14 +91,14 @@ public class MobilePartyBehaviorHandlerStaticTests
         var serverTarget = new CampaignVec2(new Vec2(30f, 10f), true);
         var ownerTarget = new CampaignVec2(new Vec2(30f, 10f), ownerTargetIsOnLand);
         var ownerOrder = new PartyBehaviorUpdateData(
-            "Test_Party",
-            ownerBehavior,
-            null,
-            ownerTarget,
-            ownerTarget,
-            ownerBehavior,
-            ownerTarget,
-            default)
+            mobilePartyId: "Test_Party",
+            newAiBehavior: ownerBehavior,
+            interactablePointId: null,
+            bestTargetPoint: ownerTarget,
+            partyPosition: ownerTarget,
+            defaultBehavior: ownerBehavior,
+            targetPosition: ownerTarget,
+            desiredAiNavigationType: default)
         {
             PartyMoveMode = ownerMoveMode,
         };
