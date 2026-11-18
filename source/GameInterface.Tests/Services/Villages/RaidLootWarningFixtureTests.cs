@@ -224,9 +224,7 @@ public class RaidLootWarningFixtureTests
         try
         {
             using var broker = new MessageBroker();
-            using var handler = subscribed ? new BattleSimulationRunHandler(broker, new Mock<INetwork>().Object,
-                new Mock<IObjectManager>().Object, new MapEventLogger(new Mock<IObjectManager>().Object), new Mock<IPlayerManager>().Object,
-                new Mock<IRetreatedMapEventPartyTracker>().Object) : null;
+            using var handler = subscribed ? CreateRunHandler(broker) : null;
             var session = CreateSession();
             session.Prepare(() => { });
             session.Capture(session.Campaign, session.Party, session.Settlement, ObjectHelper.SkipConstructor<MapEvent>(), "event-a");
@@ -253,9 +251,7 @@ public class RaidLootWarningFixtureTests
         try
         {
             using var broker = new MessageBroker();
-            using var handler = new BattleSimulationRunHandler(broker, new Mock<INetwork>().Object,
-                new Mock<IObjectManager>().Object, new MapEventLogger(new Mock<IObjectManager>().Object), new Mock<IPlayerManager>().Object,
-                new Mock<IRetreatedMapEventPartyTracker>().Object);
+            using var handler = CreateRunHandler(broker);
             var session = CreateSession();
             session.Prepare(() => { });
             session.Capture(session.Campaign, session.Party, session.Settlement, ObjectHelper.SkipConstructor<MapEvent>(), "event-a");
@@ -398,6 +394,11 @@ public class RaidLootWarningFixtureTests
         Assert.Equal(0, seeds);
         Assert.False(session.CanRepeat(session.Campaign, session.ControllerId, session.Party, session.Settlement));
     }
+
+    /// <summary>Builds a simulation run handler on the given broker with every other dependency mocked.</summary>
+    private static BattleSimulationRunHandler CreateRunHandler(MessageBroker broker) => new(broker, new Mock<INetwork>().Object,
+        new Mock<IObjectManager>().Object, new MapEventLogger(new Mock<IObjectManager>().Object), new Mock<IPlayerManager>().Object,
+        new Mock<IRetreatedMapEventPartyTracker>().Object);
 
     private static RaidLootWarningFixture.FixtureSession CreateSession() => new(
         ObjectHelper.SkipConstructor<Campaign>(), "fixture-controller",
