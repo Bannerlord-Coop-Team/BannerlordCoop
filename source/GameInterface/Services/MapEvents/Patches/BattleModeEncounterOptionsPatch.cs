@@ -139,7 +139,7 @@ internal class BattleModeEncounterOptionsPatch
                 __result = TryApplyClientSiegeOrderAttackOptionState(__0);
 
             // Native counts other players' heroes, but the server keeps them out of the simulation.
-            if (__result && MobileParty.MainParty?.MapEventSide?.CountSimulationTroops() == 0)
+            if (__result && MobileParty.MainParty?.MapEventSide is { } playerSide && playerSide.CountSimulationTroops() == 0)
                 __result = false;
         }
 
@@ -287,7 +287,7 @@ internal class BattleModeEncounterOptionsPatch
         if (playerSide.CountSimulationTroops() <= 0)
             return false;
 
-        if (!MobileParty.MainParty.IsInRaftState && PartyBase.MainParty.CountSimulationTroops() > 0)
+        if (PartyBase.MainParty.CountSimulationTroops() > 0)
         {
             MBTextManager.SetTextVariable(
                 "SEND_TROOPS_TEXT",
@@ -342,7 +342,7 @@ internal class BattleModeEncounterOptionsPatch
 
         foreach (var party in side.Parties)
         {
-            if (party.Party != PartyBase.MainParty && party.Party.NumberOfHealthyMembers > 0)
+            if (party.Party != PartyBase.MainParty && party.Party.CountSimulationTroops() > 0)
                 return true;
         }
 
