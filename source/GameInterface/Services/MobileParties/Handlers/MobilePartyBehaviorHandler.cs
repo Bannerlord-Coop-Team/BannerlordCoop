@@ -103,8 +103,14 @@ internal class MobilePartyBehaviorHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging(data.MobilePartyId, out MobileParty party))
                 return;
 
-            if (ModInformation.IsServer && KeepsNavalAutoTravelOrder(party, data))
+            if (ModInformation.IsServer && IsOwnerOrderDuringRaft(party, data))
+            {
+                bool ownerOrderDiffers = data.DefaultBehavior != party.DefaultBehavior || data.TargetPosition != party.TargetPosition;
+                // No requester on the resend, otherwise the owner reads it as its own echo and keeps its stale order
+                if (ownerOrderDiffers)
+                    PublishAuthoritativeBehavior(party, originControllerId: null, forcePosition: false, resetMovementToHold: false);
                 return;
+            }
 
             bool isSelfEcho = ModInformation.IsClient &&
                 party.IsControlledByThisInstance() &&
@@ -185,7 +191,7 @@ internal class MobilePartyBehaviorHandler : IHandler
             if (attachedParties != null)
             {
                 foreach (var attachedParty in attachedParties)
-                    PublishForcedPosition(attachedParty);
+                    PublishAuthoritativeBehavior(attachedParty, originControllerId: null, forcePosition: true, resetMovementToHold: false);
             }
         };
 
@@ -195,29 +201,10 @@ internal class MobilePartyBehaviorHandler : IHandler
             GameThread.RunSafe(apply, context: nameof(MobilePartyBehaviorHandler));
     }
 
-    private void PublishForcedPosition(MobileParty party)
-    {
-        if (!mobilePartyBehaviorSnapshot.TryCreate(
-                party,
-                out PartyBehaviorUpdateData data))
-            return;
-
-        data.ForcePosition = true;
-        messageBroker.Publish(this, new PartyBehaviorUpdated(ref data));
-    }
-
-    // Vanilla ignores orders during naval auto travel, so the server drops an owner's order that predates the raft and resends its move to shore
-    private bool KeepsNavalAutoTravelOrder(MobileParty party, PartyBehaviorUpdateData data)
-    {
-        // Server-authored updates such as debug teleports leave the origin null and apply as usual
-        if (!party.IsInNavalAutoTravel || string.IsNullOrEmpty(data.OriginControllerId))
-            return false;
-
-        // No requester on the resend, otherwise the owner reads it as its own echo and keeps its stale order
-        if (data.DefaultBehavior != party.DefaultBehavior || data.TargetPosition != party.TargetPosition)
-            PublishAuthoritativeBehavior(party, originControllerId: null, forcePosition: false, resetMovementToHold: false);
-        return true;
-    }
+    // Vanilla ignores orders on a raft, so the server drops an owner's order that predates the raft and keeps its move to shore.
+    // Server-authored updates such as debug teleports leave the origin null and apply as usual.
+    private static bool IsOwnerOrderDuringRaft(MobileParty party, PartyBehaviorUpdateData data) =>
+        party.IsInRaftState && !string.IsNullOrEmpty(data.OriginControllerId);
 
     private void PublishAuthoritativeBehavior(MobileParty party, string originControllerId, bool forcePosition, bool resetMovementToHold)
     {
