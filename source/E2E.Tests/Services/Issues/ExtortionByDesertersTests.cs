@@ -15,6 +15,7 @@ using GameInterface.Services.Issues.Quests.ExtortionByDeserters.Messages;
 using GameInterface.Services.MobileParties.Messages.Lifetime;
 using GameInterface.Services.Players;
 using GameInterface.Services.Heroes.Patches;
+using GameInterface.Tests.Utils;
 using GameInterface.Utils.NetworkEvents;
 using HarmonyLib;
 using Helpers;
@@ -345,8 +346,8 @@ public class ExtortionByDesertersTests : IDisposable
             // Seed the raid graph without announcing an unrelated field-battle start.
             var raid = GameObjectCreator.CreateInitializedObject<MapEvent>();
             raid.MapEventVisual = null;
-            raid._mapEventType = MapEvent.BattleTypes.Raid;
-            raid.MapEventSettlement = quest.QuestSettlement;
+            raid.SetBattleType(MapEvent.BattleTypes.Raid);
+            raid.SetMapEventSettlement(quest.QuestSettlement);
             raid._sides[(int)BattleSideEnum.Attacker] = new MapEventSide(raid, BattleSideEnum.Attacker, raider.Party);
             raid._sides[(int)BattleSideEnum.Defender] = new MapEventSide(raid, BattleSideEnum.Defender, quest.QuestSettlement.Party);
             raider.MapEventSide = raid.AttackerSide;
@@ -839,7 +840,7 @@ public class ExtortionByDesertersTests : IDisposable
             quest._defenderMobileParty = defenders;
             ownerParty.CurrentSettlement = quest.QuestSettlement;
             var raid = CreateBattle(deserters, quest.QuestSettlement.Party, true);
-            raid.MapEventSettlement = quest.QuestSettlement;
+            raid.SetMapEventSettlement(quest.QuestSettlement);
             defenders.MapEventSide = raid.DefenderSide;
             ownerParty.MapEventSide = raid.DefenderSide;
             Assert.True(Server.ObjectManager.TryGetId(raid, out raidId));
@@ -857,8 +858,8 @@ public class ExtortionByDesertersTests : IDisposable
             // Seed the already-applied raid graph at the client handoff boundary.
             using (new AllowedThread())
             {
-                raid._mapEventType = MapEvent.BattleTypes.Raid;
-                raid.MapEventSettlement = ownerQuest.QuestSettlement;
+                raid.SetBattleType(MapEvent.BattleTypes.Raid);
+                raid.SetMapEventSettlement(ownerQuest.QuestSettlement);
                 ownerQuest._deserterMobileParty.MapEventSide = raid.AttackerSide;
                 ownerQuest._defenderMobileParty.MapEventSide = raid.DefenderSide;
                 ownerParty.MapEventSide = raid.DefenderSide;
@@ -1201,9 +1202,9 @@ public class ExtortionByDesertersTests : IDisposable
     {
         var battle = GameObjectCreator.CreateInitializedObject<MapEvent>();
         battle.MapEventVisual = ObjectHelper.SkipConstructor<GauntletMapEventVisual>();
-        battle.Initialize(attacker.Party, defender, new FieldBattleEventComponent(battle), MapEvent.BattleTypes.FieldBattle);
+        battle.Initialize(attacker.Party, defender, new FieldBattleEventComponent(battle));
         battle.MapEventVisual = null;
-        battle._mapEventType = raid ? MapEvent.BattleTypes.Raid : MapEvent.BattleTypes.FieldBattle;
+        battle.SetBattleType(raid ? MapEvent.BattleTypes.Raid : MapEvent.BattleTypes.FieldBattle);
         return battle;
     }
 
