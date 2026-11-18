@@ -313,7 +313,25 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             bool simulatedLocally = SiegeMissionAuthorityGate.IsMachineSimulatedLocally(machineId);
             if (!isHost && !simulatedLocally) continue;
 
+            var movement = (machine as BatteringRam)?.MovementComponent
+                ?? (machine as SiegeTower)?.MovementComponent;
             var state = CaptureState(machine, isHost, simulatedLocally);
+            if (state.DestructionState > 0
+                && lastSent.TryGetValue(machineId, out var previous)
+                && state.DestructionState > previous.DestructionState)
+            {
+                float moveDistance = state.MoveDistance;
+                if (moveDistance < 0f)
+                    moveDistance = lastAppliedMoveDistance.TryGetValue(machineId, out var appliedMoveDistance)
+                        ? appliedMoveDistance
+                        : -1f;
+                if (moveDistance < 0f && movement != null)
+                    moveDistance = movement.GetTotalDistanceTraveledForPathTracker();
+
+                ApplyDestructionTransition(machine, movement, moveDistance);
+                if (isHost && !simulatedLocally && moveDistance >= 0f)
+                    state = WithMoveDistance(state, moveDistance);
+            }
             BroadcastMachineStateIfChanged(state);
 
             if (simulatedLocally && machine is SiegeLadder ladder)
@@ -1793,15 +1811,42 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             // matching vanilla's local destruction path.
             if (state.DestructionState > destruction._currentStateIndex)
             {
-                // Snap the authoritative distance before the broken entity is created because it uses the tracker's frame.
-                if (!isMachineSimulatedLocally && movement != null
-                    && lastAppliedMoveDistance.TryGetValue(machine.Id.Id, out float moveDistance))
-                {
-                    StopMovementAtDestruction(movement, moveDistance);
-                }
+                // Snap and stop the movement before the broken entity is created because it uses the tracker's frame.
+                float moveDistance = state.MoveDistance;
+                if (moveDistance < 0f)
+                    moveDistance = lastAppliedMoveDistance.TryGetValue(machine.Id.Id, out var appliedMoveDistance)
+                        ? appliedMoveDistance
+                        : -1f;
+                if (moveDistance < 0f && movement != null)
+                    moveDistance = movement.GetTotalDistanceTraveledForPathTracker();
+                ApplyDestructionTransition(machine, movement, moveDistance);
                 destruction.SetDestructionLevel(state.DestructionState, -1, 0f, TaleWorlds.Library.Vec3.Zero, TaleWorlds.Library.Vec3.Zero);
             }
         }
+    }
+
+    private static NetworkSiegeMachineState WithMoveDistance(NetworkSiegeMachineState state, float moveDistance)
+        => new NetworkSiegeMachineState(state.MachineId, state.HitPoints, state.DestructionState,
+            state.GateState, state.LadderState, moveDistance, state.HasArrived, state.WeaponState,
+            state.AimDirection, state.AimReleaseAngle, state.HostEpoch,
+            state.HasStoneAmmo ? state.StoneAmmo : -1, state.SenderControllerId, state.AuthorityRevision,
+            state.HasMangonelAmmo ? state.MangonelAmmo : -1);
+
+    private static void ApplyDestructionTransition(
+        UsableMachine machine, SiegeWeaponMovementComponent movement, float moveDistance)
+    {
+        if (movement != null && moveDistance >= 0f)
+            StopMovementAtDestruction(movement, moveDistance);
+
+        if (machine.StandingPoints == null) return;
+
+        foreach (var standingPoint in machine.StandingPoints)
+        {
+            standingPoint.UserAgent?.StopUsingGameObject();
+            standingPoint.MovingAgent?.StopUsingGameObject();
+        }
+
+        machine.Deactivate();
     }
 
     private static void StopMovementAtDestruction(SiegeWeaponMovementComponent movement, float moveDistance)

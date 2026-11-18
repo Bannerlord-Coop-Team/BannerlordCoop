@@ -24,8 +24,8 @@ public class SiegeMachineSimulationTests : IDisposable
 {
     [Theory]
     [InlineData(false, 1, 1)]
-    [InlineData(true, 0, 0)]
-    public void DestructionTransitionSnapsOnlyRemoteRamBeforeApplyingBrokenState(
+    [InlineData(true, 1, 1)]
+    public void DestructionTransitionStopsAndSnapsRamBeforeApplyingBrokenState(
         bool localSimulator, int expectedSnapCalls, int expectedResetDistanceErrorCalls)
     {
         using var mission = new MissionCurrentScope();
@@ -68,16 +68,76 @@ public class SiegeMachineSimulationTests : IDisposable
             apply.Invoke(replicator, new object[] { ram, destructionState });
 
             Assert.Equal(expectedSnapCalls, ramSnapCalls);
-            Assert.Equal(localSimulator ? 0f : 12.4f, ramSnappedDistance);
+            Assert.Equal(localSimulator ? 12.5f : 12.4f, ramSnappedDistance);
             Assert.Equal(expectedResetDistanceErrorCalls, ramResetDistanceErrorCalls);
-            if (!localSimulator) Assert.Equal(12.4f, ramResetDistanceErrorDistance);
+            Assert.Equal(localSimulator ? 12.5f : 12.4f, ramResetDistanceErrorDistance);
             Assert.Equal(1, ramDestructionCalls);
-            Assert.Equal(!localSimulator, ramSnappedBeforeDestruction);
+            Assert.True(ramSnappedBeforeDestruction);
         }
         finally
         {
             SiegeMissionAuthorityGate.IsLocalAuthority = previousHost;
             SiegeMissionAuthorityGate.ResetClaimedMachines();
+        }
+    }
+
+    [Fact]
+    public void HostDestructionSnapshotCarriesLastAppliedClaimantDistance()
+    {
+        using var mission = new MissionCurrentScope();
+        var ram = Uninitialized<BatteringRam>();
+        var movement = Uninitialized<SiegeWeaponMovementComponent>();
+        var destruction = Uninitialized<DestructableComponent>();
+        AccessTools.Property(typeof(BatteringRam), nameof(BatteringRam.MovementComponent)).SetValue(ram, movement);
+        AccessTools.Field(typeof(UsableMachine), "<DestructionComponent>k__BackingField").SetValue(ram, destruction);
+        AccessTools.Field(typeof(DestructableComponent), "_currentStateIndex").SetValue(destruction, 1);
+        ramSnapDistance = 12.5f;
+        ramSnappedDistance = 0f;
+        ramSnapCalls = 0;
+        ramResetDistanceErrorCalls = 0;
+        ramResetDistanceErrorDistance = 0f;
+        var sent = new List<IMessage>();
+        var network = new Mock<IBattleNetwork>();
+        network.Setup(value => value.SendAll(It.IsAny<IMessage>())).Callback<IMessage>(sent.Add);
+        var session = new Mock<IBattleSession>();
+        session.SetupGet(value => value.IsLocalHost).Returns(true);
+        session.SetupGet(value => value.OwnControllerId).Returns("host");
+        session.SetupGet(value => value.HostEpoch).Returns(5);
+        var replicator = new SiegeMachineStateReplicator(network.Object, new TestMessageBroker(), session.Object,
+            Mock.Of<INetworkAgentRegistry>(), new HostEpochPolicy(), Mock.Of<IRangedSiegeWeaponPresentation>());
+
+        var previous = new NetworkSiegeMachineState(ram.Id.Id, 100f, 0, -1, -1, -1f,
+            false, -1, -1000f, -1000f);
+        var destructionState = new NetworkSiegeMachineState(ram.Id.Id, 100f, 1, -1, -1, -1f,
+            false, -1, -1000f, -1000f);
+        ReadField<Dictionary<int, UsableMachine>>(replicator, "machinesById")[ram.Id.Id] = ram;
+        ReadField<List<UsableMachine>>(replicator, "machines").Add(ram);
+        ReadField<Dictionary<int, NetworkSiegeMachineState>>(replicator, "lastSent")[ram.Id.Id] = previous;
+        ReadField<Dictionary<int, float>>(replicator, "lastAppliedMoveDistance")[ram.Id.Id] = 12.4f;
+
+        destructionCaptureState = destructionState;
+        var capture = AccessTools.Method(typeof(SiegeMachineStateReplicator), "CaptureState");
+        harmony.Patch(capture, prefix: new HarmonyMethod(AccessTools.Method(
+            typeof(SiegeMachineSimulationTests), nameof(CaptureDestructionState))));
+        Stub(AccessTools.Method(typeof(SiegeWeaponMovementComponent), "GetTotalDistanceTraveledForPathTracker"), nameof(RamDistanceAtSnap));
+        Stub(AccessTools.Method(typeof(SiegeWeaponMovementComponent), "SetTotalDistanceTraveledForPathTracker"), nameof(RamSetDistance));
+        Stub(AccessTools.Method(typeof(SiegeWeaponMovementComponent), "SetDistanceTraveledAsClient"), nameof(RamResetDistanceError));
+        Stub(AccessTools.Method(typeof(SiegeWeaponMovementComponent), "SetTargetFrameForPathTracker"), nameof(RamSetTargetFrame));
+        try
+        {
+            AccessTools.Method(typeof(SiegeMachineStateReplicator), "BroadcastChangedStates")
+                .Invoke(replicator, Array.Empty<object>());
+
+            var snapshot = Assert.IsType<NetworkSiegeMachineState>(Assert.Single(sent));
+            Assert.Equal(12.4f, snapshot.MoveDistance);
+            Assert.Equal(12.4f, ramSnappedDistance);
+            Assert.Equal(1, ramResetDistanceErrorCalls);
+        }
+        finally
+        {
+            harmony.Unpatch(capture, HarmonyPatchType.All, harmony.Id);
+            replicator.Dispose();
+            destructionCaptureState = null;
         }
     }
 
@@ -92,6 +152,14 @@ public class SiegeMachineSimulationTests : IDisposable
     }
 
     private static bool SkipScriptComponentCache() => false;
+
+    private static NetworkSiegeMachineState destructionCaptureState;
+    private static bool CaptureDestructionState(
+        UsableMachine machine, bool isHost, bool simulatedLocally, ref NetworkSiegeMachineState __result)
+    {
+        __result = destructionCaptureState;
+        return false;
+    }
 
     public void Dispose()
     {
