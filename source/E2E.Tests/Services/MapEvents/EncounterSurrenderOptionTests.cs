@@ -14,6 +14,7 @@ using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
 using Xunit.Abstractions;
 
@@ -313,16 +314,9 @@ public class EncounterSurrenderOptionTests : MapEventTestBase
 
             using (new AllowedThread())
             {
-                // Native counts any hero element, even an emptied one, so drop the builders' NPC lord leaders.
+                // Native counts any hero element, even an emptied one, so drop the main party's emptied NPC leader.
                 PartyBase.MainParty.MemberRoster.RemoveZeroCounts();
-                var roster = allyParty.MemberRoster;
-                for (int i = roster.Count - 1; i >= 0; i--)
-                {
-                    var element = roster.GetElementCopyAtIndex(i);
-                    roster.AddToCountsAtIndex(i, -element.Number, -element.WoundedNumber, 0, true);
-                }
-                roster.AddNewElement(allyHero.CharacterObject, -1);
-                roster.AddToCountsAtIndex(roster.FindIndexOfTroop(allyHero.CharacterObject), 1, 0, 0, false);
+                LeaveOnlyHeroInRoster(allyParty.MemberRoster, allyHero);
             }
             Assert.Equal(1, allyParty.Party.NumberOfHealthyMembers);
 
@@ -515,6 +509,20 @@ public class EncounterSurrenderOptionTests : MapEventTestBase
 
             Assert.Equal(0, PartyBase.MainParty.NumberOfHealthyMembers);
         }, MapEventDisabledMethods);
+    }
+
+    /// <summary>Replaces the roster with just <paramref name="hero"/>, removing the builder's NPC lord leader
+    /// outright because native counts an emptied hero element as a troop.</summary>
+    private static void LeaveOnlyHeroInRoster(TroopRoster roster, Hero hero)
+    {
+        for (int i = roster.Count - 1; i >= 0; i--)
+        {
+            var element = roster.GetElementCopyAtIndex(i);
+            roster.AddToCountsAtIndex(i, -element.Number, -element.WoundedNumber, xpChange: 0, removeDepleted: true);
+        }
+
+        roster.AddNewElement(hero.CharacterObject, -1);
+        roster.AddToCountsAtIndex(roster.FindIndexOfTroop(hero.CharacterObject), 1, woundedCountChange: 0, xpChange: 0, removeDepleted: false);
     }
 
     /// <summary>
