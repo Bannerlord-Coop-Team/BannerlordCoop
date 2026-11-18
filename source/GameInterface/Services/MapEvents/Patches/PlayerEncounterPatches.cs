@@ -18,7 +18,6 @@ using HarmonyLib;
 using Helpers;
 using SandBox.View.Map;
 using Serilog;
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -512,20 +511,7 @@ internal class PlayerEncounterPatches
 
     private static MapEvent GetCurrentMapEventForTrace()
     {
-        var encounter = PlayerEncounter.Current;
-        return encounter?._mapEvent ?? GetPlayerEncounterBattleForTrace() ?? MobileParty.MainParty?.MapEvent;
-    }
-
-    private static MapEvent GetPlayerEncounterBattleForTrace()
-    {
-        try
-        {
-            return PlayerEncounter.Battle;
-        }
-        catch (NullReferenceException)
-        {
-            return null;
-        }
+        return PlayerEncounter.Current?._mapEvent ?? MobileParty.MainParty?.MapEvent;
     }
 
     private static string DescribePartyForTrace(PartyBase party)
