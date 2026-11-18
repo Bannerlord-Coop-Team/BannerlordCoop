@@ -1,7 +1,5 @@
 ﻿using Common;
 using Common.Commands;
-using Common.Messaging;
-using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.Settlements.Interfaces;
 using GameInterface.Services.Villages.Commands;
 using GameInterface.Utils.Commands;
@@ -46,9 +44,6 @@ public class PartySailCommands
         /// <summary>Checks vanilla's Set sail rule for the party's port, then leaves it at sea in front of the port.</summary>
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            if (ModInformation.IsClient)
-                return Failed("Run this command on the server.");
-
             if (!ModInformation.IsNavalEnabled)
                 return Failed("NavalDLC is not active on the server.");
 
@@ -60,10 +55,13 @@ public class PartySailCommands
                 return Failed($"{party.StringId} is not in a settlement with a port.");
 
             // Same rule as vanilla NavalTransitionCampaignBehavior.GetIsSetSailEnabled
-            if ((party.Army != null && party.Army.LeaderParty != party) || !party.HasNavalNavigationCapability || !party.Anchor.IsAtSettlement(port))
-                return Failed($"{party.StringId} can't set sail from {port.StringId}: it needs ships anchored there and can't be following an army.");
+            if (party.Army != null && party.Army.LeaderParty != party)
+                return Failed($"{party.StringId} is following an army and can't set sail.");
 
-            // Same steps as the server's set sail leave, the replicated leave closes the owner's port menu
+            if (!party.HasNavalNavigationCapability || !party.Anchor.IsAtSettlement(port))
+                return Failed($"{party.StringId} has no ships anchored at {port.StringId}.");
+
+            // Same steps as ServerSettlementExitEnterHandler's SetSail leave; the replicated leave also closes the owner's port menu
             settlementInterface.PartyLeaveSettlement(party);
             settlementInterface.PartySetSail(party, port);
 
@@ -75,13 +73,11 @@ public class PartySailCommands
     /// <summary>Orders a player's party at sea into a port, the same order a map click on that port gives.</summary>
     public sealed class SailToCoopCommand : ICoopCommand
     {
-        private readonly IMessageBroker messageBroker;
         private readonly ICommandObjectResolver resolver;
 
-        /// <summary>Uses the broker to replicate the order and the resolver to find the port by id or name.</summary>
-        public SailToCoopCommand(IMessageBroker messageBroker, ICommandObjectResolver resolver)
+        /// <summary>Uses the resolver to find the port by id or name.</summary>
+        public SailToCoopCommand(ICommandObjectResolver resolver)
         {
-            this.messageBroker = messageBroker;
             this.resolver = resolver;
         }
 
@@ -99,12 +95,9 @@ public class PartySailCommands
             new ExpectedArgs("settlement", "The settlement with a port to sail into, by id or name.", true),
         };
 
-        /// <summary>Sets the party's move order to the port and sends it to every client, the owner included.</summary>
+        /// <summary>Sets the party's move order to the port; the movement patches replicate it to every client.</summary>
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            if (ModInformation.IsClient)
-                return Failed("Run this command on the server.");
-
             if (!ModInformation.IsNavalEnabled)
                 return Failed("NavalDLC is not active on the server.");
 
@@ -122,8 +115,6 @@ public class PartySailCommands
 
             // Same call as vanilla SettlementVisual.OnMapClick for a port reached by sea
             party.SetMoveGoToSettlement(port, MobileParty.NavigationType.Naval, isTargetingThePort: true);
-            // The owning client simulates its party, so it only moves once the server-authored order reaches it
-            messageBroker.Publish(this, new PartyBehaviorChangeAttempted(party));
 
             return Succeeded($"{party.StringId} is sailing to {port.StringId}.");
         }
