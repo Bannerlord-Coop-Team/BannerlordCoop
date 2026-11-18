@@ -96,16 +96,7 @@ public class BattleSimulationCompletionTests : MapEventTestBase
         }, MapEventDisabledMethods);
     }
 
-    /// <summary>Requests a simulation of the context's battle for the client's attacker party and asserts the server accepts it.</summary>
-    private void StartAcceptedSimulation(EnvironmentInstance client, MapEventContext context)
-    {
-        Server.Resolve<IMessageBroker>().Publish(client.NetPeer, new NetworkBattleStartRequest(
-            System.Guid.NewGuid().ToString(), (int)BattleStartMode.Simulation,
-            context.MapEventId, context.AttackerPartyId));
-        Assert.True(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleStartReply>()).Accepted);
-    }
-
-    /// <summary>Sends the client's simulation advances, more than a decided battle needs to finish.</summary>
+    /// <summary>Sends <see cref="MaxAdvancesToFinish"/> one-round advances from the client, enough for a decided battle to finish.</summary>
     private void AdvanceSimulation(EnvironmentInstance client, string mapEventId)
     {
         for (var update = 0; update < MaxAdvancesToFinish; update++)
