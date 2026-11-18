@@ -62,8 +62,8 @@ public class PartySailCommands
             if (!party.HasNavalNavigationCapability || !party.Anchor.IsAtSettlement(port))
                 return Failed($"{party.StringId} has no ships anchored at {port.StringId}.");
 
-            // The leave and set sail calls of ServerSettlementExitEnterHandler's SetSail leave, without its encounter-leave event;
-            // the replicated leave also closes the owner's port menu
+            // Same two calls ServerSettlementExitEnterHandler makes when a party sets sail, without its leave reply and encounter-leave event.
+            // The replicated leave also closes the owner's port menu.
             settlementInterface.PartyLeaveSettlement(party);
             settlementInterface.PartySetSail(party, port);
 
@@ -114,7 +114,8 @@ public class PartySailCommands
             if (!port.HasPort)
                 return Failed($"{port.StringId} has no port.");
 
-            // Vanilla EnterSettlementAction keeps a party with no land navigation at sea inside a port
+            // Vanilla EnterSettlementAction keeps a party with no land navigation at sea inside a port, so IsCurrentlyAtSea alone
+            // doesn't rule out a docked party
             if (party.CurrentSettlement != null)
                 return Failed($"{party.StringId} is in {party.CurrentSettlement.StringId}, set sail first.");
 

@@ -30,7 +30,8 @@ internal class MobilePartyAiRegistry : AutoRegistryBase<MobilePartyAi>
         // Queued so ApplyInternal is compiled after the AutoSync _isDisabled patches, otherwise it inlines the unpatched
         // EnableAi/DisableAi and a raft's AI state never reaches clients.
         var applyInternal = AccessTools.Method(typeof(RaftStateChangeAction), nameof(RaftStateChangeAction.ApplyInternal));
-        patchCollector.AddPrefix(applyInternal, AccessTools.Method(typeof(RaftStateChangeActionPatches), nameof(RaftStateChangeActionPatches.ApplyInternalPrefix)));
+        var prefix = AccessTools.Method(typeof(RaftStateChangeActionPatches), nameof(RaftStateChangeActionPatches.ApplyInternalPrefix));
+        patchCollector.AddPrefix(applyInternal, prefix);
     }
 
     public override IEnumerable<MethodBase> Constructors => Array.Empty<MethodBase>();

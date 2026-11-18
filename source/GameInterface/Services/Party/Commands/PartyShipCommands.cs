@@ -75,7 +75,7 @@ public class PartyShipCommands
             // Like vanilla's naval.add_ship cheat, otherwise production leaves a first fleet unanchored and the port shows no shipyard
             var mobileParty = party.MobileParty; // null for a settlement's own PartyBase
             var port = mobileParty?.CurrentSettlement;
-            var isFirstFleetInPort = mobileParty != null && port != null && port.HasPort &&
+            var isFirstFleetInPort = port != null && port.HasPort &&
                 !mobileParty.IsCurrentlyAtSea && !mobileParty.Anchor.IsValid;
             if (isFirstFleetInPort)
                 mobileParty.Anchor.Settlement = port;
