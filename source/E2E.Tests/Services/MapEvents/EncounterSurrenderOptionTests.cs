@@ -521,8 +521,8 @@ public class EncounterSurrenderOptionTests : MapEventTestBase
         roster.Clear();
 
         // AddToCounts would sync the seed even on an allowed thread, see SeedPartyTroopOnAll.
-        roster.AddNewElement(hero.CharacterObject, -1);
-        roster.AddToCountsAtIndex(roster.FindIndexOfTroop(hero.CharacterObject), 1, woundedCountChange: 0, xpChange: 0, removeDepleted: false);
+        var index = roster.AddNewElement(hero.CharacterObject, -1);
+        roster.AddToCountsAtIndex(index, 1, woundedCountChange: 0, xpChange: 0, removeDepleted: false);
     }
 
     /// <summary>
