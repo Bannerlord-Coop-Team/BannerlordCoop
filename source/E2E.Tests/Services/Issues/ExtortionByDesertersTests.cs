@@ -671,25 +671,10 @@ public class ExtortionByDesertersTests : IDisposable
         Accept();
         var quest = (Quest)scenario.QuestOf(Server);
         var ownerQuest = (Quest)scenario.QuestOf(Owner);
-        string raidId = null!, ownerPartyId = null!, ownerHeroId = null!;
-        Server.Call(() =>
-        {
-            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(QuestScenario.ControllerA, out var owner));
-            ownerPartyId = owner.MobilePartyId;
-            ownerHeroId = owner.HeroId;
-            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var ownerParty));
-            var deserters = GameObjectCreator.CreateInitializedObject<MobileParty>();
-            var defenders = GameObjectCreator.CreateInitializedObject<MobileParty>();
-            quest._deserterMobileParty = deserters;
-            quest._defenderMobileParty = defenders;
-            ownerParty.CurrentSettlement = quest.QuestSettlement;
-            var raid = CreateBattle(deserters, quest.QuestSettlement.Party, true);
-            raid.SetMapEventSettlement(quest.QuestSettlement);
-            defenders.MapEventSide = raid.DefenderSide;
-            ownerParty.MapEventSide = raid.DefenderSide;
-            Assert.True(Server.ObjectManager.TryGetId(raid, out raidId));
-            Server.Resolve<IExtortionByDesertersProgress>().Send(quest);
-        }, TextLinks.Append(AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize))));
+        var handoff = StageAmbushHandoff(quest);
+        var raidId = handoff.RaidId;
+        var ownerPartyId = handoff.OwnerPartyId;
+        var ownerHeroId = handoff.OwnerHeroId;
         using var finish = new MethodCallRecorder(AccessTools.Method(typeof(PlayerEncounter), nameof(PlayerEncounter.Finish)));
         using var menus = new MethodCallRecorder(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu)));
         using var conversations = new MethodCallRecorder(AccessTools.Method(typeof(ConversationManager), nameof(ConversationManager.OpenMapConversation)));
@@ -880,6 +865,31 @@ public class ExtortionByDesertersTests : IDisposable
             Assert.Null(ownerQuest._defenderMobileParty);
             Assert.Equal(ownerEntries, ownerQuest.JournalEntries.Count);
         });
+    }
+
+
+    private (string RaidId, string OwnerPartyId, string OwnerHeroId) StageAmbushHandoff(Quest quest)
+    {
+        string raidId = null!, ownerPartyId = null!, ownerHeroId = null!;
+        Server.Call(() =>
+        {
+            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(QuestScenario.ControllerA, out var owner));
+            ownerPartyId = owner.MobilePartyId;
+            ownerHeroId = owner.HeroId;
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var ownerParty));
+            var deserters = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var defenders = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            quest._deserterMobileParty = deserters;
+            quest._defenderMobileParty = defenders;
+            ownerParty.CurrentSettlement = quest.QuestSettlement;
+            var raid = CreateBattle(deserters, quest.QuestSettlement.Party, true);
+            raid.SetMapEventSettlement(quest.QuestSettlement);
+            defenders.MapEventSide = raid.DefenderSide;
+            ownerParty.MapEventSide = raid.DefenderSide;
+            Assert.True(Server.ObjectManager.TryGetId(raid, out raidId));
+            Server.Resolve<IExtortionByDesertersProgress>().Send(quest);
+        }, TextLinks.Append(AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize))));
+        return (raidId, ownerPartyId, ownerHeroId);
     }
 
     private Quest DefeatDeserters()
