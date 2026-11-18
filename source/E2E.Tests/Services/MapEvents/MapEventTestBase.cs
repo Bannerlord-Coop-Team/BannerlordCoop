@@ -330,10 +330,11 @@ public abstract class MapEventTestBase : IDisposable
     /// <summary>Requests a simulation of the context's battle for the client's attacker party and asserts the server accepts it.</summary>
     protected void StartAcceptedSimulation(EnvironmentInstance client, MapEventContext context)
     {
+        var requestId = System.Guid.NewGuid().ToString();
         Server.Resolve<IMessageBroker>().Publish(client.NetPeer, new NetworkBattleStartRequest(
-            System.Guid.NewGuid().ToString(), (int)BattleStartMode.Simulation,
-            context.MapEventId, context.AttackerPartyId));
-        Assert.True(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleStartReply>()).Accepted);
+            requestId, (int)BattleStartMode.Simulation, context.MapEventId, context.AttackerPartyId));
+        Assert.True(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleStartReply>(),
+            reply => reply.RequestId == requestId).Accepted);
     }
 
     /// <summary>
