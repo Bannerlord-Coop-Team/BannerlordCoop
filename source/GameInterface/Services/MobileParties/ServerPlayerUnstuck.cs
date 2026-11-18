@@ -29,9 +29,9 @@ namespace GameInterface.Services.MobileParties;
 internal interface IServerPlayerUnstuck
 {
     /// <summary>
-    /// Force-applies every applicable exit for the player's registered party and hero, releases every
-    /// party (not only the player's) still linked to a battle that already ended, sends a raft at sea toward
-    /// shore again, takes the party out of its battle, ends battles left with no healthy troops on one side,
+    /// Force-applies every applicable exit for the player's registered party and hero, sends a raft at sea toward
+    /// shore again, releases every party (not only the player's) still linked to a battle that already ended,
+    /// takes the party out of its battle, ends battles left with no healthy troops on one side,
     /// ends the raft state of a party stranded on land, then moves a free party
     /// off a map spot it cannot move from, each step guarded independently, and sends the result to the
     /// player's connection when it has one. Runs on the game thread.
@@ -156,6 +156,17 @@ internal class ServerPlayerUnstuck : IServerPlayerUnstuck
             });
         }
 
+        // A raft at sea outside a battle whose move to shore was lost. Before every step that can clear the party's map event
+        // side, because leaving a battle fires PartyOccupancyChanged and PlayerRaftHandler resumes the raft from there.
+        // raftFleetInterface is only registered while War Sails is on
+        if (raftFleetInterface != null)
+        {
+            TryStep(actions, "raft resume", () =>
+                raftFleetInterface.ResumeRaft(party)
+                    ? $"Sent the raft toward the nearest shore at {Format(party.MoveTargetPoint)}."
+                    : null);
+        }
+
         // Nothing ends a battle again once it ended, so parties it kept linked never move. Release them
         // all, lords and garrisons too, since they can block a town for everyone.
         TryStep(actions, "ended battle release", () =>
@@ -185,17 +196,6 @@ internal class ServerPlayerUnstuck : IServerPlayerUnstuck
 
             return lines.Count == 0 ? null : string.Join(" ", lines);
         });
-
-        // A raft at sea outside a battle whose move to shore was lost. Before the map event removal, because leaving a
-        // battle fires PartyOccupancyChanged and PlayerRaftHandler resumes the raft from there.
-        // raftFleetInterface is only registered while War Sails is on
-        if (raftFleetInterface != null)
-        {
-            TryStep(actions, "raft resume", () =>
-                raftFleetInterface.ResumeRaft(party)
-                    ? $"Sent the raft toward the nearest shore at {Format(party.MoveTargetPoint)}."
-                    : null);
-        }
 
         if (party.Party?.MapEvent != null)
         {

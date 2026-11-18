@@ -48,6 +48,7 @@ internal class PlayerRaftHandler : IHandler
 
     private void Handle_SwitchedPlayer(MessagePayload<SwitchedPlayer> obj)
     {
+        // [Client] SwitchToPlayer publishes this after setting the main party.
         // The save loads the raft state straight into its field, so the setter patch that opens the raft menu never runs
         GameThread.RunSafe(() =>
         {
@@ -64,7 +65,7 @@ internal class PlayerRaftHandler : IHandler
         if (!party.IsInRaftState) return;
 
         // A raft's AI is off, so leaving a battle or its post battle screens would hold it at sea for good.
-        // Queued for a later frame, because the battle leave holds the party right after clearing its side.
+        // Queued for a later frame, because the battle leave sets the party to hold right after clearing its side, which would cancel the move to shore.
         GameThread.EnqueueSafe(() =>
         {
             // A finished battle resumes once the screens close, so its move isn't sent twice
