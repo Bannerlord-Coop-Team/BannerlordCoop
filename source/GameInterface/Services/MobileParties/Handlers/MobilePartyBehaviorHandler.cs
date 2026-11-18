@@ -105,9 +105,11 @@ internal class MobilePartyBehaviorHandler : IHandler
 
             if (ModInformation.IsServer && party.IsInNavalAutoTravel)
             {
-                // Vanilla takes no orders during naval auto travel, so an owner order sent before it saw its raft gets the one-shot move to shore back
-                if (data.DefaultBehavior != party.DefaultBehavior || data.TargetPosition != party.TargetPosition)
-                    messageBroker.Publish(this, new PartyBehaviorChangeAttempted(party));
+                // Vanilla takes no orders during naval auto travel, so an owner order sent before its raft is dropped and the move to shore resent
+                bool ownerOrderDiffers = data.DefaultBehavior != party.DefaultBehavior || data.TargetPosition != party.TargetPosition;
+                // No requester on the resend, otherwise the owner reads it as its own echo and keeps its stale order
+                if (ownerOrderDiffers)
+                    PublishAuthoritativeBehavior(party, request: default);
                 return;
             }
 
