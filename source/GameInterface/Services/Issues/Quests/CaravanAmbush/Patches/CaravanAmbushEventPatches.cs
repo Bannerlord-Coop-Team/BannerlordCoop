@@ -1,5 +1,6 @@
 ﻿using Common;
 using HarmonyLib;
+using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -27,36 +28,28 @@ internal class CaravanAmbushEventPatches
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.HourlyTick))]
     [HarmonyPostfix]
-    private static void Hourly()
-    {
-        if (ModInformation.IsServer && ContainerProvider.TryResolve<ICaravanAmbushWorldEventService>(out var events)) events.HourlyTick();
-    }
+    private static void Hourly() => Run(events => events.HourlyTick());
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnMapEventStarted))]
     [HarmonyPostfix]
-    private static void BattleStarted(MapEvent mapEvent, PartyBase attackerParty, PartyBase defenderParty)
-    {
-        if (ModInformation.IsServer && ContainerProvider.TryResolve<ICaravanAmbushWorldEventService>(out var events)) events.MapEventStarted(mapEvent, attackerParty, defenderParty);
-    }
+    private static void BattleStarted(MapEvent mapEvent, PartyBase attackerParty, PartyBase defenderParty) =>
+        Run(events => events.MapEventStarted(mapEvent, attackerParty, defenderParty));
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnMapEventEnded))]
     [HarmonyPostfix]
-    private static void BattleEnded(MapEvent mapEvent)
-    {
-        if (ModInformation.IsServer && ContainerProvider.TryResolve<ICaravanAmbushWorldEventService>(out var events)) events.BattleEnded(mapEvent);
-    }
+    private static void BattleEnded(MapEvent mapEvent) => Run(events => events.BattleEnded(mapEvent));
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnBanditPartyRecruited))]
     [HarmonyPostfix]
-    private static void Recruited(MobileParty banditParty)
-    {
-        if (ModInformation.IsServer && ContainerProvider.TryResolve<ICaravanAmbushWorldEventService>(out var events)) events.BanditsRecruited(banditParty);
-    }
+    private static void Recruited(MobileParty banditParty) => Run(events => events.BanditsRecruited(banditParty));
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnSettlementEntered))]
     [HarmonyPostfix]
-    private static void Arrived(MobileParty party, Settlement settlement, Hero hero)
+    private static void Arrived(MobileParty party, Settlement settlement, Hero hero) => Run(events => events.SettlementEntered(party));
+
+    private static void Run(Action<ICaravanAmbushWorldEventService> action)
     {
-        if (ModInformation.IsServer && ContainerProvider.TryResolve<ICaravanAmbushWorldEventService>(out var events)) events.SettlementEntered(party);
+        if (ModInformation.IsServer && ContainerProvider.TryResolve<ICaravanAmbushWorldEventService>(out var events))
+            action(events);
     }
 }

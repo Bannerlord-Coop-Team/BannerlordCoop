@@ -17,10 +17,10 @@ internal class CaravanAmbushRewardConversation : ICaravanAmbushRewardConversatio
 {
     private readonly IMessageBroker broker;
     private readonly IIssueResolver issues;
-    private readonly ICaravanAmbushConversationMap map;
+    private readonly ICaravanAmbushMapConversation map;
     private (string IssueOwnerId, string IssueId)? pendingConversation;
 
-    public CaravanAmbushRewardConversation(IMessageBroker broker, IIssueResolver issues, ICaravanAmbushConversationMap map)
+    public CaravanAmbushRewardConversation(IMessageBroker broker, IIssueResolver issues, ICaravanAmbushMapConversation map)
     {
         this.broker = broker;
         this.issues = issues;

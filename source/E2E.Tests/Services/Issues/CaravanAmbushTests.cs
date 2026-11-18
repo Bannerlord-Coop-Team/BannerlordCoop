@@ -223,8 +223,13 @@ public class CaravanAmbushTests : IDisposable
             var quest = QuestOf(Server);
             var publisher = Server.Resolve<ICaravanAmbushProgress>();
             publisher.Publish(quest);
-            quest._caravanParty.IsActive = false;
+            var before = Server.NetworkSentMessages.GetMessageCount<NetworkCaravanAmbushProgress>();
+            var party = quest._caravanParty;
+            party.IsActive = false;
+            Assert.True(Server.ObjectManager.Remove(party));
+            quest._vicinityCheckFailCounter++;
             publisher.Publish(quest);
+            Assert.Equal(before + 1, Server.NetworkSentMessages.GetMessageCount<NetworkCaravanAmbushProgress>());
         });
         Owner.Call(() =>
         {
@@ -520,6 +525,28 @@ public class CaravanAmbushTests : IDisposable
     }
 
     [Fact]
+    public void HourlyTickUsesTheOwnersVicinityWhenAnotherPlayerIsNear()
+    {
+        Server.Call(() =>
+        {
+            BindParties();
+            var quest = QuestOf(Server);
+            var ownerParty = PlayerHero(QuestScenario.ControllerA).PartyBelongedTo;
+            var otherParty = PlayerHero(QuestScenario.ControllerB).PartyBelongedTo;
+            var ownerPosition = ownerParty.Position;
+            var otherPosition = otherParty.Position;
+            ownerParty.Position = new CampaignVec2(new TaleWorlds.Library.Vec2(0f, 0f), isOnLand: true);
+            otherParty.Position = quest._caravanParty.Position;
+            quest._isCaravanSaved = true;
+            var before = quest._vicinityCheckFailCounter;
+            CampaignEventDispatcher.Instance.HourlyTick();
+            Assert.Equal(before, quest._vicinityCheckFailCounter);
+            ownerParty.Position = ownerPosition;
+            otherParty.Position = otherPosition;
+        });
+    }
+
+    [Fact]
     public void SavedCaravanConversationWaitsForAFreeMapAndOpensOnce()
     {
         Owner.Call(() =>
@@ -704,7 +731,7 @@ public class CaravanAmbushTests : IDisposable
         });
     }
 
-    private sealed class ConversationMap : ICaravanAmbushConversationMap
+    private sealed class ConversationMap : ICaravanAmbushMapConversation
     {
         public bool IsFree { get; set; }
         public bool ThrowOnOpen { get; set; }

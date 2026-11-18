@@ -22,15 +22,6 @@ internal interface ICaravanAmbushWorldEventService
     void End(Quest quest);
 }
 
-internal enum CaravanAmbushBattleOutcome
-{
-    None,
-    CaravanLost,
-    SurvivedWithoutHelp,
-    DirectSuccess,
-    HoldForReward,
-}
-
 internal class CaravanAmbushWorldEventService : ICaravanAmbushWorldEventService
 {
     private readonly IOutcomeDispatcher dispatcher;
@@ -50,13 +41,11 @@ internal class CaravanAmbushWorldEventService : ICaravanAmbushWorldEventService
         // Vanilla's vicinity check reads MainParty, which is only the owner's when the owner has a party.
         var skipsVicinityCheck = quest._caravanParty?.MapEvent != null || quest._isCaravanSaved;
         if (Hero.MainHero.PartyBelongedTo != null || skipsVicinityCheck) quest.HourlyTick();
-        return false;
     });
 
     public void MapEventStarted(MapEvent battle, PartyBase attacker, PartyBase defender) => Run(quest =>
     {
         quest.MapEventStarted(battle, attacker, defender);
-        return false;
     });
 
     public void BanditsRecruited(MobileParty bandits)
@@ -64,20 +53,18 @@ internal class CaravanAmbushWorldEventService : ICaravanAmbushWorldEventService
         var recruiter = Hero.MainHero;
         Run(quest =>
         {
-            if (quest._banditParty != bandits) return false;
+            if (quest._banditParty != bandits) return;
             if (Hero.MainHero == recruiter) quest.OnPlayerHiredBandits();
             else quest.CompleteQuestWithCancel();
-            return false;
         });
     }
 
     public void SettlementEntered(MobileParty party) => Run(quest =>
     {
-        if (party == null || quest._caravanParty != party || quest._isCaravanSaved) return false;
+        if (party == null || quest._caravanParty != party || quest._isCaravanSaved) return;
         DestroyPartyAction.Apply(party.Party, party);
         quest._caravanParty = null;
         quest.CompleteQuestWithCancel();
-        return false;
     });
 
     public void End(Quest quest)
@@ -88,14 +75,20 @@ internal class CaravanAmbushWorldEventService : ICaravanAmbushWorldEventService
 
     public void BattleEnded(MapEvent battle) => Run(quest => BattleEnded(quest, battle));
 
+    private void Run(Action<Quest> action) => Run(quest =>
+    {
+        action(quest);
+        return false;
+    });
+
     private void Run(Func<Quest, bool> action)
     {
         dispatcher.RunAsOwners<Quest>(quest =>
         {
             var before = progress.Capture(quest);
-            var openRewardConversation = action(quest);
+            var opensRewardConversation = action(quest);
             if (quest.IsOngoing && progress.Capture(quest) != before)
-                progress.Publish(quest, openRewardConversation);
+                progress.Publish(quest, opensRewardConversation);
         });
     }
 
@@ -120,8 +113,12 @@ internal class CaravanAmbushWorldEventService : ICaravanAmbushWorldEventService
         // A retreated party stays in the winners list until the event is finalized.
         var ownerWon = ownerParty != null && !retreatedPartyTracker.IsRetreated(battle, ownerParty.Party) &&
             OnSide(winners, ownerParty);
-        var outcome = Classify(OnSide(losers, quest._caravanParty), OnSide(losers, quest._banditParty),
-            quest._isCaravanSaved, ownerWon, quest._caravanParty.IsActive && OnSide(winners, quest._caravanParty));
+        var outcome = Classify(
+            caravanLost: OnSide(losers, quest._caravanParty),
+            banditsLost: OnSide(losers, quest._banditParty),
+            alreadySaved: quest._isCaravanSaved,
+            ownerWon: ownerWon,
+            caravanOnWinningSide: quest._caravanParty.IsActive && OnSide(winners, quest._caravanParty));
         switch (outcome)
         {
             case CaravanAmbushBattleOutcome.CaravanLost:

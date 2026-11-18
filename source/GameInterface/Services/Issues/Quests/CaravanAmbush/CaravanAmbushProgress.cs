@@ -52,6 +52,7 @@ internal class CaravanAmbushProgress : ICaravanAmbushProgress
     private bool TryGetPartyId(MobileParty party, out string id)
     {
         id = null;
+        // A null id means the party is inactive and the owner keeps its last known reference.
         return party == null || !party.IsActive || objects.TryGetIdWithLogging(party, out id);
     }
 }

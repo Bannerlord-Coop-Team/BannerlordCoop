@@ -71,7 +71,10 @@ internal class IssueOwnershipSnapshotReceiver : IHandler
         }
 
         foreach (var entry in dropped)
+        {
+            // Each replay gets its own catch, so one failed cancel doesnt skip the others.
             GameThread.RunSafe(() => finalization.ReplayLocalCancel(entry.IssueOwnerId, entry.IssueId, entry.WasOwner),
                 context: nameof(IssueOwnershipSnapshotReceiver));
+        }
     }
 }

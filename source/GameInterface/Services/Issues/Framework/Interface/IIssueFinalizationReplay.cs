@@ -2,6 +2,6 @@
 
 public interface IIssueFinalizationReplay
 {
-    // Replays a local cancellation dropped from a join snapshot after capturing ownership before replacement.
+    // Cancels the local copy of an issue the join snapshot no longer lists; wasOwner is this client's ownership from before the mirror was replaced.
     void ReplayLocalCancel(string issueOwnerId, string issueId, bool wasOwner);
 }

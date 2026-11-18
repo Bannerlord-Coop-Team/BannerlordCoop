@@ -7,13 +7,13 @@ using TaleWorlds.Core;
 
 namespace GameInterface.Services.Issues.Quests.CaravanAmbush;
 
-internal interface ICaravanAmbushConversationMap
+internal interface ICaravanAmbushMapConversation
 {
     bool IsOwnerFreeOnMap();
     bool TryOpen(MobileParty caravan);
 }
 
-internal class CaravanAmbushConversationMap : ICaravanAmbushConversationMap
+internal class CaravanAmbushMapConversation : ICaravanAmbushMapConversation
 {
     public bool IsOwnerFreeOnMap() => GameStateManager.Current?.ActiveState is MapState map && !map.AtMenu &&
         !map.IsSimulationActive && !Campaign.Current.ConversationManager.IsConversationInProgress;
