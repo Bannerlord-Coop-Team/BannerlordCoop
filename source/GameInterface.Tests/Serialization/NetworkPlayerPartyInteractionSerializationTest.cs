@@ -126,13 +126,15 @@ public class NetworkPlayerPartyInteractionSerializationTest
             "session-1",
             "initiator-party",
             "responder-party",
-            outcome);
+            outcome,
+            "kingdom-1");
 
         var result = RoundTrip(original);
 
         Assert.Equal(original.SessionId, result.SessionId);
         Assert.Equal(original.InitiatorPartyId, result.InitiatorPartyId);
         Assert.Equal(original.ResponderPartyId, result.ResponderPartyId);
+        Assert.Equal(original.FullKingdomId, result.FullKingdomId);
         Assert.Equal(original.OutcomeType, result.OutcomeType);
     }
 

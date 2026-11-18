@@ -30,6 +30,8 @@ public interface IVassalAndMercenaryOfferCampaignBehaviorInterface : IGameAbstra
     void OnKingdomDestroyed(Kingdom destroyedKingdom);
     void AcceptMercenaryOffer(string playerHeroId, string kingdomId, NetPeer peer);
     void DeclineOffer(string playerHeroId, string kingdomId);
+    // Withdraws the kingdom's vassal or mercenary offer to the player, and tells their client.
+    void CancelOffer(string playerHeroId, string kingdomId);
     void AddNewPlayerHeroId(string playerHeroId, NetPeer peer);
 }
 
@@ -75,7 +77,7 @@ public class VassalAndMercenaryOfferCampaignBehaviorInterface : IVassalAndMercen
                 if (playerData.Value.CurrentMercenaryOfferKingdomId != null)
                 {
                     var offerDate = new CampaignTime(playerData.Value.CurrentMercenaryOfferDateNumTicks);
-                    CancelMercenaryOfferIfInvalid(behavior, playerData.Key, playerData.Value, offerDate.ElapsedDaysUntilNow >= VassalAndMercenaryOfferCampaignBehavior.MercenaryOfferCancelTimeInDays);
+                    CancelMercenaryOfferIfInvalid(behavior, playerData.Key, playerData.Value, clan, offerDate.ElapsedDaysUntilNow >= VassalAndMercenaryOfferCampaignBehavior.MercenaryOfferCancelTimeInDays);
                     continue;
                 }
 
@@ -125,7 +127,9 @@ public class VassalAndMercenaryOfferCampaignBehaviorInterface : IVassalAndMercen
 
     public void OnClanChangedKingdom(Clan clan, Kingdom newKingdom, ChangeKingdomAction.ChangeKingdomActionDetail detail)
     {
-        if (!clan.IsPlayerClan() || newKingdom == null) return;
+        if (newKingdom == null) return;
+        CancelOffersFromFullKingdom(newKingdom);
+        if (!clan.IsPlayerClan()) return;
         if (!objectManager.TryGetIdWithLogging(newKingdom, out var newKingdomId)) return;
 
         foreach (var playerData in PlayerVassalAndMercenaryOfferData)
@@ -159,7 +163,7 @@ public class VassalAndMercenaryOfferCampaignBehaviorInterface : IVassalAndMercen
             {
                 using (new MainHeroSubstitutionScope(playerHero, playerHero.PartyBelongedTo))
                 {
-                    CancelMercenaryOfferIfInvalid(behavior, playerData.Key, playerData.Value);
+                    CancelMercenaryOfferIfInvalid(behavior, playerData.Key, playerData.Value, playerHero.Clan);
                 }
             }
         }
@@ -178,7 +182,7 @@ public class VassalAndMercenaryOfferCampaignBehaviorInterface : IVassalAndMercen
             {
                 using (new MainHeroSubstitutionScope(playerHero, playerHero.PartyBelongedTo))
                 {
-                    CancelMercenaryOfferIfInvalid(behavior, playerData.Key, playerData.Value);
+                    CancelMercenaryOfferIfInvalid(behavior, playerData.Key, playerData.Value, playerHero.Clan);
                 }
             }
         }
@@ -228,6 +232,31 @@ public class VassalAndMercenaryOfferCampaignBehaviorInterface : IVassalAndMercen
         ClearKingdomOffer(playerData, kingdomId);
     }
 
+    public void CancelOffer(string playerHeroId, string kingdomId)
+    {
+        if (!PlayerVassalAndMercenaryOfferData.TryGetValue(playerHeroId, out var playerData)) return;
+
+        CancelOffer(playerHeroId, playerData, kingdomId);
+    }
+
+    // A kingdom that just took its last clan can't take a player it still has an offer out to.
+    private void CancelOffersFromFullKingdom(Kingdom kingdom)
+    {
+        if (!objectManager.TryGetIdWithLogging(kingdom, out var kingdomId)) return;
+
+        foreach (var playerData in PlayerVassalAndMercenaryOfferData)
+        {
+            if (!objectManager.TryGetObjectWithLogging<Hero>(playerData.Key, out var playerHero)) continue;
+
+            bool fullForMercenary = playerData.Value.CurrentMercenaryOfferKingdomId == kingdomId &&
+                kingdomClanLimit.IsFull(playerHero.Clan, kingdom, asMercenary: true, ModConfigProvider.ModOptions);
+            bool fullForVassal = playerData.Value.VassalOffers.ContainsKey(kingdomId) &&
+                kingdomClanLimit.IsFull(playerHero.Clan, kingdom, asMercenary: false, ModConfigProvider.ModOptions);
+            if (fullForMercenary || fullForVassal)
+                CancelOffer(playerData.Key, playerData.Value, kingdomId);
+        }
+    }
+
     public void AddNewPlayerHeroId(string playerHeroId, NetPeer peer)
     {
         if (PlayerVassalAndMercenaryOfferData.TryGetValue(playerHeroId, out var playerData))
@@ -262,11 +291,12 @@ public class VassalAndMercenaryOfferCampaignBehaviorInterface : IVassalAndMercen
             && !kingdom.Leader.IsFugitive;
     }
 
-    private void CancelMercenaryOfferIfInvalid(VassalAndMercenaryOfferCampaignBehavior behavior, string playerHeroId, VassalAndMercenaryOfferData playerData, bool expired = false)
+    private void CancelMercenaryOfferIfInvalid(VassalAndMercenaryOfferCampaignBehavior behavior, string playerHeroId, VassalAndMercenaryOfferData playerData, Clan clan, bool expired = false)
     {
         // Cancel on a failed lookup too, otherwise DailyTick never creates another offer for this player.
         if (!objectManager.TryGetObjectWithLogging<Kingdom>(playerData.CurrentMercenaryOfferKingdomId, out var kingdom) ||
-            expired || !behavior.MercenaryKingdomSelectionConditionsHold(kingdom))
+            expired || !behavior.MercenaryKingdomSelectionConditionsHold(kingdom) ||
+            kingdomClanLimit.IsFull(clan, kingdom, asMercenary: true, ModConfigProvider.ModOptions))
         {
             CancelOffer(playerHeroId, playerData, playerData.CurrentMercenaryOfferKingdomId);
         }

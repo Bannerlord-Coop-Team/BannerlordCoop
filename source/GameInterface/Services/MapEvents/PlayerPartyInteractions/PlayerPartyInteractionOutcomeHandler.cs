@@ -319,6 +319,7 @@ internal class PlayerPartyInteractionOutcomeHandler
         }
         if (kingdomClanLimit.IsFull(initiatorClan, targetKingdom, asMercenary: false, ModConfigProvider.ModOptions))
         {
+            Logger.Warning("Rejected player-party vassalage for clan {ClanId} because kingdom {KingdomId} has maxClansPerKingdom clans", initiatorClan.StringId, targetKingdom.StringId);
             kingdomFull = true;
             return false;
         }
@@ -510,6 +511,7 @@ internal class PlayerPartyInteractionOutcomeHandler
         }
         if (kingdomClanLimit.IsFull(initiatorClan, targetKingdom, asMercenary: true, ModConfigProvider.ModOptions))
         {
+            Logger.Warning("Rejected player-party mercenary for clan {ClanId} because kingdom {KingdomId} has maxClansPerKingdom clans", initiatorClan.StringId, targetKingdom.StringId);
             kingdomFull = true;
             return false;
         }

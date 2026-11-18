@@ -50,6 +50,30 @@ internal readonly struct DoClanNameSelection : ICommand
     }
 }
 
+/// <summary>
+/// The host's answer to <see cref="DoClanNameSelection"/>, which the ruler's conversation waits for.
+/// </summary>
+[ProtoContract(SkipConstructor = true)]
+internal readonly struct ClanNameSelectionResult : ICommand
+{
+    [ProtoMember(1)]
+    public readonly bool Promoted;
+
+    // Refused because the ruler's kingdom has maxClansPerKingdom clans.
+    [ProtoMember(2)]
+    public readonly bool KingdomFull;
+
+    [ProtoMember(3)]
+    public readonly string KingdomId;
+
+    public ClanNameSelectionResult(bool promoted, bool kingdomFull, string kingdomId)
+    {
+        Promoted = promoted;
+        KingdomFull = kingdomFull;
+        KingdomId = kingdomId;
+    }
+}
+
 [ProtoContract(SkipConstructor = true)]
 public readonly struct FireCompanion : IEvent
 {

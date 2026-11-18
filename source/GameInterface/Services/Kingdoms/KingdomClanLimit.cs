@@ -30,11 +30,11 @@ public class KingdomClanLimit : IKingdomClanLimit
         return kingdom.Clans.Count(member => Counts(member.IsUnderMercenaryService, options)) >= options.MaxClansPerKingdom;
     }
 
-    /// <summary>The refusal every player sees. A null kingdom reads as the other player's kingdom.</summary>
+    /// <summary>The refusal every player sees. A null kingdom, unknown or the other player's, reads as "That kingdom".</summary>
     public static TextObject GetFullText(Kingdom kingdom, ModOptions options)
     {
         var text = new TextObject("{=coop_kingdom_full}{KINGDOM} already has the most clans this server allows ({MAX}).");
-        text.SetTextVariable("KINGDOM", kingdom?.Name ?? new TextObject("{=coop_kingdom_full_other}The other player's kingdom"));
+        text.SetTextVariable("KINGDOM", kingdom?.Name ?? new TextObject("{=coop_kingdom_full_other}That kingdom"));
         text.SetTextVariable("MAX", options.MaxClansPerKingdom);
         return text;
     }

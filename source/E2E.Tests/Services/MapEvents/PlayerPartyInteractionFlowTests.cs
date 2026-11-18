@@ -689,6 +689,42 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
         }
     }
 
+    // The kingdom has one clan, its ruler's, and the limit is one. Mercenaries only meet the limit when counted.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void OfferServices_KingdomAtMaxClans_DisablesVassalAndACountedMercenary(bool countMercenaries)
+    {
+        var (client1, _, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
+        SetupResponderKingdomLeader(initiatorPartyId, responderPartyId, initiatorClanTier: 2);
+        var previousOptions = ModConfigProvider.ModOptions;
+        ModConfigProvider.ModOptions = new ModOptions(new ModOptionsData { MaxClansPerKingdom = 1, CountMercenaries = countMercenaries });
+        try
+        {
+            RequestInteraction(client1, initiatorPartyId, responderPartyId);
+            var sessionId = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>().Single().SessionId;
+            var initialState = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>().Single(s =>
+                s.SessionId == sessionId &&
+                s.PartyId == initiatorPartyId &&
+                s.Phase == PlayerPartyInteractionPhase.InitialOptions);
+            OpenServiceOptions(client1, initialState);
+
+            const string fullText = "That kingdom already has the most clans this server allows (1).";
+            client1.Call(() =>
+            {
+                Assert.False(PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.Vassal, out var vassalExplanation));
+                Assert.Equal(fullText, vassalExplanation.ToString());
+                Assert.Equal(!countMercenaries, PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.Mercenary, out var mercenaryExplanation));
+                if (countMercenaries)
+                    Assert.Equal(fullText, mercenaryExplanation.ToString());
+            });
+        }
+        finally
+        {
+            ModConfigProvider.ModOptions = previousOptions;
+        }
+    }
+
     // The kingdom has its ruler's clan, and another clan takes the last place while the ruler is still answering.
     [Theory]
     [InlineData(false)]
@@ -759,6 +795,9 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
                     Assert.DoesNotContain(initiatorParty.LeaderHero.Clan, responderParty.LeaderHero.Clan.Kingdom.Clans);
                 });
             }
+
+            AssertInteractionStateCleared(client1);
+            AssertInteractionStateCleared(client2);
 
             // The session is closed, so a late second answer ends nothing.
             Server.NetworkSentMessages.Clear();

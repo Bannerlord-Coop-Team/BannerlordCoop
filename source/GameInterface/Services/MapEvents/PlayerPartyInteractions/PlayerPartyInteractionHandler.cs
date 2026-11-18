@@ -355,7 +355,7 @@ internal class PlayerPartyInteractionHandler : IHandler
             PlayerPartyInteractionDialogState.Clear(message.SessionId);
             trade.End(message.SessionId);
             if (message.OutcomeType == PlayerPartyInteractionOutcomeType.KingdomFull)
-                ShowKingdomFullMessage(message.ResponderPartyId);
+                ShowKingdomFullMessage(message.FullKingdomId);
             else
                 ShowOutcomeMessage(message.OutcomeType);
             var conversationWasOpened = openedConversationSessionIds.Remove(message.SessionId);
@@ -1026,16 +1026,24 @@ internal class PlayerPartyInteractionHandler : IHandler
         var outcome = new PlayerPartyInteractionOutcome(session, outcomeType, actorPartyId);
         var applied = outcomeHandler.Handle(outcome, out var kingdomFull);
         var finalOutcomeType = outcomeType;
+        string fullKingdomId = null;
         if (kingdomFull)
+        {
             finalOutcomeType = PlayerPartyInteractionOutcomeType.KingdomFull;
+            if (objectManager.TryGetIdWithLogging(session.TargetKingdom, out var kingdomId))
+                fullKingdomId = kingdomId;
+        }
         else if (!applied)
+        {
             finalOutcomeType = GetFailedOutcome(outcomeType, session.Proposal);
+        }
 
         network.SendAll(new NetworkPlayerPartyInteractionEnded(
             session.SessionId,
             session.InitiatorPartyId,
             session.ResponderPartyId,
-            finalOutcomeType));
+            finalOutcomeType,
+            fullKingdomId));
 
         if (finalOutcomeType == PlayerPartyInteractionOutcomeType.HostileDemandAccepted ||
             finalOutcomeType == PlayerPartyInteractionOutcomeType.HostileDemandYielded)
@@ -1358,10 +1366,10 @@ internal class PlayerPartyInteractionHandler : IHandler
         return PlayerPartyInteractionOutcomeType.Left;
     }
 
-    // The responder's kingdom filled up between the proposal and the answer.
-    private void ShowKingdomFullMessage(string responderPartyId)
+    // The host's kingdom filled up between the proposal and the answer.
+    private void ShowKingdomFullMessage(string fullKingdomId)
     {
-        var kingdom = objectManager.TryGetObject(responderPartyId, out PartyBase responderParty) ? responderParty.LeaderHero?.Clan?.Kingdom : null;
+        var kingdom = objectManager.TryGetObjectWithLogging<Kingdom>(fullKingdomId, out var fullKingdom) ? fullKingdom : null;
         var text = KingdomClanLimit.GetFullText(kingdom, ModConfigProvider.ModOptions);
         InformationManager.DisplayMessage(new InformationMessage(text.ToString()));
     }

@@ -983,6 +983,8 @@ public class LordBarterSyncTests : MapEventTestBase
         var player = CreatePartyWithRegisteredLeader();
         var target = CreatePartyWithRegisteredLeader();
         var ruler = CreatePartyWithRegisteredLeader();
+        // Vanilla's CanHeroDefectToFaction never offers a kingdom's ruler, so the recruited lord serves another one.
+        var originRuler = CreatePartyWithRegisteredLeader();
         var destinationKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
         var originalKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
         var requestId = Guid.NewGuid().ToString("N");
@@ -995,6 +997,7 @@ public class LordBarterSyncTests : MapEventTestBase
                 Assert.True(instance.ObjectManager.TryGetObject<Hero>(player.HeroId, out var playerHero));
                 Assert.True(instance.ObjectManager.TryGetObject<Hero>(target.HeroId, out var targetHero));
                 Assert.True(instance.ObjectManager.TryGetObject<Hero>(ruler.HeroId, out var rulerHero));
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(originRuler.HeroId, out var originRulerHero));
                 Assert.True(instance.ObjectManager.TryGetObject<Kingdom>(destinationKingdomId, out var destinationKingdom));
                 Assert.True(instance.ObjectManager.TryGetObject<Kingdom>(originalKingdomId, out var originalKingdom));
 
@@ -1007,7 +1010,9 @@ public class LordBarterSyncTests : MapEventTestBase
                     rulerHero.Clan._kingdom = destinationKingdom;
                     playerHero.Clan._kingdom = destinationKingdom;
 
-                    originalKingdom._rulingClan = targetHero.Clan;
+                    originalKingdom._rulingClan = originRulerHero.Clan;
+                    originalKingdom._clans.Add(originRulerHero.Clan);
+                    originRulerHero.Clan._kingdom = originalKingdom;
                     originalKingdom._clans.Add(targetHero.Clan);
                     targetHero.Clan._kingdom = originalKingdom;
                 }
@@ -1076,7 +1081,7 @@ public class LordBarterSyncTests : MapEventTestBase
                     var joined = accepted ? destinationKingdom : originalKingdom;
                     var left = accepted ? originalKingdom : destinationKingdom;
                     Assert.Same(joined, targetHero.Clan.Kingdom);
-                    Assert.Contains(targetHero.Clan, joined.Clans);
+                    Assert.Single(joined.Clans, clan => clan == targetHero.Clan);
                     Assert.DoesNotContain(targetHero.Clan, left.Clans);
                 });
             }

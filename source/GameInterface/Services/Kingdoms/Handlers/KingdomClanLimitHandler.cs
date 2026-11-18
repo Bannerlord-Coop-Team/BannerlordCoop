@@ -34,8 +34,8 @@ internal class KingdomClanLimitHandler : IHandler
     {
         GameThread.RunSafe(() =>
         {
-            if (!objectManager.TryGetObjectWithLogging<Kingdom>(payload.What.KingdomId, out var kingdom)) return;
-
+            // A failed lookup still tells the player, without the kingdom name.
+            var kingdom = objectManager.TryGetObjectWithLogging<Kingdom>(payload.What.KingdomId, out var fullKingdom) ? fullKingdom : null;
             MBInformationManager.AddQuickInformation(KingdomClanLimit.GetFullText(kingdom, ModConfigProvider.ModOptions));
         }, context: nameof(KingdomClanLimitHandler));
     }
