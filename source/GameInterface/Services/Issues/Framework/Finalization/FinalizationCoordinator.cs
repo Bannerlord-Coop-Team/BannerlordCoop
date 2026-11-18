@@ -266,7 +266,7 @@ internal class FinalizationCoordinator : IHandler, IIssueFinalizationReplay
                 !issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out var descriptor)) return;
 
             var quest = issue.IssueQuest;
-            if (data.IsQuestJournal && (quest == null ||
+            if (data.IsQuestJournal && (quest == null || !quest.IsOngoing ||
                 !Campaign.Current.QuestManager.Quests.Contains(quest))) return;
             if (!data.IsQuestJournal && (quest != null || issue.IsSolvingWithAlternative)) return;
 
