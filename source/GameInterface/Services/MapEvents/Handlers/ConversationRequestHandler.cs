@@ -206,7 +206,6 @@ internal class ConversationRequestHandler : IHandler
         // otherwise the attacker retries every tick and each retry denies a request nobody made.
         if (conversationPartyTracker.TryDefer(playerPeer, playerPartyId, aiPartyId, out var firstDeferral))
         {
-            // The attacker retries every tick, so the tracker lets each deferral log once.
             if (firstDeferral)
             {
                 Logger.Verbose(
@@ -859,8 +858,6 @@ internal class ConversationRequestHandler : IHandler
 
         var peer = payload.What.PlayerId;
         ReleaseEngagementOnMainThread(peer);
-        // Deferrals are recorded on the game thread, so forget them there too, after any check already running.
-        GameThread.RunSafe(() => conversationPartyTracker.ForgetDeferrals(peer), context: nameof(Handle_PlayerDisconnected));
         EndPvpInteraction(peer);
         EndPvpInteractionForDefender(peer);
     }
