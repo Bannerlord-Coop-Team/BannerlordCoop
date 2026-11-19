@@ -124,6 +124,11 @@ internal class HeroInterface : IHeroInterface
             return false;
         }
 
+        // A hero can lack an equipment set, which leaves its handle 0
+        objectManager.TryGetHandle(hero._battleEquipment, out var battleEquipmentHandle);
+        objectManager.TryGetHandle(hero._civilianEquipment, out var civilianEquipmentHandle);
+        objectManager.TryGetHandle(hero._stealthEquipment, out var stealthEquipmentHandle);
+
         handles = new PlayerRegistrationHandles(
             heroHandle,
             partyHandle,
@@ -133,7 +138,10 @@ internal class HeroInterface : IHeroInterface
             itemRosterHandle,
             partyBaseHandle,
             memberRosterHandle,
-            prisonRosterHandle);
+            prisonRosterHandle,
+            battleEquipmentHandle,
+            civilianEquipmentHandle,
+            stealthEquipmentHandle);
         return true;
     }
 
@@ -367,9 +375,14 @@ internal class HeroInterface : IHeroInterface
         RegisterPrimary(hero.CharacterObject, hero.StringId);
 
         // HeroDeveloper is not a child of MBObjectBase, can't use RegisterPrimary
-        objectManager.AddExisting($"{nameof(HeroDeveloper)}_{hero.StringId}", hero.HeroDeveloper); 
+        objectManager.AddExisting($"{nameof(HeroDeveloper)}_{hero.StringId}", hero.HeroDeveloper);
 
         RegisterPartyChildren(party);
+
+        // The unpack runs under AllowedThread, so the equipment constructors registered nothing and slot writes couldn't sync
+        RegisterHeroEquipment(hero._battleEquipment, $"{hero.StringId}_BattleEquipment", null);
+        RegisterHeroEquipment(hero._civilianEquipment, $"{hero.StringId}_CivilianEquipment", null);
+        RegisterHeroEquipment(hero._stealthEquipment, $"{hero.StringId}_StealthEquipment", null);
     }
 
     /// <summary>
@@ -395,6 +408,19 @@ internal class HeroInterface : IHeroInterface
             handles.HeroDeveloper);
 
         RegisterPartyChildren(party, handles);
+
+        RegisterHeroEquipment(hero._battleEquipment, $"{hero.StringId}_BattleEquipment", handles.BattleEquipment);
+        RegisterHeroEquipment(hero._civilianEquipment, $"{hero.StringId}_CivilianEquipment", handles.CivilianEquipment);
+        RegisterHeroEquipment(hero._stealthEquipment, $"{hero.StringId}_StealthEquipment", handles.StealthEquipment);
+    }
+
+    // Same ids EquipmentRegistry.RegisterAllObjects gives hero equipment, so a client loading the save resolves them too
+    private void RegisterHeroEquipment(Equipment equipment, string suffix, uint? handle)
+    {
+        if (equipment == null) return;
+
+        if (handle == null) RegisterChild(equipment, suffix);
+        else if (handle != 0) RegisterChild(equipment, suffix, handle.Value);
     }
 
     /// <summary>The id prefix the host gives every joined player's hero, and so its character.</summary>

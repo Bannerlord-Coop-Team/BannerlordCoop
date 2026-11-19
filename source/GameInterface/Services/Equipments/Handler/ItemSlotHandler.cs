@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using GameInterface.Services.Equipments.Interfaces;
 using GameInterface.Services.Equipments.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
@@ -19,15 +20,17 @@ namespace GameInterface.Services.Equipments.Handlers
         private readonly IMessageBroker messageBroker;
         private readonly IObjectManager objectManager;
         private readonly INetwork network;
+        private readonly IEquipmentInterface equipmentInterface;
         private readonly ILogger Logger = LogManager.GetLogger<ItemSlotHandler>();
 
 
 
-        public ItemSlotHandler(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network)
+        public ItemSlotHandler(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network, IEquipmentInterface equipmentInterface)
         {
             this.messageBroker = messageBroker;
             this.objectManager = objectManager;
             this.network = network;
+            this.equipmentInterface = equipmentInterface;
             messageBroker.Subscribe<ItemSlotsArrayUpdated>(Handle);
             messageBroker.Subscribe<NetworkUpdateItemSlots>(Handle);
         }
@@ -74,6 +77,8 @@ namespace GameInterface.Services.Equipments.Handlers
 
                 equipment._itemSlots[data.Index] =
                     new EquipmentElement(item, itemModifier);
+
+                equipmentInterface.RefreshOwnerVisuals(equipment);
             }, context: nameof(NetworkUpdateItemSlots));
         }
 
