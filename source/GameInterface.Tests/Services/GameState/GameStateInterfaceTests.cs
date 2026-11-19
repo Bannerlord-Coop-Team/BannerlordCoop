@@ -88,7 +88,7 @@ public class GameStateInterfaceTests
 
         Assert.True(loaded.Wait(Timeout));
         // Everything queued before this has run once it returns, so a late or second action would show in the order
-        GameThread.Run(() => { });
+        GameThread.Run(() => { }, blocking: true);
         Assert.Equal(new[] { "EndGame", "Load" }, order);
     }
 
