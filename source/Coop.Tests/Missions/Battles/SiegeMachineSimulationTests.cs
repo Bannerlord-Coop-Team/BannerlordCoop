@@ -40,6 +40,21 @@ public class SiegeMachineSimulationTests : IDisposable
     private static float capturedHostDistance;
     private static int capturedDestructionState;
 
+    public SiegeMachineSimulationTests()
+    {
+        harmony.Patch(
+            AccessTools.Method(typeof(ScriptComponentBehavior), "CacheEditableFieldsForAllScriptComponents"),
+            prefix: new HarmonyMethod(AccessTools.Method(typeof(SiegeMachineSimulationTests), nameof(SkipScriptComponentCache))));
+    }
+
+    private static bool SkipScriptComponentCache() => false;
+
+    public void Dispose()
+    {
+        harmony.UnpatchAll(harmony.Id);
+        PausedSkeletons.Clear();
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -129,21 +144,6 @@ public class SiegeMachineSimulationTests : IDisposable
         StubReadState(destructionState, trackerDistance: 12.4f);
 
         Assert.Equal(expectedDistance, Capture(ram, isHost: true, localSimulator: false).MoveDistance);
-    }
-
-    public SiegeMachineSimulationTests()
-    {
-        harmony.Patch(
-            AccessTools.Method(typeof(ScriptComponentBehavior), "CacheEditableFieldsForAllScriptComponents"),
-            prefix: new HarmonyMethod(AccessTools.Method(typeof(SiegeMachineSimulationTests), nameof(SkipScriptComponentCache))));
-    }
-
-    private static bool SkipScriptComponentCache() => false;
-
-    public void Dispose()
-    {
-        harmony.UnpatchAll(harmony.Id);
-        PausedSkeletons.Clear();
     }
 
     private static bool RecordPause(SynchedMissionObject __instance)

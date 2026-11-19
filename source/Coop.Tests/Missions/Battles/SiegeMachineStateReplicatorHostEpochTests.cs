@@ -486,7 +486,7 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
         var hostState = new NetworkSiegeMachineState(
             machineId,
             hitPoints: 42.5f,
-            destructionState: 2,
+            destructionState: 0,
             gateState: -1,
             ladderState: -1,
             moveDistance: -1f,
@@ -519,7 +519,7 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
 
         var pending = Assert.Single(PendingStates()).Value;
         Assert.Equal(42.5f, pending.HitPoints);
-        Assert.Equal(2, pending.DestructionState);
+        Assert.Equal(0, pending.DestructionState);
         Assert.Equal(1, pending.GateState);
         Assert.Equal(3, pending.LadderState);
         Assert.Equal(18f, pending.MoveDistance);
@@ -548,7 +548,7 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
         var hostState = new NetworkSiegeMachineState(
             machineId,
             hitPoints: 42.5f,
-            destructionState: 2,
+            destructionState: 0,
             gateState: -1,
             ladderState: -1,
             moveDistance: -1f,
@@ -584,7 +584,7 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
 
         Assert.Empty(PendingStates());
         Assert.Equal(42.5f, stateToApply.HitPoints);
-        Assert.Equal(2, stateToApply.DestructionState);
+        Assert.Equal(0, stateToApply.DestructionState);
         Assert.Equal(1, stateToApply.GateState);
         Assert.Equal(3, stateToApply.LadderState);
         Assert.Equal(18f, stateToApply.MoveDistance);
@@ -596,6 +596,53 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
         Assert.Equal(7, stateToApply.StoneAmmo);
         Assert.Equal(LocalEpoch, stateToApply.HostEpoch);
         Assert.Equal(authorityRevision, stateToApply.AuthorityRevision);
+    }
+
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, false)]
+    [InlineData(true, true)]
+    [InlineData(false, true)]
+    public void BufferedDestructionKeepsHostDistanceWhenMergedWithClaimantMovement(
+        bool hostFirst, bool reconcileOnRegistration)
+    {
+        const int machineId = 18;
+        const int authorityRevision = 4;
+        const float hostDistance = 12.4f;
+        broker.Publish(this, new NetworkSiegeMachineAuthority(
+            machineId, "claimant", hostEpoch: LocalEpoch, authorityRevision: authorityRevision,
+            senderControllerId: "host"));
+
+        var hostState = new NetworkSiegeMachineState(machineId, 0f, 1, -1, -1, hostDistance,
+            false, -1, -1000f, -1000f, hostEpoch: LocalEpoch, senderControllerId: "host",
+            authorityRevision: authorityRevision);
+        var claimantState = new NetworkSiegeMachineState(machineId, -1f, -1, -1, -1, 17.4f,
+            true, -1, -1000f, -1000f, hostEpoch: LocalEpoch, senderControllerId: "claimant",
+            authorityRevision: authorityRevision);
+
+        var first = hostFirst ? hostState : claimantState;
+        var second = hostFirst ? claimantState : hostState;
+        broker.Publish(this, first);
+        DrainGameThread();
+        Assert.Same(first, Assert.Single(PendingStates()).Value);
+
+        NetworkSiegeMachineState merged;
+        if (reconcileOnRegistration)
+        {
+            merged = ReconcilePendingStateForLiveApply(second);
+            Assert.Empty(PendingStates());
+        }
+        else
+        {
+            broker.Publish(this, second);
+            DrainGameThread();
+            merged = Assert.Single(PendingStates()).Value;
+        }
+
+        Assert.Equal(hostState.HitPoints, merged.HitPoints);
+        Assert.Equal(hostState.DestructionState, merged.DestructionState);
+        Assert.Equal(hostDistance, merged.MoveDistance);
+        Assert.Equal(hostState.HasArrived, merged.HasArrived);
     }
 
     [Fact]

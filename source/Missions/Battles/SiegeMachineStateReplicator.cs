@@ -1617,7 +1617,9 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         NetworkSiegeMachineState incoming)
     {
         bool incomingHasAim = incoming.AimDirection > AimSentinel + 1f;
-        bool incomingHasMovement = incoming.MoveDistance >= 0f;
+        // Keep the host's wreck distance when merging a movement snapshot from the claimant.
+        bool incomingHasMovement = incoming.MoveDistance >= 0f
+            && !(existing.DestructionState > 0 && incoming.DestructionState < 0);
         return new NetworkSiegeMachineState(
             incoming.MachineId,
             incoming.HitPoints >= 0f ? incoming.HitPoints : existing.HitPoints,
