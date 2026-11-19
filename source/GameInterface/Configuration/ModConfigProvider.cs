@@ -92,7 +92,7 @@ public readonly struct ModOptions
     [ProtoMember(34)]
     public readonly int MaxClansPerKingdom { get; } = 0;
     [ProtoMember(35)]
-    public readonly bool CountMercenaries { get; } = false;
+    public readonly bool MaxClansPerKingdomCountsMercenaries { get; } = false;
 
     public ModOptions(ModOptions previous, bool voiceEnabled)
     {
@@ -136,6 +136,6 @@ public readonly struct ModOptions
         PvpBlockLeave = modOptionsData.PvpBlockLeave ?? PvpBlockLeave;
         PvpResponseTimerSeconds = modOptionsData.PvpResponseTimerSeconds ?? PvpResponseTimerSeconds;
         MaxClansPerKingdom = modOptionsData.MaxClansPerKingdom ?? MaxClansPerKingdom;
-        CountMercenaries = modOptionsData.CountMercenaries ?? CountMercenaries;
+        MaxClansPerKingdomCountsMercenaries = modOptionsData.MaxClansPerKingdomCountsMercenaries ?? MaxClansPerKingdomCountsMercenaries;
     }
 }

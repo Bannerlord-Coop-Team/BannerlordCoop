@@ -1163,7 +1163,7 @@ internal class PlayerPartyInteractionHandler : IHandler
             return false;
         }
 
-        if (kingdomClanLimit.IsFull(initiatorClan, responderKingdom, asMercenary: false, ModConfigProvider.ModOptions))
+        if (kingdomClanLimit.RefusesJoin(initiatorClan, responderKingdom, asMercenary: false, ModConfigProvider.ModOptions))
         {
             unavailableReason = PlayerPartyInteractionVassalUnavailableReason.KingdomFull;
             return false;
@@ -1256,7 +1256,7 @@ internal class PlayerPartyInteractionHandler : IHandler
             return false;
         }
 
-        if (kingdomClanLimit.IsFull(initiatorClan, targetKingdom, asMercenary: true, ModConfigProvider.ModOptions))
+        if (kingdomClanLimit.RefusesJoin(initiatorClan, targetKingdom, asMercenary: true, ModConfigProvider.ModOptions))
         {
             unavailableReason = PlayerPartyInteractionMercenaryUnavailableReason.KingdomFull;
             return false;

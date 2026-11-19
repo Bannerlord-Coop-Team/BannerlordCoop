@@ -37,7 +37,7 @@ internal class CompanionRolesPatches
         // never happens. The server checks again for a kingdom that fills while the ruler names the clan.
         var kingdom = Hero.MainHero.Clan.Kingdom;
         if (ContainerProvider.TryResolve<IKingdomClanLimit>(out var kingdomClanLimit) &&
-            kingdomClanLimit.IsFull(null, kingdom, asMercenary: false, ModConfigProvider.ModOptions))
+            kingdomClanLimit.RefusesJoin(clan: null, kingdom, asMercenary: false, ModConfigProvider.ModOptions))
         {
             MBInformationManager.AddQuickInformation(KingdomClanLimit.GetFullText(kingdom, ModConfigProvider.ModOptions));
             __instance.CurrentBehavior.RejectTurningCompanionToLordConsequence();

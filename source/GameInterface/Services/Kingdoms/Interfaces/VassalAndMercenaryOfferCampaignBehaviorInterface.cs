@@ -87,7 +87,7 @@ public class VassalAndMercenaryOfferCampaignBehaviorInterface : IVassalAndMercen
                 {
                     Kingdom kingdom = Kingdom.All.GetRandomElementWithPredicate(kingdom =>
                         behavior.MercenaryKingdomSelectionConditionsHold(kingdom) &&
-                        !kingdomClanLimit.IsFull(clan, kingdom, asMercenary: true, ModConfigProvider.ModOptions));
+                        !kingdomClanLimit.RefusesJoin(clan, kingdom, asMercenary: true, ModConfigProvider.ModOptions));
                     if (kingdom != null)
                     {
                         CreateMercenaryOffer(playerData.Key, playerData.Value, kingdom);
@@ -211,7 +211,7 @@ public class VassalAndMercenaryOfferCampaignBehaviorInterface : IVassalAndMercen
             return false;
         }
 
-        if (kingdomClanLimit.IsFull(clan, kingdom, asMercenary: true, ModConfigProvider.ModOptions))
+        if (kingdomClanLimit.RefusesJoin(clan, kingdom, asMercenary: true, ModConfigProvider.ModOptions))
         {
             Logger.Warning("Rejected mercenary offer for clan {ClanId} because kingdom {KingdomId} has maxClansPerKingdom clans", clan.StringId, kingdomId);
             return true;
@@ -258,7 +258,7 @@ public class VassalAndMercenaryOfferCampaignBehaviorInterface : IVassalAndMercen
 
         return !playerData.VassalOffers.ContainsKey(kingdomId)
             && FactionHelper.CanPlayerOfferVassalage(kingdom, out _, out _)
-            && !kingdomClanLimit.IsFull(clan, kingdom, asMercenary: false, ModConfigProvider.ModOptions)
+            && !kingdomClanLimit.RefusesJoin(clan, kingdom, asMercenary: false, ModConfigProvider.ModOptions)
             && !kingdom.Leader.IsPrisoner
             && !kingdom.Leader.IsFugitive;
     }
@@ -268,7 +268,7 @@ public class VassalAndMercenaryOfferCampaignBehaviorInterface : IVassalAndMercen
         // Cancel on a failed lookup too, otherwise DailyTick never creates another offer for this player.
         if (!objectManager.TryGetObjectWithLogging<Kingdom>(playerData.CurrentMercenaryOfferKingdomId, out var kingdom) ||
             expired || !behavior.MercenaryKingdomSelectionConditionsHold(kingdom) ||
-            kingdomClanLimit.IsFull(clan, kingdom, asMercenary: true, ModConfigProvider.ModOptions))
+            kingdomClanLimit.RefusesJoin(clan, kingdom, asMercenary: true, ModConfigProvider.ModOptions))
         {
             CancelOffer(playerHeroId, playerData, playerData.CurrentMercenaryOfferKingdomId);
         }

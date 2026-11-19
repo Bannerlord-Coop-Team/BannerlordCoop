@@ -136,11 +136,10 @@ internal class CompanionRolesHandler : IHandler
 
             // The companion's new clan joins the ruler's kingdom, so it counts like any other clan joining it.
             var kingdom = mainHero.Clan.Kingdom;
-            if (kingdomClanLimit.IsFull(null, kingdom, asMercenary: false, ModConfigProvider.ModOptions))
+            if (kingdomClanLimit.RefusesJoin(clan: null, kingdom, asMercenary: false, ModConfigProvider.ModOptions))
             {
-                logger.Warning("Rejected making companion {HeroId} a lord because kingdom {KingdomId} has maxClansPerKingdom clans", data.OneToOneConversationHeroId, kingdom.StringId);
-                // A missed id still tells the ruler, without the kingdom name.
-                var kingdomId = objectManager.TryGetIdWithLogging(kingdom, out var id) ? id : null;
+                if (!objectManager.TryGetIdWithLogging(kingdom, out var kingdomId)) return;
+                logger.Warning("Rejected making companion {HeroId} a lord because kingdom {KingdomId} has maxClansPerKingdom clans", data.OneToOneConversationHeroId, kingdomId);
                 network.Send(obj.Who as NetPeer, new NetworkKingdomFull(kingdomId));
                 return;
             }

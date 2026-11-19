@@ -19,14 +19,14 @@ public class KingdomClanLimitTests
     [InlineData(2, false, true, false)]
     [InlineData(2, true, true, true)]
     [InlineData(3, true, false, true)]
-    public void IsFull_CountsTheRulingClanAndVassals_AndMercenariesOnlyWhenTheHostCountsThem(
-        int maxClans, bool countMercenaries, bool asMercenary, bool expectedFull)
+    public void RefusesJoin_CountsTheRulingClanAndVassals_AndMercenariesOnlyWhenTheHostCountsThem(
+        int maxClans, bool countMercenaries, bool asMercenary, bool expectedRefused)
     {
         var kingdom = CreateKingdom();
         AddClan(kingdom);
         AddClan(kingdom, isMercenary: true);
 
-        Assert.Equal(expectedFull, limit.IsFull(null, kingdom, asMercenary, Options(maxClans, countMercenaries)));
+        Assert.Equal(expectedRefused, limit.RefusesJoin(clan: null, kingdom, asMercenary, Options(maxClans, countMercenaries)));
     }
 
     // A clan the kingdom already counts is never refused. A mercenary becoming a vassal starts to count when
@@ -35,13 +35,13 @@ public class KingdomClanLimitTests
     [InlineData(false, false, false)]
     [InlineData(true, false, true)]
     [InlineData(true, true, false)]
-    public void IsFull_ClanAlreadyInTheKingdom_IsRefusedOnlyWhenItStartsToCount(
-        bool isMercenary, bool countMercenaries, bool expectedFull)
+    public void RefusesJoin_ClanAlreadyInTheKingdom_IsRefusedOnlyWhenItStartsToCount(
+        bool isMercenary, bool countMercenaries, bool expectedRefused)
     {
         var kingdom = CreateKingdom();
         var clan = AddClan(kingdom, isMercenary);
 
-        Assert.Equal(expectedFull, limit.IsFull(clan, kingdom, asMercenary: false, Options(maxClans: 1, countMercenaries)));
+        Assert.Equal(expectedRefused, limit.RefusesJoin(clan, kingdom, asMercenary: false, Options(maxClans: 1, countMercenaries)));
     }
 
     private static Kingdom CreateKingdom()
@@ -65,6 +65,6 @@ public class KingdomClanLimitTests
         => new ModOptions(new ModOptionsData
         {
             MaxClansPerKingdom = maxClans,
-            CountMercenaries = countMercenaries,
+            MaxClansPerKingdomCountsMercenaries = countMercenaries,
         });
 }

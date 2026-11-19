@@ -698,7 +698,7 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
         var (client1, _, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
         SetupResponderKingdomLeader(initiatorPartyId, responderPartyId, initiatorClanTier: 2);
         var previousOptions = ModConfigProvider.ModOptions;
-        ModConfigProvider.ModOptions = new ModOptions(new ModOptionsData { MaxClansPerKingdom = 1, CountMercenaries = countMercenaries });
+        ModConfigProvider.ModOptions = new ModOptions(new ModOptionsData { MaxClansPerKingdom = 1, MaxClansPerKingdomCountsMercenaries = countMercenaries });
         try
         {
             RequestInteraction(client1, initiatorPartyId, responderPartyId);

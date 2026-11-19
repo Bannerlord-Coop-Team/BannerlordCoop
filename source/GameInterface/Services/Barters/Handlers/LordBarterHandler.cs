@@ -792,7 +792,7 @@ internal sealed partial class LordBarterHandler : IHandler
             !CanAuthorizeKind(null, playerHero, targetHero, request, targetKingdom, out reason))
             return false;
         if (kind == LordBarterKind.JoinKingdomAsClan &&
-            kingdomClanLimit.IsFull(targetHero.Clan, targetKingdom, asMercenary: false, ModConfigProvider.ModOptions))
+            kingdomClanLimit.RefusesJoin(targetHero.Clan, targetKingdom, asMercenary: false, ModConfigProvider.ModOptions))
         {
             reason = KingdomClanLimit.GetFullText(targetKingdom, ModConfigProvider.ModOptions).ToString();
             return false;

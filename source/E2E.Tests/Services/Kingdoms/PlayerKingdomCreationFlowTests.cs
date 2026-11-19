@@ -664,7 +664,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     [Fact]
     public void MercenaryServiceAccepted_RulerHiresIntoAFullKingdom_KeepsTheOldContractAndTellsTheRuler()
     {
-        ModConfigProvider.ModOptions = new ModOptions(new ModOptionsData { MaxClansPerKingdom = 1, CountMercenaries = true });
+        ModConfigProvider.ModOptions = new ModOptions(new ModOptionsData { MaxClansPerKingdom = 1, MaxClansPerKingdomCountsMercenaries = true });
         var client = Clients.First();
         var ruler = CreateSyncedPlayerContext(ControllerId, client);
         var kingdomId = CreateNamedKingdomEverywhere(ruler.ClanId);
@@ -765,7 +765,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     [Fact]
     public void MercenaryOfferAccepted_KingdomFullBeforeTheClick_RefusesAndClearsTheOffer()
     {
-        ModConfigProvider.ModOptions = new ModOptions(new ModOptionsData { MaxClansPerKingdom = 1, CountMercenaries = true });
+        ModConfigProvider.ModOptions = new ModOptions(new ModOptionsData { MaxClansPerKingdom = 1, MaxClansPerKingdomCountsMercenaries = true });
         var client = Clients.First();
         var player = CreateSyncedPlayerContext(ControllerId, client);
         var ruler = CreateSyncedPlayerContext("OfferRuler", _ => false);

@@ -277,7 +277,7 @@
     // Count mercenary clans toward maxClansPerKingdom.
     // (Default) false: Mercenaries don't count, so a full kingdom can still hire them and a player can still sign on as one.
     // true: Mercenaries count, and a full kingdom can't take on another mercenary either.
-    "countMercenaries": false,
+    "maxClansPerKingdomCountsMercenaries": false,
 
     // Toggle War Sails (NavalDLC) co-op on a dedicated server. War Sails is not officially supported yet.
     // Only the dedicated server reads this. Hosting in game and joining follow the launcher's NavalDLC setting.

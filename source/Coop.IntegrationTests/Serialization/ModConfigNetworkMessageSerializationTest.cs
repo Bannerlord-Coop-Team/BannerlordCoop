@@ -90,7 +90,7 @@ namespace Coop.IntegrationTests.Serialization
                 PvpBlockLeave = true,
                 PvpResponseTimerSeconds = 30,
                 MaxClansPerKingdom = 12,
-                CountMercenaries = true,
+                MaxClansPerKingdomCountsMercenaries = true,
             });
 
             var copy = RoundTrip(new NetworkLoadModConfig(options)).ModOptions;
@@ -120,7 +120,7 @@ namespace Coop.IntegrationTests.Serialization
             Assert.True(copy.PvpBlockLeave);
             Assert.Equal(30, copy.PvpResponseTimerSeconds);
             Assert.Equal(12, copy.MaxClansPerKingdom);
-            Assert.True(copy.CountMercenaries);
+            Assert.True(copy.MaxClansPerKingdomCountsMercenaries);
 
             // Keys the operator left absent still resolve to the documented defaults, not to zero.
             Assert.True(copy.FastForwardEnabled);

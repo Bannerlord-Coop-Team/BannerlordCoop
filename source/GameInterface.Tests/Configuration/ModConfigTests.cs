@@ -321,7 +321,7 @@ public class ModConfigTests : IDisposable
         Assert.False(options.PvpBlockLeave);
         Assert.Equal(0, options.PvpResponseTimerSeconds);
         Assert.Equal(0, options.MaxClansPerKingdom);
-        Assert.False(options.CountMercenaries);
+        Assert.False(options.MaxClansPerKingdomCountsMercenaries);
     }
 
     /// <summary>

@@ -96,7 +96,7 @@ internal class MercenaryServiceHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging<Hero>(heroId, out var hero)) return;
         if (!objectManager.TryGetObjectWithLogging<Kingdom>(kingdomId, out var kingdom)) return;
 
-        if (kingdomClanLimit.IsFull(clan, kingdom, asMercenary: true, ModConfigProvider.ModOptions))
+        if (kingdomClanLimit.RefusesJoin(clan, kingdom, asMercenary: true, ModConfigProvider.ModOptions))
         {
             Logger.Warning("Rejected mercenary service request for clan {ClanId} because kingdom {KingdomId} has maxClansPerKingdom clans", clanId, kingdomId);
             network.Send(peer, new NetworkKingdomFull(kingdomId));

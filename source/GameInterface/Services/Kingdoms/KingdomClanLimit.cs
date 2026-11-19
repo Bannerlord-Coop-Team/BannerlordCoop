@@ -9,23 +9,25 @@ namespace GameInterface.Services.Kingdoms;
 public interface IKingdomClanLimit : IGameAbstraction
 {
     // Whether maxClansPerKingdom refuses the clan joining the kingdom. The clan is null for a new clan made for it, the kingdom null when there is none.
-    bool IsFull(Clan clan, Kingdom kingdom, bool asMercenary, ModOptions options);
+    bool RefusesJoin(Clan clan, Kingdom kingdom, bool asMercenary, ModOptions options);
 }
 
 /// <summary>
-/// The host's maxClansPerKingdom and countMercenaries rule. The server asks it before a clan joins a kingdom.
+/// The host's maxClansPerKingdom and maxClansPerKingdomCountsMercenaries rule. The server asks it before a clan joins a kingdom.
 /// </summary>
 public class KingdomClanLimit : IKingdomClanLimit
 {
-    // The ruling clan counts like any other. A clan already counted in the kingdom is never refused, but a
-    // mercenary becoming a vassal there starts to count when mercenaries don't.
-    public bool IsFull(Clan clan, Kingdom kingdom, bool asMercenary, ModOptions options)
+    // The ruling clan counts like any other.
+    public bool RefusesJoin(Clan clan, Kingdom kingdom, bool asMercenary, ModOptions options)
     {
         // A ruler without a kingdom makes an independent clan, which nothing limits.
         if (kingdom == null) return false;
         if (options.MaxClansPerKingdom <= 0) return false;
         if (!Counts(asMercenary, options)) return false;
-        if (clan?.Kingdom == kingdom && Counts(clan.IsUnderMercenaryService, options)) return false;
+
+        // A clan already counted in the kingdom is never refused, but a mercenary becoming a vassal there starts to count when mercenaries don't.
+        bool alreadyCounted = clan?.Kingdom == kingdom && Counts(clan.IsUnderMercenaryService, options);
+        if (alreadyCounted) return false;
 
         return kingdom.Clans.Count(member => Counts(member.IsUnderMercenaryService, options)) >= options.MaxClansPerKingdom;
     }
@@ -40,5 +42,5 @@ public class KingdomClanLimit : IKingdomClanLimit
     }
 
     private static bool Counts(bool isMercenary, ModOptions options)
-        => options.CountMercenaries || !isMercenary;
+        => options.MaxClansPerKingdomCountsMercenaries || !isMercenary;
 }
