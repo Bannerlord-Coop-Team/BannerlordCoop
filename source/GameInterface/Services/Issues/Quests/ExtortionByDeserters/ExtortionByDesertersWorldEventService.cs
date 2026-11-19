@@ -165,7 +165,7 @@ internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesert
     public void ApplyVillageBeingRaided(Quest quest, Village village)
     {
         if (ModInformation.IsClient || village.Settlement != quest.QuestSettlement) return;
-        var attacker = village.Settlement.Party.MapEvent?.AttackerSide.LeaderParty;
+        var attacker = village.Settlement.Party.MapEvent.AttackerSide.LeaderParty;
         if (!ownerPartyResolver.TryGetOwnerParty(IssueManager.GetIssueOfQuest(quest), out var owner)) return;
         if (attacker == quest._deserterMobileParty?.Party)
         {
