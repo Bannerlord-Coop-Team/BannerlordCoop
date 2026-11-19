@@ -1776,7 +1776,8 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             // component's OnDestroyed event isn't raised here, so its other listeners only run where the hit happened.
             if (!wasDestroyed && destruction.IsDestroyed)
             {
-                Mission.Current.OnObjectDisabled(destruction);
+                // Skip Mission.OnObjectDisabled because its sally-out callback can send a campaign engine removal request.
+                machine.Disable();
                 if (machine is CastleGate destroyedGate)
                     destroyedGate.OnDestroyed(destruction, null, in MissionWeapon.Invalid, null, 0);
             }

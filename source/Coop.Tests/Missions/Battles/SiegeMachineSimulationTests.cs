@@ -34,7 +34,7 @@ public class SiegeMachineSimulationTests : IDisposable
     private static float ramFrameDistance;
     private static int ramSnapCalls;
     private static int ramDestructionCalls;
-    private static readonly List<DestructableComponent> disabledObjects = new();
+    private static int ramDisableCalls;
     private static int ramResetDistanceErrorCalls;
     private static float ramResetDistanceErrorDistance;
     private static bool ramSnappedBeforeDestruction;
@@ -76,7 +76,7 @@ public class SiegeMachineSimulationTests : IDisposable
             Assert.Equal(hostDistance, ramResetDistanceErrorDistance);
             Assert.Equal(hostDistance, ramFrameDistance);
             Assert.Equal(1, ramDestructionCalls);
-            Assert.Same(ram.DestructionComponent, Assert.Single(disabledObjects));
+            Assert.Equal(1, ramDisableCalls);
             Assert.True(ramSnappedBeforeDestruction);
         }
         finally
@@ -492,7 +492,7 @@ public class SiegeMachineSimulationTests : IDisposable
         Stub(AccessTools.Method(typeof(SiegeWeaponMovementComponent), "SetTotalDistanceTraveledForPathTracker"), nameof(RamSetDistance));
         Stub(AccessTools.Method(typeof(SiegeWeaponMovementComponent), "SetDistanceTraveledAsClient"), nameof(RamResetDistanceError));
         Stub(AccessTools.Method(typeof(SiegeWeaponMovementComponent), "SetTargetFrameForPathTracker"), nameof(RamSetTargetFrame));
-        Stub(AccessTools.Method(typeof(Mission), nameof(Mission.OnObjectDisabled)), nameof(RamMissionObjectDisabled));
+        Stub(AccessTools.Method(typeof(BatteringRam), "Disable"), nameof(RamDisable));
     }
 
     private static void ResetRamStubState()
@@ -502,7 +502,7 @@ public class SiegeMachineSimulationTests : IDisposable
         ramFrameDistance = 0f;
         ramSnapCalls = 0;
         ramDestructionCalls = 0;
-        disabledObjects.Clear();
+        ramDisableCalls = 0;
         ramResetDistanceErrorCalls = 0;
         ramResetDistanceErrorDistance = 0f;
         ramSnappedBeforeDestruction = false;
@@ -601,11 +601,7 @@ public class SiegeMachineSimulationTests : IDisposable
         ramSnapCalls++;
         return false;
     }
-    private static bool RamMissionObjectDisabled(DestructableComponent destructionComponent)
-    {
-        disabledObjects.Add(destructionComponent);
-        return false;
-    }
+    private static bool RamDisable() { ramDisableCalls++; return false; }
     private static bool RamSetDestructionLevel()
     {
         ramDestructionCalls++;

@@ -47,8 +47,7 @@ public class SiegeGateDestroyedReplayTests : IDisposable
         Stub(AccessTools.PropertyGetter(typeof(WeakGameEntity), nameof(WeakGameEntity.GlobalPosition)), nameof(Origin));
         Stub(AccessTools.Method(typeof(Mission), nameof(Mission.MakeSound),
             new[] { typeof(int), typeof(Vec3), typeof(bool), typeof(bool), typeof(int), typeof(int) }), nameof(Skip));
-        Stub(AccessTools.Method(typeof(SiegeMachineStateReplicator), "SyncMissionSiegeWeaponHealth"), nameof(Skip));
-        Stub(AccessTools.Method(typeof(Mission), nameof(Mission.OnObjectDisabled)), nameof(Skip));
+        Stub(AccessTools.Method(typeof(UsableMachine), nameof(UsableMachine.Disable)), nameof(Skip));
     }
 
     public void Dispose() => harmony.UnpatchAll(harmony.Id);
@@ -187,7 +186,6 @@ public class SiegeGateDestroyedReplayTests : IDisposable
 
     private static void ApplySnapshot(CastleGate gate, float hitPoints, int destructionState, int gateState = -1)
     {
-        using var mission = new MissionCurrentScope();
         var state = new NetworkSiegeMachineState(GateId, hitPoints, destructionState, gateState, -1, -1f,
             false, -1, -1000f, -1000f, hostEpoch: 1, senderControllerId: "host");
         ApplySnapshotMethod.Invoke(null, new object[] { gate, state });
