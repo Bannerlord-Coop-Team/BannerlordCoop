@@ -133,6 +133,22 @@ public class ExtortionByDesertersTests : IDisposable
     }
 
     [Fact]
+    public void FinalizedOwnerQuestIsRemovedFromTheClientQuestManager()
+    {
+        var quest = Accept();
+        Owner.Call(() =>
+        {
+            quest._questState = QuestBase.QuestStates.Finalized;
+            Assert.Contains(quest, Campaign.Current.QuestManager.Quests);
+        });
+
+        Owner.SimulateMessage(this,
+            new NetworkIssueFinalized(scenario.NotableId, QuestScenario.IssueId, IssueOutcome.QuestSuccess));
+
+        Owner.Call(() => Assert.DoesNotContain(quest, Campaign.Current.QuestManager.Quests));
+    }
+
+    [Fact]
     public void Accept_CreatesWorldPartyOnlyOnServerAndPersonalQuestOnlyOnOwner()
     {
         Accept();
@@ -532,7 +548,11 @@ public class ExtortionByDesertersTests : IDisposable
             Assert.Equal(relation, serverQuest.RelationshipChangeWithQuestGiver);
         });
         Assert.Equal(IssueOutcome.QuestSuccess, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
-        Assert.True(quest.IsFinalized);
+        Owner.Call(() =>
+        {
+            Assert.True(quest.IsFinalized);
+            Assert.DoesNotContain(quest, Campaign.Current.QuestManager.Quests);
+        });
     }
 
     [Theory]
