@@ -1,6 +1,8 @@
 ﻿using Common;
 using Common.Messaging;
+using Common.Util;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Quests.ExtortionByDeserters.Messages;
 using GameInterface.Services.ObjectManager;
@@ -61,9 +63,18 @@ internal class ExtortionByDesertersHandler : IHandler
 
         if (!TryResolveParties(data, out var deserters, out var defenders)) return;
 
-        BindParties(quest, deserters, defenders, (State)data.State);
-        if (!TextObject.IsNullOrEmpty(data.Log)) quest.AddLog(data.Log);
-        var notice = (ExtortionByDesertersNotice)data.Notice;
+        var state = (State)data.State;
+        var desertersJustDefeated = quest._currentState != State.DesertersAreDefeated &&
+            state == State.DesertersAreDefeated;
+        BindParties(quest, deserters, defenders, state);
+        if (!TextObject.IsNullOrEmpty(data.Log))
+        {
+            using var replay = new AllowedThread();
+            using var journalReplay = new QuestJournalReplay();
+            quest.AddLog(data.Log);
+        }
+
+        var notice = desertersJustDefeated ? ExtortionByDesertersNotice.DesertersDefeated : (ExtortionByDesertersNotice)data.Notice;
         ShowNotice(quest, notice);
         if (notice == ExtortionByDesertersNotice.Ambush &&
             deserters != null && defenders != null && quest.IsOngoing)

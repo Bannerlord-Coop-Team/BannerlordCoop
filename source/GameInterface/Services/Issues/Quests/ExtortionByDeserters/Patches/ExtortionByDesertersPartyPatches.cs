@@ -9,15 +9,12 @@ using Quest = TaleWorlds.CampaignSystem.Issues.ExtortionByDesertersIssueBehavior
 
 namespace GameInterface.Services.Issues.Quests.ExtortionByDeserters.Patches;
 
-/// <summary>World creation and cleanup belong to the server, encounters to the owning client.</summary>
+/// <summary>Guards early party tracking, cleans up dismissed quest parties, and forwards server journals.</summary>
 internal class ExtortionByDesertersPartyPatches
 {
     internal static void AddPatches(IAutoSyncPatchCollector collector)
     {
         Add(collector, AccessTools.Method(typeof(QuestBase), nameof(QuestBase.AddTrackedObject)), nameof(AddTrackedObjectPrefix));
-        Add(collector, AccessTools.Method(typeof(Quest), nameof(Quest.StartAmbushEncounter)), nameof(StartAmbushEncounterPrefix));
-        Add(collector, AccessTools.Method(typeof(Quest), nameof(Quest.OnBattleStarted)), nameof(OnBattleStartedPrefix));
-        Add(collector, AccessTools.Method(typeof(Quest), nameof(Quest.GameMenuOpened)), nameof(GameMenuOpenedPrefix));
         Add(collector, AccessTools.Method(typeof(IssueBase), nameof(IssueBase.IssueFinalized)), nameof(IssueFinalizedPrefix));
         Add(collector, AccessTools.Method(typeof(QuestBase), nameof(QuestBase.AddLog), new[] { typeof(TextObject), typeof(bool) }), nameof(AddLogPrefix));
     }
@@ -30,15 +27,6 @@ internal class ExtortionByDesertersPartyPatches
         // The quest constructor runs before the server's party binding arrives.
         return !(__instance is Quest) || trackedObject != null;
     }
-
-    // The server starts the ambush, and the owner opens the encounter when its Ambush notice arrives.
-    internal static bool StartAmbushEncounterPrefix() => false;
-
-    // The server world-event service handles battle starts in the owner context.
-    internal static bool OnBattleStartedPrefix() => false;
-
-    // Vanilla destroys the battle parties when the encounter menu opens. The server does that in FinalizeEventAux.
-    internal static bool GameMenuOpenedPrefix() => false;
 
     // Dismissing an issue drops its running quest unfinished, which would leave the deserters and defenders on the map
     internal static void IssueFinalizedPrefix(IssueBase __instance)

@@ -1,5 +1,4 @@
-﻿using Common;
-using Common.Logging;
+﻿using Common.Logging;
 using GameInterface.Services.Issues.Framework.Interface;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -85,13 +84,15 @@ internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesert
             // Co-op cancels an ongoing quest if its deserters were removed without a recorded result.
             if (quest.IsOngoing && quest._deserterMobileParty?.IsActive == false)
             {
+                Logger.Warning("Cancelling extortion quest {quest}: the deserter party is gone", quest.StringId);
                 quest.CompleteQuestWithCancel();
             }
             return;
         }
 
         quest._deserterBattleFinalizedForTheFirstTime = false;
-        if (quest._currentState == State.DesertersAreDefeated)
+        var desertersDefeated = quest._currentState == State.DesertersAreDefeated;
+        if (desertersDefeated)
         {
             quest.DestroyDeserterParty();
             quest._deserterMobileParty = null;
@@ -99,7 +100,15 @@ internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesert
 
         quest.DestroyDefenderParty();
         quest._defenderMobileParty = null;
-        progress.Send(quest);
+        if (desertersDefeated)
+        {
+            // AddLog forwards the journal and the cleared party bindings in one snapshot.
+            quest.AddLog(quest.OnDeserterPartyDefeatedLogText);
+        }
+        else
+        {
+            progress.Send(quest);
+        }
     }
 
     public void ApplyMapEventStarted(Quest quest, MapEvent mapEvent, PartyBase attacker, PartyBase defender)
@@ -117,19 +126,21 @@ internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesert
     public void ApplySettlementLeft(Quest quest, MobileParty party, Settlement settlement)
     {
         if (!ownerResolver.TryResolveOwnerParty(IssueManager.GetIssueOfQuest(quest), out var owner)) return;
+        if (party != owner || settlement != quest.QuestSettlement) return;
+
         var deserters = quest._deserterMobileParty;
         var raid = settlement.Party.MapEvent;
-        var desertersRaidQuestVillage = settlement == quest.QuestSettlement && deserters != null &&
+        var desertersRaidQuestVillage = deserters != null &&
             raid?.IsRaid == true && raid.AttackerSide.LeaderParty == deserters.Party;
-        var ownerLeftQuestVillage = party == owner && desertersRaidQuestVillage;
-        if (ownerLeftQuestVillage)
+        if (desertersRaidQuestVillage)
         {
             quest.ApplyQuestResult(quest._questResultFail2);
             quest.CompleteQuestWithFail(quest.OnQuestFailed2LogText);
         }
 
-        if (quest.IsOngoing && party == owner && settlement == quest.QuestSettlement)
+        if (quest.IsOngoing)
         {
+            // This replaces the vanilla leave-menu tick in GameMenuOptionSelected.
             ApplyTick(quest);
         }
     }
@@ -148,8 +159,6 @@ internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesert
         if (mapEvent.WinningSide == owner.Party.Side)
         {
             quest._currentState = State.DesertersAreDefeated;
-            quest.AddLog(quest.OnDeserterPartyDefeatedLogText);
-            progress.Send(quest, notice: ExtortionByDesertersNotice.DesertersDefeated);
         }
         else
         {
@@ -189,11 +198,12 @@ internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesert
 
     public void ApplyTick(Quest quest)
     {
-        if (ModInformation.IsClient || !quest.IsOngoing || quest._currentState == State.DesertersAreDefeated) return;
+        if (!quest.IsOngoing || quest._currentState == State.DesertersAreDefeated) return;
         var deserters = quest._deserterMobileParty;
         // Vanilla has no active-party cancellation here. Co-op must release an owner quest after its party disappears.
         if (deserters == null || !deserters.IsActive)
         {
+            Logger.Warning("Cancelling extortion quest {quest}: the deserter party is gone", quest.StringId);
             quest.CompleteQuestWithCancel();
             return;
         }
@@ -212,8 +222,10 @@ internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesert
 
         var issue = IssueManager.GetIssueOfQuest(quest);
         if (!ownerResolver.TryResolveOwnerParty(issue, out var owner) ||
-            !ownerResolver.TryResolveOwnerHero(issue, out var ownerHero) ||
-            ownerHero.PartyBelongedTo != owner) return;
+            !ownerResolver.TryResolveOwnerHero(issue, out var ownerHero)) return;
+
+        var ownerIsCaptive = ownerHero.PartyBelongedTo != owner;
+        if (ownerIsCaptive) return;
 
         switch (quest._currentState)
         {

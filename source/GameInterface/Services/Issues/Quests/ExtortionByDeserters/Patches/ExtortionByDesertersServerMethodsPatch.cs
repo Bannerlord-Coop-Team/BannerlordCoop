@@ -18,8 +18,6 @@ internal class ExtortionByDesertersServerMethodsPatch
         yield return AccessTools.Method(typeof(Quest), nameof(Quest.OnTimedOut));
         yield return AccessTools.Method(typeof(Quest), nameof(Quest.DestroyDeserterParty));
         yield return AccessTools.Method(typeof(Quest), nameof(Quest.DestroyDefenderParty));
-        yield return AccessTools.Method(typeof(Quest), nameof(Quest.HourlyTick));
-        yield return AccessTools.Method(typeof(Quest), nameof(Quest.GameMenuOptionSelected));
         yield return AccessTools.Method(typeof(Quest), nameof(Quest.OnWarDeclared));
         yield return AccessTools.Method(typeof(Quest), nameof(Quest.OnClanChangedKingdom));
     }

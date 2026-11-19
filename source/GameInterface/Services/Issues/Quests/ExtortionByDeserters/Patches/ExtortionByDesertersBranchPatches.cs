@@ -36,17 +36,8 @@ internal class ExtortionByDesertersBranchPatches
 
     private static IReadOnlyDictionary<MethodBase, ExtortionByDesertersBranch> FindBranches()
     {
-        // The unnamed dialogue consequences call the getter for their reward result.
-        var candidates = AccessTools.GetDeclaredMethods(typeof(Quest))
-            .Where(method => method.Name.StartsWith("<get_QuestCompletionDialogFlow>b__", StringComparison.Ordinal) &&
-                method.ReturnType == typeof(void) && method.GetParameters().Length == 0)
-            .Select(method => (Method: method, Calls: PatchProcessor.GetOriginalInstructions(method)
-                .Where(instruction => instruction.opcode == OpCodes.Call || instruction.opcode == OpCodes.Callvirt)
-                .Select(instruction => instruction.operand)
-                .OfType<MethodInfo>().ToArray()))
-            .ToArray();
-
-        var bindings = new List<(MethodInfo Method, ExtortionByDesertersBranch Branch)>();
+        var branches = new Dictionary<MethodBase, ExtortionByDesertersBranch>();
+        var seenConsequences = new HashSet<MethodBase>();
         foreach (var (resultProperty, branch) in new[]
         {
             (nameof(Quest._questResultSuccess1), ExtortionByDesertersBranch.FullReward),
@@ -55,30 +46,41 @@ internal class ExtortionByDesertersBranchPatches
         })
         {
             var getter = AccessTools.PropertyGetter(typeof(Quest), resultProperty);
-            var matches = candidates.Where(candidate => candidate.Calls.Contains(getter)).ToArray();
-            if (matches.Length != 1)
+            if (getter == null)
             {
-                Logger.Warning("Expected one extortion reward branch for {resultProperty}, found {count}", resultProperty, matches.Length);
+                Logger.Warning("Missing getter for extortion reward {resultProperty}", resultProperty);
                 continue;
             }
 
-            bindings.Add((matches[0].Method, branch));
-        }
+            var consequence = FindConsequenceCalling(getter);
+            if (consequence == null) continue;
+            if (!seenConsequences.Add(consequence))
+            {
+                Logger.Warning("Extortion reward consequence {method} matches more than one branch", consequence.Name);
+                branches.Remove(consequence);
+                continue;
+            }
 
-        var branches = new Dictionary<MethodBase, ExtortionByDesertersBranch>();
-        foreach (var group in bindings.GroupBy(binding => binding.Method))
-        {
-            var matches = group.ToArray();
-            if (matches.Length == 1)
-            {
-                branches.Add(group.Key, matches[0].Branch);
-            }
-            else
-            {
-                Logger.Warning("Extortion reward consequence {method} matches more than one branch", group.Key.Name);
-            }
+            branches.Add(consequence, branch);
         }
 
         return branches;
+    }
+
+    private static MethodInfo FindConsequenceCalling(MethodInfo getter)
+    {
+        // The unnamed dialogue consequences call the getter for their reward result.
+        var matches = AccessTools.GetDeclaredMethods(typeof(Quest))
+            .Where(method => method.Name.StartsWith("<get_QuestCompletionDialogFlow>b__", StringComparison.Ordinal) &&
+                method.ReturnType == typeof(void) && method.GetParameters().Length == 0)
+            .Where(method => PatchProcessor.GetOriginalInstructions(method).Any(instruction =>
+                (instruction.opcode == OpCodes.Call || instruction.opcode == OpCodes.Callvirt) &&
+                Equals(instruction.operand, getter)))
+            .ToArray();
+
+        if (matches.Length == 1) return matches[0];
+
+        Logger.Warning("Expected one extortion reward branch calling {getter}, found {count}", getter.Name, matches.Length);
+        return null;
     }
 }

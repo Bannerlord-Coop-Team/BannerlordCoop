@@ -53,6 +53,7 @@ internal class ExtortionByDesertersWorldPatches
     [HarmonyPostfix]
     private static void MapStartedPostfix(MapEvent mapEvent, PartyBase attackerParty, PartyBase defenderParty)
     {
+        // QuestWorldEventRelayPatches runs vanilla for coercion. This postfix handles attacks on village parties.
         if (mapEvent.IsForcingSupplies || mapEvent.IsForcingVolunteers) return;
         Run((service, quest) => service.ApplyMapEventStarted(quest, mapEvent, attackerParty, defenderParty));
     }
@@ -70,6 +71,16 @@ internal class ExtortionByDesertersWorldPatches
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnSettlementLeft))]
     [HarmonyPrefix]
     private static bool LeftPrefix() => false;
+
+    [HarmonyPatch(typeof(Quest), nameof(Quest.StartAmbushEncounter))]
+    [HarmonyPrefix]
+    // The server starts the ambush and the owner opens the encounter when its notice arrives.
+    private static bool StartAmbushEncounterPrefix() => false;
+
+    [HarmonyPatch(typeof(Quest), nameof(Quest.GameMenuOpened))]
+    [HarmonyPrefix]
+    // FinalizeEventAux cleans up the quest parties without waiting for the encounter menu.
+    private static bool GameMenuOpenedPrefix() => false;
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnVillageBeingRaided))]
     [HarmonyPostfix]

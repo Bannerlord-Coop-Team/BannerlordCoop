@@ -7,7 +7,6 @@ using E2E.Tests.Util;
 using GameInterface.AutoSync;
 using GameInterface.Policies;
 using GameInterface.Services.Issues.Framework.Finalization;
-using GameInterface.Services.MapEvents.Interfaces;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Quests.ExtortionByDeserters;
 using GameInterface.Services.Issues.Quests.ExtortionByDeserters.Patches;
@@ -110,23 +109,22 @@ public class ExtortionByDesertersTests : IDisposable
     [Fact]
     public void ExtortionPatchTargetsHaveOneCoopPrefix()
     {
+        var partyPatches = typeof(ExtortionByDesertersPartyPatches);
+        var worldPatches = typeof(ExtortionByDesertersWorldPatches);
         var targets = new[]
         {
-            AccessTools.Method(typeof(QuestBase), nameof(QuestBase.AddTrackedObject)),
-            AccessTools.Method(typeof(Quest), nameof(Quest.StartAmbushEncounter)),
-            AccessTools.Method(typeof(Quest), nameof(Quest.OnBattleStarted)),
-            AccessTools.Method(typeof(Quest), nameof(Quest.GameMenuOpened)),
-            AccessTools.Method(typeof(IssueBase), nameof(IssueBase.IssueFinalized)),
-            AccessTools.Method(typeof(QuestBase), nameof(QuestBase.AddLog), new[] { typeof(TextObject), typeof(bool) }),
+            (AccessTools.Method(typeof(QuestBase), nameof(QuestBase.AddTrackedObject)), partyPatches),
+            (AccessTools.Method(typeof(IssueBase), nameof(IssueBase.IssueFinalized)), partyPatches),
+            (AccessTools.Method(typeof(QuestBase), nameof(QuestBase.AddLog), new[] { typeof(TextObject), typeof(bool) }), partyPatches),
+            (AccessTools.Method(typeof(Quest), nameof(Quest.StartAmbushEncounter)), worldPatches),
+            (AccessTools.Method(typeof(Quest), nameof(Quest.GameMenuOpened)), worldPatches),
+            (AccessTools.Method(typeof(Quest), nameof(Quest.TickDesertersPartyLogic)), worldPatches),
         };
 
-        foreach (var target in targets)
+        foreach (var (target, patchType) in targets)
         {
-            var coopPrefixes = Harmony.GetPatchInfo(target).Prefixes
-                .Where(prefix => prefix.owner == "Bannerlord.Coop" &&
-                    prefix.PatchMethod.DeclaringType == typeof(ExtortionByDesertersPartyPatches))
-                .ToArray();
-            Assert.Single(coopPrefixes);
+            Assert.Single(Harmony.GetPatchInfo(target).Prefixes, prefix =>
+                prefix.owner == "Bannerlord.Coop" && prefix.PatchMethod.DeclaringType == patchType);
         }
     }
 
@@ -150,6 +148,7 @@ public class ExtortionByDesertersTests : IDisposable
         var state = new NetworkExtortionByDesertersState(scenario.NotableId, QuestScenario.IssueId,
             QuestScenario.ControllerA, partyId, "", (int)State.DesertersAreDefeated, text);
         var wire = Server.SerializeForWire(state);
+        var requestsBefore = Owner.NetworkSentMessages.GetMessages<RequestQuestJournal>().Count();
         Owner.SimulateMessage(this, wire);
         Owner.Call(() =>
         {
@@ -161,6 +160,7 @@ public class ExtortionByDesertersTests : IDisposable
             var received = Assert.Single(quest.JournalEntries).LogText;
             Assert.Equal(text.Value, received.Value);
         });
+        Assert.Equal(requestsBefore, Owner.NetworkSentMessages.GetMessages<RequestQuestJournal>().Count());
     }
 
     [Fact]
@@ -663,6 +663,9 @@ public class ExtortionByDesertersTests : IDisposable
         using var finish = new MethodCallRecorder(AccessTools.Method(typeof(PlayerEncounter), nameof(PlayerEncounter.Finish)));
         using var menus = new MethodCallRecorder(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu)));
         using var conversations = new MethodCallRecorder(AccessTools.Method(typeof(ConversationManager), nameof(ConversationManager.OpenMapConversation)));
+        using var vanillaBodies = new MethodCallRecorder(Priority.Last, true,
+            AccessTools.Method(typeof(Quest), nameof(Quest.TickDesertersPartyLogic)),
+            AccessTools.Method(typeof(Quest), nameof(Quest.StartAmbushEncounter)));
         Owner.Call(() =>
         {
             Assert.True(Owner.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var ownerParty));
@@ -694,7 +697,14 @@ public class ExtortionByDesertersTests : IDisposable
             Assert.Contains(participants, party => party.MobileParty == ownerQuest._defenderMobileParty);
             try
             {
-                Owner.Resolve<IPlayerEncounterInterface>().OpenEncounterMeeting(raid, ownerQuest._deserterMobileParty.Party);
+                ownerQuest.HourlyTick();
+                ownerQuest.GameMenuOptionSelected(null, new GameMenuOption { IsLeave = true });
+                ownerQuest.OnBattleStarted(ownerQuest._deserterMobileParty.Party, ownerQuest.QuestSettlement.Party, null, false);
+                Assert.Equal(0, vanillaBodies.CountFor(Owner));
+
+                Server.Call(() => Server.Resolve<IExtortionByDesertersProgress>()
+                    .Send(quest, notice: ExtortionByDesertersNotice.Ambush));
+
                 Assert.Equal(alreadyAttached ? 0 : 1, finish.CountFor(Owner));
                 Assert.Equal(alreadyAttached, ReferenceEquals(existing, PlayerEncounter.Current));
                 Assert.Same(raid, PlayerEncounter.Battle);
@@ -707,6 +717,8 @@ public class ExtortionByDesertersTests : IDisposable
                 Campaign.Current.PlayerEncounter = null;
             }
         });
+        Assert.Single(Owner.InternalMessages.GetMessages<NetworkExtortionByDesertersState>(),
+            state => state.Notice == (byte)ExtortionByDesertersNotice.Ambush);
         Assert.Equal(new[] { "encounter_meeting" }, menus.MenusFor(Owner));
         Assert.Equal(1, conversations.CountFor(Owner));
         Assert.Equal(0, conversations.CountFor(Other));
@@ -718,13 +730,16 @@ public class ExtortionByDesertersTests : IDisposable
         DefeatDeserters();
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
         Assert.Empty(Owner.NetworkSentMessages.GetMessages<RequestQuestBranch>());
-        var notice = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkExtortionByDesertersState>(),
-            state => state.Notice == (byte)ExtortionByDesertersNotice.DesertersDefeated);
-        Assert.Equal(QuestScenario.ControllerA, notice.ControllerId);
+        var defeated = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkExtortionByDesertersState>(),
+            state => state.State == (int)State.DesertersAreDefeated);
+        Assert.Equal(QuestScenario.ControllerA, defeated.ControllerId);
+        Assert.True(string.IsNullOrEmpty(defeated.DeserterId));
+        Assert.True(string.IsNullOrEmpty(defeated.DefenderId));
+        Assert.NotNull(defeated.Log);
         Assert.Single(Owner.InternalMessages.GetMessages<NetworkExtortionByDesertersState>(),
-            state => state.Notice == (byte)ExtortionByDesertersNotice.DesertersDefeated);
+            state => state.State == (int)State.DesertersAreDefeated);
         Assert.DoesNotContain(Other.InternalMessages.GetMessages<NetworkExtortionByDesertersState>(),
-            state => state.Notice == (byte)ExtortionByDesertersNotice.DesertersDefeated);
+            state => state.State == (int)State.DesertersAreDefeated);
         Owner.Call(() =>
         {
             var ownerQuest = (Quest)scenario.QuestOf(Owner);
