@@ -1077,11 +1077,11 @@ public class LordBarterSyncTests : MapEventTestBase
                     Assert.True(instance.ObjectManager.TryGetObject<Hero>(target.HeroId, out var targetHero));
                     Assert.True(instance.ObjectManager.TryGetObject<Kingdom>(destinationKingdomId, out var destinationKingdom));
                     Assert.True(instance.ObjectManager.TryGetObject<Kingdom>(originalKingdomId, out var originalKingdom));
-                    var joined = accepted ? destinationKingdom : originalKingdom;
-                    var left = accepted ? originalKingdom : destinationKingdom;
-                    Assert.Same(joined, targetHero.Clan.Kingdom);
-                    Assert.Single(joined.Clans, clan => clan == targetHero.Clan);
-                    Assert.DoesNotContain(targetHero.Clan, left.Clans);
+                    var expectedKingdom = accepted ? destinationKingdom : originalKingdom;
+                    var otherKingdom = accepted ? originalKingdom : destinationKingdom;
+                    Assert.Same(expectedKingdom, targetHero.Clan.Kingdom);
+                    Assert.Single(expectedKingdom.Clans, clan => clan == targetHero.Clan);
+                    Assert.DoesNotContain(targetHero.Clan, otherKingdom.Clans);
                 });
             }
 

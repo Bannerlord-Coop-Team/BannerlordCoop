@@ -85,9 +85,7 @@ public class VassalAndMercenaryOfferCampaignBehaviorInterface : IVassalAndMercen
                 float randomFloat = MBRandom.RandomFloat;
                 if (randomFloat <= VassalAndMercenaryOfferCampaignBehavior.MercenaryOfferCreationChance && behavior.CanPlayerClanReceiveMercenaryOffer())
                 {
-                    Kingdom kingdom = Kingdom.All.GetRandomElementWithPredicate(kingdom =>
-                        behavior.MercenaryKingdomSelectionConditionsHold(kingdom) &&
-                        !kingdomClanLimit.RefusesJoin(clan, kingdom, asMercenary: true, ModConfigProvider.ModOptions));
+                    Kingdom kingdom = Kingdom.All.GetRandomElementWithPredicate(kingdom => MercenaryKingdomSelectionConditionsHold(behavior, clan, kingdom));
                     if (kingdom != null)
                     {
                         CreateMercenaryOffer(playerData.Key, playerData.Value, kingdom);
@@ -266,12 +264,15 @@ public class VassalAndMercenaryOfferCampaignBehaviorInterface : IVassalAndMercen
             && !kingdom.Leader.IsFugitive;
     }
 
+    private bool MercenaryKingdomSelectionConditionsHold(VassalAndMercenaryOfferCampaignBehavior behavior, Clan clan, Kingdom kingdom)
+        => behavior.MercenaryKingdomSelectionConditionsHold(kingdom)
+            && !kingdomClanLimit.RefusesJoin(clan, kingdom, asMercenary: true, ModConfigProvider.ModOptions);
+
     private void CancelMercenaryOfferIfInvalid(VassalAndMercenaryOfferCampaignBehavior behavior, string playerHeroId, VassalAndMercenaryOfferData playerData, Clan clan, bool expired = false)
     {
         // Cancel on a failed lookup too, otherwise DailyTick never creates another offer for this player.
         if (!objectManager.TryGetObjectWithLogging<Kingdom>(playerData.CurrentMercenaryOfferKingdomId, out var kingdom) ||
-            expired || !behavior.MercenaryKingdomSelectionConditionsHold(kingdom) ||
-            kingdomClanLimit.RefusesJoin(clan, kingdom, asMercenary: true, ModConfigProvider.ModOptions))
+            expired || !MercenaryKingdomSelectionConditionsHold(behavior, clan, kingdom))
         {
             CancelOffer(playerHeroId, playerData, playerData.CurrentMercenaryOfferKingdomId);
         }
