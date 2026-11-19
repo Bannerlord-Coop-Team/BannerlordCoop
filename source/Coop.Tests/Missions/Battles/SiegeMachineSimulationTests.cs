@@ -31,6 +31,7 @@ public class SiegeMachineSimulationTests : IDisposable
     private static int ramDisabledNavMesh;
     private static float ramSnapDistance;
     private static float ramSnappedDistance;
+    private static float ramFrameDistance;
     private static int ramSnapCalls;
     private static int ramDestructionCalls;
     private static int ramDisableCalls;
@@ -49,25 +50,15 @@ public class SiegeMachineSimulationTests : IDisposable
         var ram = CreateDestructibleRam(0);
         const float trackerDistance = 12.5f;
         const float hostDistance = 12.4f;
+        ResetRamStubState();
         ramSnapDistance = trackerDistance;
-        ramSnappedDistance = 0f;
-        ramSnapCalls = 0;
-        ramDestructionCalls = 0;
-        ramDisableCalls = 0;
-        ramResetDistanceErrorCalls = 0;
-        ramResetDistanceErrorDistance = 0f;
-        ramSnappedBeforeDestruction = false;
-        var broker = new TestMessageBroker();
-        using var replicator = new SiegeMachineStateReplicator(Mock.Of<IBattleNetwork>(), broker,
-            Mock.Of<IBattleSession>(), Mock.Of<INetworkAgentRegistry>(), new HostEpochPolicy(),
-            Mock.Of<IRangedSiegeWeaponPresentation>());
         StubRamSnap();
         Stub(AccessTools.Method(typeof(DestructableComponent), "SetDestructionLevel"), nameof(RamSetDestructionLevel));
         Stub(AccessTools.Method(typeof(SiegeMachineStateReplicator), "SyncMissionSiegeWeaponHealth"), nameof(SkipSyncHealth));
 
         var movementState = new NetworkSiegeMachineState(ram.Id.Id, 100f, 0, -1, -1, hostDistance,
             false, -1, -1000f, -1000f);
-        var destructionState = new NetworkSiegeMachineState(ram.Id.Id, 100f, 1, -1, -1, hostDistance,
+        var destructionState = new NetworkSiegeMachineState(ram.Id.Id, 0f, 1, -1, -1, hostDistance,
             false, -1, -1000f, -1000f);
         var apply = AccessTools.Method(typeof(SiegeMachineStateReplicator), "Apply");
         bool previousHost = SiegeMissionAuthorityGate.IsLocalAuthority;
@@ -76,13 +67,14 @@ public class SiegeMachineSimulationTests : IDisposable
             localSimulator ? new HashSet<int> { ram.Id.Id } : new HashSet<int>(), new HashSet<int>());
         try
         {
-            apply.Invoke(replicator, new object[] { ram, movementState });
-            apply.Invoke(replicator, new object[] { ram, destructionState });
+            apply.Invoke(null, new object[] { ram, movementState });
+            apply.Invoke(null, new object[] { ram, destructionState });
 
             Assert.Equal(1, ramSnapCalls);
             Assert.Equal(hostDistance, ramSnappedDistance);
             Assert.Equal(1, ramResetDistanceErrorCalls);
             Assert.Equal(hostDistance, ramResetDistanceErrorDistance);
+            Assert.Equal(hostDistance, ramFrameDistance);
             Assert.Equal(1, ramDestructionCalls);
             Assert.Equal(1, ramDisableCalls);
             Assert.True(ramSnappedBeforeDestruction);
@@ -95,45 +87,40 @@ public class SiegeMachineSimulationTests : IDisposable
     }
 
     [Fact]
-    public void HostDestructionSnapshotCarriesHostTrackerDistance()
+    public void DestructionDisablesRamOnlyWhenHitPointsReachZero()
     {
         using var mission = new MissionCurrentScope();
-        var ram = CreateDestructibleRam(1);
+        var ram = CreateDestructibleRam(0);
         const float hostDistance = 12.4f;
-        var sent = new List<IMessage>();
-        var network = new Mock<IBattleNetwork>();
-        network.Setup(value => value.SendAll(It.IsAny<IMessage>())).Callback<IMessage>(sent.Add);
-        var session = new Mock<IBattleSession>();
-        session.SetupGet(value => value.IsLocalHost).Returns(true);
-        session.SetupGet(value => value.OwnControllerId).Returns("host");
-        session.SetupGet(value => value.HostEpoch).Returns(5);
-        using var replicator = new SiegeMachineStateReplicator(network.Object, new TestMessageBroker(), session.Object,
-            Mock.Of<INetworkAgentRegistry>(), new HostEpochPolicy(), Mock.Of<IRangedSiegeWeaponPresentation>());
+        ResetRamStubState();
+        ramSnapDistance = 12.5f;
+        StubRamSnap();
+        Stub(AccessTools.Method(typeof(DestructableComponent), "SetDestructionLevel"), nameof(RamSetDestructionLevel));
+        Stub(AccessTools.Method(typeof(SiegeMachineStateReplicator), "SyncMissionSiegeWeaponHealth"), nameof(SkipSyncHealth));
+        var apply = AccessTools.Method(typeof(SiegeMachineStateReplicator), "Apply");
 
-        var previous = new NetworkSiegeMachineState(ram.Id.Id, 100f, 0, -1, -1, -1f,
-            false, -1, -1000f, -1000f);
-        var destructionState = new NetworkSiegeMachineState(ram.Id.Id, 100f, 1, -1, -1, hostDistance,
-            false, -1, -1000f, -1000f);
-        ReadField<Dictionary<int, UsableMachine>>(replicator, "machinesById")[ram.Id.Id] = ram;
-        ReadField<List<UsableMachine>>(replicator, "machines").Add(ram);
-        ReadField<Dictionary<int, NetworkSiegeMachineState>>(replicator, "lastSent")[ram.Id.Id] = previous;
-        bool previousAuthority = SiegeMissionAuthorityGate.IsLocalAuthority;
-        SiegeMissionAuthorityGate.IsLocalAuthority = true;
-        SiegeMissionAuthorityGate.SetClaimedMachines(new HashSet<int>(), new HashSet<int> { ram.Id.Id });
-        StubReadState(destructionState, hostDistance);
-        try
-        {
-            AccessTools.Method(typeof(SiegeMachineStateReplicator), "BroadcastChangedStates")
-                .Invoke(replicator, Array.Empty<object>());
+        apply.Invoke(null, new object[] { ram,
+            new NetworkSiegeMachineState(ram.Id.Id, 100f, 1, -1, -1, hostDistance,
+                false, -1, -1000f, -1000f) });
+        Assert.Equal(0, ramDisableCalls);
 
-            var snapshot = Assert.IsType<NetworkSiegeMachineState>(Assert.Single(sent));
-            Assert.Equal(hostDistance, snapshot.MoveDistance);
-        }
-        finally
-        {
-            SiegeMissionAuthorityGate.IsLocalAuthority = previousAuthority;
-            SiegeMissionAuthorityGate.ResetClaimedMachines();
-        }
+        apply.Invoke(null, new object[] { ram,
+            new NetworkSiegeMachineState(ram.Id.Id, 0f, 2, -1, -1, hostDistance,
+                false, -1, -1000f, -1000f) });
+        Assert.Equal(1, ramDisableCalls);
+    }
+
+    [Theory]
+    [InlineData(0, -1f)]
+    [InlineData(1, 12.4f)]
+    public void HostDestructionSnapshotCarriesHostTrackerDistance(int destructionState, float expectedDistance)
+    {
+        var ram = CreateDestructibleRam(destructionState);
+        var state = new NetworkSiegeMachineState(ram.Id.Id, 100f, destructionState, -1, -1, expectedDistance,
+            false, -1, -1000f, -1000f);
+        StubReadState(state);
+
+        Assert.Equal(expectedDistance, Capture(ram, isHost: true, localSimulator: false).MoveDistance);
     }
 
     public SiegeMachineSimulationTests()
@@ -339,9 +326,6 @@ public class SiegeMachineSimulationTests : IDisposable
 #pragma warning disable SYSLIB0050
         var pile = (ManagedStonePile)FormatterServices.GetUninitializedObject(typeof(ManagedStonePile));
 #pragma warning restore SYSLIB0050
-        using var replicator = new SiegeMachineStateReplicator(Mock.Of<IBattleNetwork>(), new TestMessageBroker(),
-            Mock.Of<IBattleSession>(), Mock.Of<INetworkAgentRegistry>(), new HostEpochPolicy(),
-            Mock.Of<IRangedSiegeWeaponPresentation>());
         pile.SetAmmo(6);
         int machineId = pile.Id.Id;
         bool previousHost = SiegeMissionAuthorityGate.IsLocalAuthority;
@@ -354,7 +338,7 @@ public class SiegeMachineSimulationTests : IDisposable
                 false, -1, -1000f, -1000f, stoneAmmo: 7);
             var apply = AccessTools.Method(typeof(SiegeMachineStateReplicator), "Apply");
             Assert.NotNull(apply);
-            apply.Invoke(replicator, new object[] { pile, snapshot });
+            apply.Invoke(null, new object[] { pile, snapshot });
             Assert.Equal(expectedAmmo, pile.AmmoCount);
         }
         finally
@@ -537,10 +521,23 @@ public class SiegeMachineSimulationTests : IDisposable
         Stub(AccessTools.Method(typeof(BatteringRam), "Disable"), nameof(RamDisable));
     }
 
-    private void StubReadState(NetworkSiegeMachineState state, float hostDistance)
+    private static void ResetRamStubState()
+    {
+        ramSnapDistance = 0f;
+        ramSnappedDistance = 0f;
+        ramFrameDistance = 0f;
+        ramSnapCalls = 0;
+        ramDestructionCalls = 0;
+        ramDisableCalls = 0;
+        ramResetDistanceErrorCalls = 0;
+        ramResetDistanceErrorDistance = 0f;
+        ramSnappedBeforeDestruction = false;
+    }
+
+    private void StubReadState(NetworkSiegeMachineState state)
     {
         capturedDestructionState = state.DestructionState;
-        capturedHostDistance = hostDistance;
+        capturedHostDistance = state.MoveDistance;
         Stub(AccessTools.Method(typeof(SiegeMachineStateReplicator), "ReadState"), nameof(ReadDestructionState));
     }
 
@@ -624,7 +621,12 @@ public class SiegeMachineSimulationTests : IDisposable
         ramResetDistanceErrorDistance = __0;
         return false;
     }
-    private static bool RamSetTargetFrame() { ramSnapCalls++; return false; }
+    private static bool RamSetTargetFrame()
+    {
+        ramFrameDistance = ramSnappedDistance;
+        ramSnapCalls++;
+        return false;
+    }
     private static bool RamDisable() { ramDisableCalls++; return false; }
     private static bool RamSetDestructionLevel()
     {

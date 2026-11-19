@@ -513,7 +513,8 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             weaponState = -1;
             aimDirection = AimSentinel;
             aimReleaseAngle = AimSentinel;
-            if (destructionState <= 0 || !(machine is BatteringRam || machine is SiegeTower))
+            // Once a ram or tower has a broken state, the host sends its own distance so peers build it from the host's frame.
+            if (destructionState <= 0)
                 moveDistance = -1f;
             hasArrived = false;
             if (machine is CastleGate || machine is SiegeTower) gateState = -1;
@@ -1687,7 +1688,7 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         Drop,
     }
 
-    private void Apply(UsableMachine machine, NetworkSiegeMachineState state)
+    private static void Apply(UsableMachine machine, NetworkSiegeMachineState state)
     {
         bool isMachineSimulatedLocally = SiegeMissionAuthorityGate.IsMachineSimulatedLocally(machine.Id.Id);
         var movement = (machine as BatteringRam)?.MovementComponent
@@ -1756,7 +1757,7 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             }
         }
 
-        if (state.HasStoneAmmo && !SiegeMissionAuthorityGate.IsMachineSimulatedLocally(machine.Id.Id)
+        if (state.HasStoneAmmo && !isMachineSimulatedLocally
             && machine is StonePile stonePile && stonePile.AmmoCount != state.StoneAmmo)
         {
             stonePile.SetAmmo(state.StoneAmmo);
@@ -1773,9 +1774,11 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             // Assigning HitPoint raises no destroyed event, so run the gate's own handler before the mesh swap like
             // vanilla OnHit: it hides the plank, turns off the standing points and opens the gate navmesh. The
             // component's OnDestroyed event isn't raised here, so its other listeners only run where the hit happened.
-            if (!wasDestroyed && destruction.IsDestroyed && machine is CastleGate destroyedGate)
+            if (!wasDestroyed && destruction.IsDestroyed)
             {
-                destroyedGate.OnDestroyed(destruction, null, in MissionWeapon.Invalid, null, 0);
+                machine.Disable();
+                if (machine is CastleGate destroyedGate)
+                    destroyedGate.OnDestroyed(destruction, null, in MissionWeapon.Invalid, null, 0);
             }
 
             // Forward only: destruction states never regress, and vanilla's broken-entity swap indexes
@@ -1785,22 +1788,13 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             if (state.DestructionState > destruction._currentStateIndex)
             {
                 // Snap and stop the movement before the broken entity is created because it uses the tracker's frame.
-                float moveDistance = ResolveDestructionMoveDistance(state, movement);
                 if (movement != null)
-                    StopMovementAtDestruction(movement, moveDistance);
-                machine.Disable();
+                    StopMovementAtDestruction(movement, state.MoveDistance >= 0f
+                        ? state.MoveDistance
+                        : movement.GetTotalDistanceTraveledForPathTracker());
                 destruction.SetDestructionLevel(state.DestructionState, -1, 0f, TaleWorlds.Library.Vec3.Zero, TaleWorlds.Library.Vec3.Zero);
             }
         }
-    }
-
-    private static float ResolveDestructionMoveDistance(
-        NetworkSiegeMachineState state, SiegeWeaponMovementComponent movement)
-    {
-        float moveDistance = state.MoveDistance;
-        if (moveDistance < 0f && movement != null)
-            moveDistance = movement.GetTotalDistanceTraveledForPathTracker();
-        return moveDistance;
     }
 
     private static void StopMovementAtDestruction(SiegeWeaponMovementComponent movement, float moveDistance)

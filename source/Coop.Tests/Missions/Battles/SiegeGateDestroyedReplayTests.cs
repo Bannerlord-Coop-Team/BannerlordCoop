@@ -1,10 +1,8 @@
 ﻿using Common;
-using Common.Messaging;
 using HarmonyLib;
 using Missions;
 using Missions.Battles;
 using Missions.Messages;
-using Moq;
 using System;
 using System.Reflection;
 using System.Runtime.Serialization;
@@ -32,8 +30,6 @@ public class SiegeGateDestroyedReplayTests : IDisposable
     private static int hitAnimations;
 
     private readonly Harmony harmony = new("coop.tests.siege-gate-destroyed-replay");
-    private readonly SiegeMachineStateReplicator replicator;
-
     public SiegeGateDestroyedReplayTests()
     {
         destroyedReplays = 0;
@@ -41,9 +37,6 @@ public class SiegeGateDestroyedReplayTests : IDisposable
         replayAttacker = null;
         replayDamage = -1;
         hitAnimations = 0;
-        replicator = new SiegeMachineStateReplicator(Mock.Of<IBattleNetwork>(), Mock.Of<IMessageBroker>(),
-            Mock.Of<IBattleSession>(), Mock.Of<INetworkAgentRegistry>(), new HostEpochPolicy(),
-            Mock.Of<IRangedSiegeWeaponPresentation>());
         Stub(AccessTools.Method(typeof(ScriptComponentBehavior), "CacheEditableFieldsForAllScriptComponents"), nameof(Skip));
         Stub(AccessTools.Method(typeof(CastleGate), "OnDestroyed"), nameof(RecordDestroyedReplay));
         Stub(AccessTools.Method(typeof(DestructableComponent), nameof(DestructableComponent.SetDestructionLevel)),
@@ -55,20 +48,17 @@ public class SiegeGateDestroyedReplayTests : IDisposable
         Stub(AccessTools.PropertyGetter(typeof(WeakGameEntity), nameof(WeakGameEntity.GlobalPosition)), nameof(Origin));
         Stub(AccessTools.Method(typeof(Mission), nameof(Mission.MakeSound),
             new[] { typeof(int), typeof(Vec3), typeof(bool), typeof(bool), typeof(int), typeof(int) }), nameof(Skip));
-        Stub(AccessTools.Method(typeof(SiegeMachineStateReplicator), "SyncMissionSiegeWeaponHealth"), nameof(Skip));
         Stub(AccessTools.Method(typeof(UsableMachine), nameof(UsableMachine.Disable)), nameof(Skip));
     }
 
     public void Dispose()
     {
-        replicator.Dispose();
         harmony.UnpatchAll(harmony.Id);
     }
 
     [Fact]
     public void PeerSnapshot_FirstDestroyedTransition_ReplaysCastleGateOnDestroyedOnce()
     {
-        using var mission = CreateMission();
         var gate = CreateGate(MaxHitPoints);
 
         ApplySnapshot(gate, 0f, DestroyedStateIndex);
@@ -89,7 +79,6 @@ public class SiegeGateDestroyedReplayTests : IDisposable
     [InlineData(MaxHitPoints, 120f)]
     public void PeerSnapshot_WithoutDestroyedTransition_DoesNotReplay(float localHitPoints, float snapshotHitPoints)
     {
-        using var mission = CreateMission();
         var gate = CreateGate(localHitPoints);
 
         ApplySnapshot(gate, snapshotHitPoints, snapshotHitPoints > 0f ? 0 : DestroyedStateIndex);
@@ -100,7 +89,6 @@ public class SiegeGateDestroyedReplayTests : IDisposable
     [Fact]
     public void PeerSnapshot_UpwardResendThenDestroyedAgain_ReplaysAgain()
     {
-        using var mission = CreateMission();
         var gate = CreateGate(0f);
 
         ApplySnapshot(gate, MaxHitPoints, 0);
@@ -113,7 +101,6 @@ public class SiegeGateDestroyedReplayTests : IDisposable
     [Fact]
     public void PeerSnapshot_DestroyedWhileOpen_ReplaysOnce()
     {
-        using var mission = CreateMission();
         var gate = CreateGate(MaxHitPoints, CastleGate.GateState.Open);
 
         ApplySnapshot(gate, 0f, DestroyedStateIndex, (int)CastleGate.GateState.Open);
@@ -170,10 +157,6 @@ public class SiegeGateDestroyedReplayTests : IDisposable
 #pragma warning restore SYSLIB0050
         AccessTools.Property(typeof(MissionObject), "Id").SetValue(gate, new MissionObjectId(GateId, false));
         AccessTools.Field(typeof(UsableMachine), "<DestructionComponent>k__BackingField").SetValue(gate, destruction);
-        AccessTools.Property(typeof(UsableMachine), nameof(UsableMachine.StandingPoints)).SetValue(gate,
-            new MBList<StandingPoint>());
-        AccessTools.Field(typeof(UsableMachine), "_components").SetValue(gate,
-            new System.Collections.Generic.List<UsableMissionObjectComponent>());
         AccessTools.Field(typeof(DestructableComponent), "_hitPoint").SetValue(destruction, hitPoints);
         destruction.MaxHitPoint = MaxHitPoints;
         AccessTools.Field(typeof(CastleGate), "<State>k__BackingField").SetValue(gate, state);
@@ -205,21 +188,11 @@ public class SiegeGateDestroyedReplayTests : IDisposable
         }
     }
 
-    private static MissionCurrentScope CreateMission()
-    {
-        var mission = new MissionCurrentScope();
-        var teamCollection = Activator.CreateInstance(
-            typeof(Mission).GetNestedType("TeamCollection", BindingFlags.NonPublic | BindingFlags.Public),
-            mission.Instance);
-        AccessTools.Property(typeof(Mission), nameof(Mission.Teams)).SetValue(mission.Instance, teamCollection);
-        return mission;
-    }
-
     private void ApplySnapshot(CastleGate gate, float hitPoints, int destructionState, int gateState = -1)
     {
         var state = new NetworkSiegeMachineState(GateId, hitPoints, destructionState, gateState, -1, -1f,
             false, -1, -1000f, -1000f, hostEpoch: 1, senderControllerId: "host");
-        ApplySnapshotMethod.Invoke(replicator, new object[] { gate, state });
+        ApplySnapshotMethod.Invoke(null, new object[] { gate, state });
     }
 
     private static NetworkGateHit CosmeticHit() => new NetworkGateHit(GateId, 15, 350, "ram-owner", 1, 0);
