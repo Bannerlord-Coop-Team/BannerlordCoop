@@ -82,17 +82,28 @@ internal class SimulatedTroopHitDifficultyPatch
         });
         var getAllocatedTroopParty = AccessTools.Method(typeof(MapEventSide), nameof(MapEventSide.GetAllocatedTroopParty));
         int hitIndex = codes.FindIndex(instruction => instruction.Calls(simulateHit));
+        if (hitIndex < 0)
+            throw new InvalidOperationException("Failed to find the troop SimulateHit call in MapEvent.SimulateSingleTroopHit.");
+
         // The struck side's troop party is read last, right before the hit.
-        int struckPartyStoreIndex = hitIndex < 0 ? -1 : codes.FindLastIndex(hitIndex, instruction => instruction.Calls(getAllocatedTroopParty)) + 1;
-        int damageStoreIndex = hitIndex < 0 ? -1 : codes.FindIndex(hitIndex, instruction => instruction.opcode == OpCodes.Conv_I4) + 1;
-        int positiveDamageIndex = damageStoreIndex <= 0 ? -1 : codes.FindIndex(damageStoreIndex, instruction => instruction.Branches(out _)) + 1;
-        if (positiveDamageIndex <= 0 || struckPartyStoreIndex <= 0
-            || !codes[damageStoreIndex].IsStloc() || !codes[struckPartyStoreIndex].IsStloc())
-            throw new InvalidOperationException("Failed to find the simulated hit damage in MapEvent.SimulateSingleTroopHit.");
+        int struckPartyStoreIndex = codes.FindLastIndex(hitIndex, instruction => instruction.Calls(getAllocatedTroopParty)) + 1;
+        if (struckPartyStoreIndex <= 0 || !codes[struckPartyStoreIndex].IsStloc())
+            throw new InvalidOperationException("Failed to find the struck party store in MapEvent.SimulateSingleTroopHit.");
+
+        // Expected IL: int num = (int)SimulateHit(...).ResultNumber; then if (num > 0) as ldloc num, ldc.i4.0, ble.
+        int damageStoreIndex = codes.FindIndex(hitIndex, instruction => instruction.opcode == OpCodes.Conv_I4) + 1;
+        if (damageStoreIndex <= 0 || !codes[damageStoreIndex].IsStloc())
+            throw new InvalidOperationException("Failed to find the damage store in MapEvent.SimulateSingleTroopHit.");
+
+        int damageLocal = codes[damageStoreIndex].LocalIndex();
+        int positiveDamageIndex = codes.FindIndex(damageStoreIndex, instruction => instruction.IsLdloc() && instruction.LocalIndex() == damageLocal);
+        if (positiveDamageIndex < 0 || positiveDamageIndex + 2 >= codes.Count
+            || !codes[positiveDamageIndex + 1].LoadsConstant(0)
+            || (codes[positiveDamageIndex + 2].opcode != OpCodes.Ble && codes[positiveDamageIndex + 2].opcode != OpCodes.Ble_S))
+            throw new InvalidOperationException("Failed to find the positive damage branch in MapEvent.SimulateSingleTroopHit.");
 
         // Scales inside vanilla's damage > 0 block, so the damage and the striker's hit reward both use it.
-        int damageLocal = codes[damageStoreIndex].LocalIndex();
-        codes.InsertRange(positiveDamageIndex, new[]
+        codes.InsertRange(positiveDamageIndex + 3, new[]
         {
             CodeInstruction.LoadLocal(damageLocal),
             CodeInstruction.LoadLocal(codes[struckPartyStoreIndex].LocalIndex()),
