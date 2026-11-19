@@ -7,7 +7,6 @@ using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
-using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
@@ -16,8 +15,8 @@ using TaleWorlds.Library;
 namespace GameInterface.Services.Ships;
 
 /// <summary>
-/// [Server, game thread] Writes held naval ship fates to the campaign ships with patches live, so every write replicates: the
-/// owner's Boatswain gains the battle's XP, then a sunk ship is destroyed and any other takes its battle HP and sail HP.
+/// [Server, game thread] Writes held naval ship fates to the campaign ships with patches live, so every write replicates: a
+/// sunk ship is destroyed and any other takes its battle HP and sail HP.
 /// </summary>
 public interface IBattleShipFateApplier
 {
@@ -105,10 +104,9 @@ public class BattleShipFateApplier : IBattleShipFateApplier
         }
     }
 
-    // Grants the fate's XP, then destroys a sunk ship or writes the survivor's battle HP.
+    // Destroys a sunk ship or writes the survivor's battle HP.
     private static void ApplyFate(Ship ship, BattleShipFate fate)
     {
-        GrantBoatswainXp(ship, fate);
         if (fate.Sunk)
         {
             Logger.Information("[NavalSync] Ship {ShipId} of {Owner} sank in battle; destroying it (hp {HitPoints}/{MaxHitPoints}, sail {SailHitPoints}/{MaxSailHitPoints})",
@@ -125,16 +123,5 @@ public class BattleShipFateApplier : IBattleShipFateApplier
         if (Math.Abs(oldSailHitPoints - sailHitPoints) > Tolerance) ship.SailHitPoints = sailHitPoints;
         Logger.Information("[NavalSync] Ship {ShipId} of {Owner} keeps its battle condition: hp {OldHitPoints} -> {HitPoints}, sail {OldSailHitPoints} -> {SailHitPoints}",
             fate.CampaignShipId, ship.Owner.Id, oldHitPoints, ship.HitPoints, oldSailHitPoints, ship.SailHitPoints);
-    }
-
-    // Vanilla's per-hit skill call with the battle's mitigated damage as raw and none as final, which grants the owner party's
-    // Boatswain (its first mate) the same 0.1 XP per mitigated point (NavalSkillLevellingManager.OnShipDamaged), once per battle.
-    private static void GrantBoatswainXp(Ship ship, BattleShipFate fate)
-    {
-        if (fate.MitigatedDamage <= 0f) return;
-
-        Logger.Information("[NavalSync] Ship {ShipId} of {Owner} grants its Boatswain XP for {MitigatedDamage} mitigated damage",
-            fate.CampaignShipId, ship.Owner.Id, fate.MitigatedDamage);
-        SkillLevelingManager.OnShipDamaged(ship, fate.MitigatedDamage, 0f);
     }
 }
