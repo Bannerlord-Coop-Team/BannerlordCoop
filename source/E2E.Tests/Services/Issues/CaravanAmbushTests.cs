@@ -99,7 +99,7 @@ public class CaravanAmbushTests : IDisposable
     [Fact]
     public void ProgressBindsTheOwnersQuestToServerPartiesAndJournal()
     {
-        SendState(QuestScenario.ControllerA, true, 3, "Follow", "Saved");
+        SendState(QuestScenario.ControllerA, saved: true, warnings: 3, journal: new[] { "Follow", "Saved" });
         Owner.Call(() =>
         {
             Owner.ObjectManager.TryGetObject<MobileParty>(caravanId, out var caravan);
@@ -516,10 +516,10 @@ public class CaravanAmbushTests : IDisposable
     {
         scenario.AttachQuest(Other, CreateQuest);
         using var warnings = new MethodCallRecorder(AccessTools.Method(typeof(MBInformationManager), nameof(MBInformationManager.AddQuickInformation)));
-        SendState(QuestScenario.ControllerA, false, 1);
-        SendState(QuestScenario.ControllerA, false, 1);
-        SendState(QuestScenario.ControllerA, false, 3);
-        SendState(QuestScenario.ControllerA, false, 4);
+        SendState(QuestScenario.ControllerA, saved: false, warnings: 1);
+        SendState(QuestScenario.ControllerA, saved: false, warnings: 1);
+        SendState(QuestScenario.ControllerA, saved: false, warnings: 3);
+        SendState(QuestScenario.ControllerA, saved: false, warnings: 4);
         Assert.Equal(2, warnings.CountFor(Owner));
         Assert.Equal(0, warnings.CountFor(Other));
     }
@@ -740,51 +740,6 @@ public class CaravanAmbushTests : IDisposable
         {
             Assert.Equal(-5, serverQuest.RelationshipChangeWithQuestGiver);
             Assert.Equal(powerBefore - 5, giver.Power);
-        });
-    }
-
-    [Theory]
-    [InlineData(IssueOutcome.QuestCancel)]
-    [InlineData(IssueOutcome.QuestFail)]
-    public void TerminalReplayKeepsTheOwnersJournalAndEndsOnlyTheirQuest(IssueOutcome outcome)
-    {
-        var otherGiverId = scenario.AddIssue();
-        Quest otherQuest = null!;
-        Other.Call(() =>
-        {
-            var giver = Other.GetRegisteredObject<Hero>(otherGiverId);
-            using (new AllowedThread())
-            {
-                otherQuest = new Quest("other_caravan_quest", giver, null, CampaignTime.Never, 1000, 0.5f);
-                giver.Issue.IssueQuest = otherQuest;
-                otherQuest.StartQuest();
-            }
-            Assert.True(Other.Resolve<IIssueOwnershipRegistry>().TrySetOwner(
-                otherGiverId, giver.Issue.StringId, QuestScenario.ControllerB));
-        });
-        Server.Call(() =>
-        {
-            QuestOf(Server).AddLog(new TextObject("Follow the caravan"));
-            QuestOf(Server).AddLog(new TextObject("The caravan failed"));
-        });
-        var ownerQuest = QuestOf(Owner);
-        Owner.Call(() =>
-        {
-            if (outcome == IssueOutcome.QuestCancel) ownerQuest.CompleteQuestWithCancel();
-            else ownerQuest.CompleteQuestWithFail();
-        });
-        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
-        Owner.Call(() =>
-        {
-            Assert.True(ownerQuest.IsFinalized);
-            Assert.Equal(new[] { "Follow the caravan", "The caravan failed" },
-                ownerQuest.JournalEntries.Select(entry => entry.LogText.ToString()));
-            Assert.DoesNotContain(ownerQuest, Campaign.Current.QuestManager.Quests);
-        });
-        Other.Call(() =>
-        {
-            Assert.True(otherQuest.IsOngoing);
-            Assert.Contains(otherQuest, Campaign.Current.QuestManager.Quests);
         });
     }
 

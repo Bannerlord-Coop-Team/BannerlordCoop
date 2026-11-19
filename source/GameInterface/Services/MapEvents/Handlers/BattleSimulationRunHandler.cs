@@ -4,12 +4,12 @@ using Common.Messaging;
 using Common.Network;
 using Common.Network.Messages;
 using Common.Util;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MapEvents.Participation;
-using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.ObjectManager;
@@ -57,6 +57,7 @@ internal class BattleSimulationRunHandler : IHandler
     private readonly IMapEventLogger mapEventLogger;
     private readonly IPlayerManager playerManager;
     private readonly IRetreatedMapEventPartyTracker retreatedPartyTracker;
+    private readonly IOrderAttackRule orderAttackRule;
 
     private sealed class ActiveSimulation
     {
@@ -75,7 +76,8 @@ internal class BattleSimulationRunHandler : IHandler
         IObjectManager objectManager,
         IMapEventLogger mapEventLogger,
         IPlayerManager playerManager,
-        IRetreatedMapEventPartyTracker retreatedPartyTracker)
+        IRetreatedMapEventPartyTracker retreatedPartyTracker,
+        IOrderAttackRule orderAttackRule)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -83,6 +85,7 @@ internal class BattleSimulationRunHandler : IHandler
         this.mapEventLogger = mapEventLogger;
         this.playerManager = playerManager;
         this.retreatedPartyTracker = retreatedPartyTracker;
+        this.orderAttackRule = orderAttackRule;
 
         messageBroker.Subscribe<RequestAdvanceBattleSimulation>(Handle_RequestAdvanceBattleSimulation);
         messageBroker.Subscribe<RequestCancelBattleSimulation>(Handle_RequestCancelBattleSimulation);
@@ -187,7 +190,7 @@ internal class BattleSimulationRunHandler : IHandler
                 }
             }
 
-            if (!TryGetRequestingParticipant(requestingPeer, payload.What, mapEvent, out var attackerParty))
+            if (!TryGetRequestingParticipant(requestingPeer, payload.What, mapEvent, out var attackerParty, out var requesterCharacter))
             {
                 Logger.Warning("Rejecting battle simulation start for map event {MapEventId}: requester is not an authoritative participant", mapEventId);
                 return;
@@ -196,7 +199,7 @@ internal class BattleSimulationRunHandler : IHandler
             MapEventHostileActionConsequences.Apply(mapEvent, attackerParty.Party, "battle simulation attack");
 
             // Match vanilla MenuHelper.EncounterOrderAttackCondition: only a valid player attack clears protection.
-            if (CanPlayerAttack(mapEvent, attackerParty))
+            if (orderAttackRule.CanOrderAttack(mapEvent, attackerParty, requesterCharacter))
                 mapEvent.IsInvulnerable = false;
 
             // v1: simulate the full participating troop count (null), not the player's selected subset.
@@ -285,43 +288,25 @@ internal class BattleSimulationRunHandler : IHandler
         }, context: nameof(Handle_NetworkCancelBattleSimulation));
     }
 
-    private static bool CanPlayerAttack(MapEvent mapEvent, MobileParty attackerParty)
-    {
-        var eventParty = mapEvent.FindMapEventParty(attackerParty.Party, out var side);
-        if (eventParty == null) return false;
-
-        var opponentParty = mapEvent.PartiesOnSide(side.MissionSide.GetOppositeSide()).FirstOrDefault();
-        if (opponentParty?.Party.MobileParty?.IsInRaftState == true) return false;
-
-        var orderableTroops = 0;
-        foreach (var party in side.Parties)
-        {
-            if (!party.Party.IsMobile || !party.Party.MobileParty.IsInRaftState)
-                orderableTroops += BattleModeEncounterOptionsPatch.CountOrderableTroops(party.Party);
-        }
-
-        return mapEvent.HasTroopsOnBothSides() &&
-            mapEvent.GetLeaderParty(side.MissionSide.GetOppositeSide()) != null &&
-            orderableTroops > 0 &&
-            !attackerParty.IsInRaftState &&
-            BattleModeEncounterOptionsPatch.CountOrderableTroops(attackerParty.Party) > 0;
-    }
-
     private bool TryGetRequestingParticipant(
         NetPeer requester,
         NetworkBattleStartRequest request,
         MapEvent mapEvent,
-        out MobileParty party)
+        out MobileParty party,
+        out CharacterObject requesterCharacter)
     {
         party = null;
+        requesterCharacter = null;
         if (requester == null ||
             !playerManager.TryGetPlayer(requester, out var player) ||
             !string.Equals(player.MobilePartyId, request.AttackerPartyId, StringComparison.Ordinal) ||
-            !objectManager.TryGetObject(player.MobilePartyId, out party))
+            !objectManager.TryGetObject(player.MobilePartyId, out party) ||
+            !objectManager.TryGetObject(player.HeroId, out Hero requesterHero))
         {
             return false;
         }
 
+        requesterCharacter = requesterHero.CharacterObject;
         return mapEvent.FindMapEventParty(party.Party) != null;
     }
 

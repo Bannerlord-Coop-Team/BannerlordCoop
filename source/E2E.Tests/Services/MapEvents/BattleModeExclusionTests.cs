@@ -32,7 +32,7 @@ public class BattleModeExclusionTests : MapEventTestBase
     [Theory]
     [InlineData(false, false)]
     [InlineData(false, true)]
-    [InlineData(true, true)]
+    [InlineData(true, false)]
     public void SimulationStart_OnlyAnAcceptedParticipantReleasesBattleInvulnerability(bool missionClaimed, bool noHealthyTroops)
     {
         var battle = CreateServerMapEvent();
@@ -87,8 +87,11 @@ public class BattleModeExclusionTests : MapEventTestBase
         {
             Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(battle.DefenderPartyId, out var requestingParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(heroId, out var requestingHero));
             requestingParty.MemberRoster.Clear();
-            requestingParty.MemberRoster.AddToCounts(CharacterObject.PlayerCharacter, 1);
+            Assert.NotSame(CharacterObject.PlayerCharacter, requestingHero.CharacterObject);
+            Assert.True(requestingHero.CharacterObject.IsHero);
+            requestingParty.MemberRoster.AddToCounts(requestingHero.CharacterObject, 1);
             mapEvent.IsInvulnerable = true;
         });
 
