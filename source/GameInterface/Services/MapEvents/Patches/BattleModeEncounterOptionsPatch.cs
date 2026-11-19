@@ -1,7 +1,9 @@
 ﻿using Common;
 using Common.Logging;
 using GameInterface.Configuration;
+using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Initialization;
+using GameInterface.Services.PartyBases.Extensions;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Helpers;
@@ -131,6 +133,10 @@ internal class BattleModeEncounterOptionsPatch
 
         if (SimulationStartConditions.Contains(name))
         {
+            // Native counts other players' heroes, but the server keeps them out of the simulation.
+            if (__result && MobileParty.MainParty?.MapEventSide is { } playerSide && playerSide.CountSimulationTroops() <= 0)
+                __result = false;
+
             EnableAlliedSimulationForIncapacitatedPlayer(__0, __result);
 
             if (name == OrderAttackCondition && !__result && ShouldShowClientSiegeAttackOption())
@@ -278,19 +284,10 @@ internal class BattleModeEncounterOptionsPatch
 
         MenuHelper.CheckEnemyAttackableHonorably(args);
 
-        var orderableTroops = 0;
-        foreach (var party in playerSide.Parties)
-        {
-            if (party.Party.IsMobile && party.Party.MobileParty.IsInRaftState)
-                continue;
-
-            orderableTroops += CountOrderableTroops(party.Party);
-        }
-
-        if (orderableTroops <= 0)
+        if (playerSide.CountSimulationTroops() <= 0)
             return false;
 
-        if (!MobileParty.MainParty.IsInRaftState && CountOrderableTroops(PartyBase.MainParty) > 0)
+        if (PartyBase.MainParty.CountSimulationTroops() > 0)
         {
             MBTextManager.SetTextVariable(
                 "SEND_TROOPS_TEXT",
@@ -319,25 +316,6 @@ internal class BattleModeEncounterOptionsPatch
         return true;
     }
 
-    private static int CountOrderableTroops(PartyBase party)
-    {
-        var count = 0;
-        foreach (var element in party.MemberRoster.GetTroopRoster())
-        {
-            if (element.Character.IsHero)
-            {
-                if (element.Character != CharacterObject.PlayerCharacter && !element.Character.HeroObject.IsWounded)
-                    count++;
-            }
-            else
-            {
-                count += element.Number - element.WoundedNumber;
-            }
-        }
-
-        return count;
-    }
-
     /// <summary>Native uses the empty main party's morale to disable "Leave it to the others" even when healthy
     /// allied parties can resolve the field battle. Restore that option without changing any other native gate.</summary>
     private static void EnableAlliedSimulationForIncapacitatedPlayer(MenuCallbackArgs args, bool isShown)
@@ -351,24 +329,12 @@ internal class BattleModeEncounterOptionsPatch
         if (mapEvent == null || !mapEvent.IsFieldBattle || mapEvent.IsNavalMapEvent || mapEvent.MapEventSettlement != null)
             return;
 
-        if (!HasHealthyAlliedParty(MobileParty.MainParty.MapEventSide)) return;
+        // Without a side the troop count in Postfix couldn't run, so keep native's disabled option.
+        if (MobileParty.MainParty.MapEventSide == null) return;
         if (IsEnemyTemporarilyProtected()) return;
 
         args.IsEnabled = true;
         args.Tooltip = TooltipHelper.GetSendTroopsPowerContextTooltipForMapEvent();
-    }
-
-    private static bool HasHealthyAlliedParty(MapEventSide side)
-    {
-        if (side == null) return false;
-
-        foreach (var party in side.Parties)
-        {
-            if (party.Party != PartyBase.MainParty && party.Party.NumberOfHealthyMembers > 0)
-                return true;
-        }
-
-        return false;
     }
 
     private static bool IsEnemyTemporarilyProtected()

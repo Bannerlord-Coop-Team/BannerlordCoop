@@ -4,6 +4,7 @@ using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Initialization;
 using HarmonyLib;
+using Helpers;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -14,6 +15,7 @@ using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
 using Xunit.Abstractions;
 
@@ -294,6 +296,39 @@ public class EncounterSurrenderOptionTests : MapEventTestBase
         }, MapEventDisabledMethods);
     }
 
+    /// <summary>The server keeps player heroes out of the auto-resolve, so an ally holding only its player hero
+    /// would lose the simulation on the first round. Native counts that hero, coop must hide the option.</summary>
+    [Fact]
+    public void IncapacitatedDefender_WithOnlyPlayerHeroAlly_CannotLeaveBattleToOthers()
+    {
+        var (ctx, client) = SetupIncapacitatedDefenderInBattle(
+            withHealthyAllyOnSide: false,
+            effectiveMorale: 0f);
+        var (allyHeroId, allyPartyId) = CreatePlayerHeroParty("PlayerTwo");
+        JoinServerPartyToSide(ctx.MapEventId, allyPartyId, BattleSideEnum.Defender);
+        SetDefenderPlayerEncounter(client, ctx);
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Hero>(allyHeroId, out var allyHero));
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(allyPartyId, out var allyParty));
+
+            using (new AllowedThread())
+            {
+                // Native counts any hero element, even an emptied one, so drop the main party's emptied NPC leader.
+                PartyBase.MainParty.MemberRoster.RemoveZeroCounts();
+                LeaveOnlyHeroInRoster(allyParty.MemberRoster, allyHero);
+            }
+            Assert.Equal(1, allyParty.Party.NumberOfHealthyMembers);
+            Assert.True(MenuHelper.EncounterOrderAttackCondition(new MenuCallbackArgs((MenuContext)null, null)),
+                "native counts the ally's player hero");
+
+            var (shown, _) = InvokeOrderAttackCondition();
+
+            Assert.False(shown);
+        }, MapEventDisabledMethods);
+    }
+
     /// <summary>The existing mission claim still takes precedence over the allied-force exception.</summary>
     [Fact]
     public void IncapacitatedDefender_WithHealthyAlliedParty_CannotSimulateWhileMissionOwnsEvent()
@@ -477,6 +512,17 @@ public class EncounterSurrenderOptionTests : MapEventTestBase
 
             Assert.Equal(0, PartyBase.MainParty.NumberOfHealthyMembers);
         }, MapEventDisabledMethods);
+    }
+
+    /// <summary>Replaces the roster with just <paramref name="hero"/>, removing the builder's NPC lord leader
+    /// outright because native counts an emptied hero element as a troop.</summary>
+    private static void LeaveOnlyHeroInRoster(TroopRoster roster, Hero hero)
+    {
+        roster.Clear();
+
+        // AddToCounts would sync the seed even on an allowed thread, see SeedPartyTroopOnAll.
+        var index = roster.AddNewElement(hero.CharacterObject, -1);
+        roster.AddToCountsAtIndex(index, 1, woundedCountChange: 0, xpChange: 0, removeDepleted: false);
     }
 
     /// <summary>

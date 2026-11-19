@@ -21,6 +21,16 @@ public static class MapEventExtensions
     public static bool IsSendTroopsHideout(this MapEvent mapEvent)
         => mapEvent.Component is HideoutEventComponent { IsSendTroops: true };
 
+    /// <summary>Troops the side can send into an auto-resolve, summed over its parties.</summary>
+    public static int CountSimulationTroops(this MapEventSide side)
+    {
+        var count = 0;
+        foreach (var mapEventParty in side.Parties)
+            count += mapEventParty.Party.CountSimulationTroops();
+
+        return count;
+    }
+
     /// <summary>
     /// Finds a party's MapEventParty on either side of the event, without going through PartiesOnSide(side) —
     /// safe to call even after the party's own MapEventSide has already been nulled elsewhere.

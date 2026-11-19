@@ -186,9 +186,16 @@ internal class BattleSimulationRunHandler : IHandler
                 }
             }
 
-            if (!TryGetRequestingParticipant(requestingPeer, payload.What, mapEvent, out var attackerParty))
+            if (!TryGetRequestingParticipant(requestingPeer, payload.What, mapEvent, out var attackerParty, out var requesterSide))
             {
                 Logger.Warning("Rejecting battle simulation start for map event {MapEventId}: requester is not an authoritative participant", mapEventId);
+                return;
+            }
+
+            // Player heroes stay out of simulations, so a side of only player heroes would lose before any fighting.
+            if (requesterSide.CountSimulationTroops() <= 0)
+            {
+                Logger.Warning("Rejecting battle simulation for map event {MapEventId}: the requester's side has no troops to simulate", mapEventId);
                 return;
             }
 
@@ -284,9 +291,11 @@ internal class BattleSimulationRunHandler : IHandler
         NetPeer requester,
         NetworkBattleStartRequest request,
         MapEvent mapEvent,
-        out MobileParty party)
+        out MobileParty party,
+        out MapEventSide side)
     {
         party = null;
+        side = null;
         if (requester == null ||
             !playerManager.TryGetPlayer(requester, out var player) ||
             !string.Equals(player.MobilePartyId, request.AttackerPartyId, StringComparison.Ordinal) ||
@@ -295,7 +304,7 @@ internal class BattleSimulationRunHandler : IHandler
             return false;
         }
 
-        return mapEvent.FindMapEventParty(party.Party) != null;
+        return mapEvent.FindMapEventParty(party.Party, out side) != null;
     }
 
     /// <summary>
