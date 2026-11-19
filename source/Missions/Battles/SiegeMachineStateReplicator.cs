@@ -1693,13 +1693,13 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
     private static void Apply(UsableMachine machine, NetworkSiegeMachineState state)
     {
         bool isMachineSimulatedLocally = SiegeMissionAuthorityGate.IsMachineSimulatedLocally(machine.Id.Id);
-        bool isDestroyed = machine.DestructionComponent?.IsDestroyed == true;
+        bool wasDestroyed = machine.DestructionComponent?.IsDestroyed == true;
         var movement = (machine as BatteringRam)?.MovementComponent
             ?? (machine as SiegeTower)?.MovementComponent;
 
         // Other peers ease toward the simulator's distance while the machine is intact.
         // After destruction, a late movement snapshot must leave the wreck at the host's frame.
-        if (state.MoveDistance >= 0f && !isMachineSimulatedLocally && movement != null && !isDestroyed)
+        if (state.MoveDistance >= 0f && !isMachineSimulatedLocally && movement != null && !wasDestroyed)
         {
             // Vanilla MP's steady-state client recipe (MissionNetworkComponent's siege machine movement
             // handler): feed the distance into the movement component's advancement error and let its own
@@ -1771,7 +1771,6 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         if (state.HitPoints >= 0f && machine.DestructionComponent != null)
         {
             var destruction = machine.DestructionComponent;
-            bool wasDestroyed = destruction.IsDestroyed;
             destruction.HitPoint = state.HitPoints;
             SyncMissionSiegeWeaponHealth(destruction, state.HitPoints);
             // Assigning HitPoint raises no destroyed event, so disable the machine and run the gate handler before the mesh swap.

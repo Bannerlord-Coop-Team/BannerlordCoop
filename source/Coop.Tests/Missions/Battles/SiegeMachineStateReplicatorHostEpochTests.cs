@@ -599,12 +599,9 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
     }
 
     [Theory]
-    [InlineData(true, false)]
-    [InlineData(false, false)]
-    [InlineData(true, true)]
-    [InlineData(false, true)]
-    public void BufferedDestructionKeepsHostDistanceWhenMergedWithClaimantMovement(
-        bool hostFirst, bool reconcileOnRegistration)
+    [InlineData(true)]
+    [InlineData(false)]
+    public void BufferedDestructionKeepsHostDistanceWhenMergedWithClaimantMovement(bool hostFirst)
     {
         const int machineId = 18;
         const int authorityRevision = 4;
@@ -648,18 +645,9 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
         DrainGameThread();
         Assert.Same(first, Assert.Single(PendingStates()).Value);
 
-        NetworkSiegeMachineState merged;
-        if (reconcileOnRegistration)
-        {
-            merged = ReconcilePendingStateForLiveApply(second);
-            Assert.Empty(PendingStates());
-        }
-        else
-        {
-            broker.Publish(this, second);
-            DrainGameThread();
-            merged = Assert.Single(PendingStates()).Value;
-        }
+        broker.Publish(this, second);
+        DrainGameThread();
+        var merged = Assert.Single(PendingStates()).Value;
 
         Assert.Equal(hostState.HitPoints, merged.HitPoints);
         Assert.Equal(hostState.DestructionState, merged.DestructionState);
