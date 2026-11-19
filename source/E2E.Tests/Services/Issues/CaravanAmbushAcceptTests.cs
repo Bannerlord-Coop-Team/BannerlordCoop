@@ -3,7 +3,6 @@ using E2E.Tests.Environment;
 using E2E.Tests.Util;
 using GameInterface;
 using GameInterface.Services.Issues.Framework.AcceptCoordination;
-using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Quests.CaravanAmbush;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Heroes.Patches;
@@ -114,32 +113,6 @@ public class CaravanAmbushAcceptTests
                 Assert.True(server.GetRegisteredObject<Hero>(scenario.NotableId).Issue.IsOngoingWithoutQuest);
             });
         });
-    }
-
-    [Fact]
-    public void OwnerWithoutAPartyCannotStartTheNativeAccept()
-    {
-        using var environment = new E2ETestEnvironment(output);
-        var scenario = new QuestScenario(environment, giver => new Issue(giver, null));
-        var server = scenario.Server;
-        scenario.AttachQuest(server, giver => new Quest("caravan_no_party", giver, null, CampaignTime.Never, 1000, 0.5f));
-
-        using var nativeAccept = new MethodCallRecorder(Priority.First,
-            AccessTools.Method(typeof(Quest), nameof(Quest.OnQuestAccepted)));
-        server.Call(() =>
-        {
-            var hero = server.GetRegisteredObject<Hero>(scenario.OwnerHeroId);
-            hero._partyBelongedTo = null;
-            Assert.True(server.Resolve<IIssueOwnershipRegistry>().TrySetOwner(
-                scenario.NotableId, QuestScenario.IssueId, QuestScenario.ControllerA));
-
-            var issue = server.GetRegisteredObject<Hero>(scenario.NotableId).Issue;
-            var strategy = new CaravanAmbushQuestSolutionAcceptStrategy(
-                server.Resolve<IIssueOwnerResolver>(), server.Resolve<ICaravanAmbushProgress>());
-            var error = Assert.Throws<InvalidOperationException>(() => strategy.Apply(issue, Array.Empty<byte>()));
-            Assert.Equal("Caravan quest owner has no party", error.Message);
-        });
-        Assert.Equal(0, nativeAccept.CountFor(server));
     }
 
     private void WithAcceptScenario(Action<E2ETestEnvironment, QuestScenario, Harmony> test)

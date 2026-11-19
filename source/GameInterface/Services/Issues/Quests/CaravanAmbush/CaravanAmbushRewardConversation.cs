@@ -42,7 +42,7 @@ internal class CaravanAmbushRewardConversation : ICaravanAmbushRewardConversatio
 
     private void Tick(MessagePayload<CampaignTick> payload)
     {
-        // Vanilla TickEvent stops while paused, including after battle loot closes.
+        // Listen to CampaignTick, because vanilla TickEvent stops while paused, including after battle loot closes.
         if (ModInformation.IsClient) TryOpenConversation();
     }
 

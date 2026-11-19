@@ -16,6 +16,7 @@ using GameInterface.Services.Players;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Conversation;
@@ -400,6 +401,59 @@ public class CaravanAmbushTests : IDisposable
             var quest = QuestOf(Server);
             Server.Resolve<ICaravanAmbushWorldEventService>().SettlementEntered(quest._caravanParty);
             Assert.Null(quest._caravanParty);
+        });
+        Assert.Equal(IssueOutcome.QuestCancel, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void WarWithTheGiversTownCancelsTheQuest(bool ownerJoinsHostileKingdom)
+    {
+        var townFactionId = environment.CreateRegisteredObject<Kingdom>();
+        var hostileKingdomId = environment.CreateRegisteredObject<Kingdom>();
+        var ownerClanId = environment.CreateRegisteredObject<Clan>();
+        var settlementId = environment.CreateRegisteredObject<Settlement>();
+        var townId = environment.CreateRegisteredObject<Town>();
+
+        Server.Call(() =>
+        {
+            Campaign.Current.EncyclopediaManager ??= new EncyclopediaManager();
+            Campaign.Current.EncyclopediaManager.CreateEncyclopediaPages();
+            BindParties();
+            var quest = QuestOf(Server);
+            var owner = PlayerHero(QuestScenario.ControllerA);
+            var ownerClan = Server.GetRegisteredObject<Clan>(ownerClanId);
+            var townFaction = Server.GetRegisteredObject<Kingdom>(townFactionId);
+            var settlement = Server.GetRegisteredObject<Settlement>(settlementId);
+            var town = Server.GetRegisteredObject<Town>(townId);
+            using (new AllowedThread())
+            {
+                owner.Clan = ownerClan;
+                quest.QuestGiver.Clan._kingdom = townFaction;
+                town._ownerClan = quest.QuestGiver.Clan;
+                settlement.SetSettlementComponent(town);
+                quest.QuestGiver.StayingInSettlement = settlement;
+            }
+
+            Assert.True(quest.IsOngoing);
+            Assert.DoesNotContain(quest, Campaign.Current.QuestManager.Quests);
+            if (ownerJoinsHostileKingdom)
+            {
+                var hostileKingdom = Server.GetRegisteredObject<Kingdom>(hostileKingdomId);
+                DeclareWarAction.ApplyInternal(townFaction, hostileKingdom, DeclareWarAction.DeclareWarDetail.CausedByRebellion);
+                Assert.True(quest.IsOngoing);
+                using (new AllowedThread()) ownerClan._kingdom = hostileKingdom;
+                CampaignEventDispatcher.Instance.OnClanChangedKingdom(ownerClan, null, hostileKingdom,
+                    ChangeKingdomAction.ChangeKingdomActionDetail.JoinKingdom, false);
+            }
+            else
+            {
+                DeclareWarAction.ApplyInternal(townFaction, ownerClan, DeclareWarAction.DeclareWarDetail.CausedByRebellion);
+            }
+
+            Assert.True(quest.IsFinalized);
+            AssertPartiesReleased();
         });
         Assert.Equal(IssueOutcome.QuestCancel, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
     }

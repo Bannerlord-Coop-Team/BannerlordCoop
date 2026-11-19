@@ -29,11 +29,19 @@ public class BattleModeExclusionTests : MapEventTestBase
 {
     public BattleModeExclusionTests(ITestOutputHelper output) : base(output) { }
 
+    public enum RequesterRoster
+    {
+        Healthy,
+        Empty,
+        HeroOnly,
+    }
+
     [Theory]
-    [InlineData(false, false)]
-    [InlineData(false, true)]
-    [InlineData(true, false)]
-    public void SimulationStart_OnlyAnAcceptedParticipantReleasesBattleInvulnerability(bool missionClaimed, bool noHealthyTroops)
+    [InlineData(false, RequesterRoster.Healthy)]
+    [InlineData(false, RequesterRoster.Empty)]
+    [InlineData(false, RequesterRoster.HeroOnly)]
+    [InlineData(true, RequesterRoster.Healthy)]
+    public void SimulationStart_OnlyAnAcceptedParticipantReleasesBattleInvulnerability(bool missionClaimed, RequesterRoster roster)
     {
         var battle = CreateServerMapEvent();
         var client = Clients.First();
@@ -44,10 +52,17 @@ public class BattleModeExclusionTests : MapEventTestBase
         {
             Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
             mapEvent.IsInvulnerable = true;
-            if (noHealthyTroops)
+            if (roster != RequesterRoster.Healthy)
             {
                 Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(battle.DefenderPartyId, out var requestingParty));
                 requestingParty.MemberRoster.Clear();
+                if (roster == RequesterRoster.HeroOnly)
+                {
+                    var requester = Server.GetRegisteredObject<Hero>(heroId).CharacterObject;
+                    Assert.NotSame(CharacterObject.PlayerCharacter, requester);
+                    Assert.True(requester.IsHero);
+                    requestingParty.MemberRoster.AddToCounts(requester, 1);
+                }
             }
             if (missionClaimed) Assert.True(ServerBattleModeArbiter.TryClaimMission(battle.MapEventId));
         });
@@ -65,7 +80,7 @@ public class BattleModeExclusionTests : MapEventTestBase
                 instance.Call(() =>
                 {
                     Assert.True(instance.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
-                    Assert.Equal(missionClaimed || noHealthyTroops, mapEvent.IsInvulnerable);
+                    Assert.Equal(missionClaimed || roster != RequesterRoster.Healthy, mapEvent.IsInvulnerable);
                 });
             }
         }
@@ -73,39 +88,6 @@ public class BattleModeExclusionTests : MapEventTestBase
         {
             Server.Call(() => ServerBattleModeArbiter.Release(battle.MapEventId));
         }
-    }
-
-    [Fact]
-    public void SimulationStartWithOnlyThePlayerCharacterKeepsBattleInvulnerability()
-    {
-        var battle = CreateServerMapEvent();
-        var client = Clients.First();
-        var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
-        RegisterAsPlayerParty("ambush-owner", heroId, battle.DefenderPartyId);
-        TestEnvironment.ConnectRegisteredPlayer(client, "ambush-owner");
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
-            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(battle.DefenderPartyId, out var requestingParty));
-            Assert.True(Server.ObjectManager.TryGetObject<Hero>(heroId, out var requestingHero));
-            requestingParty.MemberRoster.Clear();
-            Assert.NotSame(CharacterObject.PlayerCharacter, requestingHero.CharacterObject);
-            Assert.True(requestingHero.CharacterObject.IsHero);
-            requestingParty.MemberRoster.AddToCounts(requestingHero.CharacterObject, 1);
-            mapEvent.IsInvulnerable = true;
-        });
-
-        client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkBattleStartRequest(
-            Guid.NewGuid().ToString(), (int)BattleStartMode.Simulation,
-            battle.MapEventId, battle.DefenderPartyId)), MapEventDisabledMethods);
-
-        var reply = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleStartReply>());
-        Assert.True(reply.Accepted);
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
-            Assert.True(mapEvent.IsInvulnerable);
-        });
     }
 
     [Theory]

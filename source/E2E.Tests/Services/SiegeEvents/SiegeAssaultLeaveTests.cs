@@ -578,6 +578,7 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
             var encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
             encounter._mapEvent = mapEvent;
             encounter._encounteredParty = defender.Party;
+            encounter.PlayerSide = BattleSideEnum.Attacker;
             encounter.OpponentSide = BattleSideEnum.Defender;
             Campaign.Current.PlayerEncounter = encounter;
 
@@ -587,6 +588,8 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
             const string unchanged = "unset order attack text";
             const string sendTroops = "Send troops.";
             const string leaveToOthers = "Leave it to the others.";
+            const string originalTooltip = "unset order attack tooltip";
+            const string lowMoraleTooltip = "Your men lack the courage to continue the battle without you. (Low Morale)";
             var sendType = GameMenuOption.LeaveType.OrderTroopsToAttack;
             var untouchedType = new MenuCallbackArgs((MenuContext)null, null).optionLeaveType;
 
@@ -608,6 +611,8 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
 
             using var allowed = new AllowedThread();
             var orderAttackRule = client.Resolve<IOrderAttackRule>();
+            var defenderFaction = defender.MapFaction;
+            var originalProtection = defenderFaction.NotAttackableByPlayerUntilTime;
             foreach (var row in rows)
             {
                 mapEvent.Position = new CampaignVec2(default, isOnLand: !row.Naval);
@@ -628,14 +633,27 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
                 if (row.AttackerRaft)
                     ally.MemberRoster.AddToCounts(troop, 1);
 
+                var tooltip = new TextObject(originalTooltip);
+                // A protected opponent makes the honor check write both fields, even with no orderable troops.
+                if (row.PlayerOnly)
+                {
+                    defenderFaction.NotAttackableByPlayerUntilTime = CampaignTime.DaysFromNow(1f);
+                    var honorArgs = new MenuCallbackArgs((MenuContext)null, null) { IsEnabled = true, Tooltip = tooltip };
+                    MenuHelper.CheckEnemyAttackableHonorably(honorArgs);
+                    Assert.False(honorArgs.IsEnabled);
+                    Assert.NotSame(tooltip, honorArgs.Tooltip);
+                }
+
                 MBTextManager.SetTextVariable("SEND_TROOPS_TEXT", unchanged);
-                var (shown, args) = InvokeSiegeOrderAttackFallback();
+                var (shown, args) = InvokeSiegeOrderAttackFallback(tooltip);
+                defenderFaction.NotAttackableByPlayerUntilTime = originalProtection;
                 var text = new TextObject("{=!}{SEND_TROOPS_TEXT}").ToString();
 
                 Assert.Equal(
-                    (row.Name, row.CanOrder, row.Shown, row.LeaveType, row.Text),
+                    (row.Name, row.CanOrder, row.Shown, row.LeaveType, row.Text,
+                        Enabled: !row.Shown, Tooltip: row.Shown ? lowMoraleTooltip : originalTooltip),
                     (row.Name, orderAttackRule.CanOrderAttack(mapEvent, attacker, CharacterObject.PlayerCharacter),
-                        shown, args.optionLeaveType, text));
+                        shown, args.optionLeaveType, text, args.IsEnabled, args.Tooltip?.ToString()));
                 if (!row.Attached)
                     attackerSide._battleParties.Add(attackerEntry);
             }
@@ -668,12 +686,12 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
         return (shown, args);
     }
 
-    private static (bool shown, MenuCallbackArgs args) InvokeSiegeOrderAttackFallback()
+    private static (bool shown, MenuCallbackArgs args) InvokeSiegeOrderAttackFallback(TextObject tooltip)
     {
         var method = AccessTools.Method(typeof(BattleModeEncounterOptionsPatch), "TryApplyClientSiegeOrderAttackOptionState");
         Assert.NotNull(method);
 
-        var args = new MenuCallbackArgs((MenuContext)null, null);
+        var args = new MenuCallbackArgs((MenuContext)null, null) { IsEnabled = true, Tooltip = tooltip };
         var shown = (bool)method.Invoke(null, new object[] { args });
         return (shown, args);
     }
