@@ -261,7 +261,6 @@ internal class BattleModeEncounterOptionsPatch
         if (mapEvent == null || encounter == null)
             return false;
 
-        var partyIsAttached = MobileParty.MainParty?.MapEvent == mapEvent;
         var playerSide = MobileParty.MainParty?.MapEventSide;
         if (playerSide == null)
             return false;
