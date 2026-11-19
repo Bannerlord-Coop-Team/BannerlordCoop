@@ -189,6 +189,7 @@ internal class PlayerCaptivityServerHandler : IHandler
     private static float PlayerExecutionChance(bool hasBloodFeud, int mercy, int relation)
     {
         if (hasBloodFeud) return 1f;
+        if (relation >= (mercy * 10) - 50) return 0f;
 
         return Math.Max(((-relation * 0.3f) - (mercy * 5f)) * 0.01f, 0f);
     }
