@@ -279,6 +279,7 @@ internal class BattleModeEncounterOptionsPatch
             ? GameMenuOption.LeaveType.OrderShipsToAttack
             : GameMenuOption.LeaveType.OrderTroopsToAttack;
 
+        // GetConditionsHold saves the leave type even when this condition hides the option.
         if (hideOrderAttack)
             return false;
 
