@@ -49,13 +49,8 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
     {
     }
 
-    private static List<MethodBase> SiegeCreationDisabledMethods => new()
-    {
-        AccessTools.Method(typeof(MobileParty), nameof(MobileParty.OnPartyJoinedSiegeInternal)),
-        AccessTools.Method(typeof(BesiegerCamp), nameof(BesiegerCamp.InitializeSiegeEventSide)),
-        AccessTools.Method(typeof(Settlement), nameof(Settlement.InitializeSiegeEventSide)),
-        AccessTools.Method(typeof(CultureObject), nameof(CultureObject.HasFeat)),
-    };
+    private static IEnumerable<MethodBase> SiegeLeaveDisabledMethods => SiegeCreationDisabledMethods
+        .Append(AccessTools.Method(typeof(CultureObject), nameof(CultureObject.HasFeat)));
 
     [Theory]
     [InlineData(false)]
@@ -68,7 +63,7 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
         RegisterAsPlayerParty("PlayerOne", heroId, partyId);
         TestEnvironment.ConnectRegisteredPlayer(client, "PlayerOne");
         SetMainParty(client, partyId);
-        var disabledMethods = MapEventDisabledMethods.Concat(SiegeCreationDisabledMethods)
+        var disabledMethods = MapEventDisabledMethods.Concat(SiegeLeaveDisabledMethods)
             .Append(AccessTools.Method(typeof(PartyBaseHelper), nameof(PartyBaseHelper.HasFeat)))
             .ToList();
         var siegeId = TestEnvironment.CreateRegisteredObject<SiegeEvent>(disabledMethods);
@@ -193,7 +188,7 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
         {
             leavingClient.Resolve<INetwork>().SendAll(new NetworkRequestBreakSiege(partyId, finishLocalMenus: true));
         }, MapEventDisabledMethods
-            .Concat(SiegeCreationDisabledMethods)
+            .Concat(SiegeLeaveDisabledMethods)
             .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast)))
             .ToList());
 
@@ -859,7 +854,7 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
 
     private string SetClientOnlyCamp(EnvironmentInstance client, string partyId)
     {
-        var disabledMethods = SiegeCreationDisabledMethods
+        var disabledMethods = SiegeLeaveDisabledMethods
             .Append(AccessTools.Method(typeof(PartyBaseHelper), nameof(PartyBaseHelper.HasFeat)))
             .ToList();
         var siegeEventId = TestEnvironment.CreateRegisteredObject<SiegeEvent>(disabledMethods);
@@ -889,7 +884,7 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
     }
 
     private List<MethodBase> LeaveSoldiersBehindDisabledMethods => MapEventDisabledMethods
-        .Concat(SiegeCreationDisabledMethods)
+        .Concat(SiegeLeaveDisabledMethods)
         .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu), new[] { typeof(string) }))
         .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu), new[] { typeof(string) }))
         .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast)))
