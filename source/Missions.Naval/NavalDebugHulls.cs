@@ -27,6 +27,9 @@ public interface INavalDebugHulls
 
     /// <summary>The hull's rope attachment points, in a stable content-path order.</summary>
     ShipAttachmentPointMachine[] AttachmentPoints(MissionShip hull);
+
+    /// <summary>Whether vanilla blocks cutting loose because an enemy is on the hull or one of its bridges.</summary>
+    bool IsCutLooseBlocked(MissionShip hull);
 }
 
 /// <inheritdoc cref="INavalDebugHulls"/>
@@ -78,6 +81,16 @@ public class NavalDebugHulls : INavalDebugHulls
     public ShipAttachmentPointMachine[] AttachmentPoints(MissionShip hull) => hull.AttachmentPointMachines
         .OrderBy(point => NavalShipEngine.EntityPath(point.GameEntity, hull.GameEntity), StringComparer.Ordinal)
         .ToArray();
+
+    // Mirrors vanilla's MissionGauntletShipControlView.GetIsCutLooseBlockedFromNearbyEnemies, evaluated here because this client owns the hull
+    public bool IsCutLooseBlocked(MissionShip hull)
+    {
+        if (hull.ShipOrder.IsEnemyOnShip) return true;
+
+        var side = hull.BattleSide;
+        return hull.AttachmentMachines.Any(machine => machine.CurrentAttachment?.EnemySideAgentsOnTheBridge(side) == true)
+            || hull.AttachmentPointMachines.Any(point => point.CurrentAttachment?.EnemySideAgentsOnTheBridge(side) == true);
+    }
 
     /// <summary>Where a hook lands on <paramref name="point"/>, as vanilla's throw measures it.</summary>
     internal static Vec3 HookPosition(ShipAttachmentPointMachine point) =>

@@ -1,0 +1,68 @@
+﻿using E2E.Tests.Util;
+using HarmonyLib;
+using System.Reflection;
+using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.Party;
+using Xunit.Abstractions;
+
+namespace E2E.Tests.Services.Rafts;
+
+/// <summary>
+/// The AI enable and disable inside the server's raft action reach clients through the synced MobilePartyAi._isDisabled.
+/// </summary>
+public class RaftStateChangeActionTests : SyncTestBase
+{
+    private readonly string partyId;
+
+    // Raft activation moves the party to the closest land, which needs the navigation mesh
+    private static readonly MethodBase[] RaftDisabledMethods =
+    {
+        AccessTools.Method(typeof(MobileParty), nameof(MobileParty.MovePartyToTheClosestLand)),
+    };
+
+    /// <summary>Creates a registered party on every instance.</summary>
+    public RaftStateChangeActionTests(ITestOutputHelper output) : base(output)
+    {
+        partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+    }
+
+    // Starting a raft disables the AI so the owner's orders are ignored like vanilla, and landing must enable it again, otherwise it never moves
+    [Fact]
+    public void RaftState_ActivateThenDeactivate_SyncsTheAiEverywhere()
+    {
+        Server.Call(
+            () => RaftStateChangeAction.ActivateRaftStateForParty(Server.GetRegisteredObject<MobileParty>(partyId)),
+            RaftDisabledMethods);
+
+        AssertRaftStateEverywhere(isRafting: true);
+
+        // A client's own landing must leave its raft alone
+        var client = Clients.First();
+        client.Call(() => RaftStateChangeAction.DeactivateRaftStateForParty(client.GetRegisteredObject<MobileParty>(partyId)));
+
+        AssertRaftStateEverywhere(isRafting: true);
+
+        Server.Call(() => RaftStateChangeAction.DeactivateRaftStateForParty(Server.GetRegisteredObject<MobileParty>(partyId)));
+
+        AssertRaftStateEverywhere(isRafting: false);
+    }
+
+    // Checks the server's and every client's copy of the party's raft and AI state against whether it should be rafting.
+    private void AssertRaftStateEverywhere(bool isRafting)
+    {
+        Server.Call(() => AssertRaftState(isRafting, Server.GetRegisteredObject<MobileParty>(partyId)));
+
+        foreach (var client in Clients)
+        {
+            client.PumpGameThread();
+            client.Call(() => AssertRaftState(isRafting, client.GetRegisteredObject<MobileParty>(partyId)));
+        }
+    }
+
+    // A rafting party has its AI disabled and a landed one has it enabled.
+    private static void AssertRaftState(bool isRafting, MobileParty party)
+    {
+        Assert.Equal(isRafting, party.IsInRaftState);
+        Assert.Equal(isRafting, party.Ai.IsDisabled);
+    }
+}

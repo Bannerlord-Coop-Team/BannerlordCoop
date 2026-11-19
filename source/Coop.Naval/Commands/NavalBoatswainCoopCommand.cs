@@ -10,7 +10,7 @@ using TaleWorlds.CampaignSystem.Party;
 
 namespace Coop.Naval.Commands;
 
-/// <summary>Stages real Boatswain damage reduction and reads the campaign XP and ship HP used by M6 validation.</summary>
+/// <summary>Stages real Boatswain damage reduction and reads the First Mate's skill and the party's ship HP.</summary>
 public sealed class NavalBoatswainCoopCommand : ICoopCommand
 {
     private readonly IObjectManager objectManager;
@@ -23,7 +23,7 @@ public sealed class NavalBoatswainCoopCommand : ICoopCommand
 
     public string Prefix => "coop.debug.naval";
     public string Name => "boatswain";
-    public string Description => "Reads a party's effective First Mate XP and ship HP; prepare sets Boatswain to 100 and raises focus to 5 on the server before battle.";
+    public string Description => "Reads a party's effective First Mate skill and ship HP; prepare sets Boatswain to 100 on the server before battle.";
     public CoopCommandSide Side => CoopCommandSide.Both;
     public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
     {
@@ -31,7 +31,7 @@ public sealed class NavalBoatswainCoopCommand : ICoopCommand
         new ExpectedArgs("prepare", "Optional: stage skill-based hull damage reduction before battle, server only.", false),
     };
 
-    /// <summary>Prepares only on the campaign authority; reads never mutate XP or campaign ships.</summary>
+    /// <summary>Prepares only on the campaign authority; reads change no campaign state.</summary>
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
     {
         if (args == null || args.Count < 1 || args.Count > 2 || string.IsNullOrWhiteSpace(args[0]) ||
@@ -48,19 +48,15 @@ public sealed class NavalBoatswainCoopCommand : ICoopCommand
         if (hero == null) return Failed("The party has no effective First Mate.");
 
         var skill = NavalSkills.Boatswain;
-        var developer = hero.HeroDeveloper;
+        // The damage model's NavalSkillEffects.ShipDamageReduction reads the effective First Mate's Boatswain skill, so no ship upgrade is needed
         if (prepare)
-        {
-            // SkillHelper uses the effective First Mate's Boatswain skill, no ship upgrade is required.
-            if (developer.GetFocus(skill) < 5) developer.AddFocus(skill, 5 - developer.GetFocus(skill), false);
-            developer.SetInitialSkillLevel(skill, 100);
-        }
+            hero.HeroDeveloper.SetInitialSkillLevel(skill, 100);
 
         objectManager.TryGetId(hero, out var heroId);
         var output = new StringBuilder();
         output.AppendLine(string.Format(CultureInfo.InvariantCulture,
-            "NAVAL_BOATSWAIN party={0} hero={1} level={2} xp={3:R} learningRate={4:R} prepared={5}",
-            args[0], heroId, hero.GetSkillValue(skill), developer.GetSkillXp(skill), developer.GetFocusFactor(skill), prepare));
+            "NAVAL_BOATSWAIN party={0} hero={1} level={2} prepared={3}",
+            args[0], heroId, hero.GetSkillValue(skill), prepare));
         foreach (var ship in party.Ships)
         {
             objectManager.TryGetId(ship, out var shipId);
