@@ -246,6 +246,7 @@ public class ModConfigTests : IDisposable
     [Fact]
     public void MalformedConfig_IsNotChangedByMigration()
     {
+        ModInformation.IsServer = true;
         const string broken = "{ // \"birthAndDeath\": true,\r\n this is not JSON";
         File.WriteAllText(ConfigPath, broken);
 
@@ -539,33 +540,11 @@ public class ModConfigTests : IDisposable
         Assert.Equal(File.ReadAllText(ShippedTemplatePath), File.ReadAllText(ConfigPath));
     }
 
-    // On a server, a config made before the key existed gets warSails seeded off, keeping every operator value and comment.
-    [Fact]
-    public void ExistingModOptions_WithoutWarSails_IsSeededOffAndIsIdempotent()
-    {
-        ModInformation.IsServer = true;
-        File.WriteAllText(ConfigPath, @"{
-  ""modOptions"": {
-    // operator note
-    ""clientsCanUseCheats"": true
-  }
-}");
-
-        var config = NewModConfig().Data;
-        string firstMigration = File.ReadAllText(ConfigPath);
-        _ = NewModConfig().Data;
-
-        Assert.False(config.ModOptions.WarSails);
-        Assert.True(config.ModOptions.ClientsCanUseCheats);
-        Assert.Contains("\"warSails\": false", firstMigration);
-        Assert.Contains("// operator note", firstMigration);
-        Assert.Equal(firstMigration, File.ReadAllText(ConfigPath));
-    }
-
-    // An operator's warSails value wins over the seeded default.
+    // An operator's warSails value wins over the template's, whatever its casing.
     [Fact]
     public void ExistingWarSails_IsKept()
     {
+        ModInformation.IsServer = true;
         File.WriteAllText(ConfigPath, "{ \"modOptions\": { \"WarSails\": true } }");
 
         var config = NewModConfig().Data;
@@ -574,15 +553,116 @@ public class ModConfigTests : IDisposable
         Assert.DoesNotContain("\"warSails\": false", File.ReadAllText(ConfigPath));
     }
 
-    // A config with no modOptions block is left without one, and warSails still reads as off.
-    [Fact]
-    public void MissingModOptionsBlock_IsNotAdded_AndWarSailsReadsOff()
+    private const string MergeTemplate = @"{
+  ""voice"": {
+    ""mapMaximumDistance"": 20
+  },
+
+  // Advanced starting options offered to a player creating a new character on join.
+  ""advancedStart"": {
+    // false: the window never shows and everyone gets the default start.
+    ""enabled"": true,
+
+    // false hides a start type from the window.
+    ""startTypes"": {
+      ""outlaw"": true,
+      ""beggar"": true
+    }
+  },
+
+  ""modOptions"": {
+    // Enables proximity voice for every player.
+    ""voiceEnabled"": true,
+
+    // Toggle War Sails (NavalDLC) co-op on a dedicated server.
+    ""warSails"": false
+  }
+}";
+
+    private const string AllDifficultyKeys = @"  ""difficulty"": { ""playerReceivedDamage"": ""Easy"", ""playerTroopsReceivedDamage"": ""Easy"", ""combatAIDifficulty"": ""Easy"", ""recruitmentDifficulty"": ""Easy"", ""playerMapMovementSpeed"": ""Easy"", ""stealthAndDisguiseDifficulty"": ""Easy"", ""persuasionSuccessChance"": ""Easy"", ""clanMemberDeathChance"": ""Easy"", ""battleDeath"": ""Easy"", ""birthAndDeath"": false, ""autoAllocateClanMemberPerks"": true },";
+
+    private IModConfig NewModConfigWithTemplate(string template)
     {
-        File.WriteAllText(ConfigPath, "{ \"voice\": { \"mapMaximumDistance\": 20 } }");
+        string templatePath = Path.Combine(tempDir, "template.json");
+        File.WriteAllText(templatePath, template);
+        return new ModConfig(tempDir, templatePath);
+    }
 
-        var config = NewModConfig().Data;
+    // On a server, blocks and keys new in the template are copied in with their comments and nothing else changes.
+    [Fact]
+    public void ServerLoad_AddsNewTemplateSettingsWithComments_AndIsIdempotent()
+    {
+        ModInformation.IsServer = true;
+        File.WriteAllText(ConfigPath, @"{
+  // operator note
+  ""voice"": {
+    ""mapMaximumDistance"": 35
+  },
+" + AllDifficultyKeys + @"
+  ""modOptions"": {
+    // Enables proximity voice for every player.
+    ""voiceEnabled"": false
+  }
+}");
 
-        Assert.False(config.ModOptions?.WarSails ?? false);
-        Assert.DoesNotContain("modOptions", File.ReadAllText(ConfigPath));
+        var config = NewModConfigWithTemplate(MergeTemplate).Data;
+        string firstLoad = File.ReadAllText(ConfigPath);
+        _ = NewModConfigWithTemplate(MergeTemplate).Data;
+
+        Assert.Equal(@"{
+  // operator note
+  ""voice"": {
+    ""mapMaximumDistance"": 35
+  },
+
+  // Advanced starting options offered to a player creating a new character on join.
+  ""advancedStart"": {
+    // false: the window never shows and everyone gets the default start.
+    ""enabled"": true,
+
+    // false hides a start type from the window.
+    ""startTypes"": {
+      ""outlaw"": true,
+      ""beggar"": true
+    }
+  },
+
+" + AllDifficultyKeys + @"
+  ""modOptions"": {
+    // Enables proximity voice for every player.
+    ""voiceEnabled"": false,
+
+    // Toggle War Sails (NavalDLC) co-op on a dedicated server.
+    ""warSails"": false
+  }
+}", firstLoad);
+        Assert.Equal(firstLoad, File.ReadAllText(ConfigPath));
+        Assert.False(config.ModOptions.VoiceEnabled);
+        Assert.False(config.ModOptions.WarSails);
+    }
+
+    // A key the operator commented out stays commented out, and nothing is added for it.
+    [Fact]
+    public void ServerLoad_TreatsCommentedOutKeyAsPresent()
+    {
+        ModInformation.IsServer = true;
+        string config = @"{
+" + AllDifficultyKeys + @"
+  ""modOptions"": {
+    ""voiceEnabled"": true,
+    // ""warSails"": true,
+  }
+}";
+        File.WriteAllText(ConfigPath, config);
+
+        _ = NewModConfigWithTemplate(@"{
+  ""modOptions"": {
+    ""voiceEnabled"": true,
+    // Toggle War Sails (NavalDLC) co-op on a dedicated server.
+    ""warSails"": false
+  }
+}").Data;
+
+        Assert.Equal(config, File.ReadAllText(ConfigPath));
     }
 }
