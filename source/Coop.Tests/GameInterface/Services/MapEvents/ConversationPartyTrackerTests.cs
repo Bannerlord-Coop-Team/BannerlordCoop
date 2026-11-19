@@ -164,55 +164,55 @@ public class ConversationPartyTrackerTests
     }
 
     [Fact]
-    public void IsInOtherConversation_WithoutConversations_IsFalse()
+    public void TryDefer_WithoutConversations_IsFalse()
     {
-        Assert.False(tracker.IsInOtherConversation(firstPlayer, "player1", "looter1"));
+        Assert.False(tracker.TryDefer(firstPlayer, "player1", "looter1", out _));
     }
 
     [Fact]
-    public void IsInOtherConversation_WhenEngagedWithSameParty_IsFalse()
+    public void TryDefer_WhenEngagedWithSameParty_IsFalse()
     {
         // The same party attacking again refreshes the engagement, which the bandit barter needs.
         tracker.TryBeginEngagement(firstPlayer, "player1", "looter1", wasAiDisabled: false);
 
-        Assert.False(tracker.IsInOtherConversation(firstPlayer, "player1", "looter1"));
+        Assert.False(tracker.TryDefer(firstPlayer, "player1", "looter1", out _));
     }
 
     [Fact]
-    public void IsInOtherConversation_WhenEngagedWithDifferentParty_IsTrue()
+    public void TryDefer_WhenEngagedWithDifferentParty_IsTrue()
     {
         tracker.TryBeginEngagement(firstPlayer, "player1", "looter1", wasAiDisabled: false);
 
-        Assert.True(tracker.IsInOtherConversation(firstPlayer, "player1", "looter2"));
+        Assert.True(tracker.TryDefer(firstPlayer, "player1", "looter2", out _));
     }
 
     [Fact]
-    public void IsInOtherConversation_WhenPartyHeldByAnotherPlayer_IsTrue()
+    public void TryDefer_WhenPartyHeldByAnotherPlayer_IsTrue()
     {
         tracker.TryBeginEngagement(secondPlayer, "player2", "looter1", wasAiDisabled: false);
 
-        Assert.True(tracker.IsInOtherConversation(firstPlayer, "player1", "looter1"));
+        Assert.True(tracker.TryDefer(firstPlayer, "player1", "looter1", out _));
     }
 
     [Fact]
-    public void IsInOtherConversation_WhenPlayerInPvpConversation_IsTrue()
+    public void TryDefer_WhenPlayerInPvpConversation_IsTrue()
     {
         tracker.BeginPvpConversation("player1", "player2");
 
-        Assert.True(tracker.IsInOtherConversation(firstPlayer, "player1", "looter1"));
+        Assert.True(tracker.TryDefer(firstPlayer, "player1", "looter1", out _));
     }
 
     [Fact]
-    public void IsInOtherConversation_WhenAnotherPlayerIsBusy_IsFalse()
+    public void TryDefer_WhenAnotherPlayerIsBusy_IsFalse()
     {
         tracker.TryBeginEngagement(secondPlayer, "player2", "looter2", wasAiDisabled: false);
         tracker.BeginPvpConversation("player3", "player4");
 
-        Assert.False(tracker.IsInOtherConversation(firstPlayer, "player1", "looter1"));
+        Assert.False(tracker.TryDefer(firstPlayer, "player1", "looter1", out _));
     }
 
     [Fact]
-    public void IsInOtherConversation_AfterConversationsEnd_IsFalse()
+    public void TryDefer_AfterConversationsEnd_IsFalse()
     {
         tracker.TryBeginEngagement(firstPlayer, "player1", "looter1", wasAiDisabled: false);
         tracker.BeginPvpConversation("player2", "player3");
@@ -220,50 +220,56 @@ public class ConversationPartyTrackerTests
         tracker.TryEndEngagement(firstPlayer, out _, out _);
         tracker.EndPvpConversation("player3");
 
-        Assert.False(tracker.IsInOtherConversation(firstPlayer, "player1", "looter2"));
-        Assert.False(tracker.IsInOtherConversation(secondPlayer, "player2", "looter1"));
+        Assert.False(tracker.TryDefer(firstPlayer, "player1", "looter2", out _));
+        Assert.False(tracker.TryDefer(secondPlayer, "player2", "looter1", out _));
     }
 
     [Fact]
-    public void IsInOtherConversation_WithNullArgument_IsFalse()
+    public void TryDefer_WithNullArgument_IsFalse()
     {
         tracker.TryBeginEngagement(firstPlayer, "player1", "looter1", wasAiDisabled: false);
         tracker.BeginPvpConversation("player2", "player3");
 
-        Assert.False(tracker.IsInOtherConversation(null, "player1", "looter2"));
-        Assert.False(tracker.IsInOtherConversation(secondPlayer, null, "looter1"));
-        Assert.False(tracker.IsInOtherConversation(firstPlayer, "player1", null));
+        Assert.False(tracker.TryDefer(null, "player1", "looter2", out _));
+        Assert.False(tracker.TryDefer(secondPlayer, null, "looter1", out _));
+        Assert.False(tracker.TryDefer(firstPlayer, "player1", null, out _));
     }
 
     [Fact]
-    public void RecordDeferral_WhileTheConversationLasts_RecordsEachPartyOnce()
+    public void TryDefer_WhileTheConversationLasts_IsFirstOncePerParty()
     {
         tracker.TryBeginEngagement(firstPlayer, "player1", "looter1", wasAiDisabled: false);
 
-        Assert.True(tracker.RecordDeferral(firstPlayer, "player1", "looter2"));
-        Assert.True(tracker.RecordDeferral(firstPlayer, "player1", "looter3"));
-        Assert.False(tracker.RecordDeferral(firstPlayer, "player1", "looter2"));
-        Assert.False(tracker.RecordDeferral(firstPlayer, "player1", "looter3"));
-        Assert.True(tracker.RecordDeferral(secondPlayer, "player2", "looter2"));
+        Assert.True(tracker.TryDefer(firstPlayer, "player1", "looter2", out var looter2First));
+        Assert.True(tracker.TryDefer(firstPlayer, "player1", "looter3", out var looter3First));
+        Assert.True(tracker.TryDefer(firstPlayer, "player1", "looter2", out var looter2Again));
+        Assert.True(tracker.TryDefer(firstPlayer, "player1", "looter3", out var looter3Again));
+        Assert.True(tracker.TryDefer(secondPlayer, "player2", "looter1", out var otherPlayerFirst));
+        Assert.True(looter2First);
+        Assert.True(looter3First);
+        Assert.False(looter2Again);
+        Assert.False(looter3Again);
+        Assert.True(otherPlayerFirst);
     }
 
     [Fact]
-    public void RecordDeferral_AfterThePlayersEngagementEnds_RecordsAgain()
+    public void TryDefer_AfterThePlayersEngagementEnds_IsFirstAgain()
     {
         tracker.TryBeginEngagement(firstPlayer, "player1", "looter1", wasAiDisabled: false);
-        tracker.RecordDeferral(firstPlayer, "player1", "looter2");
+        tracker.TryDefer(firstPlayer, "player1", "looter2", out _);
 
         tracker.TryEndEngagement(firstPlayer, out _, out _);
         tracker.TryBeginEngagement(firstPlayer, "player1", "looter3", wasAiDisabled: false);
 
-        Assert.True(tracker.RecordDeferral(firstPlayer, "player1", "looter2"));
+        Assert.True(tracker.TryDefer(firstPlayer, "player1", "looter2", out var firstDeferral));
+        Assert.True(firstDeferral);
     }
 
     [Fact]
-    public void RecordDeferral_AfterAStaleEndIsRejected_StillRecordsOnce()
+    public void TryDefer_AfterAStaleEndIsRejected_IsNotFirstAgain()
     {
         tracker.TryBeginEngagement(firstPlayer, "player1", "looter1", wasAiDisabled: false, requestId: "current-request");
-        tracker.RecordDeferral(firstPlayer, "player1", "looter2");
+        tracker.TryDefer(firstPlayer, "player1", "looter2", out _);
 
         Assert.False(tracker.TryEndEngagement(
             firstPlayer,
@@ -273,46 +279,39 @@ public class ConversationPartyTrackerTests
             expectedRequestId: "older-request",
             requireRequestIdMatch: true));
 
-        Assert.False(tracker.RecordDeferral(firstPlayer, "player1", "looter2"));
+        Assert.True(tracker.TryDefer(firstPlayer, "player1", "looter2", out var firstDeferral));
+        Assert.False(firstDeferral);
     }
 
     [Fact]
-    public void RecordDeferral_AfterTheOtherHolderReleasesTheParty_RecordsThatPartyAgain()
+    public void TryDefer_AfterTheOtherHolderReleasesTheParty_IsFirstAgainForThatParty()
     {
         var thirdPlayer = new object();
         tracker.TryBeginEngagement(secondPlayer, "player2", "looter1", wasAiDisabled: false);
         tracker.TryBeginEngagement(thirdPlayer, "player3", "looter2", wasAiDisabled: false);
-        tracker.RecordDeferral(firstPlayer, "player1", "looter1");
-        tracker.RecordDeferral(firstPlayer, "player1", "looter2");
+        tracker.TryDefer(firstPlayer, "player1", "looter1", out _);
+        tracker.TryDefer(firstPlayer, "player1", "looter2", out _);
 
         // A new holder takes looter1 after the old one lets it go; looter2 is still held by the same player.
         tracker.TryEndEngagement(secondPlayer, out _, out _);
         tracker.TryBeginEngagement(new object(), "player4", "looter1", wasAiDisabled: false);
 
-        Assert.True(tracker.RecordDeferral(firstPlayer, "player1", "looter1"));
-        Assert.False(tracker.RecordDeferral(firstPlayer, "player1", "looter2"));
+        Assert.True(tracker.TryDefer(firstPlayer, "player1", "looter1", out var looter1First));
+        Assert.True(tracker.TryDefer(firstPlayer, "player1", "looter2", out var looter2First));
+        Assert.True(looter1First);
+        Assert.False(looter2First);
     }
 
     [Fact]
-    public void RecordDeferral_AfterThePlayersPvpConversationEnds_RecordsAgain()
+    public void TryDefer_AfterThePlayersPvpConversationEnds_IsFirstAgain()
     {
         tracker.BeginPvpConversation("player1", "player2");
-        tracker.RecordDeferral(firstPlayer, "player1", "looter1");
+        tracker.TryDefer(firstPlayer, "player1", "looter1", out _);
 
         tracker.EndPvpConversation("player2");
         tracker.BeginPvpConversation("player1", "player3");
 
-        Assert.True(tracker.RecordDeferral(firstPlayer, "player1", "looter1"));
-    }
-
-    [Fact]
-    public void ForgetDeferrals_WhenThePlayerLeaves_DropsTheirRecord()
-    {
-        tracker.BeginPvpConversation("player1", "player2");
-        tracker.RecordDeferral(firstPlayer, "player1", "looter1");
-
-        tracker.ForgetDeferrals(firstPlayer);
-
-        Assert.True(tracker.RecordDeferral(firstPlayer, "player1", "looter1"));
+        Assert.True(tracker.TryDefer(firstPlayer, "player1", "looter1", out var firstDeferral));
+        Assert.True(firstDeferral);
     }
 }

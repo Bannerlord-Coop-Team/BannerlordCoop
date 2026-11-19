@@ -204,10 +204,10 @@ internal class ConversationRequestHandler : IHandler
 
         // The player did not ask for this encounter. Wait while either side is in another conversation,
         // otherwise the attacker retries every tick and each retry denies a request nobody made.
-        if (conversationPartyTracker.IsInOtherConversation(playerPeer, playerPartyId, aiPartyId))
+        if (conversationPartyTracker.TryDefer(playerPeer, playerPartyId, aiPartyId, out var firstDeferral))
         {
             // The attacker retries every tick, so the tracker lets each deferral log once.
-            if (conversationPartyTracker.RecordDeferral(playerPeer, playerPartyId, aiPartyId))
+            if (firstDeferral)
             {
                 Logger.Verbose(
                     "Deferring server-detected conversation. AttackerId={AttackerId}, DefenderId={DefenderId}",
@@ -861,8 +861,8 @@ internal class ConversationRequestHandler : IHandler
         ReleaseEngagementOnMainThread(peer);
         // Deferrals are recorded on the game thread, so forget them there too, after any check already running.
         GameThread.RunSafe(() => conversationPartyTracker.ForgetDeferrals(peer), context: nameof(Handle_PlayerDisconnected));
-        EndPvpInteraction(payload.What.PlayerId);
-        EndPvpInteractionForDefender(payload.What.PlayerId);
+        EndPvpInteraction(peer);
+        EndPvpInteractionForDefender(peer);
     }
 
     /// <summary>[Server] The disconnected peer was a PvP defender: end the conversation and make the attacker (its
