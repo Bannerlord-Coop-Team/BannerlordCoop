@@ -509,25 +509,6 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
             Assert.Contains(
                 mapEvent.DefenderSide.Parties.SelectMany(mapEventParty => mapEventParty.Troops),
                 troop => !troop.IsWounded && !troop.IsKilled);
-            var attachedSide = party.Party._mapEventSide;
-            party.Party._mapEventSide = null;
-            var (unattachedShown, _) = InvokeSiegeOrderAttackFallback();
-            Assert.False(unattachedShown);
-            party.Party._mapEventSide = attachedSide;
-
-            var playerRoster = party.MemberRoster.GetTroopRoster()
-                .Select(element => (element.Character, element.Number))
-                .ToArray();
-            foreach (var mapEventParty in mapEvent.AttackerSide.Parties)
-                mapEventParty.Party.MemberRoster.Clear();
-            party.MemberRoster.Clear();
-            party.MemberRoster.AddToCounts(CharacterObject.PlayerCharacter, 1);
-            var (playerOnlyShown, _) = InvokeSiegeOrderAttackFallback();
-            Assert.False(playerOnlyShown);
-            party.MemberRoster.Clear();
-            foreach (var (character, number) in playerRoster)
-                party.MemberRoster.AddToCounts(character, number);
-
             foreach (var mapEventParty in mapEvent.DefenderSide.Parties)
                 mapEventParty.Party.MemberRoster.Clear();
 

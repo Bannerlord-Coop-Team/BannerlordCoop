@@ -10,8 +10,8 @@ namespace GameInterface.Services.MapEvents;
 public interface IOrderAttackRule
 {
     bool CanOrderAttack(MapEvent mapEvent, MobileParty requesterParty, CharacterObject requesterCharacter);
-    bool ShouldHideOrderAttack(MapEvent mapEvent, MobileParty requesterParty, CharacterObject requesterCharacter,
-        BattleSideEnum encounterOpponent, out bool hideBeforeSettingLeaveType);
+    bool IsOrderAttackBlocked(MapEvent mapEvent, MobileParty requesterParty, CharacterObject requesterCharacter);
+    bool IsFirstOpponentInRaft(MapEvent mapEvent, BattleSideEnum opponentSide);
     int CountOrderableTroops(PartyBase party, CharacterObject requesterCharacter);
 }
 
@@ -20,17 +20,13 @@ public class OrderAttackRule : IOrderAttackRule
     public bool CanOrderAttack(MapEvent mapEvent, MobileParty requesterParty, CharacterObject requesterCharacter)
     {
         return HasOrderAttackPreconditions(mapEvent, requesterParty, out var side, out var oppositeSide)
-            && CanOrderAttack(mapEvent, side, oppositeSide, requesterCharacter);
+            && CanSideOrderAttack(mapEvent, side, oppositeSide, requesterCharacter);
     }
 
-    public bool ShouldHideOrderAttack(MapEvent mapEvent, MobileParty requesterParty, CharacterObject requesterCharacter,
-        BattleSideEnum encounterOpponent, out bool hideBeforeSettingLeaveType)
+    public bool IsOrderAttackBlocked(MapEvent mapEvent, MobileParty requesterParty, CharacterObject requesterCharacter)
     {
-        hideBeforeSettingLeaveType = HasOrderAttackPreconditions(mapEvent, requesterParty, out var side, out var oppositeSide)
-            && !CanOrderAttack(mapEvent, side, oppositeSide, requesterCharacter);
-
-        // The encounter's raft check still applies to the fallback after it sets the leave type.
-        return hideBeforeSettingLeaveType || FirstOpponentIsInRaft(mapEvent, encounterOpponent);
+        return HasOrderAttackPreconditions(mapEvent, requesterParty, out var side, out var oppositeSide)
+            && !CanSideOrderAttack(mapEvent, side, oppositeSide, requesterCharacter);
     }
 
     private static bool HasOrderAttackPreconditions(MapEvent mapEvent, MobileParty requesterParty,
@@ -45,9 +41,9 @@ public class OrderAttackRule : IOrderAttackRule
         return mapEvent.HasTroopsOnBothSides() && mapEvent.GetLeaderParty(oppositeSide) != null;
     }
 
-    private bool CanOrderAttack(MapEvent mapEvent, MapEventSide side, BattleSideEnum oppositeSide, CharacterObject requesterCharacter)
+    private bool CanSideOrderAttack(MapEvent mapEvent, MapEventSide side, BattleSideEnum oppositeSide, CharacterObject requesterCharacter)
     {
-        if (FirstOpponentIsInRaft(mapEvent, oppositeSide))
+        if (IsFirstOpponentInRaft(mapEvent, oppositeSide))
             return false;
 
         var orderableTroops = side.Parties
@@ -57,7 +53,7 @@ public class OrderAttackRule : IOrderAttackRule
         return orderableTroops > 0;
     }
 
-    private static bool FirstOpponentIsInRaft(MapEvent mapEvent, BattleSideEnum opponentSide)
+    public bool IsFirstOpponentInRaft(MapEvent mapEvent, BattleSideEnum opponentSide)
         => mapEvent.PartiesOnSide(opponentSide).FirstOrDefault()?.Party.MobileParty?.IsInRaftState == true;
 
     public int CountOrderableTroops(PartyBase party, CharacterObject requesterCharacter)

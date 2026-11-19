@@ -14,6 +14,7 @@ using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using LiteNetLib;
 using Serilog;
 using System;
@@ -190,12 +191,16 @@ internal class BattleSimulationRunHandler : IHandler
                 }
             }
 
-            if (!TryGetRequestingParticipant(requestingPeer, payload.What, mapEvent, out var attackerParty, out var requesterCharacter))
+            if (!TryGetRequestingParticipant(requestingPeer, payload.What, mapEvent, out var attackerParty, out var player))
             {
                 Logger.Warning("Rejecting battle simulation start for map event {MapEventId}: requester is not an authoritative participant", mapEventId);
                 return;
             }
 
+            if (!objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out var requesterHero))
+                return;
+
+            var requesterCharacter = requesterHero.CharacterObject;
             MapEventHostileActionConsequences.Apply(mapEvent, attackerParty.Party, "battle simulation attack");
 
             // Match vanilla MenuHelper.EncounterOrderAttackCondition: only a valid player attack clears protection.
@@ -293,20 +298,18 @@ internal class BattleSimulationRunHandler : IHandler
         NetworkBattleStartRequest request,
         MapEvent mapEvent,
         out MobileParty party,
-        out CharacterObject requesterCharacter)
+        out Player player)
     {
         party = null;
-        requesterCharacter = null;
+        player = null;
         if (requester == null ||
-            !playerManager.TryGetPlayer(requester, out var player) ||
+            !playerManager.TryGetPlayer(requester, out player) ||
             !string.Equals(player.MobilePartyId, request.AttackerPartyId, StringComparison.Ordinal) ||
-            !objectManager.TryGetObject(player.MobilePartyId, out party) ||
-            !objectManager.TryGetObject(player.HeroId, out Hero requesterHero))
+            !objectManager.TryGetObject(player.MobilePartyId, out party))
         {
             return false;
         }
 
-        requesterCharacter = requesterHero.CharacterObject;
         return mapEvent.FindMapEventParty(party.Party) != null;
     }
 

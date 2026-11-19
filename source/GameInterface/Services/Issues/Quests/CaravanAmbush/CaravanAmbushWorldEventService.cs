@@ -92,7 +92,7 @@ internal class CaravanAmbushWorldEventService : ICaravanAmbushWorldEventService
     }
 
     public void BattleEnded(MapEvent battle) => Run(quest =>
-        BattleEnded(quest, battle) == CaravanAmbushBattleOutcome.HoldForReward);
+        ApplyBattleOutcome(quest, battle) == CaravanAmbushBattleOutcome.HoldForReward);
 
     private void Run(Action<Quest> action) => Run(quest =>
     {
@@ -121,7 +121,7 @@ internal class CaravanAmbushWorldEventService : ICaravanAmbushWorldEventService
         return CaravanAmbushBattleOutcome.DirectSuccess;
     }
 
-    private CaravanAmbushBattleOutcome BattleEnded(Quest quest, MapEvent battle)
+    private CaravanAmbushBattleOutcome ApplyBattleOutcome(Quest quest, MapEvent battle)
     {
         if (quest._caravanParty == null || quest._banditParty == null ||
             battle.WinningSide == BattleSideEnum.None || battle.DefeatedSide == BattleSideEnum.None)

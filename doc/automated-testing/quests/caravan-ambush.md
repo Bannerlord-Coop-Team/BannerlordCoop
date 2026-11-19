@@ -12,9 +12,20 @@ The full local decompilations are retained in `artifacts/caravan-vanilla.cs`, `a
 
 Vanilla offers direct and companion solutions (`IsThereAlternativeSolution = true`), and explicitly has no lord solution (`IsThereLordSolution = false`). It has no persuasion or bribe dialogue. Hiring the quest raiders is a separate success path. The companion solution has failure risk and casualties, requires tier-2 troops, and uses Tactics or Roguery at 120. Its success adds Scouting and combat skill XP, three renown and five relation; failure removes five relation and five giver power. The framework owns its roll, troop state, return and owner substitution.
 
-## Pending live flows
+## Passed live flows
 
-All live checks below remain unrun. Use a dedicated server and two real clients only after a supervisor assigns a lane. Do not substitute assigned winners or final-state writes for battle evidence.
+- `134dcac06` — Direct acceptance, owner-only journal, caravan loss.
+- `0cf2c3e84` — Owner recruits the raiders, another player recruits the owner's raiders.
+- `5eda4c727` — Direct acceptance, defender victory and reward conversation, concurrent quests, proximity warnings and failure, timeout.
+- `7bb30244c` — Direct acceptance, attacker auto-resolve victory, loot and reward, completion journals, non-owner isolation.
+
+## Remaining live flow
+
+Reconnect during an issue-giver conversation. Disconnect the owner while the conversation is open, finalize the issue on the server, reconnect to receive the ownership snapshot, then close the conversation. Check that the owner's original quest and journal are cancelled, replacement ownership stays intact, and the pending lord-solution decision is cleared.
+
+## Manual verification scenarios
+
+Use a dedicated server and two real clients only after a supervisor assigns a lane. Do not substitute assigned winners or final-state writes for battle evidence.
 
 1. Find a merchant or artisan who owns a caravan, using `coop.debug.hero.issues`, or give an eligible notable `CaravanAmbushIssue` with `coop.debug.issues.give`. Use Danustica (`town_ES1`) as the meeting town where the save permits it. The giver and owned caravan are save-specific; record the actual names and registered IDs. Decline first, then accept through the real offer dialogue with at least 30 healthy troops. Check relation below -10, war, and insufficient troops refuse the offer. The server must create one caravan and one raider party, both with matching registered identities on both clients. The owner alone gets a started journal and map tracking.
 2. Have the second player accept from another eligible giver while the first quest remains active. Each player must keep their own quest and parties. A second quest of this type for the same player must be refused by the framework. Include two clients competing for the same giver; the losing accept must leave no active personal quest or spawned duplicate parties.

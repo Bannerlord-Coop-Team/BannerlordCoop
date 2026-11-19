@@ -324,6 +324,8 @@ public class AcceptVisibilityTests : IDisposable
         var quest = scenario.AttachQuest(Owner);
         IssueBase issue = null!;
         Owner.Call(() => quest.StartQuest());
+        var router = Server.Resolve<TestNetworkRouter>();
+        router.PauseLink(Owner.NetPeer, Server.NetPeer);
         Owner.Call(() =>
         {
             Assert.True(Owner.Resolve<IIssueOwnershipRegistry>().TrySetOwner(
@@ -337,17 +339,20 @@ public class AcceptVisibilityTests : IDisposable
             Assert.True(Campaign.Current.ConversationManager.IsConversationInProgress);
             issue = Owner.GetRegisteredObject<Hero>(scenario.NotableId).Issue;
             var lordCoordinator = Owner.Resolve<ILordSolutionCoordinator>();
-            var pending = (HashSet<IssueBase>)AccessTools.Field(typeof(LordSolutionCoordinator), "pendingDecisions")!
-                .GetValue(lordCoordinator)!;
-            pending.Add(issue);
+            Assert.False(lordCoordinator.Before(issue, LordSolutionOperation.AcceptCounterOffer));
             Assert.True(lordCoordinator.IsDecisionPending(issue));
             Owner.Resolve<IIssueConversationGuard>().RunWhenNotTalkingTo(() => { }, scenario.NotableId);
         }, new[] { AccessTools.Method(typeof(ConversationManager), nameof(ConversationManager.StartNew)) });
 
+        var request = Assert.Single(Owner.NetworkSentMessages.GetMessages<RequestLordSolution>());
+        Assert.Equal(LordSolutionOperation.AcceptCounterOffer, request.Operation);
+        Assert.Equal(scenario.NotableId, request.IssueOwnerId);
+        Assert.Equal(QuestScenario.IssueId, request.IssueId);
+
         using var cancels = new MethodCallRecorder(Priority.First, true,
             AccessTools.Method(typeof(QuestBase), nameof(QuestBase.CompleteQuestWithCancel)));
         var fakeEndingsBefore = Owner.InternalMessages.GetMessageCount<NetworkIssueFinalized>();
-        Server.Resolve<TestNetworkRouter>().ReceiveContext = TestNetworkReceiveContext.PollerThread;
+        router.ReceiveContext = TestNetworkReceiveContext.PollerThread;
         Server.Call(() => Server.Resolve<INetwork>().Send(Owner.NetPeer,
             new NetworkIssueOwnershipSnapshot(replacement
                 ? new[] { new IssueOwnershipData(scenario.NotableId, "replacement_issue", QuestScenario.ControllerB) }
@@ -371,6 +376,7 @@ public class AcceptVisibilityTests : IDisposable
         });
         Assert.Equal(1, cancels.CountFor(Owner));
         Assert.Equal(fakeEndingsBefore, Owner.InternalMessages.GetMessageCount<NetworkIssueFinalized>());
+        router.ResumeLink(Owner.NetPeer, Server.NetPeer);
     }
 
     [Fact]

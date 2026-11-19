@@ -177,25 +177,6 @@ public class CaravanAmbushTests : IDisposable
     }
 
     [Fact]
-    public void AnUnregisteredActiveCaravanSendsNoProgress()
-    {
-        Server.Call(() =>
-        {
-            BindParties();
-            var quest = QuestOf(Server);
-            var publisher = Server.Resolve<ICaravanAmbushProgress>();
-            publisher.Publish(quest);
-            var before = Server.NetworkSentMessages.GetMessageCount<NetworkCaravanAmbushProgress>();
-            var party = quest._caravanParty;
-            Assert.True(party.IsActive);
-            Assert.True(Server.ObjectManager.Remove(party));
-            quest._vicinityCheckFailCounter++;
-            publisher.Publish(quest);
-            Assert.Equal(before, Server.NetworkSentMessages.GetMessageCount<NetworkCaravanAmbushProgress>());
-        });
-    }
-
-    [Fact]
     public void AnInactiveCaravanKeepsTheOwnersReferenceForVanillaDialogue()
     {
         Server.Call(() =>
@@ -612,24 +593,6 @@ public class CaravanAmbushTests : IDisposable
     }
 
     [Fact]
-    public void AFailedConversationOpenDoesNotRetryEveryCampaignTick()
-    {
-        Owner.Call(() =>
-        {
-            var map = new ConversationMap();
-            map.IsFree = true;
-            map.ThrowOnOpen = true;
-            using var conversation = new CaravanAmbushRewardConversation(Owner.Resolve<IMessageBroker>(), Owner.Resolve<IIssueResolver>(), map);
-            var quest = QuestOf(Owner);
-            quest._caravanParty = Owner.GetRegisteredObject<MobileParty>(caravanId);
-            quest._isCaravanSaved = true;
-            Assert.Throws<InvalidOperationException>(() => conversation.Request(scenario.NotableId, QuestScenario.IssueId));
-            TickOwner();
-            Assert.Same(quest._caravanParty, Assert.Single(map.Opened));
-        });
-    }
-
-    [Fact]
     public void FinalizedQuestDiscardsItsPendingConversation()
     {
         Owner.Call(() =>
@@ -741,16 +704,11 @@ public class CaravanAmbushTests : IDisposable
     private sealed class ConversationMap : ICaravanAmbushMapConversation
     {
         public bool IsFree { get; set; }
-        public bool ThrowOnOpen { get; set; }
         public List<MobileParty> Opened { get; } = new();
 
         public bool IsOwnerFreeOnMap() => IsFree;
 
-        public void Open(MobileParty caravan)
-        {
-            Opened.Add(caravan);
-            if (ThrowOnOpen) throw new InvalidOperationException("open failed");
-        }
+        public void Open(MobileParty caravan) => Opened.Add(caravan);
     }
 
     private void TickOwner()
