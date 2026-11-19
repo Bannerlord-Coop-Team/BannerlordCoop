@@ -110,7 +110,7 @@ public class NavalClientStateScopeTests
 
     // A ship snapshot belongs to the client that built it, so another client's campaign gates treat that ship as a campaign ship.
     [Fact]
-    public void SnapshotPatch_ReadsTheActiveClientsSnapshots()
+    public void IsSnapshotHere_ReadsTheActiveClientsSnapshots()
     {
         using var builder = BuildClient();
         using var other = BuildClient();
@@ -120,18 +120,15 @@ public class NavalClientStateScopeTests
         try
         {
             using (ContainerProvider.UseContainerThreadSafe(other))
-                Assert.True(SnapshotShipDamageXpPatch.Prefix(ship, rawDamage: 100f, finalDamage: 70f));
+                Assert.False(CoopShipSnapshotRegistry.IsSnapshotHere(ship));
 
             using (ContainerProvider.UseContainerThreadSafe(builder))
-                Assert.False(SnapshotShipDamageXpPatch.Prefix(ship, rawDamage: 100f, finalDamage: 70f));
+                Assert.True(CoopShipSnapshotRegistry.IsSnapshotHere(ship));
         }
         finally
         {
             ContainerProvider.Clear();
         }
-
-        Assert.Equal(30f, builder.Resolve<ICoopShipSnapshotRegistry>().MitigatedDamageOf(ship));
-        Assert.Equal(0f, other.Resolve<ICoopShipSnapshotRegistry>().MitigatedDamageOf(ship));
     }
 
     // Each client container keeps its own deployment slot, and a side plan scope gives back the side planning before it.

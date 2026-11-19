@@ -225,11 +225,13 @@ public class ServerSettlementExitEnterHandler : IHandler
                 settlementInterface.PartyDisembark(mobileParty, leftSettlement);
             }
 
-            settlementInterface.PartyLeaveSettlement(mobileParty);
-
-            if (payload.LeaveType == SettlementLeaveType.SetSail && leftSettlement != null)
+            if (payload.LeaveType == SettlementLeaveType.SetSail)
             {
-                settlementInterface.PartySetSail(mobileParty, leftSettlement);
+                settlementInterface.PartyLeaveAndSetSail(mobileParty);
+            }
+            else
+            {
+                settlementInterface.PartyLeaveSettlement(mobileParty);
             }
 
             network.Send(

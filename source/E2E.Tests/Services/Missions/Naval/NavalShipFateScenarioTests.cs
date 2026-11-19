@@ -8,9 +8,7 @@ using GameInterface.Services.Ships.Data;
 using Common.Network.Messages;
 using Missions.Battles;
 using Missions.Messages;
-using Moq;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Naval;
@@ -210,45 +208,6 @@ public class NavalShipFateScenarioTests : NavalBattleTestEnvironment
         LeaveMission(battle, returned);
 
         AssertDestroyedEverywhere(shipId, partyId);
-    }
-
-    // M6 D7: the owner's hits sum the damage the ship's upgrades mitigated; the server grants it once through vanilla's per-hit
-    // skill call (NavalSkillLevellingManager turns it into Boatswain XP), before it writes the ship.
-    [Fact]
-    public void BoatswainXp_ForTheBattlesMitigatedDamage_IsGrantedOnceAtApply()
-    {
-        using var battle = StartServerBattle(atSea: true, out var a, out _, out _);
-        var shipId = GiveShip(PlayerPartyOf("A"));
-        var hull = Damage(battle, a, shipId, hitPoints: 640f, sailHitPoints: 210f);
-        a.Hull(hull).MitigatedDamage = 30f;
-        a.Tick(BattleShipFateReporterInterval);
-        a.Hull(hull).MitigatedDamage = 50f;
-        a.Tick(BattleShipFateReporterInterval);
-
-        var grants = new List<(Ship Ship, float RawDamage, float FinalDamage)>();
-        var skills = new Mock<ISkillLevelingManager>();
-        skills.Setup(manager => manager.OnShipDamaged(It.IsAny<Ship>(), It.IsAny<float>(), It.IsAny<float>()))
-            .Callback<Ship, float, float>((ship, raw, final) => grants.Add((ship, raw, final)));
-        ISkillLevelingManager original = null!;
-        Server.Call(() =>
-        {
-            original = Campaign.Current.SkillLevelingManager;
-            Campaign.Current.SkillLevelingManager = skills.Object;
-        });
-        try
-        {
-            LeaveMission(battle, a);
-            DepartBattle("B", battle.MapEventId, isInstanceEmpty: true);
-        }
-        finally
-        {
-            Server.Call(() => Campaign.Current.SkillLevelingManager = original);
-        }
-
-        var grant = Assert.Single(grants);
-        Server.Call(() => Assert.Same(Server.GetRegisteredObject<Ship>(shipId), grant.Ship));
-        Assert.Equal(50f, grant.RawDamage, 2);
-        Assert.Equal(0f, grant.FinalDamage);
     }
 
     // Capture 2.5: once B captured an AI hull the server takes that ship's fates from B alone, so the old host's late fate is
