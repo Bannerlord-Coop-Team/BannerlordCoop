@@ -262,7 +262,12 @@ internal class BattleModeEncounterOptionsPatch
         if (mapEvent == null || encounter == null || playerSide == null)
             return false;
 
-        if (!ContainerProvider.TryResolve<IOrderAttackRule>(out var orderAttackRule) ||
+        var partyIsAttached = MobileParty.MainParty.MapEvent == mapEvent;
+        var opponentLeader = mapEvent.GetLeaderParty(playerSide.MissionSide.GetOppositeSide());
+        if (!ContainerProvider.TryResolve<IOrderAttackRule>(out var orderAttackRule))
+            return false;
+
+        if (partyIsAttached && mapEvent.HasTroopsOnBothSides() && opponentLeader != null &&
             !orderAttackRule.CanOrderAttack(mapEvent, MobileParty.MainParty, CharacterObject.PlayerCharacter))
             return false;
 
