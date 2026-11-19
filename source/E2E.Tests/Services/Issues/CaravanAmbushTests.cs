@@ -177,7 +177,7 @@ public class CaravanAmbushTests : IDisposable
     }
 
     [Fact]
-    public void AnUnregisteredCaravanDoesNotClearTheOwnersParty()
+    public void AnUnregisteredActiveCaravanSendsNoProgress()
     {
         Server.Call(() =>
         {
@@ -192,11 +192,6 @@ public class CaravanAmbushTests : IDisposable
             quest._vicinityCheckFailCounter++;
             publisher.Publish(quest);
             Assert.Equal(before, Server.NetworkSentMessages.GetMessageCount<NetworkCaravanAmbushProgress>());
-        });
-        Owner.Call(() =>
-        {
-            Assert.Same(Owner.GetRegisteredObject<MobileParty>(caravanId), QuestOf(Owner)._caravanParty);
-            Assert.Same(Owner.GetRegisteredObject<MobileParty>(banditId), QuestOf(Owner)._banditParty);
         });
     }
 

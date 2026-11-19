@@ -258,17 +258,23 @@ internal class BattleModeEncounterOptionsPatch
     {
         var mapEvent = GetPlayerEncounterBattle() ?? MobileParty.MainParty?.MapEvent;
         var encounter = PlayerEncounter.Current;
-        var playerSide = MobileParty.MainParty?.MapEventSide;
-        if (mapEvent == null || encounter == null || playerSide == null)
+        if (mapEvent == null || encounter == null)
             return false;
 
-        var partyIsAttached = MobileParty.MainParty.MapEvent == mapEvent;
+        var partyIsAttached = MobileParty.MainParty?.MapEvent == mapEvent;
+        if (!partyIsAttached)
+            return true;
+
+        var playerSide = MobileParty.MainParty?.MapEventSide;
+        if (playerSide == null)
+            return false;
+
         var opponentLeader = mapEvent.GetLeaderParty(playerSide.MissionSide.GetOppositeSide());
         if (!ContainerProvider.TryResolve<IOrderAttackRule>(out var orderAttackRule))
             return false;
 
-        if (partyIsAttached && mapEvent.HasTroopsOnBothSides() && opponentLeader != null &&
-            !orderAttackRule.CanOrderAttack(mapEvent, MobileParty.MainParty, CharacterObject.PlayerCharacter))
+        if (partyIsAttached &&
+            orderAttackRule.ShouldHideOrderAttack(mapEvent, MobileParty.MainParty, CharacterObject.PlayerCharacter))
             return false;
 
         var isNavalOrder = mapEvent.IsNavalMapEvent ||

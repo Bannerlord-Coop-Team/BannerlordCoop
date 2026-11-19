@@ -60,12 +60,8 @@ internal class CaravanAmbushPatches
     [HarmonyPrefix]
     private static bool LoadQuest(Quest __instance)
     {
-        if (ModInformation.IsClient)
-        {
-            __instance.SetDialogs();
-            return false;
-        }
-
-        return true;
+        if (ModInformation.IsServer) return true;
+        __instance.SetDialogs();
+        return false;
     }
 }

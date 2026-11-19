@@ -508,6 +508,12 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
             Assert.Contains(
                 mapEvent.DefenderSide.Parties.SelectMany(mapEventParty => mapEventParty.Troops),
                 troop => !troop.IsWounded && !troop.IsKilled);
+            var attachedSide = party.Party._mapEventSide;
+            party.Party._mapEventSide = null;
+            var (unattachedShown, _) = InvokeSiegeOrderAttackFallback();
+            Assert.True(unattachedShown);
+            party.Party._mapEventSide = attachedSide;
+
             foreach (var mapEventParty in mapEvent.DefenderSide.Parties)
                 mapEventParty.Party.MemberRoster.Clear();
 
@@ -579,6 +585,16 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
         var args = new MenuCallbackArgs((MenuContext)null, null);
         var behavior = ObjectHelper.SkipConstructor<EncounterGameMenuBehavior>();
         var shown = (bool)method.Invoke(behavior, new object[] { args });
+        return (shown, args);
+    }
+
+    private static (bool shown, MenuCallbackArgs args) InvokeSiegeOrderAttackFallback()
+    {
+        var method = AccessTools.Method(typeof(BattleModeEncounterOptionsPatch), "TryApplyClientSiegeOrderAttackOptionState");
+        Assert.NotNull(method);
+
+        var args = new MenuCallbackArgs((MenuContext)null, null);
+        var shown = (bool)method.Invoke(null, new object[] { args });
         return (shown, args);
     }
 

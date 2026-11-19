@@ -39,19 +39,21 @@ internal class CaravanAmbushWorldEventService : ICaravanAmbushWorldEventService
 
     public void HourlyTick() => Run(quest =>
     {
-        if (Hero.MainHero.PartyBelongedTo != null || quest._caravanParty?.MapEvent != null || quest._isCaravanSaved)
+        var ownerRunsVanillaTick = Hero.MainHero.PartyBelongedTo != null ||
+            quest._caravanParty?.MapEvent != null || quest._isCaravanSaved;
+        if (ownerRunsVanillaTick)
         {
             quest.HourlyTick();
             return;
         }
 
         // Vanilla's vicinity check reads MainParty, so an owner without a party only gets its ambush trigger.
-        if (quest._caravanParty != null && quest._banditParty != null &&
+        var banditsReachedCaravan = quest._caravanParty != null && quest._banditParty != null &&
             quest._caravanParty.Position.DistanceSquared(quest._banditParty.Position) <=
-            Campaign.Current.Models.EncounterModel.GetEncounterJoiningRadius * 2.2f)
+            Campaign.Current.Models.EncounterModel.GetEncounterJoiningRadius * 2.2f;
+        if (banditsReachedCaravan)
         {
             EncounterManager.StartPartyEncounter(quest._banditParty.Party, quest._caravanParty.Party);
-            return;
         }
     });
 
@@ -84,7 +86,8 @@ internal class CaravanAmbushWorldEventService : ICaravanAmbushWorldEventService
         Release(quest);
     }
 
-    public void BattleEnded(MapEvent battle) => Run(quest => BattleEnded(quest, battle));
+    public void BattleEnded(MapEvent battle) => Run(quest =>
+        BattleEnded(quest, battle) == CaravanAmbushBattleOutcome.HoldForReward);
 
     private void Run(Action<Quest> action) => Run(quest =>
     {
@@ -92,14 +95,14 @@ internal class CaravanAmbushWorldEventService : ICaravanAmbushWorldEventService
         return false;
     });
 
-    private void Run(Func<Quest, bool> action)
+    private void Run(Func<Quest, bool> opensRewardConversation)
     {
         dispatcher.RunAsOwners<Quest>(quest =>
         {
             var before = progress.Capture(quest);
-            var opensRewardConversation = action(quest);
+            var opensConversation = opensRewardConversation(quest);
             if (quest.IsOngoing && progress.Capture(quest) != before)
-                progress.Publish(quest, opensRewardConversation);
+                progress.Publish(quest, opensConversation);
         });
     }
 
@@ -113,10 +116,11 @@ internal class CaravanAmbushWorldEventService : ICaravanAmbushWorldEventService
         return CaravanAmbushBattleOutcome.DirectSuccess;
     }
 
-    private bool BattleEnded(Quest quest, MapEvent battle)
+    private CaravanAmbushBattleOutcome BattleEnded(Quest quest, MapEvent battle)
     {
         if (quest._caravanParty == null || quest._banditParty == null ||
-            battle.WinningSide == BattleSideEnum.None || battle.DefeatedSide == BattleSideEnum.None) return false;
+            battle.WinningSide == BattleSideEnum.None || battle.DefeatedSide == BattleSideEnum.None)
+            return CaravanAmbushBattleOutcome.None;
         var winners = battle.GetMapEventSide(battle.WinningSide);
         var losers = battle.GetMapEventSide(battle.DefeatedSide);
         bool OnSide(MapEventSide side, MobileParty party) => side.Parties.Any(entry => entry.Party == party.Party);
@@ -147,9 +151,9 @@ internal class CaravanAmbushWorldEventService : ICaravanAmbushWorldEventService
             case CaravanAmbushBattleOutcome.HoldForReward:
                 quest._isCaravanSaved = true;
                 HoldCaravanForReward(quest);
-                return true;
+                return CaravanAmbushBattleOutcome.HoldForReward;
         }
-        return false;
+        return outcome;
     }
 
     private void HoldCaravanForReward(Quest quest)

@@ -10,6 +10,7 @@ namespace GameInterface.Services.MapEvents;
 public interface IOrderAttackRule
 {
     bool CanOrderAttack(MapEvent mapEvent, MobileParty requesterParty, CharacterObject requesterCharacter);
+    bool ShouldHideOrderAttack(MapEvent mapEvent, MobileParty requesterParty, CharacterObject requesterCharacter);
     int CountOrderableTroops(PartyBase party, CharacterObject requesterCharacter);
 }
 
@@ -21,17 +22,33 @@ public class OrderAttackRule : IOrderAttackRule
         if (eventParty == null)
             return false;
 
-        var opponentParty = mapEvent.PartiesOnSide(side.MissionSide.GetOppositeSide()).FirstOrDefault();
+        var oppositeSide = side.MissionSide.GetOppositeSide();
+        var opponentParty = mapEvent.PartiesOnSide(oppositeSide).FirstOrDefault();
         if (opponentParty?.Party.MobileParty?.IsInRaftState == true)
+            return false;
+        if (!mapEvent.HasTroopsOnBothSides())
+            return false;
+        if (mapEvent.GetLeaderParty(oppositeSide) == null)
             return false;
 
         var orderableTroops = side.Parties
             .Where(party => !party.Party.IsMobile || party.Party.MobileParty.IsInRaftState == false)
             .Sum(party => CountOrderableTroops(party.Party, requesterCharacter));
 
-        return mapEvent.HasTroopsOnBothSides()
-            && mapEvent.GetLeaderParty(side.MissionSide.GetOppositeSide()) != null
-            && orderableTroops > 0;
+        return orderableTroops > 0;
+    }
+
+    public bool ShouldHideOrderAttack(MapEvent mapEvent, MobileParty requesterParty, CharacterObject requesterCharacter)
+    {
+        var eventParty = mapEvent.FindMapEventParty(requesterParty.Party, out var side);
+        if (eventParty == null)
+            return false;
+
+        var oppositeSide = side.MissionSide.GetOppositeSide();
+        if (!mapEvent.HasTroopsOnBothSides() || mapEvent.GetLeaderParty(oppositeSide) == null)
+            return false;
+
+        return !CanOrderAttack(mapEvent, requesterParty, requesterCharacter);
     }
 
     public int CountOrderableTroops(PartyBase party, CharacterObject requesterCharacter)
