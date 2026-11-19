@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using GameInterface.Services.BloodFeuds.Interfaces;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.MapEventParties.Messages;
 using GameInterface.Services.MapEvents;
@@ -62,20 +63,22 @@ internal class PlayerCaptivityServerHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IPlayerManager playerManager;
     private readonly ConversationPartyTracker conversationPartyTracker;
-    private readonly Dictionary<Hero, Hero> pendingExecutions = new();
+    private readonly IExecutionCampaignBehaviorInterface executionInterface;
 
     public PlayerCaptivityServerHandler(
         IObjectManager objectManager,
         INetwork network,
         IMessageBroker messageBroker,
         IPlayerManager playerManager,
-        ConversationPartyTracker conversationPartyTracker)
+        ConversationPartyTracker conversationPartyTracker,
+        IExecutionCampaignBehaviorInterface executionInterface)
     {
         this.objectManager = objectManager;
         this.network = network;
         this.messageBroker = messageBroker;
         this.playerManager = playerManager;
         this.conversationPartyTracker = conversationPartyTracker;
+        this.executionInterface = executionInterface;
 
         // ModInformation is evaluated per call (tests flip it per instance), so each handler
         // guards itself instead of gating the subscriptions here.
@@ -172,10 +175,23 @@ internal class PlayerCaptivityServerHandler : IHandler
         if (playerParty.LeaderHero != null)
             playerParty.ChangePartyLeader(null);
 
-        // Same as vanilla PlayerCaptivityCampaignBehavior.OnPrisonerTaken
+        // Vanilla ExecutionCampaignBehavior.CalculatePlayerExecutionProbability against the captured player's clan
         var executer = payload.What.CapturerParty?.LeaderHero;
-        if (executer != null && !executer.IsPlayerHero() && executer.GetRelation(hero) < -30f && MBRandom.RandomFloat <= 0.02f)
-            pendingExecutions[hero] = executer;
+        if (executer == null || executer.IsPlayerHero()) return;
+
+        int mercy = executer.GetTraitLevel(DefaultTraits.Mercy);
+        int relation = executer.Clan.GetRelationWithClan(hero.Clan);
+        bool hasBloodFeud = executionInterface.HasBloodFeud(hero, executer.Clan);
+        if (MBRandom.RandomFloat <= PlayerExecutionChance(hasBloodFeud, mercy, relation))
+            executionInterface.SetPendingPlayerExecution(hero, executer);
+    }
+
+    private static float PlayerExecutionChance(bool hasBloodFeud, int mercy, int relation)
+    {
+        if (hasBloodFeud) return 1f;
+        if (relation >= (mercy * 10) - 50) return 0f;
+
+        return Math.Max(((-relation * 0.3f) - (mercy * 5f)) * 0.01f, 0f);
     }
 
     // Same release the client's PlayerEncounter.Finish would send through NetworkConversationEnded
@@ -702,12 +718,7 @@ internal class PlayerCaptivityServerHandler : IHandler
         if (ModInformation.IsClient) return;
 
         // Deferred like native OnGameMenuOpened, so the kill doesn't run mid battle capture processing.
-        foreach (var execution in pendingExecutions.ToArray())
-        {
-            pendingExecutions.Remove(execution.Key);
-            if (execution.Key.IsPrisoner)
-                KillCharacterAction.ApplyByExecution(execution.Key, execution.Value);
-        }
+        executionInterface.ExecutePendingPlayers();
 
         foreach (var (hero, mobileParty) in PlayerHeros())
         {

@@ -2,6 +2,7 @@
 
 using Common.Messaging;
 using GameInterface.Services.Alleys;
+using GameInterface.Services.BloodFeuds;
 using GameInterface.Services.CampaignService.Data;
 using GameInterface.Services.Caravans;
 using GameInterface.Services.Clans;
@@ -62,6 +63,8 @@ public record NetworkGameSaveDataReceived : IEvent
     public string[] HeldLootShipIds { get; }
     [ProtoMember(18)]
     public ViewDataPlayerData ViewDataPlayerData { get; }
+    [ProtoMember(19)]
+    public BloodFeudPlayerData BloodFeudPlayerData { get; }
 
     public NetworkGameSaveDataReceived(
         byte[] gameSaveData,
@@ -81,7 +84,8 @@ public record NetworkGameSaveDataReceived : IEvent
         Dictionary<string, ClanFinanceSettings> clanFinance = null,
         OrderOfBattlePlayerData orderOfBattlePlayerData = null,
         string[] heldLootShipIds = null,
-        ViewDataPlayerData viewDataPlayerData = null)
+        ViewDataPlayerData viewDataPlayerData = null,
+        BloodFeudPlayerData bloodFeudPlayerData = null)
     {
         GameSaveData = gameSaveData;
         CampaignID = campaignID;
@@ -101,5 +105,6 @@ public record NetworkGameSaveDataReceived : IEvent
         OrderOfBattlePlayerData = orderOfBattlePlayerData;
         HeldLootShipIds = heldLootShipIds;
         ViewDataPlayerData = viewDataPlayerData;
+        BloodFeudPlayerData = bloodFeudPlayerData;
     }
 }

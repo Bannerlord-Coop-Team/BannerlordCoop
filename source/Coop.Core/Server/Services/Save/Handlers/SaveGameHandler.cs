@@ -126,7 +126,8 @@ internal class SaveGameHandler : IHandler
             current?.OrderOfBattlePlayerData ?? empty.OrderOfBattlePlayerData,
             current?.StatisticsPlayerData ?? empty.StatisticsPlayerData,
             current?.IncidentsPlayerData ?? empty.IncidentsPlayerData,
-            current?.ViewDataPlayerData ?? empty.ViewDataPlayerData);
+            current?.ViewDataPlayerData ?? empty.ViewDataPlayerData,
+            current?.BloodFeudPlayerData ?? empty.BloodFeudPlayerData);
 
         coopSessionProvider.CoopSession = session;
 
@@ -157,7 +158,8 @@ internal class SaveGameHandler : IHandler
             loaded?.OrderOfBattlePlayerData ?? empty.OrderOfBattlePlayerData,
             loaded?.StatisticsPlayerData ?? empty.StatisticsPlayerData,
             loaded?.IncidentsPlayerData ?? empty.IncidentsPlayerData,
-            loaded?.ViewDataPlayerData ?? empty.ViewDataPlayerData);
+            loaded?.ViewDataPlayerData ?? empty.ViewDataPlayerData,
+            loaded?.BloodFeudPlayerData ?? empty.BloodFeudPlayerData);
 
         coopSessionProvider.CoopSession = savedSession;
     }

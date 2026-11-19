@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using GameInterface.Services.BloodFeuds.Interfaces;
 using GameInterface.Services.Clans.Extensions;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Heroes.HeirSelection.Messages;
@@ -166,13 +167,14 @@ internal class KillCharacterActionPatches
         return false;
     }
 
-    // DisableExecutionCampaignBehavior turns vanilla's charge off until #3851 tracks feuds per player, so every
-    // player execution is charged here, and no feud is started.
+    // ExecutionCampaignBehavior only charges this when the killer is Hero.MainHero, so a player's execution is charged here, once per blood feud.
     private static void ApplyExecutionTraitPenalty(Hero victim, Hero killer, KillCharacterAction.KillCharacterActionDetail actionDetail)
     {
         if (actionDetail != KillCharacterAction.KillCharacterActionDetail.Executed) return;
         if (victim.Clan == null || killer?.Clan == null) return;
         if (!killer.IsPlayerHero()) return;
+        if (ContainerProvider.TryResolve<IExecutionCampaignBehaviorInterface>(out var executionInterface) &&
+            executionInterface.HasBloodFeud(killer, victim.Clan)) return;
 
         using (new MainHeroSubstitutionScope(killer, killer.PartyBelongedTo))
         {

@@ -1,4 +1,5 @@
-﻿using GameInterface.Services.CampaignService.Statistics;
+﻿using GameInterface.Services.BloodFeuds;
+using GameInterface.Services.CampaignService.Statistics;
 using GameInterface.Services.Caravans;
 using GameInterface.Services.Heroes;
 using GameInterface.Services.Incidents;
@@ -59,6 +60,10 @@ internal static class CoopSessionMigrationRules
 
         PreserveWithMigration.Add(AccessTools.Property(typeof(HeroMeetingData), nameof(HeroMeetingData.PlayerLastMeetingTimes)));
 
+        PreserveWithMigration.Add(AccessTools.Property(typeof(BloodFeudPlayerData), nameof(BloodFeudPlayerData.PlayerBloodFeuds)));
+        PreserveWithMigration.Add(AccessTools.Property(typeof(BloodFeudPlayerData), nameof(BloodFeudPlayerData.PlayerPendingSettlementExecutions)));
+        PreserveWithMigration.Add(AccessTools.Property(typeof(BloodFeudPlayerData), nameof(BloodFeudPlayerData.PlayerHeroesPendingMapEventEndExecution)));
+
         /// Define fields that should have their data cleared
         ClearWithMigration.Add(AccessTools.Property(typeof(CaravansPlayerData), nameof(CaravansPlayerData.PlayerTradeRumorTakenCaravans)));
 
@@ -80,6 +85,8 @@ internal static class CoopSessionMigrationRules
         ClearWithMigration.Add(AccessTools.Property(typeof(AgingPlayerData), nameof(AgingPlayerData.PlayerMarriageOffers)));
 
         ClearWithMigration.Add(AccessTools.Property(typeof(PlayerTraitData), nameof(PlayerTraitData.PlayerTraitXp)));
+
+        ClearWithMigration.Add(AccessTools.Property(typeof(BloodFeudPlayerData), nameof(BloodFeudPlayerData.PlayerPendingExecutions)));
 
         ClearWithMigration.Add(AccessTools.Property(typeof(IncidentsPlayerData), nameof(IncidentsPlayerData.PlayerIncidentsOnCooldown)));
         ClearWithMigration.Add(AccessTools.Property(typeof(IncidentsPlayerData), nameof(IncidentsPlayerData.PlayerLastGlobalIncidentCooldown)));
