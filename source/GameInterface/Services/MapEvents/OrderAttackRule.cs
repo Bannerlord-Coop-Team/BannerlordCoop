@@ -19,21 +19,12 @@ public class OrderAttackRule : IOrderAttackRule
 {
     public bool CanOrderAttack(MapEvent mapEvent, MobileParty requesterParty, CharacterObject requesterCharacter)
     {
-        return HasOrderAttackPreconditions(mapEvent, requesterParty, out var side, out var oppositeSide)
-            && !IsFirstOpponentInRaft(mapEvent, oppositeSide)
-            && HasOrderableTroops(side, requesterCharacter);
-    }
+        if (mapEvent.FindMapEventParty(requesterParty.Party, out var side) == null) return false;
 
-    private static bool HasOrderAttackPreconditions(MapEvent mapEvent, MobileParty requesterParty,
-        out MapEventSide side, out BattleSideEnum oppositeSide)
-    {
-        var eventParty = mapEvent.FindMapEventParty(requesterParty.Party, out side);
-        oppositeSide = BattleSideEnum.None;
-        if (eventParty == null)
-            return false;
+        var oppositeSide = side.MissionSide.GetOppositeSide();
+        if (!mapEvent.HasTroopsOnBothSides() || mapEvent.GetLeaderParty(oppositeSide) == null) return false;
 
-        oppositeSide = side.MissionSide.GetOppositeSide();
-        return mapEvent.HasTroopsOnBothSides() && mapEvent.GetLeaderParty(oppositeSide) != null;
+        return !IsFirstOpponentInRaft(mapEvent, oppositeSide) && HasOrderableTroops(side, requesterCharacter);
     }
 
     public bool HasOrderableTroops(MapEventSide side, CharacterObject requesterCharacter)

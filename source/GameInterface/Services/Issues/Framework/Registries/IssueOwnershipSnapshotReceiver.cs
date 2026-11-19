@@ -52,14 +52,7 @@ internal class IssueOwnershipSnapshotReceiver : IHandler
     {
         var owners = snapshot.Owners ?? Array.Empty<IssueOwnershipData>();
         var rememberedOwners = ownership.GetAll();
-        var snapshotPairs = new HashSet<(string IssueOwnerId, string IssueId)>(
-            owners.Select(owner => (owner.IssueOwnerId, owner.IssueId)));
-        var dropped = new List<(string IssueOwnerId, string IssueId, bool WasOwner)>();
-        foreach (var remembered in rememberedOwners)
-        {
-            if (snapshotPairs.Contains((remembered.IssueOwnerId, remembered.IssueId))) continue;
-            dropped.Add((remembered.IssueOwnerId, remembered.IssueId, remembered.ControllerId == controller.ControllerId));
-        }
+        var dropped = FindDroppedIssues(rememberedOwners, owners);
 
         // Clear remembered controllers before the authoritative snapshot, since accept is first-wins.
         foreach (var remembered in rememberedOwners)
@@ -78,5 +71,20 @@ internal class IssueOwnershipSnapshotReceiver : IHandler
             GameThread.RunSafe(() => finalization.ReplayLocalCancel(entry.IssueOwnerId, entry.IssueId, entry.WasOwner),
                 context: nameof(IssueOwnershipSnapshotReceiver));
         }
+    }
+
+    private List<(string IssueOwnerId, string IssueId, bool WasOwner)> FindDroppedIssues(
+        IssueOwnershipData[] rememberedOwners, IssueOwnershipData[] owners)
+    {
+        var snapshotPairs = new HashSet<(string IssueOwnerId, string IssueId)>(
+            owners.Select(owner => (owner.IssueOwnerId, owner.IssueId)));
+        var dropped = new List<(string IssueOwnerId, string IssueId, bool WasOwner)>();
+        foreach (var remembered in rememberedOwners)
+        {
+            if (snapshotPairs.Contains((remembered.IssueOwnerId, remembered.IssueId))) continue;
+            dropped.Add((remembered.IssueOwnerId, remembered.IssueId, remembered.ControllerId == controller.ControllerId));
+        }
+
+        return dropped;
     }
 }

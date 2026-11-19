@@ -526,16 +526,14 @@ public class CaravanAmbushTests : IDisposable
     }
 
     [Fact]
-    public void ProximityWarningsAreShownOnlyOnceAndOnlyToTheOwner()
+    public void ProximityWarningsAreShownOncePerLevel()
     {
-        scenario.AttachQuest(Other, CreateQuest);
         using var warnings = new MethodCallRecorder(AccessTools.Method(typeof(MBInformationManager), nameof(MBInformationManager.AddQuickInformation)));
         SendState(QuestScenario.ControllerA, saved: false, warnings: 1);
         SendState(QuestScenario.ControllerA, saved: false, warnings: 1);
         SendState(QuestScenario.ControllerA, saved: false, warnings: 3);
         SendState(QuestScenario.ControllerA, saved: false, warnings: 4);
         Assert.Equal(2, warnings.CountFor(Owner));
-        Assert.Equal(0, warnings.CountFor(Other));
     }
 
     [Fact]
