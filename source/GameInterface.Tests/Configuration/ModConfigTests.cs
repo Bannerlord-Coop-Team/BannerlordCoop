@@ -558,15 +558,15 @@ public class ModConfigTests : IDisposable
     ""mapMaximumDistance"": 20
   },
 
-  // Advanced starting options offered to a player creating a new character on join.
-  ""advancedStart"": {
-    // false: the window never shows and everyone gets the default start.
-    ""enabled"": true,
+  // A category added in a later version.
+  ""newCategory"": {
+    // A setting in the new category.
+    ""newSetting"": true,
 
-    // false hides a start type from the window.
-    ""startTypes"": {
-      ""outlaw"": true,
-      ""beggar"": true
+    // A nested group, copied with its block.
+    ""nestedSettings"": {
+      ""first"": true,
+      ""second"": false
     }
   },
 
@@ -615,15 +615,15 @@ public class ModConfigTests : IDisposable
     ""mapMaximumDistance"": 35
   },
 
-  // Advanced starting options offered to a player creating a new character on join.
-  ""advancedStart"": {
-    // false: the window never shows and everyone gets the default start.
-    ""enabled"": true,
+  // A category added in a later version.
+  ""newCategory"": {
+    // A setting in the new category.
+    ""newSetting"": true,
 
-    // false hides a start type from the window.
-    ""startTypes"": {
-      ""outlaw"": true,
-      ""beggar"": true
+    // A nested group, copied with its block.
+    ""nestedSettings"": {
+      ""first"": true,
+      ""second"": false
     }
   },
 
