@@ -26,7 +26,7 @@ public class StationSeatSettlerTests
         rotation.f *= 2f;
         var pose = Pose(StationSeatKind.Oar, new MatrixFrame(rotation, new Vec3(1f, 2f, 3f)), new Vec3(0.5f, 1f, -0.2f));
 
-        var spot = StationSeatSettler.SpawnPlacement(pose);
+        var spot = new StationSeatSettler(Mock.Of<INavalShipEngine>()).SpawnPlacement(pose);
 
         // Turned a quarter about up, forward is -x and side is +y; the doubled forward scale is dropped.
         AssertNear(new Vec3(0f, 2.5f, 2.8f), spot);
@@ -37,7 +37,7 @@ public class StationSeatSettlerTests
     {
         var pose = Pose(StationSeatKind.Helm, StationFrame, SitDown);
 
-        AssertNear(StationFrame.origin, StationSeatSettler.SpawnPlacement(pose));
+        AssertNear(StationFrame.origin, new StationSeatSettler(Mock.Of<INavalShipEngine>()).SpawnPlacement(pose));
     }
 
     [Theory]

@@ -11,8 +11,8 @@ using TaleWorlds.MountAndBlade;
 namespace Missions.Battles;
 
 /// <summary>
-/// [Game thread] Reports what the battle did to the campaign ship of each hull this client simulates: HP, sail HP, sinking and
-/// mitigated damage. Sinking goes out at once, other changes at most every 2 s; removals, results and mission end flush the rest.
+/// [Game thread] Reports what the battle did to the campaign ship of each hull this client simulates: HP, sail HP and sinking.
+/// Sinking goes out at once, other changes at most every 2 s; removals, results and mission end flush the rest.
 /// </summary>
 public interface IBattleShipFateReporter
 {
@@ -95,9 +95,9 @@ public class BattleShipFateReporter : IBattleShipFateReporter
         {
             if (!session.IsOwn(ship.CurrentAuthority) || engine.IsHullRemoved(ship.Hull)) continue;
 
-            reports.TryGetValue(ship.ShipId, out var report);
-            var fate = ReadFate(ship.Hull, report?.ReportedMitigatedDamage ?? 0f);
+            var fate = ReadFate(ship.Hull);
             if (fate == null) continue;
+            reports.TryGetValue(ship.ShipId, out var report);
             if (report?.Last != null && (report.Last.Sunk || !Differs(report.Last, fate))) continue;
 
             changed.Add(new PendingFate(ship.ShipId, fate));
@@ -106,29 +106,28 @@ public class BattleShipFateReporter : IBattleShipFateReporter
         return changed;
     }
 
-    // The hull's fate with the damage mitigated since the last fate this client sent for it.
-    private BattleShipFate ReadFate(MissionObject hull, float reportedMitigatedDamage)
+    // The hull's fate, or null when it stands for no campaign ship.
+    private BattleShipFate ReadFate(MissionObject hull)
     {
         var campaignShipId = engine.CampaignShipIdOf(hull);
         var condition = engine.ReadCondition(hull);
         if (string.IsNullOrEmpty(campaignShipId) || condition == null) return null;
 
-        return FateOf(campaignShipId, condition, Math.Max(0f, engine.ReadMitigatedDamage(hull) - reportedMitigatedDamage));
+        return FateOf(campaignShipId, condition);
     }
 
     /// <summary>The fate a hull's condition stands for: vanilla destroys a ship at 0 HP, so a sinking hull counts as sunk too.</summary>
-    internal static BattleShipFate FateOf(string campaignShipId, BattleShipCondition condition, float mitigatedDamage = 0f)
+    internal static BattleShipFate FateOf(string campaignShipId, BattleShipCondition condition)
     {
         bool sunk = condition.SinkingState >= BattleShipCondition.Sinking || condition.HitPoints <= 0f;
-        return new BattleShipFate(campaignShipId, condition.HitPoints, condition.SailHitPoints, sunk, mitigatedDamage);
+        return new BattleShipFate(campaignShipId, condition.HitPoints, condition.SailHitPoints, sunk);
     }
 
-    // Whether the server must hear about this fate: its sunk state, HP or sail HP moved, or new damage was mitigated.
+    // Whether the server must hear about this fate: its sunk state, HP or sail HP moved.
     private static bool Differs(BattleShipFate previous, BattleShipFate fate) =>
         previous.Sunk != fate.Sunk
         || Math.Abs(previous.HitPoints - fate.HitPoints) > Tolerance
-        || Math.Abs(previous.SailHitPoints - fate.SailHitPoints) > Tolerance
-        || fate.MitigatedDamage > Tolerance;
+        || Math.Abs(previous.SailHitPoints - fate.SailHitPoints) > Tolerance;
 
     // Sends the changed fates as one numbered message at this client's host epoch and remembers each as the last one sent.
     private void Send(IReadOnlyList<PendingFate> changed)
@@ -149,7 +148,6 @@ public class BattleShipFateReporter : IBattleShipFateReporter
             }
 
             report.Last = change.Fate;
-            report.ReportedMitigatedDamage += change.Fate.MitigatedDamage;
 #if DEBUG
             report.Sent++;
 #endif
@@ -172,11 +170,10 @@ public class BattleShipFateReporter : IBattleShipFateReporter
         public BattleShipFate Fate { get; }
     }
 
-    // The last fate this client sent for one hull, the mitigated damage its fates carried so far and how many it sent.
+    // The last fate this client sent for one hull and how many it sent.
     private sealed class HullReport
     {
         public BattleShipFate Last;
-        public float ReportedMitigatedDamage;
 #if DEBUG
         public int Sent;
 #endif
