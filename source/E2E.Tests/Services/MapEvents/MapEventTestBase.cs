@@ -174,6 +174,7 @@ public abstract class MapEventTestBase : IDisposable
     protected static GauntletMapEventVisual MockMapEventVisual()
         => ObjectHelper.SkipConstructor<GauntletMapEventVisual>();
 
+    // Stub camp joins and side initialization so fixtures can create sieges without town positions or a siege model.
     protected static IReadOnlyList<MethodBase> SiegeCreationDisabledMethods => new[]
     {
         AccessTools.Method(typeof(MobileParty), nameof(MobileParty.OnPartyJoinedSiegeInternal)),

@@ -28,9 +28,6 @@ public class BesiegerCaptureTests : MapEventTestBase
     {
     }
 
-    /// <summary>Construction-time world dependencies of the siege object graph (see
-    /// <c>SiegeLeaveMenuTests</c>): the camp-join internals and both siege-side initializers need a
-    /// live town/scene.</summary>
     [Fact]
     public void BesiegingPlayerDefeated_ViaServerCommittedBattle_LeavesCampOnServerAndClients()
     {
