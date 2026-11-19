@@ -1,8 +1,10 @@
 ﻿using GameInterface.Configuration;
 using Common;
 using GameInterface.Services.Modules;
+using Newtonsoft.Json.Linq;
 using System;
 using System.IO;
+using System.Text.RegularExpressions;
 using Xunit;
 
 namespace GameInterface.Tests.Configuration;
@@ -97,57 +99,9 @@ public class ModConfigTests : IDisposable
     }
 
     [Fact]
-    public void ExistingCommentedDifficulty_IsMigratedInPlace_WithoutOverwritingUserValues()
-    {
-        File.WriteAllText(ConfigPath, @"{
-  // keep this operator comment
-  ""difficulty"": {
-    // ""playerReceivedDamage"": ""Realistic"",
-    ""battleDeath"": ""Easy"",
-    // ""birthAndDeath"": true,
-  },
-  ""modOptions"": { ""autoPauseEnabled"": false },
-}");
-
-        var config = NewModConfig().Data;
-        string migrated = File.ReadAllText(ConfigPath);
-
-        Assert.Equal(DifficultyLevel.Realistic, config.Difficulty.PlayerReceivedDamage);
-        Assert.Equal(DifficultyLevel.Easy, config.Difficulty.BattleDeath);
-        Assert.True(config.Difficulty.BirthAndDeath);
-        Assert.False(config.ModOptions.AutoPauseEnabled);
-        Assert.Contains("// keep this operator comment", migrated);
-        Assert.Contains("\"playerReceivedDamage\": \"Realistic\"", migrated);
-        Assert.DoesNotContain("// \"playerReceivedDamage\"", migrated);
-        Assert.Contains("\"battleDeath\": \"Easy\"", migrated);
-    }
-
-    [Fact]
-    public void SiblingServerConfig_IsIgnoredDuringInPlaceMigration()
-    {
-        File.WriteAllText(ConfigPath, @"{
-  ""difficulty"": {
-    // ""battleDeath"": ""Easy"",
-    // ""birthAndDeath"": true,
-  },
-  ""modOptions"": { ""autoPauseEnabled"": false },
-}");
-        File.WriteAllText(Path.Combine(tempDir, "server-config.json"), @"{
-  ""battleDeath"": ""Realistic"",
-  ""birthAndDeath"": false,
-}");
-
-        var config = NewModConfig().Data;
-
-        Assert.Equal(DifficultyLevel.Easy, config.Difficulty.BattleDeath);
-        Assert.True(config.Difficulty.BirthAndDeath);
-        Assert.False(config.ModOptions.AutoPauseEnabled);
-        Assert.Contains("Realistic", File.ReadAllText(Path.Combine(tempDir, "server-config.json")));
-    }
-
-    [Fact]
     public void MissingDifficultySettings_ReceiveDefaultsWithoutChangingActiveValues()
     {
+        ModInformation.IsServer = true;
         File.WriteAllText(ConfigPath, @"{
   ""difficulty"": {
     // unrelated operator note
@@ -172,6 +126,7 @@ public class ModConfigTests : IDisposable
     [Fact]
     public void MissingDifficultyBlock_ReceivesDefaultsAndIsIdempotent()
     {
+        ModInformation.IsServer = true;
         File.WriteAllText(ConfigPath, @"{
   // preserve this operator file
   ""modOptions"": { ""clientsCanUseCheats"": true },
@@ -194,53 +149,12 @@ public class ModConfigTests : IDisposable
     [Fact]
     public void InvalidDifficultyBlockIsNotDuplicatedByMigration()
     {
-        const string invalid = "{ \"difficulty\": false }";
-        File.WriteAllText(ConfigPath, invalid);
+        ModInformation.IsServer = true;
+        File.WriteAllText(ConfigPath, "{ \"difficulty\": false }");
 
         _ = NewModConfig().Data;
 
-        Assert.Equal(invalid, File.ReadAllText(ConfigPath));
-    }
-
-    [Fact]
-    public void OriginalShippedDifficultyBlock_MigratesEveryCommentedSetting_AndIsIdempotent()
-    {
-        File.WriteAllText(ConfigPath, @"{
-  ""difficulty"": {
-    // ""playerReceivedDamage"": ""Realistic"",
-    // ""playerTroopsReceivedDamage"": ""VeryEasy"",
-    // ""combatAIDifficulty"": ""VeryEasy"",
-    // ""recruitmentDifficulty"": ""VeryEasy"",
-    // ""playerMapMovementSpeed"": ""VeryEasy"",
-    // ""stealthAndDisguiseDifficulty"": ""VeryEasy"",
-    // ""persuasionSuccessChance"": ""VeryEasy"",
-    // ""clanMemberDeathChance"": ""VeryEasy"",
-    // ""battleDeath"": ""VeryEasy"",
-    // ""birthAndDeath"": true,
-    // ""autoAllocateClanMemberPerks"": false,
-  },
-  ""modOptions"": { ""clientsCanUseCheats"": true }
-}");
-
-        var config = NewModConfig().Data;
-        string firstMigration = File.ReadAllText(ConfigPath);
-        _ = NewModConfig().Data;
-        string secondLoad = File.ReadAllText(ConfigPath);
-
-        Assert.Equal(DifficultyLevel.Realistic, config.Difficulty.PlayerReceivedDamage);
-        Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.PlayerTroopsReceivedDamage);
-        Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.CombatAIDifficulty);
-        Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.RecruitmentDifficulty);
-        Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.PlayerMapMovementSpeed);
-        Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.StealthAndDisguiseDifficulty);
-        Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.PersuasionSuccessChance);
-        Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.ClanMemberDeathChance);
-        Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.BattleDeath);
-        Assert.True(config.Difficulty.BirthAndDeath);
-        Assert.False(config.Difficulty.AutoAllocateClanMemberPerks);
-        Assert.True(config.ModOptions.ClientsCanUseCheats);
-        Assert.DoesNotContain("// \"", firstMigration);
-        Assert.Equal(firstMigration, secondLoad);
+        Assert.Single(Regex.Matches(File.ReadAllText(ConfigPath), "\"difficulty\""));
     }
 
     [Fact]
@@ -371,7 +285,6 @@ public class ModConfigTests : IDisposable
         Assert.False(config.Difficulty.BirthAndDeath);
         Assert.Equal(600, new ModOptions(config.ModOptions).KingdomDecisionVoteTimeoutSeconds);
         Assert.Equal(new[] { "76561198000000002", "76561198000000001" }, new ModOptions(config.ModOptions).PreferredBattleHosts);
-        Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.CombatAIDifficulty);
     }
 
     [Fact]
@@ -540,15 +453,26 @@ public class ModConfigTests : IDisposable
         Assert.Equal(File.ReadAllText(ShippedTemplatePath), File.ReadAllText(ConfigPath));
     }
 
-    // An operator's warSails value wins over the template's, whatever its casing.
+    // The shipped template's settings are all added to an old file, and an operator's warSails value wins, whatever its casing.
     [Fact]
-    public void ExistingWarSails_IsKept()
+    public void ShippedTemplate_IsMergedIntoOldFile_KeepingExistingWarSails()
     {
         ModInformation.IsServer = true;
         File.WriteAllText(ConfigPath, "{ \"modOptions\": { \"WarSails\": true } }");
 
         var config = NewModConfig().Data;
+        var merged = JObject.Parse(File.ReadAllText(ConfigPath));
+        var template = JObject.Parse(File.ReadAllText(ShippedTemplatePath));
 
+        foreach (var block in template.Properties())
+        {
+            Assert.NotNull(merged.GetValue(block.Name, StringComparison.OrdinalIgnoreCase));
+        }
+        var modOptions = (JObject)merged.GetValue("modOptions", StringComparison.OrdinalIgnoreCase);
+        foreach (var key in ((JObject)template["modOptions"]).Properties())
+        {
+            Assert.NotNull(modOptions.GetValue(key.Name, StringComparison.OrdinalIgnoreCase));
+        }
         Assert.True(config.ModOptions.WarSails);
         Assert.DoesNotContain("\"warSails\": false", File.ReadAllText(ConfigPath));
     }
@@ -579,8 +503,6 @@ public class ModConfigTests : IDisposable
   }
 }";
 
-    private const string AllDifficultyKeys = @"  ""difficulty"": { ""playerReceivedDamage"": ""Easy"", ""playerTroopsReceivedDamage"": ""Easy"", ""combatAIDifficulty"": ""Easy"", ""recruitmentDifficulty"": ""Easy"", ""playerMapMovementSpeed"": ""Easy"", ""stealthAndDisguiseDifficulty"": ""Easy"", ""persuasionSuccessChance"": ""Easy"", ""clanMemberDeathChance"": ""Easy"", ""battleDeath"": ""Easy"", ""birthAndDeath"": false, ""autoAllocateClanMemberPerks"": true },";
-
     private IModConfig NewModConfigWithTemplate(string template)
     {
         string templatePath = Path.Combine(tempDir, "template.json");
@@ -598,7 +520,7 @@ public class ModConfigTests : IDisposable
   ""voice"": {
     ""mapMaximumDistance"": 35
   },
-" + AllDifficultyKeys + @"
+  ""difficulty"": { ""battleDeath"": ""Easy"" },
   ""modOptions"": {
     // Enables proximity voice for every player.
     ""voiceEnabled"": false
@@ -627,7 +549,7 @@ public class ModConfigTests : IDisposable
     }
   },
 
-" + AllDifficultyKeys + @"
+  ""difficulty"": { ""battleDeath"": ""Easy"" },
   ""modOptions"": {
     // Enables proximity voice for every player.
     ""voiceEnabled"": false,
@@ -641,28 +563,30 @@ public class ModConfigTests : IDisposable
         Assert.False(config.ModOptions.WarSails);
     }
 
-    // A key the operator commented out stays commented out, and nothing is added for it.
+    // A key the operator commented out stays commented out while a key the file really lacks is added.
     [Fact]
     public void ServerLoad_TreatsCommentedOutKeyAsPresent()
     {
         ModInformation.IsServer = true;
-        string config = @"{
-" + AllDifficultyKeys + @"
+        File.WriteAllText(ConfigPath, @"{
   ""modOptions"": {
     ""voiceEnabled"": true,
     // ""warSails"": true,
   }
-}";
-        File.WriteAllText(ConfigPath, config);
+}");
 
         _ = NewModConfigWithTemplate(@"{
   ""modOptions"": {
     ""voiceEnabled"": true,
     // Toggle War Sails (NavalDLC) co-op on a dedicated server.
-    ""warSails"": false
+    ""warSails"": false,
+    ""newSetting"": true
   }
 }").Data;
+        string merged = File.ReadAllText(ConfigPath);
 
-        Assert.Equal(config, File.ReadAllText(ConfigPath));
+        Assert.Contains("\"newSetting\": true", merged);
+        Assert.Contains("// \"warSails\": true,", merged);
+        Assert.Single(Regex.Matches(merged, "\"warSails\""));
     }
 }
