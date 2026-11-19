@@ -65,6 +65,8 @@ public class SiegeMachineSimulationTests : IDisposable
         ResetRamStubState();
         ramTrackerDistance = trackerDistance;
         StubRamSnap();
+        AccessTools.Property(typeof(SiegeWeaponMovementComponent), nameof(SiegeWeaponMovementComponent.CurrentSpeed))
+            .SetValue(ram.MovementComponent, 1.5f);
 
         var destructionState = new NetworkSiegeMachineState(ram.Id.Id, 0f, 1, -1, -1, hostDistance,
             false, -1, -1000f, -1000f);
@@ -80,6 +82,7 @@ public class SiegeMachineSimulationTests : IDisposable
             Assert.Equal(1, ramSnapCalls);
             Assert.Equal(hostDistance, ramTrackerDistance);
             Assert.Equal(0f, ramDistanceError);
+            Assert.Equal(0f, ram.MovementComponent.CurrentSpeed);
             Assert.Equal(hostDistance, ramFrameDistance);
             Assert.Equal(1, ramDestructionCalls);
             Assert.Equal(1, ramDisableCalls);
@@ -144,6 +147,8 @@ public class SiegeMachineSimulationTests : IDisposable
         using var mission = new MissionCurrentScope().AsSiegeBattle();
         const int hostEpoch = 5;
         const float hostDistance = 12.4f;
+        const float peerTrackerDistance = 12.5f;
+        const float claimantLead = 5f;
         var hostRam = CreateDestructibleRam();
         var peerRam = CreateDestructibleRam();
         int id = hostRam.Id.Id;
@@ -171,28 +176,31 @@ public class SiegeMachineSimulationTests : IDisposable
             Assert.Equal("peer", grant.ControllerId);
             hostMessages.Clear();
 
-            var claimantMovement = new NetworkSiegeMachineState(id, -1f, -1, -1, -1, hostDistance + 5f,
+            // Deliver the claimant's movement after the hit while its revision is still current.
+            var claimantMovement = new NetworkSiegeMachineState(id, -1f, -1, -1, -1, hostDistance + claimantLead,
                 false, -1, -1000f, -1000f, hostEpoch: grant.HostEpoch, senderControllerId: "peer",
                 authorityRevision: grant.AuthorityRevision);
             MarkRamDestroyed(hostRam);
             ramTrackerDistance = hostDistance;
-            // The old revision is still current on the host between the fatal hit and the next broadcast.
             hostBroker.Publish(this, claimantMovement);
             GameThread.Run(() => { }, blocking: true);
             Assert.Equal(hostDistance, ramTrackerDistance);
 
+            // Let the host revoke the claim, then retry the claim on the wreck.
             GameThread.Run(() => host.Tick(0.25f), blocking: true);
             hostBroker.Publish(this, new NetworkSiegeMachineClaim(id, "peer", isRelease: false));
             GameThread.Run(() => { }, blocking: true);
 
+            // Give the peer its original claim and a tracker that has drifted from the host's.
             SiegeMissionAuthorityGate.IsLocalAuthority = false;
             SiegeMissionAuthorityGate.ResetClaimedMachines();
-            ramTrackerDistance = 12.5f;
+            ramTrackerDistance = peerTrackerDistance;
             peerBroker.Publish(this, grant);
             GameThread.Run(() => { }, blocking: true);
             Assert.True(SiegeMissionAuthorityGate.IsMachineSimulatedLocally(id));
             if (!buffered) RegisterRam(peer, peerRam);
 
+            // Replay the host and claimant packets in the arrival order under test.
             if (claimantFirst) peerBroker.Publish(this, claimantMovement);
             foreach (var message in hostMessages)
             {
@@ -225,6 +233,15 @@ public class SiegeMachineSimulationTests : IDisposable
                     var destruction = Assert.IsType<NetworkSiegeMachineState>(message);
                     Assert.Equal(grant.AuthorityRevision + 1, destruction.AuthorityRevision);
                     Assert.Equal(hostDistance, destruction.MoveDistance);
+                },
+                message =>
+                {
+                    var reply = Assert.IsType<NetworkSiegeMachineAuthority>(message);
+                    Assert.Equal(id, reply.MachineId);
+                    Assert.Empty(reply.ControllerId);
+                    Assert.Equal(grant.HostEpoch, reply.HostEpoch);
+                    Assert.Equal(grant.AuthorityRevision + 1, reply.AuthorityRevision);
+                    Assert.Equal("host", reply.SenderControllerId);
                 });
         }
         finally

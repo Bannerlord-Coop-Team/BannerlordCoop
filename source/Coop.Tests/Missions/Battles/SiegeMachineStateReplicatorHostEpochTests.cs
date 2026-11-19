@@ -486,7 +486,7 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
         var hostState = new NetworkSiegeMachineState(
             machineId,
             hitPoints: 42.5f,
-            destructionState: 0,
+            destructionState: 2,
             gateState: -1,
             ladderState: -1,
             moveDistance: -1f,
@@ -519,7 +519,7 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
 
         var pending = Assert.Single(PendingStates()).Value;
         Assert.Equal(42.5f, pending.HitPoints);
-        Assert.Equal(0, pending.DestructionState);
+        Assert.Equal(2, pending.DestructionState);
         Assert.Equal(1, pending.GateState);
         Assert.Equal(3, pending.LadderState);
         Assert.Equal(18f, pending.MoveDistance);
@@ -548,7 +548,7 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
         var hostState = new NetworkSiegeMachineState(
             machineId,
             hitPoints: 42.5f,
-            destructionState: 0,
+            destructionState: 2,
             gateState: -1,
             ladderState: -1,
             moveDistance: -1f,
@@ -584,7 +584,7 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
 
         Assert.Empty(PendingStates());
         Assert.Equal(42.5f, stateToApply.HitPoints);
-        Assert.Equal(0, stateToApply.DestructionState);
+        Assert.Equal(2, stateToApply.DestructionState);
         Assert.Equal(1, stateToApply.GateState);
         Assert.Equal(3, stateToApply.LadderState);
         Assert.Equal(18f, stateToApply.MoveDistance);

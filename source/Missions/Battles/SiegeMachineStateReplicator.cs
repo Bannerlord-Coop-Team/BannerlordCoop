@@ -336,7 +336,6 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             if (!claimedMachines.ContainsKey(machineId) || machine.DestructionComponent?.IsDestroyed != true)
                 continue;
 
-            ClearGrantStreak(machineId);
             proximityGrants.Remove(machineId);
             SetMachineAuthority(machineId, null);
         }
@@ -1050,7 +1049,16 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             }
 
             machinesById.TryGetValue(obj.MachineId, out var machine);
-            if (machine?.DestructionComponent?.IsDestroyed == true) return;
+            if (machine?.DestructionComponent?.IsDestroyed == true)
+            {
+                network.SendAll(new NetworkSiegeMachineAuthority(
+                    obj.MachineId,
+                    CurrentAuthorityOwner(obj.MachineId),
+                    GetSnapshotAuthorityEpoch(obj.MachineId),
+                    GetAuthorityRevision(obj.MachineId),
+                    session.OwnControllerId));
+                return;
+            }
 
             if (claimedMachines.TryGetValue(obj.MachineId, out var current))
             {
@@ -1711,7 +1719,8 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             ?? (machine as SiegeTower)?.MovementComponent;
 
         // Other peers ease toward the simulator's distance while the machine is intact.
-        // The claimant's revision can still be current between the fatal hit and the host's next poll.
+        // Skip destroyed machines, otherwise a claimant snapshot arriving before the host revokes the claim
+        // can move the wreck.
         if (state.MoveDistance >= 0f && !isMachineSimulatedLocally && movement != null && !wasDestroyed)
         {
             // Vanilla MP's steady-state client recipe (MissionNetworkComponent's siege machine movement
