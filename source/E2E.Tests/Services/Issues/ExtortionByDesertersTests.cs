@@ -111,12 +111,23 @@ public class ExtortionByDesertersTests : IDisposable
     [Fact]
     public void ExtortionPatchTargetsHaveOneCoopPrefix()
     {
-        var target = AccessTools.Method(typeof(QuestBase), nameof(QuestBase.AddTrackedObject));
-        var coopPrefixes = Harmony.GetPatchInfo(target).Prefixes
-            .Where(prefix => prefix.owner == "Bannerlord.Coop")
-            .ToArray();
+        var targets = new[]
+        {
+            AccessTools.Method(typeof(QuestBase), nameof(QuestBase.AddTrackedObject)),
+            AccessTools.Method(typeof(Quest), nameof(Quest.StartAmbushEncounter)),
+            AccessTools.Method(typeof(Quest), nameof(Quest.OnBattleStarted)),
+            AccessTools.Method(typeof(Quest), nameof(Quest.GameMenuOpened)),
+            AccessTools.Method(typeof(IssueBase), nameof(IssueBase.IssueFinalized)),
+            AccessTools.Method(typeof(QuestBase), nameof(QuestBase.AddLog), new[] { typeof(TextObject), typeof(bool) }),
+        };
 
-        Assert.Single(coopPrefixes);
+        foreach (var target in targets)
+        {
+            var coopPrefixes = Harmony.GetPatchInfo(target).Prefixes
+                .Where(prefix => prefix.owner == "Bannerlord.Coop")
+                .ToArray();
+            Assert.Single(coopPrefixes);
+        }
     }
 
     [Fact]

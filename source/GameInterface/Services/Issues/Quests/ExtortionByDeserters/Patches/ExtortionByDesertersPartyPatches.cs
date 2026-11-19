@@ -28,37 +28,25 @@ internal class ExtortionByDesertersPartyPatches
     private static void Add(IAutoSyncPatchCollector collector, MethodBase target, string prefixName) =>
         collector.AddPrefix(target, AccessTools.Method(typeof(ExtortionByDesertersPartyPatches), prefixName));
 
-    [HarmonyPatch(typeof(QuestBase), nameof(QuestBase.AddTrackedObject))]
-    [HarmonyPrefix]
     internal static bool AddTrackedObjectPrefix(QuestBase __instance, ITrackableCampaignObject trackedObject)
     {
         // Its constructor runs before the server's party binding arrives.
         return !(__instance is Quest) || trackedObject != null;
     }
 
-    [HarmonyPatch(typeof(Quest), nameof(Quest.StartAmbushEncounter))]
-    [HarmonyPrefix]
     internal static bool StartAmbushEncounterPrefix() => false;
 
-    [HarmonyPatch(typeof(Quest), nameof(Quest.OnBattleStarted))]
-    [HarmonyPrefix]
     internal static bool OnBattleStartedPrefix() => false;
 
     // Vanilla destroys the battle parties when the encounter menu opens. The server does that in FinalizeEventAux.
-    [HarmonyPatch(typeof(Quest), nameof(Quest.GameMenuOpened))]
-    [HarmonyPrefix]
     internal static bool GameMenuOpenedPrefix() => false;
 
     // Dismissing an issue drops its running quest unfinished, which would leave the deserters and defenders on the map
-    [HarmonyPatch(typeof(IssueBase), nameof(IssueBase.IssueFinalized))]
-    [HarmonyPrefix]
     internal static void IssueFinalizedPrefix(IssueBase __instance)
     {
         if (ModInformation.IsServer && __instance.IssueQuest is Quest quest && quest.IsOngoing) quest.OnFinalize();
     }
 
-    [HarmonyPatch(typeof(QuestBase), nameof(QuestBase.AddLog), new[] { typeof(TextObject), typeof(bool) })]
-    [HarmonyPrefix]
     internal static void AddLogPrefix(QuestBase __instance, TextObject text)
     {
         if (ModInformation.IsServer && __instance is Quest quest &&
