@@ -628,7 +628,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
         Server.PumpGameThread();
     }
-    
+
     // The kingdom has one clan, its ruler's.
     [Fact]
     public void VassalServiceAccepted_KingdomWithMaxClansPerKingdom_RefusesThePlayerWithTheReason()
