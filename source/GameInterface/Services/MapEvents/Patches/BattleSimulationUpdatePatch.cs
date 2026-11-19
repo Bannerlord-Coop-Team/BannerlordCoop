@@ -78,21 +78,24 @@ internal class SimulatedTroopHitDifficultyPatch
         var simulateHit = AccessTools.Method(typeof(CombatSimulationModel), nameof(CombatSimulationModel.SimulateHit), new[]
         {
             typeof(CharacterObject), typeof(CharacterObject), typeof(PartyBase), typeof(PartyBase),
-            typeof(float), typeof(MapEvent), typeof(float), typeof(float)
+            typeof(float), typeof(MapEvent), typeof(BattleEnvironment), typeof(float), typeof(float)
         });
+        var getAllocatedTroopParty = AccessTools.Method(typeof(MapEventSide), nameof(MapEventSide.GetAllocatedTroopParty));
         int hitIndex = codes.FindIndex(instruction => instruction.Calls(simulateHit));
+        // The struck side's troop party is read last, right before the hit.
+        int struckPartyStoreIndex = hitIndex < 0 ? -1 : codes.FindLastIndex(hitIndex, instruction => instruction.Calls(getAllocatedTroopParty)) + 1;
         int damageStoreIndex = hitIndex < 0 ? -1 : codes.FindIndex(hitIndex, instruction => instruction.opcode == OpCodes.Conv_I4) + 1;
         int positiveDamageIndex = damageStoreIndex <= 0 ? -1 : codes.FindIndex(damageStoreIndex, instruction => instruction.Branches(out _)) + 1;
-        if (positiveDamageIndex <= 0 || !codes[damageStoreIndex].IsStloc() || !codes[hitIndex - 5].IsLdloc())
+        if (positiveDamageIndex <= 0 || struckPartyStoreIndex <= 0
+            || !codes[damageStoreIndex].IsStloc() || !codes[struckPartyStoreIndex].IsStloc())
             throw new InvalidOperationException("Failed to find the simulated hit damage in MapEvent.SimulateSingleTroopHit.");
 
         // Scales inside vanilla's damage > 0 block, so the damage and the striker's hit reward both use it.
-        // codes[hitIndex - 5] loads the struck party argument vanilla passed to SimulateHit.
         int damageLocal = codes[damageStoreIndex].LocalIndex();
         codes.InsertRange(positiveDamageIndex, new[]
         {
             CodeInstruction.LoadLocal(damageLocal),
-            codes[hitIndex - 5].Clone(),
+            CodeInstruction.LoadLocal(codes[struckPartyStoreIndex].LocalIndex()),
             CodeInstruction.Call(() => ScalePlayerPartyDamage(default, default)),
             CodeInstruction.StoreLocal(damageLocal),
         });

@@ -131,7 +131,7 @@ public class BattleSimulationCompletionTests : MapEventTestBase
             var previousDifficultyModel = models.DifficultyModel;
             var combatModel = new Mock<CombatSimulationModel>();
             combatModel.Setup(m => m.SimulateHit(It.IsAny<CharacterObject>(), It.IsAny<CharacterObject>(), It.IsAny<PartyBase>(),
-                It.IsAny<PartyBase>(), It.IsAny<float>(), It.IsAny<MapEvent>(), It.IsAny<float>(), It.IsAny<float>()))
+                It.IsAny<PartyBase>(), It.IsAny<float>(), It.IsAny<MapEvent>(), It.IsAny<BattleEnvironment>(), It.IsAny<float>(), It.IsAny<float>()))
                 .Returns(new ExplainedNumber(40));
             // The striker's hit reward gets the same damage the struck troop takes.
             var hitDamage = new List<int>();
