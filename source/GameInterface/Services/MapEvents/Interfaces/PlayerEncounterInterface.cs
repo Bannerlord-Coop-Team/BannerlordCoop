@@ -151,8 +151,13 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
 
     public void OpenEncounterMeeting(MapEvent battle, PartyBase otherParty)
     {
-        if (ModInformation.IsServer || battle == null || otherParty == null ||
-            MobileParty.MainParty.MapEvent != battle) return;
+        if (ModInformation.IsServer || otherParty == null) return;
+        if (battle == null || battle.IsFinalized || MobileParty.MainParty.MapEvent != battle)
+        {
+            Logger.Warning("Cannot open encounter meeting for {party}: map event {battle} is missing, finalized or no longer contains the player party",
+                otherParty, battle);
+            return;
+        }
 
         using (new Common.Util.AllowedThread())
         {
@@ -160,6 +165,7 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
             {
                 if (PlayerEncounter.Current != null)
                 {
+                    // Finish would otherwise finalize the stale encounter's battle.
                     PlayerEncounter.Current._mapEvent = null;
                     PlayerEncounter.Finish(forcePlayerOutFromSettlement: false);
                 }

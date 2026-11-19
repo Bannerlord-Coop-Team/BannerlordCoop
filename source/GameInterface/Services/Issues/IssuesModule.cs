@@ -45,6 +45,7 @@ internal class IssuesModule : Module
         builder.RegisterType<IssueOwnerParty>()
             .As<IIssueOwnerParty>()
             .InstancePerDependency();
+        builder.RegisterType<IssueMissionVisibility>().As<IIssueMissionVisibility>().InstancePerDependency();
         builder.RegisterType<ClientIssueDailyTickService>()
             .As<IClientIssueDailyTickService>()
             .InstancePerDependency();

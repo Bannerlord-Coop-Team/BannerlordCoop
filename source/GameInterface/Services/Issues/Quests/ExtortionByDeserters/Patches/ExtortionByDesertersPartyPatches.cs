@@ -1,9 +1,6 @@
 ﻿using Common;
-using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.AutoSync;
-using GameInterface.Services.Issues.Quests.ExtortionByDeserters;
 using HarmonyLib;
-using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
@@ -30,12 +27,14 @@ internal class ExtortionByDesertersPartyPatches
 
     internal static bool AddTrackedObjectPrefix(QuestBase __instance, ITrackableCampaignObject trackedObject)
     {
-        // Its constructor runs before the server's party binding arrives.
+        // The quest constructor runs before the server's party binding arrives.
         return !(__instance is Quest) || trackedObject != null;
     }
 
+    // The server starts the ambush, and the owner opens the encounter when its Ambush notice arrives.
     internal static bool StartAmbushEncounterPrefix() => false;
 
+    // The server world-event service handles battle starts in the owner context.
     internal static bool OnBattleStartedPrefix() => false;
 
     // Vanilla destroys the battle parties when the encounter menu opens. The server does that in FinalizeEventAux.
@@ -55,27 +54,4 @@ internal class ExtortionByDesertersPartyPatches
             progress.Send(quest, text);
         }
     }
-}
-
-/// <summary>These world methods must stay server-only even during client replay.</summary>
-[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
-internal class ExtortionByDesertersServerMethodsPatch
-{
-    internal static IEnumerable<MethodBase> TargetMethods()
-    {
-        yield return AccessTools.Method(typeof(Quest), nameof(Quest.CreateDeserterParty));
-        yield return AccessTools.Method(typeof(Quest), nameof(Quest.CreateDefenderParty));
-        yield return AccessTools.Method(typeof(Quest), nameof(Quest.ReleaseDeserterParty));
-        yield return AccessTools.Method(typeof(Quest), nameof(Quest.ApplyQuestResult));
-        yield return AccessTools.Method(typeof(Quest), nameof(Quest.OnTimedOut));
-        yield return AccessTools.Method(typeof(Quest), nameof(Quest.DestroyDeserterParty));
-        yield return AccessTools.Method(typeof(Quest), nameof(Quest.DestroyDefenderParty));
-        yield return AccessTools.Method(typeof(Quest), nameof(Quest.HourlyTick));
-        yield return AccessTools.Method(typeof(Quest), nameof(Quest.GameMenuOptionSelected));
-        yield return AccessTools.Method(typeof(Quest), nameof(Quest.OnWarDeclared));
-        yield return AccessTools.Method(typeof(Quest), nameof(Quest.OnClanChangedKingdom));
-    }
-
-    [HarmonyPrefix]
-    internal static bool Prefix() => ModInformation.IsServer;
 }

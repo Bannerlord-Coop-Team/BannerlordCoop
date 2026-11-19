@@ -1,4 +1,5 @@
 ﻿using Common;
+using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.Issues;
 
@@ -15,7 +16,8 @@ internal class OtherPlayersTroopsReturningLogPatch
     [HarmonyPrefix]
     private static bool Prefix(IssueBase __instance)
     {
-        if (ModInformation.IsServer || !QuestScreenIssueFilterPatch.IsAnotherPlayersTroopsMission(__instance))
+        if (ModInformation.IsServer || !ContainerProvider.TryResolve<IIssueMissionVisibility>(out var visibility) ||
+            !visibility.IsAnotherPlayersTroopsMission(__instance))
         {
             return true;
         }

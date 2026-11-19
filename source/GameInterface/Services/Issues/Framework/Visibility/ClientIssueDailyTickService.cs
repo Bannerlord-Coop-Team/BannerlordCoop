@@ -1,13 +1,20 @@
-﻿using Common;
-using System;
+﻿using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using GameInterface.Services.Issues.Framework.Interface;
 
 namespace GameInterface.Services.Issues.Framework.Visibility;
 
+/// <summary>Advances the client's troop missions while the server handles expiry and stay-alive checks.</summary>
 internal sealed class ClientIssueDailyTickService : IClientIssueDailyTickService
 {
+    private readonly IIssueMissionVisibility visibility;
+
+    public ClientIssueDailyTickService(IIssueMissionVisibility visibility)
+    {
+        this.visibility = visibility;
+    }
+
     public void Apply(IssueManager issueManager)
     {
         foreach (var issue in issueManager.Issues.Values)
@@ -15,7 +22,8 @@ internal sealed class ClientIssueDailyTickService : IClientIssueDailyTickService
             if (!issue.IsSolvingWithAlternative || issue.AlternativeSolutionReturnTimeForTroops.IsPast)
                 continue;
 
-            var foreign = QuestScreenIssueFilterPatch.IsAnotherPlayersTroopsMission(issue);
+            var foreign = visibility.IsAnotherPlayersTroopsMission(issue);
+            // A joiner loads foreign journals from the save, but only their owner should get a return entry.
             if (foreign || issue.JournalEntries.Count == 0)
             {
                 if (issue.AlternativeSolutionIssueEffectClearTime.IsPast)

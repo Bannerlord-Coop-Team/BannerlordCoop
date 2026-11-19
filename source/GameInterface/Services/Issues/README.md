@@ -1,4 +1,4 @@
-﻿# Quests and issues in co-op
+# Quests and issues in co-op
 
 Vanilla issues and quests assume one player. This folder is the shared code that lets several players
 use them in one campaign. Only quest types that have been wired up here run. Every other vanilla issue

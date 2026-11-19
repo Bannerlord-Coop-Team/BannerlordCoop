@@ -1,20 +1,14 @@
 ﻿using Common;
 using Common.Messaging;
-using GameInterface.AutoSync;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.Interface;
-using GameInterface.Services.Issues.Quests.ExtortionByDeserters;
-using GameInterface.Services.Issues.Quests.ExtortionByDeserters.Patches;
 using GameInterface.Services.Issues.Quests.ExtortionByDeserters.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.MapEvents.Interfaces;
-using HarmonyLib;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
-using System.Threading;
 using Quest = TaleWorlds.CampaignSystem.Issues.ExtortionByDesertersIssueBehavior.ExtortionByDesertersIssueQuest;
 using State = TaleWorlds.CampaignSystem.Issues.ExtortionByDesertersIssueBehavior.ExtortionByDesertersIssueQuest.ExtortionByDesertersQuestState;
 
@@ -23,7 +17,6 @@ namespace GameInterface.Services.Issues.Quests.ExtortionByDeserters.Handlers;
 /// <summary>Connects personal quest state to the server's existing world parties.</summary>
 internal class ExtortionByDesertersHandler : IHandler
 {
-    private static int patchesRegistered;
     private readonly IMessageBroker broker;
     private readonly IObjectManager objects;
     private readonly IIssueResolver issues;
@@ -33,17 +26,8 @@ internal class ExtortionByDesertersHandler : IHandler
 
     public ExtortionByDesertersHandler(IMessageBroker broker, IObjectManager objects,
         IIssueResolver issues, IControllerIdProvider controller,
-        IAutoSyncPatchCollector patchCollector, IQuestFeatureFlag questFeatureFlag,
         IIssueConversationGuard conversationGuard, IPlayerEncounterInterface playerEncounter)
     {
-        if (questFeatureFlag.IsEnabled && Interlocked.Exchange(ref patchesRegistered, 1) == 0)
-        {
-            ExtortionByDesertersPartyPatches.AddPatches(patchCollector);
-            // Compile these callers after AutoSync so they cannot inline unpatched setters.
-            var prefix = AccessTools.Method(typeof(ExtortionByDesertersServerMethodsPatch), nameof(ExtortionByDesertersServerMethodsPatch.Prefix));
-            foreach (var method in ExtortionByDesertersServerMethodsPatch.TargetMethods()) patchCollector.AddPrefix(method, prefix);
-        }
-
         this.broker = broker;
         this.objects = objects;
         this.issues = issues;
@@ -77,11 +61,12 @@ internal class ExtortionByDesertersHandler : IHandler
 
         BindParties(quest, deserters, defenders, (State)data.State);
         if (!TextObject.IsNullOrEmpty(data.Log)) quest.AddLog(data.Log);
-        ShowNotice(quest, (ExtortionByDesertersNotice)data.Notice);
-        if (data.Notice == (byte)ExtortionByDesertersNotice.Ambush &&
+        var notice = (ExtortionByDesertersNotice)data.Notice;
+        ShowNotice(quest, notice);
+        if (notice == ExtortionByDesertersNotice.Ambush &&
             deserters != null && defenders != null && quest.IsOngoing)
         {
-            playerEncounter.OpenEncounterMeeting(quest._deserterMobileParty.MapEvent, quest._deserterMobileParty.Party);
+            playerEncounter.OpenEncounterMeeting(deserters.MapEvent, deserters.Party);
         }
     }
 

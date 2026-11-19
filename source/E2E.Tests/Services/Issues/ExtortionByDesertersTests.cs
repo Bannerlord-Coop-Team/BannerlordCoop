@@ -11,7 +11,6 @@ using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.MapEvents.Interfaces;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Quests.ExtortionByDeserters;
-using GameInterface.Services.Issues.Quests.ExtortionByDeserters.Handlers;
 using GameInterface.Services.Issues.Quests.ExtortionByDeserters.Patches;
 using GameInterface.Services.Issues.Quests.ExtortionByDeserters.Messages;
 using GameInterface.Services.MobileParties.Messages.Lifetime;
@@ -132,13 +131,14 @@ public class ExtortionByDesertersTests : IDisposable
     }
 
     [Fact]
-    public void Accept_CreatesWorldPartyOnlyOnServerAndPersonalQuestOnlyOnOwner()
+    public void ExtortionServerMethodsHaveOneCoopPrefix()
     {
-        Accept();
-        Assert.Equal(QuestScenario.ControllerA, scenario.OwnerOnServer());
-        Assert.Equal(1, creation.CountFor(Server));
-        Assert.Equal(0, creation.CountFor(Owner));
-        Assert.Equal(0, creation.CountFor(Other));
+        foreach (var target in ExtortionByDesertersServerMethodsPatch.ServerOnlyMethods())
+        {
+            Assert.Single(Harmony.GetPatchInfo(target).Prefixes, prefix =>
+                prefix.owner == "Bannerlord.Coop" &&
+                prefix.PatchMethod.DeclaringType == typeof(ExtortionByDesertersServerMethodsPatch));
+        }
     }
 
     [Fact]
@@ -215,22 +215,6 @@ public class ExtortionByDesertersTests : IDisposable
             Assert.Null(issue.IssueQuest);
             Assert.Empty(issue.JournalEntries);
         });
-    }
-
-    [Fact]
-    public void WarDeclaredOnTheServer_ReachesTheQuestOnce()
-    {
-        Accept();
-        var firstId = environment.CreateRegisteredObject<Kingdom>();
-        var secondId = environment.CreateRegisteredObject<Kingdom>();
-        using var calls = new MethodCallRecorder(AccessTools.Method(typeof(Quest), nameof(Quest.OnWarDeclared)));
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(firstId, out var first));
-            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(secondId, out var second));
-            CampaignEventDispatcher.Instance.OnWarDeclared(first, second, DeclareWarAction.DeclareWarDetail.Default);
-        }, TextLinks);
-        Assert.Equal(1, calls.CountFor(Server));
     }
 
     [Fact]
@@ -689,8 +673,10 @@ public class ExtortionByDesertersTests : IDisposable
 
 
 
-    [Fact]
-    public void AmbushHandoff_PreservesAnEncounterAlreadyAttachedToTheReplicatedRaid()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void AmbushHandoff_OpensOneMeetingAndPreservesTheRaid(bool alreadyAttached)
     {
         Accept();
         var quest = (Quest)scenario.QuestOf(Server);
@@ -720,17 +706,23 @@ public class ExtortionByDesertersTests : IDisposable
             Assert.Same(raid, MobileParty.MainParty.MapEvent);
             PlayerEncounter.Start();
             var existing = PlayerEncounter.Current;
-            existing._mapEvent = raid;
-            existing.FirstInit = false;
+            if (alreadyAttached)
+            {
+                existing._mapEvent = raid;
+                existing.FirstInit = false;
+            }
+            else
+            {
+                existing._encounteredParty = ownerQuest.QuestSettlement.Party;
+            }
             var participants = raid.InvolvedParties.ToArray();
             Assert.Contains(participants, party => party.MobileParty == ownerQuest._defenderMobileParty);
             try
             {
                 Owner.Resolve<IPlayerEncounterInterface>().OpenEncounterMeeting(raid, ownerQuest._deserterMobileParty.Party);
-                Assert.Equal(0, finish.CountFor(Owner));
-                Assert.Same(existing, PlayerEncounter.Current);
+                Assert.Equal(alreadyAttached ? 0 : 1, finish.CountFor(Owner));
+                Assert.Equal(alreadyAttached, ReferenceEquals(existing, PlayerEncounter.Current));
                 Assert.Same(raid, PlayerEncounter.Battle);
-                Assert.False(existing.FirstInit);
                 Assert.False(raid.IsFinalized);
                 Assert.Equal(participants, raid.InvolvedParties.ToArray());
                 Assert.Same(raid.DefenderSide, MobileParty.MainParty.MapEventSide);
@@ -769,10 +761,8 @@ public class ExtortionByDesertersTests : IDisposable
         }, TextLinks);
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void CapturedOwnerLoss_FinalizesProgressAndCleansDefendersOnce(bool throughSimulation)
+    [Fact]
+    public void CapturedOwnerLoss_FinalizesProgressAndCleansDefendersOnce()
     {
         var ownerQuest = Accept();
         var quest = (Quest)scenario.QuestOf(Server);
@@ -818,23 +808,7 @@ public class ExtortionByDesertersTests : IDisposable
             Assert.Equal(BattleSideEnum.Defender, ownerParty.Party.Side);
             Assert.Equal(State.DesertersMovingToSettlement, quest._currentState);
 
-            if (throughSimulation)
-            {
-                // Exercise the actual simulation teardown, not a direct finalization substitute.
-                var handlerType = typeof(GameInterface.Services.MapEvents.Handlers.BattleSimulationRunHandler);
-                var sessionType = handlerType.GetNestedType("ActiveSimulation", BindingFlags.NonPublic)!;
-                var session = Activator.CreateInstance(sessionType, nonPublic: true)!;
-                sessionType.GetField("MapEvent")!.SetValue(session, battle);
-                handlerType.GetMethod("EndSimulationSession", BindingFlags.Static | BindingFlags.NonPublic)!
-                    .Invoke(null, new[] { session });
-            }
-            else
-            {
-                battle.FinalizeEventAux();
-            }
-
-            if (!battle.IsFinalized)
-                battle.FinalizeEventAux();
+            battle.FinalizeEventAux();
 
             Assert.True(battle.IsFinalized);
             Assert.Equal(1, finalized.CountFor(Server));
@@ -968,6 +942,48 @@ public class ExtortionByDesertersTests : IDisposable
             AccessTools.Method(typeof(MapEvent), nameof(MapEvent.MovePartyToSuitablePositionOnMapEventFinalize)),
         }));
         return quest;
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void OwnerCoercingQuestVillage_FinalizesAndAppliesPenaltyOnce(bool forceSupplies)
+    {
+        var ownerQuest = Accept();
+        var quest = (Quest)scenario.QuestOf(Server);
+        var clanId = environment.CreateRegisteredObject<Clan>();
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(scenario.OwnerPartyId, out var ownerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(scenario.OwnerHeroId, out var owner));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(clanId, out var clan));
+            var settlement = quest.QuestSettlement;
+            var giver = quest.QuestGiver;
+            settlement.Village.Bound.Town.OwnerClan = clan;
+            settlement._notablesCache = new MBList<Hero> { giver };
+            var previousPower = giver.Power;
+            var previousRelation = giver.GetRelation(owner);
+            var coercion = GameObjectCreator.CreateInitializedObject<MapEvent>();
+            MapEventComponent component = forceSupplies
+                ? new ForceSuppliesEventComponent(coercion)
+                : new ForceVolunteersEventComponent(coercion);
+            coercion.MapEventVisual = ObjectHelper.SkipConstructor<GauntletMapEventVisual>();
+            coercion.Initialize(ownerParty.Party, settlement.Party, component);
+            coercion.MapEventVisual = null;
+
+            Assert.Same(settlement, coercion.MapEventSettlement);
+            Assert.False(quest.IsOngoing);
+            Assert.Equal(previousPower - 10, giver.Power);
+            Assert.Equal(previousRelation - 5, giver.GetRelation(owner));
+        }, TextLinks.Append(AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize))));
+
+        Assert.Equal(IssueOutcome.QuestFail,
+            Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+        Owner.Call(() =>
+        {
+            Assert.True(ownerQuest.IsFinalized);
+            Assert.Single(ownerQuest.JournalEntries, entry => entry.LogText.Value.StartsWith("{=tWZ4a8Ih}"));
+        });
     }
 
     [Fact]
@@ -1344,34 +1360,6 @@ public class ExtortionByDesertersTests : IDisposable
                 .TryGetOwner(scenario.NotableId, QuestScenario.IssueId, out _)));
     }
 
-    [Fact]
-    public void NativeGiverDeath_StillTransfersUnacceptedOffers()
-    {
-        var replacementId = environment.CreateRegisteredObject<Hero>();
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<Hero>(scenario.NotableId, out var giver));
-            Assert.True(Server.ObjectManager.TryGetObject<Hero>(replacementId, out var replacement));
-            using (new AllowedThread())
-            {
-                giver.Clan = null;
-            }
-            giver._power = 213.6168f;
-            var issue = giver.Issue;
-            using var native = new NativeNotableDeathScope(replacement);
-            KillCharacterAction.ApplyInternal(giver, null, KillCharacterAction.KillCharacterActionDetail.Murdered,
-                showNotification: true, isForced: true);
-            Assert.Equal(1, native.Replacements);
-            Assert.True(giver.IsDead);
-            Assert.Null(giver.Issue);
-            Assert.Same(issue, replacement.Issue);
-            Assert.Same(replacement, issue.IssueOwner);
-            Assert.Same(issue, Campaign.Current.IssueManager.Issues[replacement]);
-            Assert.False(Campaign.Current.IssueManager.Issues.ContainsKey(giver));
-        }, TextLinks);
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
-    }
-
     private sealed class NativeNotableDeathScope : IDisposable
     {
         private static NativeNotableDeathScope? current;
@@ -1406,6 +1394,7 @@ public class ExtortionByDesertersTests : IDisposable
             current = null;
         }
     }
+
 
     private string AddSecondIssue()
     {

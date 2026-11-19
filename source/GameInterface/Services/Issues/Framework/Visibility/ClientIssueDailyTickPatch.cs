@@ -1,6 +1,8 @@
 ﻿using Common;
+using Common.Logging;
 using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
+using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 
@@ -11,12 +13,19 @@ namespace GameInterface.Services.Issues.Framework.Visibility;
 [HarmonyPatch(typeof(IssueManager), nameof(IssueManager.DailyTick))]
 internal class ClientIssueDailyTickPatch
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<ClientIssueDailyTickPatch>();
+
     [HarmonyPrefix]
     private static bool Prefix(IssueManager __instance)
     {
         if (ModInformation.IsServer) return true;
-        if (ContainerProvider.TryResolve<IClientIssueDailyTickService>(out var service))
-            service.Apply(__instance);
+        if (!ContainerProvider.TryResolve<IClientIssueDailyTickService>(out var service))
+        {
+            Logger.Warning("Client issue daily tick service is unavailable, running the vanilla tick");
+            return true;
+        }
+
+        service.Apply(__instance);
         return false;
     }
 }

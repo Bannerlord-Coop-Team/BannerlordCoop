@@ -19,23 +19,19 @@ internal class ExtortionByDesertersWorldPatches
 {
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.HourlyTick))]
     [HarmonyPostfix]
-    private static void HourlyTickPostfix() => Run(quest => quest.HourlyTick());
+    private static void HourlyTickPostfix() => Run((_, quest) => quest.HourlyTick());
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnStartBattle))]
     [HarmonyPostfix]
     private static void BattleStartedPostfix(PartyBase attackerParty) =>
-        Run(quest =>
-        {
-            if (ContainerProvider.TryResolve<IExtortionByDesertersWorldEventService>(out var service))
-                service.TryStartAmbush(quest, attackerParty);
-        });
+        Run((service, quest) => service.TryStartAmbush(quest, attackerParty));
 
     [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.FinalizeEventAux))]
     [HarmonyPrefix]
     private static void FinalizeEventPrefix(MapEvent __instance, out List<Quest> __state)
     {
         var affected = new List<Quest>();
-        Run(quest => { if (quest._deserterMobileParty?.MapEvent == __instance) affected.Add(quest); });
+        Run((_, quest) => { if (quest._deserterMobileParty?.MapEvent == __instance) affected.Add(quest); });
         __state = affected;
     }
 
@@ -44,13 +40,9 @@ internal class ExtortionByDesertersWorldPatches
     private static void FinalizeEventPostfix(List<Quest> __state)
     {
         if (__state == null || __state.Count == 0) return;
-        Run(quest =>
+        Run((service, quest) =>
         {
-            if (!__state.Contains(quest)) return;
-            if (ContainerProvider.TryResolve<IExtortionByDesertersWorldEventService>(out var service))
-            {
-                service.ApplyBattleFinalized(quest);
-            }
+            if (__state.Contains(quest)) service.ApplyBattleFinalized(quest);
         });
     }
 
@@ -59,25 +51,18 @@ internal class ExtortionByDesertersWorldPatches
     private static void MapStartedPostfix(MapEvent mapEvent, PartyBase attackerParty, PartyBase defenderParty)
     {
         if (mapEvent.IsForcingSupplies || mapEvent.IsForcingVolunteers) return;
-        Run(quest =>
-        {
-            if (ContainerProvider.TryResolve<IExtortionByDesertersWorldEventService>(out var service))
-                service.ApplyMapEventStarted(quest, mapEvent, attackerParty, defenderParty);
-        });
+        Run((service, quest) => service.ApplyMapEventStarted(quest, mapEvent, attackerParty, defenderParty));
     }
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnMapEventStarted))]
     [HarmonyPrefix]
-    private static bool MapStartedPrefix() => false;
+    // The shared coercion relay calls vanilla on the server in the owner's context.
+    private static bool MapStartedPrefix() => ModInformation.IsServer;
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnSettlementLeft))]
     [HarmonyPostfix]
     private static void LeftPostfix(MobileParty party, Settlement settlement) =>
-        Run(quest =>
-        {
-            if (ContainerProvider.TryResolve<IExtortionByDesertersWorldEventService>(out var service))
-                service.ApplySettlementLeft(quest, party, settlement);
-        });
+        Run((service, quest) => service.ApplySettlementLeft(quest, party, settlement));
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnSettlementLeft))]
     [HarmonyPrefix]
@@ -86,20 +71,15 @@ internal class ExtortionByDesertersWorldPatches
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnVillageBeingRaided))]
     [HarmonyPostfix]
     private static void RaidPostfix(Village village) =>
-        Run(quest =>
-        {
-            if (ContainerProvider.TryResolve<IExtortionByDesertersWorldEventService>(out var service))
-                service.ApplyVillageBeingRaided(quest, village);
-        });
+        Run((service, quest) => service.ApplyVillageBeingRaided(quest, village));
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnMapEventEnded))]
     [HarmonyPostfix]
     private static void MapEndedPostfix(MapEvent mapEvent)
     {
-        Run(quest =>
+        Run((service, quest) =>
         {
-            if (quest._deserterMobileParty?.MapEvent == mapEvent &&
-                ContainerProvider.TryResolve<IExtortionByDesertersWorldEventService>(out var service))
+            if (quest._deserterMobileParty?.MapEvent == mapEvent)
                 service.ApplyMapEventEnded(quest, mapEvent);
         });
     }
@@ -124,9 +104,12 @@ internal class ExtortionByDesertersWorldPatches
         return false;
     }
 
-    private static void Run(Action<Quest> listener)
+    private static void Run(Action<IExtortionByDesertersWorldEventService, Quest> listener)
     {
-        if (ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher)) dispatcher.RunAsOwners(listener);
+        if (ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher) &&
+            ContainerProvider.TryResolve<IExtortionByDesertersWorldEventService>(out var service))
+        {
+            dispatcher.RunAsOwners<Quest>(quest => listener(service, quest));
+        }
     }
-
 }

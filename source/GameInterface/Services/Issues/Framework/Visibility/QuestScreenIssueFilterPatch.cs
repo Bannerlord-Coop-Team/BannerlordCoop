@@ -1,5 +1,4 @@
 ﻿using Common.Util;
-using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
 using System;
@@ -26,12 +25,12 @@ internal class QuestScreenIssueFilterPatch
         __state = new List<(IssueBase, IssueBase.IssueState)>();
 
         var issueManager = Campaign.Current?.IssueManager;
-        if (issueManager == null)
+        if (issueManager == null || !ContainerProvider.TryResolve<IIssueMissionVisibility>(out var visibility))
         {
             return;
         }
 
-        __state.AddRange(issueManager.Issues.Values.Where(IsAnotherPlayersTroopsMission).Select(issue => (issue, issue._issueState)));
+        __state.AddRange(issueManager.Issues.Values.Where(visibility.IsAnotherPlayersTroopsMission).Select(issue => (issue, issue._issueState)));
         SetState(__state, restore: false);
     }
 
@@ -44,23 +43,6 @@ internal class QuestScreenIssueFilterPatch
         }
 
         SetState(__state, restore: true);
-    }
-
-    internal static bool IsAnotherPlayersTroopsMission(IssueBase issue)
-    {
-        if (!issue.IsSolvingWithAlternative && !issue.IsSolvingWithLordSolution)
-        {
-            return false;
-        }
-
-        if (!ContainerProvider.TryResolve<IIssueOwnerResolver>(out var ownerResolver) ||
-            !ContainerProvider.TryResolve<IControllerIdProvider>(out var controllerIdProvider))
-        {
-            return false;
-        }
-
-        return !(ownerResolver.TryGetOwnerControllerId(issue, out var ownerControllerId)
-            && ownerControllerId == controllerIdProvider.ControllerId);
     }
 
     internal static void SetState(List<(IssueBase Issue, IssueBase.IssueState State)> issues, bool restore)
