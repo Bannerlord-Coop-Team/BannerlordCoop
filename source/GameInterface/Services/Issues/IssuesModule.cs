@@ -19,6 +19,7 @@ using System;
 using GameInterface.Services.Issues.Quests.RevenueFarming;
 using GameInterface.Services.Issues.Quests.EscortMerchantCaravan;
 using GameInterface.Services.Issues.Quests.ExtortionByDeserters;
+using GameInterface.Services.Issues.Framework.Visibility;
 
 namespace GameInterface.Services.Issues;
 
@@ -43,6 +44,9 @@ internal class IssuesModule : Module
         builder.RegisterType<OutcomeDispatcher>().As<IOutcomeDispatcher>().SingleInstance();
         builder.RegisterType<IssueOwnerParty>()
             .As<IIssueOwnerParty>()
+            .InstancePerDependency();
+        builder.RegisterType<ClientIssueDailyTickService>()
+            .As<IClientIssueDailyTickService>()
             .InstancePerDependency();
         builder.RegisterType<ArtisanProductsProgress>().As<IArtisanProductsProgress>().InstancePerDependency();
         builder.RegisterType<HeadmanHerdCleanup>().As<IHeadmanHerdCleanup>().SingleInstance();

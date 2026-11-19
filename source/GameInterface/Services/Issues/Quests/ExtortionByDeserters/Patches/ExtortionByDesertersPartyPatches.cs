@@ -1,19 +1,11 @@
 ﻿using Common;
-using Common.Util;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Quests.ExtortionByDeserters;
 using HarmonyLib;
-using Helpers;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Conversation;
-using TaleWorlds.CampaignSystem.Encounters;
-using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Issues;
-using TaleWorlds.CampaignSystem.MapEvents;
-using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.Core;
 using TaleWorlds.Localization;
 using Quest = TaleWorlds.CampaignSystem.Issues.ExtortionByDesertersIssueBehavior.ExtortionByDesertersIssueQuest;
 
@@ -40,7 +32,7 @@ internal class ExtortionByDesertersPartyPatches
     [HarmonyPrefix]
     private static bool OnBattleStartedPrefix() => false;
 
-    // The server cleans up the battle parties in its FinalizeEventAux postfix, the only caller of OnMapEventEnded
+    // Vanilla destroys the battle parties when the encounter menu opens. The server does that in FinalizeEventAux.
     [HarmonyPatch(typeof(Quest), nameof(Quest.GameMenuOpened))]
     [HarmonyPrefix]
     private static bool GameMenuOpenedPrefix() => false;
@@ -67,7 +59,6 @@ internal class ExtortionByDesertersPartyPatches
 
 /// <summary>These world methods must stay server-only even during client replay.</summary>
 [HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
-[HarmonyPatch]
 internal class ExtortionByDesertersServerMethodsPatch
 {
     internal static IEnumerable<MethodBase> TargetMethods()

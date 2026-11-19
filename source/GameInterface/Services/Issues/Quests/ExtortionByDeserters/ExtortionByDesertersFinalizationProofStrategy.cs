@@ -1,4 +1,6 @@
-﻿using GameInterface.Services.Issues.Framework.Interface;
+﻿using Common.Logging;
+using GameInterface.Services.Issues.Framework.Interface;
+using Serilog;
 using TaleWorlds.CampaignSystem;
 using Quest = TaleWorlds.CampaignSystem.Issues.ExtortionByDesertersIssueBehavior.ExtortionByDesertersIssueQuest;
 using State = TaleWorlds.CampaignSystem.Issues.ExtortionByDesertersIssueBehavior.ExtortionByDesertersIssueQuest.ExtortionByDesertersQuestState;
@@ -15,14 +17,21 @@ internal enum ExtortionByDesertersBranch : byte
 /// <summary>Runs each reward choice once, as the player whose deserters were defeated.</summary>
 internal class ExtortionByDesertersFinalizationProofStrategy : IFinalizationProofStrategy
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<ExtortionByDesertersFinalizationProofStrategy>();
     public bool TryRunBranch(QuestBase quest, byte proof)
     {
         if (!(quest is Quest deserterQuest) || !quest.IsOngoing)
         {
-            return false;
+            Logger.Warning("Skipping extortion branch {proof} for non-ongoing quest {quest}", proof, quest?.StringId);
+            return true;
         }
 
-        if (deserterQuest._currentState != State.DesertersAreDefeated) return false;
+        if (deserterQuest._currentState != State.DesertersAreDefeated)
+        {
+            Logger.Warning("Skipping extortion branch {proof} for quest {quest} in state {state}",
+                proof, deserterQuest.StringId, deserterQuest._currentState);
+            return true;
+        }
 
         switch ((ExtortionByDesertersBranch)proof)
         {

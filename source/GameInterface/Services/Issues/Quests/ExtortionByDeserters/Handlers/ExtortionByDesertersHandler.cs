@@ -7,6 +7,7 @@ using GameInterface.Services.Issues.Quests.ExtortionByDeserters;
 using GameInterface.Services.Issues.Quests.ExtortionByDeserters.Patches;
 using GameInterface.Services.Issues.Quests.ExtortionByDeserters.Messages;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.MapEvents.Interfaces;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
@@ -26,12 +27,12 @@ internal class ExtortionByDesertersHandler : IHandler
     private readonly IIssueResolver issues;
     private readonly IControllerIdProvider controller;
     private readonly IIssueConversationGuard conversationGuard;
-    private readonly IExtortionByDesertersWorldEventService worldEvents;
+    private readonly IPlayerEncounterInterface playerEncounter;
 
     public ExtortionByDesertersHandler(IMessageBroker broker, IObjectManager objects,
         IIssueResolver issues, IControllerIdProvider controller,
         IAutoSyncPatchCollector patchCollector, IQuestFeatureFlag questFeatureFlag,
-        IIssueConversationGuard conversationGuard, IExtortionByDesertersWorldEventService worldEvents)
+        IIssueConversationGuard conversationGuard, IPlayerEncounterInterface playerEncounter)
     {
         if (questFeatureFlag.IsEnabled)
         {
@@ -45,7 +46,7 @@ internal class ExtortionByDesertersHandler : IHandler
         this.issues = issues;
         this.controller = controller;
         this.conversationGuard = conversationGuard;
-        this.worldEvents = worldEvents;
+        this.playerEncounter = playerEncounter;
         broker.Subscribe<NetworkExtortionByDesertersState>(Handle);
     }
 
@@ -77,7 +78,7 @@ internal class ExtortionByDesertersHandler : IHandler
         if (data.Notice == (byte)ExtortionByDesertersNotice.Ambush &&
             deserters != null && defenders != null && quest.IsOngoing)
         {
-            worldEvents.StartAmbushEncounter(quest);
+            playerEncounter.OpenEncounterMeeting(quest._deserterMobileParty.MapEvent, quest._deserterMobileParty.Party);
         }
     }
 

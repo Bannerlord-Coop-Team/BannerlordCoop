@@ -5,7 +5,6 @@ using HarmonyLib;
 using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -24,15 +23,12 @@ internal class ExtortionByDesertersWorldPatches
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnStartBattle))]
     [HarmonyPostfix]
-    private static void BattleStartedPostfix(PartyBase attackerParty)
-    {
+    private static void BattleStartedPostfix(PartyBase attackerParty) =>
         Run(quest =>
         {
-            if (attackerParty == quest._deserterMobileParty?.Party &&
-                ContainerProvider.TryResolve<IExtortionByDesertersWorldEventService>(out var service))
-                service.TryStartAmbush(quest);
+            if (ContainerProvider.TryResolve<IExtortionByDesertersWorldEventService>(out var service))
+                service.TryStartAmbush(quest, attackerParty);
         });
-    }
 
     [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.FinalizeEventAux))]
     [HarmonyPrefix]
@@ -53,7 +49,7 @@ internal class ExtortionByDesertersWorldPatches
             if (!__state.Contains(quest)) return;
             if (ContainerProvider.TryResolve<IExtortionByDesertersWorldEventService>(out var service))
             {
-                service.TryCleanupBattle(quest);
+                service.ApplyBattleFinalized(quest);
             }
         });
     }
@@ -63,75 +59,58 @@ internal class ExtortionByDesertersWorldPatches
     private static void MapStartedPostfix(MapEvent mapEvent, PartyBase attackerParty, PartyBase defenderParty)
     {
         if (mapEvent.IsForcingSupplies || mapEvent.IsForcingVolunteers) return;
-        Run(quest => quest.OnMapEventStarted(mapEvent, attackerParty, defenderParty));
+        Run(quest =>
+        {
+            if (ContainerProvider.TryResolve<IExtortionByDesertersWorldEventService>(out var service))
+                service.ApplyMapEventStarted(quest, mapEvent, attackerParty, defenderParty);
+        });
     }
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnMapEventStarted))]
     [HarmonyPrefix]
-    private static bool MapStartedPrefix(Quest __instance, MapEvent mapEvent, PartyBase attackerParty, PartyBase defenderParty)
-    {
-        // Server decisions use the injected quest service instead of a static Harmony body.
-        if (ContainerProvider.TryResolve<IExtortionByDesertersWorldEventService>(out var service))
-        {
-            service.ApplyMapEventStarted(__instance, mapEvent, attackerParty, defenderParty);
-        }
-        return false;
-    }
+    private static bool MapStartedPrefix() => false;
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnSettlementLeft))]
     [HarmonyPostfix]
     private static void LeftPostfix(MobileParty party, Settlement settlement) =>
-        Run(quest => quest.OnSettlementLeft(party, settlement));
+        Run(quest =>
+        {
+            if (ContainerProvider.TryResolve<IExtortionByDesertersWorldEventService>(out var service))
+                service.ApplySettlementLeft(quest, party, settlement);
+        });
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnSettlementLeft))]
     [HarmonyPrefix]
-    private static bool LeftPrefix(Quest __instance, MobileParty party, Settlement settlement)
-    {
-        if (ContainerProvider.TryResolve<IExtortionByDesertersWorldEventService>(out var service))
-        {
-            service.ApplySettlementLeft(__instance, party, settlement);
-        }
-        return false;
-    }
+    private static bool LeftPrefix() => false;
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnVillageBeingRaided))]
     [HarmonyPostfix]
-    private static void RaidPostfix(Village village) => Run(quest => quest.OnVillageBeingRaided(village));
+    private static void RaidPostfix(Village village) =>
+        Run(quest =>
+        {
+            if (ContainerProvider.TryResolve<IExtortionByDesertersWorldEventService>(out var service))
+                service.ApplyVillageBeingRaided(quest, village);
+        });
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnMapEventEnded))]
     [HarmonyPostfix]
     private static void MapEndedPostfix(MapEvent mapEvent)
     {
-        if (mapEvent == null) return;
         Run(quest =>
         {
-            if (quest._deserterMobileParty?.MapEvent == mapEvent)
-                quest.MapEventEnded(mapEvent);
+            if (quest._deserterMobileParty?.MapEvent == mapEvent &&
+                ContainerProvider.TryResolve<IExtortionByDesertersWorldEventService>(out var service))
+                service.ApplyMapEventEnded(quest, mapEvent);
         });
     }
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.MapEventEnded))]
     [HarmonyPrefix]
-    private static bool MapEventEndedPrefix(Quest __instance, MapEvent mapEvent)
-    {
-        // The owner party comes from the issue resolver, unlike vanilla's MainParty.
-        if (ContainerProvider.TryResolve<IExtortionByDesertersWorldEventService>(out var service))
-        {
-            service.ApplyMapEventEnded(__instance, mapEvent);
-        }
-        return false;
-    }
+    private static bool MapEventEndedPrefix() => false;
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnVillageBeingRaided))]
     [HarmonyPrefix]
-    private static bool RaidPrefix(Quest __instance, Village village)
-    {
-        if (ContainerProvider.TryResolve<IExtortionByDesertersWorldEventService>(out var service))
-        {
-            service.ApplyVillageBeingRaided(__instance, village);
-        }
-        return false;
-    }
+    private static bool RaidPrefix() => false;
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.TickDesertersPartyLogic))]
     [HarmonyPrefix]

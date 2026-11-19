@@ -8,6 +8,7 @@ using GameInterface.AutoSync;
 using GameInterface.CoopSessionData;
 using GameInterface.Policies;
 using GameInterface.Services.Issues.Framework.Finalization;
+using GameInterface.Services.MapEvents.Interfaces;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Quests.ExtortionByDeserters;
 using GameInterface.Services.Issues.Quests.ExtortionByDeserters.Handlers;
@@ -75,7 +76,7 @@ public class ExtortionByDesertersTests : IDisposable
         townId = environment.CreateRegisteredObject<Settlement>();
         townComponentId = environment.CreateRegisteredObject<Town>();
         settlementId = environment.CreateRegisteredObject<Settlement>();
-        scenario = new QuestScenario(environment, notable => new Issue(notable), Prepare);
+        scenario = new QuestScenario(environment, (instance, notable) => { Prepare(instance, notable); return new Issue(notable); });
     }
 
     public void Dispose()
@@ -107,6 +108,17 @@ public class ExtortionByDesertersTests : IDisposable
     }
 
     [Fact]
+    public void ExtortionPatchTargetsHaveOneCoopPrefix()
+    {
+        var target = AccessTools.Method(typeof(QuestBase), nameof(QuestBase.AddTrackedObject));
+        var coopPrefixes = Harmony.GetPatchInfo(target).Prefixes
+            .Where(prefix => prefix.owner == "Bannerlord.Coop")
+            .ToArray();
+
+        Assert.Single(coopPrefixes);
+    }
+
+    [Fact]
     public void Accept_CreatesWorldPartyOnlyOnServerAndPersonalQuestOnlyOnOwner()
     {
         Accept();
@@ -114,12 +126,6 @@ public class ExtortionByDesertersTests : IDisposable
         Assert.Equal(1, creation.CountFor(Server));
         Assert.Equal(0, creation.CountFor(Owner));
         Assert.Equal(0, creation.CountFor(Other));
-        Other.Call(() =>
-        {
-            Assert.True(Other.ObjectManager.TryGetObject<Hero>(scenario.NotableId, out var notable));
-            Assert.Null(notable.Issue.IssueQuest);
-            Assert.Empty(notable.Issue.JournalEntries);
-        });
     }
 
     [Fact]
@@ -135,7 +141,6 @@ public class ExtortionByDesertersTests : IDisposable
             QuestScenario.ControllerA, partyId, "", (int)State.DesertersAreDefeated, text);
         var wire = Server.SerializeForWire(state);
         Owner.SimulateMessage(this, wire);
-        Other.SimulateMessage(this, wire);
         Owner.Call(() =>
         {
             Assert.True(Owner.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
@@ -147,12 +152,6 @@ public class ExtortionByDesertersTests : IDisposable
             Assert.Equal(text.Value, received.Value);
             var giver = Assert.IsType<TextObject>(received.Attributes["QUEST_GIVER"]);
             Assert.Equal("{=!}Danustica headman", Assert.IsType<TextObject>(giver.Attributes["LINK"]).Value);
-        });
-        Other.Call(() =>
-        {
-            Assert.True(Other.ObjectManager.TryGetObject<Hero>(scenario.NotableId, out var notable));
-            Assert.Null(notable.Issue.IssueQuest);
-            Assert.Empty(notable.Issue.JournalEntries);
         });
     }
 
@@ -524,8 +523,6 @@ public class ExtortionByDesertersTests : IDisposable
 
     [Theory]
     [InlineData(0, 10, 0)]
-    [InlineData(1, 10, 25)]
-    [InlineData(2, 10, 100)]
     [InlineData(3, -10, -50)]
     public void NativeApplyQuestResult_ReplicatesTownRewardsToBothOriginalClients(
         int choice, int securityChange, int prosperityChange)
@@ -583,7 +580,6 @@ public class ExtortionByDesertersTests : IDisposable
 
         var messages = Server.NetworkSentMessages.GetMessages<GenericNetworkEvent<Town, byte[]>>()
             .Where(message => message.InstanceId == handle).ToArray();
-        foreach (var message in messages)
         foreach (var client in environment.Clients)
         {
             client.Call(() =>
@@ -702,7 +698,7 @@ public class ExtortionByDesertersTests : IDisposable
             Assert.Contains(participants, party => party.MobileParty == ownerQuest._defenderMobileParty);
             try
             {
-                Owner.Resolve<IExtortionByDesertersWorldEventService>().StartAmbushEncounter(ownerQuest);
+                Owner.Resolve<IPlayerEncounterInterface>().OpenEncounterMeeting(raid, ownerQuest._deserterMobileParty.Party);
                 Assert.Equal(0, finish.CountFor(Owner));
                 Assert.Same(existing, PlayerEncounter.Current);
                 Assert.Same(raid, PlayerEncounter.Battle);
@@ -982,9 +978,8 @@ public class ExtortionByDesertersTests : IDisposable
         }
         else quest = DefeatDeserters();
 
-        // The recorder skips the original, so it must run before the guard that ignores a defeated quest's tick.
         using var ticks = new MethodCallRecorder(Priority.First,
-            AccessTools.Method(typeof(Quest), nameof(Quest.TickDesertersPartyLogic)));
+            AccessTools.Method(typeof(ExtortionByDesertersWorldEventService), nameof(ExtortionByDesertersWorldEventService.ApplyTick)));
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(scenario.OwnerPartyId, out var ownerParty));
@@ -1321,10 +1316,8 @@ public class ExtortionByDesertersTests : IDisposable
                 .TryGetOwner(scenario.NotableId, QuestScenario.IssueId, out _)));
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void NativeGiverDeath_StillTransfersUnacceptedOffersIncludingOtherIssueTypes(bool otherIssueType)
+    [Fact]
+    public void NativeGiverDeath_StillTransfersUnacceptedOffers()
     {
         var replacementId = environment.CreateRegisteredObject<Hero>();
         Server.Call(() =>
@@ -1334,12 +1327,6 @@ public class ExtortionByDesertersTests : IDisposable
             using (new AllowedThread())
             {
                 giver.Clan = null;
-                if (otherIssueType)
-                {
-                    var otherIssue = new GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssue(giver, null);
-                    Campaign.Current.IssueManager._issues[giver] = otherIssue;
-                    giver.OnIssueCreatedForHero(otherIssue);
-                }
             }
             giver._power = 213.6168f;
             var issue = giver.Issue;

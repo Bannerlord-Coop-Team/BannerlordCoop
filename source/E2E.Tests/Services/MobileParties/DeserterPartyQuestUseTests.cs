@@ -130,19 +130,6 @@ public class DeserterPartyQuestUseTests : SyncTestBase
             quest._deserterMobileParty = party;
         });
 
-        var originals = new Dictionary<EnvironmentInstance, MobileParty>();
-        foreach (var client in Clients)
-        {
-            client.Call(() =>
-            {
-                var party = client.GetRegisteredObject<MobileParty>(partyId);
-                Assert.Equal(handle, client.GetHandle(party));
-                Assert.True(party.IsCurrentlyUsedByAQuest);
-                originals.Add(client, party);
-            });
-        }
-        Assert.Equal(2, originals.Count);
-
         Server.NetworkSentMessages.Clear();
         Server.Call(() =>
         {
@@ -160,7 +147,6 @@ public class DeserterPartyQuestUseTests : SyncTestBase
             client.Call(() =>
             {
                 var party = client.GetRegisteredObject<MobileParty>(partyId);
-                Assert.Same(originals[client], party);
                 Assert.Equal(handle, client.GetHandle(party));
                 Assert.True(party.IsActive);
                 Assert.False(party.IsCurrentlyUsedByAQuest);

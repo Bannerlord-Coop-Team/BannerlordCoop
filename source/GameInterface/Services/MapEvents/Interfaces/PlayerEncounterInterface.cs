@@ -6,7 +6,10 @@ using Serilog;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MapEvents.Interfaces;
@@ -24,6 +27,9 @@ public interface IPlayerEncounterInterface : IGameAbstraction
     /// false with the reason when no such conversation is open.
     /// </summary>
     public bool TryCompleteEncounterMeeting(out string failure);
+
+    /// <summary>[Game thread] Opens the owner's encounter meeting for a replicated map event.</summary>
+    public void OpenEncounterMeeting(MapEvent battle, PartyBase otherParty);
 }
 
 /// <summary>Runs vanilla <see cref="PlayerEncounter"/> steps on this machine for the co-op encounter flow.</summary>
@@ -141,6 +147,33 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
 
         Campaign.Current.ConversationManager.EndConversation();
         return true;
+    }
+
+    public void OpenEncounterMeeting(MapEvent battle, PartyBase otherParty)
+    {
+        if (ModInformation.IsServer || battle == null || otherParty == null ||
+            MobileParty.MainParty.MapEvent != battle) return;
+
+        using (new Common.Util.AllowedThread())
+        {
+            if (PlayerEncounter.Battle != battle)
+            {
+                if (PlayerEncounter.Current != null)
+                {
+                    PlayerEncounter.Current._mapEvent = null;
+                    PlayerEncounter.Finish(forcePlayerOutFromSettlement: false);
+                }
+
+                PlayerEncounter.Start();
+            }
+
+            PlayerEncounter.Init();
+            var leader = ConversationHelper.GetConversationCharacterPartyLeader(otherParty);
+            var player = new ConversationCharacterData(CharacterObject.PlayerCharacter, PartyBase.MainParty, noHorse: true);
+            var other = new ConversationCharacterData(leader, otherParty, noHorse: true);
+            GameMenu.ActivateGameMenu(EncounterMeetingMenuId);
+            CampaignMapConversation.OpenConversation(player, other);
+        }
     }
 
     internal static bool ShouldReleaseWithoutConversation(Hero hero, Clan localPlayerClan)

@@ -68,15 +68,12 @@ public class ExtortionByDesertersStateTests
 
 
     [Fact]
-    public void RoundTrip_StateOnlyAndNoticeOnlyKeepNullLog()
+    public void RoundTrip_KeepsANullLogNull()
     {
-        foreach (byte notice in new byte[] { 0 })
-        {
-            var state = RoundTrip(new NetworkExtortionByDesertersState("headman", "issue-generation", "player-B",
-                "deserters", "", 1, null, notice));
-            Assert.Null(state.Log);
-            Assert.Equal(notice, state.Notice);
-        }
+        var state = RoundTrip(new NetworkExtortionByDesertersState("headman", "issue-generation", "player-B",
+            "deserters", "", 1, null));
+        Assert.Null(state.Log);
+        Assert.Equal((byte)ExtortionByDesertersNotice.None, state.Notice);
     }
 
     private T RoundTrip<T>(T message) => serializer.Deserialize<T>(serializer.Serialize(message));

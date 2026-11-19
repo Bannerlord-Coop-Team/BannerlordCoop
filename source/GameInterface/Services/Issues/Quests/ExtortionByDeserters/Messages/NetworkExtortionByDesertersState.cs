@@ -24,7 +24,7 @@ public readonly struct NetworkExtortionByDesertersState : ICommand
     [ProtoMember(5)] public readonly string DefenderId;
     [ProtoMember(6)] public readonly int State;
     [ProtoMember(7)] public readonly TextObject Log;
-    [ProtoMember(9)] public readonly byte Notice;
+    [ProtoMember(8)] public readonly byte Notice;
 
     public NetworkExtortionByDesertersState(string issueOwnerId, string issueId, string controllerId,
         string deserterId, string defenderId, int state, TextObject log, byte notice = 0)
