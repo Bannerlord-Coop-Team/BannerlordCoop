@@ -29,8 +29,7 @@ public class SiegeMachineSimulationTests : IDisposable
     private static bool ramMovementArrived;
     private static int ramStrikeReads;
     private static int ramDisabledNavMesh;
-    private static float ramSnapDistance;
-    private static float ramSnappedDistance;
+    private static float ramTrackerDistance;
     private static float ramFrameDistance;
     private static int ramSnapCalls;
     private static int ramDestructionCalls;
@@ -51,10 +50,8 @@ public class SiegeMachineSimulationTests : IDisposable
         const float trackerDistance = 12.5f;
         const float hostDistance = 12.4f;
         ResetRamStubState();
-        ramSnapDistance = trackerDistance;
+        ramTrackerDistance = trackerDistance;
         StubRamSnap();
-        Stub(AccessTools.Method(typeof(DestructableComponent), "SetDestructionLevel"), nameof(RamSetDestructionLevel));
-        Stub(AccessTools.Method(typeof(SiegeMachineStateReplicator), "SyncMissionSiegeWeaponHealth"), nameof(SkipSyncHealth));
 
         var movementState = new NetworkSiegeMachineState(ram.Id.Id, 100f, 0, -1, -1, hostDistance,
             false, -1, -1000f, -1000f);
@@ -71,7 +68,7 @@ public class SiegeMachineSimulationTests : IDisposable
             apply.Invoke(null, new object[] { ram, destructionState });
 
             Assert.Equal(1, ramSnapCalls);
-            Assert.Equal(hostDistance, ramSnappedDistance);
+            Assert.Equal(hostDistance, ramTrackerDistance);
             Assert.Equal(1, ramResetDistanceErrorCalls);
             Assert.Equal(hostDistance, ramResetDistanceErrorDistance);
             Assert.Equal(hostDistance, ramFrameDistance);
@@ -82,6 +79,43 @@ public class SiegeMachineSimulationTests : IDisposable
         finally
         {
             SiegeMissionAuthorityGate.IsLocalAuthority = previousHost;
+            SiegeMissionAuthorityGate.ResetClaimedMachines();
+        }
+    }
+
+    [Fact]
+    public void DestroyedRamKeepsHostDistanceWhenLateClaimantMovementArrives()
+    {
+        using var mission = new MissionCurrentScope();
+        var ram = CreateDestructibleRam(0);
+        const float hostDistance = 12.4f;
+        const float claimantDistance = hostDistance + 5f;
+        ResetRamStubState();
+        ramTrackerDistance = 12.5f;
+        StubRamSnap();
+
+        var destructionState = new NetworkSiegeMachineState(ram.Id.Id, 0f, 1, -1, -1, hostDistance,
+            false, -1, -1000f, -1000f, senderControllerId: "host");
+        var lateMovement = new NetworkSiegeMachineState(ram.Id.Id, -1f, -1, -1, -1, claimantDistance,
+            false, -1, -1000f, -1000f, senderControllerId: "claimer");
+        var apply = AccessTools.Method(typeof(SiegeMachineStateReplicator), "Apply");
+        bool previousAuthority = SiegeMissionAuthorityGate.IsLocalAuthority;
+        SiegeMissionAuthorityGate.IsLocalAuthority = false;
+        SiegeMissionAuthorityGate.ResetClaimedMachines();
+        try
+        {
+            apply.Invoke(null, new object[] { ram, destructionState });
+            Assert.True(ram.DestructionComponent.IsDestroyed);
+            Assert.Equal(1, ramDestructionCalls);
+            Assert.Equal(hostDistance, ramTrackerDistance);
+
+            apply.Invoke(null, new object[] { ram, lateMovement });
+            Assert.Equal(hostDistance, ramTrackerDistance);
+            Assert.Equal(hostDistance, ramFrameDistance);
+        }
+        finally
+        {
+            SiegeMissionAuthorityGate.IsLocalAuthority = previousAuthority;
             SiegeMissionAuthorityGate.ResetClaimedMachines();
         }
     }
@@ -483,22 +517,24 @@ public class SiegeMachineSimulationTests : IDisposable
             new List<UsableMissionObjectComponent>());
         AccessTools.Field(typeof(UsableMachine), "<DestructionComponent>k__BackingField").SetValue(ram, destruction);
         AccessTools.Field(typeof(DestructableComponent), "_currentStateIndex").SetValue(destruction, stateIndex);
+        destruction.HitPoint = stateIndex == 0 ? 100f : 0f;
         return ram;
     }
 
     private void StubRamSnap()
     {
-        Stub(AccessTools.Method(typeof(SiegeWeaponMovementComponent), "GetTotalDistanceTraveledForPathTracker"), nameof(RamDistanceAtSnap));
+        Stub(AccessTools.Method(typeof(SiegeWeaponMovementComponent), "GetTotalDistanceTraveledForPathTracker"), nameof(RamTrackerDistance));
         Stub(AccessTools.Method(typeof(SiegeWeaponMovementComponent), "SetTotalDistanceTraveledForPathTracker"), nameof(RamSetDistance));
         Stub(AccessTools.Method(typeof(SiegeWeaponMovementComponent), "SetDistanceTraveledAsClient"), nameof(RamResetDistanceError));
         Stub(AccessTools.Method(typeof(SiegeWeaponMovementComponent), "SetTargetFrameForPathTracker"), nameof(RamSetTargetFrame));
         Stub(AccessTools.Method(typeof(BatteringRam), "Disable"), nameof(RamDisable));
+        Stub(AccessTools.Method(typeof(DestructableComponent), "SetDestructionLevel"), nameof(RamSetDestructionLevel));
+        Stub(AccessTools.Method(typeof(SiegeMachineStateReplicator), "SyncMissionSiegeWeaponHealth"), nameof(SkipSyncHealth));
     }
 
     private static void ResetRamStubState()
     {
-        ramSnapDistance = 0f;
-        ramSnappedDistance = 0f;
+        ramTrackerDistance = 0f;
         ramFrameDistance = 0f;
         ramSnapCalls = 0;
         ramDestructionCalls = 0;
@@ -571,7 +607,7 @@ public class SiegeMachineSimulationTests : IDisposable
     private static bool RamStrikeCount(ref int __result) { ramStrikeReads++; __result = 0; return false; }
     private static bool RamMovementArrived(ref bool __result) { __result = ramMovementArrived; return false; }
     private static bool RamDistance(ref float __result) { __result = 0f; return false; }
-    private static bool RamDistanceAtSnap(ref float __result) { __result = ramSnapDistance; return false; }
+    private static bool RamTrackerDistance(ref float __result) { __result = ramTrackerDistance; return false; }
     private static bool ReadDestructionState(UsableMachine machine, ref float hitPoints, ref int destructionState,
         ref int gateState, ref int ladderState, ref float moveDistance, ref bool hasArrived, ref int weaponState,
         ref float aimDirection, ref float aimReleaseAngle, ref int stoneAmmo)
@@ -588,7 +624,7 @@ public class SiegeMachineSimulationTests : IDisposable
         stoneAmmo = -1;
         return false;
     }
-    private static bool RamSetDistance(float __0) { ramSnappedDistance = __0; return false; }
+    private static bool RamSetDistance(float __0) { ramTrackerDistance = __0; return false; }
     private static bool RamResetDistanceError(float __0)
     {
         ramResetDistanceErrorCalls++;
@@ -597,7 +633,7 @@ public class SiegeMachineSimulationTests : IDisposable
     }
     private static bool RamSetTargetFrame()
     {
-        ramFrameDistance = ramSnappedDistance;
+        ramFrameDistance = ramTrackerDistance;
         ramSnapCalls++;
         return false;
     }

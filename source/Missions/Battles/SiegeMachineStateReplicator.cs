@@ -1694,9 +1694,10 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         var movement = (machine as BatteringRam)?.MovementComponent
             ?? (machine as SiegeTower)?.MovementComponent;
 
-        // The movement simulator ignores movement echoes (a stale pre-grant broadcast must not
-        // fight its own tracker); everyone else eases toward the received distance.
-        if (state.MoveDistance >= 0f && !isMachineSimulatedLocally && movement != null)
+        // Other peers ease toward the simulator's distance while the machine is intact.
+        // After destruction, a late movement snapshot must leave the wreck at the host's frame.
+        if (state.MoveDistance >= 0f && !isMachineSimulatedLocally && movement != null
+            && machine.DestructionComponent?.IsDestroyed != true)
         {
             // Vanilla MP's steady-state client recipe (MissionNetworkComponent's siege machine movement
             // handler): feed the distance into the movement component's advancement error and let its own
@@ -1771,12 +1772,11 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             bool wasDestroyed = destruction.IsDestroyed;
             destruction.HitPoint = state.HitPoints;
             SyncMissionSiegeWeaponHealth(destruction, state.HitPoints);
-            // Assigning HitPoint raises no destroyed event, so run the gate's own handler before the mesh swap like
-            // vanilla OnHit: it hides the plank, turns off the standing points and opens the gate navmesh. The
-            // component's OnDestroyed event isn't raised here, so its other listeners only run where the hit happened.
+            // Assigning HitPoint raises no destroyed event, so disable the machine and run the gate handler before the mesh swap.
+            // Mission.OnObjectDisabled can request campaign engine removal during a sally-out, so it and the other
+            // OnDestroyed listeners run only where the hit occurred.
             if (!wasDestroyed && destruction.IsDestroyed)
             {
-                // Skip Mission.OnObjectDisabled because its sally-out callback can send a campaign engine removal request.
                 machine.Disable();
                 if (machine is CastleGate destroyedGate)
                     destroyedGate.OnDestroyed(destruction, null, in MissionWeapon.Invalid, null, 0);
