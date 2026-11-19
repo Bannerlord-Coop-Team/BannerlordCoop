@@ -174,7 +174,16 @@ public abstract class MapEventTestBase : IDisposable
     protected static GauntletMapEventVisual MockMapEventVisual()
         => ObjectHelper.SkipConstructor<GauntletMapEventVisual>();
 
-    /// <summary>Creates a registered siege graph without the native siege side initialization.</summary>
+    protected static IReadOnlyList<MethodBase> SiegeCreationDisabledMethods => new[]
+    {
+        AccessTools.Method(typeof(MobileParty), nameof(MobileParty.OnPartyJoinedSiegeInternal)),
+        AccessTools.Method(typeof(BesiegerCamp), nameof(BesiegerCamp.InitializeSiegeEventSide)),
+        AccessTools.Method(typeof(Settlement), nameof(Settlement.InitializeSiegeEventSide)),
+    };
+
+    /// <summary>
+    /// Creates a registered siege graph. Callers must disable <see cref="SiegeCreationDisabledMethods"/>.
+    /// </summary>
     protected static void CreateReplicableSiegeEvent(Settlement settlement, MobileParty besieger)
     {
         var siegeEvent = new SiegeEvent(settlement, besieger);

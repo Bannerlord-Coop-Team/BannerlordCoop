@@ -21,7 +21,6 @@ using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
 using Xunit.Abstractions;
 
@@ -225,9 +224,7 @@ public class MapEventLifetimeTests : MapEventTestBase
         PartyBase? defender = null;
         MobileParty? mainPartyStandIn = null;
         var disabledMethods = MapEventDisabledMethods
-            .Append(AccessTools.Method(typeof(MobileParty), "OnPartyJoinedSiegeInternal"))
-            .Append(AccessTools.Method(typeof(BesiegerCamp), nameof(BesiegerCamp.InitializeSiegeEventSide)))
-            .Append(AccessTools.Method(typeof(Settlement), nameof(Settlement.InitializeSiegeEventSide)))
+            .Concat(SiegeCreationDisabledMethods)
             .Append(AccessTools.Method(typeof(MapEvent), "ControlAndUpdateDefeatedPartiesAfterBattle"))
             .ToList();
 
@@ -305,9 +302,7 @@ public class MapEventLifetimeTests : MapEventTestBase
         string? besiegerPartyId = null;
 
         var disabledMethods = MapEventDisabledMethods
-            .Append(AccessTools.Method(typeof(MobileParty), "OnPartyJoinedSiegeInternal"))
-            .Append(AccessTools.Method(typeof(BesiegerCamp), nameof(BesiegerCamp.InitializeSiegeEventSide)))
-            .Append(AccessTools.Method(typeof(Settlement), nameof(Settlement.InitializeSiegeEventSide)))
+            .Concat(SiegeCreationDisabledMethods)
             .Append(AccessTools.Method(typeof(MapEvent), "CommitCalculatedMapEventResults"))
             .ToList();
 
@@ -408,9 +403,7 @@ public class MapEventLifetimeTests : MapEventTestBase
         var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
         string? mapEventId = null;
         var disabledMethods = MapEventDisabledMethods
-            .Append(AccessTools.Method(typeof(MobileParty), "OnPartyJoinedSiegeInternal"))
-            .Append(AccessTools.Method(typeof(BesiegerCamp), nameof(BesiegerCamp.InitializeSiegeEventSide)))
-            .Append(AccessTools.Method(typeof(Settlement), nameof(Settlement.InitializeSiegeEventSide)))
+            .Concat(SiegeCreationDisabledMethods)
             .Append(AccessTools.Method(typeof(MapEvent), "ControlAndUpdateDefeatedPartiesAfterBattle"))
             .Append(AccessTools.Method(typeof(DefaultBattleRewardModel), nameof(DefaultBattleRewardModel.GetCaptureMemberChancesForWinnerParties)))
             .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyCasualties"))
@@ -513,9 +506,7 @@ public class MapEventLifetimeTests : MapEventTestBase
         string? besiegerPartyId = null;
         string[]? partiesToClose = null;
         var disabledMethods = MapEventDisabledMethods
-            .Append(AccessTools.Method(typeof(MobileParty), "OnPartyJoinedSiegeInternal"))
-            .Append(AccessTools.Method(typeof(BesiegerCamp), nameof(BesiegerCamp.InitializeSiegeEventSide)))
-            .Append(AccessTools.Method(typeof(Settlement), nameof(Settlement.InitializeSiegeEventSide)))
+            .Concat(SiegeCreationDisabledMethods)
             .Append(AccessTools.Method(typeof(MapEvent), "ControlAndUpdateDefeatedPartiesAfterBattle"))
             .Append(AccessTools.Method(typeof(DefaultBattleRewardModel), nameof(DefaultBattleRewardModel.GetCaptureMemberChancesForWinnerParties)))
             .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyCasualties"))

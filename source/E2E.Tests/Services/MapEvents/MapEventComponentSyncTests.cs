@@ -6,7 +6,6 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.CampaignSystem.Siege;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.MapEvents;
@@ -27,9 +26,7 @@ public class MapEventComponentSyncTests : MapEventTestBase
         var disabledMethods = MapEventDisabledMethods
             .Append(AccessTools.Method(typeof(SiegeAssaultEventComponent), nameof(SiegeAssaultEventComponent.AddMapEventParties)))
             .Append(AccessTools.Method(typeof(SiegeAssaultEventComponent), nameof(SiegeAssaultEventComponent.AddInsideSettlementParties)))
-            .Append(AccessTools.Method(typeof(MobileParty), "OnPartyJoinedSiegeInternal"))
-            .Append(AccessTools.Method(typeof(BesiegerCamp), nameof(BesiegerCamp.InitializeSiegeEventSide)))
-            .Append(AccessTools.Method(typeof(Settlement), nameof(Settlement.InitializeSiegeEventSide)))
+            .Concat(SiegeCreationDisabledMethods)
             .ToList();
 
         Server.Resolve<TestNetworkRouter>().ReceiveContext = TestNetworkReceiveContext.PollerThread;
