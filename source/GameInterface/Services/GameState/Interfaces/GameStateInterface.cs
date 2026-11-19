@@ -85,7 +85,7 @@ internal class GameStateInterface : IGameStateInterface
     public void LoadSaveData(byte[] saveData)
     {
         messageBroker.Publish(this, new GameLoadStarted());
-        // Not blocking, because a blocking wait drops the load when the game thread stays busy past it
+        // Queued, not awaited, so the load is never dropped for starting late
         GameThread.RunSafe(() => loadTransferredSave(saveData), context: nameof(LoadSaveData));
     }
 
