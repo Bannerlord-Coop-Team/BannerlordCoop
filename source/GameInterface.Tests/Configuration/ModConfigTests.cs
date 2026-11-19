@@ -153,8 +153,12 @@ public class ModConfigTests : IDisposable
         File.WriteAllText(ConfigPath, "{ \"difficulty\": false }");
 
         _ = NewModConfig().Data;
+        string merged = File.ReadAllText(ConfigPath);
+        var template = JObject.Parse(File.ReadAllText(ShippedTemplatePath));
 
-        Assert.Single(Regex.Matches(File.ReadAllText(ConfigPath), "\"difficulty\""));
+        Assert.Single(Regex.Matches(merged, "\"difficulty\""));
+        Assert.Contains("\"difficulty\": false", merged);
+        Assert.True(JToken.DeepEquals(template["modOptions"], JObject.Parse(merged)["modOptions"]));
     }
 
     [Fact]

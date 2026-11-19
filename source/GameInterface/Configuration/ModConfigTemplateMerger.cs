@@ -7,8 +7,8 @@ namespace GameInterface.Configuration;
 
 /// <summary>
 /// Copies settings that are new in the shipped template into the text of an existing mod-config.json:
-/// each top-level block, and each key inside a block, that the config lacks, with the template's comment
-/// lines above it. A key the operator commented out counts as present. The edit is textual so operator
+/// each block or key, at any depth inside objects both files have, that the config lacks, with the template's
+/// comment lines above it. A key the operator commented out counts as present. The edit is textual so operator
 /// values, comments and ordering stay as they are.
 /// </summary>
 internal static class ModConfigTemplateMerger
@@ -39,87 +39,100 @@ internal static class ModConfigTemplateMerger
         public int End { get; }
     }
 
-    /// <summary>What <see cref="AddMissingMembers"/> found for one object.</summary>
+    /// <summary>One JSON object's braces and members, as offsets into its text.</summary>
+    private sealed class JsonObjectSpan
+    {
+        public JsonObjectSpan(int open, int close, List<JsonMember> members)
+        {
+            Open = open;
+            Close = close;
+            Members = members;
+        }
+
+        /// <summary>Index of the opening brace.</summary>
+        public int Open { get; }
+
+        /// <summary>Index of the closing brace.</summary>
+        public int Close { get; }
+
+        public List<JsonMember> Members { get; }
+    }
+
+    /// <summary>What <see cref="AddMissingMembers"/> found for one object and the objects nested in it.</summary>
     private sealed class MissingMembers
     {
         public List<(int Offset, string Text)> Edits { get; } = new List<(int Offset, string Text)>();
 
         /// <summary>Names of the template members the edits add.</summary>
         public List<string> Added { get; } = new List<string>();
-
-        /// <summary>Members both objects have.</summary>
-        public List<(JsonMember Member, JsonMember TemplateMember)> Shared { get; } =
-            new List<(JsonMember Member, JsonMember TemplateMember)>();
     }
 
     /// <summary>
-    /// Returns the config with the template's new settings added, and their names ("block" or "block.key").
+    /// Returns the config with the template's new settings added, and their dotted names ("block", "block.key").
     /// Both texts must parse as JSON.
     /// </summary>
     public static (string Merged, List<string> Added) Merge(string config, string template)
     {
         string newLine = config.Contains("\r\n") ? "\r\n" : "\n";
 
-        var root = AddMissingMembers(config, SkipTrivia(config, 0), template, SkipTrivia(template, 0), newLine);
-        var edits = new List<(int Offset, string Text)>(root.Edits);
-        var added = new List<string>(root.Added);
-        foreach (var (block, templateBlock) in root.Shared)
-        {
-            if (config[block.ValueStart] != '{' || template[templateBlock.ValueStart] != '{') continue;
-
-            var nested = AddMissingMembers(config, block.ValueStart, template, templateBlock.ValueStart, newLine);
-            edits.AddRange(nested.Edits);
-            added.AddRange(nested.Added.Select(name => templateBlock.Name + "." + name));
-        }
+        var result = AddMissingMembers(config, SkipTrivia(config, 0), template, SkipTrivia(template, 0), newLine, "");
 
         string merged = config;
-        foreach (var edit in edits.OrderByDescending(edit => edit.Offset))
+        foreach (var edit in result.Edits.OrderByDescending(edit => edit.Offset))
         {
             merged = merged.Insert(edit.Offset, edit.Text);
         }
-        return (merged, added);
+        return (merged, result.Added);
     }
 
     // Queues an insertion for each template member the object at open lacks, placed after the previous template
-    // member it has, or at the top of the object.
+    // member it has, or at the top of the object, then does the same inside each object both sides have.
     private static MissingMembers AddMissingMembers(string text, int open, string template, int templateOpen,
-        string newLine)
+        string newLine, string prefix)
     {
         var result = new MissingMembers();
-        var members = ReadMembers(text, open, out int close);
-        var templateMembers = ReadMembers(template, templateOpen, out _);
-        if (members == null || templateMembers == null) return result;
+        var span = ReadMembers(text, open);
+        var templateSpan = ReadMembers(template, templateOpen);
+        if (span == null || templateSpan == null) return result;
 
-        string block = text.Substring(open, close - open + 1);
+        string block = text.Substring(span.Open, span.Close - span.Open + 1);
         var pending = new List<string>();
         int previous = -1;
-        foreach (var templateMember in templateMembers)
+        foreach (var templateMember in templateSpan.Members)
         {
-            int index = members.FindIndex(member =>
+            int index = span.Members.FindIndex(member =>
                 string.Equals(member.Name, templateMember.Name, StringComparison.OrdinalIgnoreCase));
             if (index < 0)
             {
-                bool commentedOut = Regex.IsMatch(block,
-                    "^[\\t ]*//[\\t ]*\\\"" + Regex.Escape(templateMember.Name) + "\\\"[\\t ]*:",
-                    RegexOptions.Multiline | RegexOptions.IgnoreCase);
-                if (commentedOut) continue;
+                if (IsCommentedOut(block, templateMember.Name)) continue;
 
                 int start = MemberStart(template, templateMember.NameStart);
                 pending.Add(template.Substring(start, templateMember.ValueEnd - start)
                     .Replace("\r\n", "\n").Replace("\n", newLine));
-                result.Added.Add(templateMember.Name);
+                result.Added.Add(prefix + templateMember.Name);
                 continue;
             }
 
-            if (pending.Count > 0) result.Edits.AddRange(InsertAfter(text, members, previous, open, close, pending, newLine));
+            if (pending.Count > 0) result.Edits.AddRange(InsertAfter(text, span, previous, pending, newLine));
             pending.Clear();
             previous = index;
-            result.Shared.Add((members[index], templateMember));
+            if (text[span.Members[index].ValueStart] == '{' && template[templateMember.ValueStart] == '{')
+            {
+                var nested = AddMissingMembers(text, span.Members[index].ValueStart, template, templateMember.ValueStart,
+                    newLine, prefix + templateMember.Name + ".");
+                result.Edits.AddRange(nested.Edits);
+                result.Added.AddRange(nested.Added);
+            }
         }
-        if (pending.Count > 0) result.Edits.AddRange(InsertAfter(text, members, previous, open, close, pending, newLine));
+        if (pending.Count > 0) result.Edits.AddRange(InsertAfter(text, span, previous, pending, newLine));
 
         return result;
     }
+
+    // Whether a line of the block is the member behind //, so the operator commented it out.
+    private static bool IsCommentedOut(string block, string name) =>
+        Regex.IsMatch(block, @"^[\t ]*//[\t ]*""" + Regex.Escape(name) + @"""[\t ]*:",
+            RegexOptions.Multiline | RegexOptions.IgnoreCase);
 
     // Where a member's text begins: its line, moved up over the // comment lines directly above it,
     // or the member itself when something precedes it on its line.
@@ -131,45 +144,46 @@ internal static class ModConfigTemplateMerger
         while (lineStart > 1)
         {
             int previous = text.LastIndexOf('\n', lineStart - 2) + 1;
-            if (!text.Substring(previous, lineStart - previous).TrimStart().StartsWith("//", StringComparison.Ordinal)) break;
+            if (!StartsWithComment(text.Substring(previous, lineStart - previous))) break;
             lineStart = previous;
         }
         return lineStart;
     }
 
-    // Edits that insert the snippets after members[previous], or after the opening brace when previous is -1.
-    private static List<(int Offset, string Text)> InsertAfter(string text, List<JsonMember> members, int previous,
-        int open, int close, List<string> snippets, string newLine)
+    // Edits that insert the snippets after span.Members[previous], or after the opening brace when previous is -1.
+    private static List<(int Offset, string Text)> InsertAfter(string text, JsonObjectSpan span, int previous,
+        List<string> snippets, string newLine)
     {
         bool afterMember = previous >= 0;
-        bool hasFollowing = previous + 1 < members.Count;
-        int anchorEnd = afterMember ? members[previous].End : open + 1;
-        int followingStart = hasFollowing ? members[previous + 1].NameStart : close;
+        bool hasFollowing = previous + 1 < span.Members.Count;
+        int anchorEnd = afterMember ? span.Members[previous].End : span.Open + 1;
+        int followingStart = hasFollowing ? span.Members[previous + 1].NameStart : span.Close;
         bool needsComma = afterMember && text[anchorEnd - 1] != ',';
-
-        string joined = snippets[0];
-        for (int i = 1; i < snippets.Count; i++)
-        {
-            joined += "," + newLine + (StartsWithComment(snippets[i]) ? newLine : "") + snippets[i];
-        }
-        if (hasFollowing) joined += ",";
+        string joined = JoinSnippets(snippets, hasFollowing, newLine);
 
         int lineEnd = text.IndexOf('\n', anchorEnd);
         bool followingSharesLine = lineEnd < 0 || lineEnd > followingStart;
         if (followingSharesLine)
         {
-            return new List<(int Offset, string Text)> { (anchorEnd, (needsComma ? "," : "") + newLine + joined) };
+            string onNewLine = newLine + joined;
+            if (needsComma) onNewLine = "," + onNewLine;
+            return new List<(int Offset, string Text)> { (anchorEnd, onNewLine) };
         }
 
         // Insert at the end of the line, after any comment trailing it, with commented settings set apart by blank lines.
         if (text[lineEnd - 1] == '\r') lineEnd--;
         int nextStart = text.IndexOf('\n', lineEnd) + 1;
-        int nextEnd = text.IndexOf('\n', nextStart);
-        string nextLine = text.Substring(nextStart, (nextEnd < 0 ? text.Length : nextEnd) - nextStart).Trim();
+        int nextLineEnd = text.IndexOf('\n', nextStart);
+        if (nextLineEnd < 0) nextLineEnd = text.Length;
+        string nextLine = text.Substring(nextStart, nextLineEnd - nextStart).Trim();
         bool blankBefore = afterMember && StartsWithComment(snippets[0]);
         bool blankAfter = hasFollowing && nextLine.Length > 0 &&
-            (StartsWithComment(snippets[snippets.Count - 1]) || nextLine.StartsWith("//", StringComparison.Ordinal));
-        string insertion = newLine + (blankBefore ? newLine : "") + joined + (blankAfter ? newLine : "");
+            (StartsWithComment(snippets[snippets.Count - 1]) || StartsWithComment(nextLine));
+
+        string insertion = newLine;
+        if (blankBefore) insertion += newLine;
+        insertion += joined;
+        if (blankAfter) insertion += newLine;
 
         // The missing comma goes straight after the value: in the insertion when the line ends there,
         // otherwise as its own edit so it stays in front of a comment trailing the value.
@@ -178,13 +192,26 @@ internal static class ModConfigTemplateMerger
         return new List<(int Offset, string Text)> { (anchorEnd, ","), (lineEnd, insertion) };
     }
 
-    private static bool StartsWithComment(string snippet) => snippet.TrimStart().StartsWith("//", StringComparison.Ordinal);
+    // The snippets as one comma-separated run, a commented one set apart from the snippet above it by a blank line.
+    private static string JoinSnippets(List<string> snippets, bool hasFollowing, string newLine)
+    {
+        string joined = snippets[0];
+        for (int i = 1; i < snippets.Count; i++)
+        {
+            joined += "," + newLine;
+            if (StartsWithComment(snippets[i])) joined += newLine;
+            joined += snippets[i];
+        }
+        if (hasFollowing) joined += ",";
+        return joined;
+    }
 
-    // Lists the members of the object whose { is at open, or null when it isn't plain quoted members.
-    private static List<JsonMember> ReadMembers(string text, int open, out int close)
+    private static bool StartsWithComment(string text) => text.TrimStart().StartsWith("//", StringComparison.Ordinal);
+
+    // Reads the object whose { is at open, or returns null when it isn't plain quoted members.
+    private static JsonObjectSpan ReadMembers(string text, int open)
     {
         var members = new List<JsonMember>();
-        close = -1;
         int i = SkipTrivia(text, open + 1);
         while (i < text.Length && text[i] == '"')
         {
@@ -208,8 +235,7 @@ internal static class ModConfigTemplateMerger
         }
         if (i >= text.Length || text[i] != '}') return null;
 
-        close = i;
-        return members;
+        return new JsonObjectSpan(open, i, members);
     }
 
     // Index just past the JSON value that starts at start, or -1 when there is none.
