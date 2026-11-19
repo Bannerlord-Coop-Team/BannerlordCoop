@@ -210,6 +210,9 @@ internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesert
         }
 
         if (!ownerPartyResolver.TryGetOwnerParty(IssueManager.GetIssueOfQuest(quest), out var owner)) return;
+        // The registered party remains the saved owner party for other quests. Extortion only runs flight logic
+        // while its substituted owner hero is still attached to that party.
+        if (Hero.MainHero?.PartyBelongedTo != owner) return;
         switch (quest._currentState)
         {
             case State.DesertersMovingToSettlement:

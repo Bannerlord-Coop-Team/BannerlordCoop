@@ -14,6 +14,7 @@ using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
+using System.Threading;
 using Quest = TaleWorlds.CampaignSystem.Issues.ExtortionByDesertersIssueBehavior.ExtortionByDesertersIssueQuest;
 using State = TaleWorlds.CampaignSystem.Issues.ExtortionByDesertersIssueBehavior.ExtortionByDesertersIssueQuest.ExtortionByDesertersQuestState;
 
@@ -22,6 +23,7 @@ namespace GameInterface.Services.Issues.Quests.ExtortionByDeserters.Handlers;
 /// <summary>Connects personal quest state to the server's existing world parties.</summary>
 internal class ExtortionByDesertersHandler : IHandler
 {
+    private static int patchesRegistered;
     private readonly IMessageBroker broker;
     private readonly IObjectManager objects;
     private readonly IIssueResolver issues;
@@ -34,7 +36,7 @@ internal class ExtortionByDesertersHandler : IHandler
         IAutoSyncPatchCollector patchCollector, IQuestFeatureFlag questFeatureFlag,
         IIssueConversationGuard conversationGuard, IPlayerEncounterInterface playerEncounter)
     {
-        if (questFeatureFlag.IsEnabled)
+        if (questFeatureFlag.IsEnabled && Interlocked.Exchange(ref patchesRegistered, 1) == 0)
         {
             ExtortionByDesertersPartyPatches.AddPatches(patchCollector);
             // Compile these callers after AutoSync so they cannot inline unpatched setters.

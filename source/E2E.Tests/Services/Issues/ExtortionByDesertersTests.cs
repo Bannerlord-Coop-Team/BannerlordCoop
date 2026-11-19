@@ -124,7 +124,8 @@ public class ExtortionByDesertersTests : IDisposable
         foreach (var target in targets)
         {
             var coopPrefixes = Harmony.GetPatchInfo(target).Prefixes
-                .Where(prefix => prefix.owner == "Bannerlord.Coop")
+                .Where(prefix => prefix.owner == "Bannerlord.Coop" &&
+                    prefix.PatchMethod.DeclaringType == typeof(ExtortionByDesertersPartyPatches))
                 .ToArray();
             Assert.Single(coopPrefixes);
         }
