@@ -165,7 +165,7 @@ public static class PlayerPartyInteractionDialogState
                 explanation = new TextObject("{=coop_player_party_interaction_vassal_requires_tier_two}Your clan must be at least tier 2 to swear allegiance.");
                 return true;
             case PlayerPartyInteractionVassalUnavailableReason.KingdomFull:
-                explanation = KingdomClanLimit.GetFullText(null, ModConfigProvider.ModOptions);
+                explanation = KingdomClanLimit.GetFullText(kingdom: null, ModConfigProvider.ModOptions);
                 return true;
             default:
                 explanation = null;
@@ -246,7 +246,7 @@ public static class PlayerPartyInteractionDialogState
                 explanation = new TextObject("{=coop_player_party_interaction_mercenary_incompatible_wars}You are at war with a faction the other player's kingdom is not at war with.");
                 return true;
             case PlayerPartyInteractionMercenaryUnavailableReason.KingdomFull:
-                explanation = KingdomClanLimit.GetFullText(null, ModConfigProvider.ModOptions);
+                explanation = KingdomClanLimit.GetFullText(kingdom: null, ModConfigProvider.ModOptions);
                 return true;
             default:
                 explanation = null;
