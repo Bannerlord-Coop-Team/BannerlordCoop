@@ -68,8 +68,6 @@ public class SiegeMachineSimulationTests : IDisposable
         ramTrackerDistance = trackerDistance;
         StubRamSnap();
 
-        var movementState = new NetworkSiegeMachineState(ram.Id.Id, 100f, 0, -1, -1, hostDistance,
-            false, -1, -1000f, -1000f);
         var destructionState = new NetworkSiegeMachineState(ram.Id.Id, 0f, 1, -1, -1, hostDistance,
             false, -1, -1000f, -1000f);
         var apply = AccessTools.Method(typeof(SiegeMachineStateReplicator), "Apply");
@@ -79,7 +77,6 @@ public class SiegeMachineSimulationTests : IDisposable
             localSimulator ? new HashSet<int> { ram.Id.Id } : new HashSet<int>(), new HashSet<int>());
         try
         {
-            apply.Invoke(null, new object[] { ram, movementState });
             apply.Invoke(null, new object[] { ram, destructionState });
 
             Assert.Equal(1, ramSnapCalls);

@@ -613,11 +613,33 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
             machineId, "claimant", hostEpoch: LocalEpoch, authorityRevision: authorityRevision,
             senderControllerId: "host"));
 
-        var hostState = new NetworkSiegeMachineState(machineId, 0f, 1, -1, -1, hostDistance,
-            false, -1, -1000f, -1000f, hostEpoch: LocalEpoch, senderControllerId: "host",
+        var hostState = new NetworkSiegeMachineState(
+            machineId,
+            hitPoints: 0f,
+            destructionState: 1,
+            gateState: -1,
+            ladderState: -1,
+            moveDistance: hostDistance,
+            hasArrived: false,
+            weaponState: -1,
+            aimDirection: -1000f,
+            aimReleaseAngle: -1000f,
+            hostEpoch: LocalEpoch,
+            senderControllerId: "host",
             authorityRevision: authorityRevision);
-        var claimantState = new NetworkSiegeMachineState(machineId, -1f, -1, -1, -1, 17.4f,
-            true, -1, -1000f, -1000f, hostEpoch: LocalEpoch, senderControllerId: "claimant",
+        var claimantState = new NetworkSiegeMachineState(
+            machineId,
+            hitPoints: -1f,
+            destructionState: -1,
+            gateState: -1,
+            ladderState: -1,
+            moveDistance: 17.4f,
+            hasArrived: true,
+            weaponState: -1,
+            aimDirection: -1000f,
+            aimReleaseAngle: -1000f,
+            hostEpoch: LocalEpoch,
+            senderControllerId: "claimant",
             authorityRevision: authorityRevision);
 
         var first = hostFirst ? hostState : claimantState;
