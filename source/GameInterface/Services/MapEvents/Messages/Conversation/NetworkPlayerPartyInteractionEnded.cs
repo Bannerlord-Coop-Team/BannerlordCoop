@@ -15,21 +15,16 @@ internal readonly struct NetworkPlayerPartyInteractionEnded : ICommand
     public readonly string ResponderPartyId;
     [ProtoMember(4)]
     public readonly PlayerPartyInteractionOutcomeType OutcomeType;
-    // The kingdom that refused the join, set only for a KingdomFull outcome.
-    [ProtoMember(5)]
-    public readonly string FullKingdomId;
 
     public NetworkPlayerPartyInteractionEnded(
         string sessionId,
         string initiatorPartyId,
         string responderPartyId,
-        PlayerPartyInteractionOutcomeType outcomeType,
-        string fullKingdomId)
+        PlayerPartyInteractionOutcomeType outcomeType)
     {
         SessionId = sessionId;
         InitiatorPartyId = initiatorPartyId;
         ResponderPartyId = responderPartyId;
         OutcomeType = outcomeType;
-        FullKingdomId = fullKingdomId;
     }
 }

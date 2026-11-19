@@ -10,7 +10,6 @@ using GameInterface.Services.Companions.Interfaces;
 using GameInterface.Services.Companions.Messages;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Kingdoms;
-using GameInterface.Services.Kingdoms.Interfaces;
 using GameInterface.Services.Kingdoms.Messages;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
@@ -46,7 +45,6 @@ internal class CompanionRolesHandler : IHandler
     private readonly IPlayerManager playerManager;
     private readonly ICoopClanPermissions permissions;
     private readonly IKingdomClanLimit kingdomClanLimit;
-    private readonly IVassalAndMercenaryOfferCampaignBehaviorInterface offers;
     private readonly ISendCoalescer sendCoalescer;
     private string pendingFireCompanionRequestId;
     private string pendingFireCompanionHeroId;
@@ -60,7 +58,6 @@ internal class CompanionRolesHandler : IHandler
         IPlayerManager playerManager,
         ICoopClanPermissions permissions,
         IKingdomClanLimit kingdomClanLimit,
-        IVassalAndMercenaryOfferCampaignBehaviorInterface offers,
         ISendCoalescer sendCoalescer = null)
     {
         this.messageBroker = messageBroker;
@@ -71,7 +68,6 @@ internal class CompanionRolesHandler : IHandler
         this.playerManager = playerManager;
         this.permissions = permissions;
         this.kingdomClanLimit = kingdomClanLimit;
-        this.offers = offers;
         this.sendCoalescer = sendCoalescer;
 
         messageBroker.Subscribe<ClanNameSelectionDone>(Handle_ClanNameSelectionDone);
@@ -160,11 +156,10 @@ internal class CompanionRolesHandler : IHandler
             // Hero.MainHero which is different on the server compared to the client. Wrapped in try/finally so the static fields
             // are always cleared even if something below throws
             ResolvedMainHeroContext.ResolvedMainHero = mainHero;
-            Clan clan = null;
             try
             { 
                 int randomBannerIdForNewClan = companionRolesCampaignBehavior.GetRandomBannerIdForNewClan();
-                clan = Clan.CreateCompanionToLordClan(oneToOneConversationHero, selectedFief, textObject, randomBannerIdForNewClan);
+                Clan clan = Clan.CreateCompanionToLordClan(oneToOneConversationHero, selectedFief, textObject, randomBannerIdForNewClan);
                 if (oneToOneConversationHero.PartyBelongedTo == mainParty)
                 {
                     mainParty.MemberRoster.AddToCounts(oneToOneConversationHero.CharacterObject, -1, false, 0, 0, true, -1);
@@ -190,10 +185,6 @@ internal class CompanionRolesHandler : IHandler
             finally
             {
                 ResolvedMainHeroContext.ResolvedMainHero = null;
-
-                // Vanilla sets the new clan's Kingdom directly, which fires no kingdom change event, so once the clan exists
-                // the offers the kingdom can no longer take are withdrawn, even when a later step of the promotion threw.
-                if (clan != null) offers.WithdrawOffersIfFull(kingdom);
             }
         });
     }

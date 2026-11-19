@@ -1,7 +1,6 @@
 ﻿using E2E.Tests.Environment.Instance;
 using HarmonyLib;
 using System.Reflection;
-using TaleWorlds.Library;
 
 namespace E2E.Tests.Util;
 
@@ -36,9 +35,9 @@ internal sealed class MethodCallRecorder : IMethodCallRecorder
                 ActiveRecorders.Add(method, this);
                 methods.Add(method);
                 var parameters = method.GetParameters();
-                var prefix = parameters.Any(parameter => parameter.Name == "menuId") ? nameof(RecordMenu)
-                    : parameters.Any(parameter => parameter.Name == "message") ? nameof(RecordMessage)
-                    : nameof(RecordCall);
+                var prefix = nameof(RecordCall);
+                if (parameters.Any(parameter => parameter.Name == "menuId")) prefix = nameof(RecordMenu);
+                else if (parameters.Any(parameter => parameter.Name == "message")) prefix = nameof(RecordMessage);
                 harmony.Patch(method, prefix: new HarmonyMethod(typeof(MethodCallRecorder), prefix)
                 {
                     priority = priority,
@@ -85,9 +84,7 @@ internal sealed class MethodCallRecorder : IMethodCallRecorder
 
     private static bool RecordMenu(MethodBase __originalMethod, string menuId) => Record(__originalMethod, menuId, null);
 
-    // An InformationMessage keeps its text in Information, a TextObject prints it.
-    private static bool RecordMessage(MethodBase __originalMethod, object message) =>
-        Record(__originalMethod, null, message is InformationMessage information ? information.Information : message?.ToString());
+    private static bool RecordMessage(MethodBase __originalMethod, object message) => Record(__originalMethod, null, message?.ToString());
 
     private static bool Record(MethodBase method, string? menuId, string? text)
     {

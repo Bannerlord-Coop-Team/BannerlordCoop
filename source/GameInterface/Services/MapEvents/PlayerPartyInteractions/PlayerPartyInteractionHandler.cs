@@ -8,7 +8,6 @@ using Common.Util;
 using GameInterface.Configuration;
 using GameInterface.Services.Clans;
 using GameInterface.Services.Kingdoms;
-using GameInterface.Services.Kingdoms.Interfaces;
 using GameInterface.Services.MapTracking;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Conversation;
@@ -106,7 +105,6 @@ internal class PlayerPartyInteractionHandler : IHandler
         IPlayerPartyTradeContext trade,
         IPlayerPartyPvpRules pvpRules,
         IKingdomClanLimit kingdomClanLimit,
-        IVassalAndMercenaryOfferCampaignBehaviorInterface offers,
         // Only the server container registers a send coalescer.
         ISendCoalescer sendCoalescer = null)
     {
@@ -133,8 +131,7 @@ internal class PlayerPartyInteractionHandler : IHandler
             playerMarriageRules,
             playerDivorceRules,
             mapTracking,
-            kingdomClanLimit,
-            offers);
+            kingdomClanLimit);
 
         messageBroker.Subscribe<NetworkPlayerPartyInteractionStarted>(Handle_NetworkPlayerPartyInteractionStarted);
         messageBroker.Subscribe<NetworkPlayerPartyInteractionState>(Handle_NetworkPlayerPartyInteractionState);
@@ -357,10 +354,7 @@ internal class PlayerPartyInteractionHandler : IHandler
             endedInteractionSessionIds.Add(message.SessionId);
             PlayerPartyInteractionDialogState.Clear(message.SessionId);
             trade.End(message.SessionId);
-            if (message.OutcomeType == PlayerPartyInteractionOutcomeType.KingdomFull)
-                ShowKingdomFullMessage(message.FullKingdomId);
-            else
-                ShowOutcomeMessage(message.OutcomeType);
+            ShowOutcomeMessage(message.OutcomeType);
             var conversationWasOpened = openedConversationSessionIds.Remove(message.SessionId);
 
             var conversationManager = Campaign.Current?.ConversationManager;
@@ -1027,26 +1021,14 @@ internal class PlayerPartyInteractionHandler : IHandler
         }
 
         var outcome = new PlayerPartyInteractionOutcome(session, outcomeType, actorPartyId);
-        var applied = outcomeHandler.Handle(outcome, out var kingdomFull);
-        var finalOutcomeType = outcomeType;
-        string fullKingdomId = null;
-        if (kingdomFull)
-        {
-            finalOutcomeType = PlayerPartyInteractionOutcomeType.KingdomFull;
-            if (objectManager.TryGetIdWithLogging(session.TargetKingdom, out var kingdomId))
-                fullKingdomId = kingdomId;
-        }
-        else if (!applied)
-        {
-            finalOutcomeType = GetFailedOutcome(outcomeType, session.Proposal);
-        }
+        var applied = outcomeHandler.Handle(outcome);
+        var finalOutcomeType = applied ? outcomeType : GetFailedOutcome(outcomeType, session.Proposal);
 
         network.SendAll(new NetworkPlayerPartyInteractionEnded(
             session.SessionId,
             session.InitiatorPartyId,
             session.ResponderPartyId,
-            finalOutcomeType,
-            fullKingdomId));
+            finalOutcomeType));
 
         if (finalOutcomeType == PlayerPartyInteractionOutcomeType.HostileDemandAccepted ||
             finalOutcomeType == PlayerPartyInteractionOutcomeType.HostileDemandYielded)
@@ -1367,14 +1349,6 @@ internal class PlayerPartyInteractionHandler : IHandler
             return PlayerPartyInteractionOutcomeType.TradeDeclined;
 
         return PlayerPartyInteractionOutcomeType.Left;
-    }
-
-    // The kingdom that refused the proposal filled up between the proposal and the answer.
-    private void ShowKingdomFullMessage(string fullKingdomId)
-    {
-        var kingdom = objectManager.TryGetObjectWithLogging<Kingdom>(fullKingdomId, out var fullKingdom) ? fullKingdom : null;
-        var text = KingdomClanLimit.GetFullText(kingdom, ModConfigProvider.ModOptions);
-        InformationManager.DisplayMessage(new InformationMessage(text.ToString()));
     }
 
     // Tells the local player how the interaction ended.

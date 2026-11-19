@@ -13,8 +13,6 @@ using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Configuration;
 using GameInterface.CoopSessionData;
-using GameInterface.Services.Kingdoms.Data;
-using GameInterface.Services.Kingdoms.Messages;
 using GameInterface.Services.Bandits.Messages;
 using GameInterface.Services.Barters;
 using GameInterface.Services.Barters.Messages;
@@ -727,105 +725,6 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
         }
     }
 
-    // The kingdom has its ruler's clan, and another clan takes the last place while the ruler is still answering.
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void ServiceProposal_KingdomFillsBeforeTheAnswer_EndsAsKingdomFullOnAllInstances(bool asMercenary)
-    {
-        var (client1, client2, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
-        SetupResponderKingdomLeader(initiatorPartyId, responderPartyId, initiatorClanTier: 2);
-        var lateClanId = TestEnvironment.CreateRegisteredObject<Clan>();
-        var previousOptions = ModConfigProvider.ModOptions;
-        ModConfigProvider.ModOptions = new ModOptions(new ModOptionsData { MaxClansPerKingdom = 2, CountMercenaries = asMercenary });
-        try
-        {
-            foreach (var instance in new[] { Server, client1, client2 })
-            {
-                instance.Call(() =>
-                {
-                    Assert.True(instance.ObjectManager.TryGetObject<PartyBase>(responderPartyId, out var responderParty));
-                    using (new AllowedThread())
-                        responderParty.LeaderHero.Clan.Kingdom.Name = new TextObject("Vlandia");
-                });
-            }
-
-            RequestInteraction(client1, initiatorPartyId, responderPartyId);
-            var sessionId = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>().Single().SessionId;
-            var initialState = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>().Single(s =>
-                s.SessionId == sessionId &&
-                s.PartyId == initiatorPartyId &&
-                s.Phase == PlayerPartyInteractionPhase.InitialOptions);
-            OpenServiceOptions(client1, initialState);
-            if (asMercenary)
-            {
-                SubmitCurrentDialogOption(client1, PlayerPartyInteractionOption.Mercenary);
-                SubmitCurrentDialogOption(client1, PlayerPartyInteractionOption.ConfirmMercenary);
-            }
-            else
-            {
-                SubmitCurrentDialogOption(client1, PlayerPartyInteractionOption.Vassal);
-            }
-
-            // One replica has the responder in another kingdom, so the notice has to name the kingdom that refused.
-            var otherKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
-            client1.Call(() =>
-            {
-                Assert.True(client1.ObjectManager.TryGetObject<PartyBase>(responderPartyId, out var responderParty));
-                using (new AllowedThread())
-                {
-                    var otherKingdom = client1.GetRegisteredObject<Kingdom>(otherKingdomId);
-                    otherKingdom.Name = new TextObject("Other");
-                    responderParty.LeaderHero.Clan._kingdom = otherKingdom;
-                }
-            });
-
-            Server.Call(() =>
-            {
-                Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(responderPartyId, out var responderParty));
-                var kingdom = responderParty.LeaderHero.Clan.Kingdom;
-                var lateClan = Server.GetRegisteredObject<Clan>(lateClanId);
-                using (new AllowedThread())
-                {
-                    lateClan._kingdom = kingdom;
-                    kingdom._clans.Add(lateClan);
-                }
-            });
-            Server.NetworkSentMessages.Clear();
-            using var notices = new MethodCallRecorder(AccessTools.Method(typeof(InformationManager), nameof(InformationManager.DisplayMessage)));
-            SubmitOption(client2, sessionId, responderPartyId, PlayerPartyInteractionOption.AcceptProposal);
-
-            var ended = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionEnded>().Single();
-            Assert.Equal(PlayerPartyInteractionOutcomeType.KingdomFull, ended.OutcomeType);
-            const string fullText = "Vlandia already has the most clans this server allows (2).";
-            Assert.Equal(new[] { fullText }, notices.TextsFor(client1));
-            Assert.Equal(new[] { fullText }, notices.TextsFor(client2));
-            foreach (var instance in new[] { Server, client1, client2 })
-            {
-                instance.Call(() =>
-                {
-                    Assert.True(instance.ObjectManager.TryGetObject<PartyBase>(initiatorPartyId, out var initiatorParty));
-                    Assert.True(instance.ObjectManager.TryGetObject<PartyBase>(responderPartyId, out var responderParty));
-                    Assert.Null(initiatorParty.LeaderHero.Clan.Kingdom);
-                    if (instance != client1)
-                        Assert.DoesNotContain(initiatorParty.LeaderHero.Clan, responderParty.LeaderHero.Clan.Kingdom.Clans);
-                });
-            }
-
-            AssertInteractionStateCleared(client1);
-            AssertInteractionStateCleared(client2);
-
-            // The session is closed, so a late second answer ends nothing.
-            Server.NetworkSentMessages.Clear();
-            SubmitOption(client2, sessionId, responderPartyId, PlayerPartyInteractionOption.AcceptProposal);
-            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionEnded>());
-        }
-        finally
-        {
-            ModConfigProvider.ModOptions = previousOptions;
-        }
-    }
-
     [Fact]
     public void MercenarySelected_ShowsConfirmPromptAndDoesNotNotifyResponder()
     {
@@ -1222,52 +1121,6 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
                 Assert.Contains(initiatorClan, responderKingdom.Clans);
                 Assert.False(initiatorClan.IsUnderMercenaryService);
             });
-        }
-    }
-
-    // A mercenary of the kingdom swearing allegiance in a meeting starts to count and takes the last place without a
-    // kingdom change, so the invitation the kingdom still has out to another player is withdrawn there.
-    [Fact]
-    public void VassalProposalAsMercenary_TakingTheLastPlace_WithdrawsTheKingdomsOtherInvitations()
-    {
-        var (client1, client2, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
-        SetupResponderKingdomLeaderAndInitiatorParty(initiatorPartyId, responderPartyId, initiatorClanTier: 2);
-        var (invitedHeroId, _) = CreatePlayerHeroParty("InvitedPlayer");
-        var previousOptions = ModConfigProvider.ModOptions;
-        ModConfigProvider.ModOptions = new ModOptions(new ModOptionsData { MaxClansPerKingdom = 2 });
-        try
-        {
-            string kingdomId = null;
-            Server.Call(() =>
-            {
-                Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(responderPartyId, out var responderParty));
-                Assert.True(Server.ObjectManager.TryGetId(responderParty.LeaderHero.Clan.Kingdom, out kingdomId));
-                Server.Resolve<ICoopSessionProvider>().CoopSession.InteractionsPlayerData.PlayerVassalAndMercenaryOfferData[invitedHeroId] =
-                    new VassalAndMercenaryOfferData(null, 0, new Dictionary<string, long> { [kingdomId] = CampaignTime.Now.NumTicks }, false);
-            });
-
-            RequestInteraction(client1, initiatorPartyId, responderPartyId);
-            var sessionId = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>().Single().SessionId;
-            var initialState = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>().Single(s =>
-                s.SessionId == sessionId &&
-                s.PartyId == initiatorPartyId &&
-                s.Phase == PlayerPartyInteractionPhase.InitialOptions);
-            OpenServiceOptions(client1, initialState);
-            SubmitCurrentDialogOption(client1, PlayerPartyInteractionOption.Vassal);
-            Server.NetworkSentMessages.Clear();
-            SubmitOption(client2, sessionId, responderPartyId, PlayerPartyInteractionOption.AcceptProposal);
-
-            Assert.Equal(PlayerPartyInteractionOutcomeType.VassalAccepted,
-                Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionEnded>().Single().OutcomeType);
-            var cancelled = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkVassalOrMercenaryOfferCancelled>());
-            Assert.Equal(invitedHeroId, cancelled.PlayerHeroId);
-            Assert.Equal(kingdomId, cancelled.KingdomId);
-            Server.Call(() => Assert.Empty(
-                Server.Resolve<ICoopSessionProvider>().CoopSession.InteractionsPlayerData.PlayerVassalAndMercenaryOfferData[invitedHeroId].VassalOffers));
-        }
-        finally
-        {
-            ModConfigProvider.ModOptions = previousOptions;
         }
     }
 

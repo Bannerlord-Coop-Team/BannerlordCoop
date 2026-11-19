@@ -5,7 +5,6 @@ using Common.Network;
 using GameInterface.Configuration;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Kingdoms;
-using GameInterface.Services.Kingdoms.Interfaces;
 using GameInterface.Services.Kingdoms.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -30,7 +29,6 @@ internal class VassalServiceHandler : IHandler
     private readonly INetwork network;
     private readonly IPlayerManager playerManager;
     private readonly IKingdomClanLimit kingdomClanLimit;
-    private readonly IVassalAndMercenaryOfferCampaignBehaviorInterface offers;
 
     public VassalServiceHandler(
         IMessageBroker messageBroker,
@@ -38,8 +36,7 @@ internal class VassalServiceHandler : IHandler
         IObjectManager objectManager,
         INetwork network,
         IPlayerManager playerManager,
-        IKingdomClanLimit kingdomClanLimit,
-        IVassalAndMercenaryOfferCampaignBehaviorInterface offers)
+        IKingdomClanLimit kingdomClanLimit)
     {
         this.messageBroker = messageBroker;
         this.kingdomMembershipState = kingdomMembershipState;
@@ -47,7 +44,6 @@ internal class VassalServiceHandler : IHandler
         this.network = network;
         this.playerManager = playerManager;
         this.kingdomClanLimit = kingdomClanLimit;
-        this.offers = offers;
 
         messageBroker.Subscribe<VassalServiceAccepted>(HandleVassalServiceAccepted);
         messageBroker.Subscribe<RequestVassalService>(HandleRequestVassalService);
@@ -95,11 +91,16 @@ internal class VassalServiceHandler : IHandler
                 payload.What.GrantRewards,
                 out bool kingdomFull);
 
+            if (kingdomFull)
+            {
+                network.Send(peer, new NetworkKingdomFull(payload.What.KingdomId));
+                return;
+            }
+
             network.Send(peer, new VassalServiceResult(
                 payload.What.KingdomId,
                 accepted,
-                accepted && payload.What.GrantRewards,
-                kingdomFull));
+                accepted && payload.What.GrantRewards));
         }, context: nameof(VassalServiceHandler));
     }
 
@@ -119,8 +120,6 @@ internal class VassalServiceHandler : IHandler
         if (kingdomClanLimit.IsFull(clan, kingdom, asMercenary: false, ModConfigProvider.ModOptions))
         {
             Logger.Warning("Rejected vassal service request for clan {ClanId} because kingdom {KingdomId} has maxClansPerKingdom clans", clanId, kingdomId);
-            // An invitation from the kingdom can't be taken any more, so it doesn't come back at the next meeting or reconnect.
-            offers.CancelVassalOffer(heroId, kingdomId);
             kingdomFull = true;
             return false;
         }
@@ -165,8 +164,6 @@ internal class VassalServiceHandler : IHandler
             clan,
             publishCollectionChanges: true,
             republishExistingCollections: true);
-        // A mercenary becoming a vassal can take the last place without a kingdom change event.
-        offers.WithdrawOffersIfFull(kingdom);
         if (!kingdom.Clans.Contains(clan))
         {
             Logger.Error("Vassal service did not add clan {ClanId} to kingdom {KingdomId} collections", clanId, kingdomId);
@@ -194,14 +191,8 @@ internal class VassalServiceHandler : IHandler
         {
             if (!payload.What.Accepted)
             {
-                var refusal = new TextObject("{=coop_vassalage_rejected}The vassalage agreement could not be completed.");
-                if (payload.What.KingdomFull)
-                {
-                    var refusingKingdom = objectManager.TryGetObjectWithLogging<Kingdom>(payload.What.KingdomId, out var fullKingdom) ? fullKingdom : null;
-                    refusal = KingdomClanLimit.GetFullText(refusingKingdom, ModConfigProvider.ModOptions);
-                }
-
-                MBInformationManager.AddQuickInformation(refusal);
+                MBInformationManager.AddQuickInformation(
+                    new TextObject("{=coop_vassalage_rejected}The vassalage agreement could not be completed."));
                 return;
             }
 

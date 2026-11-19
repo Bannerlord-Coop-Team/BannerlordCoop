@@ -31,7 +31,6 @@ using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.Kingdoms.Commands;
 using GameInterface.Services.Kingdoms.Data;
-using GameInterface.Services.Kingdoms.Interfaces;
 using GameInterface.Services.Kingdoms.Extentions;
 using GameInterface.Services.Kingdoms.Messages;
 using GameInterface.Services.Kingdoms.Patches;
@@ -631,51 +630,26 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     }
     
     // The kingdom has one clan, its ruler's.
-    [Theory]
-    [InlineData(2, true)]
-    [InlineData(1, false)]
-    public void VassalServiceAccepted_KingdomWithMaxClansPerKingdom_RefusesThePlayerWithTheReason(int maxClansPerKingdom, bool accepted)
+    [Fact]
+    public void VassalServiceAccepted_KingdomWithMaxClansPerKingdom_RefusesThePlayerWithTheReason()
     {
-        ModConfigProvider.ModOptions = new ModOptions(new ModOptionsData { MaxClansPerKingdom = maxClansPerKingdom });
+        ModConfigProvider.ModOptions = new ModOptions(new ModOptionsData { MaxClansPerKingdom = 1 });
         var client = Clients.First();
         var player = CreateSyncedPlayerContext(ControllerId, client);
         var ruler = CreateSyncedPlayerContext("VassalRuler", _ => false);
         var kingdomId = CreateNamedKingdomEverywhere(ruler.ClanId);
         SetClanTierEverywhere(player.ClanId, 2);
-        Server.Call(() =>
-        {
-            Server.Resolve<IPlayerManager>().SetPeer(ControllerId, client.NetPeer);
-            ServerOffers()[player.HeroId] = new VassalAndMercenaryOfferData(
-                kingdomId, CampaignTime.Now.NumTicks, new Dictionary<string, long> { [kingdomId] = CampaignTime.Now.NumTicks }, false);
-        });
+        Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer(ControllerId, client.NetPeer));
         Server.NetworkSentMessages.Clear();
 
         Assert.True(client.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
         using var notices = new MethodCallRecorder(AccessTools.Method(typeof(MBInformationManager), nameof(MBInformationManager.AddQuickInformation)));
         client.SimulateMessage(this, new VassalServiceAccepted(kingdom, grantRewards: false));
 
-        var result = Assert.Single(Server.NetworkSentMessages.GetMessages<VassalServiceResult>());
-        Assert.Equal(accepted, result.Accepted);
-        Assert.Equal(!accepted, result.KingdomFull);
-        if (accepted)
-        {
-            Assert.Equal(0, notices.Count);
-            Server.Call(() => AssertVassalMembership(Server, player.ClanId, kingdomId));
-            foreach (var instance in Clients)
-                instance.Call(() => AssertVassalMembership(instance, player.ClanId, kingdomId));
-            return;
-        }
-
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<VassalServiceResult>());
+        Assert.Equal(kingdomId, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkKingdomFull>()).KingdomId);
         Assert.Equal(new[] { FullKingdomText }, notices.TextsFor(client));
         Assert.Empty(notices.TextsFor(Clients.Last()));
-        // Only the vassal invitation is withdrawn. Mercenaries don't count here, so the kingdom's mercenary offer still
-        // fits, and the client keeps it because no cancel goes out while one offer from the kingdom is left.
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkVassalOrMercenaryOfferCancelled>());
-        Server.Call(() =>
-        {
-            Assert.Empty(ServerOffers()[player.HeroId].VassalOffers);
-            Assert.Equal(kingdomId, ServerOffers()[player.HeroId].CurrentMercenaryOfferKingdomId);
-        });
         foreach (var instance in Clients.Append(Server))
         {
             instance.Call(() =>
@@ -787,34 +761,9 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         AssertCompanionAndFiefKept(ruler.ClanId, companionId, fiefId);
     }
 
-    // A ruler with no kingdom founds an independent clan, which the limit never refuses.
+    // A mercenary offer clicked after the kingdom's last place went is refused, cleared and explained.
     [Fact]
-    public void ClanNameSelection_RulerWithoutAKingdom_PassesTheLimit()
-    {
-        ModConfigProvider.ModOptions = new ModOptions(new ModOptionsData { MaxClansPerKingdom = 1 });
-        var client = Clients.First();
-        var ruler = CreateSyncedPlayerContext(ControllerId, client);
-        var (companionId, settlementId, _) = CreateCompanionAndFiefEverywhere(ruler.ClanId);
-        Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer(ControllerId, client.NetPeer));
-        using var notices = new MethodCallRecorder(AccessTools.Method(typeof(MBInformationManager), nameof(MBInformationManager.AddQuickInformation)));
-        using var continuations = new MethodCallRecorder(AccessTools.Method(typeof(ConversationManager), nameof(ConversationManager.ContinueConversation)));
-
-        var behavior = RunClanNameCallback(client, ruler.PartyId, companionId, settlementId);
-
-        Assert.True(behavior._playerConfirmedTheAction);
-        Assert.Equal(1, continuations.CountFor(client));
-        Assert.Single(client.NetworkSentMessages.GetMessages<DoClanNameSelection>());
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkKingdomFull>());
-        Assert.Equal(0, notices.Count);
-        Server.Call(() => Assert.Equal(Occupation.Lord, Server.GetRegisteredObject<Hero>(companionId).Occupation));
-    }
-
-    // A mercenary offer clicked after the kingdom's last place went is refused, cleared and explained, both when the
-    // click arrives while the offer is still out and when the offer was already withdrawn and the click was on its way.
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void MercenaryOfferAccepted_KingdomFullBeforeTheClick_RefusesAndClearsTheOffer(bool withdrawnFirst)
+    public void MercenaryOfferAccepted_KingdomFullBeforeTheClick_RefusesAndClearsTheOffer()
     {
         ModConfigProvider.ModOptions = new ModOptions(new ModOptionsData { MaxClansPerKingdom = 1, CountMercenaries = true });
         var client = Clients.First();
@@ -825,8 +774,6 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         {
             Server.Resolve<IPlayerManager>().SetPeer(ControllerId, client.NetPeer);
             ServerOffers()[player.HeroId] = new VassalAndMercenaryOfferData(kingdomId, CampaignTime.Now.NumTicks, new Dictionary<string, long>(), false);
-            if (withdrawnFirst)
-                Server.Resolve<IVassalAndMercenaryOfferCampaignBehaviorInterface>().WithdrawOffersIfFull(Server.GetRegisteredObject<Kingdom>(kingdomId));
         });
         Server.NetworkSentMessages.Clear();
         using var notices = new MethodCallRecorder(AccessTools.Method(typeof(MBInformationManager), nameof(MBInformationManager.AddQuickInformation)));
@@ -845,119 +792,6 @@ public class PlayerKingdomCreationFlowTests : IDisposable
                 Assert.Single(instance.GetRegisteredObject<Kingdom>(kingdomId).Clans);
             });
         }
-    }
-
-    // A mercenary of the kingdom swearing allegiance starts to count and takes the last place without a kingdom
-    // change, so the invitation the kingdom still has out to another player is withdrawn there.
-    [Fact]
-    public void VassalServiceAccepted_MercenaryTakesTheLastPlace_WithdrawsTheKingdomsOtherInvitations()
-    {
-        ModConfigProvider.ModOptions = new ModOptions(new ModOptionsData { MaxClansPerKingdom = 2 });
-        var client = Clients.First();
-        var mercenary = CreateSyncedPlayerContext(ControllerId, client);
-        var ruler = CreateSyncedPlayerContext("VassalRuler", _ => false);
-        var invited = CreateSyncedPlayerContext("InvitedPlayer", _ => false);
-        var kingdomId = CreateNamedKingdomEverywhere(ruler.ClanId);
-        ConfigureClanInKingdom(mercenary.ClanId, kingdomId);
-        SetClanTierEverywhere(mercenary.ClanId, 2);
-        foreach (var instance in Clients.Append(Server))
-        {
-            instance.Call(() =>
-            {
-                using (new AllowedThread())
-                    instance.GetRegisteredObject<Clan>(mercenary.ClanId).IsUnderMercenaryService = true;
-            });
-        }
-        Server.Call(() =>
-        {
-            Server.Resolve<IPlayerManager>().SetPeer(ControllerId, client.NetPeer);
-            ServerOffers()[invited.HeroId] = new VassalAndMercenaryOfferData(
-                null, 0, new Dictionary<string, long> { [kingdomId] = CampaignTime.Now.NumTicks }, false);
-        });
-        Server.NetworkSentMessages.Clear();
-
-        client.SimulateMessage(this, new VassalServiceAccepted(client.GetRegisteredObject<Kingdom>(kingdomId), grantRewards: false));
-
-        Assert.True(Assert.Single(Server.NetworkSentMessages.GetMessages<VassalServiceResult>()).Accepted);
-        var cancelled = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkVassalOrMercenaryOfferCancelled>());
-        Assert.Equal(invited.HeroId, cancelled.PlayerHeroId);
-        Assert.Equal(kingdomId, cancelled.KingdomId);
-        Server.Call(() => Assert.Empty(ServerOffers()[invited.HeroId].VassalOffers));
-    }
-
-    // A player who rejoins after one kingdom filled gets the other kingdom's invitation again, while one cancel
-    // withdraws both offers from the full one.
-    [Fact]
-    public void Reconnect_OffersFromAFullKingdom_AreWithdrawnNotResent()
-    {
-        ModConfigProvider.ModOptions = new ModOptions(new ModOptionsData { MaxClansPerKingdom = 2, CountMercenaries = true });
-        var client = Clients.First();
-        var player = CreateSyncedPlayerContext(ControllerId, client);
-        var fullRuler = CreateSyncedPlayerContext("FullRuler", _ => false);
-        var fullKingdomId = CreateNamedKingdomEverywhere(fullRuler.ClanId);
-        ConfigureClanInKingdom(CreateSyncedPlayerContext("FullVassal", _ => false).ClanId, fullKingdomId);
-        var openKingdomId = CreateNamedKingdomEverywhere(CreateSyncedPlayerContext("OpenRuler", _ => false).ClanId);
-        Server.Call(() =>
-        {
-            Server.Resolve<IPlayerManager>().SetPeer(ControllerId, client.NetPeer);
-            ServerOffers()[player.HeroId] = new VassalAndMercenaryOfferData(
-                fullKingdomId,
-                CampaignTime.Now.NumTicks,
-                new Dictionary<string, long> { [fullKingdomId] = CampaignTime.Now.NumTicks, [openKingdomId] = CampaignTime.Now.NumTicks },
-                false);
-        });
-        Server.NetworkSentMessages.Clear();
-
-        client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkInitializeServerInteractionsDataKeys(player.HeroId)));
-
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkMercenaryOfferSent>());
-        Assert.Equal(openKingdomId, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkVassalOfferSent>()).KingdomId);
-        var cancelled = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkVassalOrMercenaryOfferCancelled>());
-        Assert.Equal(player.HeroId, cancelled.PlayerHeroId);
-        Assert.Equal(fullKingdomId, cancelled.KingdomId);
-        Server.Call(() =>
-        {
-            Assert.Null(ServerOffers()[player.HeroId].CurrentMercenaryOfferKingdomId);
-            Assert.Equal(new[] { openKingdomId }, ServerOffers()[player.HeroId].VassalOffers.Keys);
-        });
-    }
-
-    // The clan that takes a kingdom's last place withdraws the offers the kingdom still has out.
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void ClanJoinsKingdom_TakingTheLastPlace_CancelsItsPendingOffers(bool vassalOffer)
-    {
-        ModConfigProvider.ModOptions = new ModOptions(new ModOptionsData { MaxClansPerKingdom = 2, CountMercenaries = true });
-        var client = Clients.First();
-        var player = CreateSyncedPlayerContext(ControllerId, client);
-        var ruler = CreateSyncedPlayerContext("OfferRuler", _ => false);
-        var kingdomId = CreateNamedKingdomEverywhere(ruler.ClanId);
-        var lateClan = CreateSyncedPlayerContext("LateClan", _ => false);
-        Server.Call(() =>
-        {
-            var vassalOffers = new Dictionary<string, long>();
-            if (vassalOffer)
-                vassalOffers[kingdomId] = CampaignTime.Now.NumTicks;
-            ServerOffers()[player.HeroId] = new VassalAndMercenaryOfferData(
-                vassalOffer ? null : kingdomId, CampaignTime.Now.NumTicks, vassalOffers, false);
-        });
-        ConfigureClanInKingdom(lateClan.ClanId, kingdomId);
-        Server.NetworkSentMessages.Clear();
-
-        Server.Call(() => Server.Resolve<IVassalAndMercenaryOfferCampaignBehaviorInterface>().OnClanChangedKingdom(
-            Server.GetRegisteredObject<Clan>(lateClan.ClanId),
-            Server.GetRegisteredObject<Kingdom>(kingdomId),
-            ChangeKingdomAction.ChangeKingdomActionDetail.JoinKingdom));
-
-        var cancelled = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkVassalOrMercenaryOfferCancelled>());
-        Assert.Equal(player.HeroId, cancelled.PlayerHeroId);
-        Assert.Equal(kingdomId, cancelled.KingdomId);
-        Server.Call(() =>
-        {
-            Assert.Null(ServerOffers()[player.HeroId].CurrentMercenaryOfferKingdomId);
-            Assert.Empty(ServerOffers()[player.HeroId].VassalOffers);
-        });
     }
 
     [Fact]

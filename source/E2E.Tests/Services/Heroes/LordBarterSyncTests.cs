@@ -974,7 +974,6 @@ public class LordBarterSyncTests : MapEventTestBase
     // The destination kingdom has two clans, its ruler's and the player's.
     [Theory]
     [InlineData(0, true)]
-    [InlineData(3, true)]
     [InlineData(2, false)]
     public void JoinKingdomBarter_SynchronizesDestinationKingdomClanList_UnlessItHasMaxClansPerKingdom(int maxClansPerKingdom, bool accepted)
     {
