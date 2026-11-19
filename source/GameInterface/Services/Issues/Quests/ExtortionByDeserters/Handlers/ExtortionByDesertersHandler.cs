@@ -36,6 +36,7 @@ internal class ExtortionByDesertersHandler : IHandler
     {
         if (questFeatureFlag.IsEnabled)
         {
+            ExtortionByDesertersPartyPatches.AddPatches(patchCollector);
             // Compile these callers after AutoSync so they cannot inline unpatched setters.
             var prefix = AccessTools.Method(typeof(ExtortionByDesertersServerMethodsPatch), nameof(ExtortionByDesertersServerMethodsPatch.Prefix));
             foreach (var method in ExtortionByDesertersServerMethodsPatch.TargetMethods()) patchCollector.AddPrefix(method, prefix);
