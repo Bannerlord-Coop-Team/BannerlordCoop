@@ -1,9 +1,12 @@
-﻿using E2E.Tests.Util;
+﻿using E2E.Tests.Environment;
+using E2E.Tests.Util;
+using GameInterface.Services.MapEvents.Messages.Start;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Siege;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.MapEvents;
@@ -20,38 +23,42 @@ public class MapEventComponentSyncTests : MapEventTestBase
     {
         string? mapEventId = null;
         string? settlementId = null;
-        // The siege steps read a live SiegeEvent, which this battle has none of
+        // The fixture supplies the siege graph and starts the battle with only its two leaders.
         var disabledMethods = MapEventDisabledMethods
-            .Append(AccessTools.Method(typeof(SiegeAssaultEventComponent), nameof(SiegeAssaultEventComponent.UpdateMapEventSettlement)))
             .Append(AccessTools.Method(typeof(SiegeAssaultEventComponent), nameof(SiegeAssaultEventComponent.AddMapEventParties)))
             .Append(AccessTools.Method(typeof(SiegeAssaultEventComponent), nameof(SiegeAssaultEventComponent.AddInsideSettlementParties)))
+            .Append(AccessTools.Method(typeof(MobileParty), "OnPartyJoinedSiegeInternal"))
+            .Append(AccessTools.Method(typeof(BesiegerCamp), nameof(BesiegerCamp.InitializeSiegeEventSide)))
+            .Append(AccessTools.Method(typeof(Settlement), nameof(Settlement.InitializeSiegeEventSide)))
             .ToList();
 
+        Server.Resolve<TestNetworkRouter>().ReceiveContext = TestNetworkReceiveContext.PollerThread;
         Server.Call(() =>
         {
             var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
             var attacker = GameObjectCreator.CreateInitializedObject<MobileParty>();
             var defender = GameObjectCreator.CreateInitializedObject<MobileParty>();
-            var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
-            mapEvent.MapEventVisual = MockMapEventVisual();
-            var component = SiegeAssaultEventComponent.CreateComponentForOldSaves(mapEvent);
-            component.MapEventSettlement = settlement;
-            mapEvent.Initialize(attacker.Party, defender.Party, component);
-            mapEvent.MapEventVisual = null;
+            CreateReplicableSiegeEvent(settlement, attacker);
+            var component = SiegeAssaultEventComponent.CreateSiegeAssaultMapEvent(attacker.Party, defender.Party);
+            var mapEvent = component.MapEvent;
 
             Assert.True(Server.ObjectManager.TryGetId(mapEvent, out mapEventId));
             Assert.True(Server.ObjectManager.TryGetId(settlement, out settlementId));
         }, disabledMethods);
-        TestEnvironment.FlushCoalescer();
+
+        var commit = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkMapEventInitialized>());
+        Assert.False(commit.IsTerminal);
 
         foreach (var client in Clients)
         {
             client.Call(() =>
             {
+                client.PumpGameThread();
                 Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventId!, out var mapEvent));
                 Assert.True(client.ObjectManager.TryGetObject<Settlement>(settlementId!, out var settlement));
                 var component = Assert.IsType<SiegeAssaultEventComponent>(mapEvent.Component);
                 Assert.Same(settlement, component.MapEventSettlement);
+                Assert.Contains(mapEvent, Campaign.Current.MapEventManager.MapEvents);
             }, disabledMethods);
         }
     }

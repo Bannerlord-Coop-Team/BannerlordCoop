@@ -584,18 +584,6 @@ public class MapEventLifetimeTests : MapEventTestBase
         return false;
     }
 
-    private static void CreateReplicableSiegeEvent(Settlement settlement, MobileParty besieger)
-    {
-        var siegeEvent = new SiegeEvent(settlement, besieger);
-        siegeEvent.BesiegerCamp.SiegeEngines = new SiegeEvent.SiegeEnginesContainer(
-            BattleSideEnum.Attacker, null);
-        settlement.SiegeEngines = new SiegeEvent.SiegeEnginesContainer(
-            BattleSideEnum.Defender, null);
-        siegeEvent.BesiegerCamp._besiegerParties.Add(besieger);
-        siegeEvent.BesiegerCamp._leaderParty = besieger;
-        siegeEvent.BesiegerCamp._faction = besieger.MapFaction;
-    }
-
     [Fact]
     public void ClientFinalize_MapEvent_ServerAuthoritativelyDestroys()
     {
