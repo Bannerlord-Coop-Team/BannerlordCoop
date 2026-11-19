@@ -3,7 +3,6 @@ using HarmonyLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 
 namespace GameInterface.AutoSync;
@@ -38,8 +37,6 @@ class AutoSyncPatchCollector : IAutoSyncPatchCollector
         if (patchMethod == null) throw new ArgumentNullException(nameof(patchMethod));
         if (patch == null) throw new ArgumentNullException(nameof(patch));
 
-        if (IsAlreadyApplied(patchMethod, patch, HarmonyPatchType.Prefix)) return;
-
         prefixes.Add((patchMethod, patch));
     }
     public void AddPostfix(MethodBase patchMethod, MethodInfo patch)
@@ -55,21 +52,6 @@ class AutoSyncPatchCollector : IAutoSyncPatchCollector
         if (patch == null) throw new ArgumentNullException(nameof(patch));
 
         transpilers.Add((patchMethod, patch));
-    }
-
-    private bool IsAlreadyApplied(MethodBase method, MethodInfo patch, HarmonyPatchType type)
-    {
-        var info = Harmony.GetPatchInfo(method);
-        var candidates = type switch
-        {
-            HarmonyPatchType.Prefix => info?.Prefixes,
-            HarmonyPatchType.Postfix => info?.Postfixes,
-            HarmonyPatchType.Transpiler => info?.Transpilers,
-            _ => null,
-        };
-        return candidates?.Any(existing => existing.owner == harmony.Id &&
-            existing.PatchMethod.Name == patch.Name &&
-            existing.PatchMethod.DeclaringType?.FullName == patch.DeclaringType?.FullName) == true;
     }
 
     public void PatchAll()
@@ -97,8 +79,6 @@ class AutoSyncPatchCollector : IAutoSyncPatchCollector
 
         foreach (var (method, patch) in prefixes)
         {
-            if (IsAlreadyApplied(method, patch, HarmonyPatchType.Prefix)) continue;
-
             var key = (method, patch, HarmonyPatchType.Prefix);
             if (PatchedMethods.Contains(key))
             {
