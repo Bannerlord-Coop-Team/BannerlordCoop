@@ -29,12 +29,15 @@ public class CaravanAmbushAcceptTests
     private static string caravanId = null!;
     private static Hideout hideout = null!;
     private static readonly List<(object Container, Hero Hero, MobileParty Party)> spawns = new();
+    private static (Quest Quest, MobileParty Caravan, MobileParty Bandits)? failedAccept;
     private readonly ITestOutputHelper output;
 
     public CaravanAmbushAcceptTests(ITestOutputHelper output) => this.output = output;
 
-    [Fact]
-    public void RealAcceptKeepsTheQuestOnItsOwnerAndSpawnsOnlyOnTheServer()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RealAcceptCompletesOrRemovesTheSpawnedParties(bool failAfterSpawn)
     {
         using var environment = new E2ETestEnvironment(output);
         var server = environment.Server;
@@ -118,9 +121,30 @@ public class CaravanAmbushAcceptTests
                 prefix: new HarmonyMethod(typeof(CaravanAmbushAcceptTests), nameof(FindHideout)));
             harmony.Patch(AccessTools.PropertyGetter(typeof(MobileParty), nameof(MobileParty.Speed)),
                 prefix: new HarmonyMethod(typeof(CaravanAmbushAcceptTests), nameof(ReadSpeed)));
+            if (failAfterSpawn)
+            {
+                harmony.Patch(AccessTools.Method(typeof(Quest), nameof(Quest.OnQuestAccepted)),
+                    postfix: new HarmonyMethod(typeof(CaravanAmbushAcceptTests), nameof(FailAfterSpawn)));
+            }
             using var matchSpeed = new MethodCallRecorder(AccessTools.Method(typeof(MobilePartyHelper), nameof(MobilePartyHelper.TryMatchPartySpeedWithItemWeight)));
 
             scenario.Accept(owner);
+            if (failAfterSpawn)
+            {
+                Assert.Single(server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAcceptRejected>());
+                Assert.Empty(server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAccepted>());
+                Assert.True(failedAccept.HasValue);
+                var (quest, caravan, bandits) = failedAccept.Value;
+                server.Call(() =>
+                {
+                    Assert.False(caravan.IsActive);
+                    Assert.False(bandits.IsActive);
+                    Assert.Null(quest._caravanParty);
+                    Assert.Null(quest._banditParty);
+                    Assert.True(server.GetRegisteredObject<Hero>(scenario.NotableId).Issue.IsOngoingWithoutQuest);
+                });
+                return;
+            }
             owner.Call(() => ((Quest)scenario.QuestOf(owner)).OnQuestAccepted());
 
             Assert.Equal(QuestScenario.ControllerA, scenario.OwnerOnServer());
@@ -173,7 +197,16 @@ public class CaravanAmbushAcceptTests
             harmony.UnpatchAll(harmony.Id);
             spawns.Clear();
             hideout = null!;
+            failedAccept = null;
         }
+    }
+
+    private static void FailAfterSpawn(Quest __instance)
+    {
+        Assert.True(__instance._caravanParty.IsActive);
+        Assert.True(__instance._banditParty.IsActive);
+        failedAccept = (__instance, __instance._caravanParty, __instance._banditParty);
+        throw new InvalidOperationException("test accept failure after spawning both parties");
     }
 
     private static bool CreateCaravan(ref MobileParty __result) => SupplyParty(caravanId, out __result);

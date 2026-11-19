@@ -1,11 +1,9 @@
 ﻿using Common;
 using Common.Messaging;
-using GameInterface.Services.Issues.Framework.Finalization;
 using Common.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Framework.Registries;
-using GameInterface.Services.ObjectManager;
 using ProtoBuf;
 using Moq;
 using System;

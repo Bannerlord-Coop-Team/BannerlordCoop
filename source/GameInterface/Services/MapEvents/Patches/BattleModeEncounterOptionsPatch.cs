@@ -266,9 +266,6 @@ internal class BattleModeEncounterOptionsPatch
         if (!ContainerProvider.TryResolve<IOrderAttackRule>(out var orderAttackRule))
             return false;
 
-        if (orderAttackRule.IsOrderAttackBlocked(mapEvent, MobileParty.MainParty, CharacterObject.PlayerCharacter))
-            return false;
-
         var isNavalOrder = mapEvent.IsNavalMapEvent ||
                            (MapEventHelper.IsNavalRaid(mapEvent) && mapEvent.PlayerSide == BattleSideEnum.Attacker);
         args.optionLeaveType = isNavalOrder
@@ -279,9 +276,20 @@ internal class BattleModeEncounterOptionsPatch
         if (orderAttackRule.IsFirstOpponentInRaft(mapEvent, encounter.OpponentSide))
             return false;
 
+        var wasEnabled = args.IsEnabled;
+        var previousTooltip = args.Tooltip;
         MenuHelper.CheckEnemyAttackableHonorably(args);
 
-        if (orderAttackRule.CountOrderableTroops(PartyBase.MainParty, CharacterObject.PlayerCharacter) > 0)
+        if (orderAttackRule.HasNoOrderableTroops(mapEvent, MobileParty.MainParty, CharacterObject.PlayerCharacter))
+        {
+            // Keep the original enabled state and tooltip for hidden options.
+            args.IsEnabled = wasEnabled;
+            args.Tooltip = previousTooltip;
+            return false;
+        }
+
+        if (!MobileParty.MainParty.IsInRaftState &&
+            orderAttackRule.CountOrderableTroops(PartyBase.MainParty, CharacterObject.PlayerCharacter) > 0)
         {
             MBTextManager.SetTextVariable(
                 "SEND_TROOPS_TEXT",

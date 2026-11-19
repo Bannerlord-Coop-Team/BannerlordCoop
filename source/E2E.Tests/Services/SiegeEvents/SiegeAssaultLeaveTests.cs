@@ -561,6 +561,7 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
     public void OrderAttackFallback_PreservesVisibilityLeaveTypeAndText()
     {
         var battle = CreateServerMapEvent();
+        var allyId = JoinNewServerPartyToSide(battle.MapEventId, BattleSideEnum.Attacker);
         var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
         var client = Clients.First();
         SetMainParty(client, battle.AttackerPartyId);
@@ -573,6 +574,7 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
             var mapEvent = client.GetRegisteredObject<MapEvent>(battle.MapEventId);
             var attacker = client.GetRegisteredObject<MobileParty>(battle.AttackerPartyId);
             var defender = client.GetRegisteredObject<MobileParty>(battle.DefenderPartyId);
+            var ally = client.GetRegisteredObject<MobileParty>(allyId);
             var encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
             encounter._mapEvent = mapEvent;
             encounter._encounteredParty = defender.Party;
@@ -588,19 +590,20 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
             var sendType = GameMenuOption.LeaveType.OrderTroopsToAttack;
             var untouchedType = new MenuCallbackArgs((MenuContext)null, null).optionLeaveType;
 
-            (string Name, bool Attached, bool DefenderRaft, bool DefenderHasTroops, bool HasLeader, bool PlayerOnly, bool Naval,
+            (string Name, bool Attached, bool DefenderRaft, bool DefenderHasTroops, bool HasLeader, bool PlayerOnly, bool Naval, bool AttackerRaft,
                 bool CanOrder, bool Shown, GameMenuOption.LeaveType LeaveType, string Text)[] rows =
             {
-                (Name: "attached", Attached: true, DefenderRaft: false, DefenderHasTroops: true, HasLeader: true, PlayerOnly: false, Naval: false,
+                (Name: "attached", Attached: true, DefenderRaft: false, DefenderHasTroops: true, HasLeader: true, PlayerOnly: false, Naval: false, AttackerRaft: false,
                     CanOrder: true, Shown: true, LeaveType: sendType, Text: sendTroops),
-                ("unattached", false, false, true, true, false, false, false, false, untouchedType, unchanged),
-                ("opponent in raft", true, true, true, true, false, false, false, false, untouchedType, unchanged),
-                ("opponent in raft with no troops", true, true, false, true, false, false, false, false, sendType, unchanged),
-                ("no opposing troops", true, false, false, true, false, false, false, true, sendType, sendTroops),
-                ("no opposing leader", true, false, true, false, false, false, false, true, sendType, sendTroops),
-                ("no orderable troops", true, false, true, true, true, false, false, false, untouchedType, unchanged),
-                ("player alone with no opposing troops", true, false, false, true, true, false, false, true, sendType, leaveToOthers),
-                ("naval", true, false, true, true, false, true, true, true, GameMenuOption.LeaveType.OrderShipsToAttack, "Send ships."),
+                ("unattached", false, false, true, true, false, false, false, false, false, untouchedType, unchanged),
+                ("opponent in raft", true, true, true, true, false, false, false, false, false, sendType, unchanged),
+                ("opponent in raft with no troops", true, true, false, true, false, false, false, false, false, sendType, unchanged),
+                ("no opposing troops", true, false, false, true, false, false, false, false, true, sendType, sendTroops),
+                ("no opposing leader", true, false, true, false, false, false, false, false, true, sendType, sendTroops),
+                ("no orderable troops", true, false, true, true, true, false, false, false, false, sendType, unchanged),
+                ("player alone with no opposing troops", true, false, false, true, true, false, false, false, true, sendType, leaveToOthers),
+                ("naval", true, false, true, true, false, true, false, true, true, GameMenuOption.LeaveType.OrderShipsToAttack, "Send ships."),
+                ("player in raft with an ally able to fight", true, false, true, true, false, false, true, true, true, sendType, leaveToOthers),
             };
 
             using var allowed = new AllowedThread();
@@ -610,16 +613,20 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
                 mapEvent.Position = new CampaignVec2(default, isOnLand: !row.Naval);
                 attacker.Party._mapEventSide = row.Attached ? attackerSide : null;
                 // During the join window vanilla hasn't set the party's side or added it to the event.
-                var attackerEntry = Assert.Single(attackerSide.Parties);
+                var attackerEntry = Assert.Single(attackerSide.Parties, entry => entry.Party == attacker.Party);
                 if (!row.Attached)
                     attackerSide._battleParties.Remove(attackerEntry);
                 defender.IsInRaftState = row.DefenderRaft;
+                attacker.IsInRaftState = row.AttackerRaft;
                 defenderSide.LeaderParty = row.HasLeader ? defender.Party : null;
                 attacker.MemberRoster.Clear();
                 defender.MemberRoster.Clear();
+                ally.MemberRoster.Clear();
                 attacker.MemberRoster.AddToCounts(row.PlayerOnly ? CharacterObject.PlayerCharacter : troop, 1);
                 if (row.DefenderHasTroops)
                     defender.MemberRoster.AddToCounts(troop, 1);
+                if (row.AttackerRaft)
+                    ally.MemberRoster.AddToCounts(troop, 1);
 
                 MBTextManager.SetTextVariable("SEND_TROOPS_TEXT", unchanged);
                 var (shown, args) = InvokeSiegeOrderAttackFallback();

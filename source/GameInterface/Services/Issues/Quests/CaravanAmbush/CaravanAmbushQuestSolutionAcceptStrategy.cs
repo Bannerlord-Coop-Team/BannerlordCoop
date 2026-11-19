@@ -2,6 +2,7 @@
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Interface;
 using System;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Issues;
 using Quest = TaleWorlds.CampaignSystem.Issues.CaravanAmbushIssueBehavior.CaravanAmbushIssueQuest;
 
@@ -24,11 +25,24 @@ internal class CaravanAmbushQuestSolutionAcceptStrategy : IQuestSolutionAcceptSt
     {
         if (ModInformation.IsClient || !(issue.IssueQuest is Quest quest)) return;
         if (!owners.TryResolveOwnerHero(issue, out var hero)) throw new InvalidOperationException("Caravan quest has no owner");
-        using (new MainHeroSubstitutionScope(hero, hero.PartyBelongedTo))
+        try
         {
-            // StartQuest is suppressed on the server, so vanilla spawns the parties without registering listeners.
-            quest.OnQuestAccepted();
+            using (new MainHeroSubstitutionScope(hero, hero.PartyBelongedTo))
+            {
+                // StartQuest is suppressed on the server, so vanilla spawns the parties without registering listeners.
+                quest.OnQuestAccepted();
+            }
+            progress.Publish(quest);
         }
-        progress.Publish(quest);
+        catch
+        {
+            if (quest._caravanParty?.IsActive == true)
+                DestroyPartyAction.Apply(null, quest._caravanParty);
+            if (quest._banditParty?.IsActive == true)
+                DestroyPartyAction.Apply(null, quest._banditParty);
+            quest._caravanParty = null;
+            quest._banditParty = null;
+            throw;
+        }
     }
 }

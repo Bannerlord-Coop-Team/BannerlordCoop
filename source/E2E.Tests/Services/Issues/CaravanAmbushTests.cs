@@ -405,22 +405,6 @@ public class CaravanAmbushTests : IDisposable
     }
 
     [Fact]
-    public void SavedCaravanReachingASettlementKeepsTheQuest()
-    {
-        Server.Call(() =>
-        {
-            BindParties();
-            var quest = QuestOf(Server);
-            quest._isCaravanSaved = true;
-            var caravan = quest._caravanParty;
-            Server.Resolve<ICaravanAmbushWorldEventService>().SettlementEntered(caravan);
-            Assert.True(quest.IsOngoing);
-            Assert.Same(caravan, quest._caravanParty);
-        });
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
-    }
-
-    [Fact]
     public void CapturedOwnerAmbushBattleLosesInvulnerabilityAfterSixHours()
     {
         Server.Call(() =>

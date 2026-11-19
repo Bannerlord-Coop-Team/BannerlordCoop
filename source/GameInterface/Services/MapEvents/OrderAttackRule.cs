@@ -10,7 +10,7 @@ namespace GameInterface.Services.MapEvents;
 public interface IOrderAttackRule
 {
     bool CanOrderAttack(MapEvent mapEvent, MobileParty requesterParty, CharacterObject requesterCharacter);
-    bool IsOrderAttackBlocked(MapEvent mapEvent, MobileParty requesterParty, CharacterObject requesterCharacter);
+    bool HasNoOrderableTroops(MapEvent mapEvent, MobileParty requesterParty, CharacterObject requesterCharacter);
     bool IsFirstOpponentInRaft(MapEvent mapEvent, BattleSideEnum opponentSide);
     int CountOrderableTroops(PartyBase party, CharacterObject requesterCharacter);
 }
@@ -20,13 +20,14 @@ public class OrderAttackRule : IOrderAttackRule
     public bool CanOrderAttack(MapEvent mapEvent, MobileParty requesterParty, CharacterObject requesterCharacter)
     {
         return HasOrderAttackPreconditions(mapEvent, requesterParty, out var side, out var oppositeSide)
-            && CanSideOrderAttack(mapEvent, side, oppositeSide, requesterCharacter);
+            && !IsFirstOpponentInRaft(mapEvent, oppositeSide)
+            && HasOrderableTroops(side, requesterCharacter);
     }
 
-    public bool IsOrderAttackBlocked(MapEvent mapEvent, MobileParty requesterParty, CharacterObject requesterCharacter)
+    public bool HasNoOrderableTroops(MapEvent mapEvent, MobileParty requesterParty, CharacterObject requesterCharacter)
     {
-        return HasOrderAttackPreconditions(mapEvent, requesterParty, out var side, out var oppositeSide)
-            && !CanSideOrderAttack(mapEvent, side, oppositeSide, requesterCharacter);
+        return HasOrderAttackPreconditions(mapEvent, requesterParty, out var side, out _)
+            && !HasOrderableTroops(side, requesterCharacter);
     }
 
     private static bool HasOrderAttackPreconditions(MapEvent mapEvent, MobileParty requesterParty,
@@ -41,11 +42,8 @@ public class OrderAttackRule : IOrderAttackRule
         return mapEvent.HasTroopsOnBothSides() && mapEvent.GetLeaderParty(oppositeSide) != null;
     }
 
-    private bool CanSideOrderAttack(MapEvent mapEvent, MapEventSide side, BattleSideEnum oppositeSide, CharacterObject requesterCharacter)
+    private bool HasOrderableTroops(MapEventSide side, CharacterObject requesterCharacter)
     {
-        if (IsFirstOpponentInRaft(mapEvent, oppositeSide))
-            return false;
-
         var orderableTroops = side.Parties
             .Where(party => !party.Party.IsMobile || !party.Party.MobileParty.IsInRaftState)
             .Sum(party => CountOrderableTroops(party.Party, requesterCharacter));
