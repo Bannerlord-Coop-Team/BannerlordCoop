@@ -106,15 +106,17 @@ internal class LordSolutionCoordinator : ILordSolutionCoordinator, IHandler
     {
         if (ModInformation.IsServer) return;
 
-        GameThread.RunSafe(() =>
-        {
-            var owners = new HashSet<(string IssueOwnerId, string IssueId)>(
-                (payload.What.Owners ?? Array.Empty<IssueOwnershipData>())
-                    .Select(owner => (owner.IssueOwnerId, owner.IssueId)));
-            bool StillListed(IssueBase issue) =>
-                objects.TryGetId(issue.IssueOwner, out var issueOwnerId) && owners.Contains((issueOwnerId, issue.StringId));
-            pendingDecisions.RemoveWhere(issue => !StillListed(issue));
-        }, context: nameof(LordSolutionCoordinator));
+        GameThread.RunSafe(() => DropUnlistedDecisions(payload.What), context: nameof(LordSolutionCoordinator));
+    }
+
+    private void DropUnlistedDecisions(NetworkIssueOwnershipSnapshot snapshot)
+    {
+        var owners = new HashSet<(string IssueOwnerId, string IssueId)>(
+            (snapshot.Owners ?? Array.Empty<IssueOwnershipData>())
+                .Select(owner => (owner.IssueOwnerId, owner.IssueId)));
+        bool StillListed(IssueBase issue) =>
+            objects.TryGetId(issue.IssueOwner, out var issueOwnerId) && owners.Contains((issueOwnerId, issue.StringId));
+        pendingDecisions.RemoveWhere(issue => !StillListed(issue));
     }
 
     private void HandleRequest(MessagePayload<RequestLordSolution> payload)
