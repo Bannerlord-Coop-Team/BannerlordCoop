@@ -1618,8 +1618,8 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
     {
         bool incomingHasAim = incoming.AimDirection > AimSentinel + 1f;
         // Keep the host's wreck distance when merging a movement snapshot from the claimant.
-        bool incomingHasMovement = incoming.MoveDistance >= 0f
-            && !(existing.DestructionState > 0 && incoming.DestructionState < 0);
+        bool keepsHostWreckDistance = existing.DestructionState > 0 && incoming.DestructionState < 0;
+        bool incomingHasMovement = incoming.MoveDistance >= 0f && !keepsHostWreckDistance;
         return new NetworkSiegeMachineState(
             incoming.MachineId,
             incoming.HitPoints >= 0f ? incoming.HitPoints : existing.HitPoints,
@@ -1693,13 +1693,13 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
     private static void Apply(UsableMachine machine, NetworkSiegeMachineState state)
     {
         bool isMachineSimulatedLocally = SiegeMissionAuthorityGate.IsMachineSimulatedLocally(machine.Id.Id);
+        bool isDestroyed = machine.DestructionComponent?.IsDestroyed == true;
         var movement = (machine as BatteringRam)?.MovementComponent
             ?? (machine as SiegeTower)?.MovementComponent;
 
         // Other peers ease toward the simulator's distance while the machine is intact.
         // After destruction, a late movement snapshot must leave the wreck at the host's frame.
-        if (state.MoveDistance >= 0f && !isMachineSimulatedLocally && movement != null
-            && machine.DestructionComponent?.IsDestroyed != true)
+        if (state.MoveDistance >= 0f && !isMachineSimulatedLocally && movement != null && !isDestroyed)
         {
             // Vanilla MP's steady-state client recipe (MissionNetworkComponent's siege machine movement
             // handler): feed the distance into the movement component's advancement error and let its own
