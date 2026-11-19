@@ -54,10 +54,12 @@ internal class IssueOwnershipSnapshotReceiver : IHandler
         var rememberedOwners = ownership.GetAll();
         var snapshotPairs = new HashSet<(string IssueOwnerId, string IssueId)>(
             owners.Select(owner => (owner.IssueOwnerId, owner.IssueId)));
-        var dropped = rememberedOwners
-            .Where(remembered => !snapshotPairs.Contains((remembered.IssueOwnerId, remembered.IssueId)))
-            .Select(remembered => (remembered.IssueOwnerId, remembered.IssueId,
-                WasOwner: remembered.ControllerId == controller.ControllerId)).ToArray();
+        var dropped = new List<(string IssueOwnerId, string IssueId, bool WasOwner)>();
+        foreach (var remembered in rememberedOwners)
+        {
+            if (snapshotPairs.Contains((remembered.IssueOwnerId, remembered.IssueId))) continue;
+            dropped.Add((remembered.IssueOwnerId, remembered.IssueId, remembered.ControllerId == controller.ControllerId));
+        }
 
         // Clear remembered controllers before the authoritative snapshot, since accept is first-wins.
         foreach (var remembered in rememberedOwners)

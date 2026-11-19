@@ -9,6 +9,7 @@ using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MapEvents.Participation;
+using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.ObjectManager;
@@ -287,9 +288,23 @@ internal class BattleSimulationRunHandler : IHandler
     private static bool CanPlayerAttack(MapEvent mapEvent, MobileParty attackerParty)
     {
         var eventParty = mapEvent.FindMapEventParty(attackerParty.Party, out var side);
-        return eventParty != null && mapEvent.HasTroopsOnBothSides() &&
+        if (eventParty == null) return false;
+
+        var opponentParty = mapEvent.PartiesOnSide(side.MissionSide.GetOppositeSide()).FirstOrDefault();
+        if (opponentParty?.Party.MobileParty?.IsInRaftState == true) return false;
+
+        var orderableTroops = 0;
+        foreach (var party in side.Parties)
+        {
+            if (!party.Party.IsMobile || !party.Party.MobileParty.IsInRaftState)
+                orderableTroops += BattleModeEncounterOptionsPatch.CountOrderableTroops(party.Party);
+        }
+
+        return mapEvent.HasTroopsOnBothSides() &&
             mapEvent.GetLeaderParty(side.MissionSide.GetOppositeSide()) != null &&
-            attackerParty.Party.NumberOfHealthyMembers > 0;
+            orderableTroops > 0 &&
+            !attackerParty.IsInRaftState &&
+            BattleModeEncounterOptionsPatch.CountOrderableTroops(attackerParty.Party) > 0;
     }
 
     private bool TryGetRequestingParticipant(

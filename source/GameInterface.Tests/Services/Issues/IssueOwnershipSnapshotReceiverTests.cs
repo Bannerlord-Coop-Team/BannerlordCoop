@@ -85,16 +85,6 @@ public class IssueOwnershipSnapshotReceiverTests : IDisposable
     }
 
     [Fact]
-    public void AChangedControllerDoesNotReplayCancellationForTheSameIssue()
-    {
-        Receive(new NetworkIssueOwnershipSnapshot(new[] { new IssueOwnershipData("hero_1", "issue_1", "new-player") }));
-
-        Assert.True(registry.TryGetOwner("hero_1", "issue_1", out var owner));
-        Assert.Equal("new-player", owner);
-        Assert.Empty(cancelled);
-    }
-
-    [Fact]
     public void AnEmptySnapshotThatWentThroughTheWireClearsWhatTheClientRemembered()
     {
         var received = ThroughTheWire(new NetworkIssueOwnershipSnapshot(Array.Empty<IssueOwnershipData>()));
@@ -120,6 +110,35 @@ public class IssueOwnershipSnapshotReceiverTests : IDisposable
         Assert.Equal("player-A", first);
         Assert.True(registry.TryGetOwner("hero_2", "issue_2", out var second));
         Assert.Equal("player-B", second);
+    }
+
+    [Fact]
+    public void AThrowingCancelKeepsTheReplacedMirrorAndDoesNotSkipOtherCancels()
+    {
+        registry.TrySetOwner("hero_2", "issue_2", "another-player");
+        var replacementObservedBeforeCancel = false;
+        var replay = new Mock<IIssueFinalizationReplay>();
+        replay.Setup(value => value.ReplayLocalCancel("hero_1", "issue_1", true)).Callback(() =>
+        {
+            Assert.False(registry.TryGetOwner("hero_1", "issue_1", out _));
+            Assert.True(registry.TryGetOwner("hero_1", "replacement", out var owner));
+            Assert.Equal("new-player", owner);
+            replacementObservedBeforeCancel = true;
+            throw new InvalidOperationException("cancel failed");
+        });
+        using var throwingReceiver = new IssueOwnershipSnapshotReceiver(new MessageBroker(), registry,
+            Mock.Of<IIssueResolver>(), Mock.Of<IControllerIdProvider>(c => c.ControllerId == "stale-player"), replay.Object);
+
+        GameThread.Run(() => throwingReceiver.Handle_NetworkIssueOwnershipSnapshot(
+            new MessagePayload<NetworkIssueOwnershipSnapshot>(this, new NetworkIssueOwnershipSnapshot(new[]
+            {
+                new IssueOwnershipData("hero_1", "replacement", "new-player"),
+            }))), blocking: true);
+
+        Assert.True(replacementObservedBeforeCancel);
+        replay.Verify(value => value.ReplayLocalCancel("hero_1", "issue_1", true), Times.Once);
+        replay.Verify(value => value.ReplayLocalCancel("hero_2", "issue_2", false), Times.Once);
+        Assert.Single(registry.GetAll());
     }
 
     [Fact]

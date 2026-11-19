@@ -53,6 +53,7 @@ internal class CaravanAmbushProgress : ICaravanAmbushProgress
     {
         id = null;
         // A null id means the party is inactive and the owner keeps its last known reference.
-        return party == null || !party.IsActive || objects.TryGetIdWithLogging(party, out id);
+        if (party == null || !party.IsActive) return true;
+        return objects.TryGetIdWithLogging(party, out id);
     }
 }

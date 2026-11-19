@@ -10,7 +10,7 @@ namespace GameInterface.Services.Issues.Quests.CaravanAmbush;
 internal interface ICaravanAmbushMapConversation
 {
     bool IsOwnerFreeOnMap();
-    bool TryOpen(MobileParty caravan);
+    void Open(MobileParty caravan);
 }
 
 internal class CaravanAmbushMapConversation : ICaravanAmbushMapConversation
@@ -18,12 +18,10 @@ internal class CaravanAmbushMapConversation : ICaravanAmbushMapConversation
     public bool IsOwnerFreeOnMap() => GameStateManager.Current?.ActiveState is MapState map && !map.AtMenu &&
         !map.IsSimulationActive && !Campaign.Current.ConversationManager.IsConversationInProgress;
 
-    public bool TryOpen(MobileParty caravan)
+    public void Open(MobileParty caravan)
     {
         var leader = ConversationHelper.GetConversationCharacterPartyLeader(caravan.Party);
-        if (leader == null) return false;
         CampaignMapConversation.OpenConversation(
             new ConversationCharacterData(Hero.MainHero.CharacterObject), new ConversationCharacterData(leader));
-        return true;
     }
 }

@@ -319,7 +319,7 @@ internal class BattleModeEncounterOptionsPatch
         return true;
     }
 
-    private static int CountOrderableTroops(PartyBase party)
+    internal static int CountOrderableTroops(PartyBase party)
     {
         var count = 0;
         foreach (var element in party.MemberRoster.GetTroopRoster())

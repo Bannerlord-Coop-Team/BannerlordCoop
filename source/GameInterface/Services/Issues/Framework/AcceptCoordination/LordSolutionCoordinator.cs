@@ -110,9 +110,9 @@ internal class LordSolutionCoordinator : ILordSolutionCoordinator, IHandler
             var owners = new HashSet<(string IssueOwnerId, string IssueId)>(
                 (payload.What.Owners ?? Array.Empty<IssueOwnershipData>())
                     .Select(owner => (owner.IssueOwnerId, owner.IssueId)));
-            pendingDecisions.RemoveWhere(issue =>
-                !objects.TryGetId(issue.IssueOwner, out var issueOwnerId) ||
-                !owners.Contains((issueOwnerId, issue.StringId)));
+            bool StillListed(IssueBase issue) =>
+                objects.TryGetId(issue.IssueOwner, out var issueOwnerId) && owners.Contains((issueOwnerId, issue.StringId));
+            pendingDecisions.RemoveWhere(issue => !StillListed(issue));
         }, context: nameof(LordSolutionCoordinator));
     }
 

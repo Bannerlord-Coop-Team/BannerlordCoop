@@ -41,7 +41,7 @@ internal class CaravanAmbushEventPatches
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnBanditPartyRecruited))]
     [HarmonyPostfix]
-    private static void Recruited(MobileParty banditParty) => Run(events => events.BanditsRecruited(banditParty));
+    private static void Recruited(MobileParty banditParty) => Run(events => events.BanditsRecruited(banditParty, Hero.MainHero));
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnSettlementEntered))]
     [HarmonyPostfix]

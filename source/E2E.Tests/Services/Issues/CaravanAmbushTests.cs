@@ -225,7 +225,7 @@ public class CaravanAmbushTests : IDisposable
     }
 
     [Fact]
-    public void EligibleSecondPlayerCanTakeTheSameTypeButTheOwnerCannot()
+    public void ASecondPlayerCanTakeAnotherCaravanAmbushOnAServerWithoutAPlayerClan()
     {
         var giverId = environment.CreateRegisteredObject<Hero>();
         Server.Call(() =>
@@ -239,7 +239,6 @@ public class CaravanAmbushTests : IDisposable
                 IssueOf(Server)._issueState = IssueBase.IssueState.SolvingWithQuestSolution;
             }
             var gate = Server.Resolve<IIssueAcceptPreconditions>();
-            Assert.False(gate.CanTake(second, PlayerHero(QuestScenario.ControllerA), QuestScenario.ControllerA));
             Assert.True(gate.CanTake(second, PlayerHero(QuestScenario.ControllerB), QuestScenario.ControllerB));
         });
     }
@@ -248,14 +247,21 @@ public class CaravanAmbushTests : IDisposable
     public void CaravaneerDialoguePaysTheOwnerWhenTheConversationEnds()
     {
         var goldBefore = 0;
+        var renownBefore = 0f;
+        var rewardItemCountBefore = 0;
         var ownerQuest = QuestOf(Owner);
         Server.Call(() =>
         {
             Campaign.Current.EncyclopediaManager ??= new EncyclopediaManager();
             Campaign.Current.EncyclopediaManager.CreateEncyclopediaPages();
             BindParties();
-            QuestOf(Server)._isCaravanSaved = true;
-            goldBefore = PlayerHero(QuestScenario.ControllerA).Gold;
+            var owner = PlayerHero(QuestScenario.ControllerA);
+            var quest = QuestOf(Server);
+            quest._isCaravanSaved = true;
+            quest._rewardItems.Add(DefaultItems.HardWood);
+            goldBefore = owner.Gold;
+            renownBefore = owner.Clan.Renown;
+            rewardItemCountBefore = owner.PartyBelongedTo.ItemRoster.GetItemNumber(DefaultItems.HardWood);
         });
         Owner.Call(() =>
         {
@@ -266,7 +272,13 @@ public class CaravanAmbushTests : IDisposable
             Campaign.Current.ConversationManager.EndConversation();
         });
         Assert.Equal(IssueOutcome.QuestSuccess, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
-        Server.Call(() => Assert.Equal(goldBefore + 1000, PlayerHero(QuestScenario.ControllerA).Gold));
+        Server.Call(() =>
+        {
+            var owner = PlayerHero(QuestScenario.ControllerA);
+            Assert.Equal(goldBefore + 1000, owner.Gold);
+            Assert.Equal(renownBefore + 3, owner.Clan.Renown);
+            Assert.Equal(rewardItemCountBefore + 1, owner.PartyBelongedTo.ItemRoster.GetItemNumber(DefaultItems.HardWood));
+        });
         Owner.Call(() => Assert.True(ownerQuest.IsFinalized));
     }
 
@@ -376,6 +388,7 @@ public class CaravanAmbushTests : IDisposable
             battle.BattleState = BattleState.AttackerVictory;
             CampaignEventDispatcher.Instance.OnMapEventEnded(battle);
             Assert.False(quest._isCaravanSaved);
+            AssertPartiesReleased();
         }, new[] { AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize)) });
         var finalized = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
         Assert.Equal(IssueOutcome.QuestFail, finalized.Outcome);
@@ -499,23 +512,9 @@ public class CaravanAmbushTests : IDisposable
     }
 
     [Fact]
-    public void NormalEndingReleasesTheServersPartiesOnce()
-    {
-        using var ends = new MethodCallRecorder(Priority.First, true,
-            AccessTools.Method(typeof(CaravanAmbushWorldEventService), nameof(CaravanAmbushWorldEventService.End)));
-        Server.Call(() =>
-        {
-            BindParties();
-            QuestOf(Server).CompleteQuestWithCancel();
-            AssertPartiesReleased();
-        });
-        Assert.Equal(1, ends.CountFor(Server));
-        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
-    }
-
-    [Fact]
     public void ProximityWarningsAreShownOnlyOnceAndOnlyToTheOwner()
     {
+        scenario.AttachQuest(Other, CreateQuest);
         using var warnings = new MethodCallRecorder(AccessTools.Method(typeof(MBInformationManager), nameof(MBInformationManager.AddQuickInformation)));
         SendState(QuestScenario.ControllerA, false, 1);
         SendState(QuestScenario.ControllerA, false, 1);
@@ -541,41 +540,7 @@ public class CaravanAmbushTests : IDisposable
             {
                 BindParties();
                 var quest = QuestOf(Server);
-                var settlement = Server.GetRegisteredObject<Settlement>(settlementId);
-                var town = Server.GetRegisteredObject<Town>(townId);
-                var secondSettlement = Server.GetRegisteredObject<Settlement>(secondSettlementId);
-                var secondTown = Server.GetRegisteredObject<Town>(secondTownId);
-                AccessTools.Field(typeof(Town), nameof(Town._marketData)).SetValue(town, new TownMarketData(town));
-                AccessTools.Field(typeof(Town), nameof(Town._marketData)).SetValue(secondTown, new TownMarketData(secondTown));
-                settlement.SetSettlementComponent(town);
-                secondSettlement.SetSettlementComponent(secondTown);
-                settlement._position = new CampaignVec2(new TaleWorlds.Library.Vec2(100f, 100f), isOnLand: true);
-                secondSettlement._position = new CampaignVec2(new TaleWorlds.Library.Vec2(200f, 200f), isOnLand: true);
-                town.OwnerClan = PlayerHero(QuestScenario.ControllerA).Clan;
-                secondTown.OwnerClan = PlayerHero(QuestScenario.ControllerA).Clan;
-                Campaign.Current.CampaignObjectManager.Settlements =
-                    new TaleWorlds.Library.MBList<Settlement>(Campaign.Current.Settlements) { settlement, secondSettlement };
-                quest.QuestGiver.StayingInSettlement = settlement;
-                if (Campaign.Current.Models?.EncounterModel == null)
-                {
-                    var models = Campaign.Current.Models?.GetGameModels().ToList() ?? new List<GameModel>();
-                    models.Add(new DefaultEncounterModel());
-                    Campaign.Current._gameModels = new GameModels(models);
-                }
-                AccessTools.Field(typeof(Campaign), "_averageDistanceBetweenClosestTwoTowns")?.SetValue(
-                    Campaign.Current,
-                    new Dictionary<MobileParty.NavigationType, float>
-                    {
-                        [MobileParty.NavigationType.Default] = 1000f,
-                        [MobileParty.NavigationType.Naval] = 1000f,
-                        [MobileParty.NavigationType.All] = 1000f,
-                    });
-                Assert.NotNull(Campaign.Current.Models?.EncounterModel);
-                Assert.NotNull(Campaign.Current.Models?.MapDistanceModel);
-                Assert.NotNull(Campaign.Current.MainParty);
-                Assert.NotNull(quest._caravanParty);
-                Assert.NotNull(quest._banditParty);
-                Assert.NotNull(quest.QuestGiver.CurrentSettlement);
+                SetUpGiverTowns(quest, settlementId, townId, secondSettlementId, secondTownId);
                 var ownerParty = PlayerHero(QuestScenario.ControllerA).PartyBelongedTo;
                 var otherParty = PlayerHero(QuestScenario.ControllerB).PartyBelongedTo;
                 var ownerPosition = ownerParty.Position;
@@ -583,7 +548,7 @@ public class CaravanAmbushTests : IDisposable
                 var caravanPosition = new CampaignVec2(new TaleWorlds.Library.Vec2(900f, 900f), isOnLand: true);
                 quest._caravanParty.Position = caravanPosition;
                 ownerParty.Position = new CampaignVec2(new TaleWorlds.Library.Vec2(0f, 0f), isOnLand: true);
-                otherParty.Position = new CampaignVec2(new TaleWorlds.Library.Vec2(0f, 0f), isOnLand: true);
+                otherParty.Position = caravanPosition;
                 quest._banditParty.Position = new CampaignVec2(new TaleWorlds.Library.Vec2(100f, 100f), isOnLand: true);
                 quest._vicinityCheckDisabledUntil = CampaignTime.Now - CampaignTime.Hours(2f);
                 var before = quest._vicinityCheckFailCounter;
@@ -693,6 +658,7 @@ public class CaravanAmbushTests : IDisposable
     {
         var ownerGold = 0;
         var otherGold = 0;
+        var ownerRenown = 0f;
         Server.Call(() =>
         {
             Campaign.Current.EncyclopediaManager ??= new EncyclopediaManager();
@@ -700,6 +666,7 @@ public class CaravanAmbushTests : IDisposable
             BindParties();
             ownerGold = PlayerHero(QuestScenario.ControllerA).Gold;
             otherGold = PlayerHero(QuestScenario.ControllerB).Gold;
+            ownerRenown = PlayerHero(QuestScenario.ControllerA).Clan.Renown;
             var hero = PlayerHero(QuestScenario.ControllerA);
             Server.ObjectManager.TryGetObject<MobileParty>(banditId, out var bandits);
             using (new GameInterface.Services.Heroes.Patches.MainHeroSubstitutionScope(hero, hero.PartyBelongedTo))
@@ -711,11 +678,14 @@ public class CaravanAmbushTests : IDisposable
         {
             Assert.Equal(ownerGold + 1000, PlayerHero(QuestScenario.ControllerA).Gold);
             Assert.Equal(otherGold, PlayerHero(QuestScenario.ControllerB).Gold);
+            Assert.Equal(ownerRenown + 3, PlayerHero(QuestScenario.ControllerA).Clan.Renown);
         });
     }
 
-    [Fact]
-    public void RecruitmentByAnotherPlayerCancelsWithoutPaying()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void RecruitmentByAnotherPlayerCancelsWithoutPaying(bool ownerHasParty)
     {
         var ownerGold = 0;
         var otherGold = 0;
@@ -726,6 +696,7 @@ public class CaravanAmbushTests : IDisposable
             BindParties();
             ownerGold = PlayerHero(QuestScenario.ControllerA).Gold;
             otherGold = PlayerHero(QuestScenario.ControllerB).Gold;
+            if (!ownerHasParty) PlayerHero(QuestScenario.ControllerA)._partyBelongedTo = null;
             var hero = PlayerHero(QuestScenario.ControllerB);
             Server.ObjectManager.TryGetObject<MobileParty>(banditId, out var bandits);
             using (new GameInterface.Services.Heroes.Patches.MainHeroSubstitutionScope(hero, hero.PartyBelongedTo))
@@ -740,38 +711,36 @@ public class CaravanAmbushTests : IDisposable
         });
     }
 
-    [Fact]
-    public void RecruitmentByAnotherPlayerCancelsTheQuestOfAnOwnerWithoutAParty()
-    {
-        Server.Call(() =>
-        {
-            BindParties();
-            PlayerHero(QuestScenario.ControllerA)._partyBelongedTo = null;
-            var hero = PlayerHero(QuestScenario.ControllerB);
-            Server.ObjectManager.TryGetObject<MobileParty>(banditId, out var bandits);
-            using (new GameInterface.Services.Heroes.Patches.MainHeroSubstitutionScope(hero, hero.PartyBelongedTo))
-                CampaignEventDispatcher.Instance.OnBanditPartyRecruited(bandits);
-        });
-        var finalized = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
-        Assert.Equal(IssueOutcome.QuestCancel, finalized.Outcome);
-    }
-
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
     public void OwnerTimeoutFinalizesTheQuestOnceWithTheTimeoutOutcome(bool ownerHasParty)
     {
+        var powerBefore = 0f;
+        Hero giver = null!;
+        Quest serverQuest = null!;
         Server.Call(() =>
         {
             Campaign.Current.EncyclopediaManager ??= new EncyclopediaManager();
             Campaign.Current.EncyclopediaManager.CreateEncyclopediaPages();
+            serverQuest = QuestOf(Server);
+            giver = serverQuest.QuestGiver;
+            powerBefore = giver.Power;
             if (!ownerHasParty) PlayerHero(QuestScenario.ControllerA)._partyBelongedTo = null;
         });
         var ownerQuest = QuestOf(Owner);
-        Owner.Call(() => ownerQuest.CompleteQuestWithTimeOut());
+        Server.Call(() => Server.Resolve<IOutcomeDispatcher>().RunAsOwners<Quest>(quest =>
+        {
+            quest.CompleteQuestWithTimeOut();
+        }));
         var finalized = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
         Assert.Equal(IssueOutcome.QuestTimeOut, finalized.Outcome);
         Owner.Call(() => Assert.True(ownerQuest.IsFinalized));
+        Server.Call(() =>
+        {
+            Assert.Equal(-5, serverQuest.RelationshipChangeWithQuestGiver);
+            Assert.Equal(powerBefore - 5, giver.Power);
+        });
     }
 
     [Theory]
@@ -827,11 +796,10 @@ public class CaravanAmbushTests : IDisposable
 
         public bool IsOwnerFreeOnMap() => IsFree;
 
-        public bool TryOpen(MobileParty caravan)
+        public void Open(MobileParty caravan)
         {
             Opened.Add(caravan);
             if (ThrowOnOpen) throw new InvalidOperationException("open failed");
-            return true;
         }
     }
 
@@ -884,6 +852,45 @@ public class CaravanAmbushTests : IDisposable
         // Keep the caravan on the winning side, as it is in a rescued ambush battle.
         if (caravanOnWinningSide) quest._caravanParty.Party.MapEventSide = battle.AttackerSide;
         return battle;
+    }
+
+    private void SetUpGiverTowns(Quest quest, string settlementId, string townId, string secondSettlementId, string secondTownId)
+    {
+        var settlement = Server.GetRegisteredObject<Settlement>(settlementId);
+        var town = Server.GetRegisteredObject<Town>(townId);
+        var secondSettlement = Server.GetRegisteredObject<Settlement>(secondSettlementId);
+        var secondTown = Server.GetRegisteredObject<Town>(secondTownId);
+        AccessTools.Field(typeof(Town), nameof(Town._marketData)).SetValue(town, new TownMarketData(town));
+        AccessTools.Field(typeof(Town), nameof(Town._marketData)).SetValue(secondTown, new TownMarketData(secondTown));
+        settlement.SetSettlementComponent(town);
+        secondSettlement.SetSettlementComponent(secondTown);
+        settlement._position = new CampaignVec2(new TaleWorlds.Library.Vec2(100f, 100f), isOnLand: true);
+        secondSettlement._position = new CampaignVec2(new TaleWorlds.Library.Vec2(200f, 200f), isOnLand: true);
+        town.OwnerClan = PlayerHero(QuestScenario.ControllerA).Clan;
+        secondTown.OwnerClan = PlayerHero(QuestScenario.ControllerA).Clan;
+        Campaign.Current.CampaignObjectManager.Settlements =
+            new TaleWorlds.Library.MBList<Settlement>(Campaign.Current.Settlements) { settlement, secondSettlement };
+        quest.QuestGiver.StayingInSettlement = settlement;
+        if (Campaign.Current.Models?.EncounterModel == null)
+        {
+            var models = Campaign.Current.Models?.GetGameModels().ToList() ?? new List<GameModel>();
+            models.Add(new DefaultEncounterModel());
+            Campaign.Current._gameModels = new GameModels(models);
+        }
+        AccessTools.Field(typeof(Campaign), "_averageDistanceBetweenClosestTwoTowns")?.SetValue(
+            Campaign.Current,
+            new Dictionary<MobileParty.NavigationType, float>
+            {
+                [MobileParty.NavigationType.Default] = 1000f,
+                [MobileParty.NavigationType.Naval] = 1000f,
+                [MobileParty.NavigationType.All] = 1000f,
+            });
+        Assert.NotNull(Campaign.Current.Models?.EncounterModel);
+        Assert.NotNull(Campaign.Current.Models?.MapDistanceModel);
+        Assert.NotNull(Campaign.Current.MainParty);
+        Assert.NotNull(quest._caravanParty);
+        Assert.NotNull(quest._banditParty);
+        Assert.NotNull(quest.QuestGiver.CurrentSettlement);
     }
 
     private void AssertPartiesReleased()

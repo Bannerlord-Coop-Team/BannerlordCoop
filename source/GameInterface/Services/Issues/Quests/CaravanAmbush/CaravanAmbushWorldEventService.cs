@@ -17,7 +17,7 @@ internal interface ICaravanAmbushWorldEventService
 {
     void HourlyTick();
     void MapEventStarted(MapEvent battle, PartyBase attacker, PartyBase defender);
-    void BanditsRecruited(MobileParty bandits);
+    void BanditsRecruited(MobileParty bandits, Hero recruiter);
     void SettlementEntered(MobileParty party);
     void BattleEnded(MapEvent battle);
     void End(Quest quest);
@@ -39,16 +39,20 @@ internal class CaravanAmbushWorldEventService : ICaravanAmbushWorldEventService
 
     public void HourlyTick() => Run(quest =>
     {
-        // Vanilla's vicinity check reads MainParty, which is only the owner's when the owner has a party.
-        var skipsVicinityCheck = quest._caravanParty?.MapEvent != null || quest._isCaravanSaved;
-        if (quest._caravanParty != null && quest._banditParty != null && !skipsVicinityCheck &&
+        if (Hero.MainHero.PartyBelongedTo != null || quest._caravanParty?.MapEvent != null || quest._isCaravanSaved)
+        {
+            quest.HourlyTick();
+            return;
+        }
+
+        // Vanilla's vicinity check reads MainParty, so an owner without a party only gets its ambush trigger.
+        if (quest._caravanParty != null && quest._banditParty != null &&
             quest._caravanParty.Position.DistanceSquared(quest._banditParty.Position) <=
             Campaign.Current.Models.EncounterModel.GetEncounterJoiningRadius * 2.2f)
         {
             EncounterManager.StartPartyEncounter(quest._banditParty.Party, quest._caravanParty.Party);
             return;
         }
-        if (Hero.MainHero.PartyBelongedTo != null || skipsVicinityCheck) quest.HourlyTick();
     });
 
     public void MapEventStarted(MapEvent battle, PartyBase attacker, PartyBase defender) => Run(quest =>
@@ -56,9 +60,8 @@ internal class CaravanAmbushWorldEventService : ICaravanAmbushWorldEventService
         quest.MapEventStarted(battle, attacker, defender);
     });
 
-    public void BanditsRecruited(MobileParty bandits)
+    public void BanditsRecruited(MobileParty bandits, Hero recruiter)
     {
-        var recruiter = Hero.MainHero;
         Run(quest =>
         {
             if (quest._banditParty != bandits) return;
