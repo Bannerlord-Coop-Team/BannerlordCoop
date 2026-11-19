@@ -203,7 +203,10 @@ internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorIn
 
         PartyBase captorParty = hero.PartyBelongedToAsPrisoner;
         Hero executor = captorParty.IsMobile ? captorParty.LeaderHero : captorParty.Settlement.OwnerClan.Leader;
-        if (executor != null && MBRandom.RandomFloat <= CalculatePlayerClanMemberExecutionProbability(clanPlayers, hero, executor))
+        // Another player holding the captive decides for themselves, vanilla only rolls this for AI captors
+        if (executor == null || executor.IsPlayerHero()) return;
+
+        if (MBRandom.RandomFloat <= CalculatePlayerClanMemberExecutionProbability(clanPlayers, hero, executor))
         {
             KillCharacterAction.ApplyByExecution(hero, executor);
         }
