@@ -54,10 +54,12 @@ internal class ExtortionByDesertersHandler : IHandler
     private void Apply(NetworkExtortionByDesertersState data)
     {
         if (!issues.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _) ||
-            !(issue.IssueQuest is Quest quest) || !TryResolveParties(data, out var deserters, out var defenders))
+            !(issue.IssueQuest is Quest quest))
         {
             return;
         }
+
+        if (!TryResolveParties(data, out var deserters, out var defenders)) return;
 
         BindParties(quest, deserters, defenders, (State)data.State);
         if (!TextObject.IsNullOrEmpty(data.Log)) quest.AddLog(data.Log);
@@ -74,8 +76,12 @@ internal class ExtortionByDesertersHandler : IHandler
     {
         deserters = null;
         defenders = null;
-        return (string.IsNullOrEmpty(data.DeserterId) || objects.TryGetObjectWithLogging(data.DeserterId, out deserters)) &&
-            (string.IsNullOrEmpty(data.DefenderId) || objects.TryGetObjectWithLogging(data.DefenderId, out defenders));
+        if (!string.IsNullOrEmpty(data.DeserterId) && !objects.TryGetObjectWithLogging(data.DeserterId, out deserters))
+            return false;
+        if (!string.IsNullOrEmpty(data.DefenderId) && !objects.TryGetObjectWithLogging(data.DefenderId, out defenders))
+            return false;
+
+        return true;
     }
 
     private static void BindParties(Quest quest, MobileParty deserters, MobileParty defenders, State state)

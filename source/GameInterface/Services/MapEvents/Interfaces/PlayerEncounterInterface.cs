@@ -151,7 +151,6 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
 
     public void OpenEncounterMeeting(MapEvent battle, PartyBase otherParty)
     {
-        if (ModInformation.IsServer || otherParty == null) return;
         if (battle == null || battle.IsFinalized || MobileParty.MainParty.MapEvent != battle)
         {
             Logger.Warning("Cannot open encounter meeting for {party}: map event {battle} is missing, finalized or no longer contains the player party",
@@ -161,18 +160,7 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
 
         using (new Common.Util.AllowedThread())
         {
-            if (PlayerEncounter.Battle != battle)
-            {
-                if (PlayerEncounter.Current != null)
-                {
-                    // Finish would otherwise finalize the stale encounter's battle.
-                    PlayerEncounter.Current._mapEvent = null;
-                    PlayerEncounter.Finish(forcePlayerOutFromSettlement: false);
-                }
-
-                PlayerEncounter.Start();
-            }
-
+            ReplaceEncounterFor(battle);
             PlayerEncounter.Init();
             var leader = ConversationHelper.GetConversationCharacterPartyLeader(otherParty);
             var player = new ConversationCharacterData(CharacterObject.PlayerCharacter, PartyBase.MainParty, noHorse: true);
@@ -180,6 +168,21 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
             GameMenu.ActivateGameMenu(EncounterMeetingMenuId);
             CampaignMapConversation.OpenConversation(player, other);
         }
+    }
+
+    private static void ReplaceEncounterFor(MapEvent battle)
+    {
+        if (PlayerEncounter.Battle == battle) return;
+
+        var current = PlayerEncounter.Current;
+        if (current != null)
+        {
+            // Finish would otherwise finalize the stale encounter's battle.
+            current._mapEvent = null;
+            PlayerEncounter.Finish(forcePlayerOutFromSettlement: false);
+        }
+
+        PlayerEncounter.Start();
     }
 
     internal static bool ShouldReleaseWithoutConversation(Hero hero, Clan localPlayerClan)

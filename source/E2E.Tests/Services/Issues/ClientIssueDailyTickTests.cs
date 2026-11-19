@@ -44,17 +44,30 @@ public class ClientIssueDailyTickTests : IDisposable
         });
     }
 
-    // A client that joined later has the server's journal for it, the day the troops start returning adds nothing
-    [Fact]
-    public void TheDailyTickAddsNoLogToAnotherPlayersTroopsMission()
+    [Theory]
+    [InlineData(-1, true)]
+    [InlineData(0, true)]
+    [InlineData(1, false)]
+    public void TheDailyTickResolvesForeignTroopsMissionEffectsWithoutAddingALog(int clearDayOffset, bool effectsResolved)
     {
         scenario.ClientB.Call(() =>
         {
+            // Start the harness clock on a day boundary, so "today" has not elapsed yet.
+            Campaign.Current.MapTimeTracker._numTicks = 0;
             var issue = SendTroops(scenario.ClientB, owner: QuestScenario.ControllerA, withJournal: true, troopsStartReturningToday: true);
+            using (new AllowedThread())
+            {
+                issue._areIssueEffectsResolved = false;
+                issue.AlternativeSolutionIssueEffectClearTime = CampaignTime.Days(clearDayOffset);
+                issue.AlternativeSolutionReturnTimeForTroops = CampaignTime.Days(ReturnDays);
+            }
+
+            Assert.Equal(clearDayOffset < 0, issue.AlternativeSolutionIssueEffectClearTime.IsPast);
 
             Campaign.Current.IssueManager.DailyTick();
 
             Assert.True(issue.IsSolvingWithAlternative);
+            Assert.Equal(effectsResolved, issue._areIssueEffectsResolved);
             var journal = Assert.Single(issue.JournalEntries);
             Assert.Equal(0, journal.CurrentProgress);
         });

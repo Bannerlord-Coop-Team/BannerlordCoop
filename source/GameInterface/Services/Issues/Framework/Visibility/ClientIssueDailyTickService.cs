@@ -17,22 +17,24 @@ internal sealed class ClientIssueDailyTickService : IClientIssueDailyTickService
 
     public void Apply(IssueManager issueManager)
     {
+        var today = (int)CampaignTime.Now.ToDays;
         foreach (var issue in issueManager.Issues.Values)
         {
             if (!issue.IsSolvingWithAlternative || issue.AlternativeSolutionReturnTimeForTroops.IsPast)
                 continue;
 
             var foreign = visibility.IsAnotherPlayersTroopsMission(issue);
+            var clearDay = (int)issue.AlternativeSolutionIssueEffectClearTime.ToDays;
             // A joiner loads foreign journals from the save, but only their owner should get a return entry.
             if (foreign || issue.JournalEntries.Count == 0)
             {
-                if (issue.AlternativeSolutionIssueEffectClearTime.IsPast)
+                if (clearDay <= today)
                     issue._areIssueEffectsResolved = true;
 
                 continue;
             }
 
-            if ((int)issue.AlternativeSolutionIssueEffectClearTime.ToDays == (int)CampaignTime.Now.ToDays)
+            if (clearDay == today)
                 issue.OnAlternativeSolutionSolvedAndTroopsAreReturning();
 
             var journalLog = issue.JournalEntries[0];

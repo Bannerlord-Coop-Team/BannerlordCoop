@@ -13,13 +13,11 @@ internal sealed class EscortQuestSolutionAcceptStrategy : IQuestSolutionAcceptSt
 {
     private readonly IIssueOwnerResolver owners;
     private readonly IEscortProgress progress;
-    private readonly IIssueOwnerParty parties;
 
-    public EscortQuestSolutionAcceptStrategy(IIssueOwnerResolver owners, IEscortProgress progress, IIssueOwnerParty parties)
+    public EscortQuestSolutionAcceptStrategy(IIssueOwnerResolver owners, IEscortProgress progress)
     {
         this.owners = owners;
         this.progress = progress;
-        this.parties = parties;
     }
 
     public byte[] Capture(IssueBase issue) => Array.Empty<byte>();
@@ -27,7 +25,7 @@ internal sealed class EscortQuestSolutionAcceptStrategy : IQuestSolutionAcceptSt
     public void Apply(IssueBase issue, byte[] captured)
     {
         if (ModInformation.IsClient || !(issue.IssueQuest is Quest quest)) return;
-        if (!owners.TryResolveOwnerHero(issue, out var owner) || !parties.TryGetOwnerParty(issue, out var party))
+        if (!owners.TryResolveOwnerHero(issue, out var owner) || !owners.TryResolveOwnerParty(issue, out var party))
             throw new InvalidOperationException("Escort accept has no owning player.");
 
         using (new MainHeroSubstitutionScope(owner, party))

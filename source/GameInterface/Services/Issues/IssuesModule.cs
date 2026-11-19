@@ -42,9 +42,6 @@ internal class IssuesModule : Module
         builder.Register(context => context.Resolve<AlternativeSolutionPicker>()).As<IAlternativeSolutionPicker>();
         builder.RegisterType<IssueAcceptPreconditions>().As<IIssueAcceptPreconditions>().InstancePerDependency();
         builder.RegisterType<OutcomeDispatcher>().As<IOutcomeDispatcher>().SingleInstance();
-        builder.RegisterType<IssueOwnerParty>()
-            .As<IIssueOwnerParty>()
-            .InstancePerDependency();
         builder.RegisterType<IssueMissionVisibility>().As<IIssueMissionVisibility>().InstancePerDependency();
         builder.RegisterType<ClientIssueDailyTickService>()
             .As<IClientIssueDailyTickService>()

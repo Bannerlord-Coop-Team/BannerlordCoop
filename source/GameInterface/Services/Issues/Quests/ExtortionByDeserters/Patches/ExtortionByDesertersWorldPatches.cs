@@ -19,7 +19,7 @@ internal class ExtortionByDesertersWorldPatches
 {
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.HourlyTick))]
     [HarmonyPostfix]
-    private static void HourlyTickPostfix() => Run((_, quest) => quest.HourlyTick());
+    private static void HourlyTickPostfix() => Run((service, quest) => service.ApplyTick(quest));
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnStartBattle))]
     [HarmonyPostfix]
@@ -31,7 +31,10 @@ internal class ExtortionByDesertersWorldPatches
     private static void FinalizeEventPrefix(MapEvent __instance, out List<Quest> __state)
     {
         var affected = new List<Quest>();
-        Run((_, quest) => { if (quest._deserterMobileParty?.MapEvent == __instance) affected.Add(quest); });
+        Run((service, quest) =>
+        {
+            if (service.IsDeserterBattle(quest, __instance)) affected.Add(quest);
+        });
         __state = affected;
     }
 
@@ -75,14 +78,8 @@ internal class ExtortionByDesertersWorldPatches
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnMapEventEnded))]
     [HarmonyPostfix]
-    private static void MapEndedPostfix(MapEvent mapEvent)
-    {
-        Run((service, quest) =>
-        {
-            if (quest._deserterMobileParty?.MapEvent == mapEvent)
-                service.ApplyMapEventEnded(quest, mapEvent);
-        });
-    }
+    private static void MapEndedPostfix(MapEvent mapEvent) =>
+        Run((service, quest) => service.ApplyMapEventEnded(quest, mapEvent));
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.MapEventEnded))]
     [HarmonyPrefix]
@@ -94,15 +91,8 @@ internal class ExtortionByDesertersWorldPatches
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.TickDesertersPartyLogic))]
     [HarmonyPrefix]
-    private static bool TickPrefix(Quest __instance)
-    {
-        // The server runs the quest tick for the owner, while clients only replay progress.
-        if (ContainerProvider.TryResolve<IExtortionByDesertersWorldEventService>(out var service))
-        {
-            service.ApplyTick(__instance);
-        }
-        return false;
-    }
+    // The world relay now ticks the server directly. Clients replay the resulting progress.
+    private static bool TickPrefix() => false;
 
     private static void Run(Action<IExtortionByDesertersWorldEventService, Quest> listener)
     {

@@ -1,14 +1,12 @@
-﻿using Common;
-using Common.Logging;
-using GameInterface.Services.Issues.Quests.ExtortionByDeserters;
+﻿using Common.Logging;
 using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
 using Serilog;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
-using TaleWorlds.CampaignSystem;
 using Quest = TaleWorlds.CampaignSystem.Issues.ExtortionByDesertersIssueBehavior.ExtortionByDesertersIssueQuest;
 
 namespace GameInterface.Services.Issues.Quests.ExtortionByDeserters.Patches;
@@ -20,77 +18,67 @@ internal class ExtortionByDesertersBranchPatches
 {
     private static readonly ILogger Logger = LogManager.GetLogger<ExtortionByDesertersBranchPatches>();
 
-    [HarmonyPatch]
-    [HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
-    private static class FullRewardBranchPatch
-    {
-        [HarmonyTargetMethod]
-        private static MethodBase TargetMethod() => FindBranch(nameof(Quest._questResultSuccess1));
-        [HarmonyPrepare]
-        private static bool Prepare() => HasSingleBranch(nameof(Quest._questResultSuccess1));
+    private static readonly Lazy<IReadOnlyDictionary<MethodBase, ExtortionByDesertersBranch>> Branches =
+        new(FindBranches);
 
-        [HarmonyPrefix]
-        private static bool Prefix(Quest __instance) => BeforeBranch(__instance, ExtortionByDesertersBranch.FullReward);
-    }
+    [HarmonyPrepare]
+    private static bool Prepare() => Branches.Value.Count > 0;
 
-    [HarmonyPatch]
-    [HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
-    private static class HalfRewardBranchPatch
-    {
-        [HarmonyTargetMethod]
-        private static MethodBase TargetMethod() => FindBranch(nameof(Quest._questResultSuccess2));
-        [HarmonyPrepare]
-        private static bool Prepare() => HasSingleBranch(nameof(Quest._questResultSuccess2));
+    [HarmonyTargetMethods]
+    private static IEnumerable<MethodBase> TargetMethods() => Branches.Value.Keys;
 
-        [HarmonyPrefix]
-        private static bool Prefix(Quest __instance) => BeforeBranch(__instance, ExtortionByDesertersBranch.HalfReward);
-    }
-
-    [HarmonyPatch]
-    [HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
-    private static class RefuseRewardBranchPatch
-    {
-        [HarmonyTargetMethod]
-        private static MethodBase TargetMethod() => FindBranch(nameof(Quest._questResultSuccess3));
-        [HarmonyPrepare]
-        private static bool Prepare() => HasSingleBranch(nameof(Quest._questResultSuccess3));
-
-        [HarmonyPrefix]
-        private static bool Prefix(Quest __instance) => BeforeBranch(__instance, ExtortionByDesertersBranch.RefuseReward);
-    }
-
-    private static bool BeforeBranch(Quest quest, ExtortionByDesertersBranch branch)
+    [HarmonyPrefix]
+    private static bool Prefix(Quest __instance, MethodBase __originalMethod)
     {
         return !ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher) ||
-            dispatcher.BeforeQuestBranch(quest, (byte)branch);
+            dispatcher.BeforeQuestBranch(__instance, (byte)Branches.Value[__originalMethod]);
     }
 
-    private static bool HasSingleBranch(string resultProperty)
+    private static IReadOnlyDictionary<MethodBase, ExtortionByDesertersBranch> FindBranches()
     {
-        var matches = FindBranches(resultProperty);
-        if (matches.Length != 1)
-        {
-            Logger.Warning("Expected one extortion reward branch for {resultProperty}, found {count}", resultProperty, matches.Length);
-            return false;
-        }
-
-        return true;
-    }
-
-    private static MethodBase FindBranch(string resultProperty) => FindBranches(resultProperty).SingleOrDefault();
-
-    private static MethodInfo[] FindBranches(string resultProperty)
-    {
-        var getter = AccessTools.PropertyGetter(typeof(Quest), resultProperty);
-        if (getter == null) return Array.Empty<MethodInfo>();
-
-        // The consequences are unnamed lambdas that call the getter for their reward result.
-        return AccessTools.GetDeclaredMethods(typeof(Quest))
+        // The unnamed dialogue consequences call the getter for their reward result.
+        var candidates = AccessTools.GetDeclaredMethods(typeof(Quest))
             .Where(method => method.Name.StartsWith("<get_QuestCompletionDialogFlow>b__", StringComparison.Ordinal) &&
                 method.ReturnType == typeof(void) && method.GetParameters().Length == 0)
-            .Where(method => PatchProcessor.GetOriginalInstructions(method).Any(instruction =>
-                (instruction.opcode == OpCodes.Call || instruction.opcode == OpCodes.Callvirt) &&
-                Equals(instruction.operand, getter)))
+            .Select(method => (Method: method, Calls: PatchProcessor.GetOriginalInstructions(method)
+                .Where(instruction => instruction.opcode == OpCodes.Call || instruction.opcode == OpCodes.Callvirt)
+                .Select(instruction => instruction.operand)
+                .OfType<MethodInfo>().ToArray()))
             .ToArray();
+
+        var bindings = new List<(MethodInfo Method, ExtortionByDesertersBranch Branch)>();
+        foreach (var (resultProperty, branch) in new[]
+        {
+            (nameof(Quest._questResultSuccess1), ExtortionByDesertersBranch.FullReward),
+            (nameof(Quest._questResultSuccess2), ExtortionByDesertersBranch.HalfReward),
+            (nameof(Quest._questResultSuccess3), ExtortionByDesertersBranch.RefuseReward),
+        })
+        {
+            var getter = AccessTools.PropertyGetter(typeof(Quest), resultProperty);
+            var matches = candidates.Where(candidate => candidate.Calls.Contains(getter)).ToArray();
+            if (matches.Length != 1)
+            {
+                Logger.Warning("Expected one extortion reward branch for {resultProperty}, found {count}", resultProperty, matches.Length);
+                continue;
+            }
+
+            bindings.Add((matches[0].Method, branch));
+        }
+
+        var branches = new Dictionary<MethodBase, ExtortionByDesertersBranch>();
+        foreach (var group in bindings.GroupBy(binding => binding.Method))
+        {
+            var matches = group.ToArray();
+            if (matches.Length == 1)
+            {
+                branches.Add(group.Key, matches[0].Branch);
+            }
+            else
+            {
+                Logger.Warning("Extortion reward consequence {method} matches more than one branch", group.Key.Name);
+            }
+        }
+
+        return branches;
     }
 }

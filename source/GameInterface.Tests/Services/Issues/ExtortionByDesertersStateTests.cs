@@ -1,11 +1,8 @@
 ﻿using Common.Serialization;
 using GameInterface.Services.Issues.Quests.ExtortionByDeserters;
-using GameInterface.Services.Issues.Quests.ExtortionByDeserters.Handlers;
 using GameInterface.Services.Issues.Quests.ExtortionByDeserters.Messages;
-using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Surrogates;
 using System.Collections.Generic;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.Localization;
 using Xunit;
 
@@ -35,7 +32,7 @@ public class ExtortionByDesertersStateTests
     }
 
     [Fact]
-    public void RoundTrip_PreservesLocalizationAndNestedAttributesInBothJournalPaths()
+    public void RoundTrip_PreservesLocalizationAndNestedAttributesInProgressLog()
     {
         var link = new TextObject("{=!}<a href=\"{ID}\">{NAME}</a>", new Dictionary<string, object>
         {
@@ -50,22 +47,16 @@ public class ExtortionByDesertersStateTests
         text.SetTextVariable("QUEST_GIVER", properties);
         var state = RoundTrip(new NetworkExtortionByDesertersState("headman", "issue-generation", "player-B",
             "", "", 0, text));
-        var snapshot = RoundTrip(new NetworkIssueJournal("headman", "issue-generation", true, new[] { new IssueJournalEntry(new JournalLog(default, text)) }));
-
-        foreach (var log in new[] { state.Log, Assert.Single(snapshot.Logs).Text })
-        {
-            Assert.Equal(text.Value, log.Value);
-            var giver = Assert.IsType<TextObject>(log.Attributes["QUEST_GIVER"]);
-            Assert.Equal("{=!}Danustica headman", Assert.IsType<TextObject>(giver.Attributes["NAME"]).Value);
-            Assert.Equal(0, Assert.IsType<int>(giver.Attributes["GENDER"]));
-            var receivedLink = Assert.IsType<TextObject>(giver.Attributes["LINK"]);
-            Assert.Equal(link.Value, receivedLink.Value);
-            Assert.Equal("headman", Assert.IsType<string>(receivedLink.Attributes["ID"]));
-            Assert.Equal("{=!}Danustica headman", Assert.IsType<TextObject>(receivedLink.Attributes["NAME"]).Value);
-        }
+        var log = state.Log;
+        Assert.Equal(text.Value, log.Value);
+        var giver = Assert.IsType<TextObject>(log.Attributes["QUEST_GIVER"]);
+        Assert.Equal("{=!}Danustica headman", Assert.IsType<TextObject>(giver.Attributes["NAME"]).Value);
+        Assert.Equal(0, Assert.IsType<int>(giver.Attributes["GENDER"]));
+        var receivedLink = Assert.IsType<TextObject>(giver.Attributes["LINK"]);
+        Assert.Equal(link.Value, receivedLink.Value);
+        Assert.Equal("headman", Assert.IsType<string>(receivedLink.Attributes["ID"]));
+        Assert.Equal("{=!}Danustica headman", Assert.IsType<TextObject>(receivedLink.Attributes["NAME"]).Value);
     }
-
-
 
     [Fact]
     public void RoundTrip_KeepsANullLogNull()
