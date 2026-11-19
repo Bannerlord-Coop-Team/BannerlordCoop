@@ -24,7 +24,9 @@ internal class ExtortionByDesertersBranchPatches
     [HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
     private static class FullRewardBranchPatch
     {
+        [HarmonyTargetMethod]
         private static MethodBase TargetMethod() => FindBranch(nameof(Quest._questResultSuccess1));
+        [HarmonyPrepare]
         private static bool Prepare() => HasSingleBranch(nameof(Quest._questResultSuccess1));
 
         [HarmonyPrefix]
@@ -35,7 +37,9 @@ internal class ExtortionByDesertersBranchPatches
     [HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
     private static class HalfRewardBranchPatch
     {
+        [HarmonyTargetMethod]
         private static MethodBase TargetMethod() => FindBranch(nameof(Quest._questResultSuccess2));
+        [HarmonyPrepare]
         private static bool Prepare() => HasSingleBranch(nameof(Quest._questResultSuccess2));
 
         [HarmonyPrefix]
@@ -46,7 +50,9 @@ internal class ExtortionByDesertersBranchPatches
     [HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
     private static class RefuseRewardBranchPatch
     {
+        [HarmonyTargetMethod]
         private static MethodBase TargetMethod() => FindBranch(nameof(Quest._questResultSuccess3));
+        [HarmonyPrepare]
         private static bool Prepare() => HasSingleBranch(nameof(Quest._questResultSuccess3));
 
         [HarmonyPrefix]

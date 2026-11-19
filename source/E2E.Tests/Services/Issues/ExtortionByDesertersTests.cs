@@ -5,6 +5,7 @@ using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.AutoSync;
+using GameInterface;
 using GameInterface.CoopSessionData;
 using GameInterface.Policies;
 using GameInterface.Services.Issues.Framework.Finalization;
@@ -614,10 +615,9 @@ public class ExtortionByDesertersTests : IDisposable
 
     private static void ChooseReward(Quest quest, int choice)
     {
-        var consequences = quest.QuestCompletionDialogFlow.Lines
-            .Where(line => line.ConsequenceDelegate != null).ToArray();
-        Assert.Equal(3, consequences.Length);
-        consequences[choice].ConsequenceDelegate();
+        Assert.InRange(choice, 0, 2);
+        Assert.True(ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher));
+        Assert.False(dispatcher.BeforeQuestBranch(quest, (byte)(choice + 1)));
     }
 
     [Fact]
