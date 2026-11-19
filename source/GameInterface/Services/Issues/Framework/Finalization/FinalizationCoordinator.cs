@@ -571,20 +571,10 @@ internal class FinalizationCoordinator : IHandler
 
         if (quest != null && quest.IsOngoing && TryCompleteQuest(quest, outcome))
         {
-            if (Campaign.Current.QuestManager.Quests.Contains(quest))
-            {
-                Campaign.Current.QuestManager.OnQuestFinalized(quest);
-                issue.IssueQuest = null;
-            }
             return;
         }
 
         TryCompleteIssue(issue, outcome, isOwner);
-
-        if (quest != null && quest.IsFinalized && Campaign.Current.QuestManager.Quests.Contains(quest))
-        {
-            Campaign.Current.QuestManager.OnQuestFinalized(quest);
-        }
 
         if (quest != null && quest.IsOngoing)
         {

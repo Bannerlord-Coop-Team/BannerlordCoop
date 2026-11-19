@@ -5,9 +5,9 @@ using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
 using Serilog;
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Reflection.Emit;
 using TaleWorlds.CampaignSystem;
 using Quest = TaleWorlds.CampaignSystem.Issues.ExtortionByDesertersIssueBehavior.ExtortionByDesertersIssueQuest;
 
@@ -65,42 +65,32 @@ internal class ExtortionByDesertersBranchPatches
             dispatcher.BeforeQuestBranch(quest, (byte)branch);
     }
 
-    private static bool HasSingleBranch(string resultField)
+    private static bool HasSingleBranch(string resultProperty)
     {
-        var matches = FindBranches(resultField).ToList();
-        if (matches.Count != 1)
+        var matches = FindBranches(resultProperty);
+        if (matches.Length != 1)
         {
-            Logger.Warning("Expected one extortion reward branch for {resultField}, found {count}", resultField, matches.Count);
+            Logger.Warning("Expected one extortion reward branch for {resultProperty}, found {count}", resultProperty, matches.Length);
             return false;
         }
 
         return true;
     }
 
-    private static MethodBase FindBranch(string resultField) => FindBranches(resultField).SingleOrDefault();
+    private static MethodBase FindBranch(string resultProperty) => FindBranches(resultProperty).SingleOrDefault();
 
-    private static IEnumerable<MethodInfo> FindBranches(string resultField)
+    private static MethodInfo[] FindBranches(string resultProperty)
     {
-        var field = AccessTools.Field(typeof(Quest), resultField);
-        if (field == null) yield break;
+        var getter = AccessTools.PropertyGetter(typeof(Quest), resultProperty);
+        if (getter == null) return Array.Empty<MethodInfo>();
 
-        foreach (var method in AccessTools.GetDeclaredMethods(typeof(Quest)).Where(method =>
-                     method.Name.StartsWith("<get_QuestCompletionDialogFlow>b__", StringComparison.Ordinal) &&
-                     method.ReturnType == typeof(void) && method.GetParameters().Length == 0))
-        {
-            var body = method.GetMethodBody()?.GetILAsByteArray();
-            if (body == null) continue;
-            for (var offset = 0; offset <= body.Length - 5; offset++)
-            {
-                var opcode = body[offset];
-                if (opcode != 0x7B && opcode != 0x7E) continue;
-                var token = BitConverter.ToInt32(body, offset + 1);
-                if (method.Module.ResolveField(token) == field)
-                {
-                    yield return method;
-                    break;
-                }
-            }
-        }
+        // The consequences are unnamed lambdas that call the getter for their reward result.
+        return AccessTools.GetDeclaredMethods(typeof(Quest))
+            .Where(method => method.Name.StartsWith("<get_QuestCompletionDialogFlow>b__", StringComparison.Ordinal) &&
+                method.ReturnType == typeof(void) && method.GetParameters().Length == 0)
+            .Where(method => PatchProcessor.GetOriginalInstructions(method).Any(instruction =>
+                (instruction.opcode == OpCodes.Call || instruction.opcode == OpCodes.Callvirt) &&
+                Equals(instruction.operand, getter)))
+            .ToArray();
     }
 }

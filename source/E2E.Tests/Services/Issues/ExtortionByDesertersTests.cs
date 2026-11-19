@@ -5,7 +5,6 @@ using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.AutoSync;
-using GameInterface;
 using GameInterface.CoopSessionData;
 using GameInterface.Policies;
 using GameInterface.Services.Issues.Framework.Finalization;
@@ -130,22 +129,6 @@ public class ExtortionByDesertersTests : IDisposable
                 .ToArray();
             Assert.Single(coopPrefixes);
         }
-    }
-
-    [Fact]
-    public void FinalizedOwnerQuestIsRemovedFromTheClientQuestManager()
-    {
-        var quest = Accept();
-        Owner.Call(() =>
-        {
-            quest._questState = QuestBase.QuestStates.Finalized;
-            Assert.Contains(quest, Campaign.Current.QuestManager.Quests);
-        });
-
-        Owner.SimulateMessage(this,
-            new NetworkIssueFinalized(scenario.NotableId, QuestScenario.IssueId, IssueOutcome.QuestSuccess));
-
-        Owner.Call(() => Assert.DoesNotContain(quest, Campaign.Current.QuestManager.Quests));
     }
 
     [Fact]
@@ -482,18 +465,34 @@ public class ExtortionByDesertersTests : IDisposable
 
 
     [Fact]
-    public void Victory_RemainsReadyForHandInAfterTheDeserterPartyIsGone()
+    public void Victory_FullRewardFinalizesAndRemovesTheOwnersQuest()
     {
         var quest = DefeatDeserters();
+        var ownerQuest = (Quest)scenario.QuestOf(Owner);
         Server.Call(() =>
         {
             quest.HourlyTick();
             Assert.True(quest.IsOngoing);
         });
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
-        Owner.Call(() => ChooseReward((Quest)scenario.QuestOf(Owner), 0), TextLinks);
+        Owner.Call(() =>
+        {
+            Assert.Equal(State.DesertersAreDefeated, ownerQuest._currentState);
+            Assert.Same(ownerQuest, Assert.Single(Campaign.Current.QuestManager.Quests,
+                active => active.StringId == ownerQuest.StringId));
+            ChooseReward(ownerQuest, 0);
+        }, TextLinks);
+        Owner.Call(() =>
+        {
+            Assert.DoesNotContain(Campaign.Current.QuestManager.Quests, active => active.StringId == ownerQuest.StringId);
+            Assert.True(ownerQuest.IsFinalized);
+            Assert.Single(ownerQuest.JournalEntries, entry => entry.LogText.Value == ownerQuest.OnQuestSucceededLogText.Value);
+        }, TextLinks);
+        Assert.Equal((byte)ExtortionByDesertersBranch.FullReward,
+            Assert.Single(Owner.NetworkSentMessages.GetMessages<RequestQuestBranch>()).Proof);
         Assert.Equal(IssueOutcome.QuestSuccess,
             Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+        Assert.True(quest.IsFinalized);
     }
 
     [Theory]
@@ -548,11 +547,7 @@ public class ExtortionByDesertersTests : IDisposable
             Assert.Equal(relation, serverQuest.RelationshipChangeWithQuestGiver);
         });
         Assert.Equal(IssueOutcome.QuestSuccess, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
-        Owner.Call(() =>
-        {
-            Assert.True(quest.IsFinalized);
-            Assert.DoesNotContain(quest, Campaign.Current.QuestManager.Quests);
-        });
+        Assert.True(quest.IsFinalized);
     }
 
     [Theory]
@@ -648,9 +643,9 @@ public class ExtortionByDesertersTests : IDisposable
 
     private static void ChooseReward(Quest quest, int choice)
     {
-        Assert.InRange(choice, 0, 2);
-        Assert.True(ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher));
-        Assert.False(dispatcher.BeforeQuestBranch(quest, (byte)(choice + 1)));
+        var consequences = quest.QuestCompletionDialogFlow.Lines
+            .Where(line => line.ConsequenceDelegate != null).ToArray();
+        consequences[choice].ConsequenceDelegate();
     }
 
     [Fact]
