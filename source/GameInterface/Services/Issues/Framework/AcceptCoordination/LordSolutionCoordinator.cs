@@ -101,6 +101,7 @@ internal class LordSolutionCoordinator : ILordSolutionCoordinator, IHandler
     private void HandleSessionLoaded(MessagePayload<AllGameObjectsRegistered> payload) =>
         GameThread.RunSafe(pendingDecisions.Clear, context: nameof(LordSolutionCoordinator));
 
+    // Snapshot cancels use ReplayLocalCancel, so HandleFinalized never sees them.
     private void HandleOwnershipSnapshot(MessagePayload<NetworkIssueOwnershipSnapshot> payload)
     {
         if (ModInformation.IsServer) return;

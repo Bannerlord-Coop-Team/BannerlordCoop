@@ -280,7 +280,7 @@ internal class BattleModeEncounterOptionsPatch
         var previousTooltip = args.Tooltip;
         MenuHelper.CheckEnemyAttackableHonorably(args);
 
-        if (orderAttackRule.HasNoOrderableTroops(mapEvent, MobileParty.MainParty, CharacterObject.PlayerCharacter))
+        if (!orderAttackRule.HasOrderableTroops(MobileParty.MainParty.MapEventSide, CharacterObject.PlayerCharacter))
         {
             // Keep the original enabled state and tooltip for hidden options.
             args.IsEnabled = wasEnabled;

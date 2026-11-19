@@ -601,7 +601,7 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
                 ("no opposing troops", true, false, false, true, false, false, false, false, true, sendType, sendTroops),
                 ("no opposing leader", true, false, true, false, false, false, false, false, true, sendType, sendTroops),
                 ("no orderable troops", true, false, true, true, true, false, false, false, false, sendType, unchanged),
-                ("player alone with no opposing troops", true, false, false, true, true, false, false, false, true, sendType, leaveToOthers),
+                ("player alone with no opposing troops", true, false, false, true, true, false, false, false, false, sendType, unchanged),
                 ("naval", true, false, true, true, false, true, false, true, true, GameMenuOption.LeaveType.OrderShipsToAttack, "Send ships."),
                 ("player in raft with an ally able to fight", true, false, true, true, false, false, true, true, true, sendType, leaveToOthers),
             };

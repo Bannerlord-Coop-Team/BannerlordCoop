@@ -1,10 +1,9 @@
-﻿using Common.Network;
-using Common.Util;
+﻿using Common.Util;
 using E2E.Tests.Environment;
-using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface;
 using GameInterface.Services.Issues.Framework.AcceptCoordination;
+using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Quests.CaravanAmbush;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Heroes.Patches;
@@ -34,10 +33,116 @@ public class CaravanAmbushAcceptTests
 
     public CaravanAmbushAcceptTests(ITestOutputHelper output) => this.output = output;
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void RealAcceptCompletesOrRemovesTheSpawnedParties(bool failAfterSpawn)
+    [Fact]
+    public void RealAcceptSpawnsTheAmbushOnlyOnTheServerForTheOwner()
+    {
+        WithAcceptScenario((environment, scenario, _) =>
+        {
+            var server = scenario.Server;
+            var owner = scenario.ClientA;
+            var other = scenario.ClientB;
+            scenario.Accept(owner);
+            owner.Call(() => ((Quest)scenario.QuestOf(owner)).OnQuestAccepted());
+
+            Assert.Equal(QuestScenario.ControllerA, scenario.OwnerOnServer());
+            Assert.Single(spawns);
+            Assert.All(spawns, call => Assert.Same(server.Container, call.Container));
+            string actualBanditId = null!;
+            server.Call(() =>
+            {
+                Assert.All(spawns, call =>
+                {
+                    Assert.Same(server.GetRegisteredObject<Hero>(scenario.OwnerHeroId), call.Hero);
+                    Assert.Same(server.GetRegisteredObject<MobileParty>(scenario.OwnerPartyId), call.Party);
+                });
+                var quest = Assert.IsType<Quest>(scenario.QuestOf(server));
+                Assert.Same(server.GetRegisteredObject<MobileParty>(caravanId), quest._caravanParty);
+                Assert.NotNull(quest._banditParty);
+                Assert.True(quest._banditParty.IsBandit);
+                Assert.True(server.ObjectManager.TryGetId(quest._banditParty, out actualBanditId));
+                Assert.DoesNotContain(quest, Campaign.Current.QuestManager.Quests);
+            });
+            Quest ownerQuest = null!;
+            owner.Call(() =>
+            {
+                ownerQuest = Assert.IsType<Quest>(scenario.QuestOf(owner));
+                Assert.Same(owner.GetRegisteredObject<MobileParty>(actualBanditId), ownerQuest._banditParty);
+                Assert.Contains(ownerQuest, Campaign.Current.QuestManager.Quests);
+                Assert.Equal("S4kpdrgw", Assert.Single(ownerQuest.JournalEntries).LogText.GetID());
+            });
+            server.Call(() =>
+            {
+                var quest = Assert.IsType<Quest>(scenario.QuestOf(server));
+                var ownerHero = server.GetRegisteredObject<Hero>(scenario.OwnerHeroId);
+                quest._isCaravanSaved = true;
+                using (new MainHeroSubstitutionScope(ownerHero, ownerHero.PartyBelongedTo))
+                    quest.OnQuestSucceeded();
+            });
+            environment.FlushCoalescer();
+            owner.Call(() =>
+            {
+                Assert.Equal(2, ownerQuest.JournalEntries.Count);
+                Assert.Contains("defeated the large group of bandits", ownerQuest.JournalEntries.Last().LogText.ToString());
+            });
+            other.Call(() => Assert.Null(other.GetRegisteredObject<Hero>(scenario.NotableId).Issue));
+            Assert.Single(owner.InternalMessages.GetMessages<NetworkCaravanAmbushProgress>());
+            Assert.Empty(other.InternalMessages.GetMessages<NetworkCaravanAmbushProgress>());
+            Assert.Single(server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAccepted>());
+        });
+    }
+
+    [Fact]
+    public void AcceptFailingAfterSpawnDestroysBothPartiesAndRejects()
+    {
+        WithAcceptScenario((_, scenario, harmony) =>
+        {
+            harmony.Patch(AccessTools.Method(typeof(Quest), nameof(Quest.OnQuestAccepted)),
+                postfix: new HarmonyMethod(typeof(CaravanAmbushAcceptTests), nameof(FailAfterSpawn)));
+            scenario.Accept(scenario.ClientA);
+
+            var server = scenario.Server;
+            Assert.Single(server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAcceptRejected>());
+            Assert.Empty(server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAccepted>());
+            Assert.True(failedAccept.HasValue);
+            var (quest, caravan, bandits) = failedAccept.Value;
+            server.Call(() =>
+            {
+                Assert.False(caravan.IsActive);
+                Assert.False(bandits.IsActive);
+                Assert.Null(quest._caravanParty);
+                Assert.Null(quest._banditParty);
+                Assert.True(server.GetRegisteredObject<Hero>(scenario.NotableId).Issue.IsOngoingWithoutQuest);
+            });
+        });
+    }
+
+    [Fact]
+    public void OwnerWithoutAPartyCannotStartTheNativeAccept()
+    {
+        using var environment = new E2ETestEnvironment(output);
+        var scenario = new QuestScenario(environment, giver => new Issue(giver, null));
+        var server = scenario.Server;
+        scenario.AttachQuest(server, giver => new Quest("caravan_no_party", giver, null, CampaignTime.Never, 1000, 0.5f));
+
+        using var nativeAccept = new MethodCallRecorder(Priority.First,
+            AccessTools.Method(typeof(Quest), nameof(Quest.OnQuestAccepted)));
+        server.Call(() =>
+        {
+            var hero = server.GetRegisteredObject<Hero>(scenario.OwnerHeroId);
+            hero._partyBelongedTo = null;
+            Assert.True(server.Resolve<IIssueOwnershipRegistry>().TrySetOwner(
+                scenario.NotableId, QuestScenario.IssueId, QuestScenario.ControllerA));
+
+            var issue = server.GetRegisteredObject<Hero>(scenario.NotableId).Issue;
+            var strategy = new CaravanAmbushQuestSolutionAcceptStrategy(
+                server.Resolve<IIssueOwnerResolver>(), server.Resolve<ICaravanAmbushProgress>());
+            var error = Assert.Throws<InvalidOperationException>(() => strategy.Apply(issue, Array.Empty<byte>()));
+            Assert.Equal("Caravan quest owner has no party", error.Message);
+        });
+        Assert.Equal(0, nativeAccept.CountFor(server));
+    }
+
+    private void WithAcceptScenario(Action<E2ETestEnvironment, QuestScenario, Harmony> test)
     {
         using var environment = new E2ETestEnvironment(output);
         var server = environment.Server;
@@ -121,82 +226,16 @@ public class CaravanAmbushAcceptTests
                 prefix: new HarmonyMethod(typeof(CaravanAmbushAcceptTests), nameof(FindHideout)));
             harmony.Patch(AccessTools.PropertyGetter(typeof(MobileParty), nameof(MobileParty.Speed)),
                 prefix: new HarmonyMethod(typeof(CaravanAmbushAcceptTests), nameof(ReadSpeed)));
-            if (failAfterSpawn)
-            {
-                harmony.Patch(AccessTools.Method(typeof(Quest), nameof(Quest.OnQuestAccepted)),
-                    postfix: new HarmonyMethod(typeof(CaravanAmbushAcceptTests), nameof(FailAfterSpawn)));
-            }
             using var matchSpeed = new MethodCallRecorder(AccessTools.Method(typeof(MobilePartyHelper), nameof(MobilePartyHelper.TryMatchPartySpeedWithItemWeight)));
 
-            scenario.Accept(owner);
-            if (failAfterSpawn)
-            {
-                Assert.Single(server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAcceptRejected>());
-                Assert.Empty(server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAccepted>());
-                Assert.True(failedAccept.HasValue);
-                var (quest, caravan, bandits) = failedAccept.Value;
-                server.Call(() =>
-                {
-                    Assert.False(caravan.IsActive);
-                    Assert.False(bandits.IsActive);
-                    Assert.Null(quest._caravanParty);
-                    Assert.Null(quest._banditParty);
-                    Assert.True(server.GetRegisteredObject<Hero>(scenario.NotableId).Issue.IsOngoingWithoutQuest);
-                });
-                return;
-            }
-            owner.Call(() => ((Quest)scenario.QuestOf(owner)).OnQuestAccepted());
-
-            Assert.Equal(QuestScenario.ControllerA, scenario.OwnerOnServer());
-            Assert.Single(spawns);
-            Assert.All(spawns, call => Assert.Same(server.Container, call.Container));
-            string actualBanditId = null!;
-            server.Call(() =>
-            {
-                Assert.All(spawns, call =>
-                {
-                    Assert.Same(server.GetRegisteredObject<Hero>(scenario.OwnerHeroId), call.Hero);
-                    Assert.Same(server.GetRegisteredObject<MobileParty>(scenario.OwnerPartyId), call.Party);
-                });
-                var quest = Assert.IsType<Quest>(scenario.QuestOf(server));
-                Assert.Same(server.GetRegisteredObject<MobileParty>(caravanId), quest._caravanParty);
-                Assert.NotNull(quest._banditParty);
-                Assert.True(quest._banditParty.IsBandit);
-                Assert.True(server.ObjectManager.TryGetId(quest._banditParty, out actualBanditId));
-                Assert.DoesNotContain(quest, Campaign.Current.QuestManager.Quests);
-            });
-            Quest ownerQuest = null!;
-            owner.Call(() =>
-            {
-                ownerQuest = Assert.IsType<Quest>(scenario.QuestOf(owner));
-                Assert.Same(owner.GetRegisteredObject<MobileParty>(actualBanditId), ownerQuest._banditParty);
-                Assert.Contains(ownerQuest, Campaign.Current.QuestManager.Quests);
-                Assert.Equal("S4kpdrgw", Assert.Single(ownerQuest.JournalEntries).LogText.GetID());
-            });
-            server.Call(() =>
-            {
-                var quest = Assert.IsType<Quest>(scenario.QuestOf(server));
-                var ownerHero = server.GetRegisteredObject<Hero>(scenario.OwnerHeroId);
-                quest._isCaravanSaved = true;
-                using (new MainHeroSubstitutionScope(ownerHero, ownerHero.PartyBelongedTo))
-                    quest.OnQuestSucceeded();
-            });
-            environment.FlushCoalescer();
-            owner.Call(() =>
-            {
-                Assert.Equal(2, ownerQuest.JournalEntries.Count);
-                Assert.Contains("defeated the large group of bandits", ownerQuest.JournalEntries.Last().LogText.ToString());
-            });
-            other.Call(() => Assert.Null(other.GetRegisteredObject<Hero>(scenario.NotableId).Issue));
-            Assert.Single(owner.InternalMessages.GetMessages<NetworkCaravanAmbushProgress>());
-            Assert.Empty(other.InternalMessages.GetMessages<NetworkCaravanAmbushProgress>());
-            Assert.Single(server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAccepted>());
+            test(environment, scenario, harmony);
         }
         finally
         {
             harmony.UnpatchAll(harmony.Id);
             spawns.Clear();
             hideout = null!;
+            caravanId = null!;
             failedAccept = null;
         }
     }

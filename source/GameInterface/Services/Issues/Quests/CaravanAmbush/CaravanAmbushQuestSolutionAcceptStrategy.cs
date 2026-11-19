@@ -25,6 +25,7 @@ internal class CaravanAmbushQuestSolutionAcceptStrategy : IQuestSolutionAcceptSt
     {
         if (ModInformation.IsClient || !(issue.IssueQuest is Quest quest)) return;
         if (!owners.TryResolveOwnerHero(issue, out var hero)) throw new InvalidOperationException("Caravan quest has no owner");
+        if (hero.PartyBelongedTo == null) throw new InvalidOperationException("Caravan quest owner has no party");
         try
         {
             using (new MainHeroSubstitutionScope(hero, hero.PartyBelongedTo))

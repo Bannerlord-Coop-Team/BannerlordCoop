@@ -91,16 +91,16 @@ internal class CaravanAmbushWorldEventService : ICaravanAmbushWorldEventService
         Release(quest);
     }
 
-    public void BattleEnded(MapEvent battle) => Run(quest =>
+    public void BattleEnded(MapEvent battle) => RunAndPublish(quest =>
         ApplyBattleOutcome(quest, battle) == CaravanAmbushBattleOutcome.HoldForReward);
 
-    private void Run(Action<Quest> action) => Run(quest =>
+    private void Run(Action<Quest> action) => RunAndPublish(quest =>
     {
         action(quest);
         return false;
     });
 
-    private void Run(Func<Quest, bool> opensRewardConversation)
+    private void RunAndPublish(Func<Quest, bool> opensRewardConversation)
     {
         dispatcher.RunAsOwners<Quest>(quest =>
         {
