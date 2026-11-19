@@ -788,14 +788,14 @@ internal sealed partial class LordBarterHandler : IHandler
             return false;
         }
         var kind = (LordBarterKind)request.Kind;
-        if (kind == LordBarterKind.JoinKingdomAsClan &&
-            !CanAuthorizeKind(null, playerHero, targetHero, request, targetKingdom, out reason))
-            return false;
-        if (kind == LordBarterKind.JoinKingdomAsClan &&
-            kingdomClanLimit.RefusesJoin(targetHero.Clan, targetKingdom, asMercenary: false, ModConfigProvider.ModOptions))
+        if (kind == LordBarterKind.JoinKingdomAsClan)
         {
-            reason = KingdomClanLimit.GetFullText(targetKingdom, ModConfigProvider.ModOptions).ToString();
-            return false;
+            if (!CanAuthorizeKind(null, playerHero, targetHero, request, targetKingdom, out reason)) return false;
+            if (kingdomClanLimit.RefusesJoin(targetHero.Clan, targetKingdom, asMercenary: false, ModConfigProvider.ModOptions))
+            {
+                reason = KingdomClanLimit.GetFullText(targetKingdom, ModConfigProvider.ModOptions).ToString();
+                return false;
+            }
         }
         if (kind == LordBarterKind.SafePassage && targetParty?.MobileParty == null)
         {

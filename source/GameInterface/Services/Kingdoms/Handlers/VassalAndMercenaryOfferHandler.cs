@@ -76,7 +76,7 @@ internal class VassalAndMercenaryOfferHandler : IHandler
         {
             if (!playerManager.IsSenderControllingHero(obj.Who, data.MainHeroId)) return;
 
-            var kingdomFull = vassalAndMercenaryOfferCampaignBehaviorInterface.AcceptMercenaryOffer(data.MainHeroId, data.KingdomId);
+            vassalAndMercenaryOfferCampaignBehaviorInterface.AcceptMercenaryOffer(data.MainHeroId, data.KingdomId, out bool kingdomFull);
             if (kingdomFull) network.Send(obj.Who as NetPeer, new NetworkKingdomFull(data.KingdomId));
         });
     }

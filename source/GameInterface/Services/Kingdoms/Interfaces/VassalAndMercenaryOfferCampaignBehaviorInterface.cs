@@ -28,8 +28,8 @@ public interface IVassalAndMercenaryOfferCampaignBehaviorInterface : IGameAbstra
     void OnWarDeclared(IFaction faction1, IFaction faction2);
     void OnHeroRelationChanged(Hero effectiveHero, Hero effectiveHeroGainedRelationWith);
     void OnKingdomDestroyed(Kingdom destroyedKingdom);
-    // Returns true when maxClansPerKingdom refused the join.
-    bool AcceptMercenaryOffer(string playerHeroId, string kingdomId);
+    // Returns whether the clan joined. kingdomFull is true when maxClansPerKingdom refused the join.
+    bool AcceptMercenaryOffer(string playerHeroId, string kingdomId, out bool kingdomFull);
     void DeclineOffer(string playerHeroId, string kingdomId);
     void AddNewPlayerHeroId(string playerHeroId, NetPeer peer);
 }
@@ -193,8 +193,10 @@ public class VassalAndMercenaryOfferCampaignBehaviorInterface : IVassalAndMercen
         }
     }
 
-    public bool AcceptMercenaryOffer(string playerHeroId, string kingdomId)
+    public bool AcceptMercenaryOffer(string playerHeroId, string kingdomId, out bool kingdomFull)
     {
+        kingdomFull = false;
+
         if (!ValidatePlayerHeroId(playerHeroId, out var playerData, out var playerHero)) return false;
 
         // The offer the player answered expired or was cancelled before the response arrived
@@ -214,12 +216,13 @@ public class VassalAndMercenaryOfferCampaignBehaviorInterface : IVassalAndMercen
         if (kingdomClanLimit.RefusesJoin(clan, kingdom, asMercenary: true, ModConfigProvider.ModOptions))
         {
             Logger.Warning("Rejected mercenary offer for clan {ClanId} because kingdom {KingdomId} has maxClansPerKingdom clans", clan.StringId, kingdomId);
-            return true;
+            kingdomFull = true;
+            return false;
         }
 
         int mercenaryAwardFactorToJoinKingdom = Campaign.Current.Models.MinorFactionsModel.GetMercenaryAwardFactorToJoinKingdom(clan, kingdom, true);
         ChangeKingdomAction.ApplyByJoinFactionAsMercenary(clan, kingdom, default, mercenaryAwardFactorToJoinKingdom);
-        return false;
+        return true;
     }
 
     public void DeclineOffer(string playerHeroId, string kingdomId)
