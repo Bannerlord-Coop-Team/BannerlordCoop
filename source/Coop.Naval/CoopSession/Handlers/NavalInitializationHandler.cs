@@ -29,6 +29,7 @@ internal class NavalInitializationHandler : IHandler
     private readonly IPortMooringInterface portMooringInterface;
 
     private NavalPlayerData navalPlayerData;
+    private bool mooredShipsFiltered;
 
     public NavalInitializationHandler(
         IMessageBroker messageBroker,
@@ -58,6 +59,7 @@ internal class NavalInitializationHandler : IHandler
     private void Handle(MessagePayload<InitializeClientNavalData> obj)
     {
         navalPlayerData = obj.What.NavalPlayerData;
+        mooredShipsFiltered = false;
     }
 
     // Need to load naval data when the hero changes for the player
@@ -69,7 +71,13 @@ internal class NavalInitializationHandler : IHandler
 
         Campaign.Current.UnlockedFigureheadsByMainHero = GetUnlockedFigureheads(playerHeroId);
         figureheadCampaignBehavior._lastFigureheadLootTime = GetLastFigureheadLootTime(playerHeroId);
-        portMooringInterface.KeepOnlyClanMooredShips(navalPlayerData, obj.What.NewHero.Clan);
+
+        // Only the joined stash holds other clans' ships, and the join's owner list is stale by the time an heir takes over
+        if (!mooredShipsFiltered)
+        {
+            portMooringInterface.KeepOnlyClanMooredShips(navalPlayerData, obj.What.NewHero.Clan);
+            mooredShipsFiltered = true;
+        }
 
         network.SendAll(new NetworkInitializeServerNavalDataKeys(playerHeroId));
     }
