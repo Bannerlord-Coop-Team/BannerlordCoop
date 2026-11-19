@@ -9,7 +9,6 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
-using GameInterface.Services.Issues.Framework.Registries;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.GameDebug.Messages;
@@ -17,7 +16,6 @@ using GameInterface.Services.UI.Notifications;
 using LiteNetLib;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
@@ -59,7 +57,6 @@ internal class LordSolutionCoordinator : ILordSolutionCoordinator, IHandler
         broker.Subscribe<NetworkLordSolutionStarted>(HandleStarted);
         broker.Subscribe<NetworkLordSolutionRejected>(HandleRejected);
         broker.Subscribe<NetworkIssueFinalized>(HandleFinalized);
-        broker.Subscribe<NetworkIssueOwnershipSnapshot>(HandleOwnershipSnapshot);
         broker.Subscribe<AllGameObjectsRegistered>(HandleSessionLoaded);
     }
 
@@ -69,7 +66,6 @@ internal class LordSolutionCoordinator : ILordSolutionCoordinator, IHandler
         broker.Unsubscribe<NetworkLordSolutionStarted>(HandleStarted);
         broker.Unsubscribe<NetworkLordSolutionRejected>(HandleRejected);
         broker.Unsubscribe<NetworkIssueFinalized>(HandleFinalized);
-        broker.Unsubscribe<NetworkIssueOwnershipSnapshot>(HandleOwnershipSnapshot);
         broker.Unsubscribe<AllGameObjectsRegistered>(HandleSessionLoaded);
     }
 
@@ -100,24 +96,6 @@ internal class LordSolutionCoordinator : ILordSolutionCoordinator, IHandler
 
     private void HandleSessionLoaded(MessagePayload<AllGameObjectsRegistered> payload) =>
         GameThread.RunSafe(pendingDecisions.Clear, context: nameof(LordSolutionCoordinator));
-
-    // Snapshot cancels use ReplayLocalCancel, so HandleFinalized never sees them.
-    private void HandleOwnershipSnapshot(MessagePayload<NetworkIssueOwnershipSnapshot> payload)
-    {
-        if (ModInformation.IsServer) return;
-
-        GameThread.RunSafe(() => DropUnlistedDecisions(payload.What), context: nameof(LordSolutionCoordinator));
-    }
-
-    private void DropUnlistedDecisions(NetworkIssueOwnershipSnapshot snapshot)
-    {
-        var owners = new HashSet<(string IssueOwnerId, string IssueId)>(
-            (snapshot.Owners ?? Array.Empty<IssueOwnershipData>())
-                .Select(owner => (owner.IssueOwnerId, owner.IssueId)));
-        bool StillListed(IssueBase issue) =>
-            objects.TryGetId(issue.IssueOwner, out var issueOwnerId) && owners.Contains((issueOwnerId, issue.StringId));
-        pendingDecisions.RemoveWhere(issue => !StillListed(issue));
-    }
 
     private void HandleRequest(MessagePayload<RequestLordSolution> payload)
     {
