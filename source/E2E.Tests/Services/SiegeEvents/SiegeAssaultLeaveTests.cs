@@ -511,7 +511,7 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
             var attachedSide = party.Party._mapEventSide;
             party.Party._mapEventSide = null;
             var (unattachedShown, _) = InvokeSiegeOrderAttackFallback();
-            Assert.True(unattachedShown);
+            Assert.False(unattachedShown);
             party.Party._mapEventSide = attachedSide;
 
             var playerRoster = party.MemberRoster.GetTroopRoster()
