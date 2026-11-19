@@ -269,12 +269,10 @@ internal class BattleModeEncounterOptionsPatch
         if (playerSide == null)
             return false;
 
-        var opponentLeader = mapEvent.GetLeaderParty(playerSide.MissionSide.GetOppositeSide());
         if (!ContainerProvider.TryResolve<IOrderAttackRule>(out var orderAttackRule))
             return false;
 
-        if (partyIsAttached &&
-            orderAttackRule.ShouldHideOrderAttack(mapEvent, MobileParty.MainParty, CharacterObject.PlayerCharacter))
+        if (orderAttackRule.ShouldHideOrderAttack(mapEvent, MobileParty.MainParty, CharacterObject.PlayerCharacter))
             return false;
 
         var isNavalOrder = mapEvent.IsNavalMapEvent ||
