@@ -81,7 +81,6 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
     private readonly List<UsableMachine> machines = new List<UsableMachine>();
     private readonly Dictionary<int, UsableMachine> machinesById = new Dictionary<int, UsableMachine>();
     private readonly Dictionary<int, NetworkSiegeMachineState> lastSent = new Dictionary<int, NetworkSiegeMachineState>();
-    private readonly Dictionary<int, float> lastAppliedMoveDistance = new Dictionary<int, float>();
     private readonly Dictionary<int, NetworkSiegeLadderAnimationState> lastSentLadderAnimations =
         new Dictionary<int, NetworkSiegeLadderAnimationState>();
     private readonly HashSet<int> deactivated = new HashSet<int>();
@@ -207,7 +206,6 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             ClearMangonelLoads();
             ClearMangonelPickups();
             lastSent.Clear();
-            lastAppliedMoveDistance.Clear();
             lastSentLadderAnimations.Clear();
             deactivated.Clear();
             pendingByMachineId.Clear();
@@ -313,19 +311,7 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             bool simulatedLocally = SiegeMissionAuthorityGate.IsMachineSimulatedLocally(machineId);
             if (!isHost && !simulatedLocally) continue;
 
-            var movement = (machine as BatteringRam)?.MovementComponent
-                ?? (machine as SiegeTower)?.MovementComponent;
             var state = CaptureState(machine, isHost, simulatedLocally);
-            if (state.DestructionState > 0
-                && lastSent.TryGetValue(machineId, out var previous)
-                && state.DestructionState > previous.DestructionState)
-            {
-                float moveDistance = ResolveDestructionMoveDistance(state, machineId, movement);
-
-                ApplyDestructionTransition(machine, movement, moveDistance);
-                if (isHost && !simulatedLocally && moveDistance >= 0f)
-                    state = WithMoveDistance(state, moveDistance);
-            }
             BroadcastMachineStateIfChanged(state);
 
             if (simulatedLocally && machine is SiegeLadder ladder)
@@ -527,7 +513,8 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             weaponState = -1;
             aimDirection = AimSentinel;
             aimReleaseAngle = AimSentinel;
-            moveDistance = -1f;
+            if (destructionState <= 0 || !(machine is BatteringRam || machine is SiegeTower))
+                moveDistance = -1f;
             hasArrived = false;
             if (machine is CastleGate || machine is SiegeTower) gateState = -1;
             if (machine is SiegeLadder) ladderState = -1;
@@ -1708,39 +1695,31 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
 
         // The movement simulator ignores movement echoes (a stale pre-grant broadcast must not
         // fight its own tracker); everyone else eases toward the received distance.
-        if (state.MoveDistance >= 0f && !isMachineSimulatedLocally)
+        if (state.MoveDistance >= 0f && !isMachineSimulatedLocally && movement != null)
         {
-            lastAppliedMoveDistance[machine.Id.Id] = state.MoveDistance;
-        }
-
-        if (state.MoveDistance >= 0f && !isMachineSimulatedLocally)
-        {
-            if (movement != null)
+            // Vanilla MP's steady-state client recipe (MissionNetworkComponent's siege machine movement
+            // handler): feed the distance into the movement component's advancement error and let its own
+            // per-frame tick ease toward it — wheels turn and the move sound plays. The hard snap is
+            // vanilla's JOIN-TIME recipe (BatteringRam.OnAfterReadFromNetwork), kept for a big gap
+            // (joiner catch-up) and for a real backward correction; small negative error is the easing's
+            // own overshoot and gets left alone.
+            float error = state.MoveDistance - movement.GetTotalDistanceTraveledForPathTracker();
+            if (ShouldSnapMovement(error))
             {
-                // Vanilla MP's steady-state client recipe (MissionNetworkComponent's siege machine movement
-                // handler): feed the distance into the movement component's advancement error and let its own
-                // per-frame tick ease toward it — wheels turn and the move sound plays. The hard snap is
-                // vanilla's JOIN-TIME recipe (BatteringRam.OnAfterReadFromNetwork), kept for a big gap
-                // (joiner catch-up) and for a real backward correction; small negative error is the easing's
-                // own overshoot and gets left alone.
-                float error = state.MoveDistance - movement.GetTotalDistanceTraveledForPathTracker();
-                if (ShouldSnapMovement(error))
-                {
-                    movement.SetTotalDistanceTraveledForPathTracker(state.MoveDistance);
-                    movement.SetTargetFrameForPathTracker();
-                }
-                else if (error > 0f)
-                {
-                    movement.SetDistanceTraveledAsClient(state.MoveDistance);
-                }
+                movement.SetTotalDistanceTraveledForPathTracker(state.MoveDistance);
+                movement.SetTargetFrameForPathTracker();
+            }
+            else if (error > 0f)
+            {
+                movement.SetDistanceTraveledAsClient(state.MoveDistance);
+            }
 
-                // Finish the tracker before the native arrival logic updates interaction and navigation.
-                if (state.HasArrived)
-                {
-                    // The ram tick must complete arrival itself so its standing points and navigation change too.
-                    if (machine is SiegeTower tower && !tower.HasArrivedAtTarget) tower.HasArrivedAtTarget = true;
-                    movement.MoveToTargetAsClient();
-                }
+            // Finish the tracker before the native arrival logic updates interaction and navigation.
+            if (state.HasArrived)
+            {
+                // The ram tick must complete arrival itself so its standing points and navigation change too.
+                if (machine is SiegeTower tower && !tower.HasArrivedAtTarget) tower.HasArrivedAtTarget = true;
+                movement.MoveToTargetAsClient();
             }
         }
 
@@ -1806,49 +1785,22 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             if (state.DestructionState > destruction._currentStateIndex)
             {
                 // Snap and stop the movement before the broken entity is created because it uses the tracker's frame.
-                float moveDistance = ResolveDestructionMoveDistance(state, machine.Id.Id, movement);
-                ApplyDestructionTransition(machine, movement, moveDistance);
+                float moveDistance = ResolveDestructionMoveDistance(state, movement);
+                if (movement != null)
+                    StopMovementAtDestruction(movement, moveDistance);
+                machine.Disable();
                 destruction.SetDestructionLevel(state.DestructionState, -1, 0f, TaleWorlds.Library.Vec3.Zero, TaleWorlds.Library.Vec3.Zero);
             }
         }
     }
 
-    private static NetworkSiegeMachineState WithMoveDistance(NetworkSiegeMachineState state, float moveDistance)
-        => new NetworkSiegeMachineState(state.MachineId, state.HitPoints, state.DestructionState,
-            state.GateState, state.LadderState, moveDistance, state.HasArrived, state.WeaponState,
-            state.AimDirection, state.AimReleaseAngle, state.HostEpoch,
-            state.HasStoneAmmo ? state.StoneAmmo : -1, state.SenderControllerId, state.AuthorityRevision,
-            state.HasMangonelAmmo ? state.MangonelAmmo : -1);
-
-    private float ResolveDestructionMoveDistance(
-        NetworkSiegeMachineState state, int machineId, SiegeWeaponMovementComponent movement)
+    private static float ResolveDestructionMoveDistance(
+        NetworkSiegeMachineState state, SiegeWeaponMovementComponent movement)
     {
         float moveDistance = state.MoveDistance;
-        if (moveDistance < 0f)
-            moveDistance = lastAppliedMoveDistance.TryGetValue(machineId, out var appliedMoveDistance)
-                ? appliedMoveDistance
-                : -1f;
         if (moveDistance < 0f && movement != null)
             moveDistance = movement.GetTotalDistanceTraveledForPathTracker();
         return moveDistance;
-    }
-
-    // Vanilla stops users only off-client, and replicated SetDestructionLevel does not raise OnDestroyed.
-    private static void ApplyDestructionTransition(
-        UsableMachine machine, SiegeWeaponMovementComponent movement, float moveDistance)
-    {
-        if (movement != null && moveDistance >= 0f)
-            StopMovementAtDestruction(movement, moveDistance);
-
-        if (machine.StandingPoints == null) return;
-
-        foreach (var standingPoint in machine.StandingPoints)
-        {
-            standingPoint.UserAgent?.StopUsingGameObject();
-            standingPoint.MovingAgent?.StopUsingGameObject();
-        }
-
-        machine.Deactivate();
     }
 
     private static void StopMovementAtDestruction(SiegeWeaponMovementComponent movement, float moveDistance)
@@ -1860,7 +1812,7 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         movement.SetTargetFrameForPathTracker();
     }
 
-    internal static bool ShouldSnapMovement(float error)
+    private static bool ShouldSnapMovement(float error)
         => error > MoveDistanceSnapThreshold || error < -MoveDistanceThreshold;
 
     private static void ApplyLadderAnimation(SiegeLadder ladder, NetworkSiegeLadderAnimationState state)
