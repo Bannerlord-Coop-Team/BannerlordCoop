@@ -1776,7 +1776,7 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             // component's OnDestroyed event isn't raised here, so its other listeners only run where the hit happened.
             if (!wasDestroyed && destruction.IsDestroyed)
             {
-                machine.Disable();
+                Mission.Current.OnObjectDisabled(destruction);
                 if (machine is CastleGate destroyedGate)
                     destroyedGate.OnDestroyed(destruction, null, in MissionWeapon.Invalid, null, 0);
             }
@@ -1789,9 +1789,7 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             {
                 // Snap and stop the movement before the broken entity is created because it uses the tracker's frame.
                 if (movement != null)
-                    StopMovementAtDestruction(movement, state.MoveDistance >= 0f
-                        ? state.MoveDistance
-                        : movement.GetTotalDistanceTraveledForPathTracker());
+                    StopMovementAtDestruction(movement, state.MoveDistance);
                 destruction.SetDestructionLevel(state.DestructionState, -1, 0f, TaleWorlds.Library.Vec3.Zero, TaleWorlds.Library.Vec3.Zero);
             }
         }
