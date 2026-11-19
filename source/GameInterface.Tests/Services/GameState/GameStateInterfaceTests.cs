@@ -1,11 +1,16 @@
-﻿using Common.Messaging;
+﻿using Common;
+using Common.Messaging;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Modules;
 using GameInterface.Services.UI.Interfaces;
+using GameInterface.Tests.Utils;
 using Moq;
+using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
@@ -14,8 +19,12 @@ using Xunit;
 
 namespace GameInterface.Tests.Services.GameState;
 
+/// <summary>One test blocks the shared game thread pump, so the class runs in the serial game thread collection.</summary>
+[Collection(nameof(GameThreadCancellationCollection))]
 public class GameStateInterfaceTests
 {
+    private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);
+
     static GameStateInterfaceTests()
     {
         // EndGame marshals to the game thread; start the Coop.Tests pump even when this class runs alone.
@@ -32,7 +41,7 @@ public class GameStateInterfaceTests
             () => endGameCalled = true,
             System.Array.Empty<SaveGameFileInfo>,
             _ => { },
-            _ => { },
+            loadTransferredSave: _ => { },
             Mock.Of<INavalSaveCompatibility>(),
             Mock.Of<ILoadingInterface>());
 
@@ -44,6 +53,41 @@ public class GameStateInterfaceTests
                 It.IsAny<object>(),
                 It.IsAny<MainMenuEntered>()),
             Times.Never);
+    }
+
+    // The first map frame after character creation on a big map can keep the game thread busy past every blocking wait
+    [Fact]
+    public void LoadSaveData_GameThreadBusyPastTheBlockingTimeout_LoadsAfterLeaving()
+    {
+        var order = new ConcurrentQueue<string>();
+        using var loaded = new ManualResetEventSlim(false);
+        var gameStateInterface = new GameStateInterface(Mock.Of<IMessageBroker>(), () => order.Enqueue("EndGame"),
+            System.Array.Empty<SaveGameFileInfo>, _ => { }, loadTransferredSave: _ =>
+            {
+                order.Enqueue("Load");
+                loaded.Set();
+            }, Mock.Of<INavalSaveCompatibility>(), Mock.Of<ILoadingInterface>());
+        using var entered = new ManualResetEventSlim(false);
+        using var release = new ManualResetEventSlim(false);
+
+        GameThread.Run(() => { entered.Set(); release.Wait(); });
+        try
+        {
+            Assert.True(entered.Wait(Timeout));
+            using (GameThread.Instance.LimitFrameDrain(TimeSpan.FromSeconds(1), TimeSpan.FromMilliseconds(100)))
+            {
+                // EndGame times out and stays queued, then the load queues behind it
+                gameStateInterface.EndGame();
+                gameStateInterface.LoadSaveData(new byte[16]);
+            }
+        }
+        finally
+        {
+            release.Set();
+        }
+
+        Assert.True(loaded.Wait(Timeout));
+        Assert.Equal(new[] { "EndGame", "Load" }, order);
     }
 
     // The forced load skips vanilla's NavalDLC check, so a mismatched save must stop before it and leave the loading screen.

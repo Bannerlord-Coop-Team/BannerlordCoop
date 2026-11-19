@@ -23,17 +23,15 @@ namespace GameInterface.Services.GameState.Interfaces;
 public interface IGameStateInterface : IGameAbstraction
 {
     /// <summary>
-    /// Waits the game thread's blocking wait (<see cref="GameThread.BlockingTimeout"/>, longer during a join catch up)
-    /// for leaving the campaign to run, and once more if it is still running then. When the wait ends before leaving
-    /// starts, leaving stays queued ahead of later game-thread work. The main menu may not be active yet on return.
+    /// Ends the campaign on the game thread. Leaving is ordered ahead of any game-thread work queued after this
+    /// returns, but the main menu may not be active yet.
     /// </summary>
     void GoToMainMenu();
     void StartNewGame();
     /// <summary>
-    /// Loads a transferred save on the game thread, waiting up to <paramref name="startTimeout"/> for it to start.
-    /// False only when the load never started; a load that started finishes on the game thread even after the wait ends.
+    /// Queues loading a transferred save on the game thread and returns without waiting for it.
     /// </summary>
-    bool TryLoadSaveData(byte[] saveData, TimeSpan startTimeout);
+    void LoadSaveData(byte[] saveData);
     void LoadGame(string saveName);
 
     /// <summary>
@@ -84,27 +82,11 @@ internal class GameStateInterface : IGameStateInterface
         EndGame();
     }
 
-    public bool TryLoadSaveData(byte[] saveData, TimeSpan startTimeout)
+    public void LoadSaveData(byte[] saveData)
     {
         messageBroker.Publish(this, new GameLoadStarted());
-        try
-        {
-            GameThread.Run(() => loadTransferredSave(saveData), blocking: true, blockingTimeout: startTimeout);
-        }
-        catch (GameThreadActionExpiredException e)
-        {
-            Logger.Error(e, "The transferred save did not start loading within {Seconds} seconds",
-                startTimeout.TotalSeconds);
-            return false;
-        }
-        catch (TimeoutException e)
-        {
-            // A big save can take longer than the wait to read, and it still finishes on the game thread.
-            // If that load then fails, the server's campaign entry timeout ends the join, as before.
-            Logger.Warning(e, "The transferred save is still loading on the game thread after the blocking wait");
-        }
-
-        return true;
+        // Not blocking, because a blocking wait drops the load when the game thread stays busy past it
+        GameThread.RunSafe(() => loadTransferredSave(saveData), context: nameof(LoadSaveData));
     }
 
     private static void LoadTransferredSave(byte[] saveData)

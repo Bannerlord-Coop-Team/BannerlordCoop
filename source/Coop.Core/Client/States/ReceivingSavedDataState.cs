@@ -1,7 +1,5 @@
 ﻿using Common.Messaging;
-using Common.Network;
 using Coop.Core.Client.Messages;
-using Coop.Core.Common;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.UI.Interfaces;
 using System.Globalization;
@@ -13,26 +11,19 @@ namespace Coop.Core.Client.States;
 /// </summary>
 public class ReceivingSavedDataState : ClientStateBase
 {
-    internal const string SaveHandoffTimedOutText =
-        "Loading the host campaign timed out because your game was busy for too long.\n" +
-        "Please try joining again.";
-
     private readonly IMessageBroker messageBroker;
     private readonly ILoadingInterface loadingInterface;
     private readonly IGameStateInterface gameStateInterface;
-    private readonly ICoopFinalizer coopFinalizer;
 
     public ReceivingSavedDataState(
         IClientLogic logic,
         IMessageBroker messageBroker,
         ILoadingInterface loadingInterface,
-        IGameStateInterface gameStateInterface,
-        ICoopFinalizer coopFinalizer) : base(logic)
+        IGameStateInterface gameStateInterface) : base(logic)
     {
         this.messageBroker = messageBroker;
         this.loadingInterface = loadingInterface;
         this.gameStateInterface = gameStateInterface;
-        this.coopFinalizer = coopFinalizer;
         messageBroker.Subscribe<NetworkGameSaveDataReceived>(Handle_NetworkGameSaveDataReceived);
         messageBroker.Subscribe<NetworkGameSaveDataProgress>(Handle_NetworkGameSaveDataProgress);
 
@@ -67,7 +58,6 @@ public class ReceivingSavedDataState : ClientStateBase
             "Joining Coop Campaign",
             "Preparing host save data...");
 
-        // Leaving stays queued ahead of the load below even when this wait expires
         gameStateInterface.GoToMainMenu();
 
         var saveData = obj.What.GameSaveData;
@@ -79,13 +69,7 @@ public class ReceivingSavedDataState : ClientStateBase
             "Loading Host Campaign",
             "Loading host save data...");
 
-        // The first map frame after character creation can keep the game thread busy for over a minute on a big map
-        if (!gameStateInterface.TryLoadSaveData(saveData, NetworkJoinLimits.SaveHandoffTimeout))
-        {
-            // GoToMainMenu above already left the campaign or queued leaving it
-            coopFinalizer.Finalize(SaveHandoffTimedOutText);
-            return;
-        }
+        gameStateInterface.LoadSaveData(saveData);
 
         Logic.LoadSavedData();
     }
