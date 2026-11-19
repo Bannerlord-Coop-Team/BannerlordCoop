@@ -123,24 +123,16 @@ internal sealed class ModConfig : IModConfig
             return;
         }
 
-        var (merged, added) = ModConfigTemplateMerger.Merge(original, template);
-        if (added.Count == 0) return;
-
-        WriteIfValidMigration(path, original, merged, "added settings new in the template: " + string.Join(", ", added));
-    }
-
-    private static void WriteIfValidMigration(string path, string original, string migrated, string change)
-    {
-        if (migrated == original)
-        {
-            return;
-        }
         try
         {
+            var (merged, added) = ModConfigTemplateMerger.Merge(original, template);
+            if (added.Count == 0) return;
+
             // Never replace a parseable user config with a bad migration.
-            JObject.Parse(migrated);
-            ReplaceFile(path, migrated);
-            Logger.Information("mod-config.json migrated in place: {Change} ({Path})", change, path);
+            JObject.Parse(merged);
+            ReplaceFile(path, merged);
+            Logger.Information("mod-config.json migrated in place: added settings new in the template: {Added} ({Path})",
+                string.Join(", ", added), path);
         }
         catch (Exception ex)
         {

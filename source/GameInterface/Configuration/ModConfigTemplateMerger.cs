@@ -39,6 +39,19 @@ internal static class ModConfigTemplateMerger
         public int End { get; }
     }
 
+    /// <summary>What <see cref="AddMissingMembers"/> found for one object.</summary>
+    private sealed class MissingMembers
+    {
+        public List<(int Offset, string Text)> Edits { get; } = new List<(int Offset, string Text)>();
+
+        /// <summary>Names of the template members the edits add.</summary>
+        public List<string> Added { get; } = new List<string>();
+
+        /// <summary>Members both objects have.</summary>
+        public List<(JsonMember Member, JsonMember TemplateMember)> Shared { get; } =
+            new List<(JsonMember Member, JsonMember TemplateMember)>();
+    }
+
     /// <summary>
     /// Returns the config with the template's new settings added, and their names ("block" or "block.key").
     /// Both texts must parse as JSON.
@@ -46,17 +59,17 @@ internal static class ModConfigTemplateMerger
     public static (string Merged, List<string> Added) Merge(string config, string template)
     {
         string newLine = config.Contains("\r\n") ? "\r\n" : "\n";
-        var edits = new List<(int Offset, string Text)>();
-        var added = new List<string>();
 
-        var sharedBlocks = AddMissingMembers(config, SkipTrivia(config, 0), template, SkipTrivia(template, 0),
-            "", newLine, edits, added);
-        foreach (var (block, templateBlock) in sharedBlocks)
+        var root = AddMissingMembers(config, SkipTrivia(config, 0), template, SkipTrivia(template, 0), newLine);
+        var edits = new List<(int Offset, string Text)>(root.Edits);
+        var added = new List<string>(root.Added);
+        foreach (var (block, templateBlock) in root.Shared)
         {
             if (config[block.ValueStart] != '{' || template[templateBlock.ValueStart] != '{') continue;
 
-            AddMissingMembers(config, block.ValueStart, template, templateBlock.ValueStart,
-                templateBlock.Name + ".", newLine, edits, added);
+            var nested = AddMissingMembers(config, block.ValueStart, template, templateBlock.ValueStart, newLine);
+            edits.AddRange(nested.Edits);
+            added.AddRange(nested.Added.Select(name => templateBlock.Name + "." + name));
         }
 
         string merged = config;
@@ -67,45 +80,15 @@ internal static class ModConfigTemplateMerger
         return (merged, added);
     }
 
-    /// <summary>Index of the bracket that closes the { or [ at open, or -1.</summary>
-    private static int FindMatchingBrace(string text, int open)
-    {
-        int depth = 0;
-        int i = open;
-        while (i < text.Length)
-        {
-            char current = text[i];
-            if (current == '"')
-            {
-                i = SkipString(text, i);
-                if (i < 0) return -1;
-                continue;
-            }
-
-            int afterTrivia = SkipTrivia(text, i);
-            if (afterTrivia > i)
-            {
-                i = afterTrivia;
-                continue;
-            }
-
-            if (current == '{' || current == '[') depth++;
-            else if ((current == '}' || current == ']') && --depth == 0) return i;
-            i++;
-        }
-        return -1;
-    }
-
     // Queues an insertion for each template member the object at open lacks, placed after the previous template
-    // member it has, or at the top of the object. Returns the members both objects have.
-    private static List<(JsonMember Member, JsonMember TemplateMember)> AddMissingMembers(string text, int open,
-        string template, int templateOpen, string prefix, string newLine, List<(int Offset, string Text)> edits,
-        List<string> added)
+    // member it has, or at the top of the object.
+    private static MissingMembers AddMissingMembers(string text, int open, string template, int templateOpen,
+        string newLine)
     {
-        var shared = new List<(JsonMember Member, JsonMember TemplateMember)>();
+        var result = new MissingMembers();
         var members = ReadMembers(text, open, out int close);
         var templateMembers = ReadMembers(template, templateOpen, out _);
-        if (members == null || templateMembers == null) return shared;
+        if (members == null || templateMembers == null) return result;
 
         string block = text.Substring(open, close - open + 1);
         var pending = new List<string>();
@@ -124,18 +107,34 @@ internal static class ModConfigTemplateMerger
                 int start = MemberStart(template, templateMember.NameStart);
                 pending.Add(template.Substring(start, templateMember.ValueEnd - start)
                     .Replace("\r\n", "\n").Replace("\n", newLine));
-                added.Add(prefix + templateMember.Name);
+                result.Added.Add(templateMember.Name);
                 continue;
             }
 
-            if (pending.Count > 0) edits.AddRange(InsertAfter(text, members, previous, open, close, pending, newLine));
+            if (pending.Count > 0) result.Edits.AddRange(InsertAfter(text, members, previous, open, close, pending, newLine));
             pending.Clear();
             previous = index;
-            shared.Add((members[index], templateMember));
+            result.Shared.Add((members[index], templateMember));
         }
-        if (pending.Count > 0) edits.AddRange(InsertAfter(text, members, previous, open, close, pending, newLine));
+        if (pending.Count > 0) result.Edits.AddRange(InsertAfter(text, members, previous, open, close, pending, newLine));
 
-        return shared;
+        return result;
+    }
+
+    // Where a member's text begins: its line, moved up over the // comment lines directly above it,
+    // or the member itself when something precedes it on its line.
+    private static int MemberStart(string text, int nameStart)
+    {
+        int lineStart = text.LastIndexOf('\n', nameStart - 1) + 1;
+        if (!string.IsNullOrWhiteSpace(text.Substring(lineStart, nameStart - lineStart))) return nameStart;
+
+        while (lineStart > 1)
+        {
+            int previous = text.LastIndexOf('\n', lineStart - 2) + 1;
+            if (!text.Substring(previous, lineStart - previous).TrimStart().StartsWith("//", StringComparison.Ordinal)) break;
+            lineStart = previous;
+        }
+        return lineStart;
     }
 
     // Edits that insert the snippets after members[previous], or after the opening brace when previous is -1.
@@ -231,6 +230,35 @@ internal static class ModConfigTemplateMerger
         return end > start ? end : -1;
     }
 
+    /// <summary>Index of the bracket that closes the { or [ at open, or -1.</summary>
+    private static int FindMatchingBrace(string text, int open)
+    {
+        int depth = 0;
+        int i = open;
+        while (i < text.Length)
+        {
+            char current = text[i];
+            if (current == '"')
+            {
+                i = SkipString(text, i);
+                if (i < 0) return -1;
+                continue;
+            }
+
+            int afterTrivia = SkipTrivia(text, i);
+            if (afterTrivia > i)
+            {
+                i = afterTrivia;
+                continue;
+            }
+
+            if (current == '{' || current == '[') depth++;
+            else if ((current == '}' || current == ']') && --depth == 0) return i;
+            i++;
+        }
+        return -1;
+    }
+
     // Index just past the string whose opening quote is at start, or -1 when it isn't closed.
     private static int SkipString(string text, int start)
     {
@@ -268,21 +296,5 @@ internal static class ModConfigTemplateMerger
             }
         }
         return i;
-    }
-
-    // Where a member's text begins: its line, moved up over the // comment lines directly above it,
-    // or the member itself when something precedes it on its line.
-    private static int MemberStart(string text, int nameStart)
-    {
-        int lineStart = text.LastIndexOf('\n', nameStart - 1) + 1;
-        if (!string.IsNullOrWhiteSpace(text.Substring(lineStart, nameStart - lineStart))) return nameStart;
-
-        while (lineStart > 1)
-        {
-            int previous = text.LastIndexOf('\n', lineStart - 2) + 1;
-            if (!text.Substring(previous, lineStart - previous).TrimStart().StartsWith("//", StringComparison.Ordinal)) break;
-            lineStart = previous;
-        }
-        return lineStart;
     }
 }
