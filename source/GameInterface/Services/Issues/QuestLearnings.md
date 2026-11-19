@@ -39,9 +39,10 @@ it once the user agrees:
 - **Guard repeated behavior orders.** Before an hourly tick issues a party order, compare the party's current
   behavior to the intended behavior. Reissuing the same order can reset progress and resend state. See
   `SetRaidBehaviorIfNeeded`. (#3797)
-- **Reuse the client daily tick.** Put client lifecycle exceptions for `IssueManager.DailyTick` behind
-  `ClientIssueDailyTickPatch`. Use `IIssueMissionVisibility` to tell whether a troop mission belongs to the
-  current player before changing its journal or progress. (#3797)
+- **Check who owns daily journal progress.** The shared `ClientIssueDailyTickPatch` uses `IIssueMissionVisibility`
+  to find the current player's troop missions. Check for quest-specific hooks before changing the shared tick.
+  For example, `MerchantOutlawsAlternativeJournalPatches.DailyPrefix` hides missions that get progress from
+  server snapshots, and `DailyFinalizer` restores them after the tick. (#3797)
 - **Cancellation must keep the troop owner's context.** `IssueCancellationCoordinator` holds a blocked
   cancellation until that owner has a party and the troops can return, then retries hourly. Do not let vanilla
   queue those troops globally or persist the session's pending set. The generic cancel dispatch leaves an

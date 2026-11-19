@@ -81,12 +81,7 @@ internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesert
     {
         if (!quest._deserterBattleFinalizedForTheFirstTime)
         {
-            // Co-op cancels an ongoing quest if its deserters were removed without a recorded result.
-            if (quest.IsOngoing && quest._deserterMobileParty?.IsActive == false)
-            {
-                Logger.Warning("Cancelling extortion quest {quest}: the deserter party is gone", quest.StringId);
-                quest.CompleteQuestWithCancel();
-            }
+            CancelIfDesertersGone(quest);
             return;
         }
 
@@ -163,8 +158,8 @@ internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesert
         else
         {
             SetRaidBehaviorIfNeeded(quest._deserterMobileParty, quest.QuestSettlement);
+            // Finalization publishes the loss after the defenders are cleared.
             quest._currentState = State.DesertersDefeatedPlayer;
-            progress.Send(quest);
         }
     }
 
@@ -196,17 +191,21 @@ internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesert
         }
     }
 
+    private static bool CancelIfDesertersGone(Quest quest)
+    {
+        // A defeated quest has already cleared its parties and is waiting for hand-in.
+        if (!quest.IsOngoing || quest._currentState == State.DesertersAreDefeated ||
+            quest._deserterMobileParty?.IsActive == true) return false;
+
+        Logger.Warning("Cancelling extortion quest {quest}: the deserter party is gone", quest.StringId);
+        quest.CompleteQuestWithCancel();
+        return true;
+    }
+
     public void ApplyTick(Quest quest)
     {
-        if (!quest.IsOngoing || quest._currentState == State.DesertersAreDefeated) return;
+        if (!quest.IsOngoing || quest._currentState == State.DesertersAreDefeated || CancelIfDesertersGone(quest)) return;
         var deserters = quest._deserterMobileParty;
-        // Vanilla has no active-party cancellation here. Co-op must release an owner quest after its party disappears.
-        if (deserters == null || !deserters.IsActive)
-        {
-            Logger.Warning("Cancelling extortion quest {quest}: the deserter party is gone", quest.StringId);
-            quest.CompleteQuestWithCancel();
-            return;
-        }
         // Vanilla returns while a map event is active. Co-op starts the owner ambush after the server creates its defender.
         if (deserters.MapEvent != null)
         {

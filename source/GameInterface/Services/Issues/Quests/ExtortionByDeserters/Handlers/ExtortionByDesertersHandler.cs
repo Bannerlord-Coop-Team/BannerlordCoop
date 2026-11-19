@@ -64,6 +64,7 @@ internal class ExtortionByDesertersHandler : IHandler
         if (!TryResolveParties(data, out var deserters, out var defenders)) return;
 
         var state = (State)data.State;
+        // Compare the old state before BindParties replaces it.
         var desertersJustDefeated = quest._currentState != State.DesertersAreDefeated &&
             state == State.DesertersAreDefeated;
         BindParties(quest, deserters, defenders, state);
@@ -74,7 +75,8 @@ internal class ExtortionByDesertersHandler : IHandler
             quest.AddLog(data.Log);
         }
 
-        var notice = desertersJustDefeated ? ExtortionByDesertersNotice.DesertersDefeated : (ExtortionByDesertersNotice)data.Notice;
+        var notice = (ExtortionByDesertersNotice)data.Notice;
+        if (desertersJustDefeated) notice = ExtortionByDesertersNotice.DesertersDefeated;
         ShowNotice(quest, notice);
         if (notice == ExtortionByDesertersNotice.Ambush &&
             deserters != null && defenders != null && quest.IsOngoing)

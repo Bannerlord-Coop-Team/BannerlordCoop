@@ -48,7 +48,8 @@ internal class ExtortionByDesertersBranchPatches
             var getter = AccessTools.PropertyGetter(typeof(Quest), resultProperty);
             if (getter == null)
             {
-                Logger.Warning("Missing getter for extortion reward {resultProperty}", resultProperty);
+                Logger.Error("Extortion reward routing is not installed for {resultProperty}: the result getter is missing",
+                    resultProperty);
                 continue;
             }
 
@@ -56,7 +57,8 @@ internal class ExtortionByDesertersBranchPatches
             if (consequence == null) continue;
             if (!seenConsequences.Add(consequence))
             {
-                Logger.Warning("Extortion reward consequence {method} matches more than one branch", consequence.Name);
+                Logger.Error("Extortion reward routing is not installed for {method}: the consequence matches more than one branch",
+                    consequence.Name);
                 branches.Remove(consequence);
                 continue;
             }
@@ -80,7 +82,8 @@ internal class ExtortionByDesertersBranchPatches
 
         if (matches.Length == 1) return matches[0];
 
-        Logger.Warning("Expected one extortion reward branch calling {getter}, found {count}", getter.Name, matches.Length);
+        Logger.Error("Extortion reward routing is not installed for {getter}: expected one consequence, found {count}",
+            getter.Name, matches.Length);
         return null;
     }
 }

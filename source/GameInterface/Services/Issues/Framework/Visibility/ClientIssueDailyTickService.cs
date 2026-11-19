@@ -25,9 +25,10 @@ internal sealed class ClientIssueDailyTickService : IClientIssueDailyTickService
 
             var foreign = visibility.IsAnotherPlayersTroopsMission(issue);
             var clearDay = (int)issue.AlternativeSolutionIssueEffectClearTime.ToDays;
-            // A joiner loads foreign journals from the save, but only their owner should get a return entry.
+            // Only the owner gets return entries, and vanilla's progress update needs a first journal entry.
             if (foreign || issue.JournalEntries.Count == 0)
             {
+                // A late joiner can miss the clear day, so resolve the effects on that day or later.
                 if (clearDay <= today)
                     issue._areIssueEffectsResolved = true;
 

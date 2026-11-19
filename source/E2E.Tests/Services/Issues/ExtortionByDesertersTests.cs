@@ -53,6 +53,10 @@ public class ExtortionByDesertersTests : IDisposable
         AccessTools.PropertyGetter(typeof(Settlement), nameof(Settlement.EncyclopediaLinkWithName)),
         AccessTools.PropertyGetter(typeof(Hero), nameof(Hero.EncyclopediaLinkWithName)),
     };
+    private const int GiverPowerPenalty = -10;
+    private const int TownSecurityPenalty = -10;
+    private const int TownProsperityPenalty = -50;
+
     private readonly E2ETestEnvironment environment;
     private readonly ITestOutputHelper output;
     private readonly QuestScenario scenario;
@@ -213,52 +217,41 @@ public class ExtortionByDesertersTests : IDisposable
     }
 
     [Fact]
-    public void ClientIssueLifecycle_DoesNotPurgeAnIssueWhenSecurityChanges()
+    public void ClientDailyTick_LeavesStayAliveChecksToTheServer()
     {
-        var otherHeroId = string.Empty;
-        var otherPartyId = string.Empty;
-        Server.Call(() =>
-        {
-            var player = Server.Resolve<IPlayerManager>().Players
-                .Single(player => player.ControllerId == QuestScenario.ControllerB);
-            otherHeroId = player.HeroId;
-            otherPartyId = player.MobilePartyId;
-        });
+        using var stayAliveChecks = new MethodCallRecorder(Priority.First, true,
+            AccessTools.Method(typeof(Issue), nameof(Issue.IssueStayAliveConditions)));
         Other.Call(() =>
         {
-            Assert.True(Other.ObjectManager.TryGetObject<Hero>(scenario.NotableId, out var notable));
-            Assert.True(Other.ObjectManager.TryGetObject<Hero>(otherHeroId, out var otherHero));
-            Assert.True(Other.ObjectManager.TryGetObject<Town>(townComponentId, out var town));
-            Assert.True(Other.ObjectManager.TryGetObject<MobileParty>(otherPartyId, out var party));
-            var settlement = notable.CurrentSettlement;
-            Assert.NotNull(settlement);
+            var notable = Other.GetRegisteredObject<Hero>(scenario.NotableId);
+            var town = Other.GetRegisteredObject<Town>(townComponentId);
             var issue = notable.Issue;
-            var previousSettlement = party.CurrentSettlement;
-            party.CurrentSettlement = settlement;
-            try
+            Assert.True(issue.IsOngoingWithoutQuest);
+            using (new AllowedThread())
             {
-                using (new MainHeroSubstitutionScope(otherHero, party))
-                using (new AllowedThread())
-                {
-                    town.Security = 90;
-                    Campaign.Current.IssueManager.OnSettlementEntered(party, settlement, otherHero);
-                    Campaign.Current.IssueManager.DailyTick();
-                }
+                town.Security = 90;
             }
-            finally
-            {
-                party.CurrentSettlement = previousSettlement;
-            }
+
+            Campaign.Current.IssueManager.DailyTick();
+
+            Assert.Equal(0, stayAliveChecks.CountFor(Other));
             Assert.Same(issue, notable.Issue);
         });
     }
 
+    public enum RaidAttacker
+    {
+        Deserters,
+        Owner,
+        Other,
+    }
+
     [Theory]
-    [InlineData(0, IssueOutcome.QuestFail, -10)]
-    [InlineData(1, IssueOutcome.QuestFail, -5)]
-    [InlineData(2, IssueOutcome.QuestCancel, 0)]
+    [InlineData(RaidAttacker.Deserters, IssueOutcome.QuestFail, -10, GiverPowerPenalty, TownSecurityPenalty, TownProsperityPenalty)]
+    [InlineData(RaidAttacker.Owner, IssueOutcome.QuestFail, -5, GiverPowerPenalty, TownSecurityPenalty, TownProsperityPenalty)]
+    [InlineData(RaidAttacker.Other, IssueOutcome.QuestCancel, 0, 0, 0, 0)]
     public void VillageRaided_EndsTheOwnersQuestWithTheRaidersConsequences(
-        int attacker, IssueOutcome outcome, int relationChange)
+        RaidAttacker attacker, IssueOutcome outcome, int relationChange, int powerChange, int securityChange, int prosperityChange)
     {
         var ownerQuest = Accept();
         var quest = (Quest)scenario.QuestOf(Server);
@@ -275,7 +268,14 @@ public class ExtortionByDesertersTests : IDisposable
             deserters.Aggressiveness = 0f;
             deserters.MemberRoster.AddToCounts(deserters.LeaderHero.CharacterObject, 1);
             ownerParty.CurrentSettlement = null;
-            var raider = attacker == 0 ? deserters : attacker == 1 ? ownerParty : otherParty;
+            var (raider, endingLog) = attacker switch
+            {
+                RaidAttacker.Deserters => (deserters, quest.OnQuestFailed2LogText),
+                RaidAttacker.Owner => (ownerParty, quest.OnQuestFailed3LogText),
+                RaidAttacker.Other => (otherParty, quest.OnQuestCancel2LogText),
+                _ => throw new ArgumentOutOfRangeException(nameof(attacker)),
+            };
+            log = endingLog.Value;
             // Seed the raid graph without announcing an unrelated field-battle start.
             var raid = GameObjectCreator.CreateInitializedObject<MapEvent>();
             raid.MapEventVisual = null;
@@ -288,10 +288,8 @@ public class ExtortionByDesertersTests : IDisposable
             defenders.MemberRoster.AddToCounts(GameObjectCreator.CreateInitializedObject<CharacterObject>(), 1);
             defenders.MapEventSide = raid.DefenderSide;
             Assert.Same(raid, defenders.MapEvent);
-            log = (attacker == 0 ? quest.OnQuestFailed2LogText :
-                attacker == 1 ? quest.OnQuestFailed3LogText : quest.OnQuestCancel2LogText).Value;
 
-            AssertQuestPenalty(quest, relationChange,
+            AssertQuestPenalty(quest, relationChange, powerChange, securityChange, prosperityChange,
                 () => CampaignEventDispatcher.Instance.OnVillageBeingRaided(quest.QuestSettlement.Village));
 
             Assert.True(deserters.IsActive);
@@ -366,10 +364,8 @@ public class ExtortionByDesertersTests : IDisposable
             Assert.Equal(lostSight, deserters.Position.Distance(ownerParty.Position) > ownerParty.SeeingRange + 3f);
             log = quest.OnQuestFailed1LogText.Value;
 
-            AssertQuestPenalty(quest, -10, () =>
-            {
-                CampaignEventDispatcher.Instance.HourlyTick();
-            });
+            AssertQuestPenalty(quest, -10, GiverPowerPenalty, TownSecurityPenalty, TownProsperityPenalty,
+                CampaignEventDispatcher.Instance.HourlyTick);
 
             Assert.False(defenders.IsActive);
             Assert.Null(quest._defenderMobileParty);
@@ -385,7 +381,8 @@ public class ExtortionByDesertersTests : IDisposable
         AssertQuestEnding(ownerQuest, IssueOutcome.QuestFail, log);
     }
 
-    private void AssertQuestPenalty(Quest quest, int relationChange, Action callback)
+    private void AssertQuestPenalty(Quest quest, int relationChange, int powerChange, int securityChange,
+        int prosperityChange, Action callback)
     {
         Assert.True(Server.ObjectManager.TryGetObject<Hero>(scenario.OwnerHeroId, out var ownerHero));
         Assert.True(Server.ObjectManager.TryGetObject<Hero>(scenario.OtherHeroId, out var otherHero));
@@ -414,9 +411,9 @@ public class ExtortionByDesertersTests : IDisposable
         Assert.Equal(relationChange, quest.RelationshipChangeWithQuestGiver);
         Assert.Equal(ownerRelation + relationChange, giver.GetRelation(ownerHero));
         Assert.Equal(otherRelation, giver.GetRelation(otherHero));
-        Assert.Equal(power + (relationChange == 0 ? 0 : -10), giver.Power);
-        Assert.Equal(security + (relationChange == 0 ? 0 : -10), town.Security);
-        Assert.Equal(prosperity + (relationChange == 0 ? 0 : -50), town.Prosperity);
+        Assert.Equal(power + powerChange, giver.Power);
+        Assert.Equal(security + securityChange, town.Security);
+        Assert.Equal(prosperity + prosperityChange, town.Prosperity);
     }
 
     private void AssertQuestEnding(Quest ownerQuest, IssueOutcome outcome, string log)
@@ -436,12 +433,6 @@ public class ExtortionByDesertersTests : IDisposable
         Assert.Empty(Owner.NetworkSentMessages.GetMessages<RequestQuestOutcome>());
         Assert.Empty(Other.NetworkSentMessages.GetMessages<RequestQuestOutcome>());
     }
-
-
-
-
-
-
 
     [Theory]
     [InlineData(0, 1f, 0, 4, 5, 0)]
@@ -510,10 +501,10 @@ public class ExtortionByDesertersTests : IDisposable
     }
 
     [Theory]
-    [InlineData(0, 10, 0)]
-    [InlineData(3, -10, -50)]
+    [InlineData(nameof(Quest._questResultSuccess1), 10, 0)]
+    [InlineData(nameof(Quest._questResultFail1), TownSecurityPenalty, TownProsperityPenalty)]
     public void NativeApplyQuestResult_ReplicatesTownRewardsToBothOriginalClients(
-        int choice, int securityChange, int prosperityChange)
+        string resultProperty, int securityChange, int prosperityChange)
     {
         var ownerQuest = Accept();
         var serverQuest = (Quest)scenario.QuestOf(Server);
@@ -580,7 +571,7 @@ public class ExtortionByDesertersTests : IDisposable
             });
             Assert.Empty(client.NetworkSentMessages.GetMessages<GenericNetworkEvent<Town, byte[]>>());
         }
-        var security = Assert.Single(messages.Where(message => message.GetType().Name == "Town_Security_SetNetworkMessage"));
+        var security = Assert.Single(messages, message => message.GetType().Name == "Town_Security_SetNetworkMessage");
         Assert.Equal((float)(40 + securityChange), RawSerializer.Deserialize<float>(Assert.IsType<byte[]>(security.GetType().GetProperty("Value")!.GetValue(security))));
         var prosperityMessages = messages.Where(message => message.GetType().Name == "Town__prosperity_SetNetworkMessage").ToArray();
         if (prosperityChange == 0) Assert.Empty(prosperityMessages);
@@ -591,12 +582,11 @@ public class ExtortionByDesertersTests : IDisposable
         }
         Assert.Equal(prosperityChange == 0 ? 1 : 2, messages.Length);
 
-        Quest.ExtortionByDesertersQuestResult ResultOf(Quest quest) => choice switch
+        Quest.ExtortionByDesertersQuestResult ResultOf(Quest quest) => resultProperty switch
         {
-            0 => quest._questResultSuccess1,
-            1 => quest._questResultSuccess2,
-            2 => quest._questResultSuccess3,
-            _ => quest._questResultFail1,
+            nameof(Quest._questResultSuccess1) => quest._questResultSuccess1,
+            nameof(Quest._questResultFail1) => quest._questResultFail1,
+            _ => throw new ArgumentOutOfRangeException(nameof(resultProperty)),
         };
     }
 
@@ -818,18 +808,15 @@ public class ExtortionByDesertersTests : IDisposable
         Assert.Equal(1, cleanup.CountFor(Server));
         Assert.Equal(0, rewards.Count);
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
-        var states = Server.NetworkSentMessages.GetMessages<NetworkExtortionByDesertersState>()
-            .Where(state => state.State == (int)State.DesertersDefeatedPlayer).ToArray();
-        var finalState = Assert.Single(states, state => string.IsNullOrEmpty(state.DefenderId));
+        var finalState = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkExtortionByDesertersState>(),
+            state => state.State == (int)State.DesertersDefeatedPlayer);
+        Assert.True(string.IsNullOrEmpty(finalState.DefenderId));
         Assert.Equal(deserterId, finalState.DeserterId);
         Assert.Equal(QuestScenario.ControllerA, finalState.ControllerId);
-        Assert.All(states, state =>
-        {
-            Assert.Equal((byte)ExtortionByDesertersNotice.None, state.Notice);
-            Assert.True(TextObject.IsNullOrEmpty(state.Log));
-        });
+        Assert.Equal((byte)ExtortionByDesertersNotice.None, finalState.Notice);
+        Assert.True(TextObject.IsNullOrEmpty(finalState.Log));
         Assert.Single(Owner.InternalMessages.GetMessages<NetworkExtortionByDesertersState>(),
-            state => state.State == (int)State.DesertersDefeatedPlayer && string.IsNullOrEmpty(state.DefenderId));
+            state => state.State == (int)State.DesertersDefeatedPlayer);
         Assert.DoesNotContain(Other.InternalMessages.GetMessages<NetworkExtortionByDesertersState>(),
             state => state.State == (int)State.DesertersDefeatedPlayer);
         Owner.Call(() =>
