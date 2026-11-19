@@ -270,9 +270,8 @@ internal sealed class ConversationPartyTracker : IHandler
     }
 
     /// <summary>
-    /// Defers a server-detected encounter when the player or <paramref name="partyId"/> is already in a conversation
-    /// that is not between the two: the player engages another party or is in a PvP conversation, or another player
-    /// holds the party. <paramref name="firstDeferral"/> is true only the first time until the conversation behind the
+    /// Defers a server-detected encounter when the player or <paramref name="partyId"/> is already in another
+    /// conversation. <paramref name="firstDeferral"/> is true only the first time until the conversation behind the
     /// deferral ends, so the caller logs each deferral once.
     /// </summary>
     public bool TryDefer(object engagerKey, string engagerPartyId, string partyId, out bool firstDeferral)
@@ -285,11 +284,7 @@ internal sealed class ConversationPartyTracker : IHandler
         {
             if (disposed) return false;
 
-            // A refresh by the same party still passes, the bandit barter relies on the EngagerIsDefender merge.
-            var isInOtherConversation = engagements.TryGetValue(engagerKey, out var current)
-                ? current.PartyId != partyId
-                : pvpPartnersByPartyId.ContainsKey(engagerPartyId) || engagements.Values.Any(x => x.PartyId == partyId);
-            if (!isInOtherConversation) return false;
+            if (!IsInOtherConversation(engagerKey, engagerPartyId, partyId)) return false;
 
             // A player who switched parties starts a fresh record under the new party.
             if (!loggedDeferralsByEngager.TryGetValue(engagerKey, out var deferrals) ||
@@ -390,6 +385,18 @@ internal sealed class ConversationPartyTracker : IHandler
         {
             return pvpPartyIdByPeer.TryGetValue(peer, out partyId);
         }
+    }
+
+    // True when the player engages another party or is in a PvP conversation, or another player holds the party.
+    // Must be called under stateLock. A refresh by the same party still passes, the bandit barter relies on the
+    // EngagerIsDefender merge.
+    private bool IsInOtherConversation(object engagerKey, string engagerPartyId, string partyId)
+    {
+        if (engagements.TryGetValue(engagerKey, out var current))
+            return current.PartyId != partyId;
+
+        return pvpPartnersByPartyId.ContainsKey(engagerPartyId) ||
+            engagements.Values.Any(x => x.PartyId == partyId);
     }
 
     // Drops the peer<->party mapping for a party leaving a PvP conversation. Must be called under stateLock.
