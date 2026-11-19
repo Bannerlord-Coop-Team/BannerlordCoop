@@ -13,6 +13,7 @@ using GameInterface.Services.MapEvents.Interfaces;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Quests.ExtortionByDeserters;
 using GameInterface.Services.Issues.Quests.ExtortionByDeserters.Handlers;
+using GameInterface.Services.Issues.Quests.ExtortionByDeserters.Patches;
 using GameInterface.Services.Issues.Quests.ExtortionByDeserters.Messages;
 using GameInterface.Services.MobileParties.Messages.Lifetime;
 using GameInterface.Services.Players;
