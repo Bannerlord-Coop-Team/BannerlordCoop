@@ -25,6 +25,9 @@ internal interface ICaravanAmbushWorldEventService
 
 internal class CaravanAmbushWorldEventService : ICaravanAmbushWorldEventService
 {
+    // From CaravanAmbushIssueQuest.HourlyTick.
+    private const float AmbushTriggerRadiusFactor = 2.2f;
+
     private readonly IOutcomeDispatcher dispatcher;
     private readonly ICaravanAmbushProgress progress;
     private readonly IRetreatedMapEventPartyTracker retreatedPartyTracker;
@@ -39,6 +42,8 @@ internal class CaravanAmbushWorldEventService : ICaravanAmbushWorldEventService
 
     public void HourlyTick() => Run(quest =>
     {
+        // Vanilla only reads MainParty for vicinity and escort checks while the caravan is unsaved and out of battle.
+        // A caravan already in battle or saved can run the vanilla tick even if the owner has no party.
         var ownerRunsVanillaTick = Hero.MainHero.PartyBelongedTo != null ||
             quest._caravanParty?.MapEvent != null || quest._isCaravanSaved;
         if (ownerRunsVanillaTick)
@@ -47,10 +52,10 @@ internal class CaravanAmbushWorldEventService : ICaravanAmbushWorldEventService
             return;
         }
 
-        // Vanilla's vicinity check reads MainParty, so an owner without a party only gets its ambush trigger.
+        // Without an owner party, run only the ambush trigger.
         var banditsReachedCaravan = quest._caravanParty != null && quest._banditParty != null &&
             quest._caravanParty.Position.DistanceSquared(quest._banditParty.Position) <=
-            Campaign.Current.Models.EncounterModel.GetEncounterJoiningRadius * 2.2f;
+            Campaign.Current.Models.EncounterModel.GetEncounterJoiningRadius * AmbushTriggerRadiusFactor;
         if (banditsReachedCaravan)
         {
             EncounterManager.StartPartyEncounter(quest._banditParty.Party, quest._caravanParty.Party);
@@ -151,7 +156,7 @@ internal class CaravanAmbushWorldEventService : ICaravanAmbushWorldEventService
             case CaravanAmbushBattleOutcome.HoldForReward:
                 quest._isCaravanSaved = true;
                 HoldCaravanForReward(quest);
-                return CaravanAmbushBattleOutcome.HoldForReward;
+                break;
         }
         return outcome;
     }

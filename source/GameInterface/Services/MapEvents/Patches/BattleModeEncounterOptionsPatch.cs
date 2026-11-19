@@ -268,7 +268,9 @@ internal class BattleModeEncounterOptionsPatch
         if (!ContainerProvider.TryResolve<IOrderAttackRule>(out var orderAttackRule))
             return false;
 
-        if (orderAttackRule.ShouldHideOrderAttack(mapEvent, MobileParty.MainParty, CharacterObject.PlayerCharacter))
+        var hideOrderAttack = orderAttackRule.ShouldHideOrderAttack(mapEvent, MobileParty.MainParty,
+            CharacterObject.PlayerCharacter, encounter.OpponentSide, out var hideBeforeSettingLeaveType);
+        if (hideBeforeSettingLeaveType)
             return false;
 
         var isNavalOrder = mapEvent.IsNavalMapEvent ||
@@ -277,13 +279,8 @@ internal class BattleModeEncounterOptionsPatch
             ? GameMenuOption.LeaveType.OrderShipsToAttack
             : GameMenuOption.LeaveType.OrderTroopsToAttack;
 
-        foreach (var party in mapEvent.PartiesOnSide(encounter.OpponentSide))
-        {
-            if (party.Party.MobileParty?.IsInRaftState == true)
-                return false;
-
-            break;
-        }
+        if (hideOrderAttack)
+            return false;
 
         MenuHelper.CheckEnemyAttackableHonorably(args);
 

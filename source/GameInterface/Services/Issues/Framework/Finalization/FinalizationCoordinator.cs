@@ -442,8 +442,9 @@ internal class FinalizationCoordinator : IHandler, IIssueFinalizationReplay
         if (!issueResolver.TryResolve(issueOwnerId, issueId, out _, out var issue, out _)) return;
 
         var quest = issue.IssueQuest;
-        QueueReplay(issueOwnerId, wasOwner && IsRunningLocally(quest),
-            // Keep this issue instance because a deferred replay may run after a replacement issue arrives.
+        var ownersRunningQuest = wasOwner && IsRunningLocally(quest);
+        // Keep this issue instance because a deferred replay may run after a replacement issue arrives.
+        QueueReplay(issueOwnerId, ownersRunningQuest,
             () => ReplayEnding(issue, IssueOutcome.QuestCancel, wasOwner));
     }
 

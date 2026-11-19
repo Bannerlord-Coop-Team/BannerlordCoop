@@ -38,6 +38,7 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
+using TaleWorlds.Localization;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -573,6 +574,84 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
                     Hero.MainHero.HitPoints = healthyHitPoints;
             }
         }, MapEventDisabledMethods);
+    }
+
+    [Fact]
+    public void OrderAttackFallback_PreservesVisibilityLeaveTypeAndText()
+    {
+        var battle = CreateServerMapEvent();
+        var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        var client = Clients.First();
+        SetMainParty(client, battle.AttackerPartyId);
+        var disabledMethods = MapEventDisabledMethods
+            .Append(AccessTools.Method(typeof(MobilePartyHelper), nameof(MobilePartyHelper.CanPartyAttackWithCurrentMorale)))
+            .ToList();
+
+        client.Call(() =>
+        {
+            var mapEvent = client.GetRegisteredObject<MapEvent>(battle.MapEventId);
+            var attacker = client.GetRegisteredObject<MobileParty>(battle.AttackerPartyId);
+            var defender = client.GetRegisteredObject<MobileParty>(battle.DefenderPartyId);
+            var encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
+            encounter._mapEvent = mapEvent;
+            encounter._encounteredParty = defender.Party;
+            encounter.OpponentSide = BattleSideEnum.Defender;
+            Campaign.Current.PlayerEncounter = encounter;
+
+            var attackerSide = mapEvent.AttackerSide;
+            var defenderSide = mapEvent.DefenderSide;
+            var troop = client.GetRegisteredObject<CharacterObject>(troopId);
+            const string unchanged = "unset order attack text";
+            const string sendTroops = "Send troops.";
+            const string leaveToOthers = "Leave it to the others.";
+            var sendType = GameMenuOption.LeaveType.OrderTroopsToAttack;
+            var untouchedType = new MenuCallbackArgs((MenuContext)null, null).optionLeaveType;
+
+            (string Name, bool Attached, bool DefenderRaft, bool DefenderHasTroops, bool HasLeader, bool PlayerOnly, bool Naval,
+                bool CanOrder, bool Shown, GameMenuOption.LeaveType LeaveType, string Text)[] rows =
+            {
+                (Name: "attached", Attached: true, DefenderRaft: false, DefenderHasTroops: true, HasLeader: true, PlayerOnly: false, Naval: false,
+                    CanOrder: true, Shown: true, LeaveType: sendType, Text: sendTroops),
+                ("unattached", false, false, true, true, false, false, false, false, untouchedType, unchanged),
+                ("opponent in raft", true, true, true, true, false, false, false, false, untouchedType, unchanged),
+                ("opponent in raft with no troops", true, true, false, true, false, false, false, false, sendType, unchanged),
+                ("no opposing troops", true, false, false, true, false, false, false, true, sendType, sendTroops),
+                ("no opposing leader", true, false, true, false, false, false, false, true, sendType, sendTroops),
+                ("no orderable troops", true, false, true, true, true, false, false, false, untouchedType, unchanged),
+                ("player alone with no opposing troops", true, false, false, true, true, false, false, true, sendType, leaveToOthers),
+                ("naval", true, false, true, true, false, true, true, true, GameMenuOption.LeaveType.OrderShipsToAttack, "Send ships."),
+            };
+
+            using var allowed = new AllowedThread();
+            var orderAttackRule = client.Resolve<IOrderAttackRule>();
+            foreach (var row in rows)
+            {
+                mapEvent.Position = new CampaignVec2(default, isOnLand: !row.Naval);
+                attacker.Party._mapEventSide = row.Attached ? attackerSide : null;
+                // During the join window vanilla hasn't set the party's side or added it to the event.
+                var attackerEntry = Assert.Single(attackerSide.Parties);
+                if (!row.Attached)
+                    attackerSide._battleParties.Remove(attackerEntry);
+                defender.IsInRaftState = row.DefenderRaft;
+                defenderSide.LeaderParty = row.HasLeader ? defender.Party : null;
+                attacker.MemberRoster.Clear();
+                defender.MemberRoster.Clear();
+                attacker.MemberRoster.AddToCounts(row.PlayerOnly ? CharacterObject.PlayerCharacter : troop, 1);
+                if (row.DefenderHasTroops)
+                    defender.MemberRoster.AddToCounts(troop, 1);
+
+                MBTextManager.SetTextVariable("SEND_TROOPS_TEXT", unchanged);
+                var (shown, args) = InvokeSiegeOrderAttackFallback();
+                var text = new TextObject("{=!}{SEND_TROOPS_TEXT}").ToString();
+
+                Assert.Equal(
+                    (row.Name, row.CanOrder, row.Shown, row.LeaveType, row.Text),
+                    (row.Name, orderAttackRule.CanOrderAttack(mapEvent, attacker, CharacterObject.PlayerCharacter),
+                        shown, args.optionLeaveType, text));
+                if (!row.Attached)
+                    attackerSide._battleParties.Add(attackerEntry);
+            }
+        }, disabledMethods);
     }
 
     private static (bool shown, MenuCallbackArgs args) InvokePatchedEncounterAttackCondition()
