@@ -20,7 +20,7 @@ class AutoSyncPatchCollector : IAutoSyncPatchCollector
 {
     private static readonly ILogger Logger = LogManager.GetLogger<AutoSyncPatchCollector>();
 
-    public static readonly HashSet<(string HarmonyId, MethodBase Method, MethodInfo Patch, HarmonyPatchType Type)> PatchedMethods = new();
+    public static readonly HashSet<(MethodBase, MethodInfo, HarmonyPatchType)> PatchedMethods = new();
 
     private readonly Harmony harmony;
 
@@ -58,7 +58,7 @@ class AutoSyncPatchCollector : IAutoSyncPatchCollector
     {
         foreach (var (method, patch) in transpilers)
         {
-            var key = (harmony.Id, method, patch, HarmonyPatchType.Transpiler);
+            var key = (method, patch, HarmonyPatchType.Transpiler);
             if (PatchedMethods.Contains(key))
             {
                 Logger.Error("Method '{MethodName}' was already patched with '{PatchName}'", method.Name, patch.Name);
@@ -79,7 +79,7 @@ class AutoSyncPatchCollector : IAutoSyncPatchCollector
 
         foreach (var (method, patch) in prefixes)
         {
-            var key = (harmony.Id, method, patch, HarmonyPatchType.Prefix);
+            var key = (method, patch, HarmonyPatchType.Prefix);
             if (PatchedMethods.Contains(key))
             {
                 Logger.Error("Method '{DeclaringType}.{MethodName}' was already patched with '{PatchName}'", method.DeclaringType, method.Name, patch.Name);
@@ -99,7 +99,7 @@ class AutoSyncPatchCollector : IAutoSyncPatchCollector
 
         foreach (var (method, patch) in postfixes)
         {
-            var key = (harmony.Id, method, patch, HarmonyPatchType.Postfix);
+            var key = (method, patch, HarmonyPatchType.Postfix);
             if (PatchedMethods.Contains(key))
             {
                 Logger.Error("Method '{MethodName}' was already patched with '{PatchName}'", method.Name, patch.Name);
@@ -143,7 +143,7 @@ class AutoSyncPatchCollector : IAutoSyncPatchCollector
                     method.DeclaringType, method.Name, patch.DeclaringType, patch.Name);
             }
 
-            PatchedMethods.Remove((harmony.Id, method, patch, patchType));
+            PatchedMethods.Remove((method, patch, patchType));
             patches.Remove((method, patch));
         }
     }
