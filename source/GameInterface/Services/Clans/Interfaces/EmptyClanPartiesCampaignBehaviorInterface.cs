@@ -25,8 +25,9 @@ public interface IEmptyClanPartiesCampaignBehaviorInterface : IGameAbstraction
     void TryCreateNewClanMobilePartyFromCachedEmptyParties(Hero hero, Settlement settlement);
     void TransferCachedLordPartyToNewParty(Hero cachedPartyLeader, PartyBase newParty);
     void DisbandCachedLordParty(Hero cachedPartyLeader);
+    bool HasEmptyClanParty(Hero leader);
     void AddEmptyClanParty(Hero leader, IEnumerable<Ship> ships);
-    void RemoveEmptyClanParty(Hero leader);
+    bool TryTakeEmptyClanParty(Hero leader, out EmptyClanParty emptyClanParty);
 }
 
 public class EmptyClanPartiesCampaignBehaviorInterface : IEmptyClanPartiesCampaignBehaviorInterface
@@ -39,51 +40,48 @@ public class EmptyClanPartiesCampaignBehaviorInterface : IEmptyClanPartiesCampai
     }
 
     private static List<EmptyClanParty> EmptyClanParties =>
-        Campaign.Current?.GetCampaignBehavior<EmptyClanPartiesCampaignBehavior>()?._emptyClanParties;
+        Campaign.Current.GetCampaignBehavior<EmptyClanPartiesCampaignBehavior>()._emptyClanParties;
 
     public void OnMobilePartyDestroyed(MobileParty party, PartyBase destroyerParty)
     {
         Hero owner = party.Owner;
         if (owner == null || !owner.Clan.IsPlayerClan() || owner.IsPlayerHero() || owner.IsDead || party.IsCaravan || party.IsDisbanding || destroyerParty == null) return;
 
-        var emptyClanParty = new EmptyClanParty(owner);
+        var ships = new List<Ship>();
         if (!party.IsCurrentlyAtSea)
         {
             for (int i = party.Ships.Count - 1; i >= 0; i--)
             {
                 Ship ship = party.Ships[i];
                 ship.Owner = null;
-                emptyClanParty.Ships.Add(ship);
+                ships.Add(ship);
             }
         }
 
-        EmptyClanParties.Add(emptyClanParty);
-        messageBroker.Publish(this, new EmptyClanPartyAdded(owner, emptyClanParty.Ships.ToArray()));
+        AddEmptyClanParty(owner, ships);
+        messageBroker.Publish(this, new EmptyClanPartyAdded(owner, ships.ToArray()));
     }
 
     public void OnBeforeHeroKilled(Hero victim)
     {
-        if (!victim.Clan.IsPlayerClan() || victim.IsPlayerHero() || !TryRemoveEmptyClanParty(victim, out var emptyClanParty)) return;
+        if (!victim.Clan.IsPlayerClan() || victim.IsPlayerHero()) return;
 
-        DistributePartyShipsAndRecoverGold(emptyClanParty);
+        DisbandCachedLordParty(victim);
     }
 
     public void OnMobilePartyCreated(MobileParty party)
     {
         if (!party.ActualClan.IsPlayerClan() || party.LeaderHero == null || party.IsCaravan || party.IsPlayerParty()) return;
-        if (!TryRemoveEmptyClanParty(party.LeaderHero, out var emptyClanParty)) return;
 
-        foreach (Ship ship in emptyClanParty.Ships)
-        {
-            ChangeShipOwnerAction.ApplyByTransferring(party.Party, ship);
-        }
+        TransferCachedLordPartyToNewParty(party.LeaderHero, party.Party);
     }
 
     public void TryCreateNewClanMobilePartyFromCachedEmptyParties(Hero hero, Settlement settlement)
     {
         if (hero == null || !hero.IsActive || !hero.Clan.IsPlayerClan() || hero.IsPlayerHero() || hero.PartyBelongedTo != null) return;
-        if (!TryRemoveEmptyClanParty(hero, out var emptyClanParty)) return;
+        if (!TryTakeEmptyClanParty(hero, out var emptyClanParty)) return;
 
+        messageBroker.Publish(this, new EmptyClanPartyRemoved(hero));
         MobileParty mobileParty = MobilePartyHelper.SpawnLordParty(hero, settlement);
         foreach (Ship ship in emptyClanParty.Ships)
         {
@@ -93,8 +91,9 @@ public class EmptyClanPartiesCampaignBehaviorInterface : IEmptyClanPartiesCampai
 
     public void TransferCachedLordPartyToNewParty(Hero cachedPartyLeader, PartyBase newParty)
     {
-        if (!TryRemoveEmptyClanParty(cachedPartyLeader, out var emptyClanParty)) return;
+        if (!TryTakeEmptyClanParty(cachedPartyLeader, out var emptyClanParty)) return;
 
+        messageBroker.Publish(this, new EmptyClanPartyRemoved(cachedPartyLeader));
         foreach (Ship ship in emptyClanParty.Ships)
         {
             ChangeShipOwnerAction.ApplyByTransferring(newParty, ship);
@@ -103,29 +102,25 @@ public class EmptyClanPartiesCampaignBehaviorInterface : IEmptyClanPartiesCampai
 
     public void DisbandCachedLordParty(Hero cachedPartyLeader)
     {
-        if (!TryRemoveEmptyClanParty(cachedPartyLeader, out var emptyClanParty)) return;
+        if (!TryTakeEmptyClanParty(cachedPartyLeader, out var emptyClanParty)) return;
 
+        messageBroker.Publish(this, new EmptyClanPartyRemoved(cachedPartyLeader));
         DistributePartyShipsAndRecoverGold(emptyClanParty);
     }
+
+    public bool HasEmptyClanParty(Hero leader) => EmptyClanParties.Exists(x => x.Leader == leader);
 
     public void AddEmptyClanParty(Hero leader, IEnumerable<Ship> ships)
     {
         var emptyClanParty = new EmptyClanParty(leader);
         emptyClanParty.Ships.AddRange(ships);
-        EmptyClanParties?.Add(emptyClanParty);
+        EmptyClanParties.Add(emptyClanParty);
     }
 
-    public void RemoveEmptyClanParty(Hero leader)
+    public bool TryTakeEmptyClanParty(Hero leader, out EmptyClanParty emptyClanParty)
     {
         var emptyClanParties = EmptyClanParties;
-        int index = emptyClanParties?.FindIndex(x => x.Leader == leader) ?? -1;
-        if (index >= 0) emptyClanParties.RemoveAt(index);
-    }
-
-    private bool TryRemoveEmptyClanParty(Hero leader, out EmptyClanParty emptyClanParty)
-    {
-        var emptyClanParties = EmptyClanParties;
-        int index = emptyClanParties?.FindIndex(x => x.Leader == leader) ?? -1;
+        int index = emptyClanParties.FindIndex(x => x.Leader == leader);
         if (index < 0)
         {
             emptyClanParty = default;
@@ -134,7 +129,6 @@ public class EmptyClanPartiesCampaignBehaviorInterface : IEmptyClanPartiesCampai
 
         emptyClanParty = emptyClanParties[index];
         emptyClanParties.RemoveAt(index);
-        messageBroker.Publish(this, new EmptyClanPartyRemoved(leader));
         return true;
     }
 

@@ -93,7 +93,7 @@ internal class EmptyClanPartiesHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.LeaderId, out var leader)) return;
 
-            emptyClanPartiesInterface.RemoveEmptyClanParty(leader);
+            emptyClanPartiesInterface.TryTakeEmptyClanParty(leader, out _);
         });
     }
 }

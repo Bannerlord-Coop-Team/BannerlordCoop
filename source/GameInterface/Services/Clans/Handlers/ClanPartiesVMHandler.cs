@@ -105,10 +105,7 @@ internal class ClanPartiesVMHandler : IHandler
     private MobileParty CreateClanParty(Hero mainHero, Hero newLeader, Clan clan, int partyGoldLowerThreshold)
     {
         MobileParty mobileParty = MobilePartyHelper.CreateNewClanMobileParty(newLeader, clan);
-        if (newLeader.Gold < partyGoldLowerThreshold)
-        {
-            GiveGoldAction.ApplyBetweenCharacters(mainHero, newLeader, partyGoldLowerThreshold - newLeader.Gold, false);
-        }
+        TopUpLeaderGold(mainHero, newLeader, partyGoldLowerThreshold);
         mobileParty.SetMoveModeHold();
 
         // Flush troop roster to show actual member count on clients after refresh
@@ -118,6 +115,13 @@ internal class ClanPartiesVMHandler : IHandler
         }
 
         return mobileParty;
+    }
+
+    private void TopUpLeaderGold(Hero mainHero, Hero leader, int threshold)
+    {
+        if (leader.Gold >= threshold) return;
+
+        GiveGoldAction.ApplyBetweenCharacters(mainHero, leader, threshold - leader.Gold, false);
     }
 
     private void Handle_ClanPartyLeaderChanged(MessagePayload<ClanPartyLeaderChanged> obj)
@@ -206,10 +210,9 @@ internal class ClanPartiesVMHandler : IHandler
 
             // Sync GiveGoldAction.ApplyBetweenCharacters in ClanPartiesVM.OnChangeLeaderOver here instead to avoid patching the huge client side function
             // GiveGoldAction.ApplyInternal blocked on the client so OnChangeLeaderOver shouldn't manage the gold change clientside
-            var partyGoldLowerThreshold = Campaign.Current.Models.ClanFinanceModel.PartyGoldLowerThreshold;
-            if (!isDisbanding && newLeader.Gold < partyGoldLowerThreshold)
+            if (!isDisbanding)
             {
-                GiveGoldAction.ApplyBetweenCharacters(mainHero, newLeader, partyGoldLowerThreshold - newLeader.Gold, false);
+                TopUpLeaderGold(mainHero, newLeader, Campaign.Current.Models.ClanFinanceModel.PartyGoldLowerThreshold);
             }
 
             messageBroker.Publish(this, new ClanManagementChanged(mainHero.Clan, ClanManagementRefresh.Parties | ClanManagementRefresh.Members));
@@ -245,38 +248,35 @@ internal class ClanPartiesVMHandler : IHandler
             Clan clan = cachedLeader.Clan;
             if (!permissions.CanManageClan(mainHero, clan)) return;
 
+            // The cached leader can respawn a party at a settlement while the popup is open
+            if (!emptyClanParties.HasEmptyClanParty(cachedLeader))
+            {
+                Logger.Warning($"No cached clan party left for {cachedLeader.Name}, {cachedLeader.StringId}");
+                return;
+            }
+
             if (newLeader == null)
             {
                 emptyClanParties.DisbandCachedLordParty(cachedLeader);
+                messageBroker.Publish(this, new ClanManagementChanged(clan, ClanManagementRefresh.Parties | ClanManagementRefresh.Members));
+                return;
             }
-            else
+
+            if (newLeader.IsPlayerHero())
             {
-                if (newLeader.IsPlayerHero())
-                {
-                    Logger.Error($"Blocked cached clan party leader change to player hero {newLeader.Name}, {newLeader.StringId}");
-                    return;
-                }
-                if (!permissions.CanManageHero(mainHero, newLeader)) return;
-
-                int partyGoldLowerThreshold = Campaign.Current.Models.ClanFinanceModel.PartyGoldLowerThreshold;
-                MobileParty newParty;
-
-                // Vanilla moves the ships into the player's party when the new leader is already in it
-                if (newLeader.PartyBelongedTo != null && newLeader.PartyBelongedTo == mainHero.PartyBelongedTo)
-                {
-                    newParty = newLeader.PartyBelongedTo;
-                    if (newLeader.Gold < partyGoldLowerThreshold)
-                    {
-                        GiveGoldAction.ApplyBetweenCharacters(mainHero, newLeader, partyGoldLowerThreshold - newLeader.Gold, false);
-                    }
-                }
-                else
-                {
-                    newParty = CreateClanParty(mainHero, newLeader, clan, partyGoldLowerThreshold);
-                }
-
-                emptyClanParties.TransferCachedLordPartyToNewParty(cachedLeader, newParty.Party);
+                Logger.Error($"Blocked cached clan party leader change to player hero {newLeader.Name}, {newLeader.StringId}");
+                return;
             }
+            if (!permissions.CanManageHero(mainHero, newLeader)) return;
+
+            int partyGoldLowerThreshold = Campaign.Current.Models.ClanFinanceModel.PartyGoldLowerThreshold;
+
+            // Vanilla moves the ships into the player's party when the new leader is already in it
+            bool sharesMainParty = newLeader.PartyBelongedTo != null && newLeader.PartyBelongedTo == mainHero.PartyBelongedTo;
+            MobileParty newParty = sharesMainParty ? newLeader.PartyBelongedTo : CreateClanParty(mainHero, newLeader, clan, partyGoldLowerThreshold);
+            TopUpLeaderGold(mainHero, newLeader, partyGoldLowerThreshold);
+
+            emptyClanParties.TransferCachedLordPartyToNewParty(cachedLeader, newParty.Party);
 
             messageBroker.Publish(this, new ClanManagementChanged(clan, ClanManagementRefresh.Parties | ClanManagementRefresh.Members));
         });
