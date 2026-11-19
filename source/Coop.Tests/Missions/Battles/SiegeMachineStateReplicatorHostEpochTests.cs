@@ -598,63 +598,6 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
         Assert.Equal(authorityRevision, stateToApply.AuthorityRevision);
     }
 
-    [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void BufferedDestructionKeepsHostDistanceWhenMergedWithClaimantMovement(bool hostFirst)
-    {
-        const int machineId = 18;
-        const int authorityRevision = 4;
-        const float hostDistance = 12.4f;
-        broker.Publish(this, new NetworkSiegeMachineAuthority(
-            machineId, "claimant", hostEpoch: LocalEpoch, authorityRevision: authorityRevision,
-            senderControllerId: "host"));
-
-        var hostState = new NetworkSiegeMachineState(
-            machineId,
-            hitPoints: 0f,
-            destructionState: 1,
-            gateState: -1,
-            ladderState: -1,
-            moveDistance: hostDistance,
-            hasArrived: false,
-            weaponState: -1,
-            aimDirection: -1000f,
-            aimReleaseAngle: -1000f,
-            hostEpoch: LocalEpoch,
-            senderControllerId: "host",
-            authorityRevision: authorityRevision);
-        var claimantState = new NetworkSiegeMachineState(
-            machineId,
-            hitPoints: -1f,
-            destructionState: -1,
-            gateState: -1,
-            ladderState: -1,
-            moveDistance: 17.4f,
-            hasArrived: true,
-            weaponState: -1,
-            aimDirection: -1000f,
-            aimReleaseAngle: -1000f,
-            hostEpoch: LocalEpoch,
-            senderControllerId: "claimant",
-            authorityRevision: authorityRevision);
-
-        var first = hostFirst ? hostState : claimantState;
-        var second = hostFirst ? claimantState : hostState;
-        broker.Publish(this, first);
-        DrainGameThread();
-        Assert.Same(first, Assert.Single(PendingStates()).Value);
-
-        broker.Publish(this, second);
-        DrainGameThread();
-        var merged = Assert.Single(PendingStates()).Value;
-
-        Assert.Equal(hostState.HitPoints, merged.HitPoints);
-        Assert.Equal(hostState.DestructionState, merged.DestructionState);
-        Assert.Equal(hostDistance, merged.MoveDistance);
-        Assert.Equal(hostState.HasArrived, merged.HasArrived);
-    }
-
     [Fact]
     public void OlderPendingMachineState_IsDiscardedWhenLiveArrivalHasNewerAuthority()
     {

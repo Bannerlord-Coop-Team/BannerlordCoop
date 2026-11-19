@@ -34,11 +34,9 @@ public class SiegeMachineSimulationTests : IDisposable
     private static int ramSnapCalls;
     private static int ramDestructionCalls;
     private static int ramDisableCalls;
-    private static int ramResetDistanceErrorCalls;
-    private static float ramResetDistanceErrorDistance;
+    private static float ramDistanceError;
     private static bool ramSnappedBeforeDestruction;
     private static float capturedHostDistance;
-    private static int capturedDestructionState;
 
     public SiegeMachineSimulationTests()
     {
@@ -61,7 +59,7 @@ public class SiegeMachineSimulationTests : IDisposable
     public void DestructionTransitionStopsAndSnapsRamBeforeApplyingBrokenState(bool localSimulator)
     {
         using var mission = new MissionCurrentScope();
-        var ram = CreateDestructibleRam(0);
+        var ram = CreateDestructibleRam();
         const float trackerDistance = 12.5f;
         const float hostDistance = 12.4f;
         ResetRamStubState();
@@ -81,8 +79,7 @@ public class SiegeMachineSimulationTests : IDisposable
 
             Assert.Equal(1, ramSnapCalls);
             Assert.Equal(hostDistance, ramTrackerDistance);
-            Assert.Equal(1, ramResetDistanceErrorCalls);
-            Assert.Equal(hostDistance, ramResetDistanceErrorDistance);
+            Assert.Equal(0f, ramDistanceError);
             Assert.Equal(hostDistance, ramFrameDistance);
             Assert.Equal(1, ramDestructionCalls);
             Assert.Equal(1, ramDisableCalls);
@@ -95,53 +92,164 @@ public class SiegeMachineSimulationTests : IDisposable
         }
     }
 
-    [Fact]
-    public void DestroyedRamKeepsHostDistanceWhenLateClaimantMovementArrives()
+    [Theory]
+    [InlineData(false, -1f)]
+    [InlineData(true, 12.4f)]
+    public void JoinCatchUpCarriesHostTrackerDistanceAfterRevokingDestroyedClaim(bool destroyed, float expectedDistance)
     {
-        using var mission = new MissionCurrentScope();
-        var ram = CreateDestructibleRam(0);
-        const float hostDistance = 12.4f;
-        const float claimantDistance = hostDistance + 5f;
-        ResetRamStubState();
-        ramTrackerDistance = 12.5f;
-        StubRamSnap();
+        using var mission = new MissionCurrentScope().AsSiegeBattle();
+        var ram = CreateDestructibleRam();
+        var broker = new TestMessageBroker();
+        var hostMessages = new List<IMessage>();
+        var joinerMessages = new List<IMessage>();
+        using var host = CreateReplica("host", true, 5, broker, hostMessages, joinerMessages);
+        StubReadState(trackerDistance: 12.4f);
 
-        var destructionState = new NetworkSiegeMachineState(ram.Id.Id, 0f, 1, -1, -1, hostDistance,
-            false, -1, -1000f, -1000f, senderControllerId: "host");
-        var lateMovement = new NetworkSiegeMachineState(ram.Id.Id, -1f, -1, -1, -1, claimantDistance,
-            false, -1, -1000f, -1000f, senderControllerId: "claimer");
-        var apply = AccessTools.Method(typeof(SiegeMachineStateReplicator), "Apply");
-        bool previousAuthority = SiegeMissionAuthorityGate.IsLocalAuthority;
-        SiegeMissionAuthorityGate.IsLocalAuthority = false;
-        SiegeMissionAuthorityGate.ResetClaimedMachines();
+        bool previousHost = SiegeMissionAuthorityGate.IsLocalAuthority;
         try
         {
-            apply.Invoke(null, new object[] { ram, destructionState });
-            Assert.True(ram.DestructionComponent.IsDestroyed);
-            Assert.Equal(1, ramDestructionCalls);
-            Assert.Equal(hostDistance, ramTrackerDistance);
+            SiegeMissionAuthorityGate.IsLocalAuthority = true;
+            OnGameThread(host, "RefreshMachineCache");
+            RegisterRam(host, ram);
+            broker.Publish(this, new NetworkSiegeMachineClaim(ram.Id.Id, "peer", isRelease: false));
+            GameThread.Run(() => { }, blocking: true);
+            var grant = Assert.IsType<NetworkSiegeMachineAuthority>(Assert.Single(hostMessages));
+            if (destroyed) MarkRamDestroyed(ram);
 
-            apply.Invoke(null, new object[] { ram, lateMovement });
-            Assert.Equal(hostDistance, ramTrackerDistance);
-            Assert.Equal(hostDistance, ramFrameDistance);
+            host.CatchUpJoiner("joiner");
+            GameThread.Run(() => { }, blocking: true);
+
+            Assert.Equal(2, joinerMessages.Count);
+            var replay = Assert.IsType<NetworkSiegeMachineAuthority>(joinerMessages[0]);
+            var state = Assert.IsType<NetworkSiegeMachineState>(joinerMessages[1]);
+            Assert.Equal(destroyed ? string.Empty : "peer", replay.ControllerId);
+            Assert.Equal(destroyed ? grant.AuthorityRevision + 1 : grant.AuthorityRevision, replay.AuthorityRevision);
+            Assert.Equal(replay.AuthorityRevision, state.AuthorityRevision);
+            Assert.Equal(destroyed ? 1 : 0, state.DestructionState);
+            Assert.Equal(expectedDistance, state.MoveDistance);
         }
         finally
         {
-            SiegeMissionAuthorityGate.IsLocalAuthority = previousAuthority;
+            SiegeMissionAuthorityGate.IsLocalAuthority = previousHost;
             SiegeMissionAuthorityGate.ResetClaimedMachines();
         }
     }
 
     [Theory]
-    [InlineData(0, -1f)]
-    [InlineData(1, 12.4f)]
-    public void HostDestructionSnapshotCarriesHostTrackerDistance(int destructionState, float expectedDistance)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void DestroyedClaimedRamUsesHostFrameAcrossAuthorityRevisions(bool buffered, bool claimantFirst)
     {
-        var ram = CreateDestructibleRam(destructionState);
-        StubReadState(destructionState, trackerDistance: 12.4f);
+        using var mission = new MissionCurrentScope().AsSiegeBattle();
+        const int hostEpoch = 5;
+        const float hostDistance = 12.4f;
+        var hostRam = CreateDestructibleRam();
+        var peerRam = CreateDestructibleRam();
+        int id = hostRam.Id.Id;
+        var hostBroker = new TestMessageBroker();
+        var peerBroker = new TestMessageBroker();
+        var hostMessages = new List<IMessage>();
+        using var host = CreateReplica("host", true, hostEpoch, hostBroker, hostMessages);
+        using var peer = CreateReplica("peer", false, hostEpoch, peerBroker, new List<IMessage>());
+        ResetRamStubState();
+        StubRamSnap();
+        StubReadState(hostDistance);
 
-        Assert.Equal(expectedDistance, Capture(ram, isHost: true, localSimulator: false).MoveDistance);
+        bool previousHost = SiegeMissionAuthorityGate.IsLocalAuthority;
+        bool previousKnown = SiegeMissionAuthorityGate.IsAuthorityKnown;
+        try
+        {
+            SiegeMissionAuthorityGate.IsLocalAuthority = true;
+            SiegeMissionAuthorityGate.IsAuthorityKnown = true;
+            SiegeMissionAuthorityGate.ResetClaimedMachines();
+            OnGameThread(host, "RefreshMachineCache");
+            RegisterRam(host, hostRam);
+            hostBroker.Publish(this, new NetworkSiegeMachineClaim(id, "peer", isRelease: false));
+            GameThread.Run(() => { }, blocking: true);
+            var grant = Assert.IsType<NetworkSiegeMachineAuthority>(Assert.Single(hostMessages));
+            Assert.Equal("peer", grant.ControllerId);
+            hostMessages.Clear();
+
+            var claimantMovement = new NetworkSiegeMachineState(id, -1f, -1, -1, -1, hostDistance + 5f,
+                false, -1, -1000f, -1000f, hostEpoch: grant.HostEpoch, senderControllerId: "peer",
+                authorityRevision: grant.AuthorityRevision);
+            MarkRamDestroyed(hostRam);
+            ramTrackerDistance = hostDistance;
+            // The old revision is still current on the host between the fatal hit and the next broadcast.
+            hostBroker.Publish(this, claimantMovement);
+            GameThread.Run(() => { }, blocking: true);
+            Assert.Equal(hostDistance, ramTrackerDistance);
+
+            GameThread.Run(() => host.Tick(0.25f), blocking: true);
+            hostBroker.Publish(this, new NetworkSiegeMachineClaim(id, "peer", isRelease: false));
+            GameThread.Run(() => { }, blocking: true);
+
+            SiegeMissionAuthorityGate.IsLocalAuthority = false;
+            SiegeMissionAuthorityGate.ResetClaimedMachines();
+            ramTrackerDistance = 12.5f;
+            peerBroker.Publish(this, grant);
+            GameThread.Run(() => { }, blocking: true);
+            Assert.True(SiegeMissionAuthorityGate.IsMachineSimulatedLocally(id));
+            if (!buffered) RegisterRam(peer, peerRam);
+
+            if (claimantFirst) peerBroker.Publish(this, claimantMovement);
+            foreach (var message in hostMessages)
+            {
+                if (message is NetworkSiegeMachineAuthority authority) peerBroker.Publish(this, authority);
+                if (message is NetworkSiegeMachineState state) peerBroker.Publish(this, state);
+            }
+            if (!claimantFirst) peerBroker.Publish(this, claimantMovement);
+            GameThread.Run(() => { }, blocking: true);
+
+            if (buffered)
+            {
+                RegisterRam(peer, peerRam);
+                OnGameThread(peer, "DrainPendingMachineStates");
+            }
+
+            Assert.True(peerRam.DestructionComponent.IsDestroyed);
+            Assert.Equal(1, ramDestructionCalls);
+            Assert.Equal(hostDistance, ramTrackerDistance);
+            Assert.Equal(hostDistance, ramFrameDistance);
+            Assert.False(SiegeMissionAuthorityGate.IsMachineSimulatedLocally(id));
+            Assert.Collection(hostMessages,
+                message =>
+                {
+                    var revoke = Assert.IsType<NetworkSiegeMachineAuthority>(message);
+                    Assert.Empty(revoke.ControllerId);
+                    Assert.Equal(grant.AuthorityRevision + 1, revoke.AuthorityRevision);
+                },
+                message =>
+                {
+                    var destruction = Assert.IsType<NetworkSiegeMachineState>(message);
+                    Assert.Equal(grant.AuthorityRevision + 1, destruction.AuthorityRevision);
+                    Assert.Equal(hostDistance, destruction.MoveDistance);
+                });
+        }
+        finally
+        {
+            SiegeMissionAuthorityGate.IsLocalAuthority = previousHost;
+            SiegeMissionAuthorityGate.IsAuthorityKnown = previousKnown;
+            SiegeMissionAuthorityGate.ResetClaimedMachines();
+        }
     }
+
+    private static void RegisterRam(SiegeMachineStateReplicator replicator, BatteringRam ram)
+    {
+        ReadField<List<UsableMachine>>(replicator, "machines").Add(ram);
+        ReadField<Dictionary<int, UsableMachine>>(replicator, "machinesById")[ram.Id.Id] = ram;
+    }
+
+    private static void MarkRamDestroyed(BatteringRam ram)
+    {
+        ram.DestructionComponent.HitPoint = 0f;
+        AccessTools.Field(typeof(DestructableComponent), "_currentStateIndex").SetValue(ram.DestructionComponent, 1);
+    }
+
+    private static void OnGameThread(SiegeMachineStateReplicator replicator, string method)
+        => GameThread.Run(() => AccessTools.Method(typeof(SiegeMachineStateReplicator), method)
+            .Invoke(replicator, Array.Empty<object>()), blocking: true);
 
     private static bool RecordPause(SynchedMissionObject __instance)
     {
@@ -502,7 +610,7 @@ public class SiegeMachineSimulationTests : IDisposable
         harmony.Patch(method, prefix: new HarmonyMethod(AccessTools.Method(typeof(SiegeMachineSimulationTests), prefix)));
     }
 
-    private BatteringRam CreateDestructibleRam(int stateIndex)
+    private static BatteringRam CreateDestructibleRam()
     {
         var ram = Uninitialized<BatteringRam>();
         var movement = Uninitialized<SiegeWeaponMovementComponent>();
@@ -513,8 +621,7 @@ public class SiegeMachineSimulationTests : IDisposable
         AccessTools.Field(typeof(UsableMachine), "_components").SetValue(ram,
             new List<UsableMissionObjectComponent>());
         AccessTools.Field(typeof(UsableMachine), "<DestructionComponent>k__BackingField").SetValue(ram, destruction);
-        AccessTools.Field(typeof(DestructableComponent), "_currentStateIndex").SetValue(destruction, stateIndex);
-        destruction.HitPoint = stateIndex == 0 ? 100f : 0f;
+        destruction.HitPoint = 100f;
         return ram;
     }
 
@@ -536,14 +643,12 @@ public class SiegeMachineSimulationTests : IDisposable
         ramSnapCalls = 0;
         ramDestructionCalls = 0;
         ramDisableCalls = 0;
-        ramResetDistanceErrorCalls = 0;
-        ramResetDistanceErrorDistance = 0f;
+        ramDistanceError = float.NaN;
         ramSnappedBeforeDestruction = false;
     }
 
-    private void StubReadState(int destructionState, float trackerDistance)
+    private void StubReadState(float trackerDistance)
     {
-        capturedDestructionState = destructionState;
         capturedHostDistance = trackerDistance;
         Stub(AccessTools.Method(typeof(SiegeMachineStateReplicator), "ReadState"), nameof(ReadDestructionState));
     }
@@ -609,8 +714,9 @@ public class SiegeMachineSimulationTests : IDisposable
         ref int gateState, ref int ladderState, ref float moveDistance, ref bool hasArrived, ref int weaponState,
         ref float aimDirection, ref float aimReleaseAngle, ref int stoneAmmo)
     {
-        hitPoints = 100f;
-        destructionState = capturedDestructionState;
+        hitPoints = machine.DestructionComponent.HitPoint;
+        destructionState = (int)AccessTools.Field(typeof(DestructableComponent), "_currentStateIndex")
+            .GetValue(machine.DestructionComponent);
         gateState = -1;
         ladderState = -1;
         moveDistance = capturedHostDistance;
@@ -624,8 +730,7 @@ public class SiegeMachineSimulationTests : IDisposable
     private static bool RamSetDistance(float __0) { ramTrackerDistance = __0; return false; }
     private static bool RamResetDistanceError(float __0)
     {
-        ramResetDistanceErrorCalls++;
-        ramResetDistanceErrorDistance = __0;
+        ramDistanceError = __0 - ramTrackerDistance;
         return false;
     }
     private static bool RamSetTargetFrame()
@@ -660,9 +765,9 @@ public class SiegeMachineSimulationTests : IDisposable
         var observerBroker = new TestMessageBroker();
         var hostMessages = new List<IMessage>();
         var peerMessages = new List<IMessage>();
-        using var host = CreateReplica("host", true, hostBroker, hostMessages);
-        using var peer = CreateReplica("peer", false, peerBroker, peerMessages);
-        using var observer = CreateReplica("observer", false, observerBroker, new List<IMessage>());
+        using var host = CreateReplica("host", true, hostEpoch, hostBroker, hostMessages);
+        using var peer = CreateReplica("peer", false, hostEpoch, peerBroker, peerMessages);
+        using var observer = CreateReplica("observer", false, hostEpoch, observerBroker, new List<IMessage>());
         var hostPile = RegisterPile(host);
         var peerPile = RegisterPile(peer);
         var observerPile = RegisterPile(observer);
@@ -778,21 +883,6 @@ public class SiegeMachineSimulationTests : IDisposable
             SiegeMissionAuthorityGate.ResetClaimedMachines();
         }
 
-        SiegeMachineStateReplicator CreateReplica(string controller, bool isHost,
-            TestMessageBroker broker, List<IMessage> messages)
-        {
-            var session = new Mock<IBattleSession>();
-            session.SetupGet(value => value.OwnControllerId).Returns(controller);
-            session.SetupGet(value => value.IsLocalHost).Returns(isHost);
-            session.SetupGet(value => value.HostEpoch).Returns(hostEpoch);
-            session.Setup(value => value.IsHostController(It.IsAny<string>()))
-                .Returns((string value) => value == "host");
-            var network = new Mock<IBattleNetwork>();
-            network.Setup(value => value.SendAll(It.IsAny<IMessage>())).Callback<IMessage>(messages.Add);
-            return new SiegeMachineStateReplicator(network.Object, broker, session.Object,
-                Mock.Of<INetworkAgentRegistry>(), new HostEpochPolicy(), Mock.Of<IRangedSiegeWeaponPresentation>());
-        }
-
         ManagedStonePile RegisterPile(SiegeMachineStateReplicator replicator)
         {
 #pragma warning disable SYSLIB0050
@@ -812,6 +902,24 @@ public class SiegeMachineSimulationTests : IDisposable
             GameThread.Run(() => AccessTools.Method(typeof(SiegeMachineStateReplicator), "BroadcastMachineStateIfChanged")
                 .Invoke(replicator, new object[] { Capture(pile, isHost, local) }), blocking: true);
         }
+    }
+
+    private static SiegeMachineStateReplicator CreateReplica(string controller, bool isHost, int hostEpoch,
+        TestMessageBroker broker, List<IMessage> messages, List<IMessage> joinerMessages = null)
+    {
+        var session = new Mock<IBattleSession>();
+        session.SetupGet(value => value.OwnControllerId).Returns(controller);
+        session.SetupGet(value => value.IsLocalHost).Returns(isHost);
+        session.SetupGet(value => value.HostEpoch).Returns(hostEpoch);
+        session.Setup(value => value.IsHostController(It.IsAny<string>()))
+            .Returns((string value) => value == "host");
+        var network = new Mock<IBattleNetwork>();
+        network.Setup(value => value.SendAll(It.IsAny<IMessage>())).Callback<IMessage>(messages.Add);
+        if (joinerMessages != null)
+            network.Setup(value => value.Send("joiner", It.IsAny<IMessage>()))
+                .Callback<string, IMessage>((_, message) => joinerMessages.Add(message));
+        return new SiegeMachineStateReplicator(network.Object, broker, session.Object,
+            Mock.Of<INetworkAgentRegistry>(), new HostEpochPolicy(), Mock.Of<IRangedSiegeWeaponPresentation>());
     }
 
     private sealed class ManagedStonePile : StonePile
