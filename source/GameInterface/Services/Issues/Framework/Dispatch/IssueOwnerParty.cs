@@ -28,10 +28,13 @@ internal class IssueOwnerParty : IIssueOwnerParty
         party = null;
         if (!owners.TryGetOwnerControllerId(issue, out var controller) ||
             !playerManager.TryGetPlayer(controller, out var player) ||
+            !objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out var ownerHero) ||
             !objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var ownerParty))
         {
             return false;
         }
+
+        if (ownerHero.PartyBelongedTo != ownerParty) return false;
 
         party = ownerParty;
         return true;
