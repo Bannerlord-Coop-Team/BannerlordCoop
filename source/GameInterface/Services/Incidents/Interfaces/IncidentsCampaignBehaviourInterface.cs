@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Network;
 using GameInterface.Extentions;
 using GameInterface.Services.Heroes.Patches;
@@ -6,6 +7,7 @@ using GameInterface.Services.Incidents.Messages;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.Missions;
+using GameInterface.Services.NavalDLC;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
@@ -89,13 +91,7 @@ public class IncidentsCampaignBehaviourInterface : IIncidentsCampaignBehaviourIn
 
             if (!playerManager.TryGetPlayer(playerParty, out var player)) continue;
 
-            // Roll for players whose battle ended while they were still in its mission once they've left it
-            if (heldBattleRolls.TryGetValue(player.HeroId, out var heldTrigger) && !IsInMission(player))
-            {
-                heldBattleRolls.Remove(player.HeroId);
-                TryInvokeIncident(player, playerParty, partyLeader, heldTrigger);
-                continue;
-            }
+            if (TryReleaseHeldBattleRoll(player, playerParty, partyLeader)) continue;
 
             float randomChance = playerParty.RandomFloatWithSeed((uint)CampaignTime.Now.ToMinutes);
             if (playerParty.SiegeEvent != null && randomChance < Campaign.Current.Models.IncidentModel.GetIncidentTriggerProbabilityDuringSiege())
@@ -106,6 +102,16 @@ public class IncidentsCampaignBehaviourInterface : IIncidentsCampaignBehaviourIn
 
             // Vanilla's WaitingInSettlement trigger is skipped because DisableWaitInSettlementOption removes the settlement wait menus
         }
+    }
+
+    // Roll for a player whose battle ended while they were still in its mission once they've left it, with the trigger it was held with
+    internal bool TryReleaseHeldBattleRoll(Player player, MobileParty playerParty, Hero partyLeader)
+    {
+        if (!heldBattleRolls.TryGetValue(player.HeroId, out var heldTrigger) || IsInMission(player)) return false;
+
+        heldBattleRolls.Remove(player.HeroId);
+        TryInvokeIncident(player, playerParty, partyLeader, heldTrigger);
+        return true;
     }
 
     public void OnGameMenuOptionSelected(Player player, MobileParty mainParty, Hero mainHero, string gameMenuId, string optionId)
@@ -179,7 +185,8 @@ public class IncidentsCampaignBehaviourInterface : IIncidentsCampaignBehaviourIn
 
             if (!playerManager.TryGetPlayer(party, out var player)) continue;
 
-            if (isLandBattle) playerBattleLogs[player.HeroId] = CreateBattleLog(mapEvent, party, partyLeader);
+            // Naval wins are logged too like vanilla, because land incidents like incident_sorrows_of_war read the last battle
+            playerBattleLogs[player.HeroId] = CreateBattleLog(mapEvent, party, partyLeader);
 
             if (party.RandomFloatWithSeed((uint)CampaignTime.Now.ToMinutes) >= Campaign.Current.Models.IncidentModel.GetIncidentTriggerGlobalProbability()) continue;
 
@@ -400,6 +407,8 @@ public class IncidentsCampaignBehaviourInterface : IIncidentsCampaignBehaviourIn
         try
         {
             using (new MainHeroSubstitutionScope(playerHero, playerParty))
+            // Naval incident effects check the main hero's unlocked figureheads, which on the server aren't this player's
+            using (ModInformation.IsNavalEnabled && ContainerProvider.TryResolve(out IMainHeroFigureheadsScope figureheadsScope) ? figureheadsScope.Enter(playerHero) : null)
             {
                 return evaluate();
             }

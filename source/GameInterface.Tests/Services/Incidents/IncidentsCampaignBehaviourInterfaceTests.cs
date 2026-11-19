@@ -91,19 +91,29 @@ public class IncidentsCampaignBehaviourInterfaceTests
         Assert.Empty(sentMessages);
     }
 
-    [Theory]
-    [InlineData(TriggerId.LeavingBattle)]
-    [InlineData("LeavingNavalBattle")]
-    public void TryInvokeIncident_LeavingBattleWhileInMission_DoesNotRollYet(string battleTrigger)
+    [Fact]
+    public void TryInvokeIncident_LeavingBattleWhileInMission_DoesNotRollYet()
     {
-        // The held roll running later comes from OnHourlyTick, which needs ContainerProvider-resolved player parties
         missionMembership.Setup(registry => registry.IsControllerInMission(player.ControllerId)).Returns(true);
 
-        incidentsInterface.TryInvokeIncident(player, playerParty, playerHero, new IncidentTrigger(battleTrigger));
+        incidentsInterface.TryInvokeIncident(player, playerParty, playerHero, new IncidentTrigger(TriggerId.LeavingBattle));
 
         sessionData.Verify(data => data.TryGetPendingIncident(It.IsAny<string>(), out It.Ref<string>.IsAny), Times.Never);
         sessionData.Verify(data => data.SetActiveIncidentSeed(It.IsAny<string>(), It.IsAny<long>()), Times.Never);
         Assert.Empty(sentMessages);
+    }
+
+    [Fact]
+    public void TryReleaseHeldBattleRoll_NavalBattleHeldInMission_RollsOnceLeft()
+    {
+        missionMembership.Setup(registry => registry.IsControllerInMission(player.ControllerId)).Returns(true);
+        incidentsInterface.TryInvokeIncident(player, playerParty, playerHero, new IncidentTrigger("LeavingNavalBattle"));
+
+        missionMembership.Setup(registry => registry.IsControllerInMission(player.ControllerId)).Returns(false);
+
+        Assert.True(incidentsInterface.TryReleaseHeldBattleRoll(player, playerParty, playerHero));
+        // The replay gets past the hold and the availability checks to the pending incident check
+        sessionData.Verify(data => data.TryGetPendingIncident(player.HeroId, out It.Ref<string>.IsAny), Times.Once);
     }
 
     [Fact]

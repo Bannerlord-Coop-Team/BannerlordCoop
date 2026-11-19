@@ -1,15 +1,13 @@
-﻿using GameInterface.CoopSessionData;
+﻿using Common;
 using GameInterface.Services.Heroes.Patches;
-using GameInterface.Services.ObjectManager;
+using GameInterface.Services.NavalDLC;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Incidents;
-using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Localization;
-using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.Incidents.Interfaces;
 
@@ -21,15 +19,6 @@ public interface IIncidentsInterface : IGameAbstraction
 
 public class IncidentsInterface : IIncidentsInterface
 {
-    private readonly ICoopSessionProvider coopSessionProvider;
-    private readonly IObjectManager objectManager;
-
-    public IncidentsInterface(ICoopSessionProvider coopSessionProvider, IObjectManager objectManager)
-    {
-        this.coopSessionProvider = coopSessionProvider;
-        this.objectManager = objectManager;
-    }
-
     public bool TryPrepareIncidentText(Incident incident, long activeIncidentSeed)
     {
         if (Campaign.Current?.GetCampaignBehavior<IncidentsCampaignBehaviour>() == null) return false;
@@ -49,45 +38,22 @@ public class IncidentsInterface : IIncidentsInterface
         // Vanilla conditions and effects pick their targets with the incident manager's seed, so use the one this player's incident was rolled with
         Campaign.Current.IncidentManager._activeIncidentSeed = activeIncidentSeed;
 
+        using (new MainHeroSubstitutionScope(mainHero, mainParty))
         // Naval incident effects check the main hero's unlocked figureheads, which on the server aren't this player's
-        var serverFigureheads = Campaign.Current.UnlockedFigureheadsByMainHero;
-        Campaign.Current.UnlockedFigureheadsByMainHero = GetUnlockedFigureheads(mainHero);
-        try
+        using (ModInformation.IsNavalEnabled && ContainerProvider.TryResolve(out IMainHeroFigureheadsScope figureheadsScope) ? figureheadsScope.Enter(mainHero) : null)
         {
-            using (new MainHeroSubstitutionScope(mainHero, mainParty))
+            // The player's state can change between the incident being sent and an option being picked
+            if (selectedOption.Condition != null && !selectedOption.Condition(selectedOption.Text)) return false;
+            if (selectedOption.Effects.Any(effect => !effect.Condition())) return false;
+
+            foreach (IncidentEffect incidentEffect in selectedOption.Effects)
             {
-                // The player's state can change between the incident being sent and an option being picked
-                if (selectedOption.Condition != null && !selectedOption.Condition(selectedOption.Text)) return false;
-                if (selectedOption.Effects.Any(effect => !effect.Condition())) return false;
-
-                foreach (IncidentEffect incidentEffect in selectedOption.Effects)
-                {
-                    incidentOutcomes.AddRange(incidentEffect.Consequence());
-                }
-
-                selectedOption.Consequence?.Invoke();
+                incidentOutcomes.AddRange(incidentEffect.Consequence());
             }
-        }
-        finally
-        {
-            Campaign.Current.UnlockedFigureheadsByMainHero = serverFigureheads;
+
+            selectedOption.Consequence?.Invoke();
         }
 
         return true;
-    }
-
-    private List<Figurehead> GetUnlockedFigureheads(Hero playerHero)
-    {
-        var figureheads = new List<Figurehead>();
-        if (!objectManager.TryGetId(playerHero, out var playerHeroId)) return figureheads;
-        if (coopSessionProvider.CoopSession?.NavalPlayerData?.PlayerUnlockedFigureHeads.TryGetValue(playerHeroId, out var figureheadIds) != true) return figureheads;
-
-        foreach (var figureheadId in figureheadIds)
-        {
-            var figurehead = MBObjectManager.Instance.GetObject<Figurehead>(figureheadId);
-            if (figurehead != null) figureheads.Add(figurehead);
-        }
-
-        return figureheads;
     }
 }

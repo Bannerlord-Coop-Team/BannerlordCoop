@@ -1,5 +1,4 @@
 ﻿using Common;
-using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Coop.Naval.CoopSession.Interfaces;
@@ -9,18 +8,12 @@ using GameInterface.Services.NavalDLC;
 using GameInterface.Services.NavalDLC.Messages;
 using GameInterface.Services.ObjectManager;
 using NavalDLC.CampaignBehaviors;
-using Serilog;
-using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Naval;
-using TaleWorlds.ObjectSystem;
 
 namespace Coop.Naval.CoopSession.Handlers;
 
 internal class NavalInitializationHandler : IHandler
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<NavalInitializationHandler>();
-
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
@@ -63,7 +56,7 @@ internal class NavalInitializationHandler : IHandler
 
         NavalDLCFigureheadCampaignBehavior figureheadCampaignBehavior = Campaign.Current.GetCampaignBehavior<NavalDLCFigureheadCampaignBehavior>();
 
-        Campaign.Current.UnlockedFigureheadsByMainHero = GetUnlockedFigureheads(playerHeroId);
+        Campaign.Current.UnlockedFigureheadsByMainHero = sessionNavalPlayerDataInterface.GetUnlockedFigureheads(navalPlayerData, obj.What.NewHero);
         figureheadCampaignBehavior._lastFigureheadLootTime = GetLastFigureheadLootTime(playerHeroId);
 
         network.SendAll(new NetworkInitializeServerNavalDataKeys(playerHeroId));
@@ -75,28 +68,6 @@ internal class NavalInitializationHandler : IHandler
         {
             sessionNavalPlayerDataInterface.AddPlayerKeys(obj.What.PlayerHeroId);
         });
-    }
-
-    private List<Figurehead> GetUnlockedFigureheads(string playerHeroId)
-    {
-        var unlockedFigureheads = new List<Figurehead>();
-
-        // Null and key check for players without existing unlocked figureheads
-        if (navalPlayerData?.PlayerUnlockedFigureHeads?.ContainsKey(playerHeroId) != true) return unlockedFigureheads;
-
-        foreach (var figureheadId in navalPlayerData.PlayerUnlockedFigureHeads[playerHeroId])
-        {
-            var figurehead = MBObjectManager.Instance.GetObject<Figurehead>(figureheadId);
-            if (figurehead == null)
-            {
-                Logger.Error("Failed to get {type} using {id}", nameof(Figurehead), figureheadId);
-                continue;
-            }
-
-            unlockedFigureheads.Add(figurehead);
-        }
-
-        return unlockedFigureheads;
     }
 
     private CampaignTime GetLastFigureheadLootTime(string playerHeroId)
