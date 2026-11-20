@@ -72,7 +72,6 @@ using GameInterface.Services.SiegeEvents.Commands;
 using GameInterface.Services.Stances;
 using GameInterface.Services.Time;
 using GameInterface.Services.TroopRosters;
-using GameInterface.Services.TroopRosters.Logging;
 using GameInterface.Services.UI.CoopOptions.Providers;
 using GameInterface.Services.UI.CoopOptions.Providers.BugReportTab;
 using GameInterface.Services.UI.CoopOptions.Providers.ChatTab;
@@ -291,7 +290,6 @@ public class GameInterfaceModule : Module
         builder.RegisterType<BloodFeudRepairer>().As<IBloodFeudRepairer>().InstancePerDependency();
         builder.RegisterType<PlayerCharacterLoadRepairer>().As<IPlayerCharacterLoadRepairer>().InstancePerDependency();
         builder.RegisterType<MapEventLogger>().As<IMapEventLogger>().SingleInstance();
-        builder.RegisterType<TroopRosterLogger>().As<ITroopRosterLogger>().SingleInstance();
         builder.RegisterType<PartySyncPerformanceClock>().As<IPartySyncPerformanceClock>().SingleInstance();
         builder.RegisterType<PartySyncPerformanceFileWriter>().As<IPartySyncPerformanceFileWriter>().SingleInstance();
         builder.RegisterType<PartySyncPerformancePartyProvider>().As<IPartySyncPerformancePartyProvider>().SingleInstance();
