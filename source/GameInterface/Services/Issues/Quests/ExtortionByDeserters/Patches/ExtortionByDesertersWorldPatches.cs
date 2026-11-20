@@ -1,7 +1,5 @@
 ﻿using Common;
-using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
-using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -18,12 +16,17 @@ internal class ExtortionByDesertersWorldPatches
 {
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.HourlyTick))]
     [HarmonyPostfix]
-    private static void HourlyTickPostfix() => Run((service, quest) => service.ApplyTick(quest));
+    private static void HourlyTickPostfix()
+    {
+        if (ContainerProvider.TryResolve<IExtortionByDesertersWorldEventService>(out var service)) service.HourlyTick();
+    }
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnStartBattle))]
     [HarmonyPostfix]
-    private static void BattleStartedPostfix(PartyBase attackerParty) =>
-        Run((service, quest) => service.ApplyBattleStarted(quest, attackerParty));
+    private static void BattleStartedPostfix(PartyBase attackerParty)
+    {
+        if (ContainerProvider.TryResolve<IExtortionByDesertersWorldEventService>(out var service)) service.BattleStarted(attackerParty);
+    }
 
     [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.FinalizeEventAux))]
     [HarmonyPrefix]
@@ -33,12 +36,8 @@ internal class ExtortionByDesertersWorldPatches
         if (ModInformation.IsClient || !__runOriginal || __instance.IsFinalized) return;
 
         // Finalization clears the parties and their sides before the outcome is applied.
-        var outcomes = new Dictionary<Quest, bool?>();
-        Run((service, quest) =>
-        {
-            if (service.TryCaptureBattleOutcome(quest, __instance, out var ownerWon)) outcomes.Add(quest, ownerWon);
-        });
-        __state = outcomes;
+        if (ContainerProvider.TryResolve<IExtortionByDesertersWorldEventService>(out var service))
+            __state = service.CaptureBattleOutcomes(__instance);
     }
 
     [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.FinalizeEventAux))]
@@ -46,10 +45,7 @@ internal class ExtortionByDesertersWorldPatches
     private static void FinalizeEventPostfix(MapEvent __instance, bool __runOriginal, Dictionary<Quest, bool?> __state)
     {
         if (!__runOriginal || !__instance.IsFinalized || __state == null || __state.Count == 0) return;
-        Run((service, quest) =>
-        {
-            if (__state.TryGetValue(quest, out var ownerWon)) service.ApplyBattleFinalized(quest, ownerWon);
-        });
+        if (ContainerProvider.TryResolve<IExtortionByDesertersWorldEventService>(out var service)) service.BattleFinalized(__state);
     }
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnMapEventStarted))]
@@ -58,7 +54,8 @@ internal class ExtortionByDesertersWorldPatches
     {
         // QuestWorldEventRelayPatches runs vanilla for coercion. This postfix handles attacks on village parties.
         if (mapEvent.IsForcingSupplies || mapEvent.IsForcingVolunteers) return;
-        Run((service, quest) => service.ApplyMapEventStarted(quest, mapEvent, attackerParty, defenderParty));
+        if (ContainerProvider.TryResolve<IExtortionByDesertersWorldEventService>(out var service))
+            service.MapEventStarted(mapEvent, attackerParty, defenderParty);
     }
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnMapEventStarted))]
@@ -68,8 +65,10 @@ internal class ExtortionByDesertersWorldPatches
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnSettlementLeft))]
     [HarmonyPostfix]
-    private static void LeftPostfix(MobileParty party, Settlement settlement) =>
-        Run((service, quest) => service.ApplySettlementLeft(quest, party, settlement));
+    private static void LeftPostfix(MobileParty party, Settlement settlement)
+    {
+        if (ContainerProvider.TryResolve<IExtortionByDesertersWorldEventService>(out var service)) service.SettlementLeft(party, settlement);
+    }
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnSettlementLeft))]
     [HarmonyPrefix]
@@ -88,8 +87,10 @@ internal class ExtortionByDesertersWorldPatches
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnVillageBeingRaided))]
     [HarmonyPostfix]
-    private static void RaidPostfix(Village village) =>
-        Run((service, quest) => service.ApplyVillageBeingRaided(quest, village));
+    private static void RaidPostfix(Village village)
+    {
+        if (ContainerProvider.TryResolve<IExtortionByDesertersWorldEventService>(out var service)) service.VillageBeingRaided(village);
+    }
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.MapEventEnded))]
     [HarmonyPrefix]
@@ -105,13 +106,4 @@ internal class ExtortionByDesertersWorldPatches
     [HarmonyPrefix]
     // ApplyTick replaces the vanilla tick on the server, and clients replay the resulting progress.
     private static bool TickPrefix() => false;
-
-    private static void Run(Action<IExtortionByDesertersWorldEventService, Quest> listener)
-    {
-        if (ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher) &&
-            ContainerProvider.TryResolve<IExtortionByDesertersWorldEventService>(out var service))
-        {
-            dispatcher.RunAsOwners<Quest>(quest => listener(service, quest));
-        }
-    }
 }

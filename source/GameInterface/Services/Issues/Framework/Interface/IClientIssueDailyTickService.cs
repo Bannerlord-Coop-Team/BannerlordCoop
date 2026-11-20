@@ -1,4 +1,4 @@
-using TaleWorlds.CampaignSystem.Issues;
+﻿using TaleWorlds.CampaignSystem.Issues;
 
 namespace GameInterface.Services.Issues.Framework.Interface;
 

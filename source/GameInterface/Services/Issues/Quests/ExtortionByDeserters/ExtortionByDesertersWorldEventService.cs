@@ -1,4 +1,6 @@
 ﻿using Common.Logging;
+using System;
+using System.Collections.Generic;
 using GameInterface.Services.Issues.Framework.Interface;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -16,14 +18,14 @@ namespace GameInterface.Services.Issues.Quests.ExtortionByDeserters;
 
 internal interface IExtortionByDesertersWorldEventService
 {
-    void ApplyBattleStarted(Quest quest, PartyBase attackerParty);
+    void HourlyTick();
+    void BattleStarted(PartyBase attackerParty);
+    Dictionary<Quest, bool?> CaptureBattleOutcomes(MapEvent mapEvent);
+    void BattleFinalized(Dictionary<Quest, bool?> outcomes);
+    void MapEventStarted(MapEvent mapEvent, PartyBase attacker, PartyBase defender);
+    void SettlementLeft(MobileParty party, Settlement settlement);
+    void VillageBeingRaided(Village village);
     bool TryStartAmbush(Quest quest);
-    bool TryCaptureBattleOutcome(Quest quest, MapEvent mapEvent, out bool? ownerWon);
-    void ApplyBattleFinalized(Quest quest, bool? ownerWon);
-    void ApplyMapEventStarted(Quest quest, MapEvent mapEvent, PartyBase attacker, PartyBase defender);
-    void ApplySettlementLeft(Quest quest, MobileParty party, Settlement settlement);
-    void ApplyVillageBeingRaided(Quest quest, Village village);
-    void ApplyTick(Quest quest);
 }
 
 internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesertersWorldEventService
@@ -31,27 +33,55 @@ internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesert
     private readonly IExtortionByDesertersProgress progress;
     private static readonly ILogger Logger = LogManager.GetLogger<ExtortionByDesertersWorldEventService>();
     private readonly IIssueOwnerResolver ownerResolver;
+    private readonly IOutcomeDispatcher dispatcher;
 
     public ExtortionByDesertersWorldEventService(IExtortionByDesertersProgress progress,
-        IIssueOwnerResolver ownerResolver)
+        IIssueOwnerResolver ownerResolver, IOutcomeDispatcher dispatcher)
     {
         this.progress = progress;
         this.ownerResolver = ownerResolver;
+        this.dispatcher = dispatcher;
     }
 
-    public void ApplyBattleStarted(Quest quest, PartyBase attackerParty)
+    public void HourlyTick() => RunWithOwnerParty(ApplyTick);
+
+    public void BattleStarted(PartyBase attackerParty) => RunWithOwnerParty((quest, owner) =>
     {
-        if (attackerParty != quest._deserterMobileParty?.Party) return;
-        TryStartAmbush(quest);
-    }
+        if (attackerParty == quest._deserterMobileParty?.Party) StartAmbush(quest, owner);
+    });
+
+    public void MapEventStarted(MapEvent mapEvent, PartyBase attacker, PartyBase defender) =>
+        RunWithOwnerParty((quest, owner) => ApplyMapEventStarted(quest, owner, mapEvent, attacker, defender));
+
+    public void SettlementLeft(MobileParty party, Settlement settlement) =>
+        RunWithOwnerParty((quest, owner) => ApplySettlementLeft(quest, owner, party, settlement));
+
+    public void VillageBeingRaided(Village village) =>
+        RunWithOwnerParty((quest, owner) => ApplyVillageBeingRaided(quest, owner, village));
 
     public bool TryStartAmbush(Quest quest)
     {
+        var started = false;
+        RunWithOwnerParty((runningQuest, owner) =>
+        {
+            if (runningQuest == quest) started = StartAmbush(quest, owner);
+        });
+        return started;
+    }
+
+    private void RunWithOwnerParty(Action<Quest, MobileParty> apply) => dispatcher.RunAsOwners<Quest>(quest =>
+    {
+        // Keep the registered party even when captivity detaches the owner hero from it.
+        ownerResolver.TryResolveOwnerParty(IssueManager.GetIssueOfQuest(quest), out var owner);
+        apply(quest, owner);
+    });
+
+    private bool StartAmbush(Quest quest, MobileParty owner)
+    {
         var party = quest._deserterMobileParty;
-        if (party == null) return false;
+        if (party == null || owner == null) return false;
         // The defenders exist once the ambush has started.
         if (quest._defenderMobileParty != null) return false;
-        if (!ownerResolver.TryResolveOwnerParty(IssueManager.GetIssueOfQuest(quest), out var owner)) return false;
 
         var raid = party.MapEvent;
         var isQuestRaid = raid?.IsRaid == true && !raid.HasWinner && !raid.IsFinalized &&
@@ -78,22 +108,29 @@ internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesert
         return true;
     }
 
-    public bool TryCaptureBattleOutcome(Quest quest, MapEvent mapEvent, out bool? ownerWon)
+    public Dictionary<Quest, bool?> CaptureBattleOutcomes(MapEvent mapEvent)
     {
-        ownerWon = null;
-        var deserters = quest._deserterMobileParty;
-        if (deserters == null || deserters.MapEvent != mapEvent ||
-            !mapEvent.InvolvedParties.Contains(deserters.Party)) return false;
-
-        if (ownerResolver.TryResolveOwnerParty(IssueManager.GetIssueOfQuest(quest), out var owner) &&
-            mapEvent.InvolvedParties.Contains(owner.Party))
+        var outcomes = new Dictionary<Quest, bool?>();
+        RunWithOwnerParty((quest, owner) =>
         {
-            ownerWon = mapEvent.WinningSide == owner.Party.Side;
-        }
-        return true;
+            var deserters = quest._deserterMobileParty;
+            if (deserters == null || deserters.MapEvent != mapEvent ||
+                !mapEvent.InvolvedParties.Contains(deserters.Party)) return;
+
+            bool? ownerWon = null;
+            if (owner != null && mapEvent.InvolvedParties.Contains(owner.Party))
+                ownerWon = mapEvent.WinningSide == owner.Party.Side;
+            outcomes.Add(quest, ownerWon);
+        });
+        return outcomes;
     }
 
-    public void ApplyBattleFinalized(Quest quest, bool? ownerWon)
+    public void BattleFinalized(Dictionary<Quest, bool?> outcomes) => dispatcher.RunAsOwners<Quest>(quest =>
+    {
+        if (outcomes.TryGetValue(quest, out var ownerWon)) ApplyBattleFinalized(quest, ownerWon);
+    });
+
+    internal void ApplyBattleFinalized(Quest quest, bool? ownerWon)
     {
         if (!ownerWon.HasValue)
         {
@@ -102,34 +139,26 @@ internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesert
             return;
         }
 
+        quest.DestroyDefenderParty();
+        quest._defenderMobileParty = null;
         if (ownerWon.Value)
         {
             quest._currentState = State.DesertersAreDefeated;
             quest.DestroyDeserterParty();
             quest._deserterMobileParty = null;
-        }
-        else
-        {
-            SetRaidBehaviorIfNeeded(quest._deserterMobileParty, quest.QuestSettlement);
-            quest._currentState = State.DesertersDefeatedPlayer;
-        }
-
-        quest.DestroyDefenderParty();
-        quest._defenderMobileParty = null;
-        if (ownerWon.Value)
-        {
             // AddLog forwards the journal and the cleared party bindings in one snapshot.
             quest.AddLog(quest.OnDeserterPartyDefeatedLogText);
+            return;
         }
-        else
-        {
-            progress.Send(quest);
-        }
+
+        SetRaidBehaviorIfNeeded(quest._deserterMobileParty, quest.QuestSettlement);
+        quest._currentState = State.DesertersDefeatedPlayer;
+        progress.Send(quest);
     }
 
-    public void ApplyMapEventStarted(Quest quest, MapEvent mapEvent, PartyBase attacker, PartyBase defender)
+    private void ApplyMapEventStarted(Quest quest, MobileParty owner, MapEvent mapEvent, PartyBase attacker, PartyBase defender)
     {
-        if (!ownerResolver.TryResolveOwnerParty(IssueManager.GetIssueOfQuest(quest), out var owner)) return;
+        if (owner == null) return;
         var attacksVillageParty = mapEvent.IsFieldBattle && defender.IsMobile &&
             defender.MobileParty.HomeSettlement == quest.QuestSettlement &&
             defender != quest._deserterMobileParty?.Party;
@@ -139,10 +168,9 @@ internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesert
         quest.ApplyQuestResult(quest._questResultFail3);
     }
 
-    public void ApplySettlementLeft(Quest quest, MobileParty party, Settlement settlement)
+    private void ApplySettlementLeft(Quest quest, MobileParty owner, MobileParty party, Settlement settlement)
     {
-        if (!ownerResolver.TryResolveOwnerParty(IssueManager.GetIssueOfQuest(quest), out var owner)) return;
-        if (party != owner || settlement != quest.QuestSettlement) return;
+        if (owner == null || party != owner || settlement != quest.QuestSettlement) return;
 
         var deserters = quest._deserterMobileParty;
         var raid = settlement.Party.MapEvent;
@@ -157,15 +185,14 @@ internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesert
         if (quest.IsOngoing)
         {
             // This replaces the vanilla leave-menu tick in GameMenuOptionSelected.
-            ApplyTick(quest);
+            ApplyTick(quest, owner);
         }
     }
 
-    public void ApplyVillageBeingRaided(Quest quest, Village village)
+    private void ApplyVillageBeingRaided(Quest quest, MobileParty owner, Village village)
     {
-        if (village.Settlement != quest.QuestSettlement) return;
+        if (owner == null || village.Settlement != quest.QuestSettlement) return;
         var attacker = village.Settlement.Party.MapEvent.AttackerSide.LeaderParty;
-        if (!ownerResolver.TryResolveOwnerParty(IssueManager.GetIssueOfQuest(quest), out var owner)) return;
         if (attacker == quest._deserterMobileParty?.Party)
         {
             // Vanilla checks PlayerEncounter. The co-op owner party is the authoritative substitute.
@@ -196,7 +223,7 @@ internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesert
         return true;
     }
 
-    public void ApplyTick(Quest quest)
+    internal void ApplyTick(Quest quest, MobileParty owner)
     {
         if (!quest.IsOngoing || quest._currentState == State.DesertersAreDefeated) return;
         if (CancelIfDesertersGone(quest)) return;
@@ -204,7 +231,7 @@ internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesert
         // Vanilla returns while a map event is active. Co-op starts the owner ambush after the server creates its defender.
         if (deserters.MapEvent != null)
         {
-            TryStartAmbush(quest);
+            StartAmbush(quest, owner);
             return;
         }
 
@@ -214,12 +241,8 @@ internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesert
             return;
         }
 
-        var issue = IssueManager.GetIssueOfQuest(quest);
-        if (!ownerResolver.TryResolveOwnerParty(issue, out var owner) ||
-            !ownerResolver.TryResolveOwnerHero(issue, out var ownerHero)) return;
-
-        var ownerIsCaptive = ownerHero.PartyBelongedTo != owner;
-        if (ownerIsCaptive) return;
+        // RunAsOwners has already selected the hero. Use the registered party for the captivity check.
+        if (owner == null || Hero.MainHero.PartyBelongedTo != owner) return;
 
         switch (quest._currentState)
         {

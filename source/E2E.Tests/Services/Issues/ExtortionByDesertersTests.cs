@@ -1051,21 +1051,38 @@ public class ExtortionByDesertersTests : IDisposable
     }
 
     [Fact]
-    public void RaidRepelledWithoutTheOwner_KeepsTheQuestForTheSurvivingDeserters()
+    public void BattleWithoutTheOwner_KeepsTheQuestForTheSurvivingDeserters()
     {
         Accept();
         var quest = (Quest)scenario.QuestOf(Server);
+        using var finalized = new MethodCallRecorder(Priority.First, true,
+            AccessTools.Method(typeof(ExtortionByDesertersWorldEventService), nameof(ExtortionByDesertersWorldEventService.ApplyBattleFinalized)));
         Server.Call(() =>
         {
             var deserters = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            deserters.MemberRoster.AddToCounts(GameObjectCreator.CreateInitializedObject<CharacterObject>(), 1);
             quest._deserterMobileParty = deserters;
             deserters.SetPartyUsedByQuest(true);
-            var raid = CreateBattle(deserters, quest.QuestSettlement.Party, true);
-            raid._battleState = BattleState.DefenderVictory;
-            CampaignEventDispatcher.Instance.OnMapEventEnded(raid);
+            var victors = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            victors.MemberRoster.AddToCounts(GameObjectCreator.CreateInitializedObject<CharacterObject>(), 1);
+            var battle = CreateBattle(deserters, victors.Party, false);
+            victors.MapEventSide = battle.DefenderSide;
+            battle._battleState = BattleState.DefenderVictory;
+            Assert.Same(battle, deserters.MapEvent);
+            Assert.DoesNotContain(Server.GetRegisteredObject<MobileParty>(scenario.OwnerPartyId).Party, battle.InvolvedParties);
+            Assert.True(deserters.Party.NumberOfHealthyMembers > 0);
+            battle.FinalizeEventAux();
+            Assert.True(battle.IsFinalized);
+            Assert.Equal(1, finalized.CountFor(Server));
+            Assert.True(deserters.IsActive);
+            Assert.Same(deserters, quest._deserterMobileParty);
             Assert.True(quest.IsOngoing);
             Assert.Equal(State.DesertersMovingToSettlement, quest._currentState);
-        }, TextLinks.Append(AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize))));
+        }, TextLinks.Concat(new[]
+        {
+            AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize)),
+            AccessTools.Method(typeof(MapEvent), nameof(MapEvent.MovePartyToSuitablePositionOnMapEventFinalize)),
+        }));
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
     }
 
