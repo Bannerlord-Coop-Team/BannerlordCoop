@@ -1,5 +1,4 @@
-﻿using GameInterface.CoopSessionData;
-using GameInterface.Services.NavalDLC;
+﻿using GameInterface.Services.NavalDLC;
 using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
@@ -9,12 +8,10 @@ namespace Coop.Naval.CoopSession.Interfaces;
 
 public class MainHeroFigureheadsScope : IMainHeroFigureheadsScope
 {
-    private readonly ICoopSessionProvider coopSessionProvider;
     private readonly ISessionNavalPlayerDataInterface sessionNavalPlayerDataInterface;
 
-    public MainHeroFigureheadsScope(ICoopSessionProvider coopSessionProvider, ISessionNavalPlayerDataInterface sessionNavalPlayerDataInterface)
+    public MainHeroFigureheadsScope(ISessionNavalPlayerDataInterface sessionNavalPlayerDataInterface)
     {
-        this.coopSessionProvider = coopSessionProvider;
         this.sessionNavalPlayerDataInterface = sessionNavalPlayerDataInterface;
     }
 
@@ -22,7 +19,7 @@ public class MainHeroFigureheadsScope : IMainHeroFigureheadsScope
     {
         var campaign = Campaign.Current;
         var previousFigureheads = campaign.UnlockedFigureheadsByMainHero;
-        campaign.UnlockedFigureheadsByMainHero = sessionNavalPlayerDataInterface.GetUnlockedFigureheads(coopSessionProvider.CoopSession.NavalPlayerData, playerHero);
+        campaign.UnlockedFigureheadsByMainHero = sessionNavalPlayerDataInterface.GetUnlockedFigureheads(playerHero);
 
         return new Scope(campaign, previousFigureheads);
     }

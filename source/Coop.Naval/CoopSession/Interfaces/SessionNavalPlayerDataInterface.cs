@@ -15,6 +15,7 @@ namespace Coop.Naval.CoopSession.Interfaces;
 public interface ISessionNavalPlayerDataInterface : IGameAbstraction
 {
     void UnlockFigurehead(Hero playerHero, Figurehead figurehead);
+    List<Figurehead> GetUnlockedFigureheads(Hero playerHero);
     List<Figurehead> GetUnlockedFigureheads(NavalPlayerData navalPlayerData, Hero playerHero);
     CampaignTime GetLastFigureheadLootTime(string playerHeroId);
     void SetLastFigureheadLootTime(string playerHeroId, CampaignTime lootTime);
@@ -62,6 +63,8 @@ public class SessionNavalPlayerDataInterface : ISessionNavalPlayerDataInterface
 
         return true;
     }
+
+    public List<Figurehead> GetUnlockedFigureheads(Hero playerHero) => GetUnlockedFigureheads(NavalPlayerData, playerHero);
 
     // Takes the data to read because a client only has the copy it was sent, not the session's
     public List<Figurehead> GetUnlockedFigureheads(NavalPlayerData navalPlayerData, Hero playerHero)

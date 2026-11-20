@@ -104,7 +104,7 @@ public class IncidentsCampaignBehaviourInterfaceTests
     }
 
     [Fact]
-    public void TryReleaseHeldBattleRoll_NavalBattleHeldInMission_RollsOnceLeft()
+    public void TryReleaseHeldBattleRoll_NavalBattleHeldInMission_ReleasesOnceLeft()
     {
         missionMembership.Setup(registry => registry.IsControllerInMission(player.ControllerId)).Returns(true);
         incidentsInterface.TryInvokeIncident(player, playerParty, playerHero, new IncidentTrigger("LeavingNavalBattle"));
@@ -114,6 +114,7 @@ public class IncidentsCampaignBehaviourInterfaceTests
         Assert.True(incidentsInterface.TryReleaseHeldBattleRoll(player, playerParty, playerHero));
         // The replay gets past the hold and the availability checks to the pending incident check
         sessionData.Verify(data => data.TryGetPendingIncident(player.HeroId, out It.Ref<string>.IsAny), Times.Once);
+        Assert.False(incidentsInterface.TryReleaseHeldBattleRoll(player, playerParty, playerHero));
     }
 
     [Fact]

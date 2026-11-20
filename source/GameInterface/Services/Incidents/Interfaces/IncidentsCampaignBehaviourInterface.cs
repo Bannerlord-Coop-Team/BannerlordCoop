@@ -64,6 +64,7 @@ public class IncidentsCampaignBehaviourInterface : IIncidentsCampaignBehaviourIn
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly IMissionMembershipRegistry missionMembershipRegistry;
+    private readonly IMainHeroFigureheadsScope figureheadsScope;
 
     private readonly Dictionary<string, IncidentTrigger> heldBattleRolls = new();
     private readonly Dictionary<string, PlayerBattleEndedLogEntry> playerBattleLogs = new();
@@ -73,13 +74,15 @@ public class IncidentsCampaignBehaviourInterface : IIncidentsCampaignBehaviourIn
         ISessionIncidentsPlayerDataInterface sessionIncidentsPlayerDataInterface,
         IObjectManager objectManager,
         INetwork network,
-        IMissionMembershipRegistry missionMembershipRegistry = null)
+        IMissionMembershipRegistry missionMembershipRegistry = null,
+        IMainHeroFigureheadsScope figureheadsScope = null)
     {
         this.playerManager = playerManager;
         this.sessionIncidentsPlayerDataInterface = sessionIncidentsPlayerDataInterface;
         this.objectManager = objectManager;
         this.network = network;
         this.missionMembershipRegistry = missionMembershipRegistry;
+        this.figureheadsScope = figureheadsScope;
     }
 
     public void OnHourlyTick()
@@ -408,7 +411,7 @@ public class IncidentsCampaignBehaviourInterface : IIncidentsCampaignBehaviourIn
         {
             using (new MainHeroSubstitutionScope(playerHero, playerParty))
             // Naval incident effects check the main hero's unlocked figureheads, which on the server aren't this player's
-            using (ModInformation.IsNavalEnabled && ContainerProvider.TryResolve(out IMainHeroFigureheadsScope figureheadsScope) ? figureheadsScope.Enter(playerHero) : null)
+            using (figureheadsScope?.Enter(playerHero))
             {
                 return evaluate();
             }

@@ -12,7 +12,7 @@ namespace Coop.Naval.CoopSession.Patches;
 [HarmonyPatchCategory(GameInterface.GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class CampaignFigureheadPatches
 {
-    // The server's list isn't any player's, so an unlock made as a player, like a naval incident's, goes to that player's NavalPlayerData
+    // The server's UnlockedFigureheadsByMainHero belongs to no player, so an unlock made while MainHeroSubstitutionScope runs as a player goes to that player's NavalPlayerData
     [HarmonyPatch(nameof(Campaign.UnlockFigurehead))]
     [HarmonyPrefix]
     private static bool UnlockFigureheadPrefix(Figurehead figurehead)
