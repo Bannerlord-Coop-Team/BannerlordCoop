@@ -1,5 +1,4 @@
-﻿using Common;
-using Common.Messaging;
+﻿using Common.Messaging;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MobileParties.Extensions;
 using HarmonyLib;
@@ -35,17 +34,10 @@ namespace GameInterface.Services.Settlements.Patches
         [HarmonyPatch(nameof(EncounterGameMenuBehavior.attack_blockade_besieger_side_common_condition))]
         public static bool AttackBlockadeConditionPrefix(ref bool __result)
         {
-            var settlement = PlayerEncounter.EncounterSettlement;
+            if (PlayerEncounter.EncounterSettlement?.SiegeEvent != null) return true;
 
-            // Players cant fight castle blockade battles yet because coop only syncs town blockades (#4605)
-            bool hideAtCastle = ModInformation.IsClient && settlement?.IsCastle == true;
-            if (settlement?.SiegeEvent == null || hideAtCastle)
-            {
-                __result = false;
-                return false;
-            }
-
-            return true;
+            __result = false;
+            return false;
         }
 
         [HarmonyPrefix]
