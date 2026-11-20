@@ -288,10 +288,7 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
         get => isIpHidden;
         private set
         {
-            if (isIpHidden == value)
-            {
-                return;
-            }
+            if (isIpHidden == value) return;
 
             isIpHidden = value;
             OnPropertyChanged(nameof(IsIpHidden));
