@@ -13,7 +13,11 @@ public class ExtortionByDesertersStateTests
 {
     private readonly ProtoBufSerializer serializer = new(new SerializableTypeMapper());
 
-    public ExtortionByDesertersStateTests() => new SurrogateCollection();
+    public ExtortionByDesertersStateTests()
+    {
+        // The lock inside SurrogateCollection makes repeated calls safe across tests.
+        new SurrogateCollection();
+    }
 
     [Fact]
     public void RoundTrip_PreservesOwnerAndProgress()

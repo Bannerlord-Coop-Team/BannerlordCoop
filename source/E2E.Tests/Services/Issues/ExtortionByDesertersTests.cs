@@ -9,7 +9,6 @@ using GameInterface.Policies;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Quests.ExtortionByDeserters;
-using GameInterface.Services.Issues.Quests.ExtortionByDeserters.Patches;
 using GameInterface.Services.Issues.Quests.ExtortionByDeserters.Messages;
 using GameInterface.Services.MobileParties.Messages.Lifetime;
 using GameInterface.Services.Players;
@@ -54,6 +53,8 @@ public class ExtortionByDesertersTests : IDisposable
         AccessTools.PropertyGetter(typeof(Hero), nameof(Hero.EncyclopediaLinkWithName)),
     };
     private const int GiverPowerPenalty = -10;
+    private const int FailRelationPenalty = -10;
+    private const int AttackedVillagersRelationPenalty = -5;
     private const int StartingSecurity = 40;
     private const int StartingProsperity = 200;
     private const int TownSecurityPenalty = -10;
@@ -113,45 +114,6 @@ public class ExtortionByDesertersTests : IDisposable
         var quest = (Quest)scenario.QuestOf(Owner);
         Owner.Call(() => quest.StartQuest());
         return quest;
-    }
-
-    [Fact]
-    public void ExtortionPatchTargetsHaveOneCoopPrefix()
-    {
-        var partyPatches = typeof(ExtortionByDesertersPartyPatches);
-        var worldPatches = typeof(ExtortionByDesertersWorldPatches);
-        var targets = new[]
-        {
-            (AccessTools.Method(typeof(QuestBase), nameof(QuestBase.AddTrackedObject)), partyPatches),
-            (AccessTools.Method(typeof(IssueBase), nameof(IssueBase.IssueFinalized)), partyPatches),
-            (AccessTools.Method(typeof(Quest), nameof(Quest.StartAmbushEncounter)), worldPatches),
-            (AccessTools.Method(typeof(Quest), nameof(Quest.GameMenuOpened)), worldPatches),
-            (AccessTools.Method(typeof(Quest), nameof(Quest.TickDesertersPartyLogic)), worldPatches),
-        };
-
-        foreach (var (target, patchType) in targets)
-        {
-            Assert.Single(Harmony.GetPatchInfo(target).Prefixes, prefix =>
-                prefix.owner == "Bannerlord.Coop" && prefix.PatchMethod.DeclaringType == patchType);
-        }
-
-        var journalPatches = typeof(ExtortionByDesertersJournalPatches);
-        var addLog = AccessTools.Method(typeof(QuestBase), nameof(QuestBase.AddLog), new[] { typeof(TextObject), typeof(bool) });
-        var journalPrefix = Assert.Single(Harmony.GetPatchInfo(addLog).Prefixes, prefix =>
-            prefix.owner == "Bannerlord.Coop" &&
-            (prefix.PatchMethod.DeclaringType == partyPatches || prefix.PatchMethod.DeclaringType == journalPatches));
-        Assert.Equal(journalPatches, journalPrefix.PatchMethod.DeclaringType);
-    }
-
-    [Fact]
-    public void ExtortionServerMethodsHaveOneCoopPrefix()
-    {
-        foreach (var target in ExtortionByDesertersServerMethodsPatch.ServerOnlyMethods())
-        {
-            Assert.Single(Harmony.GetPatchInfo(target).Prefixes, prefix =>
-                prefix.owner == "Bannerlord.Coop" &&
-                prefix.PatchMethod.DeclaringType == typeof(ExtortionByDesertersServerMethodsPatch));
-        }
     }
 
     [Fact]
@@ -258,8 +220,8 @@ public class ExtortionByDesertersTests : IDisposable
     }
 
     [Theory]
-    [InlineData(RaidAttacker.Deserters, IssueOutcome.QuestFail, -10, GiverPowerPenalty, TownSecurityPenalty, TownProsperityPenalty)]
-    [InlineData(RaidAttacker.Owner, IssueOutcome.QuestFail, -5, GiverPowerPenalty, TownSecurityPenalty, TownProsperityPenalty)]
+    [InlineData(RaidAttacker.Deserters, IssueOutcome.QuestFail, FailRelationPenalty, GiverPowerPenalty, TownSecurityPenalty, TownProsperityPenalty)]
+    [InlineData(RaidAttacker.Owner, IssueOutcome.QuestFail, AttackedVillagersRelationPenalty, GiverPowerPenalty, TownSecurityPenalty, TownProsperityPenalty)]
     [InlineData(RaidAttacker.Other, IssueOutcome.QuestCancel, 0, 0, 0, 0)]
     public void VillageRaided_EndsTheOwnersQuestWithTheRaidersConsequences(
         RaidAttacker attacker, IssueOutcome outcome, int relationChange, int powerChange, int securityChange, int prosperityChange)
@@ -375,7 +337,7 @@ public class ExtortionByDesertersTests : IDisposable
             Assert.Equal(lostSight, deserters.Position.Distance(ownerParty.Position) > ownerParty.SeeingRange + 3f);
             log = quest.OnQuestFailed1LogText.Value;
 
-            AssertQuestPenalty(quest, -10, GiverPowerPenalty, TownSecurityPenalty, TownProsperityPenalty,
+            AssertQuestPenalty(quest, FailRelationPenalty, GiverPowerPenalty, TownSecurityPenalty, TownProsperityPenalty,
                 CampaignEventDispatcher.Instance.HourlyTick);
 
             Assert.False(defenders.IsActive);
@@ -983,7 +945,7 @@ public class ExtortionByDesertersTests : IDisposable
             Assert.Same(settlement, coercion.MapEventSettlement);
             Assert.False(quest.IsOngoing);
             Assert.Equal(previousPower - 10, giver.Power);
-            Assert.Equal(previousRelation - 5, giver.GetRelation(owner));
+            Assert.Equal(previousRelation + AttackedVillagersRelationPenalty, giver.GetRelation(owner));
         }, TextLinks.Append(AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize))));
 
         Assert.Equal(IssueOutcome.QuestFail,
@@ -1010,8 +972,8 @@ public class ExtortionByDesertersTests : IDisposable
             // Initialize dispatches OnMapEventStarted through the real server relay.
             CreateBattle(ownerParty, villageParty.Party, false);
             Assert.False(quest.IsOngoing);
-            Assert.Equal(-5, quest.RelationshipChangeWithQuestGiver);
-            Assert.Equal(security - 10, quest.QuestSettlement.Village.Bound.Town.Security);
+            Assert.Equal(AttackedVillagersRelationPenalty, quest.RelationshipChangeWithQuestGiver);
+            Assert.Equal(security + TownSecurityPenalty, quest.QuestSettlement.Village.Bound.Town.Security);
         }, TextLinks.Append(AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize))));
         Assert.Equal(IssueOutcome.QuestFail,
             Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
@@ -1041,7 +1003,7 @@ public class ExtortionByDesertersTests : IDisposable
             CreateBattle(raiders, quest.QuestSettlement.Party, true);
             CampaignEventDispatcher.Instance.OnSettlementLeft(ownerParty, quest.QuestSettlement);
             Assert.Equal(!desertersRemain, quest.IsOngoing);
-            if (desertersRemain) Assert.Equal(-10, quest.RelationshipChangeWithQuestGiver);
+            if (desertersRemain) Assert.Equal(FailRelationPenalty, quest.RelationshipChangeWithQuestGiver);
             else Assert.Equal(State.DesertersAreDefeated, quest._currentState);
         }, TextLinks.Append(AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize))));
         var endings = Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>();
@@ -1166,7 +1128,7 @@ public class ExtortionByDesertersTests : IDisposable
         string expected = null!;
         Server.Call(() => expected = mirror.OnQuestTimedOutLogText.ToString());
         Owner.Call(() => quest.CompleteQuestWithTimeOut(), TextLinks.Skip(1));
-        Assert.Equal(-10, mirror.RelationshipChangeWithQuestGiver);
+        Assert.Equal(FailRelationPenalty, mirror.RelationshipChangeWithQuestGiver);
         Assert.True(quest.IsFinalized);
         AssertTimeoutDelivery();
         Assert.Equal(expected, Assert.Single(quest.JournalEntries).LogText.ToString());

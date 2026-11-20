@@ -9,10 +9,12 @@ namespace GameInterface.Services.Issues.Framework.Visibility;
 internal sealed class ClientIssueDailyTickService : IClientIssueDailyTickService
 {
     private readonly IIssueMissionVisibility visibility;
+    private readonly IQuestTypeRegistry registry;
 
-    public ClientIssueDailyTickService(IIssueMissionVisibility visibility)
+    public ClientIssueDailyTickService(IIssueMissionVisibility visibility, IQuestTypeRegistry registry)
     {
         this.visibility = visibility;
+        this.registry = registry;
     }
 
     public void Apply(IssueManager issueManager)
@@ -20,13 +22,15 @@ internal sealed class ClientIssueDailyTickService : IClientIssueDailyTickService
         var today = (int)CampaignTime.Now.ToDays;
         foreach (var issue in issueManager.Issues.Values)
         {
-            if (!issue.IsSolvingWithAlternative || issue.AlternativeSolutionReturnTimeForTroops.IsPast)
-                continue;
+            if (!issue.IsSolvingWithAlternative) continue;
 
-            var foreign = visibility.IsAnotherPlayersTroopsMission(issue);
+            var usesServerTroopJournal = registry.TryGet(issue.GetType(), out var descriptor) &&
+                descriptor is IServerTroopJournalDescriptor;
+            // Resolve effects for a server-managed journal even if the local troop return date passed.
+            if (!usesServerTroopJournal && issue.AlternativeSolutionReturnTimeForTroops.IsPast) continue;
+
             var clearDay = (int)issue.AlternativeSolutionIssueEffectClearTime.ToDays;
-            // Only the owner gets return entries, and vanilla's progress update needs a first journal entry.
-            if (foreign || issue.JournalEntries.Count == 0)
+            if (usesServerTroopJournal || visibility.IsAnotherPlayersTroopsMission(issue) || issue.JournalEntries.Count == 0)
             {
                 // A late joiner can miss the clear day, so resolve the effects on that day or later.
                 if (clearDay <= today)

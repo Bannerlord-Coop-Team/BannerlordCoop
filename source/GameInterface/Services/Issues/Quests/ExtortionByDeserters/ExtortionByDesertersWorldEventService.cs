@@ -65,12 +65,12 @@ internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesert
         apply(quest, owner);
     });
 
-    private bool StartAmbush(Quest quest, MobileParty owner)
+    private void StartAmbush(Quest quest, MobileParty owner)
     {
         var party = quest._deserterMobileParty;
-        if (party == null || owner == null) return false;
+        if (party == null || owner == null) return;
         // The defenders exist once the ambush has started.
-        if (quest._defenderMobileParty != null) return false;
+        if (quest._defenderMobileParty != null) return;
 
         var raid = party.MapEvent;
         var isQuestRaid = raid?.IsRaid == true && !raid.HasWinner && !raid.IsFinalized &&
@@ -80,7 +80,7 @@ internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesert
             (owner.MapEvent == null || owner.MapEvent == raid);
         if (!isQuestRaid || !ownerCanDefend)
         {
-            return false;
+            return;
         }
 
         // The server half of vanilla StartAmbushEncounter. The owner opens the encounter when the Ambush notice arrives.
@@ -94,7 +94,6 @@ internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesert
         }
 
         progress.Send(quest, notice: ExtortionByDesertersNotice.Ambush);
-        return true;
     }
 
     public Dictionary<Quest, bool?> CaptureBattleOutcomes(MapEvent mapEvent)
@@ -230,8 +229,10 @@ internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesert
             return;
         }
 
-        // RunAsOwners has already selected the hero. Use the registered party for the captivity check.
-        if (owner == null || Hero.MainHero.PartyBelongedTo != owner) return;
+        if (owner == null) return;
+        // RunAsOwners selects the hero. A captured owner no longer belongs to the registered party.
+        var ownerIsCaptive = Hero.MainHero.PartyBelongedTo != owner;
+        if (ownerIsCaptive) return;
 
         switch (quest._currentState)
         {
