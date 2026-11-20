@@ -54,7 +54,6 @@ For the most reliable experience:
 
 - Use the supported Bannerlord game version (currently **v1.5.7**)
 - Disable all other mods
-- Do not enable the War Sails DLC
 - Ensure every player is using the same mod version
 
 Compatibility with other mods is not guaranteed.

@@ -5,13 +5,10 @@ using System.Reflection;
 namespace GameInterface.Services.Modules;
 
 /// <summary>
-/// Whether this build turns on War Sails (NavalDLC) co-op at all, like <c>IQuestFeatureFlag</c> does for quests.
+/// Whether this build can run War Sails (NavalDLC) co-op.
 /// </summary>
 public interface INavalFeatureFlag
 {
-    // Off everywhere except nightly and local Debug builds
-    bool IsEnabled { get; }
-
     // Whether this build compiled the naval code (CoopNavalDlc), whatever naval assemblies sit on disk
     bool IsNavalCodeBuilt { get; }
 
@@ -20,7 +17,7 @@ public interface INavalFeatureFlag
 }
 
 /// <summary>
-/// War Sails co-op only runs in builds compiled with <c>TESTER</c>, which the nightly workflow and local Debug builds define.
+/// War Sails co-op runs in builds compiled with the naval code whose naval assemblies load.
 /// </summary>
 public class NavalFeatureFlag : INavalFeatureFlag
 {
@@ -31,18 +28,11 @@ public class NavalFeatureFlag : INavalFeatureFlag
         .GetCustomAttributes<AssemblyMetadataAttribute>()
         .Any(attribute => attribute.Key == "CoopNavalDlc" && IsTrueBuildProperty(attribute.Value));
 
-#if TESTER
-    public bool IsEnabled => true;
-#else
-    public bool IsEnabled => false;
-#endif
-
     public bool IsNavalCodeBuilt => NavalCodeBuilt;
 
     // Checks the build first, because naval assemblies left by an earlier deploy don't count for a build without naval code.
     public string GetUnsupportedReason(string assemblyDirectory)
     {
-        if (!IsEnabled) return "War Sails co-op is only in tester builds";
         if (!IsNavalCodeBuilt) return "this build was made without CoopNavalDlc";
 
         var loader = new NavalAssemblyLoader(assemblyDirectory);
