@@ -340,6 +340,25 @@ internal class UiDebugCommands
                 $"time={Campaign.Current.TimeControlMode}");
         }
     }
+
+    public sealed class UiOpenJoinScreenCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.ui";
+
+        public string Name => "open_join_screen";
+
+        public string Description => "Opens the Join Co-op screen, which DEBUG builds skip by connecting directly.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            ScreenManager.PushScreen(ViewCreatorManager.CreateScreenView<CoopConnectionUI>());
+            return Succeeded("Opened the Join Co-op screen.");
+        }
+    }
 #endif
 
     public sealed class UiSwitchMenuCoopCommand : ICoopCommand
@@ -376,25 +395,6 @@ internal class UiDebugCommands
             }
 
             return Succeeded($"Switched to game menu {args[0]}.");
-        }
-    }
-
-    public sealed class UiOpenJoinScreenCoopCommand : ICoopCommand
-    {
-        public string Prefix => "coop.debug.ui";
-
-        public string Name => "open_join_screen";
-
-        public string Description => "Opens the Join Co-op screen, which DEBUG builds skip by connecting directly.";
-
-        public CoopCommandSide Side => CoopCommandSide.Client;
-
-        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
-
-        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
-        {
-            ScreenManager.PushScreen(ViewCreatorManager.CreateScreenView<CoopConnectionUI>());
-            return Succeeded("Opened the Join Co-op screen.");
         }
     }
 

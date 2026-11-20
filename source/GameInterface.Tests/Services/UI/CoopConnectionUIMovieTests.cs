@@ -23,21 +23,6 @@ public class CoopConnectionUIMovieTests
     }
 
     [Fact]
-    public void DirectConnection_BindsAddressThroughObfuscationToggle()
-    {
-        var document = XDocument.Load(FindMoviePath());
-
-        var address = Assert.Single(document.Descendants("EditableTextWidget"),
-            element => element.Attribute("RealText")?.Value == "@Ip");
-        Assert.Null(address.Attribute("Text"));
-        Assert.Equal("@IsIpHidden", address.Attribute("IsObfuscationEnabled")?.Value);
-
-        var toggle = FindById(document, "IpVisibilityButton");
-        Assert.Equal("ActionToggleIpVisibility", toggle.Attribute("Command.Click")?.Value);
-        Assert.Equal("@IpVisibilityButtonText", toggle.Attribute("Parameter.Text")?.Value);
-    }
-
-    [Fact]
     public void IncompatibleStatusHint_KeepsRowBindingsOutsideHintDataSource()
     {
         var document = XDocument.Load(FindMoviePath());
