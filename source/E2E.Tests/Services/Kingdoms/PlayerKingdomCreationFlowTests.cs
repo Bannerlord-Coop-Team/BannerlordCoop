@@ -706,26 +706,27 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         }
     }
 
-    // The ruler's client sees the kingdom full and takes vanilla's refusal line, so the companion never thanks them.
-    [Fact]
-    public void ClanNameSelection_RulersKingdomFull_TakesTheRefusalLineAndSendsNothing()
+    // The ruler's client greys out the grant line with the reason before the fief is paid for or the clan is named.
+    [Theory]
+    [InlineData(1, false)]
+    [InlineData(2, true)]
+    public void FiefSelectedConfirm_RulersKingdomFull_GreysOutTheGrantLineWithTheReason(int maxClans, bool expectedClickable)
     {
-        ModConfigProvider.ModOptions = new ModOptions(new ModOptionsData { MaxClansPerKingdom = 1 });
+        ModConfigProvider.ModOptions = new ModOptions(new ModOptionsData { MaxClansPerKingdom = maxClans });
         var client = Clients.First();
         var ruler = CreateSyncedPlayerContext(ControllerId, client);
         CreateNamedKingdomEverywhere(ruler.ClanId);
-        var (companionId, settlementId, fiefId) = CreateCompanionAndFiefEverywhere(ruler.ClanId);
-        using var notices = new MethodCallRecorder(AccessTools.Method(typeof(MBInformationManager), nameof(MBInformationManager.AddQuickInformation)));
-        using var continuations = new MethodCallRecorder(AccessTools.Method(typeof(ConversationManager), nameof(ConversationManager.ContinueConversation)));
 
-        var behavior = RunClanNameCallback(client, ruler.PartyId, companionId, settlementId);
+        client.Call(() =>
+        {
+            var clickable = true;
+            TextObject explanation = null;
 
-        Assert.False(behavior._playerConfirmedTheAction);
-        Assert.Equal(1, continuations.CountFor(client));
-        Assert.Empty(client.NetworkSentMessages.GetMessages<DoClanNameSelection>());
-        Assert.Equal(new[] { FullKingdomText }, notices.TextsFor(client));
-        Assert.Empty(notices.TextsFor(Clients.Last()));
-        AssertCompanionAndFiefKept(ruler.ClanId, companionId, fiefId);
+            CompanionRolesPatches.FiefSelectedConfirmClickableOnConditionPostfix(ref clickable, ref explanation);
+
+            Assert.Equal(expectedClickable, clickable);
+            Assert.Equal(expectedClickable ? null : FullKingdomText, explanation?.ToString());
+        });
     }
 
     // The ruler's client still sees a free place, but another clan took it on the host. The host refuses and tells the

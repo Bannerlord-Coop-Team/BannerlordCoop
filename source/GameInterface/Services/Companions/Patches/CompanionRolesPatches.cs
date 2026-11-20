@@ -18,6 +18,7 @@ using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Companions.Patches;
 
@@ -26,23 +27,28 @@ internal class CompanionRolesPatches
 {
     private static readonly ILogger logger = LogManager.GetLogger<CompanionRolesPatches>();
 
+    // Greys out the grant line with the reason before the ruler pays or names the clan, like vanilla does for missing
+    // gold or influence. The server checks again for a kingdom that fills after the line shows.
+    [HarmonyPatch(nameof(CompanionRolesCampaignBehavior.fief_selected_confirm_clickable_on_condition))]
+    [HarmonyPostfix]
+    public static void FiefSelectedConfirmClickableOnConditionPostfix(ref bool __result, ref TextObject explanation)
+    {
+        if (!__result) return;
+
+        var kingdom = Hero.MainHero.Clan.Kingdom;
+        if (!ContainerProvider.TryResolve<IKingdomClanLimit>(out var kingdomClanLimit)) return;
+        if (!kingdomClanLimit.RefusesJoin(clan: null, kingdom, asMercenary: false, ModConfigProvider.ModOptions)) return;
+
+        explanation = KingdomClanLimit.GetFullText(kingdom, ModConfigProvider.ModOptions);
+        __result = false;
+    }
+
     [HarmonyPatch(nameof(CompanionRolesCampaignBehavior.ClanNameSelectionIsDone))]
     [HarmonyPrefix]
     public static bool ClanNameSelectionIsDonePrefix(ref CompanionRolesCampaignBehavior __instance, string clanName)
     {
         // Call original if we call this function
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
-
-        // A full kingdom takes vanilla's refusal line, so the companion doesn't thank the ruler for a promotion that
-        // never happens. The server checks again for a kingdom that fills while the ruler names the clan.
-        var kingdom = Hero.MainHero.Clan.Kingdom;
-        if (ContainerProvider.TryResolve<IKingdomClanLimit>(out var kingdomClanLimit) &&
-            kingdomClanLimit.RefusesJoin(clan: null, kingdom, asMercenary: false, ModConfigProvider.ModOptions))
-        {
-            MBInformationManager.AddQuickInformation(KingdomClanLimit.GetFullText(kingdom, ModConfigProvider.ModOptions));
-            __instance.CurrentBehavior.RejectTurningCompanionToLordConsequence();
-            return false;
-        }
 
         var message = new ClanNameSelectionDone(
             Hero.MainHero,
