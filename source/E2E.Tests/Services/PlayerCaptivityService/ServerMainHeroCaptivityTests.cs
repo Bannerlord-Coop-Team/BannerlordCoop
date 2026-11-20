@@ -43,7 +43,7 @@ public class ServerMainHeroCaptivityTests : IDisposable
             AccessTools.Method(typeof(CampaignPeriodicEventManager), nameof(CampaignPeriodicEventManager.TickPartialHourlyAi)),
             AccessTools.Method(typeof(CampaignTickCacheDataStore), nameof(CampaignTickCacheDataStore.Tick)),
             AccessTools.Method(typeof(MapEventManager), nameof(MapEventManager.Tick)),
-            AccessTools.Method(typeof(EncounterManager), nameof(EncounterManager.Tick)),
+            AccessTools.Method(typeof(EncounterManager), nameof(EncounterManager.HandleEncounters)),
         };
 
         server.Call(() =>
