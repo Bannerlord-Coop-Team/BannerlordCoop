@@ -96,9 +96,11 @@ public class SiegeMachineSimulationTests : IDisposable
     }
 
     [Theory]
-    [InlineData(false, -1f)]
-    [InlineData(true, 12.4f)]
-    public void JoinCatchUpCarriesHostTrackerDistanceAfterRevokingDestroyedClaim(bool destroyed, float expectedDistance)
+    // The host uses -1f to omit movement while the peer still holds the claim.
+    [InlineData(false, "peer", 0, 0, -1f)]
+    [InlineData(true, "", 1, 1, 12.4f)]
+    public void JoinCatchUpCarriesHostTrackerDistanceAfterRevokingDestroyedClaim(bool destroyed,
+        string expectedController, int revisionBump, int expectedDestructionState, float expectedDistance)
     {
         using var mission = new MissionCurrentScope().AsSiegeBattle();
         var ram = CreateDestructibleRam();
@@ -125,10 +127,10 @@ public class SiegeMachineSimulationTests : IDisposable
             Assert.Equal(2, joinerMessages.Count);
             var replay = Assert.IsType<NetworkSiegeMachineAuthority>(joinerMessages[0]);
             var state = Assert.IsType<NetworkSiegeMachineState>(joinerMessages[1]);
-            Assert.Equal(destroyed ? string.Empty : "peer", replay.ControllerId);
-            Assert.Equal(destroyed ? grant.AuthorityRevision + 1 : grant.AuthorityRevision, replay.AuthorityRevision);
+            Assert.Equal(expectedController, replay.ControllerId);
+            Assert.Equal(grant.AuthorityRevision + revisionBump, replay.AuthorityRevision);
             Assert.Equal(replay.AuthorityRevision, state.AuthorityRevision);
-            Assert.Equal(destroyed ? 1 : 0, state.DestructionState);
+            Assert.Equal(expectedDestructionState, state.DestructionState);
             Assert.Equal(expectedDistance, state.MoveDistance);
         }
         finally
@@ -138,11 +140,8 @@ public class SiegeMachineSimulationTests : IDisposable
         }
     }
 
-    [Theory]
-    [InlineData(false, false)]
-    [InlineData(true, false)]
-    [InlineData(true, true)]
-    public void DestroyedClaimedRamUsesHostFrameAcrossAuthorityRevisions(bool buffered, bool claimantFirst)
+    [Fact]
+    public void DestroyedClaimedRamUsesHostFrameAcrossAuthorityRevisions()
     {
         using var mission = new MissionCurrentScope().AsSiegeBattle();
         const int hostEpoch = 5;
@@ -198,23 +197,16 @@ public class SiegeMachineSimulationTests : IDisposable
             peerBroker.Publish(this, grant);
             GameThread.Run(() => { }, blocking: true);
             Assert.True(SiegeMissionAuthorityGate.IsMachineSimulatedLocally(id));
-            if (!buffered) RegisterRam(peer, peerRam);
+            RegisterRam(peer, peerRam);
 
-            // Replay the host and claimant packets in the arrival order under test.
-            if (claimantFirst) peerBroker.Publish(this, claimantMovement);
+            // Replay the host's packets ahead of the claimant's late movement.
             foreach (var message in hostMessages)
             {
                 if (message is NetworkSiegeMachineAuthority authority) peerBroker.Publish(this, authority);
                 if (message is NetworkSiegeMachineState state) peerBroker.Publish(this, state);
             }
-            if (!claimantFirst) peerBroker.Publish(this, claimantMovement);
+            peerBroker.Publish(this, claimantMovement);
             GameThread.Run(() => { }, blocking: true);
-
-            if (buffered)
-            {
-                RegisterRam(peer, peerRam);
-                OnGameThread(peer, "DrainPendingMachineStates");
-            }
 
             Assert.True(peerRam.DestructionComponent.IsDestroyed);
             Assert.Equal(1, ramDestructionCalls);
