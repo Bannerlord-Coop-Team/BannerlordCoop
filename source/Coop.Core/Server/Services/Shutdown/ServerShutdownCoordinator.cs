@@ -381,7 +381,7 @@ public class ServerShutdownCoordinator : IServerShutdownCoordinator
 
         if (!saveInterface.TryQueueSave(saveName))
         {
-            Fail("no campaign is loaded");
+            Fail("the save could not be queued");
             return;
         }
 
