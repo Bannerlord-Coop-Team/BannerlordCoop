@@ -89,6 +89,8 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     private const string ControllerId = "Player";
     private const string SecondControllerId = "Player2";
     private const string KingdomName = "Real Kingdom";
+    private const string FullKingdomName = "Vlandia";
+    private const string FullKingdomText = "Vlandia already has the most clans this server allows (1).";
 
     private E2ETestEnvironment TestEnvironment { get; }
     private readonly ITestOutputHelper output;
@@ -756,7 +758,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         Assert.Single(client.NetworkSentMessages.GetMessages<DoClanNameSelection>());
         Assert.Equal(1, continuations.CountFor(client));
         Assert.Equal(kingdomId, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkKingdomFull>()).KingdomId);
-        Assert.Equal(new[] { "Vlandia already has the most clans this server allows (2)." }, notices.TextsFor(client));
+        Assert.Equal(new[] { $"{FullKingdomName} already has the most clans this server allows (2)." }, notices.TextsFor(client));
         Assert.Empty(notices.TextsFor(Clients.Last()));
         AssertCompanionAndFiefKept(ruler.ClanId, companionId, fiefId);
     }
@@ -5783,9 +5785,6 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
         return npc.ClanId;
     }
-
-    private const string FullKingdomName = "Vlandia";
-    private const string FullKingdomText = "Vlandia already has the most clans this server allows (1).";
 
     // A kingdom ruled by the clan on every instance, named so the kingdom full text can be checked.
     private string CreateNamedKingdomEverywhere(string rulingClanId)
