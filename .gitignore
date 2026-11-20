@@ -60,6 +60,9 @@ dlldata.c
 # Benchmark Results
 BenchmarkDotNet.Artifacts/
 
+# Stryker.NET mutation reports from a run inside a project folder
+StrykerOutput/
+
 # .NET Core
 project.lock.json
 project.fragment.lock.json
