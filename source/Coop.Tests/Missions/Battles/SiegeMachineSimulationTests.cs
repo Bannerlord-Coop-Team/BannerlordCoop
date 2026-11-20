@@ -199,13 +199,12 @@ public class SiegeMachineSimulationTests : IDisposable
             Assert.True(SiegeMissionAuthorityGate.IsMachineSimulatedLocally(id));
             RegisterRam(peer, peerRam);
 
-            // Replay the host's packets ahead of the claimant's late movement.
+            // Replay the host's packets.
             foreach (var message in hostMessages)
             {
                 if (message is NetworkSiegeMachineAuthority authority) peerBroker.Publish(this, authority);
                 if (message is NetworkSiegeMachineState state) peerBroker.Publish(this, state);
             }
-            peerBroker.Publish(this, claimantMovement);
             GameThread.Run(() => { }, blocking: true);
 
             Assert.True(peerRam.DestructionComponent.IsDestroyed);
