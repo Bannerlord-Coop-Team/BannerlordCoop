@@ -16,8 +16,8 @@ namespace GameInterface.Services.Issues.Quests.ExtortionByDeserters;
 
 internal interface IExtortionByDesertersWorldEventService
 {
-    // With no attacker, the hourly tick retries a raid already in progress.
-    bool TryStartAmbush(Quest quest, PartyBase attackerParty = null);
+    void ApplyBattleStarted(Quest quest, PartyBase attackerParty);
+    bool TryStartAmbush(Quest quest);
     bool IsDeserterBattle(Quest quest, MapEvent mapEvent);
     void ApplyBattleFinalized(Quest quest);
     void ApplyMapEventStarted(Quest quest, MapEvent mapEvent, PartyBase attacker, PartyBase defender);
@@ -40,10 +40,15 @@ internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesert
         this.ownerResolver = ownerResolver;
     }
 
-    public bool TryStartAmbush(Quest quest, PartyBase attackerParty = null)
+    public void ApplyBattleStarted(Quest quest, PartyBase attackerParty)
+    {
+        if (attackerParty != null && attackerParty != quest._deserterMobileParty?.Party) return;
+        TryStartAmbush(quest);
+    }
+
+    public bool TryStartAmbush(Quest quest)
     {
         var party = quest._deserterMobileParty;
-        if (attackerParty != null && (party == null || attackerParty != party.Party)) return false;
         if (!ownerResolver.TryResolveOwnerParty(IssueManager.GetIssueOfQuest(quest), out var owner))
         {
             return false;
@@ -147,11 +152,7 @@ internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesert
     public void ApplyMapEventEnded(Quest quest, MapEvent mapEvent)
     {
         if (!IsDeserterBattle(quest, mapEvent)) return;
-        if (!ownerResolver.TryResolveOwnerParty(IssueManager.GetIssueOfQuest(quest), out var owner))
-        {
-            Logger.Warning("Could not resolve the owner party for extortion quest {quest}", quest.StringId);
-            return;
-        }
+        if (!ownerResolver.TryResolveOwnerParty(IssueManager.GetIssueOfQuest(quest), out var owner)) return;
         if (!mapEvent.InvolvedParties.Contains(owner.Party)) return;
 
         quest._deserterBattleFinalizedForTheFirstTime = true;
@@ -171,11 +172,7 @@ internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesert
     {
         if (village.Settlement != quest.QuestSettlement) return;
         var attacker = village.Settlement.Party.MapEvent.AttackerSide.LeaderParty;
-        if (!ownerResolver.TryResolveOwnerParty(IssueManager.GetIssueOfQuest(quest), out var owner))
-        {
-            Logger.Warning("Could not resolve the owner party for extortion quest {quest}", quest.StringId);
-            return;
-        }
+        if (!ownerResolver.TryResolveOwnerParty(IssueManager.GetIssueOfQuest(quest), out var owner)) return;
         if (attacker == quest._deserterMobileParty?.Party)
         {
             // Vanilla checks PlayerEncounter. The co-op owner party is the authoritative substitute.

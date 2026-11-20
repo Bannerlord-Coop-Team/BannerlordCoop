@@ -1,4 +1,5 @@
 ﻿using Common;
+using GameInterface.AutoSync;
 using HarmonyLib;
 using System.Collections.Generic;
 using System.Reflection;
@@ -9,6 +10,15 @@ namespace GameInterface.Services.Issues.Quests.ExtortionByDeserters.Patches;
 /// <summary>These world methods must stay server-only even during client replay.</summary>
 internal class ExtortionByDesertersServerMethodsPatch
 {
+    internal static void AddPatches(IAutoSyncPatchCollector collector)
+    {
+        var prefix = AccessTools.Method(typeof(ExtortionByDesertersServerMethodsPatch), nameof(ServerOnlyPrefix));
+        foreach (var method in ServerOnlyMethods())
+        {
+            collector.AddPrefix(method, prefix);
+        }
+    }
+
     internal static IEnumerable<MethodBase> ServerOnlyMethods()
     {
         yield return AccessTools.Method(typeof(Quest), nameof(Quest.CreateDeserterParty));

@@ -23,7 +23,7 @@ internal class ExtortionByDesertersWorldPatches
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnStartBattle))]
     [HarmonyPostfix]
     private static void BattleStartedPostfix(PartyBase attackerParty) =>
-        Run((service, quest) => service.TryStartAmbush(quest, attackerParty));
+        Run((service, quest) => service.ApplyBattleStarted(quest, attackerParty));
 
     [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.FinalizeEventAux))]
     [HarmonyPrefix]

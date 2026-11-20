@@ -19,8 +19,6 @@ namespace GameInterface.Services.Issues.Quests.ExtortionByDeserters.Handlers;
 /// <summary>Connects personal quest state to the server's existing world parties.</summary>
 internal class ExtortionByDesertersStateHandler : IHandler
 {
-    private enum ClientNotice { None, DesertersDefeated }
-
     private readonly IMessageBroker broker;
     private readonly IObjectManager objects;
     private readonly IIssueResolver issues;
@@ -67,9 +65,8 @@ internal class ExtortionByDesertersStateHandler : IHandler
 
         var state = (State)data.State;
         // Compare the old state before BindParties replaces it.
-        var clientNotice = quest._currentState != State.DesertersAreDefeated && state == State.DesertersAreDefeated
-            ? ClientNotice.DesertersDefeated
-            : ClientNotice.None;
+        var desertersJustDefeated = quest._currentState != State.DesertersAreDefeated &&
+            state == State.DesertersAreDefeated;
         BindParties(quest, deserters, defenders, state);
         if (!TextObject.IsNullOrEmpty(data.Log))
         {
@@ -78,7 +75,7 @@ internal class ExtortionByDesertersStateHandler : IHandler
             quest.AddLog(data.Log);
         }
 
-        if (clientNotice == ClientNotice.DesertersDefeated)
+        if (desertersJustDefeated)
         {
             MBInformationManager.AddQuickInformation(quest.OnPlayerDefeatedDesertersNotificationText, 0, quest.QuestGiver.CharacterObject);
             return;
