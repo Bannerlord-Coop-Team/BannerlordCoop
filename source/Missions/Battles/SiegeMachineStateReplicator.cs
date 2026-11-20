@@ -1020,8 +1020,8 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         }
     }
 
-    // [Host] Arbitrate a peer's claim: first come keeps it, our own mounted player outranks it, and a
-    // release hands the machine back. Every decision is (re-)announced so the requester stops waiting.
+    // [Host] First come keeps the claim, our own mounted player outranks it, and a wreck stays with the host.
+    // A release hands the machine back. Re-announce decisions so the requester stops waiting.
     private void Handle_NetworkMachineClaim(MessagePayload<NetworkSiegeMachineClaim> payload)
     {
         var obj = payload.What;
@@ -1051,12 +1051,7 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             machinesById.TryGetValue(obj.MachineId, out var machine);
             if (machine?.DestructionComponent?.IsDestroyed == true)
             {
-                network.SendAll(new NetworkSiegeMachineAuthority(
-                    obj.MachineId,
-                    CurrentAuthorityOwner(obj.MachineId),
-                    GetSnapshotAuthorityEpoch(obj.MachineId),
-                    GetAuthorityRevision(obj.MachineId),
-                    session.OwnControllerId));
+                AnnounceCurrentAuthority(obj.MachineId);
                 return;
             }
 
@@ -1077,23 +1072,13 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
                     return;
                 }
 
-                network.SendAll(new NetworkSiegeMachineAuthority(
-                    obj.MachineId,
-                    current,
-                    GetSnapshotAuthorityEpoch(obj.MachineId),
-                    GetAuthorityRevision(obj.MachineId),
-                    session.OwnControllerId));
+                AnnounceCurrentAuthority(obj.MachineId);
                 return;
             }
 
             if (machine != null && HasLocalPlayerUser(machine))
             {
-                network.SendAll(new NetworkSiegeMachineAuthority(
-                    obj.MachineId,
-                    string.Empty,
-                    GetSnapshotAuthorityEpoch(obj.MachineId),
-                    GetAuthorityRevision(obj.MachineId),
-                    session.OwnControllerId));
+                AnnounceCurrentAuthority(obj.MachineId);
                 return;
             }
 
@@ -1101,6 +1086,14 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             SetMachineAuthority(obj.MachineId, obj.ControllerId);
         });
     }
+
+    private void AnnounceCurrentAuthority(int machineId)
+        => network.SendAll(new NetworkSiegeMachineAuthority(
+            machineId,
+            CurrentAuthorityOwner(machineId),
+            GetSnapshotAuthorityEpoch(machineId),
+            GetAuthorityRevision(machineId),
+            session.OwnControllerId));
 
     // [Host, game thread] Record and announce a machine's simulation owner (null = back to the host).
     private void SetMachineAuthority(int machineId, string controllerId)
