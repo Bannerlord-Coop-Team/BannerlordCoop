@@ -25,7 +25,6 @@ internal interface IExtortionByDesertersWorldEventService
     void MapEventStarted(MapEvent mapEvent, PartyBase attacker, PartyBase defender);
     void SettlementLeft(MobileParty party, Settlement settlement);
     void VillageBeingRaided(Village village);
-    bool TryStartAmbush(Quest quest);
 }
 
 internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesertersWorldEventService
@@ -58,16 +57,6 @@ internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesert
 
     public void VillageBeingRaided(Village village) =>
         RunWithOwnerParty((quest, owner) => ApplyVillageBeingRaided(quest, owner, village));
-
-    public bool TryStartAmbush(Quest quest)
-    {
-        var started = false;
-        RunWithOwnerParty((runningQuest, owner) =>
-        {
-            if (runningQuest == quest) started = StartAmbush(quest, owner);
-        });
-        return started;
-    }
 
     private void RunWithOwnerParty(Action<Quest, MobileParty> apply) => dispatcher.RunAsOwners<Quest>(quest =>
     {

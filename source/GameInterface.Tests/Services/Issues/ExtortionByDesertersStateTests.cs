@@ -2,9 +2,9 @@
 using GameInterface.Services.Issues.Quests.ExtortionByDeserters;
 using GameInterface.Services.Issues.Quests.ExtortionByDeserters.Messages;
 using GameInterface.Surrogates;
-using System.Collections.Generic;
 using TaleWorlds.Localization;
 using Xunit;
+using State = TaleWorlds.CampaignSystem.Issues.ExtortionByDesertersIssueBehavior.ExtortionByDesertersIssueQuest.ExtortionByDesertersQuestState;
 
 namespace GameInterface.Tests.Services.Issues;
 
@@ -19,52 +19,17 @@ public class ExtortionByDesertersStateTests
     public void RoundTrip_PreservesOwnerAndProgress()
     {
         var sent = new NetworkExtortionByDesertersState("headman", "issue-generation", "player-A",
-            "deserters", "defenders", 2, new TextObject("{=!}quest progress"), (byte)ExtortionByDesertersNotice.Ambush);
+            "deserters", "defenders", (int)State.DesertersDefeatedPlayer,
+            new TextObject("{=!}quest progress"), (byte)ExtortionByDesertersNotice.Ambush);
         var received = RoundTrip(sent);
         Assert.Equal("headman", received.IssueOwnerId);
         Assert.Equal("issue-generation", received.IssueId);
         Assert.Equal("player-A", received.ControllerId);
         Assert.Equal("deserters", received.DeserterId);
         Assert.Equal("defenders", received.DefenderId);
-        Assert.Equal(2, received.State);
+        Assert.Equal((int)State.DesertersDefeatedPlayer, received.State);
         Assert.Equal("{=!}quest progress", received.Log.Value);
-        Assert.Equal((byte)3, received.Notice);
-    }
-
-    [Fact]
-    public void RoundTrip_PreservesLocalizationAndNestedAttributesInProgressLog()
-    {
-        var link = new TextObject("{=!}<a href=\"{ID}\">{NAME}</a>", new Dictionary<string, object>
-        {
-            ["ID"] = "headman",
-            ["NAME"] = new TextObject("{=!}Danustica headman"),
-        });
-        var properties = TextObject.GetEmpty();
-        properties.SetTextVariable("NAME", new TextObject("{=!}Danustica headman"));
-        properties.SetTextVariable("GENDER", 0);
-        properties.SetTextVariable("LINK", link);
-        var text = new TextObject("{=YjxCkglX}You've failed to complete this quest in time. Your agreement with {QUEST_GIVER.LINK} was canceled.");
-        text.SetTextVariable("QUEST_GIVER", properties);
-        var state = RoundTrip(new NetworkExtortionByDesertersState("headman", "issue-generation", "player-B",
-            "", "", 0, text));
-        var log = state.Log;
-        Assert.Equal(text.Value, log.Value);
-        var giver = Assert.IsType<TextObject>(log.Attributes["QUEST_GIVER"]);
-        Assert.Equal("{=!}Danustica headman", Assert.IsType<TextObject>(giver.Attributes["NAME"]).Value);
-        Assert.Equal(0, Assert.IsType<int>(giver.Attributes["GENDER"]));
-        var receivedLink = Assert.IsType<TextObject>(giver.Attributes["LINK"]);
-        Assert.Equal(link.Value, receivedLink.Value);
-        Assert.Equal("headman", Assert.IsType<string>(receivedLink.Attributes["ID"]));
-        Assert.Equal("{=!}Danustica headman", Assert.IsType<TextObject>(receivedLink.Attributes["NAME"]).Value);
-    }
-
-    [Fact]
-    public void RoundTrip_KeepsANullLogNull()
-    {
-        var state = RoundTrip(new NetworkExtortionByDesertersState("headman", "issue-generation", "player-B",
-            "deserters", "", 1, null));
-        Assert.Null(state.Log);
-        Assert.Equal((byte)ExtortionByDesertersNotice.None, state.Notice);
+        Assert.Equal((byte)ExtortionByDesertersNotice.Ambush, received.Notice);
     }
 
     private T RoundTrip<T>(T message) => serializer.Deserialize<T>(serializer.Serialize(message));

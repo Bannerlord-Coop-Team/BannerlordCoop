@@ -650,7 +650,7 @@ public class ExtortionByDesertersTests : IDisposable
             Assert.Same(raid.DefenderSide, quest._defenderMobileParty.MapEventSide);
             Assert.Same(raid.DefenderSide, ownerParty.MapEventSide);
             Assert.Null(militia.MapEventSide);
-            Assert.False(Server.Resolve<IExtortionByDesertersWorldEventService>().TryStartAmbush(quest));
+            CampaignEventDispatcher.Instance.OnStartBattle(deserters.Party, quest.QuestSettlement.Party, null, false);
         }, disabled);
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkExtortionByDesertersState>(), state => state.Notice == (byte)ExtortionByDesertersNotice.Ambush);
     }
