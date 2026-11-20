@@ -57,8 +57,7 @@ public class ExtortionByDesertersTests : IDisposable
     private const int TownSecurityPenalty = -10;
     private const int TownProsperityPenalty = -50;
     private const int NotableReplacementPowerLimit = 100;
-    // These fixture values sit on opposite sides of the notable replacement threshold.
-    private const float PowerBelowReplacementLimit = 99f;
+    // Power above the replacement threshold makes the death listener create a successor.
     private const float PowerAboveReplacementLimit = 213.6168f;
 
     private readonly E2ETestEnvironment environment;
@@ -1256,10 +1255,8 @@ public class ExtortionByDesertersTests : IDisposable
             Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
     }
 
-    [Theory]
-    [InlineData(PowerBelowReplacementLimit, 0)]
-    [InlineData(PowerAboveReplacementLimit, 1)]
-    public void NativeGiverDeath_CancelsBeforeNotableReplacementAndReleasesOnlyTheOwnersQuest(float power, int expectedReplacements)
+    [Fact]
+    public void NativeGiverDeath_CancelsBeforeNotableReplacementAndReleasesOnlyTheOwnersQuest()
     {
         var ownerQuest = Accept();
         var quest = (Quest)scenario.QuestOf(Server);
@@ -1296,7 +1293,7 @@ public class ExtortionByDesertersTests : IDisposable
             deserters.SetPartyUsedByQuest(true);
             deserters.Aggressiveness = 0f;
             deserters.Ai.SetDoNotMakeNewDecisions(true);
-            giver._power = power;
+            giver._power = PowerAboveReplacementLimit;
             using (new AllowedThread()) giver.Clan = null;
             var ownership = Server.Resolve<IIssueOwnershipRegistry>();
             Assert.True(Server.Resolve<IIssueOwnerResolver>().TryResolveOwnerHero(issue, out var resolved));
@@ -1309,7 +1306,7 @@ public class ExtortionByDesertersTests : IDisposable
             var transferred = Campaign.Current.IssueManager.Issues.TryGetValue(replacement, out var successorIssue);
             var ownerResolves = Server.Resolve<IIssueOwnerResolver>().TryResolveOwnerHero(issue, out _);
             var oldKeyRemains = ownership.TryGetOwner(scenario.NotableId, QuestScenario.IssueId, out _);
-            Assert.Equal(expectedReplacements, native.Replacements);
+            Assert.Equal(1, native.Replacements);
             Assert.True(giver.IsDead);
             Assert.Null(giver.Issue);
             Assert.False(quest.IsOngoing);

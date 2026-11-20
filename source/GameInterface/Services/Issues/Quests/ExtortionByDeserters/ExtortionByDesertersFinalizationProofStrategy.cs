@@ -7,22 +7,17 @@ using State = TaleWorlds.CampaignSystem.Issues.ExtortionByDesertersIssueBehavior
 
 namespace GameInterface.Services.Issues.Quests.ExtortionByDeserters;
 
-internal enum ExtortionByDesertersBranch : byte
-{
-    FullReward = 1,
-    HalfReward,
-    RefuseReward,
-}
-
 /// <summary>Runs each reward choice once, as the player whose deserters were defeated.</summary>
 internal class ExtortionByDesertersFinalizationProofStrategy : IFinalizationProofStrategy
 {
     private static readonly ILogger Logger = LogManager.GetLogger<ExtortionByDesertersFinalizationProofStrategy>();
     public bool TryRunBranch(QuestBase quest, byte proof)
     {
-        if (!(quest is Quest deserterQuest) || !quest.IsOngoing)
+        if (!(quest is Quest deserterQuest)) return false;
+
+        if (!quest.IsOngoing)
         {
-            Logger.Warning("Skipping extortion branch {proof} for non-ongoing quest {quest}", proof, quest?.StringId);
+            Logger.Warning("Skipping extortion branch {proof} for non-ongoing quest {quest}", proof, quest.StringId);
             return true;
         }
 

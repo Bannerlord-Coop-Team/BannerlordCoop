@@ -42,7 +42,7 @@ internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesert
 
     public void ApplyBattleStarted(Quest quest, PartyBase attackerParty)
     {
-        if (attackerParty != null && attackerParty != quest._deserterMobileParty?.Party) return;
+        if (attackerParty != quest._deserterMobileParty?.Party) return;
         TryStartAmbush(quest);
     }
 
@@ -54,6 +54,8 @@ internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesert
             return false;
         }
         if (party == null) return false;
+        // The defenders exist once the ambush has started.
+        if (quest._defenderMobileParty != null) return false;
 
         var raid = party.MapEvent;
         var isQuestRaid = raid?.IsRaid == true && !raid.HasWinner && !raid.IsFinalized &&
@@ -61,7 +63,7 @@ internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesert
             raid.DefenderSide.LeaderParty == quest.QuestSettlement.Party;
         var ownerCanDefend = owner.CurrentSettlement == quest.QuestSettlement &&
             (owner.MapEvent == null || owner.MapEvent == raid);
-        if (!isQuestRaid || !ownerCanDefend || quest._defenderMobileParty != null)
+        if (!isQuestRaid || !ownerCanDefend)
         {
             return false;
         }
@@ -284,7 +286,7 @@ internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesert
         }
     }
 
-    internal static void SetRaidBehaviorIfNeeded(MobileParty deserters, Settlement settlement)
+    private static void SetRaidBehaviorIfNeeded(MobileParty deserters, Settlement settlement)
     {
         if (deserters.DefaultBehavior == AiBehavior.RaidSettlement) return;
         SetPartyAiAction.GetActionForRaidingSettlement(deserters, settlement, MobileParty.NavigationType.Default, false, false);

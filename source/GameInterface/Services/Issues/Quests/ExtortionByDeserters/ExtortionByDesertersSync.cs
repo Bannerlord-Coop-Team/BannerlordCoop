@@ -10,9 +10,7 @@ internal sealed class ExtortionByDesertersSync : IAutoSync
     {
         if (!questFeatureFlag.IsEnabled) return;
 
-        // Install these after AutoSync so their callers cannot inline unpatched setters.
-        ExtortionByDesertersPartyPatches.AddPatches(collector);
-        ExtortionByDesertersJournalPatches.AddPatches(collector);
+        // These methods need AutoSync installed before their patched bodies can inline game setters.
         ExtortionByDesertersServerMethodsPatch.AddPatches(collector);
     }
 }

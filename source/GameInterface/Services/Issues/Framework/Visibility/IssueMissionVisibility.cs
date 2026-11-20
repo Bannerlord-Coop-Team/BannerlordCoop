@@ -19,7 +19,7 @@ internal sealed class IssueMissionVisibility : IIssueMissionVisibility
     {
         if (!issue.IsSolvingWithAlternative && !issue.IsSolvingWithLordSolution) return false;
 
-        return !(ownerResolver.TryGetOwnerControllerId(issue, out var ownerControllerId) &&
-            ownerControllerId == controller.ControllerId);
+        if (!ownerResolver.TryGetOwnerControllerId(issue, out var ownerControllerId)) return true;
+        return ownerControllerId != controller.ControllerId;
     }
 }
