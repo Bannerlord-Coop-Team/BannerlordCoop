@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using GameInterface.CoopSessionData;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.NavalDLC;
@@ -20,7 +21,8 @@ namespace GameInterface.Services.Rafts.Interfaces;
 
 /// <summary>
 /// Server-only: strands a player's party released from captivity at sea and keeps its fleet until it washes ashore or
-/// leaves its raft at sea, and lands a party left on a raft or marked at sea while it stands on land.
+/// leaves its raft at sea, sends a raft at sea toward shore again after its move was lost, and lands a party left on a
+/// raft or marked at sea while it stands on land.
 /// </summary>
 public interface IPlayerRaftFleetInterface : IGameAbstraction
 {
@@ -40,6 +42,12 @@ public interface IPlayerRaftFleetInterface : IGameAbstraction
     void LeaveRaftAtSea(MobileParty party);
 
     /// <summary>
+    /// Sends a player's raft free at sea to the nearest shore again after its move to land was lost, on the server and every
+    /// client. Returns false for a party that isn't a raft free at sea.
+    /// </summary>
+    bool ResumeRaft(MobileParty party);
+
+    /// <summary>
     /// Lands a party that stands on land but is still on a raft or marked at sea, ends its raft state, gives back its fleet
     /// and holds it there on every client. Returns false for a parked party, a party at sea, or one neither on a raft nor
     /// marked at sea.
@@ -53,21 +61,23 @@ public interface IPlayerRaftFleetInterface : IGameAbstraction
     void OnPlayerCharacterChanged(Hero newPlayerHero, MobileParty newMainParty);
 }
 
-public class PlayerRaftFleetInterface : IPlayerRaftFleetInterface
+internal class PlayerRaftFleetInterface : IPlayerRaftFleetInterface
 {
     private readonly ICoopSessionProvider coopSessionProvider;
     private readonly IObjectManager objectManager;
     private readonly IPlayerManager playerManager;
     private readonly IMessageBroker messageBroker;
+    private readonly PostBattleScreens postBattleScreens;
 
     private Dictionary<string, PlayerCachedFleetData> PlayerCachedFleets => coopSessionProvider.CoopSession.NavalPlayerData.PlayerCachedFleets;
 
-    public PlayerRaftFleetInterface(ICoopSessionProvider coopSessionProvider, IObjectManager objectManager, IPlayerManager playerManager, IMessageBroker messageBroker)
+    public PlayerRaftFleetInterface(ICoopSessionProvider coopSessionProvider, IObjectManager objectManager, IPlayerManager playerManager, IMessageBroker messageBroker, PostBattleScreens postBattleScreens)
     {
         this.coopSessionProvider = coopSessionProvider;
         this.objectManager = objectManager;
         this.playerManager = playerManager;
         this.messageBroker = messageBroker;
+        this.postBattleScreens = postBattleScreens;
     }
 
     public void StrandAfterRelease(MobileParty party)
@@ -128,6 +138,19 @@ public class PlayerRaftFleetInterface : IPlayerRaftFleetInterface
         ReturnFleet(party);
         // ReturnFleet restores the coast anchor cached at the stranding, but a party at sea sails with its fleet, unanchored.
         party.Anchor.ResetPosition();
+    }
+
+    public bool ResumeRaft(MobileParty party)
+    {
+        if (!party.IsInRaftState || !party.IsCurrentlyAtSea) return false;
+        // Leaving the battle or its post battle screens resumes it through PartyOccupancyChanged
+        if (party.MapEvent != null) return false;
+        if (postBattleScreens.IsInScreens(party)) return false;
+        if (party.CurrentSettlement != null) return false;
+
+        party.MovePartyToTheClosestLand();
+        messageBroker.Publish(this, new PartyBehaviorChangeAttempted(party, forcePosition: true, isCurrentlyAtSea: party.IsCurrentlyAtSea));
+        return true;
     }
 
     public bool PutAshore(MobileParty party)

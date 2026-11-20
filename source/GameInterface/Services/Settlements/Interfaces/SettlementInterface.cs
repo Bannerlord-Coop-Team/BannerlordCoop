@@ -47,6 +47,11 @@ public interface ISettlementInterface : IGameAbstraction
     void PartySetSail(MobileParty party, Settlement settlement);
 
     /// <summary>
+    /// Server-only: leaves the port settlement the party is in and sets sail in front of it, the way vanilla's Set sail option does.
+    /// </summary>
+    void PartyLeaveAndSetSail(MobileParty party);
+
+    /// <summary>
     /// Server-only: puts a party ashore at a settlement's gate, anchors its fleet in the port and replicates the position.
     /// </summary>
     void PartyDisembark(MobileParty party, Settlement settlement);
@@ -131,6 +136,15 @@ internal class SettlementInterface : ISettlementInterface
 
         // SetSailAtPosition writes the position directly, so push it and the sea state to clients
         messageBroker.Publish(this, new PartyBehaviorChangeAttempted(party, forcePosition: true, isCurrentlyAtSea: true));
+    }
+
+    public void PartyLeaveAndSetSail(MobileParty party)
+    {
+        var port = party.CurrentSettlement;
+        if (port == null) return;
+
+        PartyLeaveSettlement(party);
+        PartySetSail(party, port);
     }
 
     public void PartyDisembark(MobileParty party, Settlement settlement)

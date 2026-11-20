@@ -72,6 +72,11 @@ internal sealed class QuestScenario
         }
     }
 
+    public QuestScenario(E2ETestEnvironment testEnvironment, Func<Hero, IssueBase> issueFactory)
+        : this(testEnvironment, (_, hero) => issueFactory(hero))
+    {
+    }
+
     public void Accept(EnvironmentInstance client)
     {
         client.Call(() =>
@@ -109,7 +114,7 @@ internal sealed class QuestScenario
         return quest;
     }
 
-    public QuestBase AttachQuest(EnvironmentInstance instance)
+    public QuestBase AttachQuest(EnvironmentInstance instance, Func<Hero, QuestBase>? createQuest = null)
     {
         QuestBase quest = null!;
 
@@ -119,7 +124,7 @@ internal sealed class QuestScenario
 
             using (new AllowedThread())
             {
-                quest = new UnstartedQuest("quest_attached", notable);
+                quest = createQuest == null ? new UnstartedQuest("quest_attached", notable) : createQuest(notable);
                 notable.Issue.IssueQuest = quest;
             }
         });

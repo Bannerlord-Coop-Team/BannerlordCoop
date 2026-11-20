@@ -21,7 +21,16 @@ internal class NavalShipDistributionCampaignBehaviorPatches
 
     [HarmonyPatch(nameof(NavalShipDistributionCampaignBehavior.OnMobilePartyDestroyed))]
     [HarmonyPrefix]
-    public static bool OnMobilePartyDestroyedPrefix() => ModInformation.IsServer;
+    public static bool OnMobilePartyDestroyedPrefix(MobileParty party)
+    {
+        if (ModInformation.IsClient) return false;
+
+        // Vanilla v1.3.7 still distributes a destroyed player clan caravan's ships, so caravans keep the vanilla path
+        if (party.IsCaravan) return true;
+
+        // Vanilla's Clan.PlayerClan check only knows one player clan, so run it only for non-player clans
+        return !party.ActualClan.IsPlayerClan();
+    }
 
     [HarmonyPatch(nameof(NavalShipDistributionCampaignBehavior.RecoverGoldFromRemainingShipsAfterDistribution))]
     [HarmonyPrefix]
