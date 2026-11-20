@@ -1,0 +1,335 @@
+{
+  "schemaVersion": 2,
+  "catalogRevision": "f92d6ab74369914f3284fe54bc5233e12a0e7488651d97e8420726b3ae9b084f",
+  "contentDigest": "f92d6ab74369914f3284fe54bc5233e12a0e7488651d97e8420726b3ae9b084f",
+  "sourceCommit": "d8a3c6dcce1d9b452f4af9262f5a16da01ddf13a",
+  "source": "BannerlordCoop/source/GameInterface/Configuration/ModConfigData.cs",
+  "oldAgentOmittedKeys": [
+    "voiceEnabled",
+    "battleSize",
+    "allowClientTimeControls",
+    "blockAiWarDeclarationsOnOfflinePlayers",
+    "postBattleAiAmnestySeconds",
+    "ensureUnaffiliatedWanderers",
+    "spawnRateWanderers",
+    "coopClansEnabled",
+    "enablePlayerExecutions",
+    "playerWoundedBattleEntry",
+    "showPlayerNameplates",
+    "kingdomDecisionVoteTimeoutSeconds",
+    "preferredBattleHosts",
+    "pvpBlockLeave",
+    "pvpResponseTimerSeconds",
+    "warSails",
+    "clansAfterKingdomDestruction"
+  ],
+  "options": [
+    {
+      "key": "voiceEnabled",
+      "type": "boolean",
+      "stable": true,
+      "availableSince": "0.1.7",
+      "omitForOldAgents": true,
+      "default": true
+    },
+    {
+      "key": "battleSize",
+      "type": "integer",
+      "stable": true,
+      "availableSince": "0.1.7",
+      "min": 200,
+      "max": 12000,
+      "omitForOldAgents": true,
+      "default": 1000
+    },
+    {
+      "key": "fastForwardEnabled",
+      "type": "boolean",
+      "stable": true,
+      "availableSince": "0.1.7",
+      "default": true
+    },
+    {
+      "key": "autoPauseEnabled",
+      "type": "boolean",
+      "stable": true,
+      "availableSince": "0.1.7",
+      "default": true
+    },
+    {
+      "key": "allowClientTimeControls",
+      "type": "boolean",
+      "stable": false,
+      "availableSince": "0.1.8",
+      "omitForOldAgents": true,
+      "default": true
+    },
+    {
+      "key": "clientsCanUseCheats",
+      "type": "boolean",
+      "stable": true,
+      "availableSince": "0.1.7",
+      "default": false
+    },
+    {
+      "key": "goldFoodInfluenceChangeInSettlements",
+      "type": "boolean",
+      "stable": true,
+      "availableSince": "0.1.7",
+      "default": false
+    },
+    {
+      "key": "goldFoodInfluenceChangeForDisconnectedPlayers",
+      "type": "boolean",
+      "stable": true,
+      "availableSince": "0.1.7",
+      "default": false
+    },
+    {
+      "key": "blockAiWarDeclarationsOnOfflinePlayers",
+      "type": "boolean",
+      "stable": true,
+      "availableSince": "0.1.7",
+      "omitForOldAgents": true,
+      "default": false
+    },
+    {
+      "key": "playerBattleAiJoinWindowHours",
+      "type": "integer",
+      "stable": true,
+      "availableSince": "0.1.7",
+      "min": 0,
+      "max": 8760,
+      "default": 6
+    },
+    {
+      "key": "postBattleAiAmnestySeconds",
+      "type": "integer",
+      "stable": false,
+      "availableSince": "0.1.8",
+      "min": 0,
+      "max": 86400,
+      "omitForOldAgents": true,
+      "default": 0
+    },
+    {
+      "key": "speedLimitWhilePlayersInBattle",
+      "type": "boolean",
+      "stable": true,
+      "availableSince": "0.1.7",
+      "default": true
+    },
+    {
+      "key": "ensureUnaffiliatedWanderers",
+      "type": "boolean",
+      "stable": true,
+      "availableSince": "0.1.7",
+      "omitForOldAgents": true,
+      "default": true
+    },
+    {
+      "key": "wandererLimit",
+      "type": "integer",
+      "stable": true,
+      "availableSince": "0.1.7",
+      "min": 0,
+      "max": 1000,
+      "default": 32
+    },
+    {
+      "key": "spawnRateWanderers",
+      "type": "integer",
+      "stable": true,
+      "availableSince": "0.1.7",
+      "min": 0,
+      "max": 100,
+      "omitForOldAgents": true,
+      "default": 1
+    },
+    {
+      "key": "wandererLimitScalesWithPlayers",
+      "type": "boolean",
+      "stable": true,
+      "availableSince": "0.1.7",
+      "default": false
+    },
+    {
+      "key": "playerKingdomClanTierRequired",
+      "type": "integer",
+      "stable": true,
+      "availableSince": "0.1.7",
+      "min": 0,
+      "max": 6,
+      "default": 4
+    },
+    {
+      "key": "coopClansEnabled",
+      "type": "boolean",
+      "stable": true,
+      "availableSince": "0.1.7",
+      "omitForOldAgents": true,
+      "default": true
+    },
+    {
+      "key": "smithingStaminaRecoveryOutsideSettlements",
+      "type": "boolean",
+      "stable": true,
+      "availableSince": "0.1.7",
+      "default": true
+    },
+    {
+      "key": "smithingStaminaRecoveryMultiplier",
+      "type": "number",
+      "stable": true,
+      "availableSince": "0.1.7",
+      "min": 0,
+      "max": 100,
+      "default": 0.6
+    },
+    {
+      "key": "maximumLootersMultiplier",
+      "type": "number",
+      "stable": true,
+      "availableSince": "0.1.7",
+      "min": 0,
+      "max": 100,
+      "default": 1
+    },
+    {
+      "key": "looterPartySizeMultiplier",
+      "type": "number",
+      "stable": true,
+      "availableSince": "0.1.7",
+      "min": 0,
+      "max": 100,
+      "default": 1
+    },
+    {
+      "key": "enableHeroExecutions",
+      "type": "boolean",
+      "stable": true,
+      "availableSince": "0.1.7",
+      "default": false
+    },
+    {
+      "key": "enablePlayerClanMemberExecutions",
+      "type": "boolean",
+      "stable": true,
+      "availableSince": "0.1.7",
+      "default": false
+    },
+    {
+      "key": "enablePlayerExecutions",
+      "type": "boolean",
+      "stable": true,
+      "availableSince": "0.1.7",
+      "omitForOldAgents": true,
+      "default": false
+    },
+    {
+      "key": "playerWoundedBattleEntry",
+      "type": "boolean",
+      "stable": true,
+      "availableSince": "0.1.7",
+      "omitForOldAgents": true,
+      "default": true
+    },
+    {
+      "key": "showPlayerNameplates",
+      "type": "boolean",
+      "stable": true,
+      "availableSince": "0.1.7",
+      "omitForOldAgents": true,
+      "default": true
+    },
+    {
+      "key": "kingdomDecisionVoteTimeoutSeconds",
+      "type": "integer",
+      "stable": true,
+      "availableSince": "0.1.7",
+      "max": 86400,
+      "omitForOldAgents": true,
+      "default": 60
+    },
+    {
+      "key": "preferredBattleHosts",
+      "type": "steamIdList",
+      "stable": false,
+      "availableSince": "0.1.8",
+      "maxItems": 32,
+      "itemPattern": "^[0-9]{17}$",
+      "uniqueItems": true,
+      "omitForOldAgents": true,
+      "default": []
+    },
+    {
+      "key": "pvpBlockLeave",
+      "type": "boolean",
+      "stable": false,
+      "availableSince": "0.1.8",
+      "omitForOldAgents": true,
+      "default": false
+    },
+    {
+      "key": "pvpResponseTimerSeconds",
+      "type": "integer",
+      "stable": false,
+      "availableSince": "0.1.8",
+      "min": 0,
+      "max": 86400,
+      "coerceRanges": [
+        [
+          1,
+          9,
+          10
+        ]
+      ],
+      "omitForOldAgents": true,
+      "default": 0
+    },
+    {
+      "key": "warSails",
+      "type": "boolean",
+      "stable": false,
+      "availableSince": "0.1.8",
+      "omitForOldAgents": true,
+      "default": false
+    },
+    {
+      "key": "goldFoodInfluenceChangeInBattles",
+      "type": "enum",
+      "stable": true,
+      "availableSince": "0.1.7",
+      "values": [
+        "Disabled",
+        "OneDayMax",
+        "Enabled"
+      ],
+      "default": "Disabled"
+    },
+    {
+      "key": "lordDefectionRetries",
+      "type": "enum",
+      "stable": true,
+      "availableSince": "0.1.7",
+      "values": [
+        "Vanilla",
+        "NeverExpire",
+        "AlwaysRetry"
+      ],
+      "default": "Vanilla"
+    },
+    {
+      "key": "clansAfterKingdomDestruction",
+      "type": "enum",
+      "stable": false,
+      "availableSince": "0.1.8",
+      "omitForOldAgents": true,
+      "values": [
+        "Vanilla",
+        "KeepClans"
+      ],
+      "default": "Vanilla"
+    }
+  ]
+}
