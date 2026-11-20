@@ -59,6 +59,8 @@ Don't add a `static` class, or a `*Gate`, that other code writes and patches rea
 
 ## Validation
 
+Before opening a PR, compare patched methods with the decompiled vanilla path, search the diff for reflection over publicized members and new ambient state, and check that each test reaches its named behavior. Use `Assert.Single` or `Assert.Empty` for duplicate-sensitive sends and events; do not keep a test that only checks a shared guard, a recorder call, or an unreachable fixture.
+
 - Don't validate inputs that are always valid, such as constructor-injected dependencies (Autofac never injects null).
 - Validate only where bad data can actually arrive, like network message contents or game state that can really be gone by the time a message applies.
 - Co-op assumes people are playing with their friends, so cheating gets dealt with in house and the mod isn't responsible for anti-cheat. Don't add validation or tests whose only justification is stopping a cheating, malicious or modified client or a forged packet. A check, including one on network message contents, is justified by an honest failure path like a double-click, race, disconnect or stale local state.
