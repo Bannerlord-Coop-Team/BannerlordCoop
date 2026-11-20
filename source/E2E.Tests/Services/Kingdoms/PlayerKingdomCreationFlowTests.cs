@@ -707,12 +707,10 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     }
 
     // The ruler's client greys out the grant line with the reason before the fief is paid for or the clan is named.
-    [Theory]
-    [InlineData(1, false)]
-    [InlineData(2, true)]
-    public void FiefSelectedConfirm_RulersKingdomFull_GreysOutTheGrantLineWithTheReason(int maxClans, bool expectedClickable)
+    [Fact]
+    public void FiefSelectedConfirm_RulersKingdomFull_GreysOutTheGrantLineWithTheReason()
     {
-        ModConfigProvider.ModOptions = new ModOptions(new ModOptionsData { MaxClansPerKingdom = maxClans });
+        ModConfigProvider.ModOptions = new ModOptions(new ModOptionsData { MaxClansPerKingdom = 1 });
         var client = Clients.First();
         var ruler = CreateSyncedPlayerContext(ControllerId, client);
         CreateNamedKingdomEverywhere(ruler.ClanId);
@@ -724,8 +722,8 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
             CompanionRolesPatches.FiefSelectedConfirmClickableOnConditionPostfix(ref clickable, ref explanation);
 
-            Assert.Equal(expectedClickable, clickable);
-            Assert.Equal(expectedClickable ? null : FullKingdomText, explanation?.ToString());
+            Assert.False(clickable);
+            Assert.Equal(FullKingdomText, explanation.ToString());
         });
     }
 

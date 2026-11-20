@@ -28,8 +28,8 @@ public interface IVassalAndMercenaryOfferCampaignBehaviorInterface : IGameAbstra
     void OnWarDeclared(IFaction faction1, IFaction faction2);
     void OnHeroRelationChanged(Hero effectiveHero, Hero effectiveHeroGainedRelationWith);
     void OnKingdomDestroyed(Kingdom destroyedKingdom);
-    // Returns whether the clan joined. kingdomFull is true when maxClansPerKingdom refused the join.
-    bool AcceptMercenaryOffer(string playerHeroId, string kingdomId, out bool kingdomFull);
+    // kingdomFull is true when maxClansPerKingdom refused the join.
+    void AcceptMercenaryOffer(string playerHeroId, string kingdomId, out bool kingdomFull);
     void DeclineOffer(string playerHeroId, string kingdomId);
     void AddNewPlayerHeroId(string playerHeroId, NetPeer peer);
 }
@@ -191,16 +191,16 @@ public class VassalAndMercenaryOfferCampaignBehaviorInterface : IVassalAndMercen
         }
     }
 
-    public bool AcceptMercenaryOffer(string playerHeroId, string kingdomId, out bool kingdomFull)
+    public void AcceptMercenaryOffer(string playerHeroId, string kingdomId, out bool kingdomFull)
     {
         kingdomFull = false;
 
-        if (!ValidatePlayerHeroId(playerHeroId, out var playerData, out var playerHero)) return false;
+        if (!ValidatePlayerHeroId(playerHeroId, out var playerData, out var playerHero)) return;
 
         // The offer the player answered expired or was cancelled before the response arrived
-        if (playerData.CurrentMercenaryOfferKingdomId != kingdomId) return false;
+        if (playerData.CurrentMercenaryOfferKingdomId != kingdomId) return;
 
-        if (!objectManager.TryGetObjectWithLogging<Kingdom>(kingdomId, out var kingdom)) return false;
+        if (!objectManager.TryGetObjectWithLogging<Kingdom>(kingdomId, out var kingdom)) return;
 
         ClearKingdomOffer(playerData, kingdomId);
 
@@ -208,19 +208,18 @@ public class VassalAndMercenaryOfferCampaignBehaviorInterface : IVassalAndMercen
         if (clan.Kingdom != null)
         {
             Logger.Warning("Rejected mercenary offer because clan {ClanId} already belongs to a kingdom", clan.StringId);
-            return false;
+            return;
         }
 
         if (kingdomClanLimit.RefusesJoin(clan, kingdom, asMercenary: true, ModConfigProvider.ModOptions))
         {
             Logger.Warning("Rejected mercenary offer for clan {ClanId} because kingdom {KingdomId} has maxClansPerKingdom clans", clan.StringId, kingdomId);
             kingdomFull = true;
-            return false;
+            return;
         }
 
         int mercenaryAwardFactorToJoinKingdom = Campaign.Current.Models.MinorFactionsModel.GetMercenaryAwardFactorToJoinKingdom(clan, kingdom, true);
         ChangeKingdomAction.ApplyByJoinFactionAsMercenary(clan, kingdom, default, mercenaryAwardFactorToJoinKingdom);
-        return true;
     }
 
     public void DeclineOffer(string playerHeroId, string kingdomId)
