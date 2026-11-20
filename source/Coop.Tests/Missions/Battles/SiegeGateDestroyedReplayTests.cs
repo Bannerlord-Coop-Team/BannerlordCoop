@@ -47,6 +47,7 @@ public class SiegeGateDestroyedReplayTests : IDisposable
         Stub(AccessTools.PropertyGetter(typeof(WeakGameEntity), nameof(WeakGameEntity.GlobalPosition)), nameof(Origin));
         Stub(AccessTools.Method(typeof(Mission), nameof(Mission.MakeSound),
             new[] { typeof(int), typeof(Vec3), typeof(bool), typeof(bool), typeof(int), typeof(int) }), nameof(Skip));
+        Stub(AccessTools.Method(typeof(UsableMachine), nameof(UsableMachine.Disable)), nameof(Skip));
     }
 
     public void Dispose() => harmony.UnpatchAll(harmony.Id);
