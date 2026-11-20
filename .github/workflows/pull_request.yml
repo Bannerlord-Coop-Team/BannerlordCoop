@@ -29,6 +29,12 @@ jobs:
         with:
           ref: ${{ github.sha }}
 
+      - name: Check generated managed configuration catalog
+        run: node scripts/generate-managed-config-catalog.mjs --check
+
+      - name: Test generated managed configuration catalog
+        run: node --test scripts/generate-managed-config-catalog.test.mjs
+
       - name: Test scheduled nightly publication decisions
         shell: pwsh
         run: ./.github/scripts/test-nightly-publish-guard.ps1
