@@ -6,11 +6,10 @@ namespace GameInterface.Services.Issues.Quests.ExtortionByDeserters.Messages;
 
 internal enum ExtortionByDesertersNotice : byte
 {
-    None,
-    DesertersNoticedPlayer,
-    PlayerLeftVillage,
-    DesertersDefeated,
-    Ambush,
+    None = 0,
+    DesertersNoticedPlayer = 1,
+    PlayerLeftVillage = 2,
+    Ambush = 4,
 }
 
 /// <summary>Owner-only quest progress, sent after the referenced world objects.</summary>

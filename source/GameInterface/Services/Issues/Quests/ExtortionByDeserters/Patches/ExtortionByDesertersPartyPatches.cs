@@ -4,19 +4,17 @@ using HarmonyLib;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
-using TaleWorlds.Localization;
 using Quest = TaleWorlds.CampaignSystem.Issues.ExtortionByDesertersIssueBehavior.ExtortionByDesertersIssueQuest;
 
 namespace GameInterface.Services.Issues.Quests.ExtortionByDeserters.Patches;
 
-/// <summary>Guards early party tracking, cleans up dismissed quest parties, and forwards server journals.</summary>
+/// <summary>Guards early party tracking and cleans up dismissed quest parties.</summary>
 internal class ExtortionByDesertersPartyPatches
 {
     internal static void AddPatches(IAutoSyncPatchCollector collector)
     {
         Add(collector, AccessTools.Method(typeof(QuestBase), nameof(QuestBase.AddTrackedObject)), nameof(AddTrackedObjectPrefix));
         Add(collector, AccessTools.Method(typeof(IssueBase), nameof(IssueBase.IssueFinalized)), nameof(IssueFinalizedPrefix));
-        Add(collector, AccessTools.Method(typeof(QuestBase), nameof(QuestBase.AddLog), new[] { typeof(TextObject), typeof(bool) }), nameof(AddLogPrefix));
     }
 
     private static void Add(IAutoSyncPatchCollector collector, MethodBase target, string prefixName) =>
@@ -32,14 +30,5 @@ internal class ExtortionByDesertersPartyPatches
     internal static void IssueFinalizedPrefix(IssueBase __instance)
     {
         if (ModInformation.IsServer && __instance.IssueQuest is Quest quest && quest.IsOngoing) quest.OnFinalize();
-    }
-
-    internal static void AddLogPrefix(QuestBase __instance, TextObject text)
-    {
-        if (ModInformation.IsServer && __instance is Quest quest &&
-            ContainerProvider.TryResolve<IExtortionByDesertersProgress>(out var progress))
-        {
-            progress.Send(quest, text);
-        }
     }
 }

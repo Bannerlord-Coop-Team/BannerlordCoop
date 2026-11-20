@@ -1,5 +1,4 @@
 ﻿using Common;
-using GameInterface.Services.Issues.Quests.ExtortionByDeserters;
 using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
 using System;
@@ -70,6 +69,7 @@ internal class ExtortionByDesertersWorldPatches
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnSettlementLeft))]
     [HarmonyPrefix]
+    // ApplySettlementLeft handles the owner leaving the village.
     private static bool LeftPrefix() => false;
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.StartAmbushEncounter))]
@@ -94,15 +94,17 @@ internal class ExtortionByDesertersWorldPatches
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.MapEventEnded))]
     [HarmonyPrefix]
+    // ApplyMapEventEnded records the outcome in the owner's context.
     private static bool MapEventEndedPrefix() => false;
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnVillageBeingRaided))]
     [HarmonyPrefix]
+    // ApplyVillageBeingRaided handles the raid when the event reaches the server.
     private static bool RaidPrefix() => false;
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.TickDesertersPartyLogic))]
     [HarmonyPrefix]
-    // The world relay now ticks the server directly. Clients replay the resulting progress.
+    // ApplyTick replaces the vanilla tick on the server, and clients replay the resulting progress.
     private static bool TickPrefix() => false;
 
     private static void Run(Action<IExtortionByDesertersWorldEventService, Quest> listener)

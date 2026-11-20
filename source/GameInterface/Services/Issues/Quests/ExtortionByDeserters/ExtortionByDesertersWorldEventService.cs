@@ -16,6 +16,7 @@ namespace GameInterface.Services.Issues.Quests.ExtortionByDeserters;
 
 internal interface IExtortionByDesertersWorldEventService
 {
+    // With no attacker, the hourly tick retries a raid already in progress.
     bool TryStartAmbush(Quest quest, PartyBase attackerParty = null);
     bool IsDeserterBattle(Quest quest, MapEvent mapEvent);
     void ApplyBattleFinalized(Quest quest);
@@ -42,14 +43,16 @@ internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesert
     public bool TryStartAmbush(Quest quest, PartyBase attackerParty = null)
     {
         var party = quest._deserterMobileParty;
-        var raid = party?.MapEvent;
-        if (attackerParty != null && attackerParty != party?.Party) return false;
+        if (attackerParty != null && (party == null || attackerParty != party.Party)) return false;
         if (!ownerResolver.TryResolveOwnerParty(IssueManager.GetIssueOfQuest(quest), out var owner))
         {
             return false;
         }
+        if (party == null) return false;
+
+        var raid = party.MapEvent;
         var isQuestRaid = raid?.IsRaid == true && !raid.HasWinner && !raid.IsFinalized &&
-            raid.AttackerSide.LeaderParty == party?.Party &&
+            raid.AttackerSide.LeaderParty == party.Party &&
             raid.DefenderSide.LeaderParty == quest.QuestSettlement.Party;
         var ownerCanDefend = owner.CurrentSettlement == quest.QuestSettlement &&
             (owner.MapEvent == null || owner.MapEvent == raid);
@@ -81,6 +84,7 @@ internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesert
     {
         if (!quest._deserterBattleFinalizedForTheFirstTime)
         {
+            // A battle without the owner leaves the flag unset, but can still destroy the deserters.
             CancelIfDesertersGone(quest);
             return;
         }
@@ -204,7 +208,8 @@ internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesert
 
     public void ApplyTick(Quest quest)
     {
-        if (!quest.IsOngoing || quest._currentState == State.DesertersAreDefeated || CancelIfDesertersGone(quest)) return;
+        if (!quest.IsOngoing || quest._currentState == State.DesertersAreDefeated) return;
+        if (CancelIfDesertersGone(quest)) return;
         var deserters = quest._deserterMobileParty;
         // Vanilla returns while a map event is active. Co-op starts the owner ambush after the server creates its defender.
         if (deserters.MapEvent != null)

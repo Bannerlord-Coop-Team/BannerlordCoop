@@ -56,6 +56,10 @@ public class ExtortionByDesertersTests : IDisposable
     private const int GiverPowerPenalty = -10;
     private const int TownSecurityPenalty = -10;
     private const int TownProsperityPenalty = -50;
+    private const int NotableReplacementPowerLimit = 100;
+    // These fixture values sit on opposite sides of the notable replacement threshold.
+    private const float PowerBelowReplacementLimit = 99f;
+    private const float PowerAboveReplacementLimit = 213.6168f;
 
     private readonly E2ETestEnvironment environment;
     private readonly ITestOutputHelper output;
@@ -119,7 +123,6 @@ public class ExtortionByDesertersTests : IDisposable
         {
             (AccessTools.Method(typeof(QuestBase), nameof(QuestBase.AddTrackedObject)), partyPatches),
             (AccessTools.Method(typeof(IssueBase), nameof(IssueBase.IssueFinalized)), partyPatches),
-            (AccessTools.Method(typeof(QuestBase), nameof(QuestBase.AddLog), new[] { typeof(TextObject), typeof(bool) }), partyPatches),
             (AccessTools.Method(typeof(Quest), nameof(Quest.StartAmbushEncounter)), worldPatches),
             (AccessTools.Method(typeof(Quest), nameof(Quest.GameMenuOpened)), worldPatches),
             (AccessTools.Method(typeof(Quest), nameof(Quest.TickDesertersPartyLogic)), worldPatches),
@@ -130,6 +133,13 @@ public class ExtortionByDesertersTests : IDisposable
             Assert.Single(Harmony.GetPatchInfo(target).Prefixes, prefix =>
                 prefix.owner == "Bannerlord.Coop" && prefix.PatchMethod.DeclaringType == patchType);
         }
+
+        var journalPatches = typeof(ExtortionByDesertersJournalPatches);
+        var addLog = AccessTools.Method(typeof(QuestBase), nameof(QuestBase.AddLog), new[] { typeof(TextObject), typeof(bool) });
+        var journalPrefix = Assert.Single(Harmony.GetPatchInfo(addLog).Prefixes, prefix =>
+            prefix.owner == "Bannerlord.Coop" &&
+            (prefix.PatchMethod.DeclaringType == partyPatches || prefix.PatchMethod.DeclaringType == journalPatches));
+        Assert.Equal(journalPatches, journalPrefix.PatchMethod.DeclaringType);
     }
 
     [Fact]
@@ -571,16 +581,24 @@ public class ExtortionByDesertersTests : IDisposable
             });
             Assert.Empty(client.NetworkSentMessages.GetMessages<GenericNetworkEvent<Town, byte[]>>());
         }
-        var security = Assert.Single(messages, message => message.GetType().Name == "Town_Security_SetNetworkMessage");
-        Assert.Equal((float)(40 + securityChange), RawSerializer.Deserialize<float>(Assert.IsType<byte[]>(security.GetType().GetProperty("Value")!.GetValue(security))));
-        var prosperityMessages = messages.Where(message => message.GetType().Name == "Town__prosperity_SetNetworkMessage").ToArray();
+        const string securityMessageName = "Town_Security_SetNetworkMessage";
+        const string prosperityMessageName = "Town__prosperity_SetNetworkMessage";
+        var security = Assert.Single(messages, message => message.GetType().Name == securityMessageName);
+        Assert.Equal((float)(40 + securityChange), SyncedFloat(security));
+        var prosperityMessages = messages.Where(message => message.GetType().Name == prosperityMessageName);
         if (prosperityChange == 0) Assert.Empty(prosperityMessages);
         else
         {
             var prosperity = Assert.Single(prosperityMessages);
-            Assert.Equal((float)(200 + prosperityChange), RawSerializer.Deserialize<float>(Assert.IsType<byte[]>(prosperity.GetType().GetProperty("Value")!.GetValue(prosperity))));
+            Assert.Equal((float)(200 + prosperityChange), SyncedFloat(prosperity));
         }
         Assert.Equal(prosperityChange == 0 ? 1 : 2, messages.Length);
+
+        static float SyncedFloat(GenericNetworkEvent<Town, byte[]> message)
+        {
+            var value = message.GetType().GetProperty("Value")!.GetValue(message);
+            return RawSerializer.Deserialize<float>(Assert.IsType<byte[]>(value));
+        }
 
         Quest.ExtortionByDesertersQuestResult ResultOf(Quest quest) => resultProperty switch
         {
@@ -1239,8 +1257,8 @@ public class ExtortionByDesertersTests : IDisposable
     }
 
     [Theory]
-    [InlineData(99f, 0)]
-    [InlineData(213.6168f, 1)]
+    [InlineData(PowerBelowReplacementLimit, 0)]
+    [InlineData(PowerAboveReplacementLimit, 1)]
     public void NativeGiverDeath_CancelsBeforeNotableReplacementAndReleasesOnlyTheOwnersQuest(float power, int expectedReplacements)
     {
         var ownerQuest = Accept();
@@ -1351,7 +1369,7 @@ public class ExtortionByDesertersTests : IDisposable
         {
             this.replacement = replacement;
             current = this;
-            Assert.Equal(100, Campaign.Current.Models.NotablePowerModel.NotableDisappearPowerLimit);
+            Assert.Equal(NotableReplacementPowerLimit, Campaign.Current.Models.NotablePowerModel.NotableDisappearPowerLimit);
             // Supply the relative at the native appearance-creation boundary; the death listener and issue transfer run normally.
             harmony.Patch(AccessTools.Method(typeof(HeroCreator), nameof(HeroCreator.CreateRelativeNotableHero)),
                 prefix: new HarmonyMethod(typeof(NativeNotableDeathScope), nameof(CreateRelativePrefix)));

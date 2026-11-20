@@ -17,8 +17,10 @@ using State = TaleWorlds.CampaignSystem.Issues.ExtortionByDesertersIssueBehavior
 namespace GameInterface.Services.Issues.Quests.ExtortionByDeserters.Handlers;
 
 /// <summary>Connects personal quest state to the server's existing world parties.</summary>
-internal class ExtortionByDesertersHandler : IHandler
+internal class ExtortionByDesertersStateHandler : IHandler
 {
+    private enum ClientNotice { None, DesertersDefeated }
+
     private readonly IMessageBroker broker;
     private readonly IObjectManager objects;
     private readonly IIssueResolver issues;
@@ -26,7 +28,7 @@ internal class ExtortionByDesertersHandler : IHandler
     private readonly IIssueConversationGuard conversationGuard;
     private readonly IPlayerEncounterInterface playerEncounter;
 
-    public ExtortionByDesertersHandler(IMessageBroker broker, IObjectManager objects,
+    public ExtortionByDesertersStateHandler(IMessageBroker broker, IObjectManager objects,
         IIssueResolver issues, IControllerIdProvider controller,
         IIssueConversationGuard conversationGuard, IPlayerEncounterInterface playerEncounter)
     {
@@ -50,7 +52,7 @@ internal class ExtortionByDesertersHandler : IHandler
         }
 
         GameThread.RunSafe(() => conversationGuard.RunInOrder(() => Apply(data), data.IssueOwnerId),
-            context: nameof(ExtortionByDesertersHandler));
+            context: nameof(ExtortionByDesertersStateHandler));
     }
 
     private void Apply(NetworkExtortionByDesertersState data)
@@ -65,8 +67,9 @@ internal class ExtortionByDesertersHandler : IHandler
 
         var state = (State)data.State;
         // Compare the old state before BindParties replaces it.
-        var desertersJustDefeated = quest._currentState != State.DesertersAreDefeated &&
-            state == State.DesertersAreDefeated;
+        var clientNotice = quest._currentState != State.DesertersAreDefeated && state == State.DesertersAreDefeated
+            ? ClientNotice.DesertersDefeated
+            : ClientNotice.None;
         BindParties(quest, deserters, defenders, state);
         if (!TextObject.IsNullOrEmpty(data.Log))
         {
@@ -75,8 +78,13 @@ internal class ExtortionByDesertersHandler : IHandler
             quest.AddLog(data.Log);
         }
 
+        if (clientNotice == ClientNotice.DesertersDefeated)
+        {
+            MBInformationManager.AddQuickInformation(quest.OnPlayerDefeatedDesertersNotificationText, 0, quest.QuestGiver.CharacterObject);
+            return;
+        }
+
         var notice = (ExtortionByDesertersNotice)data.Notice;
-        if (desertersJustDefeated) notice = ExtortionByDesertersNotice.DesertersDefeated;
         ShowNotice(quest, notice);
         if (notice == ExtortionByDesertersNotice.Ambush &&
             deserters != null && defenders != null && quest.IsOngoing)
@@ -124,9 +132,6 @@ internal class ExtortionByDesertersHandler : IHandler
                 break;
             case ExtortionByDesertersNotice.PlayerLeftVillage:
                 MBInformationManager.AddQuickInformation(quest.OnPlayerLeftQuestSettlementNotificationText, 0, quest.QuestGiver.CharacterObject);
-                break;
-            case ExtortionByDesertersNotice.DesertersDefeated:
-                MBInformationManager.AddQuickInformation(quest.OnPlayerDefeatedDesertersNotificationText, 0, quest.QuestGiver.CharacterObject);
                 break;
         }
     }
