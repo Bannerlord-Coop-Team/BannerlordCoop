@@ -12,6 +12,7 @@ using GameInterface.Services.Issues.Quests.CaravanAmbush;
 using GameInterface.Services.Issues.Quests.ArtisanProducts;
 using GameInterface.Services.Issues.Quests.LadysKnightOut;
 using GameInterface.Services.Issues.Quests.HeadmanNeedsToDeliverAHerd;
+using GameInterface.Services.Issues.Quests.LandLordCompanyOfTrouble;
 using GameInterface.Services.Issues.Quests.MerchantNeedsHelpWithOutlaws;
 using GameInterface.Services.Issues.Quests.LesserNobleRevolt;
 using GameInterface.Services.Issues.Quests.TheConquestOfSettlement;
@@ -62,6 +63,12 @@ internal class IssuesModule : Module
         builder.RegisterType<LesserNobleRevoltWorldEventService>()
             .As<ILesserNobleRevoltWorldEventService>()
             .SingleInstance();
+        builder.RegisterType<LandLordCompanyOfTroubleService>()
+            .As<ILandLordCompanyOfTroubleService>()
+            .InstancePerDependency();
+        builder.RegisterType<LandLordCompanyOfTroubleMercenaries>()
+            .As<ILandLordCompanyOfTroubleMercenaries>()
+            .InstancePerDependency();
         builder.RegisterType<EscortProgress>().As<IEscortProgress>().InstancePerDependency();
         builder.RegisterType<EscortOwnerParty>().As<IEscortOwnerParty>().InstancePerDependency();
         builder.RegisterType<QuestEventRelay>().As<IQuestEventRelay>().InstancePerDependency();
