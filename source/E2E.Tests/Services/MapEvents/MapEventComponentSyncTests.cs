@@ -34,9 +34,8 @@ public class MapEventComponentSyncTests : MapEventTestBase
         {
             var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
             var attacker = GameObjectCreator.CreateInitializedObject<MobileParty>();
-            var defender = GameObjectCreator.CreateInitializedObject<MobileParty>();
             CreateReplicableSiegeEvent(settlement, attacker);
-            var component = SiegeAssaultEventComponent.CreateSiegeAssaultMapEvent(attacker.Party, defender.Party);
+            var component = SiegeAssaultEventComponent.CreateSiegeAssaultMapEvent(attacker.Party, settlement.Party);
             var mapEvent = component.MapEvent;
 
             Assert.True(Server.ObjectManager.TryGetId(mapEvent, out mapEventId));
@@ -45,18 +44,20 @@ public class MapEventComponentSyncTests : MapEventTestBase
 
         var commit = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkMapEventInitialized>());
         Assert.False(commit.IsTerminal);
+        Assert.True(commit.SiegeGraph.IsComplete);
+
+        foreach (var client in Clients) client.PumpGameThread();
 
         foreach (var client in Clients)
         {
             client.Call(() =>
             {
-                client.PumpGameThread();
                 Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventId!, out var mapEvent));
                 Assert.True(client.ObjectManager.TryGetObject<Settlement>(settlementId!, out var settlement));
                 var component = Assert.IsType<SiegeAssaultEventComponent>(mapEvent.Component);
                 Assert.Same(settlement, component.MapEventSettlement);
                 Assert.Contains(mapEvent, Campaign.Current.MapEventManager.MapEvents);
-            }, disabledMethods);
+            });
         }
     }
 }
