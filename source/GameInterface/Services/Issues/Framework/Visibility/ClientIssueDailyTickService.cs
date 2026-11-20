@@ -30,7 +30,10 @@ internal sealed class ClientIssueDailyTickService : IClientIssueDailyTickService
             if (!usesServerTroopJournal && issue.AlternativeSolutionReturnTimeForTroops.IsPast) continue;
 
             var clearDay = (int)issue.AlternativeSolutionIssueEffectClearTime.ToDays;
-            if (usesServerTroopJournal || visibility.IsAnotherPlayersTroopsMission(issue) || issue.JournalEntries.Count == 0)
+            // Some journals come from the server. Local return entries need an owner and an existing journal.
+            var resolveEffectsOnly = usesServerTroopJournal || visibility.IsAnotherPlayersTroopsMission(issue) ||
+                issue.JournalEntries.Count == 0;
+            if (resolveEffectsOnly)
             {
                 // A late joiner can miss the clear day, so resolve the effects on that day or later.
                 if (clearDay <= today)

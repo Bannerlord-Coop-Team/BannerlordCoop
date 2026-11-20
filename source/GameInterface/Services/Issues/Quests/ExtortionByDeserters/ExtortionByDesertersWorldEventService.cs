@@ -27,6 +27,21 @@ internal interface IExtortionByDesertersWorldEventService
     void VillageBeingRaided(Village village);
 }
 
+internal enum ExtortionRaidEnding
+{
+    None,
+    Fail2,
+    Fail3,
+    Cancel,
+}
+
+internal enum ExtortionRunAwayOutcome
+{
+    KeepFleeing,
+    LostSight,
+    TimedOut,
+}
+
 internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesertersWorldEventService
 {
     private readonly IExtortionByDesertersProgress progress;
@@ -61,14 +76,14 @@ internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesert
     private void RunWithOwnerParty(Action<Quest, MobileParty> apply) => dispatcher.RunAsOwners<Quest>(quest =>
     {
         // Keep the registered party even when captivity detaches the owner hero from it.
-        ownerResolver.TryResolveOwnerParty(IssueManager.GetIssueOfQuest(quest), out var owner);
+        if (!ownerResolver.TryResolveOwnerParty(IssueManager.GetIssueOfQuest(quest), out var owner)) return;
         apply(quest, owner);
     });
 
     private void StartAmbush(Quest quest, MobileParty owner)
     {
         var party = quest._deserterMobileParty;
-        if (party == null || owner == null) return;
+        if (party == null) return;
         // The defenders exist once the ambush has started.
         if (quest._defenderMobileParty != null) return;
 
@@ -106,7 +121,7 @@ internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesert
                 !mapEvent.InvolvedParties.Contains(deserters.Party)) return;
 
             bool? ownerWon = null;
-            if (owner != null && mapEvent.InvolvedParties.Contains(owner.Party))
+            if (mapEvent.InvolvedParties.Contains(owner.Party))
                 ownerWon = mapEvent.WinningSide == owner.Party.Side;
             outcomes.Add(quest, ownerWon);
         });
@@ -146,7 +161,6 @@ internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesert
 
     private void ApplyMapEventStarted(Quest quest, MobileParty owner, MapEvent mapEvent, PartyBase attacker, PartyBase defender)
     {
-        if (owner == null) return;
         var attacksVillageParty = mapEvent.IsFieldBattle && defender.IsMobile &&
             defender.MobileParty.HomeSettlement == quest.QuestSettlement &&
             defender != quest._deserterMobileParty?.Party;
@@ -158,17 +172,14 @@ internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesert
 
     private void ApplySettlementLeft(Quest quest, MobileParty owner, MobileParty party, Settlement settlement)
     {
-        if (owner == null || party != owner || settlement != quest.QuestSettlement) return;
+        if (party != owner || settlement != quest.QuestSettlement) return;
 
         var deserters = quest._deserterMobileParty;
         var raid = settlement.Party.MapEvent;
         var desertersRaidQuestVillage = deserters != null &&
             raid?.IsRaid == true && raid.AttackerSide.LeaderParty == deserters.Party;
-        if (desertersRaidQuestVillage)
-        {
-            quest.ApplyQuestResult(quest._questResultFail2);
-            quest.CompleteQuestWithFail(quest.OnQuestFailed2LogText);
-        }
+        ApplyRaidEnding(quest, ClassifyRaid(desertersRaidQuestVillage, ownerRaid: false,
+            ownerInVillage: false, ownerLeftVillage: true));
 
         if (quest.IsOngoing)
         {
@@ -179,24 +190,40 @@ internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesert
 
     private void ApplyVillageBeingRaided(Quest quest, MobileParty owner, Village village)
     {
-        if (owner == null || village.Settlement != quest.QuestSettlement) return;
+        if (village.Settlement != quest.QuestSettlement) return;
         var attacker = village.Settlement.Party.MapEvent.AttackerSide.LeaderParty;
-        if (attacker == quest._deserterMobileParty?.Party)
+        // Vanilla checks PlayerEncounter. The co-op owner party is the authoritative substitute.
+        ApplyRaidEnding(quest, ClassifyRaid(desertersRaid: attacker == quest._deserterMobileParty?.Party,
+            ownerRaid: attacker == owner.Party, ownerInVillage: owner.CurrentSettlement == village.Settlement,
+            ownerLeftVillage: false));
+    }
+
+    internal static ExtortionRaidEnding ClassifyRaid(bool desertersRaid, bool ownerRaid, bool ownerInVillage,
+        bool ownerLeftVillage)
+    {
+        if (desertersRaid)
+            return ownerInVillage && !ownerLeftVillage ? ExtortionRaidEnding.None : ExtortionRaidEnding.Fail2;
+
+        if (ownerLeftVillage) return ExtortionRaidEnding.None;
+        return ownerRaid ? ExtortionRaidEnding.Fail3 : ExtortionRaidEnding.Cancel;
+    }
+
+    private static void ApplyRaidEnding(Quest quest, ExtortionRaidEnding ending)
+    {
+        switch (ending)
         {
-            // Vanilla checks PlayerEncounter. The co-op owner party is the authoritative substitute.
-            if (owner.CurrentSettlement == village.Settlement) return;
-            quest.ApplyQuestResult(quest._questResultFail2);
-            quest.CompleteQuestWithFail(quest.OnQuestFailed2LogText);
-        }
-        else if (attacker == owner.Party)
-        {
-            quest.ApplyQuestResult(quest._questResultFail3);
-            quest.CompleteQuestWithFail(quest.OnQuestFailed3LogText);
-        }
-        else
-        {
-            // Vanilla applies an all-zero cancel result here. The branch has no consequences to apply.
-            quest.CompleteQuestWithCancel(quest.OnQuestCancel2LogText);
+            case ExtortionRaidEnding.Fail2:
+                quest.ApplyQuestResult(quest._questResultFail2);
+                quest.CompleteQuestWithFail(quest.OnQuestFailed2LogText);
+                break;
+            case ExtortionRaidEnding.Fail3:
+                quest.ApplyQuestResult(quest._questResultFail3);
+                quest.CompleteQuestWithFail(quest.OnQuestFailed3LogText);
+                break;
+            case ExtortionRaidEnding.Cancel:
+                // Vanilla applies an all-zero cancel result here.
+                quest.CompleteQuestWithCancel(quest.OnQuestCancel2LogText);
+                break;
         }
     }
 
@@ -229,7 +256,6 @@ internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesert
             return;
         }
 
-        if (owner == null) return;
         // RunAsOwners selects the hero. A captured owner no longer belongs to the registered party.
         var ownerIsCaptive = Hero.MainHero.PartyBelongedTo != owner;
         if (ownerIsCaptive) return;
@@ -273,21 +299,25 @@ internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesert
     {
         var ownerLostDeserters = deserters.Position.Distance(owner.Position) >
             owner.SeeingRange + Quest.SightOffsetToLoseDeserterParty;
-        if (ownerLostDeserters)
+        var timedOut = !ownerLostDeserters && quest._desertersRunAwayTimeoutTime.IsPast;
+        switch (ClassifyRunAway(ownerLostDeserters, timedOut))
         {
-            quest.ApplyQuestResult(quest._questResultFail1);
-            quest.CompleteQuestWithFail(quest.OnQuestFailed1LogText);
+            case ExtortionRunAwayOutcome.KeepFleeing:
+                quest.HandleDesertersRunningAway();
+                return;
+            case ExtortionRunAwayOutcome.TimedOut:
+                quest.DestroyDeserterParty();
+                break;
         }
-        else if (quest._desertersRunAwayTimeoutTime.IsPast)
-        {
-            quest.DestroyDeserterParty();
-            quest.ApplyQuestResult(quest._questResultFail1);
-            quest.CompleteQuestWithFail(quest.OnQuestFailed1LogText);
-        }
-        else
-        {
-            quest.HandleDesertersRunningAway();
-        }
+
+        quest.ApplyQuestResult(quest._questResultFail1);
+        quest.CompleteQuestWithFail(quest.OnQuestFailed1LogText);
+    }
+
+    internal static ExtortionRunAwayOutcome ClassifyRunAway(bool ownerLostDeserters, bool timedOut)
+    {
+        if (ownerLostDeserters) return ExtortionRunAwayOutcome.LostSight;
+        return timedOut ? ExtortionRunAwayOutcome.TimedOut : ExtortionRunAwayOutcome.KeepFleeing;
     }
 
     private static void SetRaidBehaviorIfNeeded(MobileParty deserters, Settlement settlement)

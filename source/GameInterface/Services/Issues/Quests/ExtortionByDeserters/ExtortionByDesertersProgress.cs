@@ -1,5 +1,4 @@
-﻿using Common;
-using Common.Network;
+﻿using Common.Network;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Quests.ExtortionByDeserters.Messages;
 using GameInterface.Services.ObjectManager;
@@ -36,11 +35,6 @@ internal sealed class ExtortionByDesertersProgress : IExtortionByDesertersProgre
     public void Send(Quest quest, TextObject log = null,
         ExtortionByDesertersNotice notice = ExtortionByDesertersNotice.None)
     {
-        if (ModInformation.IsClient)
-        {
-            return;
-        }
-
         var issue = IssueManager.GetIssueOfQuest(quest);
         if (issue == null || !objects.TryGetIdWithLogging(issue.IssueOwner, out var ownerId) ||
             !owners.TryGetOwnerControllerId(issue, out var controllerId) ||

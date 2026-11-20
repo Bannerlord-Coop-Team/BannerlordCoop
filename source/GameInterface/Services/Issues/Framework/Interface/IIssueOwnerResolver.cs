@@ -9,7 +9,8 @@ public interface IIssueOwnerResolver
     // The hero of the player that owns the issue, fails when nobody owns it yet
     bool TryResolveOwnerHero(IssueBase issue, out Hero ownerHero);
 
-    // The registered party remains addressable while the owner is captive.
+    // The registered party of the player who owns the issue, including while the hero is captive.
+    // Fails if the issue has no owning player or the player's party cannot be resolved.
     bool TryResolveOwnerParty(IssueBase issue, out MobileParty ownerParty);
 
     // The controller id of the player that owns the issue, fails when nobody is known to own it

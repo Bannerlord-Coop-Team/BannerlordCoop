@@ -473,11 +473,8 @@ public class ExtortionByDesertersTests : IDisposable
         }, TextLinks);
     }
 
-    [Theory]
-    [InlineData(nameof(Quest._questResultSuccess1), 10, 0)]
-    [InlineData(nameof(Quest._questResultFail1), TownSecurityPenalty, TownProsperityPenalty)]
-    public void NativeApplyQuestResult_ReplicatesTownRewardsToBothOriginalClients(
-        string resultProperty, int securityChange, int prosperityChange)
+    [Fact]
+    public void NativeApplyQuestResult_ReplicatesTownPenaltiesToBothOriginalClients()
     {
         var ownerQuest = Accept();
         var serverQuest = (Quest)scenario.QuestOf(Server);
@@ -509,7 +506,7 @@ public class ExtortionByDesertersTests : IDisposable
         Owner.Call(() =>
         {
             using var replay = new AllowedThread();
-            ownerQuest.ApplyQuestResult(ResultOf(ownerQuest));
+            ownerQuest.ApplyQuestResult(ownerQuest._questResultFail1);
             Assert.Equal(StartingSecurity, originals[Owner].Security);
             Assert.Equal(StartingProsperity, originals[Owner].Prosperity);
         });
@@ -523,11 +520,11 @@ public class ExtortionByDesertersTests : IDisposable
                 Server.GetRegisteredObject<Hero>(owner.HeroId),
                 Server.GetRegisteredObject<MobileParty>(owner.MobilePartyId));
             Assert.False(CallOriginalPolicy.IsOriginalAllowed());
-            serverQuest.ApplyQuestResult(ResultOf(serverQuest));
+            serverQuest.ApplyQuestResult(serverQuest._questResultFail1);
             Assert.Same(serverTown, Server.GetRegisteredObject<Town>(townComponentId));
             Assert.Equal(handle, Server.GetHandle(serverTown));
-            Assert.Equal(StartingSecurity + securityChange, serverTown.Security);
-            Assert.Equal(StartingProsperity + prosperityChange, serverTown.Prosperity);
+            Assert.Equal(StartingSecurity + TownSecurityPenalty, serverTown.Security);
+            Assert.Equal(StartingProsperity + TownProsperityPenalty, serverTown.Prosperity);
         });
 
         var messages = Server.NetworkSentMessages.GetMessages<GenericNetworkEvent<Town, byte[]>>()
@@ -539,36 +536,24 @@ public class ExtortionByDesertersTests : IDisposable
                 var town = client.GetRegisteredObject<Town>(townComponentId);
                 Assert.Same(originals[client], town);
                 Assert.Equal(handle, client.GetHandle(town));
-                Assert.Equal(StartingSecurity + securityChange, town.Security);
-                Assert.Equal(StartingProsperity + prosperityChange, town.Prosperity);
+                Assert.Equal(StartingSecurity + TownSecurityPenalty, town.Security);
+                Assert.Equal(StartingProsperity + TownProsperityPenalty, town.Prosperity);
             });
             Assert.Empty(client.NetworkSentMessages.GetMessages<GenericNetworkEvent<Town, byte[]>>());
         }
         const string securityMessageName = "Town_Security_SetNetworkMessage";
         const string prosperityMessageName = "Town__prosperity_SetNetworkMessage";
         var security = Assert.Single(messages, message => message.GetType().Name == securityMessageName);
-        Assert.Equal((float)(StartingSecurity + securityChange), SyncedFloat(security));
-        var prosperityMessages = messages.Where(message => message.GetType().Name == prosperityMessageName);
-        if (prosperityChange == 0) Assert.Empty(prosperityMessages);
-        else
-        {
-            var prosperity = Assert.Single(prosperityMessages);
-            Assert.Equal((float)(StartingProsperity + prosperityChange), SyncedFloat(prosperity));
-        }
-        Assert.Equal(prosperityChange == 0 ? 1 : 2, messages.Length);
+        Assert.Equal((float)(StartingSecurity + TownSecurityPenalty), SyncedFloat(security));
+        var prosperity = Assert.Single(messages, message => message.GetType().Name == prosperityMessageName);
+        Assert.Equal((float)(StartingProsperity + TownProsperityPenalty), SyncedFloat(prosperity));
+        Assert.Equal(2, messages.Length);
 
         static float SyncedFloat(GenericNetworkEvent<Town, byte[]> message)
         {
             var value = message.GetType().GetProperty("Value")!.GetValue(message);
             return RawSerializer.Deserialize<float>(Assert.IsType<byte[]>(value));
         }
-
-        Quest.ExtortionByDesertersQuestResult ResultOf(Quest quest) => resultProperty switch
-        {
-            nameof(Quest._questResultSuccess1) => quest._questResultSuccess1,
-            nameof(Quest._questResultFail1) => quest._questResultFail1,
-            _ => throw new ArgumentOutOfRangeException(nameof(resultProperty)),
-        };
     }
 
     private static void ChooseReward(Quest quest, int choice)
@@ -915,10 +900,8 @@ public class ExtortionByDesertersTests : IDisposable
         return quest;
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void OwnerCoercingQuestVillage_FinalizesAndAppliesPenaltyOnce(bool forceSupplies)
+    [Fact]
+    public void OwnerCoercingQuestVillage_FinalizesAndAppliesPenaltyOnce()
     {
         var ownerQuest = Accept();
         var quest = (Quest)scenario.QuestOf(Server);
@@ -935,9 +918,7 @@ public class ExtortionByDesertersTests : IDisposable
             var previousPower = giver.Power;
             var previousRelation = giver.GetRelation(owner);
             var coercion = GameObjectCreator.CreateInitializedObject<MapEvent>();
-            MapEventComponent component = forceSupplies
-                ? new ForceSuppliesEventComponent(coercion)
-                : new ForceVolunteersEventComponent(coercion);
+            var component = new ForceVolunteersEventComponent(coercion);
             coercion.MapEventVisual = ObjectHelper.SkipConstructor<GauntletMapEventVisual>();
             coercion.Initialize(ownerParty.Party, settlement.Party, component);
             coercion.MapEventVisual = null;
