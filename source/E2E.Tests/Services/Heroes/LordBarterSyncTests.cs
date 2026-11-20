@@ -1066,7 +1066,7 @@ public class LordBarterSyncTests : MapEventTestBase
             TestEnvironment.FlushCoalescer();
 
             var result = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkLordBarterResult>());
-            Assert.Equal(accepted, result.Accepted);
+            Assert.True(result.Accepted == accepted, result.Reason);
             if (!accepted)
                 Assert.Contains("already has the most clans this server allows (2)", result.Reason);
 
