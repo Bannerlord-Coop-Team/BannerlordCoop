@@ -1463,12 +1463,12 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         hasArrived = false;
         if (machine is BatteringRam ram)
         {
-            moveDistance = ram.MovementComponent._pathTracker.TotalDistanceTraveled;
+            moveDistance = ram.MovementComponent.GetTotalDistanceTraveledForPathTracker();
             hasArrived = ram.HasArrivedAtTarget;
         }
         else if (machine is SiegeTower tower)
         {
-            moveDistance = tower.MovementComponent._pathTracker.TotalDistanceTraveled;
+            moveDistance = tower.MovementComponent.GetTotalDistanceTraveledForPathTracker();
             hasArrived = tower.HasArrivedAtTarget;
         }
     }

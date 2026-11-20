@@ -36,7 +36,6 @@ public class SiegeMachineSimulationTests : IDisposable
     private static int ramDisableCalls;
     private static float ramDistanceError;
     private static bool ramSnappedBeforeDestruction;
-    private static float capturedHostDistance;
 
     public SiegeMachineSimulationTests()
     {
@@ -108,7 +107,8 @@ public class SiegeMachineSimulationTests : IDisposable
         var hostMessages = new List<IMessage>();
         var joinerMessages = new List<IMessage>();
         using var host = CreateReplica("host", true, 5, broker, hostMessages, joinerMessages);
-        StubReadState(trackerDistance: 12.4f);
+        ramTrackerDistance = 12.4f;
+        StubRamSnap();
 
         bool previousHost = SiegeMissionAuthorityGate.IsLocalAuthority;
         try
@@ -158,7 +158,6 @@ public class SiegeMachineSimulationTests : IDisposable
         using var peer = CreateReplica("peer", false, hostEpoch, peerBroker, new List<IMessage>());
         ResetRamStubState();
         StubRamSnap();
-        StubReadState(hostDistance);
 
         bool previousHost = SiegeMissionAuthorityGate.IsLocalAuthority;
         bool previousKnown = SiegeMissionAuthorityGate.IsAuthorityKnown;
@@ -655,12 +654,6 @@ public class SiegeMachineSimulationTests : IDisposable
         ramSnappedBeforeDestruction = false;
     }
 
-    private void StubReadState(float trackerDistance)
-    {
-        capturedHostDistance = trackerDistance;
-        Stub(AccessTools.Method(typeof(SiegeMachineStateReplicator), "ReadState"), nameof(ReadDestructionState));
-    }
-
 #pragma warning disable SYSLIB0050
     private static T Uninitialized<T>() => (T)FormatterServices.GetUninitializedObject(typeof(T));
 #pragma warning restore SYSLIB0050
@@ -718,23 +711,6 @@ public class SiegeMachineSimulationTests : IDisposable
     private static bool RamMovementArrived(ref bool __result) { __result = ramMovementArrived; return false; }
     private static bool RamDistance(ref float __result) { __result = 0f; return false; }
     private static bool RamTrackerDistance(ref float __result) { __result = ramTrackerDistance; return false; }
-    private static bool ReadDestructionState(UsableMachine machine, ref float hitPoints, ref int destructionState,
-        ref int gateState, ref int ladderState, ref float moveDistance, ref bool hasArrived, ref int weaponState,
-        ref float aimDirection, ref float aimReleaseAngle, ref int stoneAmmo)
-    {
-        hitPoints = machine.DestructionComponent.HitPoint;
-        destructionState = (int)AccessTools.Field(typeof(DestructableComponent), "_currentStateIndex")
-            .GetValue(machine.DestructionComponent);
-        gateState = -1;
-        ladderState = -1;
-        moveDistance = capturedHostDistance;
-        hasArrived = false;
-        weaponState = -1;
-        aimDirection = -1000f;
-        aimReleaseAngle = -1000f;
-        stoneAmmo = -1;
-        return false;
-    }
     private static bool RamSetDistance(float __0) { ramTrackerDistance = __0; return false; }
     private static bool RamResetDistanceError(float __0)
     {
