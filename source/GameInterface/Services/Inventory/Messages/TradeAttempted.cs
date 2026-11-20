@@ -27,6 +27,7 @@ public readonly struct TradeAttempted : IEvent
     public readonly List<(ItemRosterElement, int)> SoldItems;
     public readonly string ForceTransferId;
     public readonly ItemRosterElement[] InitialPlayerRoster;
+    public readonly Dictionary<CharacterObject, Equipment[]> InitialPartyEquipment;
 
     public TradeAttempted(
         ItemRoster fromRoster,
@@ -44,7 +45,8 @@ public readonly struct TradeAttempted : IEvent
         List<(ItemRosterElement, int)> boughtItems,
         List<(ItemRosterElement, int)> soldItems,
         string forceTransferId = null,
-        ItemRosterElement[] initialPlayerRoster = null)
+        ItemRosterElement[] initialPlayerRoster = null,
+        Dictionary<CharacterObject, Equipment[]> initialPartyEquipment = null)
     {
         FromRoster = fromRoster;
         ToRoster = toRoster;
@@ -62,5 +64,6 @@ public readonly struct TradeAttempted : IEvent
         SoldItems = soldItems;
         ForceTransferId = forceTransferId;
         InitialPlayerRoster = initialPlayerRoster;
+        InitialPartyEquipment = initialPartyEquipment;
     }
 }

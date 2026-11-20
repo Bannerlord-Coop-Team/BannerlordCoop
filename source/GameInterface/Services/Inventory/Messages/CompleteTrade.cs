@@ -55,6 +55,8 @@ internal readonly struct CompleteTrade : ICommand
     // SoldItems holds the left side for the discard XP when CanGainXpFromDiscarding, so the screen's own sales ride here
     [ProtoMember(22)]
     public readonly (ItemRosterElementData, int)[] TransactionSoldItems;
+    [ProtoMember(23)]
+    public readonly Dictionary<string, EquipmentData[]> InitialCharacterIdEquipmentsData;
 
     public CompleteTrade(
         string fromItemRosterId,
@@ -78,7 +80,8 @@ internal readonly struct CompleteTrade : ICommand
         (ItemRosterElementData, int)[] soldItems,
         string forceTransferId = null,
         ItemRosterElement[] initialPlayerRoster = null,
-        (ItemRosterElementData, int)[] transactionSoldItems = null)
+        (ItemRosterElementData, int)[] transactionSoldItems = null,
+        Dictionary<string, EquipmentData[]> initialCharacterIdEquipmentsData = null)
     {
         FromItemRosterId = fromItemRosterId;
         IsFromItemRosterNull = isFromItemRosterNull;
@@ -102,5 +105,6 @@ internal readonly struct CompleteTrade : ICommand
         ForceTransferId = forceTransferId;
         InitialPlayerRoster = initialPlayerRoster;
         TransactionSoldItems = transactionSoldItems;
+        InitialCharacterIdEquipmentsData = initialCharacterIdEquipmentsData;
     }
 }
