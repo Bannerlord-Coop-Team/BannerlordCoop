@@ -27,24 +27,28 @@ internal class ExtortionByDesertersWorldPatches
 
     [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.FinalizeEventAux))]
     [HarmonyPrefix]
-    private static void FinalizeEventPrefix(MapEvent __instance, out List<Quest> __state)
+    private static void FinalizeEventPrefix(MapEvent __instance, bool __runOriginal, out Dictionary<Quest, bool?> __state)
     {
-        var affected = new List<Quest>();
+        __state = null;
+        if (ModInformation.IsClient || !__runOriginal || __instance.IsFinalized) return;
+
+        // Finalization clears the parties and their sides before the outcome is applied.
+        var outcomes = new Dictionary<Quest, bool?>();
         Run((service, quest) =>
         {
-            if (service.IsDeserterBattle(quest, __instance)) affected.Add(quest);
+            if (service.TryCaptureBattleOutcome(quest, __instance, out var ownerWon)) outcomes.Add(quest, ownerWon);
         });
-        __state = affected;
+        __state = outcomes;
     }
 
     [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.FinalizeEventAux))]
     [HarmonyPostfix]
-    private static void FinalizeEventPostfix(List<Quest> __state)
+    private static void FinalizeEventPostfix(MapEvent __instance, bool __runOriginal, Dictionary<Quest, bool?> __state)
     {
-        if (__state == null || __state.Count == 0) return;
+        if (!__runOriginal || !__instance.IsFinalized || __state == null || __state.Count == 0) return;
         Run((service, quest) =>
         {
-            if (__state.Contains(quest)) service.ApplyBattleFinalized(quest);
+            if (__state.TryGetValue(quest, out var ownerWon)) service.ApplyBattleFinalized(quest, ownerWon);
         });
     }
 
@@ -87,14 +91,9 @@ internal class ExtortionByDesertersWorldPatches
     private static void RaidPostfix(Village village) =>
         Run((service, quest) => service.ApplyVillageBeingRaided(quest, village));
 
-    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnMapEventEnded))]
-    [HarmonyPostfix]
-    private static void MapEndedPostfix(MapEvent mapEvent) =>
-        Run((service, quest) => service.ApplyMapEventEnded(quest, mapEvent));
-
     [HarmonyPatch(typeof(Quest), nameof(Quest.MapEventEnded))]
     [HarmonyPrefix]
-    // ApplyMapEventEnded records the outcome in the owner's context.
+    // FinalizeEventAux applies the outcome after clearing the battle sides.
     private static bool MapEventEndedPrefix() => false;
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnVillageBeingRaided))]

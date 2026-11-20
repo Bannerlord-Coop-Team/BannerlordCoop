@@ -9,7 +9,7 @@ internal enum ExtortionByDesertersNotice : byte
     None = 0,
     DesertersNoticedPlayer = 1,
     PlayerLeftVillage = 2,
-    Ambush = 4,
+    Ambush = 3,
 }
 
 /// <summary>Owner-only quest progress, sent after the referenced world objects.</summary>

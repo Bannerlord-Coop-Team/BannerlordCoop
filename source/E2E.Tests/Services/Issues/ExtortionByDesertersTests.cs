@@ -54,6 +54,8 @@ public class ExtortionByDesertersTests : IDisposable
         AccessTools.PropertyGetter(typeof(Hero), nameof(Hero.EncyclopediaLinkWithName)),
     };
     private const int GiverPowerPenalty = -10;
+    private const int StartingSecurity = 40;
+    private const int StartingProsperity = 200;
     private const int TownSecurityPenalty = -10;
     private const int TownProsperityPenalty = -50;
     private const int NotableReplacementPowerLimit = 100;
@@ -522,8 +524,8 @@ public class ExtortionByDesertersTests : IDisposable
         Server.Call(() =>
         {
             serverTown = Server.GetRegisteredObject<Town>(townComponentId);
-            serverTown.Security = 40;
-            serverTown.Prosperity = 200;
+            serverTown.Security = StartingSecurity;
+            serverTown.Prosperity = StartingProsperity;
             handle = Server.GetHandle(serverTown);
         });
         var originals = new Dictionary<EnvironmentInstance, Town>();
@@ -533,8 +535,8 @@ public class ExtortionByDesertersTests : IDisposable
             {
                 var town = client.GetRegisteredObject<Town>(townComponentId);
                 Assert.Equal(handle, client.GetHandle(town));
-                Assert.Equal(40, town.Security);
-                Assert.Equal(200, town.Prosperity);
+                Assert.Equal(StartingSecurity, town.Security);
+                Assert.Equal(StartingProsperity, town.Prosperity);
                 originals.Add(client, town);
             });
             client.NetworkSentMessages.Clear();
@@ -546,8 +548,8 @@ public class ExtortionByDesertersTests : IDisposable
         {
             using var replay = new AllowedThread();
             ownerQuest.ApplyQuestResult(ResultOf(ownerQuest));
-            Assert.Equal(40, originals[Owner].Security);
-            Assert.Equal(200, originals[Owner].Prosperity);
+            Assert.Equal(StartingSecurity, originals[Owner].Security);
+            Assert.Equal(StartingProsperity, originals[Owner].Prosperity);
         });
         Assert.Empty(Owner.NetworkSentMessages.GetMessages<GenericNetworkEvent<Town, byte[]>>());
         Assert.Empty(Server.NetworkSentMessages.GetMessages<GenericNetworkEvent<Town, byte[]>>());
@@ -562,8 +564,8 @@ public class ExtortionByDesertersTests : IDisposable
             serverQuest.ApplyQuestResult(ResultOf(serverQuest));
             Assert.Same(serverTown, Server.GetRegisteredObject<Town>(townComponentId));
             Assert.Equal(handle, Server.GetHandle(serverTown));
-            Assert.Equal(40 + securityChange, serverTown.Security);
-            Assert.Equal(200 + prosperityChange, serverTown.Prosperity);
+            Assert.Equal(StartingSecurity + securityChange, serverTown.Security);
+            Assert.Equal(StartingProsperity + prosperityChange, serverTown.Prosperity);
         });
 
         var messages = Server.NetworkSentMessages.GetMessages<GenericNetworkEvent<Town, byte[]>>()
@@ -575,21 +577,21 @@ public class ExtortionByDesertersTests : IDisposable
                 var town = client.GetRegisteredObject<Town>(townComponentId);
                 Assert.Same(originals[client], town);
                 Assert.Equal(handle, client.GetHandle(town));
-                Assert.Equal(40 + securityChange, town.Security);
-                Assert.Equal(200 + prosperityChange, town.Prosperity);
+                Assert.Equal(StartingSecurity + securityChange, town.Security);
+                Assert.Equal(StartingProsperity + prosperityChange, town.Prosperity);
             });
             Assert.Empty(client.NetworkSentMessages.GetMessages<GenericNetworkEvent<Town, byte[]>>());
         }
         const string securityMessageName = "Town_Security_SetNetworkMessage";
         const string prosperityMessageName = "Town__prosperity_SetNetworkMessage";
         var security = Assert.Single(messages, message => message.GetType().Name == securityMessageName);
-        Assert.Equal((float)(40 + securityChange), SyncedFloat(security));
+        Assert.Equal((float)(StartingSecurity + securityChange), SyncedFloat(security));
         var prosperityMessages = messages.Where(message => message.GetType().Name == prosperityMessageName);
         if (prosperityChange == 0) Assert.Empty(prosperityMessages);
         else
         {
             var prosperity = Assert.Single(prosperityMessages);
-            Assert.Equal((float)(200 + prosperityChange), SyncedFloat(prosperity));
+            Assert.Equal((float)(StartingProsperity + prosperityChange), SyncedFloat(prosperity));
         }
         Assert.Equal(prosperityChange == 0 ? 1 : 2, messages.Length);
 
@@ -1329,7 +1331,7 @@ public class ExtortionByDesertersTests : IDisposable
             Assert.True(ownership.TryGetOwner(secondId, "second_deserters", out var secondOwner));
             Assert.Equal(QuestScenario.ControllerB, secondOwner);
             log = Assert.Single(quest.JournalEntries).LogText.Value;
-            Assert.Contains("died", log);
+            Assert.StartsWith("{=rTvWdMXF}", log);
         }, TextLinks);
         Assert.Equal(IssueOutcome.QuestCancel,
             Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);

@@ -28,7 +28,7 @@ public class ExtortionByDesertersStateTests
         Assert.Equal("defenders", received.DefenderId);
         Assert.Equal(2, received.State);
         Assert.Equal("{=!}quest progress", received.Log.Value);
-        Assert.Equal((byte)ExtortionByDesertersNotice.Ambush, received.Notice);
+        Assert.Equal((byte)3, received.Notice);
     }
 
     [Fact]
