@@ -172,10 +172,27 @@ internal class PlayerCaptivityServerHandler : IHandler
         if (playerParty.LeaderHero != null)
             playerParty.ChangePartyLeader(null);
 
-        // Same as vanilla PlayerCaptivityCampaignBehavior.OnPrisonerTaken
-        var executer = payload.What.CapturerParty?.LeaderHero;
-        if (executer != null && !executer.IsPlayerHero() && executer.GetRelation(hero) < -30f && MBRandom.RandomFloat <= 0.02f)
+        RollPlayerExecution(hero, payload.What.CapturerParty);
+    }
+
+    private void RollPlayerExecution(Hero hero, PartyBase captor)
+    {
+        var executer = captor?.LeaderHero;
+        if (executer == null || executer.IsPlayerHero()) return;
+
+        int mercy = executer.GetTraitLevel(DefaultTraits.Mercy);
+        // Against the captured player's clan instead of vanilla's Clan.PlayerClan
+        int relation = executer.Clan.GetRelationWithClan(hero.Clan);
+        if (MBRandom.RandomFloat <= PlayerExecutionChance(mercy, relation))
             pendingExecutions[hero] = executer;
+    }
+
+    // Vanilla ExecutionCampaignBehavior.CalculatePlayerExecutionProbability, its blood feud case comes with #3851
+    private static float PlayerExecutionChance(int mercy, int relation)
+    {
+        if (relation >= (mercy * 10) - 50) return 0f;
+
+        return Math.Max(((-relation * 0.3f) - (mercy * 5f)) * 0.01f, 0f);
     }
 
     // Same release the client's PlayerEncounter.Finish would send through NetworkConversationEnded
