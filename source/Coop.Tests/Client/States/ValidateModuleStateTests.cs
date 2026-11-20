@@ -120,7 +120,7 @@ namespace Coop.Tests.Client.States
             Assert.Contains("Update the co-op mod on both sides", popup.Text);
         }
 
-        // The same build string can come from a build without TESTER or CoopNavalDlc, or with the naval assemblies deleted.
+        // The same build string can come from a build without CoopNavalDlc, or with the naval assemblies deleted.
         [Fact]
         public void NetworkModuleVersionsValidated_NavalIncapableClient_RefusesWithTheReason()
         {
