@@ -39,6 +39,10 @@ Use a server and a client. All commands are `coop.debug.issues.*`.
   replayed, not that a success pays out.
 - `army_needs_supplies.setup <controller_id>` (server) gets a player ready to take Army Needs Supplies from
   Rhagaea, and `army_needs_supplies.stock` (server) tops up the owner's party with what the quest asks for.
+- `nearby_bandit_base.setup <controller_id>` (server) gives the headman of the first village bound to Danustica
+  Nearby Bandit Base with the nearest infested hideout and teleports the player to the village.
+  `nearby_bandit_base.ai_guard <headman id> [controller_id]` (server) prints whether an AI lord may solve it, and
+  with a controller id first takes that player prisoner into the hideout.
 - `the_conquest_of_settlement.setup <controller_id>` (server) puts a player in a ruler's kingdom, gives the ruler
   The Conquest of Settlement and counts the player as having talked to them. `the_conquest_of_settlement.accept
   <ruler id>` (that player's client) then accepts it like the dialog does, and `the_conquest_of_settlement.state
