@@ -52,8 +52,6 @@ internal class ExtortionByDesertersWorldPatches
     [HarmonyPostfix]
     private static void MapStartedPostfix(MapEvent mapEvent, PartyBase attackerParty, PartyBase defenderParty)
     {
-        // QuestWorldEventRelayPatches runs vanilla for coercion. This postfix handles attacks on village parties.
-        if (mapEvent.IsForcingSupplies || mapEvent.IsForcingVolunteers) return;
         if (ContainerProvider.TryResolve<IExtortionByDesertersWorldEventService>(out var service))
             service.MapEventStarted(mapEvent, attackerParty, defenderParty);
     }

@@ -189,29 +189,6 @@ public class ExtortionByDesertersTests : IDisposable
         });
     }
 
-    [Fact]
-    public void ClientDailyTick_LeavesStayAliveChecksToTheServer()
-    {
-        using var stayAliveChecks = new MethodCallRecorder(Priority.First, true,
-            AccessTools.Method(typeof(Issue), nameof(Issue.IssueStayAliveConditions)));
-        Other.Call(() =>
-        {
-            var notable = Other.GetRegisteredObject<Hero>(scenario.NotableId);
-            var town = Other.GetRegisteredObject<Town>(townComponentId);
-            var issue = notable.Issue;
-            Assert.True(issue.IsOngoingWithoutQuest);
-            using (new AllowedThread())
-            {
-                town.Security = 90;
-            }
-
-            Campaign.Current.IssueManager.DailyTick();
-
-            Assert.Equal(0, stayAliveChecks.CountFor(Other));
-            Assert.Same(issue, notable.Issue);
-        });
-    }
-
     public enum RaidAttacker
     {
         Deserters,

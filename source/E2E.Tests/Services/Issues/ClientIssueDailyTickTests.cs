@@ -1,7 +1,9 @@
 ﻿using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
+using E2E.Tests.Util;
 using GameInterface.Services.Issues.Framework.Interface;
+using HarmonyLib;
 using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
@@ -27,6 +29,30 @@ public class ClientIssueDailyTickTests : IDisposable
     public void Dispose()
     {
         TestEnvironment.Dispose();
+    }
+
+    [Fact]
+    public void TheClientDailyTickLeavesStayAliveChecksToTheServer()
+    {
+        var client = scenario.ClientA;
+        using var preconditions = new StubIssuePreconditions(QuestScenario.IssueType);
+        preconditions.FailStayAlive(client);
+        using var stayAliveChecks = new MethodCallRecorder(Priority.First, true,
+            AccessTools.Method(QuestScenario.IssueType, nameof(IssueBase.IssueStayAliveConditions)));
+
+        client.Call(() =>
+        {
+            var notable = client.GetRegisteredObject<Hero>(scenario.NotableId);
+            var issue = notable.Issue;
+            Assert.True(issue.IsOngoingWithoutQuest);
+            Assert.False(issue.IssueStayAliveConditions());
+            stayAliveChecks.Clear();
+
+            Campaign.Current.IssueManager.DailyTick();
+
+            Assert.Equal(0, stayAliveChecks.CountFor(client));
+            Assert.Same(issue, notable.Issue);
+        });
     }
 
     // Another player's troops mission is only marked as taken on this client, it has no journal here

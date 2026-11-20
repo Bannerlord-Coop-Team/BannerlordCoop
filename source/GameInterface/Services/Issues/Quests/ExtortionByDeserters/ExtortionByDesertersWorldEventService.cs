@@ -178,8 +178,10 @@ internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesert
         var raid = settlement.Party.MapEvent;
         var desertersRaidQuestVillage = deserters != null &&
             raid?.IsRaid == true && raid.AttackerSide.LeaderParty == deserters.Party;
-        ApplyRaidEnding(quest, ClassifyRaid(desertersRaidQuestVillage, ownerRaid: false,
-            ownerInVillage: false, ownerLeftVillage: true));
+        if (desertersRaidQuestVillage)
+        {
+            ApplyRaidEnding(quest, ExtortionRaidEnding.Fail2);
+        }
 
         if (quest.IsOngoing)
         {
@@ -194,17 +196,14 @@ internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesert
         var attacker = village.Settlement.Party.MapEvent.AttackerSide.LeaderParty;
         // Vanilla checks PlayerEncounter. The co-op owner party is the authoritative substitute.
         ApplyRaidEnding(quest, ClassifyRaid(desertersRaid: attacker == quest._deserterMobileParty?.Party,
-            ownerRaid: attacker == owner.Party, ownerInVillage: owner.CurrentSettlement == village.Settlement,
-            ownerLeftVillage: false));
+            ownerRaid: attacker == owner.Party, ownerInVillage: owner.CurrentSettlement == village.Settlement));
     }
 
-    internal static ExtortionRaidEnding ClassifyRaid(bool desertersRaid, bool ownerRaid, bool ownerInVillage,
-        bool ownerLeftVillage)
+    internal static ExtortionRaidEnding ClassifyRaid(bool desertersRaid, bool ownerRaid, bool ownerInVillage)
     {
         if (desertersRaid)
-            return ownerInVillage && !ownerLeftVillage ? ExtortionRaidEnding.None : ExtortionRaidEnding.Fail2;
+            return ownerInVillage ? ExtortionRaidEnding.None : ExtortionRaidEnding.Fail2;
 
-        if (ownerLeftVillage) return ExtortionRaidEnding.None;
         return ownerRaid ? ExtortionRaidEnding.Fail3 : ExtortionRaidEnding.Cancel;
     }
 
@@ -299,12 +298,14 @@ internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesert
     {
         var ownerLostDeserters = deserters.Position.Distance(owner.Position) >
             owner.SeeingRange + Quest.SightOffsetToLoseDeserterParty;
-        var timedOut = !ownerLostDeserters && quest._desertersRunAwayTimeoutTime.IsPast;
+        var timedOut = quest._desertersRunAwayTimeoutTime.IsPast;
         switch (ClassifyRunAway(ownerLostDeserters, timedOut))
         {
             case ExtortionRunAwayOutcome.KeepFleeing:
                 quest.HandleDesertersRunningAway();
                 return;
+            case ExtortionRunAwayOutcome.LostSight:
+                break;
             case ExtortionRunAwayOutcome.TimedOut:
                 quest.DestroyDeserterParty();
                 break;
