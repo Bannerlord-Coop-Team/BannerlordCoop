@@ -1,18 +1,19 @@
+using Common.Util;
 using HarmonyLib;
-using System.Reflection;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.GameState;
+using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.Core;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.MapEvents;
 
 /// <summary>
-/// The join encounter options ("Help the attackers" / "Help the defenders") can be refreshed on a client while
-/// its encounter is still being set up and has no encountered party yet. Native and coop both read
-/// <c>PlayerEncounter.EncounteredBattle</c> there, which dereferences that party, so the refresh must refuse the
-/// option instead of throwing out of the menu.
+/// The join encounter options ("Help the attackers" / "Help the defenders") can be refreshed on a client before
+/// the server has set the battle up there, with no encountered party or a side with no leader party yet. Native
+/// <c>PlayerEncounter.EncounteredBattle</c> and the leader reads throw then, so the refresh must refuse the option.
 /// </summary>
 public class EncounterJoinOptionTests : MapEventTestBase
 {
@@ -41,56 +42,29 @@ public class EncounterJoinOptionTests : MapEventTestBase
         }, MapEventDisabledMethods);
     }
 
-    /// <summary>The finalizer only absorbs the null reference of an encounter that is not set up yet; any other
-    /// failure in the join condition still surfaces.</summary>
-    [Fact]
-    public void JoinCondition_OtherExceptions_StillSurface()
+    /// <summary>A client's map event sides and their leader parties arrive after the battle itself, and vanilla
+    /// reads the leader of the side not being joined.</summary>
+    [Theory]
+    [InlineData(HelpAttackersCondition, BattleSideEnum.Defender)]
+    [InlineData(HelpDefendersCondition, BattleSideEnum.Attacker)]
+    public void JoinCondition_BeforeLeaderPartyArrives_IsRefusedInsteadOfThrowing(string conditionName, BattleSideEnum unsetSide)
     {
         var client = Clients.First();
         var ctx = CreateServerMapEvent();
-        SetMockPlayerEncounter(client, ctx.AttackerPartyId, ctx.MapEventId);
-
-        var condition = AccessTools.Method(typeof(EncounterGameMenuBehavior), HelpAttackersCondition);
-        var harmony = new Harmony(nameof(JoinCondition_OtherExceptions_StillSurface));
-        harmony.Patch(condition, prefix: new HarmonyMethod(typeof(EncounterJoinOptionTests), nameof(ThrowUnrelated)) { priority = Priority.First });
-        try
-        {
-            client.Call(() =>
-            {
-                var error = Assert.Throws<TargetInvocationException>(() => InvokeJoinCondition(HelpAttackersCondition));
-                Assert.IsType<InvalidOperationException>(error.InnerException);
-            }, MapEventDisabledMethods);
-        }
-        finally
-        {
-            harmony.UnpatchAll(harmony.Id);
-        }
-    }
-
-    private static bool ThrowUnrelated() => throw new InvalidOperationException("unrelated condition failure");
-
-    [Theory]
-    [InlineData(HelpAttackersCondition)]
-    [InlineData(HelpDefendersCondition)]
-    public void RaidJoinPostfix_BeforeEncounteredPartyIsSet_LeavesOptionUnchanged(string conditionName)
-    {
-        var client = Clients.First();
-        SetMockPlayerEncounter(client);
+        SetMockPlayerEncounter(client, ctx.AttackerPartyId);
 
         client.Call(() =>
         {
-            var originalMethod = AccessTools.Method(typeof(EncounterGameMenuBehavior), conditionName);
-            var patchType = AccessTools.TypeByName("GameInterface.Services.MapEvents.Patches.RaidJoinEncounterConditionPatch");
-            var postfix = AccessTools.Method(patchType, "Postfix");
-            Assert.NotNull(originalMethod);
-            Assert.NotNull(postfix);
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(ctx.MapEventId, out var mapEvent));
+            Assert.Same(mapEvent, PlayerEncounter.EncounteredBattle);
+            using (new AllowedThread())
+                mapEvent.GetMapEventSide(unsetSide).LeaderParty = null;
 
-            var args = new MenuCallbackArgs((MenuContext)null, null) { IsEnabled = true };
-            var invocationArgs = new object[] { originalMethod, args, true };
-            postfix.Invoke(null, invocationArgs);
+            var (shown, args) = InvokeJoinCondition(conditionName);
 
-            Assert.True((bool)invocationArgs[2]);
-            Assert.True(args.IsEnabled);
+            Assert.False(shown);
+            Assert.False(args.IsEnabled);
+            Assert.Equal("Waiting for the server to set up the battle.", args.Tooltip?.ToString());
         }, MapEventDisabledMethods);
     }
 
