@@ -27,7 +27,8 @@ public class ServerTelemetryReporterTests
             sessionCancellation,
             TimeSpan.FromMilliseconds(20),
             () => startedAt,
-            () => "41fa0000000000000000000000000000");
+            () => "41fa0000000000000000000000000000",
+            () => "server-identity");
 
         messageBroker.Publish(this, new ConnectedPlayersChanged(5));
         await Task.Delay(60);
@@ -42,6 +43,7 @@ public class ServerTelemetryReporterTests
         Assert.All(statuses, status =>
         {
             Assert.Equal("41fa0000000000000000000000000000", status.SessionId);
+            Assert.Equal("server-identity", status.ServerId);
             Assert.Equal(ModInformation.Version.ToString(), status.ModVersion);
             Assert.Equal(ModInformation.Commit, status.Commit);
             Assert.Equal(startedAt, status.StartedAt);

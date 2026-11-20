@@ -27,10 +27,12 @@ public class ServerTelemetryReporter : IServerTelemetryReporter
     private readonly CancellationTokenSource cancellation;
     private readonly Func<DateTime> getUtcNow;
     private readonly Func<string> createSessionId;
+    private readonly Func<string> createServerId;
     private readonly object reportGate = new object();
     private readonly Timer reportTimer;
 
     private string sessionId;
+    private string serverId;
     private DateTime startedAt;
     private int playerCount;
     private bool started;
@@ -39,6 +41,7 @@ public class ServerTelemetryReporter : IServerTelemetryReporter
     public ServerTelemetryReporter(
         IMessageBroker messageBroker,
         IServerTelemetryUploader uploader,
+        IServerTelemetryIdentity identity,
         CancellationTokenSource sessionCancellation)
         : this(
             messageBroker,
@@ -46,7 +49,8 @@ public class ServerTelemetryReporter : IServerTelemetryReporter
             sessionCancellation,
             ReportInterval,
             () => DateTime.UtcNow,
-            () => Guid.NewGuid().ToString("N"))
+            () => Guid.NewGuid().ToString("N"),
+            () => identity.ServerId)
     {
     }
 
@@ -57,6 +61,25 @@ public class ServerTelemetryReporter : IServerTelemetryReporter
         TimeSpan reportInterval,
         Func<DateTime> getUtcNow,
         Func<string> createSessionId)
+        : this(
+            messageBroker,
+            uploader,
+            sessionCancellation,
+            reportInterval,
+            getUtcNow,
+            createSessionId,
+            createSessionId)
+    {
+    }
+
+    internal ServerTelemetryReporter(
+        IMessageBroker messageBroker,
+        IServerTelemetryUploader uploader,
+        CancellationTokenSource sessionCancellation,
+        TimeSpan reportInterval,
+        Func<DateTime> getUtcNow,
+        Func<string> createSessionId,
+        Func<string> createServerId)
     {
         if (messageBroker == null) throw new ArgumentNullException(nameof(messageBroker));
         if (uploader == null) throw new ArgumentNullException(nameof(uploader));
@@ -65,11 +88,13 @@ public class ServerTelemetryReporter : IServerTelemetryReporter
             throw new ArgumentOutOfRangeException(nameof(reportInterval));
         if (getUtcNow == null) throw new ArgumentNullException(nameof(getUtcNow));
         if (createSessionId == null) throw new ArgumentNullException(nameof(createSessionId));
+        if (createServerId == null) throw new ArgumentNullException(nameof(createServerId));
 
         this.messageBroker = messageBroker;
         this.uploader = uploader;
         this.getUtcNow = getUtcNow;
         this.createSessionId = createSessionId;
+        this.createServerId = createServerId;
         cancellation = CancellationTokenSource.CreateLinkedTokenSource(sessionCancellation.Token);
 
         reportTimer = new Timer(reportInterval.TotalMilliseconds) { AutoReset = false };
@@ -86,6 +111,7 @@ public class ServerTelemetryReporter : IServerTelemetryReporter
             if (disposed || started) return;
 
             sessionId = createSessionId();
+            serverId = createServerId();
             startedAt = getUtcNow().ToUniversalTime();
             started = true;
             reportTimer.Start();
@@ -105,6 +131,7 @@ public class ServerTelemetryReporter : IServerTelemetryReporter
             if (disposed || !started) return;
 
             status = new ServerTelemetryStatus(
+                serverId,
                 sessionId,
                 ModInformation.Version.ToString(),
                 ModInformation.Commit,
