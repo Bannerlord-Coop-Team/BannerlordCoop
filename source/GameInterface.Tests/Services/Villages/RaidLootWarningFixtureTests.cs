@@ -7,6 +7,7 @@ using Xunit;
 using Common;
 using Common.Messaging;
 using Common.Network;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Logging;
 using System.Collections;
@@ -398,7 +399,7 @@ public class RaidLootWarningFixtureTests
     /// <summary>Builds a simulation run handler on the given broker with every other dependency mocked.</summary>
     private static BattleSimulationRunHandler CreateRunHandler(MessageBroker broker) => new(broker, new Mock<INetwork>().Object,
         new Mock<IObjectManager>().Object, new MapEventLogger(new Mock<IObjectManager>().Object), new Mock<IPlayerManager>().Object,
-        new Mock<IRetreatedMapEventPartyTracker>().Object);
+        new Mock<IRetreatedMapEventPartyTracker>().Object, new Mock<IOrderAttackRule>().Object);
 
     private static RaidLootWarningFixture.FixtureSession CreateSession() => new(
         ObjectHelper.SkipConstructor<Campaign>(), "fixture-controller",
