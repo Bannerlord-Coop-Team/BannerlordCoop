@@ -1048,8 +1048,8 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
                 return;
             }
 
-            machinesById.TryGetValue(obj.MachineId, out var machine);
-            if (machine?.DestructionComponent?.IsDestroyed == true)
+            bool isRegistered = machinesById.TryGetValue(obj.MachineId, out var machine);
+            if (isRegistered && machine.DestructionComponent?.IsDestroyed == true)
             {
                 AnnounceCurrentAuthority(obj.MachineId);
                 return;
@@ -1076,7 +1076,7 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
                 return;
             }
 
-            if (machine != null && HasLocalPlayerUser(machine))
+            if (isRegistered && HasLocalPlayerUser(machine))
             {
                 AnnounceCurrentAuthority(obj.MachineId);
                 return;
