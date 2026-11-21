@@ -1,6 +1,8 @@
-﻿using Common.Messaging;
+﻿using Common;
+using Common.Messaging;
 using Common.Util;
 using GameInterface.CoopSessionData;
+using GameInterface.Services.Ferries.Messages;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
@@ -25,8 +27,11 @@ namespace GameInterface.Services.Ferries.Interfaces;
 /// </summary>
 public interface IPlayerFerryInterface : IGameAbstraction
 {
-    /// <summary>[Server] Whether a player's party is on a ferry.</summary>
+    /// <summary>Whether a player's party is on a ferry.</summary>
     bool IsOnFerry(MobileParty party);
+
+    /// <summary>The village a player's party on a ferry departed from, which picks the ferry's ship.</summary>
+    bool TryGetDepartureVillage(MobileParty party, out Settlement village);
 
     /// <summary>[Server] Whether the party can take the village's ferry, like FerryCampaignBehavior.game_menu_ferry_target_on_condition.</summary>
     bool CanTakeFerry(MobileParty party, Settlement village, out string reason);
@@ -49,28 +54,45 @@ public class PlayerFerryInterface : IPlayerFerryInterface
     private readonly IPlayerManager playerManager;
     private readonly IMessageBroker messageBroker;
     private readonly IPlayerRaftFleetInterface raftFleetInterface;
+    private readonly IPlayerFerryTracker ferryTracker;
 
     private Dictionary<string, string> PlayerFerryDepartures => coopSessionProvider.CoopSession.NavalPlayerData.PlayerFerryDepartures;
+
+    // A client only has the copy of every player's departures the server sends it
+    private IReadOnlyDictionary<string, string> KnownDepartures => ModInformation.IsServer ? PlayerFerryDepartures : ferryTracker.Departures;
 
     public PlayerFerryInterface(
         ICoopSessionProvider coopSessionProvider,
         IObjectManager objectManager,
         IPlayerManager playerManager,
         IMessageBroker messageBroker,
-        IPlayerRaftFleetInterface raftFleetInterface)
+        IPlayerRaftFleetInterface raftFleetInterface,
+        IPlayerFerryTracker ferryTracker)
     {
         this.coopSessionProvider = coopSessionProvider;
         this.objectManager = objectManager;
         this.playerManager = playerManager;
         this.messageBroker = messageBroker;
         this.raftFleetInterface = raftFleetInterface;
+        this.ferryTracker = ferryTracker;
     }
 
-    public bool IsOnFerry(MobileParty party)
-    {
-        if (PlayerFerryDepartures.Count == 0) return false;
+    public bool IsOnFerry(MobileParty party) => TryGetDepartureVillageId(party, out _);
 
-        return playerManager.TryGetPlayer(party, out var player) && PlayerFerryDepartures.ContainsKey(player.HeroId);
+    public bool TryGetDepartureVillage(MobileParty party, out Settlement village)
+    {
+        village = null;
+        return TryGetDepartureVillageId(party, out var villageId) && objectManager.TryGetObjectWithLogging(villageId, out village);
+    }
+
+    // Runs on every IsInFerryState read, so the usual case of nobody on a ferry stops at the count
+    private bool TryGetDepartureVillageId(MobileParty party, out string villageId)
+    {
+        villageId = null;
+        var departures = KnownDepartures;
+        if (departures.Count == 0 || party.LeaderHero == null) return false;
+
+        return objectManager.TryGetId(party.LeaderHero, out var playerHeroId) && departures.TryGetValue(playerHeroId, out villageId);
     }
 
     public bool CanTakeFerry(MobileParty party, Settlement village, out string reason)
@@ -123,6 +145,7 @@ public class PlayerFerryInterface : IPlayerFerryInterface
 
         raftFleetInterface.CacheFleet(party);
         PlayerFerryDepartures[player.HeroId] = villageId;
+        messageBroker.Publish(this, new PlayerFerryChanged(player.HeroId, villageId));
 
         party.Position = village.PortPosition;
         party.IsCurrentlyAtSea = true;
@@ -144,6 +167,7 @@ public class PlayerFerryInterface : IPlayerFerryInterface
         if (!objectManager.TryGetObjectWithLogging<Settlement>(villageId, out var village) || village.FerryTarget == null) return false;
 
         PlayerFerryDepartures.Remove(player.HeroId);
+        messageBroker.Publish(this, new PlayerFerryChanged(player.HeroId, null));
         var target = village.FerryTarget;
         party.SetMoveModeHold();
         party.Position = target.GatePosition;

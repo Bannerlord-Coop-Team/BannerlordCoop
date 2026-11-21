@@ -15,6 +15,7 @@ using GameInterface.Services.MapEvents.NavalScenarios;
 #endif
 using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.PartyVisuals.Patches;
+using GameInterface.Services.Ferries;
 using GameInterface.Services.Ferries.Handlers;
 using GameInterface.Services.Ferries.Interfaces;
 using GameInterface.Services.Ferries.Patches;
@@ -73,6 +74,7 @@ public sealed class GameInterfaceModuleNavalGateTests : IDisposable
         typeof(RaftDebugCommands.StrandOnRaftCoopCommand),
         typeof(PlayerFerryHandler),
         typeof(PlayerFerryInterface),
+        typeof(PlayerFerryTracker),
         typeof(BattleShipFateLedger),
         typeof(BattleShipFateApplier),
         typeof(NavalNpcFleetAttemptTracker),

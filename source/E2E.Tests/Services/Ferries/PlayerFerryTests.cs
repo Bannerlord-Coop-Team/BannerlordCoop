@@ -65,6 +65,8 @@ public class PlayerFerryTests : SyncTestBase
                 var party = client.GetRegisteredObject<MobileParty>(ferry.PartyId);
                 Assert.True(party.IsCurrentlyAtSea);
                 Assert.Empty(party.Ships);
+                // Every client learns the ferry from the server, which draws it and keeps it out of reach
+                Assert.True(party.IsInFerryState);
             });
         }
     }
@@ -99,7 +101,12 @@ public class PlayerFerryTests : SyncTestBase
         foreach (var instance in Clients)
         {
             instance.PumpGameThread();
-            instance.Call(() => Assert.Same(instance.GetRegisteredObject<MobileParty>(ferry.PartyId).Party, instance.GetRegisteredObject<Ship>(shipId).Owner));
+            instance.Call(() =>
+            {
+                var party = instance.GetRegisteredObject<MobileParty>(ferry.PartyId);
+                Assert.Same(party.Party, instance.GetRegisteredObject<Ship>(shipId).Owner);
+                Assert.False(party.IsInFerryState);
+            });
         }
     }
 
@@ -161,14 +168,16 @@ public class PlayerFerryTests : SyncTestBase
         }
 
         string heroId = null;
+        string clanId = null;
+        string characterId = null;
         Server.Call(() =>
         {
             UseFerryModel();
 
             var party = Server.GetRegisteredObject<MobileParty>(partyId);
             Assert.True(Server.ObjectManager.TryGetId(party.LeaderHero, out heroId));
-            Assert.True(Server.ObjectManager.TryGetId(party.LeaderHero.Clan, out var clanId));
-            Assert.True(Server.ObjectManager.TryGetId(party.LeaderHero.CharacterObject, out var characterId));
+            Assert.True(Server.ObjectManager.TryGetId(party.LeaderHero.Clan, out clanId));
+            Assert.True(Server.ObjectManager.TryGetId(party.LeaderHero.CharacterObject, out characterId));
             Assert.True(Server.Resolve<IPlayerManager>().AddPlayer(new Player("ferried", heroId, partyId, clanId, characterId)));
 
             party.LeaderHero.Gold = Gold;
@@ -182,6 +191,12 @@ public class PlayerFerryTests : SyncTestBase
             party._currentSettlement = village;
         });
         TestEnvironment.ConnectRegisteredPlayer(Clients.First(), "ferried");
+
+        // Clients learn every player from the player list on join
+        foreach (var client in Clients)
+        {
+            client.Call(() => Assert.True(client.Resolve<IPlayerManager>().AddPlayer(new Player("ferried", heroId, partyId, clanId, characterId))));
+        }
 
         return new FerryTrip(heroId, partyId, villageId);
     }

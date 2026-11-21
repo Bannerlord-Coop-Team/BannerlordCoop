@@ -31,3 +31,36 @@ internal readonly struct NetworkRequestEndFerry : ICommand
         PartyId = partyId;
     }
 }
+
+/// <summary>
+/// [Server, local] A player got on a ferry at the village, or off it when <see cref="VillageId"/> is null.
+/// </summary>
+public readonly struct PlayerFerryChanged : IEvent
+{
+    public readonly string PlayerHeroId;
+    public readonly string VillageId;
+
+    public PlayerFerryChanged(string playerHeroId, string villageId)
+    {
+        PlayerHeroId = playerHeroId;
+        VillageId = villageId;
+    }
+}
+
+/// <summary>
+/// [Server to clients] A player got on a ferry at the village, or off it when <see cref="VillageId"/> is null.
+/// </summary>
+[ProtoContract(SkipConstructor = true)]
+internal readonly struct NetworkPlayerFerryChanged : ICommand
+{
+    [ProtoMember(1)]
+    public readonly string PlayerHeroId;
+    [ProtoMember(2)]
+    public readonly string VillageId;
+
+    public NetworkPlayerFerryChanged(string playerHeroId, string villageId)
+    {
+        PlayerHeroId = playerHeroId;
+        VillageId = villageId;
+    }
+}
