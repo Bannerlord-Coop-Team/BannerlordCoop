@@ -1,7 +1,14 @@
-﻿using Common.Util;
+﻿using Autofac;
+using Common.Messaging;
+using Common.Util;
+using Coop.Naval;
+using Coop.Naval.PortScreen.Handlers;
 using Coop.Naval.PortScreen.Interfaces;
+using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
-using E2E.Tests.Util;
+using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.NavalDLC;
+using GameInterface.Services.NavalDLC.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using TaleWorlds.CampaignSystem;
@@ -17,20 +24,31 @@ namespace E2E.Tests.Services.Ships;
 /// <summary>
 /// Mooring ships at a port: the server keeps every clan's moored ships, and only the owner's client lists its ship.
 /// </summary>
-public class PortMooringSyncTests : SyncTestBase
+public class PortMooringSyncTests : IDisposable
 {
+    private readonly E2ETestEnvironment testEnvironment;
     private readonly string settlementId;
 
-    public PortMooringSyncTests(ITestOutputHelper output) : base(output)
+    private EnvironmentInstance Server => testEnvironment.Server;
+    private IEnumerable<EnvironmentInstance> Clients => testEnvironment.Clients;
+
+    // Mooring lives in Coop.Naval, which the shared environment doesn't register
+    public PortMooringSyncTests(ITestOutputHelper output)
     {
-        settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        testEnvironment = new E2ETestEnvironment(output, configureDependencies: builder => builder.RegisterModule<CoopNavalModule>());
+        settlementId = testEnvironment.CreateRegisteredObject<Settlement>();
+    }
+
+    public void Dispose()
+    {
+        testEnvironment.Dispose();
     }
 
     [Fact]
     public void MoorAndTakeBack_OnlyTheOwnerClientListsTheShipAndOnlyTheOwnerClanTakesItBack()
     {
         var clients = Clients.ToArray();
-        StagePort();
+        var preCoopShipId = StagePort();
         var first = StagePlayerWithShip("first_player", clients[0]);
         var second = StagePlayerWithShip("second_player", clients[1]);
 
@@ -41,6 +59,7 @@ public class PortMooringSyncTests : SyncTestBase
         });
         PumpClients();
 
+        // Stashing a ship clears its owner on every machine, even where the stash doesn't list it
         foreach (var client in clients)
         {
             client.Call(() =>
@@ -54,6 +73,7 @@ public class PortMooringSyncTests : SyncTestBase
 
         Server.Call(() =>
         {
+            Assert.False(Retrieve(first, preCoopShipId));
             Assert.False(Retrieve(second, first.ShipId));
             Assert.True(Retrieve(first, first.ShipId));
         });
@@ -71,11 +91,63 @@ public class PortMooringSyncTests : SyncTestBase
         }
         AssertStash(clients[0]);
         AssertStash(clients[1], second.ShipId);
-        AssertStash(Server, second.ShipId);
+        AssertStash(Server, preCoopShipId, second.ShipId);
     }
 
-    private void StagePort()
+    // The joined save's stashes hold every clan's moored ships, so the first hero change after joining keeps only the player clan's
+    [Fact]
+    public void JoinFilter_KeepsOnlyTheClanShipsOnce()
     {
+        var client = Clients.First();
+        var unrecordedSettlementId = testEnvironment.CreateRegisteredObject<Settlement>();
+        var heroId = testEnvironment.CreateRegisteredObject<Hero>();
+        var clanId = testEnvironment.CreateRegisteredObject<Clan>();
+        var ownShipId = testEnvironment.CreateRegisteredObject<Ship>();
+        var otherShipId = testEnvironment.CreateRegisteredObject<Ship>();
+        var unrecordedShipId = testEnvironment.CreateRegisteredObject<Ship>();
+
+        client.Call(() =>
+        {
+            var hero = client.GetRegisteredObject<Hero>(heroId);
+            var clan = client.GetRegisteredObject<Clan>(clanId);
+            using (new AllowedThread())
+            {
+                clan.InitMembers();
+                hero.Clan = clan;
+            }
+
+            var port = client.GetRegisteredObject<Settlement>(settlementId);
+            var unrecorded = client.GetRegisteredObject<Settlement>(unrecordedSettlementId);
+            var ownShip = client.GetRegisteredObject<Ship>(ownShipId);
+            var otherShip = client.GetRegisteredObject<Ship>(otherShipId);
+            port.ShipStash = new MBList<Ship> { ownShip, otherShip };
+            unrecorded.ShipStash = new MBList<Ship> { client.GetRegisteredObject<Ship>(unrecordedShipId) };
+            Campaign.Current.CampaignObjectManager.Settlements = new MBList<Settlement> { port, unrecorded };
+
+            var ownerClans = new Dictionary<string, List<string>> { [port.StringId] = new List<string> { clan.StringId, "other_clan" } };
+            var navalPlayerData = new NavalPlayerData(null, null, null, null, ownerClans);
+            // Other naval PlayerHeroChanged subscribers need a full campaign, so the hero changes go straight to the handler
+            var handler = client.Resolve<PortMooringHandler>();
+            client.Resolve<IMessageBroker>().Publish(this, new InitializeClientMooredShips(navalPlayerData));
+            handler.Handle_PlayerHeroChanged(new MessagePayload<PlayerHeroChanged>(this, new PlayerHeroChanged(null, hero)));
+
+            Assert.Equal(new[] { ownShip }, port.ShipStash);
+            Assert.Empty(unrecorded.ShipStash);
+
+            // A session update republishes the naval data, and the hero change that follows must not filter again
+            port.ShipStash.Add(otherShip);
+            client.Resolve<IMessageBroker>().Publish(this, new InitializeClientNavalData(navalPlayerData));
+            handler.Handle_PlayerHeroChanged(new MessagePayload<PlayerHeroChanged>(this, new PlayerHeroChanged(hero, hero)));
+
+            Assert.Equal(new[] { ownShip, otherShip }, port.ShipStash);
+        });
+    }
+
+    // Returns a ship moored before co-op, which only the server's stash holds and no player owns
+    private string StagePort()
+    {
+        var preCoopShipId = testEnvironment.CreateRegisteredObject<Ship>();
+
         foreach (var instance in Clients.Prepend(Server))
         {
             instance.Call(() =>
@@ -85,15 +157,18 @@ public class PortMooringSyncTests : SyncTestBase
                 settlement.ShipStash ??= new MBList<Ship>();
             });
         }
+        Server.Call(() => Server.GetRegisteredObject<Settlement>(settlementId).ShipStash.Add(Server.GetRegisteredObject<Ship>(preCoopShipId)));
+
+        return preCoopShipId;
     }
 
     // A player in their own clan, inside the port with one ship
     private StagedPlayer StagePlayerWithShip(string controllerId, EnvironmentInstance client)
     {
-        var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
-        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
-        var clanId = TestEnvironment.CreateRegisteredObject<Clan>();
-        var shipId = TestEnvironment.CreateRegisteredObject<Ship>();
+        var heroId = testEnvironment.CreateRegisteredObject<Hero>();
+        var partyId = testEnvironment.CreateRegisteredObject<MobileParty>();
+        var clanId = testEnvironment.CreateRegisteredObject<Clan>();
+        var shipId = testEnvironment.CreateRegisteredObject<Ship>();
 
         Server.Call(() =>
         {

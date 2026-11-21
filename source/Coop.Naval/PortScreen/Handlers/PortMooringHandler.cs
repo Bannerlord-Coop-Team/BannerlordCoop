@@ -3,10 +3,10 @@ using Common.Logging;
 using Common.Messaging;
 using Coop.Naval.PortScreen.Messages;
 using GameInterface.Services.Heroes.Messages;
-using GameInterface.Services.NavalDLC;
 using GameInterface.Services.NavalDLC.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
+using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -23,8 +23,8 @@ internal class PortMooringHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
 
-    private NavalPlayerData joinedNavalPlayerData;
-    private bool isJoinedStashFilterPending;
+    // Set on join until the stashes are filtered
+    private Dictionary<string, List<string>> joinedMooredShipOwnerClans;
 
     public PortMooringHandler(IMessageBroker messageBroker, IObjectManager objectManager)
     {
@@ -64,21 +64,21 @@ internal class PortMooringHandler : IHandler
 
     private void Handle_InitializeClientMooredShips(MessagePayload<InitializeClientMooredShips> obj)
     {
-        joinedNavalPlayerData = obj.What.NavalPlayerData;
-        isJoinedStashFilterPending = true;
+        // Protobuf skips the constructor, so an empty owner list arrives as null
+        joinedMooredShipOwnerClans = obj.What.NavalPlayerData?.MooredShipOwnerClans ?? new Dictionary<string, List<string>>();
     }
 
     // The joined save's stashes are filtered once, on the hero change that follows the join, because the clan is only known then
     private void Handle_PlayerHeroChanged(MessagePayload<PlayerHeroChanged> obj)
     {
-        if (!isJoinedStashFilterPending) return;
+        if (joinedMooredShipOwnerClans == null) return;
 
-        isJoinedStashFilterPending = false;
-        KeepOnlyClanMooredShips(joinedNavalPlayerData, obj.What.NewHero.Clan);
-        joinedNavalPlayerData = null;
+        var mooredShipOwnerClans = joinedMooredShipOwnerClans;
+        joinedMooredShipOwnerClans = null;
+        KeepOnlyClanMooredShips(mooredShipOwnerClans, obj.What.NewHero.Clan.StringId);
     }
 
-    private static void KeepOnlyClanMooredShips(NavalPlayerData navalPlayerData, Clan playerClan)
+    private static void KeepOnlyClanMooredShips(Dictionary<string, List<string>> mooredShipOwnerClans, string playerClanId)
     {
         foreach (var settlement in Campaign.Current.CampaignObjectManager.Settlements)
         {
@@ -86,22 +86,21 @@ internal class PortMooringHandler : IHandler
             if (stash == null || stash.Count == 0) continue;
 
             // No record means nobody moored there in co-op, so the ships are from a single player save and belong to no player
-            var mooredShipOwnerClans = navalPlayerData?.MooredShipOwnerClans;
-            if (mooredShipOwnerClans == null || !mooredShipOwnerClans.TryGetValue(settlement.StringId, out var ownerClans))
+            if (!mooredShipOwnerClans.TryGetValue(settlement.StringId, out var ownerClans) || ownerClans == null)
             {
                 stash.Clear();
                 continue;
             }
 
-            if (ownerClans.Count != stash.Count)
+            if (ownerClans.Count > stash.Count)
             {
                 Logger.Error("{SettlementId} has {OwnerCount} moored ship owners for {ShipCount} moored ships", settlement.StringId, ownerClans.Count, stash.Count);
-                continue;
             }
 
+            // Like the server's owner list, a ship past the end of it has no owner
             for (int i = stash.Count - 1; i >= 0; i--)
             {
-                if (ownerClans[i] != playerClan.StringId) stash.RemoveAt(i);
+                if (i >= ownerClans.Count || ownerClans[i] != playerClanId) stash.RemoveAt(i);
             }
         }
     }
