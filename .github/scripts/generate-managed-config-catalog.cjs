@@ -31,16 +31,17 @@ const optionTypes = new Map([
   ['int', 'integer'],
   ['float', 'number'],
   ['double', 'number'],
-  ['List<string>', 'steamIdList'],
+  ['List<string>', 'stringList'],
 ]);
 const metadataFields = new Map([
   ['stable', { type: 'boolean' }],
   ['availableSince', { type: 'string' }],
   ['min', { type: 'number', appliesTo: ['integer', 'number'] }],
   ['max', { type: 'number', appliesTo: ['integer', 'number'] }],
-  ['maxItems', { type: 'number', appliesTo: ['steamIdList'] }],
-  ['itemPattern', { type: 'string', appliesTo: ['steamIdList'] }],
-  ['uniqueItems', { type: 'boolean', appliesTo: ['steamIdList'] }],
+  ['maxItems', { type: 'number', appliesTo: ['stringList'] }],
+  ['itemPattern', { type: 'string', appliesTo: ['stringList'] }],
+  ['itemFormat', { type: 'string', appliesTo: ['stringList'], values: ['steamId64'] }],
+  ['uniqueItems', { type: 'boolean', appliesTo: ['stringList'] }],
   ['coercePositiveBelow', { type: 'number', appliesTo: ['integer', 'number'] }],
 ]);
 
@@ -95,7 +96,9 @@ function parseMetadata(attributes, key, optionType, constants) {
     } catch {
       throw new Error('Invalid metadata value for ' + key + ': ' + name + ' = ' + raw);
     }
-    if (typeof value !== spec.type || (spec.type === 'number' && !Number.isFinite(value))) {
+    if (typeof value !== spec.type ||
+        (spec.type === 'number' && !Number.isFinite(value)) ||
+        (spec.values && !spec.values.includes(value))) {
       throw new Error('Invalid metadata value for ' + key + ': ' + name);
     }
     metadata[name] = value;
@@ -103,6 +106,9 @@ function parseMetadata(attributes, key, optionType, constants) {
   if (end !== args.length) throw new Error('Invalid ManagedConfigOption arguments for ' + key);
   if (metadata.stable === undefined || !/^\d+\.\d+\.\d+$/u.test(metadata.availableSince ?? '')) {
     throw new Error(key + ' needs explicit stable and availableSince metadata');
+  }
+  if (optionType === 'stringList' && (metadata.maxItems === undefined || metadata.uniqueItems === undefined)) {
+    throw new Error(key + ' needs explicit maxItems and uniqueItems metadata');
   }
   return metadata;
 }
@@ -127,7 +133,7 @@ function validateDefault(option) {
   }
   if (type === 'number' && !Number.isFinite(value)) throw new Error('Default for ' + key + ' is not numeric');
   if (type === 'enum' && !option.values.includes(value)) throw new Error('Default for ' + key + ' is not an enum member');
-  if (type === 'steamIdList' && (!Array.isArray(value) || value.some(item => typeof item !== 'string'))) {
+  if (type === 'stringList' && (!Array.isArray(value) || value.some(item => typeof item !== 'string'))) {
     throw new Error('Default for ' + key + ' is not a string list');
   }
   if (option.min !== undefined && value < option.min) throw new Error('Default for ' + key + ' is below its minimum');

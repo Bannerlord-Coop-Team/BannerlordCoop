@@ -1,5 +1,5 @@
 {
-  "contentDigest": "e02c550c2bd2c4a19f91e48051f99183637844606d663ade0ec9253dbae96871",
+  "contentDigest": "14dcdd7546ea12c4c2342e85ee6a2fa8723efe70866e630b33695f93abfece9e",
   "options": [
     {
       "key": "voiceEnabled",
@@ -236,11 +236,12 @@
     },
     {
       "key": "preferredBattleHosts",
-      "type": "steamIdList",
+      "type": "stringList",
       "stable": false,
       "availableSince": "0.1.8",
       "maxItems": 32,
       "itemPattern": "^[0-9]{17}$",
+      "itemFormat": "steamId64",
       "uniqueItems": true,
       "default": []
     },
