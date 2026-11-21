@@ -54,7 +54,6 @@ internal static class CreditsRoster
         "thomas-soutif",
         "masesk",
         "orfolei",
-        "gamingmenacers-svg",
         "martinprejsa",
         "brodrigz",
         "Gears321",
