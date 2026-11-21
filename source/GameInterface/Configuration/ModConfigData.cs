@@ -83,91 +83,91 @@ public enum DifficultyLevel
 
 public sealed class ModOptionsData
 {
-    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7", OmitForOldAgents = true)]
+    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.6", OmitForOldAgents = true)]
     public bool? VoiceEnabled { get; set; }
 
-    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7", Min = 200, Max = 12000, OmitForOldAgents = true)]
+    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.3", Min = 200, Max = 12000, OmitForOldAgents = true)]
     public int? BattleSize { get; set; }
 
-    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7")]
+    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.2")]
     public bool? FastForwardEnabled { get; set; }
 
-    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7")]
+    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.2")]
     public bool? AutoPauseEnabled { get; set; }
 
     [ManagedConfigOption(Stable = false, AvailableSince = "0.1.8", OmitForOldAgents = true)]
     public bool? AllowClientTimeControls { get; set; }
 
-    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7")]
+    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.2")]
     public bool? ClientsCanUseCheats { get; set; }
 
-    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7")]
+    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.2")]
     public bool? GoldFoodInfluenceChangeInSettlements { get; set; }
 
-    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7")]
+    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.2")]
     public GoldFoodChangeMode? GoldFoodInfluenceChangeInBattles { get; set; }
 
-    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7")]
+    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.2")]
     public bool? GoldFoodInfluenceChangeForDisconnectedPlayers { get; set; }
 
-    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7", OmitForOldAgents = true)]
+    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.6", OmitForOldAgents = true)]
     public bool? BlockAiWarDeclarationsOnOfflinePlayers { get; set; }
 
-    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7", Min = 0, Max = 8760)]
+    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.2", Min = 0, Max = 8760)]
     public int? PlayerBattleAiJoinWindowHours { get; set; }
 
     [ManagedConfigOption(Stable = false, AvailableSince = "0.1.8", Min = 0, Max = 86400, OmitForOldAgents = true)]
     public int? PostBattleAiAmnestySeconds { get; set; }
 
-    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7")]
+    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.2")]
     public bool? SpeedLimitWhilePlayersInBattle { get; set; }
 
-    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7", OmitForOldAgents = true)]
+    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.6", OmitForOldAgents = true)]
     public bool? EnsureUnaffiliatedWanderers { get; set; }
 
-    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7", Min = 0, Max = 1000)]
+    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.2", Min = 0, Max = 1000)]
     public int? WandererLimit { get; set; }
 
     [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7", Min = 0, Max = 100, OmitForOldAgents = true)]
     public int? SpawnRateWanderers { get; set; }
 
-    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7")]
+    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.2")]
     public bool? WandererLimitScalesWithPlayers { get; set; }
 
-    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7", Min = 0, Max = 6)]
+    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.2", Min = 0, Max = 6)]
     public int? PlayerKingdomClanTierRequired { get; set; }
 
-    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7", OmitForOldAgents = true)]
+    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.6", OmitForOldAgents = true)]
     public bool? CoopClansEnabled { get; set; }
 
-    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7")]
+    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.2")]
     public bool? SmithingStaminaRecoveryOutsideSettlements { get; set; }
 
-    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7", Min = 0, Max = 100)]
+    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.2", Min = 0, Max = 100)]
     public float? SmithingStaminaRecoveryMultiplier { get; set; }
 
-    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7", Min = 0, Max = 100)]
+    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.2", Min = 0, Max = 100)]
     public float? MaximumLootersMultiplier { get; set; }
 
-    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7", Min = 0, Max = 100)]
+    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.3", Min = 0, Max = 100)]
     public float? LooterPartySizeMultiplier { get; set; }
 
-    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7")]
+    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.2")]
     public LordDefectionRetryMode? LordDefectionRetries { get; set; }
   
-    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7")]
+    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.2")]
     public bool? EnableHeroExecutions { get; set; }
 
-    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7")]
+    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.2")]
     public bool? EnablePlayerClanMemberExecutions { get; set; }
 
-    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7", OmitForOldAgents = true)]
+    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.6", OmitForOldAgents = true)]
     public bool? EnablePlayerExecutions { get; set; }
     
-    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7", OmitForOldAgents = true)]
+    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.4", OmitForOldAgents = true)]
     public bool? PlayerWoundedBattleEntry { get; set; }
 
-    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7", OmitForOldAgents = true)]
+    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.3", OmitForOldAgents = true)]
     public bool? ShowPlayerNameplates { get; set; }
 
     [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7", Max = 86400, OmitForOldAgents = true)]
@@ -185,8 +185,10 @@ public sealed class ModOptionsData
     [ManagedConfigOption(Stable = false, AvailableSince = "0.1.8", Min = 0, Max = 86400, CoerceRanges = "1-9=10", OmitForOldAgents = true)]
     public int? PvpResponseTimerSeconds { get; set; }
 
+    [ManagedConfigOption(Stable = false, AvailableSince = "0.1.8", Min = -2147483648, Max = 2147483647, OmitForOldAgents = true)]
     public int? MaxClansPerKingdom { get; set; }
 
+    [ManagedConfigOption(Stable = false, AvailableSince = "0.1.8", OmitForOldAgents = true)]
     public bool? MaxClansPerKingdomCountsMercenaries { get; set; }
 
     /// <summary>Whether a dedicated server runs War Sails (NavalDLC) co-op. It parses the file itself; declared so the key isn't reported as unknown.</summary>
