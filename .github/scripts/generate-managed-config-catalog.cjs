@@ -6,11 +6,25 @@ const sourcePath = 'source/GameInterface/Configuration/ModConfigData.cs';
 const defaultsPath = 'deploy/mod-config.default.json';
 const outputPath = 'deploy/managed-config-catalog.json';
 
+const quotedString = String.raw`"(?:\\.|[^"\\])*"`;
+
 // Match quoted strings whole so only trailing commas outside strings are removed.
-const trailingCommaOrString = /"(?:\\.|[^"\\])*"|,(?=\s*[}\]])/gu;
+const trailingCommaOrString = new RegExp(String.raw`${quotedString}|,(?=\s*[}\]])`, 'gu');
 
 // [attributes] public Type Name { get; set; }
-const autoPropertyPattern = /(?<attributes>(?:\[(?:"(?:\\.|[^"\\])*"|[^\]"])*\]\s*)*)\bpublic\s+(?<type>[^;={}]+?)\s+(?<name>[A-Za-z_]\w*)\s*\{\s*get\s*;\s*set\s*;\s*\}/gu;
+const autoPropertyPattern = new RegExp(
+  String.raw`(?<attributes>(?:\[(?:${quotedString}|[^\]"])*\]\s*)*)\bpublic\s+(?<type>[^;={}]+?)\s+(?<name>[A-Za-z_]\w*)\s*\{\s*get\s*;\s*set\s*;\s*\}`,
+  'gu',
+);
+const commentOrString = new RegExp(String.raw`${quotedString}|\/\/[^\r\n]*|\/\*[\s\S]*?\*\/`, 'gu');
+const managedConfigOptionPattern = new RegExp(
+  String.raw`\[\s*ManagedConfigOption\s*\((?<args>(?:${quotedString}|[^")])*)\)\s*\]`,
+  'gu',
+);
+const metadataArgumentPattern = new RegExp(
+  String.raw`\s*(?<name>[A-Z]\w*)\s*=\s*(?<value>${quotedString}|[^,\s"]+)\s*(?:,|$)`,
+  'gyu',
+);
 
 const optionTypes = new Map([
   ['bool', 'boolean'],
@@ -19,21 +33,19 @@ const optionTypes = new Map([
   ['double', 'number'],
   ['List<string>', 'steamIdList'],
 ]);
-const metadataTypes = new Map([
-  ['stable', 'boolean'],
-  ['availableSince', 'string'],
-  ['min', 'number'],
-  ['max', 'number'],
-  ['maxItems', 'number'],
-  ['itemPattern', 'string'],
-  ['uniqueItems', 'boolean'],
-  ['coercePositiveBelow', 'number'],
+const metadataFields = new Map([
+  ['stable', { type: 'boolean' }],
+  ['availableSince', { type: 'string' }],
+  ['min', { type: 'number', appliesTo: ['integer', 'number'] }],
+  ['max', { type: 'number', appliesTo: ['integer', 'number'] }],
+  ['maxItems', { type: 'number', appliesTo: ['steamIdList'] }],
+  ['itemPattern', { type: 'string', appliesTo: ['steamIdList'] }],
+  ['uniqueItems', { type: 'boolean', appliesTo: ['steamIdList'] }],
+  ['coercePositiveBelow', { type: 'number', appliesTo: ['integer', 'number'] }],
 ]);
-const numericMetadata = new Set(['min', 'max', 'coercePositiveBelow']);
-const listMetadata = new Set(['maxItems', 'itemPattern', 'uniqueItems']);
 
 function stripComments(text) {
-  return text.replace(/"(?:\\.|[^"\\])*"|\/\/[^\r\n]*|\/\*[\s\S]*?\*\//gu, token => token.startsWith('"') ? token : ' ');
+  return text.replace(commentOrString, token => token.startsWith('"') ? token : ' ');
 }
 
 function parseDefaults(text) {
@@ -60,22 +72,20 @@ function parseEnums(source) {
 }
 
 function parseMetadata(attributes, key, optionType, constants) {
-  const matches = [...attributes.matchAll(/\[\s*ManagedConfigOption\s*\((?<args>(?:"(?:\\.|[^"\\])*"|[^")])*)\)\s*\]/gu)];
+  const matches = [...attributes.matchAll(managedConfigOptionPattern)];
   if (matches.length !== 1) throw new Error(key + ' must have exactly one ManagedConfigOption attribute');
 
   const metadata = {};
   const args = matches[0].groups.args.trim();
-  const argument = /\s*(?<name>[A-Z]\w*)\s*=\s*(?<value>"(?:\\.|[^"\\])*"|[^,\s"]+)\s*(?:,|$)/gyu;
+  // Sticky matching stops at the first malformed argument, leaving end short of args.length.
   let end = 0;
-  for (const match of args.matchAll(argument)) {
+  for (const match of args.matchAll(metadataArgumentPattern)) {
     end = match.index + match[0].length;
     const name = match.groups.name[0].toLowerCase() + match.groups.name.slice(1);
-    const valueType = metadataTypes.get(name);
-    if (!valueType || Object.hasOwn(metadata, name)) throw new Error('Invalid metadata field for ' + key + ': ' + name);
-    if ((numericMetadata.has(name) && optionType !== 'integer' && optionType !== 'number') ||
-        (listMetadata.has(name) && optionType !== 'steamIdList')) {
-      const field = name === 'coercePositiveBelow' ? 'coerceRanges' : name;
-      throw new Error(field + ' is not valid for ' + optionType + ' option ' + key);
+    const spec = metadataFields.get(name);
+    if (!spec || Object.hasOwn(metadata, name)) throw new Error('Invalid metadata field for ' + key + ': ' + name);
+    if (spec.appliesTo && !spec.appliesTo.includes(optionType)) {
+      throw new Error(name + ' is not valid for ' + optionType + ' option ' + key);
     }
 
     const raw = match.groups.value;
@@ -85,7 +95,7 @@ function parseMetadata(attributes, key, optionType, constants) {
     } catch {
       throw new Error('Invalid metadata value for ' + key + ': ' + name + ' = ' + raw);
     }
-    if (typeof value !== valueType || (valueType === 'number' && !Number.isFinite(value))) {
+    if (typeof value !== spec.type || (spec.type === 'number' && !Number.isFinite(value))) {
       throw new Error('Invalid metadata value for ' + key + ': ' + name);
     }
     metadata[name] = value;
@@ -94,11 +104,14 @@ function parseMetadata(attributes, key, optionType, constants) {
   if (metadata.stable === undefined || !/^\d+\.\d+\.\d+$/u.test(metadata.availableSince ?? '')) {
     throw new Error(key + ' needs explicit stable and availableSince metadata');
   }
+  return metadata;
+}
 
+function toCatalogConstraints(metadata, key) {
   const { coercePositiveBelow, ...constraints } = metadata;
   if (coercePositiveBelow !== undefined) {
     if (!Number.isSafeInteger(coercePositiveBelow) || coercePositiveBelow < 1) {
-      throw new Error('Invalid positive coercion threshold for ' + key);
+      throw new Error('coercePositiveBelow must be a positive integer for ' + key);
     }
     // Values from 1 through coercePositiveBelow - 1 are raised to coercePositiveBelow.
     if (coercePositiveBelow > 1) constraints.coerceRanges = [[1, coercePositiveBelow - 1, coercePositiveBelow]];
@@ -148,7 +161,8 @@ function buildCatalog(sourceText, defaultsText) {
     if (!Object.hasOwn(defaults, key)) throw new Error('Default is missing for ' + key);
 
     const metadata = parseMetadata(attributes, key, type, constants);
-    const option = { key, type, ...metadata, ...(values ? { values } : {}), default: defaults[key] };
+    const constraints = toCatalogConstraints(metadata, key);
+    const option = { key, type, ...constraints, ...(values ? { values } : {}), default: defaults[key] };
     validateDefault(option);
     options.set(key, option);
   }
