@@ -26,6 +26,20 @@ internal class FerryCampaignBehaviorPatches
         return false;
     }
 
+    // The server steers the ferry, so the client only ends the trip once it's in the target's port
+    [HarmonyPatch(nameof(FerryCampaignBehavior.player_ferry_state_menu_on_tick))]
+    [HarmonyPrefix]
+    public static bool PlayerFerryStateMenuOnTickPrefix()
+    {
+        var target = Campaign.Current.PlayerDataForNavalAutoTravel.DeparturedVillageWithFerry.FerryTarget;
+        if (MobileParty.MainParty.Position.Distance(target.PortPosition) < Campaign.Current.Models.EncounterModel.NeededMaximumNavalDistanceForEncounteringMobileParty)
+        {
+            GameMenu.SwitchToMenu("player_ferry_state_end");
+        }
+
+        return false;
+    }
+
     [HarmonyPatch(nameof(FerryCampaignBehavior.player_ferry_state_end_continue_on_consequence))]
     [HarmonyPrefix]
     public static bool PlayerFerryStateEndContinueOnConsequencePrefix()

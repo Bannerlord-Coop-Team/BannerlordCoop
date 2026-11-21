@@ -24,7 +24,7 @@ namespace E2E.Tests.Services.Ferries;
 /// </summary>
 public class PlayerFerryTests : SyncTestBase
 {
-    private const int Gold = 5000;
+    private const int Gold = 1000000;
 
     private static readonly CampaignVec2 Port = new(new Vec2(10f, 20f), false);
     private static readonly CampaignVec2 TargetGate = new(new Vec2(60f, 70f), true);
@@ -204,7 +204,8 @@ public class PlayerFerryTests : SyncTestBase
     // DefaultFerryModel charges nothing and carries no one. This fare counts the main party, like NavalFerryModel.
     private sealed class TestFerryModel : FerryModel
     {
-        public override int MaximumFerryCapacityForPassengers => 50;
+        // The harness party has a random roster, up to around a hundred troops
+        public override int MaximumFerryCapacityForPassengers => 1000;
 
         public override ExplainedNumber GetFerryCost(Settlement departureVillage, bool includeReason = false) =>
             new(Fare(MobileParty.MainParty), includeReason);

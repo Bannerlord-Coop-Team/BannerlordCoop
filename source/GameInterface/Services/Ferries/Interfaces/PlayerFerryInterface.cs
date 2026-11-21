@@ -126,10 +126,12 @@ public class PlayerFerryInterface : IPlayerFerryInterface
         party.Position = village.PortPosition;
         party.IsCurrentlyAtSea = true;
         party.IgnoreByOtherPartiesTill(CampaignTime.Never);
+        // Vanilla steers to the target village, the port stops the ferry where the client's menu ends the trip instead of entering it
+        party.SetMoveGoToPoint(village.FerryTarget.PortPosition, MobileParty.NavigationType.Naval);
         party.Ai.DisableAi();
         party.Party.SetCustomName(new TextObject("{=avb1Niqp}Ferry"));
 
-        // The client's ferry menu steers the party to the target, as it moves its own party
+        // The disabled AI never publishes the move, so this replicates it with the port position
         messageBroker.Publish(this, new PartyBehaviorChangeAttempted(party, forcePosition: true, isCurrentlyAtSea: true));
     }
 
