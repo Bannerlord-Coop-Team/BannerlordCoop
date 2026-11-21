@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using Common.Util;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.MobileParties.Messages.Behavior;
@@ -161,6 +162,13 @@ public class PlayerFerryInterface : IPlayerFerryInterface
     public void BoardLocally(Settlement village)
     {
         Campaign.Current.PlayerDataForNavalAutoTravel = new PlayerDataForNavalAutoTravel(new MBList<Ship>(), null, village);
+
+        // Leaving the village holds the party after the server's ferry move arrived, so start the same move locally
+        using (new AllowedThread())
+        {
+            MobileParty.MainParty.SetMoveGoToPoint(village.FerryTarget.PortPosition, MobileParty.NavigationType.Naval);
+        }
+
         GameMenu.ActivateGameMenu("player_ferry_state_wait");
     }
 
