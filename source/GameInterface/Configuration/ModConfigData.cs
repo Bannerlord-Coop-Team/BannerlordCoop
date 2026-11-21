@@ -5,17 +5,13 @@ using System.Collections.Generic;
 
 namespace GameInterface.Configuration;
 
-/// <summary>
-/// The catalog generator at <c>.github/scripts/generate-managed-config-catalog.cjs</c> reads these arguments
-/// directly from C# source text, independently of compilation. Use literals or a <c>const int</c> declared in
-/// <see cref="ModOptionsData"/>. Specify <see cref="AvailableSince"/> for every option.
-/// </summary>
+/// <summary>Describes a managed option for the shipped catalog. Specify <see cref="AvailableSince"/> for every option.</summary>
 [AttributeUsage(AttributeTargets.Property, AllowMultiple = false)]
 public sealed class ManagedConfigOptionAttribute : Attribute
 {
     public string AvailableSince { get; set; }
-    public double Min { get; set; }
-    public double Max { get; set; }
+    public double Min { get; set; } = double.NaN;
+    public double Max { get; set; } = double.NaN;
     public string ItemPattern { get; set; }
     public string ItemFormat { get; set; }
     public bool UniqueItems { get; set; }
