@@ -233,7 +233,7 @@ namespace GameInterface.Services.Inventory.Interfaces
                     {
                         for (int i = 0; i < EquipmentSlotLength; i++)
                         {
-                            // The indexer replicates each changed slot, and clients redraw the hero's visuals on apply
+                            // The indexer replicates every slot, unchanged ones too, so a client holding a stale copy gets reset
                             targetEquipment[i] = equipment._itemSlots[i];
                         }
                     }

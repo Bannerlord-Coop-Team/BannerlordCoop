@@ -2,7 +2,6 @@
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
-using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Utils.LocalEvents;
 using HarmonyLib;
@@ -946,9 +945,18 @@ namespace GameInterface.Utils
         public static IEnumerable<CodeInstruction> ArrayFieldChangeTranspiler<TItem, TMessage>(IEnumerable<CodeInstruction> instructions, string fieldName)
             where TMessage : GenericArrayChangedEvent<TInstance, TItem>
         {
+            var arrayAssignIntercept = typeof(GenericPatches<TPatch, TInstance>).GetMethod(nameof(ArrayAssignIntercept)).MakeGenericMethod(typeof(TItem), typeof(TMessage));
+            return ArrayFieldChangeTranspiler<TItem>(instructions, fieldName, arrayAssignIntercept);
+        }
+
+        /// <summary>
+        /// Same as <see cref="ArrayFieldChangeTranspiler{TItem, TMessage}"/>, but calls <paramref name="arrayAssignIntercept"/>, a patch's own
+        /// (items, index, item, instance) wrapper that ends in <see cref="ArrayAssignIntercept{TItem, TMessage}"/>
+        /// </summary>
+        public static IEnumerable<CodeInstruction> ArrayFieldChangeTranspiler<TItem>(IEnumerable<CodeInstruction> instructions, string fieldName, MethodInfo arrayAssignIntercept)
+        {
             var loadStack = new Stack<CodeInstruction>();
             var fieldInfo = AccessTools.Field(typeof(TInstance), fieldName);
-            var arrayAssignIntercept = typeof(GenericPatches<TPatch, TInstance>).GetMethod(nameof(ArrayAssignIntercept)).MakeGenericMethod(typeof(TItem), typeof(TMessage));
             GenericPatchHelpers.ArrayChangeInterceptCache.TryAdd(fieldInfo, arrayAssignIntercept);
             // TODO: Implement properly with loading the correct instance onto the stack before call the method
 
@@ -1057,16 +1065,10 @@ namespace GameInterface.Utils
                 return;
             }
 
-            if (typeof(TInstance) == typeof(Equipment) && TransientEquipmentSyncScope.IsActive)
-            {
-                items[index] = item;
-                return;
-            }
-
             if (ModInformation.IsClient)
             {
                 // Local copies like clones and previews have no network id, so their writes are not synced state
-                if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) && !objectManager.Contains(instance))
+                if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager) || !objectManager.Contains(instance))
                 {
                     items[index] = item;
                     return;

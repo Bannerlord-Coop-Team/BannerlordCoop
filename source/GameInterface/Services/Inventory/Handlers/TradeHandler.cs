@@ -83,7 +83,6 @@ internal class TradeHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(what.ToRoster, out var toRosterId)) return;
         if (!objectManager.TryGetIdWithLogging(what.Hero, out var heroId)) return;
         if (!objectManager.TryGetIdWithLogging(what.OwnerParty, out var ownerPartyId)) return;
-        if (!objectManager.TryGetIdWithLogging(what.InitialCharacterEquipment.HeroObject, out var initialHeroId)) return;
 
         // CurrentMobileParty can be already destroyed when this logic runs. Attempt to get an id without logging
         objectManager.TryGetId(what.CurrentMobileParty, out var currentMobilePartyId);
@@ -115,7 +114,6 @@ internal class TradeHandler : IHandler
             what.CanGainXpFromDiscarding,
             isManagingWarehouse,
             heroId,
-            initialHeroId,
             what.TotalAmount,
             what.MerchantGold,
             ownerPartyId,
@@ -144,8 +142,6 @@ internal class TradeHandler : IHandler
 
             if (!objectManager.TryGetObjectWithLogging<ItemRoster>(message.ToItemRosterId, out var toRoster)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(message.HeroId, out var hero)) return;
-            if (!objectManager.TryGetObjectWithLogging<MobileParty>(message.OwnerPartyId, out var ownerParty)) return;
-            if (!objectManager.TryGetObjectWithLogging<Hero>(message.InitialHeroId, out var initialHero)) return;
 
             SettlementComponent currentSettlementComponent = null;
             if (!message.IsSettlementComponentNull &&

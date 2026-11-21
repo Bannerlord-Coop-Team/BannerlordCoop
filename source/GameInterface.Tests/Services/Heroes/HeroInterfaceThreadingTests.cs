@@ -32,7 +32,8 @@ public class HeroInterfaceThreadingTests
             Mock.Of<IObjectManager>(),
             Mock.Of<IPartyVisibilitySweep>(),
             Mock.Of<IPlayerPartyRestorer>(),
-            Mock.Of<ITraitLevelingHelperInterface>());
+            Mock.Of<ITraitLevelingHelperInterface>(),
+            null);
 
         Assert.Throws<NullReferenceException>(() => heroInterface.SetupServerHero(null));
     }
