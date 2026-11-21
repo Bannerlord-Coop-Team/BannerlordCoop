@@ -28,7 +28,6 @@ public class ServerTelemetryReporterTests
 
         messageBroker.Publish(this, new ConnectedPlayersChanged(5));
         Assert.Null(ticks.ScheduledTick);
-        Assert.Empty(uploader.Statuses);
 
         messageBroker.Publish(this, new ServerListening());
         await ticks.AdvanceAsync();

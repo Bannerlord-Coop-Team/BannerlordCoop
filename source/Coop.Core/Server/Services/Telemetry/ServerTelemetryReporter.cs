@@ -109,7 +109,6 @@ public class ServerTelemetryReporter : IServerTelemetryReporter
             while (!cancellationToken.IsCancellationRequested)
             {
                 await waitForTick(cancellationToken).ConfigureAwait(false);
-                cancellationToken.ThrowIfCancellationRequested();
 
                 ticksSinceUpload++;
                 var currentPlayerCount = Volatile.Read(ref playerCount);
