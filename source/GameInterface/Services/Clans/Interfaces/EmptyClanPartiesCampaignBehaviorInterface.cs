@@ -50,6 +50,7 @@ public class EmptyClanPartiesCampaignBehaviorInterface : IEmptyClanPartiesCampai
         var ships = new List<Ship>();
         if (!party.IsCurrentlyAtSea)
         {
+            // Clearing Owner removes the ship from party.Ships, so walk it backwards
             for (int i = party.Ships.Count - 1; i >= 0; i--)
             {
                 Ship ship = party.Ships[i];
