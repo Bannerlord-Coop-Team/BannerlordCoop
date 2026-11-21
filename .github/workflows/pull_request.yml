@@ -29,12 +29,24 @@ jobs:
         with:
           ref: ${{ github.sha }}
 
-      - name: Check generated managed configuration catalog
-        run: node .github/scripts/generate-managed-config-catalog.cjs --check
-
       - name: Test scheduled nightly publication decisions
         shell: pwsh
         run: ./.github/scripts/test-nightly-publish-guard.ps1
+
+  managed-config-catalog:
+    name: Managed config catalog
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Check generated managed configuration catalog
+        run: node .github/scripts/generate-managed-config-catalog.cjs --check
 
   build:
     runs-on: ubuntu-latest

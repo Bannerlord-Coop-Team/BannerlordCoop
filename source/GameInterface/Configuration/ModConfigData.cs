@@ -5,15 +5,16 @@ using System.Collections.Generic;
 
 namespace GameInterface.Configuration;
 
-/// <summary>Marks an option for the generated managed configuration catalog.</summary>
+/// <summary>Only the catalog generator reads this attribute and requires explicit
+/// <see cref="Stable"/> and <see cref="AvailableSince"/> values.</summary>
 [AttributeUsage(AttributeTargets.Property, AllowMultiple = false)]
 public sealed class ManagedConfigOptionAttribute : Attribute
 {
-    public bool Stable { get; set; } = true;
-    public string AvailableSince { get; set; } = "0.1.7";
-    public double Min { get; set; } = double.NaN;
-    public double Max { get; set; } = double.NaN;
-    public int MaxItems { get; set; } = -1;
+    public bool Stable { get; set; }
+    public string AvailableSince { get; set; }
+    public double Min { get; set; }
+    public double Max { get; set; }
+    public int MaxItems { get; set; }
     public string ItemPattern { get; set; }
     public bool UniqueItems { get; set; }
     public int CoercePositiveBelow { get; set; }
@@ -192,7 +193,7 @@ public sealed class ModOptionsData
     [ManagedConfigOption(Stable = false, AvailableSince = "0.1.8", Min = 0, CoercePositiveBelow = MinimumPvpResponseTimerSeconds, OmitForOldAgents = true)]
     public int? PvpResponseTimerSeconds { get; set; }
 
-    [ManagedConfigOption(Stable = false, AvailableSince = "0.1.8", Min = -2147483648, Max = 2147483647, OmitForOldAgents = true)]
+    [ManagedConfigOption(Stable = false, AvailableSince = "0.1.8", OmitForOldAgents = true)]
     public int? MaxClansPerKingdom { get; set; }
 
     [ManagedConfigOption(Stable = false, AvailableSince = "0.1.8", OmitForOldAgents = true)]

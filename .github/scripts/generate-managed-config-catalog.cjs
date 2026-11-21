@@ -7,6 +7,12 @@ const sourcePath = 'source/GameInterface/Configuration/ModConfigData.cs';
 const defaultsPath = 'deploy/mod-config.default.json';
 const outputPath = 'deploy/managed-config-catalog.json';
 
+// Match quoted strings whole so only trailing commas outside strings are removed.
+const trailingCommaOrString = /"(?:\\.|[^"\\])*"|,(?=\s*[}\]])/gu;
+
+// [attributes] public Type Name { get; set; }
+const autoPropertyPattern = /(?<attributes>(?:\[(?:"(?:\\.|[^"\\])*"|[^\]"])*\]\s*)*)\bpublic\s+(?<type>[^;={}]+?)\s+(?<name>[A-Za-z_]\w*)\s*\{\s*get\s*;\s*set\s*;\s*\}/gu;
+
 const optionTypes = new Map([
   ['bool', 'boolean'],
   ['int', 'integer'],
@@ -25,6 +31,8 @@ const metadataTypes = new Map([
   ['coercePositiveBelow', 'number'],
   ['omitForOldAgents', 'boolean'],
 ]);
+const numericMetadata = new Set(['min', 'max', 'coercePositiveBelow']);
+const listMetadata = new Set(['maxItems', 'itemPattern', 'uniqueItems']);
 
 function stripComments(text) {
   return text.replace(/"(?:\\.|[^"\\])*"|\/\/[^\r\n]*|\/\*[\s\S]*?\*\//gu, token => token.startsWith('"') ? token : ' ');
@@ -32,7 +40,7 @@ function stripComments(text) {
 
 function parseDefaults(text) {
   const json = stripComments(text.replace(/^\uFEFF/u, ''))
-    .replace(/"(?:\\.|[^"\\])*"|,(?=\s*[}\]])/gu, token => token === ',' ? '' : token);
+    .replace(trailingCommaOrString, token => token === ',' ? '' : token);
   const { modOptions } = JSON.parse(json);
   if (!modOptions || typeof modOptions !== 'object' || Array.isArray(modOptions)) {
     throw new Error('modOptions is missing from the default config');
@@ -53,7 +61,7 @@ function parseEnums(source) {
   return enums;
 }
 
-function parseMetadata(attributes, key, constants) {
+function parseMetadata(attributes, key, optionType, constants) {
   const matches = [...attributes.matchAll(/\[\s*ManagedConfigOption\s*\((?<args>(?:"(?:\\.|[^"\\])*"|[^")])*)\)\s*\]/gu)];
   if (matches.length !== 1) throw new Error(key + ' must have exactly one ManagedConfigOption attribute');
 
@@ -64,8 +72,13 @@ function parseMetadata(attributes, key, constants) {
   for (const match of args.matchAll(argument)) {
     end = match.index + match[0].length;
     const name = match.groups.name[0].toLowerCase() + match.groups.name.slice(1);
-    const type = metadataTypes.get(name);
-    if (!type || Object.hasOwn(metadata, name)) throw new Error('Invalid metadata field for ' + key + ': ' + name);
+    const valueType = metadataTypes.get(name);
+    if (!valueType || Object.hasOwn(metadata, name)) throw new Error('Invalid metadata field for ' + key + ': ' + name);
+    if ((numericMetadata.has(name) && optionType !== 'integer' && optionType !== 'number') ||
+        (listMetadata.has(name) && optionType !== 'steamIdList')) {
+      const field = name === 'coercePositiveBelow' ? 'coerceRanges' : name;
+      throw new Error(field + ' is not valid for ' + optionType + ' option ' + key);
+    }
 
     const raw = match.groups.value;
     let value;
@@ -74,7 +87,7 @@ function parseMetadata(attributes, key, constants) {
     } catch {
       throw new Error('Invalid metadata value for ' + key + ': ' + name + ' = ' + raw);
     }
-    if (typeof value !== type || (type === 'number' && !Number.isFinite(value))) {
+    if (typeof value !== valueType || (valueType === 'number' && !Number.isFinite(value))) {
       throw new Error('Invalid metadata value for ' + key + ': ' + name);
     }
     metadata[name] = value;
@@ -89,6 +102,7 @@ function parseMetadata(attributes, key, constants) {
     if (!Number.isSafeInteger(coercePositiveBelow) || coercePositiveBelow < 1) {
       throw new Error('Invalid positive coercion threshold for ' + key);
     }
+    // Values from 1 through coercePositiveBelow - 1 are raised to coercePositiveBelow.
     if (coercePositiveBelow > 1) constraints.coerceRanges = [[1, coercePositiveBelow - 1, coercePositiveBelow]];
   }
   return constraints;
@@ -124,9 +138,8 @@ function buildCatalog(sourceText, defaultsText, sourceCommit = 'unknown') {
   const enumValues = parseEnums(source);
   const constants = new Map([...body.matchAll(/\bconst\s+int\s+(?<name>\w+)\s*=\s*(?<value>-?\d[\d_]*)\s*;/gu)]
     .map(({ groups: { name, value } }) => [name, Number(value.replaceAll('_', ''))]));
-  const properties = /(?<attributes>(?:\[(?:"(?:\\.|[^"\\])*"|[^\]"])*\]\s*)*)\bpublic\s+(?<type>[^;={}]+?)\s+(?<name>[A-Za-z_]\w*)\s*\{\s*get\s*;\s*set\s*;\s*\}/gu;
   const options = new Map();
-  for (const { groups: { attributes, type: declaredType, name } } of body.matchAll(properties)) {
+  for (const { groups: { attributes, type: declaredType, name } } of body.matchAll(autoPropertyPattern)) {
     if (name === 'UnknownKeys') continue;
 
     const key = name[0].toLowerCase() + name.slice(1);
@@ -136,7 +149,7 @@ function buildCatalog(sourceText, defaultsText, sourceCommit = 'unknown') {
     if (!type) throw new Error('Unsupported managed option type for ' + key + ': ' + declaredType);
     if (!Object.hasOwn(defaults, key)) throw new Error('Default is missing for ' + key);
 
-    const metadata = parseMetadata(attributes, key, constants);
+    const metadata = parseMetadata(attributes, key, type, constants);
     const option = { key, type, ...metadata, ...(values ? { values } : {}), default: defaults[key] };
     validateDefault(option);
     options.set(key, option);

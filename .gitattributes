@@ -6,6 +6,8 @@
 
 # Shell scripts must keep LF line endings so POSIX shells can execute them.
 *.sh text eol=lf
+
+# Keep the generated catalog byte-identical across platforms.
 deploy/managed-config-catalog.json text eol=lf
 
 # Binary files: never apply text/line-ending conversion (it would corrupt them).
