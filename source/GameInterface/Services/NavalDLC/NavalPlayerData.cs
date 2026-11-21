@@ -9,6 +9,7 @@ namespace GameInterface.Services.NavalDLC;
 /// NavalDLCFigureheadCampaignBehavior._lastFigureheadLootTime assumes only one player loots figureheads
 /// ClanFleetManagementCampaignBehavior._sentTroops assumes only one player sends troops away with ships
 /// RaftStateCampaignBehavior._playerCachedShips and _cachedAnchorPoint assumes only one player has cached ships that can be restored
+/// Settlement.ShipStash assumes only one player moors ships
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
 public class NavalPlayerData
@@ -29,15 +30,22 @@ public class NavalPlayerData
     [ProtoMember(4)]
     public Dictionary<string, PlayerCachedFleetData> PlayerCachedFleets { get; }
 
+    // Dictionary<SettlementId, List<OwnerClanId>>, in Settlement.ShipStash order because a ship has no id that survives a save.
+    // Keyed by clan, so an heir keeps the moored ships without a migration.
+    [ProtoMember(5)]
+    public Dictionary<string, List<string>> MooredShipOwnerClans { get; }
+
     public NavalPlayerData(
         Dictionary<string, List<string>> playerUnlockedFigureHeads,
         Dictionary<string, long> playerLastFigureheadLootTimes,
         Dictionary<string, List<SentTroopsData>> playerSentTroops,
-        Dictionary<string, PlayerCachedFleetData> playerCachedFleets)
+        Dictionary<string, PlayerCachedFleetData> playerCachedFleets,
+        Dictionary<string, List<string>> mooredShipOwnerClans = null)
     {
         PlayerUnlockedFigureHeads = playerUnlockedFigureHeads ?? new();
         PlayerLastFigureheadLootTimes = playerLastFigureheadLootTimes ?? new();
         PlayerSentTroops = playerSentTroops ?? new();
         PlayerCachedFleets = playerCachedFleets ?? new();
+        MooredShipOwnerClans = mooredShipOwnerClans ?? new();
     }
 }

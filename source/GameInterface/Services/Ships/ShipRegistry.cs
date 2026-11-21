@@ -47,6 +47,18 @@ internal class ShipRegistry : AutoRegistryBase<Ship>
                 RegisterExistingObject($"Settlement_{settlement.StringId}_{index++}", ship);
             }
         }
+
+        // Moored ships have no owner, so they're only reachable through their port's stash
+        foreach (var settlement in Campaign.Current.CampaignObjectManager.Settlements)
+        {
+            if (settlement.ShipStash == null) continue;
+
+            var index = 0;
+            foreach (var ship in settlement.ShipStash)
+            {
+                RegisterExistingObject($"ShipStash_{settlement.StringId}_{index++}", ship);
+            }
+        }
     }
 
     public override void OnClientCreated(Ship obj, string id)
