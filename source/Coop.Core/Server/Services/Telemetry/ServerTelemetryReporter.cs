@@ -18,8 +18,8 @@ public interface IServerTelemetryReporter : IDisposable
 public class ServerTelemetryReporter : IServerTelemetryReporter
 {
     private static readonly ILogger Logger = LogManager.GetLogger<ServerTelemetryReporter>();
+    // TickInterval * UnchangedRefreshTicks (90s) must stay under the backend's two-minute statistics freshness window.
     private static readonly TimeSpan TickInterval = TimeSpan.FromSeconds(30);
-    // Keep the refresh cadence below the backend's two-minute statistics freshness window.
     private const int UnchangedRefreshTicks = 3;
 
     private readonly IMessageBroker messageBroker;
