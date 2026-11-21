@@ -1306,4 +1306,34 @@
       </EquipmentRoster>
     </Equipments>
   </NPCCharacter>
+  <NPCCharacter
+    id="coop_fixed_npc_d0d44201"
+    name="{=!}Ambrosius"
+    default_group="Infantry"
+    level="1"
+    is_female="false"
+    is_hero="false"
+    is_template="false"
+    occupation="Townsfolk"
+    culture="Culture.empire"
+    is_hidden_encyclopedia="true"
+    coop_settlement="town_EW1"
+    coop_location="tavern"
+    coop_spawn_tag="npc_common"
+    coop_dialogue="Well, hello there..."
+    coop_enabled="true">
+    <face>
+      <face_key_template value="BodyProperty.townsman_empire" />
+    </face>
+    <skills />
+    <Equipments>
+      <EquipmentRoster civilian="true">
+        <equipment slot="Head" id="Item.empire_battle_crown_west" />
+        <equipment slot="Cape" id="Item.battania_warlord_pauldrons" />
+        <equipment slot="Body" id="Item.aserai_scale_armor_on_chain" />
+        <equipment slot="Gloves" id="Item.northern_plated_gloves" />
+        <equipment slot="Leg" id="Item.mail_chausses" />
+      </EquipmentRoster>
+    </Equipments>
+  </NPCCharacter>
 </NPCCharacters>
