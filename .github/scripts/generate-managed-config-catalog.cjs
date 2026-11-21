@@ -1,5 +1,4 @@
 const { createHash } = require('node:crypto');
-const { execFileSync } = require('node:child_process');
 const { readFileSync, writeFileSync } = require('node:fs');
 const path = require('node:path');
 
@@ -29,7 +28,6 @@ const metadataTypes = new Map([
   ['itemPattern', 'string'],
   ['uniqueItems', 'boolean'],
   ['coercePositiveBelow', 'number'],
-  ['omitForOldAgents', 'boolean'],
 ]);
 const numericMetadata = new Set(['min', 'max', 'coercePositiveBelow']);
 const listMetadata = new Set(['maxItems', 'itemPattern', 'uniqueItems']);
@@ -129,7 +127,7 @@ function validateDefault(option) {
   }
 }
 
-function buildCatalog(sourceText, defaultsText, sourceCommit = 'unknown') {
+function buildCatalog(sourceText, defaultsText) {
   const source = stripComments(sourceText);
   const defaults = parseDefaults(defaultsText);
   const body = source.match(/\bpublic\s+sealed\s+class\s+ModOptionsData\s*\{(?<body>[\s\S]*?)^\}/mu)?.groups.body;
@@ -163,52 +161,27 @@ function buildCatalog(sourceText, defaultsText, sourceCommit = 'unknown') {
   }
 
   const entries = [...options.values()];
-  const digest = createHash('sha256').update(JSON.stringify(entries)).digest('hex');
-  const oldAgentOmittedKeys = entries.filter(option => option.omitForOldAgents).map(option => option.key);
-  const catalog = {
-    schemaVersion: 2,
-    catalogRevision: digest,
-    contentDigest: digest,
-    sourceCommit,
-    source: 'BannerlordCoop/' + sourcePath,
-    oldAgentOmittedKeys,
-    options: entries,
-  };
-  return JSON.stringify(catalog, null, 2) + '\n';
+  const contentDigest = createHash('sha256').update(JSON.stringify(entries)).digest('hex');
+  return JSON.stringify({ contentDigest, options: entries }, null, 2) + '\n';
 }
 
 function main() {
   const root = path.resolve(__dirname, '../..');
   const read = file => readFileSync(path.join(root, file), 'utf8');
-  const check = process.argv.includes('--check');
-  let sourceCommit = 'unknown';
-  if (!check) {
-    try {
-      sourceCommit = execFileSync('git', ['log', '-1', '--format=%H', '--', sourcePath], {
-        cwd: root,
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'ignore'],
-        windowsHide: true,
-      }).trim() || sourceCommit;
-    } catch { /* Source archives do not have Git history. */ }
+  const output = buildCatalog(read(sourcePath), read(defaultsPath));
+  if (!process.argv.includes('--check')) {
+    writeFileSync(path.join(root, outputPath), output, 'utf8');
+    return;
   }
 
-  const output = buildCatalog(read(sourcePath), read(defaultsPath), sourceCommit);
-  if (check) {
-    let current;
-    try {
-      current = JSON.parse(read(outputPath).replace(/^\uFEFF/u, ''));
-    } catch (error) {
-      if (error.code !== 'ENOENT' && !(error instanceof SyntaxError)) throw error;
-    }
-    const expected = JSON.parse(output);
-    // Shallow CI checkouts may lack the source commit recorded when the catalog was generated.
-    if (current && typeof current.sourceCommit === 'string') expected.sourceCommit = current.sourceCommit;
-    if (JSON.stringify(current) !== JSON.stringify(expected)) {
-      throw new Error(outputPath + ' is stale; run node .github/scripts/generate-managed-config-catalog.cjs');
-    }
-  } else {
-    writeFileSync(path.join(root, outputPath), output, 'utf8');
+  let current;
+  try {
+    current = read(outputPath);
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+  }
+  if (current !== output) {
+    throw new Error(outputPath + ' is stale; run node .github/scripts/generate-managed-config-catalog.cjs');
   }
 }
 
