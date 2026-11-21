@@ -21,8 +21,6 @@ internal class PlayerPartyPvpRules : IPlayerPartyPvpRules
 {
     // How long an attacker can do nothing while pvpBlockLeave hides Leave and pvpResponseTimerSeconds is off.
     internal const int BlockLeaveIdleSeconds = 30;
-    // Lower pvpResponseTimerSeconds values count as this, so a player has time to read the dialog.
-    internal const int MinimumResponseTimerSeconds = 10;
 
     public bool IsEnabled(ModOptions options)
         => options.PvpBlockLeave || HasResponseTimer(options);
@@ -37,7 +35,7 @@ internal class PlayerPartyPvpRules : IPlayerPartyPvpRules
     public int GetIdleSeconds(PlayerPartyInteractionSession session, ModOptions options)
     {
         if (session.Proposal == PlayerPartyInteractionProposal.Trade) return 0;
-        if (HasResponseTimer(options)) return Math.Max(MinimumResponseTimerSeconds, options.PvpResponseTimerSeconds);
+        if (HasResponseTimer(options)) return Math.Max(ModOptionsData.MinimumPvpResponseTimerSeconds, options.PvpResponseTimerSeconds);
 
         // Only pvpBlockLeave is on: an idle attacker is released, otherwise a responder without Leave has nothing to pick.
         if (session.IsResponderTurn() || !session.IsLeaveHidden) return 0;
