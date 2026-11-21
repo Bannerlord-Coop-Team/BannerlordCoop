@@ -55,7 +55,8 @@ public enum PlayerPartyInteractionVassalUnavailableReason
     TargetIsNotKingdomLeader,
     InitiatorHasNoClan,
     InitiatorIsInKingdom,
-    InitiatorClanTierTooLow
+    InitiatorClanTierTooLow,
+    KingdomFull
 }
 
 public enum PlayerPartyInteractionMercenaryUnavailableReason
@@ -70,7 +71,8 @@ public enum PlayerPartyInteractionMercenaryUnavailableReason
     ClanIsInKingdom,
     TargetHasNoKingdom,
     IsAtWarWithTarget,
-    IncompatibleWars
+    IncompatibleWars,
+    KingdomFull
 }
 public enum PlayerPartyInteractionProposal
 {

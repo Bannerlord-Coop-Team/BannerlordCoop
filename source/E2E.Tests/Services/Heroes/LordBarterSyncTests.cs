@@ -2,6 +2,7 @@
 using Common.Util;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Services.MapEvents;
+using GameInterface.Configuration;
 using GameInterface.Services.Barters;
 using GameInterface.Services.Barters.Handlers;
 using GameInterface.Services.Barters.Messages;
@@ -971,13 +972,19 @@ public class LordBarterSyncTests : MapEventTestBase
         return false;
     }
 
-    [Fact]
-    public void JoinKingdomBarter_Accepted_SynchronizesDestinationKingdomClanList()
+    // The destination kingdom has two clans, its ruler's and the player's.
+    [Theory]
+    [InlineData(0, true)]
+    [InlineData(2, false)]
+    public void JoinKingdomBarter_SynchronizesDestinationKingdomClanList_UnlessItHasMaxClansPerKingdom(int maxClansPerKingdom, bool accepted)
     {
+        var previousOptions = ModConfigProvider.ModOptions;
         var client = Clients.First();
         var player = CreatePartyWithRegisteredLeader();
         var target = CreatePartyWithRegisteredLeader();
         var ruler = CreatePartyWithRegisteredLeader();
+        // Vanilla's CanHeroDefectToFaction never offers a kingdom's ruler, so the recruited lord serves another one.
+        var originRuler = CreatePartyWithRegisteredLeader();
         var destinationKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
         var originalKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
         var requestId = Guid.NewGuid().ToString("N");
@@ -990,6 +997,7 @@ public class LordBarterSyncTests : MapEventTestBase
                 Assert.True(instance.ObjectManager.TryGetObject<Hero>(player.HeroId, out var playerHero));
                 Assert.True(instance.ObjectManager.TryGetObject<Hero>(target.HeroId, out var targetHero));
                 Assert.True(instance.ObjectManager.TryGetObject<Hero>(ruler.HeroId, out var rulerHero));
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(originRuler.HeroId, out var originRulerHero));
                 Assert.True(instance.ObjectManager.TryGetObject<Kingdom>(destinationKingdomId, out var destinationKingdom));
                 Assert.True(instance.ObjectManager.TryGetObject<Kingdom>(originalKingdomId, out var originalKingdom));
 
@@ -1002,7 +1010,9 @@ public class LordBarterSyncTests : MapEventTestBase
                     rulerHero.Clan._kingdom = destinationKingdom;
                     playerHero.Clan._kingdom = destinationKingdom;
 
-                    originalKingdom._rulingClan = targetHero.Clan;
+                    originalKingdom._rulingClan = originRulerHero.Clan;
+                    originalKingdom._clans.Add(originRulerHero.Clan);
+                    originRulerHero.Clan._kingdom = originalKingdom;
                     originalKingdom._clans.Add(targetHero.Clan);
                     targetHero.Clan._kingdom = originalKingdom;
                 }
@@ -1035,6 +1045,7 @@ public class LordBarterSyncTests : MapEventTestBase
                     nameof(AcceptLordDefectionOffer)));
         });
 
+        ModConfigProvider.ModOptions = new ModOptions(new ModOptionsData { MaxClansPerKingdom = maxClansPerKingdom });
         try
         {
             client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkAuthorizeLordBarter(
@@ -1056,7 +1067,9 @@ public class LordBarterSyncTests : MapEventTestBase
             TestEnvironment.FlushCoalescer();
 
             var result = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkLordBarterResult>());
-            Assert.True(result.Accepted, result.Reason);
+            Assert.True(result.Accepted == accepted, result.Reason);
+            if (!accepted)
+                Assert.Contains("already has the most clans this server allows (2)", result.Reason);
 
             void AssertMembership(EnvironmentInstance instance)
             {
@@ -1065,9 +1078,11 @@ public class LordBarterSyncTests : MapEventTestBase
                     Assert.True(instance.ObjectManager.TryGetObject<Hero>(target.HeroId, out var targetHero));
                     Assert.True(instance.ObjectManager.TryGetObject<Kingdom>(destinationKingdomId, out var destinationKingdom));
                     Assert.True(instance.ObjectManager.TryGetObject<Kingdom>(originalKingdomId, out var originalKingdom));
-                    Assert.Same(destinationKingdom, targetHero.Clan.Kingdom);
-                    Assert.Contains(targetHero.Clan, destinationKingdom.Clans);
-                    Assert.DoesNotContain(targetHero.Clan, originalKingdom.Clans);
+                    var expectedKingdom = accepted ? destinationKingdom : originalKingdom;
+                    var otherKingdom = accepted ? originalKingdom : destinationKingdom;
+                    Assert.Same(expectedKingdom, targetHero.Clan.Kingdom);
+                    Assert.Single(expectedKingdom.Clans, clan => clan == targetHero.Clan);
+                    Assert.DoesNotContain(targetHero.Clan, otherKingdom.Clans);
                 });
             }
 
@@ -1078,6 +1093,7 @@ public class LordBarterSyncTests : MapEventTestBase
         finally
         {
             harmony.UnpatchAll(harmony.Id);
+            ModConfigProvider.ModOptions = previousOptions;
         }
     }
 
@@ -1931,7 +1947,7 @@ public class LordBarterSyncTests : MapEventTestBase
 
     /// <summary>
     /// A registered player whose clan belongs to the destination kingdom, and a target leading a clan in
-    /// another kingdom. Set on every instance, like JoinKingdomBarter_Accepted_SynchronizesDestinationKingdomClanList.
+    /// another kingdom. Set on every instance, like JoinKingdomBarter_SynchronizesDestinationKingdomClanList_UnlessItHasMaxClansPerKingdom.
     /// </summary>
     private DefectionFixture CreateDefectionFixture(
         EnvironmentInstance client,
