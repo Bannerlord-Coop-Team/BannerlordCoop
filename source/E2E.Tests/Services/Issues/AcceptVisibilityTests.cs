@@ -1,4 +1,10 @@
-﻿using Common.Util;
+﻿using TaleWorlds.Core;
+using TaleWorlds.CampaignSystem.Encyclopedia;
+using TaleWorlds.CampaignSystem.Conversation;
+using HarmonyLib;
+using E2E.Tests.Util;
+using Common.Network;
+using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using Coop.Core.Server.Connections.Messages;
@@ -8,7 +14,6 @@ using GameInterface.Services.Issues.Framework.AcceptCoordination;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Framework.Registries;
-using GameInterface.Services.Issues.Framework.Visibility;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.LogEntries;
@@ -229,8 +234,8 @@ public class AcceptVisibilityTests : IDisposable
         Owner.SimulateMessage(this, accepted);
         Other.SimulateMessage(this, accepted);
 
-        Owner.Call(() => Assert.False(QuestScreenIssueFilterPatch.IsAnotherPlayersTroopsMission(ownerIssue)));
-        Other.Call(() => Assert.True(QuestScreenIssueFilterPatch.IsAnotherPlayersTroopsMission(otherIssue)));
+        Owner.Call(() => Assert.False(Owner.Resolve<IIssueMissionVisibility>().IsAnotherPlayersTroopsMission(ownerIssue)));
+        Other.Call(() => Assert.True(Other.Resolve<IIssueMissionVisibility>().IsAnotherPlayersTroopsMission(otherIssue)));
     }
 
     private static void LoadTroopsMissionFromSave(EnvironmentInstance instance, IssueBase issue, string troopId)
@@ -268,7 +273,7 @@ public class AcceptVisibilityTests : IDisposable
             Assert.True(otherIssue.AlternativeSolutionSentTroops.TotalManCount > 0);
             Assert.True(Other.Resolve<IIssueOwnershipRegistry>().TryGetOwner(notableId, IssueId, out var ownerControllerId));
             Assert.Equal(OwnerControllerId, ownerControllerId);
-            Assert.True(QuestScreenIssueFilterPatch.IsAnotherPlayersTroopsMission(otherIssue));
+            Assert.True(Other.Resolve<IIssueMissionVisibility>().IsAnotherPlayersTroopsMission(otherIssue));
         });
     }
 
@@ -281,27 +286,113 @@ public class AcceptVisibilityTests : IDisposable
         ServerKnowsTheOwner(notableId);
         LoadTroopsMissionFromSave(Owner, ownerIssue, troopId);
 
-        Owner.Call(() => Assert.True(QuestScreenIssueFilterPatch.IsAnotherPlayersTroopsMission(ownerIssue)));
+        Owner.Call(() => Assert.True(Owner.Resolve<IIssueMissionVisibility>().IsAnotherPlayersTroopsMission(ownerIssue)));
 
         Server.SimulateMessage(this, new PlayerCampaignEntered(Owner.NetPeer));
 
-        Owner.Call(() => Assert.False(QuestScreenIssueFilterPatch.IsAnotherPlayersTroopsMission(ownerIssue)));
+        Owner.Call(() => Assert.False(Owner.Resolve<IIssueMissionVisibility>().IsAnotherPlayersTroopsMission(ownerIssue)));
     }
 
     [Fact]
     public void SendTroops_TheSnapshotReplacesAnOwnerTheClientRememberedFromBefore()
     {
         var notableId = TestEnvironment.CreateRegisteredObject<Hero>();
-        AddIssue(Other, notableId);
+        var otherIssue = AddIssue(Other, notableId);
         ServerKnowsTheOwner(notableId);
         Other.Call(() => Assert.True(Other.Resolve<IIssueOwnershipRegistry>().TrySetOwner(notableId, IssueId, "stale-player")));
 
+        Server.Resolve<TestNetworkRouter>().ReceiveContext = TestNetworkReceiveContext.PollerThread;
         Server.SimulateMessage(this, new PlayerCampaignEntered(Other.NetPeer));
+        Other.PumpGameThread();
 
         Other.Call(() =>
         {
             Assert.True(Other.Resolve<IIssueOwnershipRegistry>().TryGetOwner(notableId, IssueId, out var ownerControllerId));
             Assert.Equal(OwnerControllerId, ownerControllerId);
+            Assert.Equal(IssueBase.IssueState.Ongoing, otherIssue._issueState);
+        });
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void DeferredSnapshotCancellationKeepsTheOwnerEndingAndReplacementOwnership(bool replacement)
+    {
+        var scenario = new QuestScenario(TestEnvironment);
+        scenario.AttachQuest(Server);
+        var quest = scenario.AttachQuest(Owner);
+        Owner.Call(() => quest.StartQuest());
+        Owner.Call(() =>
+        {
+            Assert.True(Owner.Resolve<IIssueOwnershipRegistry>().TrySetOwner(
+                scenario.NotableId, QuestScenario.IssueId, QuestScenario.ControllerA));
+            Campaign.Current.EncyclopediaManager ??= new EncyclopediaManager();
+            Campaign.Current.EncyclopediaManager.CreateEncyclopediaPages();
+            var character = ObjectHelper.SkipConstructor<CharacterObject>();
+            character.HeroObject = Owner.GetRegisteredObject<Hero>(scenario.NotableId);
+            Campaign.Current.ConversationManager.SetupAndStartMapConversation(null,
+                new MapConversationAgent(character), new MapConversationAgent(CharacterObject.PlayerCharacter));
+            Assert.True(Campaign.Current.ConversationManager.IsConversationInProgress);
+            Owner.Resolve<IIssueConversationGuard>().RunWhenNotTalkingTo(() => { }, scenario.NotableId);
+        }, new[] { AccessTools.Method(typeof(ConversationManager), nameof(ConversationManager.StartNew)) });
+
+        using var cancels = new MethodCallRecorder(Priority.First, true,
+            AccessTools.Method(typeof(QuestBase), nameof(QuestBase.CompleteQuestWithCancel)));
+        var fakeEndingsBefore = Owner.InternalMessages.GetMessageCount<NetworkIssueFinalized>();
+        Server.Resolve<TestNetworkRouter>().ReceiveContext = TestNetworkReceiveContext.PollerThread;
+        Server.Call(() => Server.Resolve<INetwork>().Send(Owner.NetPeer,
+            new NetworkIssueOwnershipSnapshot(replacement
+                ? new[] { new IssueOwnershipData(scenario.NotableId, "replacement_issue", QuestScenario.ControllerB) }
+                : Array.Empty<IssueOwnershipData>())));
+        Owner.PumpGameThread();
+        Owner.Call(() =>
+        {
+            Assert.True(quest.IsOngoing);
+            Assert.False(Owner.Resolve<IIssueOwnershipRegistry>().TryGetOwner(scenario.NotableId, QuestScenario.IssueId, out _));
+            Assert.Equal(0, cancels.CountFor(Owner));
+            Campaign.Current.ConversationManager.EndConversation();
+            Assert.True(quest.IsFinalized);
+            Assert.DoesNotContain(quest, Campaign.Current.QuestManager.Quests);
+            if (replacement)
+            {
+                Assert.True(Owner.Resolve<IIssueOwnershipRegistry>().TryGetOwner(scenario.NotableId, "replacement_issue", out var controllerId));
+                Assert.Equal(QuestScenario.ControllerB, controllerId);
+            }
+            else Assert.Empty(Owner.Resolve<IIssueOwnershipRegistry>().GetAll());
+        });
+        Assert.Equal(1, cancels.CountFor(Owner));
+        Assert.Equal(fakeEndingsBefore, Owner.InternalMessages.GetMessageCount<NetworkIssueFinalized>());
+    }
+
+    [Fact]
+    public void APollerSnapshotForADifferentIssueKeepsTheNewOwnerAfterGameThreadApplication()
+    {
+        var notableId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var oldIssue = AddIssue(Other, notableId);
+        Other.Call(() => Assert.True(Other.Resolve<IIssueOwnershipRegistry>().TrySetOwner(notableId, IssueId, "stale-player")));
+        Server.Resolve<TestNetworkRouter>().ReceiveContext = TestNetworkReceiveContext.PollerThread;
+
+        Server.Call(() => Server.Resolve<INetwork>().Send(Other.NetPeer,
+            new NetworkIssueOwnershipSnapshot(new[]
+            {
+                new IssueOwnershipData(notableId, "new_issue", OwnerControllerId),
+            })));
+
+        Assert.True(Other.PendingGameThreadActionCount > 0);
+        Other.Call(() =>
+        {
+            Assert.False(Other.Resolve<IIssueOwnershipRegistry>().TryGetOwner(notableId, "new_issue", out _));
+            Assert.True(Other.Resolve<IIssueOwnershipRegistry>().TryGetOwner(notableId, IssueId, out var remembered));
+            Assert.Equal("stale-player", remembered);
+        });
+
+        Other.PumpGameThread();
+
+        Other.Call(() =>
+        {
+            Assert.True(Other.Resolve<IIssueOwnershipRegistry>().TryGetOwner(notableId, "new_issue", out var controllerId));
+            Assert.Equal(OwnerControllerId, controllerId);
+            Assert.True(oldIssue._areIssueEffectsResolved);
         });
     }
 

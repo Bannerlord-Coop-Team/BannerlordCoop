@@ -24,8 +24,9 @@ internal class EscortVisibilityPatch
         if (__instance.CurrentSettlement != null && __instance.LeaderHero?.ClanBanner == null &&
             !(__instance.MapEvent?.IsSiegeAssault == true && __instance.Party.Side == BattleSideEnum.Attacker)) return false;
         var ownerParty = MobileParty.MainParty;
-        PartyBase.CalculateVisibilityAndInspected(ownerParty.Position.ToVec2(), __instance,
-            out __result, out _, ownerParty.SeeingRange);
+        // v1.5 moved PartyBase.CalculateVisibilityAndInspected into MapVisibilityModel
+        Campaign.Current.Models.MapVisibilityModel.GetMobilePartyVisibilityAndInspectedState(__instance,
+            new[] { ownerParty.Position.ToVec2() }, ownerParty.SeeingRange, out __result, out _);
         return false;
     }
 }

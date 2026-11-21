@@ -29,9 +29,10 @@ namespace GameInterface.Services.MobileParties;
 internal interface IServerPlayerUnstuck
 {
     /// <summary>
-    /// Force-applies every applicable exit for the player's registered party and hero, releases every
-    /// party (not only the player's) still linked to a battle that already ended, ends battles left with no
-    /// healthy troops on one side, ends the raft state of a party stranded on land, then moves a free party
+    /// Force-applies every applicable exit for the player's registered party and hero, sends a raft at sea toward
+    /// shore again, releases every party (not only the player's) still linked to a battle that already ended,
+    /// takes the party out of its battle, ends battles left with no healthy troops on one side,
+    /// ends the raft state of a party stranded on land, then moves a free party
     /// off a map spot it cannot move from, each step guarded independently, and sends the result to the
     /// player's connection when it has one. Runs on the game thread.
     /// </summary>
@@ -155,30 +156,45 @@ internal class ServerPlayerUnstuck : IServerPlayerUnstuck
             });
         }
 
+        // A raft at sea outside a battle whose move to shore was lost. Before every step that can clear the party's map event
+        // side, because leaving a battle fires PartyOccupancyChanged and PlayerRaftHandler resumes the raft from there.
+        // raftFleetInterface is only registered while War Sails is on
+        if (raftFleetInterface != null)
+        {
+            TryStep(actions, "raft resume", () =>
+                raftFleetInterface.ResumeRaft(party)
+                    ? $"Sent the raft toward the nearest shore at {Format(party.MoveTargetPoint)}."
+                    : null);
+        }
+
         // Nothing ends a battle again once it ended, so parties it kept linked never move. Release them
         // all, lords and garrisons too, since they can block a town for everyone.
         TryStep(actions, "ended battle release", () =>
         {
-            // Broadcast as each party is released, so a later group that throws can't swallow it. The cleaner
-            // logs a failed broadcast and keeps going, so count the ones that reached the clients.
+            var (releasedParties, failedMapEventIds) = mapEventLoadCleaner.ReleaseEndedMapEventLinks();
             var broadcastCount = 0;
-            var releasedParties = mapEventLoadCleaner.ReleaseEndedMapEventLinks(releasedParty =>
+            foreach (var releasedParty in releasedParties)
             {
                 if (!objectManager.TryGetIdWithLogging(releasedParty, out var releasedPartyId))
-                    return;
+                    continue;
 
                 network.SendAll(new NetworkPartyLeftBattle(releasedPartyId, finishLocalMenus: false));
                 broadcastCount++;
-            });
+            }
 
-            if (releasedParties.Length == 0)
-                return null;
+            var lines = new List<string>();
+            if (releasedParties.Length > 0)
+                lines.Add($"Released {releasedParties.Length} parties still linked to a battle that already ended.");
 
-            var line = $"Released {releasedParties.Length} parties still linked to a battle that already ended.";
             var unreported = releasedParties.Length - broadcastCount;
-            return unreported == 0
-                ? line
-                : $"{line} Could not tell clients about {unreported} of them, see the server log.";
+            if (unreported > 0)
+                lines.Add($"Could not tell clients about {unreported} of them, see the server log.");
+
+            // The cleaner logs a battle that fails and moves on to the next one, so only this line reports it.
+            if (failedMapEventIds.Length > 0)
+                lines.Add($"Failed ended battle release for map events {string.Join(", ", failedMapEventIds)}, see the server log.");
+
+            return lines.Count == 0 ? null : string.Join(" ", lines);
         });
 
         if (party.Party?.MapEvent != null)

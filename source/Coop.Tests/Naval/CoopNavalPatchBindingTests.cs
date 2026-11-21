@@ -24,6 +24,8 @@ public class CoopNavalPatchBindingTests
         AccessTools.Method(typeof(NavalTransitionCampaignBehaviorPatches), nameof(NavalTransitionCampaignBehaviorPatches.SetSailConsequencePrefix)),
         AccessTools.Method(typeof(RaftStateCampaignBehaviorPatches), nameof(RaftStateCampaignBehaviorPatches.PlayerRaftStateContinueOnConsequencePrefix)),
         AccessTools.Method(typeof(NavalDLCFigureheadCampaignBehaviorPatches), "OnFigureheadUnlockedPrefix"),
+        // The vanilla naval roller stays off on both sides because IncidentsCampaignBehaviourInterface rolls those triggers per player on the server
+        AccessTools.Method(typeof(NavalIncidentsCampaignBehaviourPatches), nameof(NavalIncidentsCampaignBehaviourPatches.TryInvokeIncidentPrefix)),
     };
 
     public static IEnumerable<object[]> PatchClasses => AccessTools.GetTypesFromAssembly(typeof(CoopNavalModule).Assembly)

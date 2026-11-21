@@ -8,13 +8,13 @@ using TaleWorlds.CampaignSystem.Party;
 namespace GameInterface.Services.MapEvents;
 
 /// <summary>
-/// Keeps a hideout encounter that holds staged battle results open until its loot flow finishes it.
+/// Keeps a hideout encounter that holds staged battle results, or a send troops result menu, open until its own flow finishes it.
 /// </summary>
 public interface IHideoutResultEncounter
 {
     /// <summary>
     /// Keeps the main party's encounter through a replicated settlement leave while it holds staged hideout
-    /// battle results. Returns false when the leave should close the encounter as usual.
+    /// battle results or a send troops result menu. Returns false when the leave should close the encounter as usual.
     /// </summary>
     bool TryKeepThroughLeave(MobileParty party);
 }
@@ -32,14 +32,14 @@ internal class HideoutResultEncounter : IHideoutResultEncounter
         if (party != mainParty || settlement == null || !IsHoldingResults(encounter))
             return false;
 
-        // Same gate and hold as the settlement close, without finishing the encounter that holds the loot.
+        // Same gate and hold as the settlement close, without finishing the encounter that holds the loot or the send troops result menu.
         using (new AllowedThread())
         {
             mainParty.Position = settlement.GatePosition;
             mainParty.SetMoveModeHold();
         }
 
-        Logger.Debug("Kept hideout encounter {MapEventId} with staged results through replicated settlement leave",
+        Logger.Debug("Kept hideout result encounter {MapEventId} through replicated settlement leave",
             encounter._mapEvent.StringId);
         return true;
     }

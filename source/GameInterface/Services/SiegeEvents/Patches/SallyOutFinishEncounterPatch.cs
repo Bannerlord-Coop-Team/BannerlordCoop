@@ -25,7 +25,8 @@ internal class SallyOutFinishEncounterPatch
         if (MobileParty.MainParty?.AttachedTo != null) return;
 
         var mapEvent = PlayerEncounter.Current?._mapEvent;
-        if (mapEvent == null) return;
+        // v1.5 reads the battle type from the component, which a client's map event can lack
+        if (mapEvent?.Component == null) return;
         if (!mapEvent.IsSallyOut && !mapEvent.IsBlockadeSallyOut) return;
 
         __state = mapEvent.MapEventSettlement;

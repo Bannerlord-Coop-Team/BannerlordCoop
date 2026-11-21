@@ -43,8 +43,8 @@ public sealed class ModConfigData
 
 /// <summary>
 /// The "difficulty" block. Properties remain nullable so malformed or unreadable
-/// input can fall back safely, while ModConfig activates or fills the documented
-/// values before a normal load. CampaignOptions values live IN the save, so joining
+/// input can fall back safely. ModConfig adds settings missing from the shipped template
+/// before a normal load, while commented-out keys stay null. CampaignOptions values live IN the save, so joining
 /// clients inherit them with the join-time save transfer. PlayerReceivedDamage is
 /// engine config and is pushed to clients as a join-time ServerOption.
 /// </summary>
@@ -185,6 +185,10 @@ public sealed class ModOptionsData
     [ManagedConfigOption(Stable = false, AvailableSince = "0.1.8", Min = 0, Max = 86400, CoerceRanges = "1-9=10", OmitForOldAgents = true)]
     public int? PvpResponseTimerSeconds { get; set; }
 
+    public int? MaxClansPerKingdom { get; set; }
+
+    public bool? MaxClansPerKingdomCountsMercenaries { get; set; }
+
     /// <summary>Whether a dedicated server runs War Sails (NavalDLC) co-op. It parses the file itself; declared so the key isn't reported as unknown.</summary>
     [ManagedConfigOption(Stable = false, AvailableSince = "0.1.8", OmitForOldAgents = true)]
     public bool? WarSails { get; set; }
@@ -197,13 +201,13 @@ public sealed class ModOptionsData
 /// How long a lord remembers refusing a recruitment attempt.
 /// </summary>
 /// <remarks>
-/// Vanilla keeps each attempt for one in-game year and blocks the lord until it expires. That
+/// Vanilla blocks the lord for one in-game season after a refused attempt. That
 /// bookkeeping is filled in only by the machine that ran the conversation, so co-op has to choose
 /// what a client's list means.
 /// </remarks>
 public enum LordDefectionRetryMode
 {
-    /// <summary>Vanilla: a refusal blocks that lord for one in-game year, then expires.</summary>
+    /// <summary>Vanilla: a refusal blocks that lord for one in-game season, then expires.</summary>
     Vanilla,
 
     /// <summary>A refusal blocks that lord for the rest of the session.</summary>

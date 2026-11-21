@@ -8,6 +8,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.Incidents;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 
@@ -33,8 +34,8 @@ internal class IncidentsCampaignBehaviourPatches
     [HarmonyPrefix]
     public static bool OnGameMenuOptionSelectedPrefix(IncidentsCampaignBehaviour __instance, GameMenu gameMenu, GameMenuOption option)
     {
-        // Only settlement menus can trigger incidents, so skip sending the rest
-        if (gameMenu.StringId is not ("town" or "castle" or "village")) return false;
+        // Only settlement and port menus can trigger incidents, so skip sending the rest
+        if (gameMenu.StringId is not ("town" or "castle" or "village" or "port_menu")) return false;
 
         // Send to server to run interface version of method
         var message = new IncidentsGameMenuOptionSelected(Hero.MainHero, MobileParty.MainParty, gameMenu.StringId, option.IdString);
@@ -114,8 +115,14 @@ internal class IncidentsCampaignBehaviourPatches
         return false;
     }
 
-    // Directly called in IncidentsHandler
-    [HarmonyPatch(nameof(IncidentsCampaignBehaviour.OnIncidentResolved))]
+}
+
+// v1.5 moved OnIncidentResolved into IncidentManager.IncidentResolved, which keeps one global cooldown.
+// IncidentsHandler keeps the cooldowns per player instead.
+[HarmonyPatch(typeof(IncidentManager))]
+internal class IncidentManagerResolvedPatches
+{
+    [HarmonyPatch(nameof(IncidentManager.IncidentResolved))]
     [HarmonyPrefix]
-    public static bool OnIncidentResolvedPrefix() => false;
+    public static bool IncidentResolvedPrefix() => false;
 }

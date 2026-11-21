@@ -8,6 +8,7 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.Core;
 
@@ -47,6 +48,19 @@ internal class ShipRegistry : AutoRegistryBase<Ship>
                 RegisterExistingObject($"Settlement_{settlement.StringId}_{index++}", ship);
             }
         }
+
+        // An empty clan party keeps its ships without an owner until its leader returns
+        var emptyClanParties = Campaign.Current.GetCampaignBehavior<EmptyClanPartiesCampaignBehavior>()?._emptyClanParties;
+        if (emptyClanParties == null) return;
+
+        foreach (var emptyClanParty in emptyClanParties)
+        {
+            var index = 0;
+            foreach (var ship in emptyClanParty.Ships)
+            {
+                RegisterExistingObject($"EmptyClanParty_{emptyClanParty.Leader.StringId}_{index++}", ship);
+            }
+        }
     }
 
     public override void OnClientCreated(Ship obj, string id)
@@ -63,6 +77,13 @@ internal class ShipRegistry : AutoRegistryBase<Ship>
 
     public override void OnClientDestroyed(Ship obj, string id)
     {
+        // DestroyShipAction clears the owner, but its patched copy is compiled before the Owner sync patch is
+        // applied, and v1.5's smaller Owner setter can be inlined into it, so that owner change never reaches
+        // the clients. Clearing it here also takes the ship off the owner's ship list.
+        using (new AllowedThread())
+        {
+            obj.Owner = null;
+        }
     }
 
     public override void OnServerCreated(Ship obj, string id)

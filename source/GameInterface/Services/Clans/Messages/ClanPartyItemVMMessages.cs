@@ -1,20 +1,21 @@
 ﻿using Common.Messaging;
-using TaleWorlds.CampaignSystem.Party;
+using GameInterface.Services.Clans.Data;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Clans.Messages;
 
-public readonly struct PartyBehaviorUpdatedOnSelection : IEvent
+public readonly struct PartyConfigurationChangedOnSelection : IEvent
 {
-    public readonly MobileParty MobileParty;
-    public readonly MobileParty.PartyObjective PartyObjective;
+    public readonly Hero Leader;
+    public readonly PartyConfigurationFlag Flag;
+    public readonly bool Value;
 
-    public PartyBehaviorUpdatedOnSelection(
-        MobileParty mobileParty,
-        MobileParty.PartyObjective partyObjective)
+    public PartyConfigurationChangedOnSelection(Hero leader, PartyConfigurationFlag flag, bool value)
     {
-        MobileParty = mobileParty;
-        PartyObjective = partyObjective;
+        Leader = leader;
+        Flag = flag;
+        Value = value;
     }
 }
 

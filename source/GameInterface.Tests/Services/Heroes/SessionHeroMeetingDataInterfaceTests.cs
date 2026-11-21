@@ -22,7 +22,7 @@ public class SessionHeroMeetingDataInterfaceTests
     [Fact]
     public void RecordMeeting_NewPlayerAndHero_AddsMeetingTime()
     {
-        meetingDataInterface.RecordMeeting("Hero_Player", "lord_6_1", 1351);
+        Assert.True(meetingDataInterface.RecordMeeting("Hero_Player", "lord_6_1", 1351));
 
         Assert.Equal(
             1351,
@@ -34,7 +34,7 @@ public class SessionHeroMeetingDataInterfaceTests
     {
         meetingDataInterface.RecordMeeting("Hero_Player", "lord_6_1", 1351);
 
-        meetingDataInterface.RecordMeeting("Hero_Player", "lord_6_1", 2462);
+        Assert.False(meetingDataInterface.RecordMeeting("Hero_Player", "lord_6_1", 2462));
 
         Assert.Equal(
             2462,

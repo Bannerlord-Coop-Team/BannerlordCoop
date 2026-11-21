@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     container:
-      image: ghcr.io/bannerlord-coop-team/bannerlordcoop:latest
+      image: ghcr.io/bannerlord-coop-team/bannerlordcoop:v1.5.7
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -67,6 +67,7 @@ jobs:
             -p:SourceRevisionId="$GITHUB_SHA" \
             -p:IncludeSourceRevisionInInformationalVersion=true \
             -p:CoopVersion="${GITHUB_REF_NAME#v}" -p:ModName= \
+            -p:CoopNavalDlc=true \
             -p:NuGetAudit=false \
             --consoleLoggerParameters:ErrorsOnly
 
@@ -132,7 +133,7 @@ jobs:
     needs: build
 
     container:
-      image: ghcr.io/bannerlord-coop-team/bannerlordcoop:latest
+      image: ghcr.io/bannerlord-coop-team/bannerlordcoop:v1.5.7
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -168,7 +169,7 @@ jobs:
         shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
 
     container:
-      image: ghcr.io/bannerlord-coop-team/bannerlordcoop:latest
+      image: ghcr.io/bannerlord-coop-team/bannerlordcoop:v1.5.7
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}

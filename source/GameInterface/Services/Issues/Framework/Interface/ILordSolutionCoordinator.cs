@@ -1,4 +1,4 @@
-using GameInterface.Services.Issues.Framework.AcceptCoordination;
+﻿using GameInterface.Services.Issues.Framework.AcceptCoordination;
 using TaleWorlds.CampaignSystem.Issues;
 
 namespace GameInterface.Services.Issues.Framework.Interface;

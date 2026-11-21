@@ -4,6 +4,7 @@ using Common.Network.Messages;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
+using GameInterface.Tests.Utils;
 using GameInterface.Services.Bandits.Messages;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.AcceptCoordination;
@@ -140,6 +141,40 @@ public class MerchantOutlawsTests : IDisposable
     }
 
     public void Dispose() => environment.Dispose();
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void OwnerDailyTickClearsTroopEffectsAndKeepsTheServerJournal(bool returnDatePassed)
+    {
+        ClientA.Call(() =>
+        {
+            Campaign.Current.MapTimeTracker._numTicks = 0;
+            var issue = Get<Hero>(ClientA, scenario.NotableId).Issue;
+            Assert.True(ClientA.Resolve<IIssueOwnershipRegistry>()
+                .TrySetOwner(scenario.NotableId, issue.StringId, QuestScenario.ControllerA));
+            using (new AllowedThread())
+            {
+                issue._issueState = IssueBase.IssueState.SolvingWithAlternativeSolution;
+                issue.AlternativeSolutionReturnTimeForTroops = CampaignTime.Days(returnDatePassed ? -1 : 5);
+                issue.AlternativeSolutionIssueEffectClearTime = CampaignTime.Now;
+                issue._areIssueEffectsResolved = false;
+                issue._journalEntries.Add(new JournalLog(CampaignTime.Now, new TaleWorlds.Localization.TextObject("Troops sent"),
+                    currentProgress: 2, range: 10));
+            }
+
+            Assert.False(ClientA.Resolve<IIssueMissionVisibility>().IsAnotherPlayersTroopsMission(issue));
+            Assert.Equal(returnDatePassed, issue.AlternativeSolutionReturnTimeForTroops.IsPast);
+            var journal = Assert.Single(issue.JournalEntries);
+
+            Campaign.Current.IssueManager.DailyTick();
+
+            Assert.True(issue.IsSolvingWithAlternative);
+            Assert.True(issue._areIssueEffectsResolved);
+            Assert.Same(journal, Assert.Single(issue.JournalEntries));
+            Assert.Equal(2, journal.CurrentProgress);
+        }, TextHelpers);
+    }
 
     [Theory]
     [InlineData(true)]
@@ -820,8 +855,8 @@ public class MerchantOutlawsTests : IDisposable
             var giver = Get<Hero>(Server, scenario.NotableId);
             power = giver.Power;
             var forcing = (MapEvent)FormatterServices.GetUninitializedObject(typeof(MapEvent));
-            forcing._mapEventType = MapEvent.BattleTypes.IsForcingSupplies;
-            forcing.MapEventSettlement = Get<Settlement>(Server, settlementId);
+            forcing.SetBattleType(MapEvent.BattleTypes.IsForcingSupplies);
+            forcing.SetMapEventSettlement(Get<Settlement>(Server, settlementId));
             CampaignEventDispatcher.Instance.OnMapEventStarted(forcing, Get<MobileParty>(Server, scenario.PlayerA.MobilePartyId).Party, null);
         }, TextHelpers);
 

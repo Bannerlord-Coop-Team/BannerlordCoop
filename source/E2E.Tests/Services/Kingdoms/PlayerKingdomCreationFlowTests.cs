@@ -1,5 +1,6 @@
 ﻿using Common;
 using GameInterface.Configuration;
+using GameInterface.CoopSessionData;
 using Common.Commands;
 using Common.Network;
 using Common.Messaging;
@@ -19,6 +20,8 @@ using E2E.Tests.Util;
 using GameInterface.Services.Armies.Messages;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Clans.Patches;
+using GameInterface.Services.Companions.Messages;
+using GameInterface.Services.Companions.Patches;
 using GameInterface.Services.Entity;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameDebug.Commands;
@@ -55,6 +58,7 @@ using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.Election;
 using TaleWorlds.CampaignSystem.Encyclopedia;
 using TaleWorlds.CampaignSystem.GameComponents;
@@ -85,6 +89,8 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     private const string ControllerId = "Player";
     private const string SecondControllerId = "Player2";
     private const string KingdomName = "Real Kingdom";
+    private const string FullKingdomName = "Vlandia";
+    private const string FullKingdomText = "Vlandia already has the most clans this server allows (1).";
 
     private E2ETestEnvironment TestEnvironment { get; }
     private readonly ITestOutputHelper output;
@@ -624,7 +630,171 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
         Server.PumpGameThread();
     }
-    
+
+    // The kingdom has one clan, its ruler's.
+    [Fact]
+    public void VassalServiceAccepted_KingdomWithMaxClansPerKingdom_RefusesThePlayerWithTheReason()
+    {
+        ModConfigProvider.ModOptions = new ModOptions(new ModOptionsData { MaxClansPerKingdom = 1 });
+        var client = Clients.First();
+        var player = CreateSyncedPlayerContext(ControllerId, client);
+        var ruler = CreateSyncedPlayerContext("VassalRuler", _ => false);
+        var kingdomId = CreateNamedKingdomEverywhere(ruler.ClanId);
+        SetClanTierEverywhere(player.ClanId, 2);
+        Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer(ControllerId, client.NetPeer));
+        Server.NetworkSentMessages.Clear();
+
+        Assert.True(client.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+        using var notices = new MethodCallRecorder(AccessTools.Method(typeof(MBInformationManager), nameof(MBInformationManager.AddQuickInformation)));
+        client.SimulateMessage(this, new VassalServiceAccepted(kingdom, grantRewards: false));
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<VassalServiceResult>());
+        Assert.Equal(kingdomId, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkKingdomFull>()).KingdomId);
+        Assert.Equal(new[] { FullKingdomText }, notices.TextsFor(client));
+        Assert.Empty(notices.TextsFor(Clients.Last()));
+        foreach (var instance in Clients.Append(Server))
+        {
+            instance.Call(() =>
+            {
+                Assert.Null(instance.GetRegisteredObject<Clan>(player.ClanId).Kingdom);
+                Assert.Single(instance.GetRegisteredObject<Kingdom>(kingdomId).Clans);
+            });
+        }
+    }
+
+    // A ruler hiring a mercenary clan that serves another kingdom. The old contract has to survive the refusal.
+    [Fact]
+    public void MercenaryServiceAccepted_RulerHiresIntoAFullKingdom_KeepsTheOldContractAndTellsTheRuler()
+    {
+        ModConfigProvider.ModOptions = new ModOptions(new ModOptionsData { MaxClansPerKingdom = 1, MaxClansPerKingdomCountsMercenaries = true });
+        var client = Clients.First();
+        var ruler = CreateSyncedPlayerContext(ControllerId, client);
+        var kingdomId = CreateNamedKingdomEverywhere(ruler.ClanId);
+        var otherRuler = CreateSyncedPlayerContext("OtherRuler", _ => false);
+        var otherKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        ConfigureClanInKingdom(otherRuler.ClanId, otherKingdomId);
+        var mercenary = CreateSyncedPlayerContext("HiredMercenary", _ => false);
+        foreach (var instance in Clients.Append(Server))
+            RemovePlayerRegistration(instance, "HiredMercenary");
+        ConfigureClanInKingdom(mercenary.ClanId, otherKingdomId);
+        foreach (var instance in Clients.Append(Server))
+        {
+            instance.Call(() =>
+            {
+                using (new AllowedThread())
+                    instance.GetRegisteredObject<Clan>(mercenary.ClanId).IsUnderMercenaryService = true;
+            });
+        }
+        Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer(ControllerId, client.NetPeer));
+
+        using var notices = new MethodCallRecorder(AccessTools.Method(typeof(MBInformationManager), nameof(MBInformationManager.AddQuickInformation)));
+        client.SimulateMessage(this, new MercenaryServiceAccepted(
+            client.GetRegisteredObject<Kingdom>(kingdomId), 2, client.GetRegisteredObject<Clan>(mercenary.ClanId)));
+
+        Assert.Equal(kingdomId, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkKingdomFull>()).KingdomId);
+        Assert.Equal(new[] { FullKingdomText }, notices.TextsFor(client));
+        Assert.Empty(notices.TextsFor(Clients.Last()));
+        foreach (var instance in Clients.Append(Server))
+        {
+            instance.Call(() =>
+            {
+                var mercenaryClan = instance.GetRegisteredObject<Clan>(mercenary.ClanId);
+                Assert.Same(instance.GetRegisteredObject<Kingdom>(otherKingdomId), mercenaryClan.Kingdom);
+                Assert.True(mercenaryClan.IsUnderMercenaryService);
+                Assert.Single(instance.GetRegisteredObject<Kingdom>(kingdomId).Clans);
+            });
+        }
+    }
+
+    // The ruler's client greys out the grant line with the reason before the fief is paid for or the clan is named.
+    [Fact]
+    public void FiefSelectedConfirm_RulersKingdomFull_GreysOutTheGrantLineWithTheReason()
+    {
+        ModConfigProvider.ModOptions = new ModOptions(new ModOptionsData { MaxClansPerKingdom = 1 });
+        var client = Clients.First();
+        var ruler = CreateSyncedPlayerContext(ControllerId, client);
+        CreateNamedKingdomEverywhere(ruler.ClanId);
+
+        client.Call(() =>
+        {
+            var clickable = true;
+            TextObject explanation = null;
+
+            CompanionRolesPatches.FiefSelectedConfirmClickableOnConditionPostfix(ref clickable, ref explanation);
+
+            Assert.False(clickable);
+            Assert.Equal(FullKingdomText, explanation.ToString());
+        });
+    }
+
+    // The ruler's client still sees a free place, but another clan took it on the host. The host refuses and tells the
+    // ruler. The conversation already went on as vanilla's, which is the one case where the thanks line can show.
+    [Fact]
+    public void ClanNameSelection_LastPlaceTakenOnTheHost_ServerRefusesAndTellsTheRuler()
+    {
+        ModConfigProvider.ModOptions = new ModOptions(new ModOptionsData { MaxClansPerKingdom = 2 });
+        var client = Clients.First();
+        var ruler = CreateSyncedPlayerContext(ControllerId, client);
+        var kingdomId = CreateNamedKingdomEverywhere(ruler.ClanId);
+        var lateClanId = TestEnvironment.CreateRegisteredObject<Clan>();
+        Server.Call(() =>
+        {
+            Server.Resolve<IPlayerManager>().SetPeer(ControllerId, client.NetPeer);
+            var kingdom = Server.GetRegisteredObject<Kingdom>(kingdomId);
+            var lateClan = Server.GetRegisteredObject<Clan>(lateClanId);
+            using (new AllowedThread())
+            {
+                lateClan._kingdom = kingdom;
+                kingdom._clans.Add(lateClan);
+            }
+        });
+        var (companionId, settlementId, fiefId) = CreateCompanionAndFiefEverywhere(ruler.ClanId);
+        using var notices = new MethodCallRecorder(AccessTools.Method(typeof(MBInformationManager), nameof(MBInformationManager.AddQuickInformation)));
+        using var continuations = new MethodCallRecorder(AccessTools.Method(typeof(ConversationManager), nameof(ConversationManager.ContinueConversation)));
+
+        RunClanNameCallback(client, ruler.PartyId, companionId, settlementId);
+
+        Assert.Single(client.NetworkSentMessages.GetMessages<DoClanNameSelection>());
+        Assert.Equal(1, continuations.CountFor(client));
+        Assert.Equal(kingdomId, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkKingdomFull>()).KingdomId);
+        Assert.Equal(new[] { $"{FullKingdomName} already has the most clans this server allows (2)." }, notices.TextsFor(client));
+        Assert.Empty(notices.TextsFor(Clients.Last()));
+        AssertCompanionAndFiefKept(ruler.ClanId, companionId, fiefId);
+    }
+
+    // A mercenary offer clicked after the kingdom's last place went is refused, cleared and explained.
+    [Fact]
+    public void MercenaryOfferAccepted_KingdomFullBeforeTheClick_RefusesAndClearsTheOffer()
+    {
+        ModConfigProvider.ModOptions = new ModOptions(new ModOptionsData { MaxClansPerKingdom = 1, MaxClansPerKingdomCountsMercenaries = true });
+        var client = Clients.First();
+        var player = CreateSyncedPlayerContext(ControllerId, client);
+        var ruler = CreateSyncedPlayerContext("OfferRuler", _ => false);
+        var kingdomId = CreateNamedKingdomEverywhere(ruler.ClanId);
+        Server.Call(() =>
+        {
+            Server.Resolve<IPlayerManager>().SetPeer(ControllerId, client.NetPeer);
+            ServerOffers()[player.HeroId] = new VassalAndMercenaryOfferData(kingdomId, CampaignTime.Now.NumTicks, new Dictionary<string, long>(), false);
+        });
+        Server.NetworkSentMessages.Clear();
+        using var notices = new MethodCallRecorder(AccessTools.Method(typeof(MBInformationManager), nameof(MBInformationManager.AddQuickInformation)));
+
+        client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkMercenaryOfferAccepted(player.HeroId, kingdomId)));
+
+        Assert.Equal(kingdomId, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkKingdomFull>()).KingdomId);
+        Assert.Equal(new[] { FullKingdomText }, notices.TextsFor(client));
+        Assert.Empty(notices.TextsFor(Clients.Last()));
+        Server.Call(() => Assert.Null(ServerOffers()[player.HeroId].CurrentMercenaryOfferKingdomId));
+        foreach (var instance in Clients.Append(Server))
+        {
+            instance.Call(() =>
+            {
+                Assert.Null(instance.GetRegisteredObject<Clan>(player.ClanId).Kingdom);
+                Assert.Single(instance.GetRegisteredObject<Kingdom>(kingdomId).Clans);
+            });
+        }
+    }
+
     [Fact]
     public void VassalServiceAccepted_DuringSettlementLocationConversation_JoinsKingdomAndReleasesConversationLock()
     {
@@ -5045,19 +5215,17 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             }
         });
 
-        MapTrackerProvider provider = null;
+        RecordingMapTrackersHandler provider = null;
         client.Call(() =>
         {
             // MainHero still wrong at construction; reproduces the real bug.
             Assert.True(client.ObjectManager.TryGetObject<Hero>(player.HeroId, out var playerHero));
             Assert.NotSame(playerHero, Hero.MainHero);
 
-            provider = new MapTrackerProvider();
+            provider = RecordingMapTrackersHandler.Attach();
 
             Assert.True(client.ObjectManager.TryGetObject<Army>(armyId, out var army));
-            Assert.DoesNotContain(
-                provider.GetTrackers(),
-                tracker => ReferenceEquals(tracker.TrackedObject, army));
+            Assert.DoesNotContain(provider.Trackers, tracker => ReferenceEquals(tracker, army));
         });
 
         // Act: real switch, publishes SwitchedPlayer at the end.
@@ -5111,9 +5279,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         client.Call(() =>
         {
             Assert.True(client.ObjectManager.TryGetObject<Army>(armyId, out var army));
-            Assert.Contains(
-                provider.GetTrackers(),
-                tracker => ReferenceEquals(tracker.TrackedObject, army));
+            Assert.Contains(provider.Trackers, tracker => ReferenceEquals(tracker, army));
         });
     }
 
@@ -5175,14 +5341,12 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
         // Provider exists before the army,
         // testing the live ArmyCreated listener, not ResetTrackers.
-        MapTrackerProvider provider = null;
-        client.Call(() => provider = new MapTrackerProvider());
+        RecordingMapTrackersHandler provider = null;
+        client.Call(() => provider = RecordingMapTrackersHandler.Attach());
         client.Call(() =>
         {
             Assert.True(client.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
-            Assert.DoesNotContain(
-                provider.GetTrackers(),
-                tracker => kingdom.Armies.Contains(tracker.TrackedObject as Army));
+            Assert.DoesNotContain(provider.Trackers, tracker => kingdom.Armies.Contains(tracker as Army));
         });
 
         // Act: CreateArmy on the server, which syncs the events to the clients through a postfix.
@@ -5203,11 +5367,39 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         client.Call(() =>
         {
             Assert.True(client.ObjectManager.TryGetObject<Army>(armyId, out var army));
-            Assert.Contains(
-                provider.GetTrackers(),
-                tracker => ReferenceEquals(tracker.TrackedObject, army));
+            Assert.Contains(provider.Trackers, tracker => ReferenceEquals(tracker, army));
         });
     }
+
+    /// <summary>
+    /// The campaign's MapTrackerManager is fed by MapTrackerCampaignBehavior and shown through a handler (the
+    /// map view). This stands in for that view: it rebuilds from the manager when attached, as the view does.
+    /// </summary>
+    private sealed class RecordingMapTrackersHandler : IMapTrackersHandler
+    {
+        public HashSet<ITrackableCampaignObject> Trackers { get; } = new();
+
+        public static RecordingMapTrackersHandler Attach()
+        {
+            new MapTrackerCampaignBehavior().RegisterEvents();
+            var handler = new RecordingMapTrackersHandler();
+            Campaign.Current.MapTrackerManager.Handler = handler;
+            handler.ResetTrackers();
+            return handler;
+        }
+
+        public void OnTrackerAdded(ITrackableCampaignObject trackable) => Trackers.Add(trackable);
+
+        public void OnTrackerRemoved(ITrackableCampaignObject trackable) => Trackers.Remove(trackable);
+
+        public void ResetTrackers()
+        {
+            Trackers.Clear();
+            foreach (var tracker in Campaign.Current.MapTrackerManager.GetAllTrackers())
+                Trackers.Add(tracker);
+        }
+    }
+
     private static void ConfigureArmyInKingdom(EnvironmentInstance instance, string kingdomId, string armyId)
     {
         instance.Call(() =>
@@ -5614,6 +5806,102 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
         return npc.ClanId;
     }
+
+    // A kingdom ruled by the clan on every instance, named so the kingdom full text can be checked.
+    private string CreateNamedKingdomEverywhere(string rulingClanId)
+    {
+        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        ConfigureClanInKingdom(rulingClanId, kingdomId);
+        foreach (var instance in Clients.Append(Server))
+        {
+            instance.Call(() =>
+            {
+                using (new AllowedThread())
+                    instance.GetRegisteredObject<Kingdom>(kingdomId).Name = new TextObject(FullKingdomName);
+            });
+        }
+
+        return kingdomId;
+    }
+
+    // A companion of the clan and a town the clan owns, on every instance.
+    private (string CompanionId, string SettlementId, string FiefId) CreateCompanionAndFiefEverywhere(string clanId)
+    {
+        var companionId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var fiefId = TestEnvironment.CreateRegisteredObject<Town>();
+        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        foreach (var instance in Clients.Append(Server))
+        {
+            ConfigureClanFief(instance, clanId, fiefId, settlementId);
+            instance.Call(() =>
+            {
+                using (new AllowedThread())
+                {
+                    var companion = instance.GetRegisteredObject<Hero>(companionId);
+                    companion.SetNewOccupation(Occupation.Wanderer);
+                    companion.CompanionOf = instance.GetRegisteredObject<Clan>(clanId);
+                }
+            });
+        }
+
+        return (companionId, settlementId, fiefId);
+    }
+
+    private void AssertCompanionAndFiefKept(string clanId, string companionId, string fiefId)
+    {
+        foreach (var instance in Clients.Append(Server))
+        {
+            instance.Call(() =>
+            {
+                var clan = instance.GetRegisteredObject<Clan>(clanId);
+                var companion = instance.GetRegisteredObject<Hero>(companionId);
+                Assert.Same(clan, companion.CompanionOf);
+                Assert.NotEqual(Occupation.Lord, companion.Occupation);
+                Assert.Same(clan, instance.GetRegisteredObject<Town>(fiefId).OwnerClan);
+            });
+        }
+    }
+
+    // Runs vanilla's clan name callback on the ruler's client with the companion in an open conversation and the town
+    // picked, and lets the host's answer arrive before the conversation closes.
+    private static void RunClanNameCallback(
+        EnvironmentInstance client, string rulerPartyId, string companionId, string settlementId)
+    {
+        var behavior = new CompanionRolesCampaignBehavior();
+        var harmony = new Harmony($"e2e.companion-to-lord.{Guid.NewGuid():N}");
+        harmony.Patch(
+            AccessTools.PropertyGetter(typeof(Hero), nameof(Hero.OneToOneConversationHero)),
+            prefix: new HarmonyMethod(AccessTools.Method(typeof(PlayerKingdomCreationFlowTests), nameof(GetOneToOneConversationHeroPrefix))));
+        MobileParty previousMainParty = null;
+        client.Call(() => previousMainParty = Campaign.Current.MainParty);
+        try
+        {
+            client.Call(() =>
+            {
+                Campaign.Current.AddCampaignBehaviorManager(new CampaignBehaviorManager(new CampaignBehaviorBase[] { behavior }));
+                Campaign.Current.MainParty = client.GetRegisteredObject<MobileParty>(rulerPartyId);
+                Campaign.Current.ConversationManager.IsConversationInProgress = true;
+                OneToOneConversationHeroOverride = client.GetRegisteredObject<Hero>(companionId);
+                behavior._selectedFief = client.GetRegisteredObject<Settlement>(settlementId);
+                behavior._playerConfirmedTheAction = true;
+                Assert.False(CompanionRolesPatches.ClanNameSelectionIsDonePrefix(ref behavior, "Companion"));
+            });
+            client.PumpGameThread();
+        }
+        finally
+        {
+            client.Call(() =>
+            {
+                Campaign.Current.MainParty = previousMainParty;
+                Campaign.Current.ConversationManager.IsConversationInProgress = false;
+            });
+            harmony.UnpatchAll(harmony.Id);
+            OneToOneConversationHeroOverride = null;
+        }
+    }
+
+    private Dictionary<string, VassalAndMercenaryOfferData> ServerOffers() =>
+        Server.Resolve<ICoopSessionProvider>().CoopSession.InteractionsPlayerData.PlayerVassalAndMercenaryOfferData;
 
     private static void RemovePlayerRegistration(EnvironmentInstance instance, string controllerId)
     {
