@@ -34,7 +34,6 @@ const optionTypes = new Map([
   ['List<string>', 'stringList'],
 ]);
 const metadataFields = new Map([
-  ['stable', { type: 'boolean' }],
   ['availableSince', { type: 'string' }],
   ['min', { type: 'number', appliesTo: ['integer', 'number'] }],
   ['max', { type: 'number', appliesTo: ['integer', 'number'] }],
@@ -108,8 +107,8 @@ function parseMetadata(attributes, key, optionType, constants) {
     metadata[name] = value;
   }
   if (end !== args.length) throw new Error('Invalid ManagedConfigOption arguments for ' + key);
-  if (metadata.stable === undefined || !/^\d+\.\d+\.\d+$/u.test(metadata.availableSince ?? '')) {
-    throw new Error(key + ' needs explicit stable and availableSince metadata');
+  if (!/^\d+\.\d+\.\d+$/u.test(metadata.availableSince ?? '')) {
+    throw new Error(key + ' needs explicit availableSince metadata');
   }
   return metadata;
 }
