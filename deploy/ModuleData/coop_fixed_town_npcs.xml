@@ -1366,4 +1366,34 @@
       </EquipmentRoster>
     </Equipments>
   </NPCCharacter>
+  <NPCCharacter
+    id="coop_fixed_npc_f9c6d01c"
+    name="{=!}Mango Fett"
+    default_group="Infantry"
+    level="1"
+    is_female="false"
+    is_hero="false"
+    is_template="false"
+    occupation="Townsfolk"
+    culture="Culture.vlandia"
+    is_hidden_encyclopedia="true"
+    coop_settlement="town_V1"
+    coop_location="tavern"
+    coop_spawn_tag="npc_common"
+    coop_dialogue="&quot;I’m just a simple man trying to make my way through Calradia. Though the tavern fruit here leaves much to be desired.&quot;"
+    coop_enabled="true">
+    <face>
+      <face_key_template value="BodyProperty.townsman_vlandia" />
+    </face>
+    <skills />
+    <Equipments>
+      <EquipmentRoster civilian="true">
+        <equipment slot="Head" id="Item.sturgian_helmet_closed" />
+        <equipment slot="Cape" id="Item.battania_shoulder_strap_cloak" />
+        <equipment slot="Body" id="Item.empire_horseman_armor" />
+        <equipment slot="Gloves" id="Item.northern_plated_gloves" />
+        <equipment slot="Leg" id="Item.northern_plated_boots" />
+      </EquipmentRoster>
+    </Equipments>
+  </NPCCharacter>
 </NPCCharacters>
