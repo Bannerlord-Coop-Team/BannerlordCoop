@@ -1,4 +1,5 @@
-﻿using Autofac;
+﻿#if COOP_NAVAL
+using Autofac;
 using Common.Messaging;
 using Common.Util;
 using Coop.Naval;
@@ -92,6 +93,9 @@ public class PortMooringSyncTests : IDisposable
         AssertStash(clients[0]);
         AssertStash(clients[1], second.ShipId);
         AssertStash(Server, preCoopShipId, second.ShipId);
+
+        // Taking back the first ship moved the second one down a slot, so its owner has to move with it
+        Server.Call(() => Assert.True(Retrieve(second, second.ShipId)));
     }
 
     // The joined save's stashes hold every clan's moored ships, so the first hero change after joining keeps only the player clan's
@@ -124,7 +128,7 @@ public class PortMooringSyncTests : IDisposable
             unrecorded.ShipStash = new MBList<Ship> { client.GetRegisteredObject<Ship>(unrecordedShipId) };
             Campaign.Current.CampaignObjectManager.Settlements = new MBList<Settlement> { port, unrecorded };
 
-            var ownerClans = new Dictionary<string, List<string>> { [port.StringId] = new List<string> { clan.StringId, "other_clan" } };
+            var ownerClans = new Dictionary<string, List<string>> { [settlementId] = new List<string> { clanId, "other_clan" } };
             var navalPlayerData = new NavalPlayerData(null, null, null, null, ownerClans);
             // Other naval PlayerHeroChanged subscribers need a full campaign, so the hero changes go straight to the handler
             var handler = client.Resolve<PortMooringHandler>();
@@ -227,3 +231,4 @@ public class PortMooringSyncTests : IDisposable
 
     private sealed record StagedPlayer(string HeroId, string PartyId, string ShipId);
 }
+#endif

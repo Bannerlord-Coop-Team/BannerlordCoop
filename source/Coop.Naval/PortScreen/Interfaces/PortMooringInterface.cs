@@ -48,27 +48,31 @@ internal class PortMooringInterface : IPortMooringInterface
     public bool TryMoorShip(Hero playerHero, MobileParty playerParty, Settlement settlement, Ship ship)
     {
         if (ship.Owner != playerParty.Party || !CanUsePort(playerHero, playerParty, settlement)) return false;
+        if (!objectManager.TryGetIdWithLogging(settlement, out var settlementId)) return false;
+        if (!objectManager.TryGetIdWithLogging(playerHero.Clan, out var clanId)) return false;
 
         // The owner list has to line up with the stash before vanilla appends the ship
-        sessionNavalPlayerDataInterface.RecordMooring(settlement.StringId, settlement.ShipStash.Count, playerHero.Clan.StringId);
+        sessionNavalPlayerDataInterface.RecordMooring(settlementId, settlement.ShipStash.Count, clanId);
         ChangeShipOwnerAction.ApplyByStashingShipIntoSettlement(settlement, ship);
 
-        SendToOwner(playerHero, settlement, ship, isMoored: true);
+        SendToOwner(playerHero, settlementId, ship, isMoored: true);
         return true;
     }
 
     public bool TryRetrieveShip(Hero playerHero, MobileParty playerParty, Settlement settlement, Ship ship)
     {
         if (!CanUsePort(playerHero, playerParty, settlement)) return false;
+        if (!objectManager.TryGetIdWithLogging(settlement, out var settlementId)) return false;
+        if (!objectManager.TryGetIdWithLogging(playerHero.Clan, out var clanId)) return false;
 
         var index = settlement.ShipStash.IndexOf(ship);
         if (index < 0) return false;
 
-        if (!sessionNavalPlayerDataInterface.TryReleaseMooring(settlement.StringId, index, settlement.ShipStash.Count, playerHero.Clan.StringId)) return false;
+        if (!sessionNavalPlayerDataInterface.TryReleaseMooring(settlementId, index, settlement.ShipStash.Count, clanId)) return false;
 
         ChangeShipOwnerAction.ApplyByUnstashingShipFromSettlement(playerParty.Party, settlement, ship);
 
-        SendToOwner(playerHero, settlement, ship, isMoored: false);
+        SendToOwner(playerHero, settlementId, ship, isMoored: false);
         return true;
     }
 
@@ -81,11 +85,10 @@ internal class PortMooringInterface : IPortMooringInterface
     }
 
     // Only the owner's client keeps the ship in its stash
-    private void SendToOwner(Hero playerHero, Settlement settlement, Ship ship, bool isMoored)
+    private void SendToOwner(Hero playerHero, string settlementId, Ship ship, bool isMoored)
     {
         if (!playerManager.TryGetPlayer(playerHero, out var player)) return;
         if (!playerManager.TryGetPeer(player.ControllerId, out var peer)) return;
-        if (!objectManager.TryGetIdWithLogging(settlement, out var settlementId)) return;
         if (!objectManager.TryGetIdWithLogging(ship, out var shipId)) return;
 
         network.Send(peer, new NetworkShipMooringChanged(settlementId, shipId, isMoored));

@@ -108,10 +108,9 @@ public class SessionNavalPlayerDataInterface : ISessionNavalPlayerDataInterface
 
     public bool TryReleaseMooring(string settlementId, int stashIndex, int stashCount, string clanId)
     {
-        var ownerClans = GetMooredShipOwnerClans(settlementId, stashCount);
-        if (ownerClans[stashIndex] != clanId) return false;
+        if (NavalPlayerData.GetMooredShipOwnerClan(settlementId, stashIndex) != clanId) return false;
 
-        ownerClans.RemoveAt(stashIndex);
+        GetMooredShipOwnerClans(settlementId, stashCount).RemoveAt(stashIndex);
         return true;
     }
 

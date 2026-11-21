@@ -48,4 +48,14 @@ public class NavalPlayerData
         PlayerCachedFleets = playerCachedFleets ?? new();
         MooredShipOwnerClans = mooredShipOwnerClans ?? new();
     }
+
+    /// <summary>The clan that moored the ship at <paramref name="stashIndex"/>, or empty for a ship moored before co-op, which no player owns.</summary>
+    public string GetMooredShipOwnerClan(string settlementId, int stashIndex)
+    {
+        // Protobuf skips the constructor, so an empty dictionary arrives as null
+        if (MooredShipOwnerClans == null || !MooredShipOwnerClans.TryGetValue(settlementId, out var ownerClans) || ownerClans == null) return string.Empty;
+        if (stashIndex >= ownerClans.Count) return string.Empty;
+
+        return ownerClans[stashIndex];
+    }
 }
