@@ -77,16 +77,7 @@ internal sealed class QuestScenario
     {
     }
 
-    public void Accept(EnvironmentInstance client)
-    {
-        client.Call(() =>
-        {
-            Assert.True(client.ObjectManager.TryGetObject<Hero>(NotableId, out var notable));
-            notable.Issue.StartIssueWithQuest();
-        });
-    }
-
-    public void Accept(EnvironmentInstance client, IEnumerable<MethodBase>? disabledMethods) =>
+    public void Accept(EnvironmentInstance client, IEnumerable<MethodBase>? disabledMethods = null) =>
         client.Call(() =>
         {
             Assert.True(client.ObjectManager.TryGetObject<Hero>(NotableId, out var notable));

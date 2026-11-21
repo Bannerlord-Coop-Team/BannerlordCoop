@@ -6,7 +6,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using System.Reflection.Emit;
 using Quest = TaleWorlds.CampaignSystem.Issues.ExtortionByDesertersIssueBehavior.ExtortionByDesertersIssueQuest;
 
 namespace GameInterface.Services.Issues.Quests.ExtortionByDeserters.Patches;
@@ -75,9 +74,7 @@ internal class ExtortionByDesertersBranchPatches
         var matches = AccessTools.GetDeclaredMethods(typeof(Quest))
             .Where(method => method.Name.StartsWith("<get_QuestCompletionDialogFlow>b__", StringComparison.Ordinal) &&
                 method.ReturnType == typeof(void) && method.GetParameters().Length == 0)
-            .Where(method => PatchProcessor.GetOriginalInstructions(method).Any(instruction =>
-                (instruction.opcode == OpCodes.Call || instruction.opcode == OpCodes.Callvirt) &&
-                Equals(instruction.operand, getter)))
+            .Where(method => PatchProcessor.GetOriginalInstructions(method).Any(instruction => instruction.Calls(getter)))
             .ToArray();
 
         if (matches.Length == 1) return matches[0];

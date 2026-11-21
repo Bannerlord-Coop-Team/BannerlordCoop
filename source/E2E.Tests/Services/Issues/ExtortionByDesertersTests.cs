@@ -52,6 +52,11 @@ public class ExtortionByDesertersTests : IDisposable
         AccessTools.PropertyGetter(typeof(Settlement), nameof(Settlement.EncyclopediaLinkWithName)),
         AccessTools.PropertyGetter(typeof(Hero), nameof(Hero.EncyclopediaLinkWithName)),
     };
+    private static readonly MethodBase[] VictoryMethods = TextLinks.Concat(new[]
+    {
+        AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize)),
+        AccessTools.Method(typeof(MapEvent), nameof(MapEvent.MovePartyToSuitablePositionOnMapEventFinalize)),
+    }).ToArray();
     private const int GiverPowerPenalty = -10;
     private const int FailRelationPenalty = -10;
     private const int AttackedVillagersRelationPenalty = -5;
@@ -114,30 +119,6 @@ public class ExtortionByDesertersTests : IDisposable
         var quest = (Quest)scenario.QuestOf(Owner);
         Owner.Call(() => quest.StartQuest());
         return quest;
-    }
-
-    [Fact]
-    public void State_BindsExistingPartyAndProgressOnTheOwner()
-    {
-        var quest = Accept();
-        var partyId = environment.CreateRegisteredObject<MobileParty>();
-        var text = new TextObject("{=YjxCkglX}You've failed to complete this quest in time. Your agreement with {QUEST_GIVER.LINK} was canceled.");
-        var state = new NetworkExtortionByDesertersState(scenario.NotableId, QuestScenario.IssueId,
-            QuestScenario.ControllerA, partyId, "", (int)State.DesertersAreDefeated, text);
-        var wire = Server.SerializeForWire(state);
-        var requestsBefore = Owner.NetworkSentMessages.GetMessages<RequestQuestJournal>().Count();
-        Owner.SimulateMessage(this, wire);
-        Owner.Call(() =>
-        {
-            Assert.True(Owner.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
-            Assert.Same(party, quest._deserterMobileParty);
-            Assert.Equal(State.DesertersAreDefeated, quest._currentState);
-            Assert.True(quest.IsTracked(quest.QuestGiver));
-            Assert.True(quest.IsTracked(quest.QuestSettlement));
-            var received = Assert.Single(quest.JournalEntries).LogText;
-            Assert.Equal(text.Value, received.Value);
-        });
-        Assert.Equal(requestsBefore, Owner.NetworkSentMessages.GetMessages<RequestQuestJournal>().Count());
     }
 
     [Fact]
@@ -391,8 +372,9 @@ public class ExtortionByDesertersTests : IDisposable
     public void DialogueReward_AppliesTheDistinctEffectsToTheOwnerOnce(
         int choice, float goldMultiplier, int renown, int relation, int power, int prosperity)
     {
-        var serverQuest = DefeatDeserters();
-        var quest = (Quest)scenario.QuestOf(Owner);
+        var quest = Accept();
+        var serverQuest = (Quest)scenario.QuestOf(Server);
+        DefeatDeserters(serverQuest);
         Hero ownerHero = null!;
         Hero otherHero = null!;
         Hero giver = null!;
@@ -660,7 +642,36 @@ public class ExtortionByDesertersTests : IDisposable
     [Fact]
     public void CoopVictory_FinalizesProgressAndCleansQuestPartiesWithoutAnEncounterMenuRequest()
     {
-        DefeatDeserters();
+        var ownerQuest = Accept();
+        var quest = (Quest)scenario.QuestOf(Server);
+        var ownerParty = Server.GetRegisteredObject<MobileParty>(scenario.OwnerPartyId);
+        var otherParty = Server.GetRegisteredObject<MobileParty>(scenario.OtherPartyId);
+        var requestsBefore = Owner.NetworkSentMessages.GetMessages<RequestQuestJournal>().Count();
+        var (battle, deserters, defenders, entries) = DefeatDeserters(quest);
+
+        Server.Call(() =>
+        {
+            Assert.True(battle.IsFinalized);
+            Assert.All(battle._sides, side => Assert.Empty(side.Parties));
+            Assert.Equal(State.DesertersAreDefeated, quest._currentState);
+            Assert.Equal(entries + 1, quest.JournalEntries.Count);
+            Assert.Null(quest._deserterMobileParty);
+            Assert.Null(quest._defenderMobileParty);
+            Assert.False(quest._deserterBattleFinalizedForTheFirstTime);
+            Assert.True(quest.IsOngoing);
+            battle.FinalizeEventAux();
+            Assert.Equal(entries + 1, quest.JournalEntries.Count);
+            foreach (var party in new[] { deserters, defenders })
+            {
+                Assert.False(party.IsActive);
+                Assert.Null(party.MapEvent);
+            }
+            Assert.True(ownerParty.IsActive);
+            Assert.True(otherParty.IsActive);
+            Assert.DoesNotContain(Server.InternalMessages.GetMessages<DestroyPartyApplied>(),
+                message => message.DefeatedParty == ownerParty || message.DefeatedParty == otherParty);
+        }, VictoryMethods);
+
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
         Assert.Empty(Owner.NetworkSentMessages.GetMessages<RequestQuestBranch>());
         var defeated = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkExtortionByDesertersState>(),
@@ -675,12 +686,14 @@ public class ExtortionByDesertersTests : IDisposable
             state => state.State == (int)State.DesertersAreDefeated);
         Owner.Call(() =>
         {
-            var ownerQuest = (Quest)scenario.QuestOf(Owner);
             Assert.Null(ownerQuest._deserterMobileParty);
             Assert.Null(ownerQuest._defenderMobileParty);
             Assert.Equal(State.DesertersAreDefeated, ownerQuest._currentState);
+            Assert.True(ownerQuest.IsTracked(ownerQuest.QuestGiver));
+            Assert.True(ownerQuest.IsTracked(ownerQuest.QuestSettlement));
             Assert.Single(ownerQuest.JournalEntries,
                 entry => entry.LogText?.Value == ownerQuest.OnDeserterPartyDefeatedLogText.Value);
+            Assert.Equal(requestsBefore, Owner.NetworkSentMessages.GetMessages<RequestQuestJournal>().Count());
         }, TextLinks);
     }
 
@@ -823,16 +836,17 @@ public class ExtortionByDesertersTests : IDisposable
         return (raidId, ownerPartyId, ownerHeroId);
     }
 
-    private Quest DefeatDeserters()
+    private (MapEvent Battle, MobileParty Deserters, MobileParty Defenders, int Entries) DefeatDeserters(Quest quest)
     {
-        Accept();
-        var quest = (Quest)scenario.QuestOf(Server);
+        MapEvent battle = null!;
+        MobileParty deserters = null!;
+        MobileParty defenders = null!;
+        var entries = 0;
         Server.Call(() =>
         {
-            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(scenario.OwnerPartyId, out var ownerParty));
-            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(scenario.OtherPartyId, out var otherParty));
-            var deserters = GameObjectCreator.CreateInitializedObject<MobileParty>();
-            var defenders = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var ownerParty = Server.GetRegisteredObject<MobileParty>(scenario.OwnerPartyId);
+            deserters = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            defenders = GameObjectCreator.CreateInitializedObject<MobileParty>();
             // Healthy troops leave both quest parties for cleanup after the real map-event finalization.
             foreach (var party in new[] { deserters, defenders, ownerParty })
             {
@@ -843,38 +857,15 @@ public class ExtortionByDesertersTests : IDisposable
             quest._deserterMobileParty = deserters;
             quest._defenderMobileParty = defenders;
             deserters.SetPartyUsedByQuest(true);
-            var battle = CreateBattle(deserters, defenders.Party, false);
+            battle = CreateBattle(deserters, defenders.Party, false);
             ownerParty.MapEventSide = battle.DefenderSide;
             Assert.Equal(State.DesertersMovingToSettlement, quest._currentState);
             Assert.False(quest._deserterBattleFinalizedForTheFirstTime);
-            var entries = quest.JournalEntries.Count;
+            entries = quest.JournalEntries.Count;
             battle.SetOverrideWinner(BattleSideEnum.Defender);
             battle.FinalizeEventAux();
-            Assert.True(battle.IsFinalized);
-            Assert.All(battle._sides, side => Assert.Empty(side.Parties));
-            Assert.Equal(State.DesertersAreDefeated, quest._currentState);
-            Assert.Equal(entries + 1, quest.JournalEntries.Count);
-            Assert.Null(quest._deserterMobileParty);
-            Assert.Null(quest._defenderMobileParty);
-            Assert.False(quest._deserterBattleFinalizedForTheFirstTime);
-            Assert.True(quest.IsOngoing);
-            battle.FinalizeEventAux();
-            Assert.Equal(entries + 1, quest.JournalEntries.Count);
-            foreach (var party in new[] { deserters, defenders })
-            {
-                Assert.False(party.IsActive);
-                Assert.Null(party.MapEvent);
-            }
-            Assert.True(ownerParty.IsActive);
-            Assert.True(otherParty.IsActive);
-            Assert.DoesNotContain(Server.InternalMessages.GetMessages<DestroyPartyApplied>(),
-                message => message.DefeatedParty == ownerParty || message.DefeatedParty == otherParty);
-        }, TextLinks.Concat(new[]
-        {
-            AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize)),
-            AccessTools.Method(typeof(MapEvent), nameof(MapEvent.MovePartyToSuitablePositionOnMapEventFinalize)),
-        }));
-        return quest;
+        }, VictoryMethods);
+        return (battle, deserters, defenders, entries);
     }
 
     [Fact]
@@ -918,8 +909,9 @@ public class ExtortionByDesertersTests : IDisposable
     [Fact]
     public void OwnerAttackingVillagePartyAfterVictory_StillFailsTheQuestAndAppliesThePenalty()
     {
-        var quest = DefeatDeserters();
-        var ownerQuest = (Quest)scenario.QuestOf(Owner);
+        var ownerQuest = Accept();
+        var quest = (Quest)scenario.QuestOf(Server);
+        DefeatDeserters(quest);
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(scenario.OwnerPartyId, out var ownerParty));
@@ -943,13 +935,9 @@ public class ExtortionByDesertersTests : IDisposable
     [InlineData(true)]
     public void OwnerLeavingRaidedVillage_FailsOnlyWhileTheQuestsDesertersAreRaiding(bool desertersRemain)
     {
-        Quest quest;
-        if (desertersRemain)
-        {
-            Accept();
-            quest = (Quest)scenario.QuestOf(Server);
-        }
-        else quest = DefeatDeserters();
+        Accept();
+        var quest = (Quest)scenario.QuestOf(Server);
+        if (!desertersRemain) DefeatDeserters(quest);
 
         Server.Call(() =>
         {
