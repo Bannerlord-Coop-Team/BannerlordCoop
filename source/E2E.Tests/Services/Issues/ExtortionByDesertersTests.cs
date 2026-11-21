@@ -1080,10 +1080,35 @@ public class ExtortionByDesertersTests : IDisposable
         using var binding = new TimeoutCharacterProperties();
         var quest = Accept(TextLinks.Skip(1));
         var mirror = (Quest)scenario.QuestOf(Server);
+        var giver = mirror.QuestGiver;
+        var ownerHero = Server.GetRegisteredObject<Hero>(scenario.OwnerHeroId);
+        var otherHero = Server.GetRegisteredObject<Hero>(scenario.OtherHeroId);
+        var issues = new IssuesCampaignBehavior();
         string expected = null!;
-        Server.Call(() => expected = mirror.OnQuestTimedOutLogText.ToString());
-        Owner.Call(() => quest.CompleteQuestWithTimeOut(), TextLinks.Skip(1));
-        Assert.Equal(FailRelationPenalty, mirror.RelationshipChangeWithQuestGiver);
+        float ownerRelation = 0;
+        float otherRelation = 0;
+        Server.Call(() =>
+        {
+            expected = mirror.OnQuestTimedOutLogText.ToString();
+            ownerRelation = giver.GetRelation(ownerHero);
+            otherRelation = giver.GetRelation(otherHero);
+            issues.RegisterEvents();
+        });
+
+        try
+        {
+            Owner.Call(() => quest.CompleteQuestWithTimeOut(), TextLinks.Skip(1));
+        }
+        finally
+        {
+            Server.Call(() => CampaignEvents.Instance.RemoveListeners(issues));
+        }
+
+        Server.Call(() =>
+        {
+            Assert.Equal(ownerRelation + FailRelationPenalty, giver.GetRelation(ownerHero));
+            Assert.Equal(otherRelation, giver.GetRelation(otherHero));
+        });
         Assert.True(quest.IsFinalized);
         AssertTimeoutDelivery();
         Assert.Equal(expected, Assert.Single(quest.JournalEntries).LogText.ToString());
@@ -1143,14 +1168,14 @@ public class ExtortionByDesertersTests : IDisposable
     {
         Accept();
         var quest = (Quest)scenario.QuestOf(Server);
-        using var destruction = new MethodCallRecorder(Priority.Last,
-            AccessTools.Method(typeof(DestroyPartyAction), nameof(DestroyPartyAction.Apply)));
         MobileParty deserters = null!;
+        MobileParty defenders = null!;
         Server.Call(() =>
         {
             deserters = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            defenders = GameObjectCreator.CreateInitializedObject<MobileParty>();
             quest._deserterMobileParty = deserters;
-            quest._defenderMobileParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            quest._defenderMobileParty = defenders;
             deserters.SetPartyUsedByQuest(true);
             Server.Resolve<IPlayerManager>().ClearPeer(Owner.NetPeer);
             Server.Resolve<IMessageBroker>().Publish(this, new PlayerDisconnected(Owner.NetPeer, default(DisconnectInfo)));
@@ -1162,7 +1187,7 @@ public class ExtortionByDesertersTests : IDisposable
             Assert.False(deserters.IsCurrentlyUsedByAQuest);
             Assert.Null(quest._defenderMobileParty);
         });
-        Assert.Equal(1, destruction.CountFor(Server));
+        Assert.Single(Server.InternalMessages.GetMessages<DestroyPartyApplied>(), message => message.DefeatedParty == defenders);
         Assert.Equal(IssueOutcome.QuestCancel,
             Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
     }

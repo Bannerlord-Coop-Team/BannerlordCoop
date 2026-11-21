@@ -83,8 +83,7 @@ internal class ExtortionByDesertersStateHandler : IHandler
 
         var notice = (ExtortionByDesertersNotice)data.Notice;
         ShowNotice(quest, notice);
-        if (notice == ExtortionByDesertersNotice.Ambush &&
-            deserters != null && defenders != null && quest.IsOngoing)
+        if (notice == ExtortionByDesertersNotice.Ambush && quest.IsOngoing)
         {
             playerEncounter.OpenEncounterMeeting(deserters.MapEvent, deserters.Party);
         }
