@@ -57,7 +57,6 @@ internal class TradeHandler : IHandler
 
         messageBroker.Subscribe<TradeAttempted>(Handle_TradeAttempted);
         messageBroker.Subscribe<CompleteTrade>(Handle_CompleteTrade);
-        messageBroker.Subscribe<UpdateEquipmentClients>(Handle_UpdateEquipmentClients);
         messageBroker.Subscribe<NetworkTradeCompleted>(Handle_TradeCompleted);
     }
 
@@ -65,7 +64,6 @@ internal class TradeHandler : IHandler
     {
         messageBroker.Unsubscribe<TradeAttempted>(Handle_TradeAttempted);
         messageBroker.Unsubscribe<CompleteTrade>(Handle_CompleteTrade);
-        messageBroker.Unsubscribe<UpdateEquipmentClients>(Handle_UpdateEquipmentClients);
         messageBroker.Unsubscribe<NetworkTradeCompleted>(Handle_TradeCompleted);
     }
 
@@ -214,8 +212,7 @@ internal class TradeHandler : IHandler
             }
 
             // Update hero equipment with new data
-            inventoryLogicInterface.UpdateEquipmentWithData(ownerParty, characterEquipmentsData, initialHero);
-            network.SendAll(new UpdateEquipmentClients(message.CharacterIdEquipmentsData, message.OwnerPartyId, message.InitialHeroId));
+            inventoryLogicInterface.UpdateEquipmentWithData(characterEquipmentsData);
 
             inventoryLogicInterface.ApplyDoneLogic(
                 fromRoster,
@@ -442,20 +439,6 @@ internal class TradeHandler : IHandler
         }
 
         return true;
-    }
-
-    private void Handle_UpdateEquipmentClients(MessagePayload<UpdateEquipmentClients> obj)    {
-        GameThread.RunSafe(() =>
-        {
-            using (new AllowedThread())
-            {
-                if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out var mobileParty)) return;
-                if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.InitialHeroId, out var initialHero)) return;
-
-                ResolveCharacterEquipmentsData(obj.What.CharacterIdEquipmentsData, out var characterEquipmentsData);
-                inventoryLogicInterface.UpdateEquipmentWithData(mobileParty, characterEquipmentsData, initialHero);
-            }
-        });
     }
 
     /// <summary>
