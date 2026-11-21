@@ -1,8 +1,8 @@
 {
   "schemaVersion": 2,
-  "catalogRevision": "998d2a1e5c14c2a644c486ec80a6cdf3e7e365fc04d8b03e30e8e16608bbb90e",
-  "contentDigest": "998d2a1e5c14c2a644c486ec80a6cdf3e7e365fc04d8b03e30e8e16608bbb90e",
-  "sourceCommit": "9e28adcf6c07d7160b9ee0314b3ef6c96526c38d",
+  "catalogRevision": "5ef574ef87e19328ee5907c1d8bc4f24c3005bf584549d9e50d4927bad4052db",
+  "contentDigest": "5ef574ef87e19328ee5907c1d8bc4f24c3005bf584549d9e50d4927bad4052db",
+  "sourceCommit": "c49c4ed6b0b2107f85133af96c83a98840d4bec9",
   "source": "BannerlordCoop/source/GameInterface/Configuration/ModConfigData.cs",
   "oldAgentOmittedKeys": [
     "voiceEnabled",
@@ -312,8 +312,6 @@
       "type": "integer",
       "stable": false,
       "availableSince": "0.1.8",
-      "min": -2147483648,
-      "max": 2147483647,
       "omitForOldAgents": true,
       "default": 0
     },
