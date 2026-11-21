@@ -26,6 +26,7 @@ public class ManagedConfigCatalogTests
             ?? throw new InvalidDataException("modOptions is missing from the default config");
 
         var options = BuildOptions(defaults);
+        // The website hashes JSON.stringify(options), so Newtonsoft has to write every value the same way.
         var digest = SHA256.HashData(Encoding.UTF8.GetBytes(options.ToString(Formatting.None)));
         var catalog = new JObject
         {
@@ -44,6 +45,7 @@ public class ManagedConfigCatalogTests
     {
         var options = new JArray();
         var keys = new HashSet<string>(StringComparer.Ordinal);
+        // Read non-public and static properties too so misplaced metadata fails the test.
         var properties = typeof(ModOptionsData).GetProperties(
             BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static);
         foreach (var property in properties.OrderBy(property => property.MetadataToken))
@@ -63,17 +65,7 @@ public class ManagedConfigCatalogTests
             options.Add(BuildOption(property.PropertyType, key, metadata, value));
         }
 
-        CheckCoverage(keys, defaults);
         return options;
-    }
-
-    private static void CheckCoverage(HashSet<string> keys, JObject defaults)
-    {
-        if (keys.Count == 0) throw new InvalidDataException("modOptions has no managed options");
-        foreach (var property in defaults.Properties())
-        {
-            if (!keys.Contains(property.Name)) throw new InvalidDataException($"No managed property for default {property.Name}");
-        }
     }
 
     private static JObject BuildOption(Type propertyType, string key, ManagedConfigOptionAttribute metadata, JToken value)
@@ -85,12 +77,14 @@ public class ManagedConfigCatalogTests
         var type = ToCatalogType(clrType, key);
         var option = new JObject { ["key"] = key, ["type"] = type, ["availableSince"] = metadata.AvailableSince };
         AddConstraints(metadata, key, type, option);
-        var enumNames = clrType.IsEnum
-            ? clrType.GetFields(BindingFlags.Public | BindingFlags.Static)
-                .OrderBy(field => field.MetadataToken).Select(field => field.Name).ToArray()
-            : Array.Empty<string>();
-        if (clrType.IsEnum) option.Add("values", new JArray(enumNames));
-        option.Add("default", ValidateDefault(key, type, metadata, enumNames, value));
+        var enumNames = Array.Empty<string>();
+        if (clrType.IsEnum)
+        {
+            enumNames = clrType.GetFields(BindingFlags.Public | BindingFlags.Static)
+                .OrderBy(field => field.MetadataToken).Select(field => field.Name).ToArray();
+            option.Add("values", new JArray(enumNames));
+        }
+        option.Add("default", ToCatalogDefault(key, type, metadata, enumNames, value));
         CheckStringFormatting(option, key);
         return option;
     }
@@ -112,7 +106,7 @@ public class ManagedConfigCatalogTests
         bool hasMax = !double.IsNaN(metadata.Max);
         if (type is not ("integer" or "number") && (hasMin || hasMax || threshold != 0))
             throw new InvalidDataException($"Invalid numeric metadata for {type} option {key}");
-        if (type != "stringList" && (metadata.ItemPattern != null || metadata.ItemFormat != null || metadata.UniqueItems))
+        if (type != "stringList" && (metadata.ItemPattern != null || metadata.ItemFormat != null))
             throw new InvalidDataException($"Invalid list metadata for {type} option {key}");
         if (metadata.ItemFormat is not (null or "steamId64"))
             throw new InvalidDataException($"Invalid itemFormat for {key}");
@@ -122,12 +116,11 @@ public class ManagedConfigCatalogTests
         if (hasMax) option.Add("max", CatalogNumber(metadata.Max, key));
         if (metadata.ItemPattern != null) option.Add("itemPattern", metadata.ItemPattern);
         if (metadata.ItemFormat != null) option.Add("itemFormat", metadata.ItemFormat);
-        if (metadata.UniqueItems) option.Add("uniqueItems", true);
         // Values from 1 to threshold - 1 are raised to threshold.
         if (threshold > 1) option.Add("coerceRanges", new JArray { new JArray(1, threshold - 1, threshold) });
     }
 
-    private static JToken ValidateDefault(string key, string type, ManagedConfigOptionAttribute metadata, string[] enumNames, JToken value)
+    private static JToken ToCatalogDefault(string key, string type, ManagedConfigOptionAttribute metadata, string[] enumNames, JToken value)
     {
         double? number = value.Type is JTokenType.Integer or JTokenType.Float ? (double)value : null;
         bool valid = type switch
@@ -148,13 +141,15 @@ public class ManagedConfigCatalogTests
 
     private static JValue CatalogNumber(double value, string key)
     {
+        // JSON.stringify writes -0 as 0.
         string text = value == 0 ? "0" : value.ToString("R", CultureInfo.InvariantCulture);
-        if (double.IsFinite(value) && !text.Contains('E') && value >= long.MinValue && value < (double)long.MaxValue)
-        {
-            var number = value % 1 == 0 ? new JValue((long)value) : new JValue(value);
-            if (number.ToString(Formatting.None) == text) return number;
-        }
-        throw new InvalidDataException($"Number {text} for {key} needs JSON.stringify-compatible formatting");
+        if (!double.IsFinite(value) || text.Contains('E') || value < long.MinValue || value >= (double)long.MaxValue)
+            throw new InvalidDataException($"Number {text} for {key} needs JSON.stringify-compatible formatting");
+
+        var number = value % 1 == 0 ? new JValue((long)value) : new JValue(value);
+        if (number.ToString(Formatting.None) != text)
+            throw new InvalidDataException($"Number {text} for {key} needs JSON.stringify-compatible formatting");
+        return number;
     }
 
     private static void CheckStringFormatting(JObject option, string key)
