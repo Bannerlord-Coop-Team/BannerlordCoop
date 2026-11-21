@@ -30,6 +30,7 @@ internal class ExtortionByDesertersServerMethodsPatch
         yield return AccessTools.Method(typeof(Quest), nameof(Quest.DestroyDefenderParty));
         yield return AccessTools.Method(typeof(Quest), nameof(Quest.OnWarDeclared));
         yield return AccessTools.Method(typeof(Quest), nameof(Quest.OnClanChangedKingdom));
+        yield return AccessTools.Method(typeof(Quest), nameof(Quest.OnMapEventStarted));
     }
 
     internal static bool ServerOnlyPrefix() => ModInformation.IsServer;

@@ -20,11 +20,18 @@ internal interface IExtortionByDesertersWorldEventService
 {
     void HourlyTick();
     void BattleStarted(PartyBase attackerParty);
-    Dictionary<Quest, bool?> CaptureBattleOutcomes(MapEvent mapEvent);
-    void BattleFinalized(Dictionary<Quest, bool?> outcomes);
+    Dictionary<Quest, ExtortionByDesertersBattleOutcome> CaptureBattleOutcomes(MapEvent mapEvent);
+    void BattleFinalized(Dictionary<Quest, ExtortionByDesertersBattleOutcome> outcomes);
     void MapEventStarted(MapEvent mapEvent, PartyBase attacker, PartyBase defender);
     void SettlementLeft(MobileParty party, Settlement settlement);
     void VillageBeingRaided(Village village);
+}
+
+internal enum ExtortionByDesertersBattleOutcome
+{
+    OwnerAbsent,
+    OwnerWon,
+    OwnerLost,
 }
 
 internal enum ExtortionRaidEnding
@@ -111,31 +118,36 @@ internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesert
         progress.Send(quest, notice: ExtortionByDesertersNotice.Ambush);
     }
 
-    public Dictionary<Quest, bool?> CaptureBattleOutcomes(MapEvent mapEvent)
+    public Dictionary<Quest, ExtortionByDesertersBattleOutcome> CaptureBattleOutcomes(MapEvent mapEvent)
     {
-        var outcomes = new Dictionary<Quest, bool?>();
+        var outcomes = new Dictionary<Quest, ExtortionByDesertersBattleOutcome>();
         RunWithOwnerParty((quest, owner) =>
         {
             var deserters = quest._deserterMobileParty;
             if (deserters == null || deserters.MapEvent != mapEvent ||
                 !mapEvent.InvolvedParties.Contains(deserters.Party)) return;
 
-            bool? ownerWon = null;
+            var outcome = ExtortionByDesertersBattleOutcome.OwnerAbsent;
             if (mapEvent.InvolvedParties.Contains(owner.Party))
-                ownerWon = mapEvent.WinningSide == owner.Party.Side;
-            outcomes.Add(quest, ownerWon);
+            {
+                outcome = mapEvent.WinningSide == owner.Party.Side
+                    ? ExtortionByDesertersBattleOutcome.OwnerWon
+                    : ExtortionByDesertersBattleOutcome.OwnerLost;
+            }
+
+            outcomes.Add(quest, outcome);
         });
         return outcomes;
     }
 
-    public void BattleFinalized(Dictionary<Quest, bool?> outcomes) => dispatcher.RunAsOwners<Quest>(quest =>
+    public void BattleFinalized(Dictionary<Quest, ExtortionByDesertersBattleOutcome> outcomes) => dispatcher.RunAsOwners<Quest>(quest =>
     {
-        if (outcomes.TryGetValue(quest, out var ownerWon)) ApplyBattleFinalized(quest, ownerWon);
+        if (outcomes.TryGetValue(quest, out var outcome)) ApplyBattleFinalized(quest, outcome);
     });
 
-    internal void ApplyBattleFinalized(Quest quest, bool? ownerWon)
+    internal void ApplyBattleFinalized(Quest quest, ExtortionByDesertersBattleOutcome outcome)
     {
-        if (!ownerWon.HasValue)
+        if (outcome == ExtortionByDesertersBattleOutcome.OwnerAbsent)
         {
             // A battle without the owner can still destroy the deserters.
             CancelIfDesertersGone(quest);
@@ -144,19 +156,21 @@ internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesert
 
         quest.DestroyDefenderParty();
         quest._defenderMobileParty = null;
-        if (ownerWon.Value)
+        switch (outcome)
         {
-            quest._currentState = State.DesertersAreDefeated;
-            quest.DestroyDeserterParty();
-            quest._deserterMobileParty = null;
-            // AddLog forwards the journal and the cleared party bindings in one snapshot.
-            quest.AddLog(quest.OnDeserterPartyDefeatedLogText);
-            return;
+            case ExtortionByDesertersBattleOutcome.OwnerWon:
+                quest._currentState = State.DesertersAreDefeated;
+                quest.DestroyDeserterParty();
+                quest._deserterMobileParty = null;
+                // AddLog forwards the journal and the cleared party bindings in one snapshot.
+                quest.AddLog(quest.OnDeserterPartyDefeatedLogText);
+                break;
+            case ExtortionByDesertersBattleOutcome.OwnerLost:
+                SetRaidBehaviorIfNeeded(quest._deserterMobileParty, quest.QuestSettlement);
+                quest._currentState = State.DesertersDefeatedPlayer;
+                progress.Send(quest);
+                break;
         }
-
-        SetRaidBehaviorIfNeeded(quest._deserterMobileParty, quest.QuestSettlement);
-        quest._currentState = State.DesertersDefeatedPlayer;
-        progress.Send(quest);
     }
 
     private void ApplyMapEventStarted(Quest quest, MobileParty owner, MapEvent mapEvent, PartyBase attacker, PartyBase defender)

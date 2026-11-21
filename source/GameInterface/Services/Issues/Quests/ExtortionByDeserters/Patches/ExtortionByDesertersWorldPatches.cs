@@ -30,7 +30,7 @@ internal class ExtortionByDesertersWorldPatches
 
     [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.FinalizeEventAux))]
     [HarmonyPrefix]
-    private static void FinalizeEventPrefix(MapEvent __instance, bool __runOriginal, out Dictionary<Quest, bool?> __state)
+    private static void FinalizeEventPrefix(MapEvent __instance, bool __runOriginal, out Dictionary<Quest, ExtortionByDesertersBattleOutcome> __state)
     {
         __state = null;
         if (ModInformation.IsClient || !__runOriginal || __instance.IsFinalized) return;
@@ -42,7 +42,7 @@ internal class ExtortionByDesertersWorldPatches
 
     [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.FinalizeEventAux))]
     [HarmonyPostfix]
-    private static void FinalizeEventPostfix(MapEvent __instance, bool __runOriginal, Dictionary<Quest, bool?> __state)
+    private static void FinalizeEventPostfix(MapEvent __instance, bool __runOriginal, Dictionary<Quest, ExtortionByDesertersBattleOutcome> __state)
     {
         if (!__runOriginal || !__instance.IsFinalized || __state == null || __state.Count == 0) return;
         if (ContainerProvider.TryResolve<IExtortionByDesertersWorldEventService>(out var service)) service.BattleFinalized(__state);
@@ -55,11 +55,6 @@ internal class ExtortionByDesertersWorldPatches
         if (ContainerProvider.TryResolve<IExtortionByDesertersWorldEventService>(out var service))
             service.MapEventStarted(mapEvent, attackerParty, defenderParty);
     }
-
-    [HarmonyPatch(typeof(Quest), nameof(Quest.OnMapEventStarted))]
-    [HarmonyPrefix]
-    // The shared coercion relay calls vanilla on the server in the owner's context.
-    private static bool MapStartedPrefix() => ModInformation.IsServer;
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnSettlementLeft))]
     [HarmonyPostfix]

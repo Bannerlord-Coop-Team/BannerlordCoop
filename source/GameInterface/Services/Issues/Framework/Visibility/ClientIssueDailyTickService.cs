@@ -26,14 +26,17 @@ internal sealed class ClientIssueDailyTickService : IClientIssueDailyTickService
 
             var usesServerTroopJournal = registry.TryGet(issue.GetType(), out var descriptor) &&
                 descriptor is IServerTroopJournalDescriptor;
-            // Resolve effects for a server-managed journal even if the local troop return date passed.
-            if (!usesServerTroopJournal && issue.AlternativeSolutionReturnTimeForTroops.IsPast) continue;
-
             var clearDay = (int)issue.AlternativeSolutionIssueEffectClearTime.ToDays;
-            // Some journals come from the server. Local return entries need an owner and an existing journal.
-            var resolveEffectsOnly = usesServerTroopJournal || visibility.IsAnotherPlayersTroopsMission(issue) ||
-                issue.JournalEntries.Count == 0;
-            if (resolveEffectsOnly)
+            if (usesServerTroopJournal)
+            {
+                if (clearDay <= today) issue._areIssueEffectsResolved = true;
+                continue;
+            }
+
+            if (issue.AlternativeSolutionReturnTimeForTroops.IsPast) continue;
+
+            // Local return entries need an owner and an existing journal.
+            if (visibility.IsAnotherPlayersTroopsMission(issue) || issue.JournalEntries.Count == 0)
             {
                 // A late joiner can miss the clear day, so resolve the effects on that day or later.
                 if (clearDay <= today)
