@@ -56,7 +56,7 @@ internal class NavalInitializationHandler : IHandler
 
         NavalDLCFigureheadCampaignBehavior figureheadCampaignBehavior = Campaign.Current.GetCampaignBehavior<NavalDLCFigureheadCampaignBehavior>();
 
-        Campaign.Current.UnlockedFigureheadsByMainHero = sessionNavalPlayerDataInterface.GetUnlockedFigureheads(navalPlayerData, obj.What.NewHero);
+        Campaign.Current.UnlockedFigureheadsByMainHero = sessionNavalPlayerDataInterface.GetUnlockedFigureheads(navalPlayerData, playerHeroId);
         figureheadCampaignBehavior._lastFigureheadLootTime = GetLastFigureheadLootTime(playerHeroId);
 
         network.SendAll(new NetworkInitializeServerNavalDataKeys(playerHeroId));

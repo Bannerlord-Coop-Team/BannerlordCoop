@@ -16,7 +16,7 @@ public interface ISessionNavalPlayerDataInterface : IGameAbstraction
 {
     void UnlockFigurehead(Hero playerHero, Figurehead figurehead);
     List<Figurehead> GetUnlockedFigureheads(Hero playerHero);
-    List<Figurehead> GetUnlockedFigureheads(NavalPlayerData navalPlayerData, Hero playerHero);
+    List<Figurehead> GetUnlockedFigureheads(NavalPlayerData navalPlayerData, string playerHeroId);
     CampaignTime GetLastFigureheadLootTime(string playerHeroId);
     void SetLastFigureheadLootTime(string playerHeroId, CampaignTime lootTime);
     void AddPlayerKeys(string playerHeroId);
@@ -64,13 +64,17 @@ public class SessionNavalPlayerDataInterface : ISessionNavalPlayerDataInterface
         return true;
     }
 
-    public List<Figurehead> GetUnlockedFigureheads(Hero playerHero) => GetUnlockedFigureheads(NavalPlayerData, playerHero);
+    public List<Figurehead> GetUnlockedFigureheads(Hero playerHero)
+    {
+        if (!objectManager.TryGetIdWithLogging(playerHero, out var playerHeroId)) return new List<Figurehead>();
+
+        return GetUnlockedFigureheads(NavalPlayerData, playerHeroId);
+    }
 
     // Takes the data to read because a client only has the copy it was sent, not the session's
-    public List<Figurehead> GetUnlockedFigureheads(NavalPlayerData navalPlayerData, Hero playerHero)
+    public List<Figurehead> GetUnlockedFigureheads(NavalPlayerData navalPlayerData, string playerHeroId)
     {
         var unlockedFigureheads = new List<Figurehead>();
-        if (!objectManager.TryGetIdWithLogging(playerHero, out var playerHeroId)) return unlockedFigureheads;
 
         // Null and key check for players without existing unlocked figureheads
         if (navalPlayerData?.PlayerUnlockedFigureHeads?.TryGetValue(playerHeroId, out var figureheadIds) != true) return unlockedFigureheads;
