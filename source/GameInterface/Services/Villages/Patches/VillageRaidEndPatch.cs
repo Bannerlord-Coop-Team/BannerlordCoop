@@ -1,42 +1,71 @@
 using Common;
 using Common.Messaging;
 using GameInterface.Policies;
+using GameInterface.Services.Armies.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using HarmonyLib;
-using System.Collections.Generic;
-using System.Reflection;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Villages.Patches;
 
 [HarmonyPatch]
 internal class VillageRaidEndPatch
 {
-    private static IEnumerable<MethodBase> TargetMethods()
-    {
-        yield return AccessTools.Method(typeof(VillageHostileActionCampaignBehavior), "wait_menu_end_raiding_on_consequence");
-        yield return AccessTools.Method(typeof(VillageHostileActionCampaignBehavior), "wait_menu_end_raiding_at_army_by_leaving_on_consequence");
-        yield return AccessTools.Method(typeof(VillageHostileActionCampaignBehavior), "wait_menu_end_raiding_at_army_by_abandoning_on_consequence");
-    }
-
+    [HarmonyPatch(typeof(VillageHostileActionCampaignBehavior), nameof(VillageHostileActionCampaignBehavior.wait_menu_end_raiding_on_consequence))]
     [HarmonyPrefix]
-    private static bool Prefix()
+    private static bool Prefixwait_menu_end_raiding_on_consequence()
     {
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         if (ModInformation.IsServer) return true;
 
+        EndRaid();
+        return false;
+    }
+
+    [HarmonyPatch(typeof(VillageHostileActionCampaignBehavior), nameof(VillageHostileActionCampaignBehavior.wait_menu_end_raiding_at_army_by_leaving_on_consequence))]
+    [HarmonyPrefix]
+    private static bool Prefixwait_menu_end_raiding_at_army_by_leaving_on_consequence()
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (ModInformation.IsServer) return true;
+
+        var army = MobileParty.MainParty.Army;
+        EndRaid();
+        PublishArmyRemoval(army, abandon: false);
+        return false;
+    }
+
+    [HarmonyPatch(typeof(VillageHostileActionCampaignBehavior), nameof(VillageHostileActionCampaignBehavior.wait_menu_end_raiding_at_army_by_abandoning_on_consequence))]
+    [HarmonyPrefix]
+    private static bool Prefixwait_menu_end_raiding_at_army_by_abandoning_on_consequence()
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (ModInformation.IsServer) return true;
+
+        var army = MobileParty.MainParty.Army;
+        EndRaid();
+        PublishArmyRemoval(army, abandon: true);
+        return false;
+    }
+
+    private static void EndRaid()
+    {
         var mapEvent = PlayerEncounter.Battle ?? MapEvent.PlayerMapEvent;
         if (mapEvent != null)
-        {
             MessageBroker.Instance.Publish(mapEvent, new MapEventFinalizeAttempted(mapEvent));
-            return false;
-        }
+        else
+            CloseLocalRaidMenu();
+    }
 
-        CloseLocalRaidMenu();
-        return false;
+    private static void PublishArmyRemoval(Army army, bool abandon)
+    {
+        var party = MobileParty.MainParty;
+        MessageBroker.Instance.Publish(party, new MobilePartyInArmyRemoved(army, party, party, abandonArmy: abandon));
     }
 
     private static void CloseLocalRaidMenu()

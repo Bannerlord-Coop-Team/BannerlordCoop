@@ -1,11 +1,11 @@
-﻿using Common.Util;
-using Common.Network;
+﻿using Common.Network;
+using Common.Util;
 using Coop.Core.Client.Services.SiegeEvents.Messages;
 using Coop.Core.Server.Services.SiegeEvents.Messages;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
-using GameInterface.Services.Armies.Patches;
+using GameInterface.Services.Armies.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.SiegeEvents.Patches;
 using HarmonyLib;
@@ -22,7 +22,7 @@ using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
-using Xunit;
+using TaleWorlds.Library;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.SiegeEvents;
@@ -304,6 +304,7 @@ public class SiegeLeaveMenuTests : IDisposable
     {
         var leavingClient = Clients.First();
         var (partyId, _) = SetupBesiegingPlayerParty(leavingClient);
+        var (armyId, _) = SetupArmyWithMember(partyId);
 
         var disabledMethods = LeaveRoundTripDisabledMethods
             .Where(method => method.DeclaringType != typeof(GameMenu) ||
@@ -322,6 +323,15 @@ public class SiegeLeaveMenuTests : IDisposable
         AssertBesiegerCamp(Server, partyId, expectCamp: false);
         AssertBesiegerCamp(leavingClient, partyId, expectCamp: false);
         Assert.Equal(1, menuExit.CountFor(leavingClient));
+
+        var removal = Assert.Single(leavingClient.NetworkSentMessages.GetMessages<NetworkRemovePartyInArmy>());
+        Assert.Equal(partyId, removal.MobilePartyId);
+        Assert.Equal(armyId, removal.ArmyId);
+
+        foreach (var instance in AllEnvironmentInstances)
+        {
+            AssertOutOfArmy(instance, partyId, armyId);
+        }
     }
 
     [Fact]
@@ -332,9 +342,6 @@ public class SiegeLeaveMenuTests : IDisposable
         var disabledMethods = LeaveRoundTripDisabledMethods
             .Append(AccessTools.Method(typeof(MapEvent), nameof(MapEvent.BeginWait)))
             .Append(AccessTools.Method(typeof(MobileParty), nameof(MobileParty.SetMoveModeHold)))
-            .Append(AccessTools.Method(
-                typeof(ArmyPatches),
-                nameof(ArmyPatches.RemoveMobilePartyInArmy)))
             .ToList();
 
         using var encounterFinish = new MethodCallRecorder(
@@ -811,6 +818,59 @@ public class SiegeLeaveMenuTests : IDisposable
 
         return (partyId, siegeEventId);
     }
+
+    private (string armyId, string leaderPartyId) SetupArmyWithMember(string partyId)
+    {
+        var leaderPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var armyId = TestEnvironment.CreateRegisteredObject<Army>();
+
+        foreach (var instance in AllEnvironmentInstances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(leaderPartyId, out var leaderParty));
+                Assert.True(instance.ObjectManager.TryGetObject<Army>(armyId, out var army));
+
+                using (new AllowedThread())
+                {
+                    var camp = party._besiegerCamp; 
+
+                    army.LeaderParty = leaderParty;
+
+                    var partiesField = AccessTools.Field(typeof(Army), "_parties");
+                    if (army._parties == null)
+                        partiesField.SetValue(army, new MBList<MobileParty>());
+
+                    army._parties.Add(leaderParty);
+                    army._parties.Add(party);
+                    leaderParty._army = army;
+                    party._army = army;
+                    party.AttachedTo = leaderParty;
+
+                    party._besiegerCamp = camp;       
+                }
+
+                Assert.Same(leaderParty, army.LeaderParty);
+                Assert.NotSame(party, army.LeaderParty);
+            });
+        }
+
+        return (armyId, leaderPartyId);
+    }
+
+    private static void AssertOutOfArmy(EnvironmentInstance instance, string partyId, string armyId)
+    {
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(instance.ObjectManager.TryGetObject<Army>(armyId, out var army));
+            Assert.Null(party.Army);
+            Assert.Null(party.AttachedTo);
+            Assert.DoesNotContain(party, army._parties);
+        });
+    }
+
 
     /// <summary>Makes the party the instance's <see cref="MobileParty.MainParty"/>. Runs in the
     /// instance's static scope, where <c>Campaign.Current</c> resolves to that instance.</summary>

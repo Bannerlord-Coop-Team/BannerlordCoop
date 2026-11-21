@@ -1,5 +1,4 @@
 ﻿using Common.Messaging;
-using Common.Util;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.Armies.Messages;
 using GameInterface.Services.Armies.Patches;
@@ -43,7 +42,7 @@ internal sealed class ArmyDisbander : IArmyDisbander
         {
             foreach (var party in parties)
             {
-                messageBroker.Publish(party, new MobilePartyInArmyRemoved(army, party, null));
+                messageBroker.Publish(party, new MobilePartyInArmyRemoved(army, party, null, abandonArmy: false));
                 ArmyPatches.RemoveMobilePartyInArmyImmediate(party, army, null);
             }
 
