@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Logging;
+using GameInterface.Configuration;
 using GameInterface.Services.Clans;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Inventory.Data;
@@ -89,6 +90,7 @@ internal class PlayerPartyInteractionOutcomeHandler
     private readonly IPlayerMarriageRules playerMarriageRules;
     private readonly IPlayerDivorceRules playerDivorceRules;
     private readonly IPlayerMapTracking mapTracking;
+    private readonly IKingdomClanLimit kingdomClanLimit;
 
     public PlayerPartyInteractionOutcomeHandler(
         IObjectManager objectManager,
@@ -97,7 +99,8 @@ internal class PlayerPartyInteractionOutcomeHandler
         IClanLeaveRules clanLeaveRules,
         IPlayerMarriageRules playerMarriageRules,
         IPlayerDivorceRules playerDivorceRules,
-        IPlayerMapTracking mapTracking)
+        IPlayerMapTracking mapTracking,
+        IKingdomClanLimit kingdomClanLimit)
     {
         this.objectManager = objectManager;
         this.kingdomMembershipState = kingdomMembershipState;
@@ -106,6 +109,7 @@ internal class PlayerPartyInteractionOutcomeHandler
         this.playerMarriageRules = playerMarriageRules;
         this.playerDivorceRules = playerDivorceRules;
         this.mapTracking = mapTracking;
+        this.kingdomClanLimit = kingdomClanLimit;
     }
 
     public bool Handle(PlayerPartyInteractionOutcome outcome)
@@ -307,6 +311,11 @@ internal class PlayerPartyInteractionOutcomeHandler
                 outcome.ResponderPartyId);
             return false;
         }
+        if (kingdomClanLimit.RefusesJoin(initiatorClan, targetKingdom, asMercenary: false, ModConfigProvider.ModOptions))
+        {
+            Logger.Warning("Rejected player-party vassalage for clan {ClanId} because kingdom {KingdomId} has maxClansPerKingdom clans", initiatorClan.StringId, targetKingdom.StringId);
+            return false;
+        }
         if (initiatorClan.Kingdom == targetKingdom)
         {
             if (!initiatorClan.IsUnderMercenaryService)
@@ -487,6 +496,11 @@ internal class PlayerPartyInteractionOutcomeHandler
                 "Unable to apply player-party mercenary: eligibility changed before acceptance. InitiatorPartyId={InitiatorPartyId}, ResponderPartyId={ResponderPartyId}",
             outcome.InitiatorPartyId,
             outcome.ResponderPartyId);
+            return false;
+        }
+        if (kingdomClanLimit.RefusesJoin(initiatorClan, targetKingdom, asMercenary: true, ModConfigProvider.ModOptions))
+        {
+            Logger.Warning("Rejected player-party mercenary for clan {ClanId} because kingdom {KingdomId} has maxClansPerKingdom clans", initiatorClan.StringId, targetKingdom.StringId);
             return false;
         }
         int awardMultiplier = outcome.MercenaryAwardMultiplier;

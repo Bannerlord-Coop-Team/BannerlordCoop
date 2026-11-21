@@ -34,8 +34,8 @@ internal class IncidentsCampaignBehaviourPatches
     [HarmonyPrefix]
     public static bool OnGameMenuOptionSelectedPrefix(IncidentsCampaignBehaviour __instance, GameMenu gameMenu, GameMenuOption option)
     {
-        // Only settlement menus can trigger incidents, so skip sending the rest
-        if (gameMenu.StringId is not ("town" or "castle" or "village")) return false;
+        // Only settlement and port menus can trigger incidents, so skip sending the rest
+        if (gameMenu.StringId is not ("town" or "castle" or "village" or "port_menu")) return false;
 
         // Send to server to run interface version of method
         var message = new IncidentsGameMenuOptionSelected(Hero.MainHero, MobileParty.MainParty, gameMenu.StringId, option.IdString);

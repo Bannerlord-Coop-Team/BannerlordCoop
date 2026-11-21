@@ -19,6 +19,8 @@ using GameInterface.Services.Issues.Quests.VillageNeedsTools;
 using System;
 using GameInterface.Services.Issues.Quests.RevenueFarming;
 using GameInterface.Services.Issues.Quests.EscortMerchantCaravan;
+using GameInterface.Services.Issues.Quests.ExtortionByDeserters;
+using GameInterface.Services.Issues.Framework.Visibility;
 
 namespace GameInterface.Services.Issues;
 
@@ -42,6 +44,10 @@ internal class IssuesModule : Module
         builder.RegisterType<IssueAcceptPreconditions>().As<IIssueAcceptPreconditions>().InstancePerDependency();
         builder.RegisterType<ArtisanProductsProgress>().As<IArtisanProductsProgress>().InstancePerDependency();
         builder.RegisterType<OutcomeDispatcher>().As<IOutcomeDispatcher>().SingleInstance();
+        builder.RegisterType<IssueMissionVisibility>().As<IIssueMissionVisibility>().InstancePerDependency();
+        builder.RegisterType<ClientIssueDailyTickService>()
+            .As<IClientIssueDailyTickService>()
+            .InstancePerDependency();
         builder.Register(context => context.Resolve<CaravanAmbushRewardConversation>()).As<ICaravanAmbushRewardConversation>();
         builder.RegisterType<CaravanAmbushMapConversation>().As<ICaravanAmbushMapConversation>().InstancePerDependency();
         builder.RegisterType<CaravanAmbushProgress>().As<ICaravanAmbushProgress>().InstancePerLifetimeScope();
@@ -52,6 +58,8 @@ internal class IssuesModule : Module
         builder.RegisterType<IssueConversationTracker>().As<IIssueConversationTracker>().SingleInstance();
         builder.RegisterType<IssueConversationGuard>().As<IIssueConversationGuard>().SingleInstance();
         builder.RegisterType<MerchantOutlawsProgress>().As<IMerchantOutlawsProgress>().InstancePerLifetimeScope();
+        builder.RegisterType<ExtortionByDesertersProgress>().As<IExtortionByDesertersProgress>().InstancePerLifetimeScope();
+        builder.RegisterType<ExtortionByDesertersWorldEventService>().As<IExtortionByDesertersWorldEventService>().InstancePerLifetimeScope();
         builder.RegisterType<MerchantOutlawsHourlyTick>().As<IMerchantOutlawsHourlyTick>().InstancePerDependency();
         builder.Register(context => context.Resolve<LordSolutionCoordinator>()).As<ILordSolutionCoordinator>();
         builder.Register(context => context.Resolve<FinalizationCoordinator>()).As<IIssueFinalizationReplay>();
@@ -63,7 +71,6 @@ internal class IssuesModule : Module
             .As<ILesserNobleRevoltWorldEventService>()
             .SingleInstance();
         builder.RegisterType<EscortProgress>().As<IEscortProgress>().InstancePerDependency();
-        builder.RegisterType<EscortOwnerParty>().As<IEscortOwnerParty>().InstancePerDependency();
         builder.RegisterType<QuestEventRelay>().As<IQuestEventRelay>().InstancePerDependency();
         builder.RegisterType<VillageNeedsToolsService>().As<IVillageNeedsToolsService>().InstancePerDependency();
         builder.RegisterType<LadysKnightOutTournamentProgress>().As<ILadysKnightOutTournamentProgress>().InstancePerLifetimeScope();

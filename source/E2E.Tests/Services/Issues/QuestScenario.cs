@@ -8,6 +8,7 @@ using GameInterface.Services.Players.Data;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
+using System.Reflection;
 using AllowedIssue = TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssue;
 
 namespace E2E.Tests.Services.Issues;
@@ -76,14 +77,12 @@ internal sealed class QuestScenario
     {
     }
 
-    public void Accept(EnvironmentInstance client)
-    {
+    public void Accept(EnvironmentInstance client, IEnumerable<MethodBase>? disabledMethods = null) =>
         client.Call(() =>
         {
             Assert.True(client.ObjectManager.TryGetObject<Hero>(NotableId, out var notable));
             notable.Issue.StartIssueWithQuest();
-        });
-    }
+        }, disabledMethods);
 
     public string AddIssue()
     {
@@ -141,6 +140,16 @@ internal sealed class QuestScenario
         var heroId = testEnvironment.CreateRegisteredObject<Hero>();
         var partyId = testEnvironment.CreateRegisteredObject<MobileParty>();
 
+        foreach (var instance in new[] { Server, ClientA, ClientB })
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+                using (new AllowedThread()) hero._partyBelongedTo = party;
+            });
+        }
+
         var player = new Player(controllerId, heroId, partyId, "", "");
         Server.Call(() => Assert.True(Server.Resolve<IPlayerManager>().AddPlayer(player)));
         testEnvironment.ConnectRegisteredPlayer(client, controllerId);
@@ -148,7 +157,7 @@ internal sealed class QuestScenario
         return player;
     }
 
-    private static void AddIssue(EnvironmentInstance instance, string heroId, string issueId,
+    private void AddIssue(EnvironmentInstance instance, string heroId, string issueId,
         Func<EnvironmentInstance, Hero, IssueBase>? createIssue)
     {
         instance.Call(() =>

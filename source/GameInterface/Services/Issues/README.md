@@ -25,6 +25,8 @@ Army of Poachers supports direct village battles, negotiation and sending a comp
 The owner receives its journal and personal rewards; other players may accept separate copies.
 See [the verification recipe](../../../../../doc/automated-testing/quests/army-of-poachers.md).
 
+Extortion by Deserters supports the owner's village ambush, battle, reward branches and companion solution. See [the verification recipe](../../../../doc/automated-testing/extortion-by-deserters.md).
+
 ## Trying it in game
 
 Use a server and a client. All commands are `coop.debug.issues.*`.
