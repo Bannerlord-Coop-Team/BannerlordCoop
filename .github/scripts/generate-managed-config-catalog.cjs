@@ -158,6 +158,7 @@ function checkCoverage(options, body, defaults) {
 function buildCatalog(sourceText, defaultsText) {
   const source = stripComments(sourceText);
   const defaults = parseDefaults(defaultsText);
+  // ModOptionsData ends at the first } in column 0; member braces are indented.
   const body = source.match(/\bpublic\s+sealed\s+class\s+ModOptionsData\s*\{(?<body>[\s\S]*?)^\}/mu)?.groups.body;
   if (body === undefined) throw new Error('ModOptionsData was not found');
 

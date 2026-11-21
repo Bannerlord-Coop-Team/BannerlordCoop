@@ -5,8 +5,11 @@ using System.Collections.Generic;
 
 namespace GameInterface.Configuration;
 
-/// <summary>Only the catalog generator reads this attribute and requires explicit
-/// <see cref="Stable"/> and <see cref="AvailableSince"/> values.</summary>
+/// <summary>
+/// The catalog generator at <c>.github/scripts/generate-managed-config-catalog.cjs</c> reads these arguments
+/// directly from C# source text, independently of compilation. Use literals or a <c>const int</c> declared in
+/// <see cref="ModOptionsData"/>. Specify both <see cref="Stable"/> and <see cref="AvailableSince"/>.
+/// </summary>
 [AttributeUsage(AttributeTargets.Property, AllowMultiple = false)]
 public sealed class ManagedConfigOptionAttribute : Attribute
 {
