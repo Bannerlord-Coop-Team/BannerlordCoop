@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using GameInterface.Services.Ferries.Interfaces;
 using GameInterface.Services.Locations;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MobileParties.Messages.Behavior;
@@ -79,11 +80,14 @@ internal class SettlementInterface : ISettlementInterface
 
     private readonly SettlementPopulationTracker populationTracker;
     private readonly IMessageBroker messageBroker;
+    private readonly IPlayerFerryInterface playerFerryInterface;
 
-    public SettlementInterface(SettlementPopulationTracker populationTracker, IMessageBroker messageBroker)
+    // The ferry is only registered while War Sails is on
+    public SettlementInterface(SettlementPopulationTracker populationTracker, IMessageBroker messageBroker, IPlayerFerryInterface playerFerryInterface = null)
     {
         this.populationTracker = populationTracker;
         this.messageBroker = messageBroker;
+        this.playerFerryInterface = playerFerryInterface;
     }
 
     public void PartyEnterSettlement(MobileParty party, Settlement settlement)
@@ -183,6 +187,12 @@ internal class SettlementInterface : ISettlementInterface
             // Setting sail mirrors NavalTransitionCampaignBehavior.SetSail, which leaves from the port instead
             if (leaveType == SettlementLeaveType.SetSail)
                 mainParty.SetSailAtPosition(leftSettlement.PortPosition);
+            // The ferry leaves from the port at sea, which the server also moves the party to
+            else if (leaveType == SettlementLeaveType.Ferry)
+            {
+                mainParty.Position = leftSettlement.PortPosition;
+                mainParty.IsCurrentlyAtSea = true;
+            }
             else if (leaveType == SettlementLeaveType.Disembark)
                 mainParty.DisembarkToPosition(leftSettlement.GatePosition);
             else
@@ -208,6 +218,9 @@ internal class SettlementInterface : ISettlementInterface
         // Hold again because Finish calls LeaveSettlementAction, which resets party behavior and would
         // otherwise let the party walk straight back into the settlement.
         mainParty.SetMoveModeHold();
+
+        if (leaveType == SettlementLeaveType.Ferry && leftSettlement != null)
+            playerFerryInterface?.BoardLocally(leftSettlement);
 
         Campaign.Current.SaveHandler?.SignalAutoSave();
     }

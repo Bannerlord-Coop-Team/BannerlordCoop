@@ -13,4 +13,7 @@ public enum SettlementLeaveType
 
     // Goes ashore at a village gate and anchors the fleet in its port.
     Disembark,
+
+    // Takes the village's ferry from its port, leaving the fleet behind until the ferry arrives.
+    Ferry,
 }

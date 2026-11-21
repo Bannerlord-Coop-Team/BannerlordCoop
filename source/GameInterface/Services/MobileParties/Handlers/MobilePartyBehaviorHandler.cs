@@ -103,8 +103,8 @@ internal class MobilePartyBehaviorHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging(data.MobilePartyId, out MobileParty party))
                 return;
 
-            // Vanilla ignores orders on a raft, so keep the server's move to shore and resend it when the owner's order differs
-            if (ModInformation.IsServer && IsOwnerOrderDuringRaft(party.IsInRaftState, data.OriginControllerId))
+            // Vanilla ignores orders on a raft or ferry, so keep the server's move and resend it when the owner's order differs
+            if (ModInformation.IsServer && IsOwnerOrderDuringRaft(party.IsInRaftState || party.IsInFerryState, data.OriginControllerId))
             {
                 // No requester on the resend, otherwise the owner reads it as its own echo and keeps its stale order
                 if (OwnerOrderDiffers(data, party.DefaultBehavior, party.TargetPosition))

@@ -88,6 +88,8 @@ public class PartyVisualLifetimeHandler : IHandler
             using (new AllowedThread())
             {
                 mobileParty.CreateNewPartyVisual();
+                // A naval visual only builds its ship while the party is marked dirty, which the party's old visual already cleared
+                mobileParty.SetNavalVisualAsDirty();
 
                 var partyVisual = mobileParty.Party.GetPartyVisual();
                 if (partyVisual != null)

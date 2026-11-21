@@ -1,20 +1,55 @@
-﻿using Common;
+﻿using Common.Messaging;
+using GameInterface.Services.Ferries.Messages;
+using GameInterface.Services.MobileParties.Messages.Behavior;
 using HarmonyLib;
 using NavalDLC.CampaignBehaviors;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace Coop.Naval.CampaignBehaviors.Patches;
 
 /// <summary>
-/// Hides the coastal village ferry option on clients, because ferry travel isn't synced yet (#4604).
+/// The ferry's fare, fleet and landing are applied on the server, and the client boards once the server lets its party leave.
 /// </summary>
 [HarmonyPatch(typeof(FerryCampaignBehavior))]
 [HarmonyPatchCategory(GameInterface.GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class FerryCampaignBehaviorPatches
 {
-    [HarmonyPatch(nameof(FerryCampaignBehavior.game_menu_ferry_target_on_condition))]
-    [HarmonyPostfix]
-    public static void GameMenuFerryTargetOnConditionPostfix(ref bool __result)
+    [HarmonyPatch(nameof(FerryCampaignBehavior.game_menu_ferry_target_on_consequence))]
+    [HarmonyPrefix]
+    public static bool GameMenuFerryTargetOnConsequencePrefix()
     {
-        if (ModInformation.IsClient) __result = false;
+        var party = MobileParty.MainParty;
+        MessageBroker.Instance.Publish(party, new EndSettlementEncounterAttempted(party, SettlementLeaveType.Ferry));
+
+        return false;
+    }
+
+    // The server steers the ferry, so the client only ends the trip once it's in the target's port
+    [HarmonyPatch(nameof(FerryCampaignBehavior.player_ferry_state_menu_on_tick))]
+    [HarmonyPrefix]
+    public static bool PlayerFerryStateMenuOnTickPrefix()
+    {
+        var target = Campaign.Current.PlayerDataForNavalAutoTravel.DeparturedVillageWithFerry.FerryTarget;
+        if (MobileParty.MainParty.Position.Distance(target.PortPosition) < Campaign.Current.Models.EncounterModel.NeededMaximumNavalDistanceForEncounteringMobileParty)
+        {
+            GameMenu.SwitchToMenu("player_ferry_state_end");
+        }
+
+        return false;
+    }
+
+    [HarmonyPatch(nameof(FerryCampaignBehavior.player_ferry_state_end_continue_on_consequence))]
+    [HarmonyPrefix]
+    public static bool PlayerFerryStateEndContinueOnConsequencePrefix()
+    {
+        GameMenu.ExitToLast();
+        Campaign.Current.PlayerDataForNavalAutoTravel = null;
+
+        var party = MobileParty.MainParty;
+        MessageBroker.Instance.Publish(party, new PlayerFerryEndAttempted(party));
+
+        return false;
     }
 }
