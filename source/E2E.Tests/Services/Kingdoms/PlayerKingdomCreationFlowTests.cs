@@ -5842,7 +5842,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
     // Runs vanilla's clan name callback on the ruler's client with the companion in an open conversation and the town
     // picked, and lets the host's answer arrive before the conversation closes.
-    private static CompanionRolesCampaignBehavior RunClanNameCallback(
+    private static void RunClanNameCallback(
         EnvironmentInstance client, string rulerPartyId, string companionId, string settlementId)
     {
         var behavior = new CompanionRolesCampaignBehavior();
@@ -5865,7 +5865,6 @@ public class PlayerKingdomCreationFlowTests : IDisposable
                 Assert.False(CompanionRolesPatches.ClanNameSelectionIsDonePrefix(ref behavior, "Companion"));
             });
             client.PumpGameThread();
-            return behavior;
         }
         finally
         {
