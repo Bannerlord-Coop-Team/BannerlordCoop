@@ -1,5 +1,5 @@
 {
-  "contentDigest": "14dcdd7546ea12c4c2342e85ee6a2fa8723efe70866e630b33695f93abfece9e",
+  "contentDigest": "f4137c52bcdce10a665f4174180c949635c26a89471f30458c9e1b8cbd1a3444",
   "options": [
     {
       "key": "voiceEnabled",
@@ -239,10 +239,9 @@
       "type": "stringList",
       "stable": false,
       "availableSince": "0.1.8",
-      "maxItems": 32,
       "itemPattern": "^[0-9]{17}$",
       "itemFormat": "steamId64",
-      "uniqueItems": true,
+      "uniqueItems": false,
       "default": []
     },
     {

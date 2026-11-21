@@ -14,7 +14,6 @@ public sealed class ManagedConfigOptionAttribute : Attribute
     public string AvailableSince { get; set; }
     public double Min { get; set; }
     public double Max { get; set; }
-    public int MaxItems { get; set; }
     public string ItemPattern { get; set; }
     public string ItemFormat { get; set; }
     public bool UniqueItems { get; set; }
@@ -185,7 +184,7 @@ public sealed class ModOptionsData
     [ManagedConfigOption(Stable = false, AvailableSince = "0.1.8")]
     public ClansAfterKingdomDestructionMode? ClansAfterKingdomDestruction { get; set; }
 
-    [ManagedConfigOption(Stable = false, AvailableSince = "0.1.8", MaxItems = 32, ItemPattern = "^[0-9]{17}$", ItemFormat = "steamId64", UniqueItems = true)]
+    [ManagedConfigOption(Stable = false, AvailableSince = "0.1.8", ItemPattern = "^[0-9]{17}$", ItemFormat = "steamId64", UniqueItems = false)]
     public List<string> PreferredBattleHosts { get; set; }
 
     [ManagedConfigOption(Stable = false, AvailableSince = "0.1.8")]

@@ -38,7 +38,6 @@ const metadataFields = new Map([
   ['availableSince', { type: 'string' }],
   ['min', { type: 'number', appliesTo: ['integer', 'number'] }],
   ['max', { type: 'number', appliesTo: ['integer', 'number'] }],
-  ['maxItems', { type: 'number', appliesTo: ['stringList'] }],
   ['itemPattern', { type: 'string', appliesTo: ['stringList'] }],
   ['itemFormat', { type: 'string', appliesTo: ['stringList'], values: ['steamId64'] }],
   ['uniqueItems', { type: 'boolean', appliesTo: ['stringList'] }],
@@ -112,9 +111,6 @@ function parseMetadata(attributes, key, optionType, constants) {
   if (metadata.stable === undefined || !/^\d+\.\d+\.\d+$/u.test(metadata.availableSince ?? '')) {
     throw new Error(key + ' needs explicit stable and availableSince metadata');
   }
-  if (optionType === 'stringList' && (metadata.maxItems === undefined || metadata.uniqueItems === undefined)) {
-    throw new Error(key + ' needs explicit maxItems and uniqueItems metadata');
-  }
   return metadata;
 }
 
@@ -143,7 +139,6 @@ function validateDefault(option) {
   }
   if (option.min !== undefined && value < option.min) throw new Error('Default for ' + key + ' is below its minimum');
   if (option.max !== undefined && value > option.max) throw new Error('Default for ' + key + ' is above its maximum');
-  if (option.maxItems !== undefined && value.length > option.maxItems) throw new Error('Default for ' + key + ' exceeds maxItems');
   if (option.uniqueItems && new Set(value).size !== value.length) throw new Error('Default for ' + key + ' is not unique');
   if (option.itemPattern !== undefined) {
     const pattern = new RegExp(option.itemPattern, 'u');
