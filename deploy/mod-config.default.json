@@ -11,6 +11,9 @@
   // password, ports, autosaves) live in the dedicated server's own
   // DedicatedServer\server-config.json instead. Comments and trailing commas
   // are allowed here.
+  // The server adds settings from new mod versions to this file when it loads,
+  // so a deleted setting comes back with its default value. Comment a setting
+  // out with // instead to keep it out of the file.
 
   // Campaign difficulty, applied by the HOSTING side at every boot; joining
   // players inherit the values with the save transfer. These values mirror a

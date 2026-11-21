@@ -44,6 +44,7 @@ using GameInterface.Services.Villages.Commands;
 using GameInterface.Services.Villages.Data;
 using GameInterface.Services.Villages.Interfaces;
 using GameInterface.Services.Villages.Messages;
+using GameInterface.Services.Villages;
 using HarmonyLib;
 using Helpers;
 using Missions.Messages;
@@ -480,46 +481,69 @@ public class VillageHostileActionTests : MapEventTestBase
         var (_, mobilePartyId) = CreatePlayerHeroParty("PlayerOne");
         var target = CreateVillageTarget();
         EnableHeadlessEncounterFinish(client);
-        var encounter = SetMockPlayerEncounter(client);
-        client.Call(() =>
+        SetMockPlayerEncounter(client);
+        var router = client.Resolve<TestNetworkRouter>();
+        // Hold the server's reply so the continuation parks while the first request is still pending.
+        router.AutoDrainReady = false;
+        router.PauseLink(Server.NetPeer, client.NetPeer);
+        try
         {
-            Campaign.Current.MainParty = client.GetRegisteredObject<MobileParty>(mobilePartyId);
-            var mobileParty = Campaign.Current.MainParty;
-            var settlement = client.GetRegisteredObject<Settlement>(target.SettlementId);
-            mobileParty._currentSettlement = settlement;
-            Campaign.Current.MapStateData.GameMenuId = "village";
-            client.Resolve<IMessageBroker>().Publish(this, new VillageHostileActionAttempted(
-                VillageHostileAction.Raid,
-                mobileParty,
-                settlement));
-        }, MapEventDisabledMethods);
+            client.Call(() =>
+            {
+                Campaign.Current.MainParty = client.GetRegisteredObject<MobileParty>(mobilePartyId);
+                var mobileParty = Campaign.Current.MainParty;
+                var settlement = client.GetRegisteredObject<Settlement>(target.SettlementId);
+                mobileParty._currentSettlement = settlement;
+                Campaign.Current.MapStateData.GameMenuId = "village";
+                client.Resolve<IMessageBroker>().Publish(this, new VillageHostileActionAttempted(
+                    VillageHostileAction.Raid,
+                    mobileParty,
+                    settlement));
+            }, MapEventDisabledMethods);
 
-        Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestVillageHostileAction>());
+            Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestVillageHostileAction>());
+            Assert.Equal(1, router.DrainReady());
+            Assert.Single(Server.NetworkSentMessages.Messages.Where(message =>
+                message is NetworkVillageHostileActionStarted or NetworkVillageHostileActionDenied));
+            Assert.Empty(client.InternalMessages.GetMessages<NetworkVillageHostileActionStarted>());
+            Assert.Empty(client.InternalMessages.GetMessages<NetworkVillageHostileActionDenied>());
 
-        client.SimulateMessage(Server.NetPeer,
-            new NetworkVillageHostileActionDenied(VillageHostileActionDeniedReason.AlreadyInMapEvent));
+            var continuationEncounter = SetMockPlayerEncounter(client);
+            client.Call(() =>
+            {
+                Campaign.Current.MapStateData.GameMenuId = "encounter";
+                continuationEncounter.EncounterState = PlayerEncounterState.End;
+                var settlement = client.GetRegisteredObject<Settlement>(target.SettlementId);
+                client.Resolve<IClientVillageHostileActionTracker>().ParkRaidContinuation(settlement);
+                client.Resolve<IMessageBroker>().Publish(this, new CampaignTick());
+            }, MapEventDisabledMethods);
+            Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestVillageHostileAction>());
 
-        client.Call(() =>
+            // Deliver the first denial through the queued game-thread path so the pending latch is released before the tick.
+            client.SimulateMessage(Server.NetPeer,
+                new NetworkVillageHostileActionDenied(VillageHostileActionDeniedReason.AlreadyInMapEvent),
+                markGameThread: false);
+            client.PumpGameThread();
+
+            client.Call(() =>
+            {
+                Assert.Same(continuationEncounter, PlayerEncounter.Current);
+                Assert.Equal("encounter", Campaign.Current.MapStateData.GameMenuId);
+                client.Resolve<IMessageBroker>().Publish(this, new CampaignTick());
+            }, MapEventDisabledMethods);
+
+            Assert.Equal(2, client.NetworkSentMessages.GetMessages<NetworkRequestVillageHostileAction>().Count());
+            client.SimulateMessage(Server.NetPeer,
+                new NetworkVillageHostileActionDenied(VillageHostileActionDeniedReason.AlreadyInMapEvent));
+
+            client.Call(() => Assert.Null(PlayerEncounter.Current),
+                MapEventDisabledMethods);
+        }
+        finally
         {
-            Assert.Same(encounter, PlayerEncounter.Current);
-            Assert.Equal("village", Campaign.Current.MapStateData.GameMenuId);
-        }, MapEventDisabledMethods);
-
-        var continuationEncounter = SetMockPlayerEncounter(client);
-        client.Call(() =>
-        {
-            Campaign.Current.MapStateData.GameMenuId = "encounter";
-            continuationEncounter.EncounterState = PlayerEncounterState.End;
-            var settlement = client.GetRegisteredObject<Settlement>(target.SettlementId);
-            client.Resolve<IVillageHostileActionInterface>().ParkRaidContinuation(settlement);
-            client.Resolve<IMessageBroker>().Publish(this, new CampaignTick());
-        }, MapEventDisabledMethods);
-        client.SimulateMessage(Server.NetPeer,
-            new NetworkVillageHostileActionDenied(VillageHostileActionDeniedReason.AlreadyInMapEvent));
-
-        client.Call(() => Assert.Null(PlayerEncounter.Current),
-            MapEventDisabledMethods);
-        Assert.Equal(2, client.NetworkSentMessages.GetMessages<NetworkRequestVillageHostileAction>().Count());
+            router.ResumeLink(Server.NetPeer, client.NetPeer);
+            router.AutoDrainReady = true;
+        }
     }
 
     [Fact]
