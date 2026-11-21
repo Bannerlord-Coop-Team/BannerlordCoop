@@ -103,12 +103,12 @@ public class PlayerFerryInterface : IPlayerFerryInterface
             reason = "your party isn't a player's party";
             return false;
         }
-        if (village?.FerryTarget == null || party.CurrentSettlement != village)
+        if (village?.FerryTarget == null)
         {
             reason = "your party isn't at a village with a ferry";
             return false;
         }
-        if (party.IsCurrentlyAtSea || IsOnFerry(party))
+        if (party.IsCurrentlyAtSea)
         {
             reason = "your party is already at sea";
             return false;
