@@ -11,6 +11,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.ViewModelCollection.ClanManagement;
 using TaleWorlds.CampaignSystem.ViewModelCollection.ClanManagement.Categories;
+using TaleWorlds.CampaignSystem.ViewModelCollection.ClanManagement.ClanPartyItem;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
@@ -46,8 +47,9 @@ internal class ClanPartiesVMPatches
     [HarmonyPrefix]
     public static bool GetCanDisbandPartyPrefix(ClanPartiesVM __instance, ref bool __result, ref TextObject cannotDisbandReason)
     {
+        if (CoopClanPermissions.CanManagePartyItem(__instance.CurrentSelectedParty)) return true;
+
         var party = __instance.CurrentSelectedParty?.Party?.MobileParty;
-        if (CoopClanPermissions.CanManageParty(party)) return true;
         cannotDisbandReason = GameTexts.FindText(party?.IsPlayerParty() == true
             ? "str_coop_clan_player_party_protected" : "str_coop_clan_party_leader_only");
         __result = false;
@@ -89,20 +91,20 @@ internal class ClanPartiesVMPatches
     }
 
     /// <summary>
-    /// The party the change-leader popup was opened for. Save to use in OnPartyLeaderChangedPrefix.
+    /// The party item the change-leader popup was opened for. Save to use in OnPartyLeaderChangedPrefix.
     /// Any incoming refresh messages can change ClanPartiesVM.CurrentSelectedParty to the player's party.
     /// </summary>
-    private static MobileParty popupParty;
+    private static ClanPartyItemVM popupItem;
 
     [HarmonyPatch(nameof(ClanPartiesVM.OnShowChangeLeaderPopup))]
     [HarmonyPrefix]
     public static bool OnShowChangeLeaderPopupPrefix(ClanPartiesVM __instance)
     {
-        popupParty = null;
-        var party = __instance.CurrentSelectedParty?.Party?.MobileParty;
-        if (!CoopClanPermissions.CanManageParty(party)) return false;
+        popupItem = null;
+        var item = __instance.CurrentSelectedParty;
+        if (!CoopClanPermissions.CanManagePartyItem(item)) return false;
 
-        popupParty = party;
+        popupItem = item;
         return true;
     }
 
@@ -110,22 +112,11 @@ internal class ClanPartiesVMPatches
     [HarmonyPrefix]
     public static bool OnPartyLeaderChangedPrefix(ClanPartiesVM __instance, Hero newLeader)
     {
-        // Use popupParty instead of the CurrentSelectedParty that can change from any incoming refresh messages
-        var selectedParty = popupParty ?? __instance.CurrentSelectedParty?.Party?.MobileParty;
-        popupParty = null;
+        // Use popupItem instead of the CurrentSelectedParty that can change from any incoming refresh messages
+        var item = popupItem ?? __instance.CurrentSelectedParty;
+        popupItem = null;
 
-        if (selectedParty == null) return false;
-        if (!CoopClanPermissions.CanManageParty(selectedParty)) return false;
-
-        var oldLeader = selectedParty.Party?.LeaderHero;
-        if (oldLeader != null && oldLeader.IsPlayerHero())
-        {
-            Logger.Error($"Rejecting change of leader in clan mobile party because oldLeader is a player hero ({oldLeader.StringId}).");
-
-            // Inform client of rejected clan party leader change
-            InformationManager.DisplayMessage(new InformationMessage(PlayerHeroRejectedMessage));
-            return false;
-        }
+        if (!CoopClanPermissions.CanManagePartyItem(item)) return false;
 
         if (newLeader != null && newLeader.IsPlayerHero())
         {
@@ -136,9 +127,29 @@ internal class ClanPartiesVMPatches
             return false;
         }
 
-        // Change clan party leader on the server
         if (newLeader != null && !CoopClanPermissions.CanManageHero(newLeader)) return false;
 
+        // A cached party has no MobileParty, only the leader it's kept for
+        if (item is ClanPartyItemWithHeroVM)
+        {
+            if (newLeader != null && newLeader.PartyBelongedTo == MobileParty.MainParty) __instance._openPartyAsManage(newLeader);
+
+            MessageBroker.Instance.Publish(__instance, new EmptyClanPartyLeaderChanged(Hero.MainHero, item.Leader, newLeader));
+            return false;
+        }
+
+        var selectedParty = item.Party.MobileParty;
+        var oldLeader = selectedParty.Party?.LeaderHero;
+        if (oldLeader != null && oldLeader.IsPlayerHero())
+        {
+            Logger.Error($"Rejecting change of leader in clan mobile party because oldLeader is a player hero ({oldLeader.StringId}).");
+
+            // Inform client of rejected clan party leader change
+            InformationManager.DisplayMessage(new InformationMessage(PlayerHeroRejectedMessage));
+            return false;
+        }
+
+        // Change clan party leader on the server
         var message = new ClanPartyLeaderChanged(Hero.MainHero, newLeader, selectedParty, MobileParty.MainParty);
         MessageBroker.Instance.Publish(__instance, message);
 
@@ -158,7 +169,7 @@ internal class ClanPartiesVMPatches
     [HarmonyPostfix]
     public static void OnFinalizePostfix()
     {
-        popupParty = null;
+        popupItem = null;
     }
 
     [HarmonyPatch(nameof(ClanPartiesVM.GetNewPartyLeaderCandidates))]
