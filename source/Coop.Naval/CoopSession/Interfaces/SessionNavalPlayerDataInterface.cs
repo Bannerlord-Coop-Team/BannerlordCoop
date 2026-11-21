@@ -6,6 +6,7 @@ using GameInterface.Services;
 using GameInterface.Services.NavalDLC;
 using GameInterface.Services.ObjectManager;
 using Serilog;
+using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Naval;
 
@@ -17,6 +18,12 @@ public interface ISessionNavalPlayerDataInterface : IGameAbstraction
     CampaignTime GetLastFigureheadLootTime(string playerHeroId);
     void SetLastFigureheadLootTime(string playerHeroId, CampaignTime lootTime);
     void AddPlayerKeys(string playerHeroId);
+
+    /// <summary>[Server] Records the clan that moored the ship vanilla is about to append to a stash of <paramref name="stashCount"/> ships.</summary>
+    void RecordMooring(string settlementId, int stashCount, string clanId);
+
+    /// <summary>[Server] Removes the owner of the moored ship at <paramref name="stashIndex"/> if it is <paramref name="clanId"/>.</summary>
+    bool TryReleaseMooring(string settlementId, int stashIndex, int stashCount, string clanId);
 }
 
 public class SessionNavalPlayerDataInterface : ISessionNavalPlayerDataInterface
@@ -92,5 +99,39 @@ public class SessionNavalPlayerDataInterface : ISessionNavalPlayerDataInterface
         {
             NavalPlayerData.PlayerLastFigureheadLootTimes[playerHeroId] = CampaignTime.Zero._numTicks;
         }
+    }
+
+    public void RecordMooring(string settlementId, int stashCount, string clanId)
+    {
+        GetMooredShipOwnerClans(settlementId, stashCount).Add(clanId);
+    }
+
+    public bool TryReleaseMooring(string settlementId, int stashIndex, int stashCount, string clanId)
+    {
+        var ownerClans = GetMooredShipOwnerClans(settlementId, stashCount);
+        if (ownerClans[stashIndex] != clanId) return false;
+
+        ownerClans.RemoveAt(stashIndex);
+        return true;
+    }
+
+    // Lined up with the stash, padded with no owner for ships moored before co-op, which no player can take back
+    private List<string> GetMooredShipOwnerClans(string settlementId, int stashCount)
+    {
+        var mooredShipOwnerClans = NavalPlayerData.MooredShipOwnerClans;
+        if (!mooredShipOwnerClans.TryGetValue(settlementId, out var ownerClans))
+        {
+            ownerClans = new List<string>();
+            mooredShipOwnerClans[settlementId] = ownerClans;
+        }
+
+        while (ownerClans.Count < stashCount) ownerClans.Add(string.Empty);
+        if (ownerClans.Count > stashCount)
+        {
+            Logger.Error("{SettlementId} has {OwnerCount} moored ship owners for {ShipCount} moored ships", settlementId, ownerClans.Count, stashCount);
+            ownerClans.RemoveRange(stashCount, ownerClans.Count - stashCount);
+        }
+
+        return ownerClans;
     }
 }

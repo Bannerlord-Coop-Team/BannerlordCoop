@@ -4,7 +4,6 @@ using Common.Messaging;
 using Common.Network;
 using Coop.Naval.CoopSession.Interfaces;
 using Coop.Naval.CoopSession.Messages;
-using Coop.Naval.PortScreen.Interfaces;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.NavalDLC;
 using GameInterface.Services.NavalDLC.Messages;
@@ -26,23 +25,19 @@ internal class NavalInitializationHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly ISessionNavalPlayerDataInterface sessionNavalPlayerDataInterface;
-    private readonly IPortMooringInterface portMooringInterface;
 
     private NavalPlayerData navalPlayerData;
-    private bool mooredShipsFiltered;
 
     public NavalInitializationHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
-        ISessionNavalPlayerDataInterface sessionNavalPlayerDataInterface,
-        IPortMooringInterface portMooringInterface)
+        ISessionNavalPlayerDataInterface sessionNavalPlayerDataInterface)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.sessionNavalPlayerDataInterface = sessionNavalPlayerDataInterface;
-        this.portMooringInterface = portMooringInterface;
 
         messageBroker.Subscribe<InitializeClientNavalData>(Handle);
         messageBroker.Subscribe<PlayerHeroChanged>(Handle);
@@ -59,7 +54,6 @@ internal class NavalInitializationHandler : IHandler
     private void Handle(MessagePayload<InitializeClientNavalData> obj)
     {
         navalPlayerData = obj.What.NavalPlayerData;
-        mooredShipsFiltered = false;
     }
 
     // Need to load naval data when the hero changes for the player
@@ -71,13 +65,6 @@ internal class NavalInitializationHandler : IHandler
 
         Campaign.Current.UnlockedFigureheadsByMainHero = GetUnlockedFigureheads(playerHeroId);
         figureheadCampaignBehavior._lastFigureheadLootTime = GetLastFigureheadLootTime(playerHeroId);
-
-        // Only the joined stash holds other clans' ships, and the join's owner list is stale by the time an heir takes over
-        if (!mooredShipsFiltered)
-        {
-            portMooringInterface.KeepOnlyClanMooredShips(navalPlayerData, obj.What.NewHero.Clan);
-            mooredShipsFiltered = true;
-        }
 
         network.SendAll(new NetworkInitializeServerNavalDataKeys(playerHeroId));
     }
