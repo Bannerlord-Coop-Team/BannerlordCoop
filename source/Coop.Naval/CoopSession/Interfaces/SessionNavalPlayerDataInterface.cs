@@ -6,6 +6,7 @@ using GameInterface.Services;
 using GameInterface.Services.NavalDLC;
 using GameInterface.Services.ObjectManager;
 using Serilog;
+using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Naval;
 
@@ -14,6 +15,8 @@ namespace Coop.Naval.CoopSession.Interfaces;
 public interface ISessionNavalPlayerDataInterface : IGameAbstraction
 {
     void UnlockFigurehead(Hero playerHero, Figurehead figurehead);
+    List<Figurehead> GetUnlockedFigureheads(Hero playerHero);
+    List<Figurehead> GetUnlockedFigureheads(NavalPlayerData navalPlayerData, string playerHeroId);
     CampaignTime GetLastFigureheadLootTime(string playerHeroId);
     void SetLastFigureheadLootTime(string playerHeroId, CampaignTime lootTime);
     void AddPlayerKeys(string playerHeroId);
@@ -59,6 +62,29 @@ public class SessionNavalPlayerDataInterface : ISessionNavalPlayerDataInterface
         SetLastFigureheadLootTime(playerHeroId, new CampaignTime(lootTimeTicks));
 
         return true;
+    }
+
+    public List<Figurehead> GetUnlockedFigureheads(Hero playerHero)
+    {
+        if (!objectManager.TryGetIdWithLogging(playerHero, out var playerHeroId)) return new List<Figurehead>();
+
+        return GetUnlockedFigureheads(NavalPlayerData, playerHeroId);
+    }
+
+    // Takes the data to read because a client only has the copy it was sent, not the session's
+    public List<Figurehead> GetUnlockedFigureheads(NavalPlayerData navalPlayerData, string playerHeroId)
+    {
+        var unlockedFigureheads = new List<Figurehead>();
+
+        // Null and key check for players without existing unlocked figureheads
+        if (navalPlayerData?.PlayerUnlockedFigureHeads?.TryGetValue(playerHeroId, out var figureheadIds) != true) return unlockedFigureheads;
+
+        foreach (var figureheadId in figureheadIds)
+        {
+            if (objectManager.TryGetObjectWithLogging<Figurehead>(figureheadId, out var figurehead)) unlockedFigureheads.Add(figurehead);
+        }
+
+        return unlockedFigureheads;
     }
 
     public CampaignTime GetLastFigureheadLootTime(string playerHeroId)
