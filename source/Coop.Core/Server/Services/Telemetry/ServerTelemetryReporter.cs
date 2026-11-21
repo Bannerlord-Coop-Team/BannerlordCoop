@@ -18,7 +18,7 @@ public interface IServerTelemetryReporter : IDisposable
 public class ServerTelemetryReporter : IServerTelemetryReporter
 {
     private static readonly ILogger Logger = LogManager.GetLogger<ServerTelemetryReporter>();
-    internal static readonly TimeSpan ReportInterval = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan TickInterval = TimeSpan.FromSeconds(30);
     // Keep the refresh cadence below the backend's two-minute statistics freshness window.
     private const int UnchangedRefreshTicks = 3;
 
@@ -27,8 +27,7 @@ public class ServerTelemetryReporter : IServerTelemetryReporter
     private readonly CancellationTokenSource cancellation;
     private readonly Func<DateTime> getUtcNow;
     private readonly Func<string> createSessionId;
-    private readonly TimeSpan reportInterval;
-    private readonly Func<TimeSpan, CancellationToken, Task> waitForTick;
+    private readonly Func<CancellationToken, Task> waitForTick;
     private readonly object reportGate = new object();
 
     private int playerCount;
@@ -43,10 +42,9 @@ public class ServerTelemetryReporter : IServerTelemetryReporter
             messageBroker,
             uploader,
             sessionCancellation,
-            ReportInterval,
             () => DateTime.UtcNow,
             () => Guid.NewGuid().ToString("N"),
-            Task.Delay)
+            ct => Task.Delay(TickInterval, ct))
     {
     }
 
@@ -54,23 +52,19 @@ public class ServerTelemetryReporter : IServerTelemetryReporter
         IMessageBroker messageBroker,
         IServerTelemetryUploader uploader,
         CancellationTokenSource sessionCancellation,
-        TimeSpan reportInterval,
         Func<DateTime> getUtcNow,
         Func<string> createSessionId,
-        Func<TimeSpan, CancellationToken, Task> waitForTick)
+        Func<CancellationToken, Task> waitForTick)
     {
         if (messageBroker == null) throw new ArgumentNullException(nameof(messageBroker));
         if (uploader == null) throw new ArgumentNullException(nameof(uploader));
         if (sessionCancellation == null) throw new ArgumentNullException(nameof(sessionCancellation));
-        if (reportInterval <= TimeSpan.Zero)
-            throw new ArgumentOutOfRangeException(nameof(reportInterval));
         if (getUtcNow == null) throw new ArgumentNullException(nameof(getUtcNow));
         if (createSessionId == null) throw new ArgumentNullException(nameof(createSessionId));
         this.messageBroker = messageBroker;
         this.uploader = uploader;
         this.getUtcNow = getUtcNow;
         this.createSessionId = createSessionId;
-        this.reportInterval = reportInterval;
         this.waitForTick = waitForTick;
         cancellation = CancellationTokenSource.CreateLinkedTokenSource(sessionCancellation.Token);
 
@@ -78,7 +72,9 @@ public class ServerTelemetryReporter : IServerTelemetryReporter
         messageBroker.Subscribe<ConnectedPlayersChanged>(Handle_ConnectedPlayersChanged);
     }
 
-    private void Handle_ServerListening(MessagePayload<ServerListening> payload)
+    private void Handle_ServerListening(MessagePayload<ServerListening> _) => StartReporting();
+
+    private void StartReporting()
     {
         string sessionId;
         DateTime startedAt;
@@ -107,17 +103,18 @@ public class ServerTelemetryReporter : IServerTelemetryReporter
         CancellationToken cancellationToken)
     {
         int? lastUploadedPlayerCount = null;
-        var ticksUntilRefresh = 0;
+        var ticksSinceUpload = 0;
         try
         {
             while (!cancellationToken.IsCancellationRequested)
             {
-                await waitForTick(reportInterval, cancellationToken).ConfigureAwait(false);
+                await waitForTick(cancellationToken).ConfigureAwait(false);
                 cancellationToken.ThrowIfCancellationRequested();
 
-                if (ticksUntilRefresh > 0) ticksUntilRefresh--;
+                ticksSinceUpload++;
                 var currentPlayerCount = Volatile.Read(ref playerCount);
-                if (lastUploadedPlayerCount == currentPlayerCount && ticksUntilRefresh > 0) continue;
+                var refreshDue = ticksSinceUpload >= UnchangedRefreshTicks;
+                if (lastUploadedPlayerCount == currentPlayerCount && !refreshDue) continue;
 
                 var status = new ServerTelemetryStatus(
                     sessionId,
@@ -128,7 +125,7 @@ public class ServerTelemetryReporter : IServerTelemetryReporter
                 if (await TryUploadAsync(status, cancellationToken).ConfigureAwait(false))
                 {
                     lastUploadedPlayerCount = status.PlayerCount;
-                    ticksUntilRefresh = UnchangedRefreshTicks;
+                    ticksSinceUpload = 0;
                 }
             }
         }

@@ -27,12 +27,11 @@ public class ServerTelemetryReporterTests
         using var reporter = CreateReporter(messageBroker, uploader, sessionCancellation, ticks);
 
         messageBroker.Publish(this, new ConnectedPlayersChanged(5));
-        Assert.Null(ticks.ScheduledInterval);
+        Assert.Null(ticks.ScheduledTick);
         Assert.Empty(uploader.Statuses);
 
         messageBroker.Publish(this, new ServerListening());
         await ticks.AdvanceAsync();
-        Assert.Equal(TimeSpan.FromSeconds(30), ticks.ScheduledInterval);
         Assert.Equal(5, Assert.Single(uploader.Statuses).PlayerCount);
 
         messageBroker.Publish(this, new ConnectedPlayersChanged(3));
@@ -108,7 +107,6 @@ public class ServerTelemetryReporterTests
             messageBroker,
             uploader,
             sessionCancellation,
-            ServerTelemetryReporter.ReportInterval,
             () => StartedAt,
             () => SessionId,
             ticks.WaitAsync);
@@ -120,11 +118,10 @@ public class ServerTelemetryReporterTests
             Channel.CreateUnbounded<TaskCompletionSource<bool>>();
         private TaskCompletionSource<bool>? nextTick;
 
-        public TimeSpan? ScheduledInterval { get; private set; }
+        public Task? ScheduledTick => scheduledTicks.Reader.TryPeek(out var tick) ? tick.Task : null;
 
-        public Task WaitAsync(TimeSpan interval, CancellationToken cancellationToken)
+        public Task WaitAsync(CancellationToken cancellationToken)
         {
-            ScheduledInterval = interval;
             var tick = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             scheduledTicks.Writer.TryWrite(tick);
             return tick.Task.WaitAsync(cancellationToken);
