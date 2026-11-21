@@ -72,6 +72,11 @@ function parseEnums(source) {
   return enums;
 }
 
+function parseConstants(body) {
+  return new Map([...body.matchAll(/\bconst\s+int\s+(?<name>\w+)\s*=\s*(?<value>-?\d[\d_]*)\s*;/gu)]
+    .map(({ groups: { name, value } }) => [name, Number(value.replaceAll('_', ''))]));
+}
+
 function parseMetadata(attributes, key, optionType, constants) {
   const matches = [...attributes.matchAll(managedConfigOptionPattern)];
   if (matches.length !== 1) throw new Error(key + ' must have exactly one ManagedConfigOption attribute');
@@ -146,6 +151,15 @@ function validateDefault(option) {
   }
 }
 
+function checkCoverage(options, body, defaults) {
+  if (!options.size) throw new Error('No managed options were found');
+  const attributeCount = [...body.matchAll(/\[\s*ManagedConfigOption\b/gu)].length;
+  if (attributeCount !== options.size) throw new Error('ManagedConfigOption metadata without a managed property');
+  for (const key of Object.keys(defaults)) {
+    if (!options.has(key)) throw new Error('No managed property for default ' + key);
+  }
+}
+
 function buildCatalog(sourceText, defaultsText) {
   const source = stripComments(sourceText);
   const defaults = parseDefaults(defaultsText);
@@ -153,8 +167,7 @@ function buildCatalog(sourceText, defaultsText) {
   if (body === undefined) throw new Error('ModOptionsData was not found');
 
   const enumValues = parseEnums(source);
-  const constants = new Map([...body.matchAll(/\bconst\s+int\s+(?<name>\w+)\s*=\s*(?<value>-?\d[\d_]*)\s*;/gu)]
-    .map(({ groups: { name, value } }) => [name, Number(value.replaceAll('_', ''))]));
+  const constants = parseConstants(body);
   const options = new Map();
   for (const { groups: { attributes, type: declaredType, name } } of body.matchAll(autoPropertyPattern)) {
     if (name === 'UnknownKeys') continue;
@@ -173,12 +186,7 @@ function buildCatalog(sourceText, defaultsText) {
     options.set(key, option);
   }
 
-  if (!options.size) throw new Error('No managed options were found');
-  const attributeCount = [...body.matchAll(/\[\s*ManagedConfigOption\b/gu)].length;
-  if (attributeCount !== options.size) throw new Error('ManagedConfigOption metadata without a managed property');
-  for (const key of Object.keys(defaults)) {
-    if (!options.has(key)) throw new Error('No managed property for default ' + key);
-  }
+  checkCoverage(options, body, defaults);
 
   const entries = [...options.values()];
   const contentDigest = createHash('sha256').update(JSON.stringify(entries)).digest('hex');

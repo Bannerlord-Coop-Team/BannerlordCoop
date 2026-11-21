@@ -18,6 +18,7 @@ public sealed class ManagedConfigOptionAttribute : Attribute
     public string ItemPattern { get; set; }
     public string ItemFormat { get; set; }
     public bool UniqueItems { get; set; }
+    /// <summary>Raises positive values below this threshold to the threshold and leaves zero unchanged.</summary>
     public int CoercePositiveBelow { get; set; }
 }
 
