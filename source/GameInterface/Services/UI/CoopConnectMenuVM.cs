@@ -62,6 +62,7 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
     private int filteredSteamLobbyCount;
     private long filteredSteamLobbyPlayerCount;
     private int steamLobbyPageIndex;
+    private bool isIpHidden = true;
 
     public string JoinButtonText => "Join";
     public string RefreshButtonText => "Refresh";
@@ -280,6 +281,24 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
         }
     }
 
+    // Hidden by default so streams and screenshots don't leak the host's address.
+    [DataSourceProperty]
+    public bool IsIpHidden
+    {
+        get => isIpHidden;
+        private set
+        {
+            if (isIpHidden == value) return;
+
+            isIpHidden = value;
+            OnPropertyChanged(nameof(IsIpHidden));
+            OnPropertyChanged(nameof(IpVisibilityButtonText));
+        }
+    }
+
+    [DataSourceProperty]
+    public string IpVisibilityButtonText => IsIpHidden ? "Show" : "Hide";
+
     [DataSourceProperty]
     public string Password
     {
@@ -291,6 +310,11 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
             connectPassword = value;
             OnPropertyChanged(nameof(Password));
         }
+    }
+
+    public void ActionToggleIpVisibility()
+    {
+        IsIpHidden = !IsIpHidden;
     }
 
     public void ActionCycleSteamLobbyPasswordFilter()
