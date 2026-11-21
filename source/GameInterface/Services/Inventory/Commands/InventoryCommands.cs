@@ -195,9 +195,7 @@ internal class InventoryCommands
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
         {
-            if (ModInformation.IsClient) return Failed("Command can only be run on the server.");
-
-            if (TryGetObjectManager(out var objectManager) == false)
+            if (!TryGetObjectManager(out var objectManager))
             {
                 return Failed("Unable to resolve ObjectManager.");
             }
