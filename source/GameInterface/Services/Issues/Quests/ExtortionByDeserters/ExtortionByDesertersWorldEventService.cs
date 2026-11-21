@@ -161,6 +161,7 @@ internal sealed class ExtortionByDesertersWorldEventService : IExtortionByDesert
 
     private void ApplyMapEventStarted(Quest quest, MobileParty owner, MapEvent mapEvent, PartyBase attacker, PartyBase defender)
     {
+        // The relay only forwards coercion, so this mirrors vanilla's field-battle branch.
         var attacksVillageParty = mapEvent.IsFieldBattle && defender.IsMobile &&
             defender.MobileParty.HomeSettlement == quest.QuestSettlement &&
             defender != quest._deserterMobileParty?.Party;

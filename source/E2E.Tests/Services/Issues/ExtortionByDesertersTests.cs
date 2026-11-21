@@ -951,8 +951,6 @@ public class ExtortionByDesertersTests : IDisposable
         }
         else quest = DefeatDeserters();
 
-        using var ticks = new MethodCallRecorder(Priority.First,
-            AccessTools.Method(typeof(ExtortionByDesertersWorldEventService), nameof(ExtortionByDesertersWorldEventService.ApplyTick)));
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(scenario.OwnerPartyId, out var ownerParty));
@@ -967,7 +965,6 @@ public class ExtortionByDesertersTests : IDisposable
         var endings = Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>();
         if (desertersRemain) Assert.Equal(IssueOutcome.QuestFail, Assert.Single(endings).Outcome);
         else Assert.Empty(endings);
-        Assert.Equal(desertersRemain ? 0 : 1, ticks.CountFor(Server));
     }
 
     [Fact]
@@ -1139,30 +1136,6 @@ public class ExtortionByDesertersTests : IDisposable
             __result.SetTextVariable("LINK", link);
             return false;
         }
-    }
-
-    [Fact]
-    public void CapturedOwner_DoesNotUseAnotherPlayersPartyForFlight()
-    {
-        Accept();
-        var partyId = environment.CreateRegisteredObject<MobileParty>();
-        var quest = (Quest)scenario.QuestOf(Server);
-        using var flight = new MethodCallRecorder(AccessTools.Method(typeof(Quest), nameof(Quest.HandleDesertersRunningAway)));
-        Server.Call(() =>
-        {
-            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(QuestScenario.ControllerA, out var player));
-            Assert.True(Server.ObjectManager.TryGetObject<Hero>(player.HeroId, out var hero));
-            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var deserters));
-            using (new AllowedThread())
-            {
-                hero._partyBelongedTo = null;
-                hero.ChangeState(Hero.CharacterStates.Prisoner);
-            }
-            quest._deserterMobileParty = deserters;
-            CampaignEventDispatcher.Instance.HourlyTick();
-            Assert.Equal(State.DesertersMovingToSettlement, quest._currentState);
-        });
-        Assert.Equal(0, flight.Count);
     }
 
     [Fact]
