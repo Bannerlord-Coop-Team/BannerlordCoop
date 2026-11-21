@@ -7,7 +7,7 @@ namespace Coop.Naval.CampaignBehaviors.Patches;
 [HarmonyPatchCategory(GameInterface.GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class NavalIncidentsCampaignBehaviourPatches
 {
-    // Co-op rolls incidents on the server, so naval incidents stay off until they're synced
+    // IncidentsCampaignBehaviourInterface rolls the naval triggers on the server for each player, like the land ones
     [HarmonyPatch(nameof(NavalIncidentsCampaignBehaviour.TryInvokeIncident))]
     [HarmonyPrefix]
     public static bool TryInvokeIncidentPrefix() => false;

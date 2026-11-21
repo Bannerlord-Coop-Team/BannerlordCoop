@@ -26,7 +26,7 @@ internal class ClanPartyItemVMUpdatePropertiesPatch
     public static void UpdatePropertiesPostfix(ClanPartyItemVM __instance)
     {
         var party = __instance.Party?.MobileParty;
-        bool canManage = CoopClanPermissions.CanManageParty(party);
+        bool canManage = CoopClanPermissions.CanManagePartyItem(__instance);
         bool canAssignRoles = CoopClanPermissions.CanAssignRoles(party);
         bool isPlayerParty = party?.IsPlayerParty() == true;
         if (isPlayerParty) __instance.ShouldPartyHaveExpense = false;
@@ -71,7 +71,7 @@ internal class ClanPartyItemVMExecuteChangeLeaderPatch
     [HarmonyPrefix]
     public static bool ExecuteChangeLeaderPrefix(ClanPartyItemVM __instance)
     {
-        return CoopClanPermissions.CanManageParty(__instance.Party?.MobileParty);
+        return CoopClanPermissions.CanManagePartyItem(__instance);
     }
 }
 
@@ -108,7 +108,7 @@ internal class ClanPartyItemVMPatches
 
         Hero leader = instance.Leader;
         if (leader == null) return false;
-        if (!CoopClanPermissions.CanManageParty(instance.Party?.MobileParty)) return false;
+        if (!CoopClanPermissions.CanManagePartyItem(instance)) return false;
         if (partyConfiguration.Get(leader, flag) == value) return false;
 
         MessageBroker.Instance.Publish(instance, new PartyConfigurationChangedOnSelection(leader, flag, value));
