@@ -1,8 +1,8 @@
 {
   "schemaVersion": 2,
-  "catalogRevision": "f92d6ab74369914f3284fe54bc5233e12a0e7488651d97e8420726b3ae9b084f",
-  "contentDigest": "f92d6ab74369914f3284fe54bc5233e12a0e7488651d97e8420726b3ae9b084f",
-  "sourceCommit": "d8a3c6dcce1d9b452f4af9262f5a16da01ddf13a",
+  "catalogRevision": "61e8319d98197e97f31192acbfe513eb28ffbb4ed1b7150f4f6c69a5d208aab8",
+  "contentDigest": "61e8319d98197e97f31192acbfe513eb28ffbb4ed1b7150f4f6c69a5d208aab8",
+  "sourceCommit": "33f3018bdec0ccb9aed3663217f51dd40e196173",
   "source": "BannerlordCoop/source/GameInterface/Configuration/ModConfigData.cs",
   "oldAgentOmittedKeys": [
     "voiceEnabled",
@@ -20,6 +20,8 @@
     "preferredBattleHosts",
     "pvpBlockLeave",
     "pvpResponseTimerSeconds",
+    "maxClansPerKingdom",
+    "maxClansPerKingdomCountsMercenaries",
     "warSails",
     "clansAfterKingdomDestruction"
   ],
@@ -28,7 +30,7 @@
       "key": "voiceEnabled",
       "type": "boolean",
       "stable": true,
-      "availableSince": "0.1.7",
+      "availableSince": "0.1.6",
       "omitForOldAgents": true,
       "default": true
     },
@@ -36,7 +38,7 @@
       "key": "battleSize",
       "type": "integer",
       "stable": true,
-      "availableSince": "0.1.7",
+      "availableSince": "0.1.3",
       "min": 200,
       "max": 12000,
       "omitForOldAgents": true,
@@ -46,14 +48,14 @@
       "key": "fastForwardEnabled",
       "type": "boolean",
       "stable": true,
-      "availableSince": "0.1.7",
+      "availableSince": "0.1.2",
       "default": true
     },
     {
       "key": "autoPauseEnabled",
       "type": "boolean",
       "stable": true,
-      "availableSince": "0.1.7",
+      "availableSince": "0.1.2",
       "default": true
     },
     {
@@ -68,28 +70,28 @@
       "key": "clientsCanUseCheats",
       "type": "boolean",
       "stable": true,
-      "availableSince": "0.1.7",
+      "availableSince": "0.1.2",
       "default": false
     },
     {
       "key": "goldFoodInfluenceChangeInSettlements",
       "type": "boolean",
       "stable": true,
-      "availableSince": "0.1.7",
+      "availableSince": "0.1.2",
       "default": false
     },
     {
       "key": "goldFoodInfluenceChangeForDisconnectedPlayers",
       "type": "boolean",
       "stable": true,
-      "availableSince": "0.1.7",
+      "availableSince": "0.1.2",
       "default": false
     },
     {
       "key": "blockAiWarDeclarationsOnOfflinePlayers",
       "type": "boolean",
       "stable": true,
-      "availableSince": "0.1.7",
+      "availableSince": "0.1.6",
       "omitForOldAgents": true,
       "default": false
     },
@@ -97,7 +99,7 @@
       "key": "playerBattleAiJoinWindowHours",
       "type": "integer",
       "stable": true,
-      "availableSince": "0.1.7",
+      "availableSince": "0.1.2",
       "min": 0,
       "max": 8760,
       "default": 6
@@ -116,14 +118,14 @@
       "key": "speedLimitWhilePlayersInBattle",
       "type": "boolean",
       "stable": true,
-      "availableSince": "0.1.7",
+      "availableSince": "0.1.2",
       "default": true
     },
     {
       "key": "ensureUnaffiliatedWanderers",
       "type": "boolean",
       "stable": true,
-      "availableSince": "0.1.7",
+      "availableSince": "0.1.6",
       "omitForOldAgents": true,
       "default": true
     },
@@ -131,7 +133,7 @@
       "key": "wandererLimit",
       "type": "integer",
       "stable": true,
-      "availableSince": "0.1.7",
+      "availableSince": "0.1.2",
       "min": 0,
       "max": 1000,
       "default": 32
@@ -150,14 +152,14 @@
       "key": "wandererLimitScalesWithPlayers",
       "type": "boolean",
       "stable": true,
-      "availableSince": "0.1.7",
+      "availableSince": "0.1.2",
       "default": false
     },
     {
       "key": "playerKingdomClanTierRequired",
       "type": "integer",
       "stable": true,
-      "availableSince": "0.1.7",
+      "availableSince": "0.1.2",
       "min": 0,
       "max": 6,
       "default": 4
@@ -166,7 +168,7 @@
       "key": "coopClansEnabled",
       "type": "boolean",
       "stable": true,
-      "availableSince": "0.1.7",
+      "availableSince": "0.1.6",
       "omitForOldAgents": true,
       "default": true
     },
@@ -174,14 +176,14 @@
       "key": "smithingStaminaRecoveryOutsideSettlements",
       "type": "boolean",
       "stable": true,
-      "availableSince": "0.1.7",
+      "availableSince": "0.1.2",
       "default": true
     },
     {
       "key": "smithingStaminaRecoveryMultiplier",
       "type": "number",
       "stable": true,
-      "availableSince": "0.1.7",
+      "availableSince": "0.1.2",
       "min": 0,
       "max": 100,
       "default": 0.6
@@ -190,7 +192,7 @@
       "key": "maximumLootersMultiplier",
       "type": "number",
       "stable": true,
-      "availableSince": "0.1.7",
+      "availableSince": "0.1.2",
       "min": 0,
       "max": 100,
       "default": 1
@@ -199,7 +201,7 @@
       "key": "looterPartySizeMultiplier",
       "type": "number",
       "stable": true,
-      "availableSince": "0.1.7",
+      "availableSince": "0.1.3",
       "min": 0,
       "max": 100,
       "default": 1
@@ -208,21 +210,21 @@
       "key": "enableHeroExecutions",
       "type": "boolean",
       "stable": true,
-      "availableSince": "0.1.7",
+      "availableSince": "0.1.2",
       "default": false
     },
     {
       "key": "enablePlayerClanMemberExecutions",
       "type": "boolean",
       "stable": true,
-      "availableSince": "0.1.7",
+      "availableSince": "0.1.2",
       "default": false
     },
     {
       "key": "enablePlayerExecutions",
       "type": "boolean",
       "stable": true,
-      "availableSince": "0.1.7",
+      "availableSince": "0.1.6",
       "omitForOldAgents": true,
       "default": false
     },
@@ -230,7 +232,7 @@
       "key": "playerWoundedBattleEntry",
       "type": "boolean",
       "stable": true,
-      "availableSince": "0.1.7",
+      "availableSince": "0.1.4",
       "omitForOldAgents": true,
       "default": true
     },
@@ -238,7 +240,7 @@
       "key": "showPlayerNameplates",
       "type": "boolean",
       "stable": true,
-      "availableSince": "0.1.7",
+      "availableSince": "0.1.3",
       "omitForOldAgents": true,
       "default": true
     },
@@ -288,6 +290,24 @@
       "default": 0
     },
     {
+      "key": "maxClansPerKingdom",
+      "type": "integer",
+      "stable": false,
+      "availableSince": "0.1.8",
+      "min": -2147483648,
+      "max": 2147483647,
+      "omitForOldAgents": true,
+      "default": 0
+    },
+    {
+      "key": "maxClansPerKingdomCountsMercenaries",
+      "type": "boolean",
+      "stable": false,
+      "availableSince": "0.1.8",
+      "omitForOldAgents": true,
+      "default": false
+    },
+    {
       "key": "warSails",
       "type": "boolean",
       "stable": false,
@@ -299,7 +319,7 @@
       "key": "goldFoodInfluenceChangeInBattles",
       "type": "enum",
       "stable": true,
-      "availableSince": "0.1.7",
+      "availableSince": "0.1.2",
       "values": [
         "Disabled",
         "OneDayMax",
@@ -311,7 +331,7 @@
       "key": "lordDefectionRetries",
       "type": "enum",
       "stable": true,
-      "availableSince": "0.1.7",
+      "availableSince": "0.1.2",
       "values": [
         "Vanilla",
         "NeverExpire",
