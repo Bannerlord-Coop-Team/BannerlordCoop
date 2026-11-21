@@ -7,8 +7,6 @@ using Serilog;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Timers;
-using Timer = System.Timers.Timer;
 
 namespace Coop.Core.Server.Services.Telemetry;
 
@@ -16,29 +14,26 @@ public interface IServerTelemetryReporter : IDisposable
 {
 }
 
-/// <summary>Reports the server status at a fixed interval while it is listening.</summary>
+/// <summary>Reports server status while listening and skips unchanged player counts until a refresh is due.</summary>
 public class ServerTelemetryReporter : IServerTelemetryReporter
 {
     private static readonly ILogger Logger = LogManager.GetLogger<ServerTelemetryReporter>();
-    internal static readonly TimeSpan ReportInterval = TimeSpan.FromSeconds(60);
-    internal static readonly TimeSpan UnchangedRefreshInterval = TimeSpan.FromMinutes(2);
+    internal static readonly TimeSpan ReportInterval = TimeSpan.FromSeconds(30);
+    // Keep the refresh cadence below the backend's two-minute statistics freshness window.
+    private const int UnchangedRefreshTicks = 3;
 
     private readonly IMessageBroker messageBroker;
     private readonly IServerTelemetryUploader uploader;
     private readonly CancellationTokenSource cancellation;
     private readonly Func<DateTime> getUtcNow;
     private readonly Func<string> createSessionId;
-    private readonly TimeSpan unchangedRefreshInterval;
+    private readonly TimeSpan reportInterval;
+    private readonly Func<TimeSpan, CancellationToken, Task> waitForTick;
     private readonly object reportGate = new object();
-    private readonly Timer reportTimer;
 
-    private string sessionId;
-    private DateTime startedAt;
     private int playerCount;
     private bool started;
     private bool disposed;
-    private ServerTelemetryStatus lastUploadedStatus;
-    private DateTime lastUploadedAt;
 
     public ServerTelemetryReporter(
         IMessageBroker messageBroker,
@@ -50,7 +45,8 @@ public class ServerTelemetryReporter : IServerTelemetryReporter
             sessionCancellation,
             ReportInterval,
             () => DateTime.UtcNow,
-            () => Guid.NewGuid().ToString("N"))
+            () => Guid.NewGuid().ToString("N"),
+            Task.Delay)
     {
     }
 
@@ -61,7 +57,7 @@ public class ServerTelemetryReporter : IServerTelemetryReporter
         TimeSpan reportInterval,
         Func<DateTime> getUtcNow,
         Func<string> createSessionId,
-        TimeSpan? unchangedRefreshInterval = null)
+        Func<TimeSpan, CancellationToken, Task> waitForTick)
     {
         if (messageBroker == null) throw new ArgumentNullException(nameof(messageBroker));
         if (uploader == null) throw new ArgumentNullException(nameof(uploader));
@@ -70,34 +66,34 @@ public class ServerTelemetryReporter : IServerTelemetryReporter
             throw new ArgumentOutOfRangeException(nameof(reportInterval));
         if (getUtcNow == null) throw new ArgumentNullException(nameof(getUtcNow));
         if (createSessionId == null) throw new ArgumentNullException(nameof(createSessionId));
-        if (unchangedRefreshInterval.HasValue && unchangedRefreshInterval.Value <= TimeSpan.Zero)
-            throw new ArgumentOutOfRangeException(nameof(unchangedRefreshInterval));
-
         this.messageBroker = messageBroker;
         this.uploader = uploader;
         this.getUtcNow = getUtcNow;
         this.createSessionId = createSessionId;
-        this.unchangedRefreshInterval = unchangedRefreshInterval ?? UnchangedRefreshInterval;
+        this.reportInterval = reportInterval;
+        this.waitForTick = waitForTick;
         cancellation = CancellationTokenSource.CreateLinkedTokenSource(sessionCancellation.Token);
-
-        reportTimer = new Timer(reportInterval.TotalMilliseconds) { AutoReset = false };
-        reportTimer.Elapsed += Handle_ReportTimerElapsed;
 
         messageBroker.Subscribe<ServerListening>(Handle_ServerListening);
         messageBroker.Subscribe<ConnectedPlayersChanged>(Handle_ConnectedPlayersChanged);
     }
 
-    private void Handle_ServerListening(MessagePayload<ServerListening> _)
+    private void Handle_ServerListening(MessagePayload<ServerListening> payload)
     {
+        string sessionId;
+        DateTime startedAt;
+        CancellationToken cancellationToken;
         lock (reportGate)
         {
             if (disposed || started) return;
 
             sessionId = createSessionId();
             startedAt = getUtcNow().ToUniversalTime();
+            cancellationToken = cancellation.Token;
             started = true;
-            reportTimer.Start();
         }
+
+        _ = ReportPeriodicallyAsync(sessionId, startedAt, cancellationToken);
     }
 
     private void Handle_ConnectedPlayersChanged(MessagePayload<ConnectedPlayersChanged> payload)
@@ -105,75 +101,66 @@ public class ServerTelemetryReporter : IServerTelemetryReporter
         Volatile.Write(ref playerCount, Math.Max(0, payload.What.ConnectedPlayers));
     }
 
-    private void Handle_ReportTimerElapsed(object sender, ElapsedEventArgs e)
+    private async Task ReportPeriodicallyAsync(
+        string sessionId,
+        DateTime startedAt,
+        CancellationToken cancellationToken)
     {
-        ServerTelemetryStatus status;
-        lock (reportGate)
+        int? lastUploadedPlayerCount = null;
+        var ticksUntilRefresh = 0;
+        try
         {
-            if (disposed || !started) return;
-
-            status = new ServerTelemetryStatus(
-                sessionId,
-                ModInformation.Version.ToString(),
-                ModInformation.Commit,
-                startedAt,
-                Volatile.Read(ref playerCount));
-            var now = getUtcNow().ToUniversalTime();
-            if (lastUploadedStatus != null
-                && IsSameObservation(lastUploadedStatus, status)
-                && now - lastUploadedAt < unchangedRefreshInterval)
+            while (!cancellationToken.IsCancellationRequested)
             {
-                reportTimer.Start();
-                return;
+                await waitForTick(reportInterval, cancellationToken).ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
+
+                if (ticksUntilRefresh > 0) ticksUntilRefresh--;
+                var currentPlayerCount = Volatile.Read(ref playerCount);
+                if (lastUploadedPlayerCount == currentPlayerCount && ticksUntilRefresh > 0) continue;
+
+                var status = new ServerTelemetryStatus(
+                    sessionId,
+                    ModInformation.Version.ToString(),
+                    ModInformation.Commit,
+                    startedAt,
+                    currentPlayerCount);
+                if (await TryUploadAsync(status, cancellationToken).ConfigureAwait(false))
+                {
+                    lastUploadedPlayerCount = status.PlayerCount;
+                    ticksUntilRefresh = UnchangedRefreshTicks;
+                }
             }
         }
-
-        _ = UploadAndScheduleNextAsync(status);
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
     }
 
-    private async Task UploadAndScheduleNextAsync(ServerTelemetryStatus status)
+    private async Task<bool> TryUploadAsync(ServerTelemetryStatus status, CancellationToken cancellationToken)
     {
         try
         {
-            var result = await uploader.UploadAsync(status, cancellation.Token).ConfigureAwait(false);
+            var result = await uploader.UploadAsync(status, cancellationToken).ConfigureAwait(false);
             if (result.Uploaded)
             {
-                lock (reportGate)
-                {
-                    if (!disposed)
-                    {
-                        lastUploadedStatus = status;
-                        lastUploadedAt = getUtcNow().ToUniversalTime();
-                    }
-                }
+                return true;
             }
-            if (!result.Uploaded && result.EndpointConfigured)
+            else if (result.EndpointConfigured)
             {
                 Logger.Warning("Reporting server telemetry failed: {Details}", result.Details);
             }
         }
-        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
         }
         catch (Exception ex)
         {
             Logger.Warning(ex, "Reporting server telemetry failed");
         }
-        finally
-        {
-            lock (reportGate)
-            {
-                if (!disposed) reportTimer.Start();
-            }
-        }
-    }
 
-    private static bool IsSameObservation(ServerTelemetryStatus left, ServerTelemetryStatus right) =>
-        left.SessionId == right.SessionId
-        && left.ModVersion == right.ModVersion
-        && left.Commit == right.Commit
-        && left.StartedAt == right.StartedAt
-        && left.PlayerCount == right.PlayerCount;
+        return false;
+    }
 
     public void Dispose()
     {
@@ -183,9 +170,6 @@ public class ServerTelemetryReporter : IServerTelemetryReporter
 
             disposed = true;
             cancellation.Cancel();
-            reportTimer.Elapsed -= Handle_ReportTimerElapsed;
-            reportTimer.Stop();
-            reportTimer.Dispose();
         }
 
         messageBroker.Unsubscribe<ServerListening>(Handle_ServerListening);
