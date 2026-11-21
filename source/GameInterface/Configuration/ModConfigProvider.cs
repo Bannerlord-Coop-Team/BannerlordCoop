@@ -14,7 +14,6 @@ public class ModConfigProvider
 
     public static void LoadModConfig(ModOptionsData modOptionsData)
     {
-        ManagedConfigOptionValidation.Validate(modOptionsData);
         ModOptions = new(modOptionsData);
     }
 }
@@ -90,6 +89,10 @@ public readonly struct ModOptions
     public readonly int PvpResponseTimerSeconds { get; } = 0;
     [ProtoMember(33)]
     public readonly bool AllowClientTimeControls { get; } = true;
+    [ProtoMember(34)]
+    public readonly int MaxClansPerKingdom { get; } = 0;
+    [ProtoMember(35)]
+    public readonly bool MaxClansPerKingdomCountsMercenaries { get; } = false;
 
     public ModOptions(ModOptions previous, bool voiceEnabled)
     {
@@ -132,5 +135,7 @@ public readonly struct ModOptions
         PreferredBattleHosts = modOptionsData.PreferredBattleHosts?.FindAll(id => id != null) ?? PreferredBattleHosts;
         PvpBlockLeave = modOptionsData.PvpBlockLeave ?? PvpBlockLeave;
         PvpResponseTimerSeconds = modOptionsData.PvpResponseTimerSeconds ?? PvpResponseTimerSeconds;
+        MaxClansPerKingdom = modOptionsData.MaxClansPerKingdom ?? MaxClansPerKingdom;
+        MaxClansPerKingdomCountsMercenaries = modOptionsData.MaxClansPerKingdomCountsMercenaries ?? MaxClansPerKingdomCountsMercenaries;
     }
 }

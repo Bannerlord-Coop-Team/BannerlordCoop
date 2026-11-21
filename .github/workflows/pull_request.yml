@@ -29,12 +29,6 @@ jobs:
         with:
           ref: ${{ github.sha }}
 
-      - name: Check generated managed configuration catalog
-        run: node scripts/generate-managed-config-catalog.mjs --check
-
-      - name: Test generated managed configuration catalog
-        run: node --test scripts/generate-managed-config-catalog.test.mjs
-
       - name: Test scheduled nightly publication decisions
         shell: pwsh
         run: ./.github/scripts/test-nightly-publish-guard.ps1
@@ -49,7 +43,7 @@ jobs:
       packages: read
 
     container:
-      image: ghcr.io/bannerlord-coop-team/bannerlordcoop:latest
+      image: ghcr.io/bannerlord-coop-team/bannerlordcoop:v1.5.7
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -94,7 +88,7 @@ jobs:
       packages: read
 
     container:
-      image: ghcr.io/bannerlord-coop-team/bannerlordcoop:latest
+      image: ghcr.io/bannerlord-coop-team/bannerlordcoop:v1.5.7
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -175,7 +169,7 @@ jobs:
       packages: read
 
     container:
-      image: ghcr.io/bannerlord-coop-team/bannerlordcoop:latest
+      image: ghcr.io/bannerlord-coop-team/bannerlordcoop:v1.5.7
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}

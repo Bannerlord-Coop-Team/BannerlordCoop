@@ -1,23 +1,8 @@
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using System;
 using System.Collections.Generic;
 
 namespace GameInterface.Configuration;
-
-[AttributeUsage(AttributeTargets.Property, AllowMultiple = false)]
-public sealed class ManagedConfigOptionAttribute : Attribute
-{
-    public bool Stable { get; set; } = true;
-    public string AvailableSince { get; set; } = "0.1.7";
-    public double Min { get; set; } = double.NaN;
-    public double Max { get; set; } = double.NaN;
-    public int MaxItems { get; set; } = -1;
-    public string ItemPattern { get; set; }
-    public bool UniqueItems { get; set; }
-    public string ForbiddenRanges { get; set; }
-    public bool OmitForOldAgents { get; set; }
-}
 
 /// <summary>
 /// THE mod-config.json schema: one explicit property per key — the class IS the
@@ -43,8 +28,8 @@ public sealed class ModConfigData
 
 /// <summary>
 /// The "difficulty" block. Properties remain nullable so malformed or unreadable
-/// input can fall back safely, while ModConfig activates or fills the documented
-/// values before a normal load. CampaignOptions values live IN the save, so joining
+/// input can fall back safely. ModConfig adds settings missing from the shipped template
+/// before a normal load, while commented-out keys stay null. CampaignOptions values live IN the save, so joining
 /// clients inherit them with the join-time save transfer. PlayerReceivedDamage is
 /// engine config and is pushed to clients as a join-time ServerOption.
 /// </summary>
@@ -83,110 +68,79 @@ public enum DifficultyLevel
 
 public sealed class ModOptionsData
 {
-    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7", OmitForOldAgents = true)]
     public bool? VoiceEnabled { get; set; }
 
-    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7", Min = 200, Max = 12000, OmitForOldAgents = true)]
     public int? BattleSize { get; set; }
 
-    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7")]
     public bool? FastForwardEnabled { get; set; }
 
-    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7")]
     public bool? AutoPauseEnabled { get; set; }
 
-    [ManagedConfigOption(Stable = false, AvailableSince = "0.1.8", OmitForOldAgents = true)]
     public bool? AllowClientTimeControls { get; set; }
 
-    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7")]
     public bool? ClientsCanUseCheats { get; set; }
 
-    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7")]
     public bool? GoldFoodInfluenceChangeInSettlements { get; set; }
 
-    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7")]
     public GoldFoodChangeMode? GoldFoodInfluenceChangeInBattles { get; set; }
 
-    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7")]
     public bool? GoldFoodInfluenceChangeForDisconnectedPlayers { get; set; }
 
-    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7", OmitForOldAgents = true)]
     public bool? BlockAiWarDeclarationsOnOfflinePlayers { get; set; }
 
-    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7", Min = 0, Max = 8760)]
     public int? PlayerBattleAiJoinWindowHours { get; set; }
 
-    [ManagedConfigOption(Stable = false, AvailableSince = "0.1.8", Min = 0, Max = 86400, OmitForOldAgents = true)]
     public int? PostBattleAiAmnestySeconds { get; set; }
 
-    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7")]
     public bool? SpeedLimitWhilePlayersInBattle { get; set; }
 
-    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7", OmitForOldAgents = true)]
     public bool? EnsureUnaffiliatedWanderers { get; set; }
 
-    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7", Min = 0, Max = 1000)]
     public int? WandererLimit { get; set; }
 
-    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7", Min = 0, Max = 100, OmitForOldAgents = true)]
     public int? SpawnRateWanderers { get; set; }
 
-    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7")]
     public bool? WandererLimitScalesWithPlayers { get; set; }
 
-    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7", Min = 0, Max = 6)]
     public int? PlayerKingdomClanTierRequired { get; set; }
 
-    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7", OmitForOldAgents = true)]
     public bool? CoopClansEnabled { get; set; }
 
-    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7")]
     public bool? SmithingStaminaRecoveryOutsideSettlements { get; set; }
 
-    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7", Min = 0, Max = 100)]
     public float? SmithingStaminaRecoveryMultiplier { get; set; }
 
-    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7", Min = 0, Max = 100)]
     public float? MaximumLootersMultiplier { get; set; }
 
-    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7", Min = 0, Max = 100)]
     public float? LooterPartySizeMultiplier { get; set; }
 
-    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7")]
     public LordDefectionRetryMode? LordDefectionRetries { get; set; }
   
-    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7")]
     public bool? EnableHeroExecutions { get; set; }
 
-    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7")]
     public bool? EnablePlayerClanMemberExecutions { get; set; }
 
-    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7", OmitForOldAgents = true)]
     public bool? EnablePlayerExecutions { get; set; }
     
-    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7", OmitForOldAgents = true)]
     public bool? PlayerWoundedBattleEntry { get; set; }
 
-    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7", OmitForOldAgents = true)]
     public bool? ShowPlayerNameplates { get; set; }
 
-    [ManagedConfigOption(Stable = true, AvailableSince = "0.1.7", Min = 1, Max = 86400, OmitForOldAgents = true)]
     public int? KingdomDecisionVoteTimeoutSeconds { get; set; }
 
-    [ManagedConfigOption(Stable = false, AvailableSince = "0.1.8", OmitForOldAgents = true)]
     public ClansAfterKingdomDestructionMode? ClansAfterKingdomDestruction { get; set; }
 
-    [ManagedConfigOption(Stable = false, AvailableSince = "0.1.8", MaxItems = 32, ItemPattern = "^[0-9]{17}$", UniqueItems = true, OmitForOldAgents = true)]
     public List<string> PreferredBattleHosts { get; set; }
 
-    [ManagedConfigOption(Stable = false, AvailableSince = "0.1.8", OmitForOldAgents = true)]
     public bool? PvpBlockLeave { get; set; }
 
-    [ManagedConfigOption(Stable = false, AvailableSince = "0.1.8", Min = 0, Max = 86400, ForbiddenRanges = "1-9", OmitForOldAgents = true)]
     public int? PvpResponseTimerSeconds { get; set; }
 
+    public int? MaxClansPerKingdom { get; set; }
+
+    public bool? MaxClansPerKingdomCountsMercenaries { get; set; }
+
     /// <summary>Whether a dedicated server runs War Sails (NavalDLC) co-op. It parses the file itself; declared so the key isn't reported as unknown.</summary>
-    [ManagedConfigOption(Stable = false, AvailableSince = "0.1.8", OmitForOldAgents = true)]
     public bool? WarSails { get; set; }
 
     [JsonExtensionData]
@@ -197,13 +151,13 @@ public sealed class ModOptionsData
 /// How long a lord remembers refusing a recruitment attempt.
 /// </summary>
 /// <remarks>
-/// Vanilla keeps each attempt for one in-game year and blocks the lord until it expires. That
+/// Vanilla blocks the lord for one in-game season after a refused attempt. That
 /// bookkeeping is filled in only by the machine that ran the conversation, so co-op has to choose
 /// what a client's list means.
 /// </remarks>
 public enum LordDefectionRetryMode
 {
-    /// <summary>Vanilla: a refusal blocks that lord for one in-game year, then expires.</summary>
+    /// <summary>Vanilla: a refusal blocks that lord for one in-game season, then expires.</summary>
     Vanilla,
 
     /// <summary>A refusal blocks that lord for the rest of the session.</summary>
