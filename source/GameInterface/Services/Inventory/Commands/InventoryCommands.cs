@@ -166,60 +166,6 @@ internal class InventoryCommands
     }
 
     /// <summary>
-    /// Sets one battle equipment slot of a hero through the vanilla indexer, so the slot write replicates
-    /// </summary>
-    public sealed class InventorySetHeroEquipmentCoopCommand : ICoopCommand
-    {
-        // Resolves hero arguments by name or id.
-        private readonly ICommandObjectResolver resolver;
-
-        public InventorySetHeroEquipmentCoopCommand(ICommandObjectResolver resolver)
-        {
-            this.resolver = resolver;
-        }
-
-        public string Prefix => "coop.debug.inventory";
-
-        public string Name => "set_hero_equipment";
-
-        public string Description => "Sets a battle equipment slot of a hero to an item, or clears it with \"empty\".";
-
-        public CoopCommandSide Side => CoopCommandSide.Server;
-
-        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
-        {
-            new ExpectedArgs("hero_name", "Hero name or id; quote names with spaces.", isRequired: true),
-            new ExpectedArgs("slot", "EquipmentIndex name or number, e.g. Body or 6.", isRequired: true),
-            new ExpectedArgs("item_id", "ItemObject id, or \"empty\" to clear the slot.", isRequired: true),
-        };
-
-        public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
-        {
-            if (!TryGetObjectManager(out var objectManager))
-            {
-                return Failed("Unable to resolve ObjectManager.");
-            }
-
-            if (!resolver.TryResolveHero(strings[0], out var hero, out var error)) return Failed(error);
-
-            if (!System.Enum.TryParse(strings[1], true, out EquipmentIndex slot) || slot < EquipmentIndex.WeaponItemBeginSlot || (int)slot >= Equipment.EquipmentSlotLength)
-            {
-                return Failed($"Invalid slot {strings[1]}.");
-            }
-
-            ItemObject item = null;
-            if (strings[2] != "empty" && !objectManager.TryGetObject(strings[2], out item))
-            {
-                return Failed($"Failed to retrieve object for ItemObject id: {strings[2]}");
-            }
-
-            hero.BattleEquipment[slot] = new EquipmentElement(item);
-
-            return Succeeded($"Set {hero.Name} battle {slot} to {item?.StringId ?? "[EMPTY]"}.");
-        }
-    }
-
-    /// <summary>
     /// Give debug animals to a hero with a given name
     /// </summary>
     public sealed class InventoryGiveAnimalsCoopCommand : ICoopCommand
