@@ -4,10 +4,13 @@ using Common.Messaging;
 using Common.Network;
 using Common.Network.Coalescing;
 using Common.Util;
+using GameInterface.Configuration;
 using GameInterface.Services.Clans;
 using GameInterface.Services.Companions.Interfaces;
 using GameInterface.Services.Companions.Messages;
 using GameInterface.Services.Heroes.Patches;
+using GameInterface.Services.Kingdoms;
+using GameInterface.Services.Kingdoms.Messages;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -41,6 +44,7 @@ internal class CompanionRolesHandler : IHandler
     private readonly ITroopRosterInterface troopRosterInterface;
     private readonly IPlayerManager playerManager;
     private readonly ICoopClanPermissions permissions;
+    private readonly IKingdomClanLimit kingdomClanLimit;
     private readonly ISendCoalescer sendCoalescer;
     private string pendingFireCompanionRequestId;
     private string pendingFireCompanionHeroId;
@@ -53,6 +57,7 @@ internal class CompanionRolesHandler : IHandler
         ITroopRosterInterface troopRosterInterface,
         IPlayerManager playerManager,
         ICoopClanPermissions permissions,
+        IKingdomClanLimit kingdomClanLimit,
         ISendCoalescer sendCoalescer = null)
     {
         this.messageBroker = messageBroker;
@@ -62,6 +67,7 @@ internal class CompanionRolesHandler : IHandler
         this.troopRosterInterface = troopRosterInterface;
         this.playerManager = playerManager;
         this.permissions = permissions;
+        this.kingdomClanLimit = kingdomClanLimit;
         this.sendCoalescer = sendCoalescer;
 
         messageBroker.Subscribe<ClanNameSelectionDone>(Handle_ClanNameSelectionDone);
@@ -128,6 +134,16 @@ internal class CompanionRolesHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Settlement>(data.SelectedFiefId, out var selectedFief)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.MainPartyId, out var mainParty)) return;
 
+            // The companion's new clan joins the ruler's kingdom, so it counts like any other clan joining it.
+            var kingdom = mainHero.Clan.Kingdom;
+            if (kingdomClanLimit.RefusesJoin(clan: null, kingdom, asMercenary: false, ModConfigProvider.ModOptions))
+            {
+                if (!objectManager.TryGetIdWithLogging(kingdom, out var kingdomId)) return;
+                logger.Warning("Rejected making companion {HeroId} a lord because kingdom {KingdomId} has maxClansPerKingdom clans", data.OneToOneConversationHeroId, kingdomId);
+                network.Send(obj.Who as NetPeer, new NetworkKingdomFull(kingdomId));
+                return;
+            }
+
             var companionRolesCampaignBehavior = Campaign.Current.GetCampaignBehavior<CompanionRolesCampaignBehavior>();
 
             RemoveCompanionAction.ApplyByByTurningToLord(mainHero.Clan, oneToOneConversationHero);
@@ -147,17 +163,22 @@ internal class CompanionRolesHandler : IHandler
                 {
                     mainParty.MemberRoster.AddToCounts(oneToOneConversationHero.CharacterObject, -1, false, 0, 0, true, -1);
                 }
-                MobileParty partyBelongedTo = oneToOneConversationHero.PartyBelongedTo;
-                if (partyBelongedTo == null)
+                MobileParty mobileParty = oneToOneConversationHero.PartyBelongedTo;
+                if (mobileParty == null)
                 {
-                    MobileParty mobileParty = LordPartyComponent.CreateLordParty(oneToOneConversationHero.CharacterObject.StringId, oneToOneConversationHero, mainParty.Position, 3f, selectedFief, oneToOneConversationHero);
-                    mobileParty.MemberRoster.AddToCounts(clan.Culture.BasicTroop, MBRandom.RandomInt(12, 15), false, 0, 0, true, -1);
-                    mobileParty.MemberRoster.AddToCounts(clan.Culture.EliteBasicTroop, MBRandom.RandomInt(10, 15), false, 0, 0, true, -1);
+                    mobileParty = LordPartyComponent.CreateLordParty(oneToOneConversationHero.CharacterObject.StringId, oneToOneConversationHero, mainParty.Position, 3f, selectedFief, oneToOneConversationHero);
                 }
                 else
                 {
-                    partyBelongedTo.ActualClan = clan;
-                    partyBelongedTo.Party.SetVisualAsDirty();
+                    mobileParty.ActualClan = clan;
+                    mobileParty.Party.SetVisualAsDirty();
+                }
+                int missing = CompanionRolesCampaignBehavior.CompanionBecomingVassalPartySizeTarget - mobileParty.MemberRoster.TotalManCount;
+                if (missing > 0)
+                {
+                    int basic = missing / 2;
+                    mobileParty.MemberRoster.AddToCounts(clan.Culture.BasicTroop, basic, false, 0, 0, true, -1);
+                    mobileParty.MemberRoster.AddToCounts(clan.Culture.EliteBasicTroop, missing - basic, false, 0, 0, true, -1);
                 }
                 companionRolesCampaignBehavior.AdjustCompanionsEquipment(oneToOneConversationHero);
                 companionRolesCampaignBehavior.SpawnNewHeroesForNewCompanionClan(oneToOneConversationHero, clan, selectedFief);

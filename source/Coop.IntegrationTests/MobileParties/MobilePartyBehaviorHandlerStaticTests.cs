@@ -76,4 +76,33 @@ public class MobilePartyBehaviorHandlerStaticTests
                 currentPosition,
                 authoritativePosition));
     }
+
+    // A raft party ignores the owner's move mode like vanilla does, but a target that only changes IsOnLand is still a new order
+    [Theory]
+    [InlineData(AiBehavior.GoToPoint, true, MoveModeType.Party, false)]
+    [InlineData(AiBehavior.Hold, true, MoveModeType.Point, true)]
+    [InlineData(AiBehavior.GoToPoint, false, MoveModeType.Point, true)]
+    public void OwnerOrderDiffers_ComparesBehaviorAndTargetOnly(
+        AiBehavior ownerBehavior,
+        bool ownerTargetIsOnLand,
+        MoveModeType ownerMoveMode,
+        bool expected)
+    {
+        var serverTarget = new CampaignVec2(new Vec2(30f, 10f), true);
+        var ownerTarget = new CampaignVec2(new Vec2(30f, 10f), ownerTargetIsOnLand);
+        var ownerOrder = new PartyBehaviorUpdateData(
+            mobilePartyId: "Test_Party",
+            newAiBehavior: ownerBehavior,
+            interactablePointId: null,
+            bestTargetPoint: ownerTarget,
+            partyPosition: ownerTarget,
+            defaultBehavior: ownerBehavior,
+            targetPosition: ownerTarget,
+            desiredAiNavigationType: default)
+        {
+            PartyMoveMode = ownerMoveMode,
+        };
+
+        Assert.Equal(expected, MobilePartyBehaviorHandler.OwnerOrderDiffers(ownerOrder, AiBehavior.GoToPoint, serverTarget));
+    }
 }

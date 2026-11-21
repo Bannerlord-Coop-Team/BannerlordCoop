@@ -4,7 +4,6 @@ using E2E.Tests.Services.MapEvents;
 using HarmonyLib;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
 using Xunit;
 using Xunit.Abstractions;
@@ -28,16 +27,6 @@ public class BesiegerCaptureTests : MapEventTestBase
     public BesiegerCaptureTests(ITestOutputHelper output) : base(output)
     {
     }
-
-    /// <summary>Construction-time world dependencies of the siege object graph (see
-    /// <c>SiegeLeaveMenuTests</c>): the camp-join internals and both siege-side initializers need a
-    /// live town/scene.</summary>
-    private static List<MethodBase> SiegeCreationDisabledMethods => new()
-    {
-        AccessTools.Method(typeof(MobileParty), nameof(MobileParty.OnPartyJoinedSiegeInternal)),
-        AccessTools.Method(typeof(BesiegerCamp), nameof(BesiegerCamp.InitializeSiegeEventSide)),
-        AccessTools.Method(typeof(Settlement), nameof(Settlement.InitializeSiegeEventSide)),
-    };
 
     [Fact]
     public void BesiegingPlayerDefeated_ViaServerCommittedBattle_LeavesCampOnServerAndClients()

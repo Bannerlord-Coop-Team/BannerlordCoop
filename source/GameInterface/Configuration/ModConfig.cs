@@ -7,7 +7,6 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Text.RegularExpressions;
 using TaleWorlds.Library;
 
 namespace GameInterface.Configuration;
@@ -21,8 +20,8 @@ namespace GameInterface.Configuration;
 /// client-hosted session that is Documents\Mount and Blade II
 /// Bannerlord\CoopData, beside the mod's CoopMapData. Seeds it from the
 /// module's template when absent, and falls back to defaults if it cannot be
-/// read. Existing files are migrated in place by activating formerly commented
-/// settings without replacing active operator values.
+/// read. On the server, existing files receive settings new in the template in
+/// place, without replacing active operator values.
 /// </summary>
 internal sealed class ModConfig : IModConfig
 {
@@ -35,56 +34,21 @@ internal sealed class ModConfig : IModConfig
     /// <summary>Ships in the module root — the only copy of the defaults.</summary>
     private const string TemplateFileName = "mod-config.default.json";
 
-    private static readonly string[] FormerlyCommentedDifficultyKeys =
-    {
-        "playerReceivedDamage",
-        "playerTroopsReceivedDamage",
-        "combatAIDifficulty",
-        "recruitmentDifficulty",
-        "playerMapMovementSpeed",
-        "stealthAndDisguiseDifficulty",
-        "persuasionSuccessChance",
-        "clanMemberDeathChance",
-        "battleDeath",
-        "birthAndDeath",
-        "autoAllocateClanMemberPerks",
-    };
-
-    private static readonly IDictionary<string, JToken> DifficultyDefaults =
-        new Dictionary<string, JToken>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["playerReceivedDamage"] = "VeryEasy",
-            ["playerTroopsReceivedDamage"] = "VeryEasy",
-            ["combatAIDifficulty"] = "VeryEasy",
-            ["recruitmentDifficulty"] = "VeryEasy",
-            ["playerMapMovementSpeed"] = "VeryEasy",
-            ["stealthAndDisguiseDifficulty"] = "VeryEasy",
-            ["persuasionSuccessChance"] = "VeryEasy",
-            ["clanMemberDeathChance"] = "VeryEasy",
-            ["battleDeath"] = "VeryEasy",
-            ["birthAndDeath"] = true,
-            ["autoAllocateClanMemberPerks"] = false,
-        };
-
-    /// <summary>modOptions keys added after configs shipped, seeded with a short comment into a file that has a modOptions block.</summary>
-    private static readonly (string Key, JToken Default, string Comment)[] SeededModOptions =
-    {
-        ("warSails", false, "// Toggle War Sails (NavalDLC) co-op on a dedicated server. Not officially supported yet; see mod-config.default.json."),
-    };
-
     private static readonly ILogger Logger = LogManager.GetLogger<ModConfig>();
 
     private readonly string directoryOverride;
+    private readonly string templatePathOverride;
     private readonly Lazy<ModConfigData> data;
 
     public ModConfig() : this(null)
     {
     }
 
-    /// <summary>Test seam: this directory wins over discovery.</summary>
-    internal ModConfig(string directoryOverride)
+    /// <summary>Test seam: this directory, and this template file, win over discovery.</summary>
+    internal ModConfig(string directoryOverride, string templatePathOverride = null)
     {
         this.directoryOverride = directoryOverride;
+        this.templatePathOverride = templatePathOverride;
         data = new Lazy<ModConfigData>(Load);
     }
 
@@ -99,20 +63,20 @@ internal sealed class ModConfig : IModConfig
         }
 
         string path = Path.Combine(dir, FileName);
+        string template = templatePathOverride ?? ResolveTemplatePath();
         try
         {
             if (!File.Exists(path))
             {
-                Seed(path);
+                Seed(path, template);
                 if (!File.Exists(path))
                 {
                     return new ModConfigData();
                 }
             }
 
-            MigrateDifficultySettings(path);
-            // These options are server-only, so a client leaves them out of its file.
-            if (ModInformation.IsServer) SeedModOptionSettings(path);
+            // A player-hosted session's clients share the server's file, and remote clients don't need server options.
+            if (ModInformation.IsServer) AddNewTemplateSettings(path, template);
 
             var loaded = JsonConvert.DeserializeObject<ModConfigData>(File.ReadAllText(path), MakeSettings())
                 ?? new ModConfigData();
@@ -128,158 +92,47 @@ internal sealed class ModConfig : IModConfig
         }
     }
 
-    /// <summary>
-    /// Activates difficulty settings that older templates shipped as comments.
-    /// Existing active values win and entirely missing settings receive their
-    /// documented defaults. The edit is deliberately textual so operator comments,
-    /// ordering, and unrelated settings remain untouched.
-    /// </summary>
-    private static void MigrateDifficultySettings(string path)
+    /// <summary>Adds settings that are new in the shipped template to an existing file; see <see cref="ModConfigTemplateMerger"/>.</summary>
+    private static void AddNewTemplateSettings(string path, string templatePath)
     {
         string original = File.ReadAllText(path);
-        JObject root;
         try
         {
-            root = JObject.Parse(original);
+            JObject.Parse(original);
         }
         catch
         {
-            // Leave malformed input byte-for-byte intact; Load owns its warning and
-            // default fallback below.
+            // Leave malformed input intact; Load reports a broken config.
             return;
         }
 
-        JToken difficultyToken = root.GetValue("difficulty", StringComparison.OrdinalIgnoreCase);
-        if (difficultyToken == null)
+        if (templatePath == null)
         {
-            int rootBrace = original.IndexOf('{');
-            var properties = new List<string>();
-            foreach (string key in FormerlyCommentedDifficultyKeys)
-            {
-                properties.Add("    \"" + key + "\": " +
-                    DifficultyDefaults[key].ToString(Formatting.None) + ",");
-            }
-            string block = Environment.NewLine + "  \"difficulty\": {" +
-                Environment.NewLine + string.Join(Environment.NewLine, properties) +
-                Environment.NewLine + "  },";
-            WriteIfValidMigration(path, original, original.Insert(rootBrace + 1, block));
+            Logger.Warning("mod-config.json: new settings not added, the module ships no {Template}", TemplateFileName);
             return;
         }
-        if (!(difficultyToken is JObject difficulty))
-        {
-            // Do not create a duplicate property beside an operator's invalid
-            // difficulty value. The normal loader will report the bad config.
-            return;
-        }
-
-        int openBrace = FindBlockOpenBrace(original, "difficulty");
-        if (openBrace < 0)
-        {
-            return;
-        }
-        int closeBrace = FindMatchingBrace(original, openBrace);
-        if (closeBrace < 0)
-        {
-            return;
-        }
-
-        string migrated = original;
-        var insertions = new List<string>();
-        foreach (string key in FormerlyCommentedDifficultyKeys)
-        {
-            JToken existing = difficulty.GetValue(key, StringComparison.OrdinalIgnoreCase);
-            if (existing != null)
-            {
-                continue;
-            }
-
-            string commentedBlock = migrated.Substring(openBrace, closeBrace - openBrace + 1);
-            string pattern = "^(?<indent>[\\t ]*)//[\\t ]*(?<setting>\\\"" +
-                Regex.Escape(key) + "\\\"[\\t ]*:[\\t ]*)(?<value>\\\"[^\\\"\\r\\n]*\\\"|true|false)(?<rest>[\\t ]*,?.*)$";
-            Match commented = Regex.Match(commentedBlock, pattern,
-                RegexOptions.Multiline | RegexOptions.IgnoreCase);
-            if (commented.Success)
-            {
-                string replacement = commented.Groups["indent"].Value +
-                    commented.Groups["setting"].Value + commented.Groups["value"].Value +
-                    commented.Groups["rest"].Value;
-                int absolute = openBrace + commented.Index;
-                migrated = migrated.Remove(absolute, commented.Length).Insert(absolute, replacement);
-                int delta = replacement.Length - commented.Length;
-                closeBrace += delta;
-                continue;
-            }
-
-            insertions.Add("    \"" + key + "\": " +
-                DifficultyDefaults[key].ToString(Formatting.None) + ",");
-        }
-
-        if (insertions.Count > 0)
-        {
-            string insertion = Environment.NewLine + string.Join(Environment.NewLine, insertions);
-            migrated = migrated.Insert(openBrace + 1, insertion);
-        }
-
-        WriteIfValidMigration(path, original, migrated);
-    }
-
-    // Adds modOptions keys that postdate an existing file, leaving operator values, comments and ordering alone.
-    // A file without a modOptions block is left as is, since an absent key already reads as its default.
-    private static void SeedModOptionSettings(string path)
-    {
-        string original = File.ReadAllText(path);
-        JObject root;
+        string template;
         try
         {
-            root = JObject.Parse(original);
+            template = File.ReadAllText(templatePath);
+            JObject.Parse(template);
         }
-        catch
+        catch (Exception ex)
         {
+            Logger.Warning("mod-config.json: new settings not added, {Template} is unreadable: {Reason}", templatePath, ex.Message);
             return;
         }
 
-        if (!(root.GetValue("modOptions", StringComparison.OrdinalIgnoreCase) is JObject modOptions)) return;
-
-        var lines = new List<string>();
-        foreach (var option in SeededModOptions)
-        {
-            if (modOptions.GetValue(option.Key, StringComparison.OrdinalIgnoreCase) != null) continue;
-
-            lines.Add("    " + option.Comment);
-            lines.Add("    \"" + option.Key + "\": " + option.Default.ToString(Formatting.None) + ",");
-        }
-        if (lines.Count == 0) return;
-
-        int openBrace = FindBlockOpenBrace(original, "modOptions");
-        if (openBrace < 0) return;
-
-        string insertion = Environment.NewLine + string.Join(Environment.NewLine, lines);
-        WriteIfValidMigration(path, original, original.Insert(openBrace + 1, insertion));
-    }
-
-    // Finds the opening brace of the "name": { block, or -1 when the text has none.
-    private static int FindBlockOpenBrace(string text, string blockName)
-    {
-        Match match = Regex.Match(text,
-            "(?:^|[{,])[\\t ]*(?<property>\\\"" + Regex.Escape(blockName) + "\\\"[\\t ]*:[\\t ]*\\{)",
-            RegexOptions.Multiline | RegexOptions.IgnoreCase);
-        if (!match.Success) return -1;
-
-        return text.IndexOf('{', match.Groups["property"].Index);
-    }
-
-    private static void WriteIfValidMigration(string path, string original, string migrated)
-    {
-        if (migrated == original)
-        {
-            return;
-        }
         try
         {
+            var (merged, added) = ModConfigTemplateMerger.Merge(original, template);
+            if (added.Count == 0) return;
+
             // Never replace a parseable user config with a bad migration.
-            JObject.Parse(migrated);
-            ReplaceFile(path, migrated);
-            Logger.Information("mod-config.json migrated in place: missing settings activated ({Path})", path);
+            JObject.Parse(merged);
+            ReplaceFile(path, merged);
+            Logger.Information("mod-config.json migrated in place: added settings new in the template: {Added} ({Path})",
+                string.Join(", ", added), path);
         }
         catch (Exception ex)
         {
@@ -305,61 +158,6 @@ internal sealed class ModConfig : IModConfig
                 File.Delete(temporary);
             }
         }
-    }
-
-    private static int FindMatchingBrace(string text, int openBrace)
-    {
-        bool inString = false;
-        bool escaped = false;
-        bool lineComment = false;
-        bool blockComment = false;
-        int depth = 0;
-        for (int i = openBrace; i < text.Length; i++)
-        {
-            char current = text[i];
-            char next = i + 1 < text.Length ? text[i + 1] : '\0';
-            if (lineComment)
-            {
-                if (current == '\n') lineComment = false;
-                continue;
-            }
-            if (blockComment)
-            {
-                if (current == '*' && next == '/')
-                {
-                    blockComment = false;
-                    i++;
-                }
-                continue;
-            }
-            if (inString)
-            {
-                if (escaped) escaped = false;
-                else if (current == '\\') escaped = true;
-                else if (current == '"') inString = false;
-                continue;
-            }
-            if (current == '/' && next == '/')
-            {
-                lineComment = true;
-                i++;
-                continue;
-            }
-            if (current == '/' && next == '*')
-            {
-                blockComment = true;
-                i++;
-                continue;
-            }
-            if (current == '"')
-            {
-                inString = true;
-                continue;
-            }
-            if (current == '{') depth++;
-            else if (current == '}' && --depth == 0) return i;
-        }
-        return -1;
     }
 
     private string ResolveDirectory()
@@ -447,11 +245,9 @@ internal sealed class ModConfig : IModConfig
     }
 
     /// <summary>Copies the template out on first run. Existing files are never
-    /// replaced; schema migrations above edit only settings that were previously
-    /// shipped as comments.</summary>
-    private static void Seed(string path)
+    /// replaced; the server only adds settings new in the template to them.</summary>
+    private static void Seed(string path, string template)
     {
-        string template = ResolveTemplatePath();
         if (template == null)
         {
             Logger.Warning("mod-config.json not created: the module ships no {Template} beside SubModule.xml " +

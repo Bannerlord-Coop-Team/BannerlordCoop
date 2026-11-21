@@ -263,11 +263,20 @@ public class MapEventResultsInterface : IMapEventResultsInterface
                     playerLootData.LootedShips[winnerPlayerParty] = new();
                 }
 
-                LootDefeatedPartyCasualties(winnerParties, defeatedParties, winnerPlayerParties, winningSideIncludesPlayers, playerLootData.LootedItems);
-                LootDefeatedPartyItems(winnerParties, defeatedParties, playerLootData.LootedItems);
-                LootDefeatedPartyPrisoners(winnerParties, defeatedParties, playerLootData.LootedMembers);
-                LootDefeatedPartyShips(mapEvent, winnerParties, defeatedParties, playerLootData.LootedShips);
-                CaptureDefeatedPartyMembers(mapEvent, winnerParties, defeatedParties, playerLootData.LootedPrisoners);
+                // The map event component decides what the winners loot, as vanilla's
+                // CalculateAndCommitMapEventResults does. A partial ship loot (the player disengaged from a naval
+                // battle) reads PlayerEncounter.CapturedShipsInEncounter, which the server has no copy of, so it loots none.
+                var component = mapEvent.Component;
+                if (component.CanLootDefeatedPartyCasualties())
+                    LootDefeatedPartyCasualties(winnerParties, defeatedParties, winnerPlayerParties, winningSideIncludesPlayers, playerLootData.LootedItems);
+                if (component.CanLootDefeatedPartyItems())
+                    LootDefeatedPartyItems(winnerParties, defeatedParties, playerLootData.LootedItems);
+                if (component.CanLootDefeatedPartyPrisoners())
+                    LootDefeatedPartyPrisoners(winnerParties, defeatedParties, playerLootData.LootedMembers);
+                if (component.CanLootDefeatedPartyShips(out bool partiallyLootShips) && !partiallyLootShips)
+                    LootDefeatedPartyShips(mapEvent, winnerParties, defeatedParties, playerLootData.LootedShips);
+                if (component.CanCaptureDefeatedPartyMembers())
+                    CaptureDefeatedPartyMembers(mapEvent, winnerParties, defeatedParties, playerLootData.LootedPrisoners);
 #if DEBUG
                 raidLootWarningFixture?.SeedLoot(mapEvent, playerLootData.LootedItems);
 #endif

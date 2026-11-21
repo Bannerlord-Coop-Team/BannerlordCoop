@@ -72,6 +72,7 @@ internal class PlayerPartyInteractionHandler : IHandler
     private readonly PlayerPartyInteractionOutcomeHandler outcomeHandler;
     private readonly IPlayerPartyTradeContext trade;
     private readonly IPlayerPartyPvpRules pvpRules;
+    private readonly IKingdomClanLimit kingdomClanLimit;
     private readonly ISendCoalescer sendCoalescer;
 
     private readonly ConcurrentDictionary<string, PlayerPartyInteractionSession> sessionsById = new ConcurrentDictionary<string, PlayerPartyInteractionSession>();
@@ -103,6 +104,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         IPlayerMapTracking mapTracking,
         IPlayerPartyTradeContext trade,
         IPlayerPartyPvpRules pvpRules,
+        IKingdomClanLimit kingdomClanLimit,
         // Only the server container registers a send coalescer.
         ISendCoalescer sendCoalescer = null)
     {
@@ -119,6 +121,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         this.mapTracking = mapTracking;
         this.trade = trade;
         this.pvpRules = pvpRules;
+        this.kingdomClanLimit = kingdomClanLimit;
         this.sendCoalescer = sendCoalescer;
         outcomeHandler = new PlayerPartyInteractionOutcomeHandler(
             objectManager,
@@ -127,7 +130,8 @@ internal class PlayerPartyInteractionHandler : IHandler
             clanLeaveRules,
             playerMarriageRules,
             playerDivorceRules,
-            mapTracking);
+            mapTracking,
+            kingdomClanLimit);
 
         messageBroker.Subscribe<NetworkPlayerPartyInteractionStarted>(Handle_NetworkPlayerPartyInteractionStarted);
         messageBroker.Subscribe<NetworkPlayerPartyInteractionState>(Handle_NetworkPlayerPartyInteractionState);
@@ -1126,7 +1130,7 @@ internal class PlayerPartyInteractionHandler : IHandler
             session.InitiatorEnabledOptions.Add(option);
     }
 
-    private static bool IsVassalServiceAvailable(
+    private bool IsVassalServiceAvailable(
         PartyBase initiatorParty,
         PartyBase responderParty,
         out PlayerPartyInteractionVassalUnavailableReason unavailableReason)
@@ -1159,11 +1163,17 @@ internal class PlayerPartyInteractionHandler : IHandler
             return false;
         }
 
+        if (kingdomClanLimit.RefusesJoin(initiatorClan, responderKingdom, asMercenary: false, ModConfigProvider.ModOptions))
+        {
+            unavailableReason = PlayerPartyInteractionVassalUnavailableReason.KingdomFull;
+            return false;
+        }
+
         unavailableReason = PlayerPartyInteractionVassalUnavailableReason.None;
         return true;
     }
 
-    private static bool IsMercenaryAvailable(
+    private bool IsMercenaryAvailable(
         PartyBase initiatorParty,
         PartyBase responderParty,
         out PlayerPartyInteractionMercenaryUnavailableReason unavailableReason)
@@ -1243,6 +1253,12 @@ internal class PlayerPartyInteractionHandler : IHandler
         if (warsOfFactionToJoin.Intersect(playerwars).Count<IFaction>() != playerwars.Count)
         {
             unavailableReason = PlayerPartyInteractionMercenaryUnavailableReason.IncompatibleWars;
+            return false;
+        }
+
+        if (kingdomClanLimit.RefusesJoin(initiatorClan, targetKingdom, asMercenary: true, ModConfigProvider.ModOptions))
+        {
+            unavailableReason = PlayerPartyInteractionMercenaryUnavailableReason.KingdomFull;
             return false;
         }
 
