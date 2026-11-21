@@ -1,4 +1,5 @@
 ﻿using Common;
+using GameInterface.Services.AdvancedStart.Interfaces;
 using SandBox;
 using SandBox.GauntletUI.CharacterCreation;
 using System.Collections.Generic;
@@ -29,6 +30,13 @@ namespace GameInterface.Services.GameDebug.Interfaces
         /// True while the skip runs, so the character creation state it pushes does not start a second skip.
         /// </summary>
         private bool skipping;
+
+        private readonly IAdvancedStartInterface advancedStartInterface;
+
+        public DebugCharacterCreationInterface(IAdvancedStartInterface advancedStartInterface)
+        {
+            this.advancedStartInterface = advancedStartInterface;
+        }
 
         /// <summary>
         /// Determines if game is currently running the character creation intro.
@@ -89,6 +97,8 @@ namespace GameInterface.Services.GameDebug.Interfaces
         {
             if (skipping) return;
             skipping = true;
+            // An automated join has no one to pick a start, so the window after creation stays shut too.
+            advancedStartInterface.SkipStartOptions();
             try
             {
                 SkipStages();

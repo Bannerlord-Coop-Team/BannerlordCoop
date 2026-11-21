@@ -7,6 +7,7 @@ using Coop.Core.Client.Services.Heroes.Messages;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
+using GameInterface.Services.AdvancedStart.Interfaces;
 using E2E.Tests.Environment.Extensions;
 using GameInterface.Services.Heroes.Data;
 using GameInterface.Services.Heroes.Interfaces;
@@ -181,7 +182,8 @@ public class CreateCharacterStateRollbackTests
                 heroInterface.Object,
                 playerManager.Object,
                 Rollback.Object,
-                Mock.Of<IExistingPlayerSender>());
+                Mock.Of<IExistingPlayerSender>(),
+                Mock.Of<IAdvancedStartInterface>());
         }
 
         /// <summary>Delivers the joiner's hero on a worker inside the session, as the network poller does.</summary>

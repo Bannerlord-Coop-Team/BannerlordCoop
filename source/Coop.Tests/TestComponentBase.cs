@@ -12,6 +12,7 @@ using Coop.Core.Server.Services.MobileParties;
 using Coop.Tests.Mocks;
 using GameInterface.AutoSync;
 using GameInterface.Configuration;
+using GameInterface.Services.AdvancedStart.Interfaces;
 using GameInterface.CoopSessionData;
 using GameInterface.Registry;
 using GameInterface.Registry.Auto;
@@ -119,6 +120,7 @@ internal abstract class TestComponentBase
         builder.RegisterInstance(modConfig.Object).As<IModConfig>().SingleInstance();
         RegisterMock<IAutoSyncPatchCollector>(builder);
         RegisterMock<IHeroInterface>(builder);
+        RegisterMock<IAdvancedStartInterface>(builder);
         RegisterMock<IModuleInfoProvider>(builder);
         RegisterMock<IModuleNameProvider>(builder);
         RegisterMock<IRegistryManager>(builder);

@@ -5,6 +5,10 @@ using Common.Network;
 using Coop.Core.Client.Messages;
 using Coop.Core.Client.Services.Heroes.Messages;
 using Coop.Core.Server.Connections.Messages;
+using GameInterface.Services.AdvancedStart.Data;
+using GameInterface.Services.AdvancedStart.Interfaces;
+using GameInterface.Services.AdvancedStart.Messages;
+using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -28,6 +32,7 @@ public class CreateCharacterState : ConnectionStateBase
     private readonly IPlayerManager playerManager;
     private readonly IPlayerCreationRollback playerCreationRollback;
     private readonly IExistingPlayerSender existingPlayerSender;
+    private readonly IAdvancedStartInterface advancedStartInterface;
 
     public CreateCharacterState(
         IConnectionLogic connectionLogic,
@@ -37,7 +42,8 @@ public class CreateCharacterState : ConnectionStateBase
         IHeroInterface heroInterface,
         IPlayerManager playerManager,
         IPlayerCreationRollback playerCreationRollback,
-        IExistingPlayerSender existingPlayerSender)
+        IExistingPlayerSender existingPlayerSender,
+        IAdvancedStartInterface advancedStartInterface)
         : base(connectionLogic)
     {
         this.objectManager = objectManager;
@@ -47,12 +53,55 @@ public class CreateCharacterState : ConnectionStateBase
         this.playerManager = playerManager;
         this.playerCreationRollback = playerCreationRollback;
         this.existingPlayerSender = existingPlayerSender;
+        this.advancedStartInterface = advancedStartInterface;
         messageBroker.Subscribe<NetworkTransferNewHero>(Handle_NetworkTransferNewHero);
+        messageBroker.Subscribe<NetworkRequestAdvancedStartPolicy>(Handle_NetworkRequestAdvancedStartPolicy);
+        messageBroker.Subscribe<AdvancedStartPolicyChanged>(Handle_AdvancedStartPolicyChanged);
     }
 
     public override void Dispose()
     {
         messageBroker.Unsubscribe<NetworkTransferNewHero>(Handle_NetworkTransferNewHero);
+        messageBroker.Unsubscribe<NetworkRequestAdvancedStartPolicy>(Handle_NetworkRequestAdvancedStartPolicy);
+        messageBroker.Unsubscribe<AdvancedStartPolicyChanged>(Handle_AdvancedStartPolicyChanged);
+    }
+
+    internal void Handle_NetworkRequestAdvancedStartPolicy(MessagePayload<NetworkRequestAdvancedStartPolicy> obj)
+    {
+        if (obj.Who as NetPeer != ConnectionLogic.Peer) return;
+
+        SendAdvancedStartPolicy();
+    }
+
+    // A player still creating a character or picking a start gets the new policy, so their open window can lock
+    // what was taken instead of their pick silently falling back to the default start.
+    internal void Handle_AdvancedStartPolicyChanged(MessagePayload<AdvancedStartPolicyChanged> obj)
+    {
+        SendAdvancedStartPolicy();
+    }
+
+    private void SendAdvancedStartPolicy()
+    {
+        var netPeer = ConnectionLogic.Peer;
+
+        // On the game thread because the policy reads the campaign's kingdoms and clock. Immediate because
+        // the join queue drops ordinary sends to a peer until its save snapshot is taken.
+        GameThread.RunSafe(() =>
+        {
+            AdvancedStartPolicy policy = null;
+            try
+            {
+                policy = advancedStartInterface.CreatePolicy();
+                advancedStartInterface.WatchForWorldStart();
+            }
+            catch (System.Exception exception)
+            {
+                // The joiner waits on this reply, so reply with a null policy, which turns the window off, instead of not at all.
+                Logger.Error(exception, "Failed to create the advanced start policy; offering the default start only");
+            }
+
+            network.SendImmediate(netPeer, new NetworkAdvancedStartPolicy(policy));
+        }, context: nameof(SendAdvancedStartPolicy));
     }
 
     internal void Handle_NetworkTransferNewHero(MessagePayload<NetworkTransferNewHero> obj)
@@ -108,9 +157,14 @@ public class CreateCharacterState : ConnectionStateBase
 
         // Run authoritative setup only after existing clients can create the referenced hero graph. Follow-up
         // messages use the same reliable-ordered channel; the joining peer is still dropping pre-snapshot deltas.
+        bool startApplied;
         try
         {
             heroInterface.SetupServerHero(hero);
+
+            // Before the joiner's save snapshot, so the picked start is part of the world it loads.
+            startApplied = advancedStartInterface.ApplySelections(
+                hero, obj.What.AdvancedStart ?? System.Array.Empty<AdvancedStartSelection>());
         }
         catch (System.Exception exception)
         {
@@ -145,6 +199,13 @@ public class CreateCharacterState : ConnectionStateBase
         // TransferSave has taken the save snapshot and begun queueing this peer's broadcasts, so tell the
         // joiner about every other existing player. These queue and replay once it enters its campaign.
         existingPlayerSender.SendExistingPlayers(netPeer, controllerId);
+
+        // After the snapshot, so it queues and shows once the joiner is in the world instead of being dropped.
+        if (!startApplied)
+        {
+            network.Send(netPeer, new SendInformationMessage(
+                "Your starting option couldn't be applied."));
+        }
     }
 
     private bool TryCreatePlayer(string controllerId, Hero hero, out Player player)

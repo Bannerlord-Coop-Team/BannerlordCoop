@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using Common;
 using Common.Messaging;
 using Common.Tests.Utils;
 using Coop.Core.Client;
@@ -6,14 +7,16 @@ using Coop.Core.Client.Messages;
 using Coop.Core.Client.States;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Tests.Mocks;
+using GameInterface.Services.AdvancedStart.Data;
+using GameInterface.Services.AdvancedStart.Interfaces;
 using GameInterface.Services.CharacterCreation.Messages;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Players.Data;
-using GameInterface.Services.UI.Interfaces;
 using LiteNetLib;
 using Moq;
+using System;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -24,7 +27,6 @@ namespace Coop.Tests.Client.States
         private readonly IClientLogic clientLogic;
         private readonly NetPeer serverPeer;
         private readonly ClientTestComponent clientComponent;
-        private readonly Mock<ILoadingInterface> loadingInterfaceMock;
 
         private TestMessageBroker TestMessageBroker => clientComponent.TestMessageBroker;
         private TestNetwork MockNetwork => clientComponent.TestNetwork;
@@ -36,7 +38,6 @@ namespace Coop.Tests.Client.States
 
             serverPeer = MockNetwork.CreatePeer();
             clientLogic = container.Resolve<IClientLogic>()!;
-            loadingInterfaceMock = container.Resolve<Mock<ILoadingInterface>>();
         }
 
         [Fact]
@@ -57,8 +58,10 @@ namespace Coop.Tests.Client.States
             Assert.IsType<ReceivingSavedDataState>(clientLogic.State);
         }
 
-        [Fact]
-        public void CharacterCreationFinished_Publishes_RegisterAllGameObjects()
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public void PolicyAndCreationFinished_InEitherOrder_SendHeroOnceWithDefaultStart(bool policyFirst)
         {
             // Arrange
             var characterCreationState = clientLogic.SetState<CharacterCreationState>();
@@ -67,18 +70,79 @@ namespace Coop.Tests.Client.States
                 .Setup(x => x.PackageMainHero())
                 .Returns(heroData);
 
-            var payload = new MessagePayload<CharacterCreationFinished>(
-                this, new CharacterCreationFinished());
+            // Act
+            if (policyFirst) ReceivePolicy(characterCreationState);
+            FinishCharacterCreation(characterCreationState);
+            if (!policyFirst)
+            {
+                Assert.Empty(MockNetwork.GetPeerMessagesFromType<NetworkTransferNewHero>(serverPeer));
+                ReceivePolicy(characterCreationState);
+            }
+
+            // Assert
+            Assert.Single(MockNetwork.GetPeerMessagesFromType<NetworkRequestAdvancedStartPolicy>(serverPeer));
+            var message = Assert.Single(MockNetwork.GetPeerMessagesFromType<NetworkTransferNewHero>(serverPeer));
+            Assert.Equal(heroData, message.PlayerHero);
+            Assert.Empty(message.AdvancedStart);
+        }
+
+        [Fact]
+        public void ShownWindow_HoldsHeroUntilJoin_ThenSendsPicks()
+        {
+            // Arrange
+            var characterCreationState = clientLogic.SetState<CharacterCreationState>();
+            Action<AdvancedStartSelection[]> onJoin = null;
+            clientComponent.Container.Resolve<Mock<IAdvancedStartInterface>>()
+                .Setup(x => x.TryShowStartOptions(It.IsAny<Action<AdvancedStartSelection[]>>(), It.IsAny<Action>()))
+                .Callback<Action<AdvancedStartSelection[]>, Action>((join, _) => onJoin = join)
+                .Returns(true);
 
             // Act
-            characterCreationState.Handle_CharacterCreationFinished(payload);
+            ReceivePolicy(characterCreationState);
+            FinishCharacterCreation(characterCreationState);
+
+            // Assert
+            Assert.Empty(MockNetwork.GetPeerMessagesFromType<NetworkTransferNewHero>(serverPeer));
+
+            // Act
+            onJoin(new[] { new AdvancedStartSelection("StartType", "outlaw") });
 
             // Assert
             var message = Assert.Single(MockNetwork.GetPeerMessagesFromType<NetworkTransferNewHero>(serverPeer));
-            Assert.Equal(heroData, message.PlayerHero);
-            loadingInterfaceMock.Verify(x => x.ShowLoadingScreen(
-                "Joining Coop Campaign",
-                "Sending your character to the host..."), Times.Once);
+            var selection = Assert.Single(message.AdvancedStart);
+            Assert.Equal("StartType", selection.Id);
+            Assert.Equal("outlaw", selection.Value);
+        }
+
+        [Fact]
+        public void WindowThatThrows_JoinsWithDefaultStart()
+        {
+            // Arrange
+            var characterCreationState = clientLogic.SetState<CharacterCreationState>();
+            clientComponent.Container.Resolve<Mock<IAdvancedStartInterface>>()
+                .Setup(x => x.TryShowStartOptions(It.IsAny<Action<AdvancedStartSelection[]>>(), It.IsAny<Action>()))
+                .Throws(new InvalidOperationException("window failed"));
+
+            // Act
+            ReceivePolicy(characterCreationState);
+            FinishCharacterCreation(characterCreationState);
+
+            // Assert
+            var message = Assert.Single(MockNetwork.GetPeerMessagesFromType<NetworkTransferNewHero>(serverPeer));
+            Assert.Empty(message.AdvancedStart);
+        }
+
+        private void ReceivePolicy(CharacterCreationState characterCreationState)
+        {
+            characterCreationState.Handle_NetworkAdvancedStartPolicy(new MessagePayload<NetworkAdvancedStartPolicy>(
+                serverPeer, new NetworkAdvancedStartPolicy(null)));
+            GameThread.Run(() => { }, blocking: true);
+        }
+
+        private void FinishCharacterCreation(CharacterCreationState characterCreationState)
+        {
+            characterCreationState.Handle_CharacterCreationFinished(new MessagePayload<CharacterCreationFinished>(
+                this, new CharacterCreationFinished()));
         }
 
         [Fact]

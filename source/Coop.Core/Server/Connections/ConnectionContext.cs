@@ -4,6 +4,7 @@ using Common.Network.Coalescing;
 using Coop.Core.Server.Services.Kingdoms;
 using Coop.Core.Server.Services.MobileParties;
 using GameInterface.CoopSessionData;
+using GameInterface.Services.AdvancedStart.Interfaces;
 using GameInterface.Services.CampaignService.Interfaces;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Modules;
@@ -43,7 +44,8 @@ public class ConnectionContext
         IJoinCampaignBaselineSender joinCampaignBaselineSender,
         IJoinCampaignKingdomBaseLineSender joinCampaignKingdomBaseLineSender,
         IJoinValidationDenialLog joinValidationDenialLog,
-        ILootShipHold lootShipHold)
+        ILootShipHold lootShipHold,
+        IAdvancedStartInterface advancedStartInterface)
     {
         MessageBroker = messageBroker;
         Network = network;
@@ -67,6 +69,7 @@ public class ConnectionContext
         JoinCampaignKingdomBaseLineSender = joinCampaignKingdomBaseLineSender;
         JoinValidationDenialLog = joinValidationDenialLog;
         LootShipHold = lootShipHold;
+        AdvancedStartInterface = advancedStartInterface;
     }
 
     public IMessageBroker MessageBroker { get; }
@@ -91,4 +94,5 @@ public class ConnectionContext
     public IJoinCampaignKingdomBaseLineSender JoinCampaignKingdomBaseLineSender { get; }
     public IJoinValidationDenialLog JoinValidationDenialLog { get; }
     public ILootShipHold LootShipHold { get; }
+    public IAdvancedStartInterface AdvancedStartInterface { get; }
 }
