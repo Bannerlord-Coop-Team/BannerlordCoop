@@ -1,0 +1,70 @@
+﻿using GameInterface.Configuration;
+using GameInterface.Services.AdvancedStart.Data;
+using GameInterface.Services.AdvancedStart.Interfaces;
+using System;
+using Xunit;
+
+namespace GameInterface.Tests.Services.AdvancedStart;
+
+public class AdvancedStartInterfaceTests
+{
+    [Fact]
+    public void OffersPickableStart_NullPolicy_IsFalse()
+    {
+        Assert.False(AdvancedStartInterface.OffersPickableStart(null));
+    }
+
+    [Theory]
+    // Outlaw doesn't change the world, so it stays pickable after the clock moves.
+    [InlineData(new[] { "default", "outlaw" }, true, new string[0], new[] { "vlandia" }, true)]
+    // Only world starts are offered and the clock has moved.
+    [InlineData(new[] { "default", "trader", "mercenary", "vassal", "king" }, true, new string[0], new[] { "vlandia" }, false)]
+    // A king start with every joinable kingdom already ruled by a player.
+    [InlineData(new[] { "default", "king" }, false, new[] { "vlandia" }, new[] { "vlandia" }, false)]
+    // A vassal start can still join a kingdom a player rules.
+    [InlineData(new[] { "default", "vassal" }, false, new[] { "vlandia" }, new[] { "vlandia" }, true)]
+    // A kingdom start in a world with no joinable kingdoms.
+    [InlineData(new[] { "default", "mercenary" }, false, new string[0], new string[0], false)]
+    public void OffersPickableStart_FollowsWorldAndKingdomLocks(
+        string[] startTypes, bool worldStarted, string[] playerRuled, string[] joinable, bool expected)
+    {
+        var policy = new AdvancedStartPolicy(startTypes, "default", worldStarted, playerRuled, joinable);
+
+        Assert.Equal(expected, AdvancedStartInterface.OffersPickableStart(policy));
+    }
+
+    [Fact]
+    public void OffersPickableStart_NullArraysFromTheWire_CountAsEmpty()
+    {
+        // Empty arrays arrive as null over protobuf.
+        var policy = new AdvancedStartPolicy(new[] { "default", "king" }, "default", false, null, null);
+
+        Assert.False(AdvancedStartInterface.OffersPickableStart(policy));
+    }
+
+    [Fact]
+    public void GetOfferedStartTypes_KeepsDefaultAndDropsSwitchedOff()
+    {
+        var config = new AdvancedStartConfigData
+        {
+            StartTypes = new AdvancedStartTypesConfigData { Beggar = false, King = false },
+        };
+
+        Assert.Equal(new[] { "default", "outlaw", "trader", "mercenary", "vassal" },
+            AdvancedStartInterface.GetOfferedStartTypes(config));
+    }
+
+    [Theory]
+    [InlineData("king", false, "king")]
+    // The host's default is a world start and the clock has moved.
+    [InlineData("king", true, "default")]
+    // The host's default isn't offered.
+    [InlineData("beggar", false, "default")]
+    public void GetDefaultStartType_FallsBackWhenHostDefaultCantBePicked(string hostDefault, bool worldStarted, string expected)
+    {
+        var policy = new AdvancedStartPolicy(new[] { "default", "outlaw", "king" }, hostDefault, worldStarted,
+            Array.Empty<string>(), new[] { "vlandia" });
+
+        Assert.Equal(expected, AdvancedStartInterface.GetDefaultStartType(policy));
+    }
+}
