@@ -136,6 +136,10 @@ public sealed class ModOptionsData
 
     public int? PvpResponseTimerSeconds { get; set; }
 
+    public int? MaxClansPerKingdom { get; set; }
+
+    public bool? MaxClansPerKingdomCountsMercenaries { get; set; }
+
     /// <summary>Whether a dedicated server runs War Sails (NavalDLC) co-op. It parses the file itself; declared so the key isn't reported as unknown.</summary>
     public bool? WarSails { get; set; }
 

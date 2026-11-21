@@ -4,10 +4,13 @@ using Common.Messaging;
 using Common.Network;
 using Common.Network.Coalescing;
 using Common.Util;
+using GameInterface.Configuration;
 using GameInterface.Services.Clans;
 using GameInterface.Services.Companions.Interfaces;
 using GameInterface.Services.Companions.Messages;
 using GameInterface.Services.Heroes.Patches;
+using GameInterface.Services.Kingdoms;
+using GameInterface.Services.Kingdoms.Messages;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -41,6 +44,7 @@ internal class CompanionRolesHandler : IHandler
     private readonly ITroopRosterInterface troopRosterInterface;
     private readonly IPlayerManager playerManager;
     private readonly ICoopClanPermissions permissions;
+    private readonly IKingdomClanLimit kingdomClanLimit;
     private readonly ISendCoalescer sendCoalescer;
     private string pendingFireCompanionRequestId;
     private string pendingFireCompanionHeroId;
@@ -53,6 +57,7 @@ internal class CompanionRolesHandler : IHandler
         ITroopRosterInterface troopRosterInterface,
         IPlayerManager playerManager,
         ICoopClanPermissions permissions,
+        IKingdomClanLimit kingdomClanLimit,
         ISendCoalescer sendCoalescer = null)
     {
         this.messageBroker = messageBroker;
@@ -62,6 +67,7 @@ internal class CompanionRolesHandler : IHandler
         this.troopRosterInterface = troopRosterInterface;
         this.playerManager = playerManager;
         this.permissions = permissions;
+        this.kingdomClanLimit = kingdomClanLimit;
         this.sendCoalescer = sendCoalescer;
 
         messageBroker.Subscribe<ClanNameSelectionDone>(Handle_ClanNameSelectionDone);
@@ -127,6 +133,16 @@ internal class CompanionRolesHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.OneToOneConversationHeroId, out var oneToOneConversationHero)) return;
             if (!objectManager.TryGetObjectWithLogging<Settlement>(data.SelectedFiefId, out var selectedFief)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.MainPartyId, out var mainParty)) return;
+
+            // The companion's new clan joins the ruler's kingdom, so it counts like any other clan joining it.
+            var kingdom = mainHero.Clan.Kingdom;
+            if (kingdomClanLimit.RefusesJoin(clan: null, kingdom, asMercenary: false, ModConfigProvider.ModOptions))
+            {
+                if (!objectManager.TryGetIdWithLogging(kingdom, out var kingdomId)) return;
+                logger.Warning("Rejected making companion {HeroId} a lord because kingdom {KingdomId} has maxClansPerKingdom clans", data.OneToOneConversationHeroId, kingdomId);
+                network.Send(obj.Who as NetPeer, new NetworkKingdomFull(kingdomId));
+                return;
+            }
 
             var companionRolesCampaignBehavior = Campaign.Current.GetCampaignBehavior<CompanionRolesCampaignBehavior>();
 
