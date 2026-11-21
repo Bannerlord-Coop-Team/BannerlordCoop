@@ -79,6 +79,15 @@ public class ModConfigTests : IDisposable
         Assert.True(config.UnknownKeys == null || config.UnknownKeys.Count == 0);
         Assert.True(config.Difficulty.UnknownKeys == null || config.Difficulty.UnknownKeys.Count == 0);
         Assert.True(config.ModOptions.UnknownKeys == null || config.ModOptions.UnknownKeys.Count == 0);
+        Assert.True(config.AdvancedStart.Enabled);
+        Assert.True(config.AdvancedStart.UnknownKeys == null || config.AdvancedStart.UnknownKeys.Count == 0);
+        Assert.True(config.AdvancedStart.StartTypes.UnknownKeys == null || config.AdvancedStart.StartTypes.UnknownKeys.Count == 0);
+        Assert.True(config.AdvancedStart.StartTypes.Outlaw);
+        Assert.True(config.AdvancedStart.StartTypes.Beggar);
+        Assert.True(config.AdvancedStart.StartTypes.Trader);
+        Assert.True(config.AdvancedStart.StartTypes.Mercenary);
+        Assert.True(config.AdvancedStart.StartTypes.Vassal);
+        Assert.True(config.AdvancedStart.StartTypes.King);
     }
 
     [Fact]

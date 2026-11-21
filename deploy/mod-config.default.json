@@ -82,6 +82,32 @@
     // Toggle auto allocation of perks for members of player clans.
     "autoAllocateClanMemberPerks": false
   },
+
+  // Advanced starting options offered to a player creating a new character on join.
+  "advancedStart": {
+    // (Default) true: a joining player picks between the default start and the start types below.
+    // false: the window never shows and everyone gets the default start.
+    "enabled": true,
+
+    // The start type selected when the window opens: "default", "outlaw", "beggar",
+    // "trader", "mercenary", "vassal" or "king".
+    "defaultStartType": "default",
+
+    // false hides a start type from the window.
+    // trader, mercenary, vassal and king change the world (workshops, fiefs, kingdom
+    // rulers, wars), so they can only be picked before the campaign is first resumed.
+    // A kingdom a player already rules can't be taken with a king start. Vanilla's
+    // single-player playthrough locks on king, vassal and mercenary don't apply here.
+    "startTypes": {
+      "outlaw": true,
+      "beggar": true,
+      "trader": true,
+      "mercenary": true,
+      "vassal": true,
+      "king": true
+    }
+  },
+
   "modOptions": {
     // Enables proximity voice for every player. Runtime changes are session-only.
     "voiceEnabled": true,
