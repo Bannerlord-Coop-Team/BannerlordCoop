@@ -58,6 +58,7 @@ internal readonly struct ChangeClanPartyLeader : ICommand
         MainPartyId = mainPartyId;
     }
 }
+
 [ProtoContract(SkipConstructor = true)]
 internal readonly struct ChangeEmptyClanPartyLeader : ICommand
 {

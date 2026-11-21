@@ -8,7 +8,10 @@ using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.ComponentInterfaces;
 using TaleWorlds.CampaignSystem.Naval;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Clans;
@@ -85,8 +88,19 @@ public class EmptyClanPartiesSyncTests : SyncTestBase
             });
         }
 
+        int goldBefore = 0;
+        Server.Call(() =>
+        {
+            UseShipCostModel();
+            goldBefore = Server.GetRegisteredObject<Hero>(mainHeroId).Gold;
+        });
+
         Server.SimulateMessage(client.NetPeer, new ChangeEmptyClanPartyLeader(mainHeroId, leaderId, null));
         Server.PumpGameThread();
+
+        // No clan party needs the ship, so the disband sells it to the clan leader at the selling penalty
+        int expectedGold = goldBefore + (withShip ? (int)(TestShipCostModel.TradeValue * TestShipCostModel.SellingPenalty) : 0);
+        Server.Call(() => Assert.Equal(expectedGold, Server.GetRegisteredObject<Hero>(mainHeroId).Gold));
 
         foreach (var instance in Clients.Prepend(Server))
         {
@@ -97,4 +111,26 @@ public class EmptyClanPartiesSyncTests : SyncTestBase
 
     private static List<EmptyClanPartiesCampaignBehavior.EmptyClanParty> EmptyClanParties() =>
         Campaign.Current.GetCampaignBehavior<EmptyClanPartiesCampaignBehavior>()._emptyClanParties;
+
+    // The harness Campaign boots without models, and the disband prices leftover ships with the ShipCostModel
+    private void UseShipCostModel()
+    {
+        var models = (Campaign.Current.Models?.GetGameModels() ?? Enumerable.Empty<GameModel>())
+            .Where(model => model is not ShipCostModel).ToList();
+        models.Add(new TestShipCostModel());
+        var gameModels = new GameModels(models);
+        Server.GameInstance.Game._gameModelManagers[typeof(GameModels)] = gameModels;
+        Campaign.Current._gameModels = gameModels;
+    }
+
+    private sealed class TestShipCostModel : ShipCostModel
+    {
+        public const float TradeValue = 1000f;
+        public const float SellingPenalty = 0.5f;
+
+        public override float GetShipTradeValue(Ship ship, PartyBase seller, PartyBase buyer) => TradeValue;
+        public override float GetShipRepairCost(Ship ship, PartyBase owner) => 0f;
+        public override int GetShipUpgradePieceCost(Ship ship, ShipUpgradePiece piece, PartyBase owner) => 0;
+        public override float GetShipSellingPenalty() => SellingPenalty;
+    }
 }

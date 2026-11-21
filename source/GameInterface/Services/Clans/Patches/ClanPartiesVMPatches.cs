@@ -118,10 +118,20 @@ internal class ClanPartiesVMPatches
 
         if (!CoopClanPermissions.CanManagePartyItem(item)) return false;
 
+        if (newLeader != null && newLeader.IsPlayerHero())
+        {
+            Logger.Error($"Rejecting change of leader in clan mobile party because newLeader is a player hero ({newLeader.StringId}).");
+
+            // Inform client of rejected clan party leader change
+            InformationManager.DisplayMessage(new InformationMessage(PlayerHeroRejectedMessage));
+            return false;
+        }
+
+        if (newLeader != null && !CoopClanPermissions.CanManageHero(newLeader)) return false;
+
+        // A cached party has no MobileParty, only the leader it's kept for
         if (item is ClanPartyItemWithHeroVM)
         {
-            if (newLeader != null && (newLeader.IsPlayerHero() || !CoopClanPermissions.CanManageHero(newLeader))) return false;
-
             if (newLeader != null && newLeader.PartyBelongedTo == MobileParty.MainParty) __instance._openPartyAsManage(newLeader);
 
             MessageBroker.Instance.Publish(__instance, new EmptyClanPartyLeaderChanged(Hero.MainHero, item.Leader, newLeader));
@@ -139,18 +149,7 @@ internal class ClanPartiesVMPatches
             return false;
         }
 
-        if (newLeader != null && newLeader.IsPlayerHero())
-        {
-            Logger.Error($"Rejecting change of leader in clan mobile party because newLeader is a player hero ({newLeader.StringId}).");
-
-            // Inform client of rejected clan party leader change
-            InformationManager.DisplayMessage(new InformationMessage(PlayerHeroRejectedMessage));
-            return false;
-        }
-
         // Change clan party leader on the server
-        if (newLeader != null && !CoopClanPermissions.CanManageHero(newLeader)) return false;
-
         var message = new ClanPartyLeaderChanged(Hero.MainHero, newLeader, selectedParty, MobileParty.MainParty);
         MessageBroker.Instance.Publish(__instance, message);
 

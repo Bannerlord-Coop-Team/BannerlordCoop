@@ -96,16 +96,16 @@ internal class ClanPartiesVMHandler : IHandler
                 return;
             }
 
-            CreateClanParty(mainHero, newLeader, targetClan, data.PartyGoldLowerThreshold);
+            CreateClanParty(newLeader, targetClan);
+            TopUpLeaderGold(mainHero, newLeader, data.PartyGoldLowerThreshold);
 
             messageBroker.Publish(this, new ClanManagementChanged(targetClan, ClanManagementRefresh.Parties | ClanManagementRefresh.Members));
         });
     }
 
-    private MobileParty CreateClanParty(Hero mainHero, Hero newLeader, Clan clan, int partyGoldLowerThreshold)
+    private MobileParty CreateClanParty(Hero newLeader, Clan clan)
     {
         MobileParty mobileParty = MobilePartyHelper.CreateNewClanMobileParty(newLeader, clan);
-        TopUpLeaderGold(mainHero, newLeader, partyGoldLowerThreshold);
         mobileParty.SetMoveModeHold();
 
         // Flush troop roster to show actual member count on clients after refresh
@@ -273,7 +273,7 @@ internal class ClanPartiesVMHandler : IHandler
 
             // Vanilla moves the ships into the player's party when the new leader is already in it
             bool sharesMainParty = newLeader.PartyBelongedTo != null && newLeader.PartyBelongedTo == mainHero.PartyBelongedTo;
-            MobileParty newParty = sharesMainParty ? newLeader.PartyBelongedTo : CreateClanParty(mainHero, newLeader, clan, partyGoldLowerThreshold);
+            MobileParty newParty = sharesMainParty ? newLeader.PartyBelongedTo : CreateClanParty(newLeader, clan);
             TopUpLeaderGold(mainHero, newLeader, partyGoldLowerThreshold);
 
             emptyClanParties.TransferCachedLordPartyToNewParty(cachedLeader, newParty.Party);

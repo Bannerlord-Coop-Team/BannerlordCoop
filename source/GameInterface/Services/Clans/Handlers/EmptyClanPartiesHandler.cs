@@ -1,9 +1,11 @@
 ﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Clans.Interfaces;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.ObjectManager;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
@@ -13,6 +15,8 @@ namespace GameInterface.Services.Clans.Handlers;
 
 internal class EmptyClanPartiesHandler : IHandler
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<EmptyClanPartiesHandler>();
+
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
@@ -93,7 +97,9 @@ internal class EmptyClanPartiesHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.LeaderId, out var leader)) return;
 
-            emptyClanPartiesInterface.TryTakeEmptyClanParty(leader, out _);
+            // The add and remove ride the same ordered channel, so a miss means this client's list drifted from the server's
+            if (!emptyClanPartiesInterface.TryTakeEmptyClanParty(leader, out _))
+                Logger.Warning($"No cached clan party to remove for {leader.Name}, {leader.StringId}");
         });
     }
 }

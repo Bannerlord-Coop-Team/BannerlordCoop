@@ -43,6 +43,7 @@ public readonly struct ClanPartyLeaderChanged : IEvent
         MainParty = mainParty;
     }
 }
+
 public readonly struct EmptyClanPartyLeaderChanged : IEvent
 {
     public readonly Hero MainHero;
