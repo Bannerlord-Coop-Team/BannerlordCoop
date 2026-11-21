@@ -26,20 +26,18 @@ public class ManagedConfigCatalogTests
             ?? throw new InvalidDataException("modOptions is missing from the default config");
 
         var options = BuildOptions(defaults);
-        var digest = SHA256.HashData(Encoding.UTF8.GetBytes(Serialize(options, Formatting.None)));
+        var digest = SHA256.HashData(Encoding.UTF8.GetBytes(options.ToString(Formatting.None)));
         var catalog = new JObject
         {
             ["contentDigest"] = Convert.ToHexString(digest).ToLowerInvariant(),
             ["options"] = options,
         };
-        var expected = Encoding.UTF8.GetBytes(Serialize(catalog, Formatting.Indented) + "\n");
-        var catalogPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory,
-            "..", "..", "..", "..", "..", "deploy", "managed-config-catalog.json"));
+        var expectedText = catalog.ToString(Formatting.Indented).Replace("\r\n", "\n") + "\n";
+        var catalogPath = Path.Combine(StubMsBuild.FindRepoRoot(), "deploy", "managed-config-catalog.json");
+        var oldText = File.Exists(catalogPath) ? Encoding.UTF8.GetString(File.ReadAllBytes(catalogPath)) : null;
 
-        if (File.Exists(catalogPath) && File.ReadAllBytes(catalogPath).AsSpan().SequenceEqual(expected)) return;
-
-        File.WriteAllBytes(catalogPath, expected);
-        Assert.Fail("The managed config catalog was stale and has been regenerated at " + catalogPath);
+        if (expectedText != oldText) File.WriteAllText(catalogPath, expectedText);
+        Assert.Equal(expectedText, oldText);
     }
 
     private static JArray BuildOptions(JObject defaults)
@@ -50,7 +48,7 @@ public class ManagedConfigCatalogTests
             BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static);
         foreach (var property in properties.OrderBy(property => property.MetadataToken))
         {
-            string key = ToCatalogKey(property.Name);
+            string key = char.ToLowerInvariant(property.Name[0]) + property.Name[1..];
             var metadata = property.GetCustomAttribute<ManagedConfigOptionAttribute>();
             if (property.Name == nameof(ModOptionsData.UnknownKeys) ||
                 property.GetMethod is not { IsPublic: true, IsStatic: false })
@@ -61,66 +59,71 @@ public class ManagedConfigCatalogTests
 
             if (!keys.Add(key)) throw new InvalidDataException($"{key} is declared more than once");
             if (metadata == null) throw new InvalidDataException($"{key} is missing ManagedConfigOption metadata");
-            if (!Regex.IsMatch(metadata.AvailableSince ?? "", @"^[0-9]+\.[0-9]+\.[0-9]+\z"))
-                throw new InvalidDataException($"{key} needs explicit availableSince metadata");
             if (!defaults.TryGetValue(key, out var value)) throw new InvalidDataException($"Default is missing for {key}");
-
-            var clrType = Nullable.GetUnderlyingType(property.PropertyType) ?? property.PropertyType;
-            var type = clrType switch
-            {
-                _ when clrType == typeof(bool) => "boolean",
-                _ when clrType == typeof(int) => "integer",
-                _ when clrType == typeof(float) || clrType == typeof(double) => "number",
-                _ when clrType == typeof(List<string>) => "stringList",
-                _ when clrType.IsEnum => "enum",
-                _ => throw new InvalidDataException($"Unsupported managed option type for {key}: {clrType}")
-            };
-
-            var option = new JObject { ["key"] = key, ["type"] = type, ["availableSince"] = metadata.AvailableSince };
-            AddConstraints(property, metadata, key, type, option);
-            var enumNames = clrType.IsEnum
-                ? clrType.GetFields(BindingFlags.Public | BindingFlags.Static)
-                    .OrderBy(field => field.MetadataToken).Select(field => field.Name).ToArray()
-                : Array.Empty<string>();
-            if (clrType.IsEnum) option.Add("values", new JArray(enumNames));
-            option.Add("default", ValidateDefault(key, type, metadata, enumNames, value));
-            options.Add(option);
+            options.Add(BuildOption(property.PropertyType, key, metadata, value));
         }
 
-        if (options.Count == 0) throw new InvalidDataException("modOptions has no managed options");
+        CheckCoverage(keys, defaults);
+        return options;
+    }
+
+    private static void CheckCoverage(HashSet<string> keys, JObject defaults)
+    {
+        if (keys.Count == 0) throw new InvalidDataException("modOptions has no managed options");
         foreach (var property in defaults.Properties())
         {
             if (!keys.Contains(property.Name)) throw new InvalidDataException($"No managed property for default {property.Name}");
         }
-        return options;
     }
 
-    private static void AddConstraints(PropertyInfo property, ManagedConfigOptionAttribute metadata, string key, string type, JObject option)
+    private static JObject BuildOption(Type propertyType, string key, ManagedConfigOptionAttribute metadata, JToken value)
     {
-        bool numeric = type is "integer" or "number";
-        bool list = type == "stringList";
-        // Named arguments distinguish omitted fields from explicit false, zero and null.
-        var arguments = property.CustomAttributes.Single(attribute => attribute.AttributeType == typeof(ManagedConfigOptionAttribute)).NamedArguments;
-        foreach (var argument in arguments.OrderBy(argument => argument.MemberInfo.MetadataToken))
-        {
-            string name = ToCatalogKey(argument.MemberName);
-            if (name == "availableSince") continue;
+        if (!Regex.IsMatch(metadata.AvailableSince ?? "", @"^[0-9]+\.[0-9]+\.[0-9]+\z"))
+            throw new InvalidDataException($"{key} needs explicit availableSince metadata");
 
-            var value = argument.TypedValue.Value;
-            bool valid = name switch
-            {
-                "min" or "max" => numeric && value is double bound && double.IsFinite(bound),
-                "itemPattern" => list && value is string,
-                "itemFormat" => list && value is "steamId64",
-                "uniqueItems" => list && value is bool,
-                "coercePositiveBelow" => numeric && value is int and > 0,
-                _ => throw new InvalidDataException($"{key} has unknown metadata {name}")
-            };
-            if (!valid) throw new InvalidDataException($"Invalid {name} metadata for {type} option {key}");
-            if (name != "coercePositiveBelow") option.Add(name, JToken.FromObject(value!));
-        }
+        var clrType = Nullable.GetUnderlyingType(propertyType) ?? propertyType;
+        var type = ToCatalogType(clrType, key);
+        var option = new JObject { ["key"] = key, ["type"] = type, ["availableSince"] = metadata.AvailableSince };
+        AddConstraints(metadata, key, type, option);
+        var enumNames = clrType.IsEnum
+            ? clrType.GetFields(BindingFlags.Public | BindingFlags.Static)
+                .OrderBy(field => field.MetadataToken).Select(field => field.Name).ToArray()
+            : Array.Empty<string>();
+        if (clrType.IsEnum) option.Add("values", new JArray(enumNames));
+        option.Add("default", ValidateDefault(key, type, metadata, enumNames, value));
+        CheckStringFormatting(option, key);
+        return option;
+    }
 
+    private static string ToCatalogType(Type clrType, string key) => clrType switch
+    {
+        _ when clrType == typeof(bool) => "boolean",
+        _ when clrType == typeof(int) => "integer",
+        _ when clrType == typeof(float) || clrType == typeof(double) => "number",
+        _ when clrType == typeof(List<string>) => "stringList",
+        _ when clrType.IsEnum => "enum",
+        _ => throw new InvalidDataException($"Unsupported managed option type for {key}: {clrType}")
+    };
+
+    private static void AddConstraints(ManagedConfigOptionAttribute metadata, string key, string type, JObject option)
+    {
         int threshold = metadata.CoercePositiveBelow;
+        bool hasMin = !double.IsNaN(metadata.Min);
+        bool hasMax = !double.IsNaN(metadata.Max);
+        if (type is not ("integer" or "number") && (hasMin || hasMax || threshold != 0))
+            throw new InvalidDataException($"Invalid numeric metadata for {type} option {key}");
+        if (type != "stringList" && (metadata.ItemPattern != null || metadata.ItemFormat != null || metadata.UniqueItems))
+            throw new InvalidDataException($"Invalid list metadata for {type} option {key}");
+        if (metadata.ItemFormat is not (null or "steamId64"))
+            throw new InvalidDataException($"Invalid itemFormat for {key}");
+        if (threshold < 0) throw new InvalidDataException($"coercePositiveBelow must be positive for {key}");
+
+        if (hasMin) option.Add("min", CatalogNumber(metadata.Min, key));
+        if (hasMax) option.Add("max", CatalogNumber(metadata.Max, key));
+        if (metadata.ItemPattern != null) option.Add("itemPattern", metadata.ItemPattern);
+        if (metadata.ItemFormat != null) option.Add("itemFormat", metadata.ItemFormat);
+        if (metadata.UniqueItems) option.Add("uniqueItems", true);
+        // Values from 1 to threshold - 1 are raised to threshold.
         if (threshold > 1) option.Add("coerceRanges", new JArray { new JArray(1, threshold - 1, threshold) });
     }
 
@@ -137,107 +140,35 @@ public class ManagedConfigCatalogTests
             _ => false
         };
         if (!valid) throw new InvalidDataException($"Invalid default for {type} option {key}");
-
-        if (number is double numeric)
-        {
-            if (numeric < metadata.Min || numeric > metadata.Max)
-                throw new InvalidDataException($"Default for {key} is outside its bounds");
-            return new JValue(numeric);
-        }
-
-        if (value is JArray list)
-        {
-            var items = list.Values<string>().ToArray();
-            if (metadata.UniqueItems && items.Distinct(StringComparer.Ordinal).Count() != items.Length)
-                throw new InvalidDataException($"Default for {key} is not unique");
-            if (metadata.ItemPattern != null)
-            {
-                Regex pattern;
-                try
-                {
-                    // JavaScript's end anchor requires the actual end of the string.
-                    string expression = Regex.Replace(metadata.ItemPattern, @"\\.|\[(?:\\.|[^\]\\])*\]|\$", match => match.Value == "$" ? @"\z" : match.Value);
-                    pattern = new Regex(expression, RegexOptions.ECMAScript | RegexOptions.CultureInvariant);
-                }
-                catch (ArgumentException error)
-                {
-                    throw new InvalidDataException($"Invalid itemPattern for {key}", error);
-                }
-                if (items.Any(item => !pattern.IsMatch(item!)))
-                    throw new InvalidDataException($"Default for {key} violates itemPattern");
-            }
-        }
-        return value.DeepClone();
+        if (number is not double numeric) return value.DeepClone();
+        if (numeric < metadata.Min || numeric > metadata.Max)
+            throw new InvalidDataException($"Default for {key} is outside its bounds");
+        return CatalogNumber(numeric, key);
     }
 
-    private static string ToCatalogKey(string name) => char.ToLowerInvariant(name[0]) + name[1..];
-
-    private static string Serialize(JToken value, Formatting formatting)
+    private static JValue CatalogNumber(double value, string key)
     {
-        using var text = new StringWriter(CultureInfo.InvariantCulture) { NewLine = "\n" };
-        using var writer = new CatalogJsonWriter(text) { Formatting = formatting };
-        value.WriteTo(writer);
-        writer.Flush();
-        return text.ToString();
+        string text = value == 0 ? "0" : value.ToString("R", CultureInfo.InvariantCulture);
+        if (double.IsFinite(value) && !text.Contains('E') && value >= long.MinValue && value < (double)long.MaxValue)
+        {
+            var number = value % 1 == 0 ? new JValue((long)value) : new JValue(value);
+            if (number.ToString(Formatting.None) == text) return number;
+        }
+        throw new InvalidDataException($"Number {text} for {key} needs JSON.stringify-compatible formatting");
     }
 
-    /// <summary>Writes catalog values the way JSON.stringify does for the consumer digest.</summary>
-    private sealed class CatalogJsonWriter : JsonTextWriter
+    private static void CheckStringFormatting(JObject option, string key)
     {
-        public CatalogJsonWriter(TextWriter writer) : base(writer) { }
-
-        public override void WriteValue(double value)
+        foreach (var value in option.Descendants().OfType<JValue>())
         {
-            if (value == 0)
+            if (value.Value is not string text) continue;
+            for (int i = 0; i < text.Length;)
             {
-                WriteRawValue("0");
-                return;
+                // Newtonsoft escapes these scalars, while JSON.stringify emits them directly.
+                if (!Rune.TryGetRuneAt(text, i, out var rune) || rune.Value is 0x0085 or 0x2028 or 0x2029)
+                    throw new InvalidDataException($"String value for {key} needs JSON.stringify-compatible formatting");
+                i += rune.Utf16SequenceLength;
             }
-
-            string text = value.ToString("R", CultureInfo.InvariantCulture);
-            int separator = text.IndexOf('E');
-            if (separator < 0)
-            {
-                WriteRawValue(text);
-                return;
-            }
-
-            string mantissa = text[..separator];
-            int exponent = int.Parse(text.AsSpan(separator + 1), NumberStyles.Integer, CultureInfo.InvariantCulture);
-            if (exponent is < -6 or >= 21)
-            {
-                WriteRawValue(mantissa + "e" + (exponent >= 0 ? "+" : "") + exponent.ToString(CultureInfo.InvariantCulture));
-                return;
-            }
-
-            string sign = value < 0 ? "-" : "";
-            string digits = mantissa[sign.Length..].Replace(".", "");
-            int point = exponent + 1;
-            WriteRawValue(sign + (point <= 0 ? "0." + new string('0', -point) + digits
-                : point >= digits.Length ? digits.PadRight(point, '0') : digits.Insert(point, ".")));
-        }
-
-        public override void WriteValue(string? value)
-        {
-            if (value == null)
-            {
-                WriteNull();
-                return;
-            }
-
-            string escaped = Regex.Replace(value, "[\"\\\\\u0000-\u001f]|[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]",
-                match => match.Value[0] switch
-                {
-                    '"' => "\\\"",
-                    '\\' => "\\\\",
-                    '\b' => "\\b",
-                    '\f' => "\\f",
-                    '\n' => "\\n",
-                    '\r' => "\\r",
-                    '\t' => "\\t",
-                    var character => $"\\u{(int)character:x4}"
-                });
-            WriteRawValue("\"" + escaped + "\"");
         }
     }
 }

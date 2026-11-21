@@ -1,5 +1,5 @@
 {
-  "contentDigest": "48d462ce0e3740654d5e7e34a92ddbdb7c642f3515fbcd6bceda3763a5690e0c",
+  "contentDigest": "ec2faa9b93477e6a0627f88859f5c627a179c5ceb07e111f92d856b4e5c817eb",
   "options": [
     {
       "key": "voiceEnabled",
@@ -209,7 +209,6 @@
       "availableSince": "0.1.8",
       "itemPattern": "^[0-9]{17}$",
       "itemFormat": "steamId64",
-      "uniqueItems": false,
       "default": []
     },
     {

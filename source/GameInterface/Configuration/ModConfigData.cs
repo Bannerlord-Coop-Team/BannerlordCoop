@@ -10,6 +10,7 @@ namespace GameInterface.Configuration;
 public sealed class ManagedConfigOptionAttribute : Attribute
 {
     public string AvailableSince { get; set; }
+    // NaN leaves the bound unset.
     public double Min { get; set; } = double.NaN;
     public double Max { get; set; } = double.NaN;
     public string ItemPattern { get; set; }
@@ -182,7 +183,7 @@ public sealed class ModOptionsData
     [ManagedConfigOption(AvailableSince = "0.1.8")]
     public ClansAfterKingdomDestructionMode? ClansAfterKingdomDestruction { get; set; }
 
-    [ManagedConfigOption(AvailableSince = "0.1.8", ItemPattern = "^[0-9]{17}$", ItemFormat = "steamId64", UniqueItems = false)]
+    [ManagedConfigOption(AvailableSince = "0.1.8", ItemPattern = "^[0-9]{17}$", ItemFormat = "steamId64")]
     public List<string> PreferredBattleHosts { get; set; }
 
     [ManagedConfigOption(AvailableSince = "0.1.8")]
