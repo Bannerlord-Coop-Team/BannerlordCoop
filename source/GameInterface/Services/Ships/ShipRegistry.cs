@@ -49,6 +49,18 @@ internal class ShipRegistry : AutoRegistryBase<Ship>
             }
         }
 
+        // Moored ships have no owner, so they're only reachable through their port's stash
+        foreach (var settlement in Campaign.Current.CampaignObjectManager.Settlements)
+        {
+            if (settlement.ShipStash == null) continue;
+
+            var index = 0;
+            foreach (var ship in settlement.ShipStash)
+            {
+                RegisterExistingObject($"ShipStash_{settlement.StringId}_{index++}", ship);
+            }
+        }
+        
         // An empty clan party keeps its ships without an owner until its leader returns
         var emptyClanParties = Campaign.Current.GetCampaignBehavior<EmptyClanPartiesCampaignBehavior>()?._emptyClanParties;
         if (emptyClanParties == null) return;

@@ -126,6 +126,8 @@ public class PortTransactionPricerTests
             new MBReadOnlyList<ShipRenameInfo>(),
             pieces ?? new MBReadOnlyList<ShipUpgradePieceInfo>(),
             new MBReadOnlyList<ShipFigureheadInfo>(),
+            new MBReadOnlyList<Ship>(),
+            new MBReadOnlyList<Ship>(),
             new MBReadOnlyList<Ship>());
 }
 #endif
