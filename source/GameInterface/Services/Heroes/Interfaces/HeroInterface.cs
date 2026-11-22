@@ -461,17 +461,38 @@ internal class HeroInterface : IHeroInterface
 
     private void RegisterHeroEquipment(Hero hero)
     {
-        if (hero._battleEquipment != null) RegisterChild(hero._battleEquipment, equipmentRegistry.GetHeroEquipmentId(hero, Equipment.EquipmentType.Battle));
-        if (hero._civilianEquipment != null) RegisterChild(hero._civilianEquipment, equipmentRegistry.GetHeroEquipmentId(hero, Equipment.EquipmentType.Civilian));
-        if (hero._stealthEquipment != null) RegisterChild(hero._stealthEquipment, equipmentRegistry.GetHeroEquipmentId(hero, Equipment.EquipmentType.Stealth));
+        if (hero._battleEquipment != null)
+            RegisterChild(
+                hero._battleEquipment,
+                equipmentRegistry.GetHeroEquipmentId(hero, Equipment.EquipmentType.Battle));
+        if (hero._civilianEquipment != null)
+            RegisterChild(
+                hero._civilianEquipment,
+                equipmentRegistry.GetHeroEquipmentId(hero, Equipment.EquipmentType.Civilian));
+        if (hero._stealthEquipment != null)
+            RegisterChild(
+                hero._stealthEquipment,
+                equipmentRegistry.GetHeroEquipmentId(hero, Equipment.EquipmentType.Stealth));
     }
 
     // A 0 handle means the host's hero had no equipment of that type
     private void RegisterHeroEquipment(Hero hero, PlayerRegistrationHandles handles)
     {
-        if (handles.BattleEquipment != 0) RegisterChild(hero._battleEquipment, equipmentRegistry.GetHeroEquipmentId(hero, Equipment.EquipmentType.Battle), handles.BattleEquipment);
-        if (handles.CivilianEquipment != 0) RegisterChild(hero._civilianEquipment, equipmentRegistry.GetHeroEquipmentId(hero, Equipment.EquipmentType.Civilian), handles.CivilianEquipment);
-        if (handles.StealthEquipment != 0) RegisterChild(hero._stealthEquipment, equipmentRegistry.GetHeroEquipmentId(hero, Equipment.EquipmentType.Stealth), handles.StealthEquipment);
+        if (handles.BattleEquipment != 0)
+            RegisterChild(
+                hero._battleEquipment,
+                equipmentRegistry.GetHeroEquipmentId(hero, Equipment.EquipmentType.Battle),
+                handles.BattleEquipment);
+        if (handles.CivilianEquipment != 0)
+            RegisterChild(
+                hero._civilianEquipment,
+                equipmentRegistry.GetHeroEquipmentId(hero, Equipment.EquipmentType.Civilian),
+                handles.CivilianEquipment);
+        if (handles.StealthEquipment != 0)
+            RegisterChild(
+                hero._stealthEquipment,
+                equipmentRegistry.GetHeroEquipmentId(hero, Equipment.EquipmentType.Stealth),
+                handles.StealthEquipment);
     }
 
     private void RegisterChild(object obj, string suffix)

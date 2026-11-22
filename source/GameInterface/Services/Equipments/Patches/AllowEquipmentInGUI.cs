@@ -1,6 +1,5 @@
 ﻿using Common.Util;
 using HarmonyLib;
-using SandBox.Missions.MissionLogics;
 using SandBox.ViewModelCollection;
 using System;
 using System.Collections.Generic;
@@ -23,7 +22,6 @@ internal class AllowEquipmentInGUI
         AccessTools.Method(typeof(CampaignUIHelper), nameof(CampaignUIHelper.GetCharacterCode)),
         AccessTools.Method(typeof(SandBoxUIHelper), nameof(SandBoxUIHelper.GetCharacterCode)),
         AccessTools.Method(typeof(Mission), nameof(Mission.SpawnAgent)),
-        AccessTools.Method(typeof(MountAgentLogic), nameof(MountAgentLogic.OnAgentRemoved)),
         AccessTools.Method(typeof(CharacterSpawner), nameof(CharacterSpawner.InitWithCharacter)),
         AccessTools.Method(typeof(CharacterThumbnailCache), "GetPoseParamsFromCharacterCode")
     };
