@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using E2E.Tests.Environment;
+using GameInterface.Services.PartyVisuals.Interfaces;
 using GameInterface.Services.PartyVisuals.Messages;
 using SandBox.View.Map.Visuals;
 using TaleWorlds.CampaignSystem.Party;
@@ -46,6 +47,27 @@ namespace E2E.Tests.Services.PartyVisuals
             Assert.Equal(0u, createdVisual.PartyVisualHandle);
             Assert.Equal(partyHandle, createdVisual.MobilePartyHandle);
             Assert.Equal(partyHandle, Assert.Single(destroyed).MobilePartyHandle);
+        }
+
+        [Fact]
+        public void RecreatingAHeadlessVisual_QueuesModelRefreshForTheExistingClientParty()
+        {
+            var server = TestEnvironment.Server;
+            var client = TestEnvironment.Clients.First();
+            var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var clientParty));
+
+            client.Call(() => clientParty.Party.OnVisualsUpdated());
+
+            server.Call(() =>
+            {
+                Assert.True(server.ObjectManager.TryGetObject<MobileParty>(partyId, out var serverParty));
+                var visuals = server.Resolve<IPartyVisualInterface>();
+                visuals.RemoveVisual(serverParty);
+                visuals.CreateVisual(serverParty);
+            });
+
+            client.Call(() => Assert.True(clientParty.Party.IsVisualDirty));
         }
 
         [Fact]

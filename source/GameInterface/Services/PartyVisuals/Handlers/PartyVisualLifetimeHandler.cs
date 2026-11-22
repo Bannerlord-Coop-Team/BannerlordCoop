@@ -99,6 +99,8 @@ public class PartyVisualLifetimeHandler : IHandler
 
             using (new AllowedThread())
             {
+                // A recreated model needs a refresh even if the previous model cleared the dirty flag.
+                mobileParty.Party.SetVisualAsDirty();
                 mobileParty.CreateNewPartyVisual();
 
                 if (partyVisualId != null && mobileParty.Party.GetPartyVisual() is { } partyVisual)
