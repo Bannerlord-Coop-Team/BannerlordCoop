@@ -13,8 +13,10 @@ namespace GameInterface.Services.Equipments.Patches;
 internal class EquipmentCollectionPatches : GenericPatches<EquipmentCollectionPatches, Equipment>
 {
     // The copy constructor fills _itemSlots directly, after the registry has already sent the create
-    static IEnumerable<MethodBase> TargetMethods() => AccessTools.GetDeclaredConstructors(typeof(Equipment), searchForStatic: false)
-        .Cast<MethodBase>()
+    static IEnumerable<MethodBase> TargetMethods() => new MethodBase[]
+        {
+            AccessTools.Constructor(typeof(Equipment), new[] { typeof(Equipment) }),
+        }
         .Concat(AccessTools.GetDeclaredMethods(typeof(Equipment)));
 
     [HarmonyTranspiler]

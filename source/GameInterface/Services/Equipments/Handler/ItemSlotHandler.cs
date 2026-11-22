@@ -75,9 +75,11 @@ namespace GameInterface.Services.Equipments.Handlers
                         data.ItemModifierId,
                         out itemModifier)) return;
 
-                equipment._itemSlots[data.Index] =
-                    new EquipmentElement(item, itemModifier);
+                // The server also sends unchanged slots, so only a stale copy gets written and redrawn
+                var element = new EquipmentElement(item, itemModifier);
+                if (equipment._itemSlots[data.Index].IsEqualTo(element)) return;
 
+                equipment._itemSlots[data.Index] = element;
                 equipmentInterface.RefreshOwnerVisuals(equipment);
             }, context: nameof(NetworkUpdateItemSlots));
         }

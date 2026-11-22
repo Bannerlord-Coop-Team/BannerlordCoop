@@ -132,9 +132,15 @@ internal class HeroInterface : IHeroInterface
         uint battleEquipmentHandle = 0;
         uint civilianEquipmentHandle = 0;
         uint stealthEquipmentHandle = 0;
-        if (hero._battleEquipment != null && !objectManager.TryGetHandleWithLogging(hero._battleEquipment, out battleEquipmentHandle)) return false;
-        if (hero._civilianEquipment != null && !objectManager.TryGetHandleWithLogging(hero._civilianEquipment, out civilianEquipmentHandle)) return false;
-        if (hero._stealthEquipment != null && !objectManager.TryGetHandleWithLogging(hero._stealthEquipment, out stealthEquipmentHandle)) return false;
+        if (hero._battleEquipment != null &&
+            !objectManager.TryGetHandleWithLogging(hero._battleEquipment, out battleEquipmentHandle))
+            return false;
+        if (hero._civilianEquipment != null &&
+            !objectManager.TryGetHandleWithLogging(hero._civilianEquipment, out civilianEquipmentHandle))
+            return false;
+        if (hero._stealthEquipment != null &&
+            !objectManager.TryGetHandleWithLogging(hero._stealthEquipment, out stealthEquipmentHandle))
+            return false;
 
         handles = new PlayerRegistrationHandles(
             heroHandle,

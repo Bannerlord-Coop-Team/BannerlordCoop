@@ -153,6 +153,61 @@ public class MerchantTradeTests : IDisposable
         }
     }
 
+    [Fact]
+    public void EquippingDuringATrade_ServerAndEveryClientGetTheSlot()
+    {
+        var client = TestEnvironment.Clients.First();
+
+        var armorId = TestEnvironment.CreateRegisteredObject<ItemObject>();
+        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        var townId = TestEnvironment.CreateRegisteredObject<Town>();
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+
+        // Trade equipment resolves items through the native catalog, as a loaded campaign does
+        foreach (var instance in TestEnvironment.Clients.Prepend(Server))
+        {
+            instance.Call(() =>
+            {
+                var armor = instance.GetRegisteredObject<ItemObject>(armorId);
+                armor.StringId = "trade_equipped_armor";
+                MBObjectManager.Instance.RegisterObject(armor);
+            });
+        }
+
+        var merchantRosterId = SetUpMerchant(settlementId, townId, new[] { partyId });
+
+        // The inventory screen equips the armor locally, then Done is pressed without buying anything
+        client.Call(() =>
+        {
+            using (new AllowedThread())
+            {
+                var hero = client.GetRegisteredObject<MobileParty>(partyId).LeaderHero;
+                hero.BattleEquipment[EquipmentIndex.Body] = new EquipmentElement(client.GetRegisteredObject<ItemObject>(armorId));
+            }
+        });
+
+        var trade = CaptureTrade(client, merchantRosterId, townId, partyId,
+            bought: Array.Empty<(string, int, int)>(),
+            sold: Array.Empty<(string, int, int)>(),
+            totalAmount: 0);
+
+        // The equipment travels by wire, so the server resolves its own item instead of the client's
+        byte[]? wire = null;
+        client.Call(() => wire = client.SerializeForWire<IMessage>(trade));
+
+        Server.Call(() => Server.SimulateMessage(client.NetPeer, wire!));
+        TestEnvironment.FlushCoalescer();
+
+        foreach (var instance in TestEnvironment.Clients.Prepend(Server))
+        {
+            instance.Call(() =>
+            {
+                var hero = instance.GetRegisteredObject<MobileParty>(partyId).LeaderHero;
+                Assert.Same(instance.GetRegisteredObject<ItemObject>(armorId), hero.BattleEquipment[EquipmentIndex.Body].Item);
+            });
+        }
+    }
+
     // Gives the merchant the same opening stock and 100 gold everywhere, and each trading party 1000 gold
     private string SetUpMerchant(string settlementId, string townId, string[] partyIds, params (string itemId, int amount)[] stock)
     {

@@ -71,11 +71,12 @@ internal class MainHeroMountHandler : IHandler
                 {
                     hero.PartyBelongedTo?.ItemRoster.AddToCounts(harness, 1);
                 }
-                return;
             }
-
-            ItemModifier lameModifier = MBObjectManager.Instance.GetObject<ItemModifier>("lame_horse");
-            equipment[EquipmentIndex.Horse] = new EquipmentElement(equipment[EquipmentIndex.Horse].Item, lameModifier);
+            else
+            {
+                ItemModifier lameModifier = MBObjectManager.Instance.GetObject<ItemModifier>("lame_horse");
+                equipment[EquipmentIndex.Horse] = new EquipmentElement(equipment[EquipmentIndex.Horse].Item, lameModifier);
+            }
         }, context: nameof(NetworkMainHeroMountKilled));
     }
 }

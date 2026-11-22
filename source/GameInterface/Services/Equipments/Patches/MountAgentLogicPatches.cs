@@ -40,7 +40,8 @@ internal class MountAgentLogicPatches
 
         EquipmentElement horse = equipment[EquipmentIndex.Horse];
         bool horseLost = roll < lossChance || horse.ItemModifier?.StringId == "lame_horse";
-        if (!horseLost && roll >= lameChance) return false;
+        bool horseLamed = !horseLost && roll < lameChance;
+        if (!horseLost && !horseLamed) return false;
 
         MessageBroker.Instance.Publish(__instance, new MainHeroMountKilled(Hero.MainHero, usesCivilianEquipment, horseLost));
 
