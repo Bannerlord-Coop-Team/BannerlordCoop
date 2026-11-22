@@ -55,6 +55,9 @@ public interface IBattleBenchmarkRecorder
     /// <summary>Counts one received payload; LiteNetLib hands over a fragmented reliable packet reassembled.</summary>
     void RecordReceived(string route, bool reliable, int bytes);
 
+    void RecordRemoteActionAuthorityWork(int stateVisits, int registryLookups);
+    void RecordRemoteActionPilotWork(int stateVisits, int registryLookups);
+
     void RecordReceivedMessage(Type messageType);
 
     /// <summary>Counts one message or packet handed to the campaign connection or a mission peer, with its serialized bytes.</summary>
@@ -119,6 +122,10 @@ public class BattleBenchmarkRecorder : IBattleBenchmarkRecorder, IGameThreadFram
     private ConcurrentDictionary<Type, StrongBox<long>> receivedMessages = new ConcurrentDictionary<Type, StrongBox<long>>();
     private ConcurrentDictionary<Type, TypeCounter> sentTypes = new ConcurrentDictionary<Type, TypeCounter>();
     private ConcurrentDictionary<Type, TypeCounter> receivedTypes = new ConcurrentDictionary<Type, TypeCounter>();
+    private long remoteActionAuthorityVisits;
+    private long remoteActionAuthorityLookups;
+    private long remoteActionPilotVisits;
+    private long remoteActionPilotLookups;
     private string lastReportPath;
     private string lastError;
 
@@ -231,6 +238,10 @@ public class BattleBenchmarkRecorder : IBattleBenchmarkRecorder, IGameThreadFram
             frameTicksTotal = 0;
             frameTicksMax = 0;
             lastFrameStart = 0;
+            remoteActionAuthorityVisits = 0;
+            remoteActionAuthorityLookups = 0;
+            remoteActionPilotVisits = 0;
+            remoteActionPilotLookups = 0;
             sectionTicks = new long[(int)BattleBenchmarkSection.Count];
             sectionCalls = new long[(int)BattleBenchmarkSection.Count];
             sectionMaxTicks = new long[(int)BattleBenchmarkSection.Count];
@@ -348,6 +359,20 @@ public class BattleBenchmarkRecorder : IBattleBenchmarkRecorder, IGameThreadFram
 
         int fragmentBytes = maxSinglePacketBytes - LiteNetLib.NetConstants.FragmentHeaderSize;
         return (bytes + fragmentBytes - 1) / fragmentBytes;
+    }
+
+    public void RecordRemoteActionAuthorityWork(int stateVisits, int registryLookups)
+    {
+        if (!recording) return;
+        remoteActionAuthorityVisits += stateVisits;
+        remoteActionAuthorityLookups += registryLookups;
+    }
+
+    public void RecordRemoteActionPilotWork(int stateVisits, int registryLookups)
+    {
+        if (!recording) return;
+        remoteActionPilotVisits += stateVisits;
+        remoteActionPilotLookups += registryLookups;
     }
 
     public void RecordReceivedMessage(Type messageType)
@@ -526,6 +551,13 @@ public class BattleBenchmarkRecorder : IBattleBenchmarkRecorder, IGameThreadFram
             Sections = Enumerable.Range(0, (int)BattleBenchmarkSection.Count).ToDictionary(
                 index => ((BattleBenchmarkSection)index).ToString(),
                 index => BuildSection(index, seconds)),
+            RemoteActionWork = new Dictionary<string, long>
+            {
+                ["AuthorityStateVisits"] = remoteActionAuthorityVisits,
+                ["AuthorityRegistryLookups"] = remoteActionAuthorityLookups,
+                ["PilotStateVisits"] = remoteActionPilotVisits,
+                ["PilotRegistryLookups"] = remoteActionPilotLookups,
+            },
             Garbage = new BattleBenchmarkGarbage
             {
                 Gen0Collections = endSample.Gen0Collections - startSample.Gen0Collections,

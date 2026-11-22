@@ -15,5 +15,8 @@ public enum BattleBenchmarkSection
     /// <summary>Running the actions queued on the <see cref="GameThread"/>.</summary>
     GameThreadDrain = 3,
 
-    Count = 4,
+    RemoteActionApply = 4,
+    RemoteActionAuthority = 5,
+    RemoteActionPilot = 6,
+    Count = 7,
 }

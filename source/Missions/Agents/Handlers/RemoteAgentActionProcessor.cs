@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.BattleBenchmark;
 using Common.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MapEvents;
@@ -40,6 +41,7 @@ public partial class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
     private readonly IBattleHostRegistry battleHostRegistry;
     private readonly IMissionContext missionContext;
     private readonly IAgentVisualActionAccessor agentVisualActionAccessor;
+    private readonly IBattleBenchmarkRecorder battleBenchmark;
 
     // All receive-side state for one agent stays together so authority changes clear it atomically.
     private readonly Dictionary<Guid, RemoteAgentActionState> _agentStates =
@@ -246,13 +248,15 @@ public partial class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         IControllerIdProvider controllerIdProvider,
         IBattleHostRegistry battleHostRegistry,
         IMissionContext missionContext,
-        IAgentVisualActionAccessor agentVisualActionAccessor)
+        IAgentVisualActionAccessor agentVisualActionAccessor,
+        IBattleBenchmarkRecorder battleBenchmark)
     {
         this.agentRegistry = agentRegistry;
         this.controllerIdProvider = controllerIdProvider;
         this.battleHostRegistry = battleHostRegistry;
         this.missionContext = missionContext;
         this.agentVisualActionAccessor = agentVisualActionAccessor;
+        this.battleBenchmark = battleBenchmark;
     }
 
     public int GetOutgoingBattleHostEpoch()
@@ -270,6 +274,8 @@ public partial class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
 
     public void ClearLocalAgentStates()
     {
+        using var measurement = battleBenchmark.Measure(BattleBenchmarkSection.RemoteActionAuthority);
+        int stateVisits = _agentStates.Count;
         List<Guid> localAgentIds = null;
         foreach (Guid agentId in _agentStates.Keys)
         {
@@ -277,6 +283,7 @@ public partial class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                 (localAgentIds ??= new List<Guid>()).Add(agentId);
         }
 
+        battleBenchmark.RecordRemoteActionAuthorityWork(stateVisits, stateVisits + (localAgentIds?.Count ?? 0));
         if (localAgentIds == null) return;
         foreach (Guid agentId in localAgentIds)
         {
@@ -748,6 +755,7 @@ public partial class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         RemoteAction action,
         bool removePendingBeforeApply)
     {
+        using var measurement = battleBenchmark.Measure(BattleBenchmarkSection.RemoteActionApply);
         if (action.BattleHostEpoch == 0 && action.Data.AuthorityRevision != info.AuthorityRevision)
             return action.Data.AuthorityRevision < info.AuthorityRevision
                 ? RemoteActionApplyResult.Stale : RemoteActionApplyResult.AgentNotReady;

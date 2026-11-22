@@ -15,6 +15,7 @@ public sealed class BattleBenchmarkReport
     public BattleBenchmarkWindow Window { get; set; }
     public BattleBenchmarkFrames Frames { get; set; }
     public Dictionary<string, BattleBenchmarkSectionTiming> Sections { get; set; }
+    public Dictionary<string, long> RemoteActionWork { get; set; }
     public BattleBenchmarkGarbage Garbage { get; set; }
     public BattleBenchmarkCpu Cpu { get; set; }
     public BattleBenchmarkMemory Memory { get; set; }

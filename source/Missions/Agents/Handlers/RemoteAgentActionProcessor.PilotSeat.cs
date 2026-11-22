@@ -1,4 +1,5 @@
 ﻿using Common.Util;
+using Common.BattleBenchmark;
 using Missions.Agents.Packets;
 using Missions.Battles;
 using System.Linq;
@@ -138,6 +139,9 @@ public partial class RemoteAgentActionProcessor
 
     private void RefreshPilotSeats()
     {
+        using var measurement = battleBenchmark.Measure(BattleBenchmarkSection.RemoteActionPilot);
+        int stateVisits = _agentStates.Count;
+        int registryLookups = 0;
         foreach (var entry in _agentStates)
         {
             var state = entry.Value;
@@ -146,7 +150,7 @@ public partial class RemoteAgentActionProcessor
             {
                 Agent agent = seat.Info.Agent;
                 if (pilotMission != Mission.Current || agent.Mission != Mission.Current || !agent.IsActive() ||
-                    !agentRegistry.TryGetAgentInfo(seat.Info.AgentId, out var current) || !ReferenceEquals(current, seat.Info) ||
+                    !TryGetPilotAgentInfo(seat.Info.AgentId, out var current, ref registryLookups) || !ReferenceEquals(current, seat.Info) ||
                     current.CurrentAuthority != seat.ControllerId || current.AuthorityRevision != seat.Data.AgentRevision ||
                     pilotMachines == null ||
                     !pilotMachines.TryGetMachineAuthority(seat.Data.MachineId, out var owner, out int epoch, out int revision) ||
@@ -155,8 +159,8 @@ public partial class RemoteAgentActionProcessor
             }
             if (!state.PendingPilotSeat.HasValue) continue;
             RemoteAction pending = state.PendingPilotSeat.Value;
-            if (!agentRegistry.TryGetAgentInfo(entry.Key, out var info) ||
-                agentRegistry.IsLocallyControlled(entry.Key) || info.Agent == null ||
+            if (!TryGetPilotAgentInfo(entry.Key, out var info, ref registryLookups) ||
+                IsPilotAgentLocallyControlled(entry.Key, ref registryLookups) || info.Agent == null ||
                 info.Agent.Mission != Mission.Current || !info.Agent.IsActive() ||
                 !IsCurrentActionAuthority(info, pending.ControllerId, pending.BattleHostEpoch))
             {
@@ -168,6 +172,7 @@ public partial class RemoteAgentActionProcessor
                 state.PilotSeat.Data.Equals(pending.Data.PilotSeat.Value))
             {
                 // Native use transitions may change the hands after the action was first applied.
+                using (battleBenchmark.Measure(BattleBenchmarkSection.RemoteActionApply))
                 using (new AllowedThread())
                 {
                     if (pending.Data.Equipment.HasValue &&
@@ -177,6 +182,19 @@ public partial class RemoteAgentActionProcessor
             }
             state.PendingPilotSeat = null;
         }
+        battleBenchmark.RecordRemoteActionPilotWork(stateVisits, registryLookups);
+    }
+
+    private bool TryGetPilotAgentInfo(System.Guid agentId, out CoopAgentInfo info, ref int registryLookups)
+    {
+        registryLookups++;
+        return agentRegistry.TryGetAgentInfo(agentId, out info);
+    }
+
+    private bool IsPilotAgentLocallyControlled(System.Guid agentId, ref int registryLookups)
+    {
+        registryLookups++;
+        return agentRegistry.IsLocallyControlled(agentId);
     }
 
     private void ReleasePilotSeat(RemoteAgentActionState state, bool preserveLocalUser)
