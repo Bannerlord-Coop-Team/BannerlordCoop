@@ -1,8 +1,7 @@
 ﻿using Common;
 using Common.Logging;
-using Common.Messaging;
 using GameInterface.Policies;
-using GameInterface.Services.PartyVisuals.Messages;
+using GameInterface.Services.PartyVisuals.Interfaces;
 using HarmonyLib;
 using SandBox.View.Map.Visuals;
 using Serilog;
@@ -10,6 +9,7 @@ using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.PartyVisuals.Patches;
 
+/// <summary>Replicates visual lifetime changes made by the graphical server's map.</summary>
 [HarmonyPatch]
 public class PartyVisualLifetimePatches
 {
@@ -17,34 +17,31 @@ public class PartyVisualLifetimePatches
 
     [HarmonyPatch(typeof(MobilePartyVisual), MethodType.Constructor, typeof(PartyBase))]
     [HarmonyPrefix]
-    private static bool CreatePartyVisualPrefix(ref MobilePartyVisual __instance, PartyBase partyBase)
+    private static void CreatePartyVisualPrefix(PartyBase partyBase)
     {
-        // Call original if we call this function
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
-
-        if (ModInformation.IsClient) return true;
-
-        var message = new PartyVisualCreated(__instance, partyBase);
-
-        MessageBroker.Instance.Publish(__instance, message);
-
-        return true;
+        if (CallOriginalPolicy.IsOriginalAllowed() || ModInformation.IsClient) return;
+        if (partyBase.MobileParty is { } party &&
+            ContainerProvider.TryResolve<IPartyVisualInterface>(out var partyVisuals))
+        {
+            partyVisuals.SendCreateVisual(party);
+        }
     }
 
     [HarmonyPatch(typeof(MobilePartyVisual), nameof(MobilePartyVisual.OnPartyRemoved))]
     [HarmonyPostfix]
-    private static void OnMobilePartyDestroyedPostfix(ref MobilePartyVisual __instance)
+    private static void OnMobilePartyDestroyedPostfix(MobilePartyVisual __instance)
     {
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
-
         if (ModInformation.IsClient)
         {
             Logger.Error("Client destroyed unmanaged {name}", typeof(MobilePartyVisual));
             return;
         }
 
-        var message = new PartyVisualDestroyed(__instance, __instance.MapEntity.MobileParty);
-
-        MessageBroker.Instance.Publish(__instance, message);
+        if (__instance.MapEntity.MobileParty is { } party &&
+            ContainerProvider.TryResolve<IPartyVisualInterface>(out var partyVisuals))
+        {
+            partyVisuals.SendDestroyVisual(party);
+        }
     }
 }

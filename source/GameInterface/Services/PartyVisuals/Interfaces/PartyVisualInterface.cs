@@ -17,6 +17,12 @@ public interface IPartyVisualInterface : IGameAbstraction
     /// <summary>Replicates visual removal when a party is destroyed on a headless server.</summary>
     void OnPartyDestroyed(MobileParty party);
 
+    /// <summary>Broadcasts visual creation for a registered party.</summary>
+    void SendCreateVisual(MobileParty party);
+
+    /// <summary>Broadcasts visual removal for a registered party.</summary>
+    void SendDestroyVisual(MobileParty party);
+
     /// <summary>Replicates visual creation and creates the local visual when the server has a visual manager.</summary>
     void CreateVisual(MobileParty party);
 
@@ -68,15 +74,16 @@ internal sealed class PartyVisualInterface : IPartyVisualInterface
             party.RemovePartyVisual();
     }
 
-    private void SendCreateVisual(MobileParty party)
+    public void SendCreateVisual(MobileParty party)
     {
-        if (objectManager.TryGetHandleWithLogging(party, out var partyHandle))
+        // Map initialization can build visuals before the campaign registers their parties.
+        if (objectManager.TryGetHandle(party, out var partyHandle))
             network.SendAll(new NetworkCreatePartyVisual(partyHandle));
     }
 
-    private void SendDestroyVisual(MobileParty party)
+    public void SendDestroyVisual(MobileParty party)
     {
-        if (objectManager.TryGetHandleWithLogging(party, out var partyHandle))
+        if (objectManager.TryGetHandle(party, out var partyHandle))
             network.SendAll(new NetworkDestroyPartyVisual(partyHandle));
     }
 }
