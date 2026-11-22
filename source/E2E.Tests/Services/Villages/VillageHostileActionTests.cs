@@ -4717,7 +4717,7 @@ public class VillageHostileActionTests : MapEventTestBase
         var originalMethod = AccessTools.Method(typeof(EncounterGameMenuBehavior), methodName);
         Assert.NotNull(originalMethod);
 
-        var patchType = AccessTools.TypeByName("GameInterface.Services.MapEvents.Patches.RaidJoinEncounterConditionPatch");
+        var patchType = typeof(JoinEncounterConditionPatch);
         var postfix = AccessTools.Method(patchType, "Postfix");
         Assert.NotNull(postfix);
 
