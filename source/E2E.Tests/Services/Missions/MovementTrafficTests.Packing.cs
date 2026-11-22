@@ -88,7 +88,7 @@ public partial class MovementTrafficTests
                 {
                     mounts[i] = new AgentMountData(agent, ids[i], i % 3 == 0 ? "mount-scope-é" : null,
                         i % 3 == 1 ? guids[i] : Guid.Empty, mountAction0Speed: 1.2f,
-                        mountAction0IsLocomotion: i % 2 == 0, mountAction0TurnDirection: i % 3 - 1,
+                        mountAction0IsLocomotion: i % 2 == 0, mountAction0TurnDirection: (i % 3) - 1,
                         mountAction0TurnActionIndex: i + 100, mountAction0TurnProgress: 0.42f,
                         mountAction0IsSyntheticTurn: i % 4 == 0, mountAuthorityRevision: i % 2 == 0 ? revisions[i] : null);
                 }
