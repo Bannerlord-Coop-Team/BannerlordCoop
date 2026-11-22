@@ -110,7 +110,7 @@ public class ManagedConfigCatalogTests
             throw new InvalidDataException($"Invalid list metadata for {type} option {key}");
         if (metadata.ItemFormat is not (null or "steamId64"))
             throw new InvalidDataException($"Invalid itemFormat for {key}");
-        if (threshold < 0) throw new InvalidDataException($"coercePositiveBelow must be positive for {key}");
+        if (threshold < 0) throw new InvalidDataException($"coercePositiveBelow can't be negative for {key}");
 
         if (hasMin) option.Add("min", CatalogNumber(metadata.Min, key));
         if (hasMax) option.Add("max", CatalogNumber(metadata.Max, key));
@@ -134,6 +134,7 @@ public class ManagedConfigCatalogTests
         };
         if (!valid) throw new InvalidDataException($"Invalid default for {type} option {key}");
         if (number is not double numeric) return value.DeepClone();
+        // An unset bound is NaN, and a comparison with NaN is always false.
         if (numeric < metadata.Min || numeric > metadata.Max)
             throw new InvalidDataException($"Default for {key} is outside its bounds");
         return CatalogNumber(numeric, key);
