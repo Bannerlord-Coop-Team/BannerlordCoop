@@ -3,6 +3,7 @@ using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.AcceptCoordination;
+using GameInterface.Services.Issues.Framework.CreationCapture;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Villages.Interfaces;
 using HarmonyLib;
@@ -11,6 +12,7 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.ObjectSystem;
 using Xunit.Abstractions;
@@ -21,6 +23,10 @@ namespace E2E.Tests.Services.Issues;
 
 public sealed class RaidAnEnemyTerritoryTests : IDisposable
 {
+    private const int RewardGold = 15000;
+    private const int RenownBonus = 5;
+    private const int InfluenceBonus = 20;
+
     private static readonly MethodBase[] DialogAndTextHelpers =
     {
         AccessTools.Method(typeof(Quest), nameof(Quest.SetDialogs)),
@@ -72,6 +78,54 @@ public sealed class RaidAnEnemyTerritoryTests : IDisposable
     }
 
     public void Dispose() => environment.Dispose();
+
+    [Fact]
+    public void CreationUsesTheServersEnemyKingdomOnBothClients()
+    {
+        var giverId = environment.CreateRegisteredObject<Hero>();
+        var clientEnemyId = environment.CreateRegisteredObject<Kingdom>();
+        var instances = new[] { Server, Owner, Bystander };
+        foreach (var instance in instances)
+        {
+            instance.Call(() =>
+            {
+                var giver = instance.GetRegisteredObject<Hero>(giverId);
+                var localEnemy = instance.GetRegisteredObject<Kingdom>(instance == Server ? enemyId : clientEnemyId);
+                using (new AllowedThread())
+                {
+                    giver.Clan = Giver(instance).Clan;
+                    if (instance != Server) localEnemy.Id = new MBGUID(203);
+                    VillageHostileFactionStanceHelper.ApplyWarStance(giver.MapFaction, localEnemy);
+                    // Give each constructor one local enemy so the client roll must be replaced.
+                    var kingdoms = Campaign.Current.CampaignObjectManager._kingdoms;
+                    kingdoms.Clear();
+                    kingdoms.Add(localEnemy);
+                }
+
+                Assert.Same(localEnemy, Assert.Single(Kingdom.All, kingdom => kingdom.IsAtWarWith(giver.MapFaction)));
+            });
+        }
+
+        Server.Call(() =>
+        {
+            var giver = Server.GetRegisteredObject<Hero>(giverId);
+            var potential = new PotentialIssueData((in PotentialIssueData _, Hero owner) =>
+                new Issue(owner), typeof(Issue), IssueBase.IssueFrequency.VeryCommon);
+            Assert.True(Campaign.Current.IssueManager.CreateNewIssue(in potential, giver));
+        });
+
+        var created = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueCreated>());
+        Assert.False(string.IsNullOrEmpty(created.IssueId));
+        foreach (var instance in instances)
+        {
+            instance.Call(() =>
+            {
+                var issue = Assert.IsType<Issue>(instance.GetRegisteredObject<Hero>(giverId).Issue);
+                Assert.Equal(created.IssueId, issue.StringId);
+                Assert.Same(instance.GetRegisteredObject<Kingdom>(enemyId), issue._enemyKingdom);
+            });
+        }
+    }
 
     [Fact]
     public void AcceptanceUsesTheServersDeadlineWhenTheClientClockDiffers()
@@ -129,8 +183,19 @@ public sealed class RaidAnEnemyTerritoryTests : IDisposable
         GiveRaidCredit(Server, raids);
         var before = ServerRewards();
 
-        Server.Call(() => Campaign.Current.IssueManager.OnHeroKilled(Giver(Server), null,
-            KillCharacterAction.KillCharacterActionDetail.DiedInBattle, false), DialogAndTextHelpers);
+        Server.Call(() =>
+        {
+            var quest = QuestOn(Server);
+            Assert.DoesNotContain(quest, Campaign.Current.QuestManager.Quests);
+            var completed = new List<QuestBase>();
+            CampaignEvents.OnQuestCompletedEvent.AddNonSerializedListener(this, (ended, _) => completed.Add(ended));
+
+            CampaignEventDispatcher.Instance.OnHeroKilled(Giver(Server), null,
+                KillCharacterAction.KillCharacterActionDetail.DiedInBattle, false);
+
+            Assert.Same(quest, Assert.Single(completed));
+            Assert.True(quest.IsFinalized);
+        }, DialogAndTextHelpers);
 
         AssertOutcome(outcome);
         AssertRewards(before, outcome == IssueOutcome.QuestSuccess);
@@ -232,8 +297,8 @@ public sealed class RaidAnEnemyTerritoryTests : IDisposable
     {
         var after = ServerRewards();
         var owner = before.Owner;
-        Assert.Equal(pays ? new Rewards(owner.Gold + 15000, owner.Renown + 5, owner.Influence + 20) : owner,
-            after.Owner);
+        var paid = new Rewards(owner.Gold + RewardGold, owner.Renown + RenownBonus, owner.Influence + InfluenceBonus);
+        Assert.Equal(pays ? paid : owner, after.Owner);
         Assert.Equal(before.Bystander, after.Bystander);
     }
 

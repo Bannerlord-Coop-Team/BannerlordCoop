@@ -1,5 +1,4 @@
 ﻿using Common;
-using Common.Util;
 using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
 using System.Collections.Generic;
@@ -37,12 +36,8 @@ internal sealed class RaidAnEnemyTerritoryRaidCompletionPatch
             return;
         }
 
-        // Count progress as each owner without ending the quest or releasing a party inside the map event.
-        GameThread.RunSafe(() =>
-        {
-            var attackers = new HashSet<MobileParty>(mapEvent.AttackerSide.Parties
-                .Select(party => party.Party?.MobileParty).OfType<MobileParty>());
-            dispatcher.RunAsOwners<Quest>(quest => progress.RecordCompletedRaid(quest, village, attackers));
-        }, context: nameof(RaidCompletedPostfix));
+        var attackers = new HashSet<MobileParty>(mapEvent.AttackerSide.Parties
+            .Select(party => party.Party?.MobileParty).OfType<MobileParty>());
+        dispatcher.RunAsOwners<Quest>(quest => progress.RecordCompletedRaid(quest, village, attackers));
     }
 }

@@ -22,20 +22,13 @@ internal sealed class RaidAnEnemyTerritoryQuestEventPatches
         KillCharacterAction.KillCharacterActionDetail detail,
         bool showNotification = true)
     {
-        if (ModInformation.IsClient || victim?.Issue?.IssueQuest is not Quest)
-        {
-            return;
-        }
-
-        if (!ContainerProvider.TryResolve<IIssueOwnerResolver>(out var ownerResolver) ||
-            !ownerResolver.TryResolveOwnerHero(victim.Issue, out var owner) ||
-            !ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher))
+        if (victim?.Issue?.IssueQuest is not Quest)
         {
             return;
         }
 
         // Give vanilla's raid-specific ending first chance before IssueManager cancels the giver's issue.
-        dispatcher.RunAsOwner<Quest>(owner, quest => quest.OnHeroKilled(victim, killer, detail, showNotification));
+        RunAsOwners(quest => quest.OnHeroKilled(victim, killer, detail, showNotification));
     }
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnMakePeace))]

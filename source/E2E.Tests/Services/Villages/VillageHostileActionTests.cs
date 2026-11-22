@@ -53,6 +53,7 @@ using Missions.Messages;
 using Moq;
 using SandBox.CampaignBehaviors;
 using System.Net;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
@@ -74,6 +75,7 @@ using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.ObjectSystem;
 using Xunit.Abstractions;
+using Issue = TaleWorlds.CampaignSystem.Issues.RaidAnEnemyTerritoryIssueBehavior.RaidAnEnemyTerritoryIssue;
 using Quest = TaleWorlds.CampaignSystem.Issues.RaidAnEnemyTerritoryIssueBehavior.RaidAnEnemyTerritoryQuest;
 
 namespace E2E.Tests.Services.Villages;
@@ -2067,16 +2069,30 @@ public class VillageHostileActionTests : MapEventTestBase
     [InlineData(false)]
     public void RaidMapEventUpdate_OnlyCreditsTheQuestOwnersParty(bool ownerIsRaider)
     {
-        var ownerClient = ownerIsRaider ? Clients.First() : Clients.Last();
-        var ownerController = ownerIsRaider ? "PlayerOne" : "PlayerTwo";
-        var otherPlayer = ownerIsRaider ? default : CreatePlayerHeroParty(ownerController);
+        EnvironmentInstance ownerClient;
+        string ownerController;
+        (string heroId, string partyId)? nonRaidingOwner;
+        int expectedCount;
+        if (ownerIsRaider)
+        {
+            ownerClient = Clients.First();
+            ownerController = "PlayerOne";
+            nonRaidingOwner = null;
+            expectedCount = 1;
+        }
+        else
+        {
+            ownerClient = Clients.Last();
+            ownerController = "PlayerTwo";
+            nonRaidingOwner = CreatePlayerHeroParty(ownerController);
+            expectedCount = 0;
+        }
         var giverId = TestEnvironment.CreateRegisteredObject<Hero>();
-        var expectedCount = ownerIsRaider ? 1 : 0;
 
         AssertSlowRaidExit(naturalCompletion: true, lateFinalizeRequest: false,
             beforeRaid: (raider, target) =>
             {
-                var (heroId, partyId) = ownerIsRaider ? raider : otherPlayer;
+                var (heroId, partyId) = nonRaidingOwner ?? raider;
                 TestEnvironment.ConnectRegisteredPlayer(ownerClient, ownerController);
                 ownerClient.Resolve<IControllerIdProvider>().SetControllerId(ownerController);
                 AttachRaidQuest(Server, giverId, heroId, partyId, ownerController, target.OwnerFactionId);
@@ -2087,7 +2103,7 @@ public class VillageHostileActionTests : MapEventTestBase
                 Server.Call(() => AssertRaidQuestProgress(Server, giverId, target.SettlementId, expectedCount));
                 ownerClient.Call(() => AssertRaidQuestProgress(ownerClient, giverId, target.SettlementId, expectedCount));
                 var updates = Server.NetworkSentMessages.GetMessages<NetworkRaidAnEnemyTerritoryProgress>();
-                if (ownerIsRaider) Assert.Single(updates);
+                if (expectedCount == 1) Assert.Single(updates);
                 else Assert.Empty(updates);
             });
     }
@@ -4814,9 +4830,7 @@ public class VillageHostileActionTests : MapEventTestBase
             using (new AllowedThread())
             {
                 owner.PartyBelongedTo = ownerParty;
-                var issue = (RaidAnEnemyTerritoryIssueBehavior.RaidAnEnemyTerritoryIssue)
-                    System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(
-                        typeof(RaidAnEnemyTerritoryIssueBehavior.RaidAnEnemyTerritoryIssue));
+                var issue = (Issue)RuntimeHelpers.GetUninitializedObject(typeof(Issue));
                 issue.IssueOwner = giver;
                 issue.StringId = "raid_map_event";
                 issue._issueState = IssueBase.IssueState.SolvingWithQuestSolution;
@@ -4840,7 +4854,7 @@ public class VillageHostileActionTests : MapEventTestBase
                 Assert.Equal(0, quest._raidedVillagesTrackLog.CurrentProgress);
             }
         }, MapEventDisabledMethods
-            .Append(AccessTools.Method(typeof(Helpers.StringHelpers), nameof(Helpers.StringHelpers.GetCharacterProperties)))
+            .Append(AccessTools.Method(typeof(StringHelpers), nameof(StringHelpers.GetCharacterProperties)))
             .Append(AccessTools.Method(typeof(Quest), nameof(Quest.SetDialogs))));
     }
 

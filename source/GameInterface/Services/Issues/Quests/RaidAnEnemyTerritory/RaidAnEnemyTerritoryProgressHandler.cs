@@ -70,18 +70,12 @@ internal sealed class RaidAnEnemyTerritoryProgressHandler : IHandler
         {
             quest._raidedVillages.Clear();
             quest._raidedVillages.AddRange(villages);
-            var entries = data.Entries ?? Array.Empty<IssueJournalEntry>();
-            if (entries.Length > 0)
+            quest._journalEntries.Clear();
+            foreach (var entry in data.Entries ?? Array.Empty<IssueJournalEntry>())
             {
-                quest._journalEntries.Clear();
-                foreach (var entry in entries)
-                {
-                    quest._journalEntries.Add(entry.ToJournalLog());
-                }
-                quest._raidedVillagesTrackLog = quest.JournalEntries.FirstOrDefault(log => log.Type == LogType.Discreate);
+                quest._journalEntries.Add(entry.ToJournalLog());
             }
-
-            quest._raidedVillagesTrackLog?.UpdateCurrentProgress(quest._raidedVillages.Count);
+            quest._raidedVillagesTrackLog = quest.JournalEntries.FirstOrDefault(log => log.Type == LogType.Discreate);
             CampaignEventDispatcher.Instance.OnQuestLogAdded(quest, true);
         }
     }

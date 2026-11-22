@@ -40,7 +40,7 @@ internal sealed class RaidAnEnemyTerritoryProgress : IRaidAnEnemyTerritoryProgre
     public void RecordCompletedRaid(Quest quest, Settlement village, ISet<MobileParty> attackers)
     {
         var issue = quest.QuestGiver.Issue;
-        if (quest.IsFinalized || quest._raidedVillages.Contains(village) || issue == null ||
+        if (quest._raidedVillages.Contains(village) || issue == null ||
             !owners.TryResolveOwnerParty(issue, out var ownerParty) ||
             !owners.TryResolveOwnerHero(issue, out var ownerHero))
         {
