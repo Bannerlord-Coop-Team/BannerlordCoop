@@ -438,6 +438,7 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
             message => message.MobilePartyHandle == 42)), Times.Once);
 
         var reconnectedPeer = (NetPeer)FormatterServices.GetUninitializedObject(typeof(NetPeer));
+        players.Reset();
         players.Setup(manager => manager.TryGetPlayer(reconnectedPeer, out player)).Returns(true);
         players.Setup(manager => manager.TryGetPeer(player.ControllerId, out reconnectedPeer)).Returns(true);
         broker.Publish(this, new PlayerCampaignSynchronized(reconnectedPeer));

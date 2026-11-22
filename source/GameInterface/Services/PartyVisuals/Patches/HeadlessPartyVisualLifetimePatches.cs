@@ -28,5 +28,4 @@ internal class HeadlessPartyVisualLifetimePatches
         if (partyBase == null) return;
         MessageBroker.Instance.Publish(party, new PartyVisualCreated(null, partyBase));
     }
-
 }
