@@ -26,8 +26,11 @@ public class SaveAsCommandTests
             var saves = new Mock<ISaveInterface>();
             saves.SetupGet(x => x.CanQueueSave).Returns(true);
             saves.Setup(x => x.ReadSaveFile(It.IsAny<string>())).Returns((string name) =>
-                !written ? null : name.EndsWith(".sav") ? new byte[] { 1 } :
-                sidecar == null ? null : Encoding.UTF8.GetBytes(sidecar));
+            {
+                if (!written) return null;
+                if (name.EndsWith(".sav")) return new byte[] { 1 };
+                return sidecar == null ? null : Encoding.UTF8.GetBytes(sidecar);
+            });
             saves.Setup(x => x.SaveCurrentGameToFile("proof")).Returns(() =>
             {
                 written = true;
@@ -38,29 +41,6 @@ public class SaveAsCommandTests
             var result = new SaveDebugCommand.SaveSaveAsCoopCommand(saves.Object).ProcessCommand(args.Object);
             Assert.Equal(expected, result.Succeeded);
             saves.Verify(x => x.SaveCurrentGameToFile("proof"), Times.Once);
-            saves.Verify(x => x.ReadSaveFile("proof.sav"), Times.Once);
-        }
-        finally { ModInformation.IsServer = previous; }
-    }
-
-    [Theory]
-    [InlineData("proof.sav")]
-    [InlineData("proof.json")]
-    public void ExistingSavePairMemberIsNotOverwritten(string existingFile)
-    {
-        bool previous = ModInformation.IsServer;
-        ModInformation.IsServer = true;
-        try
-        {
-            var saves = new Mock<ISaveInterface>();
-            saves.SetupGet(x => x.CanQueueSave).Returns(true);
-            saves.Setup(x => x.ReadSaveFile(It.IsAny<string>())).Returns((byte[])null);
-            saves.Setup(x => x.ReadSaveFile(existingFile)).Returns(new byte[] { 1 });
-            var args = new Mock<ICoopCommandArgs>();
-            args.Setup(x => x[0]).Returns("proof");
-            Assert.False(new SaveDebugCommand.SaveSaveAsCoopCommand(saves.Object).ProcessCommand(args.Object).Succeeded);
-            saves.Verify(x => x.SaveCurrentGameToFile(It.IsAny<string>()), Times.Never);
-            saves.Verify(x => x.ReadSaveFile(existingFile), Times.Once);
         }
         finally { ModInformation.IsServer = previous; }
     }

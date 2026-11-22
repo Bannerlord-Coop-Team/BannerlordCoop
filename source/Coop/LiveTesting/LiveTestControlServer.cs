@@ -724,9 +724,11 @@ namespace Coop.LiveTesting
 
             return ExecuteOnGameThread(request, () =>
             {
-                bool sessionActive = ContainerProvider.TryResolve<ILogic>(out _);
-                if (!(GameStateManager.Current?.ActiveState is InitialState) || Campaign.Current != null)
+                if (!IsReadyForClientJoin(out bool sessionActive))
                 {
+                    if (sessionActive)
+                        return Failure(request.Id, "client_session_active", "The previous client session is still tearing down.", false);
+
                     return Failure(
                         request.Id,
                         "client_not_at_main_menu",
@@ -734,19 +736,18 @@ namespace Coop.LiveTesting
                         false);
                 }
 
-                if (sessionActive)
-                    return Failure(request.Id, "client_session_active", "The previous client session is still tearing down.", false);
-
                 bool started = startAsClient();
                 Logger.Information("[LiveTest] Deferred StartAsClient() returned {Started}", started);
                 if (!started)
                     return Failure(request.Id, "client_start_refused", "The client session did not start; retry once startup is ready.", false);
-                return Success(request.Id, new
-                {
-                    attempted = true,
-                    started,
-                });
+                return Success(request.Id, new { started = true });
             }, true);
+        }
+
+        private static bool IsReadyForClientJoin(out bool sessionActive)
+        {
+            sessionActive = ContainerProvider.TryResolve<ILogic>(out _);
+            return !sessionActive && GameStateManager.Current?.ActiveState is InitialState && Campaign.Current == null;
         }
 
         private LiveTestResponse CreateStatusResponse(string requestId)
@@ -884,9 +885,7 @@ namespace Coop.LiveTesting
                 registeredControllerIds,
                 connectedControllerIds,
                 deferredClientJoinEnabled,
-                readyForClientJoin = !isServer && deferredClientJoinEnabled &&
-                    GameStateManager.Current?.ActiveState is InitialState && !campaignLoaded &&
-                    !ContainerProvider.TryResolve<ILogic>(out _),
+                readyForClientJoin = !isServer && deferredClientJoinEnabled && IsReadyForClientJoin(out _),
                 readyForCampaignTests,
                 readyForMissionTests = readyForCampaignTests && missionActive,
             });
