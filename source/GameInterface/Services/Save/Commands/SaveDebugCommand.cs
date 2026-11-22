@@ -60,7 +60,7 @@ namespace GameInterface.Services.Save.Commands
 
                 string name = args[0];
                 // A fresh name prevents an old pair from hiding a suppressed or failed write.
-                if (saves.ReadSaveFile(name + ".sav") != null || saves.ReadSaveFile(name + ".json") != null)
+                if (saves.SaveFileExists(name + ".sav") || saves.SaveFileExists(name + ".json"))
                     return Failed("Save name already exists. Choose a fresh name.");
 
                 var result = saves.SaveCurrentGameToFile(name);

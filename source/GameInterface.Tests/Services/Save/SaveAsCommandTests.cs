@@ -25,12 +25,8 @@ public class SaveAsCommandTests
             bool written = false;
             var saves = new Mock<ISaveInterface>();
             saves.SetupGet(x => x.CanQueueSave).Returns(true);
-            saves.Setup(x => x.ReadSaveFile(It.IsAny<string>())).Returns((string name) =>
-            {
-                if (!written) return null;
-                if (name.EndsWith(".sav")) return new byte[] { 1 };
-                return sidecar == null ? null : Encoding.UTF8.GetBytes(sidecar);
-            });
+            saves.Setup(x => x.ReadSaveFile("proof.json")).Returns(() =>
+                written && sidecar != null ? Encoding.UTF8.GetBytes(sidecar) : null);
             saves.Setup(x => x.SaveCurrentGameToFile("proof")).Returns(() =>
             {
                 written = true;

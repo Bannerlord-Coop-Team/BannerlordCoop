@@ -724,17 +724,9 @@ namespace Coop.LiveTesting
 
             return ExecuteOnGameThread(request, () =>
             {
-                if (!IsReadyForClientJoin(out bool sessionActive))
-                {
-                    if (sessionActive)
-                        return Failure(request.Id, "client_session_active", "The previous client session is still tearing down.", false);
-
-                    return Failure(
-                        request.Id,
-                        "client_not_at_main_menu",
-                        "The client must be at the main menu with no campaign loaded before joining.",
-                        false);
-                }
+                var refusal = GetClientJoinRefusal();
+                if (refusal != null)
+                    return LiveTestResponse.Failure(request.Id, GetProcessInfo(), refusal);
 
                 bool started = startAsClient();
                 Logger.Information("[LiveTest] Deferred StartAsClient() returned {Started}", started);
@@ -744,10 +736,18 @@ namespace Coop.LiveTesting
             }, true);
         }
 
-        private static bool IsReadyForClientJoin(out bool sessionActive)
+        private static LiveTestError GetClientJoinRefusal()
         {
-            sessionActive = ContainerProvider.TryResolve<ILogic>(out _);
-            return !sessionActive && GameStateManager.Current?.ActiveState is InitialState && Campaign.Current == null;
+            if (ContainerProvider.TryResolve<ILogic>(out _))
+                return new LiveTestError("client_session_active", "A client session is still active.", false);
+
+            if (!(GameStateManager.Current?.ActiveState is InitialState) || Campaign.Current != null)
+                return new LiveTestError(
+                    "client_not_at_main_menu",
+                    "The client must be at the main menu with no campaign loaded before joining.",
+                    false);
+
+            return null;
         }
 
         private LiveTestResponse CreateStatusResponse(string requestId)
@@ -885,7 +885,7 @@ namespace Coop.LiveTesting
                 registeredControllerIds,
                 connectedControllerIds,
                 deferredClientJoinEnabled,
-                readyForClientJoin = !isServer && deferredClientJoinEnabled && IsReadyForClientJoin(out _),
+                readyForClientJoin = !isServer && deferredClientJoinEnabled && GetClientJoinRefusal() == null,
                 readyForCampaignTests,
                 readyForMissionTests = readyForCampaignTests && missionActive,
             });
