@@ -19,6 +19,6 @@ internal static class MobilePartyMapUpdatePatch
     private static PartyBase ResolveGoAroundPartyTarget(MobilePartyAi ai)
     {
         // SetMoveGoAroundParty saves TargetParty even when short-term AI has no target.
-        return ai.AiBehaviorPartyBase ?? ai._mobileParty.TargetParty?.Party ?? ai._mobileParty.Party;
+        return ai.AiBehaviorPartyBase ?? ai._mobileParty.TargetParty?.Party;
     }
 }

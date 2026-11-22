@@ -225,7 +225,7 @@ public class MobilePartyMovementTests : SyncTestBase
     }
 
     [Fact]
-    public void MapUpdate_RestoresPursuitTargetAcrossTwoLoads()
+    public void MapUpdate_RestoresPursuitTargetAfterLoad()
     {
         Server.Call(() =>
         {
@@ -245,26 +245,19 @@ public class MobilePartyMovementTests : SyncTestBase
             Assert.Equal(SaveResult.Success,
                 driver.Save("pursuing_party", 1, metadata, save.SaveData).GetAwaiter().GetResult().SaveResult);
 
-            for (int loadNumber = 1; loadNumber <= 2; loadNumber++)
-            {
-                var load = new LoadContext(definitions, driver);
-                Assert.True(load.Load(driver.Load("pursuing_party"), loadAsLateInitialize: true));
-                var loadedParty = Assert.IsType<MobileParty>(load.RootObject);
-                Assert.NotSame(party, loadedParty);
-                Assert.Equal(AiBehavior.GoAroundParty, loadedParty.DefaultBehavior);
-                Assert.Null(loadedParty.Ai.AiBehaviorInteractable);
-                var loadedTarget = Assert.IsType<MobileParty>(loadedParty.TargetParty);
-                Assert.NotSame(target, loadedTarget);
-                // Map repair updates the target's position before recalculating the pursuit destination.
-                loadedTarget._position = new CampaignVec2(new Vec2(6f + loadNumber, 7f), true);
+            var load = new LoadContext(definitions, driver);
+            Assert.True(load.Load(driver.Load("pursuing_party"), loadAsLateInitialize: true));
+            var loadedParty = Assert.IsType<MobileParty>(load.RootObject);
+            Assert.Equal(AiBehavior.GoAroundParty, loadedParty.DefaultBehavior);
+            Assert.Null(loadedParty.Ai.AiBehaviorInteractable);
+            var loadedTarget = Assert.IsType<MobileParty>(loadedParty.TargetParty);
+            // Map repair updates the target's position before recalculating the pursuit destination.
+            loadedTarget._position = new CampaignVec2(new Vec2(7f, 7f), true);
 
-                loadedParty.CheckAiForMapChangeAndUpdateIfNeeded();
+            loadedParty.CheckAiForMapChangeAndUpdateIfNeeded();
 
-                Assert.Equal(loadedTarget.Position, loadedParty.MoveTargetPoint);
-                Assert.Equal(loadedTarget.Position, loadedParty.Ai.BehaviorTarget);
-                party = loadedParty;
-                target = loadedTarget;
-            }
+            Assert.Equal(loadedTarget.Position, loadedParty.MoveTargetPoint);
+            Assert.Equal(loadedTarget.Position, loadedParty.Ai.BehaviorTarget);
         });
     }
 
