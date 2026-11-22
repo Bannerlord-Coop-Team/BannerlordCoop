@@ -6,8 +6,8 @@ using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyBases.Extensions;
 using GameInterface.Services.PartyVisuals.Extensions;
+using GameInterface.Services.PartyVisuals.Interfaces;
 using GameInterface.Services.PartyVisuals.Messages;
-using SandBox.View.Map.Managers;
 using SandBox.View.Map.Visuals;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem.Party;
@@ -19,14 +19,21 @@ public class PartyVisualLifetimeHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
+    private readonly IPartyVisualInterface partyVisuals;
     private readonly ConditionalWeakTable<MobilePartyVisual, string> skippedVisualIds = new();
 
-    public PartyVisualLifetimeHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
+    public PartyVisualLifetimeHandler(
+        IMessageBroker messageBroker,
+        INetwork network,
+        IObjectManager objectManager,
+        IPartyVisualInterface partyVisuals)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
+        this.partyVisuals = partyVisuals;
         messageBroker.Subscribe<PartyVisualCreated>(Handle);
+        messageBroker.Subscribe<PartyVisualCreationRequested>(Handle);
         messageBroker.Subscribe<NetworkCreatePartyVisual>(Handle);
         messageBroker.Subscribe<PartyVisualDestroyed>(Handle);
         messageBroker.Subscribe<MobilePartyDestroyed>(Handle);
@@ -36,6 +43,7 @@ public class PartyVisualLifetimeHandler : IHandler
     public void Dispose()
     {
         messageBroker.Unsubscribe<PartyVisualCreated>(Handle);
+        messageBroker.Unsubscribe<PartyVisualCreationRequested>(Handle);
         messageBroker.Unsubscribe<NetworkCreatePartyVisual>(Handle);
         messageBroker.Unsubscribe<PartyVisualDestroyed>(Handle);
         messageBroker.Unsubscribe<MobilePartyDestroyed>(Handle);
@@ -56,20 +64,13 @@ public class PartyVisualLifetimeHandler : IHandler
         // visuals are registered by PartyVisualRegistry after loading, so skip this live-create path.
         if (!objectManager.TryGetId(mobileParty, out _))
         {
-            if (partyVisual != null && !string.IsNullOrEmpty(mobileParty.StringId))
+            if (!string.IsNullOrEmpty(mobileParty.StringId))
             {
                 skippedVisualIds.Remove(partyVisual);
                 skippedVisualIds.Add(
                     partyVisual,
                     $"{nameof(MobilePartyVisual)}_{mobileParty.StringId}");
             }
-            return;
-        }
-
-        if (partyVisual == null)
-        {
-            if (objectManager.TryGetHandleWithLogging(mobileParty, out var partyHandle))
-                network.SendAll(new NetworkCreatePartyVisual(partyHandle));
             return;
         }
 
@@ -106,14 +107,16 @@ public class PartyVisualLifetimeHandler : IHandler
         }, context: $"create party visual {payload.What.MobilePartyHandle}");
     }
 
+    private void Handle(MessagePayload<PartyVisualCreationRequested> payload)
+    {
+        partyVisuals.CreateVisual(payload.What.MobileParty);
+    }
+
     private void Handle(MessagePayload<MobilePartyDestroyed> payload)
     {
         // The registry publishes this before it removes the party's handle.
-        if (MobilePartyVisualManager.Current == null &&
-            objectManager.TryGetHandleWithLogging(payload.What.MobileParty, out var partyHandle))
-        {
-            network.SendAll(new NetworkDestroyPartyVisual(partyHandle));
-        }
+        if (partyVisuals.IsHeadlessServer)
+            partyVisuals.RemoveVisual(payload.What.MobileParty);
     }
 
     private void Handle(MessagePayload<PartyVisualDestroyed> payload)

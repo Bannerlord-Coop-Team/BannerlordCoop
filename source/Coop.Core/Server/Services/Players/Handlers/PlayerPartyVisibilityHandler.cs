@@ -1,7 +1,6 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
-using Common.Network;
 using Common.Network.Messages;
 using Common.Util;
 using Coop.Core.Server.Connections;
@@ -14,15 +13,13 @@ using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.PartyVisuals.Extensions;
-using GameInterface.Services.PartyVisuals.Messages;
+using GameInterface.Services.PartyVisuals.Interfaces;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Players.Messages;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using LiteNetLib;
-using SandBox.View.Map.Managers;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -36,12 +33,8 @@ namespace Coop.Core.Server.Services.Players.Handlers;
 /// Server-side: hides a disconnected player's party from the map and stops it being simulated, then
 /// restores it once the peer has synchronized the campaign. Parties in a MapEvent remain active so reconnect
 /// saves preserve their battle membership.
-/// <see cref="MobileParty.IsActive"/> gates spotting/interaction/ticking (see
-/// PartyVisibilityServerPatches, MobilePartyVisualManagerPatches) and is an AutoSync property, so
-/// changing it syncs automatically. But it does NOT remove the party's rendered map figure.
-/// The actual map figure is a <see cref="MobilePartyVisual"/>, created/destroyed through
-/// MobilePartyVisualManager and replicated via the existing NetworkCreatePartyVisual /
-/// NetworkDestroyPartyVisual (see PartyVisualLifetimeHandler)
+/// <see cref="MobileParty.IsActive"/> syncs through AutoSync. <see cref="IPartyVisualInterface"/>
+/// replicates the separate lifetime of the rendered map figure.
 /// </summary>
 internal class PlayerPartyVisibilityHandler : IHandler
 {
@@ -51,7 +44,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
     private readonly IPlayerManager playerManager;
     private readonly IConnectionCollection connectionCollection;
     private readonly IObjectManager objectManager;
-    private readonly INetwork network;
+    private readonly IPartyVisualInterface partyVisuals;
     private readonly ISiegeEventInterface siegeEventInterface;
     private readonly Dictionary<MobileParty, (MapEvent MapEvent, string ControllerId)> deferredMapEventParking = new();
 
@@ -60,14 +53,14 @@ internal class PlayerPartyVisibilityHandler : IHandler
         IPlayerManager playerManager,
         IConnectionCollection connectionCollection,
         IObjectManager objectManager,
-        INetwork network,
+        IPartyVisualInterface partyVisuals,
         ISiegeEventInterface siegeEventInterface)
     {
         this.messageBroker = messageBroker;
         this.playerManager = playerManager;
         this.connectionCollection = connectionCollection;
         this.objectManager = objectManager;
-        this.network = network;
+        this.partyVisuals = partyVisuals;
         this.siegeEventInterface = siegeEventInterface;
 
         messageBroker.Subscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
@@ -150,7 +143,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
         var wasActive = party.IsActive;
         party.IsActive = false;
         party.IsVisible = false;
-        RemoveVisual(party);
+        partyVisuals.RemoveVisual(party);
 
         if (!wasActive)
         {
@@ -263,7 +256,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
 
         party.IsActive = false;
         party.IsVisible = false;
-        RemoveVisual(party);
+        partyVisuals.RemoveVisual(party);
 
         if (!TryGetPlayer(party, out var player) ||
             IsPlayerHeroDead(player) ||
@@ -284,7 +277,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
     private void ActivateParty(MobileParty party)
     {
         party.IsActive = true;
-        CreateVisual(party);
+        partyVisuals.CreateVisual(party);
         party.IsVisible = true;
         party.IsInspected = true;
     }
@@ -311,7 +304,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
             LeaveSiegeBeforeParking(party);
             party.IsActive = false;
             party.IsVisible = false;
-            RemoveVisual(party);
+            partyVisuals.RemoveVisual(party);
             Logger.Information(
                 "Parked party {PartyId} after its MapEvent ended while its player was disconnected or dead",
                 party.StringId);
@@ -351,30 +344,6 @@ internal class PlayerPartyVisibilityHandler : IHandler
         }
 
         siegeEventInterface.BreakSiegeForPartyOnly(party);
-    }
-
-    private void RemoveVisual(MobileParty party)
-    {
-        if (MobilePartyVisualManager.Current != null)
-        {
-            party.RemovePartyVisual();
-            return;
-        }
-
-        if (objectManager.TryGetHandleWithLogging(party, out var partyHandle))
-            network.SendAll(new NetworkDestroyPartyVisual(partyHandle));
-    }
-
-    private void CreateVisual(MobileParty party)
-    {
-        if (MobilePartyVisualManager.Current != null)
-        {
-            party.CreateNewPartyVisual();
-            return;
-        }
-
-        if (objectManager.TryGetHandleWithLogging(party, out var partyHandle))
-            network.SendAll(new NetworkCreatePartyVisual(partyHandle));
     }
 
     private bool TryResolveParty(NetPeer peer, out Player player, out MobileParty party)

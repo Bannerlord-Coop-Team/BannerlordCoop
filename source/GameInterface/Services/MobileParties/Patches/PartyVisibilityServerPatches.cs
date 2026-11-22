@@ -1,56 +1,26 @@
 ﻿using Common;
 using HarmonyLib;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobileParties.Patches;
 
 /// <summary>
-/// Parties are always visible on the server, and in debug builds everywhere
-/// (<see cref="DebugPartyVisibility"/>). Release clients keep the native fog of war.
-/// The party nameplates read
-/// <see cref="MobileParty.IsVisible"/> directly, so the read-time override sits on that getter.
+/// The server and debug visibility overrides reveal active parties. Release clients
+/// use native fog of war for active parties. Parked and destroyed parties read as
+/// unspotted everywhere, including when nameplates read <see cref="MobileParty.IsVisible"/>.
 /// </summary>
 [HarmonyPatch(typeof(MobileParty), nameof(MobileParty.IsVisible), MethodType.Getter)]
 internal class PartyIsVisibleGetterServerPatch
 {
     internal static void Postfix(MobileParty __instance, ref bool __result)
     {
-        if (ModInformation.IsServer || DebugPartyVisibility.ForceAllVisible)
-        {
-            // Match the IsVisible patch below: only live parties are force-spotted. A destroyed
-            // party must read as unspotted, or the map nameplate machinery keeps re-creating its
-            // banner (with 0 troops) after the destruction replicates.
-            __result = __instance.IsActive;
-        }
-        else
-        {
-            __result = __result && __instance.IsActive;
-        }
+        __result = __instance.IsActive && (ModInformation.IsServer || DebugPartyVisibility.ForceAllVisible || __result);
     }
 }
 
 [HarmonyPatch(typeof(MobileParty))]
 internal class PartyVisibilityOnServerPatch
 {
-    [HarmonyPatch(nameof(MobileParty.IsActive), MethodType.Setter)]
-    [HarmonyPrefix]
-    internal static void PrefixIsActive(MobileParty __instance, out bool __state)
-    {
-        __state = __instance.IsActive;
-    }
-
-    [HarmonyPatch(nameof(MobileParty.IsActive), MethodType.Setter)]
-    [HarmonyPostfix]
-    internal static void PostfixIsActive(MobileParty __instance, bool __state)
-    {
-        if (ModInformation.IsClient && __state != __instance.IsActive && __instance.Party != null)
-        {
-            // Nameplates must refresh when a replicated party is parked or reactivated.
-            CampaignEventDispatcher.Instance?.OnPartyVisibilityChanged(__instance.Party);
-        }
-    }
-
     [HarmonyPatch(nameof(MobileParty.IsVisible), MethodType.Setter)]
     [HarmonyPrefix]
     internal static void PrefixIsVisible(MobileParty __instance, ref bool value)
