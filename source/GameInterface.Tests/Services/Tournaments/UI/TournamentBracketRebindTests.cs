@@ -305,6 +305,36 @@ public class TournamentBracketRebindTests
     }
 
     [Fact]
+    public void TryApplyScores_CountsMultiMemberTeamScoreFromZero()
+    {
+        TournamentParticipant[] members =
+        {
+            CreateParticipant(null, 501, 3),
+            CreateParticipant(null, 502, 4)
+        };
+        TournamentMatch match = CreateMatch(members, TournamentMatch.MatchState.Started, 0);
+        var matchData = new TournamentMatchData(
+            "match",
+            "round",
+            (int)TournamentMatch.MatchState.Started,
+            2,
+            2,
+            new[]
+            {
+                new TournamentTeamData("team", new[] { "slot:0", "slot:1" }, 7, false, 0, 0, null)
+            },
+            System.Array.Empty<string>());
+
+        bool applied = TournamentGameInterface.TryApplyScores(
+            match,
+            matchData,
+            new[] { new TournamentTeamScoreData("team", 2) });
+
+        Assert.True(applied);
+        Assert.Equal(new[] { 2, 0 }, members.Select(member => member.Score).ToArray());
+    }
+
+    [Fact]
     public void AddWinnersToNextRound_FillsAllEightSecondRoundSlots()
     {
         var nextRound = new TournamentRound(
