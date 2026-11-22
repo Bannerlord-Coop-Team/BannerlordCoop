@@ -13,7 +13,9 @@ public sealed class ManagedConfigOptionAttribute : Attribute
     // NaN leaves the bound unset.
     public double Min { get; set; } = double.NaN;
     public double Max { get; set; } = double.NaN;
+    /// <summary>Regex the website applies to each item of a list option.</summary>
     public string ItemPattern { get; set; }
+    /// <summary>Item kind of a list option for the website; only "steamId64" is accepted.</summary>
     public string ItemFormat { get; set; }
     /// <summary>Raises positive values below this threshold to the threshold and leaves zero unchanged.</summary>
     public int CoercePositiveBelow { get; set; }

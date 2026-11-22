@@ -22,8 +22,8 @@ public class ManagedConfigCatalogTests
     {
         var templatePath = Path.Combine(AppContext.BaseDirectory, "mod-config.default.json");
         using var template = new JsonTextReader(File.OpenText(templatePath)) { DateParseHandling = DateParseHandling.None };
-        var defaults = JObject.Load(template)["modOptions"] as JObject
-            ?? throw new InvalidDataException("modOptions is missing from the default config");
+        var defaults = JObject.Load(template)["modOptions"] as JObject;
+        if (defaults == null) throw new InvalidDataException("modOptions is missing from the default config");
 
         var options = BuildOptions(defaults);
         // The website hashes JSON.stringify(options), so Newtonsoft has to write every value the same way.
@@ -160,7 +160,7 @@ public class ManagedConfigCatalogTests
             if (value.Value is not string text) continue;
             for (int i = 0; i < text.Length;)
             {
-                // Newtonsoft escapes these scalars, while JSON.stringify emits them directly.
+                // Newtonsoft escapes U+0085/U+2028/U+2029 and JSON.stringify doesn't; JSON.stringify escapes unpaired surrogates and Newtonsoft doesn't.
                 if (!Rune.TryGetRuneAt(text, i, out var rune) || rune.Value is 0x0085 or 0x2028 or 0x2029)
                     throw new InvalidDataException($"String value for {key} needs JSON.stringify-compatible formatting");
                 i += rune.Utf16SequenceLength;
