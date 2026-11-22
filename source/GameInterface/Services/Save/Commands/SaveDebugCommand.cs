@@ -48,9 +48,10 @@ namespace GameInterface.Services.Save.Commands
 
             public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
             {
+                string name = args[0];
                 if (!ModInformation.IsServer)
                     return Failed("Command can only be run on the server.");
-                if (!SafeSaveName.IsMatch(args[0]))
+                if (!SafeSaveName.IsMatch(name))
                     return Failed("Save name must contain 1 through 64 letters, digits, underscores, or hyphens.");
 
                 if (!saves.CanQueueSave)
@@ -58,13 +59,12 @@ namespace GameInterface.Services.Save.Commands
                 if (saves.IsSaving)
                     return Failed("A save is already queued.");
 
-                string name = args[0];
                 // A fresh name prevents an old pair from hiding a suppressed or failed write.
                 if (saves.SaveFileExists(name + ".sav") || saves.SaveFileExists(name + ".json"))
                     return Failed("Save name already exists. Choose a fresh name.");
 
                 var result = saves.SaveCurrentGameToFile(name);
-                if (!result.Success || result.Data == null || result.Data.Length == 0)
+                if (!result.Success)
                     return Failed("Campaign save was not written.");
                 var sidecar = saves.ReadSaveFile(name + ".json");
                 if (sidecar == null || sidecar.Length == 0)
