@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.BattleBenchmark;
 using Common.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MapEvents;
@@ -38,6 +39,7 @@ public partial class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
     private readonly IBattleHostRegistry battleHostRegistry;
     private readonly IMissionContext missionContext;
     private readonly IAgentVisualActionAccessor agentVisualActionAccessor;
+    private readonly IBattleBenchmarkRecorder battleBenchmark;
 
     // All receive-side state for one agent stays together so authority changes clear it atomically.
     private readonly Dictionary<Guid, RemoteAgentActionState> _agentStates =
@@ -244,13 +246,15 @@ public partial class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         IControllerIdProvider controllerIdProvider,
         IBattleHostRegistry battleHostRegistry,
         IMissionContext missionContext,
-        IAgentVisualActionAccessor agentVisualActionAccessor)
+        IAgentVisualActionAccessor agentVisualActionAccessor,
+        IBattleBenchmarkRecorder battleBenchmark)
     {
         this.agentRegistry = agentRegistry;
         this.controllerIdProvider = controllerIdProvider;
         this.battleHostRegistry = battleHostRegistry;
         this.missionContext = missionContext;
         this.agentVisualActionAccessor = agentVisualActionAccessor;
+        this.battleBenchmark = battleBenchmark;
 
         agentRegistry.AgentBecameLocallyControlled += OnAgentBecameLocallyControlled;
         agentRegistry.AgentRemoved += OnAgentRemoved;
@@ -291,6 +295,8 @@ public partial class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
 
     private void ClearRemoteAgentState(CoopAgentInfo info)
     {
+        using var measurement = battleBenchmark.Measure(BattleBenchmarkSection.RemoteActionAuthority);
+        battleBenchmark.RecordRemoteActionAuthorityWork(1, 0);
         Guid agentId = info.AgentId;
         if (!_agentStates.TryGetValue(agentId, out RemoteAgentActionState state))
             return;
@@ -754,6 +760,7 @@ public partial class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         RemoteAction action,
         bool removePendingBeforeApply)
     {
+        using var measurement = battleBenchmark.Measure(BattleBenchmarkSection.RemoteActionApply);
         if (action.BattleHostEpoch == 0 && action.Data.AuthorityRevision != info.AuthorityRevision)
             return action.Data.AuthorityRevision < info.AuthorityRevision
                 ? RemoteActionApplyResult.Stale : RemoteActionApplyResult.AgentNotReady;

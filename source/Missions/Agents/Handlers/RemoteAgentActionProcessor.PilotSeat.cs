@@ -1,4 +1,5 @@
 ﻿using Common.Util;
+using Common.BattleBenchmark;
 using Missions.Agents.Packets;
 using Missions.Battles;
 using System;
@@ -150,6 +151,8 @@ public partial class RemoteAgentActionProcessor
 
     private void RefreshPilotSeats(int? machineId = null)
     {
+        using var measurement = battleBenchmark.Measure(BattleBenchmarkSection.RemoteActionPilot);
+        int registryLookups = 0;
         if (pilotSeatAgentIds.Count == 0 || pilotSeatRefreshIds.Count != 0) return;
 
         // Releasing a seat can change the index. A nested authority notification can wait for the next tick.
@@ -159,16 +162,18 @@ public partial class RemoteAgentActionProcessor
             foreach (Guid agentId in pilotSeatRefreshIds)
             {
                 if (_agentStates.TryGetValue(agentId, out var state))
-                    RefreshPilotSeat(agentId, state, machineId);
+                    RefreshPilotSeat(agentId, state, machineId, ref registryLookups);
             }
         }
         finally
         {
+            battleBenchmark.RecordRemoteActionPilotWork(pilotSeatRefreshIds.Count, registryLookups);
             pilotSeatRefreshIds.Clear();
         }
     }
 
-    private void RefreshPilotSeat(Guid agentId, RemoteAgentActionState state, int? machineId)
+    private void RefreshPilotSeat(Guid agentId, RemoteAgentActionState state, int? machineId,
+        ref int registryLookups)
     {
         var seat = state.PilotSeat;
         RemoteAction? deferred = state.PendingPilotSeat;
@@ -176,6 +181,7 @@ public partial class RemoteAgentActionProcessor
         bool retryPending = deferred.HasValue && (!machineId.HasValue || deferred.Value.Data.PilotSeat.Value.MachineId == machineId);
         if (!refreshAttachment && !retryPending) return;
 
+        registryLookups++;
         agentRegistry.TryGetAgentInfo(agentId, out var info);
         Agent agent = info?.Agent;
         bool active = agent != null && agent.Mission == Mission.Current && agent.IsActive();
@@ -201,6 +207,7 @@ public partial class RemoteAgentActionProcessor
             state.PilotSeat.Data.Equals(pending.Data.PilotSeat.Value))
         {
             // Native use transitions may change the hands after the action was first applied.
+            using (battleBenchmark.Measure(BattleBenchmarkSection.RemoteActionApply))
             using (new AllowedThread())
             {
                 if (pending.Data.Equipment.HasValue &&
