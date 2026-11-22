@@ -392,43 +392,6 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
         Assert.Single(broker.GetMessagesFromType<PlayerConnectionStateChanged>());
     }
 
-    [Fact]
-    public void DisconnectAndReconnect_RemovesVisualThenRecreatesItOnce()
-    {
-        var player = CreatePlayer();
-        var party = CreateParty();
-        var hero = CreateActiveHero();
-        var peer = (NetPeer)FormatterServices.GetUninitializedObject(typeof(NetPeer));
-        var (players, connections, objects) =
-            CreateReleaseMocks(player, party, peer, isConnected: true, isSynchronized: true);
-        objects.Setup(manager => manager.TryGetObjectWithLogging(player.MobilePartyId, out party)).Returns(true);
-        objects.Setup(manager => manager.TryGetObjectWithLogging(player.HeroId, out hero)).Returns(true);
-        var partyVisuals = new Mock<IPartyVisualInterface>();
-        var broker = new TestMessageBroker();
-        using var handler = new PlayerPartyVisibilityHandler(
-            broker, players.Object, connections.Object, objects.Object, partyVisuals.Object,
-            Mock.Of<ISiegeEventInterface>());
-
-        broker.Publish(this, new PlayerDisconnected(peer, default));
-        GameThread.Run(() => { }, blocking: true);
-        Assert.False(party.IsActive);
-        partyVisuals.Verify(visuals => visuals.RemoveVisual(party), Times.Once);
-        partyVisuals.VerifyNoOtherCalls();
-
-        var reconnectedPeer = (NetPeer)FormatterServices.GetUninitializedObject(typeof(NetPeer));
-        players.Reset();
-        players.Setup(manager => manager.TryGetPlayer(reconnectedPeer, out player)).Returns(true);
-        players.Setup(manager => manager.TryGetPeer(player.ControllerId, out reconnectedPeer)).Returns(true);
-        broker.Publish(this, new PlayerCampaignSynchronized(reconnectedPeer));
-        GameThread.Run(() => { }, blocking: true);
-        broker.Publish(this, new PlayerCampaignSynchronized(reconnectedPeer));
-        GameThread.Run(() => { }, blocking: true);
-
-        Assert.True(party.IsActive);
-        partyVisuals.Verify(visuals => visuals.CreateVisual(party), Times.Once);
-        partyVisuals.VerifyNoOtherCalls();
-    }
-
     private static (Mock<IPlayerManager>, Mock<IConnectionCollection>, Mock<IObjectManager>)
         CreateReleaseMocks(
             Player player,

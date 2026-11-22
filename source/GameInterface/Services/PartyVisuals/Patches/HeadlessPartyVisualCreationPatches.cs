@@ -7,17 +7,17 @@ using TaleWorlds.CampaignSystem.Party;
 namespace GameInterface.Services.PartyVisuals.Patches;
 
 /// <summary>
-/// Publishes visual creation from a server without a map visual manager.
+/// Asks <see cref="IPartyVisualInterface"/> to replicate a new party's visual from a headless server.
 /// </summary>
 [HarmonyPatch]
-internal class HeadlessPartyVisualLifetimePatches
+internal class HeadlessPartyVisualCreationPatches
 {
     // The party constructor patch assigns its handle before the campaign adds it.
     [HarmonyPatch(typeof(CampaignObjectManager), nameof(CampaignObjectManager.AddMobileParty))]
     [HarmonyPostfix]
     private static void AddMobilePartyPostfix(MobileParty party)
     {
-        // Skip party creation during save loading or while applying a received action.
+        // Skip replicating the visual for parties created during save loading or while applying a received action.
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
 
         if (ContainerProvider.TryResolve<IPartyVisualInterface>(out var partyVisuals))

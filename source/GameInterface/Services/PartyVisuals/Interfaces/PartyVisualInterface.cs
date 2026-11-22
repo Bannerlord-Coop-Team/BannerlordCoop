@@ -11,9 +11,16 @@ namespace GameInterface.Services.PartyVisuals.Interfaces;
 /// <summary>Applies server-side party visual changes and replicates them to clients.</summary>
 public interface IPartyVisualInterface : IGameAbstraction
 {
+    /// <summary>Replicates visual creation when a party is added on a headless server.</summary>
     void OnPartyAdded(MobileParty party);
+
+    /// <summary>Replicates visual removal when a party is destroyed on a headless server.</summary>
     void OnPartyDestroyed(MobileParty party);
+
+    /// <summary>Replicates visual creation and creates the local visual when the server has a visual manager.</summary>
     void CreateVisual(MobileParty party);
+
+    /// <summary>Replicates visual removal and removes the local visual when the server has a visual manager.</summary>
     void RemoveVisual(MobileParty party);
 }
 
@@ -43,7 +50,6 @@ internal sealed class PartyVisualInterface : IPartyVisualInterface
             SendDestroyVisual(party);
     }
 
-    // With a visual manager, the graphical lifetime patches replicate creation and removal.
     public void CreateVisual(MobileParty party)
     {
         if (IsHeadlessServer)
