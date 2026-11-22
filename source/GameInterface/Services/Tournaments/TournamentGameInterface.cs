@@ -510,7 +510,10 @@ public sealed partial class TournamentGameInterface : ITournamentGameInterface
             TournamentParticipant scoreHolder = teams[i].Participants.FirstOrDefault();
             if (scoreHolder == null)
                 return false;
-            scoreHolder.AddScore(score - teams[i].Score);
+            // result scores count from zero because native TournamentMatch.Start resets every participant first
+            foreach (TournamentParticipant participant in teams[i].Participants)
+                participant.ResetScore();
+            scoreHolder.AddScore(score);
         }
         return true;
     }

@@ -69,15 +69,15 @@ public sealed partial class TournamentGameInterface
             .Take(winnerParticipantCount)
             .ToArray();
 
-        int winningScoreBase = match.Teams.Max(team => team.Score) + winnerTeamCount;
         var scores = new TournamentTeamScoreData[match.Teams.Length];
         for (int i = 0; i < match.Teams.Length; i++)
         {
             TournamentTeamData team = match.Teams[i];
             int winnerIndex = Array.FindIndex(winnerTeams, winner => winner.TeamId == team.TeamId);
+            // match scores count from zero, so the stored team score from an earlier match is ignored
             int score = winnerIndex < 0
-                ? team.Score
-                : winningScoreBase - winnerIndex;
+                ? 0
+                : winnerTeamCount - winnerIndex;
             scores[i] = new TournamentTeamScoreData(team.TeamId, score);
         }
 
