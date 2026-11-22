@@ -1,4 +1,10 @@
 ﻿using Autofac;
+using Common.Network;
+using Common.PacketHandlers;
+using Common.Serialization;
+using Common.Tests.Utils;
+using Coop.Core.Client.Messages;
+using Coop.Core.Client.Services.Save.PacketHandlers;
 using Coop.Core.Common.Network.Packets;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.States;
@@ -16,6 +22,8 @@ using GameInterface.Services.Players.Data;
 using LiteNetLib;
 using Moq;
 using System;
+using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using Xunit;
 using Xunit.Abstractions;
@@ -173,26 +181,120 @@ namespace Coop.Tests.Server.Connections.States
                 serverComponent.TestNetwork.GetPeerPacketsFromType<GameSaveDataChunkPacket>(playerPeer));
         }
 
-        [Fact]
-        public void EnteringState_SplitsLargeSaveData_IntoChunks()
+        [Theory]
+        [InlineData(0)]
+        [InlineData((GameSaveDataChunkPacket.ChunkSize * 2) + 17)]
+        public void EnteringState_PreservesDeflateAndChunkFramingThroughSerialization(int size)
         {
-            // Arrange
-            byte[] data = new byte[(GameSaveDataChunkPacket.ChunkSize * 2) + 17];
-            new System.Random(42).NextBytes(data);
+            byte[] data = new byte[size];
+            new Random(42).NextBytes(data);
             var saveMock = serverComponent.Container.Resolve<Mock<ISaveInterface>>();
             saveMock.Setup(m => m.SaveCurrentGame()).Returns(new SaveResults(true, data, "12345"));
 
-            // Act
             connectionLogic.SetState<TransferSaveState>();
 
-            // Assert
-            var packets = serverComponent.TestNetwork.GetPeerPacketsFromType<GameSaveDataChunkPacket>(playerPeer).ToArray();
-            Assert.True(packets.Length > 1);
+            var serializer = serverComponent.Container.Resolve<ICommonSerializer>();
+            var packets = serverComponent.TestNetwork.GetPeerPacketsFromType<GameSaveDataChunkPacket>(playerPeer)
+                .Select(packet => serializer.Deserialize<GameSaveDataChunkPacket>(serializer.Serialize(packet))).ToArray();
+            using var original = new MemoryStream();
+            using (var deflate = new DeflateStream(original, CompressionLevel.Fastest, leaveOpen: true))
+            {
+                deflate.Write(data, 0, data.Length);
+            }
+            byte[] expected = original.ToArray();
+            int expectedChunkCount = Math.Max(1, (expected.Length + GameSaveDataChunkPacket.ChunkSize - 1) / GameSaveDataChunkPacket.ChunkSize);
+
+            Assert.Equal(expectedChunkCount, packets.Length);
             Assert.Equal(Enumerable.Range(0, packets.Length), packets.Select(x => x.ChunkIndex));
-            Assert.All(packets, x => Assert.Equal(packets.Length, x.ChunkCount));
-            Assert.All(packets, x => Assert.True(x.ChunkData.Length <= GameSaveDataChunkPacket.ChunkSize));
+            Assert.All(packets, packet =>
+            {
+                Assert.Equal(packets[0].TransferId, packet.TransferId);
+                Assert.Equal(packets.Length, packet.ChunkCount);
+                Assert.Equal(expected.Length, packet.CompressedSize);
+                Assert.Equal(size, packet.UncompressedSize);
+            });
+            Assert.All(packets.SkipLast(1), packet => Assert.Equal(GameSaveDataChunkPacket.ChunkSize, packet.ChunkData.Length));
+            Assert.Equal(expected, packets.SelectMany(packet => packet.ChunkData ?? Array.Empty<byte>()).ToArray());
             Assert.Equal("12345", packets[0].CampaignID);
-            Assert.All(packets.Skip(1), x => Assert.Null(x.CampaignID));
+            Assert.All(packets.Skip(1), packet => Assert.Null(packet.CampaignID));
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void InterruptedTransfer_DiscardsPostSnapshotReplayAndStopsLoading(bool peerDisconnects)
+        {
+            var context = serverComponent.Container.Resolve<ConnectionContext>();
+            var queue = context.ConnectionMessageQueue;
+            queue.RegisterPeer(playerPeer);
+            var replay = MessagePacket.Create(new NetworkGameSaveStateChanged(false),
+                serverComponent.Container.Resolve<ICommonSerializer>());
+            byte[] data = new byte[GameSaveDataChunkPacket.ChunkSize * 2];
+            new Random(42).NextBytes(data);
+            long preSnapshotBytes = -1;
+            long postSnapshotBytes = 0;
+            serverComponent.Container.Resolve<Mock<ISaveInterface>>()
+                .Setup(save => save.SaveCurrentGame())
+                .Callback(() =>
+                {
+                    queue.TryHandleBroadcast(playerPeer, replay);
+                    queue.TryGetCatchUpPendingBytes(playerPeer, out preSnapshotBytes);
+                })
+                .Returns(new SaveResults(true, data, "12345"));
+            var network = new Mock<INetwork>();
+            int attemptedChunks = 0;
+            network.Setup(value => value.SendImmediate(playerPeer, It.IsAny<IPacket>()))
+                .Callback<NetPeer, IPacket>((peer, packet) =>
+                {
+                    if (++attemptedChunks > 1) throw new InvalidOperationException("Send failed.");
+                    queue.TryHandleBroadcast(peer, replay);
+                    queue.TryGetCatchUpPendingBytes(peer, out postSnapshotBytes);
+                    if (peerDisconnects) peer.Disconnect();
+                });
+            var logic = new Mock<IConnectionLogic>();
+            logic.SetupGet(value => value.Peer).Returns(playerPeer);
+
+            var state = new TransferSaveState(
+                logic.Object, context.MessageBroker, network.Object, context.CoopSessionProvider, context.SaveInterface,
+                queue, context.Coalescer, context.AttachmentIdMapper, context.ServerOptionsProvider, context.LootShipHold);
+            state.Load();
+
+            Assert.Equal(peerDisconnects ? 1 : 2, attemptedChunks);
+            Assert.Equal(0, preSnapshotBytes);
+            Assert.True(postSnapshotBytes > 0);
+            Assert.False(queue.TryGetCatchUpPendingBytes(playerPeer, out _));
+            Assert.Equal(0, queue.FlushBatch(playerPeer).PacketsSent);
+            Assert.Equal(ConnectionState.ShutdownRequested, playerPeer.ConnectionState);
+            logic.Verify(value => value.SetState<LoadingState>(), Times.Never);
+        }
+
+        [Fact]
+        public void ClientDiscardsPartialTransferOnDisconnectAndAcceptsFreshTransfer()
+        {
+            byte[] data = new byte[GameSaveDataChunkPacket.ChunkSize];
+            new Random(42).NextBytes(data);
+            serverComponent.Container.Resolve<Mock<ISaveInterface>>()
+                .Setup(save => save.SaveCurrentGame())
+                .Returns(new SaveResults(true, data, "12345"));
+            connectionLogic.SetState<TransferSaveState>();
+            var packets = serverComponent.TestNetwork.GetPeerPacketsFromType<GameSaveDataChunkPacket>(playerPeer).ToArray();
+            Assert.Equal(2, packets.Length);
+            using var broker = new TestMessageBroker();
+            using var handler = new GameSaveDataPacketHandler(Mock.Of<IPacketManager>(), broker);
+
+            handler.HandlePacket(playerPeer, packets[0]);
+            broker.Publish(this, new NetworkDisconnected(default));
+            handler.HandlePacket(playerPeer, packets[1]);
+            Assert.Empty(broker.GetMessagesFromType<NetworkGameSaveDataReceived>());
+
+            var retry = serverComponent.Container.Resolve<ConnectionLogic>(new TypedParameter(typeof(NetPeer), differentPeer));
+            retry.SetState<TransferSaveState>();
+            foreach (var packet in serverComponent.TestNetwork.GetPeerPacketsFromType<GameSaveDataChunkPacket>(differentPeer))
+            {
+                handler.HandlePacket(differentPeer, packet);
+            }
+            var received = Assert.Single(broker.GetMessagesFromType<NetworkGameSaveDataReceived>());
+            Assert.Equal(data, received.GameSaveData);
         }
     }
 }
