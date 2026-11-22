@@ -10,11 +10,19 @@ namespace GameInterface.Services.MobileParties.Patches;
 /// unspotted everywhere, including when nameplates read <see cref="MobileParty.IsVisible"/>.
 /// </summary>
 [HarmonyPatch(typeof(MobileParty), nameof(MobileParty.IsVisible), MethodType.Getter)]
-internal class PartyIsVisibleGetterServerPatch
+internal class PartyIsVisibleGetterPatch
 {
     internal static void Postfix(MobileParty __instance, ref bool __result)
     {
-        __result = __instance.IsActive && (ModInformation.IsServer || DebugPartyVisibility.ForceAllVisible || __result);
+        // A parked or destroyed party must read as hidden so the nameplate code stops rebuilding its banner.
+        if (!__instance.IsActive)
+        {
+            __result = false;
+            return;
+        }
+
+        if (ModInformation.IsServer || DebugPartyVisibility.ForceAllVisible)
+            __result = true;
     }
 }
 

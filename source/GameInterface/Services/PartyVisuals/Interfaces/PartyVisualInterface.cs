@@ -11,7 +11,8 @@ namespace GameInterface.Services.PartyVisuals.Interfaces;
 /// <summary>Applies server-side party visual changes and replicates them to clients.</summary>
 public interface IPartyVisualInterface : IGameAbstraction
 {
-    bool IsHeadlessServer { get; }
+    void OnPartyAdded(MobileParty party);
+    void OnPartyDestroyed(MobileParty party);
     void CreateVisual(MobileParty party);
     void RemoveVisual(MobileParty party);
 }
@@ -28,29 +29,45 @@ internal sealed class PartyVisualInterface : IPartyVisualInterface
         this.network = network;
     }
 
-    public bool IsHeadlessServer => ModInformation.IsServer && MobilePartyVisualManager.Current == null;
+    private bool IsHeadlessServer => ModInformation.IsServer && MobilePartyVisualManager.Current == null;
 
+    public void OnPartyAdded(MobileParty party)
+    {
+        if (IsHeadlessServer)
+            SendCreateVisual(party);
+    }
+
+    public void OnPartyDestroyed(MobileParty party)
+    {
+        if (IsHeadlessServer)
+            SendDestroyVisual(party);
+    }
+
+    // With a visual manager, the graphical lifetime patches replicate creation and removal.
     public void CreateVisual(MobileParty party)
     {
-        if (!IsHeadlessServer)
-        {
-            // The graphical visual lifetime patches replicate creation and removal.
+        if (IsHeadlessServer)
+            SendCreateVisual(party);
+        else
             party.CreateNewPartyVisual();
-            return;
-        }
-
-        if (objectManager.TryGetHandleWithLogging(party, out var partyHandle))
-            network.SendAll(new NetworkCreatePartyVisual(partyHandle));
     }
 
     public void RemoveVisual(MobileParty party)
     {
-        if (!IsHeadlessServer)
-        {
+        if (IsHeadlessServer)
+            SendDestroyVisual(party);
+        else
             party.RemovePartyVisual();
-            return;
-        }
+    }
 
+    private void SendCreateVisual(MobileParty party)
+    {
+        if (objectManager.TryGetHandleWithLogging(party, out var partyHandle))
+            network.SendAll(new NetworkCreatePartyVisual(partyHandle));
+    }
+
+    private void SendDestroyVisual(MobileParty party)
+    {
         if (objectManager.TryGetHandleWithLogging(party, out var partyHandle))
             network.SendAll(new NetworkDestroyPartyVisual(partyHandle));
     }

@@ -33,7 +33,6 @@ public class PartyVisualLifetimeHandler : IHandler
         this.objectManager = objectManager;
         this.partyVisuals = partyVisuals;
         messageBroker.Subscribe<PartyVisualCreated>(Handle);
-        messageBroker.Subscribe<PartyVisualCreationRequested>(Handle);
         messageBroker.Subscribe<NetworkCreatePartyVisual>(Handle);
         messageBroker.Subscribe<PartyVisualDestroyed>(Handle);
         messageBroker.Subscribe<MobilePartyDestroyed>(Handle);
@@ -43,7 +42,6 @@ public class PartyVisualLifetimeHandler : IHandler
     public void Dispose()
     {
         messageBroker.Unsubscribe<PartyVisualCreated>(Handle);
-        messageBroker.Unsubscribe<PartyVisualCreationRequested>(Handle);
         messageBroker.Unsubscribe<NetworkCreatePartyVisual>(Handle);
         messageBroker.Unsubscribe<PartyVisualDestroyed>(Handle);
         messageBroker.Unsubscribe<MobilePartyDestroyed>(Handle);
@@ -109,16 +107,10 @@ public class PartyVisualLifetimeHandler : IHandler
         }, context: $"create party visual {payload.What.MobilePartyHandle}");
     }
 
-    private void Handle(MessagePayload<PartyVisualCreationRequested> payload)
-    {
-        partyVisuals.CreateVisual(payload.What.MobileParty);
-    }
-
     private void Handle(MessagePayload<MobilePartyDestroyed> payload)
     {
         // The registry publishes this before it removes the party's handle.
-        if (partyVisuals.IsHeadlessServer)
-            partyVisuals.RemoveVisual(payload.What.MobileParty);
+        partyVisuals.OnPartyDestroyed(payload.What.MobileParty);
     }
 
     private void Handle(MessagePayload<PartyVisualDestroyed> payload)

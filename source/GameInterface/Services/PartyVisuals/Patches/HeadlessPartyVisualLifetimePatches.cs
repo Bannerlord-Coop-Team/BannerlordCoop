@@ -1,7 +1,5 @@
-﻿using Common.Messaging;
-using GameInterface.Policies;
+﻿using GameInterface.Policies;
 using GameInterface.Services.PartyVisuals.Interfaces;
-using GameInterface.Services.PartyVisuals.Messages;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
@@ -19,12 +17,10 @@ internal class HeadlessPartyVisualLifetimePatches
     [HarmonyPostfix]
     private static void AddMobilePartyPostfix(MobileParty party)
     {
-        if (!ContainerProvider.TryResolve<IPartyVisualInterface>(out var partyVisuals) || !partyVisuals.IsHeadlessServer)
-            return;
-
         // Skip party creation during save loading or while applying a received action.
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
 
-        MessageBroker.Instance.Publish(party, new PartyVisualCreationRequested(party));
+        if (ContainerProvider.TryResolve<IPartyVisualInterface>(out var partyVisuals))
+            partyVisuals.OnPartyAdded(party);
     }
 }

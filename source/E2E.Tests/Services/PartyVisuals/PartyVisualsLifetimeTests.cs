@@ -3,6 +3,7 @@ using E2E.Tests.Environment;
 using GameInterface.Services.PartyVisuals.Interfaces;
 using GameInterface.Services.PartyVisuals.Messages;
 using SandBox.View.Map.Visuals;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using Xunit.Abstractions;
 
@@ -68,6 +69,39 @@ namespace E2E.Tests.Services.PartyVisuals
             });
 
             client.Call(() => Assert.True(clientParty.Party.IsVisualDirty));
+        }
+
+        [Fact]
+        public void ReplicatedPartyActivity_RefreshesTheClientNameplateOncePerChange()
+        {
+            var server = TestEnvironment.Server;
+            var client = TestEnvironment.Clients.First();
+            var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+            Assert.True(server.ObjectManager.TryGetObject<MobileParty>(partyId, out var serverParty));
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var clientParty));
+            var activityAtRefresh = new List<bool>();
+
+            client.Call(() =>
+            {
+                Assert.True(clientParty.IsActive);
+                CampaignEvents.PartyVisibilityChangedEvent.AddNonSerializedListener(this, party =>
+                {
+                    if (ReferenceEquals(party, clientParty.Party))
+                        activityAtRefresh.Add(clientParty.IsActive);
+                });
+            });
+
+            try
+            {
+                server.Call(() => serverParty.IsActive = false);
+                server.Call(() => serverParty.IsActive = true);
+
+                Assert.Equal(new[] { false, true }, activityAtRefresh);
+            }
+            finally
+            {
+                client.Call(() => CampaignEvents.PartyVisibilityChangedEvent.ClearListeners(this));
+            }
         }
 
         [Fact]
