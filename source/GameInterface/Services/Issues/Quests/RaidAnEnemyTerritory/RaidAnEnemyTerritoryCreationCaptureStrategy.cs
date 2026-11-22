@@ -12,6 +12,7 @@ namespace GameInterface.Services.Issues.Quests.RaidAnEnemyTerritory;
 
 internal sealed class RaidAnEnemyTerritoryCreationCaptureStrategy : ICreationCaptureStrategy
 {
+    // The only vanilla constructor rolls this readonly field, so restore the captured roll afterward.
     private static readonly FieldInfo EnemyKingdomField =
         HarmonyLib.AccessTools.Field(typeof(Issue), nameof(Issue._enemyKingdom));
     private readonly IObjectManager objectManager;

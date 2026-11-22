@@ -3,6 +3,8 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Issues.Framework.Conversation;
+using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -70,10 +72,11 @@ public class RaidAnEnemyTerritoryFrameworkTests
             broker.Setup(value => value.Subscribe(It.IsAny<Action<MessagePayload<RaidAnEnemyTerritoryProgressReady>>>()))
                 .Callback<Action<MessagePayload<RaidAnEnemyTerritoryProgressReady>>>(value => receive = value);
             using var handler = new RaidAnEnemyTerritoryProgressHandler(broker.Object, network.Object,
-                Mock.Of<IObjectManager>(), resolver.Object, owners.Object, players.Object, Mock.Of<IControllerIdProvider>());
+                Mock.Of<IObjectManager>(), resolver.Object, owners.Object, players.Object, Mock.Of<IControllerIdProvider>(),
+                new IssueConversationGuard(Mock.Of<IObjectManager>()));
 
             receive(new MessagePayload<RaidAnEnemyTerritoryProgressReady>(this,
-                new RaidAnEnemyTerritoryProgressReady("giver", "issue", Array.Empty<string>(), Array.Empty<RaidAnEnemyTerritoryJournalEntry>())));
+                new RaidAnEnemyTerritoryProgressReady("giver", "issue", Array.Empty<string>(), Array.Empty<IssueJournalEntry>())));
 
             network.Verify(value => value.Send(peer, It.Is<IMessage>(message => message is NetworkRaidAnEnemyTerritoryProgress)),
                 connected ? Times.Once() : Times.Never());
@@ -113,10 +116,11 @@ public class RaidAnEnemyTerritoryFrameworkTests
             broker.Setup(value => value.Subscribe(It.IsAny<Action<MessagePayload<NetworkRaidAnEnemyTerritoryProgress>>>()))
                 .Callback<Action<MessagePayload<NetworkRaidAnEnemyTerritoryProgress>>>(value => receive = value);
             using var handler = new RaidAnEnemyTerritoryProgressHandler(broker.Object, Mock.Of<INetwork>(),
-                Mock.Of<IObjectManager>(), resolver.Object, owners.Object, Mock.Of<IPlayerManager>(), controller.Object);
+                Mock.Of<IObjectManager>(), resolver.Object, owners.Object, Mock.Of<IPlayerManager>(), controller.Object,
+                new IssueConversationGuard(Mock.Of<IObjectManager>()));
 
             GameThread.Run(() => receive(new MessagePayload<NetworkRaidAnEnemyTerritoryProgress>(this,
-                new NetworkRaidAnEnemyTerritoryProgress("giver", "issue", Array.Empty<string>(), Array.Empty<RaidAnEnemyTerritoryJournalEntry>()))), blocking: true);
+                new NetworkRaidAnEnemyTerritoryProgress("giver", "issue", Array.Empty<string>(), Array.Empty<IssueJournalEntry>()))), blocking: true);
 
             Assert.Single(quest._raidedVillages);
         }

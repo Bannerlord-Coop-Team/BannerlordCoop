@@ -4844,7 +4844,9 @@ public class VillageHostileActionTests : MapEventTestBase
         Assert.True(quest.IsOngoing);
         Assert.True(instance.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
         Assert.Same(settlement, Assert.Single(quest._raidedVillages));
-        Assert.Equal(1, quest._raidedVillagesTrackLog.CurrentProgress);
+        var journal = Assert.Single(quest.JournalEntries);
+        Assert.Equal(1, journal.CurrentProgress);
+        Assert.Same(journal, quest._raidedVillagesTrackLog);
     }
 
     private VillageTarget CreateVillageTarget()

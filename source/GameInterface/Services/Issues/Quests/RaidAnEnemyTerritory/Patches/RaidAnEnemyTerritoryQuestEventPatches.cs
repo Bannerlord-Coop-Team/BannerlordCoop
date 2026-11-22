@@ -15,7 +15,8 @@ internal sealed class RaidAnEnemyTerritoryQuestEventPatches
 {
     [HarmonyPatch(typeof(IssueManager), nameof(IssueManager.OnHeroKilled))]
     [HarmonyPrefix]
-    private static bool IssueManagerOnHeroKilledPrefix(
+    [HarmonyPriority(Priority.First)]
+    private static void IssueManagerOnHeroKilledPrefix(
         Hero victim,
         Hero killer,
         KillCharacterAction.KillCharacterActionDetail detail,
@@ -23,24 +24,24 @@ internal sealed class RaidAnEnemyTerritoryQuestEventPatches
     {
         if (ModInformation.IsClient || victim?.Issue?.IssueQuest is not Quest)
         {
-            return true;
+            return;
         }
 
         if (!ContainerProvider.TryResolve<IIssueOwnerResolver>(out var ownerResolver) ||
-            !ownerResolver.TryResolveOwnerHero(victim.Issue, out _))
+            !ownerResolver.TryResolveOwnerHero(victim.Issue, out var owner) ||
+            !ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher))
         {
-            return true;
+            return;
         }
 
-        RunAsOwners(quest => quest.OnHeroKilled(victim, killer, detail, showNotification));
-        return false;
+        // Give vanilla's raid-specific ending first chance before IssueManager cancels the giver's issue.
+        dispatcher.RunAsOwner<Quest>(owner, quest => quest.OnHeroKilled(victim, killer, detail, showNotification));
     }
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnMakePeace))]
     [HarmonyPostfix]
-    private static void OnMakePeacePostfix(object[] __args) =>
-        RunAsOwners(quest => quest.OnMakePeace(
-            (IFaction)__args[0], (IFaction)__args[1], (MakePeaceAction.MakePeaceDetail)__args[2]));
+    private static void OnMakePeacePostfix(IFaction side1Faction, IFaction side2Faction, MakePeaceAction.MakePeaceDetail detail) =>
+        RunAsOwners(quest => quest.OnMakePeace(side1Faction, side2Faction, detail));
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.DailyTick))]
     [HarmonyPostfix]

@@ -3,6 +3,7 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -24,6 +25,7 @@ internal sealed class RaidAnEnemyTerritoryProgressHandler : IHandler
     private readonly IIssueOwnerResolver owners;
     private readonly IPlayerManager players;
     private readonly IControllerIdProvider controller;
+    private readonly IIssueConversationGuard conversationGuard;
 
     public RaidAnEnemyTerritoryProgressHandler(
         IMessageBroker messageBroker,
@@ -32,7 +34,8 @@ internal sealed class RaidAnEnemyTerritoryProgressHandler : IHandler
         IIssueResolver issueResolver,
         IIssueOwnerResolver owners,
         IPlayerManager players,
-        IControllerIdProvider controller)
+        IControllerIdProvider controller,
+        IIssueConversationGuard conversationGuard)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -41,6 +44,7 @@ internal sealed class RaidAnEnemyTerritoryProgressHandler : IHandler
         this.owners = owners;
         this.players = players;
         this.controller = controller;
+        this.conversationGuard = conversationGuard;
         messageBroker.Subscribe<RaidAnEnemyTerritoryProgressReady>(HandleProgressReady);
         messageBroker.Subscribe<NetworkRaidAnEnemyTerritoryProgress>(HandleProgress);
     }
@@ -80,41 +84,45 @@ internal sealed class RaidAnEnemyTerritoryProgressHandler : IHandler
         }
 
         var data = payload.What;
-        GameThread.RunSafe(() =>
+        GameThread.RunSafe(() => conversationGuard.RunInOrder(() => Apply(data), data.IssueOwnerId),
+            context: nameof(RaidAnEnemyTerritoryProgressHandler));
+    }
+
+    private void Apply(NetworkRaidAnEnemyTerritoryProgress data)
+    {
+        if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _) ||
+            issue.IssueQuest is not Quest quest ||
+            !owners.TryGetOwnerControllerId(issue, out var owner) || owner != controller.ControllerId)
         {
-            if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _) ||
-                !(issue.IssueQuest is Quest quest) ||
-                !owners.TryGetOwnerControllerId(issue, out var owner) || owner != controller.ControllerId)
-            {
-                return;
-            }
+            return;
+        }
 
-            var villages = (data.VillageIds ?? Array.Empty<string>())
-                .Select(id => objectManager.TryGetObjectWithLogging<Settlement>(id, out var village) ? village : null)
-                .ToArray();
-            if (villages.Any(village => village == null))
-            {
-                return;
-            }
+        var villages = (data.VillageIds ?? Array.Empty<string>())
+            .Select(id => objectManager.TryGetObjectWithLogging<Settlement>(id, out var village) ? village : null)
+            .ToArray();
+        if (villages.Any(village => village == null))
+        {
+            return;
+        }
 
-            using (new AllowedThread())
+        using (new AllowedThread())
+        using (new QuestJournalReplay())
+        {
+            quest._raidedVillages.Clear();
+            quest._raidedVillages.AddRange(villages);
+            var entries = data.Entries ?? Array.Empty<IssueJournalEntry>();
+            if (entries.Length > 0)
             {
-                quest._raidedVillages.Clear();
-                quest._raidedVillages.AddRange(villages);
-                var entries = data.Entries ?? Array.Empty<RaidAnEnemyTerritoryJournalEntry>();
-                if (entries.Length > 0)
+                quest._journalEntries.Clear();
+                foreach (var entry in entries)
                 {
-                    quest._journalEntries.Clear();
-                    foreach (var entry in entries)
-                    {
-                        quest._journalEntries.Add(new JournalLog(entry.Time, entry.Text, entry.Task, entry.Progress, entry.Range, entry.Type));
-                    }
+                    quest._journalEntries.Add(entry.ToJournalLog());
                 }
-
-                quest._raidedVillagesTrackLog ??= quest.JournalEntries.FirstOrDefault(log => log.Type == LogType.Discreate);
-                quest._raidedVillagesTrackLog?.UpdateCurrentProgress(quest._raidedVillages.Count);
-                CampaignEventDispatcher.Instance.OnQuestLogAdded(quest, true);
+                quest._raidedVillagesTrackLog = quest.JournalEntries.FirstOrDefault(log => log.Type == LogType.Discreate);
             }
-        }, context: nameof(RaidAnEnemyTerritoryProgressHandler));
+
+            quest._raidedVillagesTrackLog?.UpdateCurrentProgress(quest._raidedVillages.Count);
+            CampaignEventDispatcher.Instance.OnQuestLogAdded(quest, true);
+        }
     }
 }

@@ -2,9 +2,9 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Util;
+using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Players;
 using HarmonyLib;
 using Serilog;
 using System.Collections.Generic;
@@ -33,12 +33,7 @@ internal sealed class RaidAnEnemyTerritoryRaidCompletionPatch
     [HarmonyPostfix]
     private static void RaidCompletedPostfix(BattleSideEnum winnerSide, RaidEventComponent raidEvent)
     {
-        Logger.Information("Raid quest raid callback winner={winner} village={village} hitPoints={hitPoints} mapEvent={mapEvent}",
-            winnerSide,
-            raidEvent?.MapEvent?.MapEventSettlement?.StringId,
-            raidEvent?.MapEvent?.MapEventSettlement?.SettlementHitPoints,
-            raidEvent?.MapEvent?.StringId);
-        if (!ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher))
+        if (ModInformation.IsClient || !ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher))
         {
             return;
         }
@@ -63,7 +58,7 @@ internal sealed class RaidAnEnemyTerritoryRaidCompletionPatch
         }
     }
 
-    internal static void Resolve(Quest quest, Settlement village, MobileParty attackerParty)
+    private static void Resolve(Quest quest, Settlement village, MobileParty attackerParty)
     {
         if (quest == null || village == null || attackerParty == null || quest.IsFinalized ||
             quest._raidedVillages.Contains(village))
@@ -71,35 +66,25 @@ internal sealed class RaidAnEnemyTerritoryRaidCompletionPatch
             return;
         }
 
-        if (!ContainerProvider.TryResolve<IIssueOwnerResolver>(out var ownerResolver) ||
-            !ContainerProvider.TryResolve<IPlayerManager>(out var playerManager) ||
-            !ownerResolver.TryGetOwnerControllerId(quest.QuestGiver?.Issue, out var controllerId) ||
-            !playerManager.TryGetPlayer(controllerId, out var player) ||
-            !ContainerProvider.TryResolve<IObjectManager>(out var ownerObjects) ||
-            !ownerObjects.TryGetObjectWithLogging(player.MobilePartyId, out MobileParty ownerParty) ||
-            (!ownerResolver.TryResolveOwnerHero(quest.QuestGiver?.Issue, out var ownerHero) ||
-                (ownerParty != attackerParty && ownerHero.PartyBelongedTo != attackerParty)))
+        var issue = quest.QuestGiver.Issue;
+        if (issue == null || !ContainerProvider.TryResolve<IIssueOwnerResolver>(out var ownerResolver) ||
+            !ownerResolver.TryResolveOwnerParty(issue, out var ownerParty) ||
+            (ownerParty != attackerParty &&
+             (!ownerResolver.TryResolveOwnerHero(issue, out var ownerHero) || ownerHero.PartyBelongedTo != attackerParty)))
         {
             return;
         }
 
         quest._raidedVillages.Add(village);
         quest._raidedVillagesTrackLog?.UpdateCurrentProgress(quest._raidedVillages.Count);
-        Logger.Information("Raid quest progress issue={issue} giver={giver} owner={owner} count={count} village={village}",
-            quest.QuestGiver?.Issue?.StringId,
-            quest.QuestGiver?.StringId,
-            quest.QuestGiver?.Issue?.IssueOwner?.StringId,
+        Logger.Debug("Raid quest progress issue={issue} giver={giver} count={count} village={village}",
+            issue.StringId,
+            quest.QuestGiver.StringId,
             quest._raidedVillages.Count,
             village.StringId);
 
         if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager) ||
             !objectManager.TryGetIdWithLogging(quest.QuestGiver, out var giverId))
-        {
-            return;
-        }
-
-        var issueId = quest.QuestGiver?.Issue?.StringId;
-        if (string.IsNullOrEmpty(issueId))
         {
             return;
         }
@@ -113,19 +98,11 @@ internal sealed class RaidAnEnemyTerritoryRaidCompletionPatch
             }
             villageIds.Add(raidedVillageId);
         }
-        var entries = quest.JournalEntries.Select(log => new RaidAnEnemyTerritoryJournalEntry
-        {
-            Time = log.LogTime,
-            Text = log.LogText,
-            Task = log.TaskName,
-            Progress = log.CurrentProgress,
-            Range = log.Range,
-            Type = log.Type,
-        }).ToArray();
+        var entries = quest.JournalEntries.Select(log => new IssueJournalEntry(log)).ToArray();
 
         MessageBroker.Instance.Publish(quest, new RaidAnEnemyTerritoryProgressReady(
             giverId,
-            issueId,
+            issue.StringId,
             villageIds.ToArray(),
             entries));
     }
