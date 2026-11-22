@@ -537,7 +537,7 @@
     coop_location="prison"
     coop_spawn_tag="npc_common"
     coop_dialogue="Deus Vult Friend"
-    coop_enabled="true">
+    coop_enabled="false">
     <face>
       <face_key_template value="BodyProperty.townsman_empire" />
     </face>
