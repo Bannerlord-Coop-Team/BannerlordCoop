@@ -22,8 +22,7 @@ internal class NearbyBanditBaseQuestAcceptedPatch
         var hideout = __instance._targetHideout;
 
         __instance.StartQuest();
-        // the server shows the hideout to every client in NearbyBanditBaseQuestSolutionAcceptStrategy.Apply
-        hideout.IsVisible = true;
+        // the server reveals the hideout in NearbyBanditBaseQuestSolutionAcceptStrategy.Apply
         __instance.AddTrackedObject(hideout);
         QuestHelper.AddMapArrowFromPointToTarget(new TextObject("{=xpsQyPaV}Direction to Bandits"), __instance._questSettlement.Position, hideout.Position, 5f, 0.1f);
 

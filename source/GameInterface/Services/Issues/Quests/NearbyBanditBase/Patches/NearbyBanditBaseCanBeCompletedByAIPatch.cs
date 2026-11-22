@@ -19,8 +19,7 @@ internal class NearbyBanditBaseCanBeCompletedByAIPatch
         }
 
         // vanilla checks the main hero, which the server doesnt have, so any player held in the hideout keeps AI lords away
-        var playerHeldInHideout = __instance.TargetHideout.Party.PrisonRoster.GetTroopRoster()
-            .Any(element => element.Character.HeroObject != null && element.Character.HeroObject.IsPlayerHero());
+        var playerHeldInHideout = __instance.TargetHideout.Party.PrisonerHeroes.Any(prisoner => prisoner.HeroObject.IsPlayerHero());
         __result = !playerHeldInHideout;
 
         return false;

@@ -4,6 +4,7 @@ using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.CreationCapture;
 using GameInterface.Services.Issues.Framework.AcceptCoordination;
 using GameInterface.Services.Issues.Framework.Finalization;
@@ -37,6 +38,7 @@ public class NearbyBanditBaseTests : IDisposable
     private const float PowerChange = 5f;
     private const float ProsperityChange = 10f;
     private const float CoercionPowerChange = 10f;
+    private const int SentTroops = 40;
 
     private static readonly MethodBase[] QuestLogTexts =
     {
@@ -69,6 +71,8 @@ public class NearbyBanditBaseTests : IDisposable
     private readonly string hideoutSettlementId;
     private readonly string ownerHeroId;
     private readonly string ownerPartyId;
+    private readonly string otherHeroId;
+    private readonly string otherPartyId;
 
     private E2ETestEnvironment TestEnvironment { get; }
     private EnvironmentInstance Server => TestEnvironment.Server;
@@ -89,7 +93,7 @@ public class NearbyBanditBaseTests : IDisposable
         var hideoutId = TestEnvironment.CreateRegisteredObject<Hideout>();
 
         (ownerHeroId, ownerPartyId) = RegisterPlayer(ClientA, "player-A");
-        RegisterPlayer(ClientB, "player-B");
+        (otherHeroId, otherPartyId) = RegisterPlayer(ClientB, "player-B");
 
         foreach (var instance in Instances)
         {
@@ -110,6 +114,7 @@ public class NearbyBanditBaseTests : IDisposable
                     villageSettlement.SetSettlementComponent(village);
                     village.Bound = townSettlement;
                     hideoutSettlement.SetSettlementComponent(hideout);
+                    hideoutSettlement.IsVisible = false;
                     headman.StayingInSettlement = villageSettlement;
                     headman.Occupation = Occupation.Headman;
                 }
@@ -124,7 +129,7 @@ public class NearbyBanditBaseTests : IDisposable
     }
 
     [Fact]
-    public void EveryClientBuildsTheIssueWithTheServersHideoutAndTheSameVillage()
+    public void EveryClientBuildsTheIssueWithTheServersHideout()
     {
         CreateIssueOnServer();
 
@@ -135,12 +140,10 @@ public class NearbyBanditBaseTests : IDisposable
             client.Call(() =>
             {
                 Assert.True(client.ObjectManager.TryGetObject<Hero>(headmanId, out var headman));
-                Assert.True(client.ObjectManager.TryGetObject<Settlement>(villageSettlementId, out var village));
                 Assert.True(client.ObjectManager.TryGetObject<Settlement>(hideoutSettlementId, out var hideout));
                 var issue = Assert.IsType<Issue>(headman.Issue);
 
                 Assert.Same(hideout, issue._targetHideout);
-                Assert.Same(village, issue._issueSettlement);
             });
         }
     }
@@ -149,20 +152,6 @@ public class NearbyBanditBaseTests : IDisposable
     public void AcceptingShowsTheHideoutOnTheServerAndEveryClient()
     {
         CreateIssueOnServer();
-
-        foreach (var instance in Instances)
-        {
-            instance.Call(() =>
-            {
-                Assert.True(instance.ObjectManager.TryGetObject<Settlement>(hideoutSettlementId, out var hideout));
-
-                using (new AllowedThread())
-                {
-                    hideout.IsVisible = false;
-                }
-            });
-        }
-
         AcceptOnClientA();
 
         foreach (var instance in Instances)
@@ -234,7 +223,7 @@ public class NearbyBanditBaseTests : IDisposable
     }
 
     [Fact]
-    public void TheOwnersAcceptStartsTheQuestAndShowsTheHideoutOnTheClient()
+    public void TheOwnersAcceptStartsTheQuestWithoutRevealingTheHideoutOnTheClient()
     {
         CreateIssueOnServer();
 
@@ -246,15 +235,10 @@ public class NearbyBanditBaseTests : IDisposable
             headman.Issue.StartIssueWithQuest();
             var quest = Assert.IsType<Quest>(headman.Issue.IssueQuest);
 
-            using (new AllowedThread())
-            {
-                hideout.IsVisible = false;
-            }
-
             quest.OnQuestAccepted();
 
             Assert.Contains(quest, Campaign.Current.QuestManager.Quests);
-            Assert.True(hideout.IsVisible);
+            Assert.False(hideout.IsVisible);
         }, QuestAcceptedMethods);
     }
 
@@ -319,8 +303,6 @@ public class NearbyBanditBaseTests : IDisposable
             DeclareWarAction.ApplyInternal(declarer, target, DeclareWarAction.DeclareWarDetail.CausedByKingdomCreation);
         }, QuestLogTexts);
 
-        Assert.Empty(ClientA.NetworkSentMessages.GetMessages<RequestQuestOutcome>());
-
         if (!ownersFaction)
         {
             Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
@@ -329,6 +311,104 @@ public class NearbyBanditBaseTests : IDisposable
 
         var finalized = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
         Assert.Equal(IssueOutcome.QuestFail, finalized.Outcome);
+        AssertIssueEndedEverywhere();
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void AHostilityWarFailsTheQuestOnlyWhenTheOwnerStartedIt(bool ownerStarted)
+    {
+        var ownerClanId = TestEnvironment.CreateRegisteredObject<Clan>();
+        var otherClanId = TestEnvironment.CreateRegisteredObject<Clan>();
+
+        CreateIssueOnServer();
+        AcceptOnClientA();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var owner));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(otherHeroId, out var otherPlayer));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(ownerClanId, out var ownerClan));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(otherClanId, out var otherClan));
+
+            using (new AllowedThread())
+            {
+                owner.Clan = ownerClan;
+            }
+
+            var previous = ResolvedMainHeroContext.ResolvedMainHero;
+            try
+            {
+                ResolvedMainHeroContext.ResolvedMainHero = ownerStarted ? owner : otherPlayer;
+                CampaignEventDispatcher.Instance.OnWarDeclared(otherClan, ownerClan, DeclareWarAction.DeclareWarDetail.CausedByPlayerHostility);
+            }
+            finally
+            {
+                ResolvedMainHeroContext.ResolvedMainHero = previous;
+            }
+        }, QuestLogTexts);
+
+        if (!ownerStarted)
+        {
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+            return;
+        }
+
+        var finalized = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Assert.Equal(IssueOutcome.QuestFail, finalized.Outcome);
+        AssertIssueEndedEverywhere();
+    }
+
+    [Fact]
+    public void AnOwnerWithoutAPartyIsNotPaidWhenAnotherPlayerClearsTheHideout()
+    {
+        CreateIssueOnServer();
+        AcceptOnClientA();
+
+        var goldBefore = GoldOfOwner(Server);
+        var powerBefore = PowerOfHeadman(Server);
+        RemoveTheOwnersParty();
+
+        EndHideoutBattleOnServer(otherPartyId, BattleState.AttackerVictory, otherHeroId);
+
+        var finalized = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Assert.Equal(IssueOutcome.QuestFail, finalized.Outcome);
+        Assert.Equal(goldBefore, GoldOfOwner(Server));
+        Assert.Equal(powerBefore, PowerOfHeadman(Server));
+        AssertIssueEndedEverywhere();
+    }
+
+    [Fact]
+    public void AnOwnerWithoutAPartyKeepsTheQuestWhenAnotherPlayerLosesTheHideoutBattle()
+    {
+        CreateIssueOnServer();
+        AcceptOnClientA();
+
+        var powerBefore = PowerOfHeadman(Server);
+        RemoveTheOwnersParty();
+
+        EndHideoutBattleOnServer(otherPartyId, BattleState.DefenderVictory, otherHeroId);
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Assert.Equal(powerBefore, PowerOfHeadman(Server));
+    }
+
+    [Fact]
+    public void AnOwnerCapturedLosingTheHideoutBattleFailsTheQuest()
+    {
+        CreateIssueOnServer();
+        AcceptOnClientA();
+
+        var powerBefore = PowerOfHeadman(Server);
+        RemoveTheOwnersParty();
+
+        EndHideoutBattleOnServer(ownerPartyId, BattleState.DefenderVictory, ownerCapturedByTheHideout: true);
+
+        var finalized = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Assert.Equal(IssueOutcome.QuestFail, finalized.Outcome);
+        Assert.Equal(powerBefore - PowerChange, PowerOfHeadman(Server));
+        Assert.Equal(powerBefore - PowerChange, PowerOfHeadman(ClientA));
         AssertIssueEndedEverywhere();
     }
 
@@ -472,7 +552,7 @@ public class NearbyBanditBaseTests : IDisposable
             using (new AllowedThread())
             {
                 issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 1);
-                issue.AlternativeSolutionSentTroops.AddToCounts(troop, 40);
+                issue.AlternativeSolutionSentTroops.AddToCounts(troop, SentTroops);
             }
 
             Assert.True(issue.DoTroopsSatisfyAlternativeSolution(issue.AlternativeSolutionSentTroops, out var explanation), explanation?.ToString());
@@ -481,7 +561,7 @@ public class NearbyBanditBaseTests : IDisposable
             {
                 Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(troopId, out var serverTroop));
                 Assert.True(Server.ObjectManager.TryGetHandle(serverTroop, out var handle));
-                var delta = new TroopRosterData(new[] { new TroopRosterElementData(handle, 40, 0, 0) });
+                var delta = new TroopRosterData(new[] { new TroopRosterElementData(handle, SentTroops, 0, 0) });
                 Server.Resolve<IMessageBroker>().Publish(this, new PartyDoneLogicApplied(ClientA.NetPeer,
                     PartyScreenHelper.PartyScreenMode.QuestTroopManage, delta, ownerHeroId, headmanId, issue.StringId));
             });
@@ -565,7 +645,7 @@ public class NearbyBanditBaseTests : IDisposable
         });
     }
 
-    private void EndHideoutBattleOnServer(string attackerPartyId, BattleState battleState)
+    private void EndHideoutBattleOnServer(string attackerPartyId, BattleState battleState, string? finalizingHeroId = null, bool ownerCapturedByTheHideout = false)
     {
         Server.Call(() =>
         {
@@ -578,8 +658,44 @@ public class NearbyBanditBaseTests : IDisposable
             mapEvent.MapEventVisual = null;
             mapEvent._battleState = battleState;
 
-            CampaignEventDispatcher.Instance.OnMapEventEnded(mapEvent);
+            if (ownerCapturedByTheHideout)
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var owner));
+
+                using (new AllowedThread())
+                {
+                    owner._heroState = Hero.CharacterStates.Prisoner;
+                    owner.PartyBelongedToAsPrisoner = hideout.Party;
+                    owner.CaptivityStartTime = mapEvent.BattleStartTime;
+                }
+            }
+
+            if (finalizingHeroId == null)
+            {
+                CampaignEventDispatcher.Instance.OnMapEventEnded(mapEvent);
+                return;
+            }
+
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(finalizingHeroId, out var finalizingHero));
+
+            using (new MainHeroSubstitutionScope(finalizingHero, attacker))
+            {
+                CampaignEventDispatcher.Instance.OnMapEventEnded(mapEvent);
+            }
         }, MapEventMethods.Concat(QuestLogTexts));
+    }
+
+    private void RemoveTheOwnersParty()
+    {
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var owner));
+
+            using (new AllowedThread())
+            {
+                owner._partyBelongedTo = null;
+            }
+        });
     }
 
     private void AssertIssueEndedEverywhere()
