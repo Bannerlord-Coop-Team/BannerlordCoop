@@ -80,7 +80,7 @@ internal class CoopSiegeBattleLauncher : ICoopSiegeBattleLauncher
         bool isSallyOut)
     {
         bool hasAnySiegeTower = attackerWeapons.Exists(weapon => weapon.Type == DefaultSiegeEngineTypes.SiegeTower);
-        bool isPlayerSergeant = MobileParty.MainParty.MapEvent.IsPlayerSergeant();
+        bool isPlayerSergeant = CoopFieldBattleLauncher.IsLocalPlayerSergeant(MobileParty.MainParty.MapEvent);
         bool isPlayerInArmy = MobileParty.MainParty.Army != null;
         bool isPlayerAttacker = PartyBase.MainParty.Side == BattleSideEnum.Attacker;
         List<string> heroesOnPlayerSideByPriority = CoopFieldBattleLauncher.OwnPartyHeroesByPriority();

@@ -156,7 +156,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
     // Opens the naval mission with the own party's ships, captains and slot, then attaches the coop and naval behaviours.
     private Mission CreateCoopNavalBattle(MissionInitializerRecord rec, MapEvent mapEvent, string mapEventId)
     {
-        bool isPlayerSergeant = mapEvent.IsPlayerSergeant();
+        bool isPlayerSergeant = CoopFieldBattleLauncher.IsLocalPlayerSergeant(mapEvent);
         bool isPlayerInArmy = MobileParty.MainParty.Army != null;
         BattleSideEnum playerSide = PartyBase.MainParty.Side;
         bool isPlayerAttacker = playerSide == BattleSideEnum.Attacker;
