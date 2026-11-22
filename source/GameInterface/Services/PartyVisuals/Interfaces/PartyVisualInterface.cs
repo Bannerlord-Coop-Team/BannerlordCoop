@@ -55,6 +55,7 @@ internal sealed class PartyVisualInterface : IPartyVisualInterface
         if (IsHeadlessServer)
             SendCreateVisual(party);
         else
+            // PartyVisualLifetimePatches replicates the native creation.
             party.CreateNewPartyVisual();
     }
 
@@ -63,6 +64,7 @@ internal sealed class PartyVisualInterface : IPartyVisualInterface
         if (IsHeadlessServer)
             SendDestroyVisual(party);
         else
+            // PartyVisualLifetimePatches replicates the native removal.
             party.RemovePartyVisual();
     }
 
