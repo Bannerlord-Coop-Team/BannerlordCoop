@@ -74,7 +74,7 @@ public sealed partial class TournamentGameInterface
         {
             TournamentTeamData team = match.Teams[i];
             int winnerIndex = Array.FindIndex(winnerTeams, winner => winner.TeamId == team.TeamId);
-            // match scores count from zero, so the stored team score from an earlier match is ignored
+            // each match counts from zero like native TournamentMatch.Start, so losers score 0 and winners rank down from winnerTeamCount
             int score = winnerIndex < 0
                 ? 0
                 : winnerTeamCount - winnerIndex;

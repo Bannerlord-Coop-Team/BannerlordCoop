@@ -331,8 +331,7 @@ public class TournamentBracketRebindTests
             new[] { new TournamentTeamScoreData("team", 2) });
 
         Assert.True(applied);
-        Assert.Equal(2, match.Teams.Single().Score);
-        Assert.All(members, member => Assert.True(member.Score >= 0));
+        Assert.Equal(new[] { 2, 0 }, members.Select(member => member.Score).ToArray());
     }
 
     [Fact]
