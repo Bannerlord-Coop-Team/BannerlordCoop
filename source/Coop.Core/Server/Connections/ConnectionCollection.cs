@@ -21,6 +21,9 @@ public interface IConnectionCollection : IEnumerable<IConnectionLogic>, IDisposa
 {
     IEnumerable<IConnectionLogic> LoadingPeers { get; }
     bool HasCompletedCampaignSynchronization(NetPeer peer);
+
+    /// <summary>Captures connection membership for reuse across checks. Each connection's state remains live.</summary>
+    ICollection<IConnectionLogic> GetSnapshot();
 }
 
 /// <inheritdoc cref="IConnectionCollection"/>
@@ -109,7 +112,9 @@ public class ConnectionCollection : IConnectionCollection, ICampaignSynchronizat
         messageBroker.Publish(this, new ConnectedPlayersChanged(ConnectionStates.Count));
     }
 
-    public IEnumerator<IConnectionLogic> GetEnumerator() => ConnectionStates.Values.GetEnumerator();
+    public ICollection<IConnectionLogic> GetSnapshot() => ConnectionStates.Values;
+
+    public IEnumerator<IConnectionLogic> GetEnumerator() => GetSnapshot().GetEnumerator();
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 }
