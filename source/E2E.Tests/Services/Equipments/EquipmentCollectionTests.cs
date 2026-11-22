@@ -1,4 +1,5 @@
-﻿using E2E.Tests.Environment;
+﻿using Common.Util;
+using E2E.Tests.Environment;
 using TaleWorlds.Core;
 using Xunit.Abstractions;
 
@@ -70,6 +71,37 @@ public class EquipmentCollectionTests : IDisposable
             Assert.Null(clientEquipment._itemSlots[0].Item);
             Assert.Null(clientEquipment._itemSlots[0].ItemModifier);
         }
+    }
+
+    [Fact]
+    public void ServerRewritesAnUnchangedSlot_ResetsAStaleClientCopy()
+    {
+        var server = TestEnvironment.Server;
+        var client = TestEnvironment.Clients.First();
+
+        EquipmentId = TestEnvironment.CreateRegisteredObject<Equipment>();
+        ItemObjectId = TestEnvironment.CreateRegisteredObject<ItemObject>();
+        var otherItemId = TestEnvironment.CreateRegisteredObject<ItemObject>();
+
+        server.Call(() => server.GetRegisteredObject<Equipment>(EquipmentId)[EquipmentIndex.Body] =
+            new EquipmentElement(server.GetRegisteredObject<ItemObject>(ItemObjectId)));
+
+        // Like an inventory screen equipping something the server then takes back
+        client.Call(() =>
+        {
+            using (new AllowedThread())
+            {
+                client.GetRegisteredObject<Equipment>(EquipmentId)[EquipmentIndex.Body] =
+                    new EquipmentElement(client.GetRegisteredObject<ItemObject>(otherItemId));
+            }
+        });
+
+        server.Call(() => server.GetRegisteredObject<Equipment>(EquipmentId)[EquipmentIndex.Body] =
+            new EquipmentElement(server.GetRegisteredObject<ItemObject>(ItemObjectId)));
+
+        client.Call(() => Assert.Same(
+            client.GetRegisteredObject<ItemObject>(ItemObjectId),
+            client.GetRegisteredObject<Equipment>(EquipmentId)[EquipmentIndex.Body].Item));
     }
 
     [Fact]

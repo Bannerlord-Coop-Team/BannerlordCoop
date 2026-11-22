@@ -53,7 +53,6 @@ internal class HeroInterface : IHeroInterface
     private readonly IPartyVisibilitySweep partyVisibilitySweep;
     private readonly IPlayerPartyRestorer playerPartyRestorer;
     private readonly ITraitLevelingHelperInterface traitLevelingHelperInterface;
-    private readonly EquipmentRegistry equipmentRegistry;
 
     public HeroInterface(
         IMessageBroker messageBroker,
@@ -61,8 +60,7 @@ internal class HeroInterface : IHeroInterface
         IObjectManager objectManager,
         IPartyVisibilitySweep partyVisibilitySweep,
         IPlayerPartyRestorer playerPartyRestorer,
-        ITraitLevelingHelperInterface traitLevelingHelperInterface,
-        EquipmentRegistry equipmentRegistry)
+        ITraitLevelingHelperInterface traitLevelingHelperInterface)
     {
         this.objectManager = objectManager;
         this.messageBroker = messageBroker;
@@ -70,7 +68,6 @@ internal class HeroInterface : IHeroInterface
         this.partyVisibilitySweep = partyVisibilitySweep;
         this.playerPartyRestorer = playerPartyRestorer;
         this.traitLevelingHelperInterface = traitLevelingHelperInterface;
-        this.equipmentRegistry = equipmentRegistry;
     }
 
     public byte[] PackageMainHero()
@@ -470,15 +467,15 @@ internal class HeroInterface : IHeroInterface
         if (hero._battleEquipment != null)
             RegisterChild(
                 hero._battleEquipment,
-                equipmentRegistry.GetHeroEquipmentId(hero, Equipment.EquipmentType.Battle));
+                EquipmentRegistry.GetHeroEquipmentId(hero, Equipment.EquipmentType.Battle));
         if (hero._civilianEquipment != null)
             RegisterChild(
                 hero._civilianEquipment,
-                equipmentRegistry.GetHeroEquipmentId(hero, Equipment.EquipmentType.Civilian));
+                EquipmentRegistry.GetHeroEquipmentId(hero, Equipment.EquipmentType.Civilian));
         if (hero._stealthEquipment != null)
             RegisterChild(
                 hero._stealthEquipment,
-                equipmentRegistry.GetHeroEquipmentId(hero, Equipment.EquipmentType.Stealth));
+                EquipmentRegistry.GetHeroEquipmentId(hero, Equipment.EquipmentType.Stealth));
     }
 
     // A 0 handle means the host's hero had no equipment of that type
@@ -487,17 +484,17 @@ internal class HeroInterface : IHeroInterface
         if (handles.BattleEquipment != 0)
             RegisterChild(
                 hero._battleEquipment,
-                equipmentRegistry.GetHeroEquipmentId(hero, Equipment.EquipmentType.Battle),
+                EquipmentRegistry.GetHeroEquipmentId(hero, Equipment.EquipmentType.Battle),
                 handles.BattleEquipment);
         if (handles.CivilianEquipment != 0)
             RegisterChild(
                 hero._civilianEquipment,
-                equipmentRegistry.GetHeroEquipmentId(hero, Equipment.EquipmentType.Civilian),
+                EquipmentRegistry.GetHeroEquipmentId(hero, Equipment.EquipmentType.Civilian),
                 handles.CivilianEquipment);
         if (handles.StealthEquipment != 0)
             RegisterChild(
                 hero._stealthEquipment,
-                equipmentRegistry.GetHeroEquipmentId(hero, Equipment.EquipmentType.Stealth),
+                EquipmentRegistry.GetHeroEquipmentId(hero, Equipment.EquipmentType.Stealth),
                 handles.StealthEquipment);
     }
 

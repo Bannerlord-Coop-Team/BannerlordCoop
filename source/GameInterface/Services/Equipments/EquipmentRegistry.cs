@@ -69,7 +69,7 @@ internal class EquipmentRegistry : AutoRegistryBase<Equipment>
     }
 
     // A joined player's equipment is registered under this id too, so it matches what a client loading the save registers
-    public string GetHeroEquipmentId(Hero hero, Equipment.EquipmentType type) => $"{hero.StringId}_{type}Equipment";
+    public static string GetHeroEquipmentId(Hero hero, Equipment.EquipmentType type) => $"{hero.StringId}_{type}Equipment";
 
     public override void OnClientCreated(Equipment obj, string id)
     {
