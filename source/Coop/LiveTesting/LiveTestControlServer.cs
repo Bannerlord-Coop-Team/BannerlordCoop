@@ -726,12 +726,16 @@ namespace Coop.LiveTesting
             {
                 var refusal = GetClientJoinRefusal();
                 if (refusal != null)
-                    return LiveTestResponse.Failure(request.Id, GetProcessInfo(), refusal);
+                    return Failure(request.Id, refusal);
 
                 bool started = startAsClient();
                 Logger.Information("[LiveTest] Deferred StartAsClient() returned {Started}", started);
                 if (!started)
-                    return Failure(request.Id, "client_start_refused", "The client session did not start; retry once startup is ready.", false);
+                    return Failure(
+                        request.Id,
+                        "client_start_refused",
+                        "The client session did not start: another start is still running or the /autoconnect arguments are invalid.",
+                        false);
                 return Success(request.Id, new { started = true });
             }, true);
         }
@@ -998,10 +1002,12 @@ namespace Coop.LiveTesting
             string message,
             bool outcomeUncertain)
         {
-            return LiveTestResponse.Failure(
-                id,
-                GetProcessInfo(),
-                new LiveTestError(code, message, outcomeUncertain));
+            return Failure(id, new LiveTestError(code, message, outcomeUncertain));
+        }
+
+        private LiveTestResponse Failure(string id, LiveTestError error)
+        {
+            return LiveTestResponse.Failure(id, GetProcessInfo(), error);
         }
 
         private LiveTestProcessInfo GetProcessInfo()
