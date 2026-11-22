@@ -8,14 +8,10 @@ namespace GameInterface.Tests.Serialization.SerializerTests.ProofOfConcept
 {
     public class GenericSerializationTests
     {
-        IContainer container;
+        ILifetimeScope container;
         public GenericSerializationTests()
         {
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
+            container = SerializationTestContainer.BeginScope();
         }
 
         [Fact]

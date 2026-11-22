@@ -637,16 +637,16 @@ internal readonly struct NetworkArmyDispersed : ICommand
     public readonly Army.ArmyDispersionReason Reason;
 
     [ProtoMember(3)]
-    public readonly bool IsPlayersArmy;
+    public readonly List<string> PlayerPartyIds;
 
     public NetworkArmyDispersed(
         string armyId,
         Army.ArmyDispersionReason reason,
-        bool isPlayersArmy)
+        List<string> playerPartyIds)
     {
         ArmyId = armyId;
         Reason = reason;
-        IsPlayersArmy = isPlayersArmy;
+        PlayerPartyIds = playerPartyIds;
     }
 }
 
@@ -894,5 +894,56 @@ internal readonly struct NetworkNotifyHeroTeleportation : ICommand
         TargetSettlementId = targetSettlementId;
         TargetPartyId = targetPartyId;
         Detail = detail;
+    }
+}
+
+[ProtoContract(SkipConstructor = true)]
+internal readonly struct NetworkLogArmyGathered : ICommand
+{
+    [ProtoMember(1)]
+    public readonly string ArmyId;
+
+    [ProtoMember(2)]
+    public readonly string GatheringPointId;
+
+    public NetworkLogArmyGathered(
+        string armyId,
+        string gatheringPointId)
+    {
+        ArmyId = armyId;
+        GatheringPointId = gatheringPointId;
+    }
+}
+
+[ProtoContract(SkipConstructor = true)]
+internal readonly struct NetworkLogSiegeAftermathApplied : ICommand
+{
+    [ProtoMember(1)]
+    public readonly string AttackerPartyId;
+
+    [ProtoMember(2)]
+    public readonly string SettlementId;
+
+    [ProtoMember(3)]
+    public readonly SiegeAftermathAction.SiegeAftermath AftermathType;
+
+    [ProtoMember(4)]
+    public readonly string PreviousSettlementOwnerId;
+
+    [ProtoMember(5)]
+    public readonly Dictionary<string, float> PartyContributionIds;
+
+    public NetworkLogSiegeAftermathApplied(
+        string attackerPartyId,
+        string settlementId,
+        SiegeAftermathAction.SiegeAftermath aftermathType,
+        string previousSettlementOwnerId,
+        Dictionary<string, float> partyContributionIds)
+    {
+        AttackerPartyId = attackerPartyId;
+        SettlementId = settlementId;
+        AftermathType = aftermathType;
+        PreviousSettlementOwnerId = previousSettlementOwnerId;
+        PartyContributionIds = partyContributionIds;
     }
 }

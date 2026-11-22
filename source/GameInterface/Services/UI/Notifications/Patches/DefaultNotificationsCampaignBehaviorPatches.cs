@@ -8,6 +8,7 @@ using HarmonyLib;
 using SandBox.CampaignBehaviors;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -25,6 +26,7 @@ namespace GameInterface.Services.UI.Notifications.Patches;
 /// Adds postfixes to events called on the server to run the same events on clients to display notifications and other processing.
 /// Vanilla implementation for most of these already checks for local player's hero, clan and party
 /// so usually don't need extra processing on clients for these notifications.
+/// Events also logged by DefaultLogsCampaignBehavior aren't limited to players, since clients add their log entries from these relays.
 /// Commented events are yet to be implemented or are managed elsewhere
 /// </summary>
 [HarmonyPatch(typeof(DefaultNotificationsCampaignBehavior))]
@@ -133,7 +135,7 @@ internal class DefaultNotificationsCampaignBehaviorPatches
     [HarmonyPostfix]
     public static void OnHeroBecameFugitivePostfix(ref DefaultNotificationsCampaignBehavior __instance, Hero hero, bool showNotification)
     {
-        if (ModInformation.IsClient || !IsValidPlayerClan(hero.Clan)) return;
+        if (ModInformation.IsClient) return;
 
         var message = new NotifyHeroBecameFugitive(hero, showNotification);
         MessageBroker.Instance.Publish(__instance, message);
@@ -143,7 +145,7 @@ internal class DefaultNotificationsCampaignBehaviorPatches
     [HarmonyPostfix]
     public static void OnPrisonerTakenPostfix(ref DefaultNotificationsCampaignBehavior __instance, PartyBase capturer, Hero prisoner)
     {
-        if (ModInformation.IsClient || !IsValidPlayerClan(prisoner.Clan)) return;
+        if (ModInformation.IsClient) return;
 
         var message = new NotifyPrisonerTaken(capturer, prisoner);
         MessageBroker.Instance.Publish(__instance, message);
@@ -163,8 +165,7 @@ internal class DefaultNotificationsCampaignBehaviorPatches
     [HarmonyPostfix]
     public static void OnBattleStartedPostfix(ref DefaultNotificationsCampaignBehavior __instance, PartyBase attackerParty, PartyBase defenderParty, object subject, bool showNotification)
     {
-        Settlement settlement;
-        if (ModInformation.IsClient || (settlement = (subject as Settlement)) == null || !IsValidPlayerClan(settlement.OwnerClan)) return;
+        if (ModInformation.IsClient || !showNotification || !(subject is Settlement settlement)) return;
 
         var message = new NotifyBattleStarted(attackerParty, defenderParty, settlement, showNotification);
         MessageBroker.Instance.Publish(__instance, message);
@@ -174,7 +175,7 @@ internal class DefaultNotificationsCampaignBehaviorPatches
     [HarmonyPostfix]
     public static void OnSiegeEventStartedPostfix(ref DefaultNotificationsCampaignBehavior __instance, SiegeEvent siegeEvent)
     {
-        if (ModInformation.IsClient || siegeEvent.BesiegedSettlement == null || !IsValidPlayerClan(siegeEvent.BesiegedSettlement.OwnerClan)) return;
+        if (ModInformation.IsClient || siegeEvent.BesiegedSettlement == null) return;
 
         var message = new NotifySiegeEventStarted(siegeEvent);
         MessageBroker.Instance.Publish(__instance, message);
@@ -337,9 +338,13 @@ internal class DefaultNotificationsCampaignBehaviorPatches
     [HarmonyPostfix]
     public static void OnArmyDispersedPostfix(ref DefaultNotificationsCampaignBehavior __instance, Army army, Army.ArmyDispersionReason reason, bool isPlayersArmy)
     {
-        if (ModInformation.IsClient || !isPlayersArmy) return;
+        if (ModInformation.IsClient) return;
 
-        var message = new ArmyDispersed(); // Needs to check food notifications
+        // isPlayersArmy is computed against the server's own MainParty, so each client checks for its own party instead
+        var playerParties = army.Parties.Where(party => party.IsPlayerParty()).ToList();
+        if (playerParties.Count == 0) return;
+
+        var message = new ArmyDispersed(army, reason, playerParties);
         MessageBroker.Instance.Publish(__instance, message);
     }
 
@@ -347,8 +352,7 @@ internal class DefaultNotificationsCampaignBehaviorPatches
     [HarmonyPostfix]
     public static void OnHeroesMarriedPostfix(ref DefaultNotificationsCampaignBehavior __instance, Hero firstHero, Hero secondHero, bool showNotification)
     {
-        if (ModInformation.IsClient 
-            || (!IsValidPlayerClan(firstHero.Clan) && !IsValidPlayerClan(secondHero.Clan))) return;
+        if (ModInformation.IsClient) return;
 
         var message = new NotifyHeroesMarried(firstHero, secondHero, showNotification);
         MessageBroker.Instance.Publish(__instance, message);
@@ -431,8 +435,7 @@ internal class DefaultNotificationsCampaignBehaviorPatches
     [HarmonyPostfix]
     public static void OnTournamentFinishedPostfix(ref DefaultNotificationsCampaignBehavior __instance, CharacterObject winner, MBReadOnlyList<CharacterObject> participants, Town town, ItemObject prize)
     {
-        if (ModInformation.IsClient 
-            || !winner.IsHero || !IsValidPlayerClan(winner.HeroObject.Clan) || !IsValidPlayerParty(winner.HeroObject.PartyBelongedTo)) return;
+        if (ModInformation.IsClient || !winner.IsHero) return;
 
         var message = new NotifyTournamentFinished(winner, participants, town, prize);
         MessageBroker.Instance.Publish(__instance, message);

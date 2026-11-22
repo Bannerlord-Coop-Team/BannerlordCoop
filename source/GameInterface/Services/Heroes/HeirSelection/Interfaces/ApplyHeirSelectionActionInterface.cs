@@ -1,7 +1,9 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.Actions.Patches;
+using GameInterface.Services.Clans;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Heroes.HeirSelection.Messages;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.UI.LogEntries.Messages;
 using GameInterface.Services.Workshops.Interfaces;
 using Helpers;
@@ -9,10 +11,12 @@ using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Extensions;
+using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
 using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Heroes.HeirSelection.Interfaces;
@@ -21,18 +25,25 @@ public interface IApplyHeirSelectionActionInterface : IGameAbstraction
 {
     void ApplyByDeath(Hero originalHero, Hero heir, MobileParty originalParty);
     void ApplyByRetirement(Hero originalHero, Hero heir);
+    void ApplyByRetirementWithoutHeir(Hero originalHero);
     void AppointClanLeader(Hero originalHero, Hero successor);
+    void TransferFleetToHeir(MobileParty originalParty, MobileParty heirParty);
 }
 
 public class ApplyHeirSelectionActionInterface : IApplyHeirSelectionActionInterface
 {
     private readonly IMessageBroker messageBroker;
     private readonly ISessionWorkshopPlayerDataInterface workshopData;
+    private readonly ILeaderlessClanResolver leaderlessClanResolver;
 
-    public ApplyHeirSelectionActionInterface(IMessageBroker messageBroker, ISessionWorkshopPlayerDataInterface workshopData)
+    public ApplyHeirSelectionActionInterface(
+        IMessageBroker messageBroker,
+        ISessionWorkshopPlayerDataInterface workshopData,
+        ILeaderlessClanResolver leaderlessClanResolver)
     {
         this.messageBroker = messageBroker;
         this.workshopData = workshopData;
+        this.leaderlessClanResolver = leaderlessClanResolver;
     }
 
     public void ApplyByDeath(Hero originalHero, Hero heir, MobileParty originalParty)
@@ -43,6 +54,41 @@ public class ApplyHeirSelectionActionInterface : IApplyHeirSelectionActionInterf
     public void ApplyByRetirement(Hero originalHero, Hero heir)
     {
         ApplyInternal(originalHero, heir, originalHero.PartyBelongedTo, true);
+    }
+
+    public void ApplyByRetirementWithoutHeir(Hero originalHero)
+    {
+        Clan clan = originalHero.Clan;
+        if (clan?.Leader == originalHero)
+        {
+            Hero successor = clan.Heroes
+                .Where(candidate => CanSucceedRetiringLeader(candidate, originalHero))
+                .OrderBy(candidate => candidate.IsPlayerHero())
+                .FirstOrDefault();
+
+            // a kingdom clan must not stay without a leader (#4166): any adult can take over, even one
+            // the retirement order skips (a prisoner, someone travelling)
+            if (successor == null && clan.Kingdom != null)
+                successor = leaderlessClanResolver.FindSuccessor(clan, originalHero);
+
+            if (successor != null)
+            {
+                // the retiring hero is still the leader here, so the full vanilla action applies
+                ChangeClanLeaderAction.ApplyWithSelectedNewLeader(clan, successor);
+            }
+            else if (clan.Kingdom == null)
+            {
+                // The vanilla leader change action leaves the retired hero as leader when there is no successor.
+                clan.SetLeader(null);
+            }
+        }
+
+        DisableHeroAction.Apply(originalHero);
+        RecordRetirement(originalHero);
+
+        // nobody can lead the kingdom clan: close it without killing the retired hero or the children
+        if (clan?.Kingdom != null && clan.Leader == originalHero)
+            leaderlessClanResolver.CloseClan(clan);
     }
 
     public void AppointClanLeader(Hero originalHero, Hero successor)
@@ -104,12 +150,7 @@ public class ApplyHeirSelectionActionInterface : IApplyHeirSelectionActionInterf
                 originalParty.MemberRoster.RemoveTroop(originalHero.CharacterObject, 1, default, 0);
             }
 
-            // Broadcast log entry for all clients
-            messageBroker.Publish(this, new LogPlayerRetired(originalHero));
-
-            TextObject textObject = new TextObject("{=0MTzaxau}{?CHARACTER.GENDER}She{?}He{\\?} retired from adventuring, and was last seen with a group of mountain hermits living a life of quiet contemplation.", null);
-            textObject.SetCharacterProperties("CHARACTER", originalHero.CharacterObject, false);
-            originalHero.EncyclopediaText = textObject;
+            RecordRetirement(originalHero);
         }
         if (heir.CurrentSettlement != null && heir.PartyBelongedTo != null)
         {
@@ -136,6 +177,34 @@ public class ApplyHeirSelectionActionInterface : IApplyHeirSelectionActionInterf
         messageBroker.Publish(this, new ChangePlayerCharacterAfterHeirSelection(originalHero, heir));
     }
 
+    // Substitute for fleet transfer that happens during ChangePlayerCharacterAction.Apply to run on the server
+    public void TransferFleetToHeir(MobileParty originalParty, MobileParty heirParty)
+    {
+        if (originalParty == null || heirParty == null || originalParty == heirParty) return;
+        if (originalParty.Ships.Count == 0) return;
+
+        var anchorPosition = originalParty.Anchor.Position;
+        var lastUsedDisembarkPosition = originalParty.Anchor._lastUsedDisembarkPosition;
+
+        // A crew left at sea keeps its weakest ship
+        Ship keptShip = originalParty.MemberRoster.TotalManCount <= 1 || !originalParty.IsCurrentlyAtSea
+            ? null
+            : originalParty.Ships.MinBy(ship => ship.HitPoints);
+        for (int i = originalParty.Ships.Count - 1; i >= 0; i--)
+        {
+            if (originalParty.Ships[i] != keptShip)
+            {
+                ChangeShipOwnerAction.ApplyByTransferring(heirParty.Party, originalParty.Ships[i]);
+            }
+        }
+
+        if (heirParty.Ships.Count > 0 && anchorPosition.IsValid() && !heirParty.Anchor.IsValid && !heirParty.IsCurrentlyAtSea)
+        {
+            heirParty.Anchor.Position = anchorPosition;
+            heirParty.Anchor.SetLastUsedDisembarkPosition(lastUsedDisembarkPosition);
+        }
+    }
+
     private void TransferAssets(Hero originalHero, Hero heir)
     {
         foreach (var caravan in originalHero.OwnedCaravans.ToArray())
@@ -146,5 +215,33 @@ public class ApplyHeirSelectionActionInterface : IApplyHeirSelectionActionInterf
 
         foreach (Alley alley in originalHero.OwnedAlleys.ToArray())
             alley.SetOwner(heir);
+    }
+
+    private void RecordRetirement(Hero originalHero)
+    {
+        messageBroker.Publish(this, new LogPlayerRetired(originalHero));
+
+        TextObject textObject = new TextObject("{=0MTzaxau}{?CHARACTER.GENDER}She{?}He{\\?} retired from adventuring, and was last seen with a group of mountain hermits living a life of quiet contemplation.", null);
+        textObject.SetCharacterProperties("CHARACTER", originalHero.CharacterObject, false);
+        originalHero.EncyclopediaText = textObject;
+    }
+
+    private static bool CanSucceedRetiringLeader(Hero candidate, Hero retiringHero)
+    {
+        if (candidate == retiringHero || !candidate.IsAlive || candidate.IsDisabled || candidate.IsNotSpawned ||
+            candidate.IsWanderer || candidate.IsNotable || candidate.IsChild ||
+            candidate.Age < Campaign.Current.Models.AgeModel.HeroComesOfAge ||
+            candidate.DeathMark != KillCharacterAction.KillCharacterActionDetail.None ||
+            candidate.IsPrisoner || candidate.IsFugitive || candidate.IsReleased || candidate.IsTraveling)
+        {
+            return false;
+        }
+
+        MobileParty party = candidate.PartyBelongedTo;
+        if (retiringHero.PartyBelongedTo != null && party == retiringHero.PartyBelongedTo) return false;
+        if (party?.IsPlayerParty() == true)
+            return candidate.IsPlayerHero() && party.LeaderHero == candidate;
+
+        return !candidate.IsPlayerHero() || party != null && party.LeaderHero == candidate;
     }
 }

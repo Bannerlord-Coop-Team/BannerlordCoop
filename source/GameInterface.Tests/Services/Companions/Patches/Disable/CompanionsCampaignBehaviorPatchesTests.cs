@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Util;
 using GameInterface.Services.Companions.Patches.Disable;
+using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -97,21 +98,6 @@ public class CompanionsCampaignBehaviorPatchesTests
     }
 
     [Fact]
-    public void ShouldSpawnUnaffiliatedWanderer_RepeatedTemplates_UsesHeroPopulation()
-    {
-        var template = new CharacterObject { _occupation = Occupation.Wanderer };
-        var firstWanderer = CreateWanderer(template);
-        var secondWanderer = CreateWanderer(template);
-
-        Assert.True(CompanionsCampaignBehaviorPatches.ShouldSpawnUnaffiliatedWanderer(
-            new[] { firstWanderer, secondWanderer },
-            targetPopulation: 3));
-        Assert.False(CompanionsCampaignBehaviorPatches.ShouldSpawnUnaffiliatedWanderer(
-            new[] { firstWanderer, secondWanderer },
-            targetPopulation: 2));
-    }
-
-    [Fact]
     public void RepairStuckHeroes_MultipleStuckHeroes_RepairsEveryMatch()
     {
         var firstStuckHero = CreateHero(Hero.CharacterStates.Prisoner);
@@ -126,6 +112,77 @@ public class CompanionsCampaignBehaviorPatchesTests
             repairedHeroes.Add);
 
         Assert.Equal(new[] { firstStuckHero, secondStuckHero }, repairedHeroes);
+    }
+
+    [Fact]
+    public void ShouldSpawnWanderer_FreeOnly_IgnoresHiredWanderers()
+    {
+        var template = new CharacterObject { _occupation = Occupation.Wanderer };
+        var free = CreateWanderer(template);
+        var hired = CreateHiredWanderer(template);
+
+        // 1 free wanderer, so below a limit of 2 even though 2 wanderers exist
+        Assert.True(CompanionsCampaignBehaviorPatches.ShouldSpawnWanderer(
+            new[] { free, hired }, limit: 2, freeOnly: true));
+        Assert.False(CompanionsCampaignBehaviorPatches.ShouldSpawnWanderer(
+            new[] { free, hired }, limit: 1, freeOnly: true));
+    }
+
+    [Fact]
+    public void ShouldSpawnWanderer_NotFreeOnly_CountsHiredWanderers()
+    {
+        var template = new CharacterObject { _occupation = Occupation.Wanderer };
+        var free = CreateWanderer(template);
+        var hired = CreateHiredWanderer(template);
+
+        Assert.False(CompanionsCampaignBehaviorPatches.ShouldSpawnWanderer(
+            new[] { free, hired }, limit: 2, freeOnly: false));
+        Assert.True(CompanionsCampaignBehaviorPatches.ShouldSpawnWanderer(
+            new[] { free, hired }, limit: 3, freeOnly: false));
+    }
+
+    [Fact]
+    public void ShouldSpawnWanderer_NonWanderers_AreNotCounted()
+    {
+        var lord = CreateHero(Hero.CharacterStates.Active);
+        var template = new CharacterObject { _occupation = Occupation.Wanderer };
+        var wanderer = CreateWanderer(template);
+
+        Assert.True(CompanionsCampaignBehaviorPatches.ShouldSpawnWanderer(
+            new[] { lord, wanderer }, limit: 2, freeOnly: true));
+        Assert.True(CompanionsCampaignBehaviorPatches.ShouldSpawnWanderer(
+            new[] { lord, wanderer }, limit: 2, freeOnly: false));
+    }
+
+    [Fact]
+    public void ShouldSpawnWanderer_NoHeroes_SpawnsWhenLimitPositive()
+    {
+        Assert.True(CompanionsCampaignBehaviorPatches.ShouldSpawnWanderer(
+            Array.Empty<Hero>(), limit: 1, freeOnly: true));
+        Assert.False(CompanionsCampaignBehaviorPatches.ShouldSpawnWanderer(
+            Array.Empty<Hero>(), limit: 0, freeOnly: true));
+    }
+
+    [Fact]
+    public void ShouldSpawnWanderer_CountEqualsLimit_DoesNotSpawn()
+    {
+        var template = new CharacterObject { _occupation = Occupation.Wanderer };
+        var heroes = new[] { CreateWanderer(template), CreateWanderer(template) };
+
+        Assert.False(CompanionsCampaignBehaviorPatches.ShouldSpawnWanderer(
+            heroes, limit: 2, freeOnly: true));
+    }
+
+    [Fact]
+    public void ShouldSpawnWanderer_FractionalLimit_ComparesAsFloat()
+    {
+        var template = new CharacterObject { _occupation = Occupation.Wanderer };
+        var heroes = new[] { CreateWanderer(template), CreateWanderer(template) };
+
+        Assert.True(CompanionsCampaignBehaviorPatches.ShouldSpawnWanderer(
+            heroes, limit: 2.5f, freeOnly: true));
+        Assert.False(CompanionsCampaignBehaviorPatches.ShouldSpawnWanderer(
+            heroes, limit: 1.5f, freeOnly: true));
     }
 
     private static Hero CreateHero(Hero.CharacterStates state)
@@ -158,6 +215,13 @@ public class CompanionsCampaignBehaviorPatchesTests
         wanderer._characterObject = generatedCharacter;
         wanderer.Occupation = Occupation.Wanderer;
         generatedCharacter._heroObject = wanderer;
+        return wanderer;
+    }
+
+    private static Hero CreateHiredWanderer(CharacterObject template)
+    {
+        var wanderer = CreateWanderer(template);
+        wanderer._companionOf = ObjectHelper.SkipConstructor<Clan>();
         return wanderer;
     }
 }

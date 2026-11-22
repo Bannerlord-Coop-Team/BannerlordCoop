@@ -63,7 +63,7 @@ public class ExpiredClientRequestTests : MapEventTestBase
         Server.NetworkSentMessages.Clear();
         Server.Call(() =>
         {
-            using (GameThread.Instance.LimitFrameDrain(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2)))
+            using (GameThread.Instance.LimitFrameDrain(TimeSpan.FromSeconds(1), TimeSpan.FromMilliseconds(200)))
                 RunHeldUntilThePollerGivesUp<NetworkMapEventFinalizeAttempted, MapEventFinalized>(client, request).AssertReturned();
 
             RunQueuedActions(Server);
@@ -118,7 +118,7 @@ public class ExpiredClientRequestTests : MapEventTestBase
         Server.NetworkSentMessages.Clear();
         Server.Call(() =>
         {
-            using var shortTimeout = GameThread.Instance.LimitFrameDrain(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2));
+            using var shortTimeout = GameThread.Instance.LimitFrameDrain(TimeSpan.FromSeconds(1), TimeSpan.FromMilliseconds(200));
             RunHeldUntilThePollerGivesUp<NetworkRequestJoinBattle, BattleJoinAccepted>(client, request).AssertTimedOut();
         }, MapEventDisabledMethods);
         Server.PumpGameThread();
@@ -161,7 +161,7 @@ public class ExpiredClientRequestTests : MapEventTestBase
         Server.NetworkSentMessages.Clear();
         Server.Call(() =>
         {
-            using (GameThread.Instance.LimitFrameDrain(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2)))
+            using (GameThread.Instance.LimitFrameDrain(TimeSpan.FromSeconds(1), TimeSpan.FromMilliseconds(200)))
                 RunHeldUntilThePollerGivesUp<NetworkRequestLeaveBattle, PartyBehaviorChangeAttempted>(client, request).AssertReturned();
 
             RunQueuedActions(Server);
@@ -200,7 +200,7 @@ public class ExpiredClientRequestTests : MapEventTestBase
         Server.NetworkSentMessages.Clear();
         Server.Call(() =>
         {
-            using (GameThread.Instance.LimitFrameDrain(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2)))
+            using (GameThread.Instance.LimitFrameDrain(TimeSpan.FromSeconds(1), TimeSpan.FromMilliseconds(200)))
                 RunHeldUntilThePollerGivesUp<NetworkEndPlayerCaptivityAttempted, PlayerPartyReleasedFromCaptivity>(client, request).AssertReturned();
 
             RunQueuedActions(Server);

@@ -10,6 +10,7 @@ using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Utils.Commands;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -169,13 +170,20 @@ internal static class PeaceBattleFixtureCommands
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("map_event_id", "The fixture map event id.", true),
-            new ExpectedArgs("battania_leader_id", "The Battanian leader party StringId.", true),
-            new ExpectedArgs("battania_member_id", "The Battanian member party StringId.", true),
-            new ExpectedArgs("wolfskins_party_id", "The Wolfskins party StringId.", true),
-            new ExpectedArgs("vlandia_leader_id", "The Vlandian leader party StringId.", true),
-            new ExpectedArgs("vlandia_member_id", "The Vlandian member party StringId.", true),
+            new ExpectedArgs("battania_leader_id", "The Battanian leader party name or id; quote names with spaces.", true),
+            new ExpectedArgs("battania_member_id", "The Battanian member party name or id; quote names with spaces.", true),
+            new ExpectedArgs("wolfskins_party_id", "The Wolfskins party name or id; quote names with spaces.", true),
+            new ExpectedArgs("vlandia_leader_id", "The Vlandian leader party name or id; quote names with spaces.", true),
+            new ExpectedArgs("vlandia_member_id", "The Vlandian member party name or id; quote names with spaces.", true),
             new ExpectedArgs("mode", "Use partial for the allied-attacker fixture; omit for defender reinforcement.", false),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public StateCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
@@ -184,9 +192,14 @@ internal static class PeaceBattleFixtureCommands
                 return Failed("Mode must be partial, or omit it for defender reinforcement.");
             if (!ContainerProvider.TryResolve<IObjectManager>(out var objects))
                 return Failed("Unable to resolve ObjectManager.");
-            var parties = Enumerable.Range(1, 5)
-                .Select(index => Campaign.Current.CampaignObjectManager.Find<MobileParty>(args[index]))
-                .ToArray();
+            var parties = new MobileParty[5];
+            for (var index = 0; index < parties.Length; index++)
+            {
+                // A missing party stays null so StateJson reports that role as absent; only an ambiguous name is a hard failure.
+                if (!resolver.TryResolveMobileParty(args[index + 1], out parties[index], out var partyError) &&
+                    resolver.IsAmbiguous(partyError))
+                    return Failed(partyError);
+            }
             return Succeeded(StateJson(objects, args[0], parties, partialMode: args.Count == 7));
         }
     }

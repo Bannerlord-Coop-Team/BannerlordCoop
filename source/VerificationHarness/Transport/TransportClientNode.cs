@@ -1,7 +1,9 @@
 ﻿using LiteNetLib;
+using System.Net;
 
 namespace VerificationHarness.Transport;
 
+/// <summary>Harness client peer that connects to the loopback server node and plays its side of a scenario.</summary>
 internal sealed class TransportClientNode : TransportNodeBase
 {
     private NetPeer? serverPeer;
@@ -17,6 +19,7 @@ internal sealed class TransportClientNode : TransportNodeBase
     {
     }
 
+    /// <summary>Runs the client on a loopback socket until the scenario finishes, fails or times out.</summary>
     public async Task<TransportNodeResult> RunAsync(CancellationToken cancellationToken)
     {
         var manager = new NetManager(this)
@@ -26,7 +29,7 @@ internal sealed class TransportClientNode : TransportNodeBase
             ChannelsCount = 1
         };
         Manager = manager;
-        if (!manager.Start())
+        if (!manager.Start(IPAddress.Loopback, IPAddress.IPv6Loopback, 0))
         {
             Result.Error = "Could not start LiteNetLib client.";
             return Result;

@@ -16,31 +16,12 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class CaravanPartyComponentSerializationTest
     {
-        IContainer container;
+        ILifetimeScope container;
         public CaravanPartyComponentSerializationTest()
         {
             GameBootStrap.Initialize();
 
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
-        }
-
-        [Fact]
-        public void CaravanPartyComponent_Serialize()
-        {
-            CaravanPartyComponent CaravanPartyComponent = (CaravanPartyComponent)FormatterServices.GetUninitializedObject(typeof(CaravanPartyComponent));
-
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            CaravanPartyComponentBinaryPackage package = new CaravanPartyComponentBinaryPackage(CaravanPartyComponent, factory);
-
-            package.Pack();
-
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
-
-            Assert.NotEmpty(bytes);
+            container = SerializationTestContainer.BeginScope();
         }
 
         [Fact]

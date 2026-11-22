@@ -4,7 +4,7 @@
 Please check if your PR fulfills the following requirements:
 
 - [ ] All new classes have class-level documentation comments, if there are any at all
-- [ ] Tests for the changes have been added (for bug fixes / features)
+- [ ] New behavior has a test that catches something no existing test does, or the PR says why it needs none
 
 ## PR Type
 What kind of change does this PR introduce?

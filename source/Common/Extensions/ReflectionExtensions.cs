@@ -2,19 +2,21 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using Common.Logging;
+using Serilog;
 
 namespace Common.Extensions;
 
 public static class ReflectionExtensions
 {
+    private static readonly ILogger Logger = LogManager.GetLogger(typeof(ReflectionExtensions));
+
+    private const int MaxLoggedLoaderErrors = 5;
+    private const int MaxLoggedTypeNames = 10;
+
     /// <summary>
-    /// Gets all types in an AppDomain
+    /// Gets all types in an AppDomain, skipping the types an assembly cannot load
     /// </summary>
-    /// <remarks>
-    /// When running in tests and some other situations
-    /// reflection throws a ReflectionTypeLoadException,
-    /// Try statement is for mitigation.
-    /// </remarks>
     /// <param name="domain">Domain to get types from</param>
     /// <returns>Enumarable of all domain types</returns>
     public static IEnumerable<Type> GetDomainTypes(this AppDomain domain, string namespacePrefix = null)
@@ -26,20 +28,94 @@ public static class ReflectionExtensions
         Assembly[] assemblies = domain.GetAssemblies();
         foreach (Assembly _assembly in assemblies)
         {
-            try
-            {
-                foreach (Type type in _assembly.GetTypes())
-                {
-                    if (type.Namespace == null) continue;
-                    if (type.Namespace.StartsWith(namespacePrefix) == false) continue;
-
-                    types.Add(type);
-                }
-            }
-            catch (ReflectionTypeLoadException) { }
+            types.AddRange(FilterLoadableTypes(_assembly.FullName, _assembly.GetTypes, namespacePrefix));
         }
 
         return types;
+    }
+
+    /// <summary>
+    /// Enumerates one assembly's types under the prefix, skipping any a missing optional dependency makes unreadable.
+    /// </summary>
+    internal static List<Type> FilterLoadableTypes(string assemblyName, Func<Type[]> getTypes, string namespacePrefix)
+    {
+        namespacePrefix = namespacePrefix ?? string.Empty;
+
+        Type[] candidates;
+        string[] loaderErrors = Array.Empty<string>();
+        try
+        {
+            candidates = getTypes();
+        }
+        catch (ReflectionTypeLoadException ex)
+        {
+            candidates = ex.Types ?? Array.Empty<Type>();
+            loaderErrors = (ex.LoaderExceptions ?? Array.Empty<Exception>())
+                .Where(error => error != null)
+                .Select(error => error.Message)
+                .Distinct()
+                .Take(MaxLoggedLoaderErrors)
+                .ToArray();
+        }
+        catch (Exception ex)
+        {
+            Logger.Warning(ex, "Skipped assembly {AssemblyName}: its types could not be loaded", assemblyName);
+            return new List<Type>();
+        }
+
+        List<Type> result = new List<Type>();
+        int skipped = 0;
+        List<string> skippedNames = new List<string>();
+        // GetTypes keeps a null for each type it could not load, and reading Namespace throws on a nested type
+        // whose enclosing type cannot load.
+        foreach (Type type in candidates)
+        {
+            if (type == null)
+            {
+                skipped++;
+                continue;
+            }
+
+            try
+            {
+                string typeNamespace = type.Namespace;
+                if (typeNamespace == null) continue;
+                if (!typeNamespace.StartsWith(namespacePrefix)) continue;
+            }
+            catch (Exception)
+            {
+                skipped++;
+                skippedNames.Add(SafeName(type));
+                continue;
+            }
+
+            result.Add(type);
+        }
+
+        if (skipped > 0)
+        {
+            Logger.Warning(
+                "Skipped {SkippedCount} unloadable types in assembly {AssemblyName}. Named: {SkippedTypes}. Loader errors: {LoaderErrors}",
+                skipped,
+                assemblyName,
+                string.Join(", ", skippedNames.Distinct().Take(MaxLoggedTypeNames)),
+                string.Join(" | ", loaderErrors));
+        }
+
+        return result;
+    }
+
+    // Names a skipped type for the warning, since FullName can throw on the same broken type.
+    private static string SafeName(Type type)
+    {
+        try
+        {
+            return type.FullName ?? type.Name;
+        }
+        catch (Exception)
+        {
+            return "<unnamed>";
+        }
     }
 
     /// <summary>
@@ -95,80 +171,6 @@ public static class ReflectionExtensions
         }
 
         return fields;
-    }
-
-    /// <summary>
-    /// Checks if a type is fully serializable
-    /// </summary>
-    /// <param name="type">Type to check serializability</param>
-    /// <returns>True if fully serializable otherwise False</returns>
-    public static bool IsFullySerializable(this Type type)
-    {
-        return IsFullySerializableRecursive(type, new HashSet<Type>());
-    }
-
-    private static bool IsFullySerializableRecursive(Type type, HashSet<Type> handledTypes = null)
-    {
-        bool result = true;
-
-        if (handledTypes == null) handledTypes = new HashSet<Type>();
-
-        if (handledTypes.Contains(type)) return result;
-
-        result &= type.IsSerializable;
-
-        foreach (Type genericType in type.GetGenericArguments())
-        {
-            result &= IsFullySerializableRecursive(genericType);
-            if (result == false) return result;
-        }
-
-        if (type.IsArray) result &= IsFullySerializableRecursive(type.GetElementType());
-
-        return result;
-    }
-
-    /// <summary>
-    /// Castable GetValue Extension
-    /// </summary>
-    /// <typeparam name="T">Value to cast to</typeparam>
-    /// <param name="field">Extended type</param>
-    /// <param name="obj">Object to get value from</param>
-    /// <returns></returns>
-    public static T GetValue<T>(this FieldInfo field, object obj)
-    {
-        return (T)field.GetValue(obj);
-    }
-
-    /// <summary>
-    /// Castable GetValue Extension
-    /// </summary>
-    /// <typeparam name="T">Value to cast to</typeparam>
-    /// <param name="property">Extended type</param>
-    /// <param name="obj">Object to get value from</param>
-    /// <returns></returns>
-    public static T GetValue<T>(this PropertyInfo property, object obj)
-    {
-        return (T)property.GetValue(obj);
-    }
-
-    /// <summary>
-    /// Creates a new delegate with error checking
-    /// </summary>
-    /// <param name="type">Delegate type</param>
-    /// <param name="obj">Instance used to call method</param>
-    /// <param name="method">Method to assign delegate to</param>
-    /// <param name="delegate">Newly created delegate</param>
-    /// <returns>Success status</returns>
-    public static bool TryCreateDelegate(this Type type, object obj, MethodInfo method, out Delegate @delegate)
-    {
-        @delegate = null;
-
-        if (obj == null) return false;
-
-        @delegate = Delegate.CreateDelegate(type, obj, method);
-
-        return true;
     }
 
     private static int seed = 9876;

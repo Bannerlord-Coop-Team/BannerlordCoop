@@ -11,30 +11,10 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class MaterialPropertySerializationTest
     {
-        IContainer container;
+        ILifetimeScope container;
         public MaterialPropertySerializationTest()
         {
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
-        }
-
-        [Fact]
-        public void MaterialProperty_Serialize()
-        {
-            MaterialProperty MaterialProperty = new MaterialProperty("mat1");
-            MaterialProperty.MeshMultiplier.Add(new Tuple<uint, float>(1, .5f));
-
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            MaterialPropertyBinaryPackage package = new MaterialPropertyBinaryPackage(MaterialProperty, factory);
-
-            package.Pack();
-
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
-
-            Assert.NotEmpty(bytes);
+            container = SerializationTestContainer.BeginScope();
         }
 
         [Fact]

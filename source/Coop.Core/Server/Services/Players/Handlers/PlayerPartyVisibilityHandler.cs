@@ -7,6 +7,8 @@ using Common.Util;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Services.Save.Messages;
+using GameInterface.Services.Armies.Messages;
+using GameInterface.Services.Armies.Patches;
 using GameInterface.Services.Heroes.HeirSelection.Messages;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
@@ -18,11 +20,13 @@ using GameInterface.Services.PartyVisuals.Messages;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.Players.Messages;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using HarmonyLib;
 using LiteNetLib;
 using SandBox.View.Map.Managers;
 using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -227,7 +231,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
 
             deferredMapEventParking.Remove(party);
             if (party.MapEvent != null)
-                messageBroker.Publish(this, new PlayerReconnectedToMapEvent());
+                messageBroker.Publish(this, new PlayerReconnectedToMapEvent(player.ControllerId, party.MapEvent));
 
             if (party.IsActive)
             {
@@ -247,6 +251,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
 
             ActivateParty(party, player.MobilePartyId);
             Logger.Information("Restored party {PartyId} for reconnected peer {Peer}", party.StringId, peer.Id);
+            messageBroker.Publish(this, new PlayerPartyRestoredOnReconnect(party));
         });
     }
 
@@ -322,6 +327,31 @@ internal class PlayerPartyVisibilityHandler : IHandler
         Logger.Information(
             "Removing disconnected party {PartyId} from its siege camp before parking",
             party.StringId);
+
+        // AI army members leave the siege and the army of their parked leader, otherwise they stay stuck to it; players keep their siege role
+        var army = party.Army;
+        if (army?.LeaderParty == party)
+        {
+            foreach (var member in army.Parties.Where(member => member != party && !playerManager.Contains(member)).ToArray())
+            {
+                // One member's broken state must not stop the leader from being parked
+                try
+                {
+                    if (member.BesiegerCamp != null)
+                        siegeEventInterface.BreakSiegeForPartyOnly(member);
+
+                    // Same pair the army-removal network flow uses, the publish replicates it to clients
+                    messageBroker.Publish(member, new MobilePartyInArmyRemoved(army, member, null));
+                    ArmyPatches.RemoveMobilePartyInArmy(member, army, null);
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, "Could not take army member {MemberId} out of parked leader {PartyId}'s siege and army",
+                        member.StringId, party.StringId);
+                }
+            }
+        }
+
         siegeEventInterface.BreakSiegeForPartyOnly(party);
     }
 

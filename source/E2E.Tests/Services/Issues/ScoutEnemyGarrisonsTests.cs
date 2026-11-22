@@ -1,0 +1,507 @@
+﻿using Autofac;
+using Common.Messaging;
+using Common.Util;
+using E2E.Tests.Environment;
+using E2E.Tests.Environment.Instance;
+using E2E.Tests.Util;
+using GameInterface.Services.Issues.Framework.Finalization;
+using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.Issues.Quests.ScoutEnemyGarrisons;
+using GameInterface.Services.Issues.Quests.ScoutEnemyGarrisons.Messages;
+using GameInterface.Services.Issues.Quests.ScoutEnemyGarrisons.Patches;
+using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
+using HarmonyLib;
+using System.Runtime.CompilerServices;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
+using Xunit.Abstractions;
+using Issue = TaleWorlds.CampaignSystem.Issues.ScoutEnemyGarrisonsIssueBehavior.ScoutEnemyGarrisonsIssue;
+using Quest = TaleWorlds.CampaignSystem.Issues.ScoutEnemyGarrisonsIssueBehavior.ScoutEnemyGarrisonsQuest;
+using QuestSettlement = TaleWorlds.CampaignSystem.Issues.ScoutEnemyGarrisonsIssueBehavior.QuestSettlement;
+
+namespace E2E.Tests.Services.Issues;
+
+public class ScoutEnemyGarrisonsTests : IDisposable
+{
+    private const string IssueName = "ScoutEnemyGarrisonsIssue";
+    private const string IssueId = "issue_scout_enemy_garrisons";
+
+    private readonly MethodCallRecorder scoutingDone;
+
+    private E2ETestEnvironment TestEnvironment { get; }
+    private EnvironmentInstance Server => TestEnvironment.Server;
+    private EnvironmentInstance Client => TestEnvironment.Clients.First();
+
+    public ScoutEnemyGarrisonsTests(ITestOutputHelper output)
+    {
+        TestEnvironment = new E2ETestEnvironment(output);
+        scoutingDone = new MethodCallRecorder(Priority.Last, AccessTools.Method(typeof(Quest), nameof(Quest.AllScoutingDone)));
+    }
+
+    public void Dispose()
+    {
+        scoutingDone.Dispose();
+        TestEnvironment.Dispose();
+    }
+
+    [Fact]
+    public void DebugCapture_IsRefusedForAHeroOutsideAKingdom()
+    {
+        var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+
+            Assert.False(Descriptor(Server).CreationCaptureStrategy.TryBuildDebugCapture(hero, out _));
+        });
+    }
+
+    [Fact]
+    public void CreationCapture_BuildsTheClientIssueWithTheServerTargets()
+    {
+        var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var targetIds = CreateTargets();
+        byte[] captured = null!;
+
+        Server.Call(() =>
+        {
+            var issue = IssueWithTargets(Resolve(Server, targetIds));
+            captured = Descriptor(Server).CreationCaptureStrategy.Capture(issue);
+        });
+
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+
+            var issue = (Issue)Descriptor(Client).CreationCaptureStrategy.CreateIssue(hero, captured);
+
+            Assert.Equal(Resolve(Client, targetIds), new[] { issue._settlement1, issue._settlement2, issue._settlement3 });
+        });
+    }
+
+    [Fact]
+    public void CreationCapture_RefusesToBuildAnIssueWhoseTargetsAreUnknown()
+    {
+        var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
+
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+
+            Assert.Throws<InvalidOperationException>(() => Descriptor(Client).CreationCaptureStrategy.CreateIssue(hero, Array.Empty<byte>()));
+        });
+    }
+
+    [Fact]
+    public void CreationCapture_RefusesATargetCaptureCutAfterTheLengthPrefix()
+    {
+        var targetIds = CreateTargets();
+        byte[] captured = null!;
+
+        Server.Call(() => captured = Descriptor(Server).CreationCaptureStrategy.Capture(IssueWithTargets(Resolve(Server, targetIds))));
+
+        Client.Call(() =>
+        {
+            Assert.False(((ScoutEnemyGarrisonsCreationCaptureStrategy)Descriptor(Client).CreationCaptureStrategy).TryReadTargets(
+                captured.Take(StringLengthPrefixSize(captured)).ToArray(), out _));
+        });
+    }
+
+    [Fact]
+    public void CreationCapture_RefusesATargetCaptureCutInsideAString()
+    {
+        var targetIds = CreateTargets();
+        byte[] captured = null!;
+
+        Server.Call(() => captured = Descriptor(Server).CreationCaptureStrategy.Capture(IssueWithTargets(Resolve(Server, targetIds))));
+
+        Client.Call(() =>
+        {
+            var truncated = captured.Take(StringLengthPrefixSize(captured) + 1).ToArray();
+
+            Assert.False(((ScoutEnemyGarrisonsCreationCaptureStrategy)Descriptor(Client).CreationCaptureStrategy).TryReadTargets(truncated, out _));
+        });
+    }
+
+    [Fact]
+    public void AcceptCapture_ForcesTheAccepterTargetsOntoTheMirror()
+    {
+        var accepterTargetIds = CreateTargets();
+        var staleTargetIds = CreateTargets();
+
+        Server.Call(() =>
+        {
+            var strategy = Descriptor(Server).QuestSolutionAcceptStrategy;
+            var accepterTargets = Resolve(Server, accepterTargetIds);
+            var mirrorIssue = IssueWithTargets(Resolve(Server, staleTargetIds));
+            mirrorIssue.IssueQuest = QuestWithTargets(Resolve(Server, staleTargetIds));
+
+            strategy.Apply(mirrorIssue, strategy.Capture(IssueWithTargets(accepterTargets)));
+
+            var mirror = (Quest)mirrorIssue.IssueQuest;
+            Assert.Equal(accepterTargets, new[] { mirrorIssue._settlement1, mirrorIssue._settlement2, mirrorIssue._settlement3 });
+            Assert.Equal(accepterTargets, new[] { mirror._questSettlement1.Settlement, mirror._questSettlement2.Settlement, mirror._questSettlement3.Settlement });
+            Assert.All(new[] { mirror._questSettlement1, mirror._questSettlement2, mirror._questSettlement3 },
+                target => Assert.Equal(0, target.CurrentScoutProgress));
+        });
+    }
+
+    [Fact]
+    public void ScoutingBranch_RunsAllScoutingDoneOnTheServer()
+    {
+        Server.Call(() =>
+        {
+            var quest = QuestWithTargets(Resolve(Server, CreateTargets()));
+
+            Assert.True(Descriptor(Server).FinalizationProofStrategy.TryRunBranch(quest, (byte)ScoutEnemyGarrisonsBranch.AllScoutingDone));
+        });
+
+        Assert.Equal(1, scoutingDone.CountFor(Server));
+    }
+
+    [Fact]
+    public void ScoutingBranch_RefusesAnUnknownProof()
+    {
+        Server.Call(() =>
+        {
+            var quest = QuestWithTargets(Resolve(Server, CreateTargets()));
+
+            Assert.False(Descriptor(Server).FinalizationProofStrategy.TryRunBranch(quest, 0));
+        });
+
+        Assert.Equal(0, scoutingDone.CountFor(Server));
+    }
+
+    [Fact]
+    public void ClientScoutingDone_IsHandedToTheServerAndStopsTheQuestListeners()
+    {
+        var targetIds = CreateTargets();
+        var requests = new List<QuestBranchRequested>();
+
+        using (var logs = new MethodCallRecorder(AccessTools.Method(typeof(QuestBase), nameof(QuestBase.AddLog))))
+        {
+            Client.Call(() =>
+            {
+                Client.Resolve<IMessageBroker>().Subscribe<QuestBranchRequested>(payload => requests.Add(payload.What));
+
+                var quest = QuestWithTargets(Resolve(Client, targetIds));
+
+                quest.AllScoutingDone();
+
+                // The hourly tick would call AllScoutingDone again, a quest built without a giver would also throw
+                quest.HourlyTick();
+            });
+
+            // The success entry waits for the server's outcome
+            Assert.Equal(0, logs.CountFor(Client));
+        }
+
+        var request = Assert.Single(requests);
+        Assert.Equal((byte)ScoutEnemyGarrisonsBranch.AllScoutingDone, request.Proof);
+    }
+
+    [Fact]
+    public void ForwardedEnding_MarksTheQuestHandedOffOnlyOnTheClient()
+    {
+        var targetIds = CreateTargets();
+        var giverId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var outcomes = new List<QuestOutcomeRequested>();
+
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+            Client.Resolve<IMessageBroker>().Subscribe<QuestOutcomeRequested>(payload => outcomes.Add(payload.What));
+
+            var quest = IssueBackedQuest(giver, Resolve(Client, targetIds));
+
+            // The dispatcher hands the cancel of a registered issue's quest to the server instead of running it
+            quest.CompleteQuestWithCancel();
+
+            Assert.True(quest.IsOngoing);
+            Assert.True(ScoutEnemyGarrisonsBranchPatches.IsHandedOff(quest));
+        });
+
+        var outcome = Assert.Single(outcomes);
+        Assert.Equal(IssueOutcome.QuestCancel, outcome.Outcome);
+
+        Server.Call(() =>
+        {
+            var quest = QuestWithTargets(Resolve(Server, targetIds));
+
+            ScoutEnemyGarrisonsOutcomeHandOffPatch.Postfix(quest);
+
+            Assert.False(ScoutEnemyGarrisonsBranchPatches.IsHandedOff(quest));
+        });
+    }
+
+    [Fact]
+    public void ArmyDispersalIsRelayedToTheOwnerQuestOnTheServer()
+    {
+        var targetIds = CreateTargets();
+        var giverId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var ownerHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var ownerPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        using var calls = new MethodCallRecorder(AccessTools.Method(typeof(Quest), nameof(Quest.OnArmyDispersed)));
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var ownerHero));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var ownerParty));
+
+            ownerHero._partyBelongedTo = ownerParty;
+            Assert.True(Server.Resolve<IPlayerManager>().AddPlayer(new Player("player-A", ownerHeroId, ownerPartyId, "", "")));
+
+            var quest = IssueBackedQuest(giver, Resolve(Server, targetIds));
+            Assert.True(Server.Resolve<IIssueOwnershipRegistry>().TrySetOwner(giverId, IssueId, "player-A"));
+            using (new AllowedThread())
+            {
+                var army = new Army(kingdom, party, Army.ArmyTypes.Patrolling);
+                army.ArmyOwner = giver;
+                CampaignEventDispatcher.Instance.OnArmyDispersed(army, Army.ArmyDispersionReason.Unknown, false);
+            }
+        });
+
+        Assert.Equal(1, calls.CountFor(Server));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ServerEnding_PreservesOneVanillaLineInTheOwnersJournalAndArchive(bool timeout)
+    {
+        scoutingDone.Dispose();
+        var targetIds = CreateTargets();
+        var giverId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var ownerId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var instances = TestEnvironment.Clients.Prepend(Server).ToArray();
+        var observer = TestEnvironment.Clients.Last();
+        Quest serverQuest = null!;
+        Quest ownerQuest = null!;
+        foreach (var instance in instances)
+        {
+            instance.Call(() =>
+            {
+                using (new AllowedThread())
+                {
+                    Campaign.Current.EncyclopediaManager ??= new TaleWorlds.CampaignSystem.Encyclopedia.EncyclopediaManager();
+                    Campaign.Current.EncyclopediaManager.CreateEncyclopediaPages();
+                    new TaleWorlds.CampaignSystem.CampaignBehaviors.JournalLogsCampaignBehavior().RegisterEvents();
+                    var giver = instance.GetRegisteredObject<Hero>(giverId);
+                    var targets = Resolve(instance, targetIds);
+                    var issue = new Issue(giver, targets.ToList());
+                    issue.StringId = IssueId;
+                    issue._issueState = IssueBase.IssueState.SolvingWithQuestSolution;
+                    Campaign.Current.IssueManager._issues.Add(giver, issue);
+                    giver.OnIssueCreatedForHero(issue);
+                    if (instance != observer)
+                    {
+                        var quest = new Quest(IssueId + "_quest", giver, targets[0], targets[1], targets[2]);
+                        issue.IssueQuest = quest;
+                        if (instance == Server) serverQuest = quest;
+                        else
+                        {
+                            ownerQuest = quest;
+                            quest.StartQuest();
+                        }
+                    }
+                }
+                Assert.True(instance.Resolve<IIssueOwnershipRegistry>().TrySetOwner(giverId, IssueId, "player-A"));
+            });
+        }
+        Server.Call(() => Assert.True(Server.Resolve<IPlayerManager>().AddPlayer(new Player("player-A", ownerId, partyId, "", ""))));
+        TestEnvironment.ConnectRegisteredPlayer(Client, "player-A");
+        Client.Resolve<GameInterface.Services.Entity.IControllerIdProvider>().SetControllerId("player-A");
+        using var renown = new MethodCallRecorder(Priority.First, AccessTools.Method(typeof(TaleWorlds.CampaignSystem.Actions.GainRenownAction), "ApplyInternal"));
+        using var influence = new MethodCallRecorder(Priority.First, AccessTools.Method(typeof(TaleWorlds.CampaignSystem.Actions.GainKingdomInfluenceAction), "ApplyInternal"));
+        var expected = "";
+        Server.Call(() => expected = (timeout ? serverQuest.QuestTimedOut : serverQuest.QuestSuccess).ToString());
+        Client.Call(() =>
+        {
+            if (timeout) ownerQuest.CompleteQuestWithTimeOut();
+            else ownerQuest.AllScoutingDone();
+        });
+        TestEnvironment.FlushCoalescer();
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueJournal>());
+        Client.Call(() =>
+        {
+            Assert.True(ownerQuest.IsFinalized);
+            Assert.Single(ownerQuest.JournalEntries, log => log.LogText.ToString() == expected);
+            var archive = Campaign.Current.LogEntryHistory.FindLastGameActionLog(
+                (TaleWorlds.CampaignSystem.LogEntries.JournalLogEntry entry) => entry.IsRelatedTo(ownerQuest));
+            Assert.NotNull(archive);
+            Assert.True(archive.IsEnded());
+            Assert.Single(archive.GetEntries(), log => log.LogText.ToString() == expected);
+        });
+        observer.Call(() => Assert.Null(Campaign.Current.LogEntryHistory.FindLastGameActionLog(
+            (TaleWorlds.CampaignSystem.LogEntries.JournalLogEntry entry) => entry.RelatedHero == observer.GetRegisteredObject<Hero>(giverId))));
+        Assert.Equal(timeout ? 0 : 1, renown.CountFor(Server));
+        Assert.Equal(timeout ? 0 : 1, influence.CountFor(Server));
+        foreach (var client in TestEnvironment.Clients)
+        {
+            Assert.Equal(0, renown.CountFor(client));
+            Assert.Equal(0, influence.CountFor(client));
+        }
+    }
+
+    [Fact]
+    public void ClientOfferedIssue_StaysAliveWithoutRerollingItsTargets()
+    {
+        var targetIds = CreateTargets();
+
+        Client.Call(() =>
+        {
+            var targets = Resolve(Client, targetIds);
+            var issue = IssueWithTargets(targets);
+
+            // Vanilla would reroll from the issue owner's position, which this issue does not have
+            Assert.True(issue.IssueStayAliveConditions());
+            Assert.Equal(targets, new[] { issue._settlement1, issue._settlement2, issue._settlement3 });
+        });
+    }
+
+    [Fact]
+    public void ServerReroll_ReachesOfferedIssuesAndLeavesTakenOnes()
+    {
+        var giverId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var oldTargetIds = CreateTargets();
+        var newTargetIds = CreateTargets();
+        var offering = TestEnvironment.Clients.First();
+        var taken = TestEnvironment.Clients.Last();
+
+        foreach (var instance in new[] { Server, offering, taken })
+        {
+            instance.Call(() => AddOfferedIssue(instance, giverId, Resolve(instance, oldTargetIds)));
+        }
+
+        taken.Call(() =>
+        {
+            Assert.True(taken.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+
+            using (new AllowedThread())
+            {
+                giver.Issue._issueState = IssueBase.IssueState.SolvingWithQuestSolution;
+            }
+        });
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+            var issue = (Issue)giver.Issue;
+            var newTargets = Resolve(Server, newTargetIds);
+            issue._settlement1 = newTargets[0];
+            issue._settlement2 = newTargets[1];
+            issue._settlement3 = newTargets[2];
+
+            ScoutEnemyGarrisonsStayAlivePatches.TryToUpdateSettlementsPostfix(issue, true);
+        });
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkScoutEnemyGarrisonsTargetsChanged>());
+
+        foreach (var (instance, expectedIds) in new[] { (offering, newTargetIds), (taken, oldTargetIds) })
+        {
+            instance.PumpGameThread();
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+                var issue = (Issue)giver.Issue;
+                Assert.Equal(Resolve(instance, expectedIds), new[] { issue._settlement1, issue._settlement2, issue._settlement3 });
+            });
+        }
+    }
+
+    private static void AddOfferedIssue(EnvironmentInstance instance, string giverId, Settlement[] targets)
+    {
+        Assert.True(instance.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+        var issue = IssueWithTargets(targets);
+
+        using (new AllowedThread())
+        {
+            issue.IssueOwner = giver;
+            issue.StringId = "issue_scout_reroll";
+            issue._issueState = IssueBase.IssueState.Ongoing;
+            Campaign.Current.IssueManager._issues.Add(giver, issue);
+            giver.OnIssueCreatedForHero(issue);
+        }
+    }
+
+    private string[] CreateTargets() => new[]
+    {
+        TestEnvironment.CreateRegisteredObject<Settlement>(),
+        TestEnvironment.CreateRegisteredObject<Settlement>(),
+        TestEnvironment.CreateRegisteredObject<Settlement>(),
+    };
+
+    private static int StringLengthPrefixSize(byte[] captured)
+    {
+        var prefixSize = 0;
+        while ((captured[prefixSize++] & 0x80) != 0)
+        {
+        }
+
+        return prefixSize;
+    }
+
+    private static Settlement[] Resolve(EnvironmentInstance instance, string[] ids) => ids
+        .Select(id =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<Settlement>(id, out var settlement));
+            return settlement;
+        })
+        .ToArray();
+
+    private static IQuestTypeDescriptor Descriptor(EnvironmentInstance instance)
+    {
+        Assert.True(instance.Container.Resolve<IQuestTypeRegistry>().TryGetByName(IssueName, out var descriptor));
+        return descriptor;
+    }
+
+    private static Issue IssueWithTargets(Settlement[] targets)
+    {
+        var issue = (Issue)RuntimeHelpers.GetUninitializedObject(typeof(Issue));
+        issue._settlement1 = targets[0];
+        issue._settlement2 = targets[1];
+        issue._settlement3 = targets[2];
+
+        return issue;
+    }
+
+    private static Quest IssueBackedQuest(Hero giver, Settlement[] targets)
+    {
+        var quest = QuestWithTargets(targets);
+        quest.QuestGiver = giver;
+
+        var issue = IssueWithTargets(targets);
+
+        using (new AllowedThread())
+        {
+            issue.IssueQuest = quest;
+            issue.IssueOwner = giver;
+            issue.StringId = IssueId;
+            Campaign.Current.IssueManager._issues.Add(giver, issue);
+            giver.OnIssueCreatedForHero(issue);
+        }
+
+        return quest;
+    }
+
+    private static Quest QuestWithTargets(Settlement[] targets)
+    {
+        var quest = (Quest)RuntimeHelpers.GetUninitializedObject(typeof(Quest));
+        quest._questSettlement1 = new QuestSettlement(targets[0], 8);
+        quest._questSettlement2 = new QuestSettlement(targets[1], 8);
+        quest._questSettlement3 = new QuestSettlement(targets[2], 8);
+
+        return quest;
+    }
+}

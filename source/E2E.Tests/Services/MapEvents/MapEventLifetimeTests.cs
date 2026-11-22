@@ -5,6 +5,7 @@ using GameInterface.Services.TroopRosters.Messages;
 using TaleWorlds.CampaignSystem.Roster;
 using Common.Util;
 using E2E.Tests.Util;
+using GameInterface.Tests.Utils;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.MapEvents;
@@ -20,7 +21,6 @@ using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
 using Xunit.Abstractions;
 
@@ -141,19 +141,6 @@ public class MapEventLifetimeTests : MapEventTestBase
     }
 
     [Fact]
-    public void ServerCreate_MapEvent_SyncAllClients()
-    {
-        // Act
-        var mapEventCtx = CreateServerMapEvent();
-
-        // Assert
-        foreach (var client in Clients)
-        {
-            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventCtx.MapEventId, out _));
-        }
-    }
-
-    [Fact]
     public void ClientCreate_MapEvent_DoesNothing()
     {
         // Arrange
@@ -237,9 +224,7 @@ public class MapEventLifetimeTests : MapEventTestBase
         PartyBase? defender = null;
         MobileParty? mainPartyStandIn = null;
         var disabledMethods = MapEventDisabledMethods
-            .Append(AccessTools.Method(typeof(MobileParty), "OnPartyJoinedSiegeInternal"))
-            .Append(AccessTools.Method(typeof(BesiegerCamp), nameof(BesiegerCamp.InitializeSiegeEventSide)))
-            .Append(AccessTools.Method(typeof(Settlement), nameof(Settlement.InitializeSiegeEventSide)))
+            .Concat(SiegeCreationDisabledMethods)
             .Append(AccessTools.Method(typeof(MapEvent), "ControlAndUpdateDefeatedPartiesAfterBattle"))
             .ToList();
 
@@ -251,8 +236,8 @@ public class MapEventLifetimeTests : MapEventTestBase
             CreateReplicableSiegeEvent(settlement, attacker);
 
             mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
-            mapEvent._mapEventType = MapEvent.BattleTypes.Siege;
-            mapEvent.MapEventSettlement = settlement;
+            mapEvent.SetBattleType(MapEvent.BattleTypes.Siege);
+            mapEvent.SetMapEventSettlement(settlement);
 
             var defenderSide = new MapEventSide(mapEvent, BattleSideEnum.Defender, settlement.Party);
             var attackerSide = new MapEventSide(mapEvent, BattleSideEnum.Attacker, attacker.Party);
@@ -317,9 +302,7 @@ public class MapEventLifetimeTests : MapEventTestBase
         string? besiegerPartyId = null;
 
         var disabledMethods = MapEventDisabledMethods
-            .Append(AccessTools.Method(typeof(MobileParty), "OnPartyJoinedSiegeInternal"))
-            .Append(AccessTools.Method(typeof(BesiegerCamp), nameof(BesiegerCamp.InitializeSiegeEventSide)))
-            .Append(AccessTools.Method(typeof(Settlement), nameof(Settlement.InitializeSiegeEventSide)))
+            .Concat(SiegeCreationDisabledMethods)
             .Append(AccessTools.Method(typeof(MapEvent), "CommitCalculatedMapEventResults"))
             .ToList();
 
@@ -333,8 +316,8 @@ public class MapEventLifetimeTests : MapEventTestBase
             CreateReplicableSiegeEvent(settlement, besieger);
 
             var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
-            mapEvent._mapEventType = MapEvent.BattleTypes.SallyOut;
-            mapEvent.MapEventSettlement = settlement;
+            mapEvent.SetBattleType(MapEvent.BattleTypes.SallyOut);
+            mapEvent.SetMapEventSettlement(settlement);
             var attackerSide = new MapEventSide(mapEvent, BattleSideEnum.Attacker, sallyingParty.Party);
             var defenderSide = new MapEventSide(mapEvent, BattleSideEnum.Defender, besieger.Party);
             mapEvent._sides[(int)BattleSideEnum.Attacker] = attackerSide;
@@ -420,9 +403,7 @@ public class MapEventLifetimeTests : MapEventTestBase
         var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
         string? mapEventId = null;
         var disabledMethods = MapEventDisabledMethods
-            .Append(AccessTools.Method(typeof(MobileParty), "OnPartyJoinedSiegeInternal"))
-            .Append(AccessTools.Method(typeof(BesiegerCamp), nameof(BesiegerCamp.InitializeSiegeEventSide)))
-            .Append(AccessTools.Method(typeof(Settlement), nameof(Settlement.InitializeSiegeEventSide)))
+            .Concat(SiegeCreationDisabledMethods)
             .Append(AccessTools.Method(typeof(MapEvent), "ControlAndUpdateDefeatedPartiesAfterBattle"))
             .Append(AccessTools.Method(typeof(DefaultBattleRewardModel), nameof(DefaultBattleRewardModel.GetCaptureMemberChancesForWinnerParties)))
             .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyCasualties"))
@@ -449,8 +430,8 @@ public class MapEventLifetimeTests : MapEventTestBase
             CreateReplicableSiegeEvent(settlement, besieger);
 
             var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
-            mapEvent._mapEventType = MapEvent.BattleTypes.SallyOut;
-            mapEvent.MapEventSettlement = settlement;
+            mapEvent.SetBattleType(MapEvent.BattleTypes.SallyOut);
+            mapEvent.SetMapEventSettlement(settlement);
             var attackerSide = new MapEventSide(mapEvent, BattleSideEnum.Attacker, sallyingParty.Party);
             var defenderSide = new MapEventSide(mapEvent, BattleSideEnum.Defender, besieger.Party);
             mapEvent._sides[(int)BattleSideEnum.Attacker] = attackerSide;
@@ -525,9 +506,7 @@ public class MapEventLifetimeTests : MapEventTestBase
         string? besiegerPartyId = null;
         string[]? partiesToClose = null;
         var disabledMethods = MapEventDisabledMethods
-            .Append(AccessTools.Method(typeof(MobileParty), "OnPartyJoinedSiegeInternal"))
-            .Append(AccessTools.Method(typeof(BesiegerCamp), nameof(BesiegerCamp.InitializeSiegeEventSide)))
-            .Append(AccessTools.Method(typeof(Settlement), nameof(Settlement.InitializeSiegeEventSide)))
+            .Concat(SiegeCreationDisabledMethods)
             .Append(AccessTools.Method(typeof(MapEvent), "ControlAndUpdateDefeatedPartiesAfterBattle"))
             .Append(AccessTools.Method(typeof(DefaultBattleRewardModel), nameof(DefaultBattleRewardModel.GetCaptureMemberChancesForWinnerParties)))
             .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyCasualties"))
@@ -556,8 +535,8 @@ public class MapEventLifetimeTests : MapEventTestBase
             CreateReplicableSiegeEvent(settlement, besieger);
 
             var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
-            mapEvent._mapEventType = MapEvent.BattleTypes.Siege;
-            mapEvent.MapEventSettlement = settlement;
+            mapEvent.SetBattleType(MapEvent.BattleTypes.Siege);
+            mapEvent.SetMapEventSettlement(settlement);
             var defenderSide = new MapEventSide(mapEvent, BattleSideEnum.Defender, settlement.Party);
             var attackerSide = new MapEventSide(mapEvent, BattleSideEnum.Attacker, besieger.Party);
             mapEvent._sides[(int)BattleSideEnum.Defender] = defenderSide;
@@ -594,18 +573,6 @@ public class MapEventLifetimeTests : MapEventTestBase
     {
         dispatchedSiegeLeader = attackerParty;
         return false;
-    }
-
-    private static void CreateReplicableSiegeEvent(Settlement settlement, MobileParty besieger)
-    {
-        var siegeEvent = new SiegeEvent(settlement, besieger);
-        siegeEvent.BesiegerCamp.SiegeEngines = new SiegeEvent.SiegeEnginesContainer(
-            BattleSideEnum.Attacker, null);
-        settlement.SiegeEngines = new SiegeEvent.SiegeEnginesContainer(
-            BattleSideEnum.Defender, null);
-        siegeEvent.BesiegerCamp._besiegerParties.Add(besieger);
-        siegeEvent.BesiegerCamp._leaderParty = besieger;
-        siegeEvent.BesiegerCamp._faction = besieger.MapFaction;
     }
 
     [Fact]

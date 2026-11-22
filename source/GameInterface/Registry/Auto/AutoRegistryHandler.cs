@@ -65,11 +65,10 @@ class AutoRegistryHandler<T> : IHandler where T : class
 
         if (Registry.Debug)
         {
-            Logger.Debug("[Server][{CallingMethod}] Created new instance of {type} with id {id}. {Callstack}",
+            Logger.Debug("[Server][{CallingMethod}] Created new instance of {type} with id {id}.",
                 $"{nameof(AutoRegistryHandler<T>)}.{nameof(Handle_InstanceCreated)}",
                 typeof(T).Name,
-                id,
-                Environment.StackTrace);
+                id);
         }
 
         Network.SendAll(new NetworkCreateInstance<T>(id, handle));
@@ -146,11 +145,10 @@ class AutoRegistryHandler<T> : IHandler where T : class
 
         if (Registry.Debug)
         {
-            Logger.Debug("[Server][{CallingMethod}] Destroyed instance of {type} with id {id}. {Callstack}",
+            Logger.Debug("[Server][{CallingMethod}] Destroyed instance of {type} with id {id}.",
                 $"{nameof(AutoRegistryHandler<T>)}.{nameof(Handle_InstanceDestroyed)}",
                 typeof(T).Name,
-                id,
-                Environment.StackTrace);
+                id);
         }
 
         ObjectManager.Remove(payload.What.Instance);

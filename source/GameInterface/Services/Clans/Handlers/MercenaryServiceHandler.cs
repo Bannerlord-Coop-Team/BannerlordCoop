@@ -2,8 +2,11 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using GameInterface.Configuration;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Heroes.Patches;
+using GameInterface.Services.Kingdoms;
+using GameInterface.Services.Kingdoms.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using LiteNetLib;
@@ -24,17 +27,20 @@ internal class MercenaryServiceHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly IPlayerManager playerManager;
+    private readonly IKingdomClanLimit kingdomClanLimit;
 
     public MercenaryServiceHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
-        IPlayerManager playerManager)
+        IPlayerManager playerManager,
+        IKingdomClanLimit kingdomClanLimit)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.playerManager = playerManager;
+        this.kingdomClanLimit = kingdomClanLimit;
 
         messageBroker.Subscribe<MercenaryServiceAccepted>(HandleMercenaryServiceAccepted);
         messageBroker.Subscribe<RequestMercenaryService>(HandleRequestMercenaryService);
@@ -79,16 +85,34 @@ internal class MercenaryServiceHandler : IHandler
         }
 
         GameThread.RunSafe(
-            () => ApplyMercenaryService(payload.What.ClanId, player.HeroId, payload.What.KingdomId, payload.What.AwardMultiplier),
+            () => ApplyMercenaryService(peer, payload.What.ClanId, player.HeroId, payload.What.KingdomId, payload.What.AwardMultiplier),
             context: nameof(MercenaryServiceHandler));
     }
 
-    private void ApplyMercenaryService(string clanId, string heroId, string kingdomId, int awardMultiplier)
+    private void ApplyMercenaryService(NetPeer peer, string clanId, string heroId, string kingdomId, int awardMultiplier)
     {
         // Only called from the GameThread.RunSafe action above.
         if (!objectManager.TryGetObjectWithLogging<Clan>(clanId, out var clan)) return;
         if (!objectManager.TryGetObjectWithLogging<Hero>(heroId, out var hero)) return;
         if (!objectManager.TryGetObjectWithLogging<Kingdom>(kingdomId, out var kingdom)) return;
+
+        if (kingdomClanLimit.RefusesJoin(clan, kingdom, asMercenary: true, ModConfigProvider.ModOptions))
+        {
+            Logger.Warning("Rejected mercenary service request for clan {ClanId} because kingdom {KingdomId} has maxClansPerKingdom clans", clanId, kingdomId);
+            network.Send(peer, new NetworkKingdomFull(kingdomId));
+            return;
+        }
+
+        // A ruler hiring another kingdom's mercenary ends its old contract first, as vanilla's
+        // conversation_mercenary_response_accept_on_consqequence does. A repeat hire finds it in this kingdom already.
+        bool hiresAwayMercenary = clan != hero.Clan
+            && clan.IsUnderMercenaryService
+            && clan.MapFaction.IsKingdomFaction
+            && clan.Kingdom != kingdom;
+        if (hiresAwayMercenary)
+        {
+            ChangeKingdomAction.ApplyByLeaveKingdomAsMercenary(clan);
+        }
 
         if (clan.Kingdom != null || clan.IsUnderMercenaryService)
         {
@@ -116,21 +140,20 @@ internal class MercenaryServiceHandler : IHandler
         if (ModInformation.IsClient) return;
 
         // Peer associations use a ConcurrentDictionary and are safe to resolve on the poll thread.
-        if (!(payload.Who is NetPeer peer) || !playerManager.TryGetPlayer(peer, out var player))
+        if (!(payload.Who is NetPeer peer) || !playerManager.TryGetPlayer(peer, out _))
         {
             Logger.Error("Received {Message} without a registered player peer", nameof(RequestMercenaryDismissalService));
             return;
         }
 
         GameThread.RunSafe(
-            () => ApplyMercenaryDismissalService(payload.What.ClanId, player.HeroId),
+            () => ApplyMercenaryDismissalService(payload.What.ClanId),
             context: nameof(MercenaryServiceHandler));
     }
 
-    private void ApplyMercenaryDismissalService(string clanId, string heroId)
+    private void ApplyMercenaryDismissalService(string clanId)
     {
         if (!objectManager.TryGetObjectWithLogging<Clan>(clanId, out var clan)) return;
-        if (!objectManager.TryGetObjectWithLogging<Hero>(heroId, out var hero)) return;
 
         if (clan.Kingdom == null || !clan.IsUnderMercenaryService)
         {
@@ -138,7 +161,8 @@ internal class MercenaryServiceHandler : IHandler
             return;
         }
 
-        ChangeClanInfluenceAction.Apply(clan, -hero.Clan.Influence);
+        // Leaving the kingdom clears the clan's own influence, as vanilla's Clan.LeaveKingdomInternal does, so a
+        // fired mercenary's unpaid debt goes with it and the requester's influence is never read here.
         ChangeKingdomAction.ApplyByLeaveKingdomAsMercenary(clan, true);
     }
     private void HandlePlayerRelationChange(MessagePayload<PlayerRelationChange> payload)

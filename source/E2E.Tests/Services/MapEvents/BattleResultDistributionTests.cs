@@ -7,6 +7,7 @@ using Common.Network;
 using Common.Util;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
+using GameInterface.Tests.Utils;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Data;
 using GameInterface.Services.MapEvents.Interfaces;
@@ -19,6 +20,7 @@ using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
@@ -99,6 +101,86 @@ public class BattleResultDistributionTests : MapEventTestBase
         }, MapEventDisabledMethods);
     }
 
+    // Naval loot: each winning party's looted ships cross the wire by ship id and come back to that party only.
+    [Fact]
+    public void PackUnpackPlayerLootData_RoundTripsEachPartysLootedShipsOverTheWire()
+    {
+        var partyAId = TestEnvironment.CreateRegisteredObject<MapEventParty>();
+        var partyBId = TestEnvironment.CreateRegisteredObject<MapEventParty>();
+        var shipA1Id = TestEnvironment.CreateRegisteredObject<Ship>();
+        var shipA2Id = TestEnvironment.CreateRegisteredObject<Ship>();
+        var shipBId = TestEnvironment.CreateRegisteredObject<Ship>();
+
+        NetworkPlayerLootData packed = default;
+        Server.Call(() =>
+        {
+            var lootedShips = new Dictionary<MapEventParty, List<Ship>>
+            {
+                [Server.GetRegisteredObject<MapEventParty>(partyAId)] = new() { Server.GetRegisteredObject<Ship>(shipA1Id), Server.GetRegisteredObject<Ship>(shipA2Id) },
+                [Server.GetRegisteredObject<MapEventParty>(partyBId)] = new() { Server.GetRegisteredObject<Ship>(shipBId) },
+            };
+            var original = new PlayerLootData(new(), new(), new(), lootedShips);
+            packed = Server.EnsureSerializable(Server.Resolve<IMapEventResultsInterface>().PackPlayerLootData(original));
+        }, MapEventDisabledMethods);
+
+        var client = Clients.First();
+        client.Call(() =>
+        {
+            var unpacked = client.Resolve<IMapEventResultsInterface>().UnpackPlayerLootData(packed);
+
+            Assert.Equal(
+                new[] { client.GetRegisteredObject<Ship>(shipA1Id), client.GetRegisteredObject<Ship>(shipA2Id) },
+                unpacked.LootedShips[client.GetRegisteredObject<MapEventParty>(partyAId)]);
+            Assert.Equal(
+                new[] { client.GetRegisteredObject<Ship>(shipBId) },
+                unpacked.LootedShips[client.GetRegisteredObject<MapEventParty>(partyBId)]);
+        }, MapEventDisabledMethods);
+    }
+
+    // A client stages only its own party's ships onto its encounter, skipping a ship it doesn't know.
+    [Fact]
+    public void UnpackPlayerLootDataForParty_ReturnsOnlyThatPartysKnownShips()
+    {
+        var shipAId = TestEnvironment.CreateRegisteredObject<Ship>();
+        var shipBId = TestEnvironment.CreateRegisteredObject<Ship>();
+        var packed = Server.EnsureSerializable(new NetworkPlayerLootData(new(), new(), new(), new()
+        {
+            ["MapEventParty_A"] = new LootedShipsData(new[] { shipAId, "Ship_Unknown" }),
+            ["MapEventParty_B"] = new LootedShipsData(new[] { shipBId }),
+        }));
+
+        var client = Clients.First();
+        client.Call(() =>
+        {
+            client.Resolve<IMapEventResultsInterface>().UnpackPlayerLootDataForParty(
+                packed, "MapEventParty_A", out _, out _, out _, out var lootedShips);
+
+            Assert.Equal(new[] { client.GetRegisteredObject<Ship>(shipAId) }, lootedShips);
+        }, MapEventDisabledMethods);
+    }
+
+    // An empty ship list arrives as null after protobuf, and a party with no ship entry gets none.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void UnpackPlayerLootDataForParty_NoShips_ReturnsAnEmptyList(bool hasEmptyEntry)
+    {
+        var lootedShips = hasEmptyEntry
+            ? new Dictionary<string, LootedShipsData> { ["MapEventParty_A"] = new LootedShipsData(Array.Empty<string>()) }
+            : null;
+        var packed = Server.EnsureSerializable(new NetworkPlayerLootData(new(), new(), new(), lootedShips));
+
+        var client = Clients.First();
+        client.Call(() =>
+        {
+            client.Resolve<IMapEventResultsInterface>().UnpackPlayerLootDataForParty(
+                packed, "MapEventParty_A", out _, out _, out _, out var unpackedShips);
+
+            Assert.NotNull(unpackedShips);
+            Assert.Empty(unpackedShips);
+        }, MapEventDisabledMethods);
+    }
+
     [Fact]
     public void SerializedEmptyLoot_PlayerDefeatEndsEncounterWithoutUnpackError()
     {
@@ -171,7 +253,7 @@ public class BattleResultDistributionTests : MapEventTestBase
                 instance.Call(() =>
                 {
                     Assert.True(instance.ObjectManager.TryGetObject<MapEvent>(ctx.MapEventId, out var mapEvent));
-                    mapEvent._mapEventType = MapEvent.BattleTypes.Hideout;
+                    mapEvent.SetBattleType(MapEvent.BattleTypes.Hideout);
                 });
         }
 
@@ -465,7 +547,7 @@ public class BattleResultDistributionTests : MapEventTestBase
         client.Call(() =>
         {
             Assert.True(client.ObjectManager.TryGetObject<MapEvent>(ctx.MapEventId, out var mapEvent));
-            mapEvent._mapEventType = MapEvent.BattleTypes.Hideout;
+            mapEvent.SetBattleType(MapEvent.BattleTypes.Hideout);
             mapEvent._battleState = BattleState.AttackerVictory;
             var encounter = PlayerEncounter.Current;
             encounter.EncounterState = PlayerEncounterState.ApplyResults;
@@ -490,7 +572,7 @@ public class BattleResultDistributionTests : MapEventTestBase
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(ctx.MapEventId, out var mapEvent));
-            mapEvent._mapEventType = hideout ? MapEvent.BattleTypes.Hideout : MapEvent.BattleTypes.FieldBattle;
+            mapEvent.SetBattleType(hideout ? MapEvent.BattleTypes.Hideout : MapEvent.BattleTypes.FieldBattle);
             mapEvent._battleState = BattleState.AttackerVictory;
             var parties = mapEvent.AttackerSide.Parties.ToArray();
             Assert.Equal(2, parties.Length);

@@ -11,6 +11,7 @@ using GameInterface.Services.Players;
 using HarmonyLib;
 using Serilog;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -49,6 +50,14 @@ internal class EncounterManagerPatches
         if (TryRequestActiveSlowRaidConversation(attackerParty, settlement))
             return false;
 
+        // Vanilla puts a late besieger in the camp, or a port defender in the town, before the blocked MapEventSide join
+        if (ModInformation.IsServer && !attackerParty.IsPlayerParty() && attackerParty.BesiegedSettlement != settlement &&
+            InteractionPatches.IsSiegeClosedToAiJoins(settlement))
+        {
+            RaidAiInterventionSuppression.HoldParty(attackerParty);
+            return false;
+        }
+
         if (ModInformation.IsServer) return true;
 
         if (!attackerParty.IsControlledByThisInstance())
@@ -78,7 +87,15 @@ internal class EncounterManagerPatches
         if (RaidAiInterventionSuppression.ShouldSuppressEncounter(attackerParty, defenderParty))
             return false;
 
-        if (ModInformation.IsServer && TryRequestServerPlayerConversation(attackerParty, defenderParty))
+        if (ModInformation.IsClient) return true;
+
+        if (attackerParty?.MobileParty?.IsPlayerParty() == false && InteractionPatches.IsClosedToAiJoins(defenderParty?.MapEvent))
+        {
+            RaidAiInterventionSuppression.HoldParty(attackerParty.MobileParty);
+            return false;
+        }
+
+        if (TryRequestServerPlayerConversation(attackerParty, defenderParty))
             return false;
 
         return true;
@@ -128,6 +145,11 @@ internal class EncounterManagerPatches
                 return false;
 
             if (mobileParty.ShortTermBehavior == AiBehavior.EngageParty && mobileParty.ShortTermTargetParty == null)
+                return false;
+
+            // Vanilla stops time under the encounter menu, co-op keeps the client map running, so the main party
+            // would otherwise re-interact every tick with the target it is already in an encounter with.
+            if (mobileParty.IsMainParty && PlayerEncounter.Current != null)
                 return false;
         }
 

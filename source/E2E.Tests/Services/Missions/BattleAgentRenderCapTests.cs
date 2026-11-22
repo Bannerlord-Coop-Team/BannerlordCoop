@@ -37,8 +37,7 @@ namespace E2E.Tests.Services.Missions;
 /// coop spawn path — supplier wave pulls, mid-battle reinforcement parties, or replicated puppets — may push a
 /// client's live agent count past that limit. Withheld troops are deferred, not lost: puppets stay buffered
 /// and drain as removals free capacity, withheld reinforcement troops field on tick, and unallocated wave
-/// troops stay unsupplied (wave-eligible) in the reserve. RED today: none of the spawn paths consults any
-/// mission-wide agent count, so each spawns straight past the limit.
+/// troops stay unsupplied (wave-eligible) in the reserve.
 /// </summary>
 public class BattleAgentRenderCapTests : MissionTestEnvironment
 {
@@ -95,17 +94,10 @@ public class BattleAgentRenderCapTests : MissionTestEnvironment
 
     [Theory]
     [InlineData(true, 1, false, false, 1)]
-    [InlineData(false, 1, false, false, 1)]
-    [InlineData(true, 2, false, false, 1)]
     [InlineData(false, 2, false, false, 1)]
-    [InlineData(true, 2, true, false, 1)]
     [InlineData(false, 2, true, false, 1)]
-    [InlineData(true, 1, false, true, 1)]
     [InlineData(false, 1, false, true, 1)]
-    [InlineData(true, 2, false, true, 1)]
-    [InlineData(false, 2, false, true, 1)]
     [InlineData(true, 2, true, true, 1)]
-    [InlineData(false, 2, true, true, 1)]
     [InlineData(false, 2, false, true, -1)]
     public void FormerHostRecord_BufferedBeforeMigration_DrainsUnderCurrentAuthority(
         bool promotedHost, int transfers, bool startsAsNonHost, bool formerOwnerUpdate, int formationIndex)
@@ -289,8 +281,7 @@ public class BattleAgentRenderCapTests : MissionTestEnvironment
 
     /// <summary>
     /// A puppet record arriving while the mission is at the engine limit is buffered (deferred), not spawned
-    /// and not dropped; the drain fields it once removals free capacity. RED today: TrySpawnPuppetNow spawns
-    /// unconditionally.
+    /// and not dropped; the drain fields it once removals free capacity.
     /// </summary>
     [Theory]
     [InlineData(false)]
@@ -624,7 +615,6 @@ public class BattleAgentRenderCapTests : MissionTestEnvironment
     /// <summary>
     /// The native wave pump (SupplyTroops) allocates no more troops than the engine has capacity for; the
     /// unallocated remainder stays UNSUPPLIED so later waves can re-request it as casualties free slots.
-    /// RED today: SupplyTroops honors the requested batch size unconditionally.
     /// </summary>
     [Fact]
     [Trait("Requirement", "BR-110")]

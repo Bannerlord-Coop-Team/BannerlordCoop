@@ -5,6 +5,8 @@ using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.MapEventParties;
+using GameInterface.Services.MapEvents.Handlers;
+using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.Party.Data;
 using GameInterface.Services.Party.Messages;
 using GameInterface.Services.PlayerCaptivityService.Messages;
@@ -29,6 +31,8 @@ using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
@@ -66,6 +70,13 @@ public abstract class MapEventTestBase : IDisposable
         };
     }
 
+    /// <summary>The map event methods plus the campaign tick, which a hand-driven map frame can't run in the harness.</summary>
+    protected IReadOnlyList<MethodBase> MapTickDisabledMethods => MapEventDisabledMethods.Concat(new[]
+    {
+        AccessTools.Method(typeof(Campaign), nameof(Campaign.RealTick)),
+        AccessTools.Method(typeof(Campaign), nameof(Campaign.Tick)),
+    }).ToList();
+
     protected IReadOnlyList<MethodBase> WithoutNetworkDelivery() => MapEventDisabledMethods
         .Append(AccessTools.Method(typeof(TestNetworkRouter), nameof(TestNetworkRouter.SendReliablePayload),
             new[] { typeof(NetPeer), typeof(NetPeer), typeof(byte[]) }))
@@ -99,8 +110,7 @@ public abstract class MapEventTestBase : IDisposable
             mapEvent.Initialize(
                 attackerParty.Party,
                 defenderParty.Party,
-                new FieldBattleEventComponent(mapEvent),
-                MapEvent.BattleTypes.FieldBattle);
+                new FieldBattleEventComponent(mapEvent));
             mapEvent.MapEventVisual = null;
 
             if (commit && !Campaign.Current.MapEventManager.MapEvents.Contains(mapEvent))
@@ -163,6 +173,39 @@ public abstract class MapEventTestBase : IDisposable
     /// </summary>
     protected static GauntletMapEventVisual MockMapEventVisual()
         => ObjectHelper.SkipConstructor<GauntletMapEventVisual>();
+
+    // Stub camp joins and side initialization so fixtures can create sieges without town positions or a siege model.
+    protected static IReadOnlyList<MethodBase> SiegeCreationDisabledMethods => new[]
+    {
+        AccessTools.Method(typeof(MobileParty), nameof(MobileParty.OnPartyJoinedSiegeInternal)),
+        AccessTools.Method(typeof(BesiegerCamp), nameof(BesiegerCamp.InitializeSiegeEventSide)),
+        AccessTools.Method(typeof(Settlement), nameof(Settlement.InitializeSiegeEventSide)),
+    };
+
+    /// <summary>
+    /// Creates a registered siege graph. Callers must disable <see cref="SiegeCreationDisabledMethods"/>.
+    /// </summary>
+    protected static void CreateReplicableSiegeEvent(Settlement settlement, MobileParty besieger)
+    {
+        var siegeEvent = new SiegeEvent(settlement, besieger);
+        siegeEvent.BesiegerCamp.SiegeEngines = new SiegeEvent.SiegeEnginesContainer(
+            BattleSideEnum.Attacker, null);
+        settlement.SiegeEngines = new SiegeEvent.SiegeEnginesContainer(
+            BattleSideEnum.Defender, null);
+        siegeEvent.BesiegerCamp._besiegerParties.Add(besieger);
+        siegeEvent.BesiegerCamp._leaderParty = besieger;
+        siegeEvent.BesiegerCamp._faction = besieger.MapFaction;
+    }
+
+    // The harness campaign has no encounter model, which distance checks and party searches read.
+    protected static void EnsureEncounterModel()
+    {
+        if (Campaign.Current.Models?.EncounterModel != null) return;
+
+        var models = Campaign.Current.Models?.GetGameModels().ToList() ?? new List<GameModel>();
+        models.Add(new DefaultEncounterModel());
+        Campaign.Current._gameModels = new GameModels(models);
+    }
 
     // ------------------------------------------------------------------
     // Parties joining map events
@@ -258,6 +301,40 @@ public abstract class MapEventTestBase : IDisposable
         return partyId!;
     }
 
+    /// <summary>Creates a <see cref="MobileParty"/> on the server (replicated to every client) that is in no
+    /// battle yet; join it later with <see cref="JoinServerPartyToSide"/>.</summary>
+    protected string CreateServerParty()
+    {
+        string? partyId = null;
+
+        Server.Call(() =>
+        {
+            var party = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            Assert.True(Server.ObjectManager.TryGetId(party, out partyId));
+        }, MapEventDisabledMethods);
+
+        Assert.NotNull(partyId);
+        return partyId!;
+    }
+
+    /// <summary>Joins an existing server party to a side of a map event through the same vanilla
+    /// <see cref="PartyBase.MapEventSide"/> setter as <see cref="JoinNewServerPartyToSide"/>, so the clients
+    /// receive the real battle party attach.</summary>
+    protected void JoinServerPartyToSide(string mapEventId, string partyId, BattleSideEnum side)
+    {
+        var disabledMethods = MapEventDisabledMethods
+            .Append(AccessTools.Method(typeof(CultureObject), nameof(CultureObject.HasFeat)))
+            .ToList();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+
+            party.Party.MapEventSide = mapEvent.GetMapEventSide(side);
+        }, disabledMethods);
+    }
+
     /// <summary>
     /// Asserts that the <see cref="MapEventParty"/> with <paramref name="mapEventPartyId"/> is part of the
     /// side with <paramref name="mapEventSideId"/> on the supplied <paramref name="instance"/>.
@@ -289,6 +366,16 @@ public abstract class MapEventTestBase : IDisposable
         RegisterAsPlayerParty(controllerId, heroId, partyId);
 
         return (heroId, partyId);
+    }
+
+    /// <summary>Requests a simulation of the context's battle for the client's attacker party and asserts the server accepts it.</summary>
+    protected void StartAcceptedSimulation(EnvironmentInstance client, MapEventContext context)
+    {
+        var requestId = System.Guid.NewGuid().ToString();
+        Server.Resolve<IMessageBroker>().Publish(client.NetPeer, new NetworkBattleStartRequest(
+            requestId, (int)BattleStartMode.Simulation, context.MapEventId, context.AttackerPartyId));
+        Assert.True(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleStartReply>(),
+            reply => reply.RequestId == requestId).Accepted);
     }
 
     /// <summary>
@@ -337,22 +424,6 @@ public abstract class MapEventTestBase : IDisposable
             hero.PartyBelongedToAsPrisoner = captor.Party;
 
             Assert.Equal(captor.Party, hero.PartyBelongedToAsPrisoner);
-        }, MapEventDisabledMethods);
-    }
-
-    /// <summary>
-    /// Releases the hero with <paramref name="heroId"/> from captivity on the server, syncing the cleared
-    /// state to all clients.
-    /// </summary>
-    protected void EndCaptivity(string heroId)
-    {
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
-
-            hero.PartyBelongedToAsPrisoner = null;
-
-            Assert.Null(hero.PartyBelongedToAsPrisoner);
         }, MapEventDisabledMethods);
     }
 
@@ -420,7 +491,7 @@ public abstract class MapEventTestBase : IDisposable
             // attacker = captor (winner), defender = player party (loser)
             var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
             mapEvent.MapEventVisual = MockMapEventVisual();
-            mapEvent.Initialize(captorParty.Party, playerParty.Party);
+            mapEvent.Initialize(captorParty.Party, playerParty.Party, new FieldBattleEventComponent(mapEvent));
 
             mapEvent.CaptureDefeatedPartyMembers(mapEvent.AttackerSide.Parties, mapEvent.DefenderSide.Parties);
         }, disabledMethods);
@@ -475,7 +546,7 @@ public abstract class MapEventTestBase : IDisposable
             // MapEvent (and its sides) to the clients, so the committing client can resolve and finish it.
             var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
             mapEvent.MapEventVisual = MockMapEventVisual();
-            mapEvent.Initialize(captorParty.Party, playerParty.Party);
+            mapEvent.Initialize(captorParty.Party, playerParty.Party, new FieldBattleEventComponent(mapEvent));
 
             Assert.True(Server.ObjectManager.TryGetId(mapEvent, out mapEventId));
         }, MapEventDisabledMethods);
@@ -546,9 +617,9 @@ public abstract class MapEventTestBase : IDisposable
             var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
             mapEvent.MapEventVisual = MockMapEventVisual();
             if (playersAreAttackers)
-                mapEvent.Initialize(loserParties[0].Party, captorParty.Party);
+                mapEvent.Initialize(loserParties[0].Party, captorParty.Party, new FieldBattleEventComponent(mapEvent));
             else
-                mapEvent.Initialize(captorParty.Party, loserParties[0].Party);
+                mapEvent.Initialize(captorParty.Party, loserParties[0].Party, new FieldBattleEventComponent(mapEvent));
 
             var losingSide = playersAreAttackers ? mapEvent.AttackerSide : mapEvent.DefenderSide;
             for (int i = 1; i < loserParties.Length; i++)
@@ -707,7 +778,11 @@ public abstract class MapEventTestBase : IDisposable
                 PartyScreenHelper.PartyScreenMode.Normal,
                 Server.Resolve<ITroopRosterInterface>().PackTroopRosterOrderData(captorParty.MemberRoster));
 
-            Server.Resolve<IMessageBroker>().Publish(this, message);
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.TryGetPlayer(captorHero, out var captor));
+            Assert.True(playerManager.TryGetPeer(captor.ControllerId, out var captorPeer));
+
+            Server.Resolve<IMessageBroker>().Publish(captorPeer, message);
         }, disabledMethods);
     }
 
@@ -1011,19 +1086,6 @@ public abstract class MapEventTestBase : IDisposable
     }
 
     /// <summary>
-    /// Clears <c>PlayerEncounter.Current</c> on the given <paramref name="instance"/>, simulating the player
-    /// leaving an encounter.
-    /// </summary>
-    protected void ClearPlayerEncounter(EnvironmentInstance instance)
-    {
-        instance.Call(() =>
-        {
-            Campaign.Current.PlayerEncounter = null;
-            Assert.Null(PlayerEncounter.Current);
-        }, MapEventDisabledMethods);
-    }
-
-    /// <summary>
     /// Asserts whether a <c>PlayerEncounter.Current</c> is active on the given <paramref name="instance"/>.
     /// </summary>
     protected void AssertHasPlayerEncounter(EnvironmentInstance instance, bool expected)
@@ -1121,23 +1183,19 @@ public abstract class MapEventTestBase : IDisposable
                 Assert.Null(MobileParty.MainParty.MapEvent);
                 Assert.Null(MobileParty.MainParty.CurrentSettlement);
                 Assert.Null(Campaign.Current.CurrentMenuContext);
-            }, MapEventDisabledMethods.Concat(new[]
-            {
-                AccessTools.Method(typeof(Campaign), nameof(Campaign.RealTick)),
-                AccessTools.Method(typeof(Campaign), nameof(Campaign.Tick)),
-            }).ToArray());
+            }, MapTickDisabledMethods);
         }
         finally { harmony.UnpatchAll(harmony.Id); }
     }
 
-    private static bool OpenLootPartyScreen()
+    protected static bool OpenLootPartyScreen()
     {
         var states = Game.Current.GameStateManager;
         states._gameStates.Add(states.CreateState<PartyState>());
         return false;
     }
 
-    private static bool OpenLootInventoryScreen(Dictionary<PartyBase, ItemRoster> itemRostersToLoot)
+    protected static bool OpenLootInventoryScreen(Dictionary<PartyBase, ItemRoster> itemRostersToLoot)
     {
         Assert.True(itemRostersToLoot[PartyBase.MainParty].Sum(item => item.Amount) > 0);
         var states = Game.Current.GameStateManager;

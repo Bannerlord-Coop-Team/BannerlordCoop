@@ -51,6 +51,16 @@ namespace GameInterface.Services.Kingdoms.Extentions
             }
         }
 
+        /// <summary>
+        /// Like native <see cref="KingdomElection.StartElectionWithoutPlayer"/>: the AI picks and applies the outcome
+        /// even when a player clan supports the decision.
+        /// </summary>
+        public void StartElectionWithoutPlayerCoop()
+        {
+            this._ignorePlayerSupport = true;
+            this.StartElectionCoop();
+        }
+
         public void SetupPlayerVoteElection()
         {
             this.Setup();
@@ -108,12 +118,20 @@ namespace GameInterface.Services.Kingdoms.Extentions
             return this._chosenOutcome;
         }
 
+        public DecisionOutcome ChooseCallToWarRefusal()
+        {
+            this.DetermineOfficialSupport();
+            this._chosenOutcome = this._possibleOutcomes.FirstOrDefault(outcome =>
+                outcome is ProposeCallToWarAgreementDecision.ProposeCallToWarAgreementDecisionOutcome { ShouldCallToWar: false }
+                || outcome is AcceptCallToWarAgreementDecision.AcceptCallToWarAgreementDecisionOutcome { ShouldAcceptCallToWar: false });
+
+            return this._chosenOutcome ?? this.ChooseOutcomeWithCurrentVotes();
+        }
+
         public void ApplyChosenOutcomeCoop()
         {
-            // The synchronized kingdom decision is the player-facing prompt. Native's peace
-            // notification checks process-local player singletons and must not run again when
-            // the explicit co-op vote is resolved on the authoritative server.
-            if (IsPendingPlayerPeaceOffer(this._decision) || this._decision.OnShowDecision() || IsPendingPlayerAllianceOffer(this._decision))
+            // Peace offers already use synchronized decisions; native's prompt reads the local player clan.
+            if (this._decision is MakePeaceKingdomDecision || this._decision.OnShowDecision() || IsPendingPlayerAllianceOffer(this._decision))
             {
                 this.ApplyChosenOutcome();
             }
@@ -126,7 +144,7 @@ namespace GameInterface.Services.Kingdoms.Extentions
             {
                 return;
             }
-            if (this._decision.OnShowDecision())
+            if (this._decision is MakePeaceKingdomDecision || this._decision.OnShowDecision())
             {
                 this.ApplyChosenOutcome();
             }
@@ -222,6 +240,12 @@ namespace GameInterface.Services.Kingdoms.Extentions
             playerKingdom.AddDecision(playerDecision, ignoreInfluenceCost: true);
 
             return true;
+        }
+
+        internal static bool IsPlayerTargetedCallToWarProposal(KingdomDecision decision)
+        {
+            return decision is ProposeCallToWarAgreementDecision { CalledKingdom: Kingdom calledKingdom }
+                   && calledKingdom.IsPlayerKingdom();
         }
 
         internal static bool TryRedirectPlayerProposeCallToWarAgreementOffer(KingdomDecision decision, DecisionOutcome chosenOutcome)

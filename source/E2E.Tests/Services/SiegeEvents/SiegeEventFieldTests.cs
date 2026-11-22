@@ -31,14 +31,10 @@ public class SiegeEventTests : SyncTestBase
     }
 
     [Fact]
-    public void Server_SiegeEvent_Fields()
+    public void Server_SiegeEvent_FieldsAndProperties()
     {
         TestEnvironment.AssertField<SiegeEvent, bool>(nameof(SiegeEvent._isBesiegerDefeated), true);
-    }
 
-    [Fact]
-    public void Server_SiegeEvent_Properties()
-    {
         TestEnvironment.Server.ObjectManager.TryGetObject(siegeEventId, out SiegeEvent siegeEvent);
         var defaultCampaignTime = new CampaignTime(200);
         siegeEvent.SiegeStartTime = defaultCampaignTime;

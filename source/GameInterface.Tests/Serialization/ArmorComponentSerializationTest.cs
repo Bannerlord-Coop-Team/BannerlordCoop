@@ -16,37 +16,12 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class ArmorComponentSerializationTest
     {
-        IContainer container;
+        ILifetimeScope container;
         public ArmorComponentSerializationTest()
         {
             GameBootStrap.Initialize();
 
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
-        }
-
-        [Fact]
-        public void ArmorComponent_Serialize()
-        {
-            ItemObject itemObject = new ItemObject("Attached Item");
-            ArmorComponent ArmorComponent = new ArmorComponent(itemObject);
-
-            foreach(var property in typeof(ArmorComponent).GetProperties())
-            {
-                property.SetRandom(ArmorComponent);
-            }
-
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            ArmorComponentBinaryPackage package = new ArmorComponentBinaryPackage(ArmorComponent, factory);
-
-            package.Pack();
-
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
-
-            Assert.NotEmpty(bytes);
+            container = SerializationTestContainer.BeginScope();
         }
 
         [Fact]

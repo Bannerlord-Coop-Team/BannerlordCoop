@@ -233,7 +233,7 @@ internal class ClientSiegeEngineHandler : IHandler
             obj.CollisionTicks, obj.FireTicks, obj.HitSuccessful));
     }
 
-    // Runs on the game thread already — published from the production-popup container patch; only resolves an id and sends, so no GameThread.RunSafe.
+    // Runs on the game thread already, published from MapSiegeProductionPatches or the container patches; only resolves an id and sends, so no GameThread.RunSafe.
     private void HandleDeployRequested(MessagePayload<SiegeEngineDeployRequested> payload)
     {
         var obj = payload.What;

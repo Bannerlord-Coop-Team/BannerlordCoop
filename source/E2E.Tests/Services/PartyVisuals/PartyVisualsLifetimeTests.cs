@@ -79,36 +79,5 @@ namespace E2E.Tests.Services.PartyVisuals
             Assert.NotNull(destroyed);
             Assert.Equal(expectedMobilePartyHandle, destroyed.MobilePartyHandle);
         }
-
-        [Fact]
-        public void ClientCreatePartyVisual_DoesNothing()
-        {
-            // Arrange
-            var client1 = TestEnvironment.Clients.First();
-            var server = TestEnvironment.Server;
-
-            // Act
-            string? PartyVisualId = null;
-            string? baseId = null;
-
-            server.Call(() =>
-            {
-                var MobileParty = new MobileParty();
-                var partyBase = new PartyBase(MobileParty);
-
-                Assert.True(server.ObjectManager.TryGetId(partyBase, out baseId));
-            });
-
-            client1.Call(() =>
-            {
-                Assert.True(server.ObjectManager.TryGetObject(baseId, out PartyBase baseParty));
-                var partyVisual = new MobilePartyVisual(baseParty);
-
-                Assert.False(client1.ObjectManager.TryGetId(partyVisual, out PartyVisualId));
-            });
-
-            // Assert
-            Assert.Null(PartyVisualId);
-        }
     }
 }

@@ -93,7 +93,8 @@ public class AgentDeathReporter : IAgentDeathReporter
             }
             if (info.CurrentAuthority != session.OwnControllerId)
             {
-                Logger.Information("[DeathDiag] Agent {AgentId} died but its authority is {Auth}, not us ({Us}) — not broadcasting", info.AgentId, info.CurrentAuthority, session.OwnControllerId);
+                // A replicated death never gets here, so a puppet died locally without its owner's blow and lives on there.
+                Logger.Warning("[DeathDiag] Puppet {AgentId} died here without a routed blow; its authority {Auth}, not us ({Us}), keeps it alive", info.AgentId, info.CurrentAuthority, session.OwnControllerId);
                 return;
             }
 

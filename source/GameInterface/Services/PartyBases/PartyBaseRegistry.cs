@@ -5,8 +5,10 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Library;
 
 namespace GameInterface.Services.PartyBases;
 internal class PartyBaseRegistry : AutoRegistryBase<PartyBase>
@@ -38,6 +40,8 @@ internal class PartyBaseRegistry : AutoRegistryBase<PartyBase>
 
     public override void OnClientCreated(PartyBase obj, string id)
     {
+        // Client created parties skip the field initializer, so the ship list starts null
+        obj._ships = new MBList<Ship>();
     }
 
     public override void OnClientDestroyed(PartyBase obj, string id)

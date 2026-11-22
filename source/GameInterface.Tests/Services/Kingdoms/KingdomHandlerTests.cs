@@ -2,6 +2,7 @@
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.Kingdoms.Handlers;
@@ -30,37 +31,6 @@ namespace GameInterface.Tests.Services.Kingdoms;
 
 public class KingdomHandlerTests
 {
-    [Fact]
-    public void TryGetCulture_UsesObjectManager()
-    {
-        var culture = ObjectHelper.SkipConstructor<CultureObject>();
-        var objectManager = new Mock<IObjectManager>();
-        CultureObject resolvedCulture = culture;
-        objectManager.Setup(manager => manager.TryGetObject("culture-id", out resolvedCulture)).Returns(true);
-        var handler = CreateHandler(objectManager.Object);
-
-        bool result = TryGetCulture(handler, "culture-id", out CultureObject actualCulture);
-
-        Assert.True(result);
-        Assert.Same(culture, actualCulture);
-        objectManager.Verify(manager => manager.TryGetObject("culture-id", out resolvedCulture), Times.Once);
-    }
-
-    [Fact]
-    public void TryGetCulture_ReturnsFalseWhenObjectManagerCannotResolveCulture()
-    {
-        var objectManager = new Mock<IObjectManager>();
-        CultureObject missingCulture = null!;
-        objectManager.Setup(manager => manager.TryGetObject("culture-id", out missingCulture)).Returns(false);
-        var handler = CreateHandler(objectManager.Object);
-
-        bool result = TryGetCulture(handler, "culture-id", out CultureObject culture);
-
-        Assert.False(result);
-        Assert.Null(culture);
-        objectManager.Verify(manager => manager.TryGetObject("culture-id", out missingCulture), Times.Once);
-    }
-
     [Fact]
     public void CanChangeKingdomName_NullClan_ReturnsFalse()
     {
@@ -947,7 +917,10 @@ public class KingdomHandlerTests
             new Mock<IKingdomDecisionVoteManager>().Object,
             new Mock<IKingdomMembershipState>().Object,
             new Mock<IKingdomInterface>().Object,
-            new Mock<IKingdomCreator>().Object);
+            new Mock<IKingdomCreator>().Object,
+            new Mock<IKingdomDecisionDataConverter>().Object,
+            new Mock<IControllerIdProvider>().Object,
+            new Mock<IKingdomCreationSettlementTracker>().Object);
     }
 
     private static Action<MessagePayload<RemoveDecision>> CreateRemoveDecisionHandler(
@@ -968,19 +941,13 @@ public class KingdomHandlerTests
             voteManager,
             new Mock<IKingdomMembershipState>().Object,
             kingdomInterface,
-            new Mock<IKingdomCreator>().Object);
+            new Mock<IKingdomCreator>().Object,
+            new Mock<IKingdomDecisionDataConverter>().Object,
+            new Mock<IControllerIdProvider>().Object,
+            new Mock<IKingdomCreationSettlementTracker>().Object);
         return removeDecisionHandler;
     }
 
-    private static bool TryGetCulture(KingdomHandler handler, string cultureId, out CultureObject culture)
-    {
-        MethodInfo methodInfo = typeof(KingdomHandler).GetMethod("TryGetCulture", BindingFlags.Instance | BindingFlags.NonPublic)
-            ?? throw new NullReferenceException("TryGetCulture method was not found.");
-        object[] args = { cultureId, null! };
-        bool result = (bool)(methodInfo.Invoke(handler, args) ?? false);
-        culture = (CultureObject)args[1];
-        return result;
-    }
     private static void DrainGameThread()
     {
         GameThread.Run(() => { }, blocking: true);
@@ -1014,7 +981,10 @@ public class KingdomHandlerTests
             new Mock<IKingdomDecisionVoteManager>().Object,
             new Mock<IKingdomMembershipState>().Object,
             new Mock<IKingdomInterface>().Object,
-            new Mock<IKingdomCreator>().Object);
+            new Mock<IKingdomCreator>().Object,
+            new Mock<IKingdomDecisionDataConverter>().Object,
+            new Mock<IControllerIdProvider>().Object,
+            new Mock<IKingdomCreationSettlementTracker>().Object);
 
         return handler;
     }

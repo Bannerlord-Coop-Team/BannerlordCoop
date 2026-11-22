@@ -15,16 +15,12 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class ItemObjectSerializationTest
     {
-        IContainer container;
+        ILifetimeScope container;
         public ItemObjectSerializationTest()
         {
             GameBootStrap.Initialize();
 
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
+            container = SerializationTestContainer.BeginScope();
         }
 
         [Fact]

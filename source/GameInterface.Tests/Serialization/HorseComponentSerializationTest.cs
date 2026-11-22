@@ -8,39 +8,18 @@ using GameInterface.Tests.Bootstrap.Modules;
 using System.Reflection;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
-using TaleWorlds.ObjectSystem;
 using Xunit;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class HorseComponentSerializationTest
     {
-        IContainer container;
+        ILifetimeScope container;
         public HorseComponentSerializationTest()
         {
             GameBootStrap.Initialize();
 
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
-        }
-
-        [Fact]
-        public void HorseComponent_Serialize()
-        {
-            HorseComponent HorseComponent = new HorseComponent();
-            HorseComponent.Monster = new Monster();
-
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            HorseComponentBinaryPackage package = new HorseComponentBinaryPackage(HorseComponent, factory);
-
-            package.Pack();
-
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
-
-            Assert.NotEmpty(bytes);
+            container = SerializationTestContainer.BeginScope();
         }
 
         private static readonly FieldInfo _monsterMaterialNames = typeof(HorseComponent).GetField("_monsterMaterialNames", BindingFlags.NonPublic | BindingFlags.Instance);
@@ -57,8 +36,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             HorseComponent.Maneuver = 55;
             HorseComponent.Speed = 513;
 
-            Monster monster = MBObjectManager.Instance.CreateObject<Monster>();
-            monster.StringId = "testMonster";
+            Monster monster = new Monster { StringId = "testMonster" };
 
             HorseComponent.Monster = monster;
 

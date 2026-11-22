@@ -8,6 +8,7 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Modules;
+using GameInterface.Services.Modules.Validators;
 using GameInterface.Services.Players;
 using GameInterface.Services.Time.Interfaces;
 using GameInterface.Services.UI.Interfaces;
@@ -31,6 +32,8 @@ public class ClientContext
         IControllerIdProvider controllerIdProvider,
         ICoopFinalizer coopFinalizer,
         IModuleInfoProvider moduleInfoProvider,
+        IModuleNameProvider moduleNameProvider,
+        IModuleValidator moduleValidator,
         IHeroInterface heroInterface,
         IRegistryManager registryManager,
         IPlayerManager playerManager,
@@ -47,6 +50,8 @@ public class ClientContext
         ControllerIdProvider = controllerIdProvider;
         CoopFinalizer = coopFinalizer;
         ModuleInfoProvider = moduleInfoProvider;
+        ModuleNameProvider = moduleNameProvider;
+        ModuleValidator = moduleValidator;
         HeroInterface = heroInterface;
         RegistryManager = registryManager;
         PlayerManager = playerManager;
@@ -64,6 +69,8 @@ public class ClientContext
     public IControllerIdProvider ControllerIdProvider { get; }
     public ICoopFinalizer CoopFinalizer { get; }
     public IModuleInfoProvider ModuleInfoProvider { get; }
+    public IModuleNameProvider ModuleNameProvider { get; }
+    public IModuleValidator ModuleValidator { get; }
     public IHeroInterface HeroInterface { get; }
     public IRegistryManager RegistryManager { get; }
     public IPlayerManager PlayerManager { get; }

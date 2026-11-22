@@ -10,6 +10,7 @@ using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Villages.Commands;
+using GameInterface.Utils.Commands;
 using Serilog;
 using System;
 using System.Linq;
@@ -209,16 +210,23 @@ internal class StaleLeaderMapEventFixtureCommands
         public CoopCommandSide Side => CoopCommandSide.Both;
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("party_string_id", "The AI party StringId.", true),
+            new ExpectedArgs("party_string_id", "The AI party name or id; quote names with spaces.", true),
             new ExpectedArgs("event_string_id", "The map event StringId.", true),
             new ExpectedArgs("event_registry_id", "The event registry id captured before Update.", true),
         };
 
+        private readonly ICommandObjectResolver resolver;
+
+        public StateCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (Campaign.Current == null) return Failed("No campaign is loaded.");
-            var party = Campaign.Current.CampaignObjectManager.Find<MobileParty>(args[0]);
-            if (party == null) return Failed($"AI party {args[0]} was not found.");
+            if (!resolver.TryResolveMobileParty(args[0], out var party, out var partyError))
+                return Failed(partyError);
             var mapEvent = Campaign.Current.MapEventManager.MapEvents
                 .FirstOrDefault(candidate => candidate.StringId == args[1]);
             if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))

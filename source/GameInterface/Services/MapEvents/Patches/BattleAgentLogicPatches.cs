@@ -14,11 +14,22 @@ namespace GameInterface.Services.MapEvents.Patches;
 [HarmonyPatch(typeof(BattleAgentLogic))]
 internal class BattleAgentLogicHitRewardPatch
 {
+    /// <summary>
+    /// Vanilla only reports the score hit to the attacker's origin here, and the victim's owner already reported
+    /// the killing blow of a death replayed from the network.
+    /// </summary>
+    [HarmonyPatch(nameof(BattleAgentLogic.OnAgentHit))]
+    [HarmonyPrefix]
+    public static bool OnAgentHitPrefix(Agent affectedAgent) => !BattleSpawnGate.IsReplicatedDeath(affectedAgent);
+
     [HarmonyPatch(nameof(BattleAgentLogic.EnemyHitReward))]
     [HarmonyPrefix]
     public static bool EnemyHitRewardPrefix(BattleAgentLogic __instance, Agent affectedAgent, Agent affectorAgent, float lastSpeedBonus, float lastShotDifficulty, bool isSiegeEngineHit, WeaponComponentData lastAttackerWeapon, AgentAttackType attackType, float hitpointRatio, float damageAmount, bool isSneakAttack)
     {
         if (ModInformation.IsServer) return true;
+
+        // The victim's owner already sent the hit reward for a replayed death.
+        if (BattleSpawnGate.IsReplicatedDeath(affectedAgent)) return false;
 
         if (lastAttackerWeapon == null)
             lastAttackerWeapon = BattleSpawnGate.RoutedAttackerWeapon;
@@ -80,7 +91,8 @@ internal class BattleAgentLogicHitRewardPatch
                 {
                     CampaignEventDispatcher.Instance.OnCharacterDefeated(hero2, hero); // TODO
                 }
-                if (partyBase != null)
+                // The victim's owner already sent the upgrade check for a replayed death.
+                if (partyBase != null && !BattleSpawnGate.IsReplicatedDeath(affectedAgent))
                 {
                     // Run on server instead and send message after to clients to update scoreboards
                     //__instance.CheckUpgrade(affectedAgent.Team.Side, partyBase, characterObject);

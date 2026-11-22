@@ -53,7 +53,7 @@ public sealed class BridgeBuildInspector : IBridgeBuildInspector
 {
     public BridgeBuild Inspect(LaunchProfile profile)
     {
-        string gameRoot = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(profile.Executable), "..", ".."));
+        string gameRoot = profile.GameRoot();
         string path = Path.Combine(gameRoot, "Modules", "Coop", "bin", "Win64_Shipping_Client", "Coop.dll");
         return InspectPath(path);
     }

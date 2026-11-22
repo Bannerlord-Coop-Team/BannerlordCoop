@@ -50,6 +50,7 @@ public class CoopLogSnapshotProvider : ICoopLogSnapshotProvider
         this.coopLogFile = coopLogFile;
     }
 
+    /// <summary>Gzips a redacted copy of the active log; fails when it is missing, empty, or over its limits.</summary>
     public bool TryCapture(out CoopLogSnapshot snapshot)
     {
         snapshot = null;
@@ -82,6 +83,8 @@ public class CoopLogSnapshotProvider : ICoopLogSnapshotProvider
                 }
             }
 
+            // An empty log gzips to zero bytes, which the bug-report endpoint rejects as an attachment.
+            if (uncompressedLength == 0 || compressed.Length == 0) return false;
             if (compressed.Length > MaximumCompressedLogBytes) return false;
 
             snapshot = new CoopLogSnapshot(compressed.ToArray(), uncompressedLength);

@@ -49,7 +49,7 @@ internal class ClanMembershipHandler : IHandler
         if (ModInformation.IsClient) return;
         GameThread.RunSafe(() =>
         {
-            if (!playerManager.ValidateHeroSender(payload.Who, payload.What.ActorId)) return;
+            if (!playerManager.IsSenderControllingHero(payload.Who, payload.What.ActorId)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(payload.What.ActorId, out var actor) ||
                 !objectManager.TryGetObjectWithLogging<Hero>(payload.What.MemberId, out var member)) return;
             if (actor == member ? leaveRules.CanLeave(member) : leaveRules.CanRemove(actor, member))

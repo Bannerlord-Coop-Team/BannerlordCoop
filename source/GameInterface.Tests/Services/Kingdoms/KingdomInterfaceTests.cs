@@ -3,6 +3,7 @@ using Common;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Policies;
+using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.Kingdoms.Messages;
 using Moq;
@@ -23,6 +24,7 @@ public class KingdomInterfaceTests : IDisposable
     private readonly ILifetimeScope previousContainer;
     private readonly Mock<IKingdomDecisionVoteManager> voteManager = new();
     private readonly Mock<IOfflineWarProtection> offlineWarProtection = new();
+    private readonly Mock<IKingdomDecisionDataConverter> decisionDataConverter = new();
     private readonly List<DecisionAdded> published = new();
     private readonly Action<MessagePayload<DecisionAdded>> capture;
     private readonly KingdomInterface kingdomInterface;
@@ -34,7 +36,7 @@ public class KingdomInterfaceTests : IDisposable
         ModInformation.IsServer = true;
         capture = payload => published.Add(payload.What);
         MessageBroker.Instance.Subscribe(capture);
-        kingdomInterface = new KingdomInterface(voteManager.Object, offlineWarProtection.Object);
+        kingdomInterface = new KingdomInterface(voteManager.Object, offlineWarProtection.Object, decisionDataConverter.Object);
     }
 
     public void Dispose()
@@ -69,6 +71,36 @@ public class KingdomInterfaceTests : IDisposable
     }
 
     [Fact]
+    public void AddDecisionPrefix_ClientProposesUnsupportedType_KeepsItOutOfTheLocalList()
+    {
+        ModInformation.IsServer = false;
+        UseSyncPolicy(allowOriginal: false);
+        var kingdom = ObjectHelper.SkipConstructor<Kingdom>();
+        kingdom._unresolvedDecisions = new MBList<CampaignKingdomDecision>();
+        var decision = ObjectHelper.SkipConstructor<TestModKingdomDecision>();
+        decisionDataConverter.Setup(converter => converter.IsSupported(decision)).Returns(false);
+        var shown = new List<string>();
+        Action<MessagePayload<SendInformationMessage>> showCapture = payload => shown.Add(payload.What.Text);
+        MessageBroker.Instance.Subscribe(showCapture);
+
+        bool runOriginal;
+        try
+        {
+            runOriginal = kingdomInterface.AddDecisionPrefix(kingdom, decision, ignoreInfluenceCost: false);
+        }
+        finally
+        {
+            MessageBroker.Instance.Unsubscribe(showCapture);
+        }
+
+        Assert.False(runOriginal);
+        Assert.Empty(published);
+        Assert.Empty(kingdom._unresolvedDecisions);
+        Assert.Single(shown, text => text.Contains("kingdom decision can't be proposed"));
+        voteManager.VerifyNoOtherCalls();
+    }
+
+    [Fact]
     public void AddDecisionPrefix_AllowedOriginalScope_SkipsTheOfflineWarGate()
     {
         UseSyncPolicy(allowOriginal: true);
@@ -80,6 +112,26 @@ public class KingdomInterfaceTests : IDisposable
         Assert.True(runOriginal);
         IFaction ignored;
         offlineWarProtection.Verify(protection => protection.ShouldRefuse(It.IsAny<CampaignKingdomDecision>(), out ignored), Times.Never);
+    }
+
+    [Fact]
+    public void RemoveDecisionPrefix_ClientAllowedScope_LeavesTheRemovalToTheServer()
+    {
+        ModInformation.IsServer = false;
+        UseSyncPolicy(allowOriginal: true);
+        var kingdom = ObjectHelper.SkipConstructor<Kingdom>();
+        var claimant = ObjectHelper.SkipConstructor<SettlementClaimantDecision>();
+        var peace = ObjectHelper.SkipConstructor<MakePeaceKingdomDecision>();
+        kingdom._unresolvedDecisions = new MBList<CampaignKingdomDecision> { claimant, peace };
+
+        using (new AllowedThread())
+        {
+            Assert.False(kingdomInterface.RemoveDecisionPrefix(kingdom, claimant));
+        }
+
+        // The server's remove of index 0 still lands on the claimant instead of the peace decision after it.
+        kingdomInterface.RemoveDecision(kingdom, kingdom._unresolvedDecisions[0]);
+        Assert.Same(peace, Assert.Single(kingdom._unresolvedDecisions));
     }
 
     private void UseSyncPolicy(bool allowOriginal)

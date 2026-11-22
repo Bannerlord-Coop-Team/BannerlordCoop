@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Util;
 using Coop.Core.Client.Services.Heroes.Messages;
 using GameInterface.Services.Heroes.Interfaces;
+using GameInterface.Services.MapTracking;
 using GameInterface.Services.Players;
 using Serilog;
 
@@ -30,17 +31,20 @@ internal class RemotePlayerHeroHandler : IHandler
     private readonly IHeroInterface heroInterface;
     private readonly IPlayerManager playerRegistry;
     private readonly IPlayerCreationRollback playerCreationRollback;
+    private readonly IPlayerMapTracking mapTracking;
 
     public RemotePlayerHeroHandler(
         IMessageBroker messageBroker,
         IHeroInterface heroInterface,
         IPlayerManager playerRegistry,
-        IPlayerCreationRollback playerCreationRollback)
+        IPlayerCreationRollback playerCreationRollback,
+        IPlayerMapTracking mapTracking)
     {
         this.messageBroker = messageBroker;
         this.heroInterface = heroInterface;
         this.playerRegistry = playerRegistry;
         this.playerCreationRollback = playerCreationRollback;
+        this.mapTracking = mapTracking;
 
         messageBroker.Subscribe<NetworkNewPlayerHeroCreated>(Handle_NetworkNewPlayerHeroCreated);
         messageBroker.Subscribe<NetworkPlayerCreationRolledBack>(Handle_NetworkPlayerCreationRolledBack);
@@ -90,7 +94,13 @@ internal class RemotePlayerHeroHandler : IHandler
                 heroInterface.ClientUnpackHero(message.HeroData, player, message.RegistrationHandles);
 
             if (!playerRegistry.AddPlayer(player))
+            {
                 Logger.Error("Player {HeroId} has already been added.", player.HeroId);
+                return;
+            }
+
+            // Existing players register after this client built its map trackers, so recheck their party
+            mapTracking.RefreshTracker(player);
         }, blocking: true);
     }
 
@@ -108,7 +118,10 @@ internal class RemotePlayerHeroHandler : IHandler
                 Logger.Error(
                     "Could not replace player registration for controller {ControllerId}",
                     replacement.ControllerId);
+                return;
             }
+
+            mapTracking.RefreshTracker(replacement);
         }, blocking: true, context: nameof(Handle_NetworkPlayerRegistrationUpdated));
     }
 }

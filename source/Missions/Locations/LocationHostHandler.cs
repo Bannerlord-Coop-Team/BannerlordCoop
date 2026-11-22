@@ -26,7 +26,8 @@ namespace Missions.Locations;
 /// Client: once the location mission has FINISHED LOADING (<see cref="LocationMissionReady"/>, published
 /// by <c>CoopLocationsController</c>) it asks the server to elect via
 /// <see cref="NetworkRequestLocationHost"/> and stores the reply
-/// (<see cref="NetworkLocationHostAssigned"/>), driving <see cref="LocationNpcGate"/>.
+/// (<see cref="NetworkLocationHostAssigned"/>) in <see cref="ILocationHostRegistry"/>, which
+/// <see cref="ILocationNpcAuthorityState"/> reads for the active instance.
 /// Server: the first MISSION-READY client becomes the instance's host (SR-010); later ready clients
 /// append to the successor line in mission-ready order. Departures promote the first successor
 /// (SR-014) or clear the assignment when the instance empties (SR-016). Departures for instance ids
@@ -254,9 +255,6 @@ internal class LocationHostHandler : IHandler
         bool isLocalHost = message.HostControllerId == controllerIdProvider.ControllerId;
         bool hostChanged = previousHost != null && previousHost != message.HostControllerId;
         bool isMigrationToUs = hostChanged && isLocalHost;
-
-        // Drive the static patch gate — it ignores assignments for instances other than the active mission.
-        LocationNpcGate.SetLocalHost(message.InstanceId, isLocalHost);
 
         if (isLocalHost && (!wasLocalHost || previous?.Epoch != message.Epoch))
             messageBroker.Publish(this, new LocationHostAuthorityAcquired(message.InstanceId, isMigrationToUs));

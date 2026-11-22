@@ -5,6 +5,7 @@ using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.Armies.Patches;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
@@ -16,6 +17,7 @@ using GameInterface.Services.SiegeEngines;
 using GameInterface.Services.SiegeEvents;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using GameInterface.Services.SiegeEvents.Messages;
+using GameInterface.Utils.Commands;
 using HarmonyLib;
 using Newtonsoft.Json;
 using SandBox.View.Map;
@@ -120,6 +122,14 @@ public class SiegeDebugCommand
 
     public sealed class StartPrisonerPromptFixtureCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        // Takes the resolver that turns name or id arguments into game objects.
+        public StartPrisonerPromptFixtureCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.siege";
 
         public string Name => "prisoner_prompt_fixture_start";
@@ -131,7 +141,7 @@ public class SiegeDebugCommand
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("controllerId", "The controller id."),
-            new ExpectedArgs("settlementId", "The settlement id."),
+            new ExpectedArgs("settlementId", "Settlement name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -148,8 +158,8 @@ public class SiegeDebugCommand
             if (!playerManager.TryGetPlayer(args[0], out var player) || !playerManager.IsConnected(player) ||
                 !objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var playerParty))
                 return Failed($"No connected player has controller id {args[0]}.");
-            if (!objectManager.TryGetObject<Settlement>(args[1], out var settlement))
-                return Failed($"Settlement with id {args[1]} not found.");
+            if (!resolver.TryResolveSettlement(args[1], out var settlement, out var settlementError))
+                return Failed(settlementError);
             if (!settlement.IsFortification || settlement.OwnerClan?.Leader == null)
                 return Failed($"{settlement.Name} must be an owned fortification.");
             if (playerParty.MapFaction is not Kingdom attackerKingdom ||
@@ -270,6 +280,14 @@ public class SiegeDebugCommand
 
     public sealed class PrisonerPromptFixtureStateCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        // Takes the resolver that turns name or id arguments into game objects.
+        public PrisonerPromptFixtureStateCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.siege";
 
         public string Name => "prisoner_prompt_fixture_state";
@@ -281,7 +299,7 @@ public class SiegeDebugCommand
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("controllerId", "The controller id."),
-            new ExpectedArgs("settlementId", "The settlement id."),
+            new ExpectedArgs("settlementId", "Settlement name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -290,9 +308,10 @@ public class SiegeDebugCommand
             if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager) ||
                 !ContainerProvider.TryResolve<IPlayerManager>(out var playerManager) ||
                 !playerManager.TryGetPlayer(args[0], out var player) ||
-                !objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var playerParty) ||
-                !objectManager.TryGetObject<Settlement>(args[1], out var settlement))
+                !objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var playerParty))
                 return Failed("Unable to resolve prisoner-prompt fixture state.");
+            if (!resolver.TryResolveSettlement(args[1], out var settlement, out var settlementError))
+                return Failed(settlementError);
 
             var army = playerParty.Army;
             string armyId = null;
@@ -855,6 +874,14 @@ public class SiegeDebugCommand
     /// </summary>
     public sealed class StartArmyReliefCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        // Takes the resolver that turns name or id arguments into game objects.
+        public StartArmyReliefCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.siege";
 
         public string Name => "start_army_relief";
@@ -866,7 +893,7 @@ public class SiegeDebugCommand
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("controllerId", "The controller id."),
-            new ExpectedArgs("settlementId", "The settlement id."),
+            new ExpectedArgs("settlementId", "Settlement name or id; quote names with spaces."),
             new ExpectedArgs("armyPartyCount", "The army party count.", isRequired: false),
         };
 
@@ -901,9 +928,9 @@ public class SiegeDebugCommand
                 return Failed($"Unable to resolve player party {player.MobilePartyId}");
             }
 
-            if (!objectManager.TryGetObject<Settlement>(args[1], out var settlement))
+            if (!resolver.TryResolveSettlement(args[1], out var settlement, out var settlementError))
             {
-                return Failed($"Settlement with id {args[1]} not found");
+                return Failed(settlementError);
             }
 
             if (!settlement.IsFortification || settlement.MapFaction is not Kingdom kingdom)
@@ -978,6 +1005,14 @@ public class SiegeDebugCommand
 
     public sealed class ArmyReliefStateCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        // Takes the resolver that turns name or id arguments into game objects.
+        public ArmyReliefStateCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.siege";
 
         public string Name => "army_relief_state";
@@ -989,7 +1024,7 @@ public class SiegeDebugCommand
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("controllerId", "The controller id."),
-            new ExpectedArgs("settlementId", "The settlement id."),
+            new ExpectedArgs("settlementId", "Settlement name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -998,10 +1033,14 @@ public class SiegeDebugCommand
             if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)
                 || !ContainerProvider.TryResolve<IPlayerManager>(out var playerManager)
                 || !playerManager.TryGetPlayer(args[0], out var player)
-                || !objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var playerParty)
-                || !objectManager.TryGetObject<Settlement>(args[1], out var settlement))
+                || !objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var playerParty))
             {
                 return Failed("Unable to resolve the relief fixture");
+            }
+
+            if (!resolver.TryResolveSettlement(args[1], out var settlement, out var settlementError))
+            {
+                return Failed(settlementError);
             }
 
             bool siegeActive = settlement.SiegeEvent != null;
@@ -1024,6 +1063,14 @@ public class SiegeDebugCommand
 
     public sealed class RequestBesiegeCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        // Takes the resolver that turns name or id arguments into game objects.
+        public RequestBesiegeCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.siege";
 
         public string Name => "request_besiege";
@@ -1034,7 +1081,7 @@ public class SiegeDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("settlementId", "The settlement id."),
+            new ExpectedArgs("settlementId", "Settlement name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -1045,10 +1092,9 @@ public class SiegeDebugCommand
                 return Failed("This command can only be used by a client");
             }
 
-            if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)
-                || !objectManager.TryGetObject<Settlement>(args[0], out var settlement))
+            if (!resolver.TryResolveSettlement(args[0], out var settlement, out var settlementError))
             {
-                return Failed($"Settlement with id {args[0]} not found");
+                return Failed(settlementError);
             }
 
             MessageBroker.Instance.Publish(null, new BesiegeSettlementAttempted(MobileParty.MainParty, settlement));
@@ -1059,6 +1105,14 @@ public class SiegeDebugCommand
 
     public sealed class RequestAssaultCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        // Takes the resolver that turns name or id arguments into game objects.
+        public RequestAssaultCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.siege";
 
         public string Name => "request_assault";
@@ -1069,7 +1123,7 @@ public class SiegeDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("settlementId", "The settlement id."),
+            new ExpectedArgs("settlementId", "Settlement name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -1080,10 +1134,9 @@ public class SiegeDebugCommand
                 return Failed("This command can only be used by a client");
             }
 
-            if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)
-                || !objectManager.TryGetObject<Settlement>(args[0], out var settlement))
+            if (!resolver.TryResolveSettlement(args[0], out var settlement, out var settlementError))
             {
-                return Failed($"Settlement with id {args[0]} not found");
+                return Failed(settlementError);
             }
 
             MessageBroker.Instance.Publish(null, new AssaultSiegeAttempted(MobileParty.MainParty, settlement));
@@ -1094,6 +1147,14 @@ public class SiegeDebugCommand
 
     public sealed class JoinActiveAssaultCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        // Takes the resolver that turns name or id arguments into game objects.
+        public JoinActiveAssaultCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.siege";
 
         public string Name => "join_active_assault";
@@ -1104,7 +1165,7 @@ public class SiegeDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("settlementId", "The settlement id."),
+            new ExpectedArgs("settlementId", "Settlement name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -1115,10 +1176,9 @@ public class SiegeDebugCommand
                 return Failed("This command can only be used by a client");
             }
 
-            if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)
-                || !objectManager.TryGetObject<Settlement>(args[0], out var settlement))
+            if (!resolver.TryResolveSettlement(args[0], out var settlement, out var settlementError))
             {
-                return Failed($"Unable to resolve the settlement encounter for {args[0]}");
+                return Failed(settlementError);
             }
 
             var mapEvent = settlement.Party.MapEvent;
@@ -1147,7 +1207,7 @@ public class SiegeDebugCommand
                 var menu = Campaign.Current?.CurrentMenuContext?.GameMenu;
                 var joinOption = menu?.MenuOptions.FirstOrDefault(option => option.IdString == "join_encounter_help_attackers");
                 if (PlayerEncounter.Current == null || PlayerEncounter.EncounterSettlement != settlement ||
-                    PlayerEncounter.EncounteredBattle != mapEvent || PartyBase.MainParty.MapEvent != null ||
+                    PlayerEncounter.Current.GetEncounteredBattleOrNull() != mapEvent || PartyBase.MainParty.MapEvent != null ||
                     menu?.StringId != "join_encounter" || joinOption == null ||
                     !menu.GetMenuOptionConditionsHold(Game.Current, Campaign.Current.CurrentMenuContext,
                         menu.MenuOptions.ToList().IndexOf(joinOption)) || !joinOption.IsEnabled)
@@ -1362,6 +1422,14 @@ public class SiegeDebugCommand
     /// <returns>Result of the operation as a string</returns>
     public sealed class StartSiegeCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        // Takes the resolver that turns name or id arguments into game objects.
+        public StartSiegeCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.siege";
 
         public string Name => "start";
@@ -1372,8 +1440,8 @@ public class SiegeDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("settlementId", "The settlement id."),
-            new ExpectedArgs("besiegerPartyId", "The besieger party id.", isRequired: false),
+            new ExpectedArgs("settlementId", "Settlement name or id; quote names with spaces."),
+            new ExpectedArgs("besiegerPartyId", "Besieger party name or id; quote names with spaces.", isRequired: false),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -1389,9 +1457,9 @@ public class SiegeDebugCommand
                 return Failed("Unable to resolve ObjectManager");
             }
 
-            if (!objectManager.TryGetObject<Settlement>(args[0], out var settlement))
+            if (!resolver.TryResolveSettlement(args[0], out var settlement, out var settlementError))
             {
-                return Failed($"Settlement with id {args[0]} not found");
+                return Failed(settlementError);
             }
 
             if (!settlement.IsFortification)
@@ -1407,9 +1475,9 @@ public class SiegeDebugCommand
             MobileParty besieger;
             if (args.Count == 2)
             {
-                if (!objectManager.TryGetObject(args[1], out besieger))
+                if (!resolver.TryResolveMobileParty(args[1], out besieger, out var besiegerError))
                 {
-                    return Failed($"Party with id {args[1]} not found");
+                    return Failed(besiegerError);
                 }
             }
             else
@@ -1479,6 +1547,14 @@ public class SiegeDebugCommand
     /// </summary>
     public sealed class StopSiegeCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        // Takes the resolver that turns name or id arguments into game objects.
+        public StopSiegeCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.siege";
 
         public string Name => "stop";
@@ -1489,7 +1565,7 @@ public class SiegeDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("settlementId", "The settlement id."),
+            new ExpectedArgs("settlementId", "Settlement name or id; quote names with spaces."),
             new ExpectedArgs("originalX", "The original x."),
             new ExpectedArgs("originalY", "The original y."),
             new ExpectedArgs("originalIsOnLand", "The original is on land."),
@@ -1503,14 +1579,9 @@ public class SiegeDebugCommand
                 return Failed("This command can only be used by the server");
             }
 
-            if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
+            if (!resolver.TryResolveSettlement(args[0], out var settlement, out var settlementError))
             {
-                return Failed("Unable to resolve ObjectManager");
-            }
-
-            if (!objectManager.TryGetObject<Settlement>(args[0], out var settlement))
-            {
-                return Failed($"Settlement with id {args[0]} not found");
+                return Failed(settlementError);
             }
 
             var camp = settlement.SiegeEvent?.BesiegerCamp;
@@ -1574,6 +1645,14 @@ public class SiegeDebugCommand
     /// </summary>
     public sealed class JoinPlayersCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        // Takes the resolver that turns name or id arguments into game objects.
+        public JoinPlayersCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.siege";
 
         public string Name => "join_players";
@@ -1584,7 +1663,7 @@ public class SiegeDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("settlementId", "The settlement id."),
+            new ExpectedArgs("settlementId", "Settlement name or id; quote names with spaces."),
             new ExpectedArgs("expectedPlayerCount", "The expected player count."),
             new ExpectedArgs("declareMissingWars", "Use declare-missing-wars only for a disposable debug fixture.", isRequired: false),
         };
@@ -1619,9 +1698,9 @@ public class SiegeDebugCommand
                 return Failed("Unable to resolve siege fixture services");
             }
 
-            if (!objectManager.TryGetObject<Settlement>(args[0], out var settlement))
+            if (!resolver.TryResolveSettlement(args[0], out var settlement, out var settlementError))
             {
-                return Failed($"Settlement with id {args[0]} not found");
+                return Failed(settlementError);
             }
 
             if (settlement.MapFaction == null)
@@ -1727,6 +1806,14 @@ public class SiegeDebugCommand
 
     public sealed class PlayerStateCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        // Takes the resolver that turns name or id arguments into game objects.
+        public PlayerStateCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.siege";
 
         public string Name => "player_state";
@@ -1737,7 +1824,7 @@ public class SiegeDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("partyId", "The party id."),
+            new ExpectedArgs("partyId", "Party name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -1748,9 +1835,9 @@ public class SiegeDebugCommand
                 return Failed("Unable to resolve ObjectManager");
             }
 
-            if (!objectManager.TryGetObject<MobileParty>(args[0], out var party))
+            if (!resolver.TryResolveMobileParty(args[0], out var party, out var partyError))
             {
-                return Failed($"Party with id {args[0]} not found");
+                return Failed(partyError);
             }
 
             var mapEvent = party.MapEvent;
@@ -1770,6 +1857,14 @@ public class SiegeDebugCommand
 
     public sealed class PrepareLaddersOnlyCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        // Takes the resolver that turns name or id arguments into game objects.
+        public PrepareLaddersOnlyCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.siege";
 
         public string Name => "prepare_ladders_only";
@@ -1780,7 +1875,7 @@ public class SiegeDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("settlementId", "The settlement id."),
+            new ExpectedArgs("settlementId", "Settlement name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -1791,14 +1886,9 @@ public class SiegeDebugCommand
                 return Failed("This command can only be used by the server");
             }
 
-            if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
+            if (!resolver.TryResolveSettlement(args[0], out var settlement, out var settlementError))
             {
-                return Failed("Unable to resolve ObjectManager");
-            }
-
-            if (!objectManager.TryGetObject<Settlement>(args[0], out var settlement))
-            {
-                return Failed($"Settlement with id {args[0]} not found");
+                return Failed(settlementError);
             }
 
             var siegeEvent = settlement.SiegeEvent;
@@ -1862,6 +1952,14 @@ public class SiegeDebugCommand
 
     public sealed class StageMachinesCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        // Takes the resolver that turns name or id arguments into game objects.
+        public StageMachinesCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.siege";
 
         public string Name => "stage_machines";
@@ -1872,7 +1970,7 @@ public class SiegeDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("settlementId", "The settlement id."),
+            new ExpectedArgs("settlementId", "Settlement name or id; quote names with spaces."),
 #if DEBUG
             new ExpectedArgs("profile", "Optional defender_interactables profile.", isRequired: false),
 #endif
@@ -1890,15 +1988,14 @@ public class SiegeDebugCommand
             if (args.Count > 1 && args[1] != "defender_interactables")
                 return Failed("Unknown siege machine staging profile.");
 #endif
-            if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)
-                || !ContainerProvider.TryResolve<ISiegeEventInterface>(out var siegeEventInterface))
+            if (!ContainerProvider.TryResolve<ISiegeEventInterface>(out var siegeEventInterface))
             {
                 return Failed("Unable to resolve siege fixture services");
             }
 
-            if (!objectManager.TryGetObject<Settlement>(args[0], out var settlement))
+            if (!resolver.TryResolveSettlement(args[0], out var settlement, out var settlementError))
             {
-                return Failed($"Settlement with id {args[0]} not found");
+                return Failed(settlementError);
             }
 
             var siegeEvent = settlement.SiegeEvent;
@@ -1971,6 +2068,14 @@ public class SiegeDebugCommand
     /// </summary>
     public sealed class StartAssaultCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        // Takes the resolver that turns name or id arguments into game objects.
+        public StartAssaultCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.siege";
 
         public string Name => "assault";
@@ -1981,7 +2086,7 @@ public class SiegeDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("settlementId", "The settlement id."),
+            new ExpectedArgs("settlementId", "Settlement name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -1997,9 +2102,9 @@ public class SiegeDebugCommand
                 return Failed("Unable to resolve ObjectManager");
             }
 
-            if (!objectManager.TryGetObject<Settlement>(args[0], out var settlement))
+            if (!resolver.TryResolveSettlement(args[0], out var settlement, out var settlementError))
             {
-                return Failed($"Settlement with id {args[0]} not found");
+                return Failed(settlementError);
             }
 
             var attacker = settlement.SiegeEvent?.BesiegerCamp?.LeaderParty;
@@ -2047,6 +2152,14 @@ public class SiegeDebugCommand
     /// </summary>
     public sealed class TerminalStatusCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        // Takes the resolver that turns name or id arguments into game objects.
+        public TerminalStatusCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.siege";
 
         public string Name => "terminal_status";
@@ -2057,22 +2170,21 @@ public class SiegeDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("settlementId", "The settlement id."),
+            new ExpectedArgs("settlementId", "Settlement name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
 
-            if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)
-                || !ContainerProvider.TryResolve<IAiSiegeAssaultReadiness>(out var readiness)
+            if (!ContainerProvider.TryResolve<IAiSiegeAssaultReadiness>(out var readiness)
                 || !ContainerProvider.TryResolve<IAiSiegeTerminalPolicy>(out var terminalPolicy))
             {
                 return Failed("Unable to resolve AI siege terminal services");
             }
 
-            if (!objectManager.TryGetObject<Settlement>(args[0], out var settlement))
+            if (!resolver.TryResolveSettlement(args[0], out var settlement, out var settlementError))
             {
-                return Failed($"Settlement with id {args[0]} not found");
+                return Failed(settlementError);
             }
 
             var siegeEvent = settlement.SiegeEvent;
@@ -2119,6 +2231,14 @@ public class SiegeDebugCommand
     /// </summary>
     public sealed class ResolveStarvationCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        // Takes the resolver that turns name or id arguments into game objects.
+        public ResolveStarvationCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.siege";
 
         public string Name => "resolve_starvation";
@@ -2129,7 +2249,7 @@ public class SiegeDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("settlementId", "The settlement id."),
+            new ExpectedArgs("settlementId", "Settlement name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -2140,15 +2260,14 @@ public class SiegeDebugCommand
                 return Failed("This command can only be used by the server");
             }
 
-            if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)
-                || !ContainerProvider.TryResolve<IAiSiegeTerminalPolicy>(out var terminalPolicy))
+            if (!ContainerProvider.TryResolve<IAiSiegeTerminalPolicy>(out var terminalPolicy))
             {
                 return Failed("Unable to resolve AI siege terminal services");
             }
 
-            if (!objectManager.TryGetObject<Settlement>(args[0], out var settlement))
+            if (!resolver.TryResolveSettlement(args[0], out var settlement, out var settlementError))
             {
-                return Failed($"Settlement with id {args[0]} not found");
+                return Failed(settlementError);
             }
 
             var siegeEvent = settlement.SiegeEvent;
@@ -2212,6 +2331,14 @@ public class SiegeDebugCommand
     /// </summary>
     public sealed class GraphStateCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        // Takes the resolver that turns name or id arguments into game objects.
+        public GraphStateCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.siege";
 
         public string Name => "graph";
@@ -2222,20 +2349,15 @@ public class SiegeDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("settlementId", "The settlement id."),
+            new ExpectedArgs("settlementId", "Settlement name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
 
-            if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
+            if (!resolver.TryResolveSettlement(args[0], out var settlement, out var settlementError))
             {
-                return Failed("Unable to resolve ObjectManager");
-            }
-
-            if (!objectManager.TryGetObject<Settlement>(args[0], out var settlement))
-            {
-                return Failed($"Settlement with id {args[0]} not found");
+                return Failed(settlementError);
             }
 
             var siegeEvent = settlement.SiegeEvent;
@@ -2280,6 +2402,14 @@ public class SiegeDebugCommand
     /// </summary>
     public sealed class FocusSettlementCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        // Takes the resolver that turns name or id arguments into game objects.
+        public FocusSettlementCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.siege";
 
         public string Name => "focus";
@@ -2290,7 +2420,7 @@ public class SiegeDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("settlementId", "The settlement id."),
+            new ExpectedArgs("settlementId", "Settlement name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -2301,14 +2431,9 @@ public class SiegeDebugCommand
             }
 
 
-            if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
+            if (!resolver.TryResolveSettlement(args[0], out var settlement, out var settlementError))
             {
-                return Failed("Unable to resolve ObjectManager");
-            }
-
-            if (!objectManager.TryGetObject<Settlement>(args[0], out var settlement))
-            {
-                return Failed($"Settlement with id {args[0]} not found");
+                return Failed(settlementError);
             }
 
             if (MapScreen.Instance == null)
@@ -2322,18 +2447,26 @@ public class SiegeDebugCommand
         }
     }
 
-    // coop.debug.siege.dump_party <heroName|main|partyId>
+    // coop.debug.siege.dump_party <heroNameOrPartyId|main>
     /// <summary>
     /// Dumps a party's siege-relevant state — CurrentSettlement, BesiegerCamp, BesiegedSettlement, Position —
     /// with its co-op registry id. Read-only; run on the SERVER and BOTH clients right after a siege capture and
     /// compare the co-besieger's party. A CurrentSettlement set on the server/host but null on the co-besieger's
     /// own client (party still at the camp Position, its BesiegerCamp maybe uncleared) pinpoints why it is left
-    /// outside. Resolve by "main" (that client's own party), a coop id, or a leader-hero name.
+    /// outside. Resolve by "main" (that client's own party), a party name or id, or a hero name or id.
     /// </summary>
     /// <param name="args">first arg: heroName | main | partyId</param>
     /// <returns>Result of the operation as a string</returns>
     public sealed class DumpPartyCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        // Takes the resolver that turns name or id arguments into game objects.
+        public DumpPartyCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.siege";
 
         public string Name => "dump_party";
@@ -2344,7 +2477,7 @@ public class SiegeDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("heroNameOrPartyId", "The exact hero name or party id; quote names containing spaces."),
+            new ExpectedArgs("heroNameOrPartyId", "Party or hero name or id, or main; quote names containing spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -2361,15 +2494,20 @@ public class SiegeDebugCommand
             {
                 party = MobileParty.MainParty;
             }
-            else if (!objectManager.TryGetObject(arg, out party))
+            else if (!resolver.TryResolveMobileParty(arg, out party, out var partyError))
             {
-                party = MobileParty.All.FirstOrDefault(p => p.LeaderHero?.Name != null
-                    && p.LeaderHero.Name.ToString().IndexOf(arg, StringComparison.OrdinalIgnoreCase) >= 0);
+                if (!resolver.TryResolveHero(arg, out var hero, out var heroError))
+                {
+                    // An ambiguous hero name is more useful than the party miss.
+                    return Failed(resolver.IsAmbiguous(heroError) ? heroError : partyError);
+                }
+
+                party = hero.PartyBelongedTo;
             }
 
             if (party == null)
             {
-                return Failed($"No party found for '{arg}' (use \"main\", a coop id, or a leader-hero name)");
+                return Failed($"No party found for '{arg}' (use \"main\", a party name or id, or a leader-hero name or id)");
             }
 
             var settlement = party.CurrentSettlement ?? party.BesiegedSettlement;

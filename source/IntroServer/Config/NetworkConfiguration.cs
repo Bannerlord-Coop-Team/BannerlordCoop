@@ -53,6 +53,10 @@ namespace IntroServer.Config
         public TimeSpan DisconnectTimeout { get; } = TimeSpan.FromSeconds(60);
 #endif
         /// <summary>
+        ///     The intro server hosts no battles, so this only satisfies the shared config.
+        /// </summary>
+        public TimeSpan BattleHostDisconnectTimeout => DisconnectTimeout;
+        /// <summary>
         ///     Delay after a failed connection attempt until it is tried again.
         /// </summary>
         public TimeSpan ReconnectDelay { get; } = TimeSpan.FromSeconds(1);
@@ -94,6 +98,10 @@ namespace IntroServer.Config
         public TimeSpan ObjectCreationTimeout => DisconnectTimeout;
 
         public TimeSpan NetworkPollInterval => UpdateTime;
+
+        public IPAddress BindAddressIPv4 => IPAddress.Any;
+
+        public IPAddress BindAddressIPv6 => IPAddress.IPv6Any;
         #endregion
     }
 }

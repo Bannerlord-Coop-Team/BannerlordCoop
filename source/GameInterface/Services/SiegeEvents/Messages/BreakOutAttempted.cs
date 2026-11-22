@@ -6,5 +6,11 @@ namespace GameInterface.Services.SiegeEvents.Messages;
 public readonly struct BreakOutAttempted : IEvent
 {
     public MobileParty Party { get; }
-    public BreakOutAttempted(MobileParty party) => Party = party;
+    public bool IsFromPort { get; }
+
+    public BreakOutAttempted(MobileParty party, bool isFromPort)
+    {
+        Party = party;
+        IsFromPort = isFromPort;
+    }
 }

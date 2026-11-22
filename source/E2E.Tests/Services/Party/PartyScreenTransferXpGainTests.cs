@@ -39,7 +39,7 @@ public class PartyScreenTransferXpGainTests : IDisposable
     }
 
     [Fact]
-    public void TransferThenServerXpGain_ResetsScreenAndKeepsServerXp()
+    public void TransferThenServerXpGain_CarriesXpToMovedTroop()
     {
         var fixture = CreateFixture();
         var logic = OpenPartyScreen(fixture);
@@ -48,24 +48,7 @@ public class PartyScreenTransferXpGainTests : IDisposable
         Assert.Equal(new RosterState((-1, -1), (1, TroopXp)), ReadClient(fixture));
 
         SetServerXp(fixture, ServerXp);
-        AssertScreenReset(fixture, logic);
-
-        Done(fixture, logic);
-        AssertServerKeepsTotalXp(fixture, new RosterState((1, ServerXp), (-1, -1)));
-    }
-
-    [Fact]
-    public void TransferAgainAfterReset_CommitsServerXp()
-    {
-        var fixture = CreateFixture();
-        var logic = OpenPartyScreen(fixture);
-
-        Transfer(fixture, logic, PartyScreenLogic.PartyRosterSide.Right);
-        SetServerXp(fixture, ServerXp);
-        AssertScreenReset(fixture, logic);
-
-        Transfer(fixture, logic, PartyScreenLogic.PartyRosterSide.Right);
-        Assert.Equal(new RosterState((-1, -1), (1, ServerXp)), ReadClient(fixture));
+        AssertTransferKept(fixture, logic);
 
         Done(fixture, logic);
         AssertServerKeepsTotalXp(fixture, new RosterState((-1, -1), (1, ServerXp)));
@@ -79,9 +62,8 @@ public class PartyScreenTransferXpGainTests : IDisposable
 
         Transfer(fixture, logic, PartyScreenLogic.PartyRosterSide.Right);
         SetServerXp(fixture, ServerXp);
-        AssertScreenReset(fixture, logic);
+        AssertTransferKept(fixture, logic);
 
-        Transfer(fixture, logic, PartyScreenLogic.PartyRosterSide.Right);
         Transfer(fixture, logic, PartyScreenLogic.PartyRosterSide.Left);
         Assert.Equal(new RosterState((1, ServerXp), (-1, -1)), ReadClient(fixture));
 
@@ -89,12 +71,11 @@ public class PartyScreenTransferXpGainTests : IDisposable
         AssertServerKeepsTotalXp(fixture, new RosterState((1, ServerXp), (-1, -1)));
     }
 
-    // The refresher cannot rebase the moved troop onto the gain, so it drops the pending transfer and the
-    // screen shows the server stack again, with the new xp as the baseline for the next Done.
-    private void AssertScreenReset(TransferFixture fixture, PartyScreenLogic logic)
+    // The refresher carries the gain on the emptied stack to the moved troop instead of resetting the screen,
+    // and the baseline takes the server stack so the next Done only sends the move.
+    private void AssertTransferKept(TransferFixture fixture, PartyScreenLogic logic)
     {
-        var expected = new RosterState((1, ServerXp), (-1, -1));
-        Assert.Equal(expected, ReadClient(fixture));
+        Assert.Equal(new RosterState((-1, -1), (1, ServerXp)), ReadClient(fixture));
 
         RosterState baseline = default;
         Client.Call(() =>
@@ -104,7 +85,7 @@ public class PartyScreenTransferXpGainTests : IDisposable
                 Read(logic._initialData.RightMemberRoster, troop),
                 Read(logic._initialData.LeftMemberRoster, troop));
         });
-        Assert.Equal(expected, baseline);
+        Assert.Equal(new RosterState((1, ServerXp), (-1, -1)), baseline);
     }
 
     private void AssertServerKeepsTotalXp(TransferFixture fixture, RosterState expected)
@@ -140,7 +121,7 @@ public class PartyScreenTransferXpGainTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetId(hero, out var heroId));
             Assert.True(Server.ObjectManager.TryGetId(troop, out var troopId));
             Assert.True(Server.ObjectManager.TryGetId(target, out var targetId));
-            Assert.True(Server.Resolve<IPlayerManager>().AddPlayer(new Player(ControllerId, null, rightId, null, null)));
+            Assert.True(Server.Resolve<IPlayerManager>().AddPlayer(new Player(ControllerId, heroId, rightId, null, null)));
             fixture = new TransferFixture(rightId, leftId, heroId, troopId, targetId);
         });
         TestEnvironment.ConnectRegisteredPlayer(Client, ControllerId);

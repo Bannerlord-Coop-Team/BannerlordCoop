@@ -639,6 +639,48 @@ public class TournamentSessionRegistryTests
     }
 
     [Fact]
+    public void ActiveLeave_SpectatorDuringLiveMatch_DropsFromSession()
+    {
+        var registry = new TournamentSessionRegistry();
+        TournamentSessionSnapshot snapshot = CreateStartedSession(registry, humanInMatch: true);
+        Assert.Equal(TournamentMutationStatus.Applied, registry.TryRequestSpectate(
+            snapshot.SessionId, snapshot.Revision, "spectator", out snapshot));
+        Assert.Equal(TournamentMutationStatus.Applied, registry.TryEnterMission(
+            snapshot.SessionId, snapshot.Revision, "player-1", out snapshot));
+        Assert.Equal(TournamentMutationStatus.Applied, registry.TryEnterMission(
+            snapshot.SessionId, snapshot.Revision, "player-2", out snapshot));
+        Assert.Equal(TournamentMutationStatus.Applied, registry.TryChoose(
+            snapshot.SessionId, snapshot.Revision, snapshot.CurrentMatchId, "player-1",
+            TournamentPlayerChoice.Join, out snapshot, out _));
+        Assert.Equal(TournamentMutationStatus.Applied, registry.TryChoose(
+            snapshot.SessionId, snapshot.Revision, snapshot.CurrentMatchId, "player-2",
+            TournamentPlayerChoice.Watch, out snapshot, out _));
+        Assert.Equal(TournamentMutationStatus.Applied, registry.TryChoose(
+            snapshot.SessionId, snapshot.Revision, snapshot.CurrentMatchId, "spectator",
+            TournamentPlayerChoice.Watch, out snapshot, out _));
+        Assert.Equal(TournamentSessionPhase.LiveMatch, snapshot.Phase);
+        Assert.Contains("spectator", snapshot.SpectatorControllerIds);
+
+        TournamentMutationStatus status = registry.TryLeaveActive(
+            snapshot.SessionId,
+            snapshot.Revision,
+            "spectator",
+            900,
+            "Tournament Recruit",
+            out snapshot,
+            out var outcome,
+            out var noViewers);
+
+        Assert.Equal(TournamentMutationStatus.Applied, status);
+        Assert.Equal(TournamentBallotOutcome.Open, outcome);
+        Assert.DoesNotContain("spectator", snapshot.SpectatorControllerIds);
+        Assert.Equal(TournamentSessionPhase.LiveMatch, snapshot.Phase);
+        Assert.False(noViewers);
+        Assert.Equal(2, snapshot.Contestants.Count(contestant => contestant.IsHuman));
+        Assert.DoesNotContain(snapshot.Contestants, contestant => contestant.IsReplaced);
+    }
+
+    [Fact]
     public void MatchResult_RejectsAuthenticatedNonHost()
     {
         var registry = new TournamentSessionRegistry();

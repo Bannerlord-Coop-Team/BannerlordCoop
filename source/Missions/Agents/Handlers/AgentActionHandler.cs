@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Messaging;
 using Common.PacketHandlers;
+using Common.Serialization;
 using Common.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Locations;
@@ -47,6 +48,12 @@ public interface IAgentActionHandler : IPacketHandler, IDisposable
     /// <summary>[Game thread] Apply queued remote actions and restore retained guard state before native collision.</summary>
     void ApplyRemoteGuardStates();
 
+    /// <summary>
+    /// Owned agents seated at a ship station send no action changes: the station machine animates their puppet on every peer,
+    /// and a replicated channel action makes the helm drop its pilot. Null turns it off.
+    /// </summary>
+    void ConfigureStationSeats(IShipStationSeats seats);
+
     /// <summary>[Game thread] Reapply retained defend input after continuous movement replay.</summary>
     void RefreshRemoteGuardStatesAfterMovement();
 }
@@ -62,19 +69,25 @@ public interface IAgentActionHandler : IPacketHandler, IDisposable
 /// </summary>
 public class AgentActionHandler : IAgentActionHandler
 {
-    // Reliable delivery fragments, so this is only to avoid one-giant-packet; action changes per frame are few.
+    // Packets are also cut by bytes, so they leave as one datagram instead of reliable fragments.
     private const int MaxAgentsPerActionPacket = 8;
     private const float DiscreteActionSpeedDeltaThreshold = 0.001f;
     private const float AmbientActionSpeedDeltaThreshold = 0.05f;
     private const float AmbientActionSpeedSampleIntervalSeconds = 0.25f;
 
     private readonly IBattleNetwork client;
+    private readonly ICommonSerializer serializer;
     private readonly IPacketManager packetManager;
     private readonly IMessageBroker messageBroker;
     private readonly INetworkAgentRegistry agentRegistry;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IRemoteAgentActionProcessor remoteActionProcessor;
     private readonly IGuardReactionHandler guardReactionHandler;
+    private readonly ILocationNpcAuthorityState locationAuthorityState;
+
+    private IShipStationSeats stationSeats;
+
+    public void ConfigureStationSeats(IShipStationSeats seats) => stationSeats = seats;
 
     // Outbound observation and sequence share one record because both belong to the local agent's action stream.
     private readonly Dictionary<Guid, LocalAgentActionState> _localAgentStates =
@@ -120,20 +133,24 @@ public class AgentActionHandler : IAgentActionHandler
 
     public AgentActionHandler(
         IBattleNetwork client,
+        ICommonSerializer serializer,
         IPacketManager packetManager,
         IMessageBroker messageBroker,
         INetworkAgentRegistry agentRegistry,
         IControllerIdProvider controllerIdProvider,
         IRemoteAgentActionProcessor remoteActionProcessor,
-        IGuardReactionHandler guardReactionHandler)
+        IGuardReactionHandler guardReactionHandler,
+        ILocationNpcAuthorityState locationAuthorityState)
     {
         this.client = client;
+        this.serializer = serializer;
         this.packetManager = packetManager;
         this.messageBroker = messageBroker;
         this.agentRegistry = agentRegistry;
         this.controllerIdProvider = controllerIdProvider;
         this.remoteActionProcessor = remoteActionProcessor;
         this.guardReactionHandler = guardReactionHandler;
+        this.locationAuthorityState = locationAuthorityState;
 
         this.packetManager.RegisterPacketHandler(this);
         this.messageBroker.Subscribe<BattleHostAssignmentApplied>(Handle_BattleHostAssigned);
@@ -214,7 +231,8 @@ public class AgentActionHandler : IAgentActionHandler
             ids,
             actions,
             sequences,
-            packet => client.SendAll(packet));
+            client.GetMaxUnreliablePayloadBytes(),
+            (packet, data) => client.SendAll(packet, data));
     }
 
     private void PollAgentAction(
@@ -239,7 +257,7 @@ public class AgentActionHandler : IAgentActionHandler
             agent,
             actionSyncedAgent);
 #endif
-        if (!actionSyncedAgent) return;
+        if (!actionSyncedAgent || stationSeats?.IsOwnSeat(info.AgentId) == true) return;
 
         int action0 = agent.GetCurrentAction(0).Index;
         int action1 = agent.GetCurrentAction(1).Index;
@@ -247,10 +265,14 @@ public class AgentActionHandler : IAgentActionHandler
         bool hadState = state.HasObservation;
         AgentPilotSeatData? pilotSeat = remoteActionProcessor.CapturePilotSeat(info, state.PilotSeat);
         bool pilotSeatChanged = !Nullable.Equals(state.PilotSeat, pilotSeat);
-        AgentEquipmentData? equipment = AgentEquipmentData.TryCapture(agent, out var capturedEquipment)
-            ? capturedEquipment : (AgentEquipmentData?)null;
+        // Capture again only when the live loadout differs from the last observed one, otherwise reuse it.
+        bool equipmentUnchanged = hadState
+            && (state.Equipment.HasValue ? state.Equipment.Value.MatchesLive(agent) : !agent.IsHuman);
+        AgentEquipmentData? equipment = equipmentUnchanged ? state.Equipment
+            : AgentEquipmentData.TryCapture(agent, out var capturedEquipment)
+                ? capturedEquipment : (AgentEquipmentData?)null;
         bool equipmentChanged = hadState
-            ? !Nullable.Equals(state.Equipment, equipment)
+            ? !equipmentUnchanged
             : equipment.HasValue
                 && (equipment.Value.MainHandIndex != (int)EquipmentIndex.None
                     || equipment.Value.OffHandIndex != (int)EquipmentIndex.None);
@@ -363,15 +385,13 @@ public class AgentActionHandler : IAgentActionHandler
         // Native command actions are untyped, so recognize the main agent's order gesture by action name.
         if (agent == Mission.Current.MainAgent)
         {
-            action0Discrete |= IsOrderGesture(
-                AgentActionData.GetActionNameWithCode(action0));
-            action1Discrete |= IsOrderGesture(
-                AgentActionData.GetActionNameWithCode(action1));
+            action0Discrete |= AgentActionData.IsOrderGestureAction(action0);
+            action1Discrete |= AgentActionData.IsOrderGestureAction(action1);
         }
 
         // Point-driven location performances replicate semantically. Only non-point ambient actions use this stream.
         bool locationAmbientAgent =
-            LocationNpcGate.IsCoopLocationMissionActive
+            locationAuthorityState.IsCoopLocationMissionActive
             && !isPlayerControlled
             && agent.CurrentlyUsedGameObject == null;
         bool publishAction0Speed =
@@ -542,7 +562,8 @@ public class AgentActionHandler : IAgentActionHandler
             guardMode,
             guardReactionChannel,
             publishAction0Speed ? action0Speed : (float?)null,
-            publishAction1Speed ? action1Speed : (float?)null);
+            publishAction1Speed ? action1Speed : (float?)null,
+            equipment);
         actionData = PrepareEquipmentSnapshot(info, actionData.WithPilotSeat(pilotSeat), catchUp: false);
 #if DEBUG
         MissionActionDiagnostics.RecordOutboundAction();
@@ -599,7 +620,7 @@ public class AgentActionHandler : IAgentActionHandler
                 // not only held defend/guard state. Point users are excluded: the joiner's spawn
                 // record carries the used point id and the local point animates the puppet.
                 bool locationAmbient =
-                    LocationNpcGate.IsCoopLocationMissionActive
+                    locationAuthorityState.IsCoopLocationMissionActive
                     && agent.Controller != AgentControllerType.Player
                     && agent.CurrentlyUsedGameObject == null
                     && (agent.GetCurrentAction(0) != ActionIndexCache.act_none
@@ -624,7 +645,8 @@ public class AgentActionHandler : IAgentActionHandler
                 ids,
                 actions,
                 sequences,
-                packet => client.Send(controllerId, packet));
+                client.GetMaxUnreliablePayloadBytes(controllerId),
+                (packet, data) => client.Send(controllerId, packet, data));
         });
     }
 
@@ -660,25 +682,54 @@ public class AgentActionHandler : IAgentActionHandler
         List<Guid> ids,
         List<AgentActionData> actions,
         List<long> sequences,
-        Action<AgentActionPacket> send)
+        int maxPacketBytes,
+        Action<AgentActionPacket, byte[]> send)
     {
+        // Direct routes cap at 1000 B, under the 1020 B reliable limit, and relay budgets include the relay wrapper.
         int battleHostEpoch = remoteActionProcessor.GetOutgoingBattleHostEpoch();
-        for (int start = 0; start < ids.Count; start += MaxAgentsPerActionPacket)
+        for (int start = 0; start < ids.Count;)
         {
             int count = Math.Min(MaxAgentsPerActionPacket, ids.Count - start);
-            var idChunk = new Guid[count];
-            var dataChunk = new AgentActionData[count];
-            var sequenceChunk = new long[count];
-            ids.CopyTo(start, idChunk, 0, count);
-            actions.CopyTo(start, dataChunk, 0, count);
-            sequences.CopyTo(start, sequenceChunk, 0, count);
-            send(new AgentActionPacket(
-                controllerId,
-                idChunk,
-                dataChunk,
-                sequenceChunk,
-                battleHostEpoch));
+            AgentActionPacket packet = CreateActionPacket(
+                controllerId, ids, actions, sequences, start, count, battleHostEpoch);
+            byte[] data = serializer.Serialize(packet);
+            while (count > 1 && maxPacketBytes > 0 && data.Length > maxPacketBytes)
+            {
+                // Entries vary in size (equipment snapshots), so shrink by the overshoot and measure again.
+                count = Math.Max(1, Math.Min(count - 1, (count * maxPacketBytes) / data.Length));
+                packet = CreateActionPacket(
+                    controllerId, ids, actions, sequences, start, count, battleHostEpoch);
+                data = serializer.Serialize(packet);
+            }
+#if DEBUG
+            MissionActionDiagnostics.RecordActionPacketSent(packet, data.Length);
+#endif
+            send(packet, data);
+            start += count;
         }
+    }
+
+    private static AgentActionPacket CreateActionPacket(
+        string controllerId,
+        List<Guid> ids,
+        List<AgentActionData> actions,
+        List<long> sequences,
+        int start,
+        int count,
+        int battleHostEpoch)
+    {
+        var idChunk = new Guid[count];
+        var dataChunk = new AgentActionData[count];
+        var sequenceChunk = new long[count];
+        ids.CopyTo(start, idChunk, 0, count);
+        actions.CopyTo(start, dataChunk, 0, count);
+        sequences.CopyTo(start, sequenceChunk, 0, count);
+        return new AgentActionPacket(
+            controllerId,
+            idChunk,
+            dataChunk,
+            sequenceChunk,
+            battleHostEpoch);
     }
 
     private long NextActionSequence(Guid agentId)
@@ -854,9 +905,11 @@ public class AgentActionHandler : IAgentActionHandler
     private static bool IsDiscreteAction(Agent.ActionCodeType type, int actionIndex = -1)
     {
         if (type != Agent.ActionCodeType.Other && type != Agent.ActionCodeType.Idle) return true;
-        if (actionIndex < 0) return false;
+        return AgentActionData.IsRangedSiegeUsageAction(actionIndex);
+    }
 
-        string actionName = AgentActionData.GetActionNameWithCode(actionIndex);
+    internal static bool IsRangedSiegeUsage(string actionName)
+    {
         return actionName?.StartsWith("act_usage_ballista_", StringComparison.Ordinal) == true
             || actionName?.StartsWith("act_usage_mangonel_", StringComparison.Ordinal) == true;
     }

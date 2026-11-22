@@ -1,9 +1,20 @@
+﻿using GameInterface.Services.Chat.Messages;
 using System;
 using TaleWorlds.Library;
 
 namespace GameInterface.Services.Chat;
 
-/// <summary>One selectable global or direct-message channel.</summary>
+internal enum ChatChannelKind
+{
+    All = 0,
+    Events = 1,
+    Global = 2,
+    Clan = 3,
+    Kingdom = 4,
+    Direct = 5,
+}
+
+/// <summary>One selectable feed or direct-message channel.</summary>
 internal sealed class ChatChannelVM : ViewModel
 {
     private readonly Action<ChatChannelVM> select;
@@ -12,17 +23,39 @@ internal sealed class ChatChannelVM : ViewModel
     private bool hasUnreadMessages;
     private bool isMuted;
 
-    public ChatChannelVM(string controllerId, string displayName, Action<ChatChannelVM> select)
+    public ChatChannelVM(
+        string controllerId,
+        string displayName,
+        ChatChannelKind kind,
+        Action<ChatChannelVM> select)
     {
         if (select == null) throw new ArgumentNullException(nameof(select));
 
         ControllerId = controllerId ?? string.Empty;
+        Kind = kind;
+        SendChannel = SendChannelForKind(kind);
         this.displayName = string.IsNullOrWhiteSpace(displayName) ? ControllerId : displayName;
         this.select = select;
     }
 
     public string ControllerId { get; }
-    public bool IsGlobal => ControllerId.Length == 0;
+
+    public ChatChannelKind Kind { get; }
+
+    /// <summary>Null for Events (read-only). All sends on Global.</summary>
+    public ChatChannel? SendChannel { get; }
+
+    public bool IsAll => Kind == ChatChannelKind.All;
+
+    public bool IsEvents => Kind == ChatChannelKind.Events;
+
+    public bool IsGlobal => Kind == ChatChannelKind.Global;
+
+    public bool IsClan => Kind == ChatChannelKind.Clan;
+
+    public bool IsKingdom => Kind == ChatChannelKind.Kingdom;
+
+    public bool IsDirect => Kind == ChatChannelKind.Direct;
 
     [DataSourceProperty]
     public string Name
@@ -70,9 +103,15 @@ internal sealed class ChatChannelVM : ViewModel
         if (selected) HasUnreadMessages = false;
     }
 
-    public void MarkUnread()
+    // hidden: chat is closed, so even the selected tab hasn't been seen
+    public void MarkUnread(bool hidden = false)
     {
-        if (!IsSelected) HasUnreadMessages = true;
+        if (hidden || !IsSelected) HasUnreadMessages = true;
+    }
+
+    public void ClearUnreadMessages()
+    {
+        HasUnreadMessages = false;
     }
 
     public void SetMuted(bool muted)
@@ -89,5 +128,23 @@ internal sealed class ChatChannelVM : ViewModel
 
         displayName = name;
         OnPropertyChanged(nameof(Name));
+    }
+
+    private static ChatChannel? SendChannelForKind(ChatChannelKind kind)
+    {
+        switch (kind)
+        {
+            case ChatChannelKind.All:
+            case ChatChannelKind.Global:
+                return ChatChannel.Global;
+            case ChatChannelKind.Clan:
+                return ChatChannel.Clan;
+            case ChatChannelKind.Kingdom:
+                return ChatChannel.Kingdom;
+            case ChatChannelKind.Direct:
+                return ChatChannel.Direct;
+            default:
+                return null;
+        }
     }
 }

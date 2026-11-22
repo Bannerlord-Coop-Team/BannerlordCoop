@@ -75,16 +75,6 @@ internal class ClanPatches
         return false;
     }
 
-    [HarmonyPatch(nameof(Clan.UpdateBannerColorsAccordingToKingdom))]
-    [HarmonyPostfix]
-    public static void UpdateBannerColorsAccordingToKingdomPostfix(Clan __instance)
-    {
-        if (ModInformation.IsClient) return;
-
-        var message = new UpdateBannerColorsOfClan(__instance);
-        MessageBroker.Instance.Publish(__instance, message);
-    }
-
     [HarmonyPatch(nameof(Clan.GetHeirApparents))]
     [HarmonyPostfix]
     public static void GetHeirApparentsPostfix(Dictionary<Hero, int> __result)

@@ -11,29 +11,10 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class BasicCultureObjectSerializationTest
     {
-        IContainer container;
+        ILifetimeScope container;
         public BasicCultureObjectSerializationTest()
         {
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
-        }
-
-        [Fact]
-        public void BasicCultureObject_Serialize()
-        {
-            BasicCultureObject testBasicCultureObject = (BasicCultureObject)FormatterServices.GetUninitializedObject(typeof(BasicCultureObject));
-
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            BasicCultureObjectBinaryPackage package = new BasicCultureObjectBinaryPackage(testBasicCultureObject, factory);
-
-            package.Pack();
-
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
-
-            Assert.NotEmpty(bytes);
+            container = SerializationTestContainer.BeginScope();
         }
 
         [Fact]

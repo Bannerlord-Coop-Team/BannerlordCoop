@@ -2,7 +2,6 @@
 using Common.Logging;
 using GameInterface.Policies;
 using HarmonyLib;
-using SandBox;
 using SandBox.Missions.AgentBehaviors;
 using SandBox.Missions.MissionLogics;
 using SandBox.Objects;
@@ -51,10 +50,7 @@ internal class LocationCharacterGuardPatches
             ShouldSpawnAccompanyingCharacters(ModInformation.IsClient);
 
         if (ModInformation.IsClient)
-        {
-            EnsureVanillaAccompanyingCharacter();
             LogVanillaCompanionSpawnInput(noHorse, shouldSpawn);
-        }
 
         return shouldSpawn;
     }
@@ -68,101 +64,6 @@ internal class LocationCharacterGuardPatches
     }
 
     internal static bool ShouldSpawnAccompanyingCharacters(bool isClient) => isClient;
-
-    /// <summary>
-    /// Vanilla normally delegates bodyguard selection to ClanMemberRolesCampaignBehavior, but that broad
-    /// campaign behavior is intentionally disabled in co-op. Reproduce only its location-mission responsibility:
-    /// reconcile the MainParty bodyguard entry and add the first eligible hero when needed. Other accompanying
-    /// characters, such as quest followers, are preserved.
-    /// </summary>
-    private static void EnsureVanillaAccompanyingCharacter()
-    {
-        try
-        {
-            LocationEncounter encounter = PlayerEncounter.LocationEncounter;
-            MobileParty mainParty = MobileParty.MainParty;
-            LocationComplex locationComplex = LocationComplex.Current;
-            if (encounter == null || mainParty?.MemberRoster == null || locationComplex == null) return;
-
-            bool hasEligibleCompanion = false;
-            for (int index = encounter.CharactersAccompanyingPlayer.Count - 1; index >= 0; index--)
-            {
-                AccompanyingCharacter existing = encounter.CharactersAccompanyingPlayer[index];
-                LocationCharacter existingCharacter = existing?.LocationCharacter;
-                if (!(existingCharacter?.AgentOrigin is PartyAgentOrigin origin) ||
-                    origin.Party != PartyBase.MainParty) continue;
-
-                CharacterObject character = existingCharacter.Character;
-                Hero hero = character?.HeroObject;
-                bool isEligible = hero != null && IsEligibleVanillaCompanion(
-                    character.IsHero,
-                    hero == Hero.MainHero,
-                    hero.IsPrisoner,
-                    hero.IsWounded,
-                    hero.Age,
-                    Campaign.Current.Models.AgeModel.HeroComesOfAge);
-                if (ShouldRetainExistingCompanion(
-                        character != null && mainParty.MemberRoster.Contains(character), isEligible))
-                {
-                    hasEligibleCompanion = true;
-                    continue;
-                }
-
-                encounter.RemoveAccompanyingCharacter(existingCharacter);
-                Logger.Information("[LocationCompanion] Removed stale bodyguard entry for {Character}",
-                    character?.StringId ?? "<null>");
-            }
-
-            if (hasEligibleCompanion) return;
-
-            foreach (var element in mainParty.MemberRoster.GetTroopRoster())
-            {
-                CharacterObject character = element.Character;
-                Hero hero = character?.HeroObject;
-                if (hero == null || !IsEligibleVanillaCompanion(
-                        character.IsHero,
-                        hero == Hero.MainHero,
-                        hero.IsPrisoner,
-                        hero.IsWounded,
-                        hero.Age,
-                        Campaign.Current.Models.AgeModel.HeroComesOfAge)) continue;
-
-                LocationCharacter entry = LocationCharacter.CreateBodyguardHero(
-                    hero,
-                    mainParty,
-                    SandBoxManager.Instance.AgentBehaviorManager.AddFirstCompanionBehavior);
-                encounter.AddAccompanyingCharacter(entry, isFollowing: true);
-
-                AccompanyingCharacter accompanying = encounter.GetAccompanyingCharacter(character);
-                accompanying?.DisallowEntranceToAllLocations();
-                accompanying?.AllowEntranceToLocations(location =>
-                    location == locationComplex.GetLocationWithId("center") ||
-                    location == locationComplex.GetLocationWithId("village_center") ||
-                    location == locationComplex.GetLocationWithId("tavern"));
-
-                Logger.Warning(
-                    "[LocationCompanion] Reconstructed vanilla bodyguard entry for {Character}; no MainParty companion had been added to this encounter",
-                    character.StringId);
-                break;
-            }
-        }
-        catch (Exception ex)
-        {
-            Logger.Warning(ex, "[LocationCompanion] Failed to reconstruct vanilla accompanying entry");
-        }
-    }
-
-    internal static bool ShouldRetainExistingCompanion(bool isInMainParty, bool isEligible)
-        => isInMainParty && isEligible;
-
-    internal static bool IsEligibleVanillaCompanion(
-        bool isHero,
-        bool isMainHero,
-        bool isPrisoner,
-        bool isWounded,
-        float age,
-        float heroComesOfAge)
-        => isHero && !isMainHero && !isPrisoner && !isWounded && age >= heroComesOfAge;
 
     private static void LogVanillaCompanionSpawnInput(bool noHorse, bool shouldSpawn)
     {
@@ -212,7 +113,7 @@ internal class LocationCharacterGuardPatches
             if (shouldSpawn && partyHeroDetails.Count > 0 && (accompanying == null || accompanying.Count == 0))
             {
                 Logger.Warning(
-                    "[LocationCompanion] MainParty contains companion heroes but vanilla LocationEncounter has no accompanying entries. ClanMemberRolesCampaignBehavior likely did not populate the encounter before mission open.");
+                    "[LocationCompanion] MainParty contains companion heroes but vanilla LocationEncounter has no accompanying entries. ClanMemberRolesCampaignBehavior did not add a bodyguard before mission open.");
             }
         }
         catch (Exception ex)

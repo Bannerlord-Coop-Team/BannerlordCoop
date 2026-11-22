@@ -69,8 +69,11 @@ namespace Coop.IntegrationTests.Serialization
                 GoldFoodInfluenceChangeInBattles = GoldFoodChangeMode.Enabled,
                 GoldFoodInfluenceChangeForDisconnectedPlayers = true,
                 PlayerBattleAiJoinWindowHours = 6,
+                PostBattleAiAmnestySeconds = 45,
+                KingdomDecisionVoteTimeoutSeconds = 600,
                 EnsureUnaffiliatedWanderers = false,
                 WandererLimit = 64,
+                SpawnRateWanderers = 2,
                 WandererLimitScalesWithPlayers = true,
                 PlayerKingdomClanTierRequired = 2,
                 SmithingStaminaRecoveryMultiplier = 2.5f,
@@ -82,6 +85,12 @@ namespace Coop.IntegrationTests.Serialization
                 ShowPlayerNameplates = true,
                 PlayerWoundedBattleEntry = false,
                 BlockAiWarDeclarationsOnOfflinePlayers = true,
+                ClansAfterKingdomDestruction = ClansAfterKingdomDestructionMode.KeepClans,
+                PreferredBattleHosts = new List<string> { "76561198000000002", "76561198000000001" },
+                PvpBlockLeave = true,
+                PvpResponseTimerSeconds = 30,
+                MaxClansPerKingdom = 12,
+                MaxClansPerKingdomCountsMercenaries = true,
             });
 
             var copy = RoundTrip(new NetworkLoadModConfig(options)).ModOptions;
@@ -91,8 +100,11 @@ namespace Coop.IntegrationTests.Serialization
             Assert.Equal(GoldFoodChangeMode.Enabled, copy.GoldFoodInfluenceChangeInBattles);
             Assert.True(copy.GoldFoodInfluenceChangeForDisconnectedPlayers);
             Assert.Equal(6, copy.PlayerBattleAiJoinWindowHours);
+            Assert.Equal(45, copy.PostBattleAiAmnestySeconds);
+            Assert.Equal(600, copy.KingdomDecisionVoteTimeoutSeconds);
             Assert.False(copy.EnsureUnaffiliatedWanderers);
             Assert.Equal(64, copy.WandererLimit);
+            Assert.Equal(2, copy.SpawnRateWanderers);
             Assert.True(copy.WandererLimitScalesWithPlayers);
             Assert.Equal(2, copy.PlayerKingdomClanTierRequired);
             Assert.Equal(2.5f, copy.SmithingStaminaRecoveryMultiplier);
@@ -103,10 +115,17 @@ namespace Coop.IntegrationTests.Serialization
             Assert.True(copy.EnablePlayerExecutions);
             Assert.False(copy.PlayerWoundedBattleEntry);
             Assert.True(copy.BlockAiWarDeclarationsOnOfflinePlayers);
+            Assert.Equal(ClansAfterKingdomDestructionMode.KeepClans, copy.ClansAfterKingdomDestruction);
+            Assert.Equal(new[] { "76561198000000002", "76561198000000001" }, copy.PreferredBattleHosts);
+            Assert.True(copy.PvpBlockLeave);
+            Assert.Equal(30, copy.PvpResponseTimerSeconds);
+            Assert.Equal(12, copy.MaxClansPerKingdom);
+            Assert.True(copy.MaxClansPerKingdomCountsMercenaries);
 
             // Keys the operator left absent still resolve to the documented defaults, not to zero.
             Assert.True(copy.FastForwardEnabled);
             Assert.True(copy.AutoPauseEnabled);
+            Assert.True(copy.AllowClientTimeControls);
             Assert.True(copy.SpeedLimitWhilePlayersInBattle);
             Assert.True(copy.ShowPlayerNameplates);
             Assert.True(copy.CoopClansEnabled);
@@ -136,14 +155,18 @@ namespace Coop.IntegrationTests.Serialization
         {
             FastForwardEnabled = false,
             AutoPauseEnabled = false,
+            AllowClientTimeControls = false,
             ClientsCanUseCheats = false,
             GoldFoodInfluenceChangeInSettlements = false,
             GoldFoodInfluenceChangeInBattles = GoldFoodChangeMode.Disabled,
             GoldFoodInfluenceChangeForDisconnectedPlayers = false,
             PlayerBattleAiJoinWindowHours = 0,
+            PostBattleAiAmnestySeconds = 0,
+            KingdomDecisionVoteTimeoutSeconds = 0,
             SpeedLimitWhilePlayersInBattle = false,
             EnsureUnaffiliatedWanderers = false,
             WandererLimit = 0,
+            SpawnRateWanderers = 0,
             WandererLimitScalesWithPlayers = false,
             PlayerKingdomClanTierRequired = 0,
             SmithingStaminaRecoveryOutsideSettlements = false,
@@ -158,20 +181,26 @@ namespace Coop.IntegrationTests.Serialization
             CoopClansEnabled = false,
             VoiceEnabled = false,
             BlockAiWarDeclarationsOnOfflinePlayers = false,
+            ClansAfterKingdomDestruction = ClansAfterKingdomDestructionMode.Vanilla,
+            PreferredBattleHosts = new List<string>(),
         });
 
         private static void AssertAllOptionsOff(ModOptions copy)
         {
             Assert.False(copy.FastForwardEnabled);
             Assert.False(copy.AutoPauseEnabled);
+            Assert.False(copy.AllowClientTimeControls);
             Assert.False(copy.ClientsCanUseCheats);
             Assert.False(copy.GoldFoodInfluenceChangeInSettlements);
             Assert.Equal(GoldFoodChangeMode.Disabled, copy.GoldFoodInfluenceChangeInBattles);
             Assert.False(copy.GoldFoodInfluenceChangeForDisconnectedPlayers);
             Assert.Equal(0, copy.PlayerBattleAiJoinWindowHours);
+            Assert.Equal(0, copy.PostBattleAiAmnestySeconds);
+            Assert.Equal(0, copy.KingdomDecisionVoteTimeoutSeconds);
             Assert.False(copy.SpeedLimitWhilePlayersInBattle);
             Assert.False(copy.EnsureUnaffiliatedWanderers);
             Assert.Equal(0, copy.WandererLimit);
+            Assert.Equal(0, copy.SpawnRateWanderers);
             Assert.False(copy.WandererLimitScalesWithPlayers);
             Assert.Equal(0, copy.PlayerKingdomClanTierRequired);
             Assert.False(copy.SmithingStaminaRecoveryOutsideSettlements);
@@ -186,6 +215,9 @@ namespace Coop.IntegrationTests.Serialization
             Assert.False(copy.CoopClansEnabled);
             Assert.False(copy.VoiceEnabled);
             Assert.False(copy.BlockAiWarDeclarationsOnOfflinePlayers);
+            Assert.Equal(ClansAfterKingdomDestructionMode.Vanilla, copy.ClansAfterKingdomDestruction);
+            // An empty list is not sent, so it arrives null; readers treat null as empty.
+            Assert.True(copy.PreferredBattleHosts is null or { Count: 0 });
         }
 
         private static T RoundTrip<T>(T original)

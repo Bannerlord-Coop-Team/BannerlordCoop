@@ -54,30 +54,6 @@ internal class VillagePatches
     private static bool BoundPrefix() => true;
 
 
-    [HarmonyPatch(nameof(Village.Hearth), MethodType.Setter)]
-    [HarmonyPrefix]
-    private static bool HearthPrefix(ref Village __instance, ref float value)
-    {
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
-
-        if (ModInformation.IsClient) return false;
-
-        var message = new VillageHearthChanged(__instance, value);
-        MessageBroker.Instance.Publish(__instance, message);
-        return true;
-    }
-
-    public static void ChangeHearth(Village village, float Hearth)
-    {
-        GameThread.RunSafe(() =>
-        {
-            using (new AllowedThread())
-            {
-                village.Hearth = Hearth;
-            }
-        });
-    }
-
     [HarmonyPatch(nameof(Village.TradeBound), MethodType.Setter)]
     [HarmonyPrefix]
     private static bool TradeBoundPrefix(ref Village __instance, ref Settlement value)

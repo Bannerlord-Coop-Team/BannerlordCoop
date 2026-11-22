@@ -45,6 +45,11 @@ public sealed class DebugToolsCompatibilityTests
                     actual["description"] = original["description"].DeepClone();
                     actual["annotations"] = original["annotations"].DeepClone();
                 }
+                if (name is "start_run" or "preflight_run" or "join_client")
+                {
+                    Assert.StartsWith(original["description"].GetValue<string>() + " A profile with externalServer", actual["description"].GetValue<string>());
+                    actual["description"] = original["description"].DeepClone();
+                }
                 if (name is "start_run" or "get_run" or "start_client" or "stop_run")
                 {
                     var runSchema = name == "start_client" ? actual["outputSchema"]["properties"]["run"] : actual["outputSchema"];

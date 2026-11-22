@@ -8,7 +8,8 @@ namespace Missions.Messages;
 /// <c>MissionState.FinishMissionLoading</c> fans <c>Mission.AfterStart()</c> out to the mission behaviors only
 /// once <c>Mission.IsLoadingFinished</c> turned true, so this fires exactly when the loading screen's work is
 /// done. <see cref="Battles.BattleHostHandler"/> turns it into the server-side host election request, making
-/// the server's per-battle order the mission-ready order (BR-013), not the entry order.
+/// the server's per-battle order the mission-ready order (BR-013), not the entry order, except in a hideout, where
+/// it follows the hideout state ready requests.
 /// </summary>
 public record BattleMissionReady : IEvent
 {

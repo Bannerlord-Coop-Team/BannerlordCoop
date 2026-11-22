@@ -56,6 +56,8 @@ public sealed class MovementRateSnapshot
     public int MaximumDeferredSnapshots { get; }
     public float MaximumDeferredAgeSeconds { get; }
     public int BulkPollsPerSecond { get; }
+    /// <summary>Bulk polls per second that sent each peer in the mission at least one bulk snapshot.</summary>
+    public IReadOnlyDictionary<string, int> PeerBulkHz { get; }
     public int PriorityOnlyPollsPerSecond { get; }
     public string Reason { get; }
     public int ConfiguredOutgoingBytesPerSecond { get; }
@@ -86,6 +88,7 @@ public sealed class MovementRateSnapshot
         int maximumDeferredSnapshots,
         float maximumDeferredAgeSeconds,
         int bulkPollsPerSecond,
+        IReadOnlyDictionary<string, int> peerBulkHz,
         int priorityOnlyPollsPerSecond,
         string reason,
         int configuredOutgoingBytesPerSecond,
@@ -115,6 +118,7 @@ public sealed class MovementRateSnapshot
         MaximumDeferredSnapshots = maximumDeferredSnapshots;
         MaximumDeferredAgeSeconds = maximumDeferredAgeSeconds;
         BulkPollsPerSecond = bulkPollsPerSecond;
+        PeerBulkHz = peerBulkHz;
         PriorityOnlyPollsPerSecond = priorityOnlyPollsPerSecond;
         Reason = reason;
         ConfiguredOutgoingBytesPerSecond = configuredOutgoingBytesPerSecond;
@@ -134,6 +138,7 @@ public interface IMovementRateController : IDisposable
         double elapsedMilliseconds,
         MovementTrafficFrame traffic,
         bool includesAuthoritativeAgents);
+    void ReportRecipientBulkSend(string controllerId);
     void ReportReceive(
         double queueMilliseconds,
         double applyMilliseconds,
@@ -219,6 +224,7 @@ public sealed class MovementRateController : IMovementRateController
     private int maximumDeferredSnapshots;
     private float maximumDeferredAgeSeconds;
     private int bulkPolls;
+    private readonly Dictionary<string, int> peerBulkSends = new Dictionary<string, int>();
     private int priorityOnlyPolls;
 
     private float lastFramesPerSecond;
@@ -230,6 +236,7 @@ public sealed class MovementRateController : IMovementRateController
     private int lastMaximumDeferredSnapshots;
     private float lastMaximumDeferredAgeSeconds;
     private int lastBulkPollsPerSecond;
+    private IReadOnlyDictionary<string, int> lastPeerBulkHz = new Dictionary<string, int>();
     private int lastPriorityOnlyPollsPerSecond;
 
     private sealed class ReceiverCapEntry
@@ -469,6 +476,17 @@ public sealed class MovementRateController : IMovementRateController
         }
     }
 
+    public void ReportRecipientBulkSend(string controllerId)
+    {
+        lock (gate)
+        {
+            if (disposed) return;
+
+            peerBulkSends.TryGetValue(controllerId, out int sends);
+            peerBulkSends[controllerId] = sends + 1;
+        }
+    }
+
     public int GetReceiverCapHz(string controllerId)
     {
         if (string.IsNullOrEmpty(controllerId)) return RatesAscending[RatesAscending.Length - 1];
@@ -636,6 +654,13 @@ public sealed class MovementRateController : IMovementRateController
         lastMaximumDeferredSnapshots = maximumDeferredSnapshots;
         lastMaximumDeferredAgeSeconds = maximumDeferredAgeSeconds;
         lastBulkPollsPerSecond = (int)Math.Round(bulkPolls / duration);
+        var peerBulkHz = new SortedDictionary<string, int>(StringComparer.Ordinal);
+        foreach (string controllerId in missionContext?.ControllersInMission ?? Array.Empty<string>())
+        {
+            peerBulkSends.TryGetValue(controllerId, out int sends);
+            peerBulkHz[controllerId] = (int)Math.Round(sends / duration);
+        }
+        lastPeerBulkHz = peerBulkHz;
         lastPriorityOnlyPollsPerSecond = (int)Math.Round(priorityOnlyPolls / duration);
         UpdateFrameLimit();
 
@@ -899,6 +924,7 @@ public sealed class MovementRateController : IMovementRateController
             lastMaximumDeferredSnapshots,
             lastMaximumDeferredAgeSeconds,
             lastBulkPollsPerSecond,
+            lastPeerBulkHz,
             lastPriorityOnlyPollsPerSecond,
             reason,
             networkSettings.OutgoingBytesPerSecond,
@@ -980,7 +1006,7 @@ public sealed class MovementRateController : IMovementRateController
         return Math.Min(desired, NormalizeRate(effectiveFrameLimitHz));
     }
 
-    private static int ReadFrameLimitHz()
+    internal static int ReadFrameLimitHz()
     {
         // Headless hosts do not initialize native graphics config, so they use the adaptive maximum.
         if (EngineApplicationInterface.IConfig == null)
@@ -1144,6 +1170,7 @@ public sealed class MovementRateController : IMovementRateController
         maximumDeferredSnapshots = 0;
         maximumDeferredAgeSeconds = 0f;
         bulkPolls = 0;
+        peerBulkSends.Clear();
         priorityOnlyPolls = 0;
     }
 
@@ -1159,7 +1186,8 @@ public sealed class MovementRateController : IMovementRateController
             "receiverQueueMs={QueueMs:0.00} wireBytesPerSecond={WireBytes} " +
             "outgoingBudget={OutgoingBudget} incomingBudget={IncomingBudget} incomingPerSender={IncomingPerSender} " +
             "deferred={Deferred} " +
-            "deferredAge={DeferredAge:0.000} bulkPolls={BulkPolls} priorityOnlyPolls={PriorityPolls} reason={Reason}",
+            "deferredAge={DeferredAge:0.000} bulkPolls={BulkPolls} peerBulkHz={PeerBulkHz} " +
+            "priorityOnlyPolls={PriorityPolls} reason={Reason}",
             snapshot.Profile,
             snapshot.BulkHz,
             snapshot.PriorityHz,
@@ -1183,6 +1211,7 @@ public sealed class MovementRateController : IMovementRateController
             snapshot.MaximumDeferredSnapshots,
             snapshot.MaximumDeferredAgeSeconds,
             snapshot.BulkPollsPerSecond,
+            string.Join(",", snapshot.PeerBulkHz.Select(peer => $"{peer.Key}:{peer.Value}")),
             snapshot.PriorityOnlyPollsPerSecond,
             snapshot.Reason);
 

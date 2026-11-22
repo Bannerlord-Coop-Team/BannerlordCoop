@@ -292,7 +292,7 @@ public class BattleMeshRoutingTests : MissionTestEnvironment
     }
 
     [Fact]
-    public void GuardedMissilePuppetHit_ConsumesLocalShotWithoutRoutingDamage()
+    public void GuardedMissilePuppetHit_KeepsLocalShotForTheBouncedItemWithoutRoutingDamage()
     {
         using var fixture = new MissionEngineFixture();
         var attacker = Clients.First();
@@ -374,10 +374,12 @@ public class BattleMeshRoutingTests : MissionTestEnvironment
                 0,
                 network.NetworkSentMessages
                     .GetMessageCount<NetworkApplyBattleDamage>());
-            Assert.False(missileHandler.TryTakeLocalShot(
+            Assert.True(missileHandler.TryGetLocalShot(
                 missileIndex,
-                out _,
-                out _));
+                out Guid keptShooterId,
+                out long keptShotSequence));
+            Assert.Equal(shooterId, keptShooterId);
+            Assert.Equal(shotSequence, keptShotSequence);
 
             GC.KeepAlive(controller);
         });

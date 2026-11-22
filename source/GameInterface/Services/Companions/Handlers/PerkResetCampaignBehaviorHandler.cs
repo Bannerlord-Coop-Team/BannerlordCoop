@@ -5,12 +5,12 @@ using Common.Network;
 using GameInterface.Services.Companions.Messages;
 using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using Serilog;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
-using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.Companions.Handlers;
@@ -23,17 +23,20 @@ internal class PerkResetCampaignBehaviorHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly ISessionInteractionsPlayerDataInterface sessionInteractionsPlayerDataInterface;
+    private readonly IPlayerManager playerManager;
 
     public PerkResetCampaignBehaviorHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
-        ISessionInteractionsPlayerDataInterface sessionInteractionsPlayerDataInterface)
+        ISessionInteractionsPlayerDataInterface sessionInteractionsPlayerDataInterface,
+        IPlayerManager playerManager)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.sessionInteractionsPlayerDataInterface = sessionInteractionsPlayerDataInterface;
+        this.playerManager = playerManager;
 
         messageBroker.Subscribe<UpdateCompanionWarningTime>(Handle_UpdateCompanionWarningTime);
         messageBroker.Subscribe<NetworkUpdateCompanionWarningTime>(Handle_NetworkUpdateCompanionWarningTime);
@@ -77,6 +80,7 @@ internal class PerkResetCampaignBehaviorHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
+            if (!playerManager.IsSenderControllingHero(obj.Who, data.MainHeroId)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out var _)) return;
 
             sessionInteractionsPlayerDataInterface.UpdateWarningTime(data.MainHeroId, data.WarningTimeNumTicks);
@@ -107,6 +111,7 @@ internal class PerkResetCampaignBehaviorHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
+            if (!playerManager.IsSenderControllingHero(obj.Who, data.MainHeroId)) return;
             if (!TryGetPerkResetCampaignBehavior(out var perkResetBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out var mainHero)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.HeroForPerkResetId, out var heroForPerkReset)) return;
@@ -144,15 +149,17 @@ internal class PerkResetCampaignBehaviorHandler : IHandler
             {
                 int index = (i + num) % companionsCount;
                 Hero targetCompanion = playerClan.Companions[index];
-                if ((targetCompanion.PartyBelongedTo?.MapEvent) == null)
-                {
-                    Settlement currentSettlement = targetCompanion.CurrentSettlement;
-                    if ((currentSettlement?.Party.MapEvent) == null && !Campaign.Current.IssueManager.IssueSolvingCompanionList.Contains(targetCompanion))
-                    {
-                        KillCharacterAction.ApplyByRemove(targetCompanion, true, true);
-                        return;
-                    }
-                }
+
+                bool canBeReleased = true;
+                CampaignEventDispatcher.Instance.CanHeroBeReleased(targetCompanion, ref canBeReleased);
+                if (!canBeReleased) continue;
+                if (targetCompanion.PartyBelongedTo?.MapEvent != null) continue;
+                if (targetCompanion.PartyBelongedToAsPrisoner != null) continue;
+                if (targetCompanion.CurrentSettlement?.Party.MapEvent != null) continue;
+                if (Campaign.Current.IssueManager.IssueSolvingCompanionList.Contains(targetCompanion)) continue;
+
+                KillCharacterAction.ApplyByRemove(targetCompanion, true, true);
+                return;
             }
         });
     }

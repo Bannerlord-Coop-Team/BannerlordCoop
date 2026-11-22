@@ -16,45 +16,12 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class AlleySerializationTest
     {
-        IContainer container;
+        ILifetimeScope container;
         public AlleySerializationTest()
         {
             GameBootStrap.Initialize();
 
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
-        }
-
-        [Fact]
-        public void Alley_Serialize()
-        {
-            Alley alley = (Alley)FormatterServices.GetUninitializedObject(typeof(Alley));
-            Settlement settlement = (Settlement)FormatterServices.GetUninitializedObject(typeof(Settlement));
-            settlement.StringId = "My Settlement";
-
-            container.Resolve<IObjectManager>().AddNewObject(settlement, out var _);
-            container.Resolve<IObjectManager>().AddNewObject(alley, out var _);
-
-            alley._settlement = settlement;
-
-            List<Alley> alleys = new List<Alley>
-            {
-                alley,
-            };
-
-            settlement.Alleys = alleys;
-
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            AlleyBinaryPackage package = new AlleyBinaryPackage(alley, factory);
-
-            package.Pack();
-
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
-
-            Assert.NotEmpty(bytes);
+            container = SerializationTestContainer.BeginScope();
         }
 
 

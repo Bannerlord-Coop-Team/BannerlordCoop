@@ -15,6 +15,8 @@ public interface ISteamMissionBridge : IDisposable
     void Start(int missionPort);
     bool TryConnect(ulong remoteSteamId, out IPEndPoint endpoint);
     bool TryGetRemoteSteamId(IPEndPoint endpoint, out ulong remoteSteamId);
+    /// <summary>Reads Steam's own delivery counters for the tunnel to one peer, whichever side opened it.</summary>
+    bool TryGetRouteHealth(ulong remoteSteamId, out RouteHealth health);
     void Disconnect(ulong remoteSteamId);
     void Stop();
 }
@@ -41,6 +43,12 @@ public class NoopSteamMissionBridge : ISteamMissionBridge
     public bool TryGetRemoteSteamId(IPEndPoint endpoint, out ulong remoteSteamId)
     {
         remoteSteamId = 0;
+        return false;
+    }
+
+    public bool TryGetRouteHealth(ulong remoteSteamId, out RouteHealth health)
+    {
+        health = default;
         return false;
     }
 

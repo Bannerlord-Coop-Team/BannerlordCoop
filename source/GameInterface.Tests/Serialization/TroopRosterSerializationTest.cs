@@ -13,30 +13,10 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class TroopRosterSerializationTest
     {
-        IContainer container;
+        ILifetimeScope container;
         public TroopRosterSerializationTest()
         {
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
-        }
-
-        [Fact]
-        public void TroopRoster_Serialize()
-        {
-            PartyBase partybase = (PartyBase)FormatterServices.GetUninitializedObject(typeof(PartyBase));
-            TroopRoster TroopRoster = new TroopRoster(partybase);
-
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            TroopRosterBinaryPackage package = new TroopRosterBinaryPackage(TroopRoster, factory);
-
-            package.Pack();
-
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
-
-            Assert.NotEmpty(bytes);
+            container = SerializationTestContainer.BeginScope();
         }
 
         [Fact]

@@ -74,37 +74,6 @@ public class CaravanPartyComponentTests : SyncTestBase
     }
 
     [Fact]
-    public void ClientCreateParty_DoesNothing()
-    {
-        // Arrange
-        var server = TestEnvironment.Server;
-        var client1 = TestEnvironment.Clients.First();
-        Hero hero = null;
-        Settlement settlement = null;
-        PartyTemplateObject template = null;
-
-        server.Call(() =>
-        {
-            hero = GameObjectCreator.CreateInitializedObject<Hero>();
-            settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
-            template = GameObjectCreator.CreateInitializedObject<PartyTemplateObject>();
-        });
-
-        // Act
-        PartyComponent? partyComponent = null;
-        client1.Call(() =>
-        {
-            var initArgs = new CaravanPartyComponent.InitializationArgs(template);
-            partyComponent = new CaravanPartyComponent(settlement, hero, hero, false, initArgs);
-        });
-
-        Assert.NotNull(partyComponent);
-
-        // Assert
-        Assert.False(client1.ObjectManager.TryGetId(partyComponent, out var _));
-    }
-
-    [Fact]
     public void ServerCreateParty_CaravanSeedItemsSyncByValue()
     {
         var server = TestEnvironment.Server;

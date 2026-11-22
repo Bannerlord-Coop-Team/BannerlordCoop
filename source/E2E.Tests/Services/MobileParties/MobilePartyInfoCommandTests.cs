@@ -2,6 +2,7 @@
 using E2E.Tests.Services.MapEvents;
 using E2E.Tests.Util;
 using GameInterface.Services.MobileParties.Commands;
+using GameInterface.Utils.Commands;
 using Newtonsoft.Json.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -46,7 +47,7 @@ public class MobilePartyInfoCommandTests : MapEventTestBase
                 member.Party.SetCustomName(new TextObject("Diagnostic army member"));
                 member.Ai.Tick(0.1f);
                 var args = new CoopCommandArgsFactory().FromValues(new[] { memberId });
-                var result = new MobilePartyDebugCommand.InfoCoopCommand().ProcessCommand(args);
+                var result = new MobilePartyDebugCommand.InfoCoopCommand(instance.Resolve<ICommandObjectResolver>(), instance.ObjectManager).ProcessCommand(args);
                 Assert.True(result.Succeeded, result.Output);
                 var state = JObject.Parse(result.Output.Split("LIVE_TEST_JSON=").Last());
                 Assert.Equal(memberId, state.Value<string>("partyId"));
@@ -68,7 +69,7 @@ public class MobilePartyInfoCommandTests : MapEventTestBase
             instance.Call(() =>
             {
                 var args = new CoopCommandArgsFactory().FromValues(new[] { memberId });
-                var result = new MobilePartyDebugCommand.InfoCoopCommand().ProcessCommand(args);
+                var result = new MobilePartyDebugCommand.InfoCoopCommand(instance.Resolve<ICommandObjectResolver>(), instance.ObjectManager).ProcessCommand(args);
                 Assert.True(result.Succeeded, result.Output);
                 var state = JObject.Parse(result.Output.Split("LIVE_TEST_JSON=").Last());
                 Assert.False(state.Value<bool>("mapEventSidePresent"));
@@ -91,7 +92,7 @@ public class MobilePartyInfoCommandTests : MapEventTestBase
                 var party = instance.GetRegisteredObject<MobileParty>(partyId);
                 party.Party.SetCustomName(new TextObject("Diagnostic party"));
                 var factory = new CoopCommandArgsFactory();
-                var command = new MobilePartyDebugCommand.InfoCoopCommand();
+                var command = new MobilePartyDebugCommand.InfoCoopCommand(instance.Resolve<ICommandObjectResolver>(), instance.ObjectManager);
                 var result = command.ProcessCommand(factory.FromValues(new[] { party.StringId }));
                 Assert.True(result.Succeeded, result.Output);
                 Assert.Contains("Fields:", result.Output);

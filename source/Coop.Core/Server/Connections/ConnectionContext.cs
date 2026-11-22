@@ -10,6 +10,7 @@ using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.Ships;
 
 namespace Coop.Core.Server.Connections;
 
@@ -25,6 +26,7 @@ public class ConnectionContext
         INetwork network,
         IModuleValidator moduleValidator,
         IModuleInfoProvider moduleInfoProvider,
+        IModuleNameProvider moduleNameProvider,
         IPlayerManager playerManager,
         IPlayerPartyRestorer playerPartyRestorer,
         IPlayerCreationRollback playerCreationRollback,
@@ -40,12 +42,14 @@ public class ConnectionContext
         IServerOptionsProvider serverOptionsProvider,
         IJoinCampaignBaselineSender joinCampaignBaselineSender,
         IJoinCampaignKingdomBaseLineSender joinCampaignKingdomBaseLineSender,
-        IJoinValidationDenialLog joinValidationDenialLog)
+        IJoinValidationDenialLog joinValidationDenialLog,
+        ILootShipHold lootShipHold)
     {
         MessageBroker = messageBroker;
         Network = network;
         ModuleValidator = moduleValidator;
         ModuleInfoProvider = moduleInfoProvider;
+        ModuleNameProvider = moduleNameProvider;
         PlayerManager = playerManager;
         PlayerPartyRestorer = playerPartyRestorer;
         PlayerCreationRollback = playerCreationRollback;
@@ -62,12 +66,14 @@ public class ConnectionContext
         JoinCampaignBaselineSender = joinCampaignBaselineSender;
         JoinCampaignKingdomBaseLineSender = joinCampaignKingdomBaseLineSender;
         JoinValidationDenialLog = joinValidationDenialLog;
+        LootShipHold = lootShipHold;
     }
 
     public IMessageBroker MessageBroker { get; }
     public INetwork Network { get; }
     public IModuleValidator ModuleValidator { get; }
     public IModuleInfoProvider ModuleInfoProvider { get; }
+    public IModuleNameProvider ModuleNameProvider { get; }
     public IPlayerManager PlayerManager { get; }
     public IPlayerPartyRestorer PlayerPartyRestorer { get; }
     public IPlayerCreationRollback PlayerCreationRollback { get; }
@@ -84,4 +90,5 @@ public class ConnectionContext
     public IJoinCampaignBaselineSender JoinCampaignBaselineSender { get; }
     public IJoinCampaignKingdomBaseLineSender JoinCampaignKingdomBaseLineSender { get; }
     public IJoinValidationDenialLog JoinValidationDenialLog { get; }
+    public ILootShipHold LootShipHold { get; }
 }

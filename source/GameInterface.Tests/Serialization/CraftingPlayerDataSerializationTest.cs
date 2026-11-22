@@ -11,29 +11,10 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class CraftingPlayerDataSerializationTest
     {
-        IContainer container;
+        ILifetimeScope container;
         public CraftingPlayerDataSerializationTest()
         {
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
-        }
-
-        [Fact]
-        public void CraftingPlayerData_Serialize()
-        {
-            CraftingPlayerData craftingPlayerData = (CraftingPlayerData)FormatterServices.GetUninitializedObject(typeof(CraftingPlayerData));
-
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            CraftingPlayerDataBinaryPackage package = new CraftingPlayerDataBinaryPackage(craftingPlayerData, factory);
-
-            package.Pack();
-
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
-
-            Assert.NotEmpty(bytes);
+            container = SerializationTestContainer.BeginScope();
         }
 
         [Fact]

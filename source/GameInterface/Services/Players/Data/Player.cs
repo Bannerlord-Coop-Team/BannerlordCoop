@@ -31,6 +31,15 @@ public class Player
         set => crimeRatings = value;
     }
 
+    private List<string> mapTrackedControllerIds;
+
+    [ProtoMember(9)]
+    public List<string> MapTrackedControllerIds
+    {
+        get => mapTrackedControllerIds ??= new List<string>();
+        set => mapTrackedControllerIds = value;
+    }
+
     // Associates one controller with its registered campaign objects.
     public Player(string controllerId, string heroId, string mobilePartyId, string clanId, string characterObjectId, string originalClanId = null)
     {

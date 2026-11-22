@@ -6,7 +6,6 @@ using GameInterface.Services.ObjectManager;
 using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Heroes.Handlers
 {
@@ -25,11 +24,7 @@ namespace GameInterface.Services.Heroes.Handlers
 
             messageBroker.Subscribe<ChangeLastTimeStamp>(Handle);
             messageBroker.Subscribe<ChangeCharacterObject>(Handle);
-            messageBroker.Subscribe<ChangeFirstName>(Handle);
-            messageBroker.Subscribe<ChangeName>(Handle);
             messageBroker.Subscribe<ChangeHeroState>(Handle);
-            messageBroker.Subscribe<ChangeHeroLevel>(Handle);
-            messageBroker.Subscribe<ChangeSpcDaysInLocation>(Handle);
             messageBroker.Subscribe<ChangeDefaultAge>(Handle);
             messageBroker.Subscribe<ChangeBirthDay>(Handle);
             messageBroker.Subscribe<ChangePower>(Handle);
@@ -42,11 +37,7 @@ namespace GameInterface.Services.Heroes.Handlers
         {
             messageBroker.Unsubscribe<ChangeLastTimeStamp>(Handle);
             messageBroker.Unsubscribe<ChangeCharacterObject>(Handle);
-            messageBroker.Unsubscribe<ChangeFirstName>(Handle);
-            messageBroker.Unsubscribe<ChangeName>(Handle);
             messageBroker.Unsubscribe<ChangeHeroState>(Handle);
-            messageBroker.Unsubscribe<ChangeHeroLevel>(Handle);
-            messageBroker.Unsubscribe<ChangeSpcDaysInLocation>(Handle);
             messageBroker.Unsubscribe<ChangeDefaultAge>(Handle);
             messageBroker.Unsubscribe<ChangeBirthDay>(Handle);
             messageBroker.Unsubscribe<ChangePower>(Handle);
@@ -130,23 +121,6 @@ namespace GameInterface.Services.Heroes.Handlers
             MarshalApply(data.HeroId, nameof(ChangeDefaultAge), instance => instance._defaultAge = data.Age);
         }
 
-        private void Handle(MessagePayload<ChangeSpcDaysInLocation> payload)
-        {
-            var data = payload.What;
-
-            MarshalApply(data.HeroId, nameof(ChangeSpcDaysInLocation), instance =>
-            {
-                //instance.SpcDaysInLocation = data.Days;
-            });
-        }
-
-        private void Handle(MessagePayload<ChangeHeroLevel> payload)
-        {
-            var data = payload.What;
-
-            MarshalApply(data.HeroId, nameof(ChangeHeroLevel), instance => instance.Level = data.HeroLevel);
-        }
-
         private void Handle(MessagePayload<ChangeHeroState> payload)
         {
             var data = payload.What;
@@ -156,23 +130,18 @@ namespace GameInterface.Services.Heroes.Handlers
                 // Update caches
                 using (new AllowedThread())
                 {
+                    // ChangeState would list a stub that still waits for its CharacterObject, the CharacterObject sync lists it by this state
+                    if (instance._characterObject == null)
+                    {
+                        var oldState = instance._heroState;
+                        instance._heroState = (Hero.CharacterStates)data.HeroState;
+                        instance._clan?.OnHeroChangedState(instance, oldState);
+                        return;
+                    }
+
                     instance.ChangeState((Hero.CharacterStates)data.HeroState);
                 }
             });
-        }
-
-        private void Handle(MessagePayload<ChangeName> payload)
-        {
-            var data = payload.What;
-
-            MarshalApply(data.HeroId, nameof(ChangeName), instance => instance._name = new TextObject(data.NewName));
-        }
-
-        private void Handle(MessagePayload<ChangeFirstName> payload)
-        {
-            var data = payload.What;
-
-            MarshalApply(data.HeroId, nameof(ChangeFirstName), instance => instance._firstName = new TextObject(data.NewName));
         }
 
         private void Handle(MessagePayload<ChangeCharacterObject> payload)
@@ -184,6 +153,11 @@ namespace GameInterface.Services.Heroes.Handlers
                 if (!objectManager.TryGetObjectWithLogging<CharacterObject>(data.CharacterObjectId, out var character)) return;
 
                 instance._characterObject = character;
+
+                // A client stub from HeroRegistry.OnClientCreated joins the campaign hero lists only now.
+                // OnHeroAdded, not AddHero, because AddHero would give the already registered hero a new id
+                if (!Hero.AllAliveHeroes.Contains(instance) && !Hero.DeadOrDisabledHeroes.Contains(instance))
+                    Campaign.Current?.CampaignObjectManager?.OnHeroAdded(instance);
             });
         }
 

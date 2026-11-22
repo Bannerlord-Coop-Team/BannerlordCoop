@@ -81,8 +81,7 @@ public class BattleReinforcementCasualtyQuotaTests : MissionTestEnvironment
     /// The exact call the coop death path makes for a kill — <c>origin.SetKilled()</c>, as
     /// <c>OnAgentRemovedPrefix</c> does for <c>AgentState.Killed</c> — must advance the supplier's removed
     /// quota, exactly once per origin (the one-shot latch native <c>PartyGroupAgentOrigin</c> has via
-    /// <c>_isRemoved</c>). RED today: <c>CoopAgentOrigin.SetKilled</c> is an empty body, so the counter
-    /// stays 0 for the whole battle.
+    /// <c>_isRemoved</c>).
     /// </summary>
     [Fact]
     [Trait("Requirement", "BR-073")]
@@ -110,7 +109,6 @@ public class BattleReinforcementCasualtyQuotaTests : MissionTestEnvironment
     /// <summary>
     /// The two non-kill removal states the prefix routes (<c>Unconscious → SetWounded</c>, otherwise
     /// <c>SetRouted</c>) must advance the same quota — <c>NumRemovedTroops</c> is wounded+killed+routed.
-    /// RED today: both hooks are empty bodies.
     /// </summary>
     [Fact]
     [Trait("Requirement", "BR-073")]
@@ -135,8 +133,7 @@ public class BattleReinforcementCasualtyQuotaTests : MissionTestEnvironment
     /// The full replicated-death seam, not just the origin in isolation: an agent whose origin came from the
     /// side's <see cref="CoopTroopSupplier"/> is removed as Killed through the REAL coop prefix
     /// (<see cref="BattleAgentLogicHitRewardPatch.OnAgentRemovedPrefix"/>, which fires for native and
-    /// replicated removals alike) — the supplier's quota must advance. RED today: the prefix calls
-    /// <c>Origin.SetKilled()</c>, which is a no-op on <see cref="CoopAgentOrigin"/>.
+    /// replicated removals alike) — the supplier's quota must advance.
     /// </summary>
     [Fact]
     [Trait("Requirement", "BR-073")]
@@ -201,8 +198,7 @@ public class BattleReinforcementCasualtyQuotaTests : MissionTestEnvironment
     /// spawned its 600-troop initial allotment (the live BattleSize), with the sandbox Wave settings
     /// (wavePct 0.5). Casualties through the coop death path must open the wave gate at 300 — the batch the
     /// engine then reserves via <c>SupplyTroops</c> and spawns with <c>isReinforcement: true</c> — and stay
-    /// closed at 299. RED today: the batch is 0 at ANY casualty count, because the coop death path never
-    /// moves <c>NumRemovedTroops</c>, so the engine believes all 600 initials are still standing forever.
+    /// closed at 299.
     /// </summary>
     [Fact]
     [Trait("Requirement", "BR-073")]
@@ -246,31 +242,9 @@ public class BattleReinforcementCasualtyQuotaTests : MissionTestEnvironment
         });
     }
 
-    /// <summary>
-    /// Contract lock-in (green today): the native engine reads casualties EXCLUSIVELY through
-    /// <c>IMissionTroopSupplier.NumRemovedTroops</c> — <c>NumberOfActiveTroops = _numSpawnedTroops -
-    /// supplier.NumRemovedTroops</c>. Pins the feedback contract the whole BR-073 fix relies on, so a game
-    /// update that changes it fails loudly here instead of silently re-stalling reinforcements.
-    /// </summary>
-    [Fact]
-    [Trait("Requirement", "BR-073")]
-    public void NativeContract_NumberOfActiveTroops_ReadsSupplierNumRemovedTroops()
-    {
-        var supplier = new StubTroopSupplier();
-        var context = new MissionBattleSideSpawnContext(
-            new StubBattleSpawnLogic(MissionSpawnSettings.CreateDefaultSpawnSettings()),
-            BattleSideEnum.Defender, supplier, isPlayerSide: true);
-        context._numSpawnedTroops = 600;
-
-        Assert.Equal(600, context.NumberOfActiveTroops);
-
-        supplier.RemovedTroops = 250;
-        Assert.Equal(350, context.NumberOfActiveTroops);
-    }
-
     /// <summary>Minimal spawn-logic stand-in for the per-side context: only <c>SpawnSettings</c> is read by
     /// the wave-batch computation under test.</summary>
-    private sealed class StubBattleSpawnLogic : IBattleMissionAgentSpawnLogic
+    internal sealed class StubBattleSpawnLogic : IBattleMissionAgentSpawnLogic
     {
         private readonly MissionSpawnSettings settings;
 
@@ -295,7 +269,7 @@ public class BattleReinforcementCasualtyQuotaTests : MissionTestEnvironment
     }
 
     /// <summary>Supplier stand-in with a directly settable removed count, for pinning the native formula.</summary>
-    private sealed class StubTroopSupplier : IMissionTroopSupplier
+    internal sealed class StubTroopSupplier : IMissionTroopSupplier
     {
         public int RemovedTroops;
 
@@ -307,5 +281,31 @@ public class BattleReinforcementCasualtyQuotaTests : MissionTestEnvironment
         public IEnumerable<IAgentOriginBase> GetAllTroops() => Array.Empty<IAgentOriginBase>();
         public BasicCharacterObject GetGeneralCharacter() => null!;
         public int GetNumberOfPlayerControllableTroops() => 0;
+    }
+}
+
+/// <summary>Pins the native per-side spawn context to the supplier removal count; no game instances needed.</summary>
+public class MissionBattleSideSpawnContextContractTests
+{
+    /// <summary>
+    /// Contract lock-in: the native engine reads casualties EXCLUSIVELY through
+    /// <c>IMissionTroopSupplier.NumRemovedTroops</c> — <c>NumberOfActiveTroops = _numSpawnedTroops -
+    /// supplier.NumRemovedTroops</c>. Pins the feedback contract the whole BR-073 fix relies on, so a game
+    /// update that changes it fails loudly here instead of silently re-stalling reinforcements.
+    /// </summary>
+    [Fact]
+    [Trait("Requirement", "BR-073")]
+    public void NativeContract_NumberOfActiveTroops_ReadsSupplierNumRemovedTroops()
+    {
+        var supplier = new BattleReinforcementCasualtyQuotaTests.StubTroopSupplier();
+        var context = new MissionBattleSideSpawnContext(
+            new BattleReinforcementCasualtyQuotaTests.StubBattleSpawnLogic(MissionSpawnSettings.CreateDefaultSpawnSettings()),
+            BattleSideEnum.Defender, supplier, isPlayerSide: true);
+        context._numSpawnedTroops = 600;
+
+        Assert.Equal(600, context.NumberOfActiveTroops);
+
+        supplier.RemovedTroops = 250;
+        Assert.Equal(350, context.NumberOfActiveTroops);
     }
 }

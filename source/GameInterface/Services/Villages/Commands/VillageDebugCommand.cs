@@ -5,7 +5,11 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using TaleWorlds.CampaignSystem;
+using SandBox.GauntletUI.Map;
+using SandBox.View.Map;
+using TaleWorlds.MountAndBlade;
 using TaleWorlds.CampaignSystem.Settlements;
+using GameInterface.Utils.Commands;
 namespace GameInterface.Services.Villages.Commands;
 
 internal class VillageDebugCommand
@@ -15,19 +19,6 @@ internal class VillageDebugCommand
 
     private static CoopCommandResult Failed(string output) =>
         new CoopCommandResult(false, output, "command_failed");
-
-    /// <summary>
-    /// Finds a specific village in game.
-    /// </summary>
-    /// <param name="villageId">string id of the village to search</param>
-    /// <returns>Village or null.</returns>
-    private static Village findVillage(string villageId)
-    {
-        List<Settlement> settlements = Campaign.Current.CampaignObjectManager.Settlements
-            .Where(settlement => settlement.IsVillage).ToList();
-        Village village = settlements.Find(e => e.Village.StringId == villageId)?.Village;
-        return village;
-    }
 
     // coop.debug.village.list
     /// <summary>
@@ -70,10 +61,18 @@ internal class VillageDebugCommand
     /// <summary>
     /// Gets information on a specific village
     /// </summary>
-    /// <param name="args">vilage ID to lookup</param>
+    /// <param name="args">village name or ID to lookup</param>
     /// <returns>Information regarding the village.</returns>
     public sealed class InfoCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        // Takes the resolver used to look the village up by name or id.
+        public InfoCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.village";
 
         public string Name => "info";
@@ -84,26 +83,27 @@ internal class VillageDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("villageId", "The village id."),
+            new ExpectedArgs("villageId", "Village name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-
-            Village village = findVillage(args[0]);
-
-            if (village == null)
-            {
-                return Failed(string.Format("ID: '{0}' not found", args[0]));
-            }
+            if (!resolver.TryResolveVillage(args[0], out Village village, out string error))
+                return Failed(error);
 
 
             StringBuilder sb = new();
 
-            sb.AppendFormat("ID: '{0}'\n", args[0]);
+            sb.AppendFormat("ID: '{0}'\n", village.Settlement.StringId);
             sb.AppendFormat("Name: '{0}'\n", village.Name);
             sb.AppendFormat("Owner: '{0}'\n", village.Owner.Name);
             sb.AppendFormat("State: '{0}'\n", village.VillageState.ToString());
+            var nameplate = MapScreen.Instance?.GetMapView<GauntletMapSettlementNameplateView>()?
+                ._dataSource?.GetNameplateOfSettlement(village.Settlement);
+            sb.AppendFormat("Bookmarked: '{0}'\n", Campaign.Current.VisualTrackerManager.CheckTracked(village.Settlement));
+            sb.AppendFormat("NameplateAvailable: '{0}'\n", nameplate != null);
+            sb.AppendFormat("ManuallyTracked: '{0}'\n", nameplate?._isTrackedManually);
+            sb.AppendFormat("AutoTrackAttackedSettlements: '{0}'\n", BannerlordConfig.AutoTrackAttackedSettlements);
             sb.AppendFormat("Hearth: '{0}'\n", village.Hearth);
             sb.AppendFormat("TradeTaxAccumulated: '{0}'\n", village.TradeTaxAccumulated);
             sb.AppendFormat("LastDemandStatisifiedTime: '{0}'\n", village.LastDemandSatisfiedTime);
@@ -117,10 +117,18 @@ internal class VillageDebugCommand
     /// <summary>
     /// Sets the VillageState of a specific Village.
     /// </summary>
-    /// <param name="args">villageID and the state to set</param>
+    /// <param name="args">village name or ID and the state to set</param>
     /// <returns>information if it changed</returns>
     public sealed class SetVillageStateCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        // Takes the resolver used to look the village up by name or id.
+        public SetVillageStateCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.village";
 
         public string Name => "set_state";
@@ -131,7 +139,7 @@ internal class VillageDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("villageId", "The village id."),
+            new ExpectedArgs("villageId", "Village name or id; quote names with spaces."),
             new ExpectedArgs("state", "The state."),
         };
 
@@ -141,12 +149,8 @@ internal class VillageDebugCommand
                 return Failed("This command can only be used by the server for debugging purposes.");
 
 
-            Village village = findVillage(args[0]);
-
-            if (village == null)
-            {
-                return Failed(string.Format("ID: '{0}' not found", args[0]));
-            }
+            if (!resolver.TryResolveVillage(args[0], out Village village, out string error))
+                return Failed(error);
 
 
             if(!Enum.TryParse(args[1], out Village.VillageStates villageState))
@@ -165,10 +169,18 @@ internal class VillageDebugCommand
     /// <summary>
     /// sets the hearth float value for a village.
     /// </summary>
-    /// <param name="args">the village and hearth value float</param>
+    /// <param name="args">the village (name or ID) and hearth value float</param>
     /// <returns>string output if success</returns>
     public sealed class SetVillageHearthCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        // Takes the resolver used to look the village up by name or id.
+        public SetVillageHearthCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.village";
 
         public string Name => "set_hearth";
@@ -179,7 +191,7 @@ internal class VillageDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("villageId", "The village id."),
+            new ExpectedArgs("villageId", "Village name or id; quote names with spaces."),
             new ExpectedArgs("hearth", "The hearth."),
         };
 
@@ -189,12 +201,8 @@ internal class VillageDebugCommand
                 return Failed("This command can only be used by the server for debugging purposes.");
 
 
-            Village village = findVillage(args[0]);
-
-            if (village == null)
-            {
-                return Failed(string.Format("ID: '{0}' not found", args[0]));
-            }
+            if (!resolver.TryResolveVillage(args[0], out Village village, out string error))
+                return Failed(error);
 
             float hearth = 0.0f;
             try
@@ -216,10 +224,18 @@ internal class VillageDebugCommand
     /// <summary>
     /// sets the tradetaxaccumulated value for a village.
     /// </summary>
-    /// <param name="args">the village and tradetaxaccumulated value float</param>
+    /// <param name="args">the village (name or ID) and tradetaxaccumulated value float</param>
     /// <returns>string output if success</returns>
     public sealed class SetTradeTaxAccumulatedCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        // Takes the resolver used to look the village up by name or id.
+        public SetTradeTaxAccumulatedCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.village";
 
         public string Name => "set_trade_tax_acc";
@@ -230,7 +246,7 @@ internal class VillageDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("villageId", "The village id."),
+            new ExpectedArgs("villageId", "Village name or id; quote names with spaces."),
             new ExpectedArgs("tradeTax", "The trade tax."),
         };
 
@@ -240,12 +256,8 @@ internal class VillageDebugCommand
                 return Failed("This command can only be used by the server for debugging purposes.");
 
 
-            Village village = findVillage(args[0]);
-
-            if (village == null)
-            {
-                return Failed(string.Format("ID: '{0}' not found", args[0]));
-            }
+            if (!resolver.TryResolveVillage(args[0], out Village village, out string error))
+                return Failed(error);
 
             int tradeTaxAccumulated = 0;
             try
@@ -269,10 +281,18 @@ internal class VillageDebugCommand
     /// <summary>
     /// sets the LastDemandTimeSatisified
     /// </summary>
-    /// <param name="args">the village and village last demand time value</param>
+    /// <param name="args">the village (name or ID) and village last demand time value</param>
     /// <returns>string output if success</returns>
     public sealed class SetLastDemandTimeSatisifiedCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        // Takes the resolver used to look the village up by name or id.
+        public SetLastDemandTimeSatisifiedCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.village";
 
         public string Name => "set_demand_time";
@@ -283,7 +303,7 @@ internal class VillageDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("villageId", "The village id."),
+            new ExpectedArgs("villageId", "Village name or id; quote names with spaces."),
             new ExpectedArgs("demandTime", "The demand time."),
         };
 
@@ -293,12 +313,8 @@ internal class VillageDebugCommand
                 return Failed("This command can only be used by the server for debugging purposes.");
 
 
-            Village village = findVillage(args[0]);
-
-            if (village == null)
-            {
-                return Failed(string.Format("ID: '{0}' not found", args[0]));
-            }
+            if (!resolver.TryResolveVillage(args[0], out Village village, out string error))
+                return Failed(error);
 
             float lastDemandTime = 0.0f;
             try

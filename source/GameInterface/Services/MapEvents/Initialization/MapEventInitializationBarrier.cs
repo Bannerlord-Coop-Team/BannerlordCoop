@@ -5,6 +5,7 @@ using Common.Network;
 using Common.Network.Coalescing;
 using Common.Util;
 using GameInterface.Services.GuantletMapEventVisuals;
+using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
@@ -511,13 +512,18 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         bool matchesDeferredSimulation = cleanup != null &&
             ReferenceEquals(encounter, cleanup.Encounter) &&
             ReferenceEquals(encounter?.BattleSimulation, cleanup.BattleSimulation);
+        bool playerWon = mapEvent.WinningSide == encounter?.PlayerSide;
         if (encounter?.EncounterState != PlayerEncounterState.End ||
             encounter.BattleSimulation == null ||
             (!matchesDeferredSimulation &&
-                (mapEvent.WinningSide == encounter.PlayerSide || !References(encounter, mapEvent))))
+                (playerWon || !encounter.ReferencesMapEvent(mapEvent))))
         {
             return false;
         }
+
+        // A deferred win also reaches here; a winning raid keeps its references so native loot-end can continue it.
+        if (IsStagedRaidSimulationResult(encounter))
+            return false;
 
         if (PlayerCaptivity.IsCaptive)
         {
@@ -529,7 +535,9 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
             return true;
         }
 
-        // Mirror vanilla's simulated-defeat branch before detaching the destroyed map event.
+        // Leave must not reuse battle references whose party sides were already removed.
+        encounter._mapEvent = null;
+        encounter.BattleSimulation = null;
         encounter.EncounterState = PlayerEncounterState.Begin;
         GameMenu.SwitchToMenu("encounter");
         return true;
@@ -568,7 +576,7 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
             return false;
         }
 
-        if (!References(encounter, mapEvent) && !ReferenceEquals(encounter, cleanup?.Encounter))
+        if (!encounter.ReferencesMapEvent(mapEvent) && !ReferenceEquals(encounter, cleanup?.Encounter))
             return false;
 
         if (IsBattleResultEncounter(encounter))
@@ -592,12 +600,6 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         return true;
     }
 
-    private static bool References(PlayerEncounter encounter, MapEvent mapEvent) =>
-        encounter?._mapEvent == mapEvent ||
-        encounter?.BattleSimulation?.MapEvent == mapEvent ||
-        GetPlayerEncounterBattle() == mapEvent ||
-        GetPlayerEncounterEncounteredBattle() == mapEvent;
-
     internal static bool IsBattleResultEncounter(PlayerEncounter encounter)
     {
         switch (encounter.EncounterState)
@@ -614,29 +616,11 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         }
     }
 
-    private static MapEvent GetPlayerEncounterBattle()
-    {
-        try
-        {
-            return PlayerEncounter.Battle;
-        }
-        catch (NullReferenceException)
-        {
-            return null;
-        }
-    }
-
-    private static MapEvent GetPlayerEncounterEncounteredBattle()
-    {
-        try
-        {
-            return PlayerEncounter.EncounteredBattle;
-        }
-        catch (NullReferenceException)
-        {
-            return null;
-        }
-    }
+    internal static bool IsStagedRaidSimulationResult(PlayerEncounter encounter) =>
+        encounter?._mapEvent is MapEvent mapEvent &&
+        mapEvent.IsRaidHostileAction() &&
+        encounter.BattleSimulation != null &&
+        mapEvent.WinningSide == encounter.PlayerSide;
 
     private static void ForceCloseCurrentEncounterMenu()
     {

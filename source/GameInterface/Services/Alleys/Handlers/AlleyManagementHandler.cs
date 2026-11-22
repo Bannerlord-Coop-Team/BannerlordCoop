@@ -6,8 +6,11 @@ using GameInterface.Services.Alleys.Interfaces;
 using GameInterface.Services.Alleys.Messages;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Clans;
 using GameInterface.Services.Clans.Messages;
+using GameInterface.Services.Players;
 using GameInterface.Services.TroopRosters.Data;
+using LiteNetLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -19,8 +22,8 @@ using TaleWorlds.Core;
 namespace GameInterface.Services.Alleys.Handlers;
 
 /// <summary>
-/// Routes the player's alley management actions (abandon, change overseer, manage garrison) as
-/// client to server requests, performs them authoritatively on the server with patches live, and
+/// Routes the player's alley management actions (abandon, clear a beaten gang's alley, change overseer,
+/// manage garrison) as client to server requests, performs them authoritatively on the server with patches live, and
 /// replicates the resulting garrison/overseer state to the owning client so its in-game menus stay
 /// correct. The authoritative garrison/overseer is held in the CoopSession via
 /// <see cref="ISessionAlleyPlayerDataInterface"/>; the owning client mirror lives in the behavior
@@ -36,6 +39,9 @@ internal class AlleyManagementHandler : IHandler
     private readonly ISessionAlleyPlayerDataInterface sessionInterface;
     private readonly IAlleyCampaignBehaviorInterface behaviorInterface;
     private readonly IAlleyGarrisonData garrisonData;
+    private readonly IPlayerManager playerManager;
+    private readonly ICoopClanPermissions permissions;
+    private readonly IAlleyAttacks alleyAttacks;
 
     public AlleyManagementHandler(
         IMessageBroker messageBroker,
@@ -43,7 +49,10 @@ internal class AlleyManagementHandler : IHandler
         INetwork network,
         ISessionAlleyPlayerDataInterface sessionInterface,
         IAlleyCampaignBehaviorInterface behaviorInterface,
-        IAlleyGarrisonData garrisonData)
+        IAlleyGarrisonData garrisonData,
+        IPlayerManager playerManager,
+        ICoopClanPermissions permissions,
+        IAlleyAttacks alleyAttacks)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -51,15 +60,20 @@ internal class AlleyManagementHandler : IHandler
         this.sessionInterface = sessionInterface;
         this.behaviorInterface = behaviorInterface;
         this.garrisonData = garrisonData;
+        this.playerManager = playerManager;
+        this.permissions = permissions;
+        this.alleyAttacks = alleyAttacks;
 
         messageBroker.Subscribe<AlleyAcquiredRequested>(Handle_AlleyAcquiredRequested);
         messageBroker.Subscribe<AbandonAlleyRequested>(Handle_AbandonAlleyRequested);
+        messageBroker.Subscribe<AlleyClearedRequested>(Handle_AlleyClearedRequested);
         messageBroker.Subscribe<ChangeAlleyOverseerRequested>(Handle_ChangeAlleyOverseerRequested);
         messageBroker.Subscribe<SetAlleyGarrisonRequested>(Handle_SetAlleyGarrisonRequested);
         messageBroker.Subscribe<RecruitAlleyTroopsRequested>(Handle_RecruitAlleyTroopsRequested);
 
         messageBroker.Subscribe<RequestAcquireAlley>(Handle_RequestAcquireAlley);
         messageBroker.Subscribe<RequestAbandonAlley>(Handle_RequestAbandonAlley);
+        messageBroker.Subscribe<RequestClearAlley>(Handle_RequestClearAlley);
         messageBroker.Subscribe<RequestChangeAlleyOverseer>(Handle_RequestChangeAlleyOverseer);
         messageBroker.Subscribe<RequestSetAlleyGarrison>(Handle_RequestSetAlleyGarrison);
         messageBroker.Subscribe<RequestRecruitAlleyTroops>(Handle_RequestRecruitAlleyTroops);
@@ -72,12 +86,14 @@ internal class AlleyManagementHandler : IHandler
     {
         messageBroker.Unsubscribe<AlleyAcquiredRequested>(Handle_AlleyAcquiredRequested);
         messageBroker.Unsubscribe<AbandonAlleyRequested>(Handle_AbandonAlleyRequested);
+        messageBroker.Unsubscribe<AlleyClearedRequested>(Handle_AlleyClearedRequested);
         messageBroker.Unsubscribe<ChangeAlleyOverseerRequested>(Handle_ChangeAlleyOverseerRequested);
         messageBroker.Unsubscribe<SetAlleyGarrisonRequested>(Handle_SetAlleyGarrisonRequested);
         messageBroker.Unsubscribe<RecruitAlleyTroopsRequested>(Handle_RecruitAlleyTroopsRequested);
 
         messageBroker.Unsubscribe<RequestAcquireAlley>(Handle_RequestAcquireAlley);
         messageBroker.Unsubscribe<RequestAbandonAlley>(Handle_RequestAbandonAlley);
+        messageBroker.Unsubscribe<RequestClearAlley>(Handle_RequestClearAlley);
         messageBroker.Unsubscribe<RequestChangeAlleyOverseer>(Handle_RequestChangeAlleyOverseer);
         messageBroker.Unsubscribe<RequestSetAlleyGarrison>(Handle_RequestSetAlleyGarrison);
         messageBroker.Unsubscribe<RequestRecruitAlleyTroops>(Handle_RequestRecruitAlleyTroops);
@@ -94,8 +110,10 @@ internal class AlleyManagementHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(payload.What.Alley, out var alleyId)) return;
         if (!objectManager.TryGetIdWithLogging(payload.What.Owner, out var ownerId)) return;
         if (!objectManager.TryGetIdWithLogging(payload.What.Overseer, out var overseerId)) return;
+        string previousOwnerId = null;
+        if (payload.What.PreviousOwner != null && !objectManager.TryGetIdWithLogging(payload.What.PreviousOwner, out previousOwnerId)) return;
 
-        network.SendAll(new RequestAcquireAlley(alleyId, ownerId, overseerId, garrisonData.ToData(payload.What.Garrison)));
+        network.SendAll(new RequestAcquireAlley(alleyId, ownerId, overseerId, garrisonData.ToData(payload.What.Garrison), previousOwnerId));
     }
 
     private void Handle_AbandonAlleyRequested(MessagePayload<AbandonAlleyRequested> payload)
@@ -104,6 +122,18 @@ internal class AlleyManagementHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(payload.What.Alley, out var alleyId)) return;
 
         network.SendAll(new RequestAbandonAlley(alleyId, payload.What.FromClanScreen));
+    }
+
+    private void Handle_AlleyClearedRequested(MessagePayload<AlleyClearedRequested> payload)
+    {
+        if (ModInformation.IsServer) return;
+        if (!objectManager.TryGetIdWithLogging(payload.What.Alley, out var alleyId)) return;
+        if (!objectManager.TryGetIdWithLogging(payload.What.Clearer, out var clearerId)) return;
+        // Nobody held the alley when the fight started, so there is nothing to clear.
+        if (payload.What.GangOwner == null) return;
+        if (!objectManager.TryGetIdWithLogging(payload.What.GangOwner, out var gangOwnerId)) return;
+
+        network.SendAll(new RequestClearAlley(alleyId, clearerId, gangOwnerId));
     }
 
     private void Handle_ChangeAlleyOverseerRequested(MessagePayload<ChangeAlleyOverseerRequested> payload)
@@ -146,7 +176,41 @@ internal class AlleyManagementHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.OwnerId, out var owner)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.OverseerId, out var overseer)) return;
 
+            // A double click or a second player racing the first finds the alley already taken, and must not
+            // take it again or give the relation changes and xp twice.
+            string currentOwnerId = null;
+            if (alley.Owner != null) objectManager.TryGetId(alley.Owner, out currentOwnerId);
+            if (alley.Owner == owner || currentOwnerId != data.PreviousOwnerId)
+            {
+                Logger.Warning("Ignoring a take over of alley {AlleyId}: it is no longer held by {PreviousOwnerId}",
+                    data.AlleyId, data.PreviousOwnerId);
+                return;
+            }
+
+            // Vanilla only offers a member of the owner's clan. The debug command makes the owner the overseer.
+            if (overseer != owner)
+            {
+                if (overseer.Clan == null) return;
+                if (overseer.Clan != owner.Clan) return;
+            }
+
             var garrison = data.Garrison ?? Array.Empty<TroopRosterElementData>();
+
+            // The client left the chosen troops in its party, so they leave it here like vanilla's done button,
+            // wounded ones as wounded, and only if the party still has them all.
+            var party = owner.PartyBelongedTo;
+            var troops = new List<(CharacterObject character, int number, int wounded)>();
+            foreach (var element in garrison)
+            {
+                if (!objectManager.TryGetObjectWithLogging<CharacterObject>(element.CharacterId, out var character)) return;
+                if (character.IsHero) continue;
+                int index = party?.MemberRoster.FindIndexOfTroop(character) ?? -1;
+                if (index < 0) return;
+                int number = party.MemberRoster.GetElementNumber(index);
+                int wounded = party.MemberRoster.GetElementWoundedNumber(index);
+                if (wounded < element.WoundedNumber || number - wounded < element.Number - element.WoundedNumber) return;
+                troops.Add((character, element.Number, element.WoundedNumber));
+            }
 
             // The take-over is authoritative: the alley is owned by the acquiring player (owner) and
             // run by the chosen clan member (overseer). The garrison + overseer are stored, the overseer
@@ -155,6 +219,8 @@ internal class AlleyManagementHandler : IHandler
             var displacedOwner = alley.Owner;
             alley.SetOwner(owner);
             ApplyAcquisitionRelationPenalties(owner, displacedOwner, alley.Settlement);
+            foreach (var troop in troops)
+                party.MemberRoster.AddToCounts(troop.character, -troop.number, false, -troop.wounded);
             sessionInterface.SetManagementData(data.AlleyId, data.OverseerId, garrison);
             AddXpFromClearingAlley(owner);
             TeleportOverseerToAlley(overseer, alley);
@@ -165,8 +231,8 @@ internal class AlleyManagementHandler : IHandler
     }
 
     /// <summary>
-    /// Replays vanilla OnAlleyOccupiedByPlayer's relation hits (server authoritative; relation is not
-    /// itself networked): the displaced gang leader loses 5, and if the settlement isn't the new owner's
+    /// Replays vanilla OnAlleyOccupiedByPlayer's relation hits on the server, which replicates each
+    /// relation change to clients: the displaced gang leader loses 5, and if the settlement isn't the new owner's
     /// own, its owner loses 2 and its non-gang-leader notables lose 1 each. Keyed off the acquiring
     /// owner rather than Hero.MainHero, which is null on the host.
     /// </summary>
@@ -222,7 +288,85 @@ internal class AlleyManagementHandler : IHandler
 
         var alleyId = payload.What.AlleyId;
         var fromClanScreen = payload.What.FromClanScreen;
-        GameThread.RunSafe(() => AbandonAlley(alleyId, fromClanScreen));
+        var sender = payload.Who;
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Alley>(alleyId, out var alley)) return;
+            // The alley debug command also publishes this on the server, where the sender is not a peer.
+            // The clan screen also lets the clan leader abandon a member's alley.
+            if (sender is NetPeer)
+            {
+                if (!playerManager.TryGetSenderHero(sender, out var senderHero)) return;
+                if (alley.Owner != senderHero && !permissions.CanManageClan(senderHero, alley.Owner?.Clan)) return;
+            }
+            AbandonAlley(alleyId, fromClanScreen);
+        });
+    }
+
+    private void Handle_RequestClearAlley(MessagePayload<RequestClearAlley> payload)
+    {
+        var data = payload.What;
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Alley>(data.AlleyId, out var alley)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(data.ClearerId, out var clearer)) return;
+
+            // A repeat or stale request finds the gang already gone or a player in the alley, and must not
+            // give the relation changes again or free a player's alley.
+            if (!IsExpectedGangOwner(alley.Owner, data.GangOwnerId))
+            {
+                Logger.Warning("Ignoring a clear of alley {AlleyId}: it is no longer held by gang leader {GangOwnerId}",
+                    data.AlleyId, data.GangOwnerId);
+                return;
+            }
+
+            ApplyClearRelationChanges(clearer, alley);
+            ClearAttacksFromAlley(alley, data.AlleyId);
+            alley.SetOwner(null);
+        });
+    }
+
+    // Same gang test as AlleyHandler.StartAttack. A player owner is never a gang leader, so a clear can't free a player's alley.
+    private bool IsExpectedGangOwner(Hero owner, string expectedOwnerId)
+    {
+        if (owner == null || !owner.IsGangLeader) return false;
+        return objectManager.TryGetId(owner, out var ownerId) && ownerId == expectedOwnerId;
+    }
+
+    /// <summary>
+    /// Vanilla drops the main hero's alley attack by the cleared gang. Done here for every player alley,
+    /// otherwise the attack deadline in AlleyHandler's daily tick would still hand the player's alley over.
+    /// Attacks only come from a rival alley in the same settlement (AlleyHandler.StartAttack).
+    /// </summary>
+    private void ClearAttacksFromAlley(Alley clearedAlley, string clearedAlleyId)
+    {
+        if (clearedAlley.Settlement?.Alleys == null) return;
+        foreach (var playerAlley in clearedAlley.Settlement.Alleys)
+        {
+            if (playerAlley == null || !objectManager.TryGetId(playerAlley, out var playerAlleyId)) continue;
+            if (!sessionInterface.TryGetManagementData(playerAlleyId, out var data) ||
+                data.UnderAttackByAlleyId != clearedAlleyId) continue;
+
+            alleyAttacks.EndAttack(playerAlleyId);
+        }
+    }
+
+    /// <summary>
+    /// Replays vanilla OnAlleyClearedByPlayer's relation changes keyed off the clearing player, because
+    /// Hero.MainHero is null on the host: the displaced gang leader loses 5 and other notables gain 1.
+    /// </summary>
+    private static void ApplyClearRelationChanges(Hero clearer, Alley alley)
+    {
+        var displacedOwner = alley.Owner;
+        if (displacedOwner != null && displacedOwner != clearer)
+            ChangeRelationAction.ApplyRelationChangeBetweenHeroes(clearer, displacedOwner, -5, showQuickNotification: false);
+
+        if (alley.Settlement?.Notables == null) return;
+        foreach (var notable in alley.Settlement.Notables)
+        {
+            if (notable != null && !notable.IsGangLeader)
+                ChangeRelationAction.ApplyRelationChangeBetweenHeroes(clearer, notable, 1, showQuickNotification: false);
+        }
     }
 
     private void Handle_RequestChangeAlleyOverseer(MessagePayload<RequestChangeAlleyOverseer> payload)
@@ -230,9 +374,16 @@ internal class AlleyManagementHandler : IHandler
         if (ModInformation.IsClient) return;
 
         var data = payload.What;
+        var sender = payload.Who;
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Alley>(data.AlleyId, out var alley)) return;
+            // ClanLeaveRules also publishes this on the server, where the sender is not a peer.
+            if (sender is NetPeer)
+            {
+                if (!playerManager.TryGetSenderHero(sender, out var senderHero)) return;
+                if (alley.Owner != senderHero) return;
+            }
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.NewOverseerId, out var newOverseer)) return;
 
             // Swap the overseer hero in the stored garrison the way vanilla ChangeTheLeaderOfAlleyInternal does.
@@ -252,9 +403,11 @@ internal class AlleyManagementHandler : IHandler
         if (ModInformation.IsClient) return;
 
         var data = payload.What;
+        var sender = payload.Who;
         GameThread.RunSafe(() =>
         {
-            if (!objectManager.TryGetObjectWithLogging<Alley>(data.AlleyId, out _)) return;
+            if (!objectManager.TryGetObjectWithLogging<Alley>(data.AlleyId, out var alley)) return;
+            if (!playerManager.TryGetSenderHero(sender, out var senderHero) || alley.Owner != senderHero) return;
 
             var newGarrison = data.Garrison ?? Array.Empty<TroopRosterElementData>();
             // The alley party screen already moved the troops between the owner's party and the alley

@@ -1,6 +1,5 @@
 ﻿using Common.Commands;
-using Autofac;
-using GameInterface.Services.ObjectManager;
+using GameInterface.Utils.Commands;
 using System.Collections.Generic;
 using System.Text;
 using TaleWorlds.Core;
@@ -16,19 +15,18 @@ namespace GameInterface.Services.ItemObjects.Commands
         private static CoopCommandResult Failed(string output) =>
             new CoopCommandResult(false, output, "command_failed");
 
-        private static bool TryGetObjectManager(out IObjectManager objectManager)
-        {
-            objectManager = null;
-            if (ContainerProvider.TryGetContainer(out var container) == false) return false;
-
-            return container.TryResolve(out objectManager);
-        }
-
         /// <summary>
-        /// View select properties of an item object retrieved by string id
+        /// View select properties of an item object retrieved by name or id
         /// </summary>
         public sealed class ItemObjectDataCoopCommand : ICoopCommand
         {
+            private readonly ICommandObjectResolver resolver;
+
+            public ItemObjectDataCoopCommand(ICommandObjectResolver resolver)
+            {
+                this.resolver = resolver;
+            }
+
             public string Prefix => "coop.debug.item_object";
 
             public string Name => "data";
@@ -39,25 +37,17 @@ namespace GameInterface.Services.ItemObjects.Commands
 
             public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
             {
-                new ExpectedArgs("item_id", "The registered item object id.", isRequired: true),
+                new ExpectedArgs("item_id", "Item name or id; quote names with spaces.", isRequired: true),
             };
 
             public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
             {
-
-                if (TryGetObjectManager(out var objectManager) == false)
+                if (!resolver.TryResolveItemObject(strings[0], out var itemObject, out var error))
                 {
-                    return Failed("Unable to resolve ObjectManager.");
+                    return Failed(error);
                 }
-
-                string itemId = strings[0];
 
                 StringBuilder stringBuilder = new StringBuilder();
-
-                if (!objectManager.TryGetObject(itemId, out ItemObject itemObject))
-                {
-                    return Failed("Failed to retrieve object for ItemObject id: " + itemId);
-                }
 
                 // Add properties as necessary
                 stringBuilder.AppendLine(itemObject.StringId + ": " + itemObject.Name);

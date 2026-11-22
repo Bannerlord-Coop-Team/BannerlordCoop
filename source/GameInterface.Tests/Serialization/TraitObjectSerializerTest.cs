@@ -11,29 +11,10 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class TraitObjectSerializationTest
     {
-        IContainer container;
+        ILifetimeScope container;
         public TraitObjectSerializationTest()
         {
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
-        }
-
-        [Fact]
-        public void TraitObject_Serialize()
-        {
-            TraitObject testTraitObject = (TraitObject)FormatterServices.GetUninitializedObject(typeof(TraitObject));
-
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            TraitObjectBinaryPackage package = new TraitObjectBinaryPackage(testTraitObject, factory);
-
-            package.Pack();
-
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
-
-            Assert.NotEmpty(bytes);
+            container = SerializationTestContainer.BeginScope();
         }
 
         [Fact]

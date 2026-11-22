@@ -38,14 +38,17 @@ internal class MobilePartyBehaviorHandler : IHandler
     private readonly IMobilePartyInterface mobilePartyInterface;
     private readonly IObjectManager objectManager;
     private readonly IMobilePartyBehaviorSnapshot mobilePartyBehaviorSnapshot;
+    private readonly IPartyNavigationRepair partyNavigationRepair;
 
     public MobilePartyBehaviorHandler(
         IMessageBroker messageBroker,
         IControllerIdProvider controllerIdProvider,
         IMobilePartyInterface mobilePartyInterface,
         IObjectManager objectManager,
-        IMobilePartyBehaviorSnapshot mobilePartyBehaviorSnapshot)
+        IMobilePartyBehaviorSnapshot mobilePartyBehaviorSnapshot,
+        IPartyNavigationRepair partyNavigationRepair)
     {
+        this.partyNavigationRepair = partyNavigationRepair;
         this.messageBroker = messageBroker;
         this.controllerIdProvider = controllerIdProvider;
         this.mobilePartyInterface = mobilePartyInterface;
@@ -75,7 +78,9 @@ internal class MobilePartyBehaviorHandler : IHandler
             return;
 
         data.ForcePosition = obj.What.ForcePosition;
-        data.IsCurrentlyAtSea = obj.What.IsCurrentlyAtSea;
+        // Unforced changes keep the party's own sea state from the snapshot instead of the message's default
+        if (obj.What.ForcePosition)
+            data.IsCurrentlyAtSea = obj.What.IsCurrentlyAtSea;
         data.ResetMovementToHold = obj.What.ResetMovementToHold;
 
         if (ModInformation.IsClient)
@@ -98,6 +103,15 @@ internal class MobilePartyBehaviorHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging(data.MobilePartyId, out MobileParty party))
                 return;
 
+            // Vanilla ignores orders on a raft, so keep the server's move to shore and resend it when the owner's order differs
+            if (ModInformation.IsServer && IsOwnerOrderDuringRaft(party.IsInRaftState, data.OriginControllerId))
+            {
+                // No requester on the resend, otherwise the owner reads it as its own echo and keeps its stale order
+                if (OwnerOrderDiffers(data, party.DefaultBehavior, party.TargetPosition))
+                    PublishAuthoritativeBehavior(party, originControllerId: null, forcePosition: false, resetMovementToHold: false);
+                return;
+            }
+
             bool isSelfEcho = ModInformation.IsClient &&
                 party.IsControlledByThisInstance() &&
                 !string.IsNullOrEmpty(data.OriginControllerId) &&
@@ -110,7 +124,7 @@ internal class MobilePartyBehaviorHandler : IHandler
             List<MobileParty> attachedParties = null;
             if (ModInformation.IsServer && data.ForcePosition)
             {
-                attachedParties = ApplyServerForcedPosition(party, data.PartyPosition, data.IsCurrentlyAtSea);
+                attachedParties = party.ApplyForcedPositionWithAttachedParties(data.PartyPosition, data.IsCurrentlyAtSea);
                 if (data.ResetMovementToHold)
                 {
                     party.SetMoveModeHold();
@@ -130,7 +144,12 @@ internal class MobilePartyBehaviorHandler : IHandler
                     return;
 
                 if (ModInformation.IsClient && data.ForcePosition)
-                    ApplyForcedPosition(party, data.PartyPosition, data.IsCurrentlyAtSea);
+                    party.ApplyForcedPosition(data.PartyPosition, data.IsCurrentlyAtSea);
+
+                // A party spawned at sea or one whose transition only ran on the server has no local transition to get there
+                if (ModInformation.IsClient && !data.ForcePosition && !party.IsControlledByThisInstance() &&
+                    !party.IsTransitionInProgress && party.IsCurrentlyAtSea != data.IsCurrentlyAtSea)
+                    party.IsCurrentlyAtSea = data.IsCurrentlyAtSea;
 
                 if (ModInformation.IsClient && data.ResetMovementToHold)
                 {
@@ -162,12 +181,17 @@ internal class MobilePartyBehaviorHandler : IHandler
             }
 
             if (ModInformation.IsServer)
-                PublishAuthoritativeBehavior(party, data);
+            {
+                PublishAuthoritativeBehavior(party, data.OriginControllerId, data.ForcePosition, data.ResetMovementToHold);
+
+                // A player order is the moment a frozen server copy shows: free it before it is ticked.
+                partyNavigationRepair.TryRepairForOrder(party);
+            }
 
             if (attachedParties != null)
             {
                 foreach (var attachedParty in attachedParties)
-                    PublishForcedPosition(attachedParty);
+                    PublishAuthoritativeBehavior(attachedParty, originControllerId: null, forcePosition: true, resetMovementToHold: false);
             }
         };
 
@@ -177,61 +201,29 @@ internal class MobilePartyBehaviorHandler : IHandler
             GameThread.RunSafe(apply, context: nameof(MobilePartyBehaviorHandler));
     }
 
-    private static void ApplyForcedPosition(MobileParty party, CampaignVec2 position, bool isCurrentlyAtSea)
-    {
-        party.Position = position;
-
-        if (party.IsCurrentlyAtSea != isCurrentlyAtSea)
-            party.ChangeIsCurrentlyAtSeaCheat();
-    }
-
-    private static List<MobileParty> ApplyServerForcedPosition(
-        MobileParty party,
-        CampaignVec2 position,
-        bool isCurrentlyAtSea)
-    {
-        ApplyForcedPosition(party, position, isCurrentlyAtSea);
-
-        if (party.Army == null)
-            return null;
-
-        List<MobileParty> attachedParties = null;
-        foreach (var attachedParty in party.Army.LeaderParty.AttachedParties)
-        {
-            if (attachedParty == party)
-                continue;
-
-            attachedParty.Position = position;
-            attachedParties ??= new List<MobileParty>();
-            attachedParties.Add(attachedParty);
-        }
-
-        return attachedParties;
-    }
-
-    private void PublishForcedPosition(MobileParty party)
-    {
-        if (!mobilePartyBehaviorSnapshot.TryCreate(
-                party,
-                out PartyBehaviorUpdateData data))
-            return;
-
-        data.ForcePosition = true;
-        messageBroker.Publish(this, new PartyBehaviorUpdated(ref data));
-    }
-
-    private void PublishAuthoritativeBehavior(MobileParty party, PartyBehaviorUpdateData request)
+    private void PublishAuthoritativeBehavior(MobileParty party, string originControllerId, bool forcePosition, bool resetMovementToHold)
     {
         if (!mobilePartyBehaviorSnapshot.TryCreate(
                 party,
                 out PartyBehaviorUpdateData authoritativeData))
+        {
+            Logger.Warning("Failed to snapshot the authoritative behavior of {PartyId}, clients get no update", party.StringId);
             return;
+        }
 
-        authoritativeData.OriginControllerId = request.OriginControllerId;
-        authoritativeData.ForcePosition = request.ForcePosition;
-        authoritativeData.ResetMovementToHold = request.ResetMovementToHold;
+        authoritativeData.OriginControllerId = originControllerId;
+        authoritativeData.ForcePosition = forcePosition;
+        authoritativeData.ResetMovementToHold = resetMovementToHold;
         messageBroker.Publish(this, new PartyBehaviorUpdated(ref authoritativeData));
     }
+
+    // Server-authored updates such as debug teleports leave the origin null and apply as usual
+    internal static bool IsOwnerOrderDuringRaft(bool isInRaftState, string originControllerId) =>
+        isInRaftState && !string.IsNullOrEmpty(originControllerId);
+
+    // Whether the owner asked for a different behavior or target than the server's raft move to shore
+    internal static bool OwnerOrderDiffers(PartyBehaviorUpdateData data, AiBehavior defaultBehavior, CampaignVec2 targetPosition) =>
+        data.DefaultBehavior != defaultBehavior || data.TargetPosition != targetPosition;
 
     internal static bool TrySelectBehaviorUpdate(
         bool isSelfEcho,

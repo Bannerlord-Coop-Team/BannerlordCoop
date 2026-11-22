@@ -50,7 +50,7 @@ internal class BattleJoinLeaveHandler : IHandler
     private readonly IMapEventInitializationBarrier initializationBarrier;
     private readonly ISiegeEventInterface siegeEventInterface;
     private readonly ISiegeMapEventLeaderReconciler siegeMapEventLeaderReconciler;
-    private readonly ISiegeJoinMenuActivationGate siegeJoinMenuActivationGate;
+    private readonly ISiegeJoinMenuDeferralTracker siegeJoinMenuDeferralTracker;
     private readonly ConcurrentDictionary<string, string> pendingJoinRequests = new ConcurrentDictionary<string, string>();
 
     public BattleJoinLeaveHandler(
@@ -62,7 +62,7 @@ internal class BattleJoinLeaveHandler : IHandler
         IMapEventInitializationBarrier initializationBarrier,
         ISiegeEventInterface siegeEventInterface,
         ISiegeMapEventLeaderReconciler siegeMapEventLeaderReconciler,
-        ISiegeJoinMenuActivationGate siegeJoinMenuActivationGate)
+        ISiegeJoinMenuDeferralTracker siegeJoinMenuDeferralTracker)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -72,7 +72,7 @@ internal class BattleJoinLeaveHandler : IHandler
         this.initializationBarrier = initializationBarrier;
         this.siegeEventInterface = siegeEventInterface;
         this.siegeMapEventLeaderReconciler = siegeMapEventLeaderReconciler;
-        this.siegeJoinMenuActivationGate = siegeJoinMenuActivationGate;
+        this.siegeJoinMenuDeferralTracker = siegeJoinMenuDeferralTracker;
 
         messageBroker.Subscribe<NetworkAddInvolvedParties>(Handle_NetworkAddInvolvedParties);
         messageBroker.Subscribe<PlayerJoinBattleAttempted>(Handle_PlayerJoinBattleAttempted);
@@ -152,8 +152,7 @@ internal class BattleJoinLeaveHandler : IHandler
                 }
             }
 
-            if (!siegeJoinMenuActivationGate.ResumeAfterSnapshot(mapEvent))
-                SwitchSiegeJoinerToEncounterIfNeeded(mapEvent);
+            OpenSiegeJoinMenuIfNeeded(mapEvent);
         }
         catch (Exception e)
         {
@@ -161,9 +160,27 @@ internal class BattleJoinLeaveHandler : IHandler
         }
     }
 
+    /// <summary>Opens the join menu deferred until this snapshot, otherwise moves an already-open siege joiner to the encounter.</summary>
+    private void OpenSiegeJoinMenuIfNeeded(MapEvent mapEvent)
+    {
+        var campaign = Campaign.Current;
+        var result = siegeJoinMenuDeferralTracker.Consume(mapEvent, campaign?.PlayerEncounter, campaign?.MainParty?.Party);
+        if (result == SiegeJoinMenuDeferralResult.None)
+        {
+            SwitchSiegeJoinerToEncounterIfNeeded(mapEvent);
+            return;
+        }
+
+        if (result != SiegeJoinMenuDeferralResult.Open)
+            return;
+
+        GameMenu.ActivateGameMenu("join_siege_event");
+        GameMenu.SwitchToMenu("encounter");
+    }
+
     private static void SwitchSiegeJoinerToEncounterIfNeeded(MapEvent mapEvent)
     {
-        if (!mapEvent.IsSiegeAssault && !mapEvent.IsSallyOut)
+        if (!mapEvent.IsSiegeStyleJoin())
             return;
 
         if (MobileParty.MainParty?.MapEvent != mapEvent)
@@ -177,15 +194,10 @@ internal class BattleJoinLeaveHandler : IHandler
             return;
 
         // Involved-party snapshots can arrive before the encountered party is ready.
-        var encounteredParty = encounter._encounteredParty;
-        if (encounter._mapEvent == null && encounteredParty == null)
+        if (encounter._mapEvent == null && encounter._encounteredParty == null)
             return;
 
-        var encounterMapEvent = encounter._mapEvent ?? encounteredParty?.MapEvent ??
-            (encounteredParty?.IsSettlement == true
-                ? encounteredParty.SiegeEvent?.BesiegerCamp?.LeaderParty?.MapEvent
-                : null) ?? MapEvent.PlayerMapEvent;
-        if (encounterMapEvent != mapEvent)
+        if (encounter.GetBattleOrPlayerMapEvent() != mapEvent)
             return;
 
         GameMenu.SwitchToMenu("encounter");
@@ -208,7 +220,7 @@ internal class BattleJoinLeaveHandler : IHandler
             return;
         }
 
-        siegeJoinMenuActivationGate.ArmJoinRequest(data.MapEvent, data.JoiningParty);
+        siegeJoinMenuDeferralTracker.Arm(data.MapEvent, data.JoiningParty);
 
         mapEventLogger.DebugMapEvent(data.MapEvent, "Requesting server to join battle. PartyId={PartyId}, Side={Side}", partyId, data.Side);
 
@@ -232,7 +244,7 @@ internal class BattleJoinLeaveHandler : IHandler
             pendingJoinRequests.TryRemove(reply.PartyId, out _);
             if (reply.Accepted) return;
 
-            siegeJoinMenuActivationGate.CancelDeferredActivation();
+            siegeJoinMenuDeferralTracker.Clear();
 
             Logger.Warning("Server rejected battle join for party {PartyId} and map event {MapEventId}",
                 reply.PartyId, reply.MapEventId);
@@ -534,6 +546,10 @@ internal class BattleJoinLeaveHandler : IHandler
 
             if (party.MapEventSide != null)
                 party.MapEventSide = null;
+
+            // The server-approved departure releases this encounter without finalizing the continuing raid.
+            if (isMainParty && mapEvent.IsRaidHostileAction() && PlayerEncounter.Battle == mapEvent)
+                PlayerEncounter.Current._mapEvent = null;
 
             // Vanilla discards the client's tracker when its MainParty leaves, but the server's registered tracker stays live.
             if (tracker != null && mapEvent?.IsFinalized == false && mapEvent.TroopUpgradeTracker == null)

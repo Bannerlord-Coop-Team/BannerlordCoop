@@ -6,7 +6,7 @@ $profilePath = Join-Path $runtimeDirectory 'profiles.json'
 
 try {
     if (!(Test-Path -LiteralPath $executable -PathType Leaf) -or !(Test-Path -LiteralPath $profilePath -PathType Leaf)) {
-        throw 'MCP is not set up in this checkout. Run runmefirst.cmd (first time), or powershell -NoProfile -ExecutionPolicy Bypass -File tools\mcp\setup.ps1 (existing mb2 junction). See doc/automated-testing/mcp-setup.md.'
+        throw 'MCP is not set up in this checkout. Run runmefirst.cmd (first time), or powershell -NoProfile -ExecutionPolicy Bypass -File tools\mcp\setup.ps1 (BANNERLORD_DIR already set). See doc/automated-testing/mcp-setup.md.'
     }
     # Native stdio is the protocol transport; never write setup/build output here.
     & $executable --config $profilePath

@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Runtime.CompilerServices;
 
 namespace GameInterface.Services.LiveTesting;
 
@@ -86,7 +87,7 @@ public sealed class LiveTestUi : ILiveTestUi
         {
             if (layer != null && layer != selectedHandle)
                 throw new UiAutomationException("invalid_parameters", "A snapshot's layer scope cannot be changed while paging.");
-            Validate(snapshot);
+            Validate(snapshot, -1);
         }
         var result = new UiSnapshot
         {
@@ -104,7 +105,9 @@ public sealed class LiveTestUi : ILiveTestUi
         if (element == null || element.Length > 16 || !element.StartsWith("e", StringComparison.Ordinal) ||
             !int.TryParse(element.Substring(1), out int index) || index < 0)
             throw new UiAutomationException("invalid_parameters", "Expected an element reference from ui_inspect.");
-        var current = Validate(snapshot);
+        if (frame != null && index >= frame.Widgets.Count)
+            throw new UiAutomationException("stale_reference", "Element does not belong to this snapshot.");
+        var current = Validate(snapshot, index);
         if (index >= frame.Widgets.Count)
             throw new UiAutomationException("stale_reference", "Element does not belong to this snapshot.");
         if (frame.Truncated || current.Truncated)
@@ -115,7 +118,8 @@ public sealed class LiveTestUi : ILiveTestUi
         var target = current.Widgets[index];
         if (!SameTarget(previous, target))
             throw new UiAutomationException("stale_reference", "Target content or geometry changed; inspect again.");
-        if (previous.ContentTruncated || target.ContentTruncated)
+        if ((previous.ContentTruncated || target.ContentTruncated) &&
+            (!previous.IsExactButton || !target.IsExactButton || (action != "click" && action != "toggle")))
             throw new UiAutomationException("not_interactable", "Target content exceeds inspection limits; actions are disabled.");
         if (target.Redacted || !target.Visible || !target.Enabled || !target.HitTestable)
             throw new UiAutomationException("not_interactable", "Target is hidden, clipped, disabled, covered or protected.");
@@ -140,7 +144,7 @@ public sealed class LiveTestUi : ILiveTestUi
         }
     }
 
-    private UiFrame Validate(string snapshot)
+    private UiFrame Validate(string snapshot, int targetIndex)
     {
         if (snapshotId == null || snapshot != snapshotId || age.Elapsed > TimeSpan.FromSeconds(30))
             throw new UiAutomationException("stale_reference", "Snapshot expired; inspect again.");
@@ -150,19 +154,11 @@ public sealed class LiveTestUi : ILiveTestUi
             !ReferenceEquals(frame.Screen, current.Screen) || frame.Truncated != current.Truncated ||
             frame.Widgets.Count != current.Widgets.Count)
             throw new UiAutomationException("stale_reference", "Screen or widget tree changed; inspect again.");
-        if (selectedLayer != null)
+        if (selectedLayer != null && targetIndex >= 0)
         {
-            if (frame.OcclusionWidgets.Count != current.OcclusionWidgets.Count)
+            if (targetIndex >= frame.Widgets.Count ||
+                !OcclusionMatches(frame.OcclusionWidgets, current.OcclusionWidgets, frame.Widgets[targetIndex]))
                 throw new UiAutomationException("stale_reference", "Upper-layer modal domain changed; inspect again.");
-            for (int i = 0; i < frame.OcclusionWidgets.Count; i++)
-            {
-                var a = frame.OcclusionWidgets[i];
-                var b = current.OcclusionWidgets[i];
-                if (!ReferenceEquals(a.Native, b.Native) || !ReferenceEquals(a.Layer, b.Layer) ||
-                    a.Parent != b.Parent || a.ChildIndex != b.ChildIndex || a.Id != b.Id ||
-                    !SameTarget(a, b) || a.Visible != b.Visible || a.Enabled != b.Enabled)
-                    throw new UiAutomationException("stale_reference", "Upper-layer modal domain changed; inspect again.");
-            }
         }
         for (int i = 0; i < frame.Widgets.Count; i++)
         {
@@ -177,10 +173,44 @@ public sealed class LiveTestUi : ILiveTestUi
     }
 
     private bool SameTarget(UiWidget a, UiWidget b) =>
-        a.Type == b.Type && a.Text == b.Text && a.Value == b.Value && a.Redacted == b.Redacted &&
+        a.Type == b.Type && a.Text == b.Text && a.Value == b.Value && a.FullText == b.FullText && a.FullValue == b.FullValue && a.Redacted == b.Redacted &&
         a.Minimum == b.Minimum && a.Maximum == b.Maximum && a.Step == b.Step &&
         Math.Abs(a.X - b.X) <= 1 && Math.Abs(a.Y - b.Y) <= 1 &&
         Math.Abs(a.Width - b.Width) <= 1 && Math.Abs(a.Height - b.Height) <= 1;
+
+    private bool OcclusionMatches(List<UiWidget> previous, List<UiWidget> current, UiWidget target)
+    {
+        var previousRelevant = previous.Where(widget => Overlaps(widget, target)).ToList();
+        var currentRelevant = current.Where(widget => Overlaps(widget, target)).ToList();
+        if (previousRelevant.Count != currentRelevant.Count) return false;
+        var currentByNative = new Dictionary<object, UiWidget>(ReferenceComparer.Instance);
+        foreach (var widget in currentRelevant) currentByNative[widget.Native] = widget;
+        foreach (var before in previousRelevant)
+        {
+            if (!currentByNative.TryGetValue(before.Native, out var after) || !OcclusionWidgetMatches(before, after)) return false;
+        }
+        return true;
+    }
+
+    private bool OcclusionWidgetMatches(UiWidget before, UiWidget after) =>
+        ReferenceEquals(before.Layer, after.Layer) && before.Parent == after.Parent &&
+        before.ChildIndex == after.ChildIndex && before.Id == after.Id &&
+        before.Visible == after.Visible && before.Enabled == after.Enabled &&
+        Math.Abs(before.X - after.X) <= 1 && Math.Abs(before.Y - after.Y) <= 1 &&
+        Math.Abs(before.Width - after.Width) <= 1 && Math.Abs(before.Height - after.Height) <= 1;
+
+    private bool Overlaps(UiWidget a, UiWidget b) =>
+        a.Width > 0 && a.Height > 0 && b.Width > 0 && b.Height > 0 &&
+        a.X < b.X + b.Width && a.X + a.Width > b.X &&
+        a.Y < b.Y + b.Height && a.Y + a.Height > b.Y;
+
+    private sealed class ReferenceComparer : IEqualityComparer<object>
+    {
+        internal static readonly ReferenceComparer Instance = new ReferenceComparer();
+
+        public bool Equals(object x, object y) => ReferenceEquals(x, y);
+        public int GetHashCode(object obj) => RuntimeHelpers.GetHashCode(obj);
+    }
 }
 
 /// <summary>A page from a snapshot, never containing native object references.</summary>

@@ -12,4 +12,7 @@ internal static class MapEventConfig
         get => allowRaidAiIntervention;
         set => allowRaidAiIntervention = value;
     }
+
+    // How long a battle whose players are all offline waits for one to rejoin before the server resolves it
+    public static readonly System.TimeSpan OfflinePlayerGracePeriod = System.TimeSpan.FromMinutes(5);
 }

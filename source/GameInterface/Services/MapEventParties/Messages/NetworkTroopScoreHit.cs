@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.MapEventParties.Messages;
 
@@ -23,8 +24,13 @@ public readonly struct NetworkTroopScoreHit : ICommand
     public readonly bool IsFatal;
     [ProtoMember(6)]
     public readonly bool IsSimulatedHit;
+    [ProtoMember(7)]
+    public readonly WeaponComponentData AttackerWeapon;
+    // Null when the attacker's formation has no captain.
+    [ProtoMember(8)]
+    public readonly string CaptainId;
 
-    public NetworkTroopScoreHit(string mapEventPartyId, string attackingTroopId, string attackedTroopId, int damage, bool isFatal, bool isSimulatedHit)
+    public NetworkTroopScoreHit(string mapEventPartyId, string attackingTroopId, string attackedTroopId, int damage, bool isFatal, bool isSimulatedHit, WeaponComponentData attackerWeapon, string captainId)
     {
         MapEventPartyId = mapEventPartyId;
         AttackingTroopId = attackingTroopId;
@@ -32,5 +38,7 @@ public readonly struct NetworkTroopScoreHit : ICommand
         Damage = damage;
         IsFatal = isFatal;
         IsSimulatedHit = isSimulatedHit;
+        AttackerWeapon = attackerWeapon;
+        CaptainId = captainId;
     }
 }

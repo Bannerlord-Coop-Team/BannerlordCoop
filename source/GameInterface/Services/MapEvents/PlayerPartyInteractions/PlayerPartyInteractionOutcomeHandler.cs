@@ -1,8 +1,12 @@
 ﻿using Common;
 using Common.Logging;
+using GameInterface.Configuration;
 using GameInterface.Services.Clans;
+using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.Kingdoms;
+using GameInterface.Services.MapEvents.Data;
+using GameInterface.Services.MapTracking;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.TroopRosters.Data;
 using Serilog;
@@ -36,6 +40,8 @@ internal readonly struct PlayerPartyInteractionOutcome
     public readonly TroopRosterElementData[] ResponderOfferedTroops;
     public readonly bool InitiatorOfferedPeace;
     public readonly bool ResponderOfferedPeace;
+    public readonly PlayerPartyMarriageOfferData[] InitiatorOfferedMarriages;
+    public readonly PlayerPartyMarriageOfferData[] ResponderOfferedMarriages;
     public readonly PlayerPartyInteractionProposal Proposal;
     public readonly bool IsHostile;
     public readonly string ActorPartyId;
@@ -63,6 +69,8 @@ internal readonly struct PlayerPartyInteractionOutcome
         ResponderOfferedTroops = session.ResponderOfferedTroops ?? Array.Empty<TroopRosterElementData>();
         InitiatorOfferedPeace = session.InitiatorOfferedPeace;
         ResponderOfferedPeace = session.ResponderOfferedPeace;
+        InitiatorOfferedMarriages = session.InitiatorOfferedMarriages ?? Array.Empty<PlayerPartyMarriageOfferData>();
+        ResponderOfferedMarriages = session.ResponderOfferedMarriages ?? Array.Empty<PlayerPartyMarriageOfferData>();
         Proposal = session.Proposal;
         IsHostile = session.IsHostile;
         ActorPartyId = actorPartyId;
@@ -80,19 +88,28 @@ internal class PlayerPartyInteractionOutcomeHandler
     private readonly IClanJoinRules clanJoinRules;
     private readonly IClanLeaveRules clanLeaveRules;
     private readonly IPlayerMarriageRules playerMarriageRules;
+    private readonly IPlayerDivorceRules playerDivorceRules;
+    private readonly IPlayerMapTracking mapTracking;
+    private readonly IKingdomClanLimit kingdomClanLimit;
 
     public PlayerPartyInteractionOutcomeHandler(
         IObjectManager objectManager,
         IKingdomMembershipState kingdomMembershipState,
         IClanJoinRules clanJoinRules,
         IClanLeaveRules clanLeaveRules,
-        IPlayerMarriageRules playerMarriageRules)
+        IPlayerMarriageRules playerMarriageRules,
+        IPlayerDivorceRules playerDivorceRules,
+        IPlayerMapTracking mapTracking,
+        IKingdomClanLimit kingdomClanLimit)
     {
         this.objectManager = objectManager;
         this.kingdomMembershipState = kingdomMembershipState;
         this.clanJoinRules = clanJoinRules;
         this.clanLeaveRules = clanLeaveRules;
         this.playerMarriageRules = playerMarriageRules;
+        this.playerDivorceRules = playerDivorceRules;
+        this.mapTracking = mapTracking;
+        this.kingdomClanLimit = kingdomClanLimit;
     }
 
     public bool Handle(PlayerPartyInteractionOutcome outcome)
@@ -112,10 +129,22 @@ internal class PlayerPartyInteractionOutcomeHandler
                 return HandleClanDeparture(outcome);
             case PlayerPartyInteractionOutcomeType.MarriageAccepted:
                 return HandleMarriageAccepted(outcome);
+            case PlayerPartyInteractionOutcomeType.Divorced:
+            case PlayerPartyInteractionOutcomeType.DivorcedAndLeftClan:
+                return HandleDivorce(outcome);
+            case PlayerPartyInteractionOutcomeType.MapTrackingAccepted:
+                return SetMapTracking(outcome, isTracking: true);
+            case PlayerPartyInteractionOutcomeType.MapTrackingStopped:
+                return SetMapTracking(outcome, isTracking: false);
             default:
                 return true;
         }
     }
+
+    private bool SetMapTracking(PlayerPartyInteractionOutcome outcome, bool isTracking) =>
+        objectManager.TryGetObjectWithLogging(outcome.InitiatorPartyId, out PartyBase initiatorParty) &&
+        objectManager.TryGetObjectWithLogging(outcome.ResponderPartyId, out PartyBase responderParty) &&
+        mapTracking.SetTracking(initiatorParty.MobileParty, responderParty.MobileParty, isTracking);
 
     private bool HandleClanDeparture(PlayerPartyInteractionOutcome outcome)
     {
@@ -182,6 +211,33 @@ internal class PlayerPartyInteractionOutcomeHandler
             initiatorParty.LeaderHero,
             responderParty.LeaderHero,
             outcome.Proposal == PlayerPartyInteractionProposal.MatrilinealMarriage);
+    }
+
+    private bool HandleDivorce(PlayerPartyInteractionOutcome outcome)
+    {
+        try
+        {
+            bool result = false;
+            RunOnGameThread(() => result = ApplyDivorce(outcome), "Apply player-party divorce");
+            return result;
+        }
+        catch (Exception e)
+        {
+            Logger.Error(e,
+                "Failed to apply player-party divorce. SessionId={SessionId}, InitiatorPartyId={InitiatorPartyId}, ResponderPartyId={ResponderPartyId}",
+                outcome.SessionId,
+                outcome.InitiatorPartyId,
+                outcome.ResponderPartyId);
+            return false;
+        }
+    }
+
+    private bool ApplyDivorce(PlayerPartyInteractionOutcome outcome)
+    {
+        if (!TryGetSessionParties(outcome, outcome.ActorPartyId, out var actorParty, out var otherParty)) return false;
+
+        return playerDivorceRules.TryApply(actorParty.LeaderHero, otherParty.LeaderHero,
+            outcome.OutcomeType == PlayerPartyInteractionOutcomeType.DivorcedAndLeftClan);
     }
 
     private bool TryGetSessionParties(
@@ -253,6 +309,11 @@ internal class PlayerPartyInteractionOutcomeHandler
                 "Unable to apply player-party vassalage: eligibility changed before acceptance. InitiatorPartyId={InitiatorPartyId}, ResponderPartyId={ResponderPartyId}",
                 outcome.InitiatorPartyId,
                 outcome.ResponderPartyId);
+            return false;
+        }
+        if (kingdomClanLimit.RefusesJoin(initiatorClan, targetKingdom, asMercenary: false, ModConfigProvider.ModOptions))
+        {
+            Logger.Warning("Rejected player-party vassalage for clan {ClanId} because kingdom {KingdomId} has maxClansPerKingdom clans", initiatorClan.StringId, targetKingdom.StringId);
             return false;
         }
         if (initiatorClan.Kingdom == targetKingdom)
@@ -437,6 +498,11 @@ internal class PlayerPartyInteractionOutcomeHandler
             outcome.ResponderPartyId);
             return false;
         }
+        if (kingdomClanLimit.RefusesJoin(initiatorClan, targetKingdom, asMercenary: true, ModConfigProvider.ModOptions))
+        {
+            Logger.Warning("Rejected player-party mercenary for clan {ClanId} because kingdom {KingdomId} has maxClansPerKingdom clans", initiatorClan.StringId, targetKingdom.StringId);
+            return false;
+        }
         int awardMultiplier = outcome.MercenaryAwardMultiplier;
         ChangeKingdomAction.ApplyByJoinFactionAsMercenary(initiatorClan, targetKingdom, default, awardMultiplier, true);
         GainKingdomInfluenceAction.ApplyForJoiningFaction(initiatorClan.Leader, 5f);
@@ -471,6 +537,11 @@ internal class PlayerPartyInteractionOutcomeHandler
             outcome.ResponderOfferedFiefs,
             outcome.ResponderOfferedPrisoners);
 
+        // Check marriages before applying anything, otherwise a hero offered as a troop has already moved party and fails the check.
+        var marriages = new List<(Hero Hero, Hero Spouse)>();
+        if (!TryAddMarriages(initiatorParty, responderParty, outcome.InitiatorOfferedMarriages, marriages) ||
+            !TryAddMarriages(responderParty, initiatorParty, outcome.ResponderOfferedMarriages, marriages)) return false;
+
         ApplyOffer(initiatorParty, responderParty, initiatorOffer);
         ApplyOffer(responderParty, initiatorParty, responderOffer);
 
@@ -478,6 +549,41 @@ internal class PlayerPartyInteractionOutcomeHandler
         {
             ApplyPeace(initiatorParty, responderParty);
         }
+
+        foreach (var (hero, spouse) in marriages)
+        {
+            // GetClanAfterMarriage keeps the clan of a first hero who IsHumanPlayerCharacter, so the npc always joins the player's clan.
+            if (spouse.IsPlayerHero())
+                MarriageAction.Apply(spouse, hero);
+            else
+                MarriageAction.Apply(hero, spouse);
+        }
+        return true;
+    }
+
+    private bool TryAddMarriages(PartyBase sourceParty, PartyBase targetParty, PlayerPartyMarriageOfferData[] offeredMarriages, List<(Hero Hero, Hero Spouse)> marriages)
+    {
+        foreach (var offer in offeredMarriages)
+        {
+            if (!objectManager.TryGetObjectWithLogging(offer.HeroId, out Hero hero)) return false;
+            if (!objectManager.TryGetObjectWithLogging(offer.SpouseId, out Hero spouse)) return false;
+
+            // Both players can offer a marriage for the same hero before either update arrives.
+            bool heroAlreadyMarrying = marriages.Any(marriage =>
+                marriage.Hero == hero || marriage.Spouse == hero || marriage.Hero == spouse || marriage.Spouse == spouse);
+
+            if (heroAlreadyMarrying || !PlayerPartyMarriageBarterable.CanOfferMarriage(sourceParty, targetParty, hero, spouse))
+            {
+                Logger.Warning(
+                    "Unable to apply player-party trade marriage: eligibility changed before acceptance. HeroId={HeroId}, SpouseId={SpouseId}",
+                    offer.HeroId,
+                    offer.SpouseId);
+                return false;
+            }
+
+            marriages.Add((hero, spouse));
+        }
+
         return true;
     }
 

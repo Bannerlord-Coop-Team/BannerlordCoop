@@ -6,6 +6,7 @@ using Common.Util;
 using GameInterface.Services.Armies.Messages;
 using GameInterface.Services.Armies.Patches;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -27,12 +28,14 @@ public class ArmyHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
+    private readonly IPlayerManager playerManager;
 
-    public ArmyHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
+    public ArmyHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager, IPlayerManager playerManager)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
+        this.playerManager = playerManager;
 
         messageBroker.Subscribe<MobilePartyInArmyAdded>(HandleAddMobilePartyInArmy);
         messageBroker.Subscribe<NetworkAddMobilePartyInArmy>(HandleChangeAddMobilePartyInArmy);
@@ -92,6 +95,13 @@ public class ArmyHandler : IHandler
             if (objectManager.TryGetObjectWithLogging(obj.MobilePartyId, out MobileParty mobileParty) == false) return;
             if (objectManager.TryGetObjectWithLogging<Army>(obj.ArmyId, out var army) == false) return;
 
+            // Sent before the add because the add fires the joined army notification, and clients
+            // need the party in the army when it arrives
+            if (ModInformation.IsServer)
+            {
+                network.SendAll(new NetworkAddMobilePartyInArmy(obj.ArmyId, obj.MobilePartyId, obj.AddPartyToMergedPartiesBool));
+            }
+
             ArmyPatches.AddMobilePartyInArmy(mobileParty, army);
 
             if (obj.AddPartyToMergedPartiesBool && mobileParty.AttachedTo != army.LeaderParty) 
@@ -100,10 +110,6 @@ public class ArmyHandler : IHandler
                 {
                     army.AddPartyToMergedParties(mobileParty);
                 }
-            }
-            if (ModInformation.IsServer)
-            {
-                network.SendAll(new NetworkAddMobilePartyInArmy(obj.ArmyId, obj.MobilePartyId, obj.AddPartyToMergedPartiesBool));
             }
         });
     }
@@ -214,6 +220,7 @@ public class ArmyHandler : IHandler
         var obj = payload.What;
         GameThread.RunSafe(() =>
         {
+            if (!playerManager.IsSenderControllingHero(payload.Who, obj.LeaderId)) return;
             if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.KingdomId, out var kingdom)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.LeaderId, out var leader)) return;
             if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.TargetSettlementId, out var targetSettlement)) return;

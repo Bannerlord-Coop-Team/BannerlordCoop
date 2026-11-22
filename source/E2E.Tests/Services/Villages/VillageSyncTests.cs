@@ -22,7 +22,7 @@ public class VillageSyncTests : SyncTestBase
     }
 
     [Fact]
-    public void Server_Village_Fields()
+    public void Server_Village_FieldsAndProperties()
     {
         Server.ObjectManager.TryGetObject(villageId, out Village village);
 
@@ -33,12 +33,6 @@ public class VillageSyncTests : SyncTestBase
         //TestEnvironment.AssertReferenceField<Village, PartyBase>(nameof(Village._owner)); // Failed to find intercept for _owner
         TestEnvironment.AssertReferenceField<Village, Settlement>(nameof(Village._bound));
         TestEnvironment.AssertReferenceField<Village, Settlement>(nameof(Village._tradeBound));
-    }
-
-    [Fact]
-    public void Server_Village_Properties()
-    {
-        Server.ObjectManager.TryGetObject(villageId, out Village village);
 
         TestEnvironment.AssertProperty<Village, float>(nameof(Village.Hearth), 650f);
         TestEnvironment.AssertProperty<Village, float>(nameof(Village.LastDemandSatisfiedTime), 30, defaultValue: village.LastDemandSatisfiedTime);

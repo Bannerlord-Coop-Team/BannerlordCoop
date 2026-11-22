@@ -7,8 +7,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.Serialization;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Library;
+using TaleWorlds.Localization;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.PartyComponents;
@@ -195,5 +199,53 @@ public class PartyComponentTests : SyncTestBase
             Assert.True(client.ObjectManager.TryGetId(clientParty.PartyComponent.MobileParty, out var clientPartyId));
             Assert.Equal(serverPartyId, clientPartyId);
         }
+    }
+
+    [Fact]
+    public void ClientCreatePartyComponents_DoNotRegister()
+    {
+        // Arrange
+        var client1 = TestEnvironment.Clients.First();
+
+        Hero caravanHero = null;
+        Hero lordHero = null;
+        Settlement caravanSettlement = null;
+        PartyTemplateObject caravanTemplate = null;
+        Server.Call(() =>
+        {
+            caravanHero = GameObjectCreator.CreateInitializedObject<Hero>();
+            lordHero = GameObjectCreator.CreateInitializedObject<Hero>();
+            caravanSettlement = GameObjectCreator.CreateInitializedObject<Settlement>();
+            caravanTemplate = GameObjectCreator.CreateInitializedObject<PartyTemplateObject>();
+        });
+
+        var garrisonSettlement = GameObjectCreator.CreateInitializedObject<Settlement>();
+        garrisonSettlement.Town = GameObjectCreator.CreateInitializedObject<Town>();
+        var village = GameObjectCreator.CreateInitializedObject<Village>();
+        var customSettlement = new Settlement();
+        var customClan = new Clan();
+        var lordSettlement = new Settlement();
+
+        // Act
+        var components = new List<PartyComponent>();
+        client1.Call(() =>
+        {
+            var hideout = GameObjectCreator.CreateInitializedObject<Hideout>();
+            var banditClan = GameObjectCreator.CreateInitializedObject<Clan>();
+            var banditTemplate = GameObjectCreator.CreateInitializedObject<PartyTemplateObject>();
+            var position = new CampaignVec2(new Vec2(2, 2), true);
+
+            components.Add(new BanditPartyComponent(hideout, false, new BanditPartyComponent.InitializationArgs(banditClan, banditTemplate, position)));
+            components.Add(new CaravanPartyComponent(caravanSettlement, caravanHero, caravanHero, false, new CaravanPartyComponent.InitializationArgs(caravanTemplate)));
+            components.Add(new CustomPartyComponent(customSettlement, new TextObject(""), new Hero(), "test", "testH", 1f, false,
+                new CustomPartyComponent.InitializationArgs(position, 2f, customClan)));
+            components.Add(new GarrisonPartyComponent(garrisonSettlement, new GarrisonPartyComponent.InitializationArgs()));
+            components.Add(new LordPartyComponent(lordHero, lordHero, new LordPartyComponent.InitializationArgs(position, 2f, lordSettlement)));
+            components.Add(new VillagerPartyComponent(village, new VillagerPartyComponent.InitializationArgs()));
+        });
+
+        // Assert
+        Assert.Equal(6, components.Count);
+        Assert.All(components, component => Assert.False(client1.ObjectManager.TryGetId(component, out _)));
     }
 }
