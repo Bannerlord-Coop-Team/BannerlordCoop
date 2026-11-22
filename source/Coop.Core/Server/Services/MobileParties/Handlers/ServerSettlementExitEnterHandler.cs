@@ -225,10 +225,9 @@ public class ServerSettlementExitEnterHandler : IHandler
 
             // A ferry the party can't take keeps it in the village menu, like vanilla's disabled option
             bool takesFerry = payload.LeaveType == SettlementLeaveType.Ferry;
-            string ferryRejection = "ferries aren't available";
-            if (takesFerry && playerFerryInterface?.CanTakeFerry(mobileParty, leftSettlement, out ferryRejection) != true)
+            if (takesFerry && playerFerryInterface?.CanTakeFerry(mobileParty, leftSettlement) != true)
             {
-                RejectSettlementEncounterLeave(peer, payload.PartyId, ferryRejection);
+                RejectSettlementEncounterLeave(peer, payload.PartyId, "the ferry can't take your party");
                 return;
             }
 

@@ -76,7 +76,7 @@ internal class PlayerFerryHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(partyId, out var party)) return;
 
             // A second Continue finds the party already landed
-            ferryInterface.TryEndFerry(party);
+            ferryInterface.EndFerry(party);
         });
     }
 

@@ -24,14 +24,6 @@ internal class RaftStateCampaignBehaviorPatches
     [HarmonyPrefix]
     public static bool OnShipDestroyedPrefix() => ModInformation.IsServer;
 
-    // A player on a ferry is at sea with no ships, which vanilla would put on a raft
-    [HarmonyPatch(nameof(RaftStateCampaignBehavior.ShouldActivateRaftStateForMobileParty))]
-    [HarmonyPostfix]
-    public static void ShouldActivateRaftStateForMobilePartyPostfix(MobileParty mobileParty, ref bool __result)
-    {
-        if (__result && mobileParty.IsInFerryState) __result = false;
-    }
-
     [HarmonyPatch(nameof(RaftStateCampaignBehavior.OnPartyLeftArmy))]
     [HarmonyPrefix]
     public static bool OnPartyLeftArmyPrefix() => ModInformation.IsServer;

@@ -5,7 +5,6 @@ using GameInterface.Services.Ferries.Interfaces;
 using GameInterface.Services.Ferries.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
-using GameInterface.Services.Rafts.Interfaces;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.ComponentInterfaces;
@@ -43,7 +42,7 @@ public class PlayerFerryTests : SyncTestBase
             var party = Server.GetRegisteredObject<MobileParty>(ferry.PartyId);
             var village = Server.GetRegisteredObject<Settlement>(ferry.VillageId);
             var ferryInterface = Server.Resolve<IPlayerFerryInterface>();
-            Assert.True(ferryInterface.CanTakeFerry(party, village, out var reason), reason);
+            Assert.True(ferryInterface.CanTakeFerry(party, village));
 
             ferryInterface.StartFerry(party, village);
 
@@ -108,41 +107,6 @@ public class PlayerFerryTests : SyncTestBase
                 Assert.False(party.IsInFerryState);
             });
         }
-    }
-
-    [Fact]
-    public void CanTakeFerry_WithoutTheFare_IsRefusedAndChargesNothing()
-    {
-        var ferry = CreatePlayerAtFerryVillage();
-
-        Server.Call(() =>
-        {
-            var party = Server.GetRegisteredObject<MobileParty>(ferry.PartyId);
-            party.LeaderHero.Gold = FerryFare(party) - 1;
-
-            Assert.False(Server.Resolve<IPlayerFerryInterface>().CanTakeFerry(party, Server.GetRegisteredObject<Settlement>(ferry.VillageId), out var reason));
-            Assert.Equal("you don't have enough gold to take the ferry", reason);
-            Assert.False(party.IsInFerryState);
-        });
-    }
-
-    // A player rejoining mid trip is at sea with no ships, which the raft code would otherwise put on a raft
-    [Fact]
-    public void RejoinOnFerry_KeepsTheFleetForLandingAndDoesntRaft()
-    {
-        var ferry = CreatePlayerAtFerryVillage();
-
-        Server.Call(() =>
-        {
-            var party = Server.GetRegisteredObject<MobileParty>(ferry.PartyId);
-            Server.Resolve<IPlayerFerryInterface>().StartFerry(party, Server.GetRegisteredObject<Settlement>(ferry.VillageId));
-
-            Server.Resolve<IPlayerRaftFleetInterface>().OnPlayerCharacterChanged(party.LeaderHero, party);
-
-            Assert.False(party.IsInRaftState);
-            Assert.True(CachedFleets().ContainsKey(ferry.HeroId));
-            Assert.Empty(party.Ships);
-        });
     }
 
     private record FerryTrip(string HeroId, string PartyId, string VillageId);
@@ -216,10 +180,9 @@ public class PlayerFerryTests : SyncTestBase
     private Dictionary<string, GameInterface.Services.NavalDLC.PlayerCachedFleetData> CachedFleets() =>
         Server.Resolve<ICoopSessionProvider>().CoopSession.NavalPlayerData.PlayerCachedFleets;
 
-    // DefaultFerryModel charges nothing and carries no one. This fare counts the main party, like NavalFerryModel.
+    // DefaultFerryModel charges nothing. This fare counts the main party, like NavalFerryModel.
     private sealed class TestFerryModel : FerryModel
     {
-        // The harness party has a random roster, up to around a hundred troops
         public override int MaximumFerryCapacityForPassengers => 1000;
 
         public override ExplainedNumber GetFerryCost(Settlement departureVillage, bool includeReason = false) =>

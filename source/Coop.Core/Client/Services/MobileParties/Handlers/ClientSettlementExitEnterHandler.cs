@@ -331,7 +331,7 @@ public class ClientSettlementExitEnterHandler : IHandler
         if (!IsMainParty(partyId))
             return;
 
-        // A leave this client asked for is closed by its reply, which carries the leave type (a ferry boards there)
+        // A leave this client asked for is closed by its reply with the pending leave type, which a ferry needs to board
         if (pendingLeavePartyId != 0 && pendingLeavePartyId == partyId)
             return;
 
