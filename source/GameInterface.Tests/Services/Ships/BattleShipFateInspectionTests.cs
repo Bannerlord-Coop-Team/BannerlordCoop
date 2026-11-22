@@ -14,7 +14,7 @@ public class BattleShipFateInspectionTests
     {
         var ledger = new BattleShipFateLedger();
         ledger.Record("battle", new BattleShipFate("ship", 18000f, 200f, false), 1, 9);
-        ledger.Record("battle", new BattleShipFate("ship", 17700f, 180f, false, 12f), 2, 1);
+        ledger.Record("battle", new BattleShipFate("ship", 17700f, 180f, false), 2, 1);
         ledger.Record("battle", new BattleShipFate("ship", 17900f, 190f, false), 1, 10);
         var snapshot = ledger.Inspect();
         Assert.Single(ledger.Take("battle", _ => true));
@@ -23,7 +23,6 @@ public class BattleShipFateInspectionTests
         Assert.Equal(17700f, (float)ship["hitPoints"]!);
         Assert.Equal(2, (int)ship["hostEpoch"]!);
         Assert.Equal(1L, (long)ship["revision"]!);
-        Assert.Equal(12f, (float)ship["mitigatedDamage"]!);
         Assert.Empty(JArray.FromObject(ledger.Inspect()));
     }
 

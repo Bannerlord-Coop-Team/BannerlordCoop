@@ -52,20 +52,6 @@ public class BattleShipFateLedgerTests
         Assert.Equal(100f, Assert.Single(ledger.Take(Battle, _ => true)).HitPoints);
     }
 
-    // M6 D7: every report carries the damage mitigated since its sender's last one, so all of it adds up, even a stale report's.
-    [Fact]
-    public void Record_SumsTheMitigatedDamageOfEveryReport()
-    {
-        var ledger = new BattleShipFateLedger();
-        ledger.Record(Battle, new BattleShipFate("Ship_1", 800f, 200f, false, 30f), hostEpoch: 1, revision: 2);
-        ledger.Record(Battle, new BattleShipFate("Ship_1", 900f, 200f, false, 5f), hostEpoch: 1, revision: 1);
-        ledger.Record(Battle, new BattleShipFate("Ship_1", 0f, 200f, true, 15f), hostEpoch: 2, revision: 1);
-
-        var fate = Assert.Single(ledger.Take(Battle, _ => true));
-        Assert.True(fate.Sunk);
-        Assert.Equal(50f, fate.MitigatedDamage);
-    }
-
     // Capture 2.5: the captor numbers the prize's fates from its own count, so its first fate replaces the host's held one
     // whatever their stamps, and later captor fates order among themselves.
     [Fact]

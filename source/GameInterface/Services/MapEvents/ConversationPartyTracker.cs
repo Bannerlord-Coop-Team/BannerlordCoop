@@ -10,6 +10,7 @@ namespace GameInterface.Services.MapEvents;
 
 /// <summary>
 /// Server-side registry of AI parties currently held in a conversation/encounter with a player.
+/// Also remembers which server-detected deferrals were logged, so each is logged once per blocking conversation.
 /// </summary>
 /// <remarks>
 /// One engagement per player, and one player per target: a party someone else already holds cannot be engaged,
@@ -37,6 +38,12 @@ internal sealed class ConversationPartyTracker : IHandler
     // tracked elsewhere (it sent the request); this lets a disconnecting defender be mapped back to its conversation.
     private readonly Dictionary<string, object> pvpPeerByPartyId = new Dictionary<string, object>();
     private readonly Dictionary<object, string> pvpPartyIdByPeer = new Dictionary<object, string>(ReferenceObjectComparer.Instance);
+
+    // Each player's party id -> the AI parties whose server-detected encounter with it was deferred and logged.
+    // A player's entry drops when their engagement or PvP conversation ends, and a party leaves every entry when
+    // its holder's engagement ends.
+    private readonly Dictionary<string, HashSet<string>> loggedDeferralsByEngagerPartyId =
+        new Dictionary<string, HashSet<string>>();
 
     private volatile bool isEmpty = true;
     private volatile bool pvpIsEmpty = true;
@@ -70,6 +77,7 @@ internal sealed class ConversationPartyTracker : IHandler
             pvpPartnersByPartyId.Clear();
             pvpPeerByPartyId.Clear();
             pvpPartyIdByPeer.Clear();
+            loggedDeferralsByEngagerPartyId.Clear();
             isEmpty = true;
             pvpIsEmpty = true;
         }
@@ -214,6 +222,12 @@ internal sealed class ConversationPartyTracker : IHandler
             engagements.Remove(engagerKey);
             shouldReleaseParty = !engagements.Values.Any(x => x.PartyId == endedPartyId);
             isEmpty = engagements.Count == 0;
+
+            if (engagement.EngagerPartyId != null)
+                loggedDeferralsByEngagerPartyId.Remove(engagement.EngagerPartyId);
+            // Its holder let the party go, so a later deferral of it logs again for every player.
+            foreach (var deferrals in loggedDeferralsByEngagerPartyId.Values)
+                deferrals.Remove(endedPartyId);
             return true;
         }
     }
@@ -258,21 +272,30 @@ internal sealed class ConversationPartyTracker : IHandler
     }
 
     /// <summary>
-    /// True when the player or <paramref name="partyId"/> is already in a conversation that is not between the two:
-    /// the player engages another party or is in a PvP conversation, or another player holds the party.
+    /// Defers a server-detected encounter when the player or <paramref name="partyId"/> is already in another
+    /// conversation. <paramref name="firstDeferral"/> is true only the first time until the conversation behind the
+    /// deferral ends, so the caller logs each deferral once.
     /// </summary>
-    public bool IsInOtherConversation(object engagerKey, string engagerPartyId, string partyId)
+    public bool TryDefer(object engagerKey, string engagerPartyId, string partyId, out bool firstDeferral)
     {
+        firstDeferral = false;
+
         if (engagerKey == null || engagerPartyId == null || partyId == null) return false;
 
         lock (stateLock)
         {
-            // A refresh by the same party still passes, the bandit barter relies on the EngagerIsDefender merge.
-            if (engagements.TryGetValue(engagerKey, out var current))
-                return current.PartyId != partyId;
+            if (disposed) return false;
 
-            return pvpPartnersByPartyId.ContainsKey(engagerPartyId) ||
-                engagements.Values.Any(x => x.PartyId == partyId);
+            if (!IsInOtherConversation(engagerKey, engagerPartyId, partyId)) return false;
+
+            if (!loggedDeferralsByEngagerPartyId.TryGetValue(engagerPartyId, out var deferrals))
+            {
+                deferrals = new HashSet<string>();
+                loggedDeferralsByEngagerPartyId[engagerPartyId] = deferrals;
+            }
+
+            firstDeferral = deferrals.Add(partyId);
+            return true;
         }
     }
 
@@ -303,6 +326,9 @@ internal sealed class ConversationPartyTracker : IHandler
                 pvpPartnersByPartyId.Remove(partnerId);
                 RemovePvpPeer(partyId);
                 RemovePvpPeer(partnerId);
+
+                loggedDeferralsByEngagerPartyId.Remove(partyId);
+                loggedDeferralsByEngagerPartyId.Remove(partnerId);
             }
 
             pvpIsEmpty = pvpPartnersByPartyId.Count == 0;
@@ -344,6 +370,18 @@ internal sealed class ConversationPartyTracker : IHandler
         {
             return pvpPartyIdByPeer.TryGetValue(peer, out partyId);
         }
+    }
+
+    // True when the player engages another party or is in a PvP conversation, or another player holds the party.
+    // Must be called under stateLock. A refresh by the same party still passes, the bandit barter relies on the
+    // EngagerIsDefender merge.
+    private bool IsInOtherConversation(object engagerKey, string engagerPartyId, string partyId)
+    {
+        if (engagements.TryGetValue(engagerKey, out var current))
+            return current.PartyId != partyId;
+
+        return pvpPartnersByPartyId.ContainsKey(engagerPartyId) ||
+            engagements.Values.Any(x => x.PartyId == partyId);
     }
 
     // Drops the peer<->party mapping for a party leaving a PvP conversation. Must be called under stateLock.

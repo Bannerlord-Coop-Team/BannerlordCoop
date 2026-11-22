@@ -120,6 +120,7 @@
 	</AssemblyAttribute>
   </ItemGroup>
 <ItemGroup>
+	<Publicize Include="Coop.Naval" />
 	<Publicize Include="SandBox" />
 	<Publicize Include="TaleWorlds.CampaignSystem" />
 	<Publicize Include="TaleWorlds.CampaignSystem.ViewModelCollection" />

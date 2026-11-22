@@ -20,6 +20,8 @@ internal readonly struct PortScreenChanges
     public readonly MBReadOnlyList<ShipUpgradePieceInfo> SelectedShipPieces;
     public readonly MBReadOnlyList<ShipFigureheadInfo> SelectedFigureheads;
     public readonly MBReadOnlyList<Ship> ShipsToSend;
+    public readonly MBReadOnlyList<Ship> ShipsToStash;
+    public readonly MBReadOnlyList<Ship> ShipsToRetrieveFromStash;
 
     public PortScreenChanges(
         PartyBase rightOwner,
@@ -33,7 +35,9 @@ internal readonly struct PortScreenChanges
         MBReadOnlyList<ShipRenameInfo> shipsToRename,
         MBReadOnlyList<ShipUpgradePieceInfo> selectedShipPieces,
         MBReadOnlyList<ShipFigureheadInfo> selectedFigureheads,
-        MBReadOnlyList<Ship> shipsToSend)
+        MBReadOnlyList<Ship> shipsToSend,
+        MBReadOnlyList<Ship> shipsToStash,
+        MBReadOnlyList<Ship> shipsToRetrieveFromStash)
     {
         RightOwner = rightOwner;
         LeftOwner = leftOwner;
@@ -47,5 +51,7 @@ internal readonly struct PortScreenChanges
         SelectedShipPieces = selectedShipPieces;
         SelectedFigureheads = selectedFigureheads;
         ShipsToSend = shipsToSend;
+        ShipsToStash = shipsToStash;
+        ShipsToRetrieveFromStash = shipsToRetrieveFromStash;
     }
 }
