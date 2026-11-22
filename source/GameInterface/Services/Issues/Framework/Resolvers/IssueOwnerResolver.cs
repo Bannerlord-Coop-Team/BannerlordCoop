@@ -1,4 +1,5 @@
-﻿using GameInterface.Services.Issues.Framework.Interface;
+﻿using GameInterface.Services.Entity;
+using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
@@ -13,15 +14,18 @@ internal class IssueOwnerResolver : IIssueOwnerResolver
     private readonly IObjectManager objectManager;
     private readonly IIssueOwnershipRegistry ownership;
     private readonly IPlayerManager playerManager;
+    private readonly IControllerIdProvider controller;
 
     public IssueOwnerResolver(
         IObjectManager objectManager,
         IIssueOwnershipRegistry ownership,
-        IPlayerManager playerManager)
+        IPlayerManager playerManager,
+        IControllerIdProvider controller)
     {
         this.objectManager = objectManager;
         this.ownership = ownership;
         this.playerManager = playerManager;
+        this.controller = controller;
     }
 
     public bool TryResolveOwnerHero(IssueBase issue, out Hero ownerHero)
@@ -57,4 +61,7 @@ internal class IssueOwnerResolver : IIssueOwnerResolver
 
         return ownership.TryGetOwner(issueOwnerId, issue.StringId, out controllerId);
     }
+
+    public bool IsLocalOwner(IssueBase issue) =>
+        TryGetOwnerControllerId(issue, out var owner) && owner == controller.ControllerId;
 }

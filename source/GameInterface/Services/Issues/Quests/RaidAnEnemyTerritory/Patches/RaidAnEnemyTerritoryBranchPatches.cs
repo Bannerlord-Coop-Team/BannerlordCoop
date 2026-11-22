@@ -10,14 +10,7 @@ internal sealed class RaidAnEnemyTerritoryBranchPatches
 {
     [HarmonyPatch(typeof(Quest), nameof(Quest.MainHeroRaidedAllVillages))]
     [HarmonyPrefix]
-    private static bool MainHeroRaidedAllVillagesPrefix(Quest __instance)
-    {
-        if (!ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher) ||
-            dispatcher.BeforeQuestBranch(__instance, (byte)RaidAnEnemyTerritoryBranch.SuccessfulRaid))
-        {
-            return true;
-        }
-
-        return false;
-    }
+    private static bool MainHeroRaidedAllVillagesPrefix(Quest __instance) =>
+        !ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher) ||
+        dispatcher.BeforeQuestBranch(__instance, (byte)RaidAnEnemyTerritoryBranch.SuccessfulRaid);
 }

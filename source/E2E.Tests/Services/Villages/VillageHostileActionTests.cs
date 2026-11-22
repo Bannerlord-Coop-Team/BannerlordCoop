@@ -20,6 +20,7 @@ using GameInterface.Policies;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.Issues.Quests.RaidAnEnemyTerritory;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.MapEventComponents.Messages;
@@ -73,6 +74,7 @@ using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.ObjectSystem;
 using Xunit.Abstractions;
+using Quest = TaleWorlds.CampaignSystem.Issues.RaidAnEnemyTerritoryIssueBehavior.RaidAnEnemyTerritoryQuest;
 
 namespace E2E.Tests.Services.Villages;
 
@@ -2060,23 +2062,44 @@ public class VillageHostileActionTests : MapEventTestBase
         AssertSlowRaidExit(naturalCompletion: true, lateFinalizeRequest);
     }
 
-    [Fact]
-    public void RaidMapEventUpdate_AdvancesNonHostOwnersQuestAndKeepsItActive()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void RaidMapEventUpdate_OnlyCreditsTheQuestOwnersParty(bool ownerIsRaider)
     {
-        AssertSlowRaidExit(naturalCompletion: true, lateFinalizeRequest: false, trackRaidQuest: true);
+        var ownerClient = ownerIsRaider ? Clients.First() : Clients.Last();
+        var ownerController = ownerIsRaider ? "PlayerOne" : "PlayerTwo";
+        var otherPlayer = ownerIsRaider ? default : CreatePlayerHeroParty(ownerController);
+        var giverId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var expectedCount = ownerIsRaider ? 1 : 0;
+
+        AssertSlowRaidExit(naturalCompletion: true, lateFinalizeRequest: false,
+            beforeRaid: (raider, target) =>
+            {
+                var (heroId, partyId) = ownerIsRaider ? raider : otherPlayer;
+                TestEnvironment.ConnectRegisteredPlayer(ownerClient, ownerController);
+                ownerClient.Resolve<IControllerIdProvider>().SetControllerId(ownerController);
+                AttachRaidQuest(Server, giverId, heroId, partyId, ownerController, target.OwnerFactionId);
+                AttachRaidQuest(ownerClient, giverId, heroId, partyId, ownerController, target.OwnerFactionId);
+            },
+            afterRaid: target =>
+            {
+                Server.Call(() => AssertRaidQuestProgress(Server, giverId, target.SettlementId, expectedCount));
+                ownerClient.Call(() => AssertRaidQuestProgress(ownerClient, giverId, target.SettlementId, expectedCount));
+                var updates = Server.NetworkSentMessages.GetMessages<NetworkRaidAnEnemyTerritoryProgress>();
+                if (ownerIsRaider) Assert.Single(updates);
+                else Assert.Empty(updates);
+            });
     }
 
-    private void AssertSlowRaidExit(bool naturalCompletion, bool lateFinalizeRequest, bool trackRaidQuest = false)
+    private void AssertSlowRaidExit(bool naturalCompletion, bool lateFinalizeRequest,
+        Action<(string heroId, string partyId), VillageTarget>? beforeRaid = null,
+        Action<VillageTarget>? afterRaid = null)
     {
         var client = Clients.First();
         var (ownerHeroId, mobilePartyId) = CreatePlayerHeroParty("PlayerOne");
         var target = CreateVillageTarget();
-        var giverId = trackRaidQuest ? TestEnvironment.CreateRegisteredObject<Hero>() : null;
-        if (trackRaidQuest)
-        {
-            TestEnvironment.ConnectRegisteredPlayer(client, "PlayerOne");
-            client.Resolve<IControllerIdProvider>().SetControllerId("PlayerOne");
-        }
+        beforeRaid?.Invoke((ownerHeroId, mobilePartyId), target);
         var gatePosition = new CampaignVec2(new Vec2(42f, 24f), true);
         var insidePosition = new CampaignVec2(new Vec2(40f, 24f), true);
         string? mapEventId = null;
@@ -2161,11 +2184,6 @@ public class VillageHostileActionTests : MapEventTestBase
                 Assert.True(mapEvent.DefenderSide.LeaderParty.MapFaction.IsAtWarWith(mapEvent.AttackerSide.LeaderParty.MapFaction));
                 Assert.False(mapEvent.DiplomaticallyFinished);
                 Assert.Equal(0, mapEvent.DefenderSide.TroopCount);
-                if (trackRaidQuest)
-                {
-                    AttachRaidQuest(Server, giverId!, ownerHeroId, mobilePartyId, target.SettlementId, target.OwnerFactionId);
-                    AttachRaidQuest(client, giverId!, ownerHeroId, mobilePartyId, target.SettlementId, target.OwnerFactionId);
-                }
                 CampaignEvents.RaidCompletedEvent.AddNonSerializedListener(this, (winner, component) =>
                 {
                     Assert.True(GameThread.Instance.IsGameThread);
@@ -2198,16 +2216,9 @@ public class VillageHostileActionTests : MapEventTestBase
                 Assert.Equal(1, raidCompletedCount);
                 mapEvent.Update();
                 Assert.Equal(1, raidCompletedCount);
-                if (trackRaidQuest)
-                {
-                    AssertRaidQuestProgress(Server, giverId!, target.SettlementId);
-                }
             }, disabledMethods);
 
-            if (trackRaidQuest)
-            {
-                client.Call(() => AssertRaidQuestProgress(client, giverId!, target.SettlementId));
-            }
+            afterRaid?.Invoke(target);
 
             Server.Call(() =>
             {
@@ -4789,7 +4800,7 @@ public class VillageHostileActionTests : MapEventTestBase
     }
 
     private void AttachRaidQuest(EnvironmentInstance instance, string giverId, string ownerHeroId,
-        string ownerPartyId, string settlementId, string enemyKingdomId)
+        string ownerPartyId, string ownerController, string enemyKingdomId)
     {
         // Synthetic givers have no encyclopedia entry; acceptance and journal creation still run.
         instance.Call(() =>
@@ -4797,9 +4808,8 @@ public class VillageHostileActionTests : MapEventTestBase
             Assert.True(instance.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
             Assert.True(instance.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var owner));
             Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var ownerParty));
-            Assert.True(instance.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
             Assert.True(instance.ObjectManager.TryGetObject<Kingdom>(enemyKingdomId, out var enemyKingdom));
-            Assert.True(instance.Resolve<IIssueOwnershipRegistry>().TrySetOwner(giverId, "raid_map_event", "PlayerOne"));
+            Assert.True(instance.Resolve<IIssueOwnershipRegistry>().TrySetOwner(giverId, "raid_map_event", ownerController));
 
             using (new AllowedThread())
             {
@@ -4812,7 +4822,7 @@ public class VillageHostileActionTests : MapEventTestBase
                 issue._issueState = IssueBase.IssueState.SolvingWithQuestSolution;
                 Campaign.Current.IssueManager._issues.Add(giver, issue);
                 giver.OnIssueCreatedForHero(issue);
-                var quest = new RaidAnEnemyTerritoryIssueBehavior.RaidAnEnemyTerritoryQuest(
+                var quest = new Quest(
                     "raid_map_event_quest", giver, CampaignTime.DaysFromNow(60), enemyKingdom);
                 issue.IssueQuest = quest;
                 if (instance != Server)
@@ -4823,29 +4833,29 @@ public class VillageHostileActionTests : MapEventTestBase
             }
             if (instance == Server)
             {
-                var strategy = new GameInterface.Services.Issues.Quests.RaidAnEnemyTerritory.RaidAnEnemyTerritoryQuestSolutionAcceptStrategy();
+                var strategy = new RaidAnEnemyTerritoryQuestSolutionAcceptStrategy();
                 strategy.Apply(giver.Issue, strategy.Capture(giver.Issue));
+                // Reapplying acceptance must keep a single server progress row.
                 strategy.Apply(giver.Issue, strategy.Capture(giver.Issue));
-                var quest = (RaidAnEnemyTerritoryIssueBehavior.RaidAnEnemyTerritoryQuest)giver.Issue.IssueQuest;
+                var quest = (Quest)giver.Issue.IssueQuest;
                 Assert.Same(quest._raidedVillagesTrackLog, Assert.Single(quest.JournalEntries));
                 Assert.Equal(0, quest._raidedVillagesTrackLog.CurrentProgress);
             }
         }, MapEventDisabledMethods
             .Append(AccessTools.Method(typeof(Helpers.StringHelpers), nameof(Helpers.StringHelpers.GetCharacterProperties)))
-            .Append(AccessTools.Method(
-                typeof(RaidAnEnemyTerritoryIssueBehavior.RaidAnEnemyTerritoryQuest), "SetDialogs")));
+            .Append(AccessTools.Method(typeof(Quest), nameof(Quest.SetDialogs))));
     }
 
-    private static void AssertRaidQuestProgress(EnvironmentInstance instance, string giverId, string settlementId)
+    private static void AssertRaidQuestProgress(EnvironmentInstance instance, string giverId, string settlementId, int count)
     {
         Assert.True(instance.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
         Assert.NotNull(giver.Issue);
-        var quest = Assert.IsType<RaidAnEnemyTerritoryIssueBehavior.RaidAnEnemyTerritoryQuest>(giver.Issue.IssueQuest);
+        var quest = Assert.IsType<Quest>(giver.Issue.IssueQuest);
         Assert.True(quest.IsOngoing);
         Assert.True(instance.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
-        Assert.Same(settlement, Assert.Single(quest._raidedVillages));
+        Assert.Equal(count == 1 ? new[] { settlement } : Array.Empty<Settlement>(), quest._raidedVillages);
         var journal = Assert.Single(quest.JournalEntries);
-        Assert.Equal(1, journal.CurrentProgress);
+        Assert.Equal(count, journal.CurrentProgress);
         Assert.Same(journal, quest._raidedVillagesTrackLog);
     }
 

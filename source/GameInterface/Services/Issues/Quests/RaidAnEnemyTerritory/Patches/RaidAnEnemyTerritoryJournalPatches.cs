@@ -1,9 +1,11 @@
 ﻿using Common;
-using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.UI.Notifications;
 using HarmonyLib;
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection.Emit;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Issues;
@@ -33,38 +35,36 @@ internal sealed class RaidAnEnemyTerritoryJournalCreationPatch
 [HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 internal sealed class RaidAnEnemyTerritoryJournalViewPatch
 {
-    [ThreadStatic] internal static bool IsBuildingJournal;
-
-    [HarmonyPrefix]
-    private static void Prefix(out bool __state)
+    [HarmonyTranspiler]
+    private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
     {
-        __state = IsBuildingJournal;
-        IsBuildingJournal = true;
-    }
-
-    [HarmonyFinalizer]
-    private static void Finalizer(bool __state) => IsBuildingJournal = __state;
-}
-
-[HarmonyPatch(typeof(QuestBase), nameof(QuestBase.IsOngoing), MethodType.Getter)]
-[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
-internal sealed class RaidAnEnemyTerritoryActiveJournalPatch
-{
-    [HarmonyPostfix]
-    private static void Postfix(QuestBase __instance, ref bool __result)
-    {
-        if (__result && ModInformation.IsClient && RaidAnEnemyTerritoryJournalViewPatch.IsBuildingJournal && __instance is Quest)
+        var quests = AccessTools.PropertyGetter(typeof(QuestManager), nameof(QuestManager.Quests));
+        var visibleQuests = AccessTools.Method(typeof(RaidAnEnemyTerritoryJournalViewPatch), nameof(GetVisibleQuests));
+        var matches = 0;
+        foreach (var instruction in instructions)
         {
-            __result = IsLocalOwner(__instance);
+            if (instruction.Calls(quests))
+            {
+                matches++;
+                instruction.opcode = OpCodes.Call;
+                instruction.operand = visibleQuests;
+            }
+            yield return instruction;
         }
+
+        if (matches != 1) throw new InvalidOperationException("Raid quest journal call site changed.");
     }
 
-    private static bool IsLocalOwner(QuestBase quest)
+    // Filter the journal's input before vanilla chooses a row. The quest manager still keeps every mirror.
+    private static IEnumerable<QuestBase> GetVisibleQuests(QuestManager manager)
     {
-        var issue = IssueManager.GetIssueOfQuest(quest);
-        return issue != null && ContainerProvider.TryResolve<IIssueOwnerResolver>(out var ownerResolver) &&
-            ContainerProvider.TryResolve<IControllerIdProvider>(out var controller) &&
-            ownerResolver.TryGetOwnerControllerId(issue, out var ownerController) &&
-            ownerController == controller.ControllerId;
+        if (!ModInformation.IsClient)
+        {
+            return manager.Quests;
+        }
+
+        ContainerProvider.TryResolve<IIssueOwnerResolver>(out var owners);
+        return manager.Quests.Where(quest => quest is not Quest ||
+            (owners != null && IssueManager.GetIssueOfQuest(quest) is IssueBase issue && owners.IsLocalOwner(issue)));
     }
 }

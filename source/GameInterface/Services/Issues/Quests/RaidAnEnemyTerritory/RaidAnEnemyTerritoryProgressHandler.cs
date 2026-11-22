@@ -1,12 +1,9 @@
 ﻿using Common;
 using Common.Messaging;
-using Common.Network;
 using Common.Util;
-using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Players;
 using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -19,62 +16,27 @@ namespace GameInterface.Services.Issues.Quests.RaidAnEnemyTerritory;
 internal sealed class RaidAnEnemyTerritoryProgressHandler : IHandler
 {
     private readonly IMessageBroker messageBroker;
-    private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly IIssueResolver issueResolver;
     private readonly IIssueOwnerResolver owners;
-    private readonly IPlayerManager players;
-    private readonly IControllerIdProvider controller;
     private readonly IIssueConversationGuard conversationGuard;
 
     public RaidAnEnemyTerritoryProgressHandler(
         IMessageBroker messageBroker,
-        INetwork network,
         IObjectManager objectManager,
         IIssueResolver issueResolver,
         IIssueOwnerResolver owners,
-        IPlayerManager players,
-        IControllerIdProvider controller,
         IIssueConversationGuard conversationGuard)
     {
         this.messageBroker = messageBroker;
-        this.network = network;
         this.objectManager = objectManager;
         this.issueResolver = issueResolver;
         this.owners = owners;
-        this.players = players;
-        this.controller = controller;
         this.conversationGuard = conversationGuard;
-        messageBroker.Subscribe<RaidAnEnemyTerritoryProgressReady>(HandleProgressReady);
         messageBroker.Subscribe<NetworkRaidAnEnemyTerritoryProgress>(HandleProgress);
     }
 
-    public void Dispose()
-    {
-        messageBroker.Unsubscribe<RaidAnEnemyTerritoryProgressReady>(HandleProgressReady);
-        messageBroker.Unsubscribe<NetworkRaidAnEnemyTerritoryProgress>(HandleProgress);
-    }
-
-    private void HandleProgressReady(MessagePayload<RaidAnEnemyTerritoryProgressReady> payload)
-    {
-        if (ModInformation.IsClient)
-        {
-            return;
-        }
-
-        var data = payload.What;
-        if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _) ||
-            !owners.TryGetOwnerControllerId(issue, out var owner) || !players.TryGetPeer(owner, out var peer))
-        {
-            return;
-        }
-
-        network.Send(peer, new NetworkRaidAnEnemyTerritoryProgress(
-            data.IssueOwnerId,
-            data.IssueId,
-            data.VillageIds,
-            data.Entries));
-    }
+    public void Dispose() => messageBroker.Unsubscribe<NetworkRaidAnEnemyTerritoryProgress>(HandleProgress);
 
     private void HandleProgress(MessagePayload<NetworkRaidAnEnemyTerritoryProgress> payload)
     {
@@ -92,7 +54,7 @@ internal sealed class RaidAnEnemyTerritoryProgressHandler : IHandler
     {
         if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _) ||
             issue.IssueQuest is not Quest quest ||
-            !owners.TryGetOwnerControllerId(issue, out var owner) || owner != controller.ControllerId)
+            !owners.IsLocalOwner(issue))
         {
             return;
         }
