@@ -18,6 +18,7 @@ internal sealed class RaidAnEnemyTerritoryRaidCompletionPatch
 {
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnRaidCompleted))]
     [HarmonyPrefix]
+    // RaidCompletedPostfix credits the owner on the server.
     private static bool OnRaidCompletedPrefix() => false;
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.RaidCompleted))]

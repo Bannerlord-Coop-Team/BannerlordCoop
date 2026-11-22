@@ -25,8 +25,12 @@ internal sealed class RaidAnEnemyTerritoryCreationCaptureStrategy : ICreationCap
     public byte[] Capture(IssueBase issue)
     {
         var raid = (Issue)issue;
-        objectManager.TryGetIdWithLogging(raid._enemyKingdom, out var enemyKingdomId);
-        return Write(enemyKingdomId ?? string.Empty);
+        if (!objectManager.TryGetIdWithLogging(raid._enemyKingdom, out var enemyKingdomId))
+        {
+            throw new InvalidOperationException("The raid issue enemy kingdom is not registered");
+        }
+
+        return Write(enemyKingdomId);
     }
 
     public IssueBase CreateIssue(Hero issueOwner, byte[] captured)
@@ -56,13 +60,12 @@ internal sealed class RaidAnEnemyTerritoryCreationCaptureStrategy : ICreationCap
 
         var enemyKingdom = Campaign.Current.Kingdoms.FirstOrDefault(kingdom =>
             kingdom != issueOwner.MapFaction && kingdom.IsAtWarWith(issueOwner.MapFaction));
-        if (enemyKingdom == null)
+        if (enemyKingdom == null || !objectManager.TryGetIdWithLogging(enemyKingdom, out var enemyKingdomId))
         {
             return false;
         }
 
-        objectManager.TryGetIdWithLogging(enemyKingdom, out var enemyKingdomId);
-        captured = Write(enemyKingdomId ?? string.Empty);
+        captured = Write(enemyKingdomId);
         return true;
     }
 

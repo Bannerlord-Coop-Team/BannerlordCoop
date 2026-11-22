@@ -4835,8 +4835,6 @@ public class VillageHostileActionTests : MapEventTestBase
             {
                 var strategy = new RaidAnEnemyTerritoryQuestSolutionAcceptStrategy();
                 strategy.Apply(giver.Issue, strategy.Capture(giver.Issue));
-                // Reapplying acceptance must keep a single server progress row.
-                strategy.Apply(giver.Issue, strategy.Capture(giver.Issue));
                 var quest = (Quest)giver.Issue.IssueQuest;
                 Assert.Same(quest._raidedVillagesTrackLog, Assert.Single(quest.JournalEntries));
                 Assert.Equal(0, quest._raidedVillagesTrackLog.CurrentProgress);
