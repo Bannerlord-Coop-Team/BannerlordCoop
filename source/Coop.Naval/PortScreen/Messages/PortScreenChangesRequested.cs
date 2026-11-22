@@ -23,6 +23,8 @@ public readonly struct PortScreenChangesRequested : IEvent
     public readonly MBReadOnlyList<PortScreenHandler.ShipUpgradePieceInfo> SelectedShipPieces;
     public readonly MBReadOnlyList<PortScreenHandler.ShipFigureheadInfo> SelectedFigureheads;
     public readonly MBReadOnlyList<Ship> ShipsToSend;
+    public readonly MBReadOnlyList<Ship> ShipsToStash;
+    public readonly MBReadOnlyList<Ship> ShipsToRetrieveFromStash;
 
     public PortScreenChangesRequested(
         PortScreenMode mode,
@@ -37,7 +39,9 @@ public readonly struct PortScreenChangesRequested : IEvent
         MBReadOnlyList<PortScreenHandler.ShipRenameInfo> shipsToRename,
         MBReadOnlyList<PortScreenHandler.ShipUpgradePieceInfo> selectedShipPieces,
         MBReadOnlyList<PortScreenHandler.ShipFigureheadInfo> selectedFigureheads,
-        MBReadOnlyList<Ship> shipsToSend)
+        MBReadOnlyList<Ship> shipsToSend,
+        MBReadOnlyList<Ship> shipsToStash,
+        MBReadOnlyList<Ship> shipsToRetrieveFromStash)
     {
         Mode = mode;
         RightOwner = rightOwner;
@@ -52,5 +56,7 @@ public readonly struct PortScreenChangesRequested : IEvent
         SelectedShipPieces = selectedShipPieces;
         SelectedFigureheads = selectedFigureheads;
         ShipsToSend = shipsToSend;
+        ShipsToStash = shipsToStash;
+        ShipsToRetrieveFromStash = shipsToRetrieveFromStash;
     }
 }

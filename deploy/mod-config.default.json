@@ -297,6 +297,17 @@
     // Values from 1 to 9 count as 10. The time starts again after every answer. Trades are never timed.
     "pvpResponseTimerSeconds": 0,
 
+    // Set the most clans one kingdom may have, so one kingdom can't take every clan on a big server.
+    // (Default) 0: No limit.
+    // Above 0: The ruling clan counts too. A full kingdom can't take a player as a vassal, and its ruler can't recruit another lord or make a companion a lord.
+    // The player who asked is told why. Clans already in a kingdom always stay, and new kingdoms and rebellions work as before.
+    "maxClansPerKingdom": 0,
+
+    // Count mercenary clans toward maxClansPerKingdom.
+    // (Default) false: Mercenaries don't count, so a full kingdom can still hire them and a player can still sign on as one.
+    // true: Mercenaries count, and a full kingdom can't take on another mercenary either.
+    "maxClansPerKingdomCountsMercenaries": false,
+
     // Toggle War Sails (NavalDLC) co-op on a dedicated server. War Sails is not officially supported yet.
     // Only the dedicated server reads this. Hosting in game and joining follow the launcher's NavalDLC setting.
     // (Default) false: the dedicated server runs without NavalDLC.

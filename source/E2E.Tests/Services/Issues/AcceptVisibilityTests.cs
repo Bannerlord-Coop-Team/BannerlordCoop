@@ -14,7 +14,6 @@ using GameInterface.Services.Issues.Framework.AcceptCoordination;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Framework.Registries;
-using GameInterface.Services.Issues.Framework.Visibility;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.LogEntries;
@@ -235,8 +234,8 @@ public class AcceptVisibilityTests : IDisposable
         Owner.SimulateMessage(this, accepted);
         Other.SimulateMessage(this, accepted);
 
-        Owner.Call(() => Assert.False(QuestScreenIssueFilterPatch.IsAnotherPlayersTroopsMission(ownerIssue)));
-        Other.Call(() => Assert.True(QuestScreenIssueFilterPatch.IsAnotherPlayersTroopsMission(otherIssue)));
+        Owner.Call(() => Assert.False(Owner.Resolve<IIssueMissionVisibility>().IsAnotherPlayersTroopsMission(ownerIssue)));
+        Other.Call(() => Assert.True(Other.Resolve<IIssueMissionVisibility>().IsAnotherPlayersTroopsMission(otherIssue)));
     }
 
     private static void LoadTroopsMissionFromSave(EnvironmentInstance instance, IssueBase issue, string troopId)
@@ -274,7 +273,7 @@ public class AcceptVisibilityTests : IDisposable
             Assert.True(otherIssue.AlternativeSolutionSentTroops.TotalManCount > 0);
             Assert.True(Other.Resolve<IIssueOwnershipRegistry>().TryGetOwner(notableId, IssueId, out var ownerControllerId));
             Assert.Equal(OwnerControllerId, ownerControllerId);
-            Assert.True(QuestScreenIssueFilterPatch.IsAnotherPlayersTroopsMission(otherIssue));
+            Assert.True(Other.Resolve<IIssueMissionVisibility>().IsAnotherPlayersTroopsMission(otherIssue));
         });
     }
 
@@ -287,11 +286,11 @@ public class AcceptVisibilityTests : IDisposable
         ServerKnowsTheOwner(notableId);
         LoadTroopsMissionFromSave(Owner, ownerIssue, troopId);
 
-        Owner.Call(() => Assert.True(QuestScreenIssueFilterPatch.IsAnotherPlayersTroopsMission(ownerIssue)));
+        Owner.Call(() => Assert.True(Owner.Resolve<IIssueMissionVisibility>().IsAnotherPlayersTroopsMission(ownerIssue)));
 
         Server.SimulateMessage(this, new PlayerCampaignEntered(Owner.NetPeer));
 
-        Owner.Call(() => Assert.False(QuestScreenIssueFilterPatch.IsAnotherPlayersTroopsMission(ownerIssue)));
+        Owner.Call(() => Assert.False(Owner.Resolve<IIssueMissionVisibility>().IsAnotherPlayersTroopsMission(ownerIssue)));
     }
 
     [Fact]
