@@ -3,8 +3,10 @@ using GameInterface.Services.MapEvents;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MapEvents.Patches;
 using HarmonyLib;
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameComponents;
@@ -140,22 +142,64 @@ internal class DefaultMobilePartyAIModelPatches
 
     // Vanilla zeroes an AI party's attack scores while a main party stronger than itself is near it. The server has
     // no main party on the map, so the same check runs for active player parties; a parked offline party doesn't count.
-    [HarmonyPatch(nameof(DefaultMobilePartyAIModel.CalculateInitiativeScoresForEnemy))]
-    [HarmonyPostfix]
-    private static void CalculateInitiativeScoresForEnemy_Postfix(
-        MobileParty mobileParty,
-        MobileParty enemyParty,
-        ref float attackScore)
+    [HarmonyPatch(nameof(DefaultMobilePartyAIModel.GetBestInitiativeBehavior))]
+    [HarmonyTranspiler]
+    private static IEnumerable<CodeInstruction> GetBestInitiativeBehavior_Transpiler(
+        IEnumerable<CodeInstruction> instructions,
+        ILGenerator generator)
     {
-        if (attackScore <= 0f) return;
-        if (!IsStrongerPlayerPartyNearby(mobileParty, enemyParty)) return;
+        var codes = new List<CodeInstruction>(instructions);
+        var scoreEnemy = AccessTools.Method(typeof(DefaultMobilePartyAIModel),
+            nameof(DefaultMobilePartyAIModel.CalculateInitiativeScoresForEnemy));
+        var scoreWithNearbyPlayers = AccessTools.Method(typeof(DefaultMobilePartyAIModelPatches),
+            nameof(ScoreEnemyWithNearbyPlayers));
+        int callIndex = codes.FindIndex(code => code.Calls(scoreEnemy));
+        if (callIndex < 0 || callIndex != codes.FindLastIndex(code => code.Calls(scoreEnemy)))
+            throw new InvalidOperationException("Expected one enemy scoring call in GetBestInitiativeBehavior.");
 
-        attackScore = 0f;
+        // This local belongs to one attacker decision and stays null until an enemy has a positive attack score.
+        var nearbyPlayers = generator.DeclareLocal(typeof(IReadOnlyList<MobileParty>));
+        var loadNearbyPlayers = new CodeInstruction(OpCodes.Ldloca, nearbyPlayers);
+        codes[callIndex].MoveLabelsTo(loadNearbyPlayers).MoveBlocksTo(loadNearbyPlayers);
+        codes[callIndex] = new CodeInstruction(OpCodes.Call, scoreWithNearbyPlayers);
+        codes.Insert(callIndex, loadNearbyPlayers);
+        return codes;
     }
 
-    // Searches the parties GetBestInitiativeBehavior checks around the attacker for a stronger player party.
-    private static bool IsStrongerPlayerPartyNearby(MobileParty mobileParty, MobileParty enemyParty)
+    private static void ScoreEnemyWithNearbyPlayers(
+        DefaultMobilePartyAIModel model,
+        MobileParty mobileParty,
+        MobileParty enemyParty,
+        out float avoidScore,
+        out float attackScore,
+        float localAdvantage,
+        float maxAggressiveness,
+        ref IReadOnlyList<MobileParty> nearbyPlayers)
     {
+        model.CalculateInitiativeScoresForEnemy(mobileParty, enemyParty, out avoidScore, out attackScore, localAdvantage, maxAggressiveness);
+        SuppressAttackNearStrongerPlayer(mobileParty, enemyParty, ref attackScore, ref nearbyPlayers);
+    }
+
+    internal static void SuppressAttackNearStrongerPlayer(
+        MobileParty mobileParty,
+        MobileParty enemyParty,
+        ref float attackScore,
+        ref IReadOnlyList<MobileParty> nearbyPlayers)
+    {
+        if (attackScore <= 0f) return;
+
+        nearbyPlayers ??= FindNearbyPlayerParties(mobileParty);
+        for (int i = 0; i < nearbyPlayers.Count; i++)
+        {
+            if (!IsStrongerPlayerParty(nearbyPlayers[i], mobileParty, enemyParty)) continue;
+            attackScore = 0f;
+            return;
+        }
+    }
+
+    private static IReadOnlyList<MobileParty> FindNearbyPlayerParties(MobileParty mobileParty)
+    {
+        List<MobileParty> nearbyPlayers = null;
         var searchData = MobileParty.StartFindingLocatablesAroundPosition(
             mobileParty.Position.ToVec2(),
             NearbyPartySearchRadius(mobileParty));
@@ -164,10 +208,12 @@ internal class DefaultMobilePartyAIModelPatches
              party != null;
              party = MobileParty.FindNextLocatable(ref searchData))
         {
-            if (IsStrongerPlayerParty(party, mobileParty, enemyParty)) return true;
+            if (!party.IsActive || !party.IsPlayerParty()) continue;
+            nearbyPlayers ??= new List<MobileParty>();
+            nearbyPlayers.Add(party);
         }
 
-        return false;
+        return nearbyPlayers ?? (IReadOnlyList<MobileParty>)Array.Empty<MobileParty>();
     }
 
     // The radius GetBestInitiativeBehavior searches around the attacker, wider for sea patrols and port defenders.
@@ -190,9 +236,8 @@ internal class DefaultMobilePartyAIModelPatches
     }
 
     // Vanilla's stronger main party check and the skips it runs before it, read for an active player party.
-    internal static bool IsStrongerPlayerParty(MobileParty party, MobileParty mobileParty, MobileParty enemyParty)
+    private static bool IsStrongerPlayerParty(MobileParty party, MobileParty mobileParty, MobileParty enemyParty)
     {
-        if (!party.IsActive || !party.IsPlayerParty()) return false;
         if (party.BesiegedSettlement != null && party.MapFaction == mobileParty.MapFaction) return false;
         if (party.MapEvent != null && party.MapEvent != enemyParty.MapEvent) return false;
         if (party.AttachedTo != null || party.IsInNavalAutoTravel) return false;
