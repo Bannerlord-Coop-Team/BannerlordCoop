@@ -13,6 +13,7 @@ internal class MobilePartyCollectionPatches : GenericPatches<MobilePartyCollecti
 {
     static IEnumerable<MethodBase> TargetMethods()
     {
+        // MobilePartyMapUpdatePatch owns CheckAiForMapChangeAndUpdateIfNeeded.
         return AccessTools.GetDeclaredMethods(typeof(MobileParty))
             .Where(method => method.Name != nameof(MobileParty.CheckAiForMapChangeAndUpdateIfNeeded));
     }
