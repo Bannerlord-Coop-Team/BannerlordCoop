@@ -1455,4 +1455,34 @@
       </EquipmentRoster>
     </Equipments>
   </NPCCharacter>
+  <NPCCharacter
+    id="coop_fixed_npc_deb62868"
+    name="{=!}Butterman"
+    default_group="Infantry"
+    level="1"
+    is_female="false"
+    is_hero="false"
+    is_template="false"
+    occupation="Townsfolk"
+    culture="Culture.battania"
+    is_hidden_encyclopedia="true"
+    coop_settlement="town_B1"
+    coop_location="tavern"
+    coop_spawn_tag="npc_common"
+    coop_dialogue="would you like to hear the story of the Butter Lord"
+    coop_enabled="true">
+    <face>
+      <face_key_template value="BodyProperty.townsman_vlandia" />
+    </face>
+    <skills />
+    <Equipments>
+      <EquipmentRoster civilian="true">
+        <equipment slot="Head" id="Item.empire_jewelled_helmet" />
+        <equipment slot="Cape" id="Item.noble_pauldron" />
+        <equipment slot="Body" id="Item.ringed_desert_armor" />
+        <equipment slot="Gloves" id="Item.lordly_mail_mitten" />
+        <equipment slot="Leg" id="Item.northern_plated_boots" />
+      </EquipmentRoster>
+    </Equipments>
+  </NPCCharacter>
 </NPCCharacters>
