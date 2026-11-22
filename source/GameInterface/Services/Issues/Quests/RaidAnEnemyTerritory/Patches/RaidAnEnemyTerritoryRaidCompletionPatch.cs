@@ -24,10 +24,12 @@ internal sealed class RaidAnEnemyTerritoryRaidCompletionPatch
     [HarmonyPostfix]
     private static void RaidCompletedPostfix(BattleSideEnum winnerSide, RaidEventComponent raidEvent)
     {
-        var mapEvent = raidEvent?.MapEvent;
-        var village = mapEvent?.MapEventSettlement;
-        if (ModInformation.IsClient || winnerSide != BattleSideEnum.Attacker ||
-            village?.IsVillage != true || village.SettlementHitPoints != 0f ||
+        if (ModInformation.IsClient) return;
+
+        var mapEvent = raidEvent.MapEvent;
+        var village = mapEvent.MapEventSettlement;
+        var lootedVillage = winnerSide == BattleSideEnum.Attacker && village.IsVillage && village.SettlementHitPoints == 0f;
+        if (!lootedVillage ||
             !ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher) ||
             !ContainerProvider.TryResolve<IRaidAnEnemyTerritoryProgress>(out var progress))
         {

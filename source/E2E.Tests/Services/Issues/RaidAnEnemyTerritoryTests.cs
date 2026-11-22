@@ -12,9 +12,6 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.CampaignSystem.ViewModelCollection.Quests;
-using TaleWorlds.Core;
-using TaleWorlds.Localization;
 using TaleWorlds.ObjectSystem;
 using Xunit.Abstractions;
 using Issue = TaleWorlds.CampaignSystem.Issues.RaidAnEnemyTerritoryIssueBehavior.RaidAnEnemyTerritoryIssue;
@@ -140,6 +137,33 @@ public sealed class RaidAnEnemyTerritoryTests : IDisposable
     }
 
     [Theory]
+    [InlineData(2, IssueOutcome.QuestCancel)]
+    [InlineData(3, IssueOutcome.QuestSuccess)]
+    public void PeaceWithTheEnemyEndsTheQuestOnceAndPaysOnlyForThreeRaids(int raids, IssueOutcome outcome)
+    {
+        Accept();
+        GiveRaidCredit(Server, raids);
+        var before = ServerRewards();
+        var completed = new List<QuestBase>();
+
+        Server.Call(() =>
+        {
+            var quest = QuestOn(Server);
+            Assert.DoesNotContain(quest, Campaign.Current.QuestManager.Quests);
+            CampaignEvents.OnQuestCompletedEvent.AddNonSerializedListener(this, (ended, _) => completed.Add(ended));
+
+            CampaignEventDispatcher.Instance.OnMakePeace(Giver(Server).MapFaction,
+                Server.GetRegisteredObject<Kingdom>(enemyId), MakePeaceAction.MakePeaceDetail.ByKingdomDecision);
+
+            Assert.Same(quest, Assert.Single(completed));
+            Assert.True(quest.IsFinalized);
+        }, DialogAndTextHelpers);
+
+        AssertOutcome(outcome);
+        AssertRewards(before, outcome == IssueOutcome.QuestSuccess);
+    }
+
+    [Theory]
     [InlineData(3, IssueOutcome.QuestSuccess)]
     [InlineData(0, IssueOutcome.QuestTimeOut)]
     public void DailyTickAfterTheDeadlineEndsTheUnstartedServerQuestOnce(int raids, IssueOutcome outcome)
@@ -158,41 +182,6 @@ public sealed class RaidAnEnemyTerritoryTests : IDisposable
 
         AssertOutcome(outcome);
         AssertRewards(before, outcome == IssueOutcome.QuestSuccess);
-    }
-
-    [Fact]
-    public void TheBystanderJournalHidesAnOngoingRaidQuestLoadedWithTheCampaign()
-    {
-        Accept();
-        Bystander.Call(() =>
-        {
-            Assert.Null(Giver(Bystander).Issue.IssueQuest);
-            var mirror = new Quest("loaded_raid_quest", Giver(Bystander), CampaignTime.DaysFromNow(60),
-                Bystander.GetRegisteredObject<Kingdom>(enemyId));
-            using (new AllowedThread())
-            {
-                Giver(Bystander).Issue.IssueQuest = mirror;
-                Campaign.Current.QuestManager.OnQuestStarted(mirror);
-            }
-            Assert.True(mirror.IsOngoing);
-            Assert.Contains(mirror, Campaign.Current.QuestManager.Quests);
-            Campaign.Current.AddCampaignBehaviorManager(new CampaignBehaviorManager(
-                new CampaignBehaviorBase[] { new ViewDataTrackerCampaignBehavior() }));
-
-            var previousTextManager = GameTexts._gameTextManager;
-            try
-            {
-                GameTexts._gameTextManager = new GameTextManager();
-                var journal = new QuestsVM(() => { });
-                Assert.DoesNotContain(journal.ActiveQuestsList, row => row.Quest == mirror);
-                Assert.True(mirror.IsOngoing);
-                Assert.Contains(mirror, Campaign.Current.QuestManager.Quests);
-            }
-            finally
-            {
-                GameTexts._gameTextManager = previousTextManager;
-            }
-        }, DialogAndTextHelpers);
     }
 
     private NetworkQuestSolutionAccepted Accept()

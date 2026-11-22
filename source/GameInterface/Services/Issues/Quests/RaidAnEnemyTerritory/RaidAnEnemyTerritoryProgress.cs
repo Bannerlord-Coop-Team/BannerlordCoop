@@ -1,6 +1,5 @@
 ﻿using Common.Logging;
 using Common.Network;
-using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
@@ -8,6 +7,7 @@ using GameInterface.Services.Players;
 using Serilog;
 using System.Collections.Generic;
 using System.Linq;
+using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using Quest = TaleWorlds.CampaignSystem.Issues.RaidAnEnemyTerritoryIssueBehavior.RaidAnEnemyTerritoryQuest;
@@ -42,17 +42,25 @@ internal sealed class RaidAnEnemyTerritoryProgress : IRaidAnEnemyTerritoryProgre
         var issue = quest.QuestGiver.Issue;
         if (quest.IsFinalized || quest._raidedVillages.Contains(village) || issue == null ||
             !owners.TryResolveOwnerParty(issue, out var ownerParty) ||
-            (!attackers.Contains(ownerParty) &&
-             !attackers.Contains(ResolvedMainHeroContext.ResolvedMainHero?.PartyBelongedTo)))
+            !owners.TryResolveOwnerHero(issue, out var ownerHero))
         {
             return;
         }
+
+        // The owner can raid with a party other than their registered party.
+        var ownerRaided = attackers.Contains(ownerParty) || attackers.Contains(ownerHero.PartyBelongedTo);
+        if (!ownerRaided) return;
 
         quest._raidedVillages.Add(village);
         quest._raidedVillagesTrackLog?.UpdateCurrentProgress(quest._raidedVillages.Count);
         Logger.Debug("Raid quest progress issue={issue} giver={giver} count={count} village={village}",
             issue.StringId, quest.QuestGiver.StringId, quest._raidedVillages.Count, village.StringId);
 
+        SendProgress(quest, issue);
+    }
+
+    private void SendProgress(Quest quest, IssueBase issue)
+    {
         if (!owners.TryGetOwnerControllerId(issue, out var owner) || !players.TryGetPeer(owner, out var peer) ||
             !objectManager.TryGetIdWithLogging(quest.QuestGiver, out var giverId))
         {

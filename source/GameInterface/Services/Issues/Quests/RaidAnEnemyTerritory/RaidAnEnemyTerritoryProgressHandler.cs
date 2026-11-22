@@ -40,11 +40,6 @@ internal sealed class RaidAnEnemyTerritoryProgressHandler : IHandler
 
     private void HandleProgress(MessagePayload<NetworkRaidAnEnemyTerritoryProgress> payload)
     {
-        if (ModInformation.IsServer)
-        {
-            return;
-        }
-
         var data = payload.What;
         GameThread.RunSafe(() => conversationGuard.RunInOrder(() => Apply(data), data.IssueOwnerId),
             context: nameof(RaidAnEnemyTerritoryProgressHandler));
@@ -59,12 +54,15 @@ internal sealed class RaidAnEnemyTerritoryProgressHandler : IHandler
             return;
         }
 
-        var villages = (data.VillageIds ?? Array.Empty<string>())
-            .Select(id => objectManager.TryGetObjectWithLogging<Settlement>(id, out var village) ? village : null)
-            .ToArray();
-        if (villages.Any(village => village == null))
+        var villageIds = data.VillageIds ?? Array.Empty<string>();
+        var villages = new Settlement[villageIds.Length];
+        for (var index = 0; index < villageIds.Length; index++)
         {
-            return;
+            if (!objectManager.TryGetObjectWithLogging<Settlement>(villageIds[index], out var village))
+            {
+                return;
+            }
+            villages[index] = village;
         }
 
         using (new AllowedThread())
