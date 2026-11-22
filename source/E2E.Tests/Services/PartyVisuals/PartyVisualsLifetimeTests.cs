@@ -1,7 +1,9 @@
 ﻿using Common.Messaging;
 using E2E.Tests.Environment;
+using GameInterface.Services.PartyVisuals.Interfaces;
 using GameInterface.Services.PartyVisuals.Messages;
 using SandBox.View.Map.Visuals;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using Xunit.Abstractions;
 
@@ -18,6 +20,88 @@ namespace E2E.Tests.Services.PartyVisuals
         public void Dispose()
         {
             TestEnvironment.Dispose();
+        }
+
+        [Fact]
+        public void HeadlessLifetime_UsesPartyHandleWithoutRegisteringVisualObjects()
+        {
+            var server = TestEnvironment.Server;
+            var client = TestEnvironment.Clients.First();
+            var created = new List<NetworkCreatePartyVisual>();
+            var destroyed = new List<NetworkDestroyPartyVisual>();
+            client.Resolve<IMessageBroker>().Subscribe<NetworkCreatePartyVisual>(payload => created.Add(payload.What));
+            client.Resolve<IMessageBroker>().Subscribe<NetworkDestroyPartyVisual>(payload => destroyed.Add(payload.What));
+
+            var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+            uint partyHandle = 0;
+            server.Call(() =>
+            {
+                Assert.True(server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+                Assert.True(server.ObjectManager.TryGetHandle(party, out partyHandle));
+                Assert.DoesNotContain(server.ObjectManager.GetHandleMap().Values, handle =>
+                    server.ObjectManager.TryGetObject<object>(handle, out var value) && value is MobilePartyVisual);
+                party.RemoveParty();
+            });
+
+            var createdVisual = Assert.Single(created);
+            Assert.Null(createdVisual.PartyVisualId);
+            Assert.Equal(0u, createdVisual.PartyVisualHandle);
+            Assert.Equal(partyHandle, createdVisual.MobilePartyHandle);
+            Assert.Equal(partyHandle, Assert.Single(destroyed).MobilePartyHandle);
+        }
+
+        [Fact]
+        public void RecreatingAHeadlessVisual_QueuesModelRefreshForTheExistingClientParty()
+        {
+            var server = TestEnvironment.Server;
+            var client = TestEnvironment.Clients.First();
+            var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var clientParty));
+
+            client.Call(() => clientParty.Party.OnVisualsUpdated());
+
+            server.Call(() =>
+            {
+                Assert.True(server.ObjectManager.TryGetObject<MobileParty>(partyId, out var serverParty));
+                var visuals = server.Resolve<IPartyVisualInterface>();
+                visuals.RemoveVisual(serverParty);
+                visuals.CreateVisual(serverParty);
+            });
+
+            client.Call(() => Assert.True(clientParty.Party.IsVisualDirty));
+        }
+
+        [Fact]
+        public void ReplicatedPartyActivity_RefreshesTheClientNameplateOncePerChange()
+        {
+            var server = TestEnvironment.Server;
+            var client = TestEnvironment.Clients.First();
+            var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+            Assert.True(server.ObjectManager.TryGetObject<MobileParty>(partyId, out var serverParty));
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var clientParty));
+            var activityAtRefresh = new List<bool>();
+
+            client.Call(() =>
+            {
+                Assert.True(clientParty.IsActive);
+                CampaignEvents.PartyVisibilityChangedEvent.AddNonSerializedListener(this, party =>
+                {
+                    if (ReferenceEquals(party, clientParty.Party))
+                        activityAtRefresh.Add(clientParty.IsActive);
+                });
+            });
+
+            try
+            {
+                server.Call(() => serverParty.IsActive = false);
+                server.Call(() => serverParty.IsActive = true);
+
+                Assert.Equal(new[] { false, true }, activityAtRefresh);
+            }
+            finally
+            {
+                client.Call(() => CampaignEvents.PartyVisibilityChangedEvent.ClearListeners(this));
+            }
         }
 
         [Fact]
