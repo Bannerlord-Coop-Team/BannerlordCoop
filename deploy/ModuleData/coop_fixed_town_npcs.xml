@@ -1425,4 +1425,34 @@
       </EquipmentRoster>
     </Equipments>
   </NPCCharacter>
+  <NPCCharacter
+    id="coop_fixed_npc_d6f2ca07"
+    name="{=!}Trimothy"
+    default_group="Infantry"
+    level="1"
+    is_female="false"
+    is_hero="false"
+    is_template="false"
+    occupation="Townsfolk"
+    culture="Culture.aserai"
+    is_hidden_encyclopedia="true"
+    coop_settlement="town_A5"
+    coop_location="tavern"
+    coop_spawn_tag="npc_common"
+    coop_dialogue="Can I touch the seal?"
+    coop_enabled="true">
+    <face>
+      <face_key_template value="BodyProperty.townsman_aserai" />
+    </face>
+    <skills />
+    <Equipments>
+      <EquipmentRoster civilian="true">
+        <equipment slot="Head" id="Item.headscarf_d" />
+        <equipment slot="Cape" id="Item.leopard_pelt" />
+        <equipment slot="Body" id="Item.long_desert_robe" />
+        <equipment slot="Gloves" id="Item.roughtied_leather_bracers" />
+        <equipment slot="Leg" id="Item.sturgia_boots_b" />
+      </EquipmentRoster>
+    </Equipments>
+  </NPCCharacter>
 </NPCCharacters>
