@@ -27,7 +27,7 @@ public class CoopNavalPatchBindingTests
         AccessTools.Method(typeof(FerryCampaignBehaviorPatches), nameof(FerryCampaignBehaviorPatches.PlayerFerryStateMenuOnTickPrefix)),
         AccessTools.Method(typeof(FerryCampaignBehaviorPatches), nameof(FerryCampaignBehaviorPatches.PlayerFerryStateEndContinueOnConsequencePrefix)),
         AccessTools.Method(typeof(NavalDLCFigureheadCampaignBehaviorPatches), "OnFigureheadUnlockedPrefix"),
-        // Naval incidents stay off on both sides until they're synced (#4731)
+        // The vanilla naval roller stays off on both sides because IncidentsCampaignBehaviourInterface rolls those triggers per player on the server
         AccessTools.Method(typeof(NavalIncidentsCampaignBehaviourPatches), nameof(NavalIncidentsCampaignBehaviourPatches.TryInvokeIncidentPrefix)),
     };
 

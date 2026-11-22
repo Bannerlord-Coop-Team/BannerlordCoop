@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Locations;
 using GameInterface.Services.Locations.Conversations;
+using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MobileParties.Extensions;
@@ -277,8 +278,7 @@ internal class PvPInteractionClientHandler : IHandler
 
         var encounter = PlayerEncounter.Current;
         if (IsMapEventId(encounter?._mapEvent, message.MapEventId) ||
-            IsMapEventId(GetPlayerEncounterBattle(), message.MapEventId) ||
-            IsMapEventId(GetPlayerEncounterEncounteredBattle(), message.MapEventId))
+            IsMapEventId(encounter?.GetEncounteredBattleOrNull(), message.MapEventId))
         {
             if (IsLocalParty(encounter?._attackerParty))
                 party = encounter._attackerParty;
@@ -346,30 +346,6 @@ internal class PvPInteractionClientHandler : IHandler
 
     private static string FormatIds(string[] ids)
         => ids == null || ids.Length == 0 ? "<none>" : string.Join(",", ids);
-
-    private static MapEvent GetPlayerEncounterBattle()
-    {
-        try
-        {
-            return PlayerEncounter.Battle;
-        }
-        catch (NullReferenceException)
-        {
-            return null;
-        }
-    }
-
-    private static MapEvent GetPlayerEncounterEncounteredBattle()
-    {
-        try
-        {
-            return PlayerEncounter.EncounteredBattle;
-        }
-        catch (NullReferenceException)
-        {
-            return null;
-        }
-    }
 
     /// <summary>The defender was added to the map event (battle started); drop the popup — the battle menu blocks them now.</summary>
     private void Handle_NetworkHidePvpPopup(MessagePayload<NetworkHidePvpPopup> payload)

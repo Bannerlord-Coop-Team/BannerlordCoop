@@ -15,6 +15,7 @@ using GameInterface.Configuration;
 using GameInterface.Registry;
 using GameInterface.Serialization;
 using GameInterface.Services;
+using GameInterface.Services.Villages;
 using GameInterface.Services.Armies;
 using GameInterface.Services.Alleys;
 using GameInterface.Services.Bandits;
@@ -180,6 +181,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<BinaryPackageFactory>().As<IBinaryPackageFactory>().SingleInstance();
         builder.RegisterType<ControllerIdProvider>().As<IControllerIdProvider>().SingleInstance();
         builder.RegisterType<TimeControlModeConverter>().As<ITimeControlModeConverter>().SingleInstance();
+        builder.RegisterType<OrderAttackRule>().As<IOrderAttackRule>().InstancePerDependency();
         builder.RegisterType<RomanceRetryHistory>().As<IRomanceRetryHistory>().SingleInstance();
         builder.RegisterType<RomanceRetryCooldown>().As<IRomanceRetryCooldown>().InstancePerDependency();
         builder.RegisterType<Services.Crime.CrimeRatingService>().As<Services.Crime.ICrimeRatingService>().InstancePerDependency();
@@ -260,6 +262,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<SiegeDefenderCommandAuthority>().As<ISiegeDefenderCommandAuthority>().InstancePerDependency();
         builder.RegisterType<AiSiegeTerminalPolicy>().As<IAiSiegeTerminalPolicy>().SingleInstance();
         builder.RegisterType<SiegeFinalizeTracker>().As<ISiegeFinalizeTracker>().InstancePerLifetimeScope();
+        builder.RegisterType<ClientVillageHostileActionTracker>().As<IClientVillageHostileActionTracker>().InstancePerLifetimeScope();
         builder.RegisterType<SiegeEventGraphSynchronizer>().As<ISiegeEventGraphSynchronizer>().InstancePerDependency();
         builder.RegisterType<MapEventContributionBarrier>().As<IMapEventContributionBarrier>().InstancePerDependency();
         builder.RegisterType<SiegeBreakOut>().As<ISiegeBreakOut>().InstancePerDependency();

@@ -66,6 +66,8 @@ internal class PortScreenChangesHandler : IHandler
         if (!TryConvertList<ShipUpgradePieceInfo, ShipUpgradePieceData>(data.SelectedShipPieces, TryPackChangeInfo, out var packedSelectedShipPieces)) return;
         if (!TryConvertList<ShipFigureheadInfo, ShipFigureheadData>(data.SelectedFigureheads, TryPackChangeInfo, out var packedSelectedFigureheads)) return;
         if (!TryConvertList<Ship, uint>(data.ShipsToSend, objectManager.TryGetHandleWithLogging, out var packedShipsToSend)) return;
+        if (!TryConvertList<Ship, uint>(data.ShipsToStash, objectManager.TryGetHandleWithLogging, out var packedShipsToStash)) return;
+        if (!TryConvertList<Ship, uint>(data.ShipsToRetrieveFromStash, objectManager.TryGetHandleWithLogging, out var packedShipsToRetrieveFromStash)) return;
 
         var message = new NetworkPortScreenChangesRequested(
             data.Mode,
@@ -80,7 +82,9 @@ internal class PortScreenChangesHandler : IHandler
             packedShipsToRename,
             packedSelectedShipPieces,
             packedSelectedFigureheads,
-            packedShipsToSend);
+            packedShipsToSend,
+            packedShipsToStash,
+            packedShipsToRetrieveFromStash);
 
         network.SendAll(message);
     }
@@ -111,6 +115,8 @@ internal class PortScreenChangesHandler : IHandler
             if (!TryConvertList<ShipUpgradePieceData, ShipUpgradePieceInfo>(data.PackedSelectedShipPieces, TryUnpackChangeInfo, out var selectedShipPieces)) return;
             if (!TryConvertList<ShipFigureheadData, ShipFigureheadInfo>(data.PackedSelectedFigureheads, TryUnpackChangeInfo, out var selectedFigureheads)) return;
             if (!TryConvertList<uint, Ship>(data.PackedShipsToSend, objectManager.TryGetObjectWithLogging, out var shipsToSend)) return;
+            if (!TryConvertList<uint, Ship>(data.PackedShipsToStash, objectManager.TryGetObjectWithLogging, out var shipsToStash)) return;
+            if (!TryConvertList<uint, Ship>(data.PackedShipsToRetrieveFromStash, objectManager.TryGetObjectWithLogging, out var shipsToRetrieveFromStash)) return;
 
             var changes = new PortScreenChanges(
                 rightOwner,
@@ -124,7 +130,9 @@ internal class PortScreenChangesHandler : IHandler
                 shipsToRename,
                 selectedShipPieces,
                 selectedFigureheads,
-                shipsToSend);
+                shipsToSend,
+                shipsToStash,
+                shipsToRetrieveFromStash);
 
             portScreenHandlerInterface.OnConfirmChanges(data.Mode, changes);
         });

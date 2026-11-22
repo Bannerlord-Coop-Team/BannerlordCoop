@@ -17,18 +17,18 @@ internal enum EscortBranch : byte
 internal sealed class EscortFinalizationProofStrategy : IFinalizationProofStrategy
 {
     private static readonly ILogger Logger = LogManager.GetLogger<EscortFinalizationProofStrategy>();
-    private readonly IEscortOwnerParty parties;
+    private readonly IIssueOwnerResolver owners;
 
-    public EscortFinalizationProofStrategy(IEscortOwnerParty parties)
+    public EscortFinalizationProofStrategy(IIssueOwnerResolver owners)
     {
-        this.parties = parties;
+        this.owners = owners;
     }
 
     public bool TryRunBranch(QuestBase questBase, byte proof)
     {
         if (!(questBase is Quest quest) || proof != (byte)EscortBranch.AttackCaravan) return false;
         if (!quest.IsOngoing || quest._questCaravanMobileParty?.IsActive != true ||
-            !parties.TryGet(IssueManager.GetIssueOfQuest(quest), out var party))
+            !owners.TryResolveOwnerParty(IssueManager.GetIssueOfQuest(quest), out var party))
         {
             Logger.Warning("Escort attack branch {proof} was already handled for {quest}", proof, quest.StringId);
             return true;

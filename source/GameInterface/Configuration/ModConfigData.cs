@@ -28,8 +28,8 @@ public sealed class ModConfigData
 
 /// <summary>
 /// The "difficulty" block. Properties remain nullable so malformed or unreadable
-/// input can fall back safely, while ModConfig activates or fills the documented
-/// values before a normal load. CampaignOptions values live IN the save, so joining
+/// input can fall back safely. ModConfig adds settings missing from the shipped template
+/// before a normal load, while commented-out keys stay null. CampaignOptions values live IN the save, so joining
 /// clients inherit them with the join-time save transfer. PlayerReceivedDamage is
 /// engine config and is pushed to clients as a join-time ServerOption.
 /// </summary>
@@ -135,6 +135,10 @@ public sealed class ModOptionsData
     public bool? PvpBlockLeave { get; set; }
 
     public int? PvpResponseTimerSeconds { get; set; }
+
+    public int? MaxClansPerKingdom { get; set; }
+
+    public bool? MaxClansPerKingdomCountsMercenaries { get; set; }
 
     /// <summary>Whether a dedicated server runs War Sails (NavalDLC) co-op. It parses the file itself; declared so the key isn't reported as unknown.</summary>
     public bool? WarSails { get; set; }
