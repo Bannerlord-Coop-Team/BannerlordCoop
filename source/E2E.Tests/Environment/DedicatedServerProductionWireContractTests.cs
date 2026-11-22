@@ -36,6 +36,7 @@ public sealed class DedicatedServerProductionWireContractTests
             null!,
             null!,
             null!,
+            null!,
             null!);
 
         ICommonSerializer sender = CreateSerializer();

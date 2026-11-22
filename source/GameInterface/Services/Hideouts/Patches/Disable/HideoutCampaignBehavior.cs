@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.Hideouts.Handlers;
 using GameInterface.Services.Hideouts.Messages;
+using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -145,24 +146,17 @@ internal class HideoutCampaignBehaviorPatch
 
     private static bool CanJoinHideout(MenuCallbackArgs args)
     {
-        var battle = Settlement.CurrentSettlement?.Party.MapEvent ?? PlayerEncounter.EncounteredBattle;
+        var battle = Settlement.CurrentSettlement?.Party.MapEvent ?? PlayerEncounter.Current.GetEncounteredBattleOrNull();
         args.optionLeaveType = GameMenuOption.LeaveType.Mission;
         args.IsEnabled = Hero.MainHero?.IsWounded == false;
         return battle?.EventType == MapEvent.BattleTypes.Hideout && !battle.IsFinalized &&
-            battle.BattleState == BattleState.None && (battle.Component as HideoutEventComponent)?.IsSendTroops != true;
+            battle.BattleState == BattleState.None && !battle.IsSendTroopsHideout();
     }
 
     private static void JoinHideout(MenuCallbackArgs args)
     {
         if (ContainerProvider.TryResolve<HideoutRaidHandler>(out var coordinator))
             coordinator.OpenTroopSelection(args, isDirectAssault: true);
-    }
-
-    [HarmonyPatch("hideout_send_troops_result_failure_on_init")]
-    [HarmonyPrefix]
-    private static void HideoutSendTroopsResultFailureOnInit()
-    {
-        PublishConsequence(HideoutCampaignConsequence.SetAttackCooldown);
     }
 
     [HarmonyPatch("game_menu_hideout_place_on_init")]
@@ -183,13 +177,6 @@ internal class HideoutCampaignBehaviorPatch
         return true;
     }
 
-    [HarmonyPatch("hideout_send_troops_result_success_consequence")]
-    [HarmonyPrefix]
-    private static void HideoutSendTroopsResultSuccessConsequence()
-    {
-        PublishConsequence(HideoutCampaignConsequence.GrantClearRewards);
-    }
-
     // Use coop re-implementation in handler that doesn't use Hero.MainHero
     [HarmonyPatch(nameof(HideoutCampaignBehavior.SetCleanHideoutRelations))]
     [HarmonyPrefix]
@@ -204,7 +191,7 @@ internal class HideoutCampaignBehaviorPatch
             return false;
         }
 
-        if (settlement.IsHideout && settlement.Hideout.IsInfested && !settlement.Hideout.IsSpotted)
+        if (settlement.IsHideout && settlement.Hideout.IsInfested && !settlement.IsVisible)
         {
             float hideoutSpottingDistance = Campaign.Current.Models.MapVisibilityModel.GetHideoutSpottingDistance();
 
@@ -220,9 +207,8 @@ internal class HideoutCampaignBehaviorPatch
                 {
                     float num = mobileParty.Position.DistanceSquared(settlement.Position);
                     float num2 = 1f - num / (hideoutSpottingDistance * hideoutSpottingDistance);
-                    if (num2 > 0f && settlement.Parties.Count > 0 && MBRandom.RandomFloat < num2 && !settlement.Hideout.IsSpotted)
+                    if (num2 > 0f && settlement.Parties.Count > 0 && MBRandom.RandomFloat < num2 && !settlement.IsVisible)
                     {
-                        settlement.Hideout.IsSpotted = true;
                         settlement.IsVisible = true;
                         CampaignEventDispatcher.Instance.OnHideoutSpotted(mobileParty.Party, settlement.Party);
                         break;
@@ -233,7 +219,7 @@ internal class HideoutCampaignBehaviorPatch
         return false;
     }
 
-    private static void PublishConsequence(HideoutCampaignConsequence consequence, Settlement settlement = null)
+    internal static void PublishConsequence(HideoutCampaignConsequence consequence, Settlement settlement = null)
     {
         if (!ModInformation.IsClient)
             return;
@@ -279,8 +265,10 @@ internal class HideoutJoinEncounterOptionsPatch
     [HarmonyPrefix]
     private static bool Prefix(ref bool __result)
     {
-        if (ModInformation.IsServer || PlayerEncounter.EncounteredBattle?.IsHideoutBattle != true)
-            return true;
+        if (ModInformation.IsServer) return true;
+
+        var battle = PlayerEncounter.Current.GetEncounteredBattleOrNull();
+        if (battle == null || !battle.IsHideoutBattle) return true;
 
         // Hideouts join through the shared troop selection.
         __result = false;

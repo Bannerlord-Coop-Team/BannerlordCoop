@@ -142,6 +142,7 @@ internal class CaravansCampaignBehaviorHandler : IHandler
     {
         // Update CoopSession and send changes to clients to update local instances of _tradeRumorTakenCaravans
         sessionCaravansPlayerDataInterface.DeleteExpiredTradeRumorTakenCaravans(out var playerExpiredCaravansRemovalLists);
+        if (playerExpiredCaravansRemovalLists.Count == 0) return;
 
         network.SendAll(new NetworkDeleteExpiredTradeRumorTakenCaravans(playerExpiredCaravansRemovalLists));
     }

@@ -29,7 +29,7 @@ public class CoopOptionsVM : ViewModel
     public string CommunityText => "Join the Community";
     public string CreditsButtonText => "Credits";
     public string DonateButtonText => "Donate";
-    public string PatreonButtonText => "Patreon";
+    public string RentServerButtonText => "Rent a Server";
     public string DiscordButtonText => "Discord";
 
     public CoopOptionsVM(
@@ -116,7 +116,8 @@ public class CoopOptionsVM : ViewModel
 
     public void ActionCredits() => CommunityLinks.ShowCreditsPopup();
 
-    public void ActionPatreon() => CommunityLinks.OpenPatreon();
+    // Opens the Patreon checkout for the tier that includes a rented server.
+    public void ActionRentServer() => CommunityLinks.OpenRentServer();
 
     public void ActionDiscord() => CommunityLinks.OpenDiscord();
 

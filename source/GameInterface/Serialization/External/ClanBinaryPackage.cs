@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Serialization.External
 {
@@ -16,6 +18,7 @@ namespace GameInterface.Serialization.External
         string[] aliveLordsIds;
         string[] heroesIds;
         string[] companionsIds;
+        string[] factionsAtWarWithIds;
 
 
         public ClanBinaryPackage(Clan obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
@@ -30,6 +33,8 @@ namespace GameInterface.Serialization.External
             "_heroesCache",
             "_companionsCache",
             "_defaultPartyTemplate",
+            // By value this nests each warring kingdom inside the last one, past the 512 read depth with 40+ kingdoms
+            "_factionsAtWarWith",
         };
 
         protected override void PackInternal()
@@ -43,6 +48,7 @@ namespace GameInterface.Serialization.External
             aliveLordsIds = ResolveIds(Object._aliveLordsCache);
             heroesIds = ResolveIds(Object._heroesCache);
             companionsIds = ResolveIds(Object._companionsCache);
+            factionsAtWarWithIds = ResolveIds(Object._factionsAtWarWith?.OfType<MBObjectBase>());
         }
 
         protected override void UnpackInternal()
@@ -64,6 +70,7 @@ namespace GameInterface.Serialization.External
             Object._aliveLordsCache = ResolveObjects<Hero>(aliveLordsIds).ToMBList();
             Object._heroesCache = ResolveObjects<Hero>(heroesIds).ToMBList();
             Object._companionsCache = ResolveObjects<Hero>(companionsIds).ToMBList();
+            Object._factionsAtWarWith = ResolveObjects<MBObjectBase>(factionsAtWarWithIds).OfType<IFaction>().ToMBList();
         }
     }
 }

@@ -6,6 +6,7 @@ on:
 
 permissions:
   contents: read
+  packages: read
 
 concurrency:
   group: release-${{ github.ref_name }}
@@ -20,7 +21,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     container:
-      image: garrettluskey/bannerlordcoop:latest
+      image: ghcr.io/bannerlord-coop-team/bannerlordcoop:v1.5.7
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -63,6 +67,7 @@ jobs:
             -p:SourceRevisionId="$GITHUB_SHA" \
             -p:IncludeSourceRevisionInInformationalVersion=true \
             -p:CoopVersion="${GITHUB_REF_NAME#v}" -p:ModName= \
+            -p:CoopNavalDlc=true \
             -p:NuGetAudit=false \
             --consoleLoggerParameters:ErrorsOnly
 
@@ -85,7 +90,7 @@ jobs:
           for required in Coop.dll Common.dll Coop.Core.dll Coop.Steam.dll GameInterface.dll Missions.dll Coop.CrashReporter.exe; do
             test -s "$binary/$required"
           done
-          cp 'deploy/Server Instructions.md' deploy/mod-config.default.json "$module/"
+          cp 'deploy/Server Instructions.md' deploy/mod-config.default.json deploy/managed-config-catalog.json "$module/"
           cp -R deploy/ModuleData deploy/ThirdPartyNotices deploy/GUI "$module/"
           cp -R UIMovies/. "$module/GUI/Prefabs/"
 
@@ -128,7 +133,10 @@ jobs:
     needs: build
 
     container:
-      image: garrettluskey/bannerlordcoop:latest
+      image: ghcr.io/bannerlord-coop-team/bannerlordcoop:v1.5.7
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
       - uses: actions/checkout@v7
@@ -158,10 +166,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
 
     container:
-      image: garrettluskey/bannerlordcoop:latest
+      image: ghcr.io/bannerlord-coop-team/bannerlordcoop:v1.5.7
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
       - uses: actions/checkout@v7
@@ -181,7 +192,7 @@ jobs:
 
       - name: Run E2E test shard
         working-directory: source
-        run: sh ../.github/scripts/run-e2e-shard.sh "${{ matrix.shard }}" 8
+        run: sh ../.github/scripts/run-e2e-shard.sh "${{ matrix.shard }}" 12
 
   sign:
     name: Sign release module

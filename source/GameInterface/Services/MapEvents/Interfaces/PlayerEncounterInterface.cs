@@ -6,7 +6,10 @@ using Serilog;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MapEvents.Interfaces;
@@ -15,17 +18,29 @@ public interface IPlayerEncounterInterface : IGameAbstraction
 {
     public void UpdateInternalAfterBattle(PlayerEncounter playerEncounter);
     public void ReleaseHeroesWithoutConversation(PlayerEncounter playerEncounter);
+
+    /// <summary>[Game thread] Whether this client sits in the encounter meeting menu with its conversation open.</summary>
+    public bool IsEncounterMeetingConversationOpen();
+
+    /// <summary>
+    /// [Game thread] Ends the open encounter meeting conversation as the player's answer does, so vanilla moves on to the battle;
+    /// false with the reason when no such conversation is open.
+    /// </summary>
+    public bool TryCompleteEncounterMeeting(out string failure);
+
+    /// <summary>[Game thread] Opens the owner's encounter meeting for a replicated map event.</summary>
+    public void OpenEncounterMeeting(MapEvent battle, PartyBase otherParty);
 }
 
+/// <summary>Runs vanilla <see cref="PlayerEncounter"/> steps on this machine for the co-op encounter flow.</summary>
 public class PlayerEncounterInterface : IPlayerEncounterInterface
 {
     private static readonly ILogger Logger = LogManager.GetLogger<PlayerEncounterInterface>();
 
-    private readonly ISiegeEventInterface siegeEventInterface;
+    // The menu vanilla's encounter shows while its pre-battle conversation runs.
+    private const string EncounterMeetingMenuId = "encounter_meeting";
 
-    public PlayerEncounterInterface() : this(null)
-    {
-    }
+    private readonly ISiegeEventInterface siegeEventInterface;
 
     public PlayerEncounterInterface(ISiegeEventInterface siegeEventInterface)
     {
@@ -111,6 +126,65 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
         }
     }
 
+    public bool IsEncounterMeetingConversationOpen() =>
+        Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId == EncounterMeetingMenuId
+        && Campaign.Current.ConversationManager.IsConversationInProgress;
+
+    public bool TryCompleteEncounterMeeting(out string failure)
+    {
+        failure = null;
+        if (Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId != EncounterMeetingMenuId)
+        {
+            failure = "The encounter meeting is not active.";
+            return false;
+        }
+
+        if (!Campaign.Current.ConversationManager.IsConversationInProgress)
+        {
+            failure = "The encounter conversation is not active.";
+            return false;
+        }
+
+        Campaign.Current.ConversationManager.EndConversation();
+        return true;
+    }
+
+    public void OpenEncounterMeeting(MapEvent battle, PartyBase otherParty)
+    {
+        if (battle == null || battle.IsFinalized || MobileParty.MainParty.MapEvent != battle)
+        {
+            Logger.Warning("Cannot open encounter meeting for {party}: map event {battle} is missing, finalized or no longer contains the player party",
+                otherParty, battle);
+            return;
+        }
+
+        using (new Common.Util.AllowedThread())
+        {
+            ReplaceEncounterFor(battle);
+            PlayerEncounter.Init();
+            var leader = ConversationHelper.GetConversationCharacterPartyLeader(otherParty);
+            var player = new ConversationCharacterData(CharacterObject.PlayerCharacter, PartyBase.MainParty, noHorse: true);
+            var other = new ConversationCharacterData(leader, otherParty, noHorse: true);
+            GameMenu.ActivateGameMenu(EncounterMeetingMenuId);
+            CampaignMapConversation.OpenConversation(player, other);
+        }
+    }
+
+    private static void ReplaceEncounterFor(MapEvent battle)
+    {
+        if (PlayerEncounter.Battle == battle) return;
+
+        var current = PlayerEncounter.Current;
+        if (current != null)
+        {
+            // Finish would otherwise finalize the stale encounter's battle.
+            current._mapEvent = null;
+            PlayerEncounter.Finish(forcePlayerOutFromSettlement: false);
+        }
+
+        PlayerEncounter.Start();
+    }
+
     internal static bool ShouldReleaseWithoutConversation(Hero hero, Clan localPlayerClan)
     {
         if (hero == null) return false;
@@ -124,7 +198,6 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
 
     private void EndPlayerEncounter(PlayerEncounter playerEncounter)
     {
-        //playerEncounter.DoEnd(); // Default implementation's function. Might have some logic we need later
         playerEncounter._stateHandled = true;
 
         // a won siege's leader gets the aftermath choice and an army member the leader's pick, like vanilla DoEnd

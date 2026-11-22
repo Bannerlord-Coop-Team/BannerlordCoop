@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+﻿using Common.BattleBenchmark;
+using Common.Messaging;
 using Common.Network;
 using Common.Network.Session;
 using Common.PacketHandlers;
@@ -12,6 +13,8 @@ using Missions.Agents.Handlers;
 using Missions.Agents.Packets;
 using Missions.Services.Network;
 using Moq;
+using System.Diagnostics;
+using System.Net;
 using AgentData = Missions.Agents.Packets.AgentData;
 
 namespace E2E.Tests.Services.Missions;
@@ -132,31 +135,7 @@ public class MovementRelayPayloadTests
             controllerId,
             LiteNetP2PClient.SafeSinglePacketBytes);
 
-        MovementPacket oversizedPacket = default;
-        byte[] oversizedPayload = Array.Empty<byte>();
-        for (int scopeLength = 700; scopeLength <= 1200; scopeLength++)
-        {
-            var candidate = new MovementPacket(
-                MovementTrafficTests.CreateIncompressibleString(scopeLength),
-                new ushort[] { 1 },
-                new AgentData[1]);
-            byte[] payload = compressor.Serialize(candidate);
-            if (payload.Length <= relayBudget ||
-                payload.Length > LiteNetP2PClient.SafeSinglePacketBytes)
-            {
-                continue;
-            }
-
-            oversizedPacket = candidate;
-            oversizedPayload = payload;
-            break;
-        }
-
-        Assert.NotEmpty(oversizedPayload);
-        Assert.InRange(
-            oversizedPayload.Length,
-            relayBudget + 1,
-            LiteNetP2PClient.SafeSinglePacketBytes);
+        MovementPacket oversizedPacket = CreateMovementOverRelayBudget(compressor, relayBudget);
 
         var config = new Mock<INetworkConfig>();
         config.SetupGet(value => value.IsTunneled).Returns(true);
@@ -247,6 +226,106 @@ public class MovementRelayPayloadTests
                 LiteNetP2PClient.CalculateMaxRelayPayloadBytes(legacy, "MapEvent_Created_0000", "76561198000000042", ceiling),
                 LiteNetP2PClient.CalculateMaxRelayPayloadBytes(current, "MapEvent_Created_0000", "76561198000000042", ceiling));
         }
+    }
+
+    [Fact]
+    public void SentTypeCount_LeavesOutMovementThatNeverLeaves()
+    {
+        const string instanceId = "MapEvent_Created_0000";
+        const string directControllerId = "76561198000000041";
+        const string relayControllerId = "76561198000000042";
+        var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
+        var compressor = new MovementPacketCompressor(serializer);
+        var typeSends = new List<(Type Type, int Bytes)>();
+        var routeSends = new List<(string Route, int Bytes)>();
+        var recorder = new Mock<IBattleBenchmarkRecorder>();
+        recorder.SetupGet(value => value.IsRecording).Returns(true);
+        recorder.Setup(value => value.RecordTypeSent(It.IsAny<Type>(), It.IsAny<int>()))
+            .Callback<Type, int>((type, bytes) => typeSends.Add((type, bytes)));
+        recorder.Setup(value => value.RecordSent(
+                It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<bool>()))
+            .Callback<string, bool, int, int, bool>((route, _, bytes, _, _) => routeSends.Add((route, bytes)));
+
+        var serverListener = new EventBasedNetListener();
+        serverListener.ConnectionRequestEvent += request => request.AcceptIfKey("sent-type-test");
+        var serverTransport = new NetManager(serverListener);
+        var clientTransport = new NetManager(new EventBasedNetListener());
+        try
+        {
+            Assert.True(serverTransport.StartInManualMode(IPAddress.Loopback, IPAddress.IPv6Loopback, 0));
+            Assert.True(clientTransport.StartInManualMode(IPAddress.Loopback, IPAddress.IPv6Loopback, 0));
+            NetPeer directPeer = clientTransport.Connect(IPAddress.Loopback.ToString(), serverTransport.LocalPort, "sent-type-test");
+            var timer = Stopwatch.StartNew();
+            while (directPeer.ConnectionState != LiteNetLib.ConnectionState.Connected && timer.Elapsed < TimeSpan.FromSeconds(5))
+            {
+                serverTransport.ManualUpdate(15);
+                clientTransport.ManualUpdate(15);
+                serverTransport.PollEvents();
+                clientTransport.PollEvents();
+                Thread.Sleep(1);
+            }
+            Assert.Equal(LiteNetLib.ConnectionState.Connected, directPeer.ConnectionState);
+
+            var config = new Mock<INetworkConfig>();
+            config.SetupGet(value => value.IsTunneled).Returns(true);
+            var relayNetwork = new Mock<IRelayNetwork>();
+            var missionContext = new Mock<IMissionContext>();
+            missionContext.Setup(value => value.TryGetPeer(directControllerId, out directPeer)).Returns(true);
+            using var client = new LiteNetP2PClient(
+                config.Object,
+                relayNetwork.Object,
+                missionContext.Object,
+                serializer,
+                Mock.Of<IMessageBroker>(),
+                Mock.Of<IPacketManager>(),
+                Mock.Of<IMessagePacketHandler>(),
+                Mock.Of<IControllerIdProvider>(),
+                Mock.Of<ISteamMissionBridge>(),
+                compressor,
+                new ReliableMessageBatcher<string>(serializer), () => new Common.Logging.ReceivePathDiagnostics(),
+                recorder.Object);
+            client.ConnectToInstance(instanceId);
+            int relayBudget = LiteNetP2PClient.CalculateMaxRelayPayloadBytes(
+                serializer, instanceId, relayControllerId, LiteNetP2PClient.SafeSinglePacketBytes);
+            var movement = new MovementPacket("scope", new ushort[] { 1 }, new AgentData[1]);
+            var overDatagram = new MovementPacket(
+                MovementTrafficTests.CreateIncompressibleString(LiteNetP2PClient.SafeSinglePacketBytes + 100),
+                new ushort[] { 1 },
+                new AgentData[1]);
+
+            client.Send(directControllerId, movement);
+            client.Send(directControllerId, overDatagram);
+            client.Send(relayControllerId, CreateMovementOverRelayBudget(compressor, relayBudget));
+            client.Send(relayControllerId, movement);
+
+            // Only the two copies that left count: the direct one on its route, the relayed one inside its relay packet.
+            int movementBytes = compressor.Serialize(movement).Length;
+            Assert.Equal(new[] { (typeof(MovementPacket), movementBytes), (typeof(MovementPacket), movementBytes) }, typeSends);
+            Assert.Equal(new[] { (directControllerId, movementBytes) }, routeSends);
+            var relayed = Assert.IsType<RelayPacket>(Assert.Single(relayNetwork.Invocations).Arguments[0]);
+            Assert.Equal(movementBytes, relayed.Payload.Length);
+        }
+        finally
+        {
+            clientTransport.Stop();
+            serverTransport.Stop();
+        }
+    }
+
+    // A movement packet that fits one datagram but not the relay payload budget, so only the relay drops it.
+    private static MovementPacket CreateMovementOverRelayBudget(MovementPacketCompressor compressor, int relayBudget)
+    {
+        for (int scopeLength = 700; scopeLength <= 1200; scopeLength++)
+        {
+            var candidate = new MovementPacket(
+                MovementTrafficTests.CreateIncompressibleString(scopeLength),
+                new ushort[] { 1 },
+                new AgentData[1]);
+            int length = compressor.Serialize(candidate).Length;
+            if (length > relayBudget && length <= LiteNetP2PClient.SafeSinglePacketBytes) return candidate;
+        }
+
+        throw new InvalidOperationException("No movement packet fits a datagram but not the relay budget.");
     }
 
     private readonly struct TestPacket : IPacket

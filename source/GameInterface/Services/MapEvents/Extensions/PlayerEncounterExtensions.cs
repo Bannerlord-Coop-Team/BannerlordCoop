@@ -1,5 +1,6 @@
 ﻿using GameInterface.Services.MobileParties.Extensions;
 using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MapEvents.Extensions;
@@ -31,4 +32,36 @@ public static class PlayerEncounterExtensions
 
         return true;
     }
+
+    /// <summary>
+    /// Null safe copy of native <see cref="PlayerEncounter.EncounteredBattle"/>, which throws while an encounter is
+    /// still being set up and after it closes.
+    /// </summary>
+    public static MapEvent GetEncounteredBattleOrNull(this PlayerEncounter playerEncounter)
+    {
+        var party = playerEncounter?._encounteredParty;
+        if (party == null) return null;
+        if (party.MapEvent != null) return party.MapEvent;
+        if (!party.IsSettlement) return null;
+
+        return party.SiegeEvent?.BesiegerCamp?.LeaderParty?.MapEvent;
+    }
+
+    /// <summary>
+    /// Checks if the encounter is attached to, simulating, or facing the given map event.
+    /// </summary>
+    public static bool ReferencesMapEvent(this PlayerEncounter playerEncounter, MapEvent mapEvent)
+    {
+        if (playerEncounter == null) return false;
+
+        return playerEncounter._mapEvent == mapEvent ||
+            playerEncounter.BattleSimulation?.MapEvent == mapEvent ||
+            playerEncounter.GetEncounteredBattleOrNull() == mapEvent;
+    }
+
+    /// <summary>
+    /// The encounter's own map event, else the battle it faces, else the main party's battle.
+    /// </summary>
+    public static MapEvent GetBattleOrPlayerMapEvent(this PlayerEncounter playerEncounter) =>
+        playerEncounter?._mapEvent ?? playerEncounter.GetEncounteredBattleOrNull() ?? MapEvent.PlayerMapEvent;
 }

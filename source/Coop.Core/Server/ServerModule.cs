@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using Common;
 using Common.Commands;
 using Common.LogicStates;
 using Common.Messaging;
@@ -17,6 +18,7 @@ using Coop.Core.Common.Session;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Policies;
 using Coop.Core.Server.Services.Instances;
+using Coop.Core.Server.Services.Instances.Handlers;
 using Coop.Core.Server.Services.Kingdoms;
 using Coop.Core.Server.Services.MobileParties;
 using Coop.Core.Server.Services.Save;
@@ -33,6 +35,7 @@ using GameInterface.Policies;
 using GameInterface.Services.Missions;
 using LiteNetLib;
 using Missions;
+using System;
 using System.Runtime.CompilerServices;
 
 namespace Coop.Core.Server;
@@ -42,6 +45,13 @@ namespace Coop.Core.Server;
 /// </summary>
 public class ServerModule : CommonModule
 {
+    // Coop.Core's War Sails server handlers, left unregistered while NavalDLC co-op is off like GameInterface's naval types.
+    internal static readonly Type[] NavalOnlyTypes =
+    {
+        typeof(ServerBattleShipFateHandler),
+        typeof(ServerNavalNpcFleetAttemptHandler),
+    };
+
     protected override void Load(ContainerBuilder builder)
     {
         base.Load(builder);
@@ -93,6 +103,7 @@ public class ServerModule : CommonModule
             .As<IMissionMembershipRegistry>()
             .InstancePerLifetimeScope();
         builder.RegisterType<BattleCompletionTracker>().As<IBattleCompletionTracker>().InstancePerDependency();
+        builder.RegisterType<NavalBattleMemberResolver>().As<INavalBattleMemberResolver>().InstancePerDependency();
         builder.RegisterType<SettlementEncounterDistanceValidator>()
             .As<ISettlementEncounterDistanceValidator>()
             .InstancePerDependency();
@@ -100,7 +111,7 @@ public class ServerModule : CommonModule
         builder.RegisterType<SiegeSacrifice>().As<ISiegeSacrifice>().InstancePerDependency();
 
         // Graceful restart, in Release too.
-        builder.RegisterType<ServerAdmissionGate>().As<IServerAdmissionGate>().InstancePerLifetimeScope();
+        builder.RegisterType<ServerJoinAdmission>().As<IServerJoinAdmission>().InstancePerLifetimeScope();
         // AutoActivate so it sees the GameLoaded save name.
         builder.RegisterType<ServerShutdownCoordinator>()
             .As<IServerShutdownCoordinator>()
@@ -110,8 +121,11 @@ public class ServerModule : CommonModule
 
         // Pauses time while a peer's packet queue is overloaded (slow client catching up). Constructed
         // as a CoopServer dependency, so it registers its unpause policy when the server is built.
-        builder.RegisterType<JoinPeerTerminator>().As<IJoinPeerTerminator>().InstancePerDependency();
+        builder.RegisterType<PeerTerminator>().As<IPeerTerminator>().InstancePerDependency();
         builder.RegisterType<OverloadedPeerManager>().As<IOverloadedPeerManager>().InstancePerLifetimeScope().AutoActivate();
+
+        // Drops a silent battle host with a successor waiting; CoopServer runs it each Update.
+        builder.RegisterType<UnresponsiveBattleHostManager>().As<IUnresponsiveBattleHostManager>().InstancePerDependency();
 
         // DEBUG builds, including MCP live-test runs, keep their heartbeats and battle counts off the production statistics.
 #if DEBUG
@@ -152,7 +166,8 @@ public class ServerModule : CommonModule
 
         builder.RegisterType<SessionAdvertisementConfig>().AsSelf().InstancePerLifetimeScope();
 
-        RegisterAllTypesWithInterface<ServerModule, IHandler>(builder, autoInstantiate: true);
+        RegisterAllTypesWithInterface<ServerModule, IHandler>(builder, autoInstantiate: true,
+            ModInformation.IsNavalEnabled ? null : NavalOnlyTypes);
         RegisterAllTypesWithInterface<ServerModule, IPacketHandler>(builder, autoInstantiate: true);
     }
 

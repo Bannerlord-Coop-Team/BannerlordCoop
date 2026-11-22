@@ -1,24 +1,26 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
-using TaleWorlds.CampaignSystem.Party;
+using GameInterface.Services.Clans.Data;
 
 namespace GameInterface.Services.Clans.Messages;
 
 [ProtoContract(SkipConstructor = true)]
-internal readonly struct UpdatePartyBehaviorOnSelection : ICommand
+internal readonly struct UpdatePartyConfigurationOnSelection : ICommand
 {
     [ProtoMember(1)]
-    public readonly string MobilePartyId;
+    public readonly string LeaderHeroId;
 
     [ProtoMember(2)]
-    public readonly MobileParty.PartyObjective PartyObjective;
+    public readonly PartyConfigurationFlag Flag;
 
-    public UpdatePartyBehaviorOnSelection(
-        string mobilePartyId,
-        MobileParty.PartyObjective partyObjective)
+    [ProtoMember(3)]
+    public readonly bool Value;
+
+    public UpdatePartyConfigurationOnSelection(string leaderHeroId, PartyConfigurationFlag flag, bool value)
     {
-        MobilePartyId = mobilePartyId;
-        PartyObjective = partyObjective;
+        LeaderHeroId = leaderHeroId;
+        Flag = flag;
+        Value = value;
     }
 }
 

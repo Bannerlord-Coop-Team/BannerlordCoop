@@ -3,9 +3,11 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.Kingdoms.Interfaces;
 using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.ObjectManager;
+using LiteNetLib;
 using SandBox.CampaignBehaviors;
 using Serilog;
 using System.Collections.Generic;
@@ -24,6 +26,7 @@ internal class InteractionsInitializationHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly ISessionInteractionsPlayerDataInterface sessionInteractionsPlayerDataInterface;
+    private readonly IVassalAndMercenaryOfferCampaignBehaviorInterface vassalAndMercenaryOfferCampaignBehaviorInterface;
 
     private InteractionsPlayerData interactionsPlayerData;
 
@@ -31,12 +34,14 @@ internal class InteractionsInitializationHandler : IHandler
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
-        ISessionInteractionsPlayerDataInterface sessionInteractionsPlayerDataInterface)
+        ISessionInteractionsPlayerDataInterface sessionInteractionsPlayerDataInterface,
+        IVassalAndMercenaryOfferCampaignBehaviorInterface vassalAndMercenaryOfferCampaignBehaviorInterface)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.sessionInteractionsPlayerDataInterface = sessionInteractionsPlayerDataInterface;
+        this.vassalAndMercenaryOfferCampaignBehaviorInterface = vassalAndMercenaryOfferCampaignBehaviorInterface;
 
         messageBroker.Subscribe<InitializeClientInteractionsData>(Handle);
         messageBroker.Subscribe<PlayerHeroChanged>(Handle);
@@ -91,6 +96,7 @@ internal class InteractionsInitializationHandler : IHandler
         GameThread.RunSafe(() =>
         {
             sessionInteractionsPlayerDataInterface.AddPlayerKeys(obj.What.PlayerHeroId);
+            vassalAndMercenaryOfferCampaignBehaviorInterface.AddNewPlayerHeroId(obj.What.PlayerHeroId, obj.Who as NetPeer);
         });
     }
 

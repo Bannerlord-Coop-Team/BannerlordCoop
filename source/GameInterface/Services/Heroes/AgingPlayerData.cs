@@ -1,4 +1,5 @@
-﻿using ProtoBuf;
+﻿using GameInterface.Services.Heroes.Data;
+using ProtoBuf;
 using System.Collections.Generic;
 
 namespace GameInterface.Services.Heroes;
@@ -7,6 +8,7 @@ namespace GameInterface.Services.Heroes;
 /// The following assume only one player
 /// Hero.MainHeroIllDays
 /// Player succession information also has to be separately tracked
+/// MarriageOfferCampaignBehavior current marriage offer and offer cooldown
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
 public class AgingPlayerData
@@ -18,12 +20,18 @@ public class AgingPlayerData
     [ProtoMember(2)]
     public Dictionary<string, PlayerSuccessionData> PlayerSuccessions { get; }
 
+    // Dictionary<PlayerHeroId, MarriageOfferData>
+    [ProtoMember(3)]
+    public Dictionary<string, MarriageOfferData> PlayerMarriageOffers { get; }
+
     public AgingPlayerData(
         Dictionary<string, int> playerIsIllDays,
-        Dictionary<string, PlayerSuccessionData> playerSuccessions = null)
+        Dictionary<string, PlayerSuccessionData> playerSuccessions = null,
+        Dictionary<string, MarriageOfferData> playerMarriageOffers = null)
     {
         PlayerIsIllDays = playerIsIllDays ?? new();
         PlayerSuccessions = playerSuccessions ?? new();
+        PlayerMarriageOffers = playerMarriageOffers ?? new();
     }
 }
 

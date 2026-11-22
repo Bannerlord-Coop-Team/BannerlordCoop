@@ -24,6 +24,7 @@ using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
 using Xunit.Abstractions;
+using GameInterface.Tests.Utils;
 
 namespace E2E.Tests.Services.MapEvents;
 
@@ -68,7 +69,7 @@ public class BattleMissionStartHandlerTests : MapEventTestBase
         {
             Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEvent.MapEventId, out var clientBattle));
             if (isHideout)
-                clientBattle._mapEventType = MapEvent.BattleTypes.Hideout;
+                clientBattle.SetBattleType(MapEvent.BattleTypes.Hideout);
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(nonInitiatingPartyId, out var localParty));
             var previousMainParty = Campaign.Current.MainParty;
             Campaign.Current.MainParty = localParty;
@@ -94,7 +95,7 @@ public class BattleMissionStartHandlerTests : MapEventTestBase
                 client.Resolve<INetwork>(),
                 client.Resolve<IMapEventLogger>(),
                 missionInitializerResolver,
-                null!);
+                null!, Mock.Of<IBattleHostRetentionPolicy>());
 
             try
             {
@@ -194,8 +195,8 @@ public class BattleMissionStartHandlerTests : MapEventTestBase
                 campaign.Models.LocationModel = Mock.Of<LocationModel>();
                 campaign.Models.DifficultyModel = Mock.Of<DifficultyModel>();
                 campaign.Models.MapWeatherModel = Mock.Of<MapWeatherModel>();
-                battle._mapEventType = MapEvent.BattleTypes.Siege;
-                battle.MapEventSettlement = settlement;
+                battle.SetBattleType(MapEvent.BattleTypes.Siege);
+                battle.SetMapEventSettlement(settlement);
                 settlement.LocationComplex = new LocationComplex();
                 settlement.LocationComplex._locations.Add("center", new Location(
                     "center", new TextObject("castle"), new TextObject("gate"), 0, false, false,
@@ -224,7 +225,7 @@ public class BattleMissionStartHandlerTests : MapEventTestBase
                 using var messageBroker = new MessageBroker();
                 using var handler = new BattleMissionStartHandler(messageBroker, client.ObjectManager,
                     client.Resolve<IPlayerManager>(), client.Resolve<INetwork>(),
-                    client.Resolve<IMapEventLogger>(), new RecordingMissionInitializerResolver(), null!);
+                    client.Resolve<IMapEventLogger>(), new RecordingMissionInitializerResolver(), null!, Mock.Of<IBattleHostRetentionPolicy>());
                 ContainerProvider.SetContainer(launcherScope);
                 messageBroker.Publish(this, new NetworkStartSiegeMission(mapEvent.MapEventId, 0,
                     new[] { 1f, 1f }, Array.Empty<SiegeEngineState>(), Array.Empty<SiegeEngineState>(),
@@ -307,7 +308,7 @@ public class BattleMissionStartHandlerTests : MapEventTestBase
                     client.Resolve<INetwork>(),
                     client.Resolve<IMapEventLogger>(),
                     missionInitializerResolver,
-                    null!);
+                    null!, Mock.Of<IBattleHostRetentionPolicy>());
 
                 messageBroker.Publish(this, new NetworkStartAttackMission(
                     mapEvent.MapEventId,

@@ -2229,12 +2229,13 @@ public class WeaponDropHandler : IWeaponDropHandler
             controllerId);
     }
 
-    private static bool WeaponMatches(MissionWeapon current, MissionWeapon canonical) =>
+    // Only a tableau item shows its banner, and replayed missiles arrive without one.
+    internal static bool WeaponMatches(MissionWeapon current, MissionWeapon canonical) =>
         !current.IsEmpty &&
         current.Item == canonical.Item &&
         current.ItemModifier == canonical.ItemModifier &&
         current.RawDataForNetwork == canonical.RawDataForNetwork &&
-        current.Banner?.Serialize() == canonical.Banner?.Serialize();
+        (!current.Item.IsUsingTableau || current.Banner?.Serialize() == canonical.Banner?.Serialize());
 
     private static bool IsValidEquipmentIndex(EquipmentIndex equipmentIndex) =>
         equipmentIndex >= EquipmentIndex.WeaponItemBeginSlot &&

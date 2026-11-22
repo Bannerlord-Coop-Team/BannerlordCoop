@@ -1,10 +1,26 @@
-﻿using TaleWorlds.CampaignSystem.MapEvents;
+﻿using GameInterface.Services.PartyBases.Extensions;
+using System.Collections.Generic;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
+using TaleWorlds.Library;
 
 namespace GameInterface.Services.MapEvents.Extensions;
 
 public static class MapEventExtensions
 {
+    /// <summary>Whether this map event uses the siege-style join flow.</summary>
+    public static bool IsSiegeStyleJoin(this MapEvent mapEvent)
+        => mapEvent.IsSiegeAssault || mapEvent.IsSallyOut;
+
+    /// <summary>Whether the battle's results were calculated or applied, after which no battle report may change what they read.</summary>
+    public static bool HasCalculatedResults(this MapEvent mapEvent)
+        => mapEvent._mapEventResultsCalculated || mapEvent._mapEventResultsApplied;
+
+    /// <summary>Whether the battle is a send troops hideout raid.</summary>
+    public static bool IsSendTroopsHideout(this MapEvent mapEvent)
+        => mapEvent.Component is HideoutEventComponent { IsSendTroops: true };
+
     /// <summary>
     /// Finds a party's MapEventParty on either side of the event, without going through PartiesOnSide(side) —
     /// safe to call even after the party's own MapEventSide has already been nulled elsewhere.
@@ -46,5 +62,18 @@ public static class MapEventExtensions
 
         int total = side.CalculateTotalContribution();
         return total == 0 ? 0f : (float)mapEventParty.ContributionToBattle / total;
+    }
+
+    public static MBReadOnlyList<MapEventParty> GetPlayerPartiesOnSide(this MapEvent mapEvent, BattleSideEnum battleSideEnum)
+    {
+        var playerParties = new MBReadOnlyList<MapEventParty>();
+        foreach (var mapEventParty in mapEvent.PartiesOnSide(battleSideEnum))
+        {
+            if (mapEventParty.Party?.IsPlayerParty() == true)
+            {
+                playerParties.Add(mapEventParty);
+            }
+        }
+        return playerParties;
     }
 }

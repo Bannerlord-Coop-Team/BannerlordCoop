@@ -238,13 +238,24 @@ internal class MapEventPartyHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(obj.AttackedTroop, out var attackedTroopId))
             return;
 
+        // A hit without a captain is normal and TryGetIdWithLogging logs an error on null, so only look one
+        // up when set. A failed lookup still sends the hit, without its captain.
+        string captainId = null;
+        if (obj.Captain != null)
+        {
+            objectManager.TryGetIdWithLogging(obj.Captain, out captainId);
+        }
+
         network.SendAll(new NetworkTroopScoreHit(
             mapEventPartyId,
             attackingTroopId,
             attackedTroopId,
             obj.Damage,
             obj.IsFatal,
-            obj.IsSimulatedHit));
+            obj.IsSimulatedHit,
+            // vanilla only reads the weapon for a hero attacker (OnHeroCombatHit)
+            obj.AttackingTroop.IsHero ? obj.AttackerWeapon : null,
+            captainId));
     }
 
     private void Handle_NetworkTroopScoreHit(MessagePayload<NetworkTroopScoreHit> payload)
@@ -266,13 +277,21 @@ internal class MapEventPartyHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging(obj.AttackedTroopId, out CharacterObject attackedTroop))
                 return;
 
+            CharacterObject captain = null;
+            if (!string.IsNullOrEmpty(obj.CaptainId))
+            {
+                objectManager.TryGetObjectWithLogging(obj.CaptainId, out captain);
+            }
+
             ApplyTroopScoreHit(
                 mapEventParty,
                 attackingTroop,
                 attackedTroop,
                 obj.Damage,
                 obj.IsFatal,
-                obj.IsSimulatedHit);
+                obj.IsSimulatedHit,
+                obj.AttackerWeapon,
+                captain);
         }, context: nameof(Handle_NetworkTroopScoreHit));
     }
 
@@ -282,7 +301,9 @@ internal class MapEventPartyHandler : IHandler
         CharacterObject attackedTroop,
         int damage,
         bool isFatal,
-        bool isSimulatedHit)
+        bool isSimulatedHit,
+        WeaponComponentData attackerWeapon,
+        CharacterObject captain)
     {
         var roster = mapEventParty.Troops;
         UniqueTroopDescriptor? fallbackDescriptor = null;
@@ -294,15 +315,15 @@ internal class MapEventPartyHandler : IHandler
                 fallbackDescriptor ??= element.Descriptor;
                 if (element.IsKilled || element.IsWounded || element.IsRouted) continue;
 
-                // The attacker's weapon is not carried over the wire; native simulation also passes null.
                 mapEventParty.OnTroopScoreHit(
                     element.Descriptor,
                     attackedTroop,
                     damage,
                     isFatal,
                     isTeamKill: false,
-                    null,
-                    isSimulatedHit);
+                    attackerWeapon,
+                    isSimulatedHit,
+                    captain);
                 return;
             }
         }
@@ -316,8 +337,9 @@ internal class MapEventPartyHandler : IHandler
                 damage,
                 isFatal,
                 isTeamKill: false,
-                null,
-                isSimulatedHit);
+                attackerWeapon,
+                isSimulatedHit,
+                captain);
             return;
         }
 

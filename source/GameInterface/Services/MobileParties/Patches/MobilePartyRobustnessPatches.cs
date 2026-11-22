@@ -1,4 +1,6 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
+using Common.Util;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -45,11 +47,18 @@ internal class MobilePartyRobustnessPatches
     [HarmonyPostfix]
     private static void Postfix(ref MobileParty __instance, ref AnchorPoint __result)
     {
+        // Server parties get their anchor in the constructor or OnLoad, and the synced Anchor setter reads this getter
+        if (ModInformation.IsServer) return;
+
         if (__result is null)
         {
-            var anchor = new AnchorPoint(__instance);
-            __instance.Anchor = anchor;
-            __result = anchor;
+            // A local stand-in for a party whose synced anchor hasn't arrived or that was already removed
+            using (new AllowedThread())
+            {
+                var anchor = new AnchorPoint(__instance);
+                __instance.Anchor = anchor;
+                __result = anchor;
+            }
         }
     }
 

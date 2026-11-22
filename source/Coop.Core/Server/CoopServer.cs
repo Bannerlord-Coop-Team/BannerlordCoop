@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.BattleBenchmark;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -44,13 +45,14 @@ public class CoopServer : CoopNetworkBase, ICoopServer
     private readonly IPacketManager packetManager;
     private readonly IMessagePacketHandler messagePacketHandler;
     private readonly IConnectionMessageQueue connectionMessageQueue;
-    private readonly IServerAdmissionGate admissionGate;
-    private readonly IJoinPeerTerminator peerTerminator;
+    private readonly IServerJoinAdmission joinAdmission;
+    private readonly IPeerTerminator peerTerminator;
     // Buffers per-change sends and merges them into one send per key. Drained each tick in Update.
     private readonly ISendCoalescer coalescer;
     // Lazy breaks the construction cycle: the manager depends on ITimeControlInterface, which depends
     // on INetwork (this server). It is only needed each Update, so deferring construction is fine.
     private readonly Lazy<IOverloadedPeerManager> overloadedPeerManager;
+    private readonly IUnresponsiveBattleHostManager unresponsiveBattleHostManager;
 
     // Co-hosted NAT-punch rendezvous for P2P instances (taverns etc.). The server's NetManager
     // already has NatPunchEnabled; the MissionManager answers the introduction requests.
@@ -63,27 +65,31 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         IPacketManager packetManager,
         IMessagePacketHandler messagePacketHandler,
         IConnectionMessageQueue connectionMessageQueue,
-        IServerAdmissionGate admissionGate,
-        IJoinPeerTerminator peerTerminator,
+        IServerJoinAdmission joinAdmission,
+        IPeerTerminator peerTerminator,
         IControllerIdProvider controllerIdProvider,
         IMissionManager missionManager,
         Lazy<IOverloadedPeerManager> overloadedPeerManager,
+        IUnresponsiveBattleHostManager unresponsiveBattleHostManager,
         ISendCoalescer coalescer,
         IUdpBindDiagnostics bindDiagnostics,
         ICommonSerializer serializer,
         IReliableMessageBatcher<NetPeer> reliableMessageBatcher,
-        CancellationTokenSource sessionCancellation)
-        : base(configuration, serializer, reliableMessageBatcher, sessionCancellation)
+        CancellationTokenSource sessionCancellation,
+        // Optional so the tests that build this server directly don't need a recorder.
+        IBattleBenchmarkRecorder battleBenchmark = null)
+        : base(configuration, serializer, reliableMessageBatcher, sessionCancellation, battleBenchmark)
     {
         // Dependancy assignment
         this.messageBroker = messageBroker;
         this.packetManager = packetManager;
         this.messagePacketHandler = messagePacketHandler;
         this.connectionMessageQueue = connectionMessageQueue;
-        this.admissionGate = admissionGate;
+        this.joinAdmission = joinAdmission;
         this.peerTerminator = peerTerminator;
         this.missionManager = missionManager;
         this.overloadedPeerManager = overloadedPeerManager;
+        this.unresponsiveBattleHostManager = unresponsiveBattleHostManager;
         this.coalescer = coalescer;
         this.bindDiagnostics = bindDiagnostics;
 
@@ -96,6 +102,14 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
     public override void OnConnectionRequest(ConnectionRequest request)
     {
+        // A connection check such as the tools' Check server button sends no full join data.
+        if (!HasPasswordData(request.Data))
+        {
+            Logger.Information("Client connection rejected for {Endpoint}: incomplete join data", request.RemoteEndPoint);
+            Reject(request, ConnectionRejectCode.IncorrectPassword);
+            return;
+        }
+
         string suppliedPassword;
         try
         {
@@ -116,7 +130,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         }
 
         // Checked after the password, so a wrong password learns nothing about a pending restart.
-        if (!admissionGate.IsOpen)
+        if (!joinAdmission.IsOpen)
         {
             Logger.Information("Client connection rejected for {Endpoint}: the server is restarting", request.RemoteEndPoint);
             Reject(request, ConnectionRejectCode.ServerRestarting);
@@ -125,6 +139,15 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
         Logger.Information("Client connection accepted for {Endpoint}", request.RemoteEndPoint);
         request.Accept();
+    }
+
+    // LiteNetLib prefixes a string with its byte count plus one, and GetString reads that many bytes without checking they arrived.
+    private static bool HasPasswordData(NetDataReader data)
+    {
+        if (data.AvailableBytes < sizeof(ushort)) return false;
+
+        int byteCount = Math.Max(data.PeekUShort() - 1, 0);
+        return data.AvailableBytes - sizeof(ushort) >= byteCount;
     }
 
     private static void Reject(ConnectionRequest request, ConnectionRejectCode code)
@@ -156,7 +179,9 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
     public override void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
     {
-        object received = serializer.Deserialize(reader.GetRemainingBytes());
+        byte[] payload = reader.GetRemainingBytes();
+        object received = serializer.Deserialize(payload);
+        battleBenchmark?.RecordPayloadReceived(received, payload.Length);
 
         if (received is IPacket packet)
         {
@@ -179,11 +204,11 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
     public override void OnPeerConnected(NetPeer peer)
     {
-        // Registered under the gate, so a shutdown closing it either drains this peer or it never joins.
-        if (admissionGate.TryAdmit(() => messageBroker.Publish(this, new PlayerConnected(peer)))) return;
+        // Registered inside `TryAdmit`, so a shutdown closing joins either drains this peer or it never joins.
+        if (joinAdmission.TryAdmit(() => messageBroker.Publish(this, new PlayerConnected(peer)))) return;
 
         Logger.Information("Client {Peer} disconnected before joining: the server is restarting", peer.Id);
-        peerTerminator.Disconnect(peer, ServerShutdownCoordinator.DisconnectReason);
+        peerTerminator.Disconnect(peer, DisconnectReasons.ServerRestarting);
     }
 
     public override void OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
@@ -195,6 +220,8 @@ public class CoopServer : CoopNetworkBase, ICoopServer
     public override void Update(TimeSpan frameTime)
     {
         overloadedPeerManager.Value.CheckForOverloadedPeers();
+        // Before the poll, so a host dropped here is reported as disconnected in this same update.
+        unresponsiveBattleHostManager.DisconnectUnresponsiveHosts();
 
         netManager.PollEvents();
         netManager.NatPunchModule.PollEvents();

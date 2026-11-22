@@ -12,14 +12,18 @@ namespace GameInterface.Tests;
 [Collection(nameof(CampaignCurrentCollection))]
 public class GameInterfacePatchInstallerTests
 {
-    private static List<Type> QuestPatchesOwnedBy(Harmony harmony)
+    private static List<Type> QuestPatchesOwnedBy(Harmony harmony) =>
+        CategoryPatchesOwnedBy(harmony, GameInterface.HARMONY_QUESTS_CATEGORY);
+
+    // The patch classes of one Harmony category that this harmony instance actually installed.
+    internal static List<Type> CategoryPatchesOwnedBy(Harmony harmony, string category)
     {
         return harmony.GetPatchedMethods()
             .Select(Harmony.GetPatchInfo)
             .SelectMany(info => info.Prefixes.Concat(info.Postfixes).Concat(info.Transpilers).Concat(info.Finalizers))
             .Where(patch => patch.owner == harmony.Id)
             .Select(patch => patch.PatchMethod.DeclaringType)
-            .Where(type => type.GetCustomAttribute<HarmonyPatchCategory>()?.info.category == GameInterface.HARMONY_QUESTS_CATEGORY)
+            .Where(type => type.GetCustomAttribute<HarmonyPatchCategory>()?.info.category == category)
             .Distinct()
             .ToList();
     }

@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -11,6 +12,12 @@ namespace GameInterface.Services.PlayerCaptivityService.Patches;
 internal class PlayerCaptivityRobustnessPatches
 {
     private static readonly ILogger Logger = LogManager.GetLogger<PlayerCaptivityRobustnessPatches>();
+
+    // Nobody plays the server's main hero, and an open captivity menu zeroes the campaign dt so no party AI thinks.
+    // Players' captivity runs in PlayerCaptivityServerHandler.
+    [HarmonyPatch(typeof(PlayerCaptivity), nameof(PlayerCaptivity.Update))]
+    [HarmonyPrefix]
+    private static bool Prefix_Update() => ModInformation.IsClient;
 
     [HarmonyPatch(typeof(PlayerCaptivity), nameof(PlayerCaptivity.Update))]
     [HarmonyFinalizer]

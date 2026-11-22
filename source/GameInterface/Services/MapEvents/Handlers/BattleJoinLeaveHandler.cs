@@ -180,7 +180,7 @@ internal class BattleJoinLeaveHandler : IHandler
 
     private static void SwitchSiegeJoinerToEncounterIfNeeded(MapEvent mapEvent)
     {
-        if (!mapEvent.IsSiegeAssault && !mapEvent.IsSallyOut)
+        if (!mapEvent.IsSiegeStyleJoin())
             return;
 
         if (MobileParty.MainParty?.MapEvent != mapEvent)
@@ -194,15 +194,10 @@ internal class BattleJoinLeaveHandler : IHandler
             return;
 
         // Involved-party snapshots can arrive before the encountered party is ready.
-        var encounteredParty = encounter._encounteredParty;
-        if (encounter._mapEvent == null && encounteredParty == null)
+        if (encounter._mapEvent == null && encounter._encounteredParty == null)
             return;
 
-        var encounterMapEvent = encounter._mapEvent ?? encounteredParty?.MapEvent ??
-            (encounteredParty?.IsSettlement == true
-                ? encounteredParty.SiegeEvent?.BesiegerCamp?.LeaderParty?.MapEvent
-                : null) ?? MapEvent.PlayerMapEvent;
-        if (encounterMapEvent != mapEvent)
+        if (encounter.GetBattleOrPlayerMapEvent() != mapEvent)
             return;
 
         GameMenu.SwitchToMenu("encounter");

@@ -212,7 +212,9 @@ public class ClanFinance : IClanFinance
         var party = member.PartyBelongedTo;
         if (party?.LeaderHero == member)
         {
-            int wage = ((DefaultClanFinanceModel)Campaign.Current.Models.ClanFinanceModel).CalculatePartyWage(party, Math.Max(0, member.Gold), applyWithdrawals);
+            var financeModel = Campaign.Current.Models.ClanFinanceModel;
+            var defaultModel = financeModel as DefaultClanFinanceModel ?? (DefaultClanFinanceModel)financeModel.BaseModel;
+            int wage = defaultModel.CalculatePartyWage(party, Math.Max(0, member.Gold), applyWithdrawals);
             if (applyWithdrawals)
             {
                 GiveGoldAction.ApplyBetweenCharacters(null, member, -wage, true);

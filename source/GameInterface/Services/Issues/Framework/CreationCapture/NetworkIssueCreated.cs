@@ -7,7 +7,7 @@ namespace GameInterface.Services.Issues.Framework.CreationCapture;
 /// Sent by the server so every client builds the same issue from the captured values.
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
-public readonly struct NetworkIssueCreated : IServerToClientCommand
+public readonly struct NetworkIssueCreated : ICommand
 {
     [ProtoMember(1)]
     public readonly string IssueOwnerId;

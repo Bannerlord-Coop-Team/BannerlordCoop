@@ -7,9 +7,6 @@ namespace GameInterface.Services.Alliances;
 [HarmonyPatch(typeof(AllianceCampaignBehavior))]
 internal class DisableAllianceCampaignBehavior
 {
-    [HarmonyPatch(nameof(AllianceCampaignBehavior.RegisterEvents))]
-    static bool RegisterEventsPrefix() => true;
-
     [HarmonyPatch(nameof(AllianceCampaignBehavior.DailyTickClan))]
     [HarmonyPrefix]
     private static bool DailyTickClanPrefix()

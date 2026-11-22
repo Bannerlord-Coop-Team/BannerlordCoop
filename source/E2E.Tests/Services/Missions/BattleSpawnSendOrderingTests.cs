@@ -56,7 +56,11 @@ public sealed class BattleSpawnSendOrderingTests
 
         var codec = new BattleAgentSpawnBatchCodec();
         NetworkSpawnBattleAgents spawn = CreateSpawn(codec);
-        Assert.True(fixture.Serializer.Serialize(spawn).Length < ReliableMessageBatcher<string>.DefaultBudgetBytes);
+        int relayBatchBytes = LiteNetP2PClient.CalculateMaxRelayPayloadBytes(
+            fixture.Serializer, "spawn-ordering-battle", FirstController, LiteNetP2PClient.SafeSinglePacketBytes)
+            - ReliableMessageBatcher<string>.EnvelopeHeaderBytes;
+        // Small enough to batch, so a bare spawn proves the immediate path rather than the size fallback.
+        Assert.True(fixture.Serializer.Serialize(spawn).Length < relayBatchBytes);
 
         switch (sendPath)
         {

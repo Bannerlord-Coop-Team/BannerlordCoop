@@ -66,6 +66,8 @@ internal static class LargeBattleRosterFixtureCommands
             new ExpectedArgs("first_party_or_controller_id", "First mobile party name or id, or a player controller id; quote names with spaces.", true),
             new ExpectedArgs("second_party_or_controller_id", "Second mobile party name or id, or a player controller id; quote names with spaces.", true),
             new ExpectedArgs("troops_per_party", "The troops per party.", true),
+            new ExpectedArgs("first_troop_id", $"The troop added to the first party; defaults to {FixtureTroopId}.", false),
+            new ExpectedArgs("second_troop_id", $"The troop added to the second party; defaults to {FixtureTroopId}.", false),
         };
 
         private readonly ICommandObjectResolver resolver;
@@ -109,12 +111,12 @@ internal static class LargeBattleRosterFixtureCommands
             }
             if (firstParty == secondParty)
                 return Failed("The fixture requires two distinct parties.");
-            if (!objectManager.TryGetObject(
-                    FixtureTroopId,
-                    out CharacterObject fixtureTroop))
-            {
-                return Failed($"Unable to resolve fixture troop {FixtureTroopId}.");
-            }
+            string firstTroopId = args.Count > 3 ? args[3] : FixtureTroopId;
+            string secondTroopId = args.Count > 4 ? args[4] : FixtureTroopId;
+            if (!objectManager.TryGetObject(firstTroopId, out CharacterObject firstTroop))
+                return Failed($"Unable to resolve fixture troop {firstTroopId}.");
+            if (!objectManager.TryGetObject(secondTroopId, out CharacterObject secondTroop))
+                return Failed($"Unable to resolve fixture troop {secondTroopId}.");
 
             var activeFixture = new LargeBattleRosterFixture
             {
@@ -125,13 +127,13 @@ internal static class LargeBattleRosterFixtureCommands
             fixture = activeFixture;
 
             firstParty.MemberRoster.AddToCounts(
-                fixtureTroop,
+                firstTroop,
                 addedPerParty);
             secondParty.MemberRoster.AddToCounts(
-                fixtureTroop,
+                secondTroop,
                 addedPerParty);
 
-            return Succeeded($"LARGE_BATTLE_ROSTER_FIXTURE_STARTED troop={FixtureTroopId} addedPerParty={addedPerParty}\n" +
+            return Succeeded($"LARGE_BATTLE_ROSTER_FIXTURE_STARTED troop={firstTroopId},{secondTroopId} addedPerParty={addedPerParty}\n" +
                 FormatState("active", firstParty, secondParty, null, null));
         }
     }

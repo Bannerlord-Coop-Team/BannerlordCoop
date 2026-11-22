@@ -12,7 +12,7 @@ The server uses the first folder that applies:
 2. The folder named by `BANNERLORD_USER_DIR`. The file sits directly in it, with no `CoopData` subfolder.
 3. The `CoopData` folder in the game's user folder, `Documents\Mount and Blade II Bannerlord\CoopData` on Windows. A dedicated server on the same account shares this file.
 
-If the file is missing, the server creates it from the `mod-config.default.json` that ships with the mod. The file is read once per session, so edits apply to the next session. The server may edit it in place to add difficulty settings that older templates left out or shipped as comments. Values you set are kept.
+If the file is missing, the server creates it from the `mod-config.default.json` that ships with the mod. The file is read once per session, so edits apply to the next session. When it loads, the server adds any setting that is new in the shipped template, so a deleted setting comes back with its default value. A setting you comment out with `//` stays out of the file. Values you set are kept.
 
 An older `mod-config.json` directly in `Documents\Mount and Blade II Bannerlord` is not read.
 

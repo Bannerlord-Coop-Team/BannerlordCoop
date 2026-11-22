@@ -13,6 +13,8 @@
 - **Don't invent new patterns or naming schemes.** Find how the codebase already solves the same problem and match it, reusing the existing suffixes (`*Handler`, `*Patches`, `*Registry`, `*Interface`) and mechanisms.
 - A novel concept such as a `SomeFeatureSentinel` class, or a homegrown mechanism next to an existing one, makes the code harder to navigate and gets flagged in review. If nothing existing fits, ask before introducing something new.
 - Before adding a helper, grep for an existing one of the same shape and reuse it.
+- Don't add a private method that only wraps one or two existing calls. Write the guards inline at the call site, like `if (!playerManager.IsSenderControllingParty(payload.Who, data.MobilePartyId)) return;`.
+- When several handlers need the same check, add it once to the shared service, like `IPlayerManager`, instead of a private copy in each handler.
 
 Use the existing framework for each of these instead of building a parallel one:
 
@@ -29,6 +31,13 @@ Use the existing framework for each of these instead of building a parallel one:
 | Add a console or debug command | an `ICoopCommand` registered in the owning module, not a new `[CommandLineArgumentFunction]` method |
 | Lay out a feature | `Services/<Feature>/` with `Commands`, `Handlers`, `Interfaces`, `Messages` and `Patches` folders, plus `<Feature>Registry`/`<Feature>Sync` |
 | Fake dependencies in unit tests | `RegisterMock<T>` in `Coop.Tests/TestComponentBase.cs` |
+| Read per-client state or a service from a Harmony patch | resolve it inside the patch with `ContainerProvider.TryResolve<T>`, and run vanilla when the resolve fails |
+| Hold state that Missions writes and GameInterface patches read | an interface plus a `*Registry`/`*Tracker` in GameInterface, registered `InstancePerLifetimeScope`, like `IBattleHostRegistry` |
+| Let GameInterface ask Missions a question | an interface declared in GameInterface, implemented in Missions and registered in `MissionModule`, like `ICoopBattleBehaviorAttacher` |
+| Carry context through a vanilla call, such as "dont capture this spawn" | `AllowedThread` on the receive path, otherwise an `IDisposable` scope from an injected service that restores the previous value on dispose |
+| Give a vanilla mission behavior per-mission data | a `Coop<Vanilla>` subclass built by the launcher, like `CoopSiegeDeploymentMissionController` |
+
+Don't add a `static` class, or a `*Gate`, that other code writes and patches read as ambient state. The usual reason given, "patches are static so they can't resolve DI", isn't true here, because patches resolve through `ContainerProvider`. A static also leaks between E2E client instances, which share one process. Decompile the vanilla type before patching too, because vanilla often already has the switch (for example `GauntletChatLogView.SetEnabled`).
 
 ## Classes, Interfaces, and DI
 
@@ -52,8 +61,15 @@ Use the existing framework for each of these instead of building a parallel one:
 
 - Don't validate inputs that are always valid, such as constructor-injected dependencies (Autofac never injects null).
 - Validate only where bad data can actually arrive, like network message contents or game state that can really be gone by the time a message applies.
+- Co-op assumes people are playing with their friends, so cheating gets dealt with in house and the mod isn't responsible for anti-cheat. Don't add validation or tests whose only justification is stopping a cheating, malicious or modified client or a forged packet. A check, including one on network message contents, is justified by an honest failure path like a double-click, race, disconnect or stale local state.
 - When a check is warranted, use the statement form `if (x == null) throw ...`, not `x ?? throw new ArgumentNullException(...)`.
 - Data and message types just assign.
+- Don't add a role check to a handler that only runs on one side. A message only clients send only reaches the server, so `ModInformation.IsServer` in its handler doesn't do anything.
+
+## Tests
+
+- Test a shared guard once, at the shared method, not again for every handler that calls it. Add a handler test only when that handler has its own logic around the guard.
+- A test has to reach the behavior it's named for. One that stops at an earlier reply only shows the request got through.
 
 ## Campaign Behaviors
 

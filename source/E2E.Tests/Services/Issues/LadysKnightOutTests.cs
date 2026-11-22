@@ -4,6 +4,7 @@ using Common.Network;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
+using GameInterface.Tests.Utils;
 using Common.Network.Messages;
 using Coop.Core.Server.Connections.Messages;
 using HarmonyLib;
@@ -131,7 +132,9 @@ public class LadysKnightOutTests : IDisposable
         scenario.Server.Call(() =>
         {
             var serverQuest = (Quest)scenario.QuestOf(scenario.Server);
-            Assert.Empty(serverQuest.JournalEntries);
+            Assert.Single(serverQuest.JournalEntries);
+            Assert.Equal(Assert.Single(quest.JournalEntries).LogText.ToString(),
+                Assert.Single(serverQuest.JournalEntries).LogText.ToString());
             Assert.DoesNotContain(serverQuest, Campaign.Current.QuestManager.Quests);
         });
     }
@@ -534,8 +537,8 @@ public class LadysKnightOutTests : IDisposable
             {
                 settlement.SetSettlementComponent(village);
                 village.Bound = giver.CurrentSettlement;
-                mapEvent.MapEventSettlement = settlement;
-                mapEvent._mapEventType = type;
+                mapEvent.SetBattleType(type);
+                mapEvent.SetMapEventSettlement(settlement);
             }
             CampaignEventDispatcher.Instance.OnMapEventStarted(mapEvent, owner.PartyBelongedTo.Party, null);
         });
@@ -554,7 +557,7 @@ public class LadysKnightOutTests : IDisposable
         scenario.Server.Call(() => scenario.Server.Resolve<IOutcomeDispatcher>().RunAsOwners<Quest>(serverQuest =>
         {
             var mapEvent = ObjectHelper.SkipConstructor<MapEvent>();
-            using (new AllowedThread()) mapEvent.MapEventSettlement = serverQuest.QuestGiver.CurrentSettlement;
+            using (new AllowedThread()) mapEvent.SetMapEventSettlement(serverQuest.QuestGiver.CurrentSettlement);
             before = serverQuest.QuestGiver.Power;
             QuestHelper.ApplyGenericMinorMajorCoercionConsequences(serverQuest, mapEvent);
             after = serverQuest.QuestGiver.Power;
@@ -585,7 +588,7 @@ public class LadysKnightOutTests : IDisposable
         byte[] serverStart = Array.Empty<byte>();
         scenario.Server.Call(() => serverStart = scenario.Server.SerializeForWire(
             new NetworkIssueJournal(scenario.NotableId, QuestScenario.IssueId, false,
-                new[] { Assert.Single(scenario.Server.GetRegisteredObject<Hero>(scenario.NotableId).Issue.JournalEntries).LogText })));
+                new[] { new IssueJournalEntry(Assert.Single(scenario.Server.GetRegisteredObject<Hero>(scenario.NotableId).Issue.JournalEntries)) })));
         scenario.ClientA.Call(() =>
         {
             var issue = scenario.ClientA.GetRegisteredObject<Hero>(scenario.NotableId).Issue;
@@ -595,7 +598,7 @@ public class LadysKnightOutTests : IDisposable
             var giver = Assert.IsType<TextObject>(start.Attributes["ISSUE_OWNER"]);
             Assert.Equal("Test Lady Clan", Assert.IsType<TextObject>(giver.Attributes["FACTION"]).Value);
             var snapshot = scenario.ClientA.DeserializeFromWire<NetworkIssueJournal>(serverStart);
-            Assert.Equal(Assert.Single(snapshot.Logs).ToString(), start.ToString());
+            Assert.Equal(Assert.Single(snapshot.Logs).Text.ToString(), start.ToString());
             var history = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
                 entry => entry.IsRelatedTo(issue)));
             Assert.False(history.IsEnded());

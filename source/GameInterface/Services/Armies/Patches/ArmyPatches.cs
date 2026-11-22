@@ -34,6 +34,10 @@ public class ArmyPatches
     private static ILogger Logger = LogManager.GetLogger<Kingdom>();
     private static readonly ConditionalWeakTable<Army, object> LongTermBehaviorTextFailures = new();
 
+    [HarmonyPatch(nameof(Army.OnSettlementOwnerChanged))]
+    [HarmonyPrefix]
+    private static bool OnSettlementOwnerChangedPrefix() => ModInformation.IsServer;
+
     [HarmonyPatch(nameof(Army.OnAddPartyInternal))]
     [HarmonyPrefix]
     static bool OnAddPartyInternalPrefix(ref Army __instance, MobileParty mobileParty)
@@ -231,7 +235,7 @@ public class ArmyPatches
         Army army,
         MobileParty clientMobileParty)
     {
-        if (!army._parties.Contains(mobileParty))
+        if (!IsListedMember(mobileParty, army))
         {
             ReleaseHalfRemovedParty(mobileParty, army, clientMobileParty);
             return;
@@ -323,7 +327,6 @@ public class ArmyPatches
             {
                 Campaign.Current.CameraFollowParty = mobileParty.Party;
             }
-            army.StopTrackingTargetSettlement();
         }
         mobileParty.Party.SetVisualAsDirty();
         if (clientMobileParty != null)
@@ -348,6 +351,18 @@ public class ArmyPatches
 
     private static bool IsAttachedToLeader(MobileParty mobileParty, Army army) =>
         army.LeaderParty != null && mobileParty.AttachedTo == army.LeaderParty;
+
+    // A stale entry, listed twice or in an army the party already left, is dropped without a leave. Its leave would
+    // strip the party from its real army, and vanilla's removal notification reads the army name of a party with none
+    private static bool IsListedMember(MobileParty mobileParty, Army army)
+    {
+        if (!army._parties.Contains(mobileParty)) return false;
+        if (mobileParty._army == army) return true;
+
+        Logger.Warning("Dropping stale entry of {PartyId} from army {ArmyName}", mobileParty.StringId, army.Name);
+        army._parties.Remove(mobileParty);
+        return false;
+    }
 
     // A removal that stopped after _parties.Remove (#3892) leaves the party linked to this army but out
     // of its list, so the normal removal and both disband paths would skip it. A party that joined

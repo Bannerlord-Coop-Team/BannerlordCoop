@@ -17,8 +17,11 @@ internal class StartIssueWithQuestDispatchPatch
     {
         if (ModInformation.IsClient && !CallOriginalPolicy.IsOriginalAllowed() &&
             !__instance.IsOngoingWithoutQuest && ContainerProvider.TryResolve<IQuestTypeRegistry>(out var registry) &&
-            registry.IsRegistered(__instance.GetType()))
+            registry.IsRegistered(__instance.GetType()) &&
+            ContainerProvider.TryResolve<IIssueConversationGuard>(out var conversationGuard))
         {
+            // No quest is made, so nothing would answer the accept line
+            conversationGuard.EndUnavailableAccept(__instance.IssueOwner);
             // IssueManager treats false as a failed offer and finalizes the existing issue.
             __result = true;
             return false;

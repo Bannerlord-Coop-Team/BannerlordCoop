@@ -4,7 +4,7 @@ using ProtoBuf;
 namespace GameInterface.Services.MapEventSides.Messages;
 
 [ProtoContract]
-public readonly struct NetworkAddBattleParty : IServerToClientCommand
+public readonly struct NetworkAddBattleParty : ICommand
 {
     [ProtoMember(1)]
     public readonly string MapEventSideId;

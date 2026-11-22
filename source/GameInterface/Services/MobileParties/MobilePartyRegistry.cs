@@ -69,7 +69,6 @@ internal class MobilePartyRegistry : AutoRegistryBase<MobileParty>
             obj.IsActive = true;
             obj._isCurrentlyUsedByAQuest = false;
             obj.Party = new PartyBase(obj);
-            obj.Anchor = new AnchorPoint(obj);
             obj.InitMembers();
             obj.InitCached();
             obj.Initialize();

@@ -6,6 +6,7 @@ using Coop.Core.Client.States;
 using GameInterface.Services.Caravans;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.MobileParties;
+using GameInterface.Services.NavalDLC;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Smithing;
 using GameInterface.Services.UI.Interfaces;
@@ -47,11 +48,12 @@ namespace Coop.Tests.Client.States
                 new WorkshopPlayerData(new()),
                 new CaravansPlayerData(new(), new()),
                 new AlleyPlayerData(new()),
-                new InteractionsPlayerData(new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new()),
+                new InteractionsPlayerData(new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new()),
                 new TradePlayerData(new(), new(), new(), new(), new()),
                 new InventoryPlayerData(new(), new()),
                 new HeroMeetingData(new()),
                 new AgingPlayerData(new()),
+                new NavalPlayerData(new(), new(), new(), new()),
                 new AttachmentIdMap(new(), new()),
                 new ServerOptions(new()));
 

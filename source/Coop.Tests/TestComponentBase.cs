@@ -18,6 +18,7 @@ using GameInterface.Registry.Auto;
 using GameInterface.Services.CampaignService.Interfaces;
 using GameInterface.Services.Chat;
 using GameInterface.Services.Voice;
+using GameInterface.Services.Villages;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.MapTracking;
@@ -39,8 +40,10 @@ using GameInterface.Services.Modules.Validators;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.Players.Interfaces;
 using GameInterface.Services.Save.Interfaces;
 using GameInterface.Services.Settlements.Interfaces;
+using GameInterface.Services.Ships;
 using GameInterface.Services.SiegeEvents;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using GameInterface.Services.Time.Interfaces;
@@ -142,6 +145,7 @@ internal abstract class TestComponentBase
         RegisterMock<ISiegeEventInterface>(builder);
         RegisterMock<ISiegeBreakOut>(builder);
         RegisterMock<IAttachmentIdMapper>(builder);
+        RegisterMock<ILootShipHold>(builder);
         RegisterMock<IAutoRegistryFactory>(builder);
         RegisterMock<IBattleTroopReserveBuilder>(builder);
         RegisterMock<IMapEventInitializationBarrier>(builder);
@@ -152,11 +156,18 @@ internal abstract class TestComponentBase
         RegisterMock<IPlatformDisplayNameProvider>(builder);
         RegisterMock<IVoiceClient>(builder);
         RegisterMock<IChatPlayerNameResolver>(builder);
+        RegisterMock<IChatFactionMembership>(builder);
         // BattleHostHandler (MissionModule, auto-activated) needs the registry and the troop ledger,
         // which the real containers get from GameInterfaceModule — not loaded here.
         RegisterMock<IBattleHostRegistry>(builder);
+        RegisterMock<IBattleHostRetentionPolicy>(builder);
         RegisterMock<IBattleTroopLedger>(builder);
         RegisterMock<IRetreatedMapEventPartyTracker>(builder);
+        // ServerBattleShipFateHandler (ServerModule, auto-activated) holds and applies naval ship fates through these, and
+        // ServerNavalNpcFleetAttemptHandler records the AI fleet attempts in the tracker.
+        RegisterMock<IBattleShipFateLedger>(builder);
+        RegisterMock<IBattleShipFateApplier>(builder);
+        RegisterMock<INavalNpcFleetAttemptTracker>(builder);
         // LocationHostHandler (MissionModule, auto-activated) needs its registry the same way.
         RegisterMock<ILocationHostRegistry>(builder);
         // AgentHitSoundFixtureHandler (MissionModule, auto-activated in DEBUG) needs the args factory,
@@ -165,12 +176,15 @@ internal abstract class TestComponentBase
         RegisterMock<IRaidAiInterventionConfigInterface>(builder);
         RegisterMock<ITacticalUnitSymbolsConfigInterface>(builder);
         RegisterMock<IVillageHostileActionInterface>(builder);
+        RegisterMock<IClientVillageHostileActionTracker>(builder);
         RegisterMock<IIssueOwnershipRegistry>(builder);
         RegisterMock<IQuestFeatureFlag>(builder);
         RegisterMock<IEducationCampaignBehaviorInterface>(builder);
         RegisterMock<IServerOptionsProvider>(builder);
         RegisterMock<ISteamBanList>(builder);
         RegisterMock<ISaveNotificationInterface>(builder);
+        RegisterMock<IPlayerMessageInterface>(builder);
+        RegisterMock<ICoopCommandArgsFactory>(builder);
 
         // ISaveInterface is consumed by TransferSaveState's constructor, which packages a save the
         // moment the state is entered. Give it a non-null default so simply entering the state does

@@ -1,7 +1,6 @@
 ﻿using Common.Messaging;
 using Common.Network;
 using Common.Util;
-using Coop.Core.Server.Services.Kingdoms.Messages;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Services.MapEvents;
 using GameInterface.Services.Buildings.Messages;
@@ -10,6 +9,7 @@ using GameInterface.Services.Clans;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.CampaignService.Messages;
 using GameInterface.Services.Entity;
+using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Heroes.HeirSelection.Interfaces;
 using GameInterface.Services.Heroes.HeirSelection.Messages;
 using GameInterface.Services.Kingdoms.Data;
@@ -20,6 +20,7 @@ using GameInterface.Services.Settlements;
 using GameInterface.Services.Settlements.Messages;
 using GameInterface.Services.Workshops.Interfaces;
 using HarmonyLib;
+using Moq;
 using SandBox.GauntletUI.Menu;
 using SandBox.View.Menu;
 using TaleWorlds.CampaignSystem.Actions;
@@ -32,6 +33,7 @@ using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Buildings;
 using TaleWorlds.CampaignSystem.ViewModelCollection.GameMenu.TownManagement;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Clans;
@@ -424,6 +426,80 @@ public class CoopClanFlowTests : MapEventTestBase, IDisposable
         }
     }
 
+    // Divorce must end the vanilla Marriage romance level everywhere, and remarrying must restore it.
+    [Fact]
+    public void Divorce_EndsMarriageRomanceUntilRemarriage()
+    {
+        Server.Call(() =>
+        {
+            var first = Get<Hero>(Server, leader.HeroId);
+            var second = Get<Hero>(Server, member.HeroId);
+            first.IsFemale = false;
+            second.IsFemale = true;
+            Assert.True(Server.Resolve<IPlayerMarriageRules>().TryApply(first, second, false));
+            Assert.True(Server.Resolve<IPlayerDivorceRules>().TryApply(second, first, leaveClan: false));
+        });
+        Flush();
+        foreach (var instance in Clients.Prepend(Server))
+        {
+            instance.Call(() =>
+            {
+                var first = Get<Hero>(instance, leader.HeroId);
+                var second = Get<Hero>(instance, member.HeroId);
+                Assert.Null(first.Spouse);
+                Assert.Equal(Romance.RomanceLevelEnum.Ended, Romance.GetRomanticLevel(first, second));
+            });
+        }
+
+        Server.Call(() => Assert.True(Server.Resolve<IPlayerMarriageRules>().TryApply(
+            Get<Hero>(Server, leader.HeroId), Get<Hero>(Server, member.HeroId), false)));
+        Flush();
+        foreach (var instance in Clients.Prepend(Server))
+        {
+            instance.Call(() => Assert.Equal(Romance.RomanceLevelEnum.Marriage,
+                Romance.GetRomanticLevel(Get<Hero>(instance, leader.HeroId), Get<Hero>(instance, member.HeroId))));
+        }
+    }
+
+    // A departure that fails after the divorce must not be reported as done, and the member stays in the clan.
+    [Fact]
+    public void DivorceAndLeave_DepartureFails_ReportsFailureAndKeepsMemberInClan()
+    {
+        var leaveRules = new Mock<IClanLeaveRules>();
+        leaveRules.Setup(rules => rules.CanLeaveAfterDivorce(It.IsAny<Hero>())).Returns(true);
+        Server.Call(() =>
+        {
+            var first = Get<Hero>(Server, leader.HeroId);
+            var second = Get<Hero>(Server, member.HeroId);
+            first.IsFemale = false;
+            second.IsFemale = true;
+            Assert.True(Server.Resolve<IPlayerMarriageRules>().TryApply(first, second, false));
+        });
+        Flush();
+        var noticesBefore = Clients.ToDictionary(client => client,
+            client => client.InternalMessages.GetMessages<SendInformationMessage>().Count());
+
+        Server.Call(() => Assert.False(new PlayerDivorceRules(leaveRules.Object, Server.Resolve<IPlayerManager>(),
+                Server.Resolve<IMessageBroker>(), Server.Resolve<INetwork>())
+            .TryApply(Get<Hero>(Server, member.HeroId), Get<Hero>(Server, leader.HeroId), leaveClan: true)));
+        Flush();
+
+        leaveRules.Verify(rules => rules.TryApply(It.IsAny<Hero>(), false), Times.Once);
+        foreach (var instance in Clients.Prepend(Server))
+        {
+            instance.Call(() =>
+            {
+                var first = Get<Hero>(instance, leader.HeroId);
+                var second = Get<Hero>(instance, member.HeroId);
+                Assert.Null(second.Spouse);
+                Assert.Same(first.Clan, second.Clan);
+            });
+        }
+        // Each player hears about the divorce and about the failed departure.
+        foreach (var client in Clients)
+            Assert.Equal(noticesBefore[client] + 2, client.InternalMessages.GetMessages<SendInformationMessage>().Count());
+    }
+
     // S01, S02, S17, S21: personal succession must preserve the controller, party and original clan.
     [Theory]
     [InlineData(false)]
@@ -442,6 +518,7 @@ public class CoopClanFlowTests : MapEventTestBase, IDisposable
             heir.SetBirthDay(CampaignTime.YearsFromNow(-20));
             heir.Father = original;
             heir.Clan = original.Clan;
+            heir.CanRaid = false;
             Get<MobileParty>(Server, player.MobilePartyId).MemberRoster.AddToCounts(heir.CharacterObject, 1);
             Server.Resolve<IHeirSelectionCampaignBehaviorInterface>().PrepareSuccession(original);
             original.AddDeathMark(null, KillCharacterAction.KillCharacterActionDetail.DiedInBattle);
@@ -462,6 +539,8 @@ public class CoopClanFlowTests : MapEventTestBase, IDisposable
                 var heir = Get<Hero>(instance, heirId);
                 Assert.Same(heir, Get<MobileParty>(instance, player.MobilePartyId).LeaderHero);
                 Assert.Equal(leaderDies, heir.Clan.Leader == heir);
+                // The new player character's party commands are reset.
+                Assert.True(heir.CanRaid);
             });
         }
         if (!leaderDies)
@@ -622,6 +701,105 @@ public class CoopClanFlowTests : MapEventTestBase, IDisposable
                 Assert.Equal(member.HeroId, player.HeroId);
             });
         }
+    }
+
+    // #4656: the member's map must redraw markers whose war stance flips on a clan join or leave, which vanilla only does on war, peace or kingdom changes.
+    [Fact]
+    public void JoinThenLeave_MapRedrawsOnlyMarkersWhoseStanceFlips()
+    {
+        var enemyPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var sharedEnemyPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var neutralPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        var townId = TestEnvironment.CreateRegisteredObject<Town>();
+        var enemyKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var markerPartyIds = new[] { enemyPartyId, sharedEnemyPartyId, neutralPartyId };
+        // The enemy clan rules a kingdom, like Sturgia, and owns the town, so both markers' stance comes from the kingdom.
+        foreach (var instance in Clients.Prepend(Server))
+        {
+            instance.Call(() =>
+            {
+                using var scope = new AllowedThread();
+                var town = Get<Town>(instance, townId);
+                var enemyClan = Get<MobileParty>(instance, enemyPartyId).LeaderHero.Clan;
+                var enemyKingdom = Get<Kingdom>(instance, enemyKingdomId);
+                enemyClan._kingdom = enemyKingdom;
+                enemyKingdom._rulingClan = enemyClan;
+                enemyKingdom._clans ??= new();
+                if (!enemyKingdom._clans.Contains(enemyClan)) enemyKingdom._clans.Add(enemyClan);
+                Get<Settlement>(instance, settlementId).SetSettlementComponent(town);
+                town._ownerClan = enemyClan;
+            });
+        }
+        // The enemy kingdom fights only the joined clan, so its markers flip on join. The shared enemy fights both clans, so its marker
+        // stays an enemy and must not be redrawn (and the joiner's only war is one the target shares, as IncompatibleWars requires).
+        Server.Call(() =>
+        {
+            var joinedClan = Get<Clan>(Server, leader.ClanId);
+            var enemyKingdom = Get<Kingdom>(Server, enemyKingdomId);
+            var sharedEnemyClan = Get<MobileParty>(Server, sharedEnemyPartyId).LeaderHero.Clan;
+            DeclareWarAction.ApplyByPlayerHostility(joinedClan, enemyKingdom);
+            DeclareWarAction.ApplyByPlayerHostility(joinedClan, sharedEnemyClan);
+            DeclareWarAction.ApplyByPlayerHostility(Get<Clan>(Server, member.ClanId), sharedEnemyClan);
+        });
+        Flush();
+        memberClient.Call(() =>
+        {
+            var settlement = Get<Settlement>(memberClient, settlementId);
+            // The harness doesn't list created settlements in Settlement.All, which the map walks.
+            var settlements = new MBList<Settlement>(Settlement.All ?? new MBList<Settlement>());
+            settlements.Add(settlement);
+            Campaign.Current.CampaignObjectManager.Settlements = settlements;
+            settlement._isVisible = true;
+            foreach (var id in markerPartyIds)
+                Get<MobileParty>(memberClient, id)._isVisible = true;
+        });
+
+        // Preconditions: the enemy markers resolve to the enemy kingdom, which isn't at war with the member yet, and the shared enemy already is.
+        memberClient.Call(() =>
+        {
+            var settlement = Get<Settlement>(memberClient, settlementId);
+            var sharedEnemyParty = Get<MobileParty>(memberClient, sharedEnemyPartyId);
+            var enemyKingdom = Get<Kingdom>(memberClient, enemyKingdomId);
+            Assert.Same(enemyKingdom, settlement.MapFaction);
+            Assert.Same(enemyKingdom, Get<MobileParty>(memberClient, enemyPartyId).MapFaction);
+            Assert.False(FactionManager.IsAtWarAgainstFaction(settlement.MapFaction, Hero.MainHero.MapFaction));
+            Assert.True(FactionManager.IsAtWarAgainstFaction(sharedEnemyParty.MapFaction, Hero.MainHero.MapFaction));
+        });
+
+        // Clears the member's marker dirty flags so the following asserts prove the next clan change redrew them.
+        void ClearMarkerFlags() => memberClient.Call(() =>
+        {
+            Get<Settlement>(memberClient, settlementId).Party.OnVisualsUpdated();
+            foreach (var id in markerPartyIds)
+                Get<MobileParty>(memberClient, id).Party.OnVisualsUpdated();
+        });
+
+        ClearMarkerFlags();
+        Join();
+
+        memberClient.Call(() =>
+        {
+            var settlement = Get<Settlement>(memberClient, settlementId);
+            Assert.True(FactionManager.IsAtWarAgainstFaction(settlement.MapFaction, Hero.MainHero.MapFaction));
+            Assert.True(Get<MobileParty>(memberClient, enemyPartyId).Party.IsVisualDirty);
+            Assert.True(settlement.Party.IsVisualDirty);
+            Assert.False(Get<MobileParty>(memberClient, sharedEnemyPartyId).Party.IsVisualDirty);
+            Assert.False(Get<MobileParty>(memberClient, neutralPartyId).Party.IsVisualDirty);
+        });
+
+        ClearMarkerFlags();
+        Send(memberClient, new RequestClanMemberLeave(member.HeroId, member.HeroId));
+        Flush();
+
+        memberClient.Call(() =>
+        {
+            var enemyParty = Get<MobileParty>(memberClient, enemyPartyId);
+            Assert.Same(Get<Clan>(memberClient, member.ClanId), Hero.MainHero.Clan);
+            Assert.False(FactionManager.IsAtWarAgainstFaction(enemyParty.MapFaction, Hero.MainHero.MapFaction));
+            Assert.True(enemyParty.Party.IsVisualDirty);
+            Assert.True(Get<Settlement>(memberClient, settlementId).Party.IsVisualDirty);
+        });
     }
 
     private Player CreatePlayer(EnvironmentInstance client, string controllerId)

@@ -162,7 +162,7 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
             if (!objectManager.TryGetId(party, out var partyId))
                 continue;
 
-            // Who fields this party: its own player; or — for an AI party in a player-led army — that army
+            // Who fields this party: its own player; or — for an AI party in a player-led army on land — that army
             // leader (#3 "army leader deploys the army"); or, when no player does (including a player that
             // DROPPED from this battle and hasn't returned), the host.
             if (!ledger.TryGetReserve(mapEventId, partyId, out var entries, out var supplied))
@@ -181,7 +181,8 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
 
             TryGetOwningPlayer(party, absentControllers, presentControllers, out var partyOwnerController);
             TryGetArmyLeaderPlayer(party, absentControllers, presentControllers, out var armyLeaderController);
-            var owningController = ResolveOwningController(partyOwnerController, armyLeaderController, absentControllers);
+            var owningController = ResolveOwningController(partyOwnerController, armyLeaderController, absentControllers,
+                atSea: mapEvent.IsNavalMapEvent);
 
             // Only a present player's own party reserves a player slot. Offline or absent registrations fall
             // to the host and must not reduce the allocation available to the players who entered this battle.
@@ -433,7 +434,10 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
         foreach (var element in roster)
         {
             if (element.IsRouted || element.IsKilled)
+            {
+                LogSkippedHero(party, element.Troop, element.IsRouted ? "routed" : "killed");
                 continue;
+            }
 
             var character = element.Troop;
             if (character == null)
@@ -444,6 +448,7 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
             // Skip if the troop is not a player, or if the config option is disabled and they are a player + wounded.
             if (element.IsWounded && !(isPlayer && ModConfigProvider.ModOptions.PlayerWoundedBattleEntry))
             {
+                LogSkippedHero(party, character, isPlayer ? "wounded, PlayerWoundedBattleEntry off" : "wounded, not a player hero");
                 continue;
             }
 
@@ -473,6 +478,15 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
         if (supplyOrders != null)
             entries.Sort((left, right) => left.SupplyOrder.CompareTo(right.SupplyOrder));
         return entries;
+    }
+
+    // Logs a hero this builder skips (routed, killed or wounded); a hero knocked out earlier isn't in the roster at all.
+    private static void LogSkippedHero(MapEventParty party, CharacterObject character, string reason)
+    {
+        if (character?.IsHero != true) return;
+
+        Logger.Debug("[TroopSupply] Left hero {Char} out of the reserve of {Party}: {Reason}",
+            character.StringId, party.Party?.Name?.ToString(), reason);
     }
 
     private FlattenedTroopRoster BuildSiegeAmbushPriorityRoster(
@@ -614,14 +628,17 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
 
     /// <summary>
     /// The controller that owns a party's reserve, or null if no present player does (so the host fields it).
-    /// A party's own player wins; an AI party (no own player) in a player-led army falls to that army leader.
+    /// A party's own player wins. An AI party (no own player) in a player-led army falls to that army leader on land; when
+    /// <paramref name="atSea"/>, it falls to the host, which fields every AI party of a naval side on the ally team.
     /// An owner in <paramref name="absentControllers"/> (dropped from the battle, not yet returned) resolves
     /// to null: its parties fall to the host until it re-enters, at which point the caller re-issues both
     /// scopes (the returner's grant and the host's shrunk refresh).
     /// </summary>
     internal static string ResolveOwningController(string partyOwnerController, string armyLeaderController,
-        IReadOnlyCollection<string> absentControllers = null)
+        IReadOnlyCollection<string> absentControllers = null, bool atSea = false)
     {
+        if (atSea) armyLeaderController = null;
+
         var owner = partyOwnerController ?? armyLeaderController;
         if (owner != null && absentControllers != null && absentControllers.Contains(owner))
             return null;

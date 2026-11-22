@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Util;
 using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
@@ -13,12 +14,35 @@ namespace GameInterface.Services.Issues.Framework.AcceptCoordination;
 [HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 internal class AlternativeSolutionPickerPatches
 {
+    private sealed class SelectionState : System.IDisposable
+    {
+        private readonly AllowedThread allowedThread;
+
+        public SelectionState() => allowedThread = new AllowedThread();
+
+        public void Dispose() => allowedThread.Dispose();
+    }
+
     [HarmonyPatch(typeof(IssuesCampaignBehavior), nameof(IssuesCampaignBehavior.issue_offer_player_accept_alternative_3_consequence))]
     [HarmonyPrefix]
-    private static void CompanionPrefix()
+    private static void CompanionPrefix(out SelectionState __state)
     {
+        __state = null;
+        if (ModInformation.IsClient &&
+            Hero.OneToOneConversationHero?.Issue != null &&
+            ContainerProvider.TryResolve<IQuestTypeRegistry>(out var registry) &&
+            registry.TryGet(Hero.OneToOneConversationHero.Issue.GetType(), out var descriptor) &&
+            descriptor.AlternativeSolutionAcceptStrategy != null)
+        {
+            __state = new SelectionState();
+        }
+
         OpenPrefix();
     }
+
+    [HarmonyPatch(typeof(IssuesCampaignBehavior), nameof(IssuesCampaignBehavior.issue_offer_player_accept_alternative_3_consequence))]
+    [HarmonyFinalizer]
+    private static void CompanionFinalizer(SelectionState __state) => __state?.Dispose();
 
     [HarmonyPatch(typeof(IssuesCampaignBehavior), nameof(IssuesCampaignBehavior.issue_offer_player_accept_alternative_4_consequence))]
     [HarmonyPrefix]
@@ -43,7 +67,8 @@ internal class AlternativeSolutionPickerPatches
         var issue = Hero.OneToOneConversationHero?.Issue;
         if (ModInformation.IsClient && issue != null && ContainerProvider.TryResolve<IAlternativeSolutionPicker>(out var picker))
         {
-            picker.Close(issue, cancel: true);
+            // This line runs from the picker's closed callback, and PartyScreenHelper pops the screen itself once that returns
+            picker.Close(issue, cancel: true, popScreen: false);
             return false;
         }
         return true;
@@ -54,6 +79,6 @@ internal class AlternativeSolutionPickerPatches
     private static void FinalizedPrefix(IssueBase __instance)
     {
         if (ModInformation.IsClient && ContainerProvider.TryResolve<IAlternativeSolutionPicker>(out var picker))
-            picker.Close(__instance, cancel: true);
+            picker.Close(__instance, cancel: true, popScreen: true);
     }
 }

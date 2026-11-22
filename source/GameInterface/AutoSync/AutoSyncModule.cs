@@ -52,7 +52,8 @@ internal class AutoSyncModule : Module
             .Where(t => t.GetInterface(nameof(IAutoSync)) != null &&
                         t.IsClass &&
                         t.IsGenericType == false &&
-                        t.IsAbstract == false);
+                        t.IsAbstract == false &&
+                        GameInterfaceModule.ShouldRegister(t));
         return types;
     }
 }

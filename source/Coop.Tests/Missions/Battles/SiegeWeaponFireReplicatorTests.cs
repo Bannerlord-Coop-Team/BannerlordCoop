@@ -78,7 +78,7 @@ public class SiegeWeaponFireReplicatorTests
             broker.Object,
             Mock.Of<INetworkAgentRegistry>(),
             Mock.Of<IBattleSession>(),
-            machineState.Object, Mock.Of<ISiegeGateHitApplier>(), new HostEpochPolicy());
+            machineState.Object, Mock.Of<ISiegeGateHitApplier>(), new HostEpochPolicy(), Mock.Of<IRangedSiegeWeaponPresentation>());
 
         Assert.NotNull(receive);
         var future = Fire(machineId, "owner-a", 7, 4);
@@ -114,7 +114,7 @@ public class SiegeWeaponFireReplicatorTests
         Assert.False(machineState.Object.TryGetMachineAuthority(machineId, out _, out _, out _));
         using var sut = new SiegeWeaponFireReplicator(Mock.Of<IBattleNetwork>(), broker.Object,
             Mock.Of<INetworkAgentRegistry>(), Mock.Of<IBattleSession>(), machineState.Object,
-            Mock.Of<ISiegeGateHitApplier>(), new HostEpochPolicy());
+            Mock.Of<ISiegeGateHitApplier>(), new HostEpochPolicy(), Mock.Of<IRangedSiegeWeaponPresentation>());
 
         Assert.NotNull(receive);
         receive(new MessagePayload<NetworkSiegeWeaponFired>(this, Fire(machineId, "owner-a", 7, 3)));
@@ -165,7 +165,7 @@ public class SiegeWeaponFireReplicatorTests
             var applier = new Mock<ISiegeGateHitApplier>();
             var policy = new HostEpochPolicy();
             using var sut = new SiegeWeaponFireReplicator(Mock.Of<IBattleNetwork>(), broker.Object,
-                Mock.Of<INetworkAgentRegistry>(), session.Object, state.Object, applier.Object, policy);
+                Mock.Of<INetworkAgentRegistry>(), session.Object, state.Object, applier.Object, policy, Mock.Of<IRangedSiegeWeaponPresentation>());
             void Receive(int epoch)
             {
                 if (gateHit)
@@ -240,7 +240,7 @@ public class SiegeWeaponFireReplicatorTests
             ConfigureAuthority(state, "remote", 7, 3);
             using var sut = new SiegeWeaponFireReplicator(Mock.Of<IBattleNetwork>(), broker.Object,
                 Mock.Of<INetworkAgentRegistry>(), Mock.Of<IBattleSession>(), state.Object,
-                Mock.Of<ISiegeGateHitApplier>(), new HostEpochPolicy());
+                Mock.Of<ISiegeGateHitApplier>(), new HostEpochPolicy(), Mock.Of<IRangedSiegeWeaponPresentation>());
 
             receive(new MessagePayload<NetworkSiegeWeaponFired>(this, Fire(machineId, "remote", 7, 4)));
             DrainGameThread();
@@ -295,7 +295,7 @@ public class SiegeWeaponFireReplicatorTests
         var machineState = new Mock<ISiegeMachineStateReplicator>();
         ConfigureAuthority(machineState, "owner-a", 7, 3);
         using var sut = new SiegeWeaponFireReplicator(Mock.Of<IBattleNetwork>(), broker.Object,
-            Mock.Of<INetworkAgentRegistry>(), Mock.Of<IBattleSession>(), machineState.Object, Mock.Of<ISiegeGateHitApplier>(), new HostEpochPolicy());
+            Mock.Of<INetworkAgentRegistry>(), Mock.Of<IBattleSession>(), machineState.Object, Mock.Of<ISiegeGateHitApplier>(), new HostEpochPolicy(), Mock.Of<IRangedSiegeWeaponPresentation>());
 
         receive(new MessagePayload<NetworkGateHit>(this,
             new NetworkGateHit(44, ramId, 250, "owner-b", 7, 4)));
@@ -350,7 +350,7 @@ public class SiegeWeaponFireReplicatorTests
                     return true;
                 });
             using var sut = new SiegeWeaponFireReplicator(Mock.Of<IBattleNetwork>(), broker.Object,
-                Mock.Of<INetworkAgentRegistry>(), session.Object, state.Object, applier.Object, new HostEpochPolicy());
+                Mock.Of<INetworkAgentRegistry>(), session.Object, state.Object, applier.Object, new HostEpochPolicy(), Mock.Of<IRangedSiegeWeaponPresentation>());
             receive(new MessagePayload<NetworkGateHit>(this, new NetworkGateHit(44, ramId, 250, "remote", 7, 4)));
             DrainGameThread();
             Assert.Equal(1, PendingGateHitCount(sut));
@@ -390,7 +390,7 @@ public class SiegeWeaponFireReplicatorTests
         registry.Setup(x => x.IsLocallyControlled(shooter)).Returns(true);
         using var sut = new SiegeWeaponFireReplicator(Mock.Of<IBattleNetwork>(), Mock.Of<IMessageBroker>(),
             registry.Object, Mock.Of<IBattleSession>(), Mock.Of<ISiegeMachineStateReplicator>(),
-            Mock.Of<ISiegeGateHitApplier>(), new HostEpochPolicy());
+            Mock.Of<ISiegeGateHitApplier>(), new HostEpochPolicy(), Mock.Of<IRangedSiegeWeaponPresentation>());
         var message = new NetworkSiegeWeaponFired(42, id, default, default, default, 0f, 0f, "stone",
             "remote", 7, 4);
         var method = typeof(SiegeWeaponFireReplicator).GetMethod("TrySpawnProjectile",

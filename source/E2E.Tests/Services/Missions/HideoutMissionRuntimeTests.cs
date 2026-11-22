@@ -129,8 +129,46 @@ public sealed class HideoutMissionRuntimeTests : MissionTestEnvironment
             AccessTools.Method(typeof(Agent), nameof(Agent.SetAgentFlags)),
             AccessTools.Method(typeof(Agent), nameof(Agent.SetWatchState)),
             AccessTools.Method(typeof(Agent), nameof(Agent.WieldInitialWeapons)),
+            AccessTools.Method(typeof(Agent), nameof(Agent.UpdateSpawnEquipmentAndRefreshVisuals)),
         });
     }
+
+    [Fact]
+    public void NativeAmbushLoadingFinished_LeavesTheDeploymentFinishToTheCoopLogic()
+    {
+        using var fixture = new MissionEngineFixture();
+        var harmony = new Harmony($"hideout-loading-finished.{Guid.NewGuid()}");
+        harmony.Patch(AccessTools.Method(typeof(Mission), nameof(Mission.OnInitialSpawnCompleted)),
+            prefix: new HarmonyMethod(typeof(HideoutMissionRuntimeTests), nameof(RecordInitialSpawnCompleted)));
+        initialSpawnCompletedCount = 0;
+        try
+        {
+            Clients.First().Call(() =>
+            {
+                var mission = fixture.CreateMission(Clients.First());
+                var attacker = new CoopTroopSupplier("raid", BattleSideEnum.Attacker, null, null);
+                var defender = new CoopTroopSupplier("raid", BattleSideEnum.Defender, null, null);
+                var logic = new CoopHideoutMissionLogic(Mock.Of<IBattleNetwork>(), Mock.Of<IMessageBroker>(),
+                    Mock.Of<IMissionContext>(), defender, attacker, false);
+                var native = new CoopHideoutAmbushController(logic, new IMissionTroopSupplier[] { logic.Defender, logic.Attacker });
+                AccessTools.Field(typeof(Mission), "<MissionBehaviors>k__BackingField").SetValue(mission.Shell,
+                    new List<MissionBehavior> { native });
+                AccessTools.Property(typeof(MissionBehavior), nameof(MissionBehavior.Mission)).SetValue(native, mission.Shell);
+                try
+                {
+                    // This hook runs at the end of mission loading, after AfterStart, before the co-op
+                    // session has elected a host.
+                    mission.Shell.AfterMissionLoadingFinished();
+                    Assert.Equal(0, initialSpawnCompletedCount);
+                }
+                finally { logic.OnRemoveBehavior(); }
+            });
+        }
+        finally { harmony.UnpatchAll(harmony.Id); }
+    }
+
+    private static int initialSpawnCompletedCount;
+    private static bool RecordInitialSpawnCompleted() { initialSpawnCompletedCount++; return false; }
 
     [Theory]
     [InlineData(true)]
@@ -189,6 +227,131 @@ public sealed class HideoutMissionRuntimeTests : MissionTestEnvironment
             Assert.True(logic.IsSideDepleted(BattleSideEnum.Attacker));
             logic.OnRemoveBehavior();
         });
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void CampPlayerHeroFalls_TroopsStillAlive_LosesTheAttackerSide(bool direct)
+    {
+        var (_, _, heroIds) = SetupCoopBattleWithHeroes("first", "second");
+        using var fixture = new MissionEngineFixture();
+        var client = Clients.First();
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Hero>(heroIds[0], out var playerHero));
+            var mock = fixture.CreateMission(client);
+            var (logic, native, attackerTeam, defenderTeam) = CreateCampHideout(mock, client.Resolve<IMessageBroker>(), direct);
+            var leader = mock.SpawnAgent(new AgentBuildData(playerHero.CharacterObject).Team(attackerTeam).Controller(AgentControllerType.Player));
+            var troop = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop).Team(attackerTeam).Controller(AgentControllerType.AI));
+            var guard = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop).Team(defenderTeam).Controller(AgentControllerType.AI));
+            mock.MainAgent = leader;
+            foreach (var agent in new[] { leader, troop, guard }) logic.OnAgentBuild(agent, null);
+            try
+            {
+                Assert.False(logic.IsSideDepleted(BattleSideEnum.Attacker));
+                Assert.True(AgentMirror.TryGet(leader, out var fallen));
+                fallen.IsActive = false;
+                native.OnAgentRemoved(leader, guard, AgentState.Unconscious, default);
+
+                Assert.True(logic.IsSideDepleted(BattleSideEnum.Attacker));
+                Assert.False(logic.IsSideDepleted(BattleSideEnum.Defender));
+                Assert.False(logic.ShouldResumeBossBattle(HideoutPhase.Camp));
+                if (!direct)
+                    AssertNativeBattleEndUsesSpawnLogic(Assert.IsAssignableFrom<IMissionAgentSpawnLogic>(native), mock.Shell);
+
+                // The last guard falling with the leader still resumes the boss fight with the troops.
+                Assert.True(AgentMirror.TryGet(guard, out var lastGuard));
+                lastGuard.IsActive = false;
+                Assert.True(logic.ShouldResumeBossBattle(HideoutPhase.Camp));
+            }
+            finally { logic.OnRemoveBehavior(); }
+        });
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void CampPlayerHeroFalls_AnotherPlayersHeroStillFighting_KeepsTheAttackerSide(bool direct)
+    {
+        var (_, _, heroIds) = SetupCoopBattleWithHeroes("first", "second");
+        using var fixture = new MissionEngineFixture();
+        var client = Clients.First();
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Hero>(heroIds[0], out var playerHero));
+            Assert.True(client.ObjectManager.TryGetObject<Hero>(heroIds[1], out var otherHero));
+            var mock = fixture.CreateMission(client);
+            var (logic, native, attackerTeam, defenderTeam) = CreateCampHideout(mock, client.Resolve<IMessageBroker>(), direct);
+            var allyTeam = mock.AddTeam(BattleSideEnum.Attacker);
+            var leader = mock.SpawnAgent(new AgentBuildData(playerHero.CharacterObject).Team(attackerTeam).Controller(AgentControllerType.Player));
+            var other = mock.SpawnAgent(new AgentBuildData(otherHero.CharacterObject).Team(allyTeam).Controller(AgentControllerType.None));
+            var troop = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop).Team(attackerTeam).Controller(AgentControllerType.AI));
+            var guard = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop).Team(defenderTeam).Controller(AgentControllerType.AI));
+            mock.MainAgent = leader;
+            foreach (var agent in new[] { leader, other, troop, guard }) logic.OnAgentBuild(agent, null);
+            try
+            {
+                Assert.True(AgentMirror.TryGet(leader, out var fallen));
+                fallen.IsActive = false;
+                native.OnAgentRemoved(leader, guard, AgentState.Unconscious, default);
+                Assert.False(logic.IsSideDepleted(BattleSideEnum.Attacker));
+
+                Assert.True(AgentMirror.TryGet(other, out var lastPlayer));
+                lastPlayer.IsActive = false;
+                Assert.True(logic.IsSideDepleted(BattleSideEnum.Attacker));
+            }
+            finally { logic.OnRemoveBehavior(); }
+        });
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void CampPlayerHeroNeverSpawned_TroopsStillAlive_KeepTheAttackerSide(bool direct)
+    {
+        SetupCoopBattleWithHeroes("first", "second");
+        using var fixture = new MissionEngineFixture();
+        var client = Clients.First();
+        client.Call(() =>
+        {
+            var mock = fixture.CreateMission(client);
+            var (logic, _, attackerTeam, defenderTeam) = CreateCampHideout(mock, client.Resolve<IMessageBroker>(), direct);
+            var troop = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop).Team(attackerTeam).Controller(AgentControllerType.AI));
+            var guard = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop).Team(defenderTeam).Controller(AgentControllerType.AI));
+            foreach (var agent in new[] { troop, guard }) logic.OnAgentBuild(agent, null);
+            try
+            {
+                Assert.False(logic.IsSideDepleted(BattleSideEnum.Attacker));
+                Assert.True(AgentMirror.TryGet(troop, out var lastTroop));
+                lastTroop.IsActive = false;
+                Assert.True(logic.IsSideDepleted(BattleSideEnum.Attacker));
+            }
+            finally { logic.OnRemoveBehavior(); }
+        });
+    }
+
+    private static (CoopHideoutMissionLogic logic, MissionLogic native, Team attackerTeam, Team defenderTeam) CreateCampHideout(
+        MockMission mock, IMessageBroker broker, bool direct)
+    {
+        var attackerTeam = mock.AddTeam(BattleSideEnum.Attacker);
+        mock.PlayerTeam = mock.AttackerTeam;
+        var defenderTeam = mock.AddTeam(BattleSideEnum.Defender);
+        var attacker = new CoopTroopSupplier("raid", BattleSideEnum.Attacker, null, null);
+        var defender = new CoopTroopSupplier("raid", BattleSideEnum.Defender, null, null);
+        var logic = new CoopHideoutMissionLogic(Mock.Of<IBattleNetwork>(), broker,
+            Mock.Of<IMissionContext>(), defender, attacker, direct);
+        AccessTools.Property(typeof(MissionBehavior), nameof(MissionBehavior.Mission)).SetValue(logic, mock.Shell);
+        AccessTools.Field(typeof(CoopHideoutMissionLogic), "initialized").SetValue(logic, true);
+        var suppliers = new IMissionTroopSupplier[] { logic.Defender, logic.Attacker };
+        var native = direct ? (MissionLogic)new CoopHideoutAssaultController(logic, suppliers)
+            : new CoopHideoutAmbushController(logic, suppliers);
+        AccessTools.Property(typeof(MissionBehavior), nameof(MissionBehavior.Mission)).SetValue(native, mock.Shell);
+        logic.Native = (ICoopHideoutNativeController)native;
+        mock.Shell.MissionBehaviors.Add(logic);
+        mock.Shell.MissionBehaviors.Add(native);
+        logic.Native.Apply(HideoutPhase.Camp, null, 25);
+        return (logic, native, attackerTeam, defenderTeam);
     }
 
     [Fact]

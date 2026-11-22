@@ -1,9 +1,11 @@
 ﻿using Common.Logging;
 using Common.Messaging;
+using GameInterface.Configuration;
 using GameInterface.Policies;
 using GameInterface.Services.Clans;
 using GameInterface.Services.Companions.Messages;
 using GameInterface.Services.Heroes.Patches;
+using GameInterface.Services.Kingdoms;
 using HarmonyLib;
 using Serilog;
 using System.Collections.Generic;
@@ -16,6 +18,7 @@ using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Companions.Patches;
 
@@ -23,6 +26,22 @@ namespace GameInterface.Services.Companions.Patches;
 internal class CompanionRolesPatches
 {
     private static readonly ILogger logger = LogManager.GetLogger<CompanionRolesPatches>();
+
+    // Greys out the grant line with the reason before the ruler pays or names the clan, like vanilla does for missing
+    // gold or influence. The server checks again for a kingdom that fills after the line shows.
+    [HarmonyPatch(nameof(CompanionRolesCampaignBehavior.fief_selected_confirm_clickable_on_condition))]
+    [HarmonyPostfix]
+    public static void FiefSelectedConfirmClickableOnConditionPostfix(ref bool __result, ref TextObject explanation)
+    {
+        if (!__result) return;
+
+        var kingdom = Hero.MainHero.Clan.Kingdom;
+        if (!ContainerProvider.TryResolve<IKingdomClanLimit>(out var kingdomClanLimit)) return;
+        if (!kingdomClanLimit.RefusesJoin(clan: null, kingdom, asMercenary: false, ModConfigProvider.ModOptions)) return;
+
+        explanation = KingdomClanLimit.GetFullText(kingdom, ModConfigProvider.ModOptions);
+        __result = false;
+    }
 
     [HarmonyPatch(nameof(CompanionRolesCampaignBehavior.ClanNameSelectionIsDone))]
     [HarmonyPrefix]

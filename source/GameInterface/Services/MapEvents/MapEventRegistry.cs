@@ -12,6 +12,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.GameState;
@@ -78,9 +79,11 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
 
         bool localBattleSimulationWasInvolved = PlayerEncounter.Current?.BattleSimulation?.MapEvent == obj;
         bool localPartyWasInvolved = IsLocalPartyInMapEvent(obj);
-        bool hasStagedResults = localPartyWasInvolved &&
-            StagedBattleResultUpdatePatch.HasStagedResults(PlayerEncounter.Current);
+        bool holdsBattleResultEncounter = localPartyWasInvolved &&
+            StagedBattleResultUpdatePatch.HoldsBattleResultEncounter(PlayerEncounter.Current);
         if (localPartyWasInvolved) CaptureMainPartyBattleRewards(obj);
+        if (localPartyWasInvolved && obj.IsRaid)
+            Campaign.Current.GetCampaignBehavior<ViewDataTrackerCampaignBehavior>()?._plunderItems.Clear();
         var preservedParty = localPartyWasInvolved &&
             (IsBattlePresentationActive() || localBattleSimulationWasInvolved)
             ? MobileParty.MainParty?.Party
@@ -92,10 +95,10 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
             return;
         }
 
-        // A hideout or siege assault defender who already left the mission still needs to collect the
-        // server's staged loot, which StagedBattleResultUpdatePatch resumes on the next map tick.
-        if (!hasStagedResults)
-            CloseDestroyedMapEventEncounterIfNeeded(id, localPartyWasInvolved);
+        // A hideout or siege assault defender who already left the mission keeps its encounter for the server's
+        // staged loot, which StagedBattleResultUpdatePatch resumes, or for the send troops result menu.
+        if (!holdsBattleResultEncounter)
+            CloseDestroyedMapEventEncounterIfNeeded(obj, id, localPartyWasInvolved);
     }
 
     private void CaptureMainPartyBattleRewards(MapEvent mapEvent)
@@ -123,13 +126,7 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
         if (mainParty.MapEvent == mapEvent)
             return true;
 
-        var encounter = PlayerEncounter.Current;
-        var battle = GetPlayerEncounterBattle();
-        var encounteredBattle = GetPlayerEncounterEncounteredBattle();
-        if (encounter?._mapEvent == mapEvent ||
-            encounter?.BattleSimulation?.MapEvent == mapEvent ||
-            battle == mapEvent ||
-            encounteredBattle == mapEvent)
+        if (PlayerEncounter.Current.ReferencesMapEvent(mapEvent))
             return true;
 
         var party = mainParty.Party;
@@ -148,7 +145,7 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
         return false;
     }
 
-    private void CloseDestroyedMapEventEncounterIfNeeded(string mapEventId, bool localPartyWasInvolved)
+    private void CloseDestroyedMapEventEncounterIfNeeded(MapEvent mapEvent, string mapEventId, bool localPartyWasInvolved)
     {
         if (!localPartyWasInvolved)
         {
@@ -173,6 +170,11 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
         if (MobileParty.MainParty?.Party?.MapEventSide != null)
             MobileParty.MainParty.Party._mapEventSide = null;
 
+        // Vanilla's sally out "Return to the settlement" left this battle and pointed the encounter back at the
+        // besieged settlement before the server's finalize arrived, so Finish would drop that encounter.
+        if (IsBackInEncounterSettlement(mapEvent))
+            return;
+
         if (PlayerEncounter.Current != null)
         {
             PlayerEncounter.LeaveEncounter = true;
@@ -193,6 +195,19 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
         ForceCloseCurrentEncounterMenu();
     }
 
+    private static bool IsBackInEncounterSettlement(MapEvent mapEvent)
+    {
+        var encounter = PlayerEncounter.Current;
+        var settlement = MobileParty.MainParty?.CurrentSettlement;
+        if (mapEvent == null) return false;
+        if (!mapEvent.IsSallyOut && !mapEvent.IsBlockadeSallyOut) return false;
+        if (encounter == null) return false;
+        if (encounter._mapEvent == mapEvent) return false;
+        if (settlement == null) return false;
+
+        return encounter.EncounterSettlementAux == settlement;
+    }
+
     private static bool IsBattlePresentationActive()
     {
         if (MissionState.Current != null || Mission.Current != null) return true;
@@ -208,30 +223,6 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
         return PlayerEncounter.Current != null ||
                Campaign.Current?.CurrentMenuContext != null ||
                mapState?.AtMenu == true;
-    }
-
-    private static MapEvent GetPlayerEncounterBattle()
-    {
-        try
-        {
-            return PlayerEncounter.Battle;
-        }
-        catch (NullReferenceException)
-        {
-            return null;
-        }
-    }
-
-    private static MapEvent GetPlayerEncounterEncounteredBattle()
-    {
-        try
-        {
-            return PlayerEncounter.EncounteredBattle;
-        }
-        catch (NullReferenceException)
-        {
-            return null;
-        }
     }
 
     private void ForceCloseCurrentEncounterMenu()
@@ -282,6 +273,7 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
 
     public override void OnServerDestroyed(MapEvent obj, string id)
     {
+        ServerBattleModeArbiter.Release(id);
         initializationBarrier.DestroyGraph(obj);
     }
 }

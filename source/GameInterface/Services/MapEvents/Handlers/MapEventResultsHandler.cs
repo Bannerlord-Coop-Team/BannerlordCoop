@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.MapEvents.Data;
+using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.MapEvents.Interfaces;
 using GameInterface.Services.MapEvents.Messages.Leave;
@@ -85,6 +86,9 @@ internal class MapEventResultsHandler : IHandler
         {
             if (!objectManager.TryGetIdWithLogging(mapEvent, out var mapEventId)) return;
             if (mapEvent.EventType == MapEvent.BattleTypes.Hideout && mapEvent._mapEventResultsApplied) return;
+            // Native never applies results for a send troops raid, won or lost, so it gets no loot or xp.
+            // The skip stays here, not in Prefix_OnBattleWon, because the hideout clear still records its participants from this event.
+            if (mapEvent.IsSendTroopsHideout()) return;
 
             contributionBarrier.Flush(mapEvent);
             mapEventResultsInterface.CalculateAndCommitMapEventResults(mapEvent, out NetworkPlayerLootData networkPlayerLootData);
@@ -143,7 +147,8 @@ internal class MapEventResultsHandler : IHandler
                 data.PlayerMapEventPartyId,
                 out var lootedItems,
                 out var lootedMembers,
-                out var lootedPrisoners);
+                out var lootedPrisoners,
+                out var lootedShips);
 
             // Set the encounter state ahead to start at applying results when a winning player leaves the battle
             // CaptureHeroes is the first EncounterState that doesn't rely on the MapEvent, which is already destroyed when a player leaves a battle
@@ -162,6 +167,7 @@ internal class MapEventResultsHandler : IHandler
                 playerEncounter.RosterToReceiveLootItems.Add(lootedItems);
                 playerEncounter.RosterToReceiveLootMembers.Add(lootedMembers);
                 playerEncounter.RosterToReceiveLootPrisoners.Add(lootedPrisoners);
+                playerEncounter.ReceivedLootShips.AddRange(lootedShips);
             }
         });
     }

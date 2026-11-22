@@ -15,7 +15,9 @@ internal class AlternativeSolutionJournalPatch
     private static void Prefix(IssueBase issue, IssueBase.IssueUpdateDetails details)
     {
         if (ModInformation.IsServer &&
-            (details == IssueBase.IssueUpdateDetails.SentTroopsFinishedQuest || details == IssueBase.IssueUpdateDetails.SentTroopsFailedQuest))
+            (details == IssueBase.IssueUpdateDetails.SentTroopsFinishedQuest ||
+             details == IssueBase.IssueUpdateDetails.SentTroopsFailedQuest ||
+             details == IssueBase.IssueUpdateDetails.IssueCancel))
             MessageBroker.Instance.Publish(issue, new AlternativeSolutionEndingObserved(issue, details));
     }
 }

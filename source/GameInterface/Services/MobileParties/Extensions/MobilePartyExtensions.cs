@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
+using GameInterface.Services.GameMenus;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.Players;
 using Serilog;
@@ -108,10 +109,28 @@ public static class MobilePartyExtensions
 
     public static void ApplyForcedPosition(this MobileParty party, CampaignVec2 position, bool isCurrentlyAtSea)
     {
+        // A local transition that finishes after this would flip IsCurrentlyAtSea away from the forced state
+        if (party.IsTransitionInProgress)
+            party.CancelNavigationTransition();
+
         party.Position = position;
 
         if (party.IsCurrentlyAtSea != isCurrentlyAtSea)
+        {
             party.ChangeIsCurrentlyAtSeaCheat();
+
+            // Settlement menu options like leave and set sail depend on the sea state
+            if (party == MobileParty.MainParty)
+                RefreshCurrentMenu();
+        }
+    }
+
+    // Refreshes the open menu through the shared refresher, which skips unbound menus
+    private static void RefreshCurrentMenu()
+    {
+        if (!ContainerProvider.TryResolve<IMenuOptionsRefresher>(out var refresher)) return;
+
+        refresher.RefreshMenuOptions(Campaign.Current?.CurrentMenuContext);
     }
 
     /// <summary>

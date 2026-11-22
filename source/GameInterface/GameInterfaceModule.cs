@@ -1,9 +1,12 @@
-﻿using GameInterface.Services.Clans;
+﻿using GameInterface.Services.CharacterObjects;
+using GameInterface.Services.Clans;
+using GameInterface.Services.Heroes.RomanceFlow;
 using GameInterface.Services.UI.CoopOptions.Providers.UITab;
 using Autofac;
 using Autofac.Core;
 using Autofac.Core.Registration;
 using Autofac.Core.Resolving.Pipeline;
+using Common;
 using Common.Commands;
 using Common.Logging;
 using Common.PacketHandlers;
@@ -12,6 +15,7 @@ using GameInterface.Configuration;
 using GameInterface.Registry;
 using GameInterface.Serialization;
 using GameInterface.Services;
+using GameInterface.Services.Villages;
 using GameInterface.Services.Armies;
 using GameInterface.Services.Alleys;
 using GameInterface.Services.Bandits;
@@ -20,6 +24,7 @@ using GameInterface.Services.BugReporting;
 using GameInterface.Services.Chat;
 using GameInterface.Services.Entity;
 using GameInterface.Services.GameDebug.Metrics;
+using GameInterface.Services.GameMenus;
 using GameInterface.Services.Heroes;
 using GameInterface.Services.Heroes.Commands;
 using GameInterface.Services.Heroes.Interfaces;
@@ -35,7 +40,11 @@ using GameInterface.Services.MapEventParties;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.MapEvents.Logging;
+#if DEBUG
+using GameInterface.Services.MapEvents.NavalScenarios;
+#endif
 using GameInterface.Services.MapEvents.Participation;
+using GameInterface.Services.MapEvents.PlayerPartyInteractions;
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Commands;
@@ -44,6 +53,20 @@ using GameInterface.Services.Modules;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party;
 using GameInterface.Services.Players;
+using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.MapEventComponents;
+using GameInterface.Services.AnchorPoints.Handlers;
+using GameInterface.Services.MapEventComponents.Handlers;
+using GameInterface.Services.Rafts.Commands;
+using GameInterface.Services.Rafts.Handlers;
+using GameInterface.Services.Rafts.Interfaces;
+using GameInterface.Services.Ships;
+using GameInterface.Services.Ships.Handlers;
+using GameInterface.Services.SiegeEvents.Handlers;
+using GameInterface.Services.Ships.Figureheads;
+using GameInterface.Services.Ships.ShipHulls;
+using GameInterface.Services.Ships.ShipSlots;
+using GameInterface.Services.Ships.ShipUpgradePieces;
 using GameInterface.Services.SiegeEvents;
 using GameInterface.Services.SiegeEvents.Commands;
 using GameInterface.Services.Stances;
@@ -62,11 +85,15 @@ using GameInterface.Services.UI.Patches;
 using GameInterface.Services.UI.Notifications;
 using GameInterface.Services.Workshops;
 using GameInterface.Surrogates;
+using GameInterface.Utils;
 using GameInterface.Utils.Commands;
 using HarmonyLib;
 using Serilog;
+using System;
+using System.IO;
 using System.Linq;
 using System.Threading;
+using Assembly = System.Reflection.Assembly;
 
 namespace GameInterface;
 
@@ -74,6 +101,37 @@ public class GameInterfaceModule : Module
 {
     // TODO move to config
     public const string HarmonyId = "Bannerlord.Coop";
+
+    internal const string CoopNavalAssemblyName = "Coop.Naval";
+
+    // GameInterface's War Sails types that the scanning registrations skip while NavalDLC co-op is off. Load registers its
+    // naval patch category, naval registries and explicit naval registrations behind ModInformation.IsNavalEnabled instead.
+    internal static readonly Type[] NavalOnlyTypes =
+    {
+        typeof(ShipSync),
+        typeof(ShipRegistry),
+        typeof(ShipHullRegistry),
+        typeof(FigureheadRegistry),
+        typeof(ShipSlotRegistry),
+        typeof(ShipUpgradePieceRegistry),
+        typeof(BlockadeBattleEventComponentRegistry),
+        typeof(LootShipHoldHandler),
+        typeof(NavalNpcFleetAttemptHandler),
+        typeof(LootShipsHandler),
+        typeof(ShipPiecesHandler),
+        typeof(PlayerRaftHandler),
+        typeof(AnchorPointHandler),
+        typeof(PlayerBlockadeHandler),
+        typeof(SiegeBlockadeHandler),
+        typeof(PlayerRaftFleetInterface),
+        typeof(RaftDebugCommands.StrandOnRaftCoopCommand),
+#if DEBUG
+        typeof(NavalScenarioClientHandler),
+        typeof(NavalScenarioRejoinHandler),
+        typeof(NavalScenarioCoopCommand),
+        typeof(StartNavalCoopCommand),
+#endif
+    };
 
     private static readonly Harmony harmony = new Harmony(HarmonyId);
 
@@ -97,7 +155,8 @@ public class GameInterfaceModule : Module
         builder.RegisterAssemblyTypes(typeof(GameInterfaceModule).Assembly)
             .Where(type => type.IsClass &&
                            !type.IsAbstract &&
-                           typeof(ICoopCommand).IsAssignableFrom(type))
+                           typeof(ICoopCommand).IsAssignableFrom(type) &&
+                           ShouldRegister(type))
             .As(type => type.GetInterfaces()
                 .Where(interfaceType => interfaceType != typeof(ICoopCommand)))
             .As<ICoopCommand>()
@@ -112,12 +171,17 @@ public class GameInterfaceModule : Module
         builder.RegisterType<GameInterface>().As<IGameInterface>().SingleInstance().AutoActivate();
         // mod-config.json: one lazy read per session container (see IModConfig).
         builder.RegisterType<ModConfig>().As<IModConfig>().SingleInstance();
+        builder.RegisterType<NavalSaveCompatibility>().As<INavalSaveCompatibility>().InstancePerDependency();
         builder.RegisterType<BinaryPackageFactory>().As<IBinaryPackageFactory>().SingleInstance();
         builder.RegisterType<ControllerIdProvider>().As<IControllerIdProvider>().SingleInstance();
         builder.RegisterType<TimeControlModeConverter>().As<ITimeControlModeConverter>().SingleInstance();
+        builder.RegisterType<OrderAttackRule>().As<IOrderAttackRule>().InstancePerDependency();
+        builder.RegisterType<RomanceRetryHistory>().As<IRomanceRetryHistory>().SingleInstance();
+        builder.RegisterType<RomanceRetryCooldown>().As<IRomanceRetryCooldown>().InstancePerDependency();
         builder.RegisterType<Services.Crime.CrimeRatingService>().As<Services.Crime.ICrimeRatingService>().InstancePerDependency();
         builder.RegisterType<PlayerManager>().As<IPlayerManager>().SingleInstance();
         builder.RegisterType<HideoutPreparation>().As<IHideoutPreparation>().InstancePerDependency();
+        builder.RegisterType<PartyConfigurationService>().As<IPartyConfigurationService>().InstancePerDependency();
         builder.RegisterType<BugReportService>().As<IBugReportService>().SingleInstance().AutoActivate();
         builder.RegisterType<BugReportOverlay>().As<IBugReportOverlay>().SingleInstance();
         builder.RegisterType<CoopLogSnapshotProvider>().As<ICoopLogSnapshotProvider>().InstancePerDependency();
@@ -130,7 +194,12 @@ public class GameInterfaceModule : Module
         builder.RegisterType<UIOptionsTabProvider>().As<ICoopOptionsTabProvider>().InstancePerDependency();
         builder.RegisterType<NetworkOptionsTabProvider>().As<ICoopOptionsTabProvider>().InstancePerDependency();
         builder.RegisterType<LocalMovementBandwidth>().As<ILocalMovementBandwidth>().InstancePerDependency();
+        // Only naval battle services use it. Also in the server container, which never opens a naval battle; the patch
+        // itself refuses to install on a server.
+        if (ModInformation.IsNavalEnabled)
+            builder.RegisterType<WaterClock>().As<IWaterClock>().InstancePerDependency();
         builder.RegisterType<ChatPlayerName>().As<IChatPlayerNameResolver>().InstancePerDependency();
+        builder.RegisterType<ChatFactionMembership>().As<IChatFactionMembership>().InstancePerDependency();
         builder.RegisterType<ChatEventLog>().As<IChatEventLog>().InstancePerDependency();
         builder.RegisterType<PlayerPartyRestorer>().As<IPlayerPartyRestorer>().InstancePerDependency();
         builder.RegisterType<PlayerCreationRollback>().As<IPlayerCreationRollback>().InstancePerDependency();
@@ -139,6 +208,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<MobilePartyBehaviorSnapshot>().As<IMobilePartyBehaviorSnapshot>().InstancePerDependency();
         builder.RegisterType<PartyBehaviorWireMapper>().As<IPartyBehaviorWireMapper>().InstancePerDependency();
         builder.RegisterType<AlleyGarrisonData>().As<IAlleyGarrisonData>().InstancePerDependency();
+        builder.RegisterType<AlleyFightOwnerTracker>().As<IAlleyFightOwnerTracker>().SingleInstance();
         builder.RegisterModule<IssuesModule>();
 #if DEBUG
         builder.RegisterType<ClanLordMovementFixture>().As<IClanLordMovementFixture>().SingleInstance();
@@ -151,6 +221,18 @@ public class GameInterfaceModule : Module
         builder.RegisterType<PartyVisibilitySweep>().As<IPartyVisibilitySweep>().InstancePerDependency();
         builder.RegisterType<ConversationRestartContextTracker>().As<IConversationRestartContextTracker>().SingleInstance();
         builder.RegisterType<BattleHostRegistry>().As<IBattleHostRegistry>().SingleInstance();
+        builder.RegisterType<BattleHostRetentionPolicy>().As<IBattleHostRetentionPolicy>().InstancePerDependency();
+        if (ModInformation.IsNavalEnabled)
+        {
+            builder.RegisterInstance(new HarmonyPatchCategoryRegistration(typeof(GameInterface).Assembly, GameInterface.HARMONY_NAVAL_CATEGORY));
+            foreach (var registry in NavalOnlyTypes.Where(RegistryModule.IsAutoRegistry))
+                builder.RegisterType(registry).AsSelf().SingleInstance().AutoActivate();
+            builder.RegisterType<BattleShipFateLedger>().As<IBattleShipFateLedger>().SingleInstance();
+            builder.RegisterType<NavalNpcFleetAttemptTracker>().As<INavalNpcFleetAttemptTracker>().SingleInstance();
+            builder.RegisterType<BattleShipFateApplier>().As<IBattleShipFateApplier>().InstancePerDependency();
+        }
+        // Stays registered while naval is off: MapEventResultsInterface, shared with land battles, takes it.
+        builder.RegisterType<LootShipHold>().As<ILootShipHold>().SingleInstance();
         builder.RegisterType<LocationHostRegistry>().As<ILocationHostRegistry>().SingleInstance();
         builder.RegisterType<LocationConversationAgentGuard>().As<ILocationConversationAgentGuard>().InstancePerDependency();
         builder.RegisterType<BattleAgentBudget>().As<IBattleAgentBudget>().InstancePerDependency();
@@ -160,11 +242,21 @@ public class GameInterfaceModule : Module
         builder.RegisterType<DefenderFixtureBehaviorIdentity>().As<IDefenderFixtureBehaviorIdentity>().InstancePerDependency();
         builder.RegisterType<DefenderSiegeContextFixture>().As<IDefenderSiegeContextFixture>().SingleInstance();
         builder.RegisterType<DefenderFixtureCaptivityActions>().As<IDefenderFixtureCaptivityActions>().InstancePerDependency();
+        if (ModInformation.IsNavalEnabled)
+        {
+            builder.RegisterType<NavalScenarioState>().As<INavalScenarioState>().SingleInstance();
+            builder.RegisterType<NavalScenarioResolver>().As<INavalScenarioResolver>().InstancePerDependency();
+            builder.RegisterType<NavalScenarioStager>().As<INavalScenarioStager>().InstancePerDependency();
+            builder.RegisterType<NavalBattleStaging>().As<INavalBattleStaging>().InstancePerDependency();
+            builder.RegisterType<NavalEngageResetTracer>().As<INavalEngageResetTracer>().SingleInstance();
+        }
 #endif
         builder.RegisterType<SiegeMapEventLeaderReconciler>().As<ISiegeMapEventLeaderReconciler>().InstancePerDependency();
         builder.RegisterType<AiSiegeAssaultReadiness>().As<IAiSiegeAssaultReadiness>().InstancePerDependency();
         builder.RegisterType<SiegeDefenderCommandAuthority>().As<ISiegeDefenderCommandAuthority>().InstancePerDependency();
         builder.RegisterType<AiSiegeTerminalPolicy>().As<IAiSiegeTerminalPolicy>().SingleInstance();
+        builder.RegisterType<SiegeFinalizeTracker>().As<ISiegeFinalizeTracker>().InstancePerLifetimeScope();
+        builder.RegisterType<ClientVillageHostileActionTracker>().As<IClientVillageHostileActionTracker>().InstancePerLifetimeScope();
         builder.RegisterType<SiegeEventGraphSynchronizer>().As<ISiegeEventGraphSynchronizer>().InstancePerDependency();
         builder.RegisterType<MapEventContributionBarrier>().As<IMapEventContributionBarrier>().InstancePerDependency();
         builder.RegisterType<SiegeBreakOut>().As<ISiegeBreakOut>().InstancePerDependency();
@@ -174,9 +266,17 @@ public class GameInterfaceModule : Module
         builder.RegisterType<MapEventLoadCleaner>().As<IMapEventLoadCleaner>().InstancePerDependency();
         // Shared so the per tick Update patch reads it from the provider cache.
         builder.RegisterType<StalledMapEventResolver>().As<IStalledMapEventResolver>().InstancePerLifetimeScope();
+        // Scoped so the barter patches and the trade handler share one trade and one pending offer per client.
+        builder.RegisterType<PlayerPartyTradeContext>().As<IPlayerPartyTradeContext>().InstancePerLifetimeScope();
+        builder.RegisterType<PlayerPartyTradeSender>().As<IPlayerPartyTradeSender>().InstancePerLifetimeScope();
+        builder.RegisterType<PlayerPartyTradeOverlayInterface>().As<IPlayerPartyTradeOverlayInterface>().InstancePerDependency();
+        builder.RegisterType<PlayerPartyTradeKeyResolver>().As<IPlayerPartyTradeKeyResolver>().InstancePerDependency();
+        builder.RegisterType<PlayerPartyTradeOfferBuilder>().As<IPlayerPartyTradeOfferBuilder>().InstancePerDependency();
+        builder.RegisterType<PlayerPartyTradeOfferResolver>().As<IPlayerPartyTradeOfferResolver>().InstancePerDependency();
         builder.RegisterType<LeaderlessClanResolver>().As<ILeaderlessClanResolver>().InstancePerDependency();
         builder.RegisterType<EmptyLordPartyResetter>().As<IEmptyLordPartyResetter>().InstancePerDependency();
         builder.RegisterType<EncounterMenuConditionRefresher>().As<IEncounterMenuConditionRefresher>().InstancePerDependency();
+        builder.RegisterType<MenuOptionsRefresher>().As<IMenuOptionsRefresher>().InstancePerDependency();
         builder.RegisterType<PartyScreenRosterRefresher>().As<IPartyScreenRosterRefresher>().InstancePerDependency();
         builder.RegisterType<PartyScreenLockPreserver>().As<IPartyScreenLockPreserver>().InstancePerDependency();
         builder.RegisterType<PlayerTroopXpRelevance>().As<IPlayerTroopXpRelevance>().InstancePerDependency();
@@ -188,6 +288,8 @@ public class GameInterfaceModule : Module
         builder.RegisterType<BanditPartyHomeSettlementRepairer>().As<IBanditPartyHomeSettlementRepairer>().InstancePerDependency();
         builder.RegisterType<DeadHeroCaptivityRepairer>().As<IDeadHeroCaptivityRepairer>().InstancePerDependency();
         builder.RegisterType<WorkshopRepairer>().As<IWorkshopRepairer>().InstancePerDependency();
+        builder.RegisterType<BloodFeudRepairer>().As<IBloodFeudRepairer>().InstancePerDependency();
+        builder.RegisterType<PlayerCharacterLoadRepairer>().As<IPlayerCharacterLoadRepairer>().InstancePerDependency();
         builder.RegisterType<MapEventLogger>().As<IMapEventLogger>().SingleInstance();
         builder.RegisterType<TroopRosterLogger>().As<ITroopRosterLogger>().SingleInstance();
         builder.RegisterType<PartySyncPerformanceClock>().As<IPartySyncPerformanceClock>().SingleInstance();
@@ -217,7 +319,6 @@ public class GameInterfaceModule : Module
         builder.RegisterType<PacketManager>().As<IPacketManager>().SingleInstance();
         builder.RegisterType<MapEventInitializationBarrierBinding>().SingleInstance().AutoActivate();
         builder.RegisterType<RetreatedMapEventPartyTracker>().As<IRetreatedMapEventPartyTracker>().SingleInstance();
-        builder.RegisterType<MapTrackerProviderHolder>().As<IMapTrackerProviderHolder>().SingleInstance();
 
 #if DEBUG
         builder.RegisterModule<global::GameInterface.Services.LiveTesting.LiveTestUiModule>();
@@ -227,9 +328,12 @@ public class GameInterfaceModule : Module
         builder.RegisterModule<RegistryModule>();
         builder.RegisterModule<AutoSyncModule>();
 
-
         base.Load(builder);
     }
+
+    // Whether a scanned type is registered: everything, except NavalOnlyTypes while NavalDLC co-op is off.
+    internal static bool ShouldRegister(Type type) =>
+        ModInformation.IsNavalEnabled || !NavalOnlyTypes.Contains(type);
 
     // Log injector
     protected override void AttachToComponentRegistration(IComponentRegistryBuilder componentRegistry, IComponentRegistration registration)

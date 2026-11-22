@@ -47,7 +47,8 @@ public sealed partial class MangonelLoadReplicationTests : IDisposable
         Stub(typeof(Agent), nameof(Agent.GetPrimaryWieldedItemIndex), nameof(MainHand));
         Stub(typeof(Agent), nameof(Agent.GetOffhandWieldedItemIndex), nameof(OffHand));
         Stub(typeof(Agent), nameof(Agent.UseGameObject), nameof(Use));
-        Stub(typeof(Agent), nameof(Agent.StopUsingGameObject), nameof(Stop));
+        // StopUsingGameObject only forwards here, so stubbing the body covers every caller.
+        Stub(typeof(Agent), "StopUsingGameObjectAux", nameof(Stop));
         Stub(typeof(Agent), nameof(Agent.SetActionChannel), nameof(Action));
         Stub(typeof(Agent), nameof(Agent.GetCurrentAction), nameof(CurrentAction));
         Stub(typeof(Agent), nameof(Agent.RemoveEquippedWeapon), nameof(Remove));
@@ -88,7 +89,7 @@ public sealed partial class MangonelLoadReplicationTests : IDisposable
         session.SetupGet(s => s.HostEpoch).Returns(3);
         var network = new Mock<IBattleNetwork>();
         var sut = new SiegeMachineStateReplicator(network.Object, Mock.Of<IMessageBroker>(), session.Object,
-            registry.Object, new HostEpochPolicy());
+            registry.Object, new HostEpochPolicy(), Mock.Of<IRangedSiegeWeaponPresentation>());
         Field<Dictionary<int, UsableMachine>>(sut, "machinesById")[1496] = machine;
         Field<List<UsableMachine>>(sut, "machines").Add(machine);
         Field<Dictionary<int, string>>(sut, "claimedMachines")[1496] = "simulator";

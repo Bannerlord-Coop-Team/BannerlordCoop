@@ -7,7 +7,7 @@ namespace GameInterface.Services.Issues.Quests.ScoutEnemyGarrisons.Messages;
 /// Sent by the server so every client offers the issue with the server's new targets.
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
-public readonly struct NetworkScoutEnemyGarrisonsTargetsChanged : IServerToClientCommand
+public readonly struct NetworkScoutEnemyGarrisonsTargetsChanged : ICommand
 {
     [ProtoMember(1)]
     public readonly string IssueOwnerId;
