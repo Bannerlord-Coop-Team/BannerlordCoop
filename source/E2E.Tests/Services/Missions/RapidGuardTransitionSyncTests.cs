@@ -231,6 +231,8 @@ public class RapidGuardTransitionSyncTests : MissionTestEnvironment
                 Assert.Single(requestedRightPacket.Actions);
             Assert.Equal(Agent.GuardMode.Right, requestedRight.GuardMode);
             Assert.Equal(2L, Assert.Single(requestedRightPacket.Sequences));
+            Assert.Equal(2, mirror.Action0TypeReads);
+            Assert.Equal(2, mirror.Action1TypeReads);
             context.Network.NetworkSentPackets.Packets.Clear();
 
             mirror.MovementFlags =
@@ -258,6 +260,8 @@ public class RapidGuardTransitionSyncTests : MissionTestEnvironment
             Assert.Equal(3070, realizedRight.Action1Index);
             Assert.Equal(Agent.GuardMode.Right, realizedRight.GuardMode);
             Assert.Equal(3L, Assert.Single(realizedRightPacket.Sequences));
+            Assert.Equal(4, mirror.Action0TypeReads);
+            Assert.Equal(4, mirror.Action1TypeReads);
             context.Network.NetworkSentPackets.Packets.Clear();
 
             mirror.MovementFlags =

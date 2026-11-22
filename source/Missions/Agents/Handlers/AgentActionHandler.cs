@@ -287,8 +287,9 @@ public class AgentActionHandler : IAgentActionHandler
             && isPlayerControlled
             && agent == Mission.Current.MainAgent
             && state.HasInputBoundaryObservation;
+        var actionTypes = new AgentActionData.ActionTypes(agent);
         Agent.GuardMode actionGuardMode =
-            AgentActionData.GetGuardModeFromDefendingAction(agent);
+            AgentActionData.GetGuardModeFromDefendingAction(agent, actionTypes);
         Agent.MovementControlFlag defendFlags;
         Agent.GuardMode guardMode;
         if (!afterNativeTick && isPlayerControlled)
@@ -311,7 +312,7 @@ public class AgentActionHandler : IAgentActionHandler
         else
         {
             defendFlags =
-                AgentActionData.GetEffectiveDefendMovementFlags(agent);
+                AgentActionData.GetEffectiveDefendMovementFlags(agent, actionTypes);
             guardMode = GetEffectiveGuardMode(
                 info.AgentId,
                 agent,
@@ -375,10 +376,8 @@ public class AgentActionHandler : IAgentActionHandler
                 || AgentActionData.IsGuardMode(state.GuardMode));
         bool action0Changed = !hadState || state.Action0 != action0;
         bool action1Changed = !hadState || state.Action1 != action1;
-        Agent.ActionCodeType action0Type =
-            agent.GetCurrentActionType(0);
-        Agent.ActionCodeType action1Type =
-            agent.GetCurrentActionType(1);
+        Agent.ActionCodeType action0Type = actionTypes.Channel0;
+        Agent.ActionCodeType action1Type = actionTypes.Channel1;
         bool action0Discrete = IsDiscreteAction(action0Type, action0);
         bool action1Discrete = IsDiscreteAction(action1Type, action1);
 
@@ -451,6 +450,9 @@ public class AgentActionHandler : IAgentActionHandler
             AgentActionData.IsDefendingAction(action1Type);
         int guardReactionChannel = GetGuardReactionChannel(
             agent,
+            actionTypes,
+            action0,
+            action1,
             hadState,
             state);
 
@@ -560,6 +562,7 @@ public class AgentActionHandler : IAgentActionHandler
             agent,
             defendFlags,
             guardMode,
+            actionTypes,
             guardReactionChannel,
             publishAction0Speed ? action0Speed : (float?)null,
             publishAction1Speed ? action1Speed : (float?)null,
@@ -596,6 +599,7 @@ public class AgentActionHandler : IAgentActionHandler
                 bool useInputBoundary =
                     agent.Controller == AgentControllerType.Player
                     && state.HasInputBoundaryObservation;
+                var actionTypes = new AgentActionData.ActionTypes(agent);
                 Agent.MovementControlFlag defendFlags;
                 Agent.GuardMode guardMode;
                 if (useInputBoundary)
@@ -606,9 +610,9 @@ public class AgentActionHandler : IAgentActionHandler
                 else
                 {
                     defendFlags =
-                        AgentActionData.GetEffectiveDefendMovementFlags(agent);
+                        AgentActionData.GetEffectiveDefendMovementFlags(agent, actionTypes);
                     Agent.GuardMode actionGuardMode =
-                        AgentActionData.GetGuardModeFromDefendingAction(agent);
+                        AgentActionData.GetGuardModeFromDefendingAction(agent, actionTypes);
                     guardMode = GetEffectiveGuardMode(
                         info.AgentId,
                         agent,
@@ -634,8 +638,10 @@ public class AgentActionHandler : IAgentActionHandler
 
                 (ids ??= new List<Guid>()).Add(info.AgentId);
                 (actions ??= new List<AgentActionData>()).Add(
-                    PrepareEquipmentSnapshot(info,
-                        new AgentActionData(agent, defendFlags, guardMode).WithPilotSeat(pilotSeat), catchUp: true));
+                    PrepareEquipmentSnapshot(
+                        info,
+                        new AgentActionData(agent, defendFlags, guardMode, actionTypes).WithPilotSeat(pilotSeat),
+                        catchUp: true));
                 (sequences ??= new List<long>()).Add(NextActionSequence(info.AgentId));
             }
 
@@ -938,12 +944,17 @@ public class AgentActionHandler : IAgentActionHandler
 
     private static int GetGuardReactionChannel(
         Agent agent,
+        AgentActionData.ActionTypes actionTypes,
+        int action0,
+        int action1,
         bool hadState,
         LocalAgentActionState state)
     {
         if (IsGuardReactionTransition(
                 agent,
                 channel: 1,
+                action1,
+                actionTypes.Channel1,
                 hadState,
                 state.Action1,
                 state.Action1WasDefending))
@@ -954,6 +965,8 @@ public class AgentActionHandler : IAgentActionHandler
         return IsGuardReactionTransition(
             agent,
             channel: 0,
+            action0,
+            actionTypes.Channel0,
             hadState,
             state.Action0,
             state.Action0WasDefending)
@@ -964,16 +977,15 @@ public class AgentActionHandler : IAgentActionHandler
     private static bool IsGuardReactionTransition(
         Agent agent,
         int channel,
+        int action,
+        Agent.ActionCodeType actionType,
         bool hadState,
         int previousAction,
         bool previousActionWasDefending)
     {
-        Agent.ActionCodeType actionType =
-            agent.GetCurrentActionType(channel);
         if (AgentActionData.IsGuardReactionAction(actionType))
             return true;
 
-        int action = agent.GetCurrentAction(channel).Index;
         return hadState
             && previousActionWasDefending
             && action >= 0
@@ -1014,7 +1026,8 @@ public class AgentActionHandler : IAgentActionHandler
     {
         Agent.GuardMode guardMode = AgentActionData.GetEffectiveGuardMode(
             agent,
-            defendFlags);
+            defendFlags,
+            actionGuardMode);
         if (agent.HasMount
             && AgentActionData.IsGuardMode(actionGuardMode)
             && _localAgentStates.TryGetValue(

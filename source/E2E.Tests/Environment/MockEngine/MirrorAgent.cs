@@ -79,6 +79,8 @@ public sealed class MirrorAgent
     public Agent.GuardMode GuardMode { get; set; } = Agent.GuardMode.None;
     public Agent.ActionCodeType Action0CodeType { get; set; } = Agent.ActionCodeType.Idle;
     public Agent.ActionCodeType Action1CodeType { get; set; } = Agent.ActionCodeType.Idle;
+    public int Action0TypeReads { get; set; }
+    public int Action1TypeReads { get; set; }
     public Agent.ActionStage Action0Stage { get; set; } = Agent.ActionStage.None;
     public Agent.ActionStage Action1Stage { get; set; } = Agent.ActionStage.None;
     public Agent.UsageDirection Action0Direction { get; set; } = Agent.UsageDirection.None;
