@@ -8,6 +8,10 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Library;
+using TaleWorlds.SaveSystem;
+using TaleWorlds.SaveSystem.Definition;
+using TaleWorlds.SaveSystem.Load;
+using TaleWorlds.SaveSystem.Save;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.MobileParties;
@@ -218,6 +222,50 @@ public class MobilePartyMovementTests : SyncTestBase
                 Assert.Null(pursuingParty.MoveTargetParty);
             });
         }
+    }
+
+    [Fact]
+    public void MapUpdate_RestoresPursuitTargetAcrossTwoLoads()
+    {
+        Server.Call(() =>
+        {
+            var party = Server.GetRegisteredObject<MobileParty>(MobilePartyId);
+            var target = Server.GetRegisteredObject<MobileParty>(TargetPartyId);
+            target.Position = new CampaignVec2(new Vec2(4f, 5f), true);
+            party.SetMoveGoAroundParty(target, MobileParty.NavigationType.Default);
+
+            var definitions = new DefinitionContext();
+            definitions.FillWithCurrentTypes();
+            Assert.False(definitions.GotError, string.Join("\n", definitions.Errors));
+
+            var metadata = new MetaData();
+            var save = new SaveContext(definitions);
+            Assert.True(save.Save(party, metadata, out var error), error);
+            var driver = new InMemDriver();
+            Assert.Equal(SaveResult.Success,
+                driver.Save("pursuing_party", 1, metadata, save.SaveData).GetAwaiter().GetResult().SaveResult);
+
+            for (int loadNumber = 1; loadNumber <= 2; loadNumber++)
+            {
+                var load = new LoadContext(definitions, driver);
+                Assert.True(load.Load(driver.Load("pursuing_party"), loadAsLateInitialize: true));
+                var loadedParty = Assert.IsType<MobileParty>(load.RootObject);
+                Assert.NotSame(party, loadedParty);
+                Assert.Equal(AiBehavior.GoAroundParty, loadedParty.DefaultBehavior);
+                Assert.Null(loadedParty.Ai.AiBehaviorInteractable);
+                var loadedTarget = Assert.IsType<MobileParty>(loadedParty.TargetParty);
+                Assert.NotSame(target, loadedTarget);
+                // Map repair updates the target's position before recalculating the pursuit destination.
+                loadedTarget._position = new CampaignVec2(new Vec2(6f + loadNumber, 7f), true);
+
+                loadedParty.CheckAiForMapChangeAndUpdateIfNeeded();
+
+                Assert.Equal(loadedTarget.Position, loadedParty.MoveTargetPoint);
+                Assert.Equal(loadedTarget.Position, loadedParty.Ai.BehaviorTarget);
+                party = loadedParty;
+                target = loadedTarget;
+            }
+        });
     }
 
     private void AssertPartyMovementValues(
