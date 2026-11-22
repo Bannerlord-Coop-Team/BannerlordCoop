@@ -13,29 +13,10 @@ namespace GameInterface.Tests.Serialization.SerializerTests
     /// </summary>
     public class BladeDataSerializationTest
     {
-        IContainer container;
+        ILifetimeScope container;
         public BladeDataSerializationTest()
         {
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
-        }
-
-        [Fact]
-        public void BladeData_Serialize()
-        {
-            BladeData BladeData = new BladeData(CraftingPiece.PieceTypes.Blade, 1.1f);
-
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            BladeDataBinaryPackage package = new BladeDataBinaryPackage(BladeData, factory);
-
-            package.Pack();
-
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
-
-            Assert.NotEmpty(bytes);
+            container = SerializationTestContainer.BeginScope();
         }
 
         [Fact]

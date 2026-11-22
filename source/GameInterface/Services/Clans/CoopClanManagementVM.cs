@@ -61,8 +61,7 @@ public class CoopClanManagementVM : ClanManagementVM
         var clan = member.Clan;
         InformationManager.ShowTextInquiry(new TextInquiryData(
             GameTexts.FindText(tribute ? "str_coop_clan_send_tribute" : "str_coop_clan_daily_payment").ToString(),
-            GameTexts.FindText("str_coop_clan_experimental_warning") + "\n\n" +
-                GameTexts.FindText(tribute ? "str_coop_clan_tribute_description" : "str_coop_clan_payment_description")
+            GameTexts.FindText(tribute ? "str_coop_clan_tribute_description" : "str_coop_clan_payment_description")
                 .SetTextVariable("HERO", tribute ? clan.Leader.Name : member.Name)
                 .SetTextVariable("GOLD", actor.Gold).ToString(),
             true, true, GameTexts.FindText(tribute ? "str_coop_clan_send_tribute" : "str_done").ToString(),

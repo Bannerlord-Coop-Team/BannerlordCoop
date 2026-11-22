@@ -14,6 +14,7 @@ using GameInterface.Services.PartyVisuals.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.SiegeEvents.Interfaces;
+using SandBox.View.Map.Managers;
 using HarmonyLib;
 using LiteNetLib;
 using Moq;
@@ -413,8 +414,7 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
     [Fact]
     public void HeadlessDisconnectAndReconnect_BroadcastsDestroyThenOneClientOnlyCreate()
     {
-        var managerType = Type.GetType("SandBox.View.Map.Managers.MobilePartyVisualManager, SandBox.View", true)!;
-        Assert.Null(AccessTools.Property(managerType, "Current").GetValue(null));
+        Assert.Null(MobilePartyVisualManager.Current);
         var player = CreatePlayer();
         var party = CreateParty();
         var hero = CreateActiveHero();
@@ -437,9 +437,12 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
         network.Verify(value => value.SendAll(It.Is<NetworkDestroyPartyVisual>(
             message => message.MobilePartyHandle == 42)), Times.Once);
 
-        broker.Publish(this, new PlayerCampaignSynchronized(peer));
+        var reconnectedPeer = (NetPeer)FormatterServices.GetUninitializedObject(typeof(NetPeer));
+        players.Setup(manager => manager.TryGetPlayer(reconnectedPeer, out player)).Returns(true);
+        players.Setup(manager => manager.TryGetPeer(player.ControllerId, out reconnectedPeer)).Returns(true);
+        broker.Publish(this, new PlayerCampaignSynchronized(reconnectedPeer));
         GameThread.Run(() => { }, blocking: true);
-        broker.Publish(this, new PlayerCampaignSynchronized(peer));
+        broker.Publish(this, new PlayerCampaignSynchronized(reconnectedPeer));
         GameThread.Run(() => { }, blocking: true);
 
         Assert.True(party.IsActive);

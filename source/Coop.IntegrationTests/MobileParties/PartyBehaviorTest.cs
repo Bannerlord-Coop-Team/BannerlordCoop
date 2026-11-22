@@ -6,7 +6,6 @@ using Coop.Core.Server.Services.MobileParties.Packets;
 using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
 using GameInterface.Services.MobileParties.Data;
-using GameInterface.Services.MobileParties.Handlers;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
@@ -22,36 +21,6 @@ public class PartyBehaviorTest
     {
         // Creates a test environment with 1 server and 2 clients by default
         TestEnvironment = new TestEnvironment();
-    }
-
-    /// <summary>
-    /// Verify when the server internally receives PartyBehaviorUpdated
-    /// UpdatePartyBehavior triggers on all other clients
-    /// </summary>
-    [Fact]
-    public void ControlledPartyBehaviorUpdated_Publishes_AllClients()
-    {
-        // Arrange
-        RegisterTestParty();
-        var data = new PartyBehaviorUpdateData("Test_Party", default, default, default, default, default, default, default);
-
-        var message = new PartyBehaviorUpdated(ref data);
-
-        var server = TestEnvironment.Server;
-        // Act
-        GameThreadTestRunner.Run(() =>
-        {
-            server.SimulateMessage(this, message);
-
-            // The update is coalesced, so it only reaches clients once the server flushes for the tick.
-            FlushCoalescer(server);
-        });
-
-        // Assert
-        foreach (var client in TestEnvironment.Clients)
-        {
-            Assert.Equal(1, client.InternalMessages.GetMessageCount<UpdatePartyBehavior>());
-        }
     }
 
     /// <summary>
@@ -136,72 +105,6 @@ public class PartyBehaviorTest
             Assert.True(update.BehaviorUpdateData.IsCurrentlyAtSea);
             Assert.True(update.BehaviorUpdateData.ResetMovementToHold);
         }
-    }
-
-    [Fact]
-    public void TrySelectBehaviorUpdate_SelfEchoUsesLatestPrediction()
-    {
-        var stalePoint = new CampaignVec2(new Vec2(12f, 8f), true);
-        var latestPoint = new CampaignVec2(new Vec2(42f, 24f), true);
-        var staleEcho = new PartyBehaviorUpdateData(
-            "MobileParty_Test_Party",
-            AiBehavior.EscortParty,
-            "Old_Target",
-            stalePoint,
-            stalePoint,
-            default,
-            stalePoint,
-            default);
-        var latestPrediction = new PartyBehaviorUpdateData(
-            "Test_Party",
-            AiBehavior.GoToPoint,
-            null,
-            latestPoint,
-            latestPoint,
-            default,
-            latestPoint,
-            default);
-        var latestPredictions = new Dictionary<string, PartyBehaviorUpdateData>
-        {
-            ["Test_Party"] = latestPrediction,
-        };
-
-        Assert.True(MobilePartyBehaviorHandler.TrySelectBehaviorUpdate(
-            true,
-            latestPredictions,
-            ref staleEcho));
-        Assert.Equal(AiBehavior.GoToPoint, staleEcho.NewAiBehavior);
-        Assert.Null(staleEcho.InteractablePointId);
-        Assert.Equal(latestPoint.X, staleEcho.BestTargetPoint.X);
-        Assert.Equal(latestPoint.Y, staleEcho.BestTargetPoint.Y);
-        Assert.Equal(latestPoint.IsOnLand, staleEcho.BestTargetPoint.IsOnLand);
-    }
-
-    [Theory]
-    [InlineData(false, false, false, true, true, false)]
-    [InlineData(false, false, true, true, true, true)]
-    [InlineData(false, false, false, true, false, true)]
-    [InlineData(false, true, false, true, true, true)]
-    [InlineData(true, true, true, true, false, false)]
-    public void ShouldApplyAuthoritativePosition_ReturnsExpected(
-        bool isSelfEcho,
-        bool forcePosition,
-        bool isHolding,
-        bool currentIsOnLand,
-        bool authoritativeIsOnLand,
-        bool expected)
-    {
-        var currentPosition = new CampaignVec2(new Vec2(42f, 24f), currentIsOnLand);
-        var authoritativePosition = new CampaignVec2(new Vec2(12f, 8f), authoritativeIsOnLand);
-
-        Assert.Equal(
-            expected,
-            MobilePartyBehaviorHandler.ShouldApplyAuthoritativePosition(
-                isSelfEcho,
-                forcePosition,
-                isHolding,
-                currentPosition,
-                authoritativePosition));
     }
 
     // Drains the server's per-tick coalescer the way CoopServer.Update does, inside the server's

@@ -5,8 +5,11 @@ using Common.Serialization;
 using Common.Util;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
+using GameInterface.Services.CharacterObjects;
 using GameInterface.Services.Heroes.Data;
+using GameInterface.Services.Issues.Framework.Gating;
 using GameInterface.Services.MobileParties;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyBases.Extensions;
@@ -14,6 +17,7 @@ using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.SiegeEvents.Interfaces;
+using GameInterface.Services.Traits.Interfaces;
 using GameInterface.Services.UI.Messages;
 using SandBox.View.Map.Managers;
 using Serilog;
@@ -47,19 +51,22 @@ internal class HeroInterface : IHeroInterface
     private readonly IBinaryPackageFactory binaryPackageFactory;
     private readonly IPartyVisibilitySweep partyVisibilitySweep;
     private readonly IPlayerPartyRestorer playerPartyRestorer;
+    private readonly ITraitLevelingHelperInterface traitLevelingHelperInterface;
 
     public HeroInterface(
         IMessageBroker messageBroker,
         IBinaryPackageFactory binaryPackageFactory,
         IObjectManager objectManager,
         IPartyVisibilitySweep partyVisibilitySweep,
-        IPlayerPartyRestorer playerPartyRestorer)
+        IPlayerPartyRestorer playerPartyRestorer,
+        ITraitLevelingHelperInterface traitLevelingHelperInterface)
     {
         this.objectManager = objectManager;
         this.messageBroker = messageBroker;
         this.binaryPackageFactory = binaryPackageFactory;
         this.partyVisibilitySweep = partyVisibilitySweep;
         this.playerPartyRestorer = playerPartyRestorer;
+        this.traitLevelingHelperInterface = traitLevelingHelperInterface;
     }
 
     public byte[] PackageMainHero()
@@ -149,6 +156,9 @@ internal class HeroInterface : IHeroInterface
                         .DeserializeCompressed<HeroBinaryPackage>(bytes)
                         .Unpack<Hero>(binaryPackageFactory);
 
+                    // Host and client copies get the same template; the host's save carries it for the refill after a load (#4675)
+                    PlayerCharacterTemplate.Link(hero.CharacterObject, PlayerCharacterTemplate.Find());
+
                     assignNetworkIds(hero);
 
                     if (setupHero)
@@ -189,6 +199,7 @@ internal class HeroInterface : IHeroInterface
         // reloaded party outside on this client only (the server's save keeps it inside); keep it
         // inside and rebuild the local in-settlement state afterwards.
         LeaveSettlementActionPatches.SuppressForPlayerSwitch = true;
+        PlayerSwitchQuestCancelGatePatch.SuppressForPlayerSwitch = true;
         try
         {
             ChangePlayerCharacterAction.Apply(playerHero);
@@ -196,6 +207,7 @@ internal class HeroInterface : IHeroInterface
         finally
         {
             LeaveSettlementActionPatches.SuppressForPlayerSwitch = false;
+            PlayerSwitchQuestCancelGatePatch.SuppressForPlayerSwitch = false;
         }
 
         LogPlayerSwitchState("after", player, playerHero, playerParty);
@@ -221,12 +233,17 @@ internal class HeroInterface : IHeroInterface
             playerHero.PartyBelongedTo = null;
             messageBroker.Publish(this, new PlayerCaptivityChanged(playerHero.PartyBelongedToAsPrisoner));
         }
+        else
+        {
+            // Vanilla skips the camera target while a saved party is parked for login.
+            playerParty.Party.SetAsCameraFollowParty();
+        }
 
-        // The transferred host save carries the server's always-visible party state
-        // (PartyVisibilityServerPatches) and the native load path never rebuilds fog of war
-        // (Campaign.GameInitTick only runs for new campaigns), so distant parties and their battle
-        // icons would stay revealed forever. Queued so it runs once the campaign state is entered
-        // and the hero switched to above is the local main party.
+        // On a release client the transferred host save loads with every party hidden
+        // (TransferredPartyVisibilityPatch) and the native load path never rebuilds fog of war
+        // (Campaign.GameInitTick only runs for new campaigns), so nearby parties would stay hidden.
+        // Queued so it runs once the campaign state is entered and the hero switched to above is the
+        // local main party.
         GameThread.RunSafe(partyVisibilitySweep.RebuildAroundMainParty);
         MessageBroker.Instance.Publish(player, new SwitchedPlayer());
     }
@@ -332,6 +349,9 @@ internal class HeroInterface : IHeroInterface
             playerPartyRestorer.Restore(hero, party);
         else
             playerPartyRestorer.RestoreClanMembership(hero);
+
+        // Matches CharacterCreationManager.ApplyFinalEffects setting trait xp from the created hero's levels
+        traitLevelingHelperInterface.InitializeTraitXp(hero);
     }
 
     /// <summary>
@@ -377,8 +397,11 @@ internal class HeroInterface : IHeroInterface
         RegisterPartyChildren(party, handles);
     }
 
+    /// <summary>The id prefix the host gives every joined player's hero, and so its character.</summary>
+    internal const string JoinedPlayerIdPrefix = "Player";
+
     private string NewServerStringId<T>(T obj) where T : MBObjectBase
-        => Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<T>("Player");
+        => Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<T>(JoinedPlayerIdPrefix);
 
     private void RegisterPrimary<T>(T obj, string stringId) where T : MBObjectBase
     {

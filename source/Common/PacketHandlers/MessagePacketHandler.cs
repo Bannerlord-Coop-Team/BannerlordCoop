@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.BattleBenchmark;
 using Common.Logging;
 using Common.Messaging;
 using Common.Serialization;
@@ -29,12 +30,19 @@ public class MessagePacketHandler : IMessagePacketHandler
     private readonly IMessageBroker messageBroker;
     private readonly IPacketManager packetManager;
     private readonly ICommonSerializer serializer;
+    private readonly IBattleBenchmarkRecorder battleBenchmark;
 
-    public MessagePacketHandler(IMessageBroker messageBroker, IPacketManager packetManager, ICommonSerializer serializer)
+    // The recorder is optional so the tests that build this handler directly don't need one.
+    public MessagePacketHandler(
+        IMessageBroker messageBroker,
+        IPacketManager packetManager,
+        ICommonSerializer serializer,
+        IBattleBenchmarkRecorder battleBenchmark = null)
     {
         this.messageBroker = messageBroker;
         this.packetManager = packetManager;
         this.serializer = serializer;
+        this.battleBenchmark = battleBenchmark;
         this.packetManager.RegisterPacketHandler(this);
     }
 
@@ -59,14 +67,8 @@ public class MessagePacketHandler : IMessagePacketHandler
         if (message is null)
             throw new ArgumentNullException(nameof(message));
 
-        if (ModInformation.IsServer && message is IServerToClientCommand)
-        {
-            Logger.Warning("Rejected server-to-client-only message {MessageType} received while running as server",
-                message.GetType());
-            return;
-        }
-
         var messageType = message.GetType();
+        battleBenchmark?.RecordReceivedMessage(messageType);
         var publishInvoker = GetPublishInvoker(messageType);
 
         try

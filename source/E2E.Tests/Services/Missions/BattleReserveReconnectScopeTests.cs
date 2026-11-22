@@ -4,6 +4,7 @@ using Common.Network;
 using Common.Network.Messages;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.MapEvents.TroopSupply.Handlers;
 using GameInterface.Services.MapEvents.TroopSupply.Messages;
@@ -894,53 +895,144 @@ public class BattleReserveReconnectScopeTests : MissionTestEnvironment
     }
 
     /// <summary>
-    /// The reserve allocation and flush fields survive a real protobuf round trip.
+    /// BR-054 in the R41a order: a player retreats from the mission, then drops from the campaign with its party still in
+    /// the MapEvent. Its reserve was withdrawn, so the drop hands nothing to the host, and its return re-enters with the
+    /// whole party re-flattened.
     /// </summary>
     [Fact]
-    [Trait("Requirement", "BR-033")]
-    public void FlushHandshakeFields_RoundTripOverTheWire()
+    [Trait("Requirement", "BR-054")]
+    public void RetreatedPlayerDisconnecting_KeepsItsPartyOutOfTheHostsReserveScope()
     {
-        var reserve = Server.EnsureSerializable(new NetworkBattleTroopReserve(
-            "rt_battle", (int)BattleSideEnum.Attacker,
-            new[] { new PartyReserve("own-party", 0,
-                new[] { new TroopReserveEntry(42, "priority-character", 0, supplyOrder: 9) },
-                isReceiverPlayerParty: true, sideOffset: 7, playerOwnedRank: 2,
-                playerOwnedPartiesBefore: 2) },
-            sideTotalTroops: 42,
-            playerOwnedPartyCount: 3,
-            allocationRevision: 17,
-            battleSize: 1000,
-            flushRequested: true));
-        Assert.True(reserve.FlushRequested);
-        Assert.Equal(42, reserve.SideTotalTroops);
-        Assert.Equal(3, reserve.PlayerOwnedPartyCount);
-        Assert.Equal(17, reserve.AllocationRevision);
-        Assert.Equal(1000, reserve.BattleSize);
-        var party = Assert.Single(reserve.Parties);
-        Assert.True(party.IsReceiverPlayerParty);
-        Assert.Equal(7, party.SideOffset);
-        Assert.Equal(2, party.PlayerOwnedRank);
-        Assert.Equal(2, party.PlayerOwnedPartiesBefore);
-        Assert.True(party.HasPlayerOwnedPartiesBefore);
-        Assert.Equal(9, Assert.Single(party.Entries).SupplyOrder);
-
-        var emptyReserve = Server.EnsureSerializable(new NetworkBattleTroopReserve(
-            "rt_battle", (int)BattleSideEnum.Attacker, Array.Empty<PartyReserve>(),
-            sideTotalTroops: 0, playerOwnedPartyCount: 0, allocationRevision: 18, battleSize: 1000));
-        Assert.False(emptyReserve.FlushRequested);
-        Assert.Equal(0, emptyReserve.SideTotalTroops);
-        Assert.Equal(0, emptyReserve.PlayerOwnedPartyCount);
-        Assert.Equal(1000, emptyReserve.BattleSize);
-        Assert.Equal(18, emptyReserve.AllocationRevision);
-        Assert.Empty(emptyReserve.Parties);
-
-        var flush = Server.EnsureSerializable(new NetworkBattleSupplyProgress(
-            "rt_battle", new[] { new SupplyProgressEntry("party", 2) }, isFlush: true));
-        Assert.True(flush.IsFlush);
-        Assert.Equal(2, flush.Entries.Single().SuppliedCount);
-
-        var legacyReport = Server.EnsureSerializable(new NetworkBattleSupplyProgress(
-            "rt_battle", new[] { new SupplyProgressEntry("party", 2) }));
-        Assert.False(legacyReport.IsFlush);
+        var (mapEventId, partyIds) = SetupCoopBattle("host-ctrl", "returner-ctrl");
+        AssertDepartureKeepsThePartyFromTheHost(mapEventId, partyIds, departure: () =>
+        {
+            DepartBattle("returner-ctrl", mapEventId, wasRetreat: true);
+            DisconnectFromMapEvent("returner-ctrl", mapEventId);
+        });
     }
+
+    /// <summary>
+    /// D4: at sea a mid-battle disconnect withdraws the party like a retreat, whichever of the campaign drop and the mission
+    /// departure the server sees first, so the host never fields it and a returning player gets a full, fresh reserve.
+    /// </summary>
+    [Theory]
+    [Trait("Requirement", "BR-054")]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void NavalDisconnect_WithdrawsThePartyReserve_AndTheReturnerGetsAFullOne(bool campaignDropFirst)
+    {
+        var (mapEventId, partyIds) = SetupCoopBattle("host-ctrl", "returner-ctrl");
+        Server.Call(() => Server.GetRegisteredObject<MapEvent>(mapEventId).Position =
+            new CampaignVec2(TaleWorlds.Library.Vec2.Zero, isOnLand: false));
+        AssertDepartureKeepsThePartyFromTheHost(mapEventId, partyIds, departure: () =>
+        {
+            if (campaignDropFirst) DisconnectFromMapEvent("returner-ctrl", mapEventId);
+            DepartBattle("returner-ctrl", mapEventId, wasRetreat: false);
+            if (!campaignDropFirst) DisconnectFromMapEvent("returner-ctrl", mapEventId);
+        });
+    }
+
+    // Both connected players enter, the returner fields part of its reserve, departs and goes offline; the host is never
+    // handed its party, and the returner's re-entry grant after it reconnects carries its whole party from a reset pointer.
+    private void AssertDepartureKeepsThePartyFromTheHost(string mapEventId, string[] partyIds, Action departure)
+    {
+        var clients = Clients.ToArray();
+        var host = clients[0];
+        var returner = clients[1];
+        var players = Server.Resolve<IPlayerManager>();
+
+        CoopTroopSupplierRegistry.ClearBattle(mapEventId);
+        try
+        {
+            GiveRoster(mapEventId, partyIds[1], ReturnerTroopCount);
+            var returnerMepId = GetMapEventPartyId(mapEventId, partyIds[1]);
+            Server.Call(() =>
+            {
+                players.SetPeer("host-ctrl", host.NetPeer);
+                players.SetPeer("returner-ctrl", returner.NetPeer);
+            });
+            EnterBattle(host, mapEventId);
+            EnterBattle(returner, mapEventId);
+            Server.Call(() => Server.Resolve<IBattleTroopLedger>().ReportSupplied(mapEventId, returnerMepId, 2));
+
+            int hostBaseline = FeedBaseline(host, mapEventId);
+            int expansionBaseline = host.InternalMessages.GetMessages<NetworkBattleReserveOwnershipExpanded>()
+                .Count(message => message.MapEventId == mapEventId);
+            departure();
+            Server.Call(() => players.ClearPeer(returner.NetPeer));
+            RequestOwnedReserves(host, mapEventId, "host-ctrl");
+
+            Assert.Equal(expansionBaseline, host.InternalMessages.GetMessages<NetworkBattleReserveOwnershipExpanded>()
+                .Count(message => message.MapEventId == mapEventId));
+            var hostHeld = FeedsSince(host, mapEventId, hostBaseline).SelectMany(feed => feed.Parties).Select(party => party.PartyId);
+            Assert.DoesNotContain(returnerMepId, hostHeld);
+
+            int returnerBaseline = FeedBaseline(returner, mapEventId);
+            Server.Call(() => players.SetPeer("returner-ctrl", returner.NetPeer));
+            EnterBattle(returner, mapEventId);
+
+            var granted = FeedsSince(returner, mapEventId, returnerBaseline)
+                .Where(feed => feed.Side == (int)BattleSideEnum.Defender)
+                .Last().Parties.Single(party => party.PartyId == returnerMepId);
+            Assert.Equal(0, granted.SuppliedCount);
+            Assert.Equal(ReturnerTroopCount, granted.Entries.Length);
+        }
+        finally
+        {
+            CoopTroopSupplierRegistry.ClearBattle(mapEventId);
+        }
+    }
+
+    /// <summary>
+    /// BR-031 after a BR-054 retreat: re-entering the battle ends the withdrawal, so a later campaign drop hands the
+    /// returner's party to the host again.
+    /// </summary>
+    [Fact]
+    [Trait("Requirement", "BR-031")]
+    public void RetreatedPlayerReenteringThenDisconnecting_FallsIntoTheHostsReserveScope()
+    {
+        var (mapEventId, partyIds) = SetupCoopBattle("host-ctrl", "returner-ctrl");
+        var clients = Clients.ToArray();
+        var host = clients[0];
+        var returner = clients[1];
+        var players = Server.Resolve<IPlayerManager>();
+
+        CoopTroopSupplierRegistry.ClearBattle(mapEventId);
+        try
+        {
+            GiveRoster(mapEventId, partyIds[1], ReturnerTroopCount);
+            var returnerMepId = GetMapEventPartyId(mapEventId, partyIds[1]);
+            Server.Call(() =>
+            {
+                players.SetPeer("host-ctrl", host.NetPeer);
+                players.SetPeer("returner-ctrl", returner.NetPeer);
+            });
+            EnterBattle(host, mapEventId);
+            EnterBattle(returner, mapEventId);
+            DepartBattle("returner-ctrl", mapEventId, wasRetreat: true);
+            EnterBattle(returner, mapEventId);
+
+            int feedBaseline = FeedBaseline(host, mapEventId);
+            int expansionBaseline = host.InternalMessages.GetMessages<NetworkBattleReserveOwnershipExpanded>()
+                .Count(message => message.MapEventId == mapEventId);
+            Server.Call(() => players.ClearPeer(returner.NetPeer));
+            DisconnectFromMapEvent("returner-ctrl", mapEventId);
+
+            Assert.Single(host.InternalMessages.GetMessages<NetworkBattleReserveOwnershipExpanded>()
+                .Where(message => message.MapEventId == mapEventId)
+                .Skip(expansionBaseline));
+            var defenderParties = LatestSideParties(FeedsSince(host, mapEventId, feedBaseline), BattleSideEnum.Defender);
+            Assert.NotNull(defenderParties);
+            Assert.Contains(returnerMepId, defenderParties);
+        }
+        finally
+        {
+            CoopTroopSupplierRegistry.ClearBattle(mapEventId);
+        }
+    }
+
+    // The party-visibility handler's signal for a player whose peer dropped with its party still in the MapEvent.
+    private void DisconnectFromMapEvent(string controllerId, string mapEventId) => Server.Call(() =>
+        Server.Resolve<IMessageBroker>().Publish(this,
+            new PlayerDisconnectedFromMapEvent(controllerId, Server.GetRegisteredObject<MapEvent>(mapEventId))));
 }

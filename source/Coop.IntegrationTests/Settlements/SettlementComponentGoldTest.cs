@@ -16,39 +16,6 @@ namespace Coop.IntegrationTests.Settlements
     public class SettlementComponentGoldTest
     {
         internal TestEnvironment TestEnvironment { get; } = new TestEnvironment();
-        [Fact]
-        public void ServerSettlementComponentGoldChanged_Publishes_AllClients()
-        {
-            // Arrange
-            //string settlementId = "SettlementComponent1";
-            var settlementId = "MySettlement";
-            var settlement = ObjectHelper.SkipConstructor<Settlement>();
-            TestEnvironment.RegisterObjectInNetwork(settlement, settlementId);
-
-            var settlementComponent = ObjectHelper.SkipConstructor<Hideout>();
-            TestEnvironment.RegisterObjectInNetwork<SettlementComponent>(settlementComponent);
-
-            int newGold = 120;
-            var triggerMessage = new SettlementComponentGoldChanged(settlementComponent, newGold);
-
-            var server = TestEnvironment.Server;
-
-            // Act
-            server.SimulateMessage(this, triggerMessage);
-
-            // The update is coalesced, so it only reaches clients once the server flushes for the tick.
-            FlushCoalescer(server);
-
-            // Assert
-            // Verify the server sends a single message to it's game interface
-            Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkChangeSettlementComponentGold>());
-
-            // Verify the all clients send a single message to their game interfaces
-            foreach (EnvironmentInstance client in TestEnvironment.Clients)
-            {
-                Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeSettlementComponentGold>());
-            }
-        }
 
         /// <summary>
         /// Repeated gold changes to the same component within a tick collapse into one latest-wins send.

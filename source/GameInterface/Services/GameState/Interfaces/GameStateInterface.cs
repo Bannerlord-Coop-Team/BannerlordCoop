@@ -4,13 +4,17 @@ using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes;
+using GameInterface.Services.Modules;
+using GameInterface.Services.UI.Interfaces;
 using SandBox;
 using Serilog;
 using System;
 using System.Linq;
+using TaleWorlds.CampaignSystem.AdvancedStartOptions;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
+using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.SaveSystem;
 using TaleWorlds.SaveSystem.Load;
@@ -19,10 +23,22 @@ namespace GameInterface.Services.GameState.Interfaces;
 
 public interface IGameStateInterface : IGameAbstraction
 {
+    /// <summary>
+    /// Ends the campaign on the game thread. Leaving is ordered ahead of any game-thread work queued after this
+    /// returns, but the main menu may not be active yet.
+    /// </summary>
     void GoToMainMenu();
     void StartNewGame();
+    /// <summary>
+    /// Queues loading a transferred save on the game thread and returns without waiting for it.
+    /// </summary>
     void LoadSaveData(byte[] saveData);
     void LoadGame(string saveName);
+
+    /// <summary>
+    /// Loads the named save, or starts a new campaign when no save has that name.
+    /// </summary>
+    void LoadGameOrStartNew(string saveName);
     void EndGame();
 }
 
@@ -32,16 +48,31 @@ internal class GameStateInterface : IGameStateInterface
 
     private readonly IMessageBroker messageBroker;
     private readonly Action endGame;
+    private readonly Func<SaveGameFileInfo[]> getSaveFiles;
+    private readonly Action<SaveGameFileInfo> forceLoadSave;
+    private readonly Action<byte[]> loadTransferredSave;
+    private readonly INavalSaveCompatibility navalSaveCompatibility;
+    private readonly ILoadingInterface loadingInterface;
 
-    public GameStateInterface(IMessageBroker messageBroker)
-        : this(messageBroker, MBGameManager.EndGame)
+    public GameStateInterface(IMessageBroker messageBroker, INavalSaveCompatibility navalSaveCompatibility,
+        ILoadingInterface loadingInterface)
+        : this(messageBroker, MBGameManager.EndGame, () => MBSaveLoad.GetSaveFiles(null), ForceLoadSave,
+            LoadTransferredSave, navalSaveCompatibility, loadingInterface)
     {
     }
 
-    internal GameStateInterface(IMessageBroker messageBroker, Action endGame)
+    // Lets tests replace the engine's end-game, save listing, forced load and transferred save load.
+    internal GameStateInterface(IMessageBroker messageBroker, Action endGame, Func<SaveGameFileInfo[]> getSaveFiles,
+        Action<SaveGameFileInfo> forceLoadSave, Action<byte[]> loadTransferredSave,
+        INavalSaveCompatibility navalSaveCompatibility, ILoadingInterface loadingInterface)
     {
         this.messageBroker = messageBroker;
         this.endGame = endGame;
+        this.getSaveFiles = getSaveFiles;
+        this.forceLoadSave = forceLoadSave;
+        this.loadTransferredSave = loadTransferredSave;
+        this.navalSaveCompatibility = navalSaveCompatibility;
+        this.loadingInterface = loadingInterface;
     }
 
     public void GoToMainMenu()
@@ -55,10 +86,11 @@ internal class GameStateInterface : IGameStateInterface
     public void LoadSaveData(byte[] saveData)
     {
         messageBroker.Publish(this, new GameLoadStarted());
-        GameThread.Run(() => InteralLoadSaveGame(saveData), blocking: true);
+        // Queued, not awaited, so the load is never dropped for starting late
+        GameThread.RunSafe(() => loadTransferredSave(saveData), context: nameof(LoadSaveData));
     }
 
-    private void InteralLoadSaveGame(byte[] saveData)
+    private static void LoadTransferredSave(byte[] saveData)
     {
         if (saveData == null) throw new ArgumentNullException($"Received save data was null");
 
@@ -94,30 +126,62 @@ internal class GameStateInterface : IGameStateInterface
     public void StartNewGame()
     {
         messageBroker.Publish(this, new GameLoadStarted());
-        GameThread.Run(() =>
-        {
-            MBGameManager.StartNewGame(new SandBoxGameManager(() => new Campaign(CampaignGameMode.Campaign)));
-        });
+        GameThread.RunSafe(StartNewCampaign, context: nameof(StartNewGame));
     }
 
     public void LoadGame(string saveName)
     {
+        LoadSave(saveName, () => Logger.Error("Failed to load save with name {SaveName}", saveName));
+    }
+
+    public void LoadGameOrStartNew(string saveName)
+    {
+        LoadSave(saveName, () =>
+        {
+            Logger.Information("No save named {SaveName}, starting a new campaign", saveName);
+            StartNewCampaign();
+        });
+    }
+
+    // Loads the named save on the game thread, blocking until it started, or runs onMissing there when no save has that name.
+    private void LoadSave(string saveName, Action onMissing)
+    {
         messageBroker.Publish(this, new GameLoadStarted());
         GameThread.Run(() =>
         {
-            var save = MBSaveLoad.GetSaveFiles(null).SingleOrDefault(x => x.Name == saveName);
+            var save = getSaveFiles().SingleOrDefault(x => x.Name == saveName);
 
             if (save == null)
             {
-                Logger.Error("Failed to load save with name {SaveName}", saveName);
+                onMissing();
                 return;
             }
 
-            ForceLoadSave(save);
+            if (RefuseNavalMismatch(save)) return;
+
+            forceLoadSave(save);
         }, blocking: true);
     }
 
-    private void ForceLoadSave(SaveGameFileInfo save)
+    // The forced load below skips vanilla's NavalDLC added/removed check, so a mismatched save is refused here instead.
+    private bool RefuseNavalMismatch(SaveGameFileInfo save)
+    {
+        string refusal = navalSaveCompatibility.GetHostRefusal(save.Name, save.MetaData.GetModules());
+        if (refusal == null) return false;
+
+        Logger.Error("Refusing to host: {Reason}", refusal);
+        loadingInterface.HideLoadingScreen();
+        InformationManager.DisplayMessage(new InformationMessage(refusal));
+        return true;
+    }
+
+    // Starts a new sandbox campaign; game thread only.
+    private static void StartNewCampaign()
+    {
+        MBGameManager.StartNewGame(new SandBoxGameManager(() => new Campaign(CampaignGameMode.Campaign, new AdvancedStartOptionsData())));
+    }
+
+    private static void ForceLoadSave(SaveGameFileInfo save)
     {
         LogModuleCompatibilityMismatches(save);
 
@@ -143,7 +207,7 @@ internal class GameStateInterface : IGameStateInterface
         }
     }
 
-    private void StartGame(LoadResult loadResult)
+    private static void StartGame(LoadResult loadResult)
     {
         MBGameManager.StartNewGame(new SandBoxGameManager(loadResult));
         MouseManager.ShowCursor(false);

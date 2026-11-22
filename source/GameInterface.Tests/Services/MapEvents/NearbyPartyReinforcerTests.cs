@@ -8,7 +8,6 @@ using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MapEvents.Patches;
-using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Tests.Bootstrap;
@@ -25,8 +24,10 @@ using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
 using Xunit;
+using GameInterface.Tests.Utils;
 using FormatterServices = System.Runtime.Serialization.FormatterServices;
 
 namespace GameInterface.Tests.Services.MapEvents;
@@ -108,8 +109,8 @@ public sealed class NearbyPartyReinforcerTests : IDisposable
         var enemyParty = CreateMobileParty();
         var mapEvent = CreatePlayerBattle(playerParty, enemyParty);
         var encounterSettlement = (Settlement)FormatterServices.GetUninitializedObject(typeof(Settlement));
-        mapEvent._mapEventType = MapEvent.BattleTypes.SallyOut;
-        mapEvent.MapEventSettlement = encounterSettlement;
+        mapEvent.SetBattleType(MapEvent.BattleTypes.SallyOut);
+        mapEvent.SetMapEventSettlement(encounterSettlement);
         MarkAsPlayerParty(playerParty);
         InteractionPatches.OpenAiJoinWindowAndPublish(mapEvent, () => { });
         var selectorCalled = false;
@@ -346,13 +347,16 @@ public sealed class NearbyPartyReinforcerTests : IDisposable
     }
 
     [Fact]
-    public void AttachedArmyCleanup_PublishesEveryRecursivelyRemovedParty()
+    public void AttachedArmyCleanup_RemovesLeaderAndAttachedParty()
     {
         var removedPlayer = CreateMobileParty();
         var nearbyArmyLeader = CreateMobileParty();
         var attachedArmyParty = CreateMobileParty();
         var enemyParty = CreateMobileParty();
         var mapEvent = CreatePlayerBattle(nearbyArmyLeader, enemyParty);
+        // A field battle re-places the remaining parties around the side leaders when one leaves;
+        // this leaderless fixture uses a sally-out, whose component does not, to test only the cleanup.
+        mapEvent.SetBattleType(MapEvent.BattleTypes.SallyOut);
         var side = mapEvent.AttackerSide;
         var leaderMapEventParty = side.Parties[0];
         var attachedMapEventParty = CreateMapEventParty(attachedArmyParty);
@@ -371,15 +375,7 @@ public sealed class NearbyPartyReinforcerTests : IDisposable
         nearbyArmyLeader._isCurrentlyUsedByAQuest = true;
         side._nearbyPartiesAddedToPlayerMapEvent.Add(nearbyArmyLeader);
         MarkAsPlayerParty(removedPlayer);
-        var publishedRemovals = new List<(object Source, MapEventPartyRemoved Message)>();
-        var messageBroker = new Mock<IMessageBroker>();
-        messageBroker
-            .Setup(broker => broker.Publish(
-                It.IsAny<object>(),
-                It.IsAny<MapEventPartyRemoved>()))
-            .Callback<object, MapEventPartyRemoved>((source, message) =>
-                publishedRemovals.Add((source, message)));
-        var reinforcer = new NearbyPartyReinforcer(messageBroker.Object);
+        var reinforcer = CreateReinforcer();
 
         reinforcer.RemoveReinforcementsIfNoPlayers(mapEvent, removedPlayer);
 
@@ -387,18 +383,7 @@ public sealed class NearbyPartyReinforcerTests : IDisposable
         Assert.Null(attachedArmyParty.MapEventSide);
         Assert.DoesNotContain(leaderMapEventParty, side.Parties);
         Assert.DoesNotContain(attachedMapEventParty, side.Parties);
-        Assert.Collection(
-            publishedRemovals,
-            removal =>
-            {
-                Assert.Same(side, removal.Source);
-                Assert.Same(leaderMapEventParty, removal.Message.MapEventParty);
-            },
-            removal =>
-            {
-                Assert.Same(side, removal.Source);
-                Assert.Same(attachedMapEventParty, removal.Message.MapEventParty);
-            });
+        Assert.Empty(side._nearbyPartiesAddedToPlayerMapEvent);
     }
 
     [Fact]
@@ -437,7 +422,7 @@ public sealed class NearbyPartyReinforcerTests : IDisposable
     }
 
     private static NearbyPartyReinforcer CreateReinforcer()
-        => new NearbyPartyReinforcer(Mock.Of<IMessageBroker>());
+        => new NearbyPartyReinforcer();
 
     private MapEvent CreatePlayerBattle(MobileParty playerParty, MobileParty enemyParty)
     {
@@ -445,8 +430,19 @@ public sealed class NearbyPartyReinforcerTests : IDisposable
         var defenderSide = CreateSide(CreateMapEventParty(enemyParty));
         var mapEvent = (MapEvent)FormatterServices.GetUninitializedObject(typeof(MapEvent));
         SidesField.SetValue(mapEvent, new[] { defenderSide, attackerSide });
+        // Field battles re-place the remaining parties when one leaves, which walks the sides.
+        LinkSide(defenderSide, mapEvent, BattleSideEnum.Defender);
+        LinkSide(attackerSide, mapEvent, BattleSideEnum.Attacker);
         mapEvent._state = MapEventState.Wait;
+        // The battle type is read through the component, so a map event always has one.
+        mapEvent.SetBattleType(MapEvent.BattleTypes.FieldBattle);
         return mapEvent;
+    }
+
+    private static void LinkSide(MapEventSide side, MapEvent mapEvent, BattleSideEnum missionSide)
+    {
+        MapEventField.SetValue(side, mapEvent);
+        AccessTools.Field(typeof(MapEventSide), "<MissionSide>k__BackingField").SetValue(side, missionSide);
     }
 
     private static MapEventSide CreateSide(params MapEventParty[] parties)

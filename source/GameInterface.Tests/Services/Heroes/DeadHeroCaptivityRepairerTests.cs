@@ -33,6 +33,50 @@ public class DeadHeroCaptivityRepairerTests
         Assert.Null(hero.VolunteerTypes);
     }
 
+    [Theory]
+    [InlineData(Hero.CharacterStates.Released)]
+    [InlineData(Hero.CharacterStates.Fugitive)]
+    [InlineData(Hero.CharacterStates.Active)]
+    public void TryRestoreDeadState_CompletedDeathInOtherState_RestoresState(Hero.CharacterStates savedState)
+    {
+        var hero = CreateCompletedDeathHero(savedState);
+
+        Assert.True(repairer.TryRestoreDeadState(hero));
+
+        Assert.Equal(Hero.CharacterStates.Dead, hero.HeroState);
+    }
+
+    [Fact]
+    public void RepairLoadedState_CompletedDeathReleasedHero_MovesToDeadCollection()
+    {
+        var hero = CreateCompletedDeathHero(Hero.CharacterStates.Released);
+        var objectManager = new CampaignObjectManager();
+        objectManager._aliveHeroes.Add(hero);
+
+        Assert.True(repairer.TryRestoreDeadState(hero));
+        Assert.Equal(1, repairer.RepairLoadedState(objectManager));
+
+        Assert.DoesNotContain(hero, objectManager.AliveHeroes);
+        Assert.Contains(hero, objectManager.DeadOrDisabledHeroes);
+    }
+
+    [Fact]
+    public void TryRestoreDeadState_AlreadyDead_ReturnsFalse()
+    {
+        var hero = CreateCompletedDeathHero(Hero.CharacterStates.Dead);
+
+        Assert.False(repairer.TryRestoreDeadState(hero));
+    }
+
+    [Fact]
+    public void TryRestoreDeadState_NormalReleasedHero_DoesNotChangeState()
+    {
+        var hero = new Hero();
+        hero._heroState = Hero.CharacterStates.Released;
+
+        Assert.False(repairer.TryRestoreDeadState(hero));
+        Assert.Equal(Hero.CharacterStates.Released, hero.HeroState);
+    }
     [Fact]
     public void TryRestoreDeadState_NormalPrisoner_DoesNotChangeState()
     {

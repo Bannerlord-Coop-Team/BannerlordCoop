@@ -1,9 +1,11 @@
 using E2E.Tests.Environment;
 using E2E.Tests.Util;
 using HarmonyLib;
+using SandBox.View.Map.Visuals;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
+using TaleWorlds.CampaignSystem.Roster;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.MobileParties;
@@ -19,32 +21,6 @@ public class PartyCreationTests : IDisposable
     public void Dispose()
     {
         TestEnvironment.Dispose();
-    }
-
-    [Fact]
-    public void ServerCreateParty_SyncAllClients()
-    {
-        // Arrange
-        var server = TestEnvironment.Server;
-
-        // Act
-        string? partyId = null;
-        server.Call(() =>
-        {
-            var partyComponent = GameObjectCreator.CreateInitializedObject<LordPartyComponent>();
-            var clan = GameObjectCreator.CreateInitializedObject<Clan>();
-            var party = MobileParty.CreateParty("This should not set", partyComponent);
-
-            Assert.True(server.ObjectManager.TryGetId(party, out partyId));
-        });
-
-        // Assert
-        Assert.NotNull(partyId);
-
-        foreach (var client in TestEnvironment.Clients)
-        {
-            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var newParty));
-        }
     }
 
     [Fact]
@@ -91,11 +67,12 @@ public class PartyCreationTests : IDisposable
     }
 
     [Fact]
-    public void ClientCreateParty_DoesNothing()
+    public void ClientCreatePartyObjects_DoNotRegisterOrSync()
     {
         // Arrange
         var server = TestEnvironment.Server;
         var client1 = TestEnvironment.Clients.First();
+        var registeredPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
 
         // Act
         string? partyId = null;
@@ -113,5 +90,15 @@ public class PartyCreationTests : IDisposable
         {
             Assert.False(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var _));
         }
+
+        // Each of these types has its own client guard in its lifetime patch.
+        client1.Call(() =>
+        {
+            Assert.True(client1.ObjectManager.TryGetObject<MobileParty>(registeredPartyId, out var registeredParty));
+
+            Assert.False(client1.ObjectManager.TryGetId(new MobilePartyAi(registeredParty), out _));
+            Assert.False(client1.ObjectManager.TryGetId(new MobilePartyVisual(registeredParty.Party), out _));
+            Assert.False(client1.ObjectManager.TryGetId(GameObjectCreator.CreateInitializedObject<TroopRoster>(), out _));
+        });
     }
 }

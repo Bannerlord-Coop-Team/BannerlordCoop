@@ -49,5 +49,6 @@ public interface ISteamPublicLobbyApi : ISteamLobbyApi
     /// <summary>Refreshes metadata for a lobby obtained through a friend rather than public search.</summary>
     void RequestLobbyData(ulong lobbyId, Action<bool> onCompleted);
 
-    void RequestLobbyList(Action<IReadOnlyList<ulong>, bool> onCompleted);
+    /// <param name="onPage">Receives every lobby id found so far after each partition query except the last.</param>
+    void RequestLobbyList(Action<IReadOnlyList<ulong>, bool> onCompleted, Action<IReadOnlyList<ulong>> onPage = null);
 }

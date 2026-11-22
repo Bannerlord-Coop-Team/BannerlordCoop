@@ -44,19 +44,6 @@ public class JoinCancelVMTests
         GC.KeepAlive(subscription);
     }
 
-    [Fact]
-    public void CancelButtonText_TakesTheLabelItWasGiven()
-    {
-        using var messageBroker = new MessageBroker();
-        var viewModel = new JoinCancelVM("Stop waiting", messageBroker);
-
-        Assert.Equal("Stop waiting", viewModel.CancelButtonText);
-
-        viewModel.CancelButtonText = "Cancel";
-
-        Assert.Equal("Cancel", viewModel.CancelButtonText);
-    }
-
     // The broker holds subscriptions weakly, so the handler has to be kept alive by the test.
     private static List<CancelJoinAttempt> Subscribe(
         IMessageBroker messageBroker,

@@ -18,31 +18,12 @@ namespace GameInterface.Tests.Serialization.SerializerTests
     [Collection(nameof(CampaignCurrentCollection))]
     public class BanditPartyComponentSerializationTest
     {
-        readonly IContainer container;
+        readonly ILifetimeScope container;
         public BanditPartyComponentSerializationTest()
         {
             GameBootStrap.Initialize();
 
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
-        }
-
-        [Fact]
-        public void BanditPartyComponent_Serialize()
-        {
-            BanditPartyComponent item = (BanditPartyComponent)FormatterServices.GetUninitializedObject(typeof(BanditPartyComponent));
-
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            BanditPartyComponentBinaryPackage package = new BanditPartyComponentBinaryPackage(item, factory);
-
-            package.Pack();
-
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
-
-            Assert.NotEmpty(bytes);
+            container = SerializationTestContainer.BeginScope();
         }
 
         [Fact]

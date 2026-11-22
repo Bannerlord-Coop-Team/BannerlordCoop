@@ -5,8 +5,10 @@ using Common.Network;
 using Common.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Time.UI;
 using GameInterface.Services.Tournaments.Data;
 using GameInterface.Services.Tournaments.Messages;
+using GameInterface.Services.UI.PlayerNameplates;
 using LiteNetLib;
 using Missions.Data;
 using Missions.Agents;
@@ -44,6 +46,8 @@ public class CoopTournamentController : CoopMissionController
     private readonly ITournamentSpectatorAgentManager spectatorAgentManager;
     private readonly TournamentSpawnManifestBuilder manifestBuilder;
     private readonly IMissionContext missionContext;
+    internal MissionMapTimeView MapTimeView { get; }
+    internal PlayerNameplateMissionView PlayerNameplateView { get; }
     private TournamentSessionSnapshot snapshot;
     private CoopTournamentBehavior tournamentBehavior;
     private CoopTournamentFightMissionController fightController;
@@ -147,7 +151,9 @@ public class CoopTournamentController : CoopMissionController
         INetworkWorldItemRegistry worldItemRegistry,
         ITournamentSpectatorAgentManagerFactory spectatorAgentManagerFactory,
         IGuardedHitWindow guardedHitWindow,
-        IMissionContext missionContext)
+        IMissionContext missionContext,
+        MissionMapTimeView mapTimeView,
+        PlayerNameplateMissionView playerNameplateView)
         : base(
             network,
             messageBroker,
@@ -155,6 +161,9 @@ public class CoopTournamentController : CoopMissionController
             coopMissionComponent,
             Missions.Agents.Handlers.MovementCadenceProfile.Tournament)
     {
+        MapTimeView = mapTimeView;
+        PlayerNameplateView = playerNameplateView;
+
         this.relayNetwork = relayNetwork;
         this.worldItemRegistry = worldItemRegistry;
         this.guardedHitWindow = guardedHitWindow;
@@ -432,6 +441,7 @@ public class CoopTournamentController : CoopMissionController
         agentSpawner.ApplyManifest(manifest, snapshot, session);
         CaptureManifestAgents(manifest);
         RefreshNativeFightState();
+        Mission.Current.SetMissionMode(MissionMode.Battle, true);
         if (latestRuntimeState?.MatchId == manifest.MatchId)
             ApplyRuntimeState(latestRuntimeState);
         DrainPendingTournamentPackets();
@@ -1874,11 +1884,12 @@ public class CoopTournamentController : CoopMissionController
             out weapon);
     }
 
-    private static bool RuntimeWeaponMatches(MissionWeapon current, MissionWeapon canonical) =>
+    // Only a tableau item shows its banner, and replayed missiles arrive without one.
+    internal static bool RuntimeWeaponMatches(MissionWeapon current, MissionWeapon canonical) =>
         current.Item == canonical.Item &&
         current.ItemModifier == canonical.ItemModifier &&
         current.RawDataForNetwork == canonical.RawDataForNetwork &&
-        current.Banner?.Serialize() == canonical.Banner?.Serialize();
+        (current.Item?.IsUsingTableau != true || current.Banner?.Serialize() == canonical.Banner?.Serialize());
 
     private void ApplyRuntimeTeamScores(NetworkTournamentRuntimeState state)
     {
@@ -1902,8 +1913,11 @@ public class CoopTournamentController : CoopMissionController
         {
             if (!scores.TryGetValue(match.Teams[i].TeamId, out var score)) continue;
             var participant = nativeTeams[i].Participants.FirstOrDefault();
-            if (participant != null && nativeTeams[i].Score != score.Score)
-                participant.AddScore(score.Score - nativeTeams[i].Score);
+            if (participant == null || nativeTeams[i].Score == score.Score) continue;
+            // host scores count from zero after native TournamentMatch.Start, so reset the whole team before crediting the first member
+            foreach (TournamentParticipant member in nativeTeams[i].Participants)
+                member.ResetScore();
+            participant.AddScore(score.Score);
         }
     }
 
@@ -2182,16 +2196,17 @@ public class CoopTournamentController : CoopMissionController
         session.Reset();
     }
 
-    public override void Dispose()
+    protected override void DisposeMission()
     {
-        messageBroker.Unsubscribe<TournamentSessionUpdated>(Handle_SessionUpdated);
-        messageBroker.Unsubscribe<TournamentSpawnManifestUpdated>(Handle_ManifestUpdated);
-        messageBroker.Unsubscribe<NetworkApplyTournamentDamage>(Handle_ApplyTournamentDamage);
-        messageBroker.Unsubscribe<NetworkTournamentAgentKnockedOut>(Handle_AgentKnockedOut);
-        messageBroker.Unsubscribe<NetworkTournamentRuntimeState>(Handle_RuntimeState);
-        messageBroker.Unsubscribe<NetworkTournamentRoundEnded>(Handle_RoundEnded);
-        pendingLocalDamage.Clear();
-        guardedHitWindow.Dispose();
-        base.Dispose();
+        Cleanup(
+            () => messageBroker.Unsubscribe<TournamentSessionUpdated>(Handle_SessionUpdated),
+            () => messageBroker.Unsubscribe<TournamentSpawnManifestUpdated>(Handle_ManifestUpdated),
+            () => messageBroker.Unsubscribe<NetworkApplyTournamentDamage>(Handle_ApplyTournamentDamage),
+            () => messageBroker.Unsubscribe<NetworkTournamentAgentKnockedOut>(Handle_AgentKnockedOut),
+            () => messageBroker.Unsubscribe<NetworkTournamentRuntimeState>(Handle_RuntimeState),
+            () => messageBroker.Unsubscribe<NetworkTournamentRoundEnded>(Handle_RoundEnded),
+            () => pendingLocalDamage.Clear(),
+            guardedHitWindow.Dispose,
+            base.DisposeMission);
     }
 }

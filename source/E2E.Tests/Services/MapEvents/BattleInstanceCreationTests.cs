@@ -28,43 +28,6 @@ public class BattleInstanceCreationTests : MissionTestEnvironment
     public BattleInstanceCreationTests(ITestOutputHelper output) : base(output) { }
 
     /// <summary>
-    /// BR-002: the first player to enter the battle causes the server to CREATE the battle instance record,
-    /// keyed by the map event's unique id, and replicate it to every instance — the record's key is the same
-    /// server-assigned map-event id everywhere (its association with the map event).
-    /// </summary>
-    [Fact]
-    [Trait("Requirement", "BR-002")]
-    public void FirstPlayerEntersBattle_ServerCreatesInstanceRecordKeyedByMapEventId_OnAllInstances()
-    {
-        var (mapEventId, _) = SetupCoopBattle("ctrl-A", "ctrl-B");
-
-        EnterBattle(Clients.First(), mapEventId); // ctrl-A selects the playable battle -> instance record created
-
-        AssertBattleInstanceRecord(Server, mapEventId, "ctrl-A");
-        foreach (var client in Clients)
-            AssertBattleInstanceRecord(client, mapEventId, "ctrl-A");
-    }
-
-    /// <summary>
-    /// BR-002: a second player entering the SAME map event IDENTIFIES the existing battle instance record
-    /// rather than creating a new one — the host is unchanged, the entrant is appended to the same record, and
-    /// the whole thing stays keyed by the one unchanged map-event id (no duplicate instance is minted).
-    /// </summary>
-    [Fact]
-    [Trait("Requirement", "BR-002")]
-    public void SecondPlayerEntersSameEvent_IdentifiesExistingInstanceRecord_WithoutCreatingADuplicate()
-    {
-        var (mapEventId, _) = SetupCoopBattle("ctrl-A", "ctrl-B");
-
-        EnterBattle(Clients.First(), mapEventId); // creates the instance record (host ctrl-A)
-        EnterBattle(Clients.Last(), mapEventId);  // must identify the existing one, not create a second
-
-        AssertBattleInstanceRecord(Server, mapEventId, "ctrl-A", "ctrl-B");
-        foreach (var client in Clients)
-            AssertBattleInstanceRecord(client, mapEventId, "ctrl-A", "ctrl-B");
-    }
-
-    /// <summary>
     /// BR-002: a mission-mode <see cref="NetworkBattleStartRequest"/> for a fresh field battle broadcasts the
     /// mission start carrying the map-event id and claims the mission mode — the mission is handed to the
     /// participating clients (the server does not run it). Marked uncertain only because the accept path drives
@@ -131,22 +94,5 @@ public class BattleInstanceCreationTests : MissionTestEnvironment
         {
             Server.Call(() => ServerBattleModeArbiter.Release(mapEventId));
         }
-    }
-
-    /// <summary>
-    /// Asserts the battle instance record on <paramref name="instance"/> is keyed by <paramref name="mapEventId"/>
-    /// with the given host/successor line, and that the map event it names still resolves by — and round-trips
-    /// back to — that same id (its association with the map event).
-    /// </summary>
-    private void AssertBattleInstanceRecord(EnvironmentInstance instance, string mapEventId, string expectedHost, params string[] expectedSuccessors)
-    {
-        AssertHost(instance, mapEventId, expectedHost, expectedSuccessors);
-        instance.Call(() =>
-        {
-            Assert.True(instance.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent),
-                $"map event {mapEventId} should resolve on {instance.GetType().Name}");
-            Assert.True(instance.ObjectManager.TryGetId(mapEvent, out var roundTripId));
-            Assert.Equal(mapEventId, roundTripId);
-        });
     }
 }

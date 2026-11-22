@@ -47,6 +47,21 @@ public class BugReportOptionsTests
     }
 
     [Fact]
+    public void CoopOptionsMovie_VisibilityTogglesPassEventsToParentButton()
+    {
+        var document = XDocument.Load(FindMoviePath());
+        string[] bindings = { "@ShowChat", "@ShowMapTimeInMissions", "@ShowBugReportButton" };
+
+        foreach (string binding in bindings)
+        {
+            var button = Assert.Single(document.Descendants("ButtonWidget"),
+                element => element.Attribute("IsSelected")?.Value == binding);
+            Assert.Equal("true", button.Attribute("DoNotPassEventsToChildren")?.Value);
+            Assert.Equal("Toggle", button.Attribute("ButtonType")?.Value);
+        }
+    }
+
+    [Fact]
     public void BugReportButtonHidden_PersistsAndPublishesAfterApply()
     {
         var filePath = CreateTempFilePath();

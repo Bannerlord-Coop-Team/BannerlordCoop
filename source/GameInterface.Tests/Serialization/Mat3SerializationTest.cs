@@ -10,29 +10,10 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class Mat3SerializationTest
     {
-        IContainer container;
+        ILifetimeScope container;
         public Mat3SerializationTest()
         {
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
-        }
-
-        [Fact]
-        public void Mat3_Serialize()
-        {
-            Mat3 Mat3 = new Mat3(new Vec3(1,2,3), new Vec3(4,5,6), new Vec3(7,8,9));
-
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            Mat3BinaryPackage package = new Mat3BinaryPackage(Mat3, factory);
-
-            package.Pack();
-
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
-
-            Assert.NotEmpty(bytes);
+            container = SerializationTestContainer.BeginScope();
         }
 
         [Fact]

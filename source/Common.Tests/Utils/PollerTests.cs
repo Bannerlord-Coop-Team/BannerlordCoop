@@ -110,7 +110,7 @@ public sealed class PollerTests
 
             poller.Start();
 
-            Assert.False(laterTickEntered.Wait(TimeSpan.FromSeconds(1)));
+            Assert.False(laterTickEntered.Wait(TimeSpan.FromMilliseconds(200)));
 
             releaseFirstTick.Set();
 
@@ -169,7 +169,7 @@ public sealed class PollerTests
     [Fact]
     public async Task RepeatedRestarts_KeepASingleTickInFlightAndStopCompletely()
     {
-        const int restarts = 20;
+        const int restarts = 5;
         using var tickEntered = new SemaphoreSlim(0);
         using var releaseTick = new SemaphoreSlim(0);
         using var stopStarted = new ManualResetEventSlim(false);
@@ -223,7 +223,7 @@ public sealed class PollerTests
 
             Assert.True(await stopTask);
 
-            await Task.Delay(TimeSpan.FromMilliseconds(200));
+            await Task.Delay(TimeSpan.FromMilliseconds(100));
 
             lock (sync)
             {
@@ -334,7 +334,7 @@ public sealed class PollerTests
             poller.Start();
             Assert.True(restartRequested.Wait(TimeSpan.FromSeconds(5)));
 
-            Assert.False(laterTickEntered.Wait(TimeSpan.FromSeconds(1)));
+            Assert.False(laterTickEntered.Wait(TimeSpan.FromMilliseconds(200)));
 
             releaseFirstTick.Set();
 

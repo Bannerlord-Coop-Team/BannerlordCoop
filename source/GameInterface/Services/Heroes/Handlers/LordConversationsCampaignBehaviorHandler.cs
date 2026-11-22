@@ -4,10 +4,13 @@ using Common.Messaging;
 using Common.Network;
 using Common.Network.Coalescing;
 using GameInterface.Services.Heroes.Messages.LordConversations;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Heroes.Handlers;
@@ -19,6 +22,7 @@ internal class LordConversationsCampaignBehaviorHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly IMessageBroker messageBroker;
+    private readonly IPlayerManager playerManager;
 
     private const int PrisonerLiberationRelationReward = 10;
     private const int LetLordGoReward = 4;
@@ -26,11 +30,13 @@ internal class LordConversationsCampaignBehaviorHandler : IHandler
     public LordConversationsCampaignBehaviorHandler(
         IObjectManager objectManager,
         INetwork network,
-        IMessageBroker messageBroker)
+        IMessageBroker messageBroker,
+        IPlayerManager playerManager)
     {
         this.objectManager = objectManager;
         this.network = network;
         this.messageBroker = messageBroker;
+        this.playerManager = playerManager;
 
         messageBroker.Subscribe<LiberateLordPrisoner>(Handle_LiberateLordPrisoner);
         messageBroker.Subscribe<NetworkLiberateLordPrisoner>(Handle_NetworkLiberateLordPrisoner);
@@ -80,6 +86,7 @@ internal class LordConversationsCampaignBehaviorHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
+            if (!playerManager.IsSenderControllingHero(obj.Who, data.MainHeroId)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out var playerHero)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.ConversationHeroId, out var conversationHero)) return;
             if (!conversationHero.IsPrisoner) return;
@@ -106,6 +113,19 @@ internal class LordConversationsCampaignBehaviorHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<PartyBase>(data.MainPartyId, out var mainParty)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.ConversationHeroId, out var conversationHero)) return;
+            // The answer arrives after the player chose it; meanwhile another party may hold the lord, or they
+            // may have died. A prisoner the player just looted is held by no party and can still be taken.
+            if (!conversationHero.IsAlive || conversationHero.PartyBelongedToAsPrisoner != null) return;
+
+            // A captured or freed lord has no party, and a defeated lord still leads his own. A stale dialog must
+            // not take a lord out of another party.
+            var heroParty = conversationHero.PartyBelongedTo;
+            if (heroParty != null && heroParty != mainParty.MobileParty && heroParty.LeaderHero != conversationHero)
+            {
+                Logger.Warning("Ignored taking {HeroId} prisoner because it is in {PartyId}",
+                    data.ConversationHeroId, heroParty.StringId);
+                return;
+            }
 
             TakePrisonerAction.Apply(mainParty, conversationHero);
         },
@@ -154,6 +174,7 @@ internal class LordConversationsCampaignBehaviorHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
+            if (!playerManager.IsSenderControllingHero(obj.Who, data.MainHeroId)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out var mainHero)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.ConversationHeroId, out var conversationHero)) return;
 
@@ -185,15 +206,18 @@ internal class LordConversationsCampaignBehaviorHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
+            if (!playerManager.IsSenderControllingHero(obj.Who, data.MainHeroId)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out var mainHero)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.ConversationHeroId, out var conversationHero)) return;
             if (!conversationHero.IsPrisoner) return;
 
             EndCaptivityAction.ApplyByReleasedByChoice(conversationHero, mainHero);
             ChangeRelationAction.ApplyRelationChangeBetweenHeroes(mainHero, conversationHero, LetLordGoReward);
-            
-            // TODO
-            //TraitLevelingHelper.OnLordFreed(conversationHero);
+
+            using (new MainHeroSubstitutionScope(mainHero, mainHero.PartyBelongedTo))
+            {
+                TraitLevelingHelper.OnLordFreed(conversationHero);
+            }
         },
         context: nameof(Handle_NetworkLordFreedToRelease));
     }

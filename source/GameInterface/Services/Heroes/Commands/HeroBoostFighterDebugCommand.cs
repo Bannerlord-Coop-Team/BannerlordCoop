@@ -1,6 +1,6 @@
 ﻿using Common.Commands;
 using Common;
-using GameInterface.Services.ObjectManager;
+using GameInterface.Utils.Commands;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
@@ -37,6 +37,13 @@ public class HeroBoostFighterDebugCommand
 
     public sealed class HeroBoostFighterCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public HeroBoostFighterCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.hero";
 
         public string Name => "boost_fighter";
@@ -47,16 +54,14 @@ public class HeroBoostFighterDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("hero_registry_id", "The registered hero id to boost."),
+            new ExpectedArgs("hero_registry_id", "Hero name or id to boost; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (ModInformation.IsClient) return Failed("Run coop.debug.hero.boost_fighter on the server (host) only");
 
-            if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)) return Failed("Unable to resolve IObjectManager");
-            if (!objectManager.TryGetObject<Hero>(args[0], out var hero))
-                return Failed($"Hero '{args[0]}' not found (use coop.debug.alley.my_hero_id on the owning client)");
+            if (!resolver.TryResolveHero(args[0], out var hero, out var heroError)) return Failed(heroError);
 
             var dev = hero.HeroDeveloper;
 

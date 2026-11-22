@@ -9,6 +9,7 @@ using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PlayerCaptivityService.Handlers;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.Players;
 using GameInterface.Services.Settlements.Handlers;
 using GameInterface.Services.Settlements.Messages;
@@ -81,6 +82,9 @@ public class SettlementSneakInTests
         var network = new Mock<INetwork>();
         var sessionInteractionsInterface = new Mock<ISessionInteractionsPlayerDataInterface>();
         var playerManager = new Mock<IPlayerManager>();
+        playerManager
+            .Setup(m => m.IsSenderControllingHero(It.IsAny<object>(), It.IsAny<string>()))
+            .Returns(true);
 
         var syncPolicy = new Mock<ISyncPolicy>();
         syncPolicy.Setup(policy => policy.AllowOriginal()).Returns(false);
@@ -115,13 +119,16 @@ public class SettlementSneakInTests
                 messageBroker,
                 objectManager.Object,
                 network.Object,
-                sessionInteractionsInterface.Object);
+                sessionInteractionsInterface.Object,
+                playerManager.Object);
 
+            using var conversationPartyTracker = new ConversationPartyTracker(objectManager.Object);
             using var captivityHandler = new PlayerCaptivityServerHandler(
                 objectManager.Object,
                 network.Object,
                 messageBroker,
-                playerManager.Object);
+                playerManager.Object,
+                conversationPartyTracker);
 
             using (ContainerProvider.UseContainerThreadSafe(container))
             {

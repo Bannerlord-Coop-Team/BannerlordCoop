@@ -90,6 +90,7 @@ public class PlayerPartyRestorerTests
     {
         var (hero, party, _, _) = CreatePlayerGraph();
         var player = new Player("Controller", "Hero_Saved", "MobileParty_Stale", "Clan_Stale", "Character_Stale");
+        player.CrimeRatings["Kingdom_empire_s"] = 40f;
         var objectManager = new Mock<IObjectManager>();
         Hero resolvedHero = hero;
         MobileParty missingParty = null;
@@ -123,6 +124,7 @@ public class PlayerPartyRestorerTests
         Assert.Equal(clanId, restored.ClanId);
         Assert.Equal(player.ClanId, restored.OriginalClanId);
         Assert.Equal(characterId, restored.CharacterObjectId);
+        Assert.Equal(40f, restored.CrimeRatings["Kingdom_empire_s"]);
         Assert.Equal(1, party.MemberRoster.GetTroopCount(hero.CharacterObject));
         Assert.Same(hero, party.LeaderHero);
     }

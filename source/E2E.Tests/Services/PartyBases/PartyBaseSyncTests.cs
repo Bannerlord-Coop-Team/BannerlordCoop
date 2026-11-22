@@ -22,7 +22,7 @@ public class PartyBaseSyncTests : SyncTestBase
     }
 
     [Fact]
-    public void Server_PartyBase_Properties()
+    public void Server_PartyBase_PropertiesAndFields()
     {
         Server.ObjectManager.TryGetObject<PartyBase>(PartyBaseId, out var partyBase);
         TestEnvironment.AssertReferenceProperty<PartyBase, MobileParty>(nameof(PartyBase.MobileParty));
@@ -36,13 +36,8 @@ public class PartyBaseSyncTests : SyncTestBase
         // Not synced - cached/derived values (commented out in PartyBaseSync). Kept for future reference.
         //TestEnvironment.AssertProperty<PartyBase, bool>(nameof(PartyBase.IsVisualDirty), true);
         //TestEnvironment.AssertProperty<PartyBase, bool>(nameof(PartyBase.LevelMaskIsDirty), true);
-    }
 
-    [Fact]
-    public void Server_PartyBase_Fields()
-    {
         // _index is set by a static counter in PartyBase and is not 0 by default
-        Server.ObjectManager.TryGetObject<PartyBase>(PartyBaseId, out var partyBase);
         var initialIndex = partyBase._index;
 
         TestEnvironment.AssertReferenceField<PartyBase, Hero>(nameof(PartyBase._customOwner));

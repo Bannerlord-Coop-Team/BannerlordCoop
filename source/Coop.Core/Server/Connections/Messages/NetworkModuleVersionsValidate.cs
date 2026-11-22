@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Messaging;
+using GameInterface.Services.Kingdoms;
 using GameInterface.Services.Modules;
 using ProtoBuf;
 using System;
@@ -20,6 +21,9 @@ public record NetworkModuleVersionsValidate : ICommand
     public NetworkModuleInfo[] Modules { get; }
     [ProtoMember(2)]
     public string? CoopBuildVersion { get; }
+    /// <summary>Kingdom decision types this client syncs; see <see cref="KingdomDecisionTypeRegistry"/>.</summary>
+    [ProtoMember(3)]
+    public string[]? KingdomDecisionTypes { get; set; }
 
     public NetworkModuleVersionsValidate(IEnumerable<ModuleInfo> modules)
         : this(modules, ModInformation.BuildVersion)
@@ -27,14 +31,21 @@ public record NetworkModuleVersionsValidate : ICommand
     }
 
     public NetworkModuleVersionsValidate(IEnumerable<ModuleInfo> modules, string? coopBuildVersion)
+        : this(modules, coopBuildVersion, null)
+    {
+    }
+
+    /// <param name="displayName">Display name per module id, sent only so join refusals can name mods.</param>
+    public NetworkModuleVersionsValidate(IEnumerable<ModuleInfo> modules, string? coopBuildVersion, Func<string, string>? displayName)
     {
         CoopBuildVersion = coopBuildVersion;
+        KingdomDecisionTypes = KingdomDecisionTypeRegistry.GetTypeNames();
         if (modules is null)
         {
             Modules = Array.Empty<NetworkModuleInfo>();
             return;
         }
 
-        Modules = modules.Select(m => new NetworkModuleInfo(m.Id, m.IsOfficial, m.IsDlc, m.Version)).ToArray();
+        Modules = modules.Select(m => new NetworkModuleInfo(m.Id, m.IsOfficial, m.IsDlc, m.Version, displayName?.Invoke(m.Id))).ToArray();
     }
 }

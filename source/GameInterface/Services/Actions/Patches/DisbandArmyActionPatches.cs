@@ -1,8 +1,10 @@
 ﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.Actions.Messages;
 using GameInterface.Services.SiegeEvents;
 using HarmonyLib;
+using Serilog;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -21,6 +23,8 @@ namespace GameInterface.Services.Actions.Patches;
 [HarmonyPatch]
 internal class DisbandArmyActionPatches
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<DisbandArmyActionPatches>();
+
     [HarmonyPatch(typeof(DisbandArmyAction), nameof(DisbandArmyAction.ApplyInternal))]
     [HarmonyPrefix]
     private static bool ApplyInternalPrefix(
@@ -71,6 +75,14 @@ internal class DisbandArmyActionPatches
     
     public static void DisbandArmyApplyInternal(Army army, MobileParty clientParty)
     {
+        // The kingdom screen disbands an army the party is not in, but never one in a battle.
+        // A stale screen can still send it after the army's leader joined one.
+        if (army.LeaderParty?.MapEvent != null)
+        {
+            Logger.Warning("Ignoring a disband of the army led by {LeaderPartyId} from party {PartyId} while it is in a battle", army.LeaderParty.StringId, clientParty.StringId);
+            return;
+        }
+
         DiplomacyModel diplomacyModel = Campaign.Current.Models.DiplomacyModel;
         ChangeClanInfluenceAction.Apply(clientParty.LeaderHero.Clan, (float)(-(float)diplomacyModel.GetInfluenceCostOfDisbandingArmy()));
         foreach (MobileParty mobileParty in army.Parties.ToList<MobileParty>())

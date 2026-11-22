@@ -20,7 +20,11 @@ public sealed partial class RunOrchestratorTests : IDisposable
         var settings = new CoopMcpServerSettings
         {
             ArtifactDirectory = directory,
-            Profiles = new() { ["test"] = new LaunchProfile { Executable = executable } },
+            Profiles = new()
+            {
+                ["test"] = new LaunchProfile { Executable = executable },
+                ["external"] = new LaunchProfile { Executable = executable, ExternalServer = true },
+            },
         };
         runs = new RunOrchestrator(settings, launcher, pipe, new IncrementalLogReader(), preflight, new SaveCatalog(new FakeSaveDirectory(directory)));
     }
@@ -496,10 +500,12 @@ public sealed partial class RunOrchestratorTests : IDisposable
         public int FailAt;
         public List<FakeProcess> Processes = new();
         public List<string> Saves = new();
+        public List<string> Roles = new();
         public IOwnedProcess Launch(LaunchProfile profile, string role, string platformId, string runToken, string saveName = null)
         {
             if (Processes.Count + 1 == FailAt) throw new IOException("fake launch failure");
             Saves.Add(saveName);
+            Roles.Add(role);
             var process = new FakeProcess(Processes.Count + 1);
             Processes.Add(process);
             return process;
@@ -528,6 +534,7 @@ public sealed partial class RunOrchestratorTests : IDisposable
     private sealed class FakePipe : ILiveTestPipeClient
     {
         public ConcurrentQueue<string> Methods = new();
+        public ConcurrentQueue<string> Roles = new();
         public bool Throw;
         public bool Uncertain;
         public int Delay;
@@ -540,6 +547,7 @@ public sealed partial class RunOrchestratorTests : IDisposable
         public async Task<LiveTestResponse> SendAsync(InstanceIdentity identity, string method, object parameters, bool mutation, CancellationToken cancellationToken)
         {
             Methods.Enqueue(method);
+            Roles.Enqueue(identity.Role);
             LastMutation = mutation;
             LastParameters = parameters;
             int count = Interlocked.Increment(ref concurrent);

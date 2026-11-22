@@ -3,14 +3,17 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using Coop.Core.Client.Services.MobileParties.Messages;
+using GameInterface.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.MobileParties.Messages;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Settlements.Interfaces;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -23,6 +26,9 @@ namespace Coop.Core.Client.Services.MobileParties.Handlers;
 /// </summary>
 public class ClientSettlementExitEnterHandler : IHandler
 {
+#if DEBUG
+    private readonly Serilog.ILogger Logger = global::Common.Logging.LogManager.GetLogger<ClientSettlementExitEnterHandler>();
+#endif
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
@@ -31,6 +37,8 @@ public class ClientSettlementExitEnterHandler : IHandler
     // Local attempts and all response transitions run on the game thread.
     private PendingStart pendingStart;
     private uint pendingLeavePartyId;
+    private SettlementLeaveType pendingLeaveType;
+    private (MobileParty Party, Settlement Settlement, MapEvent Battle) lastAutomaticRecovery;
 
     public ClientSettlementExitEnterHandler(
         IMessageBroker messageBroker,
@@ -52,6 +60,7 @@ public class ClientSettlementExitEnterHandler : IHandler
 
         messageBroker.Subscribe<NetworkPartyEnterSettlement>(Handle);
         messageBroker.Subscribe<NetworkPartyLeaveSettlement>(Handle);
+        messageBroker.Subscribe<NetworkPartyLeftBattle>(Handle);
     }
 
     public void Dispose()
@@ -64,6 +73,7 @@ public class ClientSettlementExitEnterHandler : IHandler
 
         messageBroker.Unsubscribe<NetworkPartyEnterSettlement>(Handle);
         messageBroker.Unsubscribe<NetworkPartyLeaveSettlement>(Handle);
+        messageBroker.Unsubscribe<NetworkPartyLeftBattle>(Handle);
     }
 
     private void Handle(MessagePayload<StartSettlementEncounterAttempted> obj)
@@ -76,11 +86,27 @@ public class ClientSettlementExitEnterHandler : IHandler
         if (pendingStart != null)
             return;
 
+        if (payload.IsAutomaticRecovery)
+        {
+            var recovery = (payload.Party, payload.Settlement, payload.Settlement.Party.MapEvent);
+            // A rejected automatic request must not repeat on every map tick.
+            if (lastAutomaticRecovery == recovery)
+                return;
+            lastAutomaticRecovery = recovery;
+        }
+
         var request = new NetworkRequestStartSettlementEncounter(partyId, settlementId);
         pendingStart = new PendingStart(
             request,
             pendingLeavePartyId == 0 ? PendingStartState.Sent : PendingStartState.Queued);
 
+#if DEBUG
+        objectManager.TryGetHandle(payload.Settlement.Party?.MapEvent, out var battleHandle);
+        Logger.Debug(
+            "SettlementEncounterRecovery phase={Phase} automatic={Automatic} partyHandle={PartyHandle} settlementHandle={SettlementHandle} party={PartyStringId} settlement={SettlementStringId} battleHandle={BattleHandle}",
+            pendingStart.State == PendingStartState.Sent ? "send" : "queued", payload.IsAutomaticRecovery,
+            partyId, settlementId, payload.Party.StringId, payload.Settlement.StringId, battleHandle);
+#endif
         if (pendingStart.State == PendingStartState.Sent)
             network.SendAll(request);
     }
@@ -95,8 +121,9 @@ public class ClientSettlementExitEnterHandler : IHandler
             return;
 
         pendingLeavePartyId = partyId;
+        pendingLeaveType = payload.LeaveType;
 
-        var message = new NetworkRequestEndSettlementEncounter(partyId);
+        var message = new NetworkRequestEndSettlementEncounter(partyId, payload.LeaveType);
 
         network.SendAll(message);
     }
@@ -112,6 +139,10 @@ public class ClientSettlementExitEnterHandler : IHandler
         if (!IsPendingStart(partyId, settlementId, PendingStartState.Sent))
             return;
 
+#if DEBUG
+        Logger.Debug("SettlementEncounterRecovery phase=approval-received partyHandle={PartyHandle} settlementHandle={SettlementHandle}",
+            partyId, settlementId);
+#endif
         pendingStart.State = PendingStartState.Approved;
         if (pendingLeavePartyId != 0)
             return;
@@ -122,6 +153,7 @@ public class ClientSettlementExitEnterHandler : IHandler
 
     private void ApplySettlementEncounter(uint partyId, uint settlementId)
     {
+        lastAutomaticRecovery = default;
         if (!objectManager.TryGetObjectWithLogging(partyId, out MobileParty party)) return;
         if (!objectManager.TryGetObjectWithLogging(settlementId, out Settlement settlement)) return;
 
@@ -132,6 +164,12 @@ public class ClientSettlementExitEnterHandler : IHandler
             if (ShouldShowRaidOccupiedMenu(party, settlement))
                 GameMenu.SwitchToMenu("raid_occupied");
         }
+#if DEBUG
+        Logger.Debug(
+            "SettlementEncounterRecovery phase=applied partyHandle={PartyHandle} settlementHandle={SettlementHandle} encounter={HasEncounter} currentSettlement={CurrentSettlement} partyBattle={HasPartyBattle}",
+            partyId, settlementId, TaleWorlds.CampaignSystem.Campaign.Current?.PlayerEncounter != null,
+            party.CurrentSettlement?.StringId, party.Party?.MapEvent != null);
+#endif
     }
 
     private void Handle(MessagePayload<NetworkSettlementEncounterRejected> obj)
@@ -151,6 +189,16 @@ public class ClientSettlementExitEnterHandler : IHandler
         pendingStart.State == state &&
         pendingStart.Request.PartyId == partyId &&
         pendingStart.Request.SettlementId == settlementId;
+
+    private void Handle(MessagePayload<NetworkPartyLeftBattle> obj)
+    {
+        var partyId = obj.What.PartyId;
+        GameThread.RunSafe(() =>
+        {
+            if (objectManager.TryGetObjectWithLogging<PartyBase>(partyId, out var party) && party == PartyBase.MainParty)
+                lastAutomaticRecovery = default;
+        });
+    }
 
     private static bool ShouldShowRaidOccupiedMenu(MobileParty party, Settlement settlement)
     {
@@ -183,6 +231,7 @@ public class ClientSettlementExitEnterHandler : IHandler
             return;
 
         pendingLeavePartyId = 0;
+        pendingLeaveType = SettlementLeaveType.Leave;
         if (pendingStart == null || pendingStart.State == PendingStartState.Sent)
             return;
 
@@ -190,6 +239,10 @@ public class ClientSettlementExitEnterHandler : IHandler
         if (start.State == PendingStartState.Queued)
         {
             start.State = PendingStartState.Sent;
+#if DEBUG
+            Logger.Debug("SettlementEncounterRecovery phase=send-deferred partyHandle={PartyHandle} settlementHandle={SettlementHandle}",
+                start.Request.PartyId, start.Request.SettlementId);
+#endif
             network.SendAll(start.Request);
             return;
         }
@@ -201,24 +254,28 @@ public class ClientSettlementExitEnterHandler : IHandler
     private void HandleAppliedLeave(uint partyId)
     {
         bool resolvesPendingLeave = pendingLeavePartyId != 0;
+        var leaveType = SettlementLeaveType.Leave;
         if (resolvesPendingLeave)
         {
             if (partyId != 0 && pendingLeavePartyId != partyId)
                 return;
 
+            leaveType = pendingLeaveType;
             pendingLeavePartyId = 0;
+            pendingLeaveType = SettlementLeaveType.Leave;
             pendingStart = null;
         }
 
         if (!IsMainParty(partyId))
             return;
 
+        lastAutomaticRecovery = default;
         if (!resolvesPendingLeave)
             pendingStart = null;
 
         using (new AllowedThread())
         {
-            settlementInterface.EndSettlementEncounter();
+            settlementInterface.EndSettlementEncounter(leaveType);
         }
     }
 
@@ -258,7 +315,7 @@ public class ClientSettlementExitEnterHandler : IHandler
                 settlementInterface.PartyLeaveSettlement(party);
             }
 
-            // Staged hideout loot lives on the encounter, so closing it here would discard the loot.
+            // Staged hideout loot and the send troops result menu live on the encounter, so closing it here would drop them.
             if (hideoutResultEncounter.TryKeepThroughLeave(party))
                 return;
 
@@ -274,6 +331,7 @@ public class ClientSettlementExitEnterHandler : IHandler
         if (!IsMainParty(partyId))
             return;
 
+        lastAutomaticRecovery = default;
         if (PlayerEncounter.Current == null)
         {
             var party = MobileParty.MainParty;
@@ -291,6 +349,13 @@ public class ClientSettlementExitEnterHandler : IHandler
         }
 
         if (PlayerEncounter.EncounterSettlement == null)
+            return;
+
+        var battle = PlayerEncounter.Battle;
+        // The server exits the town before the pending assault join arrives on this same queue.
+        if (MobileParty.MainParty.MapEvent == null && PlayerEncounter.Current.IsJoinedBattle &&
+            PlayerEncounter.Current.PlayerSide == BattleSideEnum.Attacker && battle?.IsSiegeAssault == true &&
+            battle.MapEventSettlement == PlayerEncounter.EncounterSettlement)
             return;
 
         using (new AllowedThread())

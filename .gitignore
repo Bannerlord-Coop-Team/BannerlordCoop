@@ -540,6 +540,7 @@ MigrationBackup/
 
 # End of https://www.gitignore.io/api/csharp,powershell,dotnetcore,visualstudio,visualstudiocode
 DockerAssembliesTemp/**
+# Legacy game junction, replaced by BANNERLORD_DIR. Still ignored so a leftover link never gets staged.
 mb2
 mb2/**
 source/.editorconfig
@@ -557,3 +558,7 @@ source/.idea
 
 # Repo-local MCP publish, operator profiles and run artifacts
 /.mcp-local/
+
+# Generated scenario scripts run from ignored artifacts through the shared runner.
+/doc/automated-testing/scenarios/**/*.ps1
+/doc/automated-testing/scenarios/**/*.sh

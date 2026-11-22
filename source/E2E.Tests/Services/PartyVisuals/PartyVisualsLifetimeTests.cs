@@ -25,28 +25,27 @@ namespace E2E.Tests.Services.PartyVisuals
         {
             var server = TestEnvironment.Server;
             var client = TestEnvironment.Clients.First();
-            NetworkCreatePartyVisual? created = null;
-            NetworkDestroyPartyVisual? destroyed = null;
-            client.Resolve<IMessageBroker>().Subscribe<NetworkCreatePartyVisual>(payload => created = payload.What);
-            client.Resolve<IMessageBroker>().Subscribe<NetworkDestroyPartyVisual>(payload => destroyed = payload.What);
+            var created = new List<NetworkCreatePartyVisual>();
+            var destroyed = new List<NetworkDestroyPartyVisual>();
+            client.Resolve<IMessageBroker>().Subscribe<NetworkCreatePartyVisual>(payload => created.Add(payload.What));
+            client.Resolve<IMessageBroker>().Subscribe<NetworkDestroyPartyVisual>(payload => destroyed.Add(payload.What));
 
+            var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+            uint partyHandle = 0;
             server.Call(() =>
             {
-                var party = new MobileParty();
-                var partyBase = new PartyBase(party);
-                Assert.True(server.ObjectManager.TryGetHandle(party, out var handle));
-                var before = server.ObjectManager.GetHandleMap();
-                server.Resolve<IMessageBroker>().Publish(this, new PartyVisualCreated(null, partyBase));
-                server.Resolve<IMessageBroker>().Publish(this, new PartyVisualDestroyed(null, party));
-                Assert.Equal(before.OrderBy(entry => entry.Key),
-                    server.ObjectManager.GetHandleMap().OrderBy(entry => entry.Key));
+                Assert.True(server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+                Assert.True(server.ObjectManager.TryGetHandle(party, out partyHandle));
+                Assert.DoesNotContain(server.ObjectManager.GetHandleMap().Values, handle =>
+                    server.ObjectManager.TryGetObject<object>(handle, out var value) && value is MobilePartyVisual);
+                party.RemoveParty();
             });
 
-            Assert.NotNull(created);
-            Assert.Null(created.PartyVisualId);
-            Assert.Equal(0u, created.PartyVisualHandle);
-            Assert.NotNull(destroyed);
-            Assert.Equal(created.MobilePartyHandle, destroyed.MobilePartyHandle);
+            var createdVisual = Assert.Single(created);
+            Assert.Null(createdVisual.PartyVisualId);
+            Assert.Equal(0u, createdVisual.PartyVisualHandle);
+            Assert.Equal(partyHandle, createdVisual.MobilePartyHandle);
+            Assert.Equal(partyHandle, Assert.Single(destroyed).MobilePartyHandle);
         }
 
         [Fact]
@@ -107,37 +106,6 @@ namespace E2E.Tests.Services.PartyVisuals
 
             Assert.NotNull(destroyed);
             Assert.Equal(expectedMobilePartyHandle, destroyed.MobilePartyHandle);
-        }
-
-        [Fact]
-        public void ClientCreatePartyVisual_DoesNothing()
-        {
-            // Arrange
-            var client1 = TestEnvironment.Clients.First();
-            var server = TestEnvironment.Server;
-
-            // Act
-            string? PartyVisualId = null;
-            string? baseId = null;
-
-            server.Call(() =>
-            {
-                var MobileParty = new MobileParty();
-                var partyBase = new PartyBase(MobileParty);
-
-                Assert.True(server.ObjectManager.TryGetId(partyBase, out baseId));
-            });
-
-            client1.Call(() =>
-            {
-                Assert.True(server.ObjectManager.TryGetObject(baseId, out PartyBase baseParty));
-                var partyVisual = new MobilePartyVisual(baseParty);
-
-                Assert.False(client1.ObjectManager.TryGetId(partyVisual, out PartyVisualId));
-            });
-
-            // Assert
-            Assert.Null(PartyVisualId);
         }
     }
 }

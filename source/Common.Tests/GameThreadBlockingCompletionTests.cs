@@ -126,7 +126,7 @@ public class GameThreadBlockingCompletionTests : IDisposable
     {
         var queue = new GameThread.QueueContext();
         using var active = GameThread.ActivateQueue(queue);
-        using var budget = GameThread.Instance.LimitFrameDrain(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+        using var budget = GameThread.Instance.LimitFrameDrain(TimeSpan.FromSeconds(1), TimeSpan.FromMilliseconds(500));
         using var pump = new GameThreadPump(queue);
         using var entered = new ManualResetEventSlim();
         using var release = new ManualResetEventSlim();
@@ -141,8 +141,8 @@ public class GameThreadBlockingCompletionTests : IDisposable
         try
         {
             Assert.True(entered.Wait(LongTimeout));
-            // Past the 1 s timeout and inside the second wait.
-            Thread.Sleep(1500);
+            // Past the 500 ms timeout and inside the second wait.
+            Thread.Sleep(750);
         }
         finally
         {

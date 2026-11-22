@@ -7,6 +7,7 @@ using Common.Util;
 using Coop.Core.Server.Connections.Messages;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
+using GameInterface.Services.Entity;
 using GameInterface.Services.Players;
 using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.MapEvents.Initialization;
@@ -16,6 +17,8 @@ using GameInterface.Services.MapEvents.Patches;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
 using Xunit.Abstractions;
 
@@ -24,9 +27,6 @@ namespace E2E.Tests.Services.MapEvents;
 public class MapEventCollectionTests : MapEventTestBase
 {
     public MapEventCollectionTests(ITestOutputHelper output) : base(output) { }
-
-    [Fact(Skip = "MapEvent._sides is a fixed-size MapEventSide[2] array")]
-    public void Server_MapEvent_Sides_IsFixedArray() { }
 
     [Fact]
     public void Server_MapEvent_CommitPublishesCompleteLockedGraph()
@@ -193,44 +193,50 @@ public class MapEventCollectionTests : MapEventTestBase
     }
 
     [Fact]
-    public void Server_RejectsNetworkAddBattlePartyPacket()
-    {
-        var message = new NetworkAddBattleParty("side", "map-event-party", "party");
-        var serializer = Server.Resolve<ICommonSerializer>();
-        var packet = MessagePacket.Create(message, serializer);
-
-        Server.SimulatePacket(Clients.First().NetPeer, packet);
-
-        Assert.Equal(0, Server.InternalMessages.GetMessageCount<NetworkAddBattleParty>());
-    }
-
-    [Fact]
-    public void Server_NetworkAddBattlePartyHandlerDoesNotRebindParty()
+    public void Client_FieldJoin_AttachesReplicatedBattleToJoinedPlayerEncounter()
     {
         var staged = CreateServerMapEvent();
-        string mapEventSideId = null;
-        string mapEventPartyId = null;
-        string defenderPartyId = null;
+        var (_, partyId) = CreatePlayerHeroParty("PlayerTwo");
+        var client = Clients.First();
+        string partyBaseId = null;
 
-        Server.Call(() =>
+        TestEnvironment.ConnectRegisteredPlayer(client, "PlayerTwo");
+        client.Resolve<IControllerIdProvider>().SetControllerId("PlayerTwo");
+        client.NetworkSentMessages.Clear();
+
+        client.Call(() =>
         {
-            var mapEvent = Get<MapEvent>(Server, staged.MapEventId);
-            var attackerParty = Get<MobileParty>(Server, staged.AttackerPartyId).Party;
-            var mapEventParty = Assert.Single(mapEvent.AttackerSide.Parties,
-                candidate => ReferenceEquals(candidate.Party, attackerParty));
-            Assert.True(Server.ObjectManager.TryGetId(mapEvent.AttackerSide, out mapEventSideId));
-            Assert.True(Server.ObjectManager.TryGetId(mapEventParty, out mapEventPartyId));
-            Assert.True(Server.ObjectManager.TryGetId(
-                Get<MobileParty>(Server, staged.DefenderPartyId).Party,
-                out defenderPartyId));
+            var mapEvent = Get<MapEvent>(client, staged.MapEventId);
+            var party = Get<MobileParty>(client, partyId);
+            Campaign.Current.MainParty = party;
+            PlayerEncounter.Start();
+            var encounter = PlayerEncounter.Current;
+            encounter._encounteredParty = mapEvent.DefenderSide.LeaderParty;
+            encounter.IsJoinedBattle = true;
+            Assert.True(client.ObjectManager.TryGetId(party.Party, out partyBaseId));
+            // Stages the live joiner after the join option: a joined encounter with no _mapEvent.
+            // The side write is intercepted into NetworkRequestJoinBattle instead of attaching locally.
+            party.Party.MapEventSide = mapEvent.DefenderSide;
+            Assert.Null(PlayerEncounter.Battle);
+        }, WithoutNetworkDelivery());
+
+        var request = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestJoinBattle>());
+        Assert.Equal(staged.MapEventId, request.MapEventId);
+        Assert.Equal(partyBaseId, request.PartyId);
+        Assert.Equal(BattleSideEnum.Defender, request.Side);
+
+        Server.NetworkSentMessages.Clear();
+        Server.Call(() => Server.SimulateMessage(client.NetPeer, request), MapEventDisabledMethods);
+        Assert.True(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkJoinBattleReply>()).Accepted);
+        var authoritativeAdd = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAddBattleParty>());
+
+        client.SimulateMessage(Server.NetPeer, authoritativeAdd);
+
+        client.Call(() =>
+        {
+            var mapEvent = Get<MapEvent>(client, staged.MapEventId);
+            Assert.Same(mapEvent, PlayerEncounter.Battle);
         });
-
-        Server.SimulateMessage(Clients.First().NetPeer,
-            new NetworkAddBattleParty(mapEventSideId, mapEventPartyId, defenderPartyId));
-
-        Server.Call(() => Assert.Same(
-            Get<MobileParty>(Server, staged.AttackerPartyId).Party,
-            Get<MapEventParty>(Server, mapEventPartyId).Party));
     }
 
     [Fact]
@@ -293,25 +299,6 @@ public class MapEventCollectionTests : MapEventTestBase
             Assert.Null(Get<MobileParty>(instance, staged.AttackerPartyId).MapEvent);
             Assert.Null(Get<MobileParty>(instance, staged.DefenderPartyId).MapEvent);
         });
-    }
-
-    [Fact]
-    public void PendingMovementBinding_IsIsolatedPerLifetimeScope()
-    {
-        var staged = CreateServerMapEvent(commit: false);
-        PartyBase serverDefender = null;
-
-        Server.Call(() =>
-        {
-            serverDefender = Get<MobileParty>(Server, staged.DefenderPartyId).Party;
-            Assert.False(PendingMapEventPartyMovementPatch.CanAdvancePosition(serverDefender));
-        });
-
-        foreach (var client in Clients)
-        {
-            client.Call(() =>
-                Assert.True(PendingMapEventPartyMovementPatch.CanAdvancePosition(serverDefender)));
-        }
     }
 
     [Fact]

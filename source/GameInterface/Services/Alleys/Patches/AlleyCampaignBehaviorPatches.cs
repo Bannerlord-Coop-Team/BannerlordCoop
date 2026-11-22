@@ -19,8 +19,9 @@ namespace GameInterface.Services.Alleys.Patches;
 /// the don't-die-in-an-alley-fight guard, and the alley-leader-can't-lead-a-party restriction). The AI
 /// activity (daily ticks, hero-killed) can't run per client - the host's <c>_playerOwnedCommonAreaData</c>
 /// is empty and RNG would diverge - so those handlers publish a trigger the server-side AlleyHandler
-/// applies authoritatively; new-game gang seeding runs on the server only; and the occupied/cleared
-/// handlers stay off (the take-over is already driven through AlleyManagementHandler).
+/// applies authoritatively; new-game gang seeding runs on the server only; the occupied handler stays
+/// off (the take-over is already driven through AlleyManagementHandler); and the cleared handler skips
+/// its body and has the client ask AlleyManagementHandler to free the alley on the server.
 /// </summary>
 [HarmonyPatch(typeof(AlleyCampaignBehavior))]
 internal class AlleyCampaignBehaviorPatches
@@ -64,9 +65,17 @@ internal class AlleyCampaignBehaviorPatches
     [HarmonyPrefix]
     private static bool OnAlleyOccupiedByPlayerPrefix() => false;
 
+    // "Leave it empty" after winning the fight only fires this event, so the client asks the server to free the alley.
     [HarmonyPatch("OnAlleyClearedByPlayer")]
     [HarmonyPrefix]
-    private static bool OnAlleyClearedByPlayerPrefix() => false;
+    private static bool OnAlleyClearedByPlayerPrefix(Alley alley)
+    {
+        if (ModInformation.IsServer || alley == null) return false;
+        if (!ContainerProvider.TryResolve<IAlleyFightOwnerTracker>(out var fightOwnerTracker)) return false;
+
+        MessageBroker.Instance.Publish(alley, new AlleyClearedRequested(alley, Hero.MainHero, fightOwnerTracker.Take()));
+        return false;
+    }
 
     // AI activity: on the server, hand off to AlleyHandler (RNG rolled once, results replicated) and
     // skip the vanilla body on both sides (host list is empty, per-client RNG would diverge).

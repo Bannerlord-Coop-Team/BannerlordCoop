@@ -1,4 +1,5 @@
 ﻿using Common.LiveTesting;
+using ModelContextProtocol;
 using System.Collections.Concurrent;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -117,9 +118,11 @@ public sealed partial class RunOrchestrator : IRunOrchestrator, IDeploymentRunGu
             if (!settings.Profiles.TryGetValue(profile, out var launchProfile))
                 throw new ArgumentException("Unknown configured profile.");
             launchProfile.Validate(clientCount);
+            if (launchProfile.ExternalServer && saveName != null)
+                throw new McpException("save_name selects the owned server's save. This profile's external dedicated server loads its own save.");
             using var deployment = deploymentLease?.Acquire(launchProfile);
             var selectedSave = saveName == null ? null : saves.ValidateSelection(saveName);
-            var run = new Run { RequestedSave = selectedSave, Id = Guid.NewGuid().ToString("N"), Profile = profile, Preflight = preflight.Check(launchProfile, clientCount + 1) };
+            var run = new Run { RequestedSave = selectedSave, Id = Guid.NewGuid().ToString("N"), Profile = profile, Preflight = preflight.Check(launchProfile, launchProfile.NewProcesses(clientCount)) };
             run.Directory = Path.Combine(settings.ArtifactDirectory, run.Id);
             Directory.CreateDirectory(run.Directory);
             runs[run.Id] = run;
@@ -133,7 +136,7 @@ public sealed partial class RunOrchestrator : IRunOrchestrator, IDeploymentRunGu
                     return View(run);
                 }
                 Save(run);
-                for (int index = 0; index <= clientCount; index++)
+                for (int index = launchProfile.ExternalServer ? 1 : 0; index <= clientCount; index++)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     if (index > 0) run.ClientAttempts[index] = "outcome_unknown";
@@ -167,7 +170,7 @@ public sealed partial class RunOrchestrator : IRunOrchestrator, IDeploymentRunGu
     {
         if (!settings.Profiles.TryGetValue(profile, out var launchProfile)) throw new ArgumentException("Unknown configured profile.");
         launchProfile.Validate(clientCount);
-        return preflight.Check(launchProfile, clientCount + 1);
+        return preflight.Check(launchProfile, launchProfile.NewProcesses(clientCount));
     }
 
     public async Task<ClientLaunchView> StartClientAsync(string runId, int clientIndex, CancellationToken cancellationToken)
@@ -189,8 +192,8 @@ public sealed partial class RunOrchestrator : IRunOrchestrator, IDeploymentRunGu
                 run.ClientLaunchErrors.TryGetValue(clientIndex, out var launchError);
                 return new ClientLaunchView(outcome, name, View(run), existing?.Error ?? launchError, null);
             }
-            if (run.State != "started" || !Alive(FindInstance(run, "server")))
-                return new ClientLaunchView("rejected", name, View(run), new LiveTestError("run_not_active", "A live owned server is required; start_client never restarts a run.", false), null);
+            if (run.State != "started" || !ServerAvailable(run))
+                return new ClientLaunchView("rejected", name, View(run), new LiveTestError("run_not_active", "An active run is required, with its owned server alive if it has one; start_client never restarts a run.", false), null);
             var report = preflight.Check(profile, 1);
             if (!report.Allowed || report.Bridge.Mvid != run.Preflight.Bridge.Mvid)
                 return new ClientLaunchView("preflight_rejected", name, View(run), new LiveTestError(
@@ -285,15 +288,8 @@ public sealed partial class RunOrchestrator : IRunOrchestrator, IDeploymentRunGu
                         report.Allowed ? "Coop.dll changed since launch; no join was sent." : report.Message);
                 var mismatch = await CheckLoadedBridgeAsync(target, report.Bridge.Mvid, cancellationToken);
                 if (mismatch != null) return mismatch;
-                var server = FindInstance(run, "server");
-                await server.Gate.WaitAsync(cancellationToken);
-                try
-                {
-                    if (!Alive(server)) return LocalFailure(server, "server_exited", "The owned server exited; no join was sent.");
-                    mismatch = await CheckLoadedBridgeAsync(server, report.Bridge.Mvid, cancellationToken);
-                    if (mismatch != null) return mismatch;
-                }
-                finally { server.Gate.Release(); }
+                mismatch = await CheckOwnedServerBridgeAsync(run, report.Bridge.Mvid, cancellationToken);
+                if (mismatch != null) return mismatch;
             }
             if (method == "ui-layers" || (method == "ui-inspect" &&
                 JsonSerializer.SerializeToElement(parameters).TryGetProperty("layer", out var layer) && layer.ValueKind != JsonValueKind.Null))
@@ -476,14 +472,35 @@ public sealed partial class RunOrchestrator : IRunOrchestrator, IDeploymentRunGu
         return null;
     }
 
+    // Confirms an owned server is alive on the expected bridge build; an external server has no bridge to ask.
+    private async Task<LiveTestResponse> CheckOwnedServerBridgeAsync(Run run, Guid expected, CancellationToken cancellationToken)
+    {
+        if (UsesExternalServer(run)) return null;
+        var server = FindInstance(run, "server");
+        await server.Gate.WaitAsync(cancellationToken);
+        try
+        {
+            if (!Alive(server)) return LocalFailure(server, "server_exited", "The owned server exited; no join was sent.");
+            return await CheckLoadedBridgeAsync(server, expected, cancellationToken);
+        }
+        finally { server.Gate.Release(); }
+    }
+
     private LiveTestResponse LocalFailure(Instance target, string code, string message) => LiveTestResponse.Failure(
         Guid.NewGuid().ToString("N"), new LiveTestProcessInfo { Pid = target.Identity.Pid, ProcessStartedUtc = target.Identity.StartedUtc,
             Role = target.Identity.Role, PlatformId = target.Identity.PlatformId, RunToken = target.Identity.RunToken }, new LiveTestError(code, message, false));
     private Instance[] Instances(Run run) { lock (run.ArtifactGate) return run.Instances.ToArray(); }
     private bool Alive(Instance target) => !target.Stopped && target.Process.IsAlive;
     private Run FindRun(string id) => runs.TryGetValue(id, out var run) ? run : throw new ArgumentException("Unknown run_id in this MCP session.");
+    // True when this run's dedicated server belongs to the operator, not this MCP session.
+    private bool UsesExternalServer(Run run) => settings.Profiles[run.Profile].ExternalServer;
+    // An external server is the operator's to keep alive, so only an owned server can be checked here.
+    private bool ServerAvailable(Run run) => UsesExternalServer(run) || Alive(FindInstance(run, "server"));
     private Instance FindInstance(Run run, string name)
     {
+        // McpException, because the SDK hides any other exception's message from the MCP client.
+        if (name == "server" && UsesExternalServer(run))
+            throw new McpException("This run's dedicated server is external and MCP does not own it. Use the server's own console and logs; only clientN instances exist here.");
         var instance = Instances(run).SingleOrDefault(i => i.Name == name);
         if (instance == null) throw new ArgumentException("Unknown instance; use server, client1, client2, etc. from get_run.");
         return instance;

@@ -3,8 +3,10 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Actions.Messages;
+using GameInterface.Services.Clans;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using LiteNetLib;
 using Serilog;
 using System;
@@ -22,15 +24,21 @@ internal class TeleportHeroHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly IPlayerManager playerManager;
+    private readonly ICoopClanPermissions permissions;
 
     public TeleportHeroHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
-        INetwork network)
+        INetwork network,
+        IPlayerManager playerManager,
+        ICoopClanPermissions permissions)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
+        this.playerManager = playerManager;
+        this.permissions = permissions;
 
         messageBroker.Subscribe<HeroTeleported>(Handle_HeroTeleported);
         messageBroker.Subscribe<TeleportHero>(Handle_TeleportHero);
@@ -69,6 +77,23 @@ internal class TeleportHeroHandler : IHandler
 
             MobileParty targetParty = null;
             if (data.TargetPartyId != null && !objectManager.TryGetObjectWithLogging(data.TargetPartyId, out targetParty)) return;
+
+            // Same rule as the client gate in TeleportHeroActionPatches, checked for the hero the sending peer plays.
+            if (!playerManager.TryGetSenderHero(obj.Who, out var senderHero))
+            {
+                Logger.Warning("Ignoring a teleport of hero {HeroId} from a peer that plays no hero", hero.StringId);
+                return;
+            }
+
+            // A hero that may be managed but not recalled can still be sent to a settlement.
+            bool movesToSettlementOnly = targetSettlement != null && targetParty == null;
+            bool canRecall = permissions.CanRecallHero(senderHero, hero);
+            bool canSendToSettlement = movesToSettlementOnly && permissions.CanManageHero(senderHero, hero);
+            if (!canRecall && !canSendToSettlement)
+            {
+                Logger.Warning("Ignoring a teleport of hero {HeroId} from a peer that cannot manage it", hero.StringId);
+                return;
+            }
 
             TeleportHeroAction.ApplyInternal(hero, targetSettlement, targetParty, data.Detail);
 

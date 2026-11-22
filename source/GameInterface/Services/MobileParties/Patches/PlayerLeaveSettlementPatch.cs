@@ -1,9 +1,10 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 #if DEBUG
 using GameInterface.Services.GameMenus.Patches;
 #endif
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using HarmonyLib;
+using SandBox.CampaignBehaviors;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -24,7 +25,10 @@ internal class PlayerLeaveSettlementPatch
         typeof(EncounterGameMenuBehavior).GetMethod("game_menu_castle_outside_leave_on_consequence", BindingFlags.NonPublic | BindingFlags.Instance),
         typeof(EncounterGameMenuBehavior).GetMethod("army_encounter_leave_on_consequence", BindingFlags.NonPublic | BindingFlags.Instance),
         typeof(HideoutCampaignBehavior).GetMethod("game_menu_hideout_leave_on_consequence", BindingFlags.NonPublic | BindingFlags.Instance),
-        typeof(VillageHostileActionCampaignBehavior).GetMethod("game_menu_village_hostile_action_warn_leave_on_consequence", BindingFlags.NonPublic | BindingFlags.Static),
+        // A client cant finish its hideout raid locally, so the send troops menus leave through the server too.
+        AccessTools.Method(typeof(HideoutCampaignBehavior), nameof(HideoutCampaignBehavior.hideout_send_troops_wait_leave_on_consequence)),
+        AccessTools.Method(typeof(HideoutCampaignBehavior), nameof(HideoutCampaignBehavior.hideout_send_troops_result_success_consequence)),
+        AccessTools.Method(typeof(HideoutCampaignBehavior), nameof(HideoutCampaignBehavior.hideout_send_troops_result_failure_consequence)),
         typeof(VillageHostileActionCampaignBehavior).GetMethod("village_looted_leave_on_consequence", BindingFlags.NonPublic | BindingFlags.Static),
     };
 
@@ -40,6 +44,54 @@ internal class PlayerLeaveSettlementPatch
 
         return false;
     }
+}
+
+[HarmonyPatch(typeof(PlayerTownVisitCampaignBehavior))]
+[HarmonyPatchCategory(GameInterface.HARMONY_NAVAL_CATEGORY)]
+internal class PlayerVillageLandSeaLeavePatch
+{
+    [HarmonyPatch(nameof(PlayerTownVisitCampaignBehavior.game_menu_set_sail_leave_on_consequence))]
+    [HarmonyPrefix]
+    public static bool SetSailPrefix() => RequestLeave(SettlementLeaveType.SetSail);
+
+    // v1.5 shares these two between the castle and village menus.
+    // Anchoring the fleet at the settlement only works on the server, so the whole disembark goes through it
+    [HarmonyPatch(nameof(PlayerTownVisitCampaignBehavior.game_menu_disembark_on_consequence))]
+    [HarmonyPrefix]
+    public static bool DisembarkPrefix() => RequestLeave(SettlementLeaveType.Disembark);
+
+    private static bool RequestLeave(SettlementLeaveType leaveType)
+    {
+        var party = MobileParty.MainParty;
+
+        MessageBroker.Instance.Publish(party, new EndSettlementEncounterAttempted(party, leaveType));
+
+        return false;
+    }
+}
+
+[HarmonyPatch(typeof(EncounterGameMenuBehavior))]
+[HarmonyPatchCategory(GameInterface.HARMONY_NAVAL_CATEGORY)]
+internal class PlayerNavalTownLeavePatch
+{
+    [HarmonyPatch(nameof(EncounterGameMenuBehavior.game_menu_town_naval_outside_leave_on_consequence))]
+    [HarmonyPrefix]
+    public static bool Prefix()
+    {
+        var party = MobileParty.MainParty;
+
+        MessageBroker.Instance.Publish(party, new EndSettlementEncounterAttempted(party, SettlementLeaveType.SetSail));
+
+        return false;
+    }
+}
+
+[HarmonyPatch(typeof(RetirementCampaignBehavior))]
+internal class PlayerLeaveRetirementSettlementPatch
+{
+    [HarmonyPatch(nameof(RetirementCampaignBehavior.retirement_menu_on_leave))]
+    [HarmonyPrefix]
+    public static bool Prefix() => PlayerLeaveSettlementPatch.RequestLeave();
 }
 
 [HarmonyPatch(

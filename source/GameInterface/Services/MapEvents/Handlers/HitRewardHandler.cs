@@ -7,6 +7,7 @@ using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.ComponentInterfaces;
@@ -27,6 +28,7 @@ public class HitRewardHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly ISendCoalescer coalescer;
+    private readonly HashSet<string> mapEventsMissingTracker = new HashSet<string>();
 
     public HitRewardHandler(
         IMessageBroker messageBroker,
@@ -42,6 +44,9 @@ public class HitRewardHandler : IHandler
         messageBroker.Subscribe<TrackTroopForUpgrades>(Handle_TrackTroopForUpgrades);
         messageBroker.Subscribe<NetworkTrackTroopForUpgrades>(Handle_NetworkTrackTroopForUpgrades);
 
+        messageBroker.Subscribe<BattleSurgeryReward>(Handle_BattleSurgeryReward);
+        messageBroker.Subscribe<NetworkBattleSurgeryReward>(Handle_NetworkBattleSurgeryReward);
+
         messageBroker.Subscribe<BattleHitReward>(Handle_BattleHitReward);
         messageBroker.Subscribe<NetworkBattleHitReward>(Handle_NetworkBattleHitReward);
 
@@ -55,6 +60,9 @@ public class HitRewardHandler : IHandler
     {
         messageBroker.Unsubscribe<TrackTroopForUpgrades>(Handle_TrackTroopForUpgrades);
         messageBroker.Unsubscribe<NetworkTrackTroopForUpgrades>(Handle_NetworkTrackTroopForUpgrades);
+
+        messageBroker.Unsubscribe<BattleSurgeryReward>(Handle_BattleSurgeryReward);
+        messageBroker.Unsubscribe<NetworkBattleSurgeryReward>(Handle_NetworkBattleSurgeryReward);
 
         messageBroker.Unsubscribe<BattleHitReward>(Handle_BattleHitReward);
         messageBroker.Unsubscribe<NetworkBattleHitReward>(Handle_NetworkBattleHitReward);
@@ -88,6 +96,31 @@ public class HitRewardHandler : IHandler
         });
     }
 
+    private void Handle_BattleSurgeryReward(MessagePayload<BattleSurgeryReward> payload)
+    {
+        if (ModInformation.IsServer) return;
+        var data = payload.What;
+        if (!objectManager.TryGetIdWithLogging(data.Party, out var partyId)) return;
+        if (!objectManager.TryGetIdWithLogging(data.MapEvent, out var mapEventId)) return;
+        network.SendAll(new NetworkBattleSurgeryReward(partyId, mapEventId, data.SurgerySuccess, data.TroopTier));
+    }
+
+    private void Handle_NetworkBattleSurgeryReward(MessagePayload<NetworkBattleSurgeryReward> payload)
+    {
+        if (ModInformation.IsClient) return;
+        var data = payload.What;
+        if (data.TroopTier < 0 || data.TroopTier > 10) return;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.PartyId, out var party)) return;
+            if (!objectManager.TryGetObjectWithLogging<MapEvent>(data.MapEventId, out var mapEvent)) return;
+            if (mapEvent.IsFinalized || party.MapEvent != mapEvent) return;
+
+            SkillLevelingManager.OnSurgeryApplied(party, data.SurgerySuccess, data.TroopTier);
+        });
+    }
+
     private void Handle_BattleHitReward(MessagePayload<BattleHitReward> obj)
     {
         var data = obj.What;
@@ -118,7 +151,8 @@ public class HitRewardHandler : IHandler
                 data.LastSpeedBonus,
                 data.LastShotDifficulty,
                 data.IsSiegeEngineHit,
-                data.LastAttackerWeapon,
+                // vanilla only reads the weapon for a hero attacker (weapon skill xp)
+                data.AffectorCharacter.IsHero ? data.LastAttackerWeapon : null,
                 data.AttackType,
                 data.HitpointRatio,
                 data.DamageAmount,
@@ -242,8 +276,20 @@ public class HitRewardHandler : IHandler
             if ((battleObserverMissionLogic?.BattleObserver) == null) return;
 
             TroopUpgradeTracker troopUpgradeTracker = mapEvent.TroopUpgradeTracker;
+            if (troopUpgradeTracker == null)
+            {
+                if (mapEventsMissingTracker.Add(data.MapEventId))
+                    Logger.Warning("Skipping scoreboard upgrades for {MapEventId}: its TroopUpgradeTracker is null on this client " +
+                        "(finalized {IsFinalized}, main party side {Side}, parties {PartyCount})",
+                        data.MapEventId, mapEvent.IsFinalized, PartyBase.MainParty?.Side, mapEvent.InvolvedParties.Count());
+                return;
+            }
+
             if (affectorCharacter.IsHero)
             {
+                // A client leaves the tracker null until the replicated tracker from the server arrives
+                if (troopUpgradeTracker == null) return;
+
                 Hero heroObject = affectorCharacter.HeroObject;
                 using (IEnumerator<SkillObject> enumerator = troopUpgradeTracker.CheckSkillUpgrades(heroObject).GetEnumerator())
                 {

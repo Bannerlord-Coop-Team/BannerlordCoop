@@ -13,7 +13,7 @@ public class CoopConnectionUIMovieTests
         var document = XDocument.Load(FindMoviePath());
 
         Assert.Single(document.Descendants("EditableTextWidget"),
-            element => element.Attribute("Text")?.Value == "@Ip");
+            element => element.Attribute("RealText")?.Value == "@Ip");
         Assert.DoesNotContain(document.Descendants("EditableTextWidget"),
             element => element.Attribute("Text")?.Value == "@Port");
         Assert.DoesNotContain(document.Descendants("TextWidget"),
@@ -89,8 +89,7 @@ public class CoopConnectionUIMovieTests
             passwordButton.Attribute("Command.Click")?.Value);
         Assert.Equal("@PasswordFilterButtonText",
             passwordButton.Attribute("Parameter.Text")?.Value);
-        Assert.Equal("@IsSearchSteamLobbiesDisabled",
-            passwordButton.Attribute("IsDisabled")?.Value);
+        Assert.Null(passwordButton.Attribute("IsDisabled"));
 
         var minimumPlayersInput = FindById(document, "MinimumPlayersFilterInput");
         Assert.Equal("@MinimumSteamLobbyPlayers",

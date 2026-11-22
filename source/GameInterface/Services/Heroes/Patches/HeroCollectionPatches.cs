@@ -25,6 +25,8 @@ internal class HeroCollectionPatches : GenericPatches<HeroCollectionPatches, Her
         yield return AccessTools.Method(typeof(RecruitmentCampaignBehavior), nameof(RecruitmentCampaignBehavior.RecruitVolunteersFromNotable));
         yield return AccessTools.Method(typeof(RecruitmentCampaignBehavior), nameof(RecruitmentCampaignBehavior.UpdateVolunteersOfNotablesInSettlement));
         yield return AccessTools.Method(typeof(RecruitmentCampaignBehavior), nameof(RecruitmentCampaignBehavior.ApplyInternal));
+        // Garrison auto-recruitment takes volunteers from the town's and its villages' notables.
+        yield return AccessTools.Method(typeof(GarrisonRecruitmentCampaignBehavior), nameof(GarrisonRecruitmentCampaignBehavior.TickAutoRecruitmentGarrisonChange));
         // Carvans
         yield return AccessTools.Method(typeof(CaravanPartyComponent), nameof(CaravanPartyComponent.OnFinalize));
         yield return AccessTools.Method(typeof(CaravanPartyComponent), nameof(CaravanPartyComponent.OnInitialize));

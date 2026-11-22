@@ -31,7 +31,11 @@ SubscribeNetwork<{{MemberType}}, {{ MemberDeclaringTypeName}}_{{ MemberName }}_S
 {{~ end ~}}
 });
 {{~ else ~}}
-SubscribeGenericReference<{{MemberType}}, {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetLocalMessage, {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetNetworkMessage>();
+SubscribeGenericReference<{{MemberType}}, {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetLocalMessage, {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetNetworkMessage>(
+{{~ if HeadlessMapEventVisual ~}}
+    value => GameInterface.Services.GuantletMapEventVisuals.MapEventVisualSyncFilter.IsHeadless(value)
+{{~ end ~}}
+);
 
 SubscribeNetworkReference<{{MemberType}}, {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetNetworkMessage >((instance, value, _) => { 
 {{~ if Debug ~}}

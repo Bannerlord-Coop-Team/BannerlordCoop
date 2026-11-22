@@ -14,10 +14,13 @@ public record NetworkPromptSiegeAftermathChoice : IEvent
     public string SettlementId { get; }
     [ProtoMember(2)]
     public string LeaderPartyId { get; }
+    [ProtoMember(3)]
+    public string PreviousOwnerClanId { get; }
 
-    public NetworkPromptSiegeAftermathChoice(string settlementId, string leaderPartyId)
+    public NetworkPromptSiegeAftermathChoice(string settlementId, string leaderPartyId, string previousOwnerClanId)
     {
         SettlementId = settlementId;
         LeaderPartyId = leaderPartyId;
+        PreviousOwnerClanId = previousOwnerClanId;
     }
 }

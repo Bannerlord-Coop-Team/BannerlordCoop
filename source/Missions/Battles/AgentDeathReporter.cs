@@ -2,14 +2,11 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
-using GameInterface.Services.ObjectManager;
 using Missions.Messages;
 using Serilog;
 using System;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
@@ -37,7 +34,6 @@ public class AgentDeathReporter : IAgentDeathReporter
     private readonly IBattleNetwork network;
     private readonly INetwork relayNetwork;
     private readonly IMessageBroker messageBroker;
-    private readonly IObjectManager objectManager;
     private readonly ICoopMissionComponent coopMissionComponent;
     private readonly IBattleSession session;
     private readonly ICasualtyAttributionMap casualties;
@@ -46,7 +42,6 @@ public class AgentDeathReporter : IAgentDeathReporter
         IBattleNetwork network,
         INetwork relayNetwork,
         IMessageBroker messageBroker,
-        IObjectManager objectManager,
         ICoopMissionComponent coopMissionComponent,
         IBattleSession session,
         ICasualtyAttributionMap casualties)
@@ -54,7 +49,6 @@ public class AgentDeathReporter : IAgentDeathReporter
         this.network = network;
         this.relayNetwork = relayNetwork;
         this.messageBroker = messageBroker;
-        this.objectManager = objectManager;
         this.coopMissionComponent = coopMissionComponent;
         this.session = session;
         this.casualties = casualties;
@@ -99,7 +93,8 @@ public class AgentDeathReporter : IAgentDeathReporter
             }
             if (info.CurrentAuthority != session.OwnControllerId)
             {
-                Logger.Information("[DeathDiag] Agent {AgentId} died but its authority is {Auth}, not us ({Us}) — not broadcasting", info.AgentId, info.CurrentAuthority, session.OwnControllerId);
+                // A replicated death never gets here, so a puppet died locally without its owner's blow and lives on there.
+                Logger.Warning("[DeathDiag] Puppet {AgentId} died here without a routed blow; its authority {Auth}, not us ({Us}), keeps it alive", info.AgentId, info.CurrentAuthority, session.OwnControllerId);
                 return;
             }
 
@@ -112,16 +107,7 @@ public class AgentDeathReporter : IAgentDeathReporter
 
             var attribution = casualties.GetOrDefault(info.AgentId);
 
-            bool wounded = payload.What.Wounded;
-#if !TESTER
-            if (attribution.TroopCharacterId != null
-                && objectManager.TryGetObject<CharacterObject>(attribution.TroopCharacterId, out var troop)
-                && troop.HeroObject?.IsPlayerHero() == true)
-            {
-                wounded = true;
-            }
-#endif
-
+            var wounded = payload.What.Wounded;
             Logger.Information("[DeathDiag] Broadcasting death of agent {AgentId} (wounded={Wounded}) to the battle mesh", info.AgentId, wounded);
             network.SendAll(new NetworkBattleAgentDied(
                 info.AgentId,

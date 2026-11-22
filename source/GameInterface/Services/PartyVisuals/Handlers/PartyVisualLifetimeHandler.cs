@@ -2,6 +2,7 @@
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyBases.Extensions;
 using GameInterface.Services.PartyVisuals.Extensions;
@@ -28,6 +29,7 @@ public class PartyVisualLifetimeHandler : IHandler
         messageBroker.Subscribe<PartyVisualCreated>(Handle);
         messageBroker.Subscribe<NetworkCreatePartyVisual>(Handle);
         messageBroker.Subscribe<PartyVisualDestroyed>(Handle);
+        messageBroker.Subscribe<MobilePartyDestroyed>(Handle);
         messageBroker.Subscribe<NetworkDestroyPartyVisual>(Handle);
     }
 
@@ -36,6 +38,7 @@ public class PartyVisualLifetimeHandler : IHandler
         messageBroker.Unsubscribe<PartyVisualCreated>(Handle);
         messageBroker.Unsubscribe<NetworkCreatePartyVisual>(Handle);
         messageBroker.Unsubscribe<PartyVisualDestroyed>(Handle);
+        messageBroker.Unsubscribe<MobilePartyDestroyed>(Handle);
         messageBroker.Unsubscribe<NetworkDestroyPartyVisual>(Handle);
     }
 
@@ -47,31 +50,32 @@ public class PartyVisualLifetimeHandler : IHandler
         var mobileParty = payload.What.PartyBase?.MobileParty;
         if (mobileParty == null)
             return;
+        var partyVisual = payload.What.MobilePartyVisual;
 
         // Save loading builds visuals before InitialServerState registers campaign objects. Those
         // visuals are registered by PartyVisualRegistry after loading, so skip this live-create path.
-        if (!objectManager.TryGetId(mobileParty, out string mobilePartyId))
+        if (!objectManager.TryGetId(mobileParty, out _))
         {
-            if (payload.What.MobilePartyVisual != null && !string.IsNullOrEmpty(mobileParty.StringId))
+            if (partyVisual != null && !string.IsNullOrEmpty(mobileParty.StringId))
             {
-                skippedVisualIds.Remove(payload.What.MobilePartyVisual);
+                skippedVisualIds.Remove(partyVisual);
                 skippedVisualIds.Add(
-                    payload.What.MobilePartyVisual,
+                    partyVisual,
                     $"{nameof(MobilePartyVisual)}_{mobileParty.StringId}");
             }
             return;
         }
 
-        if (payload.What.MobilePartyVisual == null)
+        if (partyVisual == null)
         {
             if (objectManager.TryGetHandleWithLogging(mobileParty, out var partyHandle))
                 network.SendAll(new NetworkCreatePartyVisual(partyHandle));
             return;
         }
 
-        if (!objectManager.AddNewObject(payload.What.MobilePartyVisual, out var visualId))
+        if (!objectManager.AddNewObject(partyVisual, out var visualId))
             return;
-        if (!objectManager.TryGetHandleWithLogging(payload.What.MobilePartyVisual, out var visualHandle) ||
+        if (!objectManager.TryGetHandleWithLogging(partyVisual, out var visualHandle) ||
             !objectManager.TryGetHandleWithLogging(mobileParty, out var mobilePartyHandle)) return;
 
         network.SendAll(new NetworkCreatePartyVisual(visualId, visualHandle, mobilePartyHandle));
@@ -96,23 +100,25 @@ public class PartyVisualLifetimeHandler : IHandler
             {
                 mobileParty.CreateNewPartyVisual();
 
-                var partyVisual = mobileParty.Party.GetPartyVisual();
-                if (partyVisual != null && partyVisualId != null)
+                if (partyVisualId != null && mobileParty.Party.GetPartyVisual() is { } partyVisual)
                     objectManager.AddExisting(partyVisualId, partyVisual, payload.What.PartyVisualHandle);
             }
-        }, context: $"create party visual {partyVisualId}");
+        }, context: $"create party visual {payload.What.MobilePartyHandle}");
+    }
+
+    private void Handle(MessagePayload<MobilePartyDestroyed> payload)
+    {
+        // The registry publishes this before it removes the party's handle.
+        if (MobilePartyVisualManager.Current == null &&
+            objectManager.TryGetHandleWithLogging(payload.What.MobileParty, out var partyHandle))
+        {
+            network.SendAll(new NetworkDestroyPartyVisual(partyHandle));
+        }
     }
 
     private void Handle(MessagePayload<PartyVisualDestroyed> payload)
     {
         var partyVisual = payload.What.MobilePartyVisual;
-        if (partyVisual == null)
-        {
-            if (objectManager.TryGetHandleWithLogging(payload.What.MobileParty, out var partyHandle))
-                network.SendAll(new NetworkDestroyPartyVisual(partyHandle));
-            return;
-        }
-
         var isRegistered = objectManager.TryGetId(partyVisual, out string partyVisualId);
         if (!isRegistered && !skippedVisualIds.TryGetValue(partyVisual, out partyVisualId))
         {
@@ -143,7 +149,7 @@ public class PartyVisualLifetimeHandler : IHandler
                 if (partyVisual != null)
                     objectManager.Remove(partyVisual);
 
-                MobilePartyVisualManager.Current?.RemovePartyVisualForParty(mobileParty);
+                mobileParty.RemovePartyVisual();
             }
         }, context: $"destroy party visual {payload.What.MobilePartyHandle}");
     }

@@ -183,8 +183,16 @@ public class ObjectManager : IObjectManager
         // Skip to next id
         GetUniqueTypeId(obj);
 
-        if (objsIds.TryGetValue(obj, out var _))
+        if (objsIds.TryGetValue(obj, out var existingId))
         {
+            if (!allowMissingHandle && existingId == id
+                && idObjs.TryGetValue(id, out var existingObject) && ReferenceEquals(existingObject, obj))
+            {
+                return objsHandles.TryGetValue(obj, out var existingHandle)
+                    ? existingHandle.Value == handle
+                    : AddHandle(obj, handle);
+            }
+
             logger.Error("Object already registered: {ObjectType}", obj.GetType());
             return false;
         }

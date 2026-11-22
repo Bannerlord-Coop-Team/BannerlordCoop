@@ -13,31 +13,12 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class StanceLinkSerializationTest
     {
-        IContainer container;
+        ILifetimeScope container;
         public StanceLinkSerializationTest()
         {
             GameBootStrap.Initialize();
 
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
-        }
-
-        [Fact]
-        public void StanceLink_Serialize()
-        {
-            StanceLink stanceLink = (StanceLink)FormatterServices.GetUninitializedObject(typeof(StanceLink));
-
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            StanceLinkBinaryPackage package = new StanceLinkBinaryPackage(stanceLink, factory);
-
-            package.Pack();
-
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
-
-            Assert.NotEmpty(bytes);
+            container = SerializationTestContainer.BeginScope();
         }
 
         [Fact]

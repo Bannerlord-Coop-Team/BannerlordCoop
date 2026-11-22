@@ -26,6 +26,7 @@ public readonly struct TradeAttempted : IEvent
     public readonly List<(ItemRosterElement, int)> BoughtItems;
     public readonly List<(ItemRosterElement, int)> SoldItems;
     public readonly string ForceTransferId;
+    public readonly ItemRosterElement[] InitialPlayerRoster;
 
     public TradeAttempted(
         ItemRoster fromRoster,
@@ -42,7 +43,8 @@ public readonly struct TradeAttempted : IEvent
         SettlementComponent currentSettlementComponent,
         List<(ItemRosterElement, int)> boughtItems,
         List<(ItemRosterElement, int)> soldItems,
-        string forceTransferId = null)
+        string forceTransferId = null,
+        ItemRosterElement[] initialPlayerRoster = null)
     {
         FromRoster = fromRoster;
         ToRoster = toRoster;
@@ -59,5 +61,6 @@ public readonly struct TradeAttempted : IEvent
         BoughtItems = boughtItems;
         SoldItems = soldItems;
         ForceTransferId = forceTransferId;
+        InitialPlayerRoster = initialPlayerRoster;
     }
 }

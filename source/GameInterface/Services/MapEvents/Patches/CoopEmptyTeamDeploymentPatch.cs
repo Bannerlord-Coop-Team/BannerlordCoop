@@ -1,11 +1,12 @@
 ﻿using System;
 #if DEBUG
-using System.Collections.Generic;
 using Common;
 using Common.Commands;
 using Newtonsoft.Json;
 #endif
 using HarmonyLib;
+using System.Collections.Generic;
+using System.Reflection.Emit;
 using TaleWorlds.MountAndBlade;
 
 namespace GameInterface.Services.MapEvents.Patches;
@@ -22,7 +23,8 @@ namespace GameInterface.Services.MapEvents.Patches;
 /// <c>IsPlanMade(team)</c> as its "already planned?" guard, and at plan time EVERY team is still empty (troops spawn
 /// later), so forcing it true there would skip making the real plans — the troops then spawn into an unplanned team
 /// and crash (the host's <c>SpawnAgent</c> "Nullable object must have a value"). The <see cref="_inMakeTeamPlans"/>
-/// flag scopes the override out of that path. <c>IsReinforcementPlanMade</c> is deliberately NOT overridden: leaving
+/// flag scopes the override out of that path. CheckDeployment reads it through a transpiler as well, because the JIT can
+/// inline <c>IsPlanMade</c> there and skip the postfix. <c>IsReinforcementPlanMade</c> is deliberately NOT overridden: leaving
 /// it false for an empty team keeps <c>CheckDeployment</c>'s plan-making loop alive (it gates the SKIP on
 /// <c>IsPlanMade &amp;&amp; IsReinforcementPlanMade</c>) so the fillable teams still get real plans. Scoped to coop.
 /// </para>
@@ -54,6 +56,37 @@ internal class CoopEmptyTeamDeploymentPatch
     [HarmonyFinalizer]
     private static void MakeTeamPlans_Finalizer() => _inMakeTeamPlans = false;
 
+    // IsPlanMade is small enough for the JIT to inline into CheckDeployment, where the postfix below would not run. The
+    // #4223 logs fit that: a spawn path never plans an empty team, so its spawn gate read false and the side never spawned
+    [HarmonyPatch(typeof(DefaultBattleMissionAgentSpawnLogic), "CheckDeployment")]
+    [HarmonyTranspiler]
+    internal static IEnumerable<CodeInstruction> CheckDeployment_Transpiler(IEnumerable<CodeInstruction> instructions)
+    {
+        var isPlanMade = AccessTools.Method(typeof(DefaultMissionDeploymentPlan),
+            nameof(DefaultMissionDeploymentPlan.IsPlanMade), new[] { typeof(Team) });
+        var spawnGate = AccessTools.Method(typeof(CoopEmptyTeamDeploymentPatch), nameof(IsPlanMadeForSpawnGate));
+
+        foreach (var instruction in instructions)
+        {
+            if (instruction.Calls(isPlanMade))
+            {
+                instruction.opcode = OpCodes.Call;
+                instruction.operand = spawnGate;
+            }
+            yield return instruction;
+        }
+    }
+
+    internal static bool IsPlanMadeForSpawnGate(DefaultMissionDeploymentPlan plan, Team team)
+    {
+        bool result = plan.IsPlanMade(team);
+        IsPlanMade_Postfix(team, ref result);
+        return result;
+    }
+
+    // The one place the rule lives, the transpiler above calls it too. The postfix still covers Mission.SpawnAgent and
+    // BattleDeploymentHandler.AutoDeployTeamUsingDeploymentPlan, which read IsPlanMade through IMissionDeploymentPlan so
+    // the JIT cannot inline it. PhaseTick needs no override, an unplanned team has no plan for it to clear
     [HarmonyPatch(typeof(DefaultMissionDeploymentPlan), nameof(DefaultMissionDeploymentPlan.IsPlanMade), new[] { typeof(Team) })]
     [HarmonyPostfix]
     private static void IsPlanMade_Postfix(Team team, ref bool __result)

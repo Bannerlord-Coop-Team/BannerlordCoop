@@ -5,6 +5,8 @@ using E2E.Tests.Util;
 using GameInterface.Services.MapEventParties;
 using GameInterface.Services.Party.Data;
 using GameInterface.Services.Party.Messages;
+using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using GameInterface.Services.TroopRosters.Data;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
@@ -110,6 +112,13 @@ public class PartyDoneLogicPrisonerRecruitTests : IDisposable
 
             Assert.True(Server.ObjectManager.TryGetId(party.LeaderHero, out var heroId));
             Assert.True(Server.ObjectManager.TryGetId(prisoner, out var prisonerId));
+
+            if (mainHeroId == null)
+            {
+                var playerManager = Server.Resolve<IPlayerManager>();
+                Assert.True(playerManager.AddPlayer(new Player("RequestingControllerId", heroId, string.Empty, string.Empty, string.Empty)));
+                playerManager.SetPeer("RequestingControllerId", Client.NetPeer);
+            }
             fixture = new PrisonerFixture(heroId, prisonerId);
         });
         TestEnvironment.FlushCoalescer();

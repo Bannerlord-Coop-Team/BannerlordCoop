@@ -4,6 +4,7 @@ using Common.Logging;
 using GameInterface.Services.MobileParties.Audit;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Utils.Commands;
 using Helpers;
 using Serilog;
 using System;
@@ -30,9 +31,12 @@ internal class MobilePartyDebugCommand
 
     public sealed class SetDisorganizedCoopCommand : ICoopCommand
     {
-        private readonly IObjectManager objectManager;
+        private readonly ICommandObjectResolver resolver;
 
-        public SetDisorganizedCoopCommand(IObjectManager objectManager) => this.objectManager = objectManager;
+        public SetDisorganizedCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public string Prefix => "coop.debug.mobileparty";
         public string Name => "set_disorganized";
@@ -40,7 +44,7 @@ internal class MobilePartyDebugCommand
         public CoopCommandSide Side => CoopCommandSide.Server;
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("partyId", "The registered party id."),
+            new ExpectedArgs("partyId", "Party name or id; quote names with spaces."),
             new ExpectedArgs("value", "True or false."),
         };
 
@@ -48,20 +52,24 @@ internal class MobilePartyDebugCommand
         {
             if (ModInformation.IsClient) return Failed("Command can only be run on the server.");
             if (args.Count != 2 || !bool.TryParse(args[1], out var value))
-                return Failed("Expected a registered party id and true or false.");
-            if (!objectManager.TryGetObject<MobileParty>(args[0], out var party))
-                return Failed($"Party with id {args[0]} not found.");
+                return Failed("Expected a party name or id and true or false.");
+            if (!resolver.TryResolveMobileParty(args[0], out var party, out var error))
+                return Failed(error);
 
             party.SetDisorganized(value);
-            return Succeeded($"PartyId={args[0]} IsDisorganized={party.IsDisorganized}");
+            var partyId = resolver.DisplayId(party);
+            return Succeeded($"PartyId={partyId} IsDisorganized={party.IsDisorganized}");
         }
     }
 
     public sealed class DisorganizationCacheCoopCommand : ICoopCommand
     {
-        private readonly IObjectManager objectManager;
+        private readonly ICommandObjectResolver resolver;
 
-        public DisorganizationCacheCoopCommand(IObjectManager objectManager) => this.objectManager = objectManager;
+        public DisorganizationCacheCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public string Prefix => "coop.debug.mobileparty";
         public string Name => "disorganization_cache";
@@ -69,28 +77,33 @@ internal class MobilePartyDebugCommand
         public CoopCommandSide Side => CoopCommandSide.Both;
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("partyId", "The registered party id."),
+            new ExpectedArgs("partyId", "Party name or id; quote names with spaces."),
             new ExpectedArgs("evaluate", "True to evaluate the local speed cache; false only observes."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (args.Count != 2 || !bool.TryParse(args[1], out var evaluate))
-                return Failed("Expected a registered party id and true or false.");
-            if (!objectManager.TryGetObject<MobileParty>(args[0], out var party))
-                return Failed($"Party with id {args[0]} not found.");
+                return Failed("Expected a party name or id and true or false.");
+            if (!resolver.TryResolveMobileParty(args[0], out var party, out var error))
+                return Failed(error);
 
+            var partyId = resolver.DisplayId(party);
             int beforeVersion = party.VersionNo;
             int beforeDerivedVersion = party.GetVersionNoForBaseSpeedCalculation();
             int beforeCacheVersion = party._partyPureSpeedLastCheckVersion;
             if (evaluate) party.CalculateSpeedForPartyUnified();
             return Succeeded(FormattableString.Invariant(
-                $"PartyId={args[0]} StringId={party.StringId} IsDisorganized={party.IsDisorganized} ExpiryDays={party._disorganizedUntilTime.ToDays:R} Evaluate={evaluate} BeforeVersion={beforeVersion} BeforeDerivedVersion={beforeDerivedVersion} BeforeCacheVersion={beforeCacheVersion} Version={party.VersionNo} DerivedVersion={party.GetVersionNoForBaseSpeedCalculation()} CacheVersion={party._partyPureSpeedLastCheckVersion} BaseSpeed={party.LastCalculatedBaseSpeed:R} Speed={party._lastCalculatedSpeed:R}"));
+                $"PartyId={partyId} StringId={party.StringId} IsDisorganized={party.IsDisorganized} ExpiryDays={party._disorganizedUntilTime.ToDays:R} Evaluate={evaluate} BeforeVersion={beforeVersion} BeforeDerivedVersion={beforeDerivedVersion} BeforeCacheVersion={beforeCacheVersion} Version={party.VersionNo} DerivedVersion={party.GetVersionNoForBaseSpeedCalculation()} CacheVersion={party._partyPureSpeedLastCheckVersion} BaseSpeed={party.LastCalculatedBaseSpeed:R} Speed={party._lastCalculatedSpeed:R}"));
         }
     }
 
     public sealed class InfoCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public InfoCoopCommand(ICommandObjectResolver resolver) => this.resolver = resolver;
+
         public string Prefix => "coop.debug.mobileparty";
 
         public string Name => "info";
@@ -101,18 +114,13 @@ internal class MobilePartyDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("partyStringId", "The party string id."),
+            new ExpectedArgs("partyStringId", "Party name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-
-            MobileParty mobileParty = Campaign.Current.CampaignObjectManager.Find<MobileParty>(args[0]);
-
-            if (mobileParty == null)
-            {
-                return Failed(string.Format("ID: '{0}' not found", args[0]));
-            }
+            if (!resolver.TryResolveMobileParty(args[0], out var mobileParty, out var error))
+                return Failed(error);
 
             var stringBuilder = new StringBuilder();
             stringBuilder.AppendLine($"MobileParty info for: {SafeToString(mobileParty)}");
@@ -141,11 +149,15 @@ internal class MobilePartyDebugCommand
         }
     }
 
-    // coop.debug.mobileparty.component_info <PartyStringID>
+    // coop.debug.mobileparty.component_info <party name or id>
     // Dumps the party's _partyComponent fields (LordPartyComponent/Caravan/Garrison/etc.), which the plain
     // info cheat does NOT show (it dumps MobileParty + PartyBase only). e.g. LordPartyComponent._wagePaymentLimit.
     public sealed class ComponentInfoCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public ComponentInfoCoopCommand(ICommandObjectResolver resolver) => this.resolver = resolver;
+
         public string Prefix => "coop.debug.mobileparty";
 
         public string Name => "component_info";
@@ -156,17 +168,13 @@ internal class MobilePartyDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("partyStringId", "The party string id."),
+            new ExpectedArgs("partyStringId", "Party name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-
-            MobileParty mobileParty = Campaign.Current.CampaignObjectManager.Find<MobileParty>(args[0]);
-            if (mobileParty == null)
-            {
-                return Failed(string.Format("ID: '{0}' not found", args[0]));
-            }
+            if (!resolver.TryResolveMobileParty(args[0], out var mobileParty, out var error))
+                return Failed(error);
 
             var stringBuilder = new StringBuilder();
             stringBuilder.AppendLine($"PartyComponent ({mobileParty.PartyComponent?.GetType().Name ?? "null"}) for: {SafeToString(mobileParty.Name)}");
@@ -176,13 +184,17 @@ internal class MobilePartyDebugCommand
         }
     }
 
-    // coop.debug.mobileparty.attachment_ids <PartyStringID>
+    // coop.debug.mobileparty.attachment_ids <party name or id>
     // Prints the network ObjectManager id THIS machine holds for a party and each of its non-MBObjectBase
     // attachments. Run on the server and on each client and compare: a party the client got via live create
     // matches the server's runtime "Created_N"/concrete-type ids, while a party re-derived at join carries
     // "{Type}_{StringId}" ids that never reconcile with the server's, so its synced updates fail to resolve.
     public sealed class AttachmentIdsCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public AttachmentIdsCoopCommand(ICommandObjectResolver resolver) => this.resolver = resolver;
+
         public string Prefix => "coop.debug.mobileparty";
 
         public string Name => "attachment_ids";
@@ -193,17 +205,13 @@ internal class MobilePartyDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("partyStringId", "The party string id."),
+            new ExpectedArgs("partyStringId", "Party name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-
-            MobileParty mobileParty = Campaign.Current.CampaignObjectManager.Find<MobileParty>(args[0]);
-            if (mobileParty == null)
-            {
-                return Failed(string.Format("ID: '{0}' not found", args[0]));
-            }
+            if (!resolver.TryResolveMobileParty(args[0], out var mobileParty, out var error))
+                return Failed(error);
 
             if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
             {
@@ -230,6 +238,10 @@ internal class MobilePartyDebugCommand
 
     public sealed class VerifyAiAuthorityCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public VerifyAiAuthorityCoopCommand(ICommandObjectResolver resolver) => this.resolver = resolver;
+
         public string Prefix => "coop.debug.mobileparty";
 
         public string Name => "verify_ai_authority";
@@ -240,7 +252,7 @@ internal class MobilePartyDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("mobilePartyId", "The mobile party id."),
+            new ExpectedArgs("mobilePartyId", "Party name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -251,30 +263,25 @@ internal class MobilePartyDebugCommand
             }
 
 
-            if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
-            {
-                return Failed($"Unable to get {nameof(IObjectManager)}");
-            }
-
             if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager))
             {
                 return Failed($"Unable to get {nameof(IPlayerManager)}");
             }
 
-            if (!objectManager.TryGetObjectWithLogging<MobileParty>(args[0], out var mobileParty))
+            if (!resolver.TryResolveMobileParty(args[0], out var mobileParty, out var error))
             {
-                return Failed($"Unable to get {nameof(MobileParty)} with id: {args[0]}");
+                return Failed(error);
             }
 
             if (!playerManager.Contains(mobileParty))
             {
-                return Failed($"Party {args[0]} is not registered as a player party");
+                return Failed($"Party {mobileParty.StringId} is not registered as a player party");
             }
 
             var partyAi = mobileParty.Ai;
             if (partyAi == null)
             {
-                return Failed($"Party {args[0]} has no {nameof(MobilePartyAi)}");
+                return Failed($"Party {mobileParty.StringId} has no {nameof(MobilePartyAi)}");
             }
 
             bool previousNeedsUpdate = partyAi.DefaultBehaviorNeedsUpdate;
@@ -291,8 +298,8 @@ internal class MobilePartyDebugCommand
             }
 
             return Succeeded(tickWasBlocked
-                ? $"Server AI tick blocked for player party {args[0]}"
-                : $"Server AI tick ran for player party {args[0]}");
+                ? $"Server AI tick blocked for player party {mobileParty.StringId}"
+                : $"Server AI tick ran for player party {mobileParty.StringId}");
 
         }
     }
@@ -425,6 +432,10 @@ internal class MobilePartyDebugCommand
     // coop.debug.mobileparty.createParty lord_1_1 town_V1
     public sealed class CreateNewPartyCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public CreateNewPartyCoopCommand(ICommandObjectResolver resolver) => this.resolver = resolver;
+
         public string Prefix => "coop.debug.mobileparty";
 
         public string Name => "create_party";
@@ -435,8 +446,8 @@ internal class MobilePartyDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("heroId", "The hero id."),
-            new ExpectedArgs("settlementId", "The settlement id."),
+            new ExpectedArgs("heroId", "Hero name or id; quote names with spaces."),
+            new ExpectedArgs("settlementId", "Settlement name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -447,22 +458,14 @@ internal class MobilePartyDebugCommand
             }
 
 
-            if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+            if (!resolver.TryResolveHero(args[0], out var hero, out var error))
             {
-                return Failed($"Unable to get {nameof(IObjectManager)}");
+                return Failed(error);
             }
 
-            string heroStringId = args[0];
-            string settlementId = args[1];
-
-            if (objectManager.TryGetObject<Hero>(heroStringId, out var hero) == false)
+            if (!resolver.TryResolveSettlement(args[1], out var settlement, out error))
             {
-                return Failed($"Unable to get {typeof(Hero)} with id: {heroStringId}");
-            }
-
-            if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
-            {
-                return Failed($"Unable to get {typeof(Settlement)} with id: {settlementId}");
+                return Failed(error);
             }
 
             var newParty = MobilePartyHelper.SpawnLordParty(hero, settlement);
@@ -477,6 +480,10 @@ internal class MobilePartyDebugCommand
     // (default Danustica, town_ES1) to exercise mid-session party creation/replication to clients.
     public sealed class SpawnTestPartiesCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public SpawnTestPartiesCoopCommand(ICommandObjectResolver resolver) => this.resolver = resolver;
+
         public string Prefix => "coop.debug.mobileparty";
 
         public string Name => "spawn_test_parties";
@@ -488,7 +495,7 @@ internal class MobilePartyDebugCommand
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("count", "The count.", isRequired: false),
-            new ExpectedArgs("settlementId", "The settlement id.", isRequired: false),
+            new ExpectedArgs("settlementId", "Settlement name or id; quote names with spaces.", isRequired: false),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -505,12 +512,10 @@ internal class MobilePartyDebugCommand
             }
 
             // Spawn near a settlement (default Danustica, town_ES1 -- a common client location).
-            string settlementId = args.Count >= 2 ? args[1] : "town_ES1";
-            var settlement = Settlement.All.FirstOrDefault(s => s.StringId == settlementId);
-            if (settlement == null)
+            string settlementQuery = args.Count >= 2 ? args[1] : "town_ES1";
+            if (!resolver.TryResolveSettlement(settlementQuery, out var settlement, out var error))
             {
-                var towns = string.Join(", ", Settlement.All.Where(s => s.IsTown).Take(15).Select(s => s.StringId));
-                return Failed($"Settlement '{settlementId}' not found. Try one of: {towns}");
+                return Failed(error);
             }
 
             var candidates = Hero.AllAliveHeroes
@@ -545,9 +550,13 @@ internal class MobilePartyDebugCommand
         }
     }
 
-    // coop.debug.mobileParty.destroyParty tbd
+    // coop.debug.mobileparty.destroy_party <party name or id>
     public sealed class DestroyPartyCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public DestroyPartyCoopCommand(ICommandObjectResolver resolver) => this.resolver = resolver;
+
         public string Prefix => "coop.debug.mobileparty";
 
         public string Name => "destroy_party";
@@ -568,23 +577,16 @@ internal class MobilePartyDebugCommand
                 return Failed("Create party is only to be called on the server");
             }
 
-            if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+            if (!resolver.TryResolveMobileParty(args[0], out var party, out var error))
             {
-                return Failed($"Unable to get {nameof(IObjectManager)}");
-            }
-
-            string partyId = args[0];
-
-            if (objectManager.TryGetObject<MobileParty>(partyId, out var party) == false)
-            {
-                return Failed($"Unable to get {typeof(MobileParty)} with id: {partyId}");
+                return Failed(error);
             }
 
             // DestroyPartyAction is the destruction path synced to clients; plain
             // RemoveParty is not. A null destroyer replicates like any other.
             DestroyPartyAction.Apply(null, party);
 
-            return Succeeded($"Destroyed {nameof(MobileParty)} with string id: {partyId}");
+            return Succeeded($"Destroyed {nameof(MobileParty)} with string id: {party.StringId}");
 
         }
     }
@@ -669,6 +671,10 @@ internal class MobilePartyDebugCommand
     /// <returns>success message</returns>
     public sealed class SetWagePaymentLimitCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public SetWagePaymentLimitCoopCommand(ICommandObjectResolver resolver) => this.resolver = resolver;
+
         public string Prefix => "coop.debug.mobileparty";
 
         public string Name => "set_wage_limit_updated";
@@ -679,7 +685,7 @@ internal class MobilePartyDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("partyStringId", "The party string id."),
+            new ExpectedArgs("partyStringId", "Party name or id; quote names with spaces."),
             new ExpectedArgs("value", "The value."),
         };
 
@@ -696,12 +702,9 @@ internal class MobilePartyDebugCommand
                 return Failed($"Error setting int: {e}");
             }
 
-            MobileParty mobileParty = Campaign.Current.CampaignObjectManager.Find<MobileParty>(args[0]);
-
-
-            if (mobileParty == null)
+            if (!resolver.TryResolveMobileParty(args[0], out var mobileParty, out var error))
             {
-                return Failed(string.Format("ID: '{0}' not found", args[0]));
+                return Failed(error);
             }
 
             var obj = new ClanFinanceExpenseItemVM(mobileParty);
@@ -722,6 +725,10 @@ internal class MobilePartyDebugCommand
     /// <returns>success message</returns>
     public sealed class SetUnlimitedWageToggleCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public SetUnlimitedWageToggleCoopCommand(ICommandObjectResolver resolver) => this.resolver = resolver;
+
         public string Prefix => "coop.debug.mobileparty";
 
         public string Name => "set_wage_unlimited";
@@ -732,7 +739,7 @@ internal class MobilePartyDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("partyStringId", "The party string id."),
+            new ExpectedArgs("partyStringId", "Party name or id; quote names with spaces."),
             new ExpectedArgs("value", "The value."),
         };
 
@@ -749,12 +756,9 @@ internal class MobilePartyDebugCommand
                 return Failed($"Error setting bool: {e}");
             }
 
-            MobileParty mobileParty = Campaign.Current.CampaignObjectManager.Find<MobileParty>(args[0]);
-
-
-            if (mobileParty == null)
+            if (!resolver.TryResolveMobileParty(args[0], out var mobileParty, out var error))
             {
-                return Failed(string.Format("ID: '{0}' not found", args[0]));
+                return Failed(error);
             }
 
             var obj = new ClanFinanceExpenseItemVM(mobileParty);

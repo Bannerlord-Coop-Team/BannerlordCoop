@@ -477,16 +477,16 @@ public readonly struct ArmyDispersed : IEvent
 {
     public readonly Army Army;
     public readonly Army.ArmyDispersionReason Reason;
-    public readonly bool IsPlayersArmy;
+    public readonly List<MobileParty> PlayerParties;
 
     public ArmyDispersed(
         Army army,
         Army.ArmyDispersionReason reason,
-        bool isPlayersArmy)
+        List<MobileParty> playerParties)
     {
         Army = army;
         Reason = reason;
-        IsPlayersArmy = isPlayersArmy;
+        PlayerParties = playerParties;
     }
 }
 
@@ -670,5 +670,42 @@ public readonly struct NotifyHeroTeleportation : IEvent
         TargetSettlement = targetSettlement;
         TargetParty = targetParty;
         Detail = detail;
+    }
+}
+
+public readonly struct LogArmyGathered : IEvent
+{
+    public readonly Army Army;
+    public readonly IMapPoint GatheringPoint;
+
+    public LogArmyGathered(
+        Army army,
+        IMapPoint gatheringPoint)
+    {
+        Army = army;
+        GatheringPoint = gatheringPoint;
+    }
+}
+
+public readonly struct LogSiegeAftermathApplied : IEvent
+{
+    public readonly MobileParty AttackerParty;
+    public readonly Settlement Settlement;
+    public readonly SiegeAftermathAction.SiegeAftermath AftermathType;
+    public readonly Clan PreviousSettlementOwner;
+    public readonly Dictionary<MobileParty, float> PartyContributions;
+
+    public LogSiegeAftermathApplied(
+        MobileParty attackerParty,
+        Settlement settlement,
+        SiegeAftermathAction.SiegeAftermath aftermathType,
+        Clan previousSettlementOwner,
+        Dictionary<MobileParty, float> partyContributions)
+    {
+        AttackerParty = attackerParty;
+        Settlement = settlement;
+        AftermathType = aftermathType;
+        PreviousSettlementOwner = previousSettlementOwner;
+        PartyContributions = partyContributions;
     }
 }

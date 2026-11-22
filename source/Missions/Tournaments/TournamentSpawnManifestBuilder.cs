@@ -173,7 +173,7 @@ public class TournamentSpawnManifestBuilder
         TournamentSpawnManifestData manifest,
         int expectedAgentCount)
     {
-        if (TournamentSpawnManifestValidator.IsValid(manifest, snapshot))
+        if (TournamentSpawnManifestValidator.IsValid(manifest, snapshot, out string rejectionReason))
         {
             rejectedManifestMatchId = null;
             return true;
@@ -182,10 +182,11 @@ public class TournamentSpawnManifestBuilder
         if (rejectedManifestMatchId != snapshot.CurrentMatchId)
         {
             Logger.Warning(
-                "[Tournament] Locally rejected spawn manifest for {MatchId}: agents={AgentCount}, expected={ExpectedCount}",
+                "[Tournament] Locally rejected spawn manifest for {MatchId}: agents={AgentCount}, expected={ExpectedCount}, reason={RejectionReason}",
                 snapshot.CurrentMatchId,
                 manifest.Agents.Length,
-                expectedAgentCount);
+                expectedAgentCount,
+                rejectionReason);
         }
         rejectedManifestMatchId = snapshot.CurrentMatchId;
         return false;

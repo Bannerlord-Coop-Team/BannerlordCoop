@@ -5,6 +5,7 @@ using Common.Network;
 using Common.Util;
 using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.ObjectManager;
 using Serilog;
@@ -91,11 +92,14 @@ internal class MapEventSideDataHandler : IHandler
 
                 using (new AllowedThread())
                 {
-                    side._battleParties.Remove(party);
+                    // Army attachment replay can have added a local entry for the same party.
+                    side._battleParties.RemoveAll(entry =>
+                        entry == party || (party.Party != null && entry.Party == party.Party));
                     if (party.Party?.MobileParty != null)
                         side._nearbyPartiesAddedToPlayerMapEvent.Remove(party.Party.MobileParty);
                     if (party.Party?.MapEventSide == side) party.Party._mapEventSide = null;
                 }
+                encounterMenuConditionRefresher.RefreshForMapEvent(side.MapEvent);
             }
             catch (Exception e)
             {
@@ -199,11 +203,11 @@ internal class MapEventSideDataHandler : IHandler
         if (MobileParty.MainParty?.MapEvent != mapEvent)
             return;
 
-        if (PlayerEncounter.Current == null)
+        var encounter = PlayerEncounter.Current;
+        if (encounter == null)
             return;
 
-        var encounterMapEvent = PlayerEncounter.Battle ?? PlayerEncounter.EncounteredBattle ?? MapEvent.PlayerMapEvent;
-        if (encounterMapEvent != mapEvent)
+        if (encounter.GetBattleOrPlayerMapEvent() != mapEvent)
             return;
 
         if (Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId != "raiding_village")

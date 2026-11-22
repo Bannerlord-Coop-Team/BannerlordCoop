@@ -18,14 +18,5 @@ namespace E2E.Tests.Services.TroopRosters
         {
             TestEnvironment.AssertReferenceProperty<TroopRoster, PartyBase>(nameof(TroopRoster.OwnerParty));
         }
-
-        [Fact]
-        public void Server_TroopRoster_Fields()
-        {
-            // These are cached values
-            //TestEnvironment.AssertField<TroopRoster, int>(nameof(TroopRoster._count), 5);
-            //TestEnvironment.AssertField<TroopRoster, int>(nameof(TroopRoster._troopRosterElementsVersion), 6);
-            //TestEnvironment.AssertField<TroopRoster, bool>(nameof(TroopRoster._isPrisonRoster), true);
-        }
     }
 }

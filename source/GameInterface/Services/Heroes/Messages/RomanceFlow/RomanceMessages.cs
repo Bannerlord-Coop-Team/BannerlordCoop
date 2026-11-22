@@ -96,6 +96,9 @@ internal readonly struct RomanceStateData
     public readonly float LastVisit;
     [ProtoMember(6)]
     public readonly float ScoreFromPersuasion;
+    /// <summary>This couple's failed courtship in campaign ticks, or 0 if there is none.</summary>
+    [ProtoMember(7)]
+    public readonly long FailedAtTicks;
 
     public RomanceStateData(
         string person1Id,
@@ -103,7 +106,8 @@ internal readonly struct RomanceStateData
         Romance.RomanceLevelEnum level,
         int progressToNextLevel,
         float lastVisit,
-        float scoreFromPersuasion)
+        float scoreFromPersuasion,
+        long failedAtTicks = 0)
     {
         Person1Id = person1Id;
         Person2Id = person2Id;
@@ -111,6 +115,7 @@ internal readonly struct RomanceStateData
         ProgressToNextLevel = progressToNextLevel;
         LastVisit = lastVisit;
         ScoreFromPersuasion = scoreFromPersuasion;
+        FailedAtTicks = failedAtTicks;
     }
 }
 

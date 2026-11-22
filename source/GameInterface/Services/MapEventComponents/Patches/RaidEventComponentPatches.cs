@@ -2,7 +2,6 @@ using Common;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.MapEventComponents.Messages;
-using HarmonyLib;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Roster;
@@ -10,12 +9,16 @@ using TaleWorlds.Core;
 
 namespace GameInterface.Services.MapEventComponents.Patches;
 
-[HarmonyPatch(typeof(RaidEventComponent))]
-internal class RaidEventComponentPatches
+/// <summary>
+/// Publishes raid loot and reward progress made by <see cref="RaidEventComponent.Update"/>.
+/// Applied by <see cref="RaidEventComponentRegistry"/>, not by attribute.
+/// </summary>
+internal static class RaidEventComponentPatches
 {
-    [HarmonyPatch(nameof(RaidEventComponent.Update))]
-    [HarmonyPrefix]
-    private static void UpdatePrefix(RaidEventComponent __instance, out RaidUpdateState __state)
+    /// <summary>
+    /// Captures loot and reward state before the raid update runs.
+    /// </summary>
+    internal static void UpdatePrefix(RaidEventComponent __instance, out RaidUpdateState __state)
     {
         __state = new RaidUpdateState(
             __instance._lootedItemCount,
@@ -23,9 +26,10 @@ internal class RaidEventComponentPatches
             CaptureItems(__instance.AttackerSide?.LeaderParty?.ItemRoster));
     }
 
-    [HarmonyPatch(nameof(RaidEventComponent.Update))]
-    [HarmonyPostfix]
-    private static void UpdatePostfix(RaidEventComponent __instance, RaidUpdateState __state)
+    /// <summary>
+    /// Publishes loot and reward changes the raid update made.
+    /// </summary>
+    internal static void UpdatePostfix(RaidEventComponent __instance, RaidUpdateState __state)
     {
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
         if (ModInformation.IsClient) return;
@@ -42,19 +46,19 @@ internal class RaidEventComponentPatches
             MessageBroker.Instance.Publish(__instance, new RaidLootedItemsUpdated(leaderParty.MobileParty, lootedItems));
     }
 
-    private static Dictionary<ItemObject, int> CaptureItems(ItemRoster roster)
+    // Keyed by item and modifier, otherwise two stacks of one item compare against each other and every tick reports phantom loot
+    internal static Dictionary<EquipmentElement, int> CaptureItems(ItemRoster roster)
     {
-        var result = new Dictionary<ItemObject, int>();
+        var result = new Dictionary<EquipmentElement, int>();
         if (roster == null)
             return result;
 
         foreach (var element in roster)
         {
-            var item = element.EquipmentElement.Item;
-            if (item == null)
+            if (element.EquipmentElement.Item == null)
                 continue;
 
-            result[item] = element.Amount;
+            result[element.EquipmentElement] = element.Amount;
         }
 
         return result;
@@ -67,7 +71,7 @@ internal class RaidEventComponentPatches
             : new Dictionary<ItemObject, float>(rewards);
     }
 
-    private static ItemRoster GetAddedItems(Dictionary<ItemObject, int> before, ItemRoster after)
+    internal static ItemRoster GetAddedItems(Dictionary<EquipmentElement, int> before, ItemRoster after)
     {
         var result = new ItemRoster();
         if (after == null)
@@ -75,11 +79,10 @@ internal class RaidEventComponentPatches
 
         foreach (var element in after)
         {
-            var item = element.EquipmentElement.Item;
-            if (item == null)
+            if (element.EquipmentElement.Item == null)
                 continue;
 
-            before.TryGetValue(item, out var previousAmount);
+            before.TryGetValue(element.EquipmentElement, out var previousAmount);
             var added = element.Amount - previousAmount;
             if (added <= 0)
                 continue;
@@ -110,16 +113,16 @@ internal class RaidEventComponentPatches
         return false;
     }
 
-    private sealed class RaidUpdateState
+    internal sealed class RaidUpdateState
     {
         public int LootedItemCount { get; }
         public Dictionary<ItemObject, float> RaidProductionRewards { get; }
-        public Dictionary<ItemObject, int> PartyItemCounts { get; }
+        public Dictionary<EquipmentElement, int> PartyItemCounts { get; }
 
         public RaidUpdateState(
             int lootedItemCount,
             Dictionary<ItemObject, float> raidProductionRewards,
-            Dictionary<ItemObject, int> partyItemCounts)
+            Dictionary<EquipmentElement, int> partyItemCounts)
         {
             LootedItemCount = lootedItemCount;
             RaidProductionRewards = raidProductionRewards;

@@ -10,14 +10,9 @@ namespace GameInterface.Services.Heroes.Patches.Disable;
 internal class DisablePregnancyCampaignBehavior
 {
     [HarmonyPatch(nameof(PregnancyCampaignBehavior.RegisterEvents))]
-#if TESTER
     static bool Prefix() => ModInformation.IsServer;
-#else
-    static bool Prefix() => false;
-#endif
 }
 
-#if TESTER
 [HarmonyPatch(typeof(PregnancyCampaignBehavior))]
 internal class PregnancyCampaignBehaviorPatches
 {
@@ -25,7 +20,7 @@ internal class PregnancyCampaignBehaviorPatches
     [HarmonyPrefix]
     public static bool CheckOffspringToDeliverPrefix(PregnancyCampaignBehavior __instance, PregnancyCampaignBehavior.Pregnancy pregnancy)
     {
-        if (!ContainerProvider.TryResolve<IPregnancyCampaignBehaviorInterface>(out var pregnancyBehaviorInterface)) return false;
+        if (!ContainerProvider.TryResolve<IPregnancyCampaignBehaviorInterface>(out var pregnancyBehaviorInterface)) return true;
 
         pregnancyBehaviorInterface.CheckOffspringToDeliver(__instance, pregnancy);
 
@@ -36,11 +31,10 @@ internal class PregnancyCampaignBehaviorPatches
     [HarmonyPrefix]
     public static bool CheckAreNearbyPrefix(PregnancyCampaignBehavior __instance, ref bool __result, Hero hero, Hero spouse)
     {
-        if (!ContainerProvider.TryResolve<IPregnancyCampaignBehaviorInterface>(out var pregnancyBehaviorInterface)) return false;
+        if (!ContainerProvider.TryResolve<IPregnancyCampaignBehaviorInterface>(out var pregnancyBehaviorInterface)) return true;
 
         __result = pregnancyBehaviorInterface.CheckAreNearby(__instance, hero, spouse);
 
         return false;
     }
 }
-#endif

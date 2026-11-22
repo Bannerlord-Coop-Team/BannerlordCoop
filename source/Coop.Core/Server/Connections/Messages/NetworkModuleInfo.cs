@@ -14,10 +14,14 @@ public class NetworkModuleInfo
     public NetworkApplicationVersion Version { get; }
     [ProtoMember(4)]
     public bool IsDlc { get; }
+    // optional, older clients leave it out
+    [ProtoMember(5)]
+    public string Name { get; }
 
-    public NetworkModuleInfo(string id, bool isOfficial, bool isDlc, ApplicationVersion version)
+    public NetworkModuleInfo(string id, bool isOfficial, bool isDlc, ApplicationVersion version, string name = null)
     {
         Id = id;
+        Name = name;
         IsOfficial = isOfficial;
         IsDlc = isDlc;
         Version = new NetworkApplicationVersion((int) version.ApplicationVersionType, version.Major, version.Minor, version.Revision, version.ChangeSet);

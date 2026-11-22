@@ -10,29 +10,10 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class WeaponComponentSerializationTest
     {
-        IContainer container;
+        ILifetimeScope container;
         public WeaponComponentSerializationTest()
         {
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
-        }
-
-        [Fact]
-        public void WeaponComponent_Serialize()
-        {
-            WeaponComponent weaponComponent = new WeaponComponent(new ItemObject());
-
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            WeaponComponentBinaryPackage package = new WeaponComponentBinaryPackage(weaponComponent, factory);
-
-            package.Pack();
-
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
-            
-            Assert.NotEmpty(bytes);
+            container = SerializationTestContainer.BeginScope();
         }
 
         [Fact]

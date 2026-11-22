@@ -1,6 +1,5 @@
 ﻿using Common;
 using Common.Messaging;
-using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using System.Linq;
@@ -83,7 +82,6 @@ internal static class RaidAiInterventionSuppression
             if (party._mapEventSide == defenderSide)
                 party._mapEventSide = null;
 
-            MessageBroker.Instance.Publish(defenderSide, new MapEventPartyRemoved(defenderSide, mapEventParty));
             HoldParty(party.MobileParty);
         }
     }
@@ -134,7 +132,7 @@ internal static class RaidAiInterventionSuppression
         return settlement?.Party?.MapEvent?.IsRaidAiInterventionSuppressed() == true;
     }
 
-    private static void HoldParty(MobileParty party)
+    internal static void HoldParty(MobileParty party)
     {
         if (ModInformation.IsClient)
             return;

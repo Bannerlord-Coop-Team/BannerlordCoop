@@ -31,7 +31,7 @@ public class AutoSyncBuilder
     public Assembly Build()
     {
         // Only the server/host process manages the export directory (ExportFiles=true by
-        // default; the client sets it to false in StartAsClient before calling PatchAll).
+        // default in DEBUG, false in Release; the client sets it to false in StartAsClient).
         //
         // Why it is safe for the client never to delete or write the export directory:
         //
@@ -116,6 +116,13 @@ public class AutoSyncBuilder
         {
             assemblies.Add(Assembly.Load(asm.FullName));
         }
+
+        // A target method can live in an assembly GameInterface doesnt reference, such as NavalDLC
+        assemblies.AddRange(autoSyncRegistry.Registrations.Values
+            .SelectMany(item => item.TargetMethods.Concat(item.CategorizedTargetMethods.Values.SelectMany(methods => methods)))
+            .Select(method => method.DeclaringType.Assembly)
+            .Distinct()
+            .ToList());
 
         var syntaxTrees = autoSyncRegistry.Registrations
             .SelectMany(registration => autoSyncPatchBuilder.Build(registration.Key, registration.Value))

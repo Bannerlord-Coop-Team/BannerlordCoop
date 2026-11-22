@@ -1,11 +1,14 @@
 ﻿using Common;
 using Common.Messaging;
+using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.MobileParties.Handlers;
 using GameInterface.Services.MobileParties.Messages;
 using HarmonyLib;
+using Helpers;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Party;
@@ -145,7 +148,8 @@ internal class RecruitmentCampaignBehaviorPatch
         if (unitPrice <= 0)
             return false;
 
-        int count = GetMercenaryHireCount(selectedMercenaryCount, mercenaryData.Number, Hero.MainHero.Gold, unitPrice);
+        int hireLimit = Hero.MainHero.GetMercenaryHireLimit(mercenaryData.Number);
+        int count = GetMercenaryHireCount(selectedMercenaryCount, hireLimit, Hero.MainHero.Gold, unitPrice);
         if (count <= 0)
             return false;
 

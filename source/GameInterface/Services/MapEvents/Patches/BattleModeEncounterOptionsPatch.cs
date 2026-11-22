@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using GameInterface.Configuration;
+using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Helpers;
@@ -8,6 +9,7 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
@@ -39,6 +41,7 @@ internal class BattleModeEncounterOptionsPatch
     private static readonly TextObject MissionUnderwayTooltip = new("{=!}A battle is already underway.");
     private static readonly TextObject SimulationUnderwayTooltip = new("{=!}A battle simulation is already underway.");
     private static readonly TextObject EncounterUnavailableTooltip = new("{=!}The battle encounter is no longer available.");
+    internal static readonly TextObject BattleNotReadyTooltip = new("{=!}Waiting for the server to set up the battle.");
     private static readonly TextObject LowMoraleTooltip = new("{=xnRtINwH}Your men lack the courage to continue the battle without you. (Low Morale)");
     private static readonly TextObject WoundedTooltip = new("{=UL8za0AO}You are wounded.");
     private static readonly TextObject RaftTooltip = new("{=x9ePfpw5}You are on a raft, in desperate circumstances, and cannot fight");
@@ -67,6 +70,9 @@ internal class BattleModeEncounterOptionsPatch
     // Handled inversely to the start buckets: forced available / refused rather than only greyed.
     private const string SurrenderCondition = "game_menu_encounter_surrender_on_condition"; // Surrender.
     private const string AbandonArmyCondition = "game_menu_encounter_abandon_army_on_condition"; // Abandon army.
+
+    // Map events a greyed Surrender already waits on, so repeated menu refreshes queue one commit callback each.
+    private static readonly ConditionalWeakTable<MapEvent, object> refreshQueued = new();
 
     static IEnumerable<MethodBase> TargetMethods()
     {
@@ -252,8 +258,12 @@ internal class BattleModeEncounterOptionsPatch
     {
         var mapEvent = GetPlayerEncounterBattle() ?? MobileParty.MainParty?.MapEvent;
         var encounter = PlayerEncounter.Current;
-        var playerSide = MobileParty.MainParty?.MapEventSide;
-        if (mapEvent == null || encounter == null || playerSide == null)
+        if (mapEvent == null || encounter == null)
+            return false;
+
+        if (MobileParty.MainParty?.MapEventSide == null) return false;
+
+        if (!ContainerProvider.TryResolve<IOrderAttackRule>(out var orderAttackRule))
             return false;
 
         var isNavalOrder = mapEvent.IsNavalMapEvent ||
@@ -262,29 +272,17 @@ internal class BattleModeEncounterOptionsPatch
             ? GameMenuOption.LeaveType.OrderShipsToAttack
             : GameMenuOption.LeaveType.OrderTroopsToAttack;
 
-        foreach (var party in mapEvent.PartiesOnSide(encounter.OpponentSide))
-        {
-            if (party.Party.MobileParty?.IsInRaftState == true)
-                return false;
+        // GetConditionsHold saves the leave type even when this condition hides the option.
+        if (orderAttackRule.IsFirstOpponentInRaft(mapEvent, encounter.OpponentSide))
+            return false;
 
-            break;
-        }
+        if (!orderAttackRule.HasOrderableTroops(MobileParty.MainParty.MapEventSide, CharacterObject.PlayerCharacter))
+            return false;
 
         MenuHelper.CheckEnemyAttackableHonorably(args);
 
-        var orderableTroops = 0;
-        foreach (var party in playerSide.Parties)
-        {
-            if (party.Party.IsMobile && party.Party.MobileParty.IsInRaftState)
-                continue;
-
-            orderableTroops += CountOrderableTroops(party.Party);
-        }
-
-        if (orderableTroops <= 0)
-            return false;
-
-        if (!MobileParty.MainParty.IsInRaftState && CountOrderableTroops(PartyBase.MainParty) > 0)
+        if (!MobileParty.MainParty.IsInRaftState &&
+            orderAttackRule.CountOrderableTroops(PartyBase.MainParty, CharacterObject.PlayerCharacter) > 0)
         {
             MBTextManager.SetTextVariable(
                 "SEND_TROOPS_TEXT",
@@ -311,25 +309,6 @@ internal class BattleModeEncounterOptionsPatch
         }
 
         return true;
-    }
-
-    private static int CountOrderableTroops(PartyBase party)
-    {
-        var count = 0;
-        foreach (var element in party.MemberRoster.GetTroopRoster())
-        {
-            if (element.Character.IsHero)
-            {
-                if (element.Character != CharacterObject.PlayerCharacter && !element.Character.HeroObject.IsWounded)
-                    count++;
-            }
-            else
-            {
-                count += element.Number - element.WoundedNumber;
-            }
-        }
-
-        return count;
     }
 
     /// <summary>Native uses the empty main party's morale to disable "Leave it to the others" even when healthy
@@ -385,6 +364,8 @@ internal class BattleModeEncounterOptionsPatch
     /// auto-resolve), a surrender would conclude the battle under them, so a claimed event refuses the option until
     /// the claim releases (<see cref="Messages.Start.NetworkBattleModeSet"/>); the server mirrors this refusal
     /// authoritatively via <see cref="ServerBattleModeArbiter"/> in <c>PlayerCaptivityServerHandler</c>.
+    /// Until the encounter's own map event has reached this client the option is also refused, because the
+    /// request is built from it (<see cref="PlayerEncounterPatches.IsSurrenderRequestReady"/>).
     /// </summary>
     private static void PostfixSurrenderCondition(MenuCallbackArgs args, ref bool __result)
     {
@@ -395,6 +376,16 @@ internal class BattleModeEncounterOptionsPatch
         }
 
         if (!__result) return;
+
+        // The surrender request carries the encounter's map event; a click before it arrives would be dropped.
+        var encounter = PlayerEncounter.Current;
+        if (encounter != null && !PlayerEncounterPatches.IsSurrenderRequestReady(encounter))
+        {
+            args.IsEnabled = false;
+            args.Tooltip = BattleNotReadyTooltip;
+            RefreshMenuAfterCommit(PlayerEncounterPatches.GetSurrenderMapEvent(encounter));
+            return;
+        }
 
         if (!TryGetCurrentMapEventId(out var mapEventId)) return;
 
@@ -408,6 +399,22 @@ internal class BattleModeEncounterOptionsPatch
             args.IsEnabled = false;
             args.Tooltip = SimulationUnderwayTooltip;
         }
+    }
+
+    /// <summary>Re-evaluates the encounter menu once a still initializing map event commits on this client.</summary>
+    private static void RefreshMenuAfterCommit(MapEvent mapEvent)
+    {
+        if (mapEvent == null || refreshQueued.TryGetValue(mapEvent, out _)) return;
+        if (!ContainerProvider.TryResolve<IMapEventInitializationBarrier>(out var barrier) || !barrier.IsPending(mapEvent))
+            return;
+        if (!ContainerProvider.TryResolve<IEncounterMenuConditionRefresher>(out var refresher)) return;
+
+        refreshQueued.Add(mapEvent, barrier);
+        barrier.RunAfterCommit(mapEvent, () =>
+        {
+            refreshQueued.Remove(mapEvent);
+            refresher.RefreshForMapEvent(mapEvent);
+        });
     }
 
     /// <summary>Wounded main hero with no healthy member in its own party, on a battle side native gives no plain

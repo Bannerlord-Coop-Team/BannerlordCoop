@@ -122,7 +122,7 @@ internal class CoopSiegeBattleLauncher : ICoopSiegeBattleLauncher
                     mapEvent.GetLeaderParty(BattleSideEnum.Attacker),
                     isSallyOut ? Mission.MissionTeamAITypeEnum.SallyOut : Mission.MissionTeamAITypeEnum.Siege,
                     isPlayerSergeant),
-                new SiegeMissionPreparationHandler(isSallyOut, false, wallHitPointRatios, hasAnySiegeTower),
+                new CoopSiegeMissionPreparationHandler(isSallyOut, wallHitPointRatios, hasAnySiegeTower, mapEventId),
                 new CampaignSiegeStateHandler(),
             };
 
@@ -168,11 +168,6 @@ internal class CoopSiegeBattleLauncher : ICoopSiegeBattleLauncher
 
             return behaviors.ToArray();
         }, true, true);
-
-        // OpenNew only constructs and pushes the MissionState. Vanilla invokes behavior initialization later,
-        // after asynchronous scene loading; bind the deterministic wall-dressing seed to this mission until
-        // SiegeDestructionSeedPatch consumes it inside ArrangeDestructedMeshes.
-        SiegeSceneDestructionGate.Begin(mission, mapEventId);
 
         behaviorAttacher.Attach(mission);
 

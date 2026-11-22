@@ -775,7 +775,7 @@ public class CoopTroopSupplier : IMissionTroopSupplier
         // It also carries this supplier, so removals feed back into NumRemovedTroops (the engine's
         // reinforcement quota) — see OnTroopWounded/Killed/Routed above.
         var party = ResolveParty(partyId);
-        var origin = new CoopAgentOrigin(character, party, -1, null, new UniqueTroopDescriptor(entry.Seed), partyId, this);
+        var origin = new CoopAgentOrigin(character, party, -1, null, new UniqueTroopDescriptor(entry.Seed), partyId, this, entry.Health);
         if (party == null)
             Logger.Warning("[TroopSupply] {Side} origin char={Char} (isHero={Hero}) got NULL party — partyId {PartyId} unresolvable → no team / not player-commanded",
                 Side, entry.CharacterId, character.IsHero, partyId);

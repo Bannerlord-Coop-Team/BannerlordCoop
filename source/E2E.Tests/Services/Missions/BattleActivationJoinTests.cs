@@ -7,9 +7,11 @@ using E2E.Tests.Environment.Instance;
 using E2E.Tests.Environment.Mock;
 using E2E.Tests.Environment.MockEngine;
 using GameInterface.Services.MapEvents.Messages;
+using HarmonyLib;
 using Missions;
 using Missions.Battles;
 using Missions.Messages;
+using Moq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
@@ -439,6 +441,54 @@ public class BattleActivationJoinTests : MissionTestEnvironment
 
             Assert.True(controller.ResultCommitter.TryGetResolvedState(out var state));
             Assert.Equal(BattleState.DefenderVictory, state);
+        });
+    }
+
+    // Runs vanilla's real MissionEnded, because the fix only works while it keeps reading the latches the controller sets.
+    [Theory]
+    [InlineData(BattleState.AttackerVictory, BattleSideEnum.Attacker, true)]
+    [InlineData(BattleState.AttackerVictory, BattleSideEnum.Defender, false)]
+    [InlineData(BattleState.DefenderVictory, BattleSideEnum.Defender, true)]
+    [InlineData(BattleState.DefenderVictory, BattleSideEnum.Attacker, false)]
+    public void ResultSnapshot_EndsAPeersMission_OnceItsDeploymentCommits(BattleState battleState, BattleSideEnum playerSide, bool playerWon)
+    {
+        using var fixture = new MissionEngineFixture();
+        var (mapEventId, _) = SetupCoopBattle("host", "joiner");
+        var host = Clients.First();
+        var joiner = Clients.Skip(1).First();
+
+        host.Call(() => CreateConnectedMission(fixture, host, mapEventId));
+        EnterBattle(host, mapEventId);
+
+        joiner.Call(() =>
+        {
+            var mock = CreateConnectedMission(fixture, joiner, mapEventId);
+            mock.PlayerTeam = playerSide == BattleSideEnum.Attacker ? mock.AttackerTeam : mock.DefenderTeam;
+            var missionProperty = AccessTools.Property(typeof(MissionBehavior), nameof(MissionBehavior.Mission));
+            var endLogic = new BattleEndLogic();
+            missionProperty.SetValue(endLogic, mock.Shell);
+            endLogic._missionAgentSpawnLogic = new Mock<IMissionAgentSpawnLogic>().Object;
+            mock.Shell.MissionBehaviors.Add(endLogic);
+
+            var controller = joiner.Resolve<CoopBattleController>();
+            missionProperty.SetValue(controller, mock.Shell);
+            controller.Session.TryBegin(mapEventId);
+            joiner.Resolve<IMessageBroker>().Publish(host, new NetworkBattleResultSnapshot(
+                mapEventId,
+                "host",
+                controller.Session.HostEpoch,
+                battleState));
+            GameThread.Run(() => { }, blocking: true);
+
+            MissionResult result = null;
+            Assert.False(endLogic.MissionEnded(ref result));
+
+            controller.OnDeploymentFinished();
+
+            Assert.True(endLogic.MissionEnded(ref result));
+            Assert.Equal(battleState, result.BattleState);
+            Assert.Equal(playerWon, result.PlayerVictory);
+            Assert.Equal(!playerWon, result.PlayerDefeated);
         });
     }
 }

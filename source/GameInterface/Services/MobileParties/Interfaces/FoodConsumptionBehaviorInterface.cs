@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.Armies.Extensions;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.UI.Notifications.Messages;
 using Serilog;
@@ -199,7 +200,10 @@ public class FoodConsumptionBehaviorInterface : IFoodConsumptionBehaviorInterfac
 
                         if ((int)CampaignTime.Now.ToDays % 3 == 0 && mobileParty.MemberRoster.TotalManCount > 1)
                         {
-                            TraitLevelingHelper.OnPartyStarved(); // TODO
+                            using (new MainHeroSubstitutionScope(mobileParty.LeaderHero, mobileParty))
+                            {
+                                TraitLevelingHelper.OnPartyStarved();
+                            }
                         }
                     }
                 }
@@ -210,7 +214,10 @@ public class FoodConsumptionBehaviorInterface : IFoodConsumptionBehaviorInterfac
                     // Replace IsMainParty check
                     if (!wasStarving && !isNowStarving && mobileParty.IsPlayerParty() && mobileParty.Morale >= 90f && mobileParty.MemberRoster.TotalRegulars >= 20 && (int)CampaignTime.Now.ToDays % 10 == 0)
                     {
-                        TraitLevelingHelper.OnPartyTreatedWell(); // TODO
+                        using (new MainHeroSubstitutionScope(mobileParty.LeaderHero, mobileParty))
+                        {
+                            TraitLevelingHelper.OnPartyTreatedWell();
+                        }
                     }
                 }
             }
@@ -222,17 +229,21 @@ public class FoodConsumptionBehaviorInterface : IFoodConsumptionBehaviorInterfac
     {
         GameThread.RunSafe(() =>
         {
-            if (MBRandom.RandomFloat < DefaultPerks.Riding.Breeder.PrimaryBonus && !mobileParty.IsCurrentlyAtSea && mobileParty.HasPerk(DefaultPerks.Riding.Breeder, false) && (mobileParty.ItemRoster.NumberOfLivestockAnimals > 1 || mobileParty.ItemRoster.NumberOfPackAnimals > 1 || mobileParty.ItemRoster.NumberOfMounts > 1))
+            if (MBRandom.RandomFloat >= DefaultPerks.Riding.Breeder.PrimaryBonus) return;
+            if (!mobileParty.HasPerk(DefaultPerks.Riding.Breeder)) return;
+
+            var itemRoster = mobileParty.ItemRoster;
+            bool hasAnimalsToBreed = itemRoster.NumberOfLivestockAnimals > 1 || itemRoster.NumberOfPackAnimals > 1 || itemRoster.NumberOfMounts > 1;
+            if (!hasAnimalsToBreed) return;
+
+            int numberOfAnimalsInParty = itemRoster.NumberOfLivestockAnimals + itemRoster.NumberOfPackAnimals + itemRoster.NumberOfMounts;
+            ItemRosterElement randomAnimal = itemRoster.GetRandomElementWithPredicate((ItemRosterElement x) => x.EquipmentElement.Item.HasHorseComponent);
+            int numberBred = MathF.Round(MathF.Max(1f, (float)numberOfAnimalsInParty / 50f));
+            itemRoster.AddToCounts(randomAnimal.EquipmentElement.Item, numberBred);
+            if (mobileParty.IsPlayerParty())
             {
-                int numberOfAnimalsInParty = mobileParty.ItemRoster.NumberOfLivestockAnimals + mobileParty.ItemRoster.NumberOfPackAnimals + mobileParty.ItemRoster.NumberOfMounts;
-                ItemRosterElement randomAnimal = mobileParty.ItemRoster.GetRandomElementWithPredicate((ItemRosterElement x) => x.EquipmentElement.Item.HasHorseComponent);
-                int numberBred = MathF.Round(MathF.Max(1f, (float)numberOfAnimalsInParty / 50f));
-                mobileParty.ItemRoster.AddToCounts(randomAnimal.EquipmentElement.Item, numberBred);
-                if (mobileParty.IsPlayerParty())
-                {
-                    // Notify players of animals bred in their party
-                    MessageBroker.Instance.Publish(this, new NotifyAnimalsBred(mobileParty, numberBred, randomAnimal));
-                }
+                // Notify players of animals bred in their party
+                MessageBroker.Instance.Publish(this, new NotifyAnimalsBred(mobileParty, numberBred, randomAnimal));
             }
         });
     }

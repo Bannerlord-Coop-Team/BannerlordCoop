@@ -68,32 +68,5 @@ public class PartyBaseLifetimeTests : IDisposable
             Assert.Same(clientItemRoster, clientPartyBase.ItemRoster);
         }
     }
-
-    [Fact]
-    public void ClientCreate_PartyBase_DoesNothing()
-    {
-        // Arrange
-        var server = TestEnvironment.Server;
-
-        // Act
-        string? partyBaseId = null;
-
-        var firstClient = TestEnvironment.Clients.First();
-        firstClient.Call(() =>
-        {
-            var party = new PartyBase(default(MobileParty));
-
-            Assert.False(server.ObjectManager.TryGetId(party, out partyBaseId));
-        });
-
-        // Assert
-        Assert.Null(partyBaseId);
-    }
-
-    [Fact(Skip = "PartyDestroyed message was removed; needs updating to use current party destruction mechanism")]
-    public void ServerDestroy_PartyBase_SyncAllClients() { }
-
-    [Fact(Skip = "PartyDestroyed message was removed; needs updating to use current party destruction mechanism")]
-    public void ClientDestroy_PartyBase_DoesNothing() { }
 }
 

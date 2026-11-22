@@ -3,9 +3,11 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.Kingdoms.Interfaces;
 using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.ObjectManager;
+using LiteNetLib;
 using SandBox.CampaignBehaviors;
 using Serilog;
 using System.Collections.Generic;
@@ -24,6 +26,7 @@ internal class InteractionsInitializationHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly ISessionInteractionsPlayerDataInterface sessionInteractionsPlayerDataInterface;
+    private readonly IVassalAndMercenaryOfferCampaignBehaviorInterface vassalAndMercenaryOfferCampaignBehaviorInterface;
 
     private InteractionsPlayerData interactionsPlayerData;
 
@@ -31,12 +34,14 @@ internal class InteractionsInitializationHandler : IHandler
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
-        ISessionInteractionsPlayerDataInterface sessionInteractionsPlayerDataInterface)
+        ISessionInteractionsPlayerDataInterface sessionInteractionsPlayerDataInterface,
+        IVassalAndMercenaryOfferCampaignBehaviorInterface vassalAndMercenaryOfferCampaignBehaviorInterface)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.sessionInteractionsPlayerDataInterface = sessionInteractionsPlayerDataInterface;
+        this.vassalAndMercenaryOfferCampaignBehaviorInterface = vassalAndMercenaryOfferCampaignBehaviorInterface;
 
         messageBroker.Subscribe<InitializeClientInteractionsData>(Handle);
         messageBroker.Subscribe<PlayerHeroChanged>(Handle);
@@ -68,6 +73,7 @@ internal class InteractionsInitializationHandler : IHandler
         PerkResetCampaignBehavior perkResetCampaignBehavior = Campaign.Current.GetCampaignBehavior<PerkResetCampaignBehavior>();
         EncounterGameMenuBehavior encounterGameMenuBehavior = Campaign.Current.GetCampaignBehavior<EncounterGameMenuBehavior>();
         TavernEmployeesCampaignBehavior tavernEmployeesCampaignBehavior = Campaign.Current.GetCampaignBehavior<TavernEmployeesCampaignBehavior>();
+        RetirementCampaignBehavior retirementCampaignBehavior = Campaign.Current.GetCampaignBehavior<RetirementCampaignBehavior>();
 
         villagerCampaignBehavior._interactedVillagers = GetInteractedVillagers(playerHeroId);
         caravansCampaignBehavior._interactedCaravans = GetInteractedCaravans(playerHeroId);
@@ -80,6 +86,7 @@ internal class InteractionsInitializationHandler : IHandler
         tavernEmployeesCampaignBehavior._orderedDrinkThisDayInSettlement = GetOrderedDrinkThisDayInSettlement(playerHeroId);
         tavernEmployeesCampaignBehavior._hasBoughtTunToParty = GetHasBoughtTunToParty(playerHeroId);
         tavernEmployeesCampaignBehavior._hasMetWithRansomBroker = GetHasMetRansomBroker(playerHeroId);
+        retirementCampaignBehavior._hasTalkedWithHermitBefore = GetHasMetHermit(playerHeroId);
 
         network.SendAll(new NetworkInitializeServerInteractionsDataKeys(playerHeroId));
     }
@@ -89,6 +96,7 @@ internal class InteractionsInitializationHandler : IHandler
         GameThread.RunSafe(() =>
         {
             sessionInteractionsPlayerDataInterface.AddPlayerKeys(obj.What.PlayerHeroId);
+            vassalAndMercenaryOfferCampaignBehaviorInterface.AddNewPlayerHeroId(obj.What.PlayerHeroId, obj.Who as NetPeer);
         });
     }
 
@@ -231,5 +239,12 @@ internal class InteractionsInitializationHandler : IHandler
         if (interactionsPlayerData?.PlayerHasMetRansomBroker?.ContainsKey(playerHeroId) != true) return false;
 
         return interactionsPlayerData.PlayerHasMetRansomBroker[playerHeroId];
+    }
+
+    private bool GetHasMetHermit(string playerHeroId)
+    {
+        if (interactionsPlayerData?.PlayerHasMetHermit?.ContainsKey(playerHeroId) != true) return false;
+
+        return interactionsPlayerData.PlayerHasMetHermit[playerHeroId];
     }
 }

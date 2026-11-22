@@ -4,6 +4,7 @@ using Common.Messaging;
 using GameInterface.Services.Clans.Extensions;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Heroes.HeirSelection.Messages;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.MobileParties.Extensions;
 using HarmonyLib;
 using Serilog;
@@ -11,6 +12,7 @@ using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Election;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -32,7 +34,6 @@ internal class KillCharacterActionPatches
     [HarmonyPrefix]
     public static bool ApplyInternalPrefix(Hero victim, Hero killer, KillCharacterAction.KillCharacterActionDetail actionDetail, bool showNotification, bool isForced = false)
     {
-#if TESTER
         if (ModInformation.IsClient) return false;
 
         if (!victim.CanDie(actionDetail) && !isForced) return false;
@@ -119,11 +120,7 @@ internal class KillCharacterActionPatches
             ChangeGovernorAction.RemoveGovernorOf(victim);
         }
 
-        // TODO: Traits aren't synced
-        //if ((actionDetail == KillCharacterAction.KillCharacterActionDetail.Executed || actionDetail == KillCharacterAction.KillCharacterActionDetail.ExecutionAfterMapEvent) && killer == Hero.MainHero && victim.Clan != null && victim.GetTraitLevel(DefaultTraits.Honor) >= 0)
-        //{
-        //    TraitLevelingHelper.OnLordExecuted();
-        //}
+        ApplyExecutionTraitPenalty(victim, killer, actionDetail);
 
         if (victim.Clan != null && !victim.Clan.IsEliminated && !victim.Clan.IsBanditFaction && !victim.Clan.IsPlayerClan())
         {
@@ -167,9 +164,20 @@ internal class KillCharacterActionPatches
         }
 
         return false;
-#else
-        return ModInformation.IsServer;
-#endif
+    }
+
+    // DisableExecutionCampaignBehavior turns vanilla's charge off until #3851 tracks feuds per player, so every
+    // player execution is charged here, and no feud is started.
+    private static void ApplyExecutionTraitPenalty(Hero victim, Hero killer, KillCharacterAction.KillCharacterActionDetail actionDetail)
+    {
+        if (actionDetail != KillCharacterAction.KillCharacterActionDetail.Executed) return;
+        if (victim.Clan == null || killer?.Clan == null) return;
+        if (!killer.IsPlayerHero()) return;
+
+        using (new MainHeroSubstitutionScope(killer, killer.PartyBelongedTo))
+        {
+            TraitLevelingHelper.OnBloodFeudStarted(victim);
+        }
     }
 
     public static void HandleKingdomLeaderDeath(Hero victim)

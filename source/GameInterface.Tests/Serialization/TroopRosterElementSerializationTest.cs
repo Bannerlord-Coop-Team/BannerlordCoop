@@ -12,14 +12,10 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class TroopRosterElementSerializationTest
     {
-        IContainer container;
+        ILifetimeScope container;
         public TroopRosterElementSerializationTest()
         {
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
+            container = SerializationTestContainer.BeginScope();
         }
 
         [Fact]

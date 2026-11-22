@@ -1,4 +1,6 @@
-﻿using Missions.Agents.Handlers;
+﻿using Common.BattleBenchmark;
+using Missions.Agents.Handlers;
+using Missions.Battles;
 using Missions.Missiles.Handlers;
 
 namespace Missions;
@@ -6,6 +8,8 @@ namespace Missions;
 public interface ICoopMissionComponent
 {
     INetworkAgentRegistry AgentRegistry { get; }
+    /// <summary>Network identities of naval hulls in this mission.</summary>
+    INetworkShipRegistry ShipRegistry { get; }
     IMissileHandler MissileHandler { get; }
     IAgentMovementHandler AgentMovementHandler { get; }
     IAgentActionHandler AgentActionHandler { get; }
@@ -17,11 +21,14 @@ public interface ICoopMissionComponent
     //IAgentDamageHandler AgentDamageHandler { get; }
     IAgentDeathHandler AgentDeathHandler { get; }
     //INetworkMissileRegistry NetworkMissileRegistry { get; }
+    IBattleBenchmarkRecorder BattleBenchmark { get; }
 }
 
 public class CoopMissionComponent : ICoopMissionComponent
 {
     public INetworkAgentRegistry AgentRegistry { get; }
+
+    public INetworkShipRegistry ShipRegistry { get; }
 
     public IMissileHandler MissileHandler { get; }
     public IAgentMovementHandler AgentMovementHandler { get; }
@@ -40,11 +47,13 @@ public class CoopMissionComponent : ICoopMissionComponent
 
     public IAgentDeathHandler AgentDeathHandler { get; }
 
+    public IBattleBenchmarkRecorder BattleBenchmark { get; }
 
     //public INetworkMissileRegistry NetworkMissileRegistry { get; }
 
     public CoopMissionComponent(
         INetworkAgentRegistry agentRegistry,
+        INetworkShipRegistry shipRegistry,
         IMissileHandler missileHandler,
         IAgentMovementHandler agentMovementHandler,
         IAgentActionHandler agentActionHandler,
@@ -54,11 +63,13 @@ public class CoopMissionComponent : ICoopMissionComponent
         IShieldDamageHandler shieldDamageHandler,
         ICombatHitPresentationHandler combatHitPresentationHandler,
         //IAgentDamageHandler agentDamageHandler,
-        IAgentDeathHandler agentDeathHandler
+        IAgentDeathHandler agentDeathHandler,
         //INetworkMissileRegistry networkMissileRegistry
+        IBattleBenchmarkRecorder battleBenchmark
         )
     {
         AgentRegistry = agentRegistry;
+        ShipRegistry = shipRegistry;
         MissileHandler = missileHandler;
         AgentMovementHandler = agentMovementHandler;
         AgentActionHandler = agentActionHandler;
@@ -70,5 +81,6 @@ public class CoopMissionComponent : ICoopMissionComponent
         //AgentDamageHandler = agentDamageHandler;
         AgentDeathHandler = agentDeathHandler;
         //NetworkMissileRegistry = networkMissileRegistry;
+        BattleBenchmark = battleBenchmark;
     }
 }

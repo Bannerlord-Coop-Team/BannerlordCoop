@@ -6,6 +6,7 @@ using GameInterface.Policies;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Locations.Messages;
 using HarmonyLib;
+using SandBox.Missions.MissionLogics.Towns;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -13,6 +14,7 @@ using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Settlements.Locations;
+using TaleWorlds.MountAndBlade;
 
 namespace GameInterface.Services.Locations.Patches;
 
@@ -169,6 +171,8 @@ internal class LocationCharacterListPatches
     /// </summary>
     internal static void AddEntry(Location location, LocationCharacter locationCharacter)
     {
+        if (IsLocalPrisonBreakLocation(location)) return;
+
         if (location._ownerComplex == null)
         {
             location._characterList ??= new List<LocationCharacter>();
@@ -212,6 +216,8 @@ internal class LocationCharacterListPatches
     {
         SyncedLocationCharacters.Unregister(entry);
 
+        if (IsLocalPrisonBreakLocation(location)) return;
+
         if (location._ownerComplex == null ||
             (CampaignMission.Current != null && PlayerEncounter.LocationEncounter == null))
         {
@@ -233,8 +239,16 @@ internal class LocationCharacterListPatches
                     SyncedLocationCharacters.Unregister(entry);
                 }
 
+                if (IsLocalPrisonBreakLocation(location)) return;
+
                 location.RemoveAllCharacters();
             }
         });
     }
+
+    // The prison break mission swaps in its own local prison roster, so server roster changes there would
+    // spawn the real prisoners at the entrance. The roster is rebuilt when the player next enters the settlement.
+    private static bool IsLocalPrisonBreakLocation(Location location) =>
+        CampaignMission.Current?.Location == location &&
+        Mission.Current?.GetMissionBehavior<PrisonBreakMissionController>() != null;
 }

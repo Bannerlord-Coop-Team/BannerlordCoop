@@ -2,6 +2,7 @@
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Roster;
@@ -71,6 +72,11 @@ internal class GameObjectCreator
         { typeof(SiegeEngineConstructionProgress), new SiegeEngineConstructionProgressBuilder()  },
         { typeof(StanceLink), new StanceLinkBuilder() },
         { typeof(Army), new ArmyBuilder() },
+        { typeof(Ship), new ShipBuilder() },
+        { typeof(ShipHull), new ShipHullBuilder() },
+        { typeof(ShipSlot), new ShipSlotBuilder() },
+        { typeof(ShipUpgradePiece), new ShipUpgradePieceBuilder() },
+        { typeof(Figurehead), new FigureheadBuilder() },
     };
 
     public static T CreateInitializedObject<T>()

@@ -7,22 +7,24 @@ using Common.Util;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Services.Save.Messages;
+using GameInterface.Services.Armies.Messages;
+using GameInterface.Services.Armies.Patches;
 using GameInterface.Services.Heroes.HeirSelection.Messages;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.PartyBases.Extensions;
 using GameInterface.Services.PartyVisuals.Extensions;
 using GameInterface.Services.PartyVisuals.Messages;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.Players.Messages;
 using GameInterface.Services.SiegeEvents.Interfaces;
-using HarmonyLib;
 using LiteNetLib;
 using SandBox.View.Map.Managers;
 using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -193,7 +195,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
             return;
         }
 
-        ActivateParty(party, player.MobilePartyId);
+        ActivateParty(party);
         Logger.Information($"Activated party {party.StringId} after player {heroId} selected an heir");
     }
 
@@ -227,7 +229,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
 
             deferredMapEventParking.Remove(party);
             if (party.MapEvent != null)
-                messageBroker.Publish(this, new PlayerReconnectedToMapEvent());
+                messageBroker.Publish(this, new PlayerReconnectedToMapEvent(player.ControllerId, party.MapEvent));
 
             if (party.IsActive)
             {
@@ -245,8 +247,9 @@ internal class PlayerPartyVisibilityHandler : IHandler
                 return;
             }
 
-            ActivateParty(party, player.MobilePartyId);
+            ActivateParty(party);
             Logger.Information("Restored party {PartyId} for reconnected peer {Peer}", party.StringId, peer.Id);
+            messageBroker.Publish(this, new PlayerPartyRestoredOnReconnect(party));
         });
     }
 
@@ -274,14 +277,14 @@ internal class PlayerPartyVisibilityHandler : IHandler
             return;
         }
 
-        ActivateParty(party, player.MobilePartyId);
+        ActivateParty(party);
         Logger.Information("Restored released party {PartyId} for peer {Peer}", party.StringId, peer.Id);
     }
 
-    private void ActivateParty(MobileParty party, string mobilePartyId)
+    private void ActivateParty(MobileParty party)
     {
         party.IsActive = true;
-        CreateVisual(party, mobilePartyId);
+        CreateVisual(party);
         party.IsVisible = true;
         party.IsInspected = true;
     }
@@ -322,69 +325,56 @@ internal class PlayerPartyVisibilityHandler : IHandler
         Logger.Information(
             "Removing disconnected party {PartyId} from its siege camp before parking",
             party.StringId);
-        siegeEventInterface.BreakSiegeForPartyOnly(party);
-    }
 
-    /// <summary>
-    /// Removes the party's map figure and tells every client to do the same, mirroring
-    /// PartyVisualLifetimeHandler's NetworkDestroyPartyVisual path exactly, but triggered by us
-    /// rather than a native OnPartyRemoved call (the party itself is not being destroyed).
-    /// </summary>
-    private void RemoveVisual(MobileParty party)
-    {
-        if (!objectManager.TryGetHandleWithLogging(party, out var mobilePartyHandle))
-            return;
-
-        var partyVisual = party.Party.GetPartyVisual();
-        if (partyVisual != null)
+        // AI army members leave the siege and the army of their parked leader, otherwise they stay stuck to it; players keep their siege role
+        var army = party.Army;
+        if (army?.LeaderParty == party)
         {
-            objectManager.Remove(partyVisual);
-
-            using (new AllowedThread())
+            foreach (var member in army.Parties.Where(member => member != party && !playerManager.Contains(member)).ToArray())
             {
-                AccessTools.Method(typeof(MobilePartyVisualManager), "RemovePartyVisualForParty").Invoke(MobilePartyVisualManager.Current, new object[] { party });
+                // One member's broken state must not stop the leader from being parked
+                try
+                {
+                    if (member.BesiegerCamp != null)
+                        siegeEventInterface.BreakSiegeForPartyOnly(member);
+
+                    // Same pair the army-removal network flow uses, the publish replicates it to clients
+                    messageBroker.Publish(member, new MobilePartyInArmyRemoved(army, member, null));
+                    ArmyPatches.RemoveMobilePartyInArmy(member, army, null);
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, "Could not take army member {MemberId} out of parked leader {PartyId}'s siege and army",
+                        member.StringId, party.StringId);
+                }
             }
         }
 
-        network.SendAll(new NetworkDestroyPartyVisual(mobilePartyHandle));
+        siegeEventInterface.BreakSiegeForPartyOnly(party);
     }
 
-    /// <summary>
-    /// Recreates the party's map figure and tells every client to do the same, mirroring
-    /// PartyVisualLifetimeHandler's NetworkCreatePartyVisual path exactly, but triggered by us
-    /// rather than a native visual construction call.
-    /// </summary>
-    private void CreateVisual(MobileParty party, string mobilePartyId)
+    private void RemoveVisual(MobileParty party)
     {
-        if (MobilePartyVisualManager.Current == null)
+        if (MobilePartyVisualManager.Current != null)
         {
-            if (objectManager.TryGetHandleWithLogging(party, out var partyHandle))
-                network.SendAll(new NetworkCreatePartyVisual(partyHandle));
+            party.RemovePartyVisual();
             return;
         }
 
-        using (new AllowedThread())
+        if (objectManager.TryGetHandleWithLogging(party, out var partyHandle))
+            network.SendAll(new NetworkDestroyPartyVisual(partyHandle));
+    }
+
+    private void CreateVisual(MobileParty party)
+    {
+        if (MobilePartyVisualManager.Current != null)
         {
             party.CreateNewPartyVisual();
-        }
-
-        var partyVisual = party.Party.GetPartyVisual();
-        if (partyVisual == null)
-        {
-            Logger.Error("CreateNewPartyVisual did not produce a visual for party {PartyId}", party.StringId);
             return;
         }
 
-        if (!objectManager.AddNewObject(partyVisual, out var visualId))
-        {
-            Logger.Error("Failed to register recreated visual for party {PartyId}", party.StringId);
-            return;
-        }
-
-        if (!objectManager.TryGetHandleWithLogging(partyVisual, out var visualHandle) ||
-            !objectManager.TryGetHandleWithLogging(party, out var mobilePartyHandle)) return;
-
-        network.SendAll(new NetworkCreatePartyVisual(visualId, visualHandle, mobilePartyHandle));
+        if (objectManager.TryGetHandleWithLogging(party, out var partyHandle))
+            network.SendAll(new NetworkCreatePartyVisual(partyHandle));
     }
 
     private bool TryResolveParty(NetPeer peer, out Player player, out MobileParty party)

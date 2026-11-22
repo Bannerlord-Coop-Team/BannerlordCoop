@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.Heroes.Extensions;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using GameInterface.Services.SiegeEvents.Messages;
 using HarmonyLib;
@@ -14,6 +15,7 @@ using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -117,13 +119,7 @@ internal class SiegeAftermathPatches
         leaderParty = null;
         settlement = null;
         if (mapEvent == null) return false;
-
-        var battleSide = (!mapEvent.IsSallyOut && !mapEvent.IsBlockadeSallyOut) ? BattleSideEnum.Attacker : BattleSideEnum.Defender;
-        if ((!mapEvent.IsSiegeAssault && !mapEvent.IsSiegeOutside && !mapEvent.IsSallyOut && !mapEvent.IsBlockadeSallyOut)
-            || mapEvent.WinningSide != battleSide || mapEvent.MapEventSettlement == null)
-        {
-            return false;
-        }
+        if (!TryGetAftermathSide(mapEvent, out var battleSide)) return false;
 
         var lp = mapEvent.GetMapEventSide(battleSide).LeaderParty?.MobileParty;
         if (lp?.LeaderHero == null || !lp.LeaderHero.IsPlayerHero()) return false;
@@ -131,6 +127,19 @@ internal class SiegeAftermathPatches
         leaderParty = lp;
         settlement = mapEvent.MapEventSettlement;
         return true;
+    }
+
+    // Vanilla's aftermath trigger: a siege assault or sally out at a settlement, won by the attacker
+    // (the defender on a sally out). aftermathSide is the side whose win runs the aftermath.
+    private static bool TryGetAftermathSide(MapEvent mapEvent, out BattleSideEnum aftermathSide)
+    {
+        bool isSallyOut = mapEvent.IsSallyOut || mapEvent.IsBlockadeSallyOut;
+        aftermathSide = isSallyOut ? BattleSideEnum.Defender : BattleSideEnum.Attacker;
+
+        if (!mapEvent.IsSiegeAssault && !isSallyOut) return false;
+        if (mapEvent.WinningSide != aftermathSide) return false;
+
+        return mapEvent.MapEventSettlement != null;
     }
 
     [HarmonyPatch(typeof(SiegeAftermathCampaignBehavior), nameof(SiegeAftermathCampaignBehavior.OnSiegeAftermathApplied))]
@@ -171,7 +180,7 @@ internal class SiegeAftermathPatches
         }
         else
         {
-            PendingAftermaths.TryRemove(settlement, out _);
+            DiscardPending(settlement);
             Logger.Error("Discarded pending siege aftermath for {Settlement}: behavior unavailable before owner transfer",
                 settlement.Name?.ToString());
         }
@@ -207,12 +216,7 @@ internal class SiegeAftermathPatches
     [HarmonyPrefix]
     private static bool OnMapEventEndedPrefix(SiegeAftermathCampaignBehavior __instance, MapEvent mapEvent)
     {
-        var battleSide = (!mapEvent.IsSallyOut && !mapEvent.IsBlockadeSallyOut) ? BattleSideEnum.Attacker : BattleSideEnum.Defender;
-        if ((!mapEvent.IsSiegeAssault && !mapEvent.IsSiegeOutside && !mapEvent.IsSallyOut && !mapEvent.IsBlockadeSallyOut)
-            || mapEvent.WinningSide != battleSide || mapEvent.MapEventSettlement == null)
-        {
-            return false;
-        }
+        if (!TryGetAftermathSide(mapEvent, out var battleSide)) return false;
 
         var settlement = mapEvent.MapEventSettlement;
         var winningSide = mapEvent.GetMapEventSide(battleSide);
@@ -249,16 +253,16 @@ internal class SiegeAftermathPatches
                 }
 
                 __instance._playerEncounterAftermathDamagedBuildings.Clear();
+                // This cache is saved, so a client loads the server's last value; vanilla resets it here.
+                __instance._settlementProsperityCache = -1f;
                 __instance._besiegerParty = leaderParty;
                 __instance._prevSettlementOwnerClan = settlement.OwnerClan;
-                // Vanilla's army-member test: in the besieger's own army, or in an army the player
-                // does not lead.
+                // Vanilla's army-member test: in an army the player does not lead.
                 __instance._wasPlayerArmyMember = leaderParty != MobileParty.MainParty
-                    && ((leaderParty?.Army != null && leaderParty.Army.Parties.Contains(MobileParty.MainParty))
-                        || (MobileParty.MainParty.Army != null && MobileParty.MainParty.Army.LeaderParty != MobileParty.MainParty));
+                    && MobileParty.MainParty.Army != null && MobileParty.MainParty.Army.LeaderParty != MobileParty.MainParty;
                 if (ContainerProvider.TryResolve<ISiegeEventInterface>(out var siegeEventInterface))
                 {
-                    siegeEventInterface.SetLocalAftermathNarrationContext(settlement);
+                    siegeEventInterface.SetLocalAftermathNarrationContext(settlement, mapEvent);
                 }
                 // Don't guess _playerEncounterAftermath locally: DetermineAISiegeAftermath is a weighted
                 // RNG draw that would diverge from the server's pick. The applied-aftermath broadcast
@@ -280,7 +284,7 @@ internal class SiegeAftermathPatches
             // Make sure the leading player actually gets the choice menu: their local encounter flow
             // usually opens it, but if it doesn't (encounter torn down first), the server would wait
             // on this pending entry forever.
-            MessageBroker.Instance.Publish(null, new SiegeAftermathChoicePrompted(leaderParty, settlement));
+            MessageBroker.Instance.Publish(null, new SiegeAftermathChoicePrompted(leaderParty, settlement, settlement.OwnerClan));
             return false;
         }
 
@@ -297,7 +301,7 @@ internal class SiegeAftermathPatches
         {
             if (!pair.Value.MatchesCurrentCapture(pair.Key))
             {
-                if (PendingAftermaths.TryRemove(pair.Key, out _))
+                if (DiscardPending(pair.Key))
                 {
                     Logger.Warning("Discarded stale siege aftermath for {Settlement}: capture identity no longer matches",
                         pair.Key?.Name?.ToString());
@@ -365,8 +369,7 @@ internal class SiegeAftermathPatches
 
     // Vanilla's player relation effect is gated on MobileParty.MainParty, which is null on the
     // dedicated host, so a player-led capture would silently lose the relation changes with the lords
-    // who fought alongside. The trait XP branch stays skipped: TraitLevelingHelper works on the local
-    // main hero only.
+    // who fought alongside. The same gate skips the player's mercy trait XP.
     [HarmonyPatch(typeof(SiegeAftermathCampaignBehavior), nameof(SiegeAftermathCampaignBehavior.OnSiegeAftermathApplied))]
     [HarmonyPostfix]
     private static void OnSiegeAftermathAppliedPostfix(SiegeAftermathCampaignBehavior __instance,
@@ -376,6 +379,12 @@ internal class SiegeAftermathPatches
         if (ModInformation.IsClient) return;
         if (attackerParty?.LeaderHero == null || !attackerParty.LeaderHero.IsPlayerHero()) return;
         if (aftermathType == SiegeAftermathAction.SiegeAftermath.Pillage) return;
+
+        using (new MainHeroSubstitutionScope(attackerParty.LeaderHero, attackerParty))
+        {
+            TraitLevelingHelper.OnSiegeAftermathApplied(settlement, aftermathType, new TraitObject[] { DefaultTraits.Mercy });
+        }
+
         if (attackerParty.MapFaction.Culture == settlement.Culture) return;
 
         foreach (var contribution in partyContributions)
@@ -407,7 +416,7 @@ internal class SiegeAftermathPatches
 
         if (pending.MatchesCurrentCapture(settlement)) return;
 
-        PendingAftermaths.TryRemove(settlement, out _);
+        DiscardPending(settlement);
         Logger.Warning("Invalidated pending siege aftermath for {Settlement}: settlement ownership no longer matches the capture",
             settlement.Name?.ToString());
     }
@@ -475,14 +484,17 @@ internal class SiegeAftermathPatches
             Dictionary<MobileParty, float>> applyAftermath = null)
     {
         if (behavior == null || settlement == null) return false;
-        if (!PendingAftermaths.TryRemove(settlement, out var pending)) return false;
+        if (!PendingAftermaths.TryGetValue(settlement, out var pending)) return false;
 
         if (!pending.MatchesCurrentCapture(settlement))
         {
+            DiscardPending(settlement);
             Logger.Warning("Discarded pending siege aftermath for {Settlement} ({Reason}): capture identity no longer matches",
                 settlement.Name?.ToString(), reason);
             return false;
         }
+
+        PendingAftermaths.TryRemove(settlement, out _);
 
         determineAftermath ??= static (aftermathBehavior, leaderParty, capturedSettlement) =>
             aftermathBehavior.DetermineAISiegeAftermath(leaderParty, capturedSettlement);
@@ -493,6 +505,16 @@ internal class SiegeAftermathPatches
         applyAftermath(pending.LeaderParty, settlement, aftermath, pending.PreviousOwnerClan, pending.Contributions);
         Logger.Information("Resolved pending siege aftermath for {Settlement} because {Reason}",
             settlement.Name?.ToString(), reason);
+        return true;
+    }
+
+    // Drops a parked aftermath without applying it. Only an applied one is broadcast otherwise, so the leader's
+    // client would keep holding a choice the server no longer accepts.
+    internal static bool DiscardPending(Settlement settlement)
+    {
+        if (!PendingAftermaths.TryRemove(settlement, out _)) return false;
+
+        MessageBroker.Instance.Publish(null, new SiegeAftermathDiscarded(settlement));
         return true;
     }
 }

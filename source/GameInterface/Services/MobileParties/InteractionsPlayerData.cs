@@ -1,4 +1,5 @@
-﻿using ProtoBuf;
+﻿using GameInterface.Services.Kingdoms.Data;
+using ProtoBuf;
 using System.Collections.Generic;
 
 namespace GameInterface.Services.MobileParties;
@@ -16,6 +17,7 @@ namespace GameInterface.Services.MobileParties;
 /// _orderedDrinkThisDayInSettlement is used to keep track of a settlement a player bought a drink at in the last day
 /// _hasBoughtToParty is true when a player buys drinks for their party at a tavern for a temporary morale boost
 /// _hasMetRansomBroker is used to determine whether or not the ransom broker intro dialogue is used when talking in taverns
+/// VassalAndMercenaryOfferCampaignBehavior offer data (current mercenary offer, vassal offers and whether offers stopped)
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
 public class InteractionsPlayerData
@@ -60,9 +62,16 @@ public class InteractionsPlayerData
     [ProtoMember(10)]
     public Dictionary<string, bool> PlayerHasBoughtTunToParty { get; }
 
-    // Dictionary<PlayerHeroId, HasMetRahsomBroker>
+    // Dictionary<PlayerHeroId, HasMetRansomBroker>
     [ProtoMember(11)]
     public Dictionary<string, bool> PlayerHasMetRansomBroker { get; }
+
+    // Dictionary<PlayerHeroId, HasTalkedWithHermitBefore>
+    [ProtoMember(12)]
+    public Dictionary<string, bool> PlayerHasMetHermit { get; }
+
+    [ProtoMember(13)]
+    public Dictionary<string, VassalAndMercenaryOfferData> PlayerVassalAndMercenaryOfferData { get; }
 
     public InteractionsPlayerData(
         Dictionary<string, Dictionary<string, int>> playerInteractedVillagers,
@@ -75,7 +84,9 @@ public class InteractionsPlayerData
         Dictionary<string, List<string>> playerAlreadySneakedSettlements,
         Dictionary<string, string> playerOrderedDrinkThisDayInSettlement,
         Dictionary<string, bool> playerHasBoughtTunToParty,
-        Dictionary<string, bool> playerHasMetRansomBroker)
+        Dictionary<string, bool> playerHasMetRansomBroker,
+        Dictionary<string, bool> playerHasMetHermit,
+        Dictionary<string, VassalAndMercenaryOfferData> playerVassalAndMercenaryOfferData)
     {
         PlayerInteractedVillagers = playerInteractedVillagers ?? new();
         PlayerInteractedCaravans = playerInteractedCaravans ?? new();
@@ -88,5 +99,7 @@ public class InteractionsPlayerData
         PlayerOrderedDrinkThisDayInSettlement = playerOrderedDrinkThisDayInSettlement ?? new();
         PlayerHasBoughtTunToParty = playerHasBoughtTunToParty ?? new();
         PlayerHasMetRansomBroker = playerHasMetRansomBroker ?? new();
+        PlayerHasMetHermit = playerHasMetHermit ?? new();
+        PlayerVassalAndMercenaryOfferData = playerVassalAndMercenaryOfferData ?? new();
     }
 }

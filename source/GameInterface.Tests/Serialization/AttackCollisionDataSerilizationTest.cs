@@ -11,14 +11,10 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class AttackCollisionDataSerilizationTest
     {
-        IContainer container;
+        ILifetimeScope container;
         public AttackCollisionDataSerilizationTest()
         {
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
+            container = SerializationTestContainer.BeginScope();
         }
 
         [Fact]

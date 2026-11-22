@@ -11,6 +11,9 @@ using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Unstuck;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.UI.Patches;
+using System.Reflection;
+using TaleWorlds.Library;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -19,16 +22,6 @@ using TaleWorlds.Core;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.MobileParties;
-
-/// <summary>Skips unstuck bug-report tests while the feature is disabled.</summary>
-public sealed class UnstuckCommandReportingFactAttribute : FactAttribute
-{
-    public UnstuckCommandReportingFactAttribute()
-    {
-        if (!BugReportConfig.UnstuckCommandReportsEnabled)
-            Skip = "Automatic unstuck bug reports are disabled.";
-    }
-}
 
 /// <summary>
 /// Verifies the dedicated unstuck flow: coop.unstuck forwards a
@@ -78,41 +71,70 @@ public class UnstuckCommandTests : MapEventTestBase
         Assert.Equal(player.HeroId, request.HeroId);
     }
 
-    [UnstuckCommandReportingFact]
-    public void ServerUnstuckRequest_RequestsDiagnosticLogsFromEveryConnectedClient()
+    [Fact]
+    public void EscapeMenuUnstuck_ConfirmYes_SendsTheSameRequestAsTheCommand()
     {
-        var requester = SetupRegisteredMainHeroAndParty();
-        var secondHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
-        var secondCharacterId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
-        var secondPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var player = SetupRegisteredMainHeroAndParty();
 
-        Server.Call(() =>
+        var shownInquiries = new List<InquiryData>();
+        Action<InquiryData, bool, bool> onShowInquiry = (data, _, _) => shownInquiries.Add(data);
+        EventInfo showInquiryEvent = typeof(InformationManager).GetEvent(
+            "OnShowInquiry",
+            BindingFlags.Public | BindingFlags.Static);
+        showInquiryEvent.AddEventHandler(null, onShowInquiry);
+        try
         {
-            var playerManager = Server.Resolve<IPlayerManager>();
-            Assert.True(playerManager.AddPlayer(new Player(
-                "unstuck-report-requester",
-                requester.HeroId,
-                requester.PartyId,
-                null,
-                requester.CharacterId)));
-            Assert.True(playerManager.AddPlayer(new Player(
-                "unstuck-report-second",
-                secondHeroId,
-                secondPartyId,
-                null,
-                secondCharacterId)));
-            playerManager.SetPeer("unstuck-report-requester", Client.NetPeer);
-            playerManager.SetPeer("unstuck-report-second", SecondClient.NetPeer);
-        });
+            Client.Call(() => EscapeMenuCoopOptionsPatch.ShowUnstuckConfirm());
 
-        Server.SimulateMessage(
-            Client.NetPeer,
-            new NetworkRequestPlayerUnstuck(requester.PartyId, requester.HeroId));
+            var inquiry = Assert.Single(shownInquiries);
+            Assert.Empty(Client.NetworkSentMessages.GetMessages<NetworkRequestPlayerUnstuck>());
 
-        Assert.Collection(
-            Server.NetworkSentMessages.GetMessages<NetworkRequestBugReportLogs>(),
-            _ => { },
-            _ => { });
+            Client.Call(() => inquiry.AffirmativeAction());
+        }
+        finally
+        {
+            showInquiryEvent.RemoveEventHandler(null, onShowInquiry);
+        }
+
+        Assert.Single(Client.InternalMessages.GetMessages<PlayerUnstuckRequested>());
+
+        var request = Assert.Single(Client.NetworkSentMessages.GetMessages<NetworkRequestPlayerUnstuck>());
+        Assert.Equal(player.PartyId, request.PartyId);
+        Assert.Equal(player.HeroId, request.HeroId);
+    }
+
+    [Fact]
+    public void EscapeMenuUnstuck_ConfirmYesAfterTheCampaignIsGone_SendsNothingAndDoesNotThrow()
+    {
+        SetupRegisteredMainHeroAndParty();
+
+        var shownInquiries = new List<InquiryData>();
+        Action<InquiryData, bool, bool> onShowInquiry = (data, _, _) => shownInquiries.Add(data);
+        EventInfo showInquiryEvent = typeof(InformationManager).GetEvent(
+            "OnShowInquiry",
+            BindingFlags.Public | BindingFlags.Static);
+        showInquiryEvent.AddEventHandler(null, onShowInquiry);
+        try
+        {
+            Client.Call(() => EscapeMenuCoopOptionsPatch.ShowUnstuckConfirm());
+
+            var inquiry = Assert.Single(shownInquiries);
+
+            // A server disconnect ends the campaign while the popup stays open. Client.Call
+            // restores Campaign.Current afterwards.
+            Client.Call(() =>
+            {
+                Campaign.Current = null;
+                inquiry.AffirmativeAction();
+            });
+        }
+        finally
+        {
+            showInquiryEvent.RemoveEventHandler(null, onShowInquiry);
+        }
+
+        Assert.Empty(Client.InternalMessages.GetMessages<PlayerUnstuckRequested>());
+        Assert.Empty(Client.NetworkSentMessages.GetMessages<NetworkRequestPlayerUnstuck>());
     }
 
     [Fact]
@@ -200,32 +222,6 @@ public class UnstuckCommandTests : MapEventTestBase
     }
 
     [Fact]
-    public void ServerUnstuckRequest_ClearsArmyAndSettlement_AndReportsResult()
-    {
-        var player = SetupRegisteredMainHeroAndParty();
-        RegisterOnServer(player, "unstuck-requester", Client);
-        StageArmyAndSettlement(player.PartyId);
-
-        Server.SimulateMessage(Client.NetPeer, new NetworkRequestPlayerUnstuck(player.PartyId, player.HeroId));
-
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(player.PartyId, out var party));
-
-            Assert.Null(party.Army);
-            Assert.Null(party.CurrentSettlement);
-        });
-
-        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkRemovePartyInArmy>());
-
-        var result = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPlayerUnstuckResult>());
-        Assert.Equal(player.PartyId, result.PartyId);
-        Assert.NotNull(result.Actions);
-        Assert.Contains(result.Actions, action => action.Contains("army"));
-        Assert.Contains(result.Actions, action => action.Contains("settlement"));
-    }
-
-    [Fact]
     public void ServerUnstuckRequest_NamingAnotherPlayersParty_UnsticksOnlyTheRequester()
     {
         var requester = SetupRegisteredMainHeroAndParty();
@@ -250,6 +246,12 @@ public class UnstuckCommandTests : MapEventTestBase
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkRemovePartyInArmy>());
         var result = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPlayerUnstuckResult>());
         Assert.Equal(requester.PartyId, result.PartyId);
+        Assert.Contains(result.Actions, action => action.Contains("army"));
+        Assert.Contains(result.Actions, action => action.Contains("settlement"));
+
+        Assert.Single(Client.InternalMessages.GetMessages<NetworkPlayerUnstuckResult>());
+        Assert.Single(Client.InternalMessages.GetMessages<PlayerUnstuckCompleted>());
+        Assert.Empty(SecondClient.InternalMessages.GetMessages<NetworkPlayerUnstuckResult>());
     }
 
     [Fact]
@@ -323,21 +325,6 @@ public class UnstuckCommandTests : MapEventTestBase
         AssertStillInArmyAndSettlement(player.PartyId);
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkRemovePartyInArmy>());
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPlayerUnstuckResult>());
-    }
-
-    [Fact]
-    public void ServerUnstuckRequest_SendsResultOnlyToTheRequester()
-    {
-        var requester = SetupRegisteredMainHeroAndParty();
-        var other = CreatePlayerIds();
-        RegisterOnServer(requester, "unstuck-requester", Client);
-        RegisterOnServer(other, "unstuck-other", SecondClient);
-
-        Server.SimulateMessage(Client.NetPeer, new NetworkRequestPlayerUnstuck(requester.PartyId, requester.HeroId));
-
-        Assert.Single(Client.InternalMessages.GetMessages<NetworkPlayerUnstuckResult>());
-        Assert.Single(Client.InternalMessages.GetMessages<PlayerUnstuckCompleted>());
-        Assert.Empty(SecondClient.InternalMessages.GetMessages<NetworkPlayerUnstuckResult>());
     }
 
     [Fact]

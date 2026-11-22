@@ -10,29 +10,10 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class PieceDataSerializationTest
     {
-        IContainer container;
+        ILifetimeScope container;
         public PieceDataSerializationTest()
         {
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
-        }
-
-        [Fact]
-        public void PieceData_Serialize()
-        {
-            PieceData PieceData = new PieceData(CraftingPiece.PieceTypes.Pommel, 1);
-
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            PieceDataBinaryPackage package = new PieceDataBinaryPackage(PieceData, factory);
-
-            package.Pack();
-
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
-
-            Assert.NotEmpty(bytes);
+            container = SerializationTestContainer.BeginScope();
         }
 
         [Fact]

@@ -1,4 +1,4 @@
-using GameInterface.Services.Chat;
+﻿using GameInterface.Services.Chat;
 using TaleWorlds.Library;
 using TaleWorlds.ScreenSystem;
 using Xunit;
@@ -16,6 +16,71 @@ public class ChatOverlayTests
 
         Assert.Equal(InputUsageMask.Mouse, inputRestrictions.InputUsageMask);
         Assert.False(inputRestrictions.MouseVisibility);
+    }
+
+    [Fact]
+    public void DisplayOnlyInputRestrictions_LeaveMouseToUnderlyingMenuScreens()
+    {
+        var inputRestrictions = new InputRestrictions(900);
+
+        ChatOverlay.SetDisplayOnlyInputRestrictions(inputRestrictions);
+
+        Assert.Equal(InputUsageMask.Invalid, inputRestrictions.InputUsageMask);
+        Assert.False(inputRestrictions.MouseVisibility);
+    }
+
+    [Fact]
+    public void OpenPanelInputRestrictions_ShowCursorWithoutClaimingKeyboard()
+    {
+        var inputRestrictions = new InputRestrictions(900);
+
+        ChatOverlay.SetOpenPanelInputRestrictions(inputRestrictions);
+
+        Assert.Equal(InputUsageMask.Mouse, inputRestrictions.InputUsageMask);
+        Assert.True(inputRestrictions.MouseVisibility);
+    }
+
+    [Fact]
+    public void OpenPanelTypingRestrictions_ClaimKeyboardWithoutMouse()
+    {
+        var inputRestrictions = new InputRestrictions(900);
+
+        ChatOverlay.SetOpenPanelTypingRestrictions(inputRestrictions);
+
+        Assert.Equal(InputUsageMask.Keyboardkeys, inputRestrictions.InputUsageMask);
+        Assert.False(inputRestrictions.MouseVisibility);
+    }
+
+    [Fact]
+    public void OpenPanelTypingWithMouseRestrictions_ClaimAllWithCursor()
+    {
+        var inputRestrictions = new InputRestrictions(900);
+
+        ChatOverlay.SetOpenPanelTypingWithMouseRestrictions(inputRestrictions);
+
+        Assert.Equal(InputUsageMask.All, inputRestrictions.InputUsageMask);
+        Assert.True(inputRestrictions.MouseVisibility);
+    }
+
+    [Theory]
+    [InlineData(false, true, true, true, true)]
+    [InlineData(false, true, true, false, false)]
+    [InlineData(false, true, false, true, false)]
+    [InlineData(true, true, false, false, true)]
+    [InlineData(true, false, false, false, false)]
+    [InlineData(true, true, true, false, true)]
+    public void ChatPointerCapture_StartsOnPressOverPanelOnly(
+        bool currentlyHeld,
+        bool buttonDown,
+        bool buttonPressed,
+        bool pointerOverChat,
+        bool expected)
+    {
+        Assert.Equal(expected, ChatOverlay.ShouldKeepChatPointerCapture(
+            currentlyHeld,
+            buttonDown,
+            buttonPressed,
+            pointerOverChat));
     }
 
     [Fact]
@@ -87,24 +152,37 @@ public class ChatOverlayTests
     }
 
     [Theory]
-    [InlineData(true, true, false, true, false, true)]
-    [InlineData(true, true, false, false, true, true)]
-    [InlineData(false, true, false, true, false, false)]
-    [InlineData(true, false, false, true, false, false)]
-    [InlineData(true, true, true, true, false, false)]
-    [InlineData(true, true, true, false, true, false)]
-    [InlineData(true, true, false, false, false, false)]
-    public void Presentation_IsLimitedToUnobstructedGameplay(
-        bool isEnabled,
-        bool isGameplayScreen,
+    [InlineData(true, false, false, true)]
+    [InlineData(true, false, true, false)]
+    [InlineData(true, true, false, false)]
+    [InlineData(false, false, false, false)]
+    public void Presentation_ShowsEventLogDuringCampaign(
+        bool isCampaignContext,
+        bool isConversationActive,
+        bool isLoading,
+        bool expected)
+    {
+        Assert.Equal(expected, ChatOverlay.ShouldShowPresentation(
+            isCampaignContext,
+            isConversationActive,
+            isLoading));
+    }
+
+    [Theory]
+    [InlineData(true, false, true, false, true)]
+    [InlineData(true, false, false, true, true)]
+    [InlineData(false, false, true, false, false)]
+    [InlineData(true, true, true, false, false)]
+    [InlineData(true, false, false, false, false)]
+    public void ChatOpen_WhenOpenableScreenAndFocusAllows(
+        bool isOpenableScreen,
         bool isConversationActive,
         bool isGameplayLayerFocused,
         bool isChatLayerFocused,
         bool expected)
     {
-        Assert.Equal(expected, ChatOverlay.ShouldShowPresentation(
-            isEnabled,
-            isGameplayScreen,
+        Assert.Equal(expected, ChatOverlay.ShouldAllowChatOpen(
+            isOpenableScreen,
             isConversationActive,
             isGameplayLayerFocused,
             isChatLayerFocused));

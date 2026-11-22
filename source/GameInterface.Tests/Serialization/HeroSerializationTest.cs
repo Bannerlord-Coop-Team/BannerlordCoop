@@ -22,17 +22,13 @@ namespace GameInterface.Tests.Serialization.SerializerTests
     {
         private readonly ITestOutputHelper output;
 
-        IContainer container;
+        ILifetimeScope container;
         public HeroSerializationTest(ITestOutputHelper output)
         {
             this.output = output;
             GameBootStrap.Initialize();
 
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
+            container = SerializationTestContainer.BeginScope();
         }
 
         private void EnsureAllMemberCoverage(Hero hero)
@@ -130,6 +126,10 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Assert.Equal(heroData.HeroDeveloper.ToString(), newHero.HeroDeveloper?.ToString());
             Assert.Equal(heroData.StaticBodyProperties, newHero.BodyProperties.StaticProperties);
             AssertValuesEqual(heroData.VolunteerTypes, newHero.VolunteerTypes);
+            Assert.False(newHero.CanJoinArmy);
+            Assert.True(newHero.CanRaid);
+            Assert.False(newHero.CanDonateTroopsToGarrison);
+            Assert.True(newHero.CanHaveFleet);
         }
 
         private void AssertValuesEqual<T>(IEnumerable<T> values1, IEnumerable<T> values2)

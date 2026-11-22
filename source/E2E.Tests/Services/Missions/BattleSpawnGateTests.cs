@@ -31,10 +31,17 @@ public class BattleSpawnGateTests : IDisposable
     }
 
     [Fact]
-    public void EndBattle_ClearsActiveBattle()
+    [Trait("Requirement", "BR-091")]
+    public void EndBattle_ClearsActiveBattle_Idempotently()
     {
         BattleSpawnGate.BeginBattle("mapEvent-1");
 
+        BattleSpawnGate.EndBattle();
+
+        Assert.False(BattleSpawnGate.IsCoopBattleActive);
+        Assert.Null(BattleSpawnGate.ActiveMapEventId);
+
+        // A repeated teardown neither throws nor resurrects the battle.
         BattleSpawnGate.EndBattle();
 
         Assert.False(BattleSpawnGate.IsCoopBattleActive);

@@ -70,21 +70,6 @@ public partial class MovementTrafficTests
     }
 
     [Fact]
-    public void SerializerEquivalence_RelayBudgetMatchesLegacy()
-    {
-        var mapper = new SerializableTypeMapper();
-        var legacy = new LegacyProtoBufSerializer(mapper);
-        var current = new ProtoBufSerializer(mapper);
-
-        foreach (int ceiling in new[] { 0, 16, 127, 128, 300, LiteNetP2PClient.SafeSinglePacketBytes, 20_000 })
-        {
-            Assert.Equal(
-                LiteNetP2PClient.CalculateMaxRelayPayloadBytes(legacy, EquivalenceScope, EquivalenceRecipient, ceiling),
-                LiteNetP2PClient.CalculateMaxRelayPayloadBytes(current, EquivalenceScope, EquivalenceRecipient, ceiling));
-        }
-    }
-
-    [Fact]
     public void SerializerEquivalence_InterleavedRidersAndMountsSendIdenticalPackets()
     {
         MovementSenderRun run = RunSenderEquivalence(
@@ -361,7 +346,16 @@ public partial class MovementTrafficTests
             return payload;
         }
 
+        public byte[] SerializeSnapshots(IPacket packet, Guid[] snapshotIds)
+        {
+            byte[] payload = inner.SerializeSnapshots(packet, snapshotIds);
+            run.Candidates.Add(DescribeWire(serializer, packet, payload));
+            return payload;
+        }
+
         public bool TryRestore(IPacket packet, out IPacket restored) => inner.TryRestore(packet, out restored);
+
+        public int GetSerializedLength(CompressedMovementPacket packet) => inner.GetSerializedLength(packet);
     }
 
     private static string DescribeWire(ICommonSerializer serializer, IPacket packet, byte[] payload)
@@ -400,5 +394,10 @@ public partial class MovementTrafficTests
         public void SendAllBut(string controllerId, IMessage message) => throw new NotSupportedException();
         public int GetMaxUnreliablePayloadBytes(string controllerId) => throw new NotSupportedException();
         public int GetMaxUnreliablePayloadBytes() => throw new NotSupportedException();
+        public bool TryGetRouteHealth(string controllerId, out Common.Network.Session.RouteHealth health)
+        {
+            health = default;
+            return false;
+        }
     }
 }

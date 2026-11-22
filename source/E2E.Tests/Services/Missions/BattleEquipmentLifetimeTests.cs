@@ -136,7 +136,7 @@ public sealed class BattleEquipmentLifetimeTests : IDisposable
             Assert.True(server.ObjectManager.TryGetId(civilian, out civilianId));
             using var stream = new MemoryStream();
             Serializer.Serialize(stream, new NetworkInitializeNewHero(
-                "Hero_wire_test", new TextObject("first"), new TextObject("name"),
+                "Hero_wire_test", "CharacterObject_wire_test", new TextObject("first"), new TextObject("name"),
                 civilianId, battleId, civilian, battle));
             wire = stream.ToArray();
         });
@@ -146,6 +146,7 @@ public sealed class BattleEquipmentLifetimeTests : IDisposable
         {
             using var stream = new MemoryStream(wire);
             var received = Serializer.Deserialize<NetworkInitializeNewHero>(stream);
+            Assert.Equal("CharacterObject_wire_test", received.CharacterObjectId);
             Assert.Equal(Equipment.EquipmentType.Civilian, received.CivilianEquipment._equipmentType);
             Assert.Equal(Equipment.EquipmentType.Battle, received.BattleEquipment._equipmentType);
             Assert.Equal(Equipment.EquipmentSlotLength, received.CivilianEquipment._itemSlots.Length);

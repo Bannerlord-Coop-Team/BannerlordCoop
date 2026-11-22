@@ -41,7 +41,7 @@
                                 Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center"
                                 Text="Direct Connection"/>
 
-                    <ListPanel WidthSizePolicy="Fixed" SuggestedWidth="760" HeightSizePolicy="Fixed" SuggestedHeight="76"
+                    <ListPanel WidthSizePolicy="Fixed" SuggestedWidth="860" HeightSizePolicy="Fixed" SuggestedHeight="76"
                                HorizontalAlignment="Center" StackLayout.LayoutMethod="HorizontalLeftToRight">
                       <Children>
                         <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="270" HeightSizePolicy="StretchToParent"
@@ -51,7 +51,8 @@
                         <EditableTextWidget WidthSizePolicy="Fixed" SuggestedWidth="390" HeightSizePolicy="Fixed" SuggestedHeight="58"
                                             VerticalAlignment="Center" Brush="ScoreboardPanels_2" Brush.AlphaFactor="0.75"
                                             Brush.FontSize="28" Brush.TextHorizontalAlignment="Center"
-                                            Brush.TextVerticalAlignment="Center" Text="@Ip"/>
+                                            Brush.TextVerticalAlignment="Center" RealText="@Ip"
+                                            IsObfuscationEnabled="@IsIpHidden"/>
                         <HintWidget DataSource="{ServerAddressHint}" WidthSizePolicy="Fixed" SuggestedWidth="44"
                                     HeightSizePolicy="StretchToParent" MarginLeft="14"
                                     Command.HoverBegin="ExecuteBeginHint" Command.HoverEnd="ExecuteEndHint">
@@ -61,10 +62,14 @@
                                         Brush.TextVerticalAlignment="Center" Text="(i)"/>
                           </Children>
                         </HintWidget>
+                        <Standard.Button Id="IpVisibilityButton" WidthSizePolicy="Fixed" SuggestedWidth="100"
+                                         HeightSizePolicy="Fixed" SuggestedHeight="58" VerticalAlignment="Center"
+                                         MarginLeft="10" Command.Click="ActionToggleIpVisibility"
+                                         Parameter.Text="@IpVisibilityButtonText"/>
                       </Children>
                     </ListPanel>
 
-                    <ListPanel WidthSizePolicy="Fixed" SuggestedWidth="760" HeightSizePolicy="Fixed" SuggestedHeight="76"
+                    <ListPanel WidthSizePolicy="Fixed" SuggestedWidth="860" HeightSizePolicy="Fixed" SuggestedHeight="76"
                                HorizontalAlignment="Center" StackLayout.LayoutMethod="HorizontalLeftToRight">
                       <Children>
                         <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="270" HeightSizePolicy="StretchToParent"
@@ -134,7 +139,6 @@
                         </BrushWidget>
                         <Standard.Button WidthSizePolicy="Fixed" SuggestedWidth="150" HeightSizePolicy="Fixed" SuggestedHeight="58"
                                          VerticalAlignment="Center" MarginLeft="12"
-                                         IsDisabled="@IsSearchSteamLobbiesDisabled"
                                          Command.Click="ActionSearchSteamLobbies" Parameter.Text="@SearchButtonText"/>
                       </Children>
                     </ListPanel>
@@ -161,7 +165,6 @@
                                          HeightSizePolicy="Fixed"
                                          SuggestedHeight="65"
                                          VerticalAlignment="Center"
-                                         IsDisabled="@IsSearchSteamLobbiesDisabled"
                                          Command.Click="ActionCycleSteamLobbyPasswordFilter"
                                          Parameter.Text="@PasswordFilterButtonText"/>
 
@@ -370,7 +373,8 @@
                    StackLayout.LayoutMethod="HorizontalLeftToRight">
           <Children>
             <Standard.Button HorizontalAlignment="Left" VerticalAlignment="Bottom"
-                             Command.Click="ActionPatreon" Parameter.Text="@PatreonButtonText" PositionXOffset="-20"/>
+                             Command.Click="ActionRentServer" Parameter.Text="@RentServerButtonText" PositionXOffset="-20"
+                             Brush="Coop.Button.Red"/>
           </Children>
         </ListPanel>
 
@@ -379,7 +383,8 @@
                    StackLayout.LayoutMethod="HorizontalLeftToRight">
           <Children>
             <Standard.Button HorizontalAlignment="Left" VerticalAlignment="Bottom"
-                             Command.Click="ActionDonate" Parameter.Text="@DonateButtonText" PositionXOffset="-20"/>
+                             Command.Click="ActionDonate" Parameter.Text="@DonateButtonText" PositionXOffset="-20"
+                             Brush="Coop.Button.Red"/>
           </Children>
         </ListPanel>
 

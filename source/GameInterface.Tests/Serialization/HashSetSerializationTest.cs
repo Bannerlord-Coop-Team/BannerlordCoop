@@ -10,29 +10,10 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class HashSetSerializationTest
     {
-        IContainer container;
+        ILifetimeScope container;
         public HashSetSerializationTest()
         {
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
-        }
-
-        [Fact]
-        public void HashSet_Serialize()
-        {
-            HashSet<int> HashSet = new HashSet<int> { 1, 2, 3, 4, 5, 6, 7, 8 };
-
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            EnumerableBinaryPackage package = new EnumerableBinaryPackage(HashSet, factory);
-
-            package.Pack();
-
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
-
-            Assert.NotEmpty(bytes);
+            container = SerializationTestContainer.BeginScope();
         }
 
         [Fact]

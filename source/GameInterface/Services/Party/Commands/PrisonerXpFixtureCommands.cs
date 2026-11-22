@@ -2,8 +2,6 @@
 using Common;
 using Common.Commands;
 using GameInterface.Utils.Commands;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Party.Commands;
 
@@ -33,10 +31,17 @@ internal static class PrisonerXpFixtureCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("party_id", "The registered MobileParty id.", true),
-            new ExpectedArgs("character_id", "The prisoner CharacterObject id.", true),
+            new ExpectedArgs("party_id", "Mobile party name or id; quote names with spaces.", true),
+            new ExpectedArgs("character_id", "Prisoner troop character name or id; quote names with spaces.", true),
             new ExpectedArgs("xp", "The xp to set before the vanilla cap.", true),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public SetPrisonerXpCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
@@ -44,20 +49,17 @@ internal static class PrisonerXpFixtureCommands
             if (args.Count != 3 || !int.TryParse(args[2], out var xp) || xp < 0)
                 return Failed("Xp must be a non-negative integer.");
 
-            if (!CommandHelpers.TryGetObjectManager(out var objectManager, out var error)) return Failed(error);
-            if (!CommandHelpers.TryGetManagedObject<MobileParty>(objectManager, args[0], out var party, out error))
-                return Failed(error);
-            if (!CommandHelpers.TryGetManagedObject<CharacterObject>(objectManager, args[1], out var character, out error))
-                return Failed(error);
+            if (!resolver.TryResolveMobileParty(args[0], out var party, out var error)) return Failed(error);
+            if (!resolver.TryResolveCharacterObject(args[1], out var character, out error)) return Failed(error);
             if (character.IsHero) return Failed("Hero prisoners always have zero xp.");
 
             var roster = party.PrisonRoster;
             int index = roster.FindIndexOfTroop(character);
-            if (index < 0) return Failed($"{args[1]} is not in {args[0]}'s prison roster.");
+            if (index < 0) return Failed($"{resolver.DisplayId(character)} is not in {resolver.DisplayId(party)}'s prison roster.");
 
             int oldXp = roster.GetElementXp(index);
             roster.SetElementXp(index, xp);
-            return Succeeded($"PRISONER_XP_SET party={args[0]} character={args[1]} " +
+            return Succeeded($"PRISONER_XP_SET party={resolver.DisplayId(party)} character={resolver.DisplayId(character)} " +
                 $"number={roster.GetElementNumber(index)} oldXp={oldXp} requestedXp={xp} " +
                 $"newXp={roster.GetElementXp(index)}");
         }

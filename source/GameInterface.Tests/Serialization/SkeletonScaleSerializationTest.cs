@@ -12,29 +12,10 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class SkeletonScaleSerializationTest
     {
-        IContainer container;
+        ILifetimeScope container;
         public SkeletonScaleSerializationTest()
         {
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
-        }
-
-        [Fact]
-        public void SkeletonScale_Serialize()
-        {
-            SkeletonScale SkeletonScale = new SkeletonScale();
-
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            SkeletonScaleBinaryPackage package = new SkeletonScaleBinaryPackage(SkeletonScale, factory);
-
-            package.Pack();
-
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
-
-            Assert.NotEmpty(bytes);
+            container = SerializationTestContainer.BeginScope();
         }
 
         [Fact]

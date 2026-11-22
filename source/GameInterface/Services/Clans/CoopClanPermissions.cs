@@ -2,6 +2,8 @@
 using GameInterface.Services.MobileParties.Extensions;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.ViewModelCollection.ClanManagement;
+using TaleWorlds.CampaignSystem.ViewModelCollection.ClanManagement.ClanPartyItem;
 
 namespace GameInterface.Services.Clans;
 
@@ -34,6 +36,14 @@ public class CoopClanPermissions : ICoopClanPermissions
     {
         return ContainerProvider.TryResolve<ICoopClanPermissions>(out var permissions) &&
             permissions.CanManageParty(Hero.MainHero, party);
+    }
+
+    public static bool CanManagePartyItem(ClanPartyItemVM item)
+    {
+        // A cached empty party has no MobileParty, so its leader's clan decides
+        return item is ClanPartyItemWithHeroVM
+            ? CanManageClan(item.Leader?.Clan)
+            : CanManageParty(item?.Party?.MobileParty);
     }
 
     public static bool CanAssignRoles(MobileParty party)

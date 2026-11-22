@@ -2,6 +2,7 @@
 using Common.Network;
 using Common.Util;
 using Coop.Core.Client.Services.MobileParties.Messages;
+using GameInterface.Services.MobileParties.Messages;
 using Coop.Core.Client.Services.SiegeEvents.Handlers;
 using Coop.Core.Client.Services.SiegeEvents.Messages;
 using Coop.Core.Server.Services.MobileParties.Messages;
@@ -9,13 +10,28 @@ using Coop.Core.Server.Services.SiegeEvents.Messages;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Services.MapEvents;
 using E2E.Tests.Util;
+using GameInterface.Tests.Utils;
+using GameInterface.Services.Entity;
 using GameInterface.Services.GameDebug.Messages;
+using GameInterface.Services.MapEventSides.Messages;
+using GameInterface.Services.MapEvents.Extensions;
+using GameInterface.Services.MapEvents.Messages.Leave;
+using GameInterface.Services.MapEvents.Messages.Start;
+using GameInterface.Services.Settlements.Interfaces;
+using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using GameInterface.Services.Villages.Interfaces;
 using HarmonyLib;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.GameState;
+using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.GameComponents;
+using TaleWorlds.CampaignSystem.Map;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
@@ -29,21 +45,8 @@ namespace E2E.Tests.Services.SiegeEvents;
 
 public class SiegeEntryValidationFlowTests : MapEventTestBase
 {
-    private static IReadOnlyList<MethodBase> SiegeCreationDisabledMethods => new[]
-    {
-        AccessTools.Method(
-            typeof(MobileParty),
-            nameof(MobileParty.OnPartyJoinedSiegeInternal)),
-        AccessTools.Method(
-            typeof(BesiegerCamp),
-            nameof(BesiegerCamp.InitializeSiegeEventSide)),
-        AccessTools.Method(
-            typeof(Settlement),
-            nameof(Settlement.InitializeSiegeEventSide)),
-        AccessTools.Method(
-            typeof(ChangeRelationAction),
-            "ApplyInternal"),
-    };
+    private static IEnumerable<MethodBase> SiegeEntryDisabledMethods => SiegeCreationDisabledMethods
+        .Append(AccessTools.Method(typeof(ChangeRelationAction), "ApplyInternal"));
 
     public SiegeEntryValidationFlowTests(ITestOutputHelper output) : base(output)
     {
@@ -98,6 +101,63 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
             client,
             "Unable to begin the siege: your party is too far from the settlement.");
         AssertNoSiege(context);
+    }
+
+    [Fact]
+    public void SettlementEncounterRequest_AfterWinningAssaultFromSiegeCamp_EntersTown()
+    {
+        var client = Clients.First();
+        var context = CreateEntryContext(client);
+        StageCapturedTown(context, Position(24.5f, 34.5f), ledAssault: true, captured: true);
+
+        SendSettlementEncounterRequest(client, context);
+
+        Assert.Empty(
+            Server.NetworkSentMessages.GetMessages<NetworkSettlementEncounterRejected>());
+        Assert.Single(
+            Server.NetworkSentMessages.GetMessages<NetworkStartSettlementEncounter>());
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(
+                context.PartyId,
+                out var party));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(
+                context.SettlementId,
+                out var settlement));
+            Assert.Same(settlement, party.CurrentSettlement);
+        });
+    }
+
+    [Theory]
+    [InlineData(27f, 37f, true, true)]
+    [InlineData(24.5f, 34.5f, false, true)]
+    [InlineData(24.5f, 34.5f, true, false)]
+    public void SettlementEncounterRequest_FromSiegeCampWithoutWinningAssault_IsRejected(
+        float x,
+        float y,
+        bool ledAssault,
+        bool captured)
+    {
+        var client = Clients.First();
+        var context = CreateEntryContext(client);
+        StageCapturedTown(context, Position(x, y), ledAssault, captured);
+
+        SendSettlementEncounterRequest(client, context);
+
+        Assert.Single(
+            Server.NetworkSentMessages.GetMessages<NetworkSettlementEncounterRejected>());
+        AssertInformationMessage(
+            client,
+            "Unable to enter the settlement: your party is too far from the settlement.");
+        Assert.Empty(
+            Server.NetworkSentMessages.GetMessages<NetworkStartSettlementEncounter>());
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(
+                context.PartyId,
+                out var party));
+            Assert.Null(party.CurrentSettlement);
+        });
     }
 
     [Fact]
@@ -179,32 +239,6 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
     }
 
     [Fact]
-    public void BesiegeRequest_WhenPartyIsFarFromSettlement_IsRejected()
-    {
-        var client = Clients.First();
-        var context = CreateEntryContext(client);
-
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(
-                context.PartyId,
-                out var party));
-            using (new AllowedThread())
-            {
-                party.Position = Position(900f, 900f);
-            }
-        });
-
-        SendBesiegeRequest(client, context);
-
-        Assert.False(GetBesiegeApproval().Approved);
-        AssertInformationMessage(
-            client,
-            "Unable to begin the siege: your party is too far from the settlement.");
-        AssertNoSiege(context);
-    }
-
-    [Fact]
     public void BesiegeRequest_ForOwnSettlement_IsRejected()
     {
         var client = Clients.First();
@@ -240,7 +274,7 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
         var context = CreateEntryContext(client);
         IgnoreEntryResults(client);
 
-        SendBesiegeRequest(client, context, SiegeCreationDisabledMethods);
+        SendBesiegeRequest(client, context, SiegeEntryDisabledMethods);
 
         Assert.True(GetBesiegeApproval().Approved);
         AssertSiegeStarted(context);
@@ -253,7 +287,7 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
         var context = CreateEntryContext(client);
         IgnoreEntryResults(client);
 
-        SendBesiegeRequest(client, context, SiegeCreationDisabledMethods);
+        SendBesiegeRequest(client, context, SiegeEntryDisabledMethods);
 
         SiegeEvent? originalSiege = null;
         Server.Call(() =>
@@ -308,11 +342,11 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
             Assert.True(settlement.SiegeEvent.CanPartyJoinSide(
                 party.Party,
                 BattleSideEnum.Attacker));
-        }, SiegeCreationDisabledMethods);
+        }, SiegeEntryDisabledMethods);
         Server.NetworkSentMessages.Clear();
         IgnoreEntryResults(client);
 
-        SendJoinRequest(client, context, SiegeCreationDisabledMethods);
+        SendJoinRequest(client, context, SiegeEntryDisabledMethods);
 
         var approval = GetJoinApproval();
         Assert.True(approval.Approved);
@@ -321,58 +355,453 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
     }
 
     [Fact]
-    public void JoinRequest_WhenPartyIsFarFromSettlement_IsRejected()
+    public void JoinRequest_FromNativeBesiegerEncounterOutsideTownGate_IsApproved()
     {
         var client = Clients.First();
-        var context = CreateJoinContext(client);
+        var context = CreateEntryContext(client);
+        var campPosition = Position(24.5f, 34.5f);
+        var arrivalPosition = Position(24.75f, 34.5f);
 
-        Server.Call(() =>
+        foreach (var instance in Clients.Append(Server))
         {
-            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(
-                context.PartyId,
-                out var party));
+            instance.Call(() =>
+            {
+                var settlement = CreatePresentedTownSiege(instance, context);
+                var camp = settlement.SiegeEvent.BesiegerCamp;
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(context.PartyId, out var party));
+                using (new AllowedThread())
+                {
+                    settlement._position = Position(20f, 30f);
+                    settlement.GatePosition = settlement.Position;
+                    camp.LeaderParty._besiegerCamp = camp;
+                    camp.LeaderParty.Position = campPosition;
+                    party.Position = arrivalPosition;
+                    party.SetShortTermBehavior(AiBehavior.EngageParty, camp.LeaderParty.Party);
+                }
+            }, SiegeEntryDisabledMethods);
+        }
+        ClearMessages();
+
+        client.Call(() =>
+        {
+            var settlement = PrepareClientMenuContext(client, context);
+            var party = MobileParty.MainParty;
+            var besieger = settlement.SiegeEvent.BesiegerCamp.LeaderParty;
+            EnsureEncounterModel();
+            Assert.True(((IInteractablePoint)besieger.Party).CanPartyInteract(party, 0f));
+            Assert.True(party.Position.Distance(settlement.GatePosition) > 0.55f);
+            Assert.True(party.Position.Distance(settlement.Position) > 0.55f);
+
+            var encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
+            Campaign.Current.PlayerEncounter = encounter;
+            encounter.SetupFields(party.Party, besieger.Party);
+            Assert.Same(settlement, PlayerEncounter.EncounterSettlement);
+            Assert.Equal("join_siege_event", new DefaultEncounterGameMenuModel().GetEncounterMenu(
+                party.Party, besieger.Party, out var startBattle, out var joinBattle));
+            Assert.False(startBattle);
+            Assert.False(joinBattle);
+
+            new EncounterGameMenuBehavior().game_menu_join_siege_event_on_consequence(null);
+        }, WithoutNetworkDelivery());
+
+        var request = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestJoinSiegeCamp>());
+        Assert.Equal(context.PartyId, request.PartyId);
+        Assert.Equal(context.SettlementId, request.SettlementId);
+        IgnoreEntryResults(client);
+        client.NetworkSentMessages.Clear();
+
+        // Replay the captured native request without the player-local menu continuation.
+        client.Call(() => client.Resolve<INetwork>().SendAll(request), SiegeEntryDisabledMethods);
+
+        Assert.True(GetJoinApproval().Approved);
+        AssertJoinedSiege(context);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void GenericBattleJoinMenu_RequestsMissingEncounterOnceAndPreservesExistingEncounter(bool hasEncounter)
+    {
+        var client = Clients.First();
+        var context = CreateEntryContext(client);
+        var battle = CreateServerMapEvent();
+        client.NetworkSentMessages.Clear();
+
+        client.Call(() =>
+        {
+            var settlement = PrepareClientMenuContext(client, context);
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
             using (new AllowedThread())
             {
-                party.Position = Position(900f, 900f);
+                MobileParty.MainParty.CurrentSettlement = settlement;
+                settlement.Party._mapEventSide = mapEvent.DefenderSide;
             }
-        });
+            var encounter = hasEncounter ? ObjectHelper.SkipConstructor<PlayerEncounter>() : null;
+            Campaign.Current.PlayerEncounter = encounter;
+            var model = new DefaultEncounterGameMenuModel();
 
-        SendJoinRequest(client, context);
+            Assert.Equal(hasEncounter ? "join_encounter" : null, model.GetGenericStateMenu());
+            Assert.Equal(hasEncounter ? "join_encounter" : null, model.GetGenericStateMenu());
+            Assert.Same(encounter, PlayerEncounter.Current);
+            Assert.Same(settlement, MobileParty.MainParty.CurrentSettlement);
+            Assert.Null(MobileParty.MainParty.MapEvent);
+        }, WithoutNetworkDelivery());
 
-        Assert.False(GetJoinApproval().Approved);
-        AssertInformationMessage(
-            client,
-            "Unable to join the siege: your party is too far from the settlement.");
-        AssertNotJoined(context);
+        var requests = client.NetworkSentMessages.GetMessages<NetworkRequestStartSettlementEncounter>();
+        if (hasEncounter)
+        {
+            Assert.Empty(requests);
+        }
+        else
+        {
+            var request = Assert.Single(requests);
+            Assert.Equal(client.GetHandle<MobileParty>(context.PartyId), request.PartyId);
+            Assert.Equal(client.GetHandle<Settlement>(context.SettlementId), request.SettlementId);
+        }
     }
 
     [Fact]
-    public void JoinRequest_WhenPartyBelongsToDefender_IsRejected()
+    public void BesiegedTownEncounter_RepeatedArrival_RequestsOnce()
     {
         var client = Clients.First();
-        var context = CreateJoinContext(client);
-
-        Server.Call(() =>
+        var context = CreateEntryContext(client);
+        foreach (var instance in Clients.Append(Server))
         {
-            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(
-                context.PartyId,
-                out var party));
-            Assert.True(Server.ObjectManager.TryGetObject<Town>(
-                context.TownId,
-                out var town));
+            instance.Call(() => CreatePresentedTownSiege(instance, context), SiegeEntryDisabledMethods);
+        }
+        ClearMessages();
+
+        client.Call(() =>
+        {
+            var settlement = PrepareClientMenuContext(client, context);
+            client.Resolve<IControllerIdProvider>().SetControllerId("PlayerOne");
+            Assert.True(settlement.IsUnderSiege);
+            Campaign.Current.PlayerEncounter = null;
+
+            EncounterManager.StartSettlementEncounter(MobileParty.MainParty, settlement);
+        }, SiegeEntryDisabledMethods);
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkStartSettlementEncounter>());
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Settlement>(context.SettlementId, out var settlement));
+            var encounter = PlayerEncounter.Current;
+            Assert.NotNull(encounter);
+            Assert.Same(settlement, PlayerEncounter.EncounterSettlement);
+            Assert.Null(MobileParty.MainParty.CurrentSettlement);
+            EnsureEncounterModel();
+            EngageSettlement(MobileParty.MainParty, settlement, atSea: false);
+
+            // Client time keeps running under the menu, so the map tick arrives here again.
+            EncounterManager.HandleEncounterForMobileParty(MobileParty.MainParty, 0f);
+            EncounterManager.HandleEncounterForMobileParty(MobileParty.MainParty, 0f);
+
+            Assert.Same(encounter, PlayerEncounter.Current);
+        }, SiegeEntryDisabledMethods);
+
+        Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestStartSettlementEncounter>());
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkStartSettlementEncounter>());
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void SettlementArrivalTick_WithEncounterOpen_DoesNotRequestEntryAgain(bool atSea, bool encounterOpen)
+    {
+        var client = Clients.First();
+        var context = CreateEntryContext(client);
+
+        client.Call(() =>
+        {
+            var settlement = PrepareClientMenuContext(client, context);
+            client.Resolve<IControllerIdProvider>().SetControllerId("PlayerOne");
+            EnsureEncounterModel();
+            EngageSettlement(MobileParty.MainParty, settlement, atSea);
+            PlayerEncounter? encounter = null;
+            if (encounterOpen)
+            {
+                // An outside menu such as the port menu of a blockaded town, the party never enters.
+                encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
+                encounter.EncounterSettlementAux = settlement;
+            }
+            Campaign.Current.PlayerEncounter = encounter;
+
+            EncounterManager.HandleEncounterForMobileParty(MobileParty.MainParty, 0f);
+            EncounterManager.HandleEncounterForMobileParty(MobileParty.MainParty, 0f);
+
+            Assert.Same(encounter, PlayerEncounter.Current);
+        }, WithoutNetworkDelivery());
+
+        var requests = client.NetworkSentMessages.GetMessages<NetworkRequestStartSettlementEncounter>();
+        if (encounterOpen)
+        {
+            Assert.Empty(requests);
+        }
+        else
+        {
+            var request = Assert.Single(requests);
+            Assert.Equal(client.GetHandle<Settlement>(context.SettlementId), request.SettlementId);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SettlementArrival_WithoutEncounterAtThatSettlement_StillRequestsEntry(bool otherSettlementEncounter)
+    {
+        var client = Clients.First();
+        var context = CreateEntryContext(client);
+
+        client.Call(() =>
+        {
+            var settlement = PrepareClientMenuContext(client, context);
+            client.Resolve<IControllerIdProvider>().SetControllerId("PlayerOne");
+            PlayerEncounter? encounter = null;
+            if (otherSettlementEncounter)
+            {
+                encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
+                encounter.EncounterSettlementAux = GameObjectCreator.CreateInitializedObject<Settlement>();
+            }
+            Campaign.Current.PlayerEncounter = encounter;
+
+            EncounterManager.StartSettlementEncounter(MobileParty.MainParty, settlement);
+        }, WithoutNetworkDelivery());
+
+        var request = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestStartSettlementEncounter>());
+        Assert.Equal(client.GetHandle<Settlement>(context.SettlementId), request.SettlementId);
+    }
+
+    [Fact]
+    public void GenericTownMenu_WithoutBattle_DoesNotRequestEncounterRecovery()
+    {
+        var client = Clients.First();
+        var context = CreateEntryContext(client);
+        client.Call(() =>
+        {
+            var settlement = PrepareClientMenuContext(client, context);
+            using (new AllowedThread()) MobileParty.MainParty.CurrentSettlement = settlement;
+            Campaign.Current.PlayerEncounter = null;
+
+            Assert.Equal("town_outside", new DefaultEncounterGameMenuModel().GetGenericStateMenu());
+        }, WithoutNetworkDelivery());
+
+        Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkRequestStartSettlementEncounter>());
+    }
+
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(false, false, true)]
+    public void RejectedGenericBattleRecovery_RetriesAfterExplicitEntryOrBattleChange(bool explicitEntry, bool differentBattle, bool leaveBattle)
+    {
+        var client = Clients.First();
+        var context = CreateEntryContext(client);
+        var battle = CreateServerMapEvent();
+        var nextBattle = differentBattle ? CreateServerMapEvent() : battle;
+        client.NetworkSentMessages.Clear();
+
+        client.Call(() =>
+        {
+            var settlement = PrepareClientMenuContext(client, context);
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
             using (new AllowedThread())
             {
-                town.OwnerClan = party.ActualClan;
+                MobileParty.MainParty.CurrentSettlement = settlement;
+                settlement.Party._mapEventSide = mapEvent.DefenderSide;
             }
+            Campaign.Current.PlayerEncounter = null;
+            Assert.Null(new DefaultEncounterGameMenuModel().GetGenericStateMenu());
+        }, WithoutNetworkDelivery());
+
+        var request = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestStartSettlementEncounter>());
+        client.SimulateMessage(Server.NetPeer, new NetworkSettlementEncounterRejected(request));
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Settlement>(context.SettlementId, out var settlement));
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(nextBattle.MapEventId, out var mapEvent));
+            using (new AllowedThread()) settlement.Party._mapEventSide = mapEvent.DefenderSide;
+
+            if (leaveBattle)
+            {
+                using (new AllowedThread()) MobileParty.MainParty.Party.MapEventSide = mapEvent.DefenderSide;
+                Assert.True(client.ObjectManager.TryGetId(MobileParty.MainParty.Party, out var partyBaseId));
+                client.SimulateMessage(Server.NetPeer, new NetworkPartyLeftBattle(partyBaseId, finishLocalMenus: false));
+                Assert.Null(MobileParty.MainParty.MapEvent);
+            }
+            if (explicitEntry)
+                client.SimulateMessage(this, new StartSettlementEncounterAttempted(MobileParty.MainParty, settlement));
+            Assert.Null(new DefaultEncounterGameMenuModel().GetGenericStateMenu());
+            Assert.Null(PlayerEncounter.Current);
+        }, WithoutNetworkDelivery());
+
+        Assert.Equal(explicitEntry || differentBattle || leaveBattle ? 2 : 1,
+            client.NetworkSentMessages.GetMessages<NetworkRequestStartSettlementEncounter>().Count());
+    }
+
+    [Fact]
+    public void RecoveredCityAssault_ExplicitJoinLeavesTownOnAllPeersAndPreservesEncounter()
+    {
+        var client = Clients.First();
+        var context = CreateEntryContext(client);
+        var battle = CreateServerMapEvent();
+        using var activation = new MethodCallRecorder(Priority.Last,
+            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu), new[] { typeof(string) }));
+        using var menuSwitch = new MethodCallRecorder(
+            AccessTools.Method(typeof(MenuContext), nameof(MenuContext.SwitchToMenu), new[] { typeof(string) }));
+        var disabledMethods = MapEventDisabledMethods.Concat(SiegeEntryDisabledMethods).ToList();
+        foreach (var instance in Clients.Append(Server))
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
+                var settlement = CreatePresentedTownSiege(instance, context, (party, besiegedSettlement) =>
+                {
+                    party.CurrentSettlement = besiegedSettlement;
+                    besiegedSettlement.Party._mapEventSide = mapEvent.DefenderSide;
+                    mapEvent.DefenderSide.LeaderParty = besiegedSettlement.Party;
+                    mapEvent.SetBattleType(MapEvent.BattleTypes.Siege);
+                    mapEvent.SetMapEventSettlement(besiegedSettlement);
+                });
+                using (new AllowedThread())
+                {
+                    // The skipped scene initializer also creates the collections read by siege strength calculations.
+                    settlement.SiegeEvent.BesiegerCamp.SiegeEngines = new SiegeEvent.SiegeEnginesContainer(
+                        BattleSideEnum.Attacker, null);
+                    settlement.SiegeEngines = new SiegeEvent.SiegeEnginesContainer(
+                        BattleSideEnum.Defender, null);
+                }
+            }, disabledMethods);
+        }
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(context.SettlementId, out var settlement));
+            Assert.True(Campaign.Current.Models.CombatSimulationModel.GetSettlementAdvantage(settlement) > 0f);
         });
+        ClearMessages();
+        PlayerEncounter? recoveredEncounter = null;
 
-        SendJoinRequest(client, context);
+        client.Call(() =>
+        {
+            var settlement = PrepareClientMenuContext(client, context);
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
+            Campaign.Current.PlayerEncounter = null;
+            Assert.True(mapEvent.CanPartyJoinBattle(PartyBase.MainParty, settlement.BattleSide));
+            using (new AllowedThread())
+                client.Resolve<ISettlementInterface>().StartSettlementEncounter(MobileParty.MainParty, settlement);
 
-        Assert.False(GetJoinApproval().Approved);
-        AssertInformationMessage(
-            client,
-            "Unable to join the siege: your party belongs to the defending faction.");
-        AssertNotJoined(context);
+            Assert.NotNull(PlayerEncounter.Current);
+            Assert.Same(settlement, PlayerEncounter.EncounterSettlement);
+            Assert.Same(mapEvent, PlayerEncounter.EncounteredBattle);
+            Assert.Null(PlayerEncounter.Battle);
+            Assert.Null(MobileParty.MainParty.MapEvent);
+            Assert.Equal(new[] { "join_encounter" }, activation.MenusFor(client));
+            Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkRequestCreateMapEvent>());
+            Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkRequestJoinBattle>());
+
+            recoveredEncounter = PlayerEncounter.Current;
+            Assert.Equal("join_encounter", new DefaultEncounterGameMenuModel().GetGenericStateMenu());
+            Assert.Same(recoveredEncounter, PlayerEncounter.Current);
+            Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkRequestStartSettlementEncounter>());
+
+            // Activation is recorded without rendering, so supply the menu context it would create.
+            var mapState = Game.Current.GameStateManager.CreateState<MapState>();
+            mapState._menuContext = ObjectHelper.SkipConstructor<MenuContext>();
+            mapState._menuContext.GameMenu = new GameMenu("join_encounter");
+            Game.Current.GameStateManager._gameStates.Add(mapState);
+
+            new EncounterGameMenuBehavior().game_menu_join_encounter_help_attackers_on_consequence(
+                new MenuCallbackArgs((MenuContext)null, null));
+            Assert.Null(MobileParty.MainParty.MapEvent);
+        }, disabledMethods);
+
+        var request = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestJoinBattle>());
+        Assert.Equal(battle.MapEventId, request.MapEventId);
+        Assert.Equal(BattleSideEnum.Attacker, request.Side);
+        Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkRequestCreateMapEvent>());
+        Assert.True(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkJoinBattleReply>()).Accepted);
+        var sent = Server.NetworkSentMessages.ToList();
+        var leave = Assert.Single(sent.OfType<NetworkPartyLeaveSettlement>());
+        Assert.True(sent.IndexOf(leave) < sent.FindIndex(message => message is NetworkAddBattleParty));
+        foreach (var instance in Clients.Append(Server))
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(context.PartyId, out var party));
+                Assert.True(instance.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
+                Assert.Null(party.CurrentSettlement);
+                Assert.Same(mapEvent, party.MapEvent);
+                Assert.Same(mapEvent.AttackerSide, party.Party.MapEventSide);
+                Assert.NotNull(mapEvent.FindMapEventParty(party.Party));
+            });
+        }
+        client.Call(() =>
+        {
+            Assert.Same(recoveredEncounter, PlayerEncounter.Current);
+            Assert.Same(MobileParty.MainParty.MapEvent, PlayerEncounter.Battle);
+            Assert.True(PlayerEncounter.Current.IsJoinedBattle);
+            Assert.Contains("encounter", menuSwitch.MenusFor(client));
+            var attack = new MenuCallbackArgs((MenuContext)null, null);
+            Assert.True(new EncounterGameMenuBehavior().game_menu_encounter_attack_on_condition(attack));
+            Assert.True(attack.IsEnabled);
+        });
+    }
+
+    [Theory]
+    [InlineData(MapEvent.BattleTypes.Siege, true, "encounter")]
+    [InlineData(MapEvent.BattleTypes.FieldBattle, false, "encounter")]
+    public void SettlementEncounterMenu_PreservesDefenderAndNonAssaultMenus(
+        MapEvent.BattleTypes battleType, bool sameFaction, string expectedMenu)
+    {
+        var client = Clients.First();
+        var context = CreateEntryContext(client);
+        var battle = CreateServerMapEvent();
+        client.Call(() =>
+        {
+            var settlement = PrepareClientMenuContext(client, context);
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
+            using (new AllowedThread())
+            {
+                MobileParty.MainParty.CurrentSettlement = settlement;
+                settlement.Party._mapEventSide = mapEvent.DefenderSide;
+                mapEvent.SetBattleType(battleType);
+                if (sameFaction) settlement.Town.OwnerClan = MobileParty.MainParty.ActualClan;
+            }
+            Assert.Equal(expectedMenu, new DefaultEncounterGameMenuModel().GetEncounterMenu(
+                MobileParty.MainParty.Party, settlement.Party, out var startBattle, out var joinBattle));
+            Assert.False(startBattle);
+            Assert.False(joinBattle);
+        }, WithoutNetworkDelivery());
+    }
+
+    private static Settlement PrepareClientMenuContext(EnvironmentInstance client, EntryContext context)
+    {
+        Assert.True(client.ObjectManager.TryGetObject<MobileParty>(context.PartyId, out var party));
+        Assert.True(client.ObjectManager.TryGetObject<Settlement>(context.SettlementId, out var settlement));
+        Assert.True(client.ObjectManager.TryGetObject<Town>(context.TownId, out var town));
+        Assert.True(client.ObjectManager.TryGetObject<Clan>(context.DefenderClanId, out var defenderClan));
+        using (new AllowedThread())
+        {
+            // Player registration does not replace the client's bootstrap main party.
+            Campaign.Current.MainParty = party;
+            // CreateEntryContext wires the server city under AllowedThread, so prepare its client copy too.
+            settlement.SetSettlementComponent(town);
+            town.OwnerClan = defenderClan;
+        }
+
+        Assert.Same(party, MobileParty.MainParty);
+        Assert.True(client.ObjectManager.TryGetHandle(MobileParty.MainParty, out _));
+        Assert.True(settlement.IsTown);
+        Assert.Equal(KillCharacterAction.KillCharacterActionDetail.None, Hero.MainHero.DeathMark);
+        Assert.Null(MobileParty.MainParty.MapEvent);
+        Assert.Null(MobileParty.MainParty.BesiegerCamp);
+        Assert.Null(MobileParty.MainParty.AttachedTo);
+        Assert.NotEqual(MobileParty.MainParty.MapFaction, settlement.MapFaction);
+        return settlement;
     }
 
     private EntryContext CreateEntryContext(EnvironmentInstance client)
@@ -425,7 +854,49 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
         client.NetworkSentMessages.Clear();
         foreach (var connectedClient in Clients)
             connectedClient.InternalMessages.Clear();
-        return new EntryContext(partyId, settlementId, townId);
+        return new EntryContext(partyId, settlementId, townId, defenderClanId);
+    }
+
+    // Leaves the party where the server rolled its camp slot (one slot at 24,34, gate at 20,30),
+    // as vanilla does once a won assault hands the town to the attacker.
+    private void StageCapturedTown(
+        EntryContext context,
+        CampaignVec2 partyPosition,
+        bool ledAssault,
+        bool captured)
+    {
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(
+                context.PartyId,
+                out var party));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(
+                context.SettlementId,
+                out var settlement));
+
+            var campSlot = MatrixFrame.Identity;
+            campSlot.origin = new Vec3(24f, 34f, 0f);
+            using (new AllowedThread())
+            {
+                settlement.Town.BesiegerCampPositions1 = new[] { campSlot };
+                settlement.Town.BesiegerCampPositions2 = System.Array.Empty<MatrixFrame>();
+                if (captured)
+                    settlement.Town.OwnerClan = party.ActualClan;
+                settlement._lastAttackerParty = ledAssault ? party : null;
+                party.Position = partyPosition;
+            }
+        });
+        Server.NetworkSentMessages.Clear();
+    }
+
+    private static void SendSettlementEncounterRequest(
+        EnvironmentInstance client,
+        EntryContext context)
+    {
+        client.Call(() => client.Resolve<INetwork>().SendAll(
+            new NetworkRequestStartSettlementEncounter(
+                client.GetHandle<MobileParty>(context.PartyId),
+                client.GetHandle<Settlement>(context.SettlementId))));
     }
 
     private EntryContext CreateJoinContext(EnvironmentInstance client)
@@ -443,7 +914,7 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
             {
                 CreatePresentedSiege(party, settlement);
             }
-        }, SiegeCreationDisabledMethods);
+        }, SiegeEntryDisabledMethods);
         Server.NetworkSentMessages.Clear();
         return context;
     }
@@ -554,19 +1025,26 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
         });
     }
 
-    private void AssertNotJoined(EntryContext context)
+    // Wires the context's town on this instance and presents a siege on it. beforeSiege runs after the
+    // town is wired and before the siege is created.
+    private static Settlement CreatePresentedTownSiege(
+        EnvironmentInstance instance,
+        EntryContext context,
+        Action<MobileParty, Settlement>? beforeSiege = null)
     {
-        Server.Call(() =>
+        Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(context.PartyId, out var party));
+        Assert.True(instance.ObjectManager.TryGetObject<Settlement>(context.SettlementId, out var settlement));
+        Assert.True(instance.ObjectManager.TryGetObject<Town>(context.TownId, out var town));
+        Assert.True(instance.ObjectManager.TryGetObject<Clan>(context.DefenderClanId, out var defenderClan));
+        using (new AllowedThread())
         {
-            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(
-                context.PartyId,
-                out var party));
-            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(
-                context.SettlementId,
-                out var settlement));
-            Assert.NotNull(settlement.SiegeEvent);
-            Assert.Null(party.BesiegerCamp);
-        });
+            settlement.SetSettlementComponent(town);
+            town.OwnerClan = defenderClan;
+            beforeSiege?.Invoke(party, settlement);
+            CreatePresentedSiege(party, settlement);
+        }
+
+        return settlement;
     }
 
     private static void CreatePresentedSiege(
@@ -584,11 +1062,29 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
         siegeEvent.BesiegerCamp._leaderParty = siegeLeader;
     }
 
+    // Puts the party at the settlement's gate or port, engaging it the way the map AI leaves it on arrival.
+    private static void EngageSettlement(MobileParty party, Settlement settlement, bool atSea)
+    {
+        using (new AllowedThread())
+        {
+            if (atSea)
+                settlement.SetPortPosition(new CampaignVec2(new Vec2(22f, 32f), isOnLand: false));
+
+            party._isCurrentlyAtSea = atSea;
+            party.SetTargetSettlement(settlement, atSea);
+            party.Position = atSea ? settlement.PortPosition : settlement.GatePosition;
+            party.SetShortTermBehavior(AiBehavior.GoToSettlement, settlement.Party);
+        }
+
+        Assert.Same(settlement, party.ShortTermTargetSettlement);
+    }
+
     private static CampaignVec2 Position(float x, float y) =>
         new CampaignVec2(new Vec2(x, y), isOnLand: true);
 
     private sealed record EntryContext(
         string PartyId,
         string SettlementId,
-        string TownId);
+        string TownId,
+        string DefenderClanId);
 }

@@ -1,8 +1,10 @@
 ﻿using LiteNetLib;
+using System.Net;
 using System.Text.Json;
 
 namespace VerificationHarness.Transport;
 
+/// <summary>Harness server peer that accepts the loopback client nodes and checks their scenario outcome.</summary>
 internal sealed class TransportServerNode : TransportNodeBase
 {
     private readonly TextWriter output;
@@ -35,6 +37,7 @@ internal sealed class TransportServerNode : TransportNodeBase
         Result.ObservedDigests["server"] = Result.LocalDigest;
     }
 
+    /// <summary>Listens on loopback, reports its port, and serves clients until the scenario finishes or times out.</summary>
     public async Task<TransportNodeResult> RunAsync(CancellationToken cancellationToken)
     {
         var manager = new NetManager(this)
@@ -45,7 +48,7 @@ internal sealed class TransportServerNode : TransportNodeBase
         };
         Manager = manager;
 
-        if (!manager.Start(Options.Port))
+        if (!manager.Start(IPAddress.Loopback, IPAddress.IPv6Loopback, Options.Port))
         {
             Result.Error = $"Could not bind LiteNetLib server to UDP port {Options.Port}.";
             return Result;

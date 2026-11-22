@@ -3,6 +3,7 @@ using Coop.Core.Client.Services.Heroes.Handlers;
 using Coop.Core.Client.Services.Heroes.Messages;
 using GameInterface.Services.Heroes.Data;
 using GameInterface.Services.Heroes.Interfaces;
+using GameInterface.Services.MapTracking;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using Moq;
@@ -16,6 +17,7 @@ public class RemotePlayerHeroHandlerTests
     private readonly Mock<IHeroInterface> heroInterface = new();
     private readonly Mock<IPlayerManager> playerManager = new();
     private readonly Mock<IPlayerCreationRollback> playerCreationRollback = new();
+    private readonly Mock<IPlayerMapTracking> mapTracking = new();
     private readonly RemotePlayerHeroHandler handler;
 
     public RemotePlayerHeroHandlerTests()
@@ -24,7 +26,8 @@ public class RemotePlayerHeroHandlerTests
             messageBroker,
             heroInterface.Object,
             playerManager.Object,
-            playerCreationRollback.Object);
+            playerCreationRollback.Object,
+            mapTracking.Object);
     }
 
     [Fact]
@@ -85,6 +88,17 @@ public class RemotePlayerHeroHandlerTests
             It.IsAny<byte[]>(),
             It.IsAny<Player>(),
             It.IsAny<PlayerRegistrationHandles>()), Times.Never);
+    }
+
+    [Fact]
+    public void ExistingPlayer_RefreshesMapTrackerAfterRegistering()
+    {
+        var player = new Player("ctrl", "hero1", "party1", "clan1", "char1");
+        playerManager.Setup(x => x.AddPlayer(player)).Returns(true);
+
+        messageBroker.Publish(this, new NetworkNewPlayerHeroCreated("ctrl", player, System.Array.Empty<byte>()));
+
+        mapTracking.Verify(x => x.RefreshTracker(player), Times.Once);
     }
 
     [Fact]

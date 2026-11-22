@@ -26,7 +26,6 @@ internal class ServerSettlementHandler : IHandler
         this.network = network;
         this.objectManager = objectManager;
         messageBroker.Subscribe<SettlementChangedBribePaid>(HandleBribePaid);
-        messageBroker.Subscribe<SettlementChangedSettlementHitPoints>(HandleHitPoints);
         messageBroker.Subscribe<SettlementChangedLastAttackerParty>(HandleLastAttackerParty);
         messageBroker.Subscribe<SettlementChangedLastThreatTime>(HandleLastThreatTime);
         messageBroker.Subscribe<SettlementChangedCurrentSiegeState>(HandleCurrentSiegeState);
@@ -38,12 +37,6 @@ internal class ServerSettlementHandler : IHandler
         messageBroker.Subscribe<SettlementWallHitPointsRatioChanged>(HandleWallRatio);
 
         messageBroker.Subscribe<SettlementChangedLastVisitTimeOfOwner>(HandleLastVisitOfOwner);
-
-        messageBroker.Subscribe<ClientChangeLordConversationCampaignBehaviorPlayerClaim>(HandleLordConversationCampaignBehaviorPlayerClaim);
-        messageBroker.Subscribe<ClientChangeLordConversationCampaignBehaviorPlayerClaimValue>(HandleLordConversationCampaignBehaviorPlayerClaimValue);
-
-        //Settlement.CanBeClaimed
-        messageBroker.Subscribe<SettlementClaimantCanBeClaimedChanged>(HandleSettlementClaimaintCanBeClaimed);
 
         // auditor
         messageBroker.Subscribe<RequestSettlementAudit>(Handle_Request);
@@ -63,34 +56,6 @@ internal class ServerSettlementHandler : IHandler
         var message = new ProcessSettlementAudit(payload.What.Data);
         messageBroker.Publish(this, message);
 
-    }
-
-    private void HandleSettlementClaimaintCanBeClaimed(MessagePayload<SettlementClaimantCanBeClaimedChanged> payload)
-    {
-        var obj = payload.What;
-
-        if (!objectManager.TryGetIdWithLogging(obj.Settlement, out var settlementId)) return;
-
-        network.SendAll(new NetworkChangeSettlementClaimantCanBeClaimed(settlementId, obj.CanBeClaimed)); 
-    }
-
-    private void HandleLordConversationCampaignBehaviorPlayerClaimValue(MessagePayload<ClientChangeLordConversationCampaignBehaviorPlayerClaimValue> payload)
-    {
-        var obj = payload.What;
-        // send to server GI
-        messageBroker.Publish(this, new ChangeLordConversationCampaignBehaviourPlayerClaimValue(obj.SettlementId, obj.ClaimValue));
-
-        // send to other clients
-        network.SendAllBut(payload.Who as NetPeer, new NetworkChangeLordConverationCampaignBehaviorPlayerClaimValueOther(obj.SettlementId, obj.ClaimValue));
-    }
-
-    private void HandleLordConversationCampaignBehaviorPlayerClaim(MessagePayload<ClientChangeLordConversationCampaignBehaviorPlayerClaim> payload)
-    {
-        var obj = payload.What;
-        messageBroker.Publish(this, new ChangeLordConversationCampaignBehaviorPlayerClaim(obj.SettlementId, obj.HeroId));
-
-        // notify other clients of what player did
-        network.SendAllBut(payload.Who as NetPeer, new NetworkChangeLordConverationCampaignBehaviorPlayerClaimOther(obj.SettlementId, obj.HeroId));
     }
 
     private void HandleLastVisitOfOwner(MessagePayload<SettlementChangedLastVisitTimeOfOwner> payload)
@@ -176,17 +141,6 @@ internal class ServerSettlementHandler : IHandler
         network.SendAll(message);   
     }
 
-    private void HandleHitPoints(MessagePayload<SettlementChangedSettlementHitPoints> payload)
-    {
-        var obj = payload.What;
-
-        if (!objectManager.TryGetIdWithLogging(obj.Settlement, out var settlementId)) return;
-
-        var message = new NetworkChangeSettlementHitPoints(settlementId, obj.SettlementHitPoints);
-
-        network.SendAll(message);
-    }
-
     private void HandleBribePaid(MessagePayload<SettlementChangedBribePaid> payload)
     {
         var obj = payload.What;
@@ -198,11 +152,9 @@ internal class ServerSettlementHandler : IHandler
         network.SendAll(message);
     }
 
-
     public void Dispose()
     {
         messageBroker.Unsubscribe<SettlementChangedBribePaid>(HandleBribePaid);
-        messageBroker.Unsubscribe<SettlementChangedSettlementHitPoints>(HandleHitPoints);
         messageBroker.Unsubscribe<SettlementChangedLastAttackerParty>(HandleLastAttackerParty);
         messageBroker.Unsubscribe<SettlementChangedLastThreatTime>(HandleLastThreatTime);
         messageBroker.Unsubscribe<SettlementChangedCurrentSiegeState>(HandleCurrentSiegeState);
@@ -212,11 +164,6 @@ internal class ServerSettlementHandler : IHandler
         messageBroker.Unsubscribe<SettlementChangedMobileParty>(HandleChangedMobileParty);
         messageBroker.Unsubscribe<SettlementWallHitPointsRatioChanged>(HandleWallRatio);
         messageBroker.Unsubscribe<SettlementChangedLastVisitTimeOfOwner>(HandleLastVisitOfOwner);
-        messageBroker.Unsubscribe<ClientChangeLordConversationCampaignBehaviorPlayerClaim>(HandleLordConversationCampaignBehaviorPlayerClaim);
-        messageBroker.Unsubscribe<ClientChangeLordConversationCampaignBehaviorPlayerClaimValue>(HandleLordConversationCampaignBehaviorPlayerClaimValue);
-
-        //Settlement.CanBeClaimed
-        messageBroker.Unsubscribe<SettlementClaimantCanBeClaimedChanged>(HandleSettlementClaimaintCanBeClaimed);
 
         messageBroker.Unsubscribe<RequestSettlementAudit>(Handle_Request);
         messageBroker.Unsubscribe<SettlementAuditResponse>(Handle_Respond);

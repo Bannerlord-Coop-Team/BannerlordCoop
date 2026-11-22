@@ -7,6 +7,7 @@ using Common.Serialization;
 using E2E.Tests.Environment.Extensions;
 using E2E.Tests.Environment.MockEngine;
 using GameInterface.Services.Entity;
+using GameInterface.Surrogates;
 using LiteNetLib;
 using Missions.Agents.Handlers;
 using Missions.Agents.Messages;
@@ -17,15 +18,15 @@ using Moq;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
-using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Missions;
 
 /// <summary>Regression coverage for battle message wire volume and stale hit presentation.</summary>
-public class BattleMessageBatchingTests : MissionTestEnvironment
+public class BattleMessageBatchingTests
 {
-    public BattleMessageBatchingTests(ITestOutputHelper output) : base(output)
+    public BattleMessageBatchingTests()
     {
+        _ = new SurrogateCollection();
     }
 
     [Fact]
@@ -76,16 +77,15 @@ public class BattleMessageBatchingTests : MissionTestEnvironment
             client.Send(controllerId, message);
         }
 
-        Assert.True(
-            logicalPayloads.Max(payload => payload.Length) < ReliableMessageBatcher<string>.DefaultBudgetBytes,
-            $"payload sizes: min={logicalPayloads.Min(payload => payload.Length)} " +
-            $"max={logicalPayloads.Max(payload => payload.Length)} " +
-            $"average={logicalPayloads.Average(payload => payload.Length):F1}");
         Assert.True(relayedPackets.Count < logicalMessageCount);
 
         client.FlushPendingMessages();
 
         Assert.InRange(relayedPackets.Count, 1, 63);
+        // Batches stay within one datagram on the relay hop, so none of them fragments.
+        Assert.All(
+            relayedPackets,
+            packet => Assert.InRange(serializer.Serialize(packet).Length, 1, LiteNetP2PClient.SafeSinglePacketBytes));
         Assert.All(
             relayedPackets,
             packet => Assert.Equal(LiteNetLib.DeliveryMethod.ReliableOrdered, packet.DeliveryMethod));
@@ -209,24 +209,18 @@ public class BattleMessageBatchingTests : MissionTestEnvironment
     public void PlayBlood_InactiveAgent_DoesNotCallNativePresentation()
     {
         using var fixture = new MissionEngineFixture();
-        var client = Clients.First();
+        Agent victim = new MockMission().SpawnMount();
+        Assert.True(AgentMirror.TryGet(victim, out MirrorAgent mirror));
+        mirror.IsActive = false;
 
-        client.Call(() =>
-        {
-            MockMission mission = fixture.CreateMission(client);
-            Agent victim = mission.SpawnMount();
-            Assert.True(AgentMirror.TryGet(victim, out MirrorAgent mirror));
-            mirror.IsActive = false;
+        CombatHitPresentationHandler.PlayBlood(victim, 1, 1f);
 
-            CombatHitPresentationHandler.PlayBlood(victim, 1, 1f);
+        Assert.Equal(0, mirror.BloodBurstCalls);
 
-            Assert.Equal(0, mirror.BloodBurstCalls);
+        mirror.IsActive = true;
+        CombatHitPresentationHandler.PlayBlood(victim, 1, 1f);
 
-            mirror.IsActive = true;
-            CombatHitPresentationHandler.PlayBlood(victim, 1, 1f);
-
-            Assert.Equal(1, mirror.BloodBurstCalls);
-        });
+        Assert.Equal(1, mirror.BloodBurstCalls);
     }
 
     private static IMessage CreateBattleMessage(int index, IBattleDamageDataMapper damageDataMapper)

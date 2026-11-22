@@ -16,7 +16,7 @@ public class TownSyncTests : SyncTestBase
     }
 
     [Fact]
-    public void Server_Town_Fields()
+    public void Server_Town_FieldsAndProperties()
     {
         Server.ObjectManager.TryGetObject(townId, out Town town);
 
@@ -32,11 +32,7 @@ public class TownSyncTests : SyncTestBase
         TestEnvironment.AssertField<Town, bool>(nameof(Town.InRebelliousState), true, defaultValue: town.InRebelliousState);
 
         //TestEnvironment.AssertReferenceField<Town, int>(nameof(Town._marketData)); // readonly
-    }
 
-    [Fact]
-    public void Server_Town_Properties()
-    {
         TestEnvironment.AssertReferenceProperty<Town, Hero>(nameof(Town.Governor));
         //TestEnvironment.AssertProperty<Town, int>(nameof(Town.TradeTaxAccumulated), 200);
         TestEnvironment.AssertProperty<Town, float>(nameof(Town.Security), 50f);

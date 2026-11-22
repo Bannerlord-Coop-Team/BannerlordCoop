@@ -1,6 +1,10 @@
-using Common.Messaging;
+﻿using Common.Messaging;
+using Common.Network;
 using GameInterface.Services.MapEvents.TroopSupply;
+using GameInterface.Services.MapEvents.TroopSupply.Messages;
+using GameInterface.Services.Players;
 using Missions.Messages;
+using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -31,6 +35,7 @@ public class BattleRetreatCasualtyTests : MissionTestEnvironment
         // is the successor that will retreat.
         var (mapEventId, _) = SetupCoopBattle("host-ctrl", "retreat-ctrl");
         var clients = Clients.ToArray();
+        Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer("host-ctrl", clients[0].NetPeer));
 
         // Seed the retreating player's party with five identical troops BEFORE any reserve is flattened, and
         // build its flattened battle roster the way the engine does (OnTroopKilled/Wounded then key off it).
@@ -75,6 +80,12 @@ public class BattleRetreatCasualtyTests : MissionTestEnvironment
         // The player retreats: a real graceful departure (wasRetreat) which forgets its reserve so a rejoin
         // re-flattens the party fresh.
         DepartBattle("retreat-ctrl", mapEventId, wasRetreat: true);
+
+        // This harness has no mission lifecycle to answer the holder's collection request.
+        var request = Server.NetworkSentMessages.GetMessages<NetworkRequestBattleTroopHealth>().Last();
+        Assert.Contains(retreatPartyId, request.PartyIds);
+        clients[0].Call(() => clients[0].Resolve<INetwork>().SendAll(new NetworkBattleTroopHealth(
+            mapEventId, retreatPartyId, new Dictionary<int, float>(), 0, snapshotId: request.SnapshotId)));
 
         // Re-engaging re-flattens the party FROM SCRATCH. BR-052: the three troops lost before the retreat
         // must NOT be restored by the re-flatten — the rebuilt reserve is exactly three men short of the

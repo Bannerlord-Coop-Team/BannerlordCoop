@@ -74,14 +74,22 @@ internal class RomanceDebugCommand
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             return Succeeded($"{CommandNamespace}.list; {CommandNamespace}.status <player_hero_id> <npc_hero_id>; " +
-                $"{CommandNamespace}.start|compatible|agree|marry|divorce <player_hero_id> <npc_hero_id>. " +
-                "Only start, compatible, agree, marry, and divorce require the server console. " +
+                $"{CommandNamespace}.start|compatible|agree|marry|divorce <player_hero_id> <npc_hero_id>; " +
+                $"{CommandNamespace}.fail_practicalities <first_hero_id> <second_hero_id>. " +
+                "Only start, compatible, fail_practicalities, agree, marry, and divorce require the server console. " +
                 "Divorce does not restore pre-marriage clan or party changes.");
         }
     }
 
     public sealed class RomanceStatusCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public RomanceStatusCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => CommandNamespace;
 
         public string Name => "status";
@@ -97,7 +105,7 @@ internal class RomanceDebugCommand
             const string command = CommandNamespace + ".status";
             return RunOnGameThread(command, () =>
             {
-                if (!TryGetPlayerNpcPair(args, out var playerHero, out var targetHero, out string error))
+                if (!TryGetPlayerNpcPair(resolver, args, out var playerHero, out var targetHero, out string error))
                     return Failed(error);
                 if (!CommandHelpers.TryGetObjectManager(out var objectManager, out error))
                     return Failed(error);
@@ -113,6 +121,13 @@ internal class RomanceDebugCommand
 
     public sealed class RomanceStartCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public RomanceStartCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => CommandNamespace;
 
         public string Name => "start";
@@ -130,7 +145,7 @@ internal class RomanceDebugCommand
 
             return RunOnGameThread(command, () =>
             {
-                if (!TryGetPlayerNpcPair(args, out var playerHero, out var targetHero, out string error))
+                if (!TryGetPlayerNpcPair(resolver, args, out var playerHero, out var targetHero, out string error))
                     return Failed(error);
                 if (!TryGetRomanceAuthority(out var romanceAuthority, out error))
                     return Failed(error);
@@ -152,6 +167,13 @@ internal class RomanceDebugCommand
 
     public sealed class RomanceCompatibleCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public RomanceCompatibleCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => CommandNamespace;
 
         public string Name => "compatible";
@@ -169,7 +191,7 @@ internal class RomanceDebugCommand
 
             return RunOnGameThread(command, () =>
             {
-                if (!TryGetPlayerNpcPair(args, out var playerHero, out var targetHero, out string error))
+                if (!TryGetPlayerNpcPair(resolver, args, out var playerHero, out var targetHero, out string error))
                     return Failed(error);
                 if (!TryGetRomanceAuthority(out var romanceAuthority, out error))
                     return Failed(error);
@@ -189,8 +211,64 @@ internal class RomanceDebugCommand
         }
     }
 
+    public sealed class RomanceFailPracticalitiesCoopCommand : ICoopCommand
+    {
+        private readonly ICommandObjectResolver resolver;
+
+        public RomanceFailPracticalitiesCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
+        public string Prefix => CommandNamespace;
+
+        public string Name => "fail_practicalities";
+
+        public string Description => "Sets a marriage fixture pair to failed in practicalities.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("first_hero_id", "First hero name or id; quote names with spaces.", true),
+            new ExpectedArgs("second_hero_id", "Second hero name or id; quote names with spaces.", true),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            const string command = CommandNamespace + ".fail_practicalities";
+            if (ModInformation.IsClient) return Failed("Command can only be run on the server.");
+
+            return RunOnGameThread(command, () =>
+            {
+                if (!resolver.TryResolveHero(args[0], out var firstHero, out string error))
+                    return Failed(error);
+                if (!resolver.TryResolveHero(args[1], out var secondHero, out error))
+                    return Failed(error);
+                if (firstHero == secondHero || !firstHero.IsAlive || !secondHero.IsAlive ||
+                    firstHero.Spouse != null || secondHero.Spouse != null)
+                    return Failed("Both fixture heroes must exist, be alive, distinct, and unmarried.");
+
+                ChangeRomanticStateAction.Apply(
+                    firstHero,
+                    secondHero,
+                    Romance.RomanceLevelEnum.FailedInPracticalities);
+                if (Romance.GetRomanticLevel(firstHero, secondHero) != Romance.RomanceLevelEnum.FailedInPracticalities)
+                    return Failed("The romance state did not change to FailedInPracticalities.");
+                return Succeeded($"Changed romance between {firstHero.Name} and {secondHero.Name} to {Romance.RomanceLevelEnum.FailedInPracticalities}.");
+            });
+        }
+    }
+
     public sealed class RomanceAgreeCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public RomanceAgreeCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => CommandNamespace;
 
         public string Name => "agree";
@@ -208,7 +286,7 @@ internal class RomanceDebugCommand
 
             return RunOnGameThread(command, () =>
             {
-                if (!TryGetPlayerNpcPair(args, out var playerHero, out var targetHero, out string error))
+                if (!TryGetPlayerNpcPair(resolver, args, out var playerHero, out var targetHero, out string error))
                     return Failed(error);
                 if (!TryGetRomanceAuthority(out var romanceAuthority, out error))
                     return Failed(error);
@@ -230,6 +308,13 @@ internal class RomanceDebugCommand
 
     public sealed class RomanceMarryCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public RomanceMarryCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => CommandNamespace;
 
         public string Name => "marry";
@@ -247,7 +332,7 @@ internal class RomanceDebugCommand
 
             return RunOnGameThread(command, () =>
             {
-                if (!TryGetPlayerNpcPair(args, out var playerHero, out var targetHero, out string error))
+                if (!TryGetPlayerNpcPair(resolver, args, out var playerHero, out var targetHero, out string error))
                     return Failed(error);
                 if (!TryGetRomanceAuthority(out var romanceAuthority, out error))
                     return Failed(error);
@@ -264,6 +349,13 @@ internal class RomanceDebugCommand
 
     public sealed class RomanceDivorceCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public RomanceDivorceCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => CommandNamespace;
 
         public string Name => "divorce";
@@ -281,7 +373,7 @@ internal class RomanceDebugCommand
 
             return RunOnGameThread(command, () =>
             {
-                if (!TryGetPlayerNpcPair(args, out var playerHero, out var targetHero, out string error))
+                if (!TryGetPlayerNpcPair(resolver, args, out var playerHero, out var targetHero, out string error))
                     return Failed(error);
                 if (playerHero.Spouse != targetHero || targetHero.Spouse != playerHero)
                     return Failed($"{playerHero.Name} and {targetHero.Name} are not married to each other.");
@@ -300,11 +392,13 @@ internal class RomanceDebugCommand
 
     private static IExpectedArgs[] CreatePairArguments() => new IExpectedArgs[]
     {
-        new ExpectedArgs("player_hero_id", "The registered player hero id."),
-        new ExpectedArgs("npc_hero_id", "The registered NPC hero id."),
+        new ExpectedArgs("player_hero_id", "Player hero name or id; quote names with spaces."),
+        new ExpectedArgs("npc_hero_id", "NPC hero name or id; quote names with spaces."),
     };
 
+    // Resolves the player and NPC heroes by name or id and checks which side is player-controlled.
     private static bool TryGetPlayerNpcPair(
+        ICommandObjectResolver resolver,
         IReadOnlyList<string> args,
         out Hero playerHero,
         out Hero targetHero,
@@ -314,22 +408,12 @@ internal class RomanceDebugCommand
         targetHero = null;
         error = null;
 
-        if (!CommandHelpers.TryGetObjectManager(out var objectManager, out error)) return false;
-        if (!objectManager.TryGetObject<Hero>(args[0], out playerHero))
-        {
-            error = $"Unable to find player hero with id: {args[0]}";
-            return false;
-        }
-
-        if (!objectManager.TryGetObject<Hero>(args[1], out targetHero))
-        {
-            error = $"Unable to find NPC hero with id: {args[1]}";
-            return false;
-        }
+        if (!resolver.TryResolveHero(args[0], out playerHero, out error)) return false;
+        if (!resolver.TryResolveHero(args[1], out targetHero, out error)) return false;
 
         if (!playerHero.IsPlayerHero())
         {
-            error = $"Hero '{args[0]}' is not player-controlled.";
+            error = $"Hero '{playerHero.Name}' is not player-controlled.";
             return false;
         }
 

@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.GameDebug.Messages;
 
@@ -12,9 +13,13 @@ public record NetworkRouteBattleEnemies : ICommand
     [ProtoMember(2)]
     public int EnemiesToLeaveFighting { get; }
 
-    public NetworkRouteBattleEnemies(string mapEventId, int enemiesToLeaveFighting)
+    [ProtoMember(3)]
+    public BattleSideEnum? Side { get; }
+
+    public NetworkRouteBattleEnemies(string mapEventId, int enemiesToLeaveFighting, BattleSideEnum? side = null)
     {
         MapEventId = mapEventId;
         EnemiesToLeaveFighting = enemiesToLeaveFighting;
+        Side = side;
     }
 }

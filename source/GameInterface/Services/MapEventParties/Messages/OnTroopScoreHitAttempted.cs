@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.MapEventParties.Messages;
 
@@ -18,8 +19,11 @@ public readonly struct OnTroopScoreHitAttempted : IEvent
     public readonly int Damage;
     public readonly bool IsFatal;
     public readonly bool IsSimulatedHit;
+    public readonly WeaponComponentData AttackerWeapon;
+    // The attacker's formation captain, null when it has none. Feeds the captain perk bonus of the xp model.
+    public readonly CharacterObject Captain;
 
-    public OnTroopScoreHitAttempted(MapEventParty mapEventParty, CharacterObject attackingTroop, CharacterObject attackedTroop, int damage, bool isFatal, bool isSimulatedHit)
+    public OnTroopScoreHitAttempted(MapEventParty mapEventParty, CharacterObject attackingTroop, CharacterObject attackedTroop, int damage, bool isFatal, bool isSimulatedHit, WeaponComponentData attackerWeapon, CharacterObject captain)
     {
         MapEventParty = mapEventParty;
         AttackingTroop = attackingTroop;
@@ -27,5 +31,7 @@ public readonly struct OnTroopScoreHitAttempted : IEvent
         Damage = damage;
         IsFatal = isFatal;
         IsSimulatedHit = isSimulatedHit;
+        AttackerWeapon = attackerWeapon;
+        Captain = captain;
     }
 }

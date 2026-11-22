@@ -129,6 +129,10 @@ public class HeirSelectionCampaignBehaviorInterface : IHeirSelectionCampaignBeha
             {
                 playerHeroEquipmentsThatWillBeInherited[oldPlayerHero].AddToCounts(oldPlayerHero.CivilianEquipment[i], 1);
             }
+            if (!oldPlayerHero.StealthEquipment[i].IsEmpty)
+            {
+                playerHeroEquipmentsThatWillBeInherited[oldPlayerHero].AddToCounts(oldPlayerHero.StealthEquipment[i], 1);
+            }
         }
     }
 

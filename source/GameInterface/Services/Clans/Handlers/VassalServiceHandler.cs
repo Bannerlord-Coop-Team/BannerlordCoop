@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using GameInterface.Configuration;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.Kingdoms.Messages;
@@ -27,19 +28,22 @@ internal class VassalServiceHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly IPlayerManager playerManager;
+    private readonly IKingdomClanLimit kingdomClanLimit;
 
     public VassalServiceHandler(
         IMessageBroker messageBroker,
         IKingdomMembershipState kingdomMembershipState,
         IObjectManager objectManager,
         INetwork network,
-        IPlayerManager playerManager)
+        IPlayerManager playerManager,
+        IKingdomClanLimit kingdomClanLimit)
     {
         this.messageBroker = messageBroker;
         this.kingdomMembershipState = kingdomMembershipState;
         this.objectManager = objectManager;
         this.network = network;
         this.playerManager = playerManager;
+        this.kingdomClanLimit = kingdomClanLimit;
 
         messageBroker.Subscribe<VassalServiceAccepted>(HandleVassalServiceAccepted);
         messageBroker.Subscribe<RequestVassalService>(HandleRequestVassalService);
@@ -84,7 +88,14 @@ internal class VassalServiceHandler : IHandler
                 player.ClanId,
                 player.HeroId,
                 payload.What.KingdomId,
-                payload.What.GrantRewards);
+                payload.What.GrantRewards,
+                out bool kingdomFull);
+
+            if (kingdomFull)
+            {
+                network.Send(peer, new NetworkKingdomFull(payload.What.KingdomId));
+                return;
+            }
 
             network.Send(peer, new VassalServiceResult(
                 payload.What.KingdomId,
@@ -93,8 +104,9 @@ internal class VassalServiceHandler : IHandler
         }, context: nameof(VassalServiceHandler));
     }
 
-    private bool ApplyVassalage(string clanId, string heroId, string kingdomId, bool grantRewards)
+    private bool ApplyVassalage(string clanId, string heroId, string kingdomId, bool grantRewards, out bool kingdomFull)
     {
+        kingdomFull = false;
         if (!objectManager.TryGetObjectWithLogging<Clan>(clanId, out var clan)) return false;
         if (!objectManager.TryGetObjectWithLogging<Hero>(heroId, out var hero)) return false;
         if (!objectManager.TryGetObjectWithLogging<Kingdom>(kingdomId, out var kingdom)) return false;
@@ -102,6 +114,13 @@ internal class VassalServiceHandler : IHandler
         if (hero.Clan != clan || clan.Tier < Campaign.Current.Models.ClanTierModel.VassalEligibleTier)
         {
             Logger.Warning("Rejected vassal service request for clan {ClanId} because it is no longer eligible", clanId);
+            return false;
+        }
+
+        if (kingdomClanLimit.RefusesJoin(clan, kingdom, asMercenary: false, ModConfigProvider.ModOptions))
+        {
+            Logger.Warning("Rejected vassal service request for clan {ClanId} because kingdom {KingdomId} has maxClansPerKingdom clans", clanId, kingdomId);
+            kingdomFull = true;
             return false;
         }
 

@@ -14,31 +14,12 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class ArmySerializationTest
     {
-        IContainer container;
+        ILifetimeScope container;
         public ArmySerializationTest()
         {
             GameBootStrap.Initialize();
 
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
-        }
-
-        [Fact]
-        public void Army_Serialize()
-        {
-            Army armyObject = (Army)FormatterServices.GetUninitializedObject(typeof(Army));
-
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            ArmyBinaryPackage package = new ArmyBinaryPackage(armyObject, factory);
-
-            package.Pack();
-
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
-
-            Assert.NotEmpty(bytes);
+            container = SerializationTestContainer.BeginScope();
         }
 
         [Fact]

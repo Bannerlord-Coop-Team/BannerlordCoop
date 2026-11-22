@@ -124,6 +124,9 @@ internal class PlayerCaptivityClientHandler : IHandler
         playerCaptivity._captorParty.SetAsCameraFollowParty();
         playerCaptivity._captorParty.UpdateVisibilityAndInspected(MobileParty.MainParty.Position, 0f);
 
+        // Same as the vanilla CaptorParty setter, the visibility sweep skips a captor because its visibility is persistent
+        if (captorParty.IsMobile) captorParty.MobileParty.IsVisible = true;
+
         // Mirror native menu activation: switch when a menu is already open (e.g. the post-battle
         // encounter menu), otherwise activate a fresh one. A bare SwitchToMenu does nothing when no
         // menu is open, which left the player captive without a capture screen.

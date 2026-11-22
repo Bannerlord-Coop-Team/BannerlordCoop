@@ -96,7 +96,7 @@ public class SharedHostEpochWatermarkTests : IDisposable
     private void Compose(IHostEpochPolicy enginePolicy, IHostEpochPolicy machinePolicy)
     {
         engineReplicator = new SiegeEngineDeploymentReplicator(network.Object, broker, session.Object, enginePolicy);
-        machineReplicator = new SiegeMachineStateReplicator(network.Object, broker, session.Object, agentRegistry.Object, machinePolicy);
+        machineReplicator = new SiegeMachineStateReplicator(network.Object, broker, session.Object, agentRegistry.Object, machinePolicy, Mock.Of<IRangedSiegeWeaponPresentation>());
     }
 
     private static NetworkSiegeMachineState MachineState(int machineId, int hostEpoch)
