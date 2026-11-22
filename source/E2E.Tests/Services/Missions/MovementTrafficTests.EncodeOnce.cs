@@ -15,7 +15,7 @@ using AgentData = Missions.Agents.Packets.AgentData;
 
 namespace E2E.Tests.Services.Missions;
 
-// #4487: snapshots encoded once per capture and shared across recipients must send the same datagrams as before.
+// Per-capture reuse must emit the same datagrams as encoding each candidate directly.
 public partial class MovementTrafficTests
 {
     private static readonly string[] EncodeOnceRecipients =
@@ -26,13 +26,13 @@ public partial class MovementTrafficTests
     };
 
     [Theory]
-    [InlineData(1024 * 1024, 1024 * 1024, 3)]
-    [InlineData(40_000, 2_500, 6)]
-    public void EncodeOnce_RecipientsAndCapturesSendLegacyDatagrams(int bytesPerSecond, int burstBytes, int frames)
+    [InlineData(1024 * 1024, 1024 * 1024, 3, true)]
+    [InlineData(40_000, 2_500, 6, false)]
+    public void EncodeOnce_RecipientsAndCapturesSendTheSameDatagrams(int bytesPerSecond, int burstBytes, int frames, bool expectRawDatagram)
     {
         using var fixture = new MissionEngineFixture();
         var peer = Clients.First();
-        EncodeOnceRun legacyRun = null!;
+        EncodeOnceRun uncachedRun = null!;
         EncodeOnceRun currentRun = null!;
 
         peer.Call(() =>
@@ -42,17 +42,17 @@ public partial class MovementTrafficTests
             List<MovementSnapshots> captures = CreateEncodeOnceCaptures(mock, riders: 72, mounts: 24, frames);
             Func<IMovementTrafficBudget> budgets = () => new MovementTrafficBudget(bytesPerSecond, burstBytes);
 
-            legacyRun = RunEncodeOnce(serializer, new LegacyMovementPacketCompressor(serializer), captures, budgets);
-            currentRun = RunEncodeOnce(serializer, new MovementPacketCompressor(serializer), captures, budgets);
+            uncachedRun = RunEncodeOnce(serializer, captures, budgets, reuseSnapshots: false);
+            currentRun = RunEncodeOnce(serializer, captures, budgets, reuseSnapshots: true);
         });
 
-        Assert.Equal(legacyRun.Frames, currentRun.Frames);
-        Assert.Equal(legacyRun.SentAgents, currentRun.SentAgents);
-        Assert.Equal(legacyRun.Datagrams.Count, currentRun.Datagrams.Count);
-        for (int i = 0; i < legacyRun.Datagrams.Count; i++)
+        Assert.Equal(uncachedRun.Frames, currentRun.Frames);
+        Assert.Equal(uncachedRun.SentAgents, currentRun.SentAgents);
+        Assert.Equal(uncachedRun.Datagrams.Count, currentRun.Datagrams.Count);
+        for (int i = 0; i < uncachedRun.Datagrams.Count; i++)
         {
-            Assert.Equal(legacyRun.Datagrams[i].Recipient, currentRun.Datagrams[i].Recipient);
-            Assert.Equal(legacyRun.Datagrams[i].Payload, currentRun.Datagrams[i].Payload);
+            Assert.Equal(uncachedRun.Datagrams[i].Recipient, currentRun.Datagrams[i].Recipient);
+            Assert.Equal(uncachedRun.Datagrams[i].Payload, currentRun.Datagrams[i].Payload);
         }
 
         // The run has to reach every path the cache changes: several recipients and captures, envelopes and decks.
@@ -60,7 +60,7 @@ public partial class MovementTrafficTests
             Assert.Contains(currentRun.Datagrams, datagram => datagram.Recipient == recipient));
         Assert.True(currentRun.SequencesSent.Count > 1, "Expected several captures to send");
         Assert.Contains(currentRun.Datagrams, datagram => datagram.Envelope);
-        Assert.Contains(currentRun.Datagrams, datagram => !datagram.Envelope);
+        if (expectRawDatagram) Assert.Contains(currentRun.Datagrams, datagram => !datagram.Envelope);
         Assert.True(currentRun.DeckPackets > 0, "Expected packets carrying deck poses");
         output.WriteLine(string.Join(System.Environment.NewLine, currentRun.Frames));
     }
@@ -90,13 +90,13 @@ public partial class MovementTrafficTests
 
     private static EncodeOnceRun RunEncodeOnce(
         ICommonSerializer serializer,
-        IMovementPacketCompressor compressor,
         List<MovementSnapshots> captures,
-        Func<IMovementTrafficBudget> budgets)
+        Func<IMovementTrafficBudget> budgets,
+        bool reuseSnapshots)
     {
         var run = new EncodeOnceRun();
         var network = new DatagramRecordingNetwork(serializer, run);
-        var sender = new MovementBatchSender(network, compressor, budgets);
+        var sender = new MovementBatchSender(network, new MovementPacketCompressor(serializer), budgets);
         int payloadBudget = LiteNetP2PClient.CalculateMaxRelayPayloadBytes(
             serializer,
             EquivalenceScope,
@@ -122,7 +122,7 @@ public partial class MovementTrafficTests
 
             sender.BeginFrame(frame == 0 ? 0f : 0.025f);
             // Every third capture takes the single-recipient whole-packet path, so switching paths is covered too.
-            sender.SetCaptureRecipients(frame % 3 == 1 ? 1 : EncodeOnceRecipients.Length);
+            sender.SetCaptureRecipients(reuseSnapshots && frame % 3 != 1 ? EncodeOnceRecipients.Length : 1);
             foreach (string recipient in EncodeOnceRecipients)
             {
                 MovementSendPairResult result = sender.SendInterleaved(

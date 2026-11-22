@@ -175,23 +175,23 @@ namespace Missions.Agents.Packets
         }
 
         [ProtoMember(1)]
-        public Vec3 Position { get; }
+        public Vec3 Position { get; private set; }
         [ProtoMember(2)]
-        public Vec2 InputVector { get; }
+        public Vec2 InputVector { get; private set; }
         [ProtoMember(3)]
-        public Vec3 LookDirection { get; }
+        public Vec3 LookDirection { get; private set; }
         [ProtoMember(4)]
-        public Vec2 MovementDirection { get; }
+        public Vec2 MovementDirection { get; private set; }
         // 5 was AgentEquipmentData — wield state moved to reliable on-change updates.
         // 6 was ActionData — actions moved to the event-driven AgentActionHandler.
         [ProtoMember(7)]
-        public AgentMountData MountData { get; }
+        public AgentMountData MountData { get; private set; }
         /// <summary>The owner's real ground speed, m/s — drives the on-foot puppet's locomotion throttle.</summary>
         [ProtoMember(8)]
         public float Speed { get; private set; }
         /// <summary>The owner's current translation and turn inputs.</summary>
         [ProtoMember(9)]
-        public uint MovementFlag { get; }
+        public uint MovementFlag { get; private set; }
         // Deck pose: 0 is a world pose, otherwise a 1-based index into the packet's DeckShips with a hull-local position.
         [ProtoMember(11)]
         public int DeckShipIndex { get; private set; }
@@ -202,6 +202,44 @@ namespace Missions.Agents.Packets
         /// <summary>The hull this deck pose is relative to, resolved from the packet's DeckShips on receive.</summary>
         [ProtoIgnore]
         public System.Guid DeckShip { get; private set; }
+
+        internal const int SnapshotBytes = 49;
+        internal const int DeckSnapshotBytes = 16;
+
+        internal void WriteSnapshot(ref MovementSnapshotColumns columns, byte attachments)
+        {
+            columns.WriteByte(attachments);
+            columns.WriteVec3(Position);
+            columns.WriteVec2(InputVector);
+            columns.WriteVec3(LookDirection);
+            columns.WriteVec2(MovementDirection);
+            columns.WriteSingle(Speed);
+            columns.WriteUInt32(MovementFlag);
+        }
+
+        internal static AgentData ReadSnapshot(ref MovementSnapshotColumns columns) => new AgentData
+        {
+            Position = columns.ReadVec3(),
+            InputVector = columns.ReadVec2(),
+            LookDirection = columns.ReadVec3(),
+            MovementDirection = columns.ReadVec2(),
+            Speed = columns.ReadSingle(),
+            MovementFlag = columns.ReadUInt32(),
+        };
+
+        internal void WriteDeckSnapshot(ref MovementSnapshotColumns columns)
+        {
+            columns.WriteUInt32((uint)DeckShipIndex);
+            columns.WriteVec3(DeckLocal);
+        }
+
+        internal void ReadDeckSnapshot(ref MovementSnapshotColumns columns)
+        {
+            DeckShipIndex = (int)columns.ReadUInt32();
+            DeckLocal = columns.ReadVec3();
+        }
+
+        internal void SetSnapshotMount(AgentMountData mount) => MountData = mount;
 
         // Whether a received deck pose names a hull in its packet's table and carries a finite pose.
         internal bool HasValidDeck => DeckShipIndex >= 1 && DeckShip != System.Guid.Empty && DeckLocal.IsValid

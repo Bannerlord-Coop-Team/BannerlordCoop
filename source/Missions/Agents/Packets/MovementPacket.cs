@@ -40,6 +40,9 @@ namespace Missions.Agents.Packets
         [ProtoMember(8)]
         public Guid[] DeckShips { get; }
 
+        [ProtoMember(9)]
+        internal byte[] PackedSnapshots { get; }
+
         public MovementPacket(string identityScopeId, ushort[] agentIds, AgentData[] agents, string senderControllerId = null, long[] authorityRevisions = null, long sampleSequence = 0, Guid[] deckShips = null)
         {
             SampleSequence = sampleSequence;
@@ -50,6 +53,7 @@ namespace Missions.Agents.Packets
             Agents = agents;
             AgentGuids = null;
             DeckShips = deckShips;
+            PackedSnapshots = null;
         }
 
         public MovementPacket(Guid[] agentGuids, AgentData[] agents, string senderControllerId = null, long[] authorityRevisions = null, long sampleSequence = 0, Guid[] deckShips = null)
@@ -62,7 +66,19 @@ namespace Missions.Agents.Packets
             AgentGuids = agentGuids;
             Agents = agents;
             DeckShips = deckShips;
+            PackedSnapshots = null;
         }
+
+        private MovementPacket(MovementPacket packet, AgentData[] agents, byte[] packedSnapshots)
+        {
+            this = packet;
+            Agents = agents;
+            PackedSnapshots = packedSnapshots;
+        }
+
+        internal MovementPacket WithPackedSnapshots(byte[] snapshots) => new MovementPacket(this, null, snapshots);
+        internal MovementPacket WithRestoredSnapshots(AgentData[] agents) => new MovementPacket(this, agents, null);
+
         internal MovementPacket WithAuthorityRevisions(long[] revisions) => AgentIds == null
             ? new MovementPacket(AgentGuids, Agents, SenderControllerId, revisions, SampleSequence, DeckShips)
             : new MovementPacket(IdentityScopeId, AgentIds, Agents, SenderControllerId, revisions, SampleSequence, DeckShips);

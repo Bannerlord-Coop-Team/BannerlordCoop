@@ -1,12 +1,16 @@
-﻿using ProtoBuf;
+﻿using Common.Serialization;
+using ProtoBuf;
 #if DEBUG
 using Missions.Diagnostics;
 #endif
 using System;
 using System.Collections.Concurrent;
+using System.Text;
 using TaleWorlds.Engine;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
+using BinaryReader = System.IO.BinaryReader;
+using BinaryWriter = System.IO.BinaryWriter;
 
 namespace Missions.Agents.Packets
 {
@@ -498,49 +502,49 @@ namespace Missions.Agents.Packets
         }
 
         [ProtoMember(1)]
-        public Vec2 MountInputVector { get; }
+        public Vec2 MountInputVector { get; private set; }
         [ProtoMember(2)]
-        public ulong MountAction1Flag { get; }
+        public ulong MountAction1Flag { get; private set; }
         [ProtoMember(3)]
-        public float MountAction1Progress { get; }
+        public float MountAction1Progress { get; private set; }
         // Shift by one so protobuf omits the common act_none (-1) value.
         [ProtoMember(4)]
         private int MountAction1IndexWire { get; set; }
         public int MountAction1Index => MountAction1IndexWire - 1;
         [ProtoMember(5)]
-        public Vec3 MountLookDirection { get; }
+        public Vec3 MountLookDirection { get; private set; }
         [ProtoMember(6)]
-        public Vec2 MountMovementDirection { get; }
+        public Vec2 MountMovementDirection { get; private set; }
         [ProtoMember(7)]
-        public Vec3 MountPosition { get; }
+        public Vec3 MountPosition { get; private set; }
         /// <summary>The mount's owner-scoped movement id, or zero when the horse is unregistered.</summary>
         [ProtoMember(8)]
-        public ushort MountMovementId { get; }
+        public ushort MountMovementId { get; private set; }
         [ProtoMember(9)]
-        public ulong MountAction0Flag { get; }
+        public ulong MountAction0Flag { get; private set; }
         [ProtoMember(10)]
-        public float MountAction0Progress { get; }
+        public float MountAction0Progress { get; private set; }
         [ProtoMember(11)]
-        public int MountAction0Index { get; }
+        public int MountAction0Index { get; private set; }
         /// <summary>The owner's horizontal mount speed, used as the puppet's absolute native speed limit.</summary>
         [ProtoMember(12)]
-        public float MountSpeed { get; }
+        public float MountSpeed { get; private set; }
         /// <summary>Only populated when the mount's original owner differs from the rider's identity scope.</summary>
         [ProtoMember(13)]
-        public string MountIdentityScopeId { get; }
+        public string MountIdentityScopeId { get; private set; }
         [ProtoMember(14)]
-        public Guid MountAgentId { get; }
+        public Guid MountAgentId { get; private set; }
         [ProtoMember(15)]
-        public uint MountMovementFlag { get; }
+        public uint MountMovementFlag { get; private set; }
         /// <summary>The owner's rendered gait playback speed for action channel zero.</summary>
         [ProtoMember(16)]
-        public float MountAction0Speed { get; }
+        public float MountAction0Speed { get; private set; }
         /// <summary>Whether the owner's rendered channel-zero animation is a locomotion gait.</summary>
         [ProtoMember(17)]
-        public bool MountAction0IsLocomotion { get; }
+        public bool MountAction0IsLocomotion { get; private set; }
         /// <summary>The owner's rendered stationary turn direction: -1 left, 0 none, 1 right.</summary>
         [ProtoMember(18)]
-        public int MountAction0TurnDirection { get; }
+        public int MountAction0TurnDirection { get; private set; }
         // Shift by one so protobuf omits the common no-turn value.
         [ProtoMember(19)]
         private int MountAction0TurnActionIndexWire { get; set; }
@@ -548,10 +552,101 @@ namespace Missions.Agents.Packets
         public int MountAction0TurnActionIndex => MountAction0TurnActionIndexWire - 1;
         /// <summary>Whether channel zero is being driven through the bounded synthetic turn timeline.</summary>
         [ProtoMember(20)]
-        public bool MountAction0IsSyntheticTurn { get; }
+        public bool MountAction0IsSyntheticTurn { get; private set; }
 
         // Embedded poses may share ordering with the horse stream only in this authority generation.
         [ProtoMember(21)]
-        public long? MountAuthorityRevision { get; }
+        public long? MountAuthorityRevision { get; private set; }
+
+        internal const int SnapshotBytes = 97;
+        private const byte HasScope = 1;
+        private const byte HasGuid = 2;
+        private const byte HasRevision = 4;
+        private const byte IsLocomotion = 8;
+        private const byte IsSyntheticTurn = 16;
+
+        internal int GetSnapshotExtraBytes()
+        {
+            int length = 0;
+            if (MountIdentityScopeId != null)
+            {
+                int utf8Length = Encoding.UTF8.GetByteCount(MountIdentityScopeId);
+                length += ProtoBufSerializer.GetVarintLength((uint)utf8Length) + utf8Length;
+            }
+            if (MountAgentId != Guid.Empty) length += 16;
+            if (MountAuthorityRevision.HasValue) length += sizeof(long);
+            return length;
+        }
+
+        internal void WriteSnapshot(ref MovementSnapshotColumns columns, BinaryWriter extras)
+        {
+            byte flags = 0;
+            if (MountIdentityScopeId != null)
+            {
+                flags |= HasScope;
+                extras.Write(MountIdentityScopeId);
+            }
+            if (MountAgentId != Guid.Empty)
+            {
+                flags |= HasGuid;
+                extras.Write(MountAgentId.ToByteArray());
+            }
+            if (MountAuthorityRevision.HasValue)
+            {
+                flags |= HasRevision;
+                extras.Write(MountAuthorityRevision.Value);
+            }
+            if (MountAction0IsLocomotion) flags |= IsLocomotion;
+            if (MountAction0IsSyntheticTurn) flags |= IsSyntheticTurn;
+
+            columns.WriteByte(flags);
+            columns.WriteVec3(MountPosition);
+            columns.WriteVec2(MountInputVector);
+            columns.WriteVec3(MountLookDirection);
+            columns.WriteVec2(MountMovementDirection);
+            columns.WriteSingle(MountSpeed);
+            columns.WriteUInt32(MountMovementFlag);
+            columns.WriteUInt32(MountMovementId);
+            columns.WriteUInt32((uint)MountAction0Index);
+            columns.WriteUInt64(MountAction0Flag);
+            columns.WriteSingle(MountAction0Progress);
+            columns.WriteSingle(MountAction0Speed);
+            columns.WriteUInt32((uint)MountAction0TurnDirection);
+            columns.WriteUInt32((uint)MountAction0TurnActionIndexWire);
+            columns.WriteUInt32((uint)MountAction1IndexWire);
+            columns.WriteUInt64(MountAction1Flag);
+            columns.WriteSingle(MountAction1Progress);
+        }
+
+        internal static AgentMountData ReadSnapshot(ref MovementSnapshotColumns columns, BinaryReader extras)
+        {
+            byte flags = columns.ReadByte();
+            return new AgentMountData
+            {
+                MountPosition = columns.ReadVec3(),
+                MountInputVector = columns.ReadVec2(),
+                MountLookDirection = columns.ReadVec3(),
+                MountMovementDirection = columns.ReadVec2(),
+                MountSpeed = columns.ReadSingle(),
+                MountMovementFlag = columns.ReadUInt32(),
+                MountMovementId = (ushort)columns.ReadUInt32(),
+                MountAction0Index = (int)columns.ReadUInt32(),
+                MountAction0Flag = columns.ReadUInt64(),
+                MountAction0Progress = columns.ReadSingle(),
+                MountAction0Speed = columns.ReadSingle(),
+                MountAction0TurnDirection = (int)columns.ReadUInt32(),
+                MountAction0TurnActionIndexWire = (int)columns.ReadUInt32(),
+                MountAction1IndexWire = (int)columns.ReadUInt32(),
+                MountAction1Flag = columns.ReadUInt64(),
+                MountAction1Progress = columns.ReadSingle(),
+                MountIdentityScopeId = (flags & HasScope) != 0 ? extras.ReadString() : null,
+                MountAgentId = (flags & HasGuid) != 0 ? new Guid(extras.ReadBytes(16)) : Guid.Empty,
+                MountAuthorityRevision = (flags & HasRevision) != 0 ? extras.ReadInt64() : (long?)null,
+                MountAction0IsLocomotion = (flags & IsLocomotion) != 0,
+                MountAction0IsSyntheticTurn = (flags & IsSyntheticTurn) != 0,
+            };
+        }
+
+        private AgentMountData() { }
     }
 }

@@ -18,8 +18,8 @@ public interface IMovementPacketCompressor
     byte[] Serialize(IPacket packet);
 
     /// <summary>
-    /// Same bytes as <see cref="Serialize"/>, but each snapshot is encoded once per capture and reused by every later
-    /// packet of that capture. <paramref name="snapshotIds"/> holds the canonical id of each snapshot in packet order.
+    /// Same bytes as <see cref="Serialize"/>, with per-capture reuse when the legacy snapshot encoding is used.
+    /// <paramref name="snapshotIds"/> holds the canonical id of each snapshot in packet order.
     /// </summary>
     byte[] SerializeSnapshots(IPacket packet, Guid[] snapshotIds);
 
@@ -61,6 +61,11 @@ public class MovementPacketCompressor : IMovementPacketCompressor
 
     public byte[] Serialize(IPacket packet)
     {
+        return TrySerializePacked(packet) ?? SerializeUnpacked(packet);
+    }
+
+    private byte[] SerializeUnpacked(IPacket packet)
+    {
         byte[] original = serializer.Serialize(packet);
 #if DEBUG
         if (packet is AgentActionPacket actionPacket)
@@ -78,6 +83,9 @@ public class MovementPacketCompressor : IMovementPacketCompressor
 
     public byte[] SerializeSnapshots(IPacket packet, Guid[] snapshotIds)
     {
+        byte[] packed = TrySerializePacked(packet);
+        if (packed != null) return packed;
+
         // Sequence 0 is never a real capture, so it gives no guarantee that an id maps to one snapshot.
         switch (packet)
         {
@@ -100,7 +108,7 @@ public class MovementPacketCompressor : IMovementPacketCompressor
                     mountSegments,
                     mount => true);
             default:
-                return Serialize(packet);
+                return SerializeUnpacked(packet);
         }
     }
 
@@ -129,8 +137,21 @@ public class MovementPacketCompressor : IMovementPacketCompressor
             if (decodedLength != decompressed.Length)
                 return false;
 
-            restored = serializer.Deserialize<IPacket>(decompressed);
-            return restored != null && IsMovement(restored);
+            switch (serializer.Deserialize<IPacket>(decompressed))
+            {
+                case MovementPacket movement:
+                    restored = movement.PackedSnapshots == null
+                        ? movement
+                        : movement.WithRestoredSnapshots(MovementSnapshotPacking.Restore(movement));
+                    return true;
+                case MountMovementPacket mounts:
+                    restored = mounts.PackedSnapshots == null
+                        ? mounts
+                        : mounts.WithRestoredSnapshots(MovementSnapshotPacking.Restore(mounts));
+                    return true;
+                default:
+                    return false;
+            }
         }
         catch (Exception)
         {
@@ -143,7 +164,7 @@ public class MovementPacketCompressor : IMovementPacketCompressor
         snapshots != null && snapshots.Length > 0 &&
         snapshotIds != null && snapshotIds.Length == snapshots.Length;
 
-    // Writes the bytes Serialize would write for the packet, splicing cached snapshot encodings in as field 3.
+    // Writes the legacy snapshot layout, splicing cached snapshot encodings in as field 3.
     private byte[] SerializeWithSnapshots<T>(
         IPacket packetWithoutSnapshots,
         long sampleSequence,
@@ -231,12 +252,37 @@ public class MovementPacketCompressor : IMovementPacketCompressor
         return new EncodedSnapshot(captured, start, (int)destination.Length - start);
     }
 
+    private byte[] TrySerializePacked(IPacket packet)
+    {
+        // The packed layout goes inside the existing envelope, which restores the snapshot array before dispatch.
+        byte[] original;
+        switch (packet)
+        {
+            case MovementPacket movement:
+                byte[] riders = MovementSnapshotPacking.Pack(movement, MaxUncompressedBytes);
+                if (riders == null) return null;
+                original = serializer.Serialize(movement.WithPackedSnapshots(riders));
+                break;
+            case MountMovementPacket mounts:
+                byte[] horses = MovementSnapshotPacking.Pack(mounts, MaxUncompressedBytes);
+                if (horses == null) return null;
+                original = serializer.Serialize(mounts.WithPackedSnapshots(horses));
+                break;
+            default:
+                return null;
+        }
+        return TryCompress(original, original.Length);
+    }
+
     // Returns the LZ4 envelope when it is smaller than the first length bytes of original, otherwise those bytes.
     // A rented original goes back to the pool, so its bytes are always copied out.
-    private byte[] Compress(byte[] original, int length, bool originalIsOwned)
+    private byte[] Compress(byte[] original, int length, bool originalIsOwned) =>
+        TryCompress(original, length) ?? Exact(original, length, originalIsOwned);
+
+    private byte[] TryCompress(byte[] original, int length)
     {
         if (length == 0 || length > MaxUncompressedBytes)
-            return Exact(original, length, originalIsOwned);
+            return null;
 
         int maximumLength = LZ4Codec.MaximumOutputSize(length);
         byte[] buffer = ArrayPool<byte>.Shared.Rent(maximumLength);
@@ -247,9 +293,9 @@ public class MovementPacketCompressor : IMovementPacketCompressor
                 buffer, 0, maximumLength,
                 LZ4Level.L00_FAST);
             if (compressedLength <= 0 || compressedLength >= length)
-                return Exact(original, length, originalIsOwned);
+                return null;
 
-            return WriteEnvelope(length, buffer, compressedLength) ?? Exact(original, length, originalIsOwned);
+            return WriteEnvelope(length, buffer, compressedLength);
         }
         finally
         {

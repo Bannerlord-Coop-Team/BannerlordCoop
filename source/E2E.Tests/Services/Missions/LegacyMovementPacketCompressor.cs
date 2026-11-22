@@ -9,7 +9,7 @@ namespace E2E.Tests.Services.Missions;
 
 /// <summary>
 /// Frozen copy of MovementPacketCompressor before #4487, which serialized every candidate and its LZ4 envelope with
-/// protobuf-net. Equivalence tests compare the current compressor's datagrams against it byte for byte.
+/// protobuf-net. Packing tests use it as the baseline for the original movement datagrams.
 /// </summary>
 internal sealed class LegacyMovementPacketCompressor : IMovementPacketCompressor
 {

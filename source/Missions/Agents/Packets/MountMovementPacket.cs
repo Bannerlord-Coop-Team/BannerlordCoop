@@ -38,6 +38,9 @@ namespace Missions.Agents.Packets
         [ProtoMember(7)]
         public long SampleSequence { get; }
 
+        [ProtoMember(8)]
+        internal byte[] PackedSnapshots { get; }
+
         public MountMovementPacket(string identityScopeId, ushort[] mountIds, AgentMountData[] mounts, string senderControllerId = null, long[] authorityRevisions = null, long sampleSequence = 0)
         {
             SampleSequence = sampleSequence;
@@ -47,6 +50,7 @@ namespace Missions.Agents.Packets
             MountIds = mountIds;
             Mounts = mounts;
             MountGuids = null;
+            PackedSnapshots = null;
         }
 
         public MountMovementPacket(Guid[] mountGuids, AgentMountData[] mounts, string senderControllerId = null, long[] authorityRevisions = null, long sampleSequence = 0)
@@ -58,7 +62,19 @@ namespace Missions.Agents.Packets
             MountIds = null;
             MountGuids = mountGuids;
             Mounts = mounts;
+            PackedSnapshots = null;
         }
+
+        private MountMovementPacket(MountMovementPacket packet, AgentMountData[] mounts, byte[] packedSnapshots)
+        {
+            this = packet;
+            Mounts = mounts;
+            PackedSnapshots = packedSnapshots;
+        }
+
+        internal MountMovementPacket WithPackedSnapshots(byte[] snapshots) => new MountMovementPacket(this, null, snapshots);
+        internal MountMovementPacket WithRestoredSnapshots(AgentMountData[] mounts) => new MountMovementPacket(this, mounts, null);
+
         internal MountMovementPacket WithAuthorityRevisions(long[] revisions) => MountIds == null
             ? new MountMovementPacket(MountGuids, Mounts, SenderControllerId, revisions, SampleSequence)
             : new MountMovementPacket(IdentityScopeId, MountIds, Mounts, SenderControllerId, revisions, SampleSequence);
