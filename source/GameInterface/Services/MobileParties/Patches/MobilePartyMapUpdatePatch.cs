@@ -13,6 +13,7 @@ internal static class MobilePartyMapUpdatePatch
     {
         var behaviorParty = AccessTools.PropertyGetter(typeof(MobilePartyAi), nameof(MobilePartyAi.AiBehaviorPartyBase));
         var resolveTarget = AccessTools.Method(typeof(MobilePartyMapUpdatePatch), nameof(ResolveGoAroundPartyTarget));
+        // the GoAroundParty case is the only AiBehaviorPartyBase read in this method
         return instructions.MethodReplacer(behaviorParty, resolveTarget);
     }
 
