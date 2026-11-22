@@ -4,6 +4,8 @@ using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.CampaignService.Commands;
 using GameInterface.Services.GameDebug.Commands;
+using GameInterface.Services.Heroes.Interfaces;
+using GameInterface.Services.Save.Commands;
 using GameInterface.Services.UI.Commands;
 using Moq;
 using Serilog;
@@ -53,7 +55,7 @@ public class SystemDeveloperDirectCommandTests
         Type[] commandTypes = GetCommandTypes();
 
 #if DEBUG
-        Assert.Equal(105, commandTypes.Length);
+        Assert.Equal(106, commandTypes.Length);
 #else
         Assert.Equal(93, commandTypes.Length);
 #endif
@@ -256,6 +258,8 @@ public class SystemDeveloperDirectCommandTests
     {
         if (type == typeof(ModOptionsCommands.VoiceEnabledCoopCommand))
             return new ModOptionsCommands.VoiceEnabledCoopCommand(Mock.Of<INetwork>(), Mock.Of<IMessageBroker>());
+        if (type == typeof(SaveDebugCommand.SaveSaveAsCoopCommand))
+            return new SaveDebugCommand.SaveSaveAsCoopCommand(Mock.Of<ISaveInterface>());
         // Only the metadata is read here, so the server dependencies can stay empty.
         if (type == typeof(UnstuckCommand.UnstuckCoopCommand))
             return new UnstuckCommand.UnstuckCoopCommand(null, null, null, null);

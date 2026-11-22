@@ -22,7 +22,7 @@ Read each new or changed test next to the code it covers.
 - waits on timing;
 - `Skip` without a linked issue.
 
-**Missing tests.** Testable logic (serialization, state transitions, service behavior) with no test, and a new GameInterface dependency without a `RegisterMock` in `Coop.Tests/TestComponentBase.cs`. Logic that needs the game runtime should come with manual verification steps in the PR instead.
+**Missing tests.** Testable logic (serialization, state transitions, service behavior) with no test, and a new GameInterface dependency without a `RegisterMock` in `Coop.Tests/TestComponentBase.cs`.
 
 Before suggesting a test:
 - name the specific failure or regression it would catch;

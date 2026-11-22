@@ -1,8 +1,10 @@
 ﻿using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Issues.Framework.Resolvers;
 
@@ -26,17 +28,22 @@ internal class IssueOwnerResolver : IIssueOwnerResolver
     {
         ownerHero = null;
 
-        if (!TryGetOwnerControllerId(issue, out var controllerId))
-        {
-            return false;
-        }
+        return TryResolveOwnerPlayer(issue, out var player) &&
+            objectManager.TryGetObject(player.HeroId, out ownerHero);
+    }
 
-        if (!playerManager.TryGetPlayer(controllerId, out var player))
-        {
-            return false;
-        }
+    public bool TryResolveOwnerParty(IssueBase issue, out MobileParty ownerParty)
+    {
+        ownerParty = null;
+        return TryResolveOwnerPlayer(issue, out var player) &&
+            objectManager.TryGetObjectWithLogging(player.MobilePartyId, out ownerParty);
+    }
 
-        return objectManager.TryGetObject(player.HeroId, out ownerHero);
+    private bool TryResolveOwnerPlayer(IssueBase issue, out Player player)
+    {
+        player = null;
+        return TryGetOwnerControllerId(issue, out var controllerId) &&
+            playerManager.TryGetPlayer(controllerId, out player);
     }
 
     public bool TryGetOwnerControllerId(IssueBase issue, out string controllerId)

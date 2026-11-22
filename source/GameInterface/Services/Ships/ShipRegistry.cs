@@ -8,6 +8,7 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.Core;
 
@@ -45,6 +46,31 @@ internal class ShipRegistry : AutoRegistryBase<Ship>
             foreach (var ship in settlement.Party.Ships)
             {
                 RegisterExistingObject($"Settlement_{settlement.StringId}_{index++}", ship);
+            }
+        }
+
+        // Moored ships have no owner, so they're only reachable through their port's stash
+        foreach (var settlement in Campaign.Current.CampaignObjectManager.Settlements)
+        {
+            if (settlement.ShipStash == null) continue;
+
+            var index = 0;
+            foreach (var ship in settlement.ShipStash)
+            {
+                RegisterExistingObject($"ShipStash_{settlement.StringId}_{index++}", ship);
+            }
+        }
+        
+        // An empty clan party keeps its ships without an owner until its leader returns
+        var emptyClanParties = Campaign.Current.GetCampaignBehavior<EmptyClanPartiesCampaignBehavior>()?._emptyClanParties;
+        if (emptyClanParties == null) return;
+
+        foreach (var emptyClanParty in emptyClanParties)
+        {
+            var index = 0;
+            foreach (var ship in emptyClanParty.Ships)
+            {
+                RegisterExistingObject($"EmptyClanParty_{emptyClanParty.Leader.StringId}_{index++}", ship);
             }
         }
     }

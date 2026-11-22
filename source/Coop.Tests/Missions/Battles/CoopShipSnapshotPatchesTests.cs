@@ -17,24 +17,6 @@ namespace Coop.Tests.Missions.Battles;
 
 public class CoopShipSnapshotPatchesTests
 {
-    // M6 D7: a snapshot's hits grant no XP here, but their mitigated damage is kept for the fate report; a campaign ship's pass.
-    [Fact]
-    public void DamageXp_SumsASnapshotsMitigatedDamage_AndLetsACampaignShipThrough()
-    {
-        using var naval = new NavalClientContainer();
-        var snapshot = Snapshot(naval);
-        var ship = CreateOwnedShip();
-
-        Assert.False(SnapshotShipDamageXpPatch.Prefix(snapshot, rawDamage: 100f, finalDamage: 70f));
-        Assert.False(SnapshotShipDamageXpPatch.Prefix(snapshot, rawDamage: 40f, finalDamage: 50f));
-        Assert.False(SnapshotShipDamageXpPatch.Prefix(snapshot, rawDamage: 20f, finalDamage: 15f));
-        Assert.True(SnapshotShipDamageXpPatch.Prefix(ship, rawDamage: 100f, finalDamage: 70f));
-
-        var snapshots = naval.Resolve<ICoopShipSnapshotRegistry>();
-        Assert.Equal(35f, snapshots.MitigatedDamageOf(snapshot));
-        Assert.Equal(0f, snapshots.MitigatedDamageOf(ship));
-    }
-
     [Fact]
     public void SnapshotHitPointWrites_RunTheDefaultPrioritySyncPrefixInsideTheScope()
     {

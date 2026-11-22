@@ -8,6 +8,7 @@ using Coop.Naval.CampaignBehaviors.Messages;
 using Coop.Naval.PortScreen;
 using Coop.Naval.PortScreen.Data;
 using Coop.Naval.PortScreen.Interfaces;
+using GameInterface.Services.AnchorPoints.Interfaces;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Interfaces;
@@ -48,7 +49,7 @@ public class PortAffordabilityTests
         var piece = CreatePiece();
         shipCosts.TradeValues[(bought, player)] = 400;
         shipCosts.UpgradeCosts[(bought, piece)] = 300;
-        var portScreen = new PortScreenHandlerInterface(playerMessages.Object, new PortTransactionPricer(shipCosts));
+        var portScreen = new PortScreenHandlerInterface(playerMessages.Object, new PortTransactionPricer(shipCosts), Mock.Of<IAnchorPointInterface>(), portMooringInterface: null);
 
         portScreen.OnConfirmChanges(PortScreenMode.Trade, TradeChanges(hero, bought, new ShipUpgradePieceInfo(bought, "sail", piece)));
 
@@ -98,6 +99,8 @@ public class PortAffordabilityTests
         new MBReadOnlyList<ShipRenameInfo>(),
         new MBReadOnlyList<ShipUpgradePieceInfo> { upgrade },
         new MBReadOnlyList<ShipFigureheadInfo>(),
+        new MBReadOnlyList<Ship>(),
+        new MBReadOnlyList<Ship>(),
         new MBReadOnlyList<Ship>());
 
     // A bare mobile party whose component reports the given leader.

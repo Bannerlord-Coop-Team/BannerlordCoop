@@ -7,10 +7,9 @@
     <Publicize Remove="@(Publicize)" />
     <DoNotPublicize Remove="@(DoNotPublicize)" />
   </ItemGroup>
-  <!-- A local Release build with War Sails installed is a TESTER build like Debug, so War Sails co-op can run in it.
-       CI sets CI=true, so its release builds stay without TESTER unless the workflow passes -p:CoopTesterBuild=true.
+  <!-- Release builds stay without TESTER unless the workflow passes -p:CoopTesterBuild=true.
        A global -p:DefineConstants would replace each project's own constants, COOP_NAVAL in Coop.Core included. -->
-  <PropertyGroup Condition="'$(CoopTesterBuild)' == 'true' Or ('$(Configuration)' == 'Release' And '$(CoopNavalDlc)' == 'true' And '$(CI)' != 'true')">
+  <PropertyGroup Condition="'$(CoopTesterBuild)' == 'true'">
     <DefineConstants>$(DefineConstants);TESTER</DefineConstants>
   </PropertyGroup>
   <!-- Fails a game-referencing project with one clear error when BANNERLORD_DIR is unset or isn't an install, instead

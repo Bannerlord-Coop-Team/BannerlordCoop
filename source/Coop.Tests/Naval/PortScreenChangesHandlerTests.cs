@@ -49,6 +49,8 @@ public class PortScreenChangesHandlerTests : IDisposable
     private readonly Ship renamedShip;
     private readonly Ship upgradedShip;
     private readonly Ship sentShip;
+    private readonly Ship mooredShip;
+    private readonly Ship retrievedShip;
     private readonly ShipUpgradePiece piece;
     private readonly Figurehead figurehead;
 
@@ -77,6 +79,8 @@ public class PortScreenChangesHandlerTests : IDisposable
         sentShip = Register<Ship>(11);
         piece = Register<ShipUpgradePiece>(12);
         figurehead = Register<Figurehead>(13);
+        mooredShip = Register<Ship>(14);
+        retrievedShip = Register<Ship>(15);
     }
 
     public void Dispose() => handler.Dispose();
@@ -97,7 +101,9 @@ public class PortScreenChangesHandlerTests : IDisposable
             new MBReadOnlyList<ShipRenameInfo> { new ShipRenameInfo(renamedShip, "Sea Wolf") },
             new MBReadOnlyList<ShipUpgradePieceInfo> { new ShipUpgradePieceInfo(upgradedShip, "sail", piece) },
             new MBReadOnlyList<ShipFigureheadInfo> { new ShipFigureheadInfo(upgradedShip, figurehead) },
-            new MBReadOnlyList<Ship> { sentShip });
+            new MBReadOnlyList<Ship> { sentShip },
+            new MBReadOnlyList<Ship> { mooredShip },
+            new MBReadOnlyList<Ship> { retrievedShip });
 
         SendAndReceive(request);
 
@@ -112,6 +118,8 @@ public class PortScreenChangesHandlerTests : IDisposable
         Assert.Same(soldShip, Assert.Single(changes.ShipsToSell));
         Assert.Same(repairedShip, Assert.Single(changes.ShipsToRepair));
         Assert.Same(sentShip, Assert.Single(changes.ShipsToSend));
+        Assert.Same(mooredShip, Assert.Single(changes.ShipsToStash));
+        Assert.Same(retrievedShip, Assert.Single(changes.ShipsToRetrieveFromStash));
 
         var rename = Assert.Single(changes.ShipsToRename);
         Assert.Same(renamedShip, rename.Ship);
@@ -144,6 +152,8 @@ public class PortScreenChangesHandlerTests : IDisposable
             new MBReadOnlyList<ShipRenameInfo>(),
             new MBReadOnlyList<ShipUpgradePieceInfo> { new ShipUpgradePieceInfo(upgradedShip, "sail", null) },
             new MBReadOnlyList<ShipFigureheadInfo> { new ShipFigureheadInfo(upgradedShip, null) },
+            new MBReadOnlyList<Ship>(),
+            new MBReadOnlyList<Ship>(),
             new MBReadOnlyList<Ship>());
 
         SendAndReceive(request);
@@ -157,6 +167,8 @@ public class PortScreenChangesHandlerTests : IDisposable
         Assert.Empty(changes.ShipsToRepair);
         Assert.Empty(changes.ShipsToRename);
         Assert.Empty(changes.ShipsToSend);
+        Assert.Empty(changes.ShipsToStash);
+        Assert.Empty(changes.ShipsToRetrieveFromStash);
         Assert.Null(Assert.Single(changes.SelectedShipPieces).Piece);
         Assert.Null(Assert.Single(changes.SelectedFigureheads).Figurehead);
     }
@@ -198,6 +210,8 @@ public class PortScreenChangesHandlerTests : IDisposable
         new MBReadOnlyList<ShipRenameInfo>(),
         new MBReadOnlyList<ShipUpgradePieceInfo>(),
         new MBReadOnlyList<ShipFigureheadInfo>(),
+        new MBReadOnlyList<Ship>(),
+        new MBReadOnlyList<Ship>(),
         new MBReadOnlyList<Ship>());
 
     private void SendAndReceive(PortScreenChangesRequested request)

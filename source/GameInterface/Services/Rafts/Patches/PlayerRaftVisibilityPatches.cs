@@ -1,11 +1,6 @@
-﻿using Common.Logging;
-using GameInterface.Services.MobileParties.Extensions;
+﻿using GameInterface.Services.MobileParties.Extensions;
 using HarmonyLib;
 using SandBox.ViewModelCollection.Nameplate;
-using Serilog;
-using System.Collections.Generic;
-using System.Reflection;
-using System.Reflection.Emit;
 using TaleWorlds.CampaignSystem.Party;
 using static TaleWorlds.CampaignSystem.Party.MobileParty;
 
@@ -19,34 +14,26 @@ namespace GameInterface.Services.Rafts.Patches;
 [HarmonyPatchCategory(GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class PlayerRaftVisibilityPatches
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<PlayerRaftVisibilityPatches>();
-
-    private static readonly MethodInfo IsInRaftStateGetter = AccessTools.PropertyGetter(typeof(MobileParty), nameof(MobileParty.IsInRaftState));
-    private static readonly MethodInfo HidesRaftNameplateMethod = AccessTools.Method(typeof(PlayerRaftVisibilityPatches), nameof(HidesRaftNameplate));
-
-    // Vanilla hides the nameplate of every raft that isn't the main party
+    // Remembers whether the camera left the nameplate visible before vanilla's hide rules run
     [HarmonyPatch(typeof(PartyNameplateVM), nameof(PartyNameplateVM.RefreshDynamicProperties))]
-    [HarmonyTranspiler]
-    private static IEnumerable<CodeInstruction> RefreshDynamicPropertiesTranspiler(IEnumerable<CodeInstruction> instructions)
+    [HarmonyPrefix]
+    private static void RefreshDynamicPropertiesPrefix(PartyNameplateVM __instance, out bool __state) => __state = __instance._isVisibleOnMapBind;
+
+    // Vanilla hides the nameplate of every non-main party in naval auto travel (a raft or a ferry), so show other players' rafts again
+    [HarmonyPatch(typeof(PartyNameplateVM), nameof(PartyNameplateVM.RefreshDynamicProperties))]
+    [HarmonyPostfix]
+    private static void RefreshDynamicPropertiesPostfix(PartyNameplateVM __instance, bool __state)
     {
-        var replaced = 0;
-        foreach (var instruction in instructions)
-        {
-            if (instruction.Calls(IsInRaftStateGetter))
-            {
-                replaced++;
-                yield return new CodeInstruction(OpCodes.Call, HidesRaftNameplateMethod).MoveLabelsFrom(instruction).MoveBlocksFrom(instruction);
-                continue;
-            }
+        var party = __instance.Party;
+        // Vanilla's army and settlement hides still apply to a raft
+        var hiddenOnlyForNavalAutoTravel = __state && !__instance._isVisibleOnMapBind &&
+            !__instance._isInArmyBind && !__instance._isInSettlementBind && party.IsInNavalAutoTravel;
 
-            yield return instruction;
-        }
+        if (!hiddenOnlyForNavalAutoTravel) return;
+        if (!IsOtherPlayersRaft(party, MobileParty.MainParty)) return;
 
-        if (replaced != 1)
-            Logger.Error("Expected one IsInRaftState read in {Method}, found {Count}", nameof(PartyNameplateVM.RefreshDynamicProperties), replaced);
+        __instance._isVisibleOnMapBind = true;
     }
-
-    private static bool HidesRaftNameplate(MobileParty party) => party.IsInRaftState && !party.IsPlayerParty();
 
     [HarmonyPatch(typeof(PartyBase), "TaleWorlds.CampaignSystem.Map.IInteractablePoint.CanPartyInteract")]
     [HarmonyPostfix]

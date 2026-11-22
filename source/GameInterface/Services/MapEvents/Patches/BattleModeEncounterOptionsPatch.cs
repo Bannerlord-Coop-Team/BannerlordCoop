@@ -258,8 +258,12 @@ internal class BattleModeEncounterOptionsPatch
     {
         var mapEvent = GetPlayerEncounterBattle() ?? MobileParty.MainParty?.MapEvent;
         var encounter = PlayerEncounter.Current;
-        var playerSide = MobileParty.MainParty?.MapEventSide;
-        if (mapEvent == null || encounter == null || playerSide == null)
+        if (mapEvent == null || encounter == null)
+            return false;
+
+        if (MobileParty.MainParty?.MapEventSide == null) return false;
+
+        if (!ContainerProvider.TryResolve<IOrderAttackRule>(out var orderAttackRule))
             return false;
 
         var isNavalOrder = mapEvent.IsNavalMapEvent ||
@@ -268,29 +272,17 @@ internal class BattleModeEncounterOptionsPatch
             ? GameMenuOption.LeaveType.OrderShipsToAttack
             : GameMenuOption.LeaveType.OrderTroopsToAttack;
 
-        foreach (var party in mapEvent.PartiesOnSide(encounter.OpponentSide))
-        {
-            if (party.Party.MobileParty?.IsInRaftState == true)
-                return false;
+        // GetConditionsHold saves the leave type even when this condition hides the option.
+        if (orderAttackRule.IsFirstOpponentInRaft(mapEvent, encounter.OpponentSide))
+            return false;
 
-            break;
-        }
+        if (!orderAttackRule.HasOrderableTroops(MobileParty.MainParty.MapEventSide, CharacterObject.PlayerCharacter))
+            return false;
 
         MenuHelper.CheckEnemyAttackableHonorably(args);
 
-        var orderableTroops = 0;
-        foreach (var party in playerSide.Parties)
-        {
-            if (party.Party.IsMobile && party.Party.MobileParty.IsInRaftState)
-                continue;
-
-            orderableTroops += CountOrderableTroops(party.Party);
-        }
-
-        if (orderableTroops <= 0)
-            return false;
-
-        if (!MobileParty.MainParty.IsInRaftState && CountOrderableTroops(PartyBase.MainParty) > 0)
+        if (!MobileParty.MainParty.IsInRaftState &&
+            orderAttackRule.CountOrderableTroops(PartyBase.MainParty, CharacterObject.PlayerCharacter) > 0)
         {
             MBTextManager.SetTextVariable(
                 "SEND_TROOPS_TEXT",
@@ -317,25 +309,6 @@ internal class BattleModeEncounterOptionsPatch
         }
 
         return true;
-    }
-
-    private static int CountOrderableTroops(PartyBase party)
-    {
-        var count = 0;
-        foreach (var element in party.MemberRoster.GetTroopRoster())
-        {
-            if (element.Character.IsHero)
-            {
-                if (element.Character != CharacterObject.PlayerCharacter && !element.Character.HeroObject.IsWounded)
-                    count++;
-            }
-            else
-            {
-                count += element.Number - element.WoundedNumber;
-            }
-        }
-
-        return count;
     }
 
     /// <summary>Native uses the empty main party's morale to disable "Leave it to the others" even when healthy
