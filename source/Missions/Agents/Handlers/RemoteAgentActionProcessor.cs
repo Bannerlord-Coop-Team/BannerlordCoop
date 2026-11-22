@@ -22,8 +22,6 @@ public interface IRemoteAgentActionProcessor : IDisposable
     void BindPilotSeats(string battleId, ISiegeMachineStateReplicator machineState);
     AgentPilotSeatData? CapturePilotSeat(CoopAgentInfo info, AgentPilotSeatData? previous);
     int GetOutgoingBattleHostEpoch();
-    void ClearLocalAgentStates();
-    void ClearForLocalAgent(Guid agentId, Agent agent);
     void ApplyRemoteGuardStates();
     void RefreshRemoteGuardStatesAfterMovement();
     void AdvanceRemoteGuardStatesAfterNativeTick();
@@ -253,6 +251,10 @@ public partial class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         this.battleHostRegistry = battleHostRegistry;
         this.missionContext = missionContext;
         this.agentVisualActionAccessor = agentVisualActionAccessor;
+
+        agentRegistry.AgentBecameLocallyControlled += OnAgentBecameLocallyControlled;
+        agentRegistry.AgentRemoved += OnAgentRemoved;
+        agentRegistry.AgentsCleared += OnAgentsCleared;
     }
 
     public int GetOutgoingBattleHostEpoch()
@@ -268,35 +270,39 @@ public partial class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         return assignment.Epoch;
     }
 
-    public void ClearLocalAgentStates()
-    {
-        List<Guid> localAgentIds = null;
-        foreach (Guid agentId in _agentStates.Keys)
+    private void OnAgentBecameLocallyControlled(CoopAgentInfo info) =>
+        GameThread.RunSafe(() =>
         {
-            if (agentRegistry.IsLocallyControlled(agentId))
-                (localAgentIds ??= new List<Guid>()).Add(agentId);
-        }
+            if (!_disposed && info.CurrentAuthority == controllerIdProvider.ControllerId)
+                ClearRemoteAgentState(info);
+        });
 
-        if (localAgentIds == null) return;
-        foreach (Guid agentId in localAgentIds)
+    private void OnAgentRemoved(CoopAgentInfo info) =>
+        GameThread.RunSafe(() =>
         {
-            agentRegistry.TryGetAgentInfo(
-                agentId,
-                out CoopAgentInfo info);
-            ClearForLocalAgent(agentId, info?.Agent);
-        }
-    }
+            if (!_disposed) ClearRemoteAgentState(info);
+        });
 
-    public void ClearForLocalAgent(Guid agentId, Agent agent)
+    private void OnAgentsCleared() =>
+        GameThread.RunSafe(() =>
+        {
+            if (!_disposed) ResetAgentStates();
+        });
+
+    private void ClearRemoteAgentState(CoopAgentInfo info)
     {
+        Guid agentId = info.AgentId;
         if (!_agentStates.TryGetValue(agentId, out RemoteAgentActionState state))
             return;
 
-        ReleasePilotSeat(state, preserveLocalUser: true);
         _agentStates.Remove(agentId);
         _pendingActionAgentIds.Remove(agentId);
         _retainedGuardAgentIds.Remove(agentId);
+        SetPendingPilotSeat(agentId, state, null);
+        ReleasePilotSeat(state, preserveLocalUser: true);
+
         if (state.RetainedGuard == null) return;
+        Agent agent = info.Agent;
         if (agent == null || agent.Mission != Mission.Current || !agent.IsActive()) return;
 
         using (new AllowedThread())
@@ -769,7 +775,7 @@ public partial class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         if (agent == null || agent.Mission != Mission.Current || !agent.IsActive())
             return RemoteActionApplyResult.AgentNotReady;
 
-        GetOrCreateAgentState(agentId).PendingPilotSeat = null;
+        SetPendingPilotSeat(agentId, GetOrCreateAgentState(agentId), null);
         if (action.Data.EquipmentRevision > 0)
         {
             RemoteAgentActionState state = GetOrCreateAgentState(agentId);
@@ -878,7 +884,8 @@ public partial class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         }
         RecordRemoteActionSequence(agentId, action);
         // A busy seat must not block unrelated equipment or action presentation.
-        GetOrCreateAgentState(agentId).PendingPilotSeat = pilotSeatReady ? null : action;
+        if (!pilotSeatReady)
+            SetPendingPilotSeat(agentId, GetOrCreateAgentState(agentId), action);
         UpdateRemoteGuardState(
             agentId,
             appliedGuardState,
@@ -1336,7 +1343,7 @@ public partial class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             if (deferred.ControllerId == action.ControllerId &&
                 (action.BattleHostEpoch > deferred.BattleHostEpoch ||
                     HasPendingRemoteActionAtOrAfter(agentId, deferred)))
-                state.PendingPilotSeat = null;
+                SetPendingPilotSeat(agentId, state, null);
         }
     }
 
@@ -1564,14 +1571,23 @@ public partial class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         if (_disposed) return;
         _disposed = true;
 
+        agentRegistry.AgentBecameLocallyControlled -= OnAgentBecameLocallyControlled;
+        agentRegistry.AgentRemoved -= OnAgentRemoved;
+        agentRegistry.AgentsCleared -= OnAgentsCleared;
         BindPilotSeats(null, null);
-        _agentStates.Clear();
-        _pendingActionAgentIds.Clear();
-        _retainedGuardAgentIds.Clear();
+        ResetAgentStates();
         _migrationLineages.Clear();
         lock (_knownBattleHostControllersGate)
         {
             _knownBattleHostControllers.Clear();
         }
+    }
+
+    private void ResetAgentStates()
+    {
+        ClearPilotSeats();
+        _agentStates.Clear();
+        _pendingActionAgentIds.Clear();
+        _retainedGuardAgentIds.Clear();
     }
 }

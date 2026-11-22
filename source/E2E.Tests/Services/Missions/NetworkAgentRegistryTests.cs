@@ -4,6 +4,8 @@ using Missions;
 using Missions.Agents.Packets;
 using Moq;
 using System;
+using System.Collections.Generic;
+using System.Threading;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
@@ -157,6 +159,33 @@ public class NetworkAgentRegistryTests
 
         Assert.True(registry.IsLocallyControlled(id));
         Assert.True(registry.IsLocallyControlled(agent));
+    }
+
+    [Fact]
+    public void ReturnRetainedPlayer_NotifiesAfterCommittingRiderAndMountTogether()
+    {
+        var (registry, _, riderId) = RegisterAgent("host", "me");
+        Guid mountId = Guid.NewGuid();
+        Assert.True(registry.TryRegisterAgent("host", mountId, ObjectHelper.SkipConstructor<Agent>()));
+        var notified = new List<Guid>();
+        registry.AgentBecameLocallyControlled += info =>
+        {
+            // A separate reader detects a notification made under the reentrant registry lock.
+            bool committed = false;
+            var reader = new Thread(() =>
+                committed = registry.IsLocallyControlled(riderId) && registry.IsLocallyControlled(mountId))
+            {
+                IsBackground = true,
+            };
+            reader.Start();
+            Assert.True(reader.Join(TimeSpan.FromSeconds(5)));
+            Assert.True(committed);
+            notified.Add(info.AgentId);
+        };
+
+        Assert.True(registry.TryReturnRetainedPlayer("host", "me", riderId, 0, mountId, 0));
+        Assert.True(registry.TryReturnRetainedPlayer("host", "me", riderId, 0, mountId, 0));
+        Assert.Equal(new[] { riderId, mountId }, notified);
     }
 
     [Fact]

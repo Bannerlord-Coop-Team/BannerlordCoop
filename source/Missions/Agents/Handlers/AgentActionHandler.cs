@@ -203,7 +203,6 @@ public class AgentActionHandler : IAgentActionHandler
         }
         else
         {
-            remoteActionProcessor.ClearLocalAgentStates();
             Agent mainAgent = mission.MainAgent;
             if (mainAgent == null
                 || mainAgent.Controller != AgentControllerType.Player
@@ -244,7 +243,6 @@ public class AgentActionHandler : IAgentActionHandler
         ref List<long> sequences)
     {
         Agent agent = info.Agent;
-        remoteActionProcessor.ClearForLocalAgent(info.AgentId, agent);
         // Registered mounts are not action-synced; the rider's MountData owns their presentation.
         bool actionSyncedAgent =
             agent != null

@@ -1,6 +1,8 @@
 ﻿using Common.Util;
 using Missions.Agents.Packets;
 using Missions.Battles;
+using System;
+using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
@@ -12,6 +14,8 @@ public partial class RemoteAgentActionProcessor
     private string pilotBattleId;
     private Mission pilotMission;
     private ISiegeMachineStateReplicator pilotMachines;
+    private readonly HashSet<Guid> pilotSeatAgentIds = new();
+    private readonly List<Guid> pilotSeatRefreshIds = new();
 
     private sealed class PilotSeatAttachment
     {
@@ -24,15 +28,22 @@ public partial class RemoteAgentActionProcessor
     public void BindPilotSeats(string battleId, ISiegeMachineStateReplicator machineState)
     {
         if (pilotMachines != null) pilotMachines.AuthorityChanged -= OnPilotMachineAuthorityChanged;
-        foreach (var state in _agentStates.Values)
-        {
-            state.PendingPilotSeat = null;
-            ReleasePilotSeat(state, preserveLocalUser: true);
-        }
+        ClearPilotSeats();
         pilotBattleId = battleId;
         pilotMission = machineState == null ? null : Mission.Current;
         pilotMachines = machineState;
         if (pilotMachines != null) pilotMachines.AuthorityChanged += OnPilotMachineAuthorityChanged;
+    }
+
+    private void ClearPilotSeats()
+    {
+        foreach (Guid agentId in pilotSeatAgentIds.ToArray())
+        {
+            if (!_agentStates.TryGetValue(agentId, out var state)) continue;
+            SetPendingPilotSeat(agentId, state, null);
+            ReleasePilotSeat(state, preserveLocalUser: true);
+            RemoveAgentStateIfEmpty(agentId, state);
+        }
     }
 
     public AgentPilotSeatData? CapturePilotSeat(CoopAgentInfo info, AgentPilotSeatData? previous)
@@ -131,52 +142,83 @@ public partial class RemoteAgentActionProcessor
         if (agent.CurrentlyUsedGameObject != point || point.UserAgent != agent) return false;
         info.ReplicatedPilotPoint = point;
         state.PilotSeat = new PilotSeatAttachment { Info = info, Point = point, Data = data, ControllerId = owner };
+        pilotSeatAgentIds.Add(info.AgentId);
         return true;
     }
 
-    private void OnPilotMachineAuthorityChanged(int machineId) => RefreshPilotSeats();
+    private void OnPilotMachineAuthorityChanged(int machineId) => RefreshPilotSeats(machineId);
 
-    private void RefreshPilotSeats()
+    private void RefreshPilotSeats(int? machineId = null)
     {
-        foreach (var entry in _agentStates)
+        if (pilotSeatAgentIds.Count == 0 || pilotSeatRefreshIds.Count != 0) return;
+
+        // Releasing a seat can change the index. A nested authority notification can wait for the next tick.
+        pilotSeatRefreshIds.AddRange(pilotSeatAgentIds);
+        try
         {
-            var state = entry.Value;
-            var seat = state.PilotSeat;
-            if (seat != null)
+            foreach (Guid agentId in pilotSeatRefreshIds)
             {
-                Agent agent = seat.Info.Agent;
-                if (pilotMission != Mission.Current || agent.Mission != Mission.Current || !agent.IsActive() ||
-                    !agentRegistry.TryGetAgentInfo(seat.Info.AgentId, out var current) || !ReferenceEquals(current, seat.Info) ||
-                    current.CurrentAuthority != seat.ControllerId || current.AuthorityRevision != seat.Data.AgentRevision ||
-                    pilotMachines == null ||
-                    !pilotMachines.TryGetMachineAuthority(seat.Data.MachineId, out var owner, out int epoch, out int revision) ||
-                    owner != seat.ControllerId || epoch != seat.Data.HostEpoch || revision != seat.Data.MachineRevision)
-                    ReleasePilotSeat(state, preserveLocalUser: true);
+                if (_agentStates.TryGetValue(agentId, out var state))
+                    RefreshPilotSeat(agentId, state, machineId);
             }
-            if (!state.PendingPilotSeat.HasValue) continue;
-            RemoteAction pending = state.PendingPilotSeat.Value;
-            if (!agentRegistry.TryGetAgentInfo(entry.Key, out var info) ||
-                agentRegistry.IsLocallyControlled(entry.Key) || info.Agent == null ||
-                info.Agent.Mission != Mission.Current || !info.Agent.IsActive() ||
-                !IsCurrentActionAuthority(info, pending.ControllerId, pending.BattleHostEpoch))
-            {
-                state.PendingPilotSeat = null;
-                continue;
-            }
-            if (!TryApplyPilotSeat(info, pending, out _)) continue;
-            if (state.PilotSeat != null && state.PilotSeat.ControllerId == pending.ControllerId &&
-                state.PilotSeat.Data.Equals(pending.Data.PilotSeat.Value))
-            {
-                // Native use transitions may change the hands after the action was first applied.
-                using (new AllowedThread())
-                {
-                    if (pending.Data.Equipment.HasValue &&
-                        !pending.Data.Equipment.Value.TryApplyForAction(info.Agent)) continue;
-                    pending.Data.ApplyActionChannels(info.Agent, agentVisualActionAccessor);
-                }
-            }
-            state.PendingPilotSeat = null;
         }
+        finally
+        {
+            pilotSeatRefreshIds.Clear();
+        }
+    }
+
+    private void RefreshPilotSeat(Guid agentId, RemoteAgentActionState state, int? machineId)
+    {
+        var seat = state.PilotSeat;
+        RemoteAction? deferred = state.PendingPilotSeat;
+        bool refreshAttachment = seat != null && (!machineId.HasValue || seat.Data.MachineId == machineId);
+        bool retryPending = deferred.HasValue && (!machineId.HasValue || deferred.Value.Data.PilotSeat.Value.MachineId == machineId);
+        if (!refreshAttachment && !retryPending) return;
+
+        agentRegistry.TryGetAgentInfo(agentId, out var info);
+        Agent agent = info?.Agent;
+        bool active = agent != null && agent.Mission == Mission.Current && agent.IsActive();
+        if (refreshAttachment && (!active || pilotMission != Mission.Current || !ReferenceEquals(info, seat.Info) ||
+            info.CurrentAuthority != seat.ControllerId || info.AuthorityRevision != seat.Data.AgentRevision ||
+            pilotMachines == null ||
+            !pilotMachines.TryGetMachineAuthority(seat.Data.MachineId, out var owner, out int epoch, out int revision) ||
+            owner != seat.ControllerId || epoch != seat.Data.HostEpoch || revision != seat.Data.MachineRevision))
+        {
+            ReleasePilotSeat(state, preserveLocalUser: true);
+        }
+
+        if (!retryPending) return;
+        RemoteAction pending = deferred.Value;
+        if (!active || info.CurrentAuthority == controllerIdProvider.ControllerId ||
+            !IsCurrentActionAuthority(info, pending.ControllerId, pending.BattleHostEpoch))
+        {
+            SetPendingPilotSeat(agentId, state, null);
+            return;
+        }
+        if (!TryApplyPilotSeat(info, pending, out _)) return;
+        if (state.PilotSeat != null && state.PilotSeat.ControllerId == pending.ControllerId &&
+            state.PilotSeat.Data.Equals(pending.Data.PilotSeat.Value))
+        {
+            // Native use transitions may change the hands after the action was first applied.
+            using (new AllowedThread())
+            {
+                if (pending.Data.Equipment.HasValue &&
+                    !pending.Data.Equipment.Value.TryApplyForAction(agent)) return;
+                pending.Data.ApplyActionChannels(agent, agentVisualActionAccessor);
+            }
+        }
+        SetPendingPilotSeat(agentId, state, null);
+    }
+
+    private void SetPendingPilotSeat(Guid agentId, RemoteAgentActionState state, RemoteAction? action)
+    {
+        if (!action.HasValue && !state.PendingPilotSeat.HasValue) return;
+        state.PendingPilotSeat = action;
+        if (action.HasValue)
+            pilotSeatAgentIds.Add(agentId);
+        else if (state.PilotSeat == null)
+            pilotSeatAgentIds.Remove(agentId);
     }
 
     private void ReleasePilotSeat(RemoteAgentActionState state, bool preserveLocalUser)
@@ -184,6 +226,7 @@ public partial class RemoteAgentActionProcessor
         var seat = state.PilotSeat;
         if (seat == null) return;
         state.PilotSeat = null;
+        if (!state.PendingPilotSeat.HasValue) pilotSeatAgentIds.Remove(seat.Info.AgentId);
         if (seat.Info.ReplicatedPilotPoint == seat.Point) seat.Info.ReplicatedPilotPoint = null;
         Agent agent = seat.Info.Agent;
         if (agent == null || agent.Mission != Mission.Current || !agent.IsActive() ||
