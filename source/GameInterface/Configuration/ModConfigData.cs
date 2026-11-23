@@ -1,8 +1,25 @@
 ﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using System;
 using System.Collections.Generic;
 
 namespace GameInterface.Configuration;
+
+/// <summary>Describes a managed option for the shipped catalog. Specify <see cref="AvailableSince"/> for every option.</summary>
+[AttributeUsage(AttributeTargets.Property, AllowMultiple = false)]
+public sealed class ManagedConfigOptionAttribute : Attribute
+{
+    public string AvailableSince { get; set; }
+    // NaN leaves the bound unset.
+    public double Min { get; set; } = double.NaN;
+    public double Max { get; set; } = double.NaN;
+    /// <summary>Regex the website applies to each item of a list option.</summary>
+    public string ItemPattern { get; set; }
+    /// <summary>Item kind of a list option for the website; only "steamId64" is accepted.</summary>
+    public string ItemFormat { get; set; }
+    /// <summary>Raises positive values below this threshold to the threshold and leaves zero unchanged.</summary>
+    public int CoercePositiveBelow { get; set; }
+}
 
 /// <summary>
 /// THE mod-config.json schema: one explicit property per key — the class IS the
@@ -68,79 +85,122 @@ public enum DifficultyLevel
 
 public sealed class ModOptionsData
 {
+    public const int MinimumBattleSize = 200;
+    public const int MaximumBattleSize = 1000;
+
+    // Give a player time to read the dialog even with a very short timer.
+    internal const int MinimumPvpResponseTimerSeconds = 10;
+
+    [ManagedConfigOption(AvailableSince = "0.1.6")]
     public bool? VoiceEnabled { get; set; }
 
+    [ManagedConfigOption(AvailableSince = "0.1.3", Min = MinimumBattleSize, Max = MaximumBattleSize)]
     public int? BattleSize { get; set; }
 
+    [ManagedConfigOption(AvailableSince = "0.1.2")]
     public bool? FastForwardEnabled { get; set; }
 
+    [ManagedConfigOption(AvailableSince = "0.1.2")]
     public bool? AutoPauseEnabled { get; set; }
 
+    [ManagedConfigOption(AvailableSince = "0.1.8")]
     public bool? AllowClientTimeControls { get; set; }
 
+    [ManagedConfigOption(AvailableSince = "0.1.2")]
     public bool? ClientsCanUseCheats { get; set; }
 
+    [ManagedConfigOption(AvailableSince = "0.1.2")]
     public bool? GoldFoodInfluenceChangeInSettlements { get; set; }
 
+    [ManagedConfigOption(AvailableSince = "0.1.2")]
     public GoldFoodChangeMode? GoldFoodInfluenceChangeInBattles { get; set; }
 
+    [ManagedConfigOption(AvailableSince = "0.1.2")]
     public bool? GoldFoodInfluenceChangeForDisconnectedPlayers { get; set; }
 
+    [ManagedConfigOption(AvailableSince = "0.1.6")]
     public bool? BlockAiWarDeclarationsOnOfflinePlayers { get; set; }
 
+    [ManagedConfigOption(AvailableSince = "0.1.2")]
     public int? PlayerBattleAiJoinWindowHours { get; set; }
 
+    [ManagedConfigOption(AvailableSince = "0.1.8")]
     public int? PostBattleAiAmnestySeconds { get; set; }
 
+    [ManagedConfigOption(AvailableSince = "0.1.2")]
     public bool? SpeedLimitWhilePlayersInBattle { get; set; }
 
+    [ManagedConfigOption(AvailableSince = "0.1.6")]
     public bool? EnsureUnaffiliatedWanderers { get; set; }
 
+    [ManagedConfigOption(AvailableSince = "0.1.2")]
     public int? WandererLimit { get; set; }
 
+    [ManagedConfigOption(AvailableSince = "0.1.7")]
     public int? SpawnRateWanderers { get; set; }
 
+    [ManagedConfigOption(AvailableSince = "0.1.2")]
     public bool? WandererLimitScalesWithPlayers { get; set; }
 
+    [ManagedConfigOption(AvailableSince = "0.1.2")]
     public int? PlayerKingdomClanTierRequired { get; set; }
 
+    [ManagedConfigOption(AvailableSince = "0.1.6")]
     public bool? CoopClansEnabled { get; set; }
 
+    [ManagedConfigOption(AvailableSince = "0.1.2")]
     public bool? SmithingStaminaRecoveryOutsideSettlements { get; set; }
 
+    [ManagedConfigOption(AvailableSince = "0.1.2")]
     public float? SmithingStaminaRecoveryMultiplier { get; set; }
 
+    [ManagedConfigOption(AvailableSince = "0.1.2")]
     public float? MaximumLootersMultiplier { get; set; }
 
+    [ManagedConfigOption(AvailableSince = "0.1.3")]
     public float? LooterPartySizeMultiplier { get; set; }
 
+    [ManagedConfigOption(AvailableSince = "0.1.2")]
     public LordDefectionRetryMode? LordDefectionRetries { get; set; }
   
+    [ManagedConfigOption(AvailableSince = "0.1.2")]
     public bool? EnableHeroExecutions { get; set; }
 
+    [ManagedConfigOption(AvailableSince = "0.1.2")]
     public bool? EnablePlayerClanMemberExecutions { get; set; }
 
+    [ManagedConfigOption(AvailableSince = "0.1.6")]
     public bool? EnablePlayerExecutions { get; set; }
     
+    [ManagedConfigOption(AvailableSince = "0.1.4")]
     public bool? PlayerWoundedBattleEntry { get; set; }
 
+    [ManagedConfigOption(AvailableSince = "0.1.3")]
     public bool? ShowPlayerNameplates { get; set; }
 
+    [ManagedConfigOption(AvailableSince = "0.1.7")]
     public int? KingdomDecisionVoteTimeoutSeconds { get; set; }
 
+    [ManagedConfigOption(AvailableSince = "0.1.8")]
     public ClansAfterKingdomDestructionMode? ClansAfterKingdomDestruction { get; set; }
 
+    [ManagedConfigOption(AvailableSince = "0.1.8", ItemPattern = "^[0-9]{17}$", ItemFormat = "steamId64")]
     public List<string> PreferredBattleHosts { get; set; }
 
+    [ManagedConfigOption(AvailableSince = "0.1.8")]
     public bool? PvpBlockLeave { get; set; }
 
+    [ManagedConfigOption(AvailableSince = "0.1.8", Min = 0, CoercePositiveBelow = MinimumPvpResponseTimerSeconds)]
     public int? PvpResponseTimerSeconds { get; set; }
 
+    [ManagedConfigOption(AvailableSince = "0.1.8")]
     public int? MaxClansPerKingdom { get; set; }
 
+    [ManagedConfigOption(AvailableSince = "0.1.8")]
     public bool? MaxClansPerKingdomCountsMercenaries { get; set; }
 
     /// <summary>Whether a dedicated server runs War Sails (NavalDLC) co-op. It parses the file itself; declared so the key isn't reported as unknown.</summary>
+    [ManagedConfigOption(AvailableSince = "0.1.8")]
     public bool? WarSails { get; set; }
 
     [JsonExtensionData]

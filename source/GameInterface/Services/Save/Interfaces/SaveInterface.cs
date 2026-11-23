@@ -14,6 +14,7 @@ public interface ISaveInterface : IGameAbstraction
 {
     SaveResults SaveCurrentGame();
     SaveResults SaveCurrentGameToFile(string saveName);
+    bool SaveFileExists(string fileName);
     byte[] ReadSaveFile(string fileName);
     void DeleteSaveFile(string fileName);
 
@@ -74,6 +75,9 @@ internal class SaveInterface : ISaveInterface
 
         return new SaveResults(true, data, result.CampaignId);
     }
+
+    public bool SaveFileExists(string fileName) =>
+        FileHelper.FileExists(FileDriver.GetSaveFilePath(fileName));
 
     public byte[] ReadSaveFile(string fileName)
     {

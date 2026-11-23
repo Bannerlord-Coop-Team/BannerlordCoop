@@ -1913,8 +1913,11 @@ public class CoopTournamentController : CoopMissionController
         {
             if (!scores.TryGetValue(match.Teams[i].TeamId, out var score)) continue;
             var participant = nativeTeams[i].Participants.FirstOrDefault();
-            if (participant != null && nativeTeams[i].Score != score.Score)
-                participant.AddScore(score.Score - nativeTeams[i].Score);
+            if (participant == null || nativeTeams[i].Score == score.Score) continue;
+            // host scores count from zero after native TournamentMatch.Start, so reset the whole team before crediting the first member
+            foreach (TournamentParticipant member in nativeTeams[i].Participants)
+                member.ResetScore();
+            participant.AddScore(score.Score);
         }
     }
 

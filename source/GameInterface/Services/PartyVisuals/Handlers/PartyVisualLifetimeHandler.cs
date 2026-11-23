@@ -2,11 +2,12 @@
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyBases.Extensions;
 using GameInterface.Services.PartyVisuals.Extensions;
+using GameInterface.Services.PartyVisuals.Interfaces;
 using GameInterface.Services.PartyVisuals.Messages;
-using SandBox.View.Map.Managers;
 using SandBox.View.Map.Visuals;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem.Party;
@@ -18,16 +19,23 @@ public class PartyVisualLifetimeHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
+    private readonly IPartyVisualInterface partyVisuals;
     private readonly ConditionalWeakTable<MobilePartyVisual, string> skippedVisualIds = new();
 
-    public PartyVisualLifetimeHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
+    public PartyVisualLifetimeHandler(
+        IMessageBroker messageBroker,
+        INetwork network,
+        IObjectManager objectManager,
+        IPartyVisualInterface partyVisuals)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
+        this.partyVisuals = partyVisuals;
         messageBroker.Subscribe<PartyVisualCreated>(Handle);
         messageBroker.Subscribe<NetworkCreatePartyVisual>(Handle);
         messageBroker.Subscribe<PartyVisualDestroyed>(Handle);
+        messageBroker.Subscribe<MobilePartyDestroyed>(Handle);
         messageBroker.Subscribe<NetworkDestroyPartyVisual>(Handle);
     }
 
@@ -36,6 +44,7 @@ public class PartyVisualLifetimeHandler : IHandler
         messageBroker.Unsubscribe<PartyVisualCreated>(Handle);
         messageBroker.Unsubscribe<NetworkCreatePartyVisual>(Handle);
         messageBroker.Unsubscribe<PartyVisualDestroyed>(Handle);
+        messageBroker.Unsubscribe<MobilePartyDestroyed>(Handle);
         messageBroker.Unsubscribe<NetworkDestroyPartyVisual>(Handle);
     }
 
@@ -47,24 +56,25 @@ public class PartyVisualLifetimeHandler : IHandler
         var mobileParty = payload.What.PartyBase?.MobileParty;
         if (mobileParty == null)
             return;
+        var partyVisual = payload.What.MobilePartyVisual;
 
         // Save loading builds visuals before InitialServerState registers campaign objects. Those
         // visuals are registered by PartyVisualRegistry after loading, so skip this live-create path.
-        if (!objectManager.TryGetId(mobileParty, out string mobilePartyId))
+        if (!objectManager.TryGetId(mobileParty, out _))
         {
             if (!string.IsNullOrEmpty(mobileParty.StringId))
             {
-                skippedVisualIds.Remove(payload.What.MobilePartyVisual);
+                skippedVisualIds.Remove(partyVisual);
                 skippedVisualIds.Add(
-                    payload.What.MobilePartyVisual,
+                    partyVisual,
                     $"{nameof(MobilePartyVisual)}_{mobileParty.StringId}");
             }
             return;
         }
 
-        if (!objectManager.AddNewObject(payload.What.MobilePartyVisual, out var visualId))
+        if (!objectManager.AddNewObject(partyVisual, out var visualId))
             return;
-        if (!objectManager.TryGetHandleWithLogging(payload.What.MobilePartyVisual, out var visualHandle) ||
+        if (!objectManager.TryGetHandleWithLogging(partyVisual, out var visualHandle) ||
             !objectManager.TryGetHandleWithLogging(mobileParty, out var mobilePartyHandle)) return;
 
         network.SendAll(new NetworkCreatePartyVisual(visualId, visualHandle, mobilePartyHandle));
@@ -87,15 +97,22 @@ public class PartyVisualLifetimeHandler : IHandler
 
             using (new AllowedThread())
             {
+                // A recreated model needs a refresh even if the previous model cleared the dirty flag.
+                mobileParty.Party.SetVisualAsDirty();
                 mobileParty.CreateNewPartyVisual();
                 // A naval visual only builds its ship while the party is marked dirty, which the party's old visual already cleared
                 mobileParty.SetNavalVisualAsDirty();
 
-                var partyVisual = mobileParty.Party.GetPartyVisual();
-                if (partyVisual != null)
+                if (partyVisualId != null && mobileParty.Party.GetPartyVisual() is { } partyVisual)
                     objectManager.AddExisting(partyVisualId, partyVisual, payload.What.PartyVisualHandle);
             }
-        }, context: $"create party visual {partyVisualId}");
+        }, context: $"create party visual {payload.What.MobilePartyHandle}");
+    }
+
+    private void Handle(MessagePayload<MobilePartyDestroyed> payload)
+    {
+        // The registry publishes this before it removes the party's handle.
+        partyVisuals.OnPartyDestroyed(payload.What.MobileParty);
     }
 
     private void Handle(MessagePayload<PartyVisualDestroyed> payload)
@@ -131,7 +148,7 @@ public class PartyVisualLifetimeHandler : IHandler
                 if (partyVisual != null)
                     objectManager.Remove(partyVisual);
 
-                MobilePartyVisualManager.Current?.RemovePartyVisualForParty(mobileParty);
+                mobileParty.RemovePartyVisual();
             }
         }, context: $"destroy party visual {payload.What.MobilePartyHandle}");
     }
