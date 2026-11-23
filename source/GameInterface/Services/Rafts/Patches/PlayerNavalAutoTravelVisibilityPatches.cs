@@ -7,30 +7,30 @@ using static TaleWorlds.CampaignSystem.Party.MobileParty;
 namespace GameInterface.Services.Rafts.Patches;
 
 /// <summary>
-/// Other players' rafts stay visible with their nameplate but can't be engaged, so a player sailing back
-/// after escaping captivity can be seen without being attacked or talked to.
+/// Other players' rafts and ferries stay visible with their nameplate but can't be engaged, so a player sailing back
+/// after escaping captivity or crossing on a ferry can be seen without being attacked or talked to.
 /// </summary>
 [HarmonyPatch]
 [HarmonyPatchCategory(GameInterface.HARMONY_NAVAL_CATEGORY)]
-internal class PlayerRaftVisibilityPatches
+internal class PlayerNavalAutoTravelVisibilityPatches
 {
     // Remembers whether the camera left the nameplate visible before vanilla's hide rules run
     [HarmonyPatch(typeof(PartyNameplateVM), nameof(PartyNameplateVM.RefreshDynamicProperties))]
     [HarmonyPrefix]
     private static void RefreshDynamicPropertiesPrefix(PartyNameplateVM __instance, out bool __state) => __state = __instance._isVisibleOnMapBind;
 
-    // Vanilla hides the nameplate of every non-main party in naval auto travel (a raft or a ferry), so show other players' rafts again
+    // Vanilla hides the nameplate of every non-main party in naval auto travel (a raft or a ferry), so show other players' rafts and ferries again
     [HarmonyPatch(typeof(PartyNameplateVM), nameof(PartyNameplateVM.RefreshDynamicProperties))]
     [HarmonyPostfix]
     private static void RefreshDynamicPropertiesPostfix(PartyNameplateVM __instance, bool __state)
     {
         var party = __instance.Party;
-        // Vanilla's army and settlement hides still apply to a raft
+        // Vanilla's army and settlement hides still apply to a raft or ferry, and so does a disconnected player's parked party
         var hiddenOnlyForNavalAutoTravel = __state && !__instance._isVisibleOnMapBind &&
-            !__instance._isInArmyBind && !__instance._isInSettlementBind && party.IsInNavalAutoTravel;
+            !__instance._isInArmyBind && !__instance._isInSettlementBind && party.IsInNavalAutoTravel && party.IsActive;
 
         if (!hiddenOnlyForNavalAutoTravel) return;
-        if (!IsOtherPlayersRaft(party, MobileParty.MainParty)) return;
+        if (!IsOtherPlayersRaftOrFerry(party, MobileParty.MainParty)) return;
 
         __instance._isVisibleOnMapBind = true;
     }
@@ -41,21 +41,21 @@ internal class PlayerRaftVisibilityPatches
     {
         if (!__result) return;
 
-        if (IsOtherPlayersRaft(__instance.MobileParty, mobileParty))
+        if (IsOtherPlayersRaftOrFerry(__instance.MobileParty, mobileParty))
             __result = false;
     }
 
-    // A click on another player's raft moves next to it instead of following it forever
+    // A click on another player's raft or ferry moves next to it instead of following it forever
     [HarmonyPatch(typeof(MobileParty), nameof(MobileParty.SetMoveEngageParty))]
     [HarmonyPrefix]
     private static bool SetMoveEngagePartyPrefix(MobileParty __instance, MobileParty party, NavigationType navigationType)
     {
-        if (!IsOtherPlayersRaft(party, __instance)) return true;
+        if (!IsOtherPlayersRaftOrFerry(party, __instance)) return true;
 
         __instance.SetMoveGoToPoint(party.Position, navigationType);
         return false;
     }
 
-    private static bool IsOtherPlayersRaft(MobileParty target, MobileParty interactor) =>
-        target != null && target != interactor && target.IsInRaftState && target.IsPlayerParty();
+    private static bool IsOtherPlayersRaftOrFerry(MobileParty target, MobileParty interactor) =>
+        target != null && target != interactor && target.IsInNavalAutoTravel && target.IsPlayerParty();
 }

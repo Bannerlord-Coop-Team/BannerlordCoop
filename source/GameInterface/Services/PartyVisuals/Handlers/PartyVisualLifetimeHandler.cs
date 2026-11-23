@@ -50,6 +50,8 @@ public class PartyVisualLifetimeHandler : IHandler
                 // A recreated model needs a refresh even if the previous model cleared the dirty flag.
                 mobileParty.Party.SetVisualAsDirty();
                 mobileParty.CreateNewPartyVisual();
+                // A naval visual only builds its ship while the party is marked dirty, which the party's old visual already cleared
+                mobileParty.SetNavalVisualAsDirty();
             }
         }, context: $"create party visual {payload.What.MobilePartyHandle}");
     }
