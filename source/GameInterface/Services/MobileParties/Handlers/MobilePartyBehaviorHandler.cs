@@ -103,8 +103,8 @@ internal class MobilePartyBehaviorHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging(data.MobilePartyId, out MobileParty party))
                 return;
 
-            // Vanilla ignores orders on a raft, so keep the server's move to shore and resend it when the owner's order differs
-            if (ModInformation.IsServer && IsOwnerOrderDuringRaft(party.IsInRaftState, data.OriginControllerId))
+            // Vanilla ignores orders on a raft or ferry, so keep the server's move and resend it when the owner's order differs
+            if (ModInformation.IsServer && IsOwnerOrderDuringNavalAutoTravel(party.IsInNavalAutoTravel, data.OriginControllerId))
             {
                 // No requester on the resend, otherwise the owner reads it as its own echo and keeps its stale order
                 if (OwnerOrderDiffers(data, party.DefaultBehavior, party.TargetPosition))
@@ -218,10 +218,10 @@ internal class MobilePartyBehaviorHandler : IHandler
     }
 
     // Server-authored updates such as debug teleports leave the origin null and apply as usual
-    internal static bool IsOwnerOrderDuringRaft(bool isInRaftState, string originControllerId) =>
-        isInRaftState && !string.IsNullOrEmpty(originControllerId);
+    internal static bool IsOwnerOrderDuringNavalAutoTravel(bool isInNavalAutoTravel, string originControllerId) =>
+        isInNavalAutoTravel && !string.IsNullOrEmpty(originControllerId);
 
-    // Whether the owner asked for a different behavior or target than the server's raft move to shore
+    // Whether the owner asked for a different behavior or target than the server's raft or ferry move
     internal static bool OwnerOrderDiffers(PartyBehaviorUpdateData data, AiBehavior defaultBehavior, CampaignVec2 targetPosition) =>
         data.DefaultBehavior != defaultBehavior || data.TargetPosition != targetPosition;
 
