@@ -270,12 +270,19 @@ internal class ConversationRequestHandler : IHandler
             // PvP: tell the defending player's client to show a "hold on" popup while the attacker drives the
             // interaction. request.DefenderId is the engaged (non-initiating) party.
             if (isPlayerVsPlayer)
+            {
                 NotifyPvpInteractionStarted(requestingPeer, request, attacker);
+
+                // Vanilla StartPartyEncounter fires OnPartyEncounter, but it only runs on the attacking client
+                CampaignEventDispatcher.Instance.OnPartyEncounter(attacker, defender);
+            }
 
             return;
         }
 
-        HoldAndApprove(requestingPeer, request, aiPartyId, playerPartyId, serverDetected);
+        // StartPartyEncounterPrefix skips vanilla StartPartyEncounter for server detected encounters, so fire its OnPartyEncounter here
+        if (HoldAndApprove(requestingPeer, request, aiPartyId, playerPartyId, serverDetected) && serverDetected)
+            CampaignEventDispatcher.Instance.OnPartyEncounter(attacker, defender);
     }
 
     /// <summary>
@@ -437,9 +444,9 @@ internal class ConversationRequestHandler : IHandler
     }
 
     /// <summary>
-    /// [Server, game thread] Holds the AI party and replies to allow.
+    /// [Server, game thread] Holds the AI party and replies to allow. Returns false when the request is rejected.
     /// </summary>
-    private void HoldAndApprove(
+    private bool HoldAndApprove(
         NetPeer requestingPeer,
         NetworkRequestConversation request,
         string aiPartyId,
@@ -451,7 +458,7 @@ internal class ConversationRequestHandler : IHandler
             Logger.Debug(
                 "Rejecting conversation request: the party no longer resolves. PartyId={PartyId}",
                 aiPartyId);
-            return;
+            return false;
         }
 
         if (!objectManager.TryGetObject(playerPartyId, out PartyBase playerPartyBase))
@@ -459,7 +466,7 @@ internal class ConversationRequestHandler : IHandler
             Logger.Debug(
                 "Rejecting conversation request: the player party no longer resolves. PartyId={PartyId}",
                 playerPartyId);
-            return;
+            return false;
         }
 
         if (aiPartyBase.MapEvent != null || playerPartyBase.MapEvent != null)
@@ -467,7 +474,7 @@ internal class ConversationRequestHandler : IHandler
             Logger.Debug(
                 "Rejecting conversation request: a party entered a map event while approving. AttackerId={AttackerId}, DefenderId={DefenderId}",
                 request.AttackerId, request.DefenderId);
-            return;
+            return false;
         }
 
         // A map conversation is exclusive to one player, like a settlement conversation. The
@@ -482,7 +489,7 @@ internal class ConversationRequestHandler : IHandler
                 "Rejecting conversation request: the party is already conversing with another player. PartyId={PartyId}",
                 aiPartyId);
             network.Send(requestingPeer, new NetworkConversationDenied(ConversationDeniedReason.PartyEngaged, request.RequestId));
-            return;
+            return false;
         }
 
         var playerIsDefender = serverDetected && request.DefenderId == playerPartyId;
@@ -501,7 +508,7 @@ internal class ConversationRequestHandler : IHandler
                 "Rejecting conversation request: the party or the requester is already engaged. PartyId={PartyId}",
                 aiPartyId);
             network.Send(requestingPeer, new NetworkConversationDenied(ConversationDeniedReason.PartyEngaged, request.RequestId));
-            return;
+            return false;
         }
 
         var playerParty = playerPartyBase.MobileParty;
@@ -509,6 +516,7 @@ internal class ConversationRequestHandler : IHandler
             playerParty.SetMoveModeHold();
 
         SendAllowConversation(requestingPeer, request);
+        return true;
     }
 
     private static bool AreHostile(PartyBase playerParty, PartyBase aiParty)

@@ -42,7 +42,9 @@ internal class BattleWreckageCampaignBehaviorPatches
     [HarmonyPrefix]
     public static bool OnAiHourlyTickEventPrefix() => ModInformation.IsServer;
 
-    // TODO: This event may not be fired when needed. Double check this actually fires when an encounter starts in coop.
+    /// <summary>
+    /// Server detected and PvP encounters fire this from ConversationRequestHandler.ProcessConversationRequest
+    /// </summary>
     [HarmonyPatch(nameof(BattleWreckageCampaignBehavior.OnPartyEncounter))]
     [HarmonyPrefix]
     public static bool OnPartyEncounterPrefix(PartyBase attackerParty, PartyBase defenderParty)
@@ -134,6 +136,4 @@ internal class BattleWreckageCampaignBehaviorPatches
         // Vanilla still sets the client's local start time and switches to the wait menu, the server copy in the tracker is authoritative
         return true;
     }
-    
-    // TODO: Replace remaining methods that need it
 }

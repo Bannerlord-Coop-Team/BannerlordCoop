@@ -39,7 +39,11 @@ public class BattleWreckageCampaignBehaviorInterface : IBattleWreckageCampaignBe
 
     public void OnPartyEncounter(PartyBase attackerParty, PartyBase defenderParty)
     {
-        // TODO: Check if the defender is a player and make them leave their wreckage encounter
+        // Only players are tracked, so a tracked leader hero is a player being attacked mid investigation
+        var hero = defenderParty.LeaderHero;
+        if (hero == null || !encounterTracker.TryGetEncounter(hero, out _)) return;
+
+        LeaveWreckageEncounter(hero, BattleWreckageCampaignBehavior.WreckageLeaveReason.PlayerInterrupted);
     }
 
     public void OnHeroPrisonerTakenEvent(Hero hero)
