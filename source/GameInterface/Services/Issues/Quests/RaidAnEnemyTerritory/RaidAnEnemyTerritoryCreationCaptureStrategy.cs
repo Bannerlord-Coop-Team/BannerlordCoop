@@ -1,9 +1,9 @@
 ﻿using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
 using System;
-using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using Issue = TaleWorlds.CampaignSystem.Issues.RaidAnEnemyTerritoryIssueBehavior.RaidAnEnemyTerritoryIssue;
@@ -30,12 +30,12 @@ internal sealed class RaidAnEnemyTerritoryCreationCaptureStrategy : ICreationCap
             throw new InvalidOperationException("The raid issue enemy kingdom is not registered");
         }
 
-        return Write(enemyKingdomId);
+        return Encoding.UTF8.GetBytes(enemyKingdomId);
     }
 
     public IssueBase CreateIssue(Hero issueOwner, byte[] captured)
     {
-        var enemyKingdomId = Read(captured);
+        var enemyKingdomId = Encoding.UTF8.GetString(captured);
         if (!objectManager.TryGetObjectWithLogging<Kingdom>(enemyKingdomId, out var enemyKingdom))
         {
             throw new InvalidOperationException("The raid issue enemy kingdom could not be resolved");
@@ -65,42 +65,7 @@ internal sealed class RaidAnEnemyTerritoryCreationCaptureStrategy : ICreationCap
             return false;
         }
 
-        captured = Write(enemyKingdomId);
+        captured = Encoding.UTF8.GetBytes(enemyKingdomId);
         return true;
-    }
-
-    private static byte[] Write(string enemyKingdomId)
-    {
-        using (var stream = new MemoryStream())
-        using (var writer = new BinaryWriter(stream))
-        {
-            writer.Write(enemyKingdomId);
-            writer.Flush();
-            return stream.ToArray();
-        }
-    }
-
-    private static string Read(byte[] captured)
-    {
-        if (captured == null || captured.Length == 0)
-        {
-            throw new InvalidDataException("The raid issue capture is missing its enemy kingdom");
-        }
-        try
-        {
-            using (var stream = new MemoryStream(captured))
-            using (var reader = new BinaryReader(stream))
-            {
-                return reader.ReadString();
-            }
-        }
-        catch (EndOfStreamException exception)
-        {
-            throw new InvalidDataException("The raid issue capture has a truncated enemy kingdom", exception);
-        }
-        catch (FormatException exception)
-        {
-            throw new InvalidDataException("The raid issue capture has an invalid enemy kingdom length", exception);
-        }
     }
 }

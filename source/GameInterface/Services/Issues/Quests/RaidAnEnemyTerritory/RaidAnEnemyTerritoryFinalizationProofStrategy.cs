@@ -20,7 +20,8 @@ internal sealed class RaidAnEnemyTerritoryFinalizationProofStrategy : IFinalizat
 
         if (raidQuest._raidedVillages.Count < RaidAnEnemyTerritoryIssueBehavior.TargetRaidVillageCount)
         {
-            Logger.Warning("The owner of {quest} has not completed three raids for branch {proof}", raidQuest.StringId, proof);
+            Logger.Warning("Skipping the raid reward for {quest}: progress={progress}/{required}", raidQuest.StringId,
+                raidQuest._raidedVillages.Count, RaidAnEnemyTerritoryIssueBehavior.TargetRaidVillageCount);
             return true;
         }
 

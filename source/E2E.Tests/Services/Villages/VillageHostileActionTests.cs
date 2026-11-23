@@ -2102,9 +2102,10 @@ public class VillageHostileActionTests : MapEventTestBase
             {
                 Server.Call(() => AssertRaidQuestProgress(Server, giverId, target.SettlementId, expectedCount));
                 ownerClient.Call(() => AssertRaidQuestProgress(ownerClient, giverId, target.SettlementId, expectedCount));
-                var updates = Server.NetworkSentMessages.GetMessages<NetworkRaidAnEnemyTerritoryProgress>();
-                if (expectedCount == 1) Assert.Single(updates);
-                else Assert.Empty(updates);
+                var otherClient = Clients.Single(client => client != ownerClient);
+                Assert.Equal(expectedCount, Server.NetworkSentMessages.GetMessages<NetworkRaidAnEnemyTerritoryProgress>().Count());
+                Assert.Equal(expectedCount, ownerClient.InternalMessages.GetMessages<NetworkRaidAnEnemyTerritoryProgress>().Count());
+                Assert.Empty(otherClient.InternalMessages.GetMessages<NetworkRaidAnEnemyTerritoryProgress>());
             });
     }
 
