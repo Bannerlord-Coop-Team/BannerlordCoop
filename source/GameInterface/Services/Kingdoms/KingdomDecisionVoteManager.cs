@@ -1,4 +1,5 @@
 ﻿using Common;
+using GameInterface.Configuration;
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.GameDebug.Messages;
@@ -17,10 +18,12 @@ using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Election;
+using TaleWorlds.CampaignSystem.MapNotificationTypes;
 using TaleWorlds.CampaignSystem.ViewModelCollection;
 using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Decisions;
 using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Decisions.ItemTypes;
 using TaleWorlds.Core.ViewModelCollection.ImageIdentifiers;
+using MBInformationManager = TaleWorlds.Core.MBInformationManager;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
 
@@ -68,7 +71,10 @@ namespace GameInterface.Services.Kingdoms
 
     public class KingdomDecisionVoteManager : IKingdomDecisionVoteManager, IDisposable
     {
-        internal static readonly TimeSpan VotingRoundDuration = TimeSpan.FromSeconds(60);
+        internal static TimeSpan VotingRoundDuration => TimeSpan.FromSeconds(
+            ModConfigProvider.ModOptions.KingdomDecisionVoteTimeoutSeconds > 0
+                ? ModConfigProvider.ModOptions.KingdomDecisionVoteTimeoutSeconds
+                : 60);
         private static readonly TimeSpan VotingRoundTickInterval = TimeSpan.FromSeconds(1);
         private static readonly ILogger Logger = LogManager.GetLogger(typeof(KingdomDecisionVoteManager));
         private readonly Dictionary<KingdomDecision, KingdomDecisionVoteState> DecisionStates = new Dictionary<KingdomDecision, KingdomDecisionVoteState>();
@@ -744,6 +750,17 @@ namespace GameInterface.Services.Kingdoms
         {
             if (decision == null) return;
 
+            var notices = Campaign.Current?.CampaignInformationManager?._mapNotices;
+            if (notices != null)
+            {
+                foreach (KingdomDecisionMapNotification notice in notices
+                             .OfType<KingdomDecisionMapNotification>()
+                             .Where(notice => notice.Decision == decision).ToList())
+                {
+                    notices.Remove(notice);
+                    MBInformationManager.MapNoticeRemoved(notice);
+                }
+            }
             DecisionStates.Remove(decision);
             LocalSubmittedDecisions.Remove(decision);
             foreach (KingdomDecision staleDecision in DecisionStates.Keys
@@ -1047,7 +1064,9 @@ namespace GameInterface.Services.Kingdoms
                     messageBroker?.Publish(state.Decision, new AllianceOfferPendingStatusChanged(
                         allianceDecision.Kingdom,
                         allianceDecision.KingdomToStartAllianceWith,
-                        isPending: true));
+                        isPending: playerkingdom2.UnresolvedDecisions.OfType<StartAllianceDecision>()
+                            .Any(offer => CoopKingdomElection._opponentProposedAllianceDecisions.Contains(offer)
+                                          && offer.KingdomToStartAllianceWith == playerKingdom)));
                 }
                 if (state.Decision.Kingdom._unresolvedDecisions.Contains(state.Decision))
                 {
@@ -1076,7 +1095,8 @@ namespace GameInterface.Services.Kingdoms
                     messageBroker?.Publish(state.Decision, new PeaceOfferPendingStatusChanged(
                         peaceDecision.Kingdom,
                         (Kingdom)peaceDecision.FactionToMakePeaceWith,
-                        isPending: true));
+                        isPending: playerkingdom2.UnresolvedDecisions.OfType<MakePeaceKingdomDecision>()
+                            .Any(offer => offer._isProposedByOpponent && offer.FactionToMakePeaceWith == playerKingdom)));
                 }
 
                 if (state.Decision.Kingdom._unresolvedDecisions.Contains(state.Decision))
@@ -1725,6 +1745,27 @@ namespace GameInterface.Services.Kingdoms
 
         internal void ProcessVotingRounds(DateTime utcNow)
         {
+            if (ModInformation.IsServer && Campaign.Current?.KingdomManager != null)
+            {
+                foreach (Kingdom kingdom in Kingdom.All)
+                {
+                    if (kingdom?._unresolvedDecisions == null) continue;
+
+                    foreach (MakePeaceKingdomDecision decision in kingdom.UnresolvedDecisions.OfType<MakePeaceKingdomDecision>().ToList())
+                    {
+                        if (!decision.ShouldBeCancelledInternal()) continue;
+
+                        // The campaign can be paused in the kingdom screen after console-forced peace.
+                        kingdom.RemoveDecision(decision);
+                        if (CoopKingdomElection.IsPendingPlayerPeaceOffer(decision)
+                            && decision.FactionToMakePeaceWith is Kingdom proposingKingdom)
+                        {
+                            messageBroker.Publish(this, new PeaceOfferPendingStatusChanged(proposingKingdom, kingdom, false));
+                        }
+                        CampaignEventDispatcher.Instance.OnKingdomDecisionCancelled(decision, kingdom.IsPlayerKingdom());
+                    }
+                }
+            }
             RegisterLoadedDecisions();
             foreach (KingdomDecisionVoteState state in DecisionStates.Values.ToList())
             {

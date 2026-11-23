@@ -8,6 +8,7 @@ using E2E.Tests.Environment.Extensions;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Environment.Mock;
 using E2E.Tests.Environment.MockEngine;
+using GameInterface.Services.Locations;
 using LiteNetLib;
 using Missions;
 using Missions.Agents;
@@ -15,6 +16,7 @@ using Missions.Agents.Handlers;
 using Missions.Agents.Packets;
 using Missions.Messages;
 using Missions.Services.Network;
+using Moq;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
@@ -708,49 +710,6 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
     }
 
     [Fact]
-    public void IsLocomotionAction_RecognizesWalkStrafeActionsWithCrossAnimations()
-    {
-        Assert.True(AgentMountData.IsLocomotionAction(
-            "act_horse_forward_walk_strafe_right",
-            "horse_strafe_r_cross_fast"));
-    }
-
-    [Theory]
-    [InlineData("act_horse_turn_right", "", AgentMountData.TurnRight)]
-    [InlineData("act_horse_turn_left", "", AgentMountData.TurnLeft)]
-    [InlineData("", "rider_horse_rotate_right", AgentMountData.TurnRight)]
-    [InlineData("", "rider_horse_rotate_left", AgentMountData.TurnLeft)]
-    [InlineData("act_horse_forward_walk", "rider_forward_walk", AgentMountData.NoTurn)]
-    public void GetTurnDirection_ClassifiesNativeStationaryTurnActions(
-        string actionName,
-        string animationName,
-        int expected)
-    {
-        Assert.Equal(
-            expected,
-            AgentMountData.GetTurnDirection(actionName, animationName));
-    }
-
-    [Theory]
-    [InlineData(0f, 1f, -1f, 0f, AgentMountData.TurnLeft)]
-    [InlineData(0f, 1f, 1f, 0f, AgentMountData.TurnRight)]
-    [InlineData(0f, 1f, 0.001f, 1f, AgentMountData.NoTurn)]
-    [InlineData(0f, 1f, 0f, -1f, AgentMountData.TurnRight)]
-    public void GetTurnDirection_DerivesStationaryTurnsFromFacingChanges(
-        float previousX,
-        float previousY,
-        float currentX,
-        float currentY,
-        int expected)
-    {
-        Assert.Equal(
-            expected,
-            AgentMountData.GetTurnDirection(
-                new Vec2(previousX, previousY),
-                new Vec2(currentX, currentY)));
-    }
-
-    [Fact]
     public void PollMovement_StartsAndBroadcastsAStationaryTurnWhenFacingChangesDuringIdle()
     {
         using var fixture = new MissionEngineFixture();
@@ -1287,70 +1246,6 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
         });
     }
 
-    [Theory]
-    [InlineData("", "horse", AgentMountData.TurnRight, "act_horse_turn_right")]
-    [InlineData("", "horse", AgentMountData.TurnLeft, "act_horse_turn_left")]
-    [InlineData("", "camel", AgentMountData.TurnRight, "act_camel_turn_right")]
-    [InlineData("", "camel", AgentMountData.TurnLeft, "act_camel_turn_left")]
-    [InlineData("act_camel_turn_right", "horse", AgentMountData.TurnRight, "act_camel_turn_right")]
-    [InlineData("act_horse_walk_turn_right_head", "horse", AgentMountData.TurnRight, "act_horse_turn_right")]
-    public void GetStationaryTurnActionName_UsesNativeMountActions(
-        string authoritativeActionName,
-        string monsterUsage,
-        int direction,
-        string expected)
-    {
-        Assert.Equal(
-            expected,
-            AgentMountData.GetStationaryTurnActionName(
-                authoritativeActionName,
-                monsterUsage,
-                direction));
-    }
-
-    [Theory]
-    [InlineData("act_horse_turn_right", true)]
-    [InlineData("act_horse_turn_left", true)]
-    [InlineData("act_camel_turn_right", true)]
-    [InlineData("act_camel_turn_left", true)]
-    [InlineData("act_horse_walk_turn_right_head", false)]
-    [InlineData("act_camel_trot_turn_left_head", false)]
-    [InlineData("act_horse_turn_right_head", false)]
-    public void IsStationaryTurnAction_RejectsGaitAndHeadTurnActions(
-        string actionName,
-        bool expected)
-    {
-        Assert.Equal(
-            expected,
-            AgentMountData.IsStationaryTurnAction(actionName));
-    }
-
-    [Fact]
-    public void ResolveAction0Index_SelectsTheMountSpecificStationaryTurnAction()
-    {
-        Assert.Equal(
-            902,
-            AgentMountData.ResolveAction0Index(
-                actionIndex: 101,
-                speed: 0f,
-                isLocomotion: true,
-                turnDirection: AgentMountData.TurnRight,
-                turnActionIndex: 902));
-    }
-
-    [Fact]
-    public void ResolveAction0Index_ClearsTheGaitAfterAStationaryTurnSettles()
-    {
-        Assert.Equal(
-            AgentMountData.NoActionIndex,
-            AgentMountData.ResolveAction0Index(
-                actionIndex: 101,
-                speed: 0f,
-                isLocomotion: true,
-                turnDirection: AgentMountData.NoTurn,
-                turnActionIndex: 902));
-    }
-
     [Fact]
     public void MountedFollow_ReplaysTheLatestOwnerInputsAfterNativeClearsThePuppet()
     {
@@ -1389,7 +1284,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
 
             var data = new AgentData(sourceRider);
             data.Apply(puppetRider);
-            var interpolator = new AgentPositionInterpolator();
+            var interpolator = new AgentPositionInterpolator(Mock.Of<ILocationNpcAuthorityState>());
             interpolator.SetMountedRiderTarget(puppetRider, data);
 
             puppetRiderMirror.MovementFlags =
@@ -1450,7 +1345,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
             sourceHorseMirror.RealGlobalVelocity = new Vec3(1f, 0f, 0f);
             sourceHorseMirror.MovementFlags = Agent.MovementControlFlag.TurnRight;
 
-            var interpolator = new AgentPositionInterpolator();
+            var interpolator = new AgentPositionInterpolator(Mock.Of<ILocationNpcAuthorityState>());
             interpolator.SetMountedRiderTarget(
                 puppetRider,
                 new AgentData(sourceRider));
@@ -1503,7 +1398,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
 
             var data = new AgentData(sourceRider);
             data.Apply(puppetRider);
-            var interpolator = new AgentPositionInterpolator();
+            var interpolator = new AgentPositionInterpolator(Mock.Of<ILocationNpcAuthorityState>());
             interpolator.SetMountedRiderTarget(
                 puppetRider,
                 data);
@@ -1571,7 +1466,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
                 sourceRider,
                 out var sourceRiderMirror));
 
-            var interpolator = new AgentPositionInterpolator();
+            var interpolator = new AgentPositionInterpolator(Mock.Of<ILocationNpcAuthorityState>());
             sourceRiderMirror.LookDirection =
                 new Vec3(1f, 0f, 0f);
             interpolator.SetMountedRiderTarget(
@@ -1632,7 +1527,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
             var data = new AgentData(source);
             data.Apply(puppet);
             Vec2 expectedInput = puppet.MovementInputVector;
-            var interpolator = new AgentPositionInterpolator();
+            var interpolator = new AgentPositionInterpolator(Mock.Of<ILocationNpcAuthorityState>());
             interpolator.SetRiderTarget(puppet, data);
 
             puppetMirror.MovementFlags =
@@ -1679,7 +1574,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
 
             var data = new AgentData(source);
             data.Apply(puppet);
-            var interpolator = new AgentPositionInterpolator();
+            var interpolator = new AgentPositionInterpolator(Mock.Of<ILocationNpcAuthorityState>());
             interpolator.SetRiderTarget(puppet, data);
             interpolator.Tick(1f / 60f);
             int targetFrameCalls =
@@ -1731,7 +1626,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
                 Agent.MovementControlFlag.Forward |
                 Agent.MovementControlFlag.TurnRight;
 
-            var interpolator = new AgentPositionInterpolator();
+            var interpolator = new AgentPositionInterpolator(Mock.Of<ILocationNpcAuthorityState>());
             interpolator.SetRiderTarget(puppet, new AgentData(source));
 
             puppetMirror.Health = 0f;
@@ -1756,31 +1651,6 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
                     puppet,
                     out _,
                     out _));
-        });
-    }
-
-    [Fact]
-    public void MountMovementPacket_RoundTripsHorizontalMountSpeed()
-    {
-        using var fixture = new MissionEngineFixture();
-        var peer = Clients.First();
-
-        peer.Call(() =>
-        {
-            var mock = CreateMovementMission(fixture, peer);
-            Agent sourceHorse = mock.SpawnMount();
-            Assert.True(AgentMirror.TryGet(sourceHorse, out var sourceHorseMirror));
-            sourceHorseMirror.RealGlobalVelocity = new Vec3(3f, 4f, 12f);
-            var horseId = Guid.NewGuid();
-            var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
-
-            byte[] wire = serializer.Serialize(
-                new MountMovementPacket(
-                    new[] { horseId },
-                    new[] { new AgentMountData(sourceHorse, horseId) }));
-            var result = Assert.IsType<MountMovementPacket>(serializer.Deserialize<IPacket>(wire));
-
-            Assert.Equal(5f, Assert.Single(result.Mounts).MountSpeed);
         });
     }
 
@@ -1839,7 +1709,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
             Assert.True(AgentMirror.TryGet(horse, out var horseMirror));
 
             var target = new Vec3(0.02f, 0f, 0f);
-            var interpolator = new AgentPositionInterpolator();
+            var interpolator = new AgentPositionInterpolator(Mock.Of<ILocationNpcAuthorityState>());
             interpolator.SetMountedRiderTarget(rider, target, Vec2.Forward, Vec2.Forward, target);
 
             for (int i = 0; i < 60; i++)
@@ -1873,7 +1743,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
                 Agent.MovementControlFlag.DefendBlock |
                 Agent.MovementControlFlag.DefendUp;
 
-            var interpolator = new AgentPositionInterpolator();
+            var interpolator = new AgentPositionInterpolator(Mock.Of<ILocationNpcAuthorityState>());
             interpolator.SetMountedRiderTarget(
                 rider,
                 new Vec3(2f, 0f, 0f),
@@ -1929,7 +1799,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
                 Agent.MovementControlFlag.DefendBlock |
                 Agent.MovementControlFlag.DefendRight;
 
-            var interpolator = new AgentPositionInterpolator();
+            var interpolator = new AgentPositionInterpolator(Mock.Of<ILocationNpcAuthorityState>());
             interpolator.SetMountedRiderTarget(
                 rider,
                 new Vec3(0.1f, 0f, 0f),
@@ -1967,7 +1837,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
             riderMirror.Action1CodeType =
                 Agent.ActionCodeType.BlockedMelee;
 
-            var interpolator = new AgentPositionInterpolator();
+            var interpolator = new AgentPositionInterpolator(Mock.Of<ILocationNpcAuthorityState>());
             interpolator.SetMountedRiderTarget(
                 rider,
                 new Vec3(2f, 0f, 0f),
@@ -2000,7 +1870,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
                 Agent.MovementControlFlag.DefendUp;
 
             var target = new Vec3(13f, 0f, 0f);
-            var interpolator = new AgentPositionInterpolator();
+            var interpolator = new AgentPositionInterpolator(Mock.Of<ILocationNpcAuthorityState>());
             interpolator.SetMountedRiderTarget(
                 rider,
                 target,

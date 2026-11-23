@@ -11,8 +11,6 @@ public interface IBattleSizeProvider
 public class BattleSizeProvider : IBattleSizeProvider
 {
     internal const int DefaultBattleSize = 1000;
-    internal const int MinimumBattleSize = 200;
-    internal const int MaximumBattleSize = 1000;
 
     private readonly IModConfig modConfig;
 
@@ -26,6 +24,6 @@ public class BattleSizeProvider : IBattleSizeProvider
     public int GetBattleSize()
     {
         int configuredBattleSize = modConfig.Data?.ModOptions?.BattleSize ?? DefaultBattleSize;
-        return Math.Max(MinimumBattleSize, Math.Min(MaximumBattleSize, configuredBattleSize));
+        return Math.Max(ModOptionsData.MinimumBattleSize, Math.Min(ModOptionsData.MaximumBattleSize, configuredBattleSize));
     }
 }

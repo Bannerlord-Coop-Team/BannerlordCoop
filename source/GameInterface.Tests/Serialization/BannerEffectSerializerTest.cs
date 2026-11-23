@@ -11,29 +11,10 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class BannerEffectSerializationTest
     {
-        IContainer container;
+        ILifetimeScope container;
         public BannerEffectSerializationTest()
         {
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
-        }
-
-        [Fact]
-        public void BannerEffect_Serialize()
-        {
-            BannerEffect testBannerEffect = (BannerEffect)FormatterServices.GetUninitializedObject(typeof(BannerEffect));
-
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            BannerEffectBinaryPackage package = new BannerEffectBinaryPackage(testBannerEffect, factory);
-
-            package.Pack();
-
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
-
-            Assert.NotEmpty(bytes);
+            container = SerializationTestContainer.BeginScope();
         }
 
         [Fact]

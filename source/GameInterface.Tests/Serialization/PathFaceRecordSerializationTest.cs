@@ -10,29 +10,10 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class PathFaceRecordSerializationTest
     {
-        IContainer container;
+        ILifetimeScope container;
         public PathFaceRecordSerializationTest()
         {
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
-        }
-
-        [Fact]
-        public void PathFaceRecord_Serialize()
-        {
-            PathFaceRecord pfrObject = new PathFaceRecord();      
-
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            PathFaceRecordBinaryPackage package = new PathFaceRecordBinaryPackage(pfrObject, factory);
-
-            package.Pack();
-
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
-
-            Assert.NotEmpty(bytes);
+            container = SerializationTestContainer.BeginScope();
         }
 
         [Fact]

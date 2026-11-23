@@ -1,5 +1,6 @@
 ﻿using GameInterface.Services.MobilePartyAIs.Patches;
 using GameInterface.Services.PlayerCaptivityService.Patches;
+using GameInterface.Tests.Bootstrap;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,6 +15,8 @@ public sealed class PlayerCaptivityAttackProtectionPersistenceTests : IDisposabl
 {
     public PlayerCaptivityAttackProtectionPersistenceTests()
     {
+        // MobilePartyAi rolls MBRandom, which throws while a parallel bootstrap has set Game.Current but not its generator.
+        GameBootStrap.Initialize();
         DefaultMobilePartyAIModelPatches.ResetPersistedAttackProtections();
     }
 

@@ -1,25 +1,28 @@
-using Common;
+﻿using Common;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobileParties.Patches;
 
 /// <summary>
-/// Parties are always visible on the server, and in debug builds everywhere
-/// (<see cref="DebugPartyVisibility"/>). Release clients keep the native fog of war.
+/// The server and debug visibility overrides reveal active parties. Release clients
+/// use native fog of war for active parties. Parked and destroyed parties read as
+/// unspotted everywhere, including when nameplates read <see cref="MobileParty.IsVisible"/>.
 /// </summary>
-[HarmonyPatch(typeof(MobileParty), nameof(MobileParty.IsSpotted))]
-internal class PartyIsSpottedServerPatch
+[HarmonyPatch(typeof(MobileParty), nameof(MobileParty.IsVisible), MethodType.Getter)]
+internal class PartyIsVisibleGetterPatch
 {
     internal static void Postfix(MobileParty __instance, ref bool __result)
     {
-        if (ModInformation.IsServer || DebugPartyVisibility.ForceAllVisible)
+        // A parked or destroyed party must read as hidden so the nameplate code stops rebuilding its banner.
+        if (!__instance.IsActive)
         {
-            // Match the IsVisible patch below: only live parties are force-spotted. A destroyed
-            // party must read as unspotted, or the map nameplate machinery keeps re-creating its
-            // banner (with 0 troops) after the destruction replicates.
-            __result = __instance.IsActive;
+            __result = false;
+            return;
         }
+
+        if (ModInformation.IsServer || DebugPartyVisibility.ForceAllVisible)
+            __result = true;
     }
 }
 

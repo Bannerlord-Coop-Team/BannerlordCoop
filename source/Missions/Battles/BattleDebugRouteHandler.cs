@@ -45,9 +45,11 @@ internal class BattleDebugRouteHandler : IHandler
                 return;
             }
 
-            var enemySide = playerTeam.Side == BattleSideEnum.Attacker
+            var enemySide = payload.What.Side ?? (playerTeam.Side == BattleSideEnum.Attacker
                 ? BattleSideEnum.Defender
-                : BattleSideEnum.Attacker;
+                : BattleSideEnum.Attacker);
+            if ((enemySide != BattleSideEnum.Attacker && enemySide != BattleSideEnum.Defender) ||
+                payload.What.EnemiesToLeaveFighting < 0) return;
             var enemies = mission.Agents
                 .Where(agent =>
                     agent.IsActive() &&
@@ -61,10 +63,11 @@ internal class BattleDebugRouteHandler : IHandler
                 enemies[i].Retreat(mission.GetClosestFleePositionForAgent(enemies[i]));
 
             Logger.Information(
-                "[BattleDebug] Ordered {RoutedCount}/{EnemyCount} authoritative enemies to retreat for {MapEventId}",
+                "[BattleDebug] Ordered {RoutedCount}/{EnemyCount} authoritative agents to retreat for {MapEventId} on {Side}",
                 routeCount,
                 enemies.Length,
-                payload.What.MapEventId);
+                payload.What.MapEventId,
+                enemySide);
         });
     }
 }

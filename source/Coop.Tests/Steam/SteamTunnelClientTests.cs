@@ -108,6 +108,47 @@ namespace Coop.Tests.Steam
         }
 
         [Fact]
+        public void MergedDatagram_SendsUnreliablePacketsOnTheDroppableLane()
+        {
+            client.Start(76561198000000042);
+
+            using var liteNetSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+            liteNetSocket.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+            var pumpEndpoint = new IPEndPoint(IPAddress.Loopback, client.LocalPort);
+
+            liteNetSocket.SendTo(SteamTunnelTests.MergedUnreliableAndChanneled, pumpEndpoint);
+
+            WaitUntil(() => transport.SentDatagrams.Length == 2);
+            var sent = transport.SentDatagrams;
+            var droppable = Assert.Single(sent, datagram => datagram.Droppable);
+            var reliable = Assert.Single(sent, datagram => !datagram.Droppable);
+            Assert.Equal(SteamTunnelTests.MergedUnreliable, droppable.Data);
+            Assert.Equal(SteamTunnelTests.MergedChanneled, reliable.Data);
+        }
+
+        [Fact]
+        public void MergedDatagram_UnderBackpressure_ParksOnlyTheReliablePart()
+        {
+            client.Start(76561198000000042);
+
+            using var liteNetSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+            liteNetSocket.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+            var pumpEndpoint = new IPEndPoint(IPAddress.Loopback, client.LocalPort);
+
+            // Refuses the unreliable part, which drops, then the reliable part, which parks.
+            transport.FailSendsRemaining = 2;
+            liteNetSocket.SendTo(SteamTunnelTests.MergedUnreliableAndChanneled, pumpEndpoint);
+            WaitUntil(() => transport.RejectedSends >= 2);
+            liteNetSocket.SendTo(new byte[] { 1, 8 }, pumpEndpoint);
+
+            WaitUntil(() => transport.SentDatagrams.Length == 2);
+            var sent = transport.SentDatagrams;
+            Assert.Equal(SteamTunnelTests.MergedChanneled, sent[0].Data);
+            Assert.False(sent[0].Droppable);
+            Assert.Equal(new byte[] { 1, 8 }, sent[1].Data);
+        }
+
+        [Fact]
         public void InboundBeforeAnyOutbound_IsDroppedNotMisdelivered()
         {
             client.Start(76561198000000042);

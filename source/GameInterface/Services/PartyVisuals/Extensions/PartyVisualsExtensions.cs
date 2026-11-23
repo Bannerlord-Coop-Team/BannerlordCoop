@@ -20,4 +20,9 @@ public static class PartyVisualsExtensions
 
         MobilePartyVisualManager.Current.AddNewPartyVisualForParty(partyBase);
     }
+
+    public static void RemovePartyVisual(this MobileParty party)
+    {
+        MobilePartyVisualManager.Current?.RemovePartyVisualForParty(party);
+    }
 }

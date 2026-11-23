@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Kingdoms.Interfaces;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using GameInterface.Services.UI.Notifications.Messages;
 using Helpers;
 using Serilog;
@@ -27,17 +28,20 @@ internal class OtherNotificationsHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly IFactionInterface factionInterface;
+    private readonly IPlayerManager playerManager;
 
     public OtherNotificationsHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
-        IFactionInterface factionInterface)
+        IFactionInterface factionInterface,
+        IPlayerManager playerManager)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.factionInterface = factionInterface;
+        this.playerManager = playerManager;
 
         messageBroker.Subscribe<NotifyAnimalsSlaughteredToEat>(Handle_NotifyAnimalsSlaughteredToEat);
         messageBroker.Subscribe<NetworkNotifyAnimalsSlaughteredToEat>(Handle_NetworkNotifyAnimalsSlaughteredToEat);
@@ -53,12 +57,6 @@ internal class OtherNotificationsHandler : IHandler
 
         messageBroker.Subscribe<NotifyKingdomInfluenceChanged>(Handle_NotifyKingdomInfluenceChanged);
         messageBroker.Subscribe<NetworkNotifyKingdomInfluenceChanged>(Handle_NetworkNotifyKingdomInfluenceChanged);
-
-        messageBroker.Subscribe<NotifyRelationDecreasedByExecution>(Handle_NotifyRelationDecreasedByExecution);
-        messageBroker.Subscribe<NetworkNotifyRelationDecreasedByExecution>(Handle_NetworkNotifyRelationDecreasedByExecution);
-
-        messageBroker.Subscribe<NotifyRelationDecreasedByExecutionSummary>(Handle_NotifyRelationDecreasedByExecutionSummary);
-        messageBroker.Subscribe<NetworkNotifyRelationDecreasedByExecutionSummary>(Handle_NetworkNotifyRelationDecreasedByExecutionSummary);
 
         messageBroker.Subscribe<NotifyRelationsIncreasedWithNotables>(Handle_NotifyRelationsIncreasedWithNotables);
         messageBroker.Subscribe<NetworkNotifyRelationsIncreasedWithNotables>(Handle_NetworkNotifyRelationsIncreasedWithNotables);
@@ -82,6 +80,14 @@ internal class OtherNotificationsHandler : IHandler
 
         messageBroker.Subscribe<NotifyCleanHideoutRelations>(Handle_NotifyCleanHideoutRelations);
         messageBroker.Subscribe<NetworkNotifyCleanHideoutRelations>(Handle_NetworkNotifyCleanHideoutRelations);
+
+        messageBroker.Subscribe<NetworkNotifyIncidentOutcomes>(Handle_NetworkNotifyIncidentOutcomes);
+
+        messageBroker.Subscribe<NotifyScatteredCompanionInSettlement>(Handle_NotifyScatteredCompanionInSettlement);
+        messageBroker.Subscribe<NetworkNotifyScatteredCompanionInSettlement>(Handle_NetworkNotifyScatteredCompanionInSettlement);
+
+        messageBroker.Subscribe<NotifyEmptyClanPartyShipsRecovered>(Handle_NotifyEmptyClanPartyShipsRecovered);
+        messageBroker.Subscribe<NetworkNotifyEmptyClanPartyShipsRecovered>(Handle_NetworkNotifyEmptyClanPartyShipsRecovered);
     }
 
     public void Dispose()
@@ -100,12 +106,6 @@ internal class OtherNotificationsHandler : IHandler
 
         messageBroker.Unsubscribe<NotifyKingdomInfluenceChanged>(Handle_NotifyKingdomInfluenceChanged);
         messageBroker.Unsubscribe<NetworkNotifyKingdomInfluenceChanged>(Handle_NetworkNotifyKingdomInfluenceChanged);
-
-        messageBroker.Unsubscribe<NotifyRelationDecreasedByExecution>(Handle_NotifyRelationDecreasedByExecution);
-        messageBroker.Unsubscribe<NetworkNotifyRelationDecreasedByExecution>(Handle_NetworkNotifyRelationDecreasedByExecution);
-
-        messageBroker.Unsubscribe<NotifyRelationDecreasedByExecutionSummary>(Handle_NotifyRelationDecreasedByExecutionSummary);
-        messageBroker.Unsubscribe<NetworkNotifyRelationDecreasedByExecutionSummary>(Handle_NetworkNotifyRelationDecreasedByExecutionSummary);
 
         messageBroker.Unsubscribe<NotifyRelationsIncreasedWithNotables>(Handle_NotifyRelationsIncreasedWithNotables);
         messageBroker.Unsubscribe<NetworkNotifyRelationsIncreasedWithNotables>(Handle_NetworkNotifyRelationsIncreasedWithNotables);
@@ -129,6 +129,14 @@ internal class OtherNotificationsHandler : IHandler
 
         messageBroker.Unsubscribe<NotifyCleanHideoutRelations>(Handle_NotifyCleanHideoutRelations);
         messageBroker.Unsubscribe<NetworkNotifyCleanHideoutRelations>(Handle_NetworkNotifyCleanHideoutRelations);
+
+        messageBroker.Unsubscribe<NetworkNotifyIncidentOutcomes>(Handle_NetworkNotifyIncidentOutcomes);
+
+        messageBroker.Unsubscribe<NotifyScatteredCompanionInSettlement>(Handle_NotifyScatteredCompanionInSettlement);
+        messageBroker.Unsubscribe<NetworkNotifyScatteredCompanionInSettlement>(Handle_NetworkNotifyScatteredCompanionInSettlement);
+
+        messageBroker.Unsubscribe<NotifyEmptyClanPartyShipsRecovered>(Handle_NotifyEmptyClanPartyShipsRecovered);
+        messageBroker.Unsubscribe<NetworkNotifyEmptyClanPartyShipsRecovered>(Handle_NetworkNotifyEmptyClanPartyShipsRecovered);
     }
 
     private void Handle_NotifyAnimalsSlaughteredToEat(MessagePayload<NotifyAnimalsSlaughteredToEat> obj)
@@ -268,59 +276,6 @@ internal class OtherNotificationsHandler : IHandler
                 textObject2.SetTextVariable("INFLUENCE", -obj.What.GainedInfluence);
                 InformationManager.DisplayMessage(new InformationMessage(textObject2.ToString()));
             }
-        });
-    }
-
-    private void Handle_NotifyRelationDecreasedByExecution(MessagePayload<NotifyRelationDecreasedByExecution> obj)
-    {
-        GameThread.RunSafe(() =>
-        {
-            if (!objectManager.TryGetIdWithLogging(obj.What.Killer, out var killerId)) return;
-            if (!objectManager.TryGetIdWithLogging(obj.What.Clan, out var clanId)) return;
-
-            network.SendAll(new NetworkNotifyRelationDecreasedByExecution(killerId, clanId, obj.What.Value, obj.What.RelationChange));
-        });
-    }
-
-    private void Handle_NetworkNotifyRelationDecreasedByExecution(MessagePayload<NetworkNotifyRelationDecreasedByExecution> obj)
-    {
-        GameThread.RunSafe(() =>
-        {
-            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.KillerId, out var killer)) return;
-            if (!objectManager.TryGetObjectWithLogging<Clan>(obj.What.ClanId, out var clan)) return;
-
-            if (killer != Hero.MainHero) return;
-
-            TextObject textObject = GameTexts.FindText("str_your_relation_decreased_with_clan", null);
-            textObject.SetTextVariable("CLAN_LEADER", clan.Name);
-            textObject.SetTextVariable("VALUE", obj.What.Value);
-            textObject.SetTextVariable("MAGNITUDE", MathF.Abs(obj.What.RelationChange));
-            InformationManager.DisplayMessage(new InformationMessage(textObject.ToString()));
-        });
-    }
-
-    private void Handle_NotifyRelationDecreasedByExecutionSummary(MessagePayload<NotifyRelationDecreasedByExecutionSummary> obj)
-    {
-        GameThread.RunSafe(() =>
-        {
-            if (!objectManager.TryGetIdWithLogging(obj.What.Killer, out var killerId)) return;
-
-            network.SendAll(new NetworkNotifyRelationDecreasedByExecutionSummary(killerId, obj.What.NumberOfClans));
-        });
-    }
-
-    private void Handle_NetworkNotifyRelationDecreasedByExecutionSummary(MessagePayload<NetworkNotifyRelationDecreasedByExecutionSummary> obj)
-    {
-        GameThread.RunSafe(() =>
-        {
-            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.KillerId, out var killer)) return;
-
-            if (killer != Hero.MainHero) return;
-
-            TextObject textObject2 = new TextObject("{=oqO9kjeW}The execution has hurt your relations with {COUNT} {?IS_PLURAL}clans{?}clan{\\?}.", null);
-            MBTextManager.SetTextVariable("IS_PLURAL", (obj.What.NumberOfClans > 1) ? 1 : 0);
-            textObject2.SetTextVariable("COUNT", obj.What.NumberOfClans);
-            MBInformationManager.AddQuickInformation(textObject2, 0, null, null, "");
         });
     }
 
@@ -519,6 +474,68 @@ internal class OtherNotificationsHandler : IHandler
 
             MBTextManager.SetTextVariable("RELATION_VALUE", obj.What.RelationValue);
             MBInformationManager.AddQuickInformation(new TextObject("{=o0qwDa0q}Your relation increased by {RELATION_VALUE} with nearby notables.", null), 0, null, null, "");
+        });
+    }
+
+    private void Handle_NetworkNotifyIncidentOutcomes(MessagePayload<NetworkNotifyIncidentOutcomes> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            foreach (var outcome in obj.What.Outcomes)
+            {
+                MBInformationManager.AddQuickInformation(outcome, 0, null, null, "");
+            }
+        });
+    }
+
+    private void Handle_NotifyScatteredCompanionInSettlement(MessagePayload<NotifyScatteredCompanionInSettlement> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetIdWithLogging(obj.What.MobileParty, out var mobilePartyId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.What.Companion, out var companionId)) return;
+
+            network.SendAll(new NetworkNotifyScatteredCompanionInSettlement(mobilePartyId, companionId));
+        });
+    }
+
+    private void Handle_NetworkNotifyScatteredCompanionInSettlement(MessagePayload<NetworkNotifyScatteredCompanionInSettlement> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out var mobileParty)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.CompanionId, out var companion)) return;
+
+            if (mobileParty != MobileParty.MainParty) return;
+
+            TextObject textObject = new TextObject("{=ahpSGaow}You hear that your companion {COMPANION.LINK}, who was separated from you after a battle, is currently in this settlement.", null);
+            StringHelpers.SetCharacterProperties("COMPANION", companion.CharacterObject, textObject, false);
+            InformationManager.ShowInquiry(new InquiryData(new TextObject("{=dx0hmeH6}Tracking", null).ToString(), textObject.ToString(), true, false, new TextObject("{=yS7PvrTD}OK", null).ToString(), "", null, null, "", 0f, null, null, null), false, false);
+        });
+    }
+
+    private void Handle_NotifyEmptyClanPartyShipsRecovered(MessagePayload<NotifyEmptyClanPartyShipsRecovered> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!playerManager.TryGetPlayer(obj.What.PlayerHero, out var player)) return;
+            if (!playerManager.TryGetPeer(player.ControllerId, out var peer)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.What.PartyLeader, out var partyLeaderId)) return;
+
+            network.Send(peer, new NetworkNotifyEmptyClanPartyShipsRecovered(partyLeaderId, obj.What.Gold));
+        });
+    }
+
+    private void Handle_NetworkNotifyEmptyClanPartyShipsRecovered(MessagePayload<NetworkNotifyEmptyClanPartyShipsRecovered> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.PartyLeaderId, out var partyLeader)) return;
+
+            MBTextManager.SetTextVariable("GOLD_AMOUNT", obj.What.Gold);
+            MBTextManager.SetTextVariable("LEADER_NAME", partyLeader.Name);
+            MBTextManager.SetTextVariable("GOLD_ICON", "{=!}<img src=\"General\\Icons\\Coin@2x\" extend=\"6\">");
+            MBInformationManager.AddQuickInformation(new TextObject("{=YaSnA9j0}{LEADER_NAME}'s party has disbanded. You recovered {GOLD_AMOUNT}{GOLD_ICON} from its ships."));
         });
     }
 }

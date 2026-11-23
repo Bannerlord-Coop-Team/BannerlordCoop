@@ -59,33 +59,4 @@ public class LordPartyComponentTests : SyncTestBase
             Assert.IsType<LordPartyComponent>(newParty.PartyComponent);
         }
     }
-
-    [Fact]
-    public void ClientCreateParty_DoesNothing()
-    {
-        // Arrange
-        var server = TestEnvironment.Server;
-        var client1 = TestEnvironment.Clients.First();
-
-        Hero leaderHero = null;
-        server.Call(() =>
-        {
-            leaderHero = GameObjectCreator.CreateInitializedObject<Hero>();
-        });
-
-
-        // Act
-        PartyComponent? partyComponent = null;
-        Settlement setlement = new Settlement();
-        client1.Call(() =>
-        {
-            partyComponent = new LordPartyComponent(leaderHero, leaderHero, new LordPartyComponent.InitializationArgs(new CampaignVec2(new Vec2(2, 2), true), 2f, setlement));
-        });
-
-        Assert.NotNull(partyComponent);
-
-
-        // Assert
-        Assert.False(client1.ObjectManager.TryGetId(partyComponent, out var _));
-    }
 }

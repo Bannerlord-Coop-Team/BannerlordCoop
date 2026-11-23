@@ -55,33 +55,66 @@ public sealed class McpSetupTests
         Assert.Equal(0, result.Code);
         string prepare = File.ReadAllText(Path.Combine(fixture.Root, "prepare-links.ps1"));
         Assert.Contains("$ErrorActionPreference = 'Stop'", prepare);
-        Assert.Contains("Join-Path $PSScriptRoot 'mb2'", prepare);
+        Assert.Contains("SetEnvironmentVariable('BANNERLORD_DIR'", prepare);
+        Assert.DoesNotContain("-ItemType Junction", prepare);
         Assert.Contains("if (!$setupSucceeded) { exit 1 }", prepare);
     }
 
+    [Theory]
+    [InlineData(null, "BANNERLORD_DIR/p")]
+    [InlineData("USERPROFILE/p", "USERPROFILE/p:BANNERLORD_DIR/p")]
+    [InlineData("USERPROFILE/p:BANNERLORD_DIR/p", "USERPROFILE/p:BANNERLORD_DIR/p")]
+    [InlineData("BANNERLORD_DIR/u:COOP_LOG/p:BANNERLORD_DIR", "COOP_LOG/p:BANNERLORD_DIR/p")]
+    [InlineData("BANNERLORD_DIR_OTHER/p", "BANNERLORD_DIR_OTHER/p:BANNERLORD_DIR/p")]
+    public async Task PrepareAddsOneTranslatedBannerlordDirToWslEnvAndKeepsOtherEntries(string current, string expected)
+    {
+        using var fixture = new SetupFixture();
+        // Runs only Join-WslEnv from the real script, so the interactive flow and user environment stay untouched.
+        File.WriteAllText(Path.Combine(fixture.Root, "wslenv.ps1"),
+            "param([string] $current) $ErrorActionPreference = 'Stop'; " +
+            "$tokens = $null; $errors = $null; $ast = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PSScriptRoot 'prepare-links.ps1'), [ref]$tokens, [ref]$errors); " +
+            "$function = $ast.Find({ param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Join-WslEnv' }, $true); " +
+            ". ([ScriptBlock]::Create($function.Extent.Text)); [Console]::Write((Join-WslEnv $current)); exit 0");
+        var result = await fixture.PowerShell("wslenv.ps1", current == null ? Array.Empty<string>() : new[] { "-current", current });
+        Assert.Equal(0, result.Code);
+        Assert.Equal(expected, result.Output);
+    }
+
     [Fact]
-    public async Task SetupUsesRealJunctionWithoutTouchingTheGameDirectory()
+    public async Task SetupUsesBannerlordDirWithoutTouchingTheGameDirectory()
     {
         using var fixture = new SetupFixture();
         string game = fixture.CreateGame();
-        var link = await fixture.Run("cmd.exe", $"/d /s /c \"mklink /J \"{Path.Combine(fixture.Root, "mb2")}\" \"{game}\"\"");
-        Assert.Equal(0, link.Code);
-        try
-        {
-            var result = await fixture.PowerShell("tools/mcp/setup.ps1", "-DotnetPath", fixture.CreatePublisher());
-            Assert.Equal(0, result.Code);
-            Assert.Single(Directory.GetFiles(game, "*", SearchOption.AllDirectories));
-        }
-        finally { Directory.Delete(Path.Combine(fixture.Root, "mb2")); }
+        fixture.BannerlordDir = game;
+        var result = await fixture.PowerShell("tools/mcp/setup.ps1", "-DotnetPath", fixture.CreatePublisher());
+        Assert.Equal(0, result.Code);
+        using var json = JsonDocument.Parse(File.ReadAllText(Path.Combine(fixture.Root, ".mcp-local", "profiles.json")));
+        Assert.Equal(Path.Combine(game, "bin", "Win64_Shipping_Client", "Bannerlord.exe"),
+            json.RootElement.GetProperty("profiles").GetProperty("local").GetProperty("executable").GetString());
+        Assert.Single(Directory.GetFiles(game, "*", SearchOption.AllDirectories));
+    }
+
+    [Fact]
+    public async Task SetupPrefersGameDirectoryOverBannerlordDir()
+    {
+        using var fixture = new SetupFixture();
+        string game = fixture.CreateGame();
+        fixture.BannerlordDir = Path.Combine(fixture.Root, "not a game");
+        var result = await fixture.PowerShell("tools/mcp/setup.ps1", "-GameDirectory", game, "-DotnetPath", fixture.CreatePublisher());
+        Assert.Equal(0, result.Code);
+        using var json = JsonDocument.Parse(File.ReadAllText(Path.Combine(fixture.Root, ".mcp-local", "profiles.json")));
+        Assert.Equal(Path.Combine(game, "bin", "Win64_Shipping_Client", "Bannerlord.exe"),
+            json.RootElement.GetProperty("profiles").GetProperty("local").GetProperty("executable").GetString());
     }
 
     [Fact]
     public async Task SetupFailureDoesNotCreateProfileOrContinuePublishing()
     {
         using var fixture = new SetupFixture();
-        var noJunction = await fixture.PowerShell("tools/mcp/setup.ps1", "-DotnetPath", fixture.CreatePublisher());
-        Assert.NotEqual(0, noJunction.Code);
-        Assert.Contains("mb2 junction missing", noJunction.Error);
+        var unset = await fixture.PowerShell("tools/mcp/setup.ps1", "-DotnetPath", fixture.CreatePublisher());
+        Assert.NotEqual(0, unset.Code);
+        Assert.Contains("BANNERLORD_DIR is not set", unset.Error);
+        Assert.Contains("runmefirst.cmd", unset.Error);
         var missing = await fixture.PowerShell("tools/mcp/setup.ps1", "-GameDirectory", fixture.Root, "-DotnetPath", fixture.CreatePublisher());
         Assert.NotEqual(0, missing.Code);
         Assert.Contains("Bannerlord.exe not found", missing.Error);
@@ -171,6 +204,8 @@ public sealed class McpSetupTests
     private sealed class SetupFixture : IDisposable
     {
         public string Root { get; } = Path.Combine(Path.GetTempPath(), "Coop MCP setup " + Guid.NewGuid().ToString("N"));
+        // BANNERLORD_DIR given to child processes; null removes it so the developer's own value never leaks in.
+        public string BannerlordDir { get; set; }
         private readonly string outside;
 
         public SetupFixture()
@@ -241,6 +276,8 @@ public sealed class McpSetupTests
             info.RedirectStandardInput = true;
             info.RedirectStandardOutput = true;
             info.RedirectStandardError = true;
+            info.Environment.Remove("BANNERLORD_DIR");
+            if (BannerlordDir != null) info.Environment["BANNERLORD_DIR"] = BannerlordDir;
             using var process = Process.Start(info);
             process.StandardInput.Close();
             Task<string> output = process.StandardOutput.ReadToEndAsync();

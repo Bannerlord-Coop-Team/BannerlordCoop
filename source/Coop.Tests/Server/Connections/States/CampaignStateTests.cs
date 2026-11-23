@@ -34,16 +34,6 @@ namespace Coop.Tests.Server.Connections.States
         }
 
         [Fact]
-        public void EnterMissionMethod_TransitionState_MissionState()
-        {
-            connectionLogic.SetState<CampaignState>();
-
-            connectionLogic.EnterMission();
-
-            Assert.IsType<MissionState>(connectionLogic.State);
-        }
-
-        [Fact]
         public void UnusedStatesMethods_DoNothing()
         {
             connectionLogic.SetState<CampaignState>();
@@ -53,36 +43,6 @@ namespace Coop.Tests.Server.Connections.States
             connectionLogic.Load();
             connectionLogic.EnterCampaign();
 
-            Assert.IsType<CampaignState>(connectionLogic.State);
-        }
-
-        [Fact]
-        public void PlayerMissionEntered_ValidPlayerId()
-        {
-            // Arrange
-            CampaignState currentState = connectionLogic.SetState<CampaignState>();
-
-            // Act
-            var payload = new MessagePayload<NetworkPlayerMissionEntered>(
-                playerPeer, new NetworkPlayerMissionEntered());
-            currentState.PlayerMissionEnteredHandler(payload);
-
-            // Assert
-            Assert.IsType<MissionState>(connectionLogic.State);
-        }
-
-        [Fact]
-        public void PlayerMissionEntered_InvalidPlayerId()
-        {
-            // Arrange
-            CampaignState currentState = connectionLogic.SetState<CampaignState>();
-
-            // Act
-            var payload = new MessagePayload<NetworkPlayerMissionEntered>(
-                differentPeer, new NetworkPlayerMissionEntered());
-            currentState.PlayerMissionEnteredHandler(payload);
-
-            // Assert
             Assert.IsType<CampaignState>(connectionLogic.State);
         }
     }

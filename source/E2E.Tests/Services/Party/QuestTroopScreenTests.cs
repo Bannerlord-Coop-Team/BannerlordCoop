@@ -62,7 +62,7 @@ public class QuestTroopScreenTests : IDisposable
                 RightMemberRoster = party.MemberRoster,
                 RightPrisonerRoster = party.PrisonRoster,
                 RightOwnerParty = party.Party,
-                PartyPresentationDoneButtonDelegate = (_, _, _, _, _, _, _, _, _) => true
+                PartyPresentationDoneButtonDelegate = Helpers.PartyScreenHelper.ManageTroopsAndPrisonersDoneHandler,
             });
 
             var states = Game.Current.GameStateManager;

@@ -12,9 +12,7 @@ namespace GameInterface.Tests.Serialization
 
         public BinaryPackageFactoryTests()
         {
-            ContainerBuilder builder = new ContainerBuilder();
-            builder.RegisterModule<SerializationTestModule>();
-            factory = builder.Build().Resolve<IBinaryPackageFactory>();
+            factory = SerializationTestContainer.BeginScope().Resolve<IBinaryPackageFactory>();
         }
 
         [Fact]

@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Barbers.Messages;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using SandBox.CampaignBehaviors;
 using Serilog;
 using TaleWorlds.CampaignSystem;
@@ -20,15 +21,18 @@ internal class BarberHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly IPlayerManager playerManager;
 
     public BarberHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
-        INetwork network)
+        INetwork network,
+        IPlayerManager playerManager)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
+        this.playerManager = playerManager;
 
         messageBroker.Subscribe<BarberChargesPlayer>(Handle_BarberChargesPlayer);
         messageBroker.Subscribe<NetworkBarberChargesPlayer>(Handle_NetworkBarberChargesPlayer);
@@ -62,6 +66,7 @@ internal class BarberHandler : IHandler
     {
         GameThread.RunSafe(() =>
         {
+            if (!playerManager.IsSenderControllingHero(obj.Who, obj.What.MainHeroId)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.MainHeroId, out var mainHero)) return;
 
             GiveGoldAction.ApplyBetweenCharacters(mainHero, null, BarberCampaignBehavior.BarberCost, false);

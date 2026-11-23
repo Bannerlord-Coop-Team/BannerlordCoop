@@ -1,0 +1,46 @@
+﻿using Common.Messaging;
+using ProtoBuf;
+using System;
+
+namespace Missions.Messages;
+
+/// <summary>Why an owner's hull left a naval battle.</summary>
+public enum ShipRemovalReason
+{
+    /// <summary>The owner retreated from the battle, or the hull sailed off the map under a Retreat order.</summary>
+    Retreat,
+
+    /// <summary>The owner left the battle any other way, or the hull left the mission without a retreat.</summary>
+    Leave,
+
+    /// <summary>
+    /// The battle host took back a hull of a failed AI fleet attempt; the hull never fought for its side, so it is no departure
+    /// that keeps the side's retreat.
+    /// </summary>
+    Retracted,
+}
+
+/// <summary>
+/// Owner to peers over the mission mesh as its hull leaves the mission (vanilla's BeforeShipRemovedEvent). Peers remove
+/// their copy the same way: seats released, other owners' agents on its deck moved to their own hull, then the hull goes.
+/// </summary>
+[ProtoContract(SkipConstructor = true)]
+public sealed class NetworkShipRemoved : IEvent
+{
+    [ProtoMember(1)] public readonly Guid ShipId;
+    [ProtoMember(2)] public readonly string OwnerControllerId;
+    [ProtoMember(3)] public readonly ShipRemovalReason Reason;
+    /// <summary>
+    /// Whether the hull's crew left the battle with it: the owner's mission ended with the removal, or the owner took back a
+    /// failed AI fleet attempt.
+    /// </summary>
+    [ProtoMember(4)] public readonly bool MissionEnding;
+
+    public NetworkShipRemoved(Guid shipId, string ownerControllerId, ShipRemovalReason reason, bool missionEnding)
+    {
+        ShipId = shipId;
+        OwnerControllerId = ownerControllerId;
+        Reason = reason;
+        MissionEnding = missionEnding;
+    }
+}

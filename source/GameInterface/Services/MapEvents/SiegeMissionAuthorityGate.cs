@@ -8,7 +8,8 @@ namespace GameInterface.Services.MapEvents;
 /// ballistas, gates, ladders) — because their vanilla simulation is driven by whatever agents each
 /// machine happens to man locally, which diverges per client. A client interacting with a machine can
 /// claim its simulation per machine (see SiegeMachineStateReplicator). The Missions battle controller
-/// keeps <see cref="IsLocalAuthority"/> current, and the appliers raise <see cref="SuppressCapture"/>
+/// keeps <see cref="IsLocalAuthority"/> current in sieges; in naval battles the ship engine clears it and
+/// claims the weapons of the hulls this client owns instead. The appliers raise <see cref="SuppressCapture"/>
 /// around a received change so the capture patches don't echo.
 /// </summary>
 public static class SiegeMissionAuthorityGate

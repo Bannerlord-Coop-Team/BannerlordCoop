@@ -6,6 +6,7 @@ using Common.Messaging;
 using HarmonyLib;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.StanceLinks.Messages;
+using GameInterface.Utils.Commands;
 using System;
 using System.Collections.Concurrent;
 using System.Reflection;
@@ -23,6 +24,16 @@ public sealed class StanceLinkHandleDebugCommand : ICoopCommand
     private static volatile uint preparedHandle;
     private static int receivedMessages;
 
+    private readonly ICommandObjectResolver resolver;
+    private readonly IObjectManager manager;
+
+    // Receives the resolver for kingdom lookup and the object manager for stance registry ids.
+    public StanceLinkHandleDebugCommand(ICommandObjectResolver resolver, IObjectManager manager)
+    {
+        this.resolver = resolver;
+        this.manager = manager;
+    }
+
     public string Prefix => "coop.debug.stance_link";
     public string Name => "handle_fixture";
     public string Description => "Prepares, inspects, sends, checks, or restores the missing stance handle fixture.";
@@ -30,23 +41,23 @@ public sealed class StanceLinkHandleDebugCommand : ICoopCommand
     public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
     {
         new ExpectedArgs("action", "prepare, state, send, conflicts, or restore."),
-        new ExpectedArgs("faction1", "First registered kingdom id, e.g. Kingdom_vlandia."),
-        new ExpectedArgs("faction2", "Second registered kingdom id, e.g. Kingdom_empire."),
+        new ExpectedArgs("faction1", "First kingdom name or id, e.g. Vlandia or Kingdom_vlandia; quote names with spaces."),
+        new ExpectedArgs("faction2", "Second kingdom name or id, e.g. Northern Empire or Kingdom_empire; quote names with spaces."),
     };
 
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
     {
-        if (args.Count != 3) return Failed("Expected action and two kingdom ids.");
+        if (args.Count != 3) return Failed("Expected action and two kingdoms (name or id).");
         var action = args[0];
         if (action != "prepare" && action != "state" && action != "send" && action != "conflicts" && action != "restore")
             return Failed("Unknown fixture action.");
         if (action == "send" && ModInformation.IsClient) return Failed("send requires the server.");
         if (action != "send" && action != "state" && ModInformation.IsServer)
             return Failed("Setup and conflict checks require a client.");
-        if (!ContainerProvider.TryResolve<IObjectManager>(out var manager)
-            || !manager.TryGetObject<Kingdom>(args[1], out var faction1)
-            || !manager.TryGetObject<Kingdom>(args[2], out var faction2))
-            return Failed("Registered kingdoms and ObjectManager are required.");
+        if (!resolver.TryResolveKingdom(args[1], out var faction1, out var error1))
+            return Failed(error1);
+        if (!resolver.TryResolveKingdom(args[2], out var faction2, out var error2))
+            return Failed(error2);
         var stance = FactionManager.Instance._stances.GetStance(faction1, faction2);
         if (stance == null || !manager.TryGetId(stance, out var id)) return Failed("An existing registered stance is required.");
         if (id != $"StanceLink_{StanceLinkHandler.GetStanceLinkKey(faction1, faction2)}")

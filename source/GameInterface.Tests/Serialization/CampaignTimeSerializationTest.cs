@@ -10,29 +10,10 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class CampaignTimeSerializationTest
     {
-        IContainer container;
+        ILifetimeScope container;
         public CampaignTimeSerializationTest()
         {
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
-        }
-
-        [Fact]
-        public void CampaignTime_Serialize()
-        {
-            CampaignTime CampaignTime = new CampaignTime();
-
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            CampaignTimeBinaryPackage package = new CampaignTimeBinaryPackage(CampaignTime, factory);
-
-            package.Pack();
-
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
-
-            Assert.NotEmpty(bytes);
+            container = SerializationTestContainer.BeginScope();
         }
 
         [Fact]

@@ -11,15 +11,12 @@ using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MobilePartyAIs.Patches;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.PartyBases.Extensions;
-using GameInterface.Services.PartyVisuals.Extensions;
-using GameInterface.Services.PartyVisuals.Messages;
+using GameInterface.Services.PartyVisuals.Interfaces;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.TroopRosters.Messages;
 using Helpers;
 using LiteNetLib;
-using SandBox.View.Map.Managers;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -61,17 +58,24 @@ internal class PlayerCaptivityServerHandler : IHandler
     private readonly INetwork network;
     private readonly IMessageBroker messageBroker;
     private readonly IPlayerManager playerManager;
+    private readonly ConversationPartyTracker conversationPartyTracker;
+    private readonly IPartyVisualInterface partyVisuals;
+    private readonly Dictionary<Hero, Hero> pendingExecutions = new();
 
     public PlayerCaptivityServerHandler(
         IObjectManager objectManager,
         INetwork network,
         IMessageBroker messageBroker,
-        IPlayerManager playerManager)
+        IPlayerManager playerManager,
+        ConversationPartyTracker conversationPartyTracker,
+        IPartyVisualInterface partyVisuals)
     {
         this.objectManager = objectManager;
         this.network = network;
         this.messageBroker = messageBroker;
         this.playerManager = playerManager;
+        this.conversationPartyTracker = conversationPartyTracker;
+        this.partyVisuals = partyVisuals;
 
         // ModInformation is evaluated per call (tests flip it per instance), so each handler
         // guards itself instead of gating the subscriptions here.
@@ -140,6 +144,9 @@ internal class PlayerCaptivityServerHandler : IHandler
         // the captivity-end flow reactivates the party.
         playerParty.IsActive = false;
 
+        // A captive's client doesn't finish its encounter until it's released, so the captor would stay held until then
+        ReleaseConversationHold(hero);
+
         // BR-061: surviving companion heroes riding in the surrendered party become prisoners of the
         // captor through the same TakePrisonerAction that captured the leader, BEFORE the rosters are
         // emptied below (which would silently discard them). Each capture runs with patches live, so its
@@ -161,9 +168,40 @@ internal class PlayerCaptivityServerHandler : IHandler
         // transferred — out of BR-061's scope, which covers the surrendered party's own heroes and troops.
         EmptyRoster(playerParty.MemberRoster);
         EmptyRoster(playerParty.PrisonRoster);
-        RemoveVisual(playerParty);
+        partyVisuals.RemoveVisual(playerParty);
         if (playerParty.LeaderHero != null)
             playerParty.ChangePartyLeader(null);
+
+        RollPlayerExecution(hero, payload.What.CapturerParty);
+    }
+
+    private void RollPlayerExecution(Hero hero, PartyBase captor)
+    {
+        var executer = captor?.LeaderHero;
+        if (executer == null || executer.IsPlayerHero()) return;
+
+        int mercy = executer.GetTraitLevel(DefaultTraits.Mercy);
+        // Against the captured player's clan instead of vanilla's Clan.PlayerClan
+        int relation = executer.Clan.GetRelationWithClan(hero.Clan);
+        if (MBRandom.RandomFloat <= PlayerExecutionChance(mercy, relation))
+            pendingExecutions[hero] = executer;
+    }
+
+    // Vanilla ExecutionCampaignBehavior.CalculatePlayerExecutionProbability, its blood feud case comes with #3851
+    private static float PlayerExecutionChance(int mercy, int relation)
+    {
+        if (relation >= (mercy * 10) - 50) return 0f;
+
+        return Math.Max(((-relation * 0.3f) - (mercy * 5f)) * 0.01f, 0f);
+    }
+
+    // Same release the client's PlayerEncounter.Finish would send through NetworkConversationEnded
+    private void ReleaseConversationHold(Hero playerHero)
+    {
+        if (!playerManager.TryGetPlayer(playerHero, out var player)) return;
+        if (!playerManager.TryGetPeer(player.ControllerId, out var peer)) return;
+
+        ConversationPartyHold.EndEngagement(conversationPartyTracker, peer);
     }
 
     /// <summary>
@@ -333,7 +371,7 @@ internal class PlayerCaptivityServerHandler : IHandler
             return;
         }
 
-        if (!TryGetPlayerHeroOfParty(playerParty, out var playerHero))
+        if (!playerManager.TryGetPlayer(playerParty, out var player) || !objectManager.TryGetObject(player.HeroId, out Hero playerHero))
         {
             Logger.Error("Refused partial surrender of {PartyId}: no registered player hero resolves for it", surrenderedPartyId);
             return;
@@ -370,27 +408,6 @@ internal class PlayerCaptivityServerHandler : IHandler
 
         captorParty = enemySide.Parties.FirstOrDefault(p => p.Party?.NumberOfHealthyMembers > 0)?.Party ?? leader;
         return captorParty != null;
-    }
-
-    /// <summary>
-    /// Resolves the player hero registered for <paramref name="playerParty"/>. A player party's component
-    /// leader is not reliably set on the server, so the player registry is the source of truth (the inverse
-    /// of <see cref="TryGetPlayerParty"/>). The registry keys players by the MOBILE party's id, which is
-    /// distinct from the <see cref="PartyBase"/> id used on the battle-leave wire.
-    /// </summary>
-    private bool TryGetPlayerHeroOfParty(MobileParty playerParty, out Hero playerHero)
-    {
-        playerHero = null;
-
-        if (!objectManager.TryGetId(playerParty, out var mobilePartyId)) return false;
-
-        foreach (var player in playerManager.Players)
-        {
-            if (player.MobilePartyId == mobilePartyId)
-                return objectManager.TryGetObject(player.HeroId, out playerHero);
-        }
-
-        return false;
     }
 
     /// <summary>
@@ -444,6 +461,8 @@ internal class PlayerCaptivityServerHandler : IHandler
         {
             try
             {
+                if (!playerManager.IsSenderControllingHero(peer, heroId))
+                    return;
                 if (!objectManager.TryGetObjectWithLogging<Hero>(heroId, out var playerHero))
                     return;
                 if (!objectManager.TryGetObjectWithLogging<MobileParty>(partyId, out var playerParty))
@@ -487,7 +506,7 @@ internal class PlayerCaptivityServerHandler : IHandler
         var playerHero = payload.What.PrisonerHero;
         if (playerHero == null) return;
 
-        if (!TryGetPlayerParty(playerHero, out var playerParty))
+        if (!playerManager.TryGetPlayer(playerHero, out var player) || !objectManager.TryGetObject(player.MobilePartyId, out MobileParty playerParty))
         {
             Logger.Error("Could not resolve a player party for released hero {HeroId}; cannot restore it", playerHero.StringId);
             return;
@@ -596,6 +615,10 @@ internal class PlayerCaptivityServerHandler : IHandler
             playerParty.TeleportPartyToOutSideOfEncounterRadius();
         }
 
+        // A parked party doesn't tick, so a landing it started before capture would finish after release and flip it back to sea
+        if (playerParty.IsTransitionInProgress)
+            playerParty.CancelNavigationTransition();
+
         if (captorParty != null && captorParty.IsSettlement)
         {
             playerParty.DisembarkToPosition(captorParty.Settlement.GatePosition);
@@ -670,41 +693,6 @@ internal class PlayerCaptivityServerHandler : IHandler
         network.SendAll(new NetworkPlayerCaptivityReleasePositionSet(playerPartyId, releasePosition));
     }
 
-    private void RemoveVisual(MobileParty party)
-    {
-        var partyVisual = party.Party.GetPartyVisual();
-        if (partyVisual == null) return;
-        if (!objectManager.TryGetHandleWithLogging(party, out var mobilePartyHandle)) return;
-
-        objectManager.Remove(partyVisual);
-
-        using (new AllowedThread())
-        {
-            MobilePartyVisualManager.Current?.RemovePartyVisualForParty(party);
-        }
-
-        network.SendAll(new NetworkDestroyPartyVisual(mobilePartyHandle));
-    }
-
-    /// <summary>
-    /// Resolves the <see cref="MobileParty"/> registered to the player that owns <paramref name="hero"/>.
-    /// </summary>
-    private bool TryGetPlayerParty(Hero hero, out MobileParty playerParty)
-    {
-        playerParty = null;
-
-        if (!objectManager.TryGetId(hero, out var heroId))
-            return false;
-
-        foreach (var player in playerManager.Players)
-        {
-            if (player.HeroId == heroId)
-                return objectManager.TryGetObject(player.MobilePartyId, out playerParty);
-        }
-
-        return false;
-    }
-
     /// <summary>
     /// Keeps captive players' parties at their captor's position; the server-side replacement for
     /// native <see cref="PlayerCaptivity"/>.Update, which only handles the local main hero.
@@ -713,6 +701,14 @@ internal class PlayerCaptivityServerHandler : IHandler
     private void Handle_CampaignTick(MessagePayload<CampaignTick> payload)
     {
         if (ModInformation.IsClient) return;
+
+        // Deferred like native OnGameMenuOpened, so the kill doesn't run mid battle capture processing.
+        foreach (var execution in pendingExecutions.ToArray())
+        {
+            pendingExecutions.Remove(execution.Key);
+            if (execution.Key.IsPrisoner)
+                KillCharacterAction.ApplyByExecution(execution.Key, execution.Value);
+        }
 
         foreach (var (hero, mobileParty) in PlayerHeros())
         {

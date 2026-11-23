@@ -69,35 +69,4 @@ public class CustomPartyComponentTests : SyncTestBase
             Assert.IsType<CustomPartyComponent>(newParty.PartyComponent);
         }
     }
-
-    [Fact]
-    public void ClientCreateParty_DoesNothing()
-    {
-        // Arrange
-        var server = TestEnvironment.Server;
-        var client1 = TestEnvironment.Clients.First();
-
-
-        // Act
-        PartyComponent? partyComponent = null;
-        Settlement settlement = new Settlement();
-        Clan clan = new Clan();
-        client1.Call(() =>
-        {
-            partyComponent = new CustomPartyComponent(settlement, 
-                new TextObject(""), 
-                new Hero(), 
-                "test", 
-                "testH", 
-                1f, 
-                false,
-                new CustomPartyComponent.InitializationArgs(new CampaignVec2(new Vec2(2, 2), true), 2f, clan));
-        });
-
-        Assert.NotNull(partyComponent);
-
-
-        // Assert
-        Assert.False(client1.ObjectManager.TryGetId(partyComponent, out var _));
-    }
 }

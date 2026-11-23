@@ -33,6 +33,17 @@ internal class EndCaptivityActionPatches
                 return false;
             }
 
+            if (prisoner != null && !prisoner.IsAlive && detail != EndCaptivityDetail.Death)
+            {
+                var captorRoster = prisoner.PartyBelongedToAsPrisoner?.PrisonRoster;
+                if (captorRoster != null && captorRoster.Contains(prisoner.CharacterObject))
+                {
+                    captorRoster.RemoveTroop(prisoner.CharacterObject);
+                }
+
+                return false;
+            }
+
             return true;
         }
 

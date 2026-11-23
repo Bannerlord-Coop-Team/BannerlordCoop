@@ -2,6 +2,7 @@
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using GameInterface.Services.Smithing.Interfaces;
 using GameInterface.Services.Smithing.Messages;
 using Serilog;
@@ -17,17 +18,20 @@ internal class CraftingCampaignBehaviorHistoryHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly IPlayerManager playerManager;
     private readonly ISessionCraftingPlayerDataInterface sessionCraftingPlayerDataInterface;
 
     public CraftingCampaignBehaviorHistoryHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
+        IPlayerManager playerManager,
         ISessionCraftingPlayerDataInterface sessionCraftingPlayerDataInterface)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
+        this.playerManager = playerManager;
         this.sessionCraftingPlayerDataInterface = sessionCraftingPlayerDataInterface;
 
         messageBroker.Subscribe<UpdateCraftedItemHistory>(Handle_UpdateCraftedItemHistory);
@@ -56,6 +60,8 @@ internal class CraftingCampaignBehaviorHistoryHandler : IHandler
 
     private void Handle_NetworkUpdateCraftedItemHistory(MessagePayload<NetworkUpdateCraftedItemHistory> obj)
     {
+        if (!playerManager.IsSenderControllingHero(obj.Who, obj.What.PlayerHeroId)) return;
+
         // Save crafting history on server in CoopSession
         sessionCraftingPlayerDataInterface.UpdateCraftingHistory(
             obj.What.PlayerHeroId,

@@ -11,6 +11,9 @@
   // password, ports, autosaves) live in the dedicated server's own
   // DedicatedServer\server-config.json instead. Comments and trailing commas
   // are allowed here.
+  // The server adds settings from new mod versions to this file when it loads,
+  // so a deleted setting comes back with its default value. Comment a setting
+  // out with // instead to keep it out of the file.
 
   // Campaign difficulty, applied by the HOSTING side at every boot; joining
   // players inherit the values with the save transfer. These values mirror a
@@ -92,9 +95,17 @@
     "fastForwardEnabled": true,
 
     // Toggle auto pausing
-    // (Default) true: Pause when all players are occupied (in a battle or a settlement).
+    // (Default) true: Pause when all players are occupied (in a battle, a settlement or the screens after a battle).
     // false: Auto pause is disabled. The game will still automatically pause for clients catching up and when there are no players online.
     "autoPauseEnabled": true,
+
+    // Toggle players being able to pause or change the game speed
+    // (Default) true: Any player can pause, play or fast forward.
+    // false: Only the host (the server console or the dedicated server manager) can pause or change the speed.
+    // The game still pauses by itself when players join or catch up, when nobody is online and for auto pause.
+    // Players can't resume those pauses themselves. The pauses for catching up and auto pause end on their own,
+    // but after the pause for nobody online the host has to start the game again.
+    "allowClientTimeControls": true,
 
     // Toggle clients being able to use cheats
     // Vanilla bannerlord commands are always disabled on clients but this disables cheating in troops, equipment, teleporting etc.
@@ -127,6 +138,13 @@
     // Default is 6, meaning AI parties can only join a player battle within 6 hours of it starting.
     // If set to 0, AI parties will not join in player battles.
     "playerBattleAiJoinWindowHours": 6,
+
+    // Set how many real seconds AI parties leave a player alone after a battle.
+    // (Default) 0: Off. AI parties can attack a player as soon as their battle ends.
+    // Above 0: AI parties can't attack a player who is still in the loot, prisoner or other after battle screens,
+    // or for this many seconds after the player leaves them. The seconds count while paused too, and game speed
+    // doesn't change them. Other players can still attack.
+    "postBattleAiAmnestySeconds": 0,
 
     // Toggle speed limit when players are in a battle.
     // Default is true, meaning the game will be locked at 1x speed when any player is in a battle.
@@ -171,10 +189,10 @@
     "smithingStaminaRecoveryOutsideSettlements": true,
 
     // Set a multiplier for increasing/decreasing smithing stamina recovery speed.
-    // The vanilla rate is 1. The default for this mod is 0.1 as stamina regenerates in the smithing screen.
-    // Setting any lower than this won't decrease speed more.
+    // The vanilla rate is 1. The default for this mod is 0.6 as stamina regenerates in the smithing screen.
+    // Setting it lower than 0.1 won't decrease speed more.
     // Stamina is stored as an integer and ticks are rounded up to ensure heroes always recover some stamina.
-    "smithingStaminaRecoveryMultiplier": 0.1,
+    "smithingStaminaRecoveryMultiplier": 0.6,
 
     // Set a multiplier for increasing/decreasing the number of looter/bandit parties.
     // The higher the multiplier, the more looter parties can exist on the map at a time.
@@ -193,9 +211,9 @@
 
     // How long a lord remembers refusing to defect to your kingdom.
     // Vanilla records each failed persuasion and refuses that lord until the
-    // record expires after one in-game year. Only the machine that ran the
+    // refusal cools down after one in-game season. Only the machine that ran the
     // conversation records it, so co-op has to decide what a client's list means.
-    // (Default) "Vanilla":     a refusal blocks that lord for one in-game year, as in singleplayer.
+    // (Default) "Vanilla":     a refusal blocks that lord for one in-game season, as in singleplayer.
     // "NeverExpire": a refusal blocks that lord for the rest of the session.
     // "AlwaysRetry": a refusal never blocks; you can ask the same lord again straight away.
     "lordDefectionRetries": "Vanilla",
@@ -221,6 +239,53 @@
 
     // Toggle players being allowed to join battles when wounded
     // Default is true
-    "playerWoundedBattleEntry": true
+    "playerWoundedBattleEntry": true,
+
+    // Set the time in seconds players have to vote on kingdom decisions.
+    // Default is 60. Values of 0 or lower will default back to 60.
+    "kingdomDecisionVoteTimeoutSeconds": 60,
+
+    // Set what happens to clans when their kingdom is destroyed.
+    // "KeepClans": Clans leave the destroyed kingdom and stay alive as independent clans.
+    // (Default) "Vanilla": Clans still in a kingdom are destroyed with it, and clans left independent are destroyed after 28 days like vanilla.
+    "clansAfterKingdomDestruction": "Vanilla",
+
+    // Players who should host battles, in order of preference, listed by Steam ID.
+    // The battle host runs the battle for everyone else, so list players with a fast and stable upload.
+    // If a higher-priority player is still loading, the server waits up to 5 seconds for them before picking someone else.
+    // (Default) []: The first player to finish loading hosts the battle.
+    // e.g. ["76561198000000001", "76561198000000002"]
+    "preferredBattleHosts": [],
+
+    // Stop a player caught by an enemy player from leaving.
+    // (Default) false: The caught player can pick "I must leave now." whenever the meeting offers it.
+    // true: When the two players' factions are at war as the meeting starts, the caught player isn't offered "I must leave now." and the server ignores it.
+    // A trade can still be cancelled, and Leave comes back if the two make peace during the meeting, except while answering a hostile demand, which never offers Leave.
+    // If the other player then does nothing for 30 seconds (or pvpResponseTimerSeconds when set), the caught player goes free.
+    "pvpBlockLeave": false,
+
+    // Set how many real seconds a player has to answer in a meeting with another player.
+    // (Default) 0: Off. A player can wait as long as they like, except that with pvpBlockLeave on a caught player goes free after the other player does nothing for 30 seconds.
+    // Above 0: A caught player who doesn't answer a demand in time gets the battle, as if they picked refuse, while the two are at war.
+    // Any other unanswered meeting just ends, so the timer never starts a war. A player who caught someone and does nothing for this long lets them go.
+    // Values from 1 to 9 count as 10. The time starts again after every answer. Trades are never timed.
+    "pvpResponseTimerSeconds": 0,
+
+    // Set the most clans one kingdom may have, so one kingdom can't take every clan on a big server.
+    // (Default) 0: No limit.
+    // Above 0: The ruling clan counts too. A full kingdom can't take a player as a vassal, and its ruler can't recruit another lord or make a companion a lord.
+    // The player who asked is told why. Clans already in a kingdom always stay, and new kingdoms and rebellions work as before.
+    "maxClansPerKingdom": 0,
+
+    // Count mercenary clans toward maxClansPerKingdom.
+    // (Default) false: Mercenaries don't count, so a full kingdom can still hire them and a player can still sign on as one.
+    // true: Mercenaries count, and a full kingdom can't take on another mercenary either.
+    "maxClansPerKingdomCountsMercenaries": false,
+
+    // Toggle War Sails (NavalDLC) co-op on a dedicated server. War Sails is not officially supported yet.
+    // Only the dedicated server reads this. Hosting in game and joining follow the launcher's NavalDLC setting.
+    // (Default) false: the dedicated server runs without NavalDLC.
+    // true: the dedicated server runs with NavalDLC. Needs a save made with it and a tester build.
+    "warSails": false
   }
 }

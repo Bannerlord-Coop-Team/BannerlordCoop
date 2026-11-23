@@ -317,27 +317,21 @@ public abstract class EnvironmentInstance : IDisposable
     {
         if (disposeResources == null) throw new ArgumentNullException(nameof(disposeResources));
 
-        // PumpGameThread holds this lock across dequeue and execution. Waiting here prevents an
-        // already-dequeued apply from resuming after its instance dependencies have been disposed.
+        Exception? queueFailure = null;
+        // Wait for any dequeued apply to finish before closing the instance to later scopes.
         lock (GameInstance.@lock)
         {
-            CloseGameThreadQueueAndDisposeLocked(disposeResources);
-        }
-    }
-
-    private void CloseGameThreadQueueAndDisposeLocked(Action disposeResources)
-    {
-        Exception? queueFailure = null;
-        try
-        {
-            // Release blocked callers and reject silently lost applies before their dependencies disappear.
-            ReleasePendingGameThreadActions();
-        }
-        catch (Exception e)
-        {
-            queueFailure = e;
+            try
+            {
+                ReleasePendingGameThreadActions();
+            }
+            catch (Exception e)
+            {
+                queueFailure = e;
+            }
         }
 
+        // Timer disposal drains callbacks that may need the static-scope lock to finish.
         Exception? containerFailure = null;
         try
         {
@@ -380,6 +374,12 @@ public abstract class EnvironmentInstance : IDisposable
             // recycled) thread forever and every later scope or GameInstance build deadlocks.
             try
             {
+                lock (instance.gameThreadQueue.gate)
+                {
+                    if (instance.gameThreadQueue.isClosed)
+                        throw new ObjectDisposedException(instance.GetType().Name);
+                }
+
                 gameThreadQueueScope = GameThread.ActivateQueue(instance.gameThreadQueue);
 
                 // A nested poller receive can run on the fixture's already-marked test thread. Clear the

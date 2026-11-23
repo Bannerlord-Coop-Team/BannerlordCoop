@@ -29,15 +29,19 @@ public class SettlementLeaveMenuTests : IDisposable
         environment = new E2ETestEnvironment(output);
     }
 
-    public static IEnumerable<object[]> MenuStates()
-    {
-        foreach (string menu in new[] { "town_outside", "castle_outside", "siege_attacker_left", "siege_attacker_defeated" })
-        foreach (string state in new[] { "orphaned", "other-party", "other-menu", "no-menu", "active-encounter", "battle-side", "siege-camp", "mission-state" })
-            yield return new object[] { menu, state, state == "orphaned" };
-    }
-
+    // Each settlement menu once when orphaned, then each blocking guard once; the guards don't depend on the menu.
     [Theory]
-    [MemberData(nameof(MenuStates))]
+    [InlineData("town_outside", "orphaned", true)]
+    [InlineData("castle_outside", "orphaned", true)]
+    [InlineData("siege_attacker_left", "orphaned", true)]
+    [InlineData("siege_attacker_defeated", "orphaned", true)]
+    [InlineData("town_outside", "other-party", false)]
+    [InlineData("town_outside", "other-menu", false)]
+    [InlineData("town_outside", "no-menu", false)]
+    [InlineData("castle_outside", "active-encounter", false)]
+    [InlineData("castle_outside", "battle-side", false)]
+    [InlineData("siege_attacker_left", "siege-camp", false)]
+    [InlineData("siege_attacker_defeated", "mission-state", false)]
     public void ServerDrivenLeave_ClosesOnlyOrphanedSettlementMenu(string settlementMenu, string state, bool closesMenu)
     {
         var client = environment.Clients.First();
@@ -115,6 +119,22 @@ public class SettlementLeaveMenuTests : IDisposable
             Assert.Equal(hasSettlement, EncounterGameMenuBehaviorPatch.CastleOutsidePrefix(null));
             if (!hasSettlement)
                 ObjectHelper.SkipConstructor<EncounterGameMenuBehavior>().game_menu_castle_outside_on_init(null);
+        });
+    }
+
+    // Vanilla passes the null encounter settlement into the prison break model, which throws while the menu is built.
+    [Fact]
+    public void ScoutKeepCondition_WithoutEncounterSettlement_HidesOption()
+    {
+        environment.Clients.First().Call(() =>
+        {
+            var encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
+            encounter.EncounterSettlementAux = null;
+            Campaign.Current.PlayerEncounter = encounter;
+
+            var behavior = ObjectHelper.SkipConstructor<EncounterGameMenuBehavior>();
+            var args = new MenuCallbackArgs((MenuContext)null, null);
+            Assert.False(behavior.game_menu_castle_outside_scout_keep_on_condition(args));
         });
     }
 

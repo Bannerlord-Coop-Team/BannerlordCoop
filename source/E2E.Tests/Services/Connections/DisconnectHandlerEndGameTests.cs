@@ -7,12 +7,15 @@ using Coop.Core.Common;
 using Coop.Core.Common.Services.Connection.Messages;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameState.Interfaces;
+using GameInterface.Services.Modules;
 using GameInterface.Services.UI.Interfaces;
 using LiteNetLib;
 using Moq;
+using System;
 using System.Collections.Concurrent;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
+using TaleWorlds.SaveSystem;
 
 namespace E2E.Tests.Services.Connections;
 
@@ -49,7 +52,7 @@ public class DisconnectHandlerEndGameTests
     public void DisconnectWhoseEndGameTimesOutWhileItRuns_LeavesTheCampaignOnceThenEndsCoop()
     {
         using var fixture = new Fixture();
-        using var shortTimeout = GameThread.Instance.LimitFrameDrain(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+        using var shortTimeout = GameThread.Instance.LimitFrameDrain(TimeSpan.FromSeconds(1), ShortTimeout);
         Disconnect? disconnect = null;
         bool pollerReturnedDuringEndGame = false;
         fixture.DuringEndGame = () => pollerReturnedDuringEndGame = disconnect!.TryJoin(LongTimeout);
@@ -95,7 +98,7 @@ public class DisconnectHandlerEndGameTests
     public void DisconnectWhoseTimedOutEndGameEndsTheSessionWhenItRuns_ShowsTheReasonOnceWithoutAFinalize()
     {
         using var fixture = new Fixture();
-        using var shortTimeout = GameThread.Instance.LimitFrameDrain(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2));
+        using var shortTimeout = GameThread.Instance.LimitFrameDrain(TimeSpan.FromSeconds(1), ShortTimeout);
         Disconnect? disconnect = null;
         bool pollerReturnedDuringEndGame = false;
         fixture.DuringEndGame = () =>
@@ -148,7 +151,7 @@ public class DisconnectHandlerEndGameTests
             {
                 DuringEndGame?.Invoke();
                 order.Enqueue("EndGame");
-            });
+            }, Array.Empty<SaveGameFileInfo>, _ => { }, loadTransferredSave: _ => { }, Mock.Of<INavalSaveCompatibility>(), Mock.Of<ILoadingInterface>());
             handler = new DisconnectHandler(Broker, new CoopFinalizer(Broker, loadingScreen.Object), gameState);
         }
 

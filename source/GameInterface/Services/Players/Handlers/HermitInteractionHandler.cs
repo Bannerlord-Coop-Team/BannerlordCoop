@@ -14,17 +14,20 @@ internal class HermitInteractionHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly ISessionInteractionsPlayerDataInterface sessionInteractionsPlayerDataInterface;
+    private readonly IPlayerManager playerManager;
 
     public HermitInteractionHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
-        ISessionInteractionsPlayerDataInterface sessionInteractionsPlayerDataInterface)
+        ISessionInteractionsPlayerDataInterface sessionInteractionsPlayerDataInterface,
+        IPlayerManager playerManager)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.sessionInteractionsPlayerDataInterface = sessionInteractionsPlayerDataInterface;
+        this.playerManager = playerManager;
 
         messageBroker.Subscribe<UpdateHasMetHermit>(Handle_UpdateHasMetHermit);
         messageBroker.Subscribe<NetworkUpdateHasMetHermit>(Handle_NetworkUpdateHasMetHermit);
@@ -49,6 +52,7 @@ internal class HermitInteractionHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
+            if (!playerManager.IsSenderControllingHero(obj.Who, data.MainHeroId)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out _)) return;
 
             sessionInteractionsPlayerDataInterface.UpdateHasMetHermit(data.MainHeroId, data.HasMetHermit);

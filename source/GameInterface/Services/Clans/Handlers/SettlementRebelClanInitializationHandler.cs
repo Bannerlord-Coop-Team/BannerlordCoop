@@ -2,6 +2,7 @@
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using GameInterface.Services.Banners.Extensions;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.ObjectManager;
 using TaleWorlds.CampaignSystem;
@@ -78,7 +79,7 @@ internal sealed class SettlementRebelClanInitializationHandler : IHandler
             {
                 clan.Culture = culture;
                 clan._leader = leader;
-                clan._banner = data.BannerCode == null ? null : new Banner(data.BannerCode);
+                clan._banner = data.BannerCode.ToBannerWithLayers();
                 clan._tier = data.Tier;
                 clan.InitialHomeSettlement = initialHomeSettlement;
                 clan._home = homeSettlement;

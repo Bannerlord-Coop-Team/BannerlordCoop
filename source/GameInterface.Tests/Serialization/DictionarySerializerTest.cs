@@ -11,14 +11,10 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class DictionarySerializerTest
     {
-        IContainer container;
+        ILifetimeScope container;
         public DictionarySerializerTest()
         {
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
+            container = SerializationTestContainer.BeginScope();
         }
 
         [Fact]

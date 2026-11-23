@@ -36,58 +36,32 @@ public class PlayerKillFeedColorSyncTests : IDisposable
     }
 
     [Fact]
-    public void ClientColorRequest_ServerStoresAndAllClientsUseColor()
+    public void ClientColorRequests_ServerStoresAndAllClientsUseColors()
     {
         var color = new PlayerKillFeedColor(12, 34, 56);
-
-        SendColor(Clients[0], color);
-
-        AssertStored(Server, PlayerOne, color);
-        foreach (var client in Clients)
-        {
-            AssertStored(client, PlayerOne, color);
-        }
-    }
-
-    [Fact]
-    public void DuplicateColorRequests_AreAllowedForDifferentPlayers()
-    {
-        var color = new PlayerKillFeedColor(90, 80, 70);
         var clients = Clients;
 
         SendColor(clients[0], color);
-        SendColor(clients[1], color);
 
         AssertStored(Server, PlayerOne, color);
-        AssertStored(Server, PlayerTwo, color);
+        foreach (var client in clients)
+        {
+            AssertStored(client, PlayerOne, color);
+        }
 
+        // The same color is allowed for a different player, and the later requester gets the existing snapshot.
+        Server.NetworkSentMessages.Clear();
+        SendColor(clients[1], color);
+
+        var updates = Server.NetworkSentMessages.GetMessages<NetworkUpdateKillFeedColor>().ToArray();
+        Assert.Contains(updates, update => Matches(update, PlayerOne, color));
+        Assert.Contains(updates, update => Matches(update, PlayerTwo, color));
+
+        AssertStored(Server, PlayerTwo, color);
         foreach (var client in clients)
         {
             AssertStored(client, PlayerOne, color);
             AssertStored(client, PlayerTwo, color);
-        }
-    }
-
-    [Fact]
-    public void LaterColorRequest_ReceivesExistingSnapshotAndBroadcastsOwnColor()
-    {
-        var colorOne = new PlayerKillFeedColor(20, 40, 60);
-        var colorTwo = new PlayerKillFeedColor(100, 120, 140);
-        var clients = Clients;
-
-        SendColor(clients[0], colorOne);
-        Server.NetworkSentMessages.Clear();
-
-        SendColor(clients[1], colorTwo);
-
-        var updates = Server.NetworkSentMessages.GetMessages<NetworkUpdateKillFeedColor>().ToArray();
-        Assert.Contains(updates, update => Matches(update, PlayerOne, colorOne));
-        Assert.Contains(updates, update => Matches(update, PlayerTwo, colorTwo));
-
-        foreach (var client in clients)
-        {
-            AssertStored(client, PlayerOne, colorOne);
-            AssertStored(client, PlayerTwo, colorTwo);
         }
     }
 

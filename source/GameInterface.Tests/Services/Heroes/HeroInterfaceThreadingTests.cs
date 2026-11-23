@@ -5,6 +5,7 @@ using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.Traits.Interfaces;
 using Moq;
 using System;
 using System.Runtime.CompilerServices;
@@ -30,7 +31,8 @@ public class HeroInterfaceThreadingTests
             Mock.Of<IBinaryPackageFactory>(),
             Mock.Of<IObjectManager>(),
             Mock.Of<IPartyVisibilitySweep>(),
-            Mock.Of<IPlayerPartyRestorer>());
+            Mock.Of<IPlayerPartyRestorer>(),
+            Mock.Of<ITraitLevelingHelperInterface>());
 
         Assert.Throws<NullReferenceException>(() => heroInterface.SetupServerHero(null));
     }

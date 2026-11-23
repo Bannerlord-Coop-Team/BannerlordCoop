@@ -1,6 +1,5 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.Clans.Data;
-using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
 using ProtoBuf;
 
@@ -29,10 +28,7 @@ internal readonly struct NetworkPlayerPartyInteractionState : ICommand
     public readonly bool ResponderAcceptedTrade;
     [ProtoMember(10)]
     public readonly bool IsInitiator;
-    [ProtoMember(11)]
-    public readonly ItemRosterElementData[] PartyItems;
-    [ProtoMember(12)]
-    public readonly ItemRosterElementData[] OtherPartyItems;
+    // ProtoMember 11 and 12 carried both party inventories, keep them unused.
     [ProtoMember(13)]
     public readonly PlayerPartyInteractionOption[] EnabledOptions;
     [ProtoMember(14)]
@@ -45,6 +41,10 @@ internal readonly struct NetworkPlayerPartyInteractionState : ICommand
     public readonly int MercenaryAwardMultiplier;
     [ProtoMember(18)]
     public readonly ClanJoinUnavailableReason ClanJoinUnavailableReason;
+    [ProtoMember(19)]
+    public readonly ClanJoinUnavailableReason PatrilinealMarriageUnavailableReason;
+    [ProtoMember(20)]
+    public readonly ClanJoinUnavailableReason MatrilinealMarriageUnavailableReason;
 
     public NetworkPlayerPartyInteractionState(
         string sessionId,
@@ -58,13 +58,13 @@ internal readonly struct NetworkPlayerPartyInteractionState : ICommand
         int mercenaryAwardMultiplier = 0,
         bool initiatorAcceptedTrade = false,
         bool responderAcceptedTrade = false,
-        ItemRosterElementData[] partyItems = null,
-        ItemRosterElementData[] otherPartyItems = null,
         PlayerPartyInteractionOption[] enabledOptions = null,
         bool isHostile = false,
         PlayerPartyInteractionVassalUnavailableReason vassalUnavailableReason = PlayerPartyInteractionVassalUnavailableReason.None,
         PlayerPartyInteractionMercenaryUnavailableReason mercenaryUnavailableReason = PlayerPartyInteractionMercenaryUnavailableReason.None,
-        ClanJoinUnavailableReason clanJoinUnavailableReason = ClanJoinUnavailableReason.None)
+        ClanJoinUnavailableReason clanJoinUnavailableReason = ClanJoinUnavailableReason.None,
+        ClanJoinUnavailableReason patrilinealMarriageUnavailableReason = ClanJoinUnavailableReason.None,
+        ClanJoinUnavailableReason matrilinealMarriageUnavailableReason = ClanJoinUnavailableReason.None)
     {
         SessionId = sessionId;
         PartyId = partyId;
@@ -76,13 +76,13 @@ internal readonly struct NetworkPlayerPartyInteractionState : ICommand
         IsInitiator = isInitiator;
         InitiatorAcceptedTrade = initiatorAcceptedTrade;
         ResponderAcceptedTrade = responderAcceptedTrade;
-        PartyItems = partyItems ?? new ItemRosterElementData[0];
-        OtherPartyItems = otherPartyItems ?? new ItemRosterElementData[0];
         EnabledOptions = enabledOptions ?? Options;
         IsHostile = isHostile;
         VassalUnavailableReason = vassalUnavailableReason;
         MercenaryUnavailableReason = mercenaryUnavailableReason;
         MercenaryAwardMultiplier = mercenaryAwardMultiplier;
         ClanJoinUnavailableReason = clanJoinUnavailableReason;
+        PatrilinealMarriageUnavailableReason = patrilinealMarriageUnavailableReason;
+        MatrilinealMarriageUnavailableReason = matrilinealMarriageUnavailableReason;
     }
 }

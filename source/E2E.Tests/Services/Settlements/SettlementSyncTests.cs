@@ -28,7 +28,7 @@ namespace E2E.Tests.Services.Settlements
         }
 
         [Fact]
-        public void Server_Settlement_Fields()
+        public void Server_Settlement_FieldsAndProperties()
         {
             Server.ObjectManager.TryGetObject(settlementId, out Settlement settlement);
             settlement._name = null;
@@ -58,12 +58,6 @@ namespace E2E.Tests.Services.Settlements
             //TestEnvironment.AssertReferenceField<Settlement, List<Alley>>(nameof(Settlement.Alleys));
 
             //TestEnvironment.AssertReferenceField<Settlement, ItemRoster>(nameof(Settlement.Stash)); // readonly
-        }
-
-        [Fact]
-        public void Server_Settlement_Properties()
-        {
-            Server.ObjectManager.TryGetObject(settlementId, out Settlement settlement);
 
             TestEnvironment.AssertReferenceProperty<Settlement, PartyBase>(nameof(Settlement.Party));
             TestEnvironment.AssertProperty<Settlement, int>(nameof(Settlement.BribePaid), 43);

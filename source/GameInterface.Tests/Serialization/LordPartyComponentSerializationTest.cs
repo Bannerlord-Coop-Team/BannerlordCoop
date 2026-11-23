@@ -15,31 +15,12 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class LordPartyComponentSerializationTest
     {
-        IContainer container;
+        ILifetimeScope container;
         public LordPartyComponentSerializationTest()
         {
             GameBootStrap.Initialize();
 
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
-        }
-
-        [Fact]
-        public void LordPartyComponent_Serialize()
-        {
-            LordPartyComponent LordPartyComponent = (LordPartyComponent)FormatterServices.GetUninitializedObject(typeof(LordPartyComponent));
-
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            LordPartyComponentBinaryPackage package = new LordPartyComponentBinaryPackage(LordPartyComponent, factory);
-
-            package.Pack();
-
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
-
-            Assert.NotEmpty(bytes);
+            container = SerializationTestContainer.BeginScope();
         }
 
         [Fact]

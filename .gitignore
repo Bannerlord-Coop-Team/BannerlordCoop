@@ -540,6 +540,7 @@ MigrationBackup/
 
 # End of https://www.gitignore.io/api/csharp,powershell,dotnetcore,visualstudio,visualstudiocode
 DockerAssembliesTemp/**
+# Legacy game junction, replaced by BANNERLORD_DIR. Still ignored so a leftover link never gets staged.
 mb2
 mb2/**
 source/.editorconfig

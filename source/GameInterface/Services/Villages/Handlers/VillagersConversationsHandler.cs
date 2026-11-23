@@ -5,6 +5,7 @@ using Common.Network;
 using GameInterface.Services.ItemRosters.Interfaces;
 using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using GameInterface.Services.Villages.Messages;
 using Serilog;
 using TaleWorlds.CampaignSystem;
@@ -26,19 +27,22 @@ internal class VillagersConversationsHandler : IHandler
     private readonly INetwork network;
     private readonly ISessionInteractionsPlayerDataInterface sessionInteractionsPlayerDataInterface;
     private readonly IItemRosterInterface itemRosterInterface;
+    private readonly IPlayerManager playerManager;
 
     public VillagersConversationsHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
         ISessionInteractionsPlayerDataInterface sessionInteractionsPlayerDataInterface,
-        IItemRosterInterface itemRosterInterface)
+        IItemRosterInterface itemRosterInterface,
+        IPlayerManager playerManager)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.sessionInteractionsPlayerDataInterface = sessionInteractionsPlayerDataInterface;
         this.itemRosterInterface = itemRosterInterface;
+        this.playerManager = playerManager;
 
         messageBroker.Subscribe<SetPlayerVillagersInteraction>(Handle_SetPlayerVillagersInteraction);
         messageBroker.Subscribe<NetworkSetPlayerVillagersInteraction>(Handle_NetworkSetPlayerVillagersInteraction);
@@ -91,6 +95,8 @@ internal class VillagersConversationsHandler : IHandler
 
     private void Handle_NetworkSetPlayerVillagersInteraction(MessagePayload<NetworkSetPlayerVillagersInteraction> obj)
     {
+        if (!playerManager.IsSenderControllingHero(obj.Who, obj.What.MainHeroId)) return;
+
         // Guard against saving ids that can't be resolved on the server
         if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.MainHeroId, out var _)) return;
         if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.ConversationPartyId, out var _)) return;
@@ -112,6 +118,7 @@ internal class VillagersConversationsHandler : IHandler
     {
         GameThread.RunSafe(() =>
         {
+            if (!playerManager.IsSenderControllingHero(obj.Who, obj.What.MainHeroId)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.MainHeroId, out var mainHero)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MainPartyId, out var mainParty)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.ConversationPartyId, out var conversationParty)) return;
@@ -150,6 +157,7 @@ internal class VillagersConversationsHandler : IHandler
     {
         GameThread.RunSafe(() =>
         {
+            if (!playerManager.IsSenderControllingHero(obj.Who, obj.What.MainHeroId)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.MainHeroId, out var mainHero)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MainPartyId, out var mainParty)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.ConversationPartyId, out var conversationParty)) return;
@@ -173,6 +181,7 @@ internal class VillagersConversationsHandler : IHandler
     {
         GameThread.RunSafe(() =>
         {
+            if (!playerManager.IsSenderControllingHero(obj.Who, obj.What.MainHeroId)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.MainHeroId, out var mainHero)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MainPartyId, out var mainParty)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.ConversationPartyId, out var conversationParty)) return;
@@ -210,6 +219,7 @@ internal class VillagersConversationsHandler : IHandler
     {
         GameThread.RunSafe(() =>
         {
+            if (!playerManager.IsSenderControllingHero(obj.Who, obj.What.MainHeroId)) return;
             if (!TryGetVillagerBehavior(out var villagerBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.MainHeroId, out var mainHero)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MainPartyId, out var mainParty)) return;
@@ -254,6 +264,7 @@ internal class VillagersConversationsHandler : IHandler
     {
         GameThread.RunSafe(() =>
         {
+            if (!playerManager.IsSenderControllingHero(obj.Who, obj.What.MainHeroId)) return;
             if (!TryGetVillagerBehavior(out var villagerBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.MainHeroId, out var mainHero)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MainPartyId, out var mainParty)) return;

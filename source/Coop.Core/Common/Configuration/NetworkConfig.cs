@@ -45,6 +45,10 @@ public class NetworkConfig : INetworkConfig
     // three within a campaign frame or two for negligible poll-thread cost.
     public TimeSpan NetworkPollInterval => TimeSpan.FromMilliseconds(25);
 
+    public IPAddress BindAddressIPv4 => IPAddress.Any;
+
+    public IPAddress BindAddressIPv6 => IPAddress.IPv6Any;
+
     #region MeshNetwork
     private string LanAddressText { get; set; } = "127.0.0.1";
     /// <summary>
@@ -83,6 +87,12 @@ public class NetworkConfig : INetworkConfig
 #else
         public TimeSpan DisconnectTimeout { get; } = TimeSpan.FromSeconds(60);
 #endif
+
+    /// <summary>
+    ///     A battle host's AI runs nowhere else while it is unheard, so the server drops a silent one sooner. LiteNetLib pings
+    ///     every <see cref="PingInterval"/> off the game thread, so loading screens and frame hitches don't count as silence.
+    /// </summary>
+    public TimeSpan BattleHostDisconnectTimeout { get; } = TimeSpan.FromSeconds(15);
 
 #if DEBUG
     public NatAddressType NATType { get; } = NatAddressType.Internal;

@@ -1,6 +1,11 @@
 ﻿using Common.Commands;
 using Common;
 using GameInterface.Services.PartyVisuals.Patches;
+using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
+using SandBox.View.Map.Visuals;
+using GameInterface.Utils.Commands;
 using SandBox.View.Map.Managers;
 using System;
 using System.Collections.Generic;
@@ -79,6 +84,74 @@ internal class PartyVisualDebugCommands
     }
 
 #if DEBUG
+    /// <summary>Reports per-player visual lifetime and headless registry state without changing them.</summary>
+    public sealed class PlayerStateCoopCommand : ICoopCommand
+    {
+        private readonly IObjectManager objectManager;
+        private readonly IPlayerManager playerManager;
+
+        public PlayerStateCoopCommand(IObjectManager objectManager, IPlayerManager playerManager)
+        {
+            this.objectManager = objectManager;
+            this.playerManager = playerManager;
+        }
+
+        public string Prefix => "coop.debug.party_visuals";
+        public string Name => "player_state";
+        public string Description => "Reports player party visuals and registered visual objects without changing them.";
+        public CoopCommandSide Side => CoopCommandSide.Both;
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            var manager = MobilePartyVisualManager.Current;
+            int registeredVisualCount = objectManager.GetHandleMap().Values.Count(handle =>
+                objectManager.TryGetObject<object>(handle, out var value) && value is MobilePartyVisual);
+            var players = playerManager.Players.Select(player => DescribePlayer(player, manager)).ToArray();
+            return Succeeded("LIVE_TEST_JSON=" + JsonSerializer.Serialize(new
+            {
+                isServer = ModInformation.IsServer,
+                managerPresent = manager != null,
+                registeredVisualCount,
+                players,
+            }));
+        }
+
+        private object DescribePlayer(Player player, MobilePartyVisualManager manager)
+        {
+            bool found = objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party);
+            uint partyHandle = 0;
+            if (found)
+                objectManager.TryGetHandle(party, out partyHandle);
+
+            object Row(int visualCount = 0, int fadingVisualCount = 0, int dictionaryVisualCount = 0) => new
+            {
+                controllerId = player.ControllerId,
+                platformName = player.PlatformName,
+                partyId = player.MobilePartyId,
+                partyHandle,
+                found,
+                stringId = party?.StringId,
+                name = party?.Name?.ToString(),
+                active = party?.IsActive,
+                x = party?.Position.X,
+                y = party?.Position.Y,
+                isOnLand = party?.Position.IsOnLand,
+                visualCount,
+                fadingVisualCount,
+                dictionaryVisualCount,
+            };
+
+            if (!found || manager == null)
+                return Row();
+
+            return Row(
+                manager._visualsFlattened.Count(visual => visual.MapEntity == party.Party),
+                manager._fadingPartiesFlatten.Count(visual => visual.MapEntity == party.Party),
+                manager._partiesAndVisuals.ContainsKey(party.Party) ? 1 : 0);
+        }
+    }
+
     public sealed class FixtureStateCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.party_visuals";
@@ -99,6 +172,13 @@ internal class PartyVisualDebugCommands
 
     public sealed class StageOverLimitFixtureCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public StageOverLimitFixtureCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.party_visuals";
 
         public string Name => "stage_over_limit_fixture";
@@ -110,7 +190,7 @@ internal class PartyVisualDebugCommands
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("target_eligible_party_count", "The target eligible party count.", true),
-            new ExpectedArgs("settlement_id", "The settlement id.", true),
+            new ExpectedArgs("settlement_id", "Settlement name or id; quote names with spaces.", true),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -127,9 +207,8 @@ internal class PartyVisualDebugCommands
             if (stagedParties.Count != 0 || GetLiveFixturePartyCount() != 0)
                 return Failed("The party-visual fixture is already staged.");
 
-            Settlement settlement = Settlement.All.FirstOrDefault(candidate => candidate.StringId == args[1]);
-            if (settlement == null)
-                return Failed($"Settlement '{args[1]}' was not found.");
+            if (!resolver.TryResolveSettlement(args[1], out var settlement, out var error))
+                return Failed(error);
 
             Clan looterClan = Clan.BanditFactions.FirstOrDefault(candidate => candidate.StringId == "looters");
             if (looterClan == null)

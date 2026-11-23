@@ -8,6 +8,7 @@ using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.MapEventParties;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party.Messages;
+using GameInterface.Services.Players;
 using GameInterface.Services.TroopRosters.Interfaces;
 using Helpers;
 using LiteNetLib;
@@ -31,6 +32,7 @@ internal class PartyScreenHelperHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly ITroopRosterInterface troopRosterInterface;
+    private readonly IPlayerManager playerManager;
     private readonly ISendCoalescer sendCoalescer;
 
     public PartyScreenHelperHandler(
@@ -38,12 +40,14 @@ internal class PartyScreenHelperHandler : IHandler
         IObjectManager objectManager,
         INetwork network,
         ITroopRosterInterface troopRosterInterface,
+        IPlayerManager playerManager,
         ISendCoalescer sendCoalescer = null)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.troopRosterInterface = troopRosterInterface;
+        this.playerManager = playerManager;
         this.sendCoalescer = sendCoalescer;
         messageBroker.Subscribe<NewClanPartyScreenClosed>(Handle_NewClanPartyScreenClosed);
         messageBroker.Subscribe<CreateClanPartyAfterScreenClose>(Handle_CreateClanPartyAfterScreenClose);
@@ -88,6 +92,7 @@ internal class PartyScreenHelperHandler : IHandler
     {
         GameThread.RunSafe(() =>
         {
+            if (!playerManager.IsSenderControllingHero(obj.Who, obj.What.MainHeroId)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.MainHeroId, out var mainHero)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.NewLeaderHeroId, out var newLeaderHero)) return;
 

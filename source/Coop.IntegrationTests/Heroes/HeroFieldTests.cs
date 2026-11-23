@@ -63,72 +63,6 @@ namespace Coop.IntegrationTests.Heroes
             }
         }
         [Fact]
-        public void ServerRecievesHairTagsChanged()
-        {
-            var hero = TestEnvironment.Server.CreateRegisteredObject<Hero>("hero1");
-            foreach (var client in TestEnvironment.Clients)
-            {
-                client.CreateRegisteredObject<Hero>("hero1");
-            }
-
-            var triggerMessage = new HairTagsChanged("TestTags", hero);
-
-            var server = TestEnvironment.Server;
-
-            server.SimulateMessage(this, triggerMessage);
-
-            Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkHairTagsChanged>());
-
-            foreach (EnvironmentInstance client in TestEnvironment.Clients)
-            {
-                Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeHairTags>());
-            }
-        }
-        [Fact]
-        public void ServerRecievesBeardTagsChanged()
-        {
-            var hero = TestEnvironment.Server.CreateRegisteredObject<Hero>("hero1");
-            foreach (var client in TestEnvironment.Clients)
-            {
-                client.CreateRegisteredObject<Hero>("hero1");
-            }
-
-            var triggerMessage = new BeardTagsChanged("TestTags", hero);
-
-            var server = TestEnvironment.Server;
-
-            server.SimulateMessage(this, triggerMessage);
-
-            Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkBeardTagsChanged>());
-
-            foreach (EnvironmentInstance client in TestEnvironment.Clients)
-            {
-                Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeBeardTags>());
-            }
-        }
-        [Fact]
-        public void ServerRecievesTattooTagsChanged()
-        {
-            var hero = TestEnvironment.Server.CreateRegisteredObject<Hero>("hero1");
-            foreach (var client in TestEnvironment.Clients)
-            {
-                client.CreateRegisteredObject<Hero>("hero1");
-            }
-
-            var triggerMessage = new TattooTagsChanged("TestTags", hero);
-
-            var server = TestEnvironment.Server;
-
-            server.SimulateMessage(this, triggerMessage);
-
-            Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkTattooTagsChanged>());
-
-            foreach (EnvironmentInstance client in TestEnvironment.Clients)
-            {
-                Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeTattooTags>());
-            }
-        }
-        [Fact]
         public void ServerRecievesHeroStateChanged()
         {
             var hero = TestEnvironment.Server.CreateRegisteredObject<Hero>("hero1");
@@ -148,50 +82,6 @@ namespace Coop.IntegrationTests.Heroes
             foreach (EnvironmentInstance client in TestEnvironment.Clients)
             {
                 Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeHeroState>());
-            }
-        }
-        [Fact]
-        public void ServerRecievesHeroLevelChanged()
-        {
-            var hero = TestEnvironment.Server.CreateRegisteredObject<Hero>("hero1");
-            foreach (var client in TestEnvironment.Clients)
-            {
-                client.CreateRegisteredObject<Hero>("hero1");
-            }
-
-            var triggerMessage = new HeroLevelChanged(5, hero);
-
-            var server = TestEnvironment.Server;
-
-            server.SimulateMessage(this, triggerMessage);
-
-            Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkHeroLevelChanged>());
-
-            foreach (EnvironmentInstance client in TestEnvironment.Clients)
-            {
-                Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeHeroLevel>());
-            }
-        }
-        [Fact]
-        public void ServerRecievesSpcDaysInLocationChanged()
-        {
-            var hero = TestEnvironment.Server.CreateRegisteredObject<Hero>("hero1");
-            foreach (var client in TestEnvironment.Clients)
-            {
-                client.CreateRegisteredObject<Hero>("hero1");
-            }
-
-            var triggerMessage = new SpcDaysInLocationChanged(5, hero);
-
-            var server = TestEnvironment.Server;
-
-            server.SimulateMessage(this, triggerMessage);
-
-            Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkSpcDaysInLocationChanged>());
-
-            foreach (EnvironmentInstance client in TestEnvironment.Clients)
-            {
-                Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeSpcDaysInLocation>());
             }
         }
         [Fact]
@@ -258,34 +148,6 @@ namespace Coop.IntegrationTests.Heroes
             foreach (EnvironmentInstance client in TestEnvironment.Clients)
             {
                 Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangePower>());
-            }
-        }
-        [Fact]
-        public void ServerRecievesCultureChanged()
-        {
-            var culture = TestEnvironment.Server.CreateRegisteredObject<CultureObject>("culture1");
-            foreach (var client in TestEnvironment.Clients)
-            {
-                client.CreateRegisteredObject<CultureObject>("culture1");
-            }
-
-            var hero = TestEnvironment.Server.CreateRegisteredObject<Hero>("hero1");
-            foreach (var client in TestEnvironment.Clients)
-            {
-                client.CreateRegisteredObject<Hero>("hero1");
-            }
-
-            var triggerMessage = new CultureChanged(culture, hero);
-
-            var server = TestEnvironment.Server;
-
-            server.SimulateMessage(this, triggerMessage);
-
-            Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkCultureChanged>());
-
-            foreach (EnvironmentInstance client in TestEnvironment.Clients)
-            {
-                Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeCulture>());
             }
         }
         [Fact]

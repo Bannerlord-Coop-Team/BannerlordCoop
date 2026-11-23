@@ -112,6 +112,7 @@ namespace GameInterface.Services.PartyVisuals.Patches
     /// Grows the optional Naval DLC manager's independent dirty-visual buffer.
     /// </summary>
     [HarmonyPatch]
+    [HarmonyPatchCategory(GameInterface.HARMONY_NAVAL_CATEGORY)]
     public class NavalMobilePartyVisualManagerPatches
     {
         private const string ManagerTypeName = "NavalDLC.View.Map.Managers.NavalMobilePartyVisualManager";

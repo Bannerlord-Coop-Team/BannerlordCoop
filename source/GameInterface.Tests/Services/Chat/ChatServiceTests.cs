@@ -49,6 +49,31 @@ public class ChatServiceTests
         playerManager.VerifyGet(manager => manager.Players, Times.Never);
     }
 
+    [Theory]
+    [InlineData(ChatChannel.Clan)]
+    [InlineData(ChatChannel.Kingdom)]
+    public void Receive_GroupMessage_RefreshesFactionMembership(ChatChannel channel)
+    {
+        var localPlayer = Player("local");
+        var playerManager = new Mock<IPlayerManager>();
+        playerManager.Setup(manager => manager.TryGetPlayer("local", out localPlayer)).Returns(true);
+        var factionMembership = new Mock<IChatFactionMembership>();
+        using var service = CreateService(
+            playerManager: playerManager,
+            factionMembership: factionMembership);
+
+        service.Receive(new NetworkChatMessage(
+            channel,
+            "other-controller",
+            "Other Hero",
+            string.Empty,
+            string.Empty,
+            "group message"));
+
+        factionMembership.Verify(membership => membership.GetClan(localPlayer), Times.Once);
+        factionMembership.Verify(membership => membership.GetKingdom(localPlayer), Times.Once);
+    }
+
     [Fact]
     public void VisibilityOption_LoadsAndAppliesWithoutRecreatingService()
     {
@@ -69,38 +94,38 @@ public class ChatServiceTests
         Assert.True(service.IsPlayerChatEnabled);
     }
 
+    /// <summary>Verifies dispose stops the event log and survives the overlay's vanilla restore with no vanilla chat log view present.</summary>
+    /// <remarks>Only the null <c>GauntletChatLogView.Current</c> path is reachable here; the non-null restore needs the game runtime.</remarks>
     [Fact]
-    public void Dispose_StopsEventLogAndHidesVanillaGateReplacement()
+    public void Dispose_StopsEventLog()
     {
-        var gate = new Mock<IChatVanillaLogGate>();
         var eventLog = new Mock<IChatEventLog>();
-        var service = CreateService(vanillaLogGate: gate, eventLog: eventLog);
+        var service = CreateService(eventLog: eventLog);
 
         service.Dispose();
 
         eventLog.Verify(value => value.Dispose(), Times.Once);
-        gate.Verify(value => value.SetReplacementVisible(false), Times.Once);
     }
 
     private static ChatService CreateService(
         Mock<INetwork>? network = null,
         Mock<IPlayerManager>? playerManager = null,
         Mock<IChatPlayerNameResolver>? playerNameResolver = null,
+        Mock<IChatFactionMembership>? factionMembership = null,
         Mock<ICoopOptionsStore>? optionsStore = null,
         IMessageBroker? messageBroker = null,
-        Mock<IChatVanillaLogGate>? vanillaLogGate = null,
         Mock<IChatEventLog>? eventLog = null)
     {
         network ??= new Mock<INetwork>();
         playerManager ??= new Mock<IPlayerManager>();
         playerNameResolver ??= new Mock<IChatPlayerNameResolver>();
+        factionMembership ??= new Mock<IChatFactionMembership>();
         if (optionsStore == null)
         {
             optionsStore = new Mock<ICoopOptionsStore>();
             optionsStore.Setup(store => store.LoadOrDefault()).Returns(new CoopOptionsData());
         }
         messageBroker ??= new MessageBroker();
-        vanillaLogGate ??= new Mock<IChatVanillaLogGate>();
         eventLog ??= new Mock<IChatEventLog>();
         var controllerIdProvider = new Mock<IControllerIdProvider>();
         controllerIdProvider.SetupGet(provider => provider.ControllerId).Returns("local");
@@ -110,9 +135,9 @@ public class ChatServiceTests
             playerManager.Object,
             playerNameResolver.Object,
             controllerIdProvider.Object,
+            factionMembership.Object,
             optionsStore.Object,
             messageBroker,
-            vanillaLogGate.Object,
             eventLog.Object,
             new PlayerKillFeedColorService());
     }

@@ -3,10 +3,13 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client.Services.MobileParties.Messages;
+using GameInterface.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.Settlements;
+using GameInterface.Services.Ferries.Interfaces;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Kingdoms;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
@@ -32,6 +35,7 @@ public class ServerSettlementExitEnterHandler : IHandler
     private readonly ISettlementInterface settlementInterface;
     private readonly IKingdomCreationSettlementTracker settlementTracker;
     private readonly ISettlementEncounterDistanceValidator distanceValidator;
+    private readonly IPlayerFerryInterface playerFerryInterface;
     private readonly ILogger Logger = LogManager.GetLogger<ServerSettlementExitEnterHandler>();
 
     public ServerSettlementExitEnterHandler(
@@ -41,7 +45,8 @@ public class ServerSettlementExitEnterHandler : IHandler
         IPlayerManager playerManager,
         ISettlementInterface settlementInterface,
         IKingdomCreationSettlementTracker settlementTracker,
-        ISettlementEncounterDistanceValidator distanceValidator)
+        ISettlementEncounterDistanceValidator distanceValidator,
+        IPlayerFerryInterface playerFerryInterface = null)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -50,6 +55,8 @@ public class ServerSettlementExitEnterHandler : IHandler
         this.settlementInterface = settlementInterface;
         this.settlementTracker = settlementTracker;
         this.distanceValidator = distanceValidator;
+        // Only registered while War Sails is on, which is the only time a client asks for a ferry
+        this.playerFerryInterface = playerFerryInterface;
         messageBroker.Subscribe<NetworkRequestStartSettlementEncounter>(Handle);
         messageBroker.Subscribe<NetworkRequestEndSettlementEncounter>(Handle);
 
@@ -136,6 +143,7 @@ public class ServerSettlementExitEnterHandler : IHandler
                     payload.PartyId,
                     payload.SettlementId,
                     rejectionReason);
+                settlementInterface.CorrectPartyPosition(mobileParty);
                 RejectSettlementEncounter(peer, payload, rejectionReason);
                 return;
             }
@@ -214,8 +222,36 @@ public class ServerSettlementExitEnterHandler : IHandler
             }
 
             var leftSettlement = mobileParty.CurrentSettlement;
-            LeaveHideoutMapEvent(mobileParty);
-            settlementInterface.PartyLeaveSettlement(mobileParty);
+
+            // A ferry the party can't take keeps it in the village menu, like vanilla's disabled option
+            bool takesFerry = payload.LeaveType == SettlementLeaveType.Ferry;
+            if (takesFerry && (playerFerryInterface == null || !playerFerryInterface.CanTakeFerry(mobileParty, leftSettlement)))
+            {
+                RejectSettlementEncounterLeave(peer, payload.PartyId, "the ferry can't take your party");
+                return;
+            }
+
+            LeaveSettlementMapEvent(mobileParty);
+
+            // Vanilla disembarks before leaving, otherwise leaving at sea resets the anchor
+            if (payload.LeaveType == SettlementLeaveType.Disembark && leftSettlement != null)
+            {
+                settlementInterface.PartyDisembark(mobileParty, leftSettlement);
+            }
+
+            if (payload.LeaveType == SettlementLeaveType.SetSail)
+            {
+                settlementInterface.PartyLeaveAndSetSail(mobileParty);
+            }
+            else
+            {
+                settlementInterface.PartyLeaveSettlement(mobileParty);
+            }
+
+            if (takesFerry)
+            {
+                playerFerryInterface.StartFerry(mobileParty, leftSettlement);
+            }
 
             network.Send(
                 peer,
@@ -231,10 +267,17 @@ public class ServerSettlementExitEnterHandler : IHandler
         }, context: nameof(NetworkRequestEndSettlementEncounter));
     }
 
-    private void LeaveHideoutMapEvent(MobileParty mobileParty)
+    private void LeaveSettlementMapEvent(MobileParty mobileParty)
     {
         var party = mobileParty?.Party;
         var mapEvent = party?.MapEvent;
+        // Detach a leaving village defender before the settlement reply closes its menus.
+        if (mapEvent.IsRaidHostileAction() && !mapEvent.IsFinalized && party.MapEventSide == mapEvent.DefenderSide)
+        {
+            messageBroker.Publish(this, new PlayerLeaveBattleAttempted(party, finishLocalMenus: false));
+            return;
+        }
+
         if (mapEvent?.EventType != MapEvent.BattleTypes.Hideout) return;
 
         foreach (var player in playerManager.Players)

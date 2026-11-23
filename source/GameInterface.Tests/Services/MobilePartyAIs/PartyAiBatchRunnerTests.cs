@@ -2,6 +2,7 @@
 using Common.Util;
 using GameInterface.Services.MobilePartyAIs;
 using GameInterface.Services.MobilePartyAIs.Patches;
+using GameInterface.Tests.Bootstrap;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -20,6 +21,8 @@ public sealed class PartyAiBatchRunnerTests : IDisposable
 
     public PartyAiBatchRunnerTests()
     {
+        // MobilePartyAi rolls MBRandom, which throws while a parallel bootstrap has set Game.Current but not its generator.
+        GameBootStrap.Initialize();
         captureLog = logs.Enqueue;
         OutputSinkManager.AddLogCallback(captureLog);
     }

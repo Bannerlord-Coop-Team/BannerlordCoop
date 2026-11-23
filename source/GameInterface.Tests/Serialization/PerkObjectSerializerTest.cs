@@ -10,29 +10,10 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class PerkObjectSerializationTest
     {
-        IContainer container;
+        ILifetimeScope container;
         public PerkObjectSerializationTest()
         {
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
-        }
-
-        [Fact]
-        public void PerkObject_Serialize()
-        {
-            PerkObject testPerkObject = new PerkObject("test");
-
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            PerkObjectBinaryPackage package = new PerkObjectBinaryPackage(testPerkObject, factory);
-
-            package.Pack();
-
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
-
-            Assert.NotEmpty(bytes);
+            container = SerializationTestContainer.BeginScope();
         }
 
         [Fact]

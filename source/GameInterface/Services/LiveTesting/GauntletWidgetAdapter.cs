@@ -152,6 +152,7 @@ public sealed class GauntletWidgetAdapter : IUiWidgetAdapter
             Native = widget, Layer = layer, Parent = parent, ChildIndex = childIndex,
             Id = Limit(widget.Id), Type = Limit(widget.GetType().Name), Redacted = redacted,
             Text = Limit(label), Value = Limit(value),
+            IsExactButton = widget.GetType() == typeof(ButtonWidget), FullText = label, FullValue = value,
             ContentTruncated = label?.Length > 128 || value?.Length > 128,
             X = widget.GlobalPosition.X, Y = widget.GlobalPosition.Y, Width = widget.Size.X, Height = widget.Size.Y,
             Visible = visible && InsideClips(widget, point), Enabled = enabled,
@@ -203,7 +204,8 @@ public sealed class GauntletWidgetAdapter : IUiWidgetAdapter
             throw new UiAutomationException("unsupported_action", "This concrete native control does not support that action in this scope.");
         var current = Read(scoped ? layer : null);
         if (current.Truncated || !current.ScopeComplete || !current.Widgets.Any(w =>
-            ReferenceEquals(w.Native, widget) && w.Visible && w.Enabled && w.HitTestable && !w.Redacted && !w.ContentTruncated))
+            ReferenceEquals(w.Native, widget) && w.Visible && w.Enabled && w.HitTestable && !w.Redacted &&
+            (!w.ContentTruncated || (widget.GetType() == typeof(ButtonWidget) && (action == "click" || action == "toggle")))))
             throw new UiAutomationException("not_interactable", "Native hit test no longer reaches this control.");
         if (action == "click" || action == "toggle")
         {

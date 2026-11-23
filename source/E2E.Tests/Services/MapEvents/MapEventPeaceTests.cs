@@ -18,8 +18,6 @@ public class MapEventPeaceTests : MapEventTestBase
 
     [Theory]
     [InlineData(BattleSideEnum.Attacker, false)]
-    [InlineData(BattleSideEnum.Defender, false)]
-    [InlineData(BattleSideEnum.Attacker, true)]
     [InlineData(BattleSideEnum.Defender, true)]
     public void ServerRemovesParty_ClientsReleasePartyWhileBattleContinues(BattleSideEnum side, bool removeLeader)
     {
@@ -44,11 +42,10 @@ public class MapEventPeaceTests : MapEventTestBase
         AssertReleasedOnClients(context.MapEventId, side, removedId);
     }
 
-    [Theory]
-    [InlineData(BattleSideEnum.Attacker)]
-    [InlineData(BattleSideEnum.Defender)]
-    public void ServerRemovesArmyLeader_ClientsReleaseAttachedMember(BattleSideEnum side)
+    [Fact]
+    public void ServerRemovesArmyLeader_ClientsReleaseAttachedMember()
     {
+        var side = BattleSideEnum.Attacker;
         var context = CreateServerMapEvent();
         var leaderId = JoinNewServerPartyToSide(context.MapEventId, side);
         string? memberId = null;

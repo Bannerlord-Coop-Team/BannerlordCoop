@@ -28,6 +28,8 @@ public sealed class DeploymentSettings
 
 public sealed class LaunchProfile
 {
+    // The operator owns the dedicated server; runs on this profile launch and manage clients only.
+    public bool ExternalServer { get; set; }
     public string Executable { get; set; }
     public DeploymentSettings Deployment { get; set; }
     public string[] Modules { get; set; } = { "Native", "SandBoxCore", "SandBox", "StoryMode", "Coop" };
@@ -37,6 +39,12 @@ public sealed class LaunchProfile
     // Conservative estimate from ~6 GiB observed game peaks, with room for loading spikes.
     public long EstimatedCommitBytesPerProcess { get; set; } = 8L * 1024 * 1024 * 1024;
     public long CommitReserveBytes { get; set; } = 2L * 1024 * 1024 * 1024;
+
+    // Bannerlord install root, two levels above the bin\Win64_Shipping_Client executable.
+    public string GameRoot() => Path.GetFullPath(Path.Combine(Path.GetDirectoryName(Executable), "..", ".."));
+
+    // Number of game processes a run with this many clients launches.
+    public int NewProcesses(int clientCount) => clientCount + (ExternalServer ? 0 : 1);
 
     public void ValidateBudgets()
     {
@@ -59,9 +67,15 @@ public sealed class LaunchProfile
             ids.Distinct(StringComparer.OrdinalIgnoreCase).Count() != ids.Length)
             throw new ArgumentException("All selected platform IDs must be distinct, 1..64 ASCII letters/digits, '-' or '_'.");
         if (Modules == null || Modules.Length == 0 || Modules.Length > 32 ||
-            Modules.Any(m => string.IsNullOrWhiteSpace(m) || m.Length > 128 ||
-                m.Any(c => !char.IsAsciiLetterOrDigit(c) && c != '_' && c != '-')) ||
+            Modules.Any(m => !IsModuleId(m)) ||
             !Modules.Contains("Coop", StringComparer.Ordinal))
             throw new ArgumentException("modules must include Coop and contain only module identifiers.");
     }
+
+    // Module ids such as Bannerlord.Harmony contain dots. A dot may only separate two other characters:
+    // no segment is empty, so no id can be "..", hidden or end in a dot.
+    internal static bool IsModuleId(string module) =>
+        !string.IsNullOrWhiteSpace(module) && module.Length <= 128 &&
+        module.All(c => char.IsAsciiLetterOrDigit(c) || c == '_' || c == '-' || c == '.') &&
+        module.Split('.').All(segment => segment.Length > 0);
 }

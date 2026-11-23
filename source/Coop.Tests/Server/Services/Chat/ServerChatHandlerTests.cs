@@ -15,7 +15,9 @@ using LiteNetLib;
 using Moq;
 using Serilog;
 using System;
+using System.Collections.Generic;
 using System.Linq;
+using TaleWorlds.CampaignSystem;
 using Xunit;
 
 namespace Coop.Tests.Server.Services.Chat;
@@ -27,6 +29,7 @@ public class ServerChatHandlerTests : IDisposable
     private readonly IPlayerManager playerManager;
     private readonly Mock<IObjectManager> objectManager = new();
     private readonly Mock<IChatPlayerNameResolver> playerNameResolver = new();
+    private readonly Mock<IChatFactionMembership> factionMembership = new();
     private readonly ServerChatHandler handler;
 
     public ServerChatHandlerTests()
@@ -42,7 +45,8 @@ public class ServerChatHandlerTests : IDisposable
             messageBroker,
             network,
             playerManager,
-            playerNameResolver.Object);
+            playerNameResolver.Object,
+            factionMembership.Object);
     }
 
     [Fact]
@@ -159,7 +163,8 @@ public class ServerChatHandlerTests : IDisposable
             broker,
             participantNetwork,
             players.Object,
-            playerNameResolver.Object);
+            playerNameResolver.Object,
+            factionMembership.Object);
 
         participantHandler.SendParticipants(requesterPeer);
 
@@ -190,7 +195,8 @@ public class ServerChatHandlerTests : IDisposable
             broker,
             broadcastNetwork,
             players.Object,
-            playerNameResolver.Object);
+            playerNameResolver.Object,
+            factionMembership.Object);
 
         broker.Publish(joiningPeer, new PlayerCampaignSynchronized(joiningPeer));
         DrainGameThread();
@@ -201,6 +207,111 @@ public class ServerChatHandlerTests : IDisposable
                 broadcastNetwork.GetPeerMessagesFromType<NetworkChatParticipants>(peer));
             Assert.Equal(new[] { "joining", "other" }, snapshot.ControllerIds);
         }
+    }
+
+    [Fact]
+    public void ClanMessage_ReachesOnlySameClanPeers()
+    {
+        var senderPeer = CreatePeer("127.0.0.1");
+        var clanmatePeer = CreatePeer("127.0.0.2");
+        var outsiderPeer = CreatePeer("127.0.0.3");
+        // Stale join-time ClanIds differ after JoinClan. Live Hero.Clan is the same object.
+        var sender = Player("sender", clanId: "stale-sender-clan");
+        var clanmate = Player("clanmate", clanId: "stale-clanmate-clan");
+        var outsider = Player("outsider", clanId: "outsider-clan");
+        ConfigurePlayers((senderPeer, sender), (clanmatePeer, clanmate), (outsiderPeer, outsider));
+
+        var sharedClan = new Clan();
+        var outsiderClan = new Clan();
+        var liveClans = new Dictionary<string, Clan>(StringComparer.Ordinal)
+        {
+            [sender.ControllerId] = sharedClan,
+            [clanmate.ControllerId] = sharedClan,
+            [outsider.ControllerId] = outsiderClan,
+        };
+        SetupLiveClans(liveClans);
+
+        handler.RouteMessage(senderPeer,
+            new NetworkSendChatMessage(ChatChannel.Clan, string.Empty, "for the clan"));
+
+        foreach (var peer in new[] { senderPeer, clanmatePeer })
+        {
+            var message = Assert.Single(network.GetPeerMessagesFromType<NetworkChatMessage>(peer));
+            Assert.Equal(ChatChannel.Clan, message.Channel);
+            Assert.Equal("for the clan", message.Text);
+        }
+
+        Assert.False(network.SentNetworkMessages.ContainsKey(outsiderPeer.Id));
+    }
+
+    [Fact]
+    public void ClanMessage_WithoutClan_ReturnsSystemMessageOnlyToSender()
+    {
+        var senderPeer = CreatePeer("127.0.0.1");
+        var otherPeer = CreatePeer("127.0.0.2");
+        ConfigurePlayers((senderPeer, Player("sender")), (otherPeer, Player("other")));
+        factionMembership
+            .Setup(membership => membership.GetClan(It.IsAny<Player>()))
+            .Returns((IFaction)null);
+
+        handler.RouteMessage(senderPeer,
+            new NetworkSendChatMessage(ChatChannel.Clan, string.Empty, "hello?"));
+
+        var rejection = Assert.Single(network.GetPeerMessagesFromType<NetworkChatMessage>(senderPeer));
+        Assert.Equal(ChatChannel.System, rejection.Channel);
+        Assert.Equal("You are not in a clan.", rejection.Text);
+        Assert.False(network.SentNetworkMessages.ContainsKey(otherPeer.Id));
+    }
+
+    [Fact]
+    public void KingdomMessage_ReachesOnlySameKingdomPeers()
+    {
+        var senderPeer = CreatePeer("127.0.0.1");
+        var allyPeer = CreatePeer("127.0.0.2");
+        var outsiderPeer = CreatePeer("127.0.0.3");
+        var sender = Player("sender", clanId: "clan-a");
+        var ally = Player("ally", clanId: "clan-b");
+        var outsider = Player("outsider", clanId: "clan-c");
+        ConfigurePlayers((senderPeer, sender), (allyPeer, ally), (outsiderPeer, outsider));
+
+        var sharedKingdom = new Kingdom();
+        var liveKingdoms = new Dictionary<string, Kingdom>(StringComparer.Ordinal)
+        {
+            [sender.ControllerId] = sharedKingdom,
+            [ally.ControllerId] = sharedKingdom,
+        };
+        SetupLiveKingdoms(liveKingdoms);
+
+        handler.RouteMessage(senderPeer,
+            new NetworkSendChatMessage(ChatChannel.Kingdom, string.Empty, "for the realm"));
+
+        foreach (var peer in new[] { senderPeer, allyPeer })
+        {
+            var message = Assert.Single(network.GetPeerMessagesFromType<NetworkChatMessage>(peer));
+            Assert.Equal(ChatChannel.Kingdom, message.Channel);
+            Assert.Equal("for the realm", message.Text);
+        }
+
+        Assert.False(network.SentNetworkMessages.ContainsKey(outsiderPeer.Id));
+    }
+
+    [Fact]
+    public void KingdomMessage_WithoutKingdom_ReturnsSystemMessageOnlyToSender()
+    {
+        var senderPeer = CreatePeer("127.0.0.1");
+        var otherPeer = CreatePeer("127.0.0.2");
+        ConfigurePlayers((senderPeer, Player("sender")), (otherPeer, Player("other")));
+        factionMembership
+            .Setup(membership => membership.GetKingdom(It.IsAny<Player>()))
+            .Returns((IFaction)null);
+
+        handler.RouteMessage(senderPeer,
+            new NetworkSendChatMessage(ChatChannel.Kingdom, string.Empty, "hello?"));
+
+        var rejection = Assert.Single(network.GetPeerMessagesFromType<NetworkChatMessage>(senderPeer));
+        Assert.Equal(ChatChannel.System, rejection.Channel);
+        Assert.Equal("You are not in a kingdom.", rejection.Text);
+        Assert.False(network.SentNetworkMessages.ContainsKey(otherPeer.Id));
     }
 
     [Fact]
@@ -221,7 +332,8 @@ public class ServerChatHandlerTests : IDisposable
             broker,
             broadcastNetwork,
             players.Object,
-            playerNameResolver.Object);
+            playerNameResolver.Object,
+            factionMembership.Object);
 
         broker.Publish(departedPeer, new PlayerDisconnected(departedPeer, default));
         DrainGameThread();
@@ -247,9 +359,29 @@ public class ServerChatHandlerTests : IDisposable
         }
     }
 
-    private static Player Player(string controllerId)
+    private void SetupLiveClans(IReadOnlyDictionary<string, Clan> liveClansByControllerId)
     {
-        return new Player(controllerId, string.Empty, string.Empty, string.Empty, string.Empty);
+        factionMembership
+            .Setup(membership => membership.GetClan(It.IsAny<Player>()))
+            .Returns((Player player) =>
+                liveClansByControllerId.TryGetValue(player.ControllerId, out var clan)
+                    ? clan
+                    : null);
+    }
+
+    private void SetupLiveKingdoms(IReadOnlyDictionary<string, Kingdom> liveKingdomsByControllerId)
+    {
+        factionMembership
+            .Setup(membership => membership.GetKingdom(It.IsAny<Player>()))
+            .Returns((Player player) =>
+                liveKingdomsByControllerId.TryGetValue(player.ControllerId, out var kingdom)
+                    ? kingdom
+                    : null);
+    }
+
+    private static Player Player(string controllerId, string clanId = "")
+    {
+        return new Player(controllerId, string.Empty, string.Empty, clanId ?? string.Empty, string.Empty);
     }
 
     private NetPeer CreatePeer(string ipAddress)

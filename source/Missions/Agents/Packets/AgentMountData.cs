@@ -65,7 +65,7 @@ namespace Missions.Agents.Packets
             }
             MountAction1Flag = (ulong)mountAgent.GetCurrentAnimationFlag(1);
             MountAction1Progress = mountAgent.GetCurrentActionProgress(1);
-            MountAction1Index = mountAgent.GetCurrentAction(1).Index;
+            MountAction1IndexWire = mountAgent.GetCurrentAction(1).Index + 1;
             MountLookDirection = mountAgent.LookDirection;
             MountMovementDirection = mountAgent.GetMovementDirection();
             MountPosition = mountAgent.Position;
@@ -503,8 +503,10 @@ namespace Missions.Agents.Packets
         public ulong MountAction1Flag { get; }
         [ProtoMember(3)]
         public float MountAction1Progress { get; }
+        // Shift by one so protobuf omits the common act_none (-1) value.
         [ProtoMember(4)]
-        public int MountAction1Index { get; }
+        private int MountAction1IndexWire { get; set; }
+        public int MountAction1Index => MountAction1IndexWire - 1;
         [ProtoMember(5)]
         public Vec3 MountLookDirection { get; }
         [ProtoMember(6)]

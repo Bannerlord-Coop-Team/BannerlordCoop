@@ -1,5 +1,7 @@
-﻿using Common;
+﻿using Autofac;
+using Common;
 using Common.Util;
+using GameInterface.Services.SiegeEvents;
 using GameInterface.Services.SiegeEvents.Patches;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -8,9 +10,11 @@ using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
 using Xunit;
+using GameInterface.Tests.Utils;
 
 namespace GameInterface.Tests.Services.SiegeEvents;
 
+[Collection(ModInformationRoleCollection.Name)]
 public class SiegePreparationPromptPatchesTests
 {
     [Theory]
@@ -25,7 +29,7 @@ public class SiegePreparationPromptPatchesTests
         bool expected)
     {
         var mapEvent = ObjectHelper.SkipConstructor<MapEvent>();
-        mapEvent._mapEventType = battleType;
+        mapEvent.SetBattleType(battleType);
         mapEvent._battleState = battleState;
 
         Assert.Equal(
@@ -37,7 +41,12 @@ public class SiegePreparationPromptPatchesTests
     public void FinalizePrefix_WhenParticipantCaptureThrows_AllowsRetryAfterFinalizer()
     {
         var wasServer = ModInformation.IsServer;
+        bool hadPreviousContainer = ContainerProvider.TryGetContainer(out var previousContainer);
+        var builder = new ContainerBuilder();
+        builder.RegisterType<SiegeFinalizeTracker>().As<ISiegeFinalizeTracker>().InstancePerLifetimeScope();
+        using var container = builder.Build();
         ModInformation.IsServer = true;
+        ContainerProvider.SetContainer(container);
         try
         {
             var settlement = ObjectHelper.SkipConstructor<Settlement>();
@@ -67,6 +76,8 @@ public class SiegePreparationPromptPatchesTests
         finally
         {
             ModInformation.IsServer = wasServer;
+            if (hadPreviousContainer) ContainerProvider.SetContainer(previousContainer);
+            else ContainerProvider.Clear();
         }
     }
 }

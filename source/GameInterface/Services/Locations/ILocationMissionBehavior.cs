@@ -1,4 +1,4 @@
-namespace GameInterface.Services.Locations
+﻿namespace GameInterface.Services.Locations
 {
     /// <summary>
     /// Marker for the P2P mission behaviors (in the Missions assembly) that must be attached to a

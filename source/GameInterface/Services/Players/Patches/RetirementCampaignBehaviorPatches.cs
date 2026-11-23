@@ -19,10 +19,6 @@ internal class RetirementCampaignBehaviorPatches
     [HarmonyPrefix]
     public static bool OnSessionLaunchedPrefix() => ModInformation.IsClient;
 
-    [HarmonyPatch(nameof(RetirementCampaignBehavior.HourlyTick))]
-    [HarmonyPrefix]
-    public static bool HourlyTickPrefix() => ModInformation.IsClient;
-
     [HarmonyPatch(nameof(RetirementCampaignBehavior.GameMenuOpened))]
     [HarmonyPrefix]
     public static bool GameMenuOpenedPrefix(RetirementCampaignBehavior __instance, MenuCallbackArgs args)
@@ -44,8 +40,8 @@ internal class RetirementCampaignBehaviorPatches
             GameOverState.IsGameOver = true;
             MessageBroker.Instance.Publish(__instance, new PlayerRetirementRequested());
 
+            // The statistics are shown once the server sends them back with NetworkPlayerRetired
             GameMenu.ExitToLast();
-            __instance.ShowGameStatistics();
         }
 
         return false;

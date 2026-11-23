@@ -44,6 +44,7 @@ public class SessionCaravansPlayerDataInterface : ISessionCaravansPlayerDataInte
         {
             if (!IsPlayerHeroIdValid(playerHeroId)) return;
 
+            AddPlayerKeys(playerHeroId);
             CaravansPlayerData.PlayerProhibitedKingdomsForPlayerCaravans[playerHeroId].Add(kingdomId);
         });
     }
@@ -53,8 +54,9 @@ public class SessionCaravansPlayerDataInterface : ISessionCaravansPlayerDataInte
         GameThread.RunSafe(() =>
         {
             if (!IsPlayerHeroIdValid(playerHeroId)) return;
+            if (!CaravansPlayerData.PlayerProhibitedKingdomsForPlayerCaravans.TryGetValue(playerHeroId, out var prohibitedKingdomIds)) return;
 
-            CaravansPlayerData.PlayerProhibitedKingdomsForPlayerCaravans[playerHeroId].Remove(kingdomId);
+            prohibitedKingdomIds.Remove(kingdomId);
         });
     }
 
@@ -78,7 +80,11 @@ public class SessionCaravansPlayerDataInterface : ISessionCaravansPlayerDataInte
         {
             if (!IsPlayerHeroIdValid(playerHeroId)) return;
 
-            CaravansPlayerData.PlayerTradeRumorTakenCaravans[playerHeroId] = tradeRumorTakenCaravansIds;
+            if (tradeRumorTakenCaravansIds == null)
+            {
+                Logger.Warning("Received null trade rumor caravans for {PlayerHeroId}", playerHeroId);
+            }
+            CaravansPlayerData.PlayerTradeRumorTakenCaravans[playerHeroId] = tradeRumorTakenCaravansIds ?? new Dictionary<string, long>();
         });
     }
 
@@ -130,8 +136,10 @@ public class SessionCaravansPlayerDataInterface : ISessionCaravansPlayerDataInte
         });
         if (playerHeroId == null || kingdomId == null) return false;
 
+        if (!CaravansPlayerData.PlayerProhibitedKingdomsForPlayerCaravans.TryGetValue(playerHeroId, out var prohibitedKingdomIds)) return true;
+
         // Prevent trading if the caravan's player owner has prohibited trading with this kingdom
-        return !CaravansPlayerData.PlayerProhibitedKingdomsForPlayerCaravans[playerHeroId].Contains(kingdomId);
+        return !prohibitedKingdomIds.Contains(kingdomId);
     }
 
     public void AddPlayerKeys(string playerHeroId)

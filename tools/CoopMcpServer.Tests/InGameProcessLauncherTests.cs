@@ -32,6 +32,19 @@ public sealed class InGameProcessLauncherTests
         Assert.DoesNotContain("/coopowner", info.ArgumentList);
     }
 
+    [Theory]
+    [InlineData("Bannerlord.Harmony", true)]
+    [InlineData("Sandbox_Core-2", true)]
+    [InlineData("..", false)]
+    [InlineData(".Hidden", false)]
+    [InlineData("Trailing.", false)]
+    [InlineData("A..B", false)]
+    [InlineData("A/B", false)]
+    public void ModuleIdsMayBeDottedButNeverNameAFolderOutsideModules(string module, bool accepted)
+    {
+        Assert.Equal(accepted, LaunchProfile.IsModuleId(module));
+    }
+
     [Fact]
     public void DuplicatePlatformIdsAreRejectedBeforeLaunch()
     {

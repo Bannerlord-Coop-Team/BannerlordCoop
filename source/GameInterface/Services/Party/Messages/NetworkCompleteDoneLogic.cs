@@ -55,7 +55,7 @@ internal readonly struct NetworkCompleteDoneLogic : ICommand
     public readonly int PartyInfluenceChangeAmount;
 
     [ProtoMember(15)]
-    public readonly int PartyMoraleChangeAmount;
+    public readonly float PartyMoraleChangeAmount;
 
     [ProtoMember(16)]
     public readonly bool DoNotApplyGoldTransactions;
@@ -80,6 +80,8 @@ internal readonly struct NetworkCompleteDoneLogic : ICommand
 
     [ProtoMember(23)]
     public readonly string ForceTransferId;
+    [ProtoMember(24)] public readonly string IssueOwnerId;
+    [ProtoMember(25)] public readonly string IssueId;
 
     public NetworkCompleteDoneLogic(
         string mainHeroId,
@@ -96,7 +98,7 @@ internal readonly struct NetworkCompleteDoneLogic : ICommand
         string leftPrisonerRosterId,
         int partyGoldChangeAmount,
         int partyInfluenceChangeAmount,
-        int partyMoraleChangeAmount,
+        float partyMoraleChangeAmount,
         bool doNotApplyGoldTransactions,
         CampaignVec2 releaserPartyPosition,
         PartyScreenHelper.PartyScreenMode partyScreenMode,
@@ -104,7 +106,7 @@ internal readonly struct NetworkCompleteDoneLogic : ICommand
         bool applyReleasedAndTakenPrisonerActions = false,
         string donationSettlementId = null,
         FlattenedTroop[] donatedPrisonersRoster = null,
-        string forceTransferId = null)
+        string forceTransferId = null, string issueOwnerId = null, string issueId = null)
     {
         MainHeroId = mainHeroId;
         ReleasedPrisonersRoster = releasedPrisonersRoster;
@@ -129,5 +131,7 @@ internal readonly struct NetworkCompleteDoneLogic : ICommand
         DonationSettlementId = donationSettlementId;
         DonatedPrisonersRoster = donatedPrisonersRoster;
         ForceTransferId = forceTransferId;
+        IssueOwnerId = issueOwnerId;
+        IssueId = issueId;
     }
 }

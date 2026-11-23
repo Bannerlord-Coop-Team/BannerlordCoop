@@ -1,10 +1,12 @@
 ﻿using Common;
+using Common.Network;
 using Common.Tests.Utils;
 using Common.Util;
 using Coop.Core.Server.Services.Instances;
 using Coop.Core.Server.Services.Instances.Handlers;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
+using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
@@ -73,6 +75,7 @@ public class ServerBattleCompletionHandlerRecoveryTests : IDisposable
                 HostControllerId,
                 1,
                 out It.Ref<BattleState>.IsAny,
+                It.IsAny<bool>(),
                 It.IsAny<bool>()))
             .Returns((
                 string _,
@@ -80,6 +83,7 @@ public class ServerBattleCompletionHandlerRecoveryTests : IDisposable
                 string _,
                 int _,
                 out BattleState concludedState,
+                bool _,
                 bool _) =>
             {
                 concludedState = BattleState.DefenderVictory;
@@ -88,11 +92,13 @@ public class ServerBattleCompletionHandlerRecoveryTests : IDisposable
 
         handler = new ServerBattleCompletionHandler(
             broker,
+            Mock.Of<INetwork>(),
             missionManager,
             objectManager.Object,
             playerManager.Object,
             hostRegistry.Object,
-            completionTracker.Object);
+            completionTracker.Object,
+            Mock.Of<IBattleTroopReserveBuilder>());
     }
 
     public void Dispose() => handler.Dispose();

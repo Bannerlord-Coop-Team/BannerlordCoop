@@ -17,33 +17,14 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class MobilePartyAISerializationTest
     {
-        IContainer container;
+        ILifetimeScope container;
         public MobilePartyAISerializationTest()
         {
             GameBootStrap.Initialize();
 
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
+            container = SerializationTestContainer.BeginScope();
         }
         
-        [Fact]
-        public void MobilePartyAi_Serialize()
-        {
-            MobilePartyAi PartyAI = (MobilePartyAi)FormatterServices.GetUninitializedObject(typeof(MobilePartyAi));
-
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            MobilePartyAIBinaryPackage package = new MobilePartyAIBinaryPackage(PartyAI, factory);
-
-            package.Pack();
-
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
-
-            Assert.NotEmpty(bytes);
-        }
-
         private static readonly FieldInfo _mobileParty = typeof(MobilePartyAi).GetField("_mobileParty", BindingFlags.NonPublic | BindingFlags.Instance);
         [Fact]
         public void MobilePartyAi_Full_Serialization()

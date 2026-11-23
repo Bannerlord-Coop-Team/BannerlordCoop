@@ -3,6 +3,7 @@ using TaleWorlds.CampaignSystem.GameComponents;
 
 namespace GameInterface.Services.Issues.Framework.AcceptCoordination;
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(DefaultIssueModel), nameof(DefaultIssueModel.GetIssueDifficultyMultiplier))]
 internal class IssueDifficultyOverridePatch
 {

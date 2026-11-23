@@ -3,6 +3,7 @@ using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.Party.Messages;
+using GameInterface.Services.Party.Patches;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -57,6 +58,27 @@ public class GarrisonDonationTests : IDisposable
         var troop = Assert.Single(message.Troops);
         Assert.Equal(characterId, troop.CharacterId);
         Assert.Equal(3, troop.Count);
+    }
+
+    // A donate screen Done after the party left the town is refused, so the party keeps the troops.
+    [Fact]
+    public void DonationDone_AfterLeavingTheTown_IsRefused()
+    {
+        string characterId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        bool result = true;
+        bool runOriginal = true;
+
+        Client.Call(() =>
+        {
+            Assert.Null(Hero.MainHero.CurrentSettlement);
+            TroopRoster roster = TroopRoster.CreateDummyTroopRoster();
+            roster.AddToCounts(Client.GetRegisteredObject<CharacterObject>(characterId), 3);
+
+            runOriginal = PartyScreenHelperPatches.DonateGarrisonDoneHandlerPrefix(ref result, roster);
+        });
+
+        Assert.False(runOriginal);
+        Assert.False(result);
     }
 
     // An empty donation from an older client arrives with null troops and must not touch the garrison.

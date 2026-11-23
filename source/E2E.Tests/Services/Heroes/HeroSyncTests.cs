@@ -92,6 +92,11 @@ namespace E2E.Tests.Services.Heroes
             TestEnvironment.AssertReferenceProperty<Hero, Hero>(nameof(Hero.Father));
             TestEnvironment.AssertReferenceProperty<Hero, Hero>(nameof(Hero.Mother));
             TestEnvironment.AssertReferenceProperty<Hero, Hero>(nameof(Hero.Spouse));
+            // Party commands; a hero with no party configuration reads true for each.
+            TestEnvironment.AssertProperty<Hero, bool>(nameof(Hero.CanJoinArmy), false, defaultValue: true);
+            TestEnvironment.AssertProperty<Hero, bool>(nameof(Hero.CanRaid), false, defaultValue: true);
+            TestEnvironment.AssertProperty<Hero, bool>(nameof(Hero.CanDonateTroopsToGarrison), false, defaultValue: true);
+            TestEnvironment.AssertProperty<Hero, bool>(nameof(Hero.CanHaveFleet), false, defaultValue: true);
         }
 
         [Fact]
@@ -111,6 +116,30 @@ namespace E2E.Tests.Services.Heroes
             assertHelper.AssertPropertyOwnerField<Hero, CharacterAttribute>(nameof(Hero._characterAttributes));
 
             TestEnvironment.AssertField<Hero, int>(nameof(Hero.Level), 10, defaultValue: hero.Level);
+        }
+
+        [Theory]
+        [InlineData(10f)]
+        [InlineData(-10f)]
+        public void Server_AddPower_ReplicatesToBothClients(float delta)
+        {
+            float expectedPower = 0;
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject(HeroId, out Hero hero));
+                expectedPower = hero.Power + delta;
+                hero.AddPower(delta);
+                Assert.Equal(expectedPower, hero.Power);
+            });
+
+            foreach (var client in Clients)
+            {
+                client.Call(() =>
+                {
+                    Assert.True(client.ObjectManager.TryGetObject(HeroId, out Hero hero));
+                    Assert.Equal(expectedPower, hero.Power);
+                });
+            }
         }
 
         [Fact]

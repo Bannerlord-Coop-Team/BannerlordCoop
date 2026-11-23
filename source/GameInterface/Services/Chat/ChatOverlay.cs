@@ -10,6 +10,7 @@ using TaleWorlds.GauntletUI.BaseTypes;
 using TaleWorlds.GauntletUI.Data;
 using TaleWorlds.InputSystem;
 using TaleWorlds.Library;
+using TaleWorlds.MountAndBlade.GauntletUI;
 using TaleWorlds.MountAndBlade.View.Screens;
 using TaleWorlds.ScreenSystem;
 
@@ -25,12 +26,12 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
     private const string ResizerWidgetId = "CoopChatResizer";
     private const string ResizeFrameWidgetId = "CoopChatResizeFrame";
     private const string ResizeCaptureWidgetId = "CoopChatResizeCapture";
+    private const string MapMenuLayerName = "MapMenuView";
     private const int LayerOrder = 200;
     private const float ResizeTransitionSeconds = 0.14f;
 
     private readonly ChatVM dataSource;
     private readonly Action refreshParticipants;
-    private readonly IChatVanillaLogGate vanillaLogGate;
     private GauntletLayer gauntletLayer;
     private GauntletMovieIdentifier movie;
     private EditableTextWidget inputWidget;
@@ -45,10 +46,13 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
     private bool ignoreNextOutsideClick;
     private bool playerChatEnabled;
     private bool allowChatOpen;
+    private bool isMapMenu;
     private bool pinFeedToBottom;
     private float pinFeedLastMaxValue = -1f;
     private bool isResizing;
     private bool applyResizeToPanel;
+    /// <summary>True while a press that started over the open chat panel is still held.</summary>
+    private bool chatPointerCaptureHeld;
     private bool feedInnerPoliciesCaptured;
     private float resizeLerpRatio;
     private Vec2 resizeStartMousePosition;
@@ -59,18 +63,14 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
     public ChatOverlay(
         ChatVM dataSource,
         Action refreshParticipants,
-        bool playerChatEnabled,
-        IChatVanillaLogGate vanillaLogGate)
+        bool playerChatEnabled)
     {
         if (dataSource == null) throw new ArgumentNullException(nameof(dataSource));
         if (refreshParticipants == null) throw new ArgumentNullException(nameof(refreshParticipants));
-        if (vanillaLogGate == null) throw new ArgumentNullException(nameof(vanillaLogGate));
 
         this.dataSource = dataSource;
         this.refreshParticipants = refreshParticipants;
-        this.vanillaLogGate = vanillaLogGate;
         this.playerChatEnabled = playerChatEnabled;
-        dataSource.SetPlayerChatEnabled(playerChatEnabled);
         dataSource.FeedScrolledToBottomRequested += OnFeedScrolledToBottomRequested;
     }
 
@@ -99,7 +99,7 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
             // Keep pinning while closed so new lines stay in view
             if (pinFeedToBottom)
                 ContinuePinFeedToBottom();
-            if (allowChatOpen && playerChatEnabled && ShouldOpenInput(
+            if (allowChatOpen && ShouldOpenInput(
                     Input.IsKeyPressed(InputKey.Enter),
                     Input.IsKeyPressed(InputKey.NumpadEnter),
                     Input.IsKeyPressed(InputKey.ControllerLOption)))
@@ -164,7 +164,20 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
             ReleaseInputFocus();
         }
 
-        if (!isInputFocused) return;
+        // Unfocused open panel: Enter returns to typing without claiming keys until then
+        if (!isInputFocused)
+        {
+            if (dataSource.IsChatInputEnabled &&
+                ShouldOpenInput(
+                    Input.IsKeyPressed(InputKey.Enter),
+                    Input.IsKeyPressed(InputKey.NumpadEnter),
+                    controllerOpenPressed: false))
+            {
+                FocusInput();
+            }
+
+            return;
+        }
 
         if (!ReferenceEquals(ScreenManager.FocusedLayer, gauntletLayer) ||
             !ReferenceEquals(gauntletLayer.UIContext.EventManager.FocusedWidget, inputWidget))
@@ -183,6 +196,7 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
     public void Dispose()
     {
         dataSource.FeedScrolledToBottomRequested -= OnFeedScrolledToBottomRequested;
+        SetVanillaLogReplaced(false);
         if (!initialized) return;
 
         CloseInput();
@@ -205,19 +219,21 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
 
     internal bool IsPlayerChatEnabled => playerChatEnabled;
 
+    /// <summary>True only while the text field owns keyboard focus (panel open alone does not count).</summary>
+    internal bool IsInputFocused => isInputFocused;
+
     internal void SetPlayerChatEnabled(bool value)
     {
         if (playerChatEnabled == value) return;
 
         playerChatEnabled = value;
-        dataSource.SetPlayerChatEnabled(value);
         if (!value)
             CloseInput();
     }
 
     private bool CanOpenInput()
     {
-        if (!allowChatOpen || !playerChatEnabled || !gauntletLayer.IsActive || Input.IsOnScreenKeyboardActive)
+        if (!allowChatOpen || !gauntletLayer.IsActive || Input.IsOnScreenKeyboardActive)
             return false;
 
         var focusedLayer = ScreenManager.FocusedLayer;
@@ -232,39 +248,49 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
     {
         var topScreen = ScreenManager.TopScreen;
         ScreenLayer gameplayLayer;
-        bool isGameplayScreen;
+        bool isOpenableScreen;
         bool isConversationActive = Campaign.Current?.ConversationManager?.IsConversationInProgress == true;
         bool isCampaignContext = Campaign.Current != null;
         bool isLoading = LoadingWindow.IsLoadingWindowActive;
+        isMapMenu = false;
+        bool isMenuLayerFocused = false;
 
         if (topScreen is MapScreen mapScreen)
         {
             gameplayLayer = mapScreen.SceneLayer;
-            isGameplayScreen = GameStateManager.Current?.ActiveState is MapState mapState && !mapState.AtMenu;
+            var mapState = GameStateManager.Current?.ActiveState as MapState;
+            // MapMenuView focus below keeps escape, encyclopedia, and other map layers out.
+            isMapMenu = mapState?.AtMenu == true;
+            isMenuLayerFocused = isMapMenu &&
+                ReferenceEquals(ScreenManager.FocusedLayer, mapScreen.FindLayer<GauntletLayer>(MapMenuLayerName));
+            isOpenableScreen = mapState != null;
         }
         else if (topScreen is MissionScreen missionScreen)
         {
             gameplayLayer = missionScreen.SceneLayer;
-            isGameplayScreen = true;
+            isOpenableScreen = true;
             isConversationActive |= missionScreen.IsConversationActive;
         }
         else
         {
             gameplayLayer = null;
-            // Character, clan, party, inventory, settlement menus, Coop Options, etc.
-            isGameplayScreen = false;
+            // Character, clan, party, inventory, Coop Options, etc.
+            isOpenableScreen = false;
         }
 
         var focusedLayer = ScreenManager.FocusedLayer;
         bool isGameplayLayerFocused = ReferenceEquals(focusedLayer, gameplayLayer);
         bool isChatLayerFocused = ReferenceEquals(focusedLayer, gauntletLayer);
 
-        // Don't fall back to vanilla feed when gameplay screens clear the frame
-        bool shouldShow = ShouldShowPresentation(isCampaignContext, isConversationActive, isLoading);
-        allowChatOpen = ShouldAllowChatOpen(
-            isGameplayScreen && !isLoading,
+        // Suspend overlay when chat is off so vanilla log shows
+        bool shouldShow = playerChatEnabled && ShouldShowPresentation(
+            isCampaignContext,
             isConversationActive,
-            isGameplayLayerFocused,
+            isLoading);
+        allowChatOpen = ShouldAllowChatOpen(
+            isOpenableScreen && !isLoading,
+            isConversationActive,
+            isGameplayLayerFocused || isMenuLayerFocused,
             isChatLayerFocused);
 
         if (!allowChatOpen && dataSource.IsOpen)
@@ -276,7 +302,7 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
             ScreenManager.SetSuspendLayer(gauntletLayer, !shouldShow);
         }
 
-        vanillaLogGate.SetReplacementVisible(shouldShow);
+        SetVanillaLogReplaced(shouldShow);
         // Menus/options sit under this global layer; drop mouse so their widgets stay clickable
         if (shouldShow && !dataSource.IsOpen)
             ApplyClosedFeedInputRestrictions();
@@ -284,9 +310,21 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         return shouldShow;
     }
 
+    /// <summary>Hides the vanilla chat log and turns off its input while this overlay replaces it.</summary>
+    /// <remarks>Re-applied every tick because <c>shouldShow</c> flips on conversations/loading and other code can resume the layer; disabled vanilla still records messages.</remarks>
+    private static void SetVanillaLogReplaced(bool replaced)
+    {
+        var vanillaLog = GauntletChatLogView.Current;
+        if (vanillaLog == null) return;
+
+        ScreenManager.SetSuspendLayer(vanillaLog.Layer, replaced);
+        vanillaLog.SetEnabled(!replaced);
+    }
+
     private void ApplyClosedFeedInputRestrictions()
     {
-        if (allowChatOpen)
+        // Map menus need display-only even when Enter is allowed, otherwise the feed steals clicks
+        if (allowChatOpen && !isMapMenu)
             SetPassiveInputRestrictions(gauntletLayer.InputRestrictions);
         else
             SetDisplayOnlyInputRestrictions(gauntletLayer.InputRestrictions);
@@ -479,66 +517,53 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         if (gauntletLayer == null) return;
 
         ResolveFeedWidgets();
-        bool holdFromChat = IsMouseHoldFromChat();
+        bool overChat = IsPointerOverOpenChat();
+        bool holdFromChat = UpdateChatPointerCapture(overChat);
         // Resize owns the capture widget while dragging
         if (!isResizing && !applyResizeToPanel)
             SetResizeCaptureVisible(holdFromChat);
 
-        // Typing path already claimed keyboard via FocusInput
-        if (isInputFocused) return;
+        bool mouseCaptureActive = holdFromChat || isResizing || applyResizeToPanel;
+        // Claim mouse only over the panel or while dragging, so map clicks pass through
+        bool claimMouse = overChat || mouseCaptureActive;
 
-        bool overChat = IsPointerOverOpenChat();
-        bool mapLookActive = Input.IsKeyDown(InputKey.RightMouseButton) && !holdFromChat && !overChat;
-        bool showCursor = ShouldShowOpenPanelCursor(
-            inputFocused: false,
-            pointerOverChat: overChat,
-            mouseCaptureActive: holdFromChat || isResizing || applyResizeToPanel,
-            mapLookActive: mapLookActive);
+        if (isInputFocused)
+        {
+            if (claimMouse)
+                SetOpenPanelTypingWithMouseRestrictions(gauntletLayer.InputRestrictions);
+            else
+                SetOpenPanelTypingRestrictions(gauntletLayer.InputRestrictions);
+            return;
+        }
 
-        // While open, keep the cursor up for tabs/resize; hide only during map RMB look
-        if (showCursor)
+        if (claimMouse)
             SetOpenPanelInputRestrictions(gauntletLayer.InputRestrictions);
         else
-            gauntletLayer.InputRestrictions.SetInputRestrictions(false, InputUsageMask.Mouse);
+            SetDisplayOnlyInputRestrictions(gauntletLayer.InputRestrictions);
     }
 
-    private bool IsMouseHoldFromChat()
+    private bool UpdateChatPointerCapture(bool pointerOverChat)
     {
-        bool lmbDown = Input.IsKeyDown(InputKey.LeftMouseButton);
-        bool rmbDown = Input.IsKeyDown(InputKey.RightMouseButton);
-        if (!lmbDown && !rmbDown) return false;
+        bool buttonDown = Input.IsKeyDown(InputKey.LeftMouseButton) ||
+                          Input.IsKeyDown(InputKey.RightMouseButton);
+        bool buttonPressed = Input.IsKeyPressed(InputKey.LeftMouseButton) ||
+                             Input.IsKeyPressed(InputKey.RightMouseButton);
 
-        var eventManager = gauntletLayer.UIContext.EventManager;
-        if (lmbDown && IsUnderChatRoot(eventManager.LatestMouseDownWidget))
-            return true;
-        if (rmbDown && IsUnderChatRoot(eventManager.LatestMouseAlternateDownWidget))
-            return true;
-
-        return false;
+        chatPointerCaptureHeld = ShouldKeepChatPointerCapture(
+            chatPointerCaptureHeld,
+            buttonDown,
+            buttonPressed,
+            pointerOverChat);
+        return chatPointerCaptureHeld;
     }
 
     private bool IsPointerOverOpenChat()
     {
         if (chatRootWidget == null) return false;
 
-        var eventManager = gauntletLayer.UIContext.EventManager;
-        if (IsUnderChatRoot(eventManager.HoveredWidget))
-            return true;
-
-        return chatRootWidget.IsPointInsideMeasuredArea(eventManager.MousePosition);
-    }
-
-    private bool IsUnderChatRoot(Widget widget)
-    {
-        if (chatRootWidget == null || widget == null) return false;
-
-        for (Widget current = widget; current != null; current = current.ParentWidget)
-        {
-            if (ReferenceEquals(current, chatRootWidget))
-                return true;
-        }
-
-        return false;
+        // Measured bounds only, Gauntlet hover can go stale under DisplayOnly
+        return chatRootWidget.IsPointInsideMeasuredArea(
+            gauntletLayer.UIContext.EventManager.MousePosition);
     }
 
     private void CloseInput()
@@ -547,6 +572,7 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
 
         dataSource.SetOpen(false);
         ignoreNextOutsideClick = false;
+        chatPointerCaptureHeld = false;
         SetOpenPanelEventAcceptance(false);
         CancelActiveResize();
         ReleaseInputFocus();
@@ -563,18 +589,18 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
             return;
         }
 
-        gauntletLayer.InputRestrictions.SetInputRestrictions();
         gauntletLayer.IsFocusLayer = true;
         ScreenManager.TrySetFocus(gauntletLayer);
         if (!ReferenceEquals(ScreenManager.FocusedLayer, gauntletLayer))
         {
             gauntletLayer.IsFocusLayer = false;
-            SetOpenPanelInputRestrictions(gauntletLayer.InputRestrictions);
+            UpdateOpenPanelCursorAndCapture();
             return;
         }
 
         gauntletLayer.UIContext.EventManager.FocusedWidget = inputWidget;
         isInputFocused = true;
+        UpdateOpenPanelCursorAndCapture();
     }
 
     /// <summary>Briefly own Escape so the game menu does not open, then CloseInput clears it.</summary>
@@ -593,10 +619,7 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         gauntletLayer.IsFocusLayer = false;
         ScreenManager.TryLoseFocus(gauntletLayer);
         if (dataSource.IsOpen)
-        {
-            // Cursor visibility for the open panel is refreshed next tick
-            SetOpenPanelInputRestrictions(gauntletLayer.InputRestrictions);
-        }
+            UpdateOpenPanelCursorAndCapture();
         else
             ApplyClosedFeedInputRestrictions();
     }
@@ -651,14 +674,14 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         return isCampaignContext && !isConversationActive && !isLoading;
     }
 
-    /// <summary>Enter/typing only on unobstructed map or mission gameplay.</summary>
+    /// <summary>Enter/typing on open map, map menus, or mission gameplay.</summary>
     internal static bool ShouldAllowChatOpen(
-        bool isGameplayScreen,
+        bool isOpenableScreen,
         bool isConversationActive,
         bool isGameplayLayerFocused,
         bool isChatLayerFocused)
     {
-        return isGameplayScreen &&
+        return isOpenableScreen &&
                !isConversationActive &&
                (isGameplayLayerFocused || isChatLayerFocused);
     }
@@ -686,17 +709,34 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
             mask: InputUsageMask.Mouse);
     }
 
-    /// <summary>
-    /// Open panel keeps a cursor for UI, except during map RMB look which would warp a visible cursor.
-    /// </summary>
-    internal static bool ShouldShowOpenPanelCursor(
-        bool inputFocused,
-        bool pointerOverChat,
-        bool mouseCaptureActive,
-        bool mapLookActive)
+    /// <summary>Typing with the pointer off the panel: keep keys, leave mouse to the map.</summary>
+    internal static void SetOpenPanelTypingRestrictions(InputRestrictions inputRestrictions)
     {
-        if (inputFocused || pointerOverChat || mouseCaptureActive)
-            return true;
-        return !mapLookActive;
+        inputRestrictions.SetInputRestrictions(
+            isMouseVisible: false,
+            mask: InputUsageMask.Keyboardkeys);
+    }
+
+    /// <summary>Typing while interacting with the open panel chrome.</summary>
+    internal static void SetOpenPanelTypingWithMouseRestrictions(InputRestrictions inputRestrictions)
+    {
+        inputRestrictions.SetInputRestrictions(
+            isMouseVisible: true,
+            mask: InputUsageMask.All);
+    }
+
+    /// <summary>
+    /// Capture starts only on a fresh press over the panel. LatestMouseDownWidget must not be used:
+    /// it survives DisplayOnly map clicks and would treat every later map click as a chat hold.
+    /// </summary>
+    internal static bool ShouldKeepChatPointerCapture(
+        bool currentlyHeld,
+        bool buttonDown,
+        bool buttonPressed,
+        bool pointerOverChat)
+    {
+        if (!buttonDown) return false;
+        if (currentlyHeld) return true;
+        return buttonPressed && pointerOverChat;
     }
 }

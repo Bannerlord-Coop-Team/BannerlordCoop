@@ -13,6 +13,7 @@ using Xunit;
 
 namespace GameInterface.Tests.Services.MapEvents;
 
+[Collection(nameof(MissionCurrentCollection))]
 public class HitRewardHandlerTests
 {
     static HitRewardHandlerTests()

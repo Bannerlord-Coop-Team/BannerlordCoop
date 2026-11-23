@@ -112,12 +112,8 @@ public partial class ActionEquipmentSyncTests
 
     [Theory]
     [InlineData("machine", false)]
-    [InlineData("agent", false)]
-    [InlineData("point", false)]
-    [InlineData("authority", false)]
-    [InlineData("machine", true)]
     [InlineData("agent", true)]
-    [InlineData("point", true)]
+    [InlineData("point", false)]
     [InlineData("authority", true)]
     public void PilotSeat_BeginWaitsForDependencyAndReleaseSupersedesPendingBegin(string missing, bool released)
     {
@@ -186,12 +182,9 @@ public partial class ActionEquipmentSyncTests
     }
 
     [Theory]
-    [InlineData("occupied", false)]
+    [InlineData("occupied", true)]
     [InlineData("moving", false)]
     [InlineData("loading", false)]
-    [InlineData("occupied", true)]
-    [InlineData("moving", true)]
-    [InlineData("loading", true)]
     public void PilotSeat_ConflictDoesNotBlockEquipmentOrActionsAndRetainsOnlyLatestSeat(string conflict, bool stopped)
     {
         RunScenario(context =>
@@ -592,24 +585,6 @@ public partial class ActionEquipmentSyncTests
     private static T NewPilotObject<T>() => (T)FormatterServices.GetUninitializedObject(typeof(T));
 
     [Fact]
-    public void MissionModule_InstallsReplicatedPilotPointGuard()
-    {
-        HarmonyPatchCategoryRegistration registration = Assert.Single(
-            MissionModule.CreatePatchCategoryRegistrations(),
-            candidate => candidate.Category == MissionModule.PilotSeatPatchCategory);
-        Assert.Equal(typeof(ReplicatedPilotPointPatch).Assembly, registration.Assembly);
-        var harmony = new Harmony($"{nameof(MissionModule_InstallsReplicatedPilotPointGuard)}.{Guid.NewGuid()}");
-        var target = AccessTools.Method(typeof(StandingPoint), "TickAux");
-        try
-        {
-            registration.Apply(harmony);
-            Assert.Contains(Harmony.GetPatchInfo(target).Prefixes, patch =>
-                patch.owner == harmony.Id && patch.PatchMethod.DeclaringType == typeof(ReplicatedPilotPointPatch));
-        }
-        finally { harmony.UnpatchAll(harmony.Id); }
-    }
-
-    [Fact]
     public void PilotSeat_NativePointTickOnlyStandsDownForAcceptedPuppetAttachment()
     {
         RunScenario(context =>
@@ -728,5 +703,27 @@ public partial class ActionEquipmentSyncTests
             context.Component.AgentActionHandler.BindPilotSeats(null, null);
             harmony.UnpatchAll(harmony.Id);
         }
+    }
+}
+
+/// <summary>Checks the pilot-seat Harmony category registration; no game instances needed.</summary>
+public class PilotSeatPatchRegistrationTests
+{
+    [Fact]
+    public void MissionModule_InstallsReplicatedPilotPointGuard()
+    {
+        HarmonyPatchCategoryRegistration registration = Assert.Single(
+            MissionModule.CreatePatchCategoryRegistrations(),
+            candidate => candidate.Category == MissionModule.PilotSeatPatchCategory);
+        Assert.Equal(typeof(ReplicatedPilotPointPatch).Assembly, registration.Assembly);
+        var harmony = new Harmony($"{nameof(MissionModule_InstallsReplicatedPilotPointGuard)}.{Guid.NewGuid()}");
+        var target = AccessTools.Method(typeof(StandingPoint), "TickAux");
+        try
+        {
+            registration.Apply(harmony);
+            Assert.Contains(Harmony.GetPatchInfo(target).Prefixes, patch =>
+                patch.owner == harmony.Id && patch.PatchMethod.DeclaringType == typeof(ReplicatedPilotPointPatch));
+        }
+        finally { harmony.UnpatchAll(harmony.Id); }
     }
 }

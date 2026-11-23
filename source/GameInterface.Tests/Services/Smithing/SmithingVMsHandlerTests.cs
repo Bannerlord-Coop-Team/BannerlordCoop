@@ -5,6 +5,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Smithing.Handlers;
 using GameInterface.Services.Smithing.Interfaces;
 using GameInterface.Services.Smithing.Messages;
+using GameInterface.Services.Smithing.Patches;
 using Moq;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting;
@@ -47,5 +48,20 @@ public sealed class SmithingVMsHandlerTests
         Assert.Same(pendingItem, weaponDesign.CraftedItemObject);
         Assert.False(weaponDesign.IsInFinalCraftingStage);
         Assert.Null(weaponDesign.CraftingResultPopup);
+    }
+
+
+    [Fact]
+    public void ClosingTheScreen_ThroughTheFinalizePatch_DropsIt()
+    {
+        var craftingVM = (CraftingVM)RuntimeHelpers.GetUninitializedObject(typeof(CraftingVM));
+        var provider = new SmithingVMsProvider();
+        using var handler = new SmithingVMsHandler(MessageBroker.Instance, Mock.Of<IObjectManager>(), provider);
+        MessageBroker.Instance.Publish(this, new CraftingVMCreated(craftingVM));
+        Assert.Same(craftingVM, provider.GetCurrentCraftingVM());
+
+        CraftingVMConstructorPatch.OnFinalizePostfix(craftingVM);
+
+        Assert.Null(provider.GetCurrentCraftingVM());
     }
 }

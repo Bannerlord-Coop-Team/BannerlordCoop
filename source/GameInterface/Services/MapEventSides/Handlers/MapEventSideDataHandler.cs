@@ -5,6 +5,7 @@ using Common.Network;
 using Common.Util;
 using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.ObjectManager;
 using Serilog;
@@ -98,6 +99,7 @@ internal class MapEventSideDataHandler : IHandler
                         side._nearbyPartiesAddedToPlayerMapEvent.Remove(party.Party.MobileParty);
                     if (party.Party?.MapEventSide == side) party.Party._mapEventSide = null;
                 }
+                encounterMenuConditionRefresher.RefreshForMapEvent(side.MapEvent);
             }
             catch (Exception e)
             {
@@ -201,11 +203,11 @@ internal class MapEventSideDataHandler : IHandler
         if (MobileParty.MainParty?.MapEvent != mapEvent)
             return;
 
-        if (PlayerEncounter.Current == null)
+        var encounter = PlayerEncounter.Current;
+        if (encounter == null)
             return;
 
-        var encounterMapEvent = PlayerEncounter.Battle ?? PlayerEncounter.EncounteredBattle ?? MapEvent.PlayerMapEvent;
-        if (encounterMapEvent != mapEvent)
+        if (encounter.GetBattleOrPlayerMapEvent() != mapEvent)
             return;
 
         if (Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId != "raiding_village")

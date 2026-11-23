@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Issues.Framework.Finalization;
 
@@ -15,10 +16,14 @@ public readonly struct RequestQuestOutcome : ICommand
     [ProtoMember(3)]
     public readonly IssueOutcome Outcome;
 
-    public RequestQuestOutcome(string issueOwnerId, string issueId, IssueOutcome outcome)
+    [ProtoMember(4)]
+    public readonly TextObject Log;
+
+    public RequestQuestOutcome(string issueOwnerId, string issueId, IssueOutcome outcome, TextObject log = null)
     {
         IssueOwnerId = issueOwnerId;
         IssueId = issueId;
         Outcome = outcome;
+        Log = log;
     }
 }

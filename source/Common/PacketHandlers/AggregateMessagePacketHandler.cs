@@ -1,3 +1,4 @@
+using Common.BattleBenchmark;
 using Common.Logging;
 using Common.Serialization;
 using LiteNetLib;
@@ -26,15 +27,19 @@ public class AggregateMessagePacketHandler : IPacketHandler
     private readonly IMessagePacketHandler messagePacketHandler;
     private readonly IPacketManager packetManager;
     private readonly ICommonSerializer serializer;
+    private readonly IBattleBenchmarkRecorder battleBenchmark;
 
+    // The recorder is optional so the tests that build this handler directly don't need one.
     public AggregateMessagePacketHandler(
         IMessagePacketHandler messagePacketHandler,
         IPacketManager packetManager,
-        ICommonSerializer serializer)
+        ICommonSerializer serializer,
+        IBattleBenchmarkRecorder battleBenchmark = null)
     {
         this.messagePacketHandler = messagePacketHandler;
         this.packetManager = packetManager;
         this.serializer = serializer;
+        this.battleBenchmark = battleBenchmark;
         this.packetManager.RegisterPacketHandler(this);
     }
 
@@ -56,6 +61,7 @@ public class AggregateMessagePacketHandler : IPacketHandler
             try
             {
                 var message = serializer.Deserialize<Messaging.IMessage>(payload);
+                battleBenchmark?.RecordTypeReceived(message?.GetType(), payload.Length);
                 messagePacketHandler.PublishEvent(peer, message);
             }
             catch (Exception ex)

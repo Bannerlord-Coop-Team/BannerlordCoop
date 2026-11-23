@@ -132,14 +132,24 @@ public class BattleInstanceLifecycle : IBattleInstanceLifecycle
 
         if (session.HasInstance)
         {
-            if (wasRetreat)
+            if (wasRetreat
+#if DEBUG
+                && !session.DebugWithholdCompletion
+#endif
+                )
             {
                 relayNetwork.SendAll(new NetworkBattleRetreated(session.InstanceId));
                 Logger.Information("[Relay] Announced battle retreat for instance {Instance}", session.InstanceId);
             }
             CoopTroopSupplierRegistry.ClearBattle(session.InstanceId);
-            relayNetwork.SendAll(new NetworkMissionLeft(session.OwnControllerId, session.InstanceId));
-            Logger.Information("[Relay] Announced MissionLeft for battle instance {Instance}", session.InstanceId);
+#if DEBUG
+            // Retain server membership for the deadline fixture even if the local mission closes.
+            if (!session.DebugWithholdCompletion)
+#endif
+            {
+                relayNetwork.SendAll(new NetworkMissionLeft(session.OwnControllerId, session.InstanceId));
+                Logger.Information("[Relay] Announced MissionLeft for battle instance {Instance}", session.InstanceId);
+            }
         }
 
         network.Stop();

@@ -10,10 +10,12 @@ public readonly struct IssueOutcomeObserved : IEvent
 {
     public readonly IssueBase Issue;
     public readonly IssueOutcome Outcome;
+    public readonly string IssueOwnerId;
 
-    public IssueOutcomeObserved(IssueBase issue, IssueOutcome outcome)
+    public IssueOutcomeObserved(IssueBase issue, IssueOutcome outcome, string issueOwnerId = null)
     {
         Issue = issue;
         Outcome = outcome;
+        IssueOwnerId = issueOwnerId;
     }
 }

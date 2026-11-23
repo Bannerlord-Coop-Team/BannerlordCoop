@@ -7,6 +7,7 @@ using GameInterface.Services.Issues.Framework.Commands;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Utils.Commands;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -165,7 +166,7 @@ public class IssueSafetyTests : IDisposable
 
     private CoopCommandResult Give(string heroId, string questType)
     {
-        var command = new IssuesGiveCoopCommand(Server.Container.Resolve<IQuestTypeRegistry>(), Server.ObjectManager);
+        var command = new IssuesGiveCoopCommand(Server.Container.Resolve<IQuestTypeRegistry>(), Server.Container.Resolve<ICommandObjectResolver>());
         var args = new CoopCommandArgsFactory().FromValues(new[] { heroId, questType });
 
         return command.ProcessCommand(args);

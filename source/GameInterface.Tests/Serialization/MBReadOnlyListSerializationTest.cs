@@ -11,31 +11,10 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class MBReadOnlyListSerializationTest
     {
-        IContainer container;
+        ILifetimeScope container;
         public MBReadOnlyListSerializationTest()
         {
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
-        }
-
-        [Fact]
-        public void MBReadOnlyList_Serialize()
-        {
-            List<int> ints = new List<int> { 1, 2, 3, 4, 5 };
-
-            MBReadOnlyList<int> MBReadOnlyList = new MBReadOnlyList<int>(ints);
-
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            MBReadOnlyListBinaryPackage package = new MBReadOnlyListBinaryPackage(MBReadOnlyList, factory);
-
-            package.Pack();
-
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
-
-            Assert.NotEmpty(bytes);
+            container = SerializationTestContainer.BeginScope();
         }
 
         [Fact]

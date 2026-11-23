@@ -16,7 +16,7 @@ namespace E2E.Tests.Services.MapEventParties
         }
 
         [Fact]
-        public void Server_MapEventParty_Properties()
+        public void Server_MapEventParty_PropertiesAndFields()
         {
             Server.ObjectManager.TryGetObject(MepId, out MapEventParty eventParty);
             eventParty.Party = null;
@@ -25,13 +25,7 @@ namespace E2E.Tests.Services.MapEventParties
             TestEnvironment.AssertProperty<MapEventParty, int>(nameof(MapEventParty.GoldLost), 3);
             TestEnvironment.AssertReferenceProperty<MapEventParty, PartyBase>(nameof(MapEventParty.Party));
             TestEnvironment.AssertProperty<MapEventParty, int>(nameof(MapEventParty.PlunderedGold), 3);
-            
-        }
 
-        [Fact]
-        public void Server_MapEventParty_Fields()
-        {
-            Server.ObjectManager.TryGetObject(MepId, out MapEventParty eventParty);
             // Not needed on client as it only is used in server calculations
             //TestEnvironment.AssertField<MapEventParty, int>(nameof(MapEventParty._contributionToBattle), 3, defaultValue: eventParty._contributionToBattle);
             TestEnvironment.AssertField<MapEventParty, int>(nameof(MapEventParty._healthyManCountAtStart), 3, defaultValue: eventParty._healthyManCountAtStart);

@@ -12,6 +12,7 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.Modules;
+using GameInterface.Services.Modules.Validators;
 using Serilog;
 using System;
 using System.Threading;
@@ -39,6 +40,8 @@ public class ValidateModuleState : ClientStateBase
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly ICoopFinalizer coopFinalizer;
     private readonly IGameStateInterface gameStateInterface;
+    private readonly IModuleInfoProvider moduleInfoProvider;
+    private readonly IModuleValidator moduleValidator;
     private readonly Timer validationTimeoutTimer;
 
     private volatile bool disposed;
@@ -66,13 +69,17 @@ public class ValidateModuleState : ClientStateBase
         IControllerIdProvider controllerIdProvider,
         ICoopFinalizer coopFinalizer,
         IGameStateInterface gameStateInterface,
-        IModuleInfoProvider moduleInfoProvider) : base(logic)
+        IModuleInfoProvider moduleInfoProvider,
+        IModuleNameProvider moduleNameProvider,
+        IModuleValidator moduleValidator) : base(logic)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.controllerIdProvider = controllerIdProvider;
         this.coopFinalizer = coopFinalizer;
         this.gameStateInterface = gameStateInterface;
+        this.moduleInfoProvider = moduleInfoProvider;
+        this.moduleValidator = moduleValidator;
         messageBroker.Subscribe<NetworkModuleVersionsValidated>(Handle_NetworkModuleVersionsValidated);
         messageBroker.Subscribe<NetworkClientValidated>(Handle_NetworkClientValidated);
 
@@ -84,9 +91,10 @@ public class ValidateModuleState : ClientStateBase
 
 #if DEBUG
         network.SendAll(new NetworkModuleVersionsValidate(
-            moduleInfoProvider.GetModuleInfos(), JoinBuildDebugCommands.ReportedBuildVersion));
+            moduleInfoProvider.GetModuleInfos(), JoinBuildDebugCommands.ReportedBuildVersion, moduleNameProvider.GetDisplayName));
 #else
-        network.SendAll(new NetworkModuleVersionsValidate(moduleInfoProvider.GetModuleInfos()));
+        network.SendAll(new NetworkModuleVersionsValidate(
+            moduleInfoProvider.GetModuleInfos(), ModInformation.BuildVersion, moduleNameProvider.GetDisplayName));
 #endif
 
         // One-shot deadline covering this state's whole exchange; leaving the state disposes it.
@@ -138,14 +146,22 @@ public class ValidateModuleState : ClientStateBase
         }
 
         // Reaching this handshake proves both sides run Coop; only a version mismatch should block it.
-        if (obj.What.Matches || string.Equals(obj.What.Reason, NetworkModuleVersionsValidated.UnsupportedCoopModuleReason, StringComparison.Ordinal))
-        {
-            network.SendAll(new NetworkClientValidate(controllerIdProvider.ControllerId));
-        }
-        else
+        bool accepted = obj.What.Matches ||
+            string.Equals(obj.What.Reason, NetworkModuleVersionsValidated.UnsupportedCoopModuleReason, StringComparison.Ordinal);
+        if (!accepted)
         {
             RejectModuleValidation(obj.What.Reason);
+            return;
         }
+
+        // The server can only see that this client enabled a DLC it accepts, not whether this client can run it.
+        if (!moduleValidator.ValidateNoDlc(moduleInfoProvider.GetModuleInfos(), out _))
+        {
+            RejectModuleValidation("The server needs a DLC this co-op build can't run. The co-op log has the details.");
+            return;
+        }
+
+        network.SendAll(new NetworkClientValidate(controllerIdProvider.ControllerId));
     }
 
     private static string GetIncompatibleBuildReason(string? serverBuildVersion)

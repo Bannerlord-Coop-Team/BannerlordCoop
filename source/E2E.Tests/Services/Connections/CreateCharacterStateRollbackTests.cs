@@ -54,7 +54,7 @@ public class CreateCharacterStateRollbackTests
     public void HandleCaptureFailure_WhoseRollbackTimesOutWhileItRuns_RollsBackOnceThenDisconnects()
     {
         using var fixture = new Fixture(handleCaptureFails: true);
-        using var shortTimeout = GameThread.Instance.LimitFrameDrain(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+        using var shortTimeout = GameThread.Instance.LimitFrameDrain(TimeSpan.FromSeconds(1), ShortTimeout);
         Transfer? transfer = null;
         bool pollerReturnedDuringRollback = false;
         fixture.DuringRollback = () => pollerReturnedDuringRollback = transfer!.TryJoin(LongTimeout);
@@ -93,7 +93,7 @@ public class CreateCharacterStateRollbackTests
     public void SetupFailure_WhoseRollbackTimesOutWhileItRuns_RollsBackOnceThenTellsTheOthersAndDisconnects()
     {
         using var fixture = new Fixture(handleCaptureFails: false);
-        using var shortTimeout = GameThread.Instance.LimitFrameDrain(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+        using var shortTimeout = GameThread.Instance.LimitFrameDrain(TimeSpan.FromSeconds(1), ShortTimeout);
         Transfer? transfer = null;
         bool pollerReturnedDuringRollback = false;
         fixture.DuringRollback = () => pollerReturnedDuringRollback = transfer!.TryJoin(LongTimeout);

@@ -1,7 +1,11 @@
 ﻿using Common;
 using Common.Messaging;
+using Common.Util;
+using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.Interface;
 using System;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace GameInterface.Services.Issues.Framework.Registries;
 
@@ -13,11 +17,18 @@ internal class IssueOwnershipSnapshotReceiver : IHandler
 {
     private readonly IMessageBroker messageBroker;
     private readonly IIssueOwnershipRegistry ownership;
+    private readonly IIssueResolver resolver;
+    private readonly IControllerIdProvider controller;
+    private readonly IIssueFinalizationReplay finalization;
 
-    public IssueOwnershipSnapshotReceiver(IMessageBroker messageBroker, IIssueOwnershipRegistry ownership)
+    public IssueOwnershipSnapshotReceiver(IMessageBroker messageBroker, IIssueOwnershipRegistry ownership,
+        IIssueResolver resolver, IControllerIdProvider controller, IIssueFinalizationReplay finalization)
     {
         this.messageBroker = messageBroker;
         this.ownership = ownership;
+        this.resolver = resolver;
+        this.controller = controller;
+        this.finalization = finalization;
 
         messageBroker.Subscribe<NetworkIssueOwnershipSnapshot>(Handle_NetworkIssueOwnershipSnapshot);
     }
@@ -34,14 +45,46 @@ internal class IssueOwnershipSnapshotReceiver : IHandler
             return;
         }
 
-        foreach (var remembered in ownership.GetAll())
-        {
-            ownership.Remove(remembered.IssueOwnerId);
-        }
+        GameThread.RunSafe(() => Apply(payload.What), context: nameof(IssueOwnershipSnapshotReceiver));
+    }
 
-        foreach (var owner in payload.What.Owners ?? Array.Empty<IssueOwnershipData>())
+    private void Apply(NetworkIssueOwnershipSnapshot snapshot)
+    {
+        var owners = snapshot.Owners ?? Array.Empty<IssueOwnershipData>();
+        var rememberedOwners = ownership.GetAll();
+        var dropped = FindDroppedIssues(rememberedOwners, owners);
+
+        // Clear remembered controllers before the authoritative snapshot, since accept is first-wins.
+        foreach (var remembered in rememberedOwners)
+            ownership.Remove(remembered.IssueOwnerId);
+
+        foreach (var owner in owners)
         {
             ownership.TrySetOwner(owner.IssueOwnerId, owner.IssueId, owner.ControllerId);
+            if (resolver.TryResolve(owner.IssueOwnerId, owner.IssueId, out _, out var issue, out _))
+                issue.IsTriedToSolveBefore = owner.ControllerId == controller.ControllerId;
         }
+
+        foreach (var entry in dropped)
+        {
+            // Each replay gets its own catch, so one failed cancel doesnt skip the others.
+            GameThread.RunSafe(() => finalization.ReplayLocalCancel(entry.IssueOwnerId, entry.IssueId, entry.WasOwner),
+                context: nameof(IssueOwnershipSnapshotReceiver));
+        }
+    }
+
+    private List<(string IssueOwnerId, string IssueId, bool WasOwner)> FindDroppedIssues(
+        IssueOwnershipData[] rememberedOwners, IssueOwnershipData[] owners)
+    {
+        var snapshotPairs = new HashSet<(string IssueOwnerId, string IssueId)>(
+            owners.Select(owner => (owner.IssueOwnerId, owner.IssueId)));
+        var dropped = new List<(string IssueOwnerId, string IssueId, bool WasOwner)>();
+        foreach (var remembered in rememberedOwners)
+        {
+            if (snapshotPairs.Contains((remembered.IssueOwnerId, remembered.IssueId))) continue;
+            dropped.Add((remembered.IssueOwnerId, remembered.IssueId, remembered.ControllerId == controller.ControllerId));
+        }
+
+        return dropped;
     }
 }

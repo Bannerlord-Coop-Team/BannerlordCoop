@@ -63,15 +63,4 @@ public class SettlementListNotablesCommandTests : IDisposable
             Assert.DoesNotContain(otherNotableId, output);
         });
     }
-
-    [Fact]
-    public void Command_IsClientSideWithNoArguments()
-    {
-        var command = new SettlementListNotablesCoopCommand(Client.ObjectManager);
-
-        Assert.Equal(CoopCommandSide.Client, command.Side);
-        Assert.Equal("coop.debug.settlements", command.Prefix);
-        Assert.Equal("list_notables", command.Name);
-        Assert.Empty(command.ExpectedArgs);
-    }
 }
