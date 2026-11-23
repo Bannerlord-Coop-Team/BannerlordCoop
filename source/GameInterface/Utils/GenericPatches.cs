@@ -1074,7 +1074,8 @@ namespace GameInterface.Utils
                     return;
                 }
 
-                Logger.Error("Client updated unmanaged {type}", typeof(TItem));
+                objectManager.TryGetId(instance, out var id);
+                Logger.Error("Client wrote synced {type} {id} at index {index}, write dropped", typeof(TInstance).Name, id, index);
                 return;
             }
 

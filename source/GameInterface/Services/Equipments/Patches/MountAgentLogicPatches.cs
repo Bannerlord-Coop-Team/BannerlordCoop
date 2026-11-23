@@ -39,19 +39,20 @@ internal class MountAgentLogicPatches
         }
 
         EquipmentElement horse = equipment[EquipmentIndex.Horse];
-        bool horseLost = roll < lossChance || horse.ItemModifier?.StringId == "lame_horse";
-        bool horseLamed = !horseLost && roll < lameChance;
-        if (!horseLost && !horseLamed) return false;
+        MountLoss loss;
+        if (roll < lossChance || horse.ItemModifier?.StringId == MainHeroMountKilled.LameHorseModifierId) loss = MountLoss.Lost;
+        else if (roll < lameChance) loss = MountLoss.Lamed;
+        else return false;
 
-        MessageBroker.Instance.Publish(__instance, new MainHeroMountKilled(Hero.MainHero, usesCivilianEquipment, horseLost));
+        MessageBroker.Instance.Publish(__instance, new MainHeroMountKilled(Hero.MainHero, usesCivilianEquipment, loss));
 
-        if (horseLost)
+        if (loss == MountLoss.Lost)
         {
             MBInformationManager.AddQuickInformation(new TextObject("{=nZhPS83J}You lost your horse."));
         }
         else
         {
-            var lamedHorse = new EquipmentElement(horse.Item, MBObjectManager.Instance.GetObject<ItemModifier>("lame_horse"));
+            var lamedHorse = new EquipmentElement(horse.Item, MBObjectManager.Instance.GetObject<ItemModifier>(MainHeroMountKilled.LameHorseModifierId));
             TextObject textObject = new TextObject("{=a6hwSEAK}Your horse is turned into a {MODIFIED_NAME}, since it got seriously injured.");
             textObject.SetTextVariable("MODIFIED_NAME", lamedHorse.GetModifiedItemName());
             MBInformationManager.AddQuickInformation(textObject);

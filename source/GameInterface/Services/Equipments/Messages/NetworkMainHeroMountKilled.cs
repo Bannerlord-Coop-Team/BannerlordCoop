@@ -11,12 +11,12 @@ internal readonly struct NetworkMainHeroMountKilled : ICommand
     [ProtoMember(2)]
     public readonly bool UsesCivilianEquipment;
     [ProtoMember(3)]
-    public readonly bool HorseLost;
+    public readonly MountLoss Loss;
 
-    public NetworkMainHeroMountKilled(string heroId, bool usesCivilianEquipment, bool horseLost)
+    public NetworkMainHeroMountKilled(string heroId, bool usesCivilianEquipment, MountLoss loss)
     {
         HeroId = heroId;
         UsesCivilianEquipment = usesCivilianEquipment;
-        HorseLost = horseLost;
+        Loss = loss;
     }
 }

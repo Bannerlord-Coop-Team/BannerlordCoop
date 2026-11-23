@@ -46,7 +46,7 @@ internal class MainHeroMountHandler : IHandler
         var data = payload.What;
         if (!objectManager.TryGetIdWithLogging(data.Hero, out var heroId)) return;
 
-        network.SendAll(new NetworkMainHeroMountKilled(heroId, data.UsesCivilianEquipment, data.HorseLost));
+        network.SendAll(new NetworkMainHeroMountKilled(heroId, data.UsesCivilianEquipment, data.Loss));
     }
 
     private void Handle_NetworkMainHeroMountKilled(MessagePayload<NetworkMainHeroMountKilled> payload)
@@ -60,22 +60,23 @@ internal class MainHeroMountHandler : IHandler
 
             Equipment equipment = data.UsesCivilianEquipment ? hero.CivilianEquipment : hero.BattleEquipment;
 
-            if (data.HorseLost)
+            switch (data.Loss)
             {
-                EquipmentElement harness = equipment[EquipmentIndex.HorseHarness];
-                equipment[EquipmentIndex.Horse] = EquipmentElement.Invalid;
-                equipment[EquipmentIndex.HorseHarness] = EquipmentElement.Invalid;
+                case MountLoss.Lost:
+                    EquipmentElement harness = equipment[EquipmentIndex.HorseHarness];
+                    equipment[EquipmentIndex.Horse] = EquipmentElement.Invalid;
+                    equipment[EquipmentIndex.HorseHarness] = EquipmentElement.Invalid;
 
-                // Vanilla keeps the harness, adding it to the rider's party roster
-                if (!harness.IsInvalid() && !harness.IsEmpty)
-                {
-                    hero.PartyBelongedTo?.ItemRoster.AddToCounts(harness, 1);
-                }
-            }
-            else
-            {
-                ItemModifier lameModifier = MBObjectManager.Instance.GetObject<ItemModifier>("lame_horse");
-                equipment[EquipmentIndex.Horse] = new EquipmentElement(equipment[EquipmentIndex.Horse].Item, lameModifier);
+                    // Vanilla keeps the harness, adding it to the rider's party roster
+                    if (!harness.IsInvalid() && !harness.IsEmpty)
+                    {
+                        hero.PartyBelongedTo?.ItemRoster.AddToCounts(harness, 1);
+                    }
+                    break;
+                case MountLoss.Lamed:
+                    ItemModifier lameModifier = MBObjectManager.Instance.GetObject<ItemModifier>(MainHeroMountKilled.LameHorseModifierId);
+                    equipment[EquipmentIndex.Horse] = new EquipmentElement(equipment[EquipmentIndex.Horse].Item, lameModifier);
+                    break;
             }
         }, context: nameof(NetworkMainHeroMountKilled));
     }

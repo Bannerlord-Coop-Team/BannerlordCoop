@@ -32,9 +32,9 @@ public class MainHeroMountHandlerTests : IDisposable
     }
 
     [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void MainHeroMountKilled_ServerAndEveryClientHoldTheResult(bool horseLost)
+    [InlineData(MountLoss.Lost)]
+    [InlineData(MountLoss.Lamed)]
+    public void MainHeroMountKilled_ServerAndEveryClientHoldTheResult(MountLoss loss)
     {
         var client = TestEnvironment.Clients.First();
 
@@ -56,7 +56,7 @@ public class MainHeroMountHandlerTests : IDisposable
             var lame = Server.GetRegisteredObject<ItemModifier>(lameId);
             using (new AllowedThread())
             {
-                lame.StringId = "lame_horse";
+                lame.StringId = MainHeroMountKilled.LameHorseModifierId;
             }
             MBObjectManager.Instance.RegisterObject(lame);
 
@@ -72,7 +72,7 @@ public class MainHeroMountHandlerTests : IDisposable
         TestEnvironment.ConnectRegisteredPlayer(client, "mount-rider");
 
         client.Call(() => client.Resolve<IMessageBroker>().Publish(this,
-            new MainHeroMountKilled(client.GetRegisteredObject<Hero>(heroId!), usesCivilianEquipment: false, horseLost)));
+            new MainHeroMountKilled(client.GetRegisteredObject<Hero>(heroId!), usesCivilianEquipment: false, loss)));
         TestEnvironment.FlushCoalescer();
 
         foreach (var instance in TestEnvironment.Clients.Prepend(Server))
@@ -83,7 +83,7 @@ public class MainHeroMountHandlerTests : IDisposable
                 var equipment = party.LeaderHero.BattleEquipment;
                 var harness = instance.GetRegisteredObject<ItemObject>(harnessId);
 
-                if (horseLost)
+                if (loss == MountLoss.Lost)
                 {
                     Assert.Null(equipment[EquipmentIndex.Horse].Item);
                     Assert.Null(equipment[EquipmentIndex.HorseHarness].Item);
