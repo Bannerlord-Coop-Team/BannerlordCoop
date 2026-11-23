@@ -4,14 +4,24 @@ using Coop.Core.Client.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.MobileParties.Messages;
 using E2E.Tests.Util;
 using GameInterface.CoopSessionData;
+using GameInterface.Services.Ferries;
 using GameInterface.Services.Ferries.Interfaces;
 using GameInterface.Services.Ferries.Messages;
+using GameInterface.Services.Heroes.Interfaces;
+using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.MobileParties.Handlers;
 using GameInterface.Services.MobileParties.Messages.Behavior;
+using GameInterface.Services.NavalDLC;
+using GameInterface.Services.NavalDLC.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.Rafts.Interfaces;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.ComponentInterfaces;
+using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
@@ -50,6 +60,11 @@ public class PlayerFerryTests : SyncTestBase
             }
             // PlayerEncounter.Finish writes the menu id, which the harness campaign doesn't have
             Campaign.Current.MapStateData ??= new MapStateData();
+
+            // The village menu runs in a settlement encounter, which still has the village once the server's leave arrives
+            var encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
+            encounter.EncounterSettlementAux = requester.GetRegisteredObject<Settlement>(ferry.VillageId);
+            Campaign.Current.PlayerEncounter = encounter;
         });
 
         requester.Call(() => requester.Resolve<IMessageBroker>().Publish(this, new EndSettlementEncounterAttempted(
@@ -119,6 +134,7 @@ public class PlayerFerryTests : SyncTestBase
             Assert.False(CachedFleets().ContainsKey(ferry.HeroId));
             Assert.True(Server.ObjectManager.TryGetId(Assert.Single(party.Ships), out shipId));
         });
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPlayerFerryChanged>(), message => message.VillageId == null);
 
         foreach (var instance in Clients)
         {
@@ -128,8 +144,58 @@ public class PlayerFerryTests : SyncTestBase
                 var party = instance.GetRegisteredObject<MobileParty>(ferry.PartyId);
                 Assert.Same(party.Party, instance.GetRegisteredObject<Ship>(shipId).Owner);
                 Assert.False(party.IsInFerryState);
+                Assert.False(instance.Resolve<IPlayerFerryTracker>().Departures.ContainsKey(ferry.HeroId));
             });
         }
+    }
+
+    // A rejoin mid trip reaches the server as a character change, and the party has no ships, which vanilla puts on a raft
+    [Fact]
+    public void OnPlayerCharacterChanged_PartyOnFerry_KeepsTheCachedFleet()
+    {
+        var ferry = CreatePlayerAtFerryVillage();
+
+        Server.Call(() =>
+        {
+            var party = Server.GetRegisteredObject<MobileParty>(ferry.PartyId);
+            Server.Resolve<IPlayerFerryInterface>().StartFerry(party, Server.GetRegisteredObject<Settlement>(ferry.VillageId));
+
+            Server.Resolve<IPlayerRaftFleetInterface>().OnPlayerCharacterChanged(party.LeaderHero, party);
+
+            Assert.False(party.IsInRaftState);
+            Assert.Empty(party.Ships);
+            Assert.True(CachedFleets().ContainsKey(ferry.HeroId));
+        });
+    }
+
+    // The save has no PlayerDataForNavalAutoTravel, so a client rejoining mid trip boards again from the server's departures
+    [Fact]
+    public void SwitchToPlayer_PartyOnFerry_BoardsTheFerry()
+    {
+        var ferry = CreatePlayerAtFerryVillage();
+        var client = Clients.First();
+        using var menuRecorder = new MethodCallRecorder(Priority.First,
+            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu), new[] { typeof(string) }));
+
+        client.Call(() =>
+        {
+            var departures = new Dictionary<string, string> { [ferry.HeroId] = ferry.VillageId };
+            client.Resolve<IMessageBroker>().Publish(this, new InitializeClientNavalData(new NavalPlayerData(null, null, null, null, playerFerryDepartures: departures)));
+
+            var hero = client.GetRegisteredObject<MobileParty>(ferry.PartyId).LeaderHero;
+            Assert.True(client.ObjectManager.TryGetId(hero.Clan, out var clanId));
+            Assert.True(client.ObjectManager.TryGetId(hero.CharacterObject, out var characterId));
+            client.Resolve<IHeroInterface>().SwitchToPlayer(new Player("ferried", ferry.HeroId, ferry.PartyId, clanId, characterId));
+        }, new[]
+        {
+            AccessTools.Method(typeof(InteractionsInitializationHandler), "Handle", new[] { typeof(MessagePayload<PlayerHeroChanged>) }),
+        });
+        client.PumpGameThread();
+
+        client.Call(() => Assert.Same(
+            client.GetRegisteredObject<Settlement>(ferry.VillageId),
+            Campaign.Current.PlayerDataForNavalAutoTravel?.DeparturedVillageWithFerry));
+        Assert.Equal(new[] { "player_ferry_state_wait" }, menuRecorder.MenusFor(client));
     }
 
     private record FerryTrip(string HeroId, string PartyId, string VillageId);

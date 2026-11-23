@@ -47,6 +47,12 @@ public interface IPlayerFerryInterface : IGameAbstraction
 
     /// <summary>[Client] Puts this client's party on the village's ferry, so vanilla's ferry menus steer it to the target.</summary>
     void BoardLocally(Settlement village);
+
+    /// <summary>Where the ferry from <paramref name="village"/> takes a party.</summary>
+    CampaignVec2 GetFerryDestination(Settlement village);
+
+    /// <summary>Whether a party on the ferry from <paramref name="village"/> reached its destination.</summary>
+    bool HasArrived(MobileParty party, Settlement village);
 }
 
 /// <inheritdoc cref="IPlayerFerryInterface"/>
@@ -116,8 +122,7 @@ public class PlayerFerryInterface : IPlayerFerryInterface
         party.Position = village.PortPosition;
         party.IsCurrentlyAtSea = true;
         party.IgnoreByOtherPartiesTill(CampaignTime.Never);
-        // Vanilla steers into the target village, steering to its port instead stops the ferry where the client's menu ends the trip
-        party.SetMoveGoToPoint(village.FerryTarget.PortPosition, MobileParty.NavigationType.Naval);
+        party.SetMoveGoToPoint(GetFerryDestination(village), MobileParty.NavigationType.Naval);
         party.Ai.DisableAi();
         party.Party.SetCustomName(new TextObject("{=avb1Niqp}Ferry"));
 
@@ -130,7 +135,7 @@ public class PlayerFerryInterface : IPlayerFerryInterface
     {
         if (!playerManager.TryGetPlayer(party, out var player)) return;
         if (!PlayerFerryDepartures.TryGetValue(player.HeroId, out var villageId)) return;
-        if (!objectManager.TryGetObjectWithLogging<Settlement>(villageId, out var village) || village.FerryTarget == null) return;
+        if (!objectManager.TryGetObjectWithLogging<Settlement>(villageId, out var village)) return;
 
         PlayerFerryDepartures.Remove(player.HeroId);
         messageBroker.Publish(this, new PlayerFerryChanged(player.HeroId, null));
@@ -155,11 +160,18 @@ public class PlayerFerryInterface : IPlayerFerryInterface
         // Leaving the village holds the party after the server's ferry move arrived, so start the same move locally
         using (new AllowedThread())
         {
-            MobileParty.MainParty.SetMoveGoToPoint(village.FerryTarget.PortPosition, MobileParty.NavigationType.Naval);
+            MobileParty.MainParty.SetMoveGoToPoint(GetFerryDestination(village), MobileParty.NavigationType.Naval);
         }
 
         GameMenu.ActivateGameMenu("player_ferry_state_wait");
     }
+
+    // Vanilla steers into the target village, steering to its port instead stops the ferry where the client's menu ends the trip
+    public CampaignVec2 GetFerryDestination(Settlement village) => village.FerryTarget.PortPosition;
+
+    // Same distance as FerryCampaignBehavior.player_ferry_state_menu_on_tick
+    public bool HasArrived(MobileParty party, Settlement village) =>
+        party.Position.Distance(GetFerryDestination(village)) < Campaign.Current.Models.EncounterModel.NeededMaximumNavalDistanceForEncounteringMobileParty;
 
     // NavalFerryModel prices the fare from Clan.PlayerClan and MobileParty.MainParty
     private static float GetFare(MobileParty party, Settlement village)

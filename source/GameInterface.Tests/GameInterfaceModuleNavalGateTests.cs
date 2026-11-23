@@ -102,7 +102,7 @@ public sealed class GameInterfaceModuleNavalGateTests : IDisposable
         typeof(ShipMainPartyPatches),
         typeof(ShipPiecesPatches),
         typeof(PlayerRaftFleetPatches),
-        typeof(PlayerRaftVisibilityPatches),
+        typeof(PlayerNavalAutoTravelVisibilityPatches),
         typeof(PlayerFerryStatePatches),
         typeof(AnchorPointPatches),
         typeof(AnchorPointMenuRefreshPatch),

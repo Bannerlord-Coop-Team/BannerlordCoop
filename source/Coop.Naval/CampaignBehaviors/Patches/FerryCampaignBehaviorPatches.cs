@@ -1,4 +1,6 @@
 ﻿using Common.Messaging;
+using GameInterface;
+using GameInterface.Services.Ferries.Interfaces;
 using GameInterface.Services.Ferries.Messages;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using HarmonyLib;
@@ -31,8 +33,9 @@ internal class FerryCampaignBehaviorPatches
     [HarmonyPrefix]
     public static bool PlayerFerryStateMenuOnTickPrefix()
     {
-        var target = Campaign.Current.PlayerDataForNavalAutoTravel.DeparturedVillageWithFerry.FerryTarget;
-        if (MobileParty.MainParty.Position.Distance(target.PortPosition) < Campaign.Current.Models.EncounterModel.NeededMaximumNavalDistanceForEncounteringMobileParty)
+        if (!ContainerProvider.TryResolve<IPlayerFerryInterface>(out var ferryInterface)) return true;
+
+        if (ferryInterface.HasArrived(MobileParty.MainParty, Campaign.Current.PlayerDataForNavalAutoTravel.DeparturedVillageWithFerry))
         {
             GameMenu.SwitchToMenu("player_ferry_state_end");
         }

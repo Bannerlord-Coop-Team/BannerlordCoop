@@ -280,12 +280,12 @@ public class ClientSettlementExitEnterHandler : IHandler
 
         using (new AllowedThread())
         {
+            // The server's leave already cleared CurrentSettlement, so this is usually the encounter's settlement
+            var leftSettlement = MobileParty.MainParty.CurrentSettlement ?? Settlement.CurrentSettlement;
             settlementInterface.EndSettlementEncounter(leaveType);
 
-            // The server's ferry change is sent before this reply, so the departure is already known here
-            if (leaveType == SettlementLeaveType.Ferry && playerFerryInterface != null &&
-                playerFerryInterface.TryGetDepartureVillage(MobileParty.MainParty, out var village))
-                playerFerryInterface.BoardLocally(village);
+            if (leaveType == SettlementLeaveType.Ferry && leftSettlement != null)
+                playerFerryInterface?.BoardLocally(leftSettlement);
         }
     }
 

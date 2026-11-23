@@ -12,7 +12,7 @@ namespace GameInterface.Services.Rafts.Patches;
 /// </summary>
 [HarmonyPatch]
 [HarmonyPatchCategory(GameInterface.HARMONY_NAVAL_CATEGORY)]
-internal class PlayerRaftVisibilityPatches
+internal class PlayerNavalAutoTravelVisibilityPatches
 {
     // Remembers whether the camera left the nameplate visible before vanilla's hide rules run
     [HarmonyPatch(typeof(PartyNameplateVM), nameof(PartyNameplateVM.RefreshDynamicProperties))]
