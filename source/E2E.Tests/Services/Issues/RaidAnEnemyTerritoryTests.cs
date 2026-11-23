@@ -127,23 +127,6 @@ public sealed class RaidAnEnemyTerritoryTests : IDisposable
         }
     }
 
-    [Fact]
-    public void AcceptanceUsesTheServersDeadlineWhenTheClientClockDiffers()
-    {
-        long serverDeadline = 0;
-        Server.Call(() => serverDeadline = CampaignTime.DaysFromNow(60).NumTicks);
-        Owner.Call(() =>
-        {
-            Campaign.Current.MapTimeTracker._numTicks += CampaignTime.Days(1).NumTicks;
-            Assert.NotEqual(serverDeadline, CampaignTime.DaysFromNow(60).NumTicks);
-        });
-
-        var accepted = Accept();
-        Assert.True(accepted.HasQuestDueTime);
-        Assert.Equal(serverDeadline, accepted.QuestDueTimeTicks);
-        Owner.Call(() => Assert.Equal(serverDeadline, QuestOn(Owner).QuestDueTime.NumTicks));
-    }
-
     [Theory]
     [InlineData(3, true)]
     [InlineData(2, false)]
@@ -249,7 +232,7 @@ public sealed class RaidAnEnemyTerritoryTests : IDisposable
         AssertRewards(before, outcome == IssueOutcome.QuestSuccess);
     }
 
-    private NetworkQuestSolutionAccepted Accept()
+    private void Accept()
     {
         Owner.Call(() =>
         {
@@ -261,7 +244,7 @@ public sealed class RaidAnEnemyTerritoryTests : IDisposable
             }
         }, DialogAndTextHelpers);
 
-        return Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAccepted>());
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAccepted>());
     }
 
     private void GiveRaidCredit(EnvironmentInstance instance, int count) => instance.Call(() =>

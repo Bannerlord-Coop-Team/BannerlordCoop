@@ -52,7 +52,7 @@ internal sealed class RaidAnEnemyTerritoryProgress : IRaidAnEnemyTerritoryProgre
         if (!ownerRaided) return;
 
         quest._raidedVillages.Add(village);
-        quest._raidedVillagesTrackLog?.UpdateCurrentProgress(quest._raidedVillages.Count);
+        quest._raidedVillagesTrackLog.UpdateCurrentProgress(quest._raidedVillages.Count);
         Logger.Debug("Raid quest progress issue={issue} giver={giver} count={count} village={village}",
             issue.StringId, quest.QuestGiver.StringId, quest._raidedVillages.Count, village.StringId);
 
