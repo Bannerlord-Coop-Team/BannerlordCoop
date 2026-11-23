@@ -34,7 +34,7 @@ namespace GameInterface.AutoSync.Builders
                 serializer = autoSyncRegistry.Serializers[type];
             }
             return ($"{serializer.Serialize.DeclaringType.Namespace}.{serializer.Serialize.DeclaringType.Name}.{serializer.Serialize.Name}",
-                $"{serializer.Deserialize.DeclaringType.Namespace}.{serializer.Deserialize.DeclaringType.Name}.{serializer.Deserialize.Name}<{type.Name}>");
+                $"{serializer.Deserialize.DeclaringType.Namespace}.{serializer.Deserialize.DeclaringType.Name}.{serializer.Deserialize.Name}<{AutoSyncUtils.GetSimpleTypeName(type)}>");
         }
 
         protected string GetSetTranspiler(Debuggable<FieldInfo> fieldItem)
