@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Messaging;
 using Common.Network;
+using Common.Network.Messages;
 using GameInterface.Services.BattleWreckages.Interfaces;
 using GameInterface.Services.BattleWreckages.Messages;
 using GameInterface.Services.ObjectManager;
@@ -49,6 +50,8 @@ internal class BattleWreckageCampaignBehaviorHandler : IHandler
 
         messageBroker.Subscribe<RequestAcceptRecoverTroops>(Handle_RequestAcceptRecoverTroops);
         messageBroker.Subscribe<NetworkRequestAcceptRecoverTroops>(Handle_NetworkRequestAcceptRecoverTroops);
+
+        messageBroker.Subscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
     }
 
     public void Dispose()
@@ -72,6 +75,8 @@ internal class BattleWreckageCampaignBehaviorHandler : IHandler
 
         messageBroker.Unsubscribe<RequestAcceptRecoverTroops>(Handle_RequestAcceptRecoverTroops);
         messageBroker.Unsubscribe<NetworkRequestAcceptRecoverTroops>(Handle_NetworkRequestAcceptRecoverTroops);
+
+        messageBroker.Unsubscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
     }
 
     private void Handle_RequestLeaveWreckageEncounter(MessagePayload<RequestLeaveWreckageEncounter> obj)
@@ -226,6 +231,14 @@ internal class BattleWreckageCampaignBehaviorHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out var mainHero)) return;
 
             battleWreckageCampaignBehaviorInterface.AcceptRecoverTroops(mainHero);
+        });
+    }
+
+    private void Handle_PlayerDisconnected(MessagePayload<PlayerDisconnected> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            battleWreckageCampaignBehaviorInterface.RemoveDisconnectedPlayers();
         });
     }
 }

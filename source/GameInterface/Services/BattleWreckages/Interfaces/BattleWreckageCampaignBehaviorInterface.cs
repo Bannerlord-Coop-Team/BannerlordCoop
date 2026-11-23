@@ -1,4 +1,5 @@
-﻿using TaleWorlds.CampaignSystem;
+﻿using GameInterface.Services.Players;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Party;
 
@@ -17,15 +18,18 @@ public interface IBattleWreckageCampaignBehaviorInterface : IGameAbstraction
     void ShowRecoverTroopsDecision(int recoverTroopCount, CampaignTime requiredInvestigationDuration);
     void ShowWreckageResultsConnectionMenu();
     void AcceptRecoverTroops(Hero mainHero);
+    void RemoveDisconnectedPlayers();
 }
 
 public class BattleWreckageCampaignBehaviorInterface : IBattleWreckageCampaignBehaviorInterface
 {
     private readonly IBattleWreckageEncounterTracker encounterTracker;
+    private readonly IPlayerManager playerManager;
 
-    public BattleWreckageCampaignBehaviorInterface(IBattleWreckageEncounterTracker encounterTracker)
+    public BattleWreckageCampaignBehaviorInterface(IBattleWreckageEncounterTracker encounterTracker, IPlayerManager playerManager)
     {
         this.encounterTracker = encounterTracker;
+        this.playerManager = playerManager;
     }
 
     public void OnHourlyTick()
@@ -81,5 +85,14 @@ public class BattleWreckageCampaignBehaviorInterface : IBattleWreckageCampaignBe
     public void AcceptRecoverTroops(Hero mainHero)
     {
         // TODO: Mark the player's recover troops consequence as accepted and restart their investigation time
+    }
+
+    public void RemoveDisconnectedPlayers()
+    {
+        foreach (var encounter in encounterTracker.Encounters)
+        {
+            if (playerManager.IsOwnerOfHeroDisconnected(encounter.Hero))
+                encounterTracker.RemoveEncounter(encounter.Hero);
+        }
     }
 }
