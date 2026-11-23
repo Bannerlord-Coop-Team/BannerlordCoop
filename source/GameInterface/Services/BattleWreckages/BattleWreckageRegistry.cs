@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.BattleWreckages;
+using TaleWorlds.CampaignSystem.LogEntries;
 
 namespace GameInterface.Services.BattleWreckages;
 
@@ -40,6 +41,7 @@ internal class BattleWreckageRegistry : AutoRegistryBase<BattleWreckage>
         {
             Campaign.Current.CampaignObjectManager.AddWreckage(obj);
             CampaignEventDispatcher.Instance.OnMapInteractableCreated(obj);
+            LogEntry.AddLogEntry(new WreckageCreatedLogEntry(obj));
         }
     }
 
