@@ -30,6 +30,7 @@ internal sealed class CoopHideoutMissionLogic : MissionLogic
     private readonly HashSet<int> hidden = new();
     private readonly Dictionary<Agent, AgentControllerType> spectatorControllers = new();
     private readonly Dictionary<Agent, Team> spectatorTeams = new();
+    private readonly HashSet<Agent> surrenderedDefenders = new();
     private NetworkHideoutState pendingState;
     private CoopBattleController battle;
     private bool initialized;
@@ -252,9 +253,10 @@ internal sealed class CoopHideoutMissionLogic : MissionLogic
     // A won duel leaves the leftover bandits surrendered (vanilla makes them teamless), so nothing may wake or charge them
     public bool HoldsSurrenderedDefenders => Native?.Phase == HideoutPhase.Resolved && winner == BattleSideEnum.Attacker;
 
-    // A duel spectator stays teamless until RestoreSpectators runs, so its real side is the team it was taken from
-    public bool IsSurrenderedDefender(Agent agent) => HoldsSurrenderedDefenders &&
-        (spectatorTeams.TryGetValue(agent, out var team) ? team : agent.Team)?.Side == BattleSideEnum.Defender;
+    // A duel spectator is teamless, and a won duel's guards stay that way after RestoreSpectators,
+    // so its real side is the team it was taken from
+    public bool IsSurrenderedDefender(Agent agent) => HoldsSurrenderedDefenders && (surrenderedDefenders.Contains(agent) ||
+        (spectatorTeams.TryGetValue(agent, out var team) ? team : agent.Team)?.Side == BattleSideEnum.Defender);
 
     public bool RestoreAdoptedAgent(Agent agent)
     {
@@ -443,8 +445,13 @@ internal sealed class CoopHideoutMissionLogic : MissionLogic
         // Native leaves the boss's guards teamless after a won duel, otherwise they block every nearby player's exit.
         bool duelWon = Native.Phase == HideoutPhase.Resolved && winner == BattleSideEnum.Attacker;
         foreach (var pair in spectatorTeams)
-            if (pair.Key.IsActive() && !(duelWon && pair.Value.Side == BattleSideEnum.Defender))
+        {
+            if (!pair.Key.IsActive()) continue;
+            if (duelWon && pair.Value.Side == BattleSideEnum.Defender)
+                surrenderedDefenders.Add(pair.Key);
+            else
                 pair.Key.SetTeam(pair.Value, true);
+        }
         foreach (var pair in spectatorControllers)
             if (pair.Key.IsActive()) pair.Key.Controller = pair.Value;
         spectatorTeams.Clear();
