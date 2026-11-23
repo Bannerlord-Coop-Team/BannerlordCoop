@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.Heroes.Extensions;
@@ -7,6 +8,8 @@ using Missions.Battles;
 using Missions.Services.Network;
 using Missions.Messages;
 using SandBox.Conversation.MissionLogics;
+using SandBox.Missions;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -20,6 +23,9 @@ namespace Missions.Hideouts;
 
 internal sealed class CoopHideoutMissionLogic : MissionLogic
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<CoopHideoutMissionLogic>();
+    private (HideoutPhase Phase, BattleSideEnum Winner, bool Attacker, bool Defender) loggedOutcome;
+
     private readonly IBattleNetwork network;
     private readonly IMessageBroker broker;
     private readonly IMissionContext missionContext;
@@ -32,6 +38,7 @@ internal sealed class CoopHideoutMissionLogic : MissionLogic
     private readonly Dictionary<Agent, Team> spectatorTeams = new();
     private readonly HashSet<Agent> surrenderedDefenders = new();
     private NetworkHideoutState pendingState;
+    private NetworkHideoutState failCounterState;
     private CoopBattleController battle;
     private bool initialized;
     private bool reportedSuccessorReady;
@@ -55,6 +62,8 @@ internal sealed class CoopHideoutMissionLogic : MissionLogic
     public bool IsAuthority => battle?.Session.IsLocalHost == true;
     public bool HasPhaseSnapshot => initialized && ledger.Latest != null;
     public int InitialPopulation => defenderSource.SideTotalTroops;
+    // A lost raid, such as a stealth failure, can leave living heroes among the bandits.
+    public bool IsLostToDefenders => Native?.Phase == HideoutPhase.Resolved && winner == BattleSideEnum.Defender;
     public bool HasOtherPlayers => missionContext.ControllersInMission.Count > 0;
 
     public CoopHideoutMissionLogic(IBattleNetwork network, IMessageBroker broker, IMissionContext missionContext,
@@ -70,6 +79,7 @@ internal sealed class CoopHideoutMissionLogic : MissionLogic
         Attacker = new HideoutTroopSupplier(attackerSource, ledger);
         broker.Subscribe<NetworkHideoutState>(HandleState);
         broker.Subscribe<NetworkHideoutCallTroops>(HandleCallTroops);
+        broker.Subscribe<NetworkHideoutTeleportToBoss>(HandleTeleportToBoss);
     }
 
     public override void AfterStart() => battle = Mission.GetMissionBehavior<CoopBattleController>();
@@ -165,6 +175,8 @@ internal sealed class CoopHideoutMissionLogic : MissionLogic
             snapshotTimer -= dt;
             if (Native.Phase != lastPhase || snapshotTimer <= 0f)
             {
+                if (Native.Phase != lastPhase)
+                    Logger.Information("[Hideout] Host phase {Old} -> {New}, winner {Winner}", lastPhase, Native.Phase, winner);
                 lastPhase = Native.Phase;
                 snapshotTimer = 0.5f;
                 BroadcastState();
@@ -175,11 +187,28 @@ internal sealed class CoopHideoutMissionLogic : MissionLogic
             ApplyLatest();
         }
         ApplySpectators();
+        ConcludeResolved();
+        ApplyDefeatTruce();
+        LogOutcomeChange();
         if (!reportedSuccessorReady && HasPhaseSnapshot)
         {
             reportedSuccessorReady = true;
             broker.Publish(this, new BattleMissionReady(battle.Session.InstanceId));
         }
+    }
+
+    // Diagnostic: what the native end check would read, logged whenever it changes.
+    private void LogOutcomeChange()
+    {
+        var outcome = (Native.Phase, winner, IsSideDepleted(BattleSideEnum.Attacker), IsSideDepleted(BattleSideEnum.Defender));
+        if (outcome.Equals(loggedOutcome)) return;
+        loggedOutcome = outcome;
+        Logger.Information("[Hideout] Outcome changed: authority={Authority} phase={Phase} winner={Winner} attackerDepleted={Attacker} " +
+            "defenderDepleted={Defender} canCheckEnd={CanCheck} mode={Mode} activeAttackers={ActiveAttackers} activeDefenders={ActiveDefenders}",
+            IsAuthority, outcome.Item1, outcome.Item2, outcome.Item3, outcome.Item4,
+            Mission.GetMissionBehavior<BattleEndLogic>()?._canCheckForEndCondition, Mission.Mode,
+            Mission.Agents.Count(agent => agent.IsHuman && agent.IsActive() && agent.Team?.Side == BattleSideEnum.Attacker),
+            Mission.Agents.Count(agent => agent.IsHuman && agent.IsActive() && agent.Team?.Side == BattleSideEnum.Defender));
     }
 
     private void SpawnHero()
@@ -354,6 +383,34 @@ internal sealed class CoopHideoutMissionLogic : MissionLogic
         });
     }
 
+    // Debug command: each client owns its hero's position, so every player moves its own hero.
+    public bool RequestTeleportToBoss()
+    {
+        if (battle == null || Native.Boss?.IsActive() != true) return false;
+        network.SendAll(new NetworkHideoutTeleportToBoss(battle.Session.InstanceId));
+        TeleportToBoss();
+        return true;
+    }
+
+    internal bool TeleportToBoss()
+    {
+        var boss = Native.Boss;
+        var hero = Mission.MainAgent;
+        if (boss?.IsActive() != true || hero?.IsActive() != true) return false;
+        hero.TeleportToPosition(boss.Position + (boss.GetMovementDirection() * 2f).ToVec3());
+        return true;
+    }
+
+    private void HandleTeleportToBoss(MessagePayload<NetworkHideoutTeleportToBoss> payload)
+    {
+        var message = payload.What;
+        GameThread.RunSafe(() =>
+        {
+            if (battle != null && message.InstanceId == battle.Session.InstanceId)
+                TeleportToBoss();
+        });
+    }
+
     private void HandleState(MessagePayload<NetworkHideoutState> payload)
     {
         var state = payload.What;
@@ -401,16 +458,50 @@ internal sealed class CoopHideoutMissionLogic : MissionLogic
         };
         if (Mission.Mode != mode)
             Mission.SetMissionMode(mode, false);
-        bool enemies = state.Phase is not (HideoutPhase.Cinematic or HideoutPhase.Conversation);
+        if (!ReferenceEquals(state, failCounterState))
+        {
+            failCounterState = state;
+            ApplyFailCounter(Mission.GetMissionBehavior<StealthFailCounterMissionLogic>(), state, Mission.Agents, Mission.CurrentTime);
+        }
+        bool enemies = state.Phase is not (HideoutPhase.Cinematic or HideoutPhase.Conversation) && !IsLostToDefenders;
         Mission.AttackerTeam.SetIsEnemyOf(Mission.DefenderTeam, enemies);
         foreach (var agent in Mission.Agents)
             if (agent.IsActive() && agent.Origin != null && hidden.Contains(agent.Origin.UniqueSeed))
                 agent.FadeOut(true, true);
         if (state.Phase == HideoutPhase.Resolved && winner != BattleSideEnum.None)
         {
-            MapEvent.PlayerMapEvent.SetOverrideWinner(winner);
-            Mission.GetMissionBehavior<BattleEndLogic>().ChangeCanCheckForEndCondition(true);
+            ConcludeResolved();
+            MapEvent.PlayerMapEvent?.SetOverrideWinner(winner);
         }
+    }
+
+    // Sentry AI only runs on the host, so its alarms and countdown reach a peer's fail bar through the snapshot.
+    internal static void ApplyFailCounter(StealthFailCounterMissionLogic counter, NetworkHideoutState state,
+        IEnumerable<Agent> agents, float missionTime)
+    {
+        if (counter == null) return;
+        var alarmed = new HashSet<int>();
+        if (state.Defenders != null)
+            foreach (var defender in state.Defenders)
+                if (defender.Alarmed) alarmed.Add(defender.Seed);
+        counter._alarmedAgents.Clear();
+        counter._alarmedAgents.AddRange(agents.Where(agent => agent.IsActive() && agent.Origin != null &&
+            alarmed.Contains(agent.Origin.UniqueSeed)));
+        bool running = state.Phase == HideoutPhase.Stealth && state.FailCounterElapsed >= 0f && counter._alarmedAgents.Count > 0;
+        counter.IsActive = running;
+        counter._failCounter = running
+            ? new Timer(missionTime - state.FailCounterElapsed, counter.FailCounterSeconds, autoReset: false)
+            : null;
+        // A new timer reads zero elapsed until its first check, which would blink the bar empty on every snapshot.
+        counter._failCounter?.Check(missionTime);
+    }
+
+    private float FailCounterElapsed()
+    {
+        var counter = Mission.GetMissionBehavior<StealthFailCounterMissionLogic>();
+        return counter?.IsActive == true && counter._failCounter != null
+            ? Mission.CurrentTime - counter._failCounter.StartTime
+            : -1f;
     }
 
     private void ApplySpectators()
@@ -467,7 +558,8 @@ internal sealed class CoopHideoutMissionLogic : MissionLogic
                     new HideoutDefenderState(agent.Origin.UniqueSeed, (int)agent.CurrentWatchState,
                         agent.IsAlarmed(), -1, false)).ToArray(),
             Mission.Agents.Where(agent => agent.IsActive() && agent.IsHero && agent.Origin != null)
-                .Select(agent => agent.Origin.UniqueSeed).ToArray());
+                .Select(agent => agent.Origin.UniqueSeed).ToArray(),
+            FailCounterElapsed());
 
     private void BroadcastState()
     {
@@ -484,18 +576,49 @@ internal sealed class CoopHideoutMissionLogic : MissionLogic
 
     public void OnStealthFailure()
     {
-        if (!IsAuthority || Native.Phase != HideoutPhase.Stealth) return;
+        // The counter only runs in stealth mode, so any unresolved phase it expires in is a failure.
+        if (!IsAuthority || Native.Phase == HideoutPhase.Resolved) return;
+        Logger.Information("[Hideout] Stealth fail countdown expired in phase {Phase}", Native.Phase);
         winner = BattleSideEnum.Defender;
         Native.Apply(HideoutPhase.Resolved, Native.Boss, InitialPopulation);
-        MapEvent.PlayerMapEvent.SetOverrideWinner(winner);
-        Mission.GetMissionBehavior<BattleEndLogic>().ChangeCanCheckForEndCondition(true);
+        // The prefix skipped the native popup that stops the counter, so stop it here or the bar restarts.
+        var counter = Mission.GetMissionBehavior<StealthFailCounterMissionLogic>();
+        if (counter != null) counter.IsActive = false;
+        ConcludeResolved();
         BroadcastState();
+        MapEvent.PlayerMapEvent?.SetOverrideWinner(winner);
+    }
+
+    // Native ends a failed stealth mission at once; here it stays open for the results, so the bandits stand down.
+    private void ApplyDefeatTruce()
+    {
+        if (!IsLostToDefenders || Mission.DefenderTeam == null) return;
+        foreach (var team in new[] { Mission.AttackerTeam, Mission.AttackerAllyTeam })
+            if (team != null && team.IsEnemyOf(Mission.DefenderTeam))
+                team.SetIsEnemyOf(Mission.DefenderTeam, false);
+    }
+
+    // The host's verdict ends the mission on every client. It is latched straight onto the native end logic
+    // because a stealth failure leaves both sides standing, which the native depletion checks read as no result.
+    internal void ConcludeResolved()
+    {
+        if (Native.Phase != HideoutPhase.Resolved || winner == BattleSideEnum.None) return;
+        var end = Mission.GetMissionBehavior<BattleEndLogic>();
+        var playerSide = Mission.PlayerTeam?.Side ?? BattleSideEnum.None;
+        if (end == null || playerSide == BattleSideEnum.None) return;
+        bool playerWon = winner == playerSide;
+        end.ChangeCanCheckForEndCondition(true);
+        end._isEnemySideDepleted = playerWon;
+        end._isPlayerSideDepleted = !playerWon;
+        end._isEnemySideRetreating = false;
+        end._isPlayerSideRetreating = false;
     }
 
     public override void OnRemoveBehavior()
     {
         broker.Unsubscribe<NetworkHideoutState>(HandleState);
         broker.Unsubscribe<NetworkHideoutCallTroops>(HandleCallTroops);
+        broker.Unsubscribe<NetworkHideoutTeleportToBoss>(HandleTeleportToBoss);
         base.OnRemoveBehavior();
     }
 }

@@ -57,6 +57,20 @@ internal static class HideoutStealthFailurePopupPatch
     }
 }
 
+// Native refuses to leave while an enemy is close, but a failed stealth raid ends with living heroes beside the bandits.
+[HarmonyPatch(typeof(BattleEndLogic), nameof(BattleEndLogic.TryExit))]
+[HarmonyPatchCategory(MissionModule.HideoutPatchCategory)]
+internal static class HideoutLostRaidExitPatch
+{
+    private static void Postfix(BattleEndLogic __instance, ref BattleEndLogic.ExitResult __result)
+    {
+        if (__result != BattleEndLogic.ExitResult.False) return;
+        if (__instance.Mission?.GetMissionBehavior<CoopHideoutMissionLogic>()?.IsLostToDefenders != true) return;
+        __instance.Mission.EndMission();
+        __result = BattleEndLogic.ExitResult.True;
+    }
+}
+
 [HarmonyPatch(typeof(HideoutConversationsCampaignBehavior))]
 [HarmonyPatchCategory(MissionModule.HideoutPatchCategory)]
 internal static class HideoutBossDuelPatches

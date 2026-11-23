@@ -554,6 +554,113 @@ public sealed class HideoutMissionRuntimeTests : MissionTestEnvironment
         finally { harmony.UnpatchAll(harmony.Id); }
     }
 
+    [Fact]
+    public void PeerFailCounter_FollowsTheHostsAlarmedSentriesAndCountdown()
+    {
+        using var fixture = new MissionEngineFixture();
+        var client = Clients.Last();
+        client.Call(() =>
+        {
+            var mission = fixture.CreateMission(client);
+            var team = mission.AddTeam(BattleSideEnum.Defender);
+            var origin = Mock.Of<IAgentOriginBase>(value => value.Troop == Game.Current.PlayerTroop && value.UniqueSeed == 7);
+            var sentry = mission.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop).Team(team).TroopOrigin(origin)
+                .Controller(AgentControllerType.None));
+            var counter = new StealthFailCounterMissionLogic { FailCounterSeconds = 15f };
+
+            // The sentry's AI is idle on a peer, so only the host's snapshot can start the countdown.
+            CoopHideoutMissionLogic.ApplyFailCounter(counter, FailCounterState(alarmed: true, elapsed: 4f), mission.Agents, 10f);
+            Assert.True(counter.IsActive);
+            Assert.Same(sentry, Assert.Single(counter._alarmedAgents));
+            Assert.Equal(6f, counter._failCounter.StartTime);
+            Assert.Equal(4f, counter.FailCounterElapsedTime);
+            Assert.Equal(15f, counter._failCounter.Duration);
+
+            CoopHideoutMissionLogic.ApplyFailCounter(counter, FailCounterState(alarmed: false, elapsed: -1f), mission.Agents, 11f);
+            Assert.False(counter.IsActive);
+            Assert.Empty(counter._alarmedAgents);
+            Assert.Null(counter._failCounter);
+        });
+    }
+
+    [Fact]
+    public void TeleportToBoss_MovesTheLocalHeroOnlyOnceTheBossHasSpawned()
+    {
+        using var fixture = new MissionEngineFixture();
+        var client = Clients.Last();
+        client.Call(() =>
+        {
+            var mission = fixture.CreateMission(client);
+            var hero = mission.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop).Team(mission.AddTeam(BattleSideEnum.Attacker)));
+            var boss = mission.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop).Team(mission.AddTeam(BattleSideEnum.Defender))
+                .Controller(AgentControllerType.None).InitialPosition(new Vec3(20f, 30f, 2f)).InitialDirection(new Vec2(0f, 1f)));
+            mission.MainAgent = hero;
+            var logic = new CoopHideoutMissionLogic(Mock.Of<IBattleNetwork>(), Mock.Of<IMessageBroker>(), Mock.Of<IMissionContext>(),
+                new CoopTroopSupplier("raid", BattleSideEnum.Defender, null, null),
+                new CoopTroopSupplier("raid", BattleSideEnum.Attacker, null, null), false);
+            AccessTools.Property(typeof(MissionBehavior), nameof(MissionBehavior.Mission)).SetValue(logic, mission.Shell);
+            var native = new PromotionController(() => { });
+            logic.Native = native;
+            try
+            {
+                Assert.False(logic.TeleportToBoss());
+                Assert.Equal(default, hero.Position);
+
+                native.Boss = boss;
+                Assert.True(logic.TeleportToBoss());
+                Assert.Equal(new Vec3(20f, 32f, 2f), hero.Position);
+            }
+            finally { logic.OnRemoveBehavior(); }
+        });
+    }
+
+    // A stealth failure leaves both sides standing, so the verdict has to reach the native end logic directly.
+    [Theory]
+    [InlineData(BattleSideEnum.Defender, true)]
+    [InlineData(BattleSideEnum.Attacker, false)]
+    public void ResolvedVerdict_LatchesTheNativeEndLogicOnEveryClient(BattleSideEnum winner, bool playerLost)
+    {
+        using var fixture = new MissionEngineFixture();
+        var client = Clients.Last();
+        client.Call(() =>
+        {
+            var mission = fixture.CreateMission(client);
+            var team = mission.AddTeam(BattleSideEnum.Attacker);
+            mission.PlayerTeam = mission.AttackerTeam;
+            mission.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop).Team(team));
+            mission.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop).Team(mission.AddTeam(BattleSideEnum.Defender))
+                .Controller(AgentControllerType.None));
+            var logic = new CoopHideoutMissionLogic(Mock.Of<IBattleNetwork>(), Mock.Of<IMessageBroker>(), Mock.Of<IMissionContext>(),
+                new CoopTroopSupplier("raid", BattleSideEnum.Defender, null, null),
+                new CoopTroopSupplier("raid", BattleSideEnum.Attacker, null, null), false);
+            var end = new BattleEndLogic();
+            end.ChangeCanCheckForEndCondition(false);
+            AccessTools.Field(typeof(Mission), "<MissionBehaviors>k__BackingField").SetValue(mission.Shell,
+                new List<MissionBehavior> { logic, end });
+            AccessTools.Property(typeof(MissionBehavior), nameof(MissionBehavior.Mission)).SetValue(logic, mission.Shell);
+            logic.Native = new PromotionController(() => { });
+            try
+            {
+                logic.Native.Apply(HideoutPhase.Stealth, null, 25);
+                logic.ConcludeResolved();
+                Assert.False(end._canCheckForEndCondition);
+
+                logic.Native.Apply(HideoutPhase.Resolved, null, 25);
+                AccessTools.Field(typeof(CoopHideoutMissionLogic), "winner").SetValue(logic, winner);
+                logic.ConcludeResolved();
+                Assert.True(end._canCheckForEndCondition);
+                Assert.Equal(playerLost, end._isPlayerSideDepleted);
+                Assert.Equal(!playerLost, end._isEnemySideDepleted);
+                Assert.False(end._isEnemySideRetreating);
+            }
+            finally { logic.OnRemoveBehavior(); }
+        });
+    }
+
+    private static NetworkHideoutState FailCounterState(bool alarmed, float elapsed)
+        => new("raid", "host", 1, 1, HideoutPhase.Stealth, 0, 0, null, BattleSideEnum.None, 25,
+            defenders: new[] { new HideoutDefenderState(7, 0, alarmed, -1, false) }, failCounterElapsed: elapsed);
+
     private static float stealthClock;
     private static int stealthFailureCount;
     private static bool StealthMissionTime(ref float __result) { __result = stealthClock; return false; }
@@ -624,7 +731,7 @@ public sealed class HideoutMissionRuntimeTests : MissionTestEnvironment
         private readonly Action onResume;
         public PromotionController(Action onResume) => this.onResume = onResume;
         public HideoutPhase Phase { get; private set; } = HideoutPhase.Duel;
-        public Agent Boss => null;
+        public Agent Boss { get; set; }
         public bool Resumed { get; private set; }
         public void Initialize(bool authority, bool migration) { }
         public void TickAuthority(float dt) { }
@@ -699,6 +806,24 @@ public sealed class HideoutMissionRuntimeTests : MissionTestEnvironment
 /// <summary>Hideout runtime rules that only need mocks and skip-ctor game objects, so no game instances.</summary>
 public sealed class HideoutMissionLogicTests
 {
+    [Theory]
+    [InlineData(BattleSideEnum.None)]
+    [InlineData(BattleSideEnum.Defender)]
+    [InlineData(BattleSideEnum.Attacker)]
+    public void StateSnapshot_RoundTripKeepsTheWinnerAndFailCountdown(BattleSideEnum winner)
+    {
+        var original = new NetworkHideoutState("raid", "host", 1, 2, HideoutPhase.Resolved, 0, 0, null, winner, 25,
+            failCounterElapsed: -1f);
+        using var stream = new System.IO.MemoryStream();
+        ProtoBuf.Serializer.Serialize(stream, original);
+        stream.Position = 0;
+        var result = ProtoBuf.Serializer.Deserialize<NetworkHideoutState>(stream);
+
+        Assert.Equal(winner, result.Winner);
+        Assert.Equal(HideoutPhase.Resolved, result.Phase);
+        Assert.Equal(-1f, result.FailCounterElapsed);
+    }
+
     [Fact]
     public void AmbushReady_WaitsForThePromotedHostsExpandedDefenderReserve()
     {
