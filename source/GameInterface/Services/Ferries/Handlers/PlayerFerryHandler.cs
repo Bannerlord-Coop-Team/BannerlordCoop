@@ -9,7 +9,6 @@ using GameInterface.Services.Players;
 using GameInterface.Services.UI.Messages;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Ferries.Handlers;
 
@@ -112,10 +111,7 @@ internal class PlayerFerryHandler : IHandler
     {
         GameThread.RunSafe(() =>
         {
-            if (!objectManager.TryGetId(Hero.MainHero, out var playerHeroId)) return;
-            if (!ferryTracker.Departures.TryGetValue(playerHeroId, out var villageId)) return;
-
-            if (!objectManager.TryGetObjectWithLogging<Settlement>(villageId, out var village) || village.FerryTarget == null) return;
+            if (!ferryInterface.TryGetDepartureVillage(MobileParty.MainParty, out var village)) return;
 
             ferryInterface.BoardLocally(village);
         });

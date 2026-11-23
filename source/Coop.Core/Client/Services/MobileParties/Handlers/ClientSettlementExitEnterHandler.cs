@@ -5,6 +5,7 @@ using Common.Util;
 using Coop.Core.Client.Services.MobileParties.Messages;
 using GameInterface.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.MobileParties.Messages;
+using GameInterface.Services.Ferries.Interfaces;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MobileParties.Messages.Behavior;
@@ -34,6 +35,7 @@ public class ClientSettlementExitEnterHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly ISettlementInterface settlementInterface;
     private readonly IHideoutResultEncounter hideoutResultEncounter;
+    private readonly IPlayerFerryInterface playerFerryInterface;
     // Local attempts and all response transitions run on the game thread.
     private PendingStart pendingStart;
     private uint pendingLeavePartyId;
@@ -45,13 +47,16 @@ public class ClientSettlementExitEnterHandler : IHandler
         INetwork network,
         IObjectManager objectManager,
         ISettlementInterface settlementInterface,
-        IHideoutResultEncounter hideoutResultEncounter)
+        IHideoutResultEncounter hideoutResultEncounter,
+        IPlayerFerryInterface playerFerryInterface = null)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.settlementInterface = settlementInterface;
         this.hideoutResultEncounter = hideoutResultEncounter;
+        // Only registered while War Sails is on, which is the only time a ferry leave comes back
+        this.playerFerryInterface = playerFerryInterface;
         messageBroker.Subscribe<StartSettlementEncounterAttempted>(Handle);
         messageBroker.Subscribe<EndSettlementEncounterAttempted>(Handle);
         messageBroker.Subscribe<NetworkSettlementEncounterLeaveResult>(Handle);
@@ -276,6 +281,11 @@ public class ClientSettlementExitEnterHandler : IHandler
         using (new AllowedThread())
         {
             settlementInterface.EndSettlementEncounter(leaveType);
+
+            // The server's ferry change is sent before this reply, so the departure is already known here
+            if (leaveType == SettlementLeaveType.Ferry && playerFerryInterface != null &&
+                playerFerryInterface.TryGetDepartureVillage(MobileParty.MainParty, out var village))
+                playerFerryInterface.BoardLocally(village);
         }
     }
 

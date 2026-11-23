@@ -1,13 +1,18 @@
 ﻿using Common.Messaging;
+using Common.Util;
+using Coop.Core.Client.Services.MobileParties.Messages;
+using Coop.Core.Server.Services.MobileParties.Messages;
 using E2E.Tests.Util;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.Ferries.Interfaces;
 using GameInterface.Services.Ferries.Messages;
+using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.ComponentInterfaces;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -33,18 +38,31 @@ public class PlayerFerryTests : SyncTestBase
     }
 
     [Fact]
-    public void StartFerry_PaysTheFareAsThePlayerKeepsTheFleetAndPutsThePartyOnTheFerry()
+    public void FerryLeave_PaysTheFareAsThePlayerKeepsTheFleetAndPutsThePartyOnTheFerry()
     {
         var ferry = CreatePlayerAtFerryVillage();
+        var requester = Clients.First();
+        requester.Call(() =>
+        {
+            using (new AllowedThread())
+            {
+                Campaign.Current.MainParty = requester.GetRegisteredObject<MobileParty>(ferry.PartyId);
+            }
+            // PlayerEncounter.Finish writes the menu id, which the harness campaign doesn't have
+            Campaign.Current.MapStateData ??= new MapStateData();
+        });
+
+        requester.Call(() => requester.Resolve<IMessageBroker>().Publish(this, new EndSettlementEncounterAttempted(
+            requester.GetRegisteredObject<MobileParty>(ferry.PartyId), SettlementLeaveType.Ferry)));
+        Assert.Single(requester.NetworkSentMessages.GetMessages<NetworkRequestEndSettlementEncounter>());
+        Server.PumpGameThread();
+
+        Assert.Equal(SettlementEncounterLeaveOutcome.Applied,
+            Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkSettlementEncounterLeaveResult>()).Outcome);
 
         Server.Call(() =>
         {
             var party = Server.GetRegisteredObject<MobileParty>(ferry.PartyId);
-            var village = Server.GetRegisteredObject<Settlement>(ferry.VillageId);
-            var ferryInterface = Server.Resolve<IPlayerFerryInterface>();
-            Assert.True(ferryInterface.CanTakeFerry(party, village));
-
-            ferryInterface.StartFerry(party, village);
 
             // The fare counts the player's party, so it was priced with the player as the main party
             Assert.Equal(Gold - FerryFare(party), party.LeaderHero.Gold);
@@ -68,6 +86,11 @@ public class PlayerFerryTests : SyncTestBase
                 Assert.True(party.IsInFerryState);
             });
         }
+
+        // The requester boards locally, so vanilla's ferry menus steer its party
+        requester.Call(() => Assert.Same(
+            requester.GetRegisteredObject<Settlement>(ferry.VillageId),
+            Campaign.Current.PlayerDataForNavalAutoTravel?.DeparturedVillageWithFerry));
     }
 
     [Fact]
@@ -116,6 +139,7 @@ public class PlayerFerryTests : SyncTestBase
     {
         var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         var villageId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        var villageComponentId = TestEnvironment.CreateRegisteredObject<Village>();
         var targetId = TestEnvironment.CreateRegisteredObject<Settlement>();
         var hullId = TestEnvironment.CreateRegisteredObject<ShipHull>();
 
@@ -128,6 +152,18 @@ public class PlayerFerryTests : SyncTestBase
                 hull.MaxHitPoints = 100;
                 hull.MaxSailHitPoints = 100;
                 hull.AvailableSlots = new Dictionary<string, ShipSlot>().GetReadOnlyDictionary();
+
+                // So are the village's ferry and positions
+                var village = instance.GetRegisteredObject<Settlement>(villageId);
+                var target = instance.GetRegisteredObject<Settlement>(targetId);
+                using (new AllowedThread())
+                {
+                    village.SetSettlementComponent(instance.GetRegisteredObject<Village>(villageComponentId));
+                    village.FerryTarget = target;
+                    village.PortPosition = Port;
+                    target.GatePosition = TargetGate;
+                    instance.GetRegisteredObject<MobileParty>(partyId)._currentSettlement = village;
+                }
             });
         }
 
@@ -146,13 +182,6 @@ public class PlayerFerryTests : SyncTestBase
 
             party.LeaderHero.Gold = Gold;
             ChangeShipOwnerAction.ApplyByProduction(party.Party, new Ship(Server.GetRegisteredObject<ShipHull>(hullId)));
-
-            var village = Server.GetRegisteredObject<Settlement>(villageId);
-            var target = Server.GetRegisteredObject<Settlement>(targetId);
-            village.FerryTarget = target;
-            village.PortPosition = Port;
-            target.GatePosition = TargetGate;
-            party._currentSettlement = village;
         });
         TestEnvironment.ConnectRegisteredPlayer(Clients.First(), "ferried");
 
