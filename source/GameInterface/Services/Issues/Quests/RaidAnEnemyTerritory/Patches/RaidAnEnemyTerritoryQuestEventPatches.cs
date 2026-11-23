@@ -84,7 +84,7 @@ internal sealed class RaidAnEnemyTerritoryQuestEventPatches
 
     private static void RunAsOwners(Action<Quest> listener)
     {
-        if (ModInformation.IsClient || !ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher))
+        if (!ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher))
         {
             return;
         }
