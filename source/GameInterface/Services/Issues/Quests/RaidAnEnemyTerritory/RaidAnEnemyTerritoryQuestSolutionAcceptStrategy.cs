@@ -14,13 +14,12 @@ internal sealed class RaidAnEnemyTerritoryQuestSolutionAcceptStrategy : IQuestSo
 
     public void Apply(IssueBase issue, byte[] captured)
     {
-        if (ModInformation.IsServer && issue.IssueQuest is Quest quest && quest._raidedVillagesTrackLog == null)
-        {
-            // Keep the acceptance stage in the saved mirror without starting it or raising UI events.
-            quest._raidedVillagesTrackLog = new JournalLog(CampaignTime.Now, quest.QuestAcceptedByPlayerLog,
-                new TextObject("{=RFH1lDMj}Raided Village Count"), quest._raidedVillages.Count,
-                RaidAnEnemyTerritoryIssueBehavior.TargetRaidVillageCount, LogType.Discreate);
-            quest._journalEntries.Add(quest._raidedVillagesTrackLog);
-        }
+        if (ModInformation.IsClient || issue.IssueQuest is not Quest quest || quest._raidedVillagesTrackLog != null) return;
+
+        // Keep the acceptance stage in the saved mirror without starting it or raising UI events.
+        quest._raidedVillagesTrackLog = new JournalLog(CampaignTime.Now, quest.QuestAcceptedByPlayerLog,
+            new TextObject("{=RFH1lDMj}Raided Village Count"), quest._raidedVillages.Count,
+            RaidAnEnemyTerritoryIssueBehavior.TargetRaidVillageCount, LogType.Discreate);
+        quest._journalEntries.Add(quest._raidedVillagesTrackLog);
     }
 }
