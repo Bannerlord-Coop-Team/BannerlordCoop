@@ -18,7 +18,8 @@ internal sealed class RaidAnEnemyTerritoryQuestSolutionAcceptStrategy : IQuestSo
         {
             // Keep the acceptance stage in the saved mirror without starting it or raising UI events.
             quest._raidedVillagesTrackLog = new JournalLog(CampaignTime.Now, quest.QuestAcceptedByPlayerLog,
-                new TextObject("{=RFH1lDMj}Raided Village Count"), quest._raidedVillages.Count, 3, LogType.Discreate);
+                new TextObject("{=RFH1lDMj}Raided Village Count"), quest._raidedVillages.Count,
+                RaidAnEnemyTerritoryIssueBehavior.TargetRaidVillageCount, LogType.Discreate);
             quest._journalEntries.Add(quest._raidedVillagesTrackLog);
         }
     }

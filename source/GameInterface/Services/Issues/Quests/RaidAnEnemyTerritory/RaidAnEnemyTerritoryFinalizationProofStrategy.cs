@@ -2,6 +2,7 @@
 using Serilog;
 using GameInterface.Services.Issues.Framework.Interface;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Issues;
 using Quest = TaleWorlds.CampaignSystem.Issues.RaidAnEnemyTerritoryIssueBehavior.RaidAnEnemyTerritoryQuest;
 
 namespace GameInterface.Services.Issues.Quests.RaidAnEnemyTerritory;
@@ -17,7 +18,7 @@ internal sealed class RaidAnEnemyTerritoryFinalizationProofStrategy : IFinalizat
             return false;
         }
 
-        if (raidQuest._raidedVillages.Count < 3)
+        if (raidQuest._raidedVillages.Count < RaidAnEnemyTerritoryIssueBehavior.TargetRaidVillageCount)
         {
             Logger.Warning("The owner of {quest} has not completed three raids for branch {proof}", raidQuest.StringId, proof);
             return true;
