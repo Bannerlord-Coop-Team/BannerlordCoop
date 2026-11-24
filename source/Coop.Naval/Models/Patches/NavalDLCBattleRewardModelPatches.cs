@@ -1,7 +1,7 @@
 ﻿using Common;
 using Coop.Naval.Models.Interfaces;
 using GameInterface;
-using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Services.PartyBases.Extensions;
 using HarmonyLib;
 using NavalDLC.GameComponents;
 using System.Collections.Generic;
@@ -23,12 +23,11 @@ internal class NavalDLCBattleRewardModelPatches
     {
         if (ModInformation.IsClient) return true;
 
-        var playerParties = winnerParties.Where(x => x.Party.MobileParty?.IsPlayerParty() == true).ToList();
-        if (playerParties.Count == 0) return true;
+        if (!winnerParties.Any(x => x.Party.IsPlayerParty())) return true;
 
         if (!ContainerProvider.TryResolve<INavalDLCBattleRewardModelInterface>(out var battleRewardModelInterface)) return true;
 
-        __result = battleRewardModelInterface.DistributeDefeatedPartyShipsAmongWinners(__instance, playerParties, shipsToLoot, winnerParties);
+        __result = battleRewardModelInterface.DistributeDefeatedPartyShipsAmongWinners(__instance, shipsToLoot, winnerParties);
 
         return false;
     }

@@ -34,10 +34,11 @@ internal static class StagedBattleResultUpdatePatch
         PlayerEncounter.Update();
     }
 
-    // Whether a hideout, naval or siege assault defender encounter must stay open after its map event is destroyed.
+    // Whether a battle result encounter must stay open after its map event is destroyed: a battle that waits for server
+    // results on either side, a staged raid result or a siege assault defender.
     internal static bool HoldsBattleResultEncounter(PlayerEncounter encounter) =>
         encounter?._mapEvent is MapEvent mapEvent &&
-        (mapEvent.IsHideoutBattle || mapEvent.IsNavalMapEvent ||
+        (mapEvent.WaitsForServerResults() ||
          MapEventInitializationBarrier.IsStagedRaidSimulationResult(encounter) ||
          (mapEvent.IsSiegeAssault && encounter.PlayerSide == BattleSideEnum.Defender)) &&
         MapEventInitializationBarrier.IsBattleResultEncounter(encounter);
