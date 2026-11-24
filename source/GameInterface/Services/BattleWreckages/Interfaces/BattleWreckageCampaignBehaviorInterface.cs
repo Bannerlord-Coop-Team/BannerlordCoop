@@ -7,6 +7,7 @@ using GameInterface.Services.TroopRosters.Data;
 using GameInterface.Services.TroopRosters.Interfaces;
 using Serilog;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.BattleWreckages;
@@ -65,7 +66,28 @@ public class BattleWreckageCampaignBehaviorInterface : IBattleWreckageCampaignBe
 
     public void OnHourlyTick()
     {
-        // TODO: Destroy expired wreckages, then check active players in wreckages and make them leave
+        // The server has no encountered wreckage or visibility, so tracked encounters are what keep a wreckage alive
+        var encounteredWreckages = encounterTracker.Encounters.Select(encounter => encounter.BattleWreckage).ToList();
+
+        // Destroy expired wreckages
+        for (int i = Campaign.Current.Wreckages.Count - 1; i >= 0; i--)
+        {
+            var battleWreckage = Campaign.Current.Wreckages[i];
+            if (battleWreckage.IsWreckageDestroyable && !encounteredWreckages.Contains(battleWreckage))
+            {
+                battleWreckage.DestroyWreckage();
+            }
+        }
+
+        // Check active players in wreckages and make them leave
+        foreach (var encounter in encounterTracker.Encounters)
+        {
+            if (encounter.LastInteractionTime != CampaignTime.Zero &&
+                (CampaignTime.Now - encounter.LastInteractionTime).ToHours > BattleWreckageCampaignBehavior.InterruptedSnapshotExpiryAsHours)
+            {
+                LeaveWreckageEncounter(encounter.Hero, BattleWreckageCampaignBehavior.WreckageLeaveReason.WreckageExpired);
+            }
+        }
     }
 
     public void OnPartyEncounter(PartyBase attackerParty, PartyBase defenderParty)
@@ -79,7 +101,9 @@ public class BattleWreckageCampaignBehaviorInterface : IBattleWreckageCampaignBe
 
     public void OnHeroPrisonerTakenEvent(Hero hero)
     {
-        // TODO: Check if the taken hero is a player and make them leave their wreckage encounter
+        if (hero == null || !encounterTracker.TryGetEncounter(hero, out _)) return;
+
+        LeaveWreckageEncounter(hero, BattleWreckageCampaignBehavior.WreckageLeaveReason.WreckageExpired);
     }
 
     public void LeaveWreckageEncounter(Hero mainHero, BattleWreckageCampaignBehavior.WreckageLeaveReason reason)
