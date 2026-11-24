@@ -4,6 +4,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyVisuals.Extensions;
 using GameInterface.Services.PartyVisuals.Messages;
 using SandBox.View.Map.Managers;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.PartyVisuals.Interfaces;
@@ -28,6 +29,9 @@ public interface IPartyVisualInterface : IGameAbstraction
 
     /// <summary>Replicates visual removal and removes the local visual when the server has a visual manager.</summary>
     void RemoveVisual(MobileParty party);
+
+    /// <summary>Refreshes the server nameplate after a player party is parked.</summary>
+    void RefreshParkedNameplate(MobileParty party);
 }
 
 /// <inheritdoc cref="IPartyVisualInterface"/>
@@ -81,6 +85,13 @@ internal sealed class PartyVisualInterface : IPartyVisualInterface
         else
             // PartyVisualLifetimePatches replicates the native removal.
             party.RemovePartyVisual();
+    }
+
+    public void RefreshParkedNameplate(MobileParty party)
+    {
+        // PartyIsVisibleGetterPatch shows active parties on the server even when _isVisible is false.
+        // The native setter returns early when _isVisible is already false, so refresh explicitly.
+        CampaignEventDispatcher.Instance?.OnPartyVisibilityChanged(party.Party);
     }
 
     private void SendCreateVisual(MobileParty party)

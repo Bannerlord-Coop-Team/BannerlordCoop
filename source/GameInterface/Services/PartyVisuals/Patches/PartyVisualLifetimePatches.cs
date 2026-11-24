@@ -21,17 +21,16 @@ public class PartyVisualLifetimePatches
     private static void CreatePartyVisualPrefix(PartyBase partyBase)
     {
         if (CallOriginalPolicy.IsOriginalAllowed() || ModInformation.IsClient) return;
-        if (partyBase.MobileParty is { } party &&
-            ContainerProvider.TryResolve<IPartyVisualInterface>(out var partyVisuals))
+        if (partyBase.MobileParty is not { } party) return;
+        if (!ContainerProvider.TryResolve<IPartyVisualInterface>(out var partyVisuals)) return;
+
+        try
         {
-            try
-            {
-                partyVisuals.OnNativeVisualCreated(party);
-            }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "Failed to replicate visual creation for {Party}", party.StringId);
-            }
+            partyVisuals.OnNativeVisualCreated(party);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "Failed to replicate visual creation for {Party}", party.StringId);
         }
     }
 
@@ -46,17 +45,16 @@ public class PartyVisualLifetimePatches
             return;
         }
 
-        if (__instance.MapEntity.MobileParty is { } party &&
-            ContainerProvider.TryResolve<IPartyVisualInterface>(out var partyVisuals))
+        if (__instance.MapEntity.MobileParty is not { } party) return;
+        if (!ContainerProvider.TryResolve<IPartyVisualInterface>(out var partyVisuals)) return;
+
+        try
         {
-            try
-            {
-                partyVisuals.OnNativeVisualRemoved(party);
-            }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "Failed to replicate visual removal for {Party}", party.StringId);
-            }
+            partyVisuals.OnNativeVisualRemoved(party);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "Failed to replicate visual removal for {Party}", party.StringId);
         }
     }
 }

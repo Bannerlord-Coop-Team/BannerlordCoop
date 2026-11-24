@@ -174,9 +174,7 @@ internal class PlayerCaptivityServerHandler : IHandler
 
         RollPlayerExecution(hero, payload.What.CapturerParty);
 
-        // The server getter can show an active party whose native visibility is already false.
-        // Writing false in that case skips the event the host nameplate needs.
-        CampaignEventDispatcher.Instance?.OnPartyVisibilityChanged(playerParty.Party);
+        partyVisuals.RefreshParkedNameplate(playerParty);
     }
 
     private void RollPlayerExecution(Hero hero, PartyBase captor)
