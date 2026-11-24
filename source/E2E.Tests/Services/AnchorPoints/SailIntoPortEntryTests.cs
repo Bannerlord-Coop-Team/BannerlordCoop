@@ -17,32 +17,36 @@ using Xunit.Abstractions;
 namespace E2E.Tests.Services.AnchorPoints;
 
 /// <summary>
-/// A player sailing into a town: the fleet docks there before the client opens the town menu that reads it.
+/// A player sailing into a town: the fleet is anchored there before the client opens the town menu that reads it.
 /// </summary>
 public class SailIntoPortEntryTests : MapEventTestBase
 {
     private static readonly CampaignVec2 Gate = new(new Vec2(20f, 30f), true);
     private static readonly CampaignVec2 Port = new(new Vec2(21f, 31f), false);
 
+    // The AutoSync message for a write to AnchorPoint._settlement
+    private const string AnchorSettlementSetMessage = "AnchorPoint__settlement_SetNetworkMessage";
+
     /// <summary>Passes the test output to the environment.</summary>
     public SailIntoPortEntryTests(ITestOutputHelper output) : base(output) { }
 
-    // The approval opens the town menu, so the docked fleet has to reach the client before it (#4881)
+    // The approval opens the town menu, whose Set sail option needs the fleet docked there (#4881)
     [Fact]
-    public void SettlementEncounterRequest_FromTheSea_DocksTheFleetBeforeTheApproval()
+    public void SettlementEncounterRequest_FromTheSea_AnchorsTheFleetBeforeTheApproval()
     {
         var client = Clients.First();
         var (partyId, settlementId) = CreatePlayerAtSeaNearTown(client);
 
+        // The send order is asserted by index, so only the entry's own sends count
+        Server.NetworkSentMessages.Clear();
         client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkRequestStartSettlementEncounter(
             client.GetHandle<MobileParty>(partyId),
             client.GetHandle<Settlement>(settlementId))));
 
         var sent = Server.NetworkSentMessages.Messages.ToList();
-        int approval = sent.FindIndex(message => message is NetworkStartSettlementEncounter);
-        int docked = sent.FindIndex(message => message.GetType().Name == "AnchorPoint__settlement_SetNetworkMessage");
-        Assert.True(approval >= 0, "the entry was not approved");
-        Assert.InRange(docked, 0, approval - 1);
+        var approval = Assert.Single(sent, message => message is NetworkStartSettlementEncounter);
+        var anchored = Assert.Single(sent, message => message.GetType().Name == AnchorSettlementSetMessage);
+        Assert.True(sent.IndexOf(anchored) < sent.IndexOf(approval), "the fleet was anchored after the approval");
 
         Server.Call(() =>
         {
@@ -100,7 +104,6 @@ public class SailIntoPortEntryTests : MapEventTestBase
             party.Anchor.ResetPosition();
         });
 
-        Server.NetworkSentMessages.Clear();
         return (partyId, settlementId);
     }
 }

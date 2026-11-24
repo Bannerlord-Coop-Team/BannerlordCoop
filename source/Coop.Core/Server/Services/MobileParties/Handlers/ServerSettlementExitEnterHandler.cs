@@ -152,16 +152,13 @@ public class ServerSettlementExitEnterHandler : IHandler
             Logger.Debug("SettlementEncounterRecovery phase=approve branch=validated-entry partyHandle={PartyHandle} settlementHandle={SettlementHandle}",
                 payload.PartyId, payload.SettlementId);
 #endif
-            // Vanilla starts under-siege and under-raid encounters outside the settlement.
-            bool entersSettlement = !settlement.IsUnderSiege && !(settlement.IsVillage && settlement.IsUnderRaid);
-
-            // The approval opens the client's town menu, whose Set sail option reads the docked fleet, so it has to be synced first
-            if (entersSettlement)
-                settlementInterface.DockLandingFleet(mobileParty, settlement);
+            // The approval opens the client's town menu, whose Set sail option reads the anchored fleet, so it has to be synced first
+            settlementInterface.AnchorLandingFleet(mobileParty, settlement);
 
             network.Send(peer, new NetworkStartSettlementEncounter(payload));
 
-            if (!entersSettlement) return;
+            // Vanilla starts under-siege and under-raid encounters outside the settlement.
+            if (settlement.IsUnderSiege || (settlement.IsVillage && settlement.IsUnderRaid)) return;
 
             network.SendAllBut(peer, new NetworkPartyEnterSettlement(
                 payload.SettlementId,
