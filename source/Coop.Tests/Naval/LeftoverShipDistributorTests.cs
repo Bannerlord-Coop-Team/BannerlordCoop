@@ -19,8 +19,8 @@ namespace Coop.Tests.Naval;
 public class LeftoverShipDistributorTests
 {
     private readonly MapEventParty aiWinner = CreateMapEventParty(contribution: 10);
-    private readonly MapEventParty firstPlayer = CreateMapEventParty(contribution: 10);
-    private readonly MapEventParty secondPlayer = CreateMapEventParty(contribution: 10);
+    private readonly MapEventParty firstPlayer = CreateMapEventParty(contribution: 5);
+    private readonly MapEventParty secondPlayer = CreateMapEventParty(contribution: 15);
     private readonly LeftoverShipDistributor distributor;
     private readonly MapEventParty[] winners;
 
@@ -33,7 +33,7 @@ public class LeftoverShipDistributorTests
         winners = new[] { aiWinner, firstPlayer, secondPlayer };
     }
 
-    // #4860: only the top player could win a leftover ship. The players' shares are 0-9 and 10-19 with the AI winner's after
+    // #4860: only the top player could win a leftover ship. The players' shares are 0-4 and 5-19 with the AI winner's after
     // them, so 20 ends the handout and the last ship stays unlooted even though its roll would have hit the first player.
     [Fact]
     public void RollOnSecondPlayersShare_GivesItTheShip_AndAnAiRollEndsTheHandout()
@@ -41,7 +41,7 @@ public class LeftoverShipDistributorTests
         var ships = CreateShips(3);
         var distributedShips = ships.ToDictionary(ship => ship, _ => (MapEventParty)null);
 
-        distributor.GiveToPlayers(distributedShips, ships, winners, ScriptedRolls(10, 20, 0));
+        distributor.GiveToPlayers(distributedShips, ships, winners, ScriptedRolls(5, 20, 0));
 
         Assert.Same(ships[0], Assert.Single(distributedShips, x => x.Value == secondPlayer).Key);
         Assert.DoesNotContain(distributedShips, x => x.Value == firstPlayer);
@@ -55,7 +55,7 @@ public class LeftoverShipDistributorTests
         var ships = CreateShips(2);
         foreach (var ship in ships) distributedShips.Add(ship, null);
 
-        distributor.GiveToPlayers(distributedShips, ships, winners, ScriptedRolls(0, 10));
+        distributor.GiveToPlayers(distributedShips, ships, winners, ScriptedRolls(0, 5));
 
         Assert.Equal(25, distributedShips.Count(x => x.Value == firstPlayer));
         Assert.Same(ships[1], Assert.Single(distributedShips, x => x.Value == secondPlayer).Key);

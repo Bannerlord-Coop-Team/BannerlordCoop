@@ -571,8 +571,11 @@ public class BattleResultDistributionTests : MapEventTestBase
         var (ctx, _) = SetupTwoAlliedPlayersOnAttackerSide();
         var client = Clients.First();
         var shipId = TestEnvironment.CreateRegisteredObject<Ship>();
-        Server.Call(() => Server.GetRegisteredObject<MapEvent>(ctx.MapEventId).Position =
-            new CampaignVec2(TaleWorlds.Library.Vec2.Zero, isOnLand: false), MapEventDisabledMethods);
+        Server.Call(() =>
+        {
+            // An off-land position makes the battle naval, which syncs to the client.
+            Server.GetRegisteredObject<MapEvent>(ctx.MapEventId).Position = new CampaignVec2(default, isOnLand: false);
+        }, MapEventDisabledMethods);
         SetMockPlayerEncounter(client, mapEventId: ctx.MapEventId);
         client.Call(() =>
         {
