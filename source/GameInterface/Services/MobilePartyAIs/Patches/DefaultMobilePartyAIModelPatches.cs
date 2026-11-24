@@ -158,7 +158,7 @@ internal class DefaultMobilePartyAIModelPatches
         if (callIndex < 0 || callIndex != codes.FindLastIndex(code => code.Calls(scoreEnemy)))
             throw new InvalidOperationException("Expected one enemy scoring call in GetBestInitiativeBehavior.");
 
-        // This local belongs to one attacker decision and stays null until an enemy has a positive attack score.
+        // Each attacker decision starts with a default search that runs only for a positive attack score.
         var nearbyPlayers = generator.DeclareLocal(typeof(NearbyPlayerSearch));
         var loadNearbyPlayers = new CodeInstruction(OpCodes.Ldloca, nearbyPlayers);
         codes[callIndex].MoveLabelsTo(loadNearbyPlayers).MoveBlocksTo(loadNearbyPlayers);
@@ -178,51 +178,47 @@ internal class DefaultMobilePartyAIModelPatches
         ref NearbyPlayerSearch nearbyPlayers)
     {
         model.CalculateInitiativeScoresForEnemy(mobileParty, enemyParty, out avoidScore, out attackScore, localAdvantage, maxAggressiveness);
-        SuppressAttackNearStrongerPlayer(mobileParty, enemyParty, ref attackScore, ref nearbyPlayers);
+        attackScore = SuppressAttackNearStrongerPlayer(mobileParty, enemyParty, attackScore, ref nearbyPlayers);
     }
 
-    internal static void SuppressAttackNearStrongerPlayer(
+    internal static float SuppressAttackNearStrongerPlayer(
         MobileParty mobileParty,
         MobileParty enemyParty,
-        ref float attackScore,
+        float attackScore,
         ref NearbyPlayerSearch nearbyPlayers)
     {
-        if (attackScore <= 0f) return;
+        if (attackScore <= 0f) return attackScore;
 
-        if (nearbyPlayers.HasStrongerPlayer(mobileParty, enemyParty))
-            attackScore = 0f;
+        return nearbyPlayers.HasStrongerPlayer(mobileParty, enemyParty) ? 0f : attackScore;
     }
 
     /// <summary>Resumes one attacker's locator scan only when the players already seen cannot suppress an enemy.</summary>
     internal struct NearbyPlayerSearch
     {
+        private enum ScanState { NotStarted, InProgress, Exhausted }
+
         private LocatableSearchData<MobileParty> searchData;
-        private bool started;
-        private bool exhausted;
-        private MobileParty firstPlayer;
-        private List<MobileParty> otherPlayers;
+        private ScanState state;
+        private List<MobileParty> seenPlayers;
 
         public bool HasStrongerPlayer(MobileParty attacker, MobileParty enemy)
         {
-            if (firstPlayer != null && IsStrongerPlayerParty(firstPlayer, attacker, enemy))
-                return true;
-
-            if (otherPlayers != null)
+            if (seenPlayers != null)
             {
-                foreach (var player in otherPlayers)
+                foreach (var player in seenPlayers)
                 {
                     if (IsStrongerPlayerParty(player, attacker, enemy))
                         return true;
                 }
             }
 
-            if (exhausted) return false;
+            if (state == ScanState.Exhausted) return false;
 
-            if (!started)
+            if (state == ScanState.NotStarted)
             {
                 searchData = MobileParty.StartFindingLocatablesAroundPosition(
                     attacker.Position.ToVec2(), NearbyPartySearchRadius(attacker));
-                started = true;
+                state = ScanState.InProgress;
             }
 
             for (var party = MobileParty.FindNextLocatable(ref searchData);
@@ -230,16 +226,13 @@ internal class DefaultMobilePartyAIModelPatches
                  party = MobileParty.FindNextLocatable(ref searchData))
             {
                 if (!party.IsActive || !party.IsPlayerParty()) continue;
-                if (firstPlayer == null)
-                    firstPlayer = party;
-                else
-                    (otherPlayers ??= new List<MobileParty>()).Add(party);
+                (seenPlayers ??= new List<MobileParty>()).Add(party);
 
                 if (IsStrongerPlayerParty(party, attacker, enemy))
                     return true;
             }
 
-            exhausted = true;
+            state = ScanState.Exhausted;
             return false;
         }
     }
