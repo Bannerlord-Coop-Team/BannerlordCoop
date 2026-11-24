@@ -173,6 +173,8 @@ internal class PlayerCaptivityServerHandler : IHandler
             playerParty.ChangePartyLeader(null);
 
         RollPlayerExecution(hero, payload.What.CapturerParty);
+
+        partyVisuals.RefreshParkedNameplate(playerParty);
     }
 
     private void RollPlayerExecution(Hero hero, PartyBase captor)

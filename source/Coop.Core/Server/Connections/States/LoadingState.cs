@@ -9,6 +9,7 @@ using Coop.Core.Server.Services.MobileParties;
 using Coop.Core.Server.Services.Kingdoms;
 using LiteNetLib;
 using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Threading;
 
@@ -62,6 +63,10 @@ public class LoadingState : ConnectionStateBase
     private bool replayDrainBlocked;
     private long joinProgressVersion;
     private ReplayContinuation replayContinuation;
+
+    // The poller owns these observations, which expire with this loading state.
+    private (long Version, DateTime LastProgressUtc)? observedJoinProgress;
+    private DateTime? preEntryBackpressureStartedUtc;
 #if DEBUG
 
     internal string DebugJoinState =>
@@ -108,6 +113,23 @@ public class LoadingState : ConnectionStateBase
     internal string JoinPhaseName => CurrentPhase.ToString();
 
     internal long JoinProgressVersion => Interlocked.Read(ref joinProgressVersion);
+
+    internal void StartPreEntryBackpressure(DateTime utcNow) => preEntryBackpressureStartedUtc ??= utcNow;
+
+    internal void ClearPreEntryBackpressure() => preEntryBackpressureStartedUtc = null;
+
+    internal TimeSpan? GetPreEntryBackpressureElapsed(DateTime utcNow) => utcNow - preEntryBackpressureStartedUtc;
+
+    // Measure the stall from the first poll that observes the latest join progress.
+    internal TimeSpan ObserveJoinStall(DateTime utcNow)
+    {
+        long version = JoinProgressVersion;
+        if (observedJoinProgress is { } progress && progress.Version == version)
+            return utcNow - progress.LastProgressUtc;
+
+        observedJoinProgress = (version, utcNow);
+        return TimeSpan.Zero;
+    }
 
     internal bool TryAbortJoinCatchUp()
     {
