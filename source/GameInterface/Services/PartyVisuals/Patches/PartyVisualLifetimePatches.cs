@@ -5,6 +5,7 @@ using GameInterface.Services.PartyVisuals.Interfaces;
 using HarmonyLib;
 using SandBox.View.Map.Visuals;
 using Serilog;
+using System;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.PartyVisuals.Patches;
@@ -23,7 +24,14 @@ public class PartyVisualLifetimePatches
         if (partyBase.MobileParty is { } party &&
             ContainerProvider.TryResolve<IPartyVisualInterface>(out var partyVisuals))
         {
-            partyVisuals.OnNativeVisualCreated(party);
+            try
+            {
+                partyVisuals.OnNativeVisualCreated(party);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Failed to replicate visual creation for {Party}", party.StringId);
+            }
         }
     }
 
@@ -41,7 +49,14 @@ public class PartyVisualLifetimePatches
         if (__instance.MapEntity.MobileParty is { } party &&
             ContainerProvider.TryResolve<IPartyVisualInterface>(out var partyVisuals))
         {
-            partyVisuals.OnNativeVisualRemoved(party);
+            try
+            {
+                partyVisuals.OnNativeVisualRemoved(party);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Failed to replicate visual removal for {Party}", party.StringId);
+            }
         }
     }
 }

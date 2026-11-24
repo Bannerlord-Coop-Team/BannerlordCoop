@@ -59,7 +59,8 @@ internal sealed class PartyVisualInterface : IPartyVisualInterface
     public void OnNativeVisualCreated(MobileParty party)
     {
         // Map initialization can build visuals before the campaign registers their parties.
-        SendCreateVisual(party, logMissingHandle: false);
+        if (objectManager.TryGetHandle(party, out var partyHandle))
+            network.SendAll(new NetworkCreatePartyVisual(partyHandle));
     }
 
     public void OnNativeVisualRemoved(MobileParty party) => SendDestroyVisual(party);
@@ -82,13 +83,9 @@ internal sealed class PartyVisualInterface : IPartyVisualInterface
             party.RemovePartyVisual();
     }
 
-    private void SendCreateVisual(MobileParty party, bool logMissingHandle = true)
+    private void SendCreateVisual(MobileParty party)
     {
-        var hasHandle = logMissingHandle
-            ? objectManager.TryGetHandleWithLogging(party, out var partyHandle)
-            : objectManager.TryGetHandle(party, out partyHandle);
-
-        if (hasHandle)
+        if (objectManager.TryGetHandleWithLogging(party, out var partyHandle))
             network.SendAll(new NetworkCreatePartyVisual(partyHandle));
     }
 

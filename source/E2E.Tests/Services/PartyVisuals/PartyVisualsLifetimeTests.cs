@@ -1,10 +1,14 @@
-﻿using Common;
+﻿using Autofac;
+using Common;
+using Common.Network;
 using E2E.Tests.Environment;
+using GameInterface;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.PartyVisuals.Extensions;
 using GameInterface.Services.PartyVisuals.Interfaces;
 using GameInterface.Services.PartyVisuals.Messages;
 using HarmonyLib;
+using Moq;
 using SandBox.View.Map.Managers;
 using SandBox.View.Map.Visuals;
 using TaleWorlds.CampaignSystem;
@@ -37,6 +41,7 @@ namespace E2E.Tests.Services.PartyVisuals
         {
             var server = TestEnvironment.Server;
             var client = TestEnvironment.Clients.First();
+            // Poller delivery leaves the visual apply queued until the client pumps its game thread.
             server.Resolve<TestNetworkRouter>().ReceiveContext = TestNetworkReceiveContext.PollerThread;
             var presentation = new Harmony($"e2e.party-visual-lifetime.{Guid.NewGuid():N}");
 
@@ -63,6 +68,7 @@ namespace E2E.Tests.Services.PartyVisuals
                 client.Call(() =>
                 {
                     Assert.NotNull(clientVisualManager.GetVisualOfEntity(clientParty.Party));
+                    // Clear the first creation's dirty flag so only recreation satisfies the later check.
                     clientParty.Party.OnVisualsUpdated();
                 });
                 Assert.Equal(partyHandle, Assert.Single(client.InternalMessages.GetMessages<NetworkCreatePartyVisual>()).MobilePartyHandle);
@@ -122,6 +128,55 @@ namespace E2E.Tests.Services.PartyVisuals
         }
 
         private static bool SkipVisualStartup() => false;
+
+        [Fact]
+        public void GraphicalVisualLifecycle_CompletesWhenReplicationThrows()
+        {
+            var server = TestEnvironment.Server;
+            var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+            var network = new Mock<INetwork>();
+            var sendFailure = new InvalidOperationException("visual send failed");
+            network.Setup(n => n.SendAll(It.IsAny<NetworkCreatePartyVisual>())).Throws(sendFailure);
+            network.Setup(n => n.SendAll(It.IsAny<NetworkDestroyPartyVisual>())).Throws(sendFailure);
+            using var scope = server.Container.BeginLifetimeScope(builder =>
+            {
+                builder.RegisterInstance(network.Object).As<INetwork>();
+                builder.RegisterType<PartyVisualInterface>().As<IPartyVisualInterface>();
+            });
+            var presentation = new Harmony($"e2e.party-visual-send-failure.{Guid.NewGuid():N}");
+
+            try
+            {
+                PatchVisualManagers(presentation, graphicalServer: true);
+                server.Call(() =>
+                {
+                    var party = server.GetRegisteredObject<MobileParty>(partyId);
+
+                    ContainerProvider.SetContainer(scope);
+                    try
+                    {
+                        party.CreateNewPartyVisual();
+                        Assert.NotNull(serverVisualManager.GetVisualOfEntity(party.Party));
+
+                        party.RemovePartyVisual();
+                        Assert.Null(serverVisualManager.GetVisualOfEntity(party.Party));
+                    }
+                    finally
+                    {
+                        ContainerProvider.SetContainer(server.Container);
+                    }
+                });
+
+                network.Verify(n => n.SendAll(It.IsAny<NetworkCreatePartyVisual>()), Times.Once);
+                network.Verify(n => n.SendAll(It.IsAny<NetworkDestroyPartyVisual>()), Times.Once);
+            }
+            finally
+            {
+                presentation.UnpatchAll(presentation.Id);
+                serverVisualManager = null;
+                clientVisualManager = null;
+            }
+        }
 
         [Fact]
         public void DestroyingAHeadlessParty_SendsVisualRemovalBeforePartyDestruction()
