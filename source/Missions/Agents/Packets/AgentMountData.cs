@@ -501,6 +501,7 @@ namespace Missions.Agents.Packets
             public bool IsStationary { get; }
         }
 
+        // Add mount fields to WriteSnapshot, ReadSnapshot and SnapshotBytes or GetSnapshotExtraBytes too.
         [ProtoMember(1)]
         public Vec2 MountInputVector { get; private set; }
         [ProtoMember(2)]

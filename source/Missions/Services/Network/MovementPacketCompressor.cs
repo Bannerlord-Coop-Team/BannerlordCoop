@@ -1,10 +1,12 @@
-﻿using Common.PacketHandlers;
+﻿using Common.Logging;
+using Common.PacketHandlers;
 using Common.Serialization;
 using K4os.Compression.LZ4;
 using Missions.Agents.Packets;
 #if DEBUG
 using Missions.Diagnostics;
 #endif
+using Serilog;
 using System;
 using System.Buffers;
 
@@ -30,6 +32,8 @@ public class MovementPacketCompressor : IMovementPacketCompressor
     private const byte UncompressedLengthTag = 0x08;
     private const byte CompressedPayloadTag = 0x12;
 
+    private static readonly ILogger Logger = LogManager.GetLogger<MovementPacketCompressor>();
+
     private readonly ICommonSerializer serializer;
     private byte[] compressedTypeField;
 
@@ -40,11 +44,14 @@ public class MovementPacketCompressor : IMovementPacketCompressor
 
     public byte[] Serialize(IPacket packet)
     {
-        return TrySerializePacked(packet) ?? SerializeUnpacked(packet);
-    }
+        // Packed snapshots travel inside the envelope so the receiver restores the arrays before dispatch.
+        IPacket packed = MovementSnapshotPacking.TryPack(packet, MaxUncompressedBytes);
+        if (packed != null)
+        {
+            byte[] compressed = TryCompress(serializer.Serialize(packed));
+            if (compressed != null) return compressed;
+        }
 
-    private byte[] SerializeUnpacked(IPacket packet)
-    {
         byte[] original = serializer.Serialize(packet);
 #if DEBUG
         if (packet is AgentActionPacket actionPacket)
@@ -85,49 +92,15 @@ public class MovementPacketCompressor : IMovementPacketCompressor
             if (decodedLength != decompressed.Length)
                 return false;
 
-            switch (serializer.Deserialize<IPacket>(decompressed))
-            {
-                case MovementPacket movement:
-                    restored = movement.PackedSnapshots == null
-                        ? movement
-                        : movement.WithRestoredSnapshots(MovementSnapshotPacking.Restore(movement));
-                    return true;
-                case MountMovementPacket mounts:
-                    restored = mounts.PackedSnapshots == null
-                        ? mounts
-                        : mounts.WithRestoredSnapshots(MovementSnapshotPacking.Restore(mounts));
-                    return true;
-                default:
-                    return false;
-            }
+            restored = MovementSnapshotPacking.Restore(serializer.Deserialize<IPacket>(decompressed));
+            return restored != null;
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            restored = null;
+            Logger.Warning(ex, "Failed to restore compressed movement packet with {UncompressedLength} uncompressed bytes",
+                compressed.UncompressedLength);
             return false;
         }
-    }
-
-    private byte[] TrySerializePacked(IPacket packet)
-    {
-        // The packed layout goes inside the existing envelope, which restores the snapshot array before dispatch.
-        byte[] original;
-        switch (packet)
-        {
-            case MovementPacket movement:
-                byte[] riders = MovementSnapshotPacking.Pack(movement, MaxUncompressedBytes);
-                if (riders == null) return null;
-                original = serializer.Serialize(movement.WithPackedSnapshots(riders));
-                break;
-            case MountMovementPacket mounts:
-                byte[] horses = MovementSnapshotPacking.Pack(mounts, MaxUncompressedBytes);
-                if (horses == null) return null;
-                original = serializer.Serialize(mounts.WithPackedSnapshots(horses));
-                break;
-            default:
-                return null;
-        }
-        return TryCompress(original);
     }
 
     private byte[] TryCompress(byte[] original)

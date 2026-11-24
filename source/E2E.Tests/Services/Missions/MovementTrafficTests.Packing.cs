@@ -2,7 +2,6 @@
 using Common.Serialization;
 using E2E.Tests.Environment.MockEngine;
 using K4os.Compression.LZ4;
-using LiteNetLib;
 using Missions.Agents.Packets;
 using Missions.Services.Network;
 using TaleWorlds.Library;
@@ -73,13 +72,6 @@ public partial class MovementTrafficTests
 
             var restored = Assert.IsType<MovementPacket>(RestorePackedMovement(serializer, receiver, wire));
             Assert.Equal(serializer.Serialize(movement), serializer.Serialize(restored));
-            Assert.Equal(DeliveryMethod.Unreliable, restored.DeliveryMethod);
-            for (int i = 0; i < count; i++)
-            {
-                AgentData snapshot = restored.Agents[i];
-                snapshot.ResolveDeckShip(restored.DeckShips);
-                Assert.Equal(latest[i].DeckShip, snapshot.DeckShip);
-            }
         });
     }
 

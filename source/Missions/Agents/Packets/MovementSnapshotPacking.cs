@@ -1,9 +1,10 @@
-﻿using System;
+﻿using Common.PacketHandlers;
+using System;
 using System.IO;
 
 namespace Missions.Agents.Packets;
 
-/// <summary>Writes the rider, deck and mount columns of one datagram in snapshot order.</summary>
+/// <summary>Packs and restores the rider, deck and mount columns of one datagram in snapshot order.</summary>
 internal static class MovementSnapshotPacking
 {
     // Small batches retain protobuf's sparse encoding. The column layout has little repetition at those sizes.
@@ -12,7 +13,32 @@ internal static class MovementSnapshotPacking
     private const byte HasDeck = 1;
     private const byte HasMount = 2;
 
-    public static byte[] Pack(MovementPacket packet, int limit)
+    public static IPacket TryPack(IPacket packet, int limit)
+    {
+        switch (packet)
+        {
+            case MovementPacket movement:
+                byte[] riders = Pack(movement, limit);
+                return riders == null ? null : movement.WithPackedSnapshots(riders);
+            case MountMovementPacket mounts:
+                byte[] horses = Pack(mounts, limit);
+                return horses == null ? null : mounts.WithPackedSnapshots(horses);
+            default:
+                return null;
+        }
+    }
+
+    public static IPacket Restore(IPacket packet) => packet switch
+    {
+        MovementPacket movement when movement.PackedSnapshots != null =>
+            movement.WithRestoredSnapshots(Restore(movement)),
+        MountMovementPacket mounts when mounts.PackedSnapshots != null =>
+            mounts.WithRestoredSnapshots(Restore(mounts)),
+        MovementPacket or MountMovementPacket => packet,
+        _ => null,
+    };
+
+    private static byte[] Pack(MovementPacket packet, int limit)
     {
         AgentData[] agents = packet.Agents;
         int count = packet.SnapshotCount;
@@ -64,7 +90,7 @@ internal static class MovementSnapshotPacking
         return packed;
     }
 
-    public static byte[] Pack(MountMovementPacket packet, int limit)
+    private static byte[] Pack(MountMovementPacket packet, int limit)
     {
         AgentMountData[] mounts = packet.Mounts;
         int count = packet.SnapshotCount;
@@ -88,7 +114,7 @@ internal static class MovementSnapshotPacking
         return packed;
     }
 
-    public static AgentData[] Restore(MovementPacket packet)
+    private static AgentData[] Restore(MovementPacket packet)
     {
         byte[] packed = packet.PackedSnapshots;
         int count = packet.SnapshotCount;
@@ -132,7 +158,7 @@ internal static class MovementSnapshotPacking
         return agents;
     }
 
-    public static AgentMountData[] Restore(MountMovementPacket packet)
+    private static AgentMountData[] Restore(MountMovementPacket packet)
     {
         byte[] packed = packet.PackedSnapshots;
         int count = packet.SnapshotCount;

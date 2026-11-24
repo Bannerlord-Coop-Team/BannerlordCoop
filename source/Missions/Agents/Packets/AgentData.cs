@@ -174,6 +174,7 @@ namespace Missions.Agents.Packets
                 : new Vec2(0f, throttle);
         }
 
+        // Add rider pose fields to WriteSnapshot, ReadSnapshot and SnapshotBytes too.
         [ProtoMember(1)]
         public Vec3 Position { get; private set; }
         [ProtoMember(2)]
@@ -193,6 +194,7 @@ namespace Missions.Agents.Packets
         [ProtoMember(9)]
         public uint MovementFlag { get; private set; }
         // Deck pose: 0 is a world pose, otherwise a 1-based index into the packet's DeckShips with a hull-local position.
+        // Add deck pose fields to WriteDeckSnapshot, ReadDeckSnapshot and DeckSnapshotBytes too.
         [ProtoMember(11)]
         public int DeckShipIndex { get; private set; }
         [ProtoMember(12)]
