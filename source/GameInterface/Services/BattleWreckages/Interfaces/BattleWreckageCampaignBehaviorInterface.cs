@@ -17,6 +17,7 @@ using TaleWorlds.CampaignSystem.BattleWreckages;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.LogEntries;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
@@ -27,6 +28,8 @@ namespace GameInterface.Services.BattleWreckages.Interfaces;
 
 public interface IBattleWreckageCampaignBehaviorInterface : IGameAbstraction
 {
+    void AddWreckageToMap(BattleWreckage battleWreckage);
+    void RemoveWreckageFromMap(BattleWreckage battleWreckage);
     void StartWreckageEncounter(BattleWreckage battleWreckage, Hero mainHero);
     void OpenWreckageEncounter(BattleWreckage battleWreckage, bool isInterrupted, CampaignTime requiredInvestigationDuration);
     void OnHourlyTick();
@@ -68,6 +71,27 @@ public class BattleWreckageCampaignBehaviorInterface : IBattleWreckageCampaignBe
         this.playerManager = playerManager;
         this.messageBroker = messageBroker;
         this.troopRosterInterface = troopRosterInterface;
+    }
+
+    public void AddWreckageToMap(BattleWreckage battleWreckage)
+    {
+        // The end of vanilla BattleWreckage.CreateWreckage, which never runs on a client.
+        using (new AllowedThread())
+        {
+            Campaign.Current.CampaignObjectManager.AddWreckage(battleWreckage);
+            CampaignEventDispatcher.Instance.OnMapInteractableCreated(battleWreckage);
+            LogEntry.AddLogEntry(new WreckageCreatedLogEntry(battleWreckage));
+        }
+    }
+
+    public void RemoveWreckageFromMap(BattleWreckage battleWreckage)
+    {
+        // Vanilla BattleWreckage.DestroyWreckage, whose prefix skips it on clients.
+        using (new AllowedThread())
+        {
+            Campaign.Current.CampaignObjectManager.RemoveWreckage(battleWreckage);
+            CampaignEventDispatcher.Instance.OnMapInteractableDestroyed(battleWreckage);
+        }
     }
 
     public void StartWreckageEncounter(BattleWreckage battleWreckage, Hero mainHero)

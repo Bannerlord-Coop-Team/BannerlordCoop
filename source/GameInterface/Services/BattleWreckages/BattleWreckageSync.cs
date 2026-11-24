@@ -9,6 +9,7 @@ internal class BattleWreckageSync : IAutoSync
     public BattleWreckageSync(AutoSyncRegistry AutoSyncRegistry)
     {
         //// Fields
+        // Position and type are sent uncoalesced so they reach clients before NetworkAddBattleWreckage builds the map visual
         AutoSyncRegistry.AddField(AccessTools.Field(typeof(BattleWreckage), nameof(BattleWreckage.Position)));
         AutoSyncRegistry.AddField(AccessTools.Field(typeof(BattleWreckage), nameof(BattleWreckage.DestroyTime)));
         AutoSyncRegistry.AddField(AccessTools.Field(typeof(BattleWreckage), nameof(BattleWreckage.WreckageTypeCategory)));

@@ -1,5 +1,4 @@
-﻿using Common.Util;
-using GameInterface.Registry.Auto;
+﻿using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
@@ -7,7 +6,6 @@ using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.BattleWreckages;
-using TaleWorlds.CampaignSystem.LogEntries;
 
 namespace GameInterface.Services.BattleWreckages;
 
@@ -36,23 +34,10 @@ internal class BattleWreckageRegistry : AutoRegistryBase<BattleWreckage>
 
     public override void OnClientCreated(BattleWreckage obj, string id)
     {
-        // Same as the end of vanilla BattleWreckage.CreateWreckage, which never runs on a client
-        using (new AllowedThread())
-        {
-            Campaign.Current.CampaignObjectManager.AddWreckage(obj);
-            CampaignEventDispatcher.Instance.OnMapInteractableCreated(obj);
-            LogEntry.AddLogEntry(new WreckageCreatedLogEntry(obj));
-        }
     }
 
     public override void OnClientDestroyed(BattleWreckage obj, string id)
     {
-        // Same as vanilla BattleWreckage.DestroyWreckage, whose prefix skips it on clients
-        using (new AllowedThread())
-        {
-            Campaign.Current.CampaignObjectManager.RemoveWreckage(obj);
-            CampaignEventDispatcher.Instance.OnMapInteractableDestroyed(obj);
-        }
     }
 
     public override void OnServerCreated(BattleWreckage obj, string id)

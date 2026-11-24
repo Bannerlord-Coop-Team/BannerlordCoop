@@ -53,6 +53,42 @@ public class BattleWreckageLifetimeTests : IDisposable
     }
 
     [Fact]
+    public void ServerCreate_BattleWreckage_AnnouncesOnClientsAfterItsFieldsArrive()
+    {
+        // Arrange, the map visual reads the wreckage's type and position once, when the interactable is created
+        var typesWhenAnnounced = new Dictionary<EnvironmentInstance, List<BattleWreckage.WreckageType>>();
+        foreach (var client in Clients)
+        {
+            var types = new List<BattleWreckage.WreckageType>();
+            typesWhenAnnounced[client] = types;
+
+            client.Call(() =>
+            {
+                CampaignEvents.MapInteractableCreated.AddNonSerializedListener(types, point =>
+                {
+                    if (point is BattleWreckage battleWreckage) types.Add(battleWreckage.WreckageTypeCategory);
+                });
+            });
+        }
+
+        // Deliver on the poller thread like a live client, so each handler's game thread work queues up behind the
+        // deferred create and field values instead of running inline
+        Server.Resolve<TestNetworkRouter>().ReceiveContext = TestNetworkReceiveContext.PollerThread;
+
+        // Act
+        CreateServerWreckage();
+
+        foreach (var client in Clients) client.PumpGameThread();
+
+        // Assert
+        foreach (var client in Clients)
+        {
+            var type = Assert.Single(typesWhenAnnounced[client]);
+            Assert.Equal(BattleWreckage.WreckageType.Small, type);
+        }
+    }
+
+    [Fact]
     public void ServerCreate_BattleWreckage_SyncsRosters()
     {
         // Arrange
@@ -113,6 +149,26 @@ public class BattleWreckageLifetimeTests : IDisposable
             });
         }
 
+        // The map visual is removed on MapInteractableDestroyed
+        var destroyedWreckages = new Dictionary<EnvironmentInstance, List<BattleWreckage>>();
+        foreach (var client in Clients)
+        {
+            var destroyed = new List<BattleWreckage>();
+            destroyedWreckages[client] = destroyed;
+
+            client.Call(() =>
+            {
+                CampaignEvents.MapInteractableDestroyed.AddNonSerializedListener(destroyed, point =>
+                {
+                    if (point is BattleWreckage battleWreckage) destroyed.Add(battleWreckage);
+                });
+            });
+        }
+
+        // Deliver on the poller thread like a live client, so the remove and the registry's destroy queue on the game
+        // thread in send order, and the remove has to find the wreckage before the destroy drops its id
+        Server.Resolve<TestNetworkRouter>().ReceiveContext = TestNetworkReceiveContext.PollerThread;
+
         // Act
         Server.Call(() =>
         {
@@ -121,9 +177,13 @@ public class BattleWreckageLifetimeTests : IDisposable
             battleWreckage.DestroyWreckage();
         });
 
+        foreach (var client in Clients) client.PumpGameThread();
+
         // Assert
         foreach (var client in Clients)
         {
+            Assert.Same(clientWreckages[client], Assert.Single(destroyedWreckages[client]));
+
             client.Call(() =>
             {
                 Assert.False(client.ObjectManager.TryGetObject<BattleWreckage>(battleWreckageId, out _));

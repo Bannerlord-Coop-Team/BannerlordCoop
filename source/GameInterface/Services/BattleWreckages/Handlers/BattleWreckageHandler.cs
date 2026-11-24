@@ -35,6 +35,11 @@ internal class BattleWreckageHandler : IHandler
         messageBroker.Subscribe<NetworkRequestStartWreckageEncounter>(Handle_NetworkRequestStartWreckageEncounter);
         messageBroker.Subscribe<WreckageEncounterStarted>(Handle_WreckageEncounterStarted);
         messageBroker.Subscribe<NetworkOpenWreckageEncounter>(Handle_NetworkOpenWreckageEncounter);
+
+        messageBroker.Subscribe<BattleWreckageAdded>(Handle_BattleWreckageAdded);
+        messageBroker.Subscribe<NetworkAddBattleWreckage>(Handle_NetworkAddBattleWreckage);
+        messageBroker.Subscribe<BattleWreckageRemoved>(Handle_BattleWreckageRemoved);
+        messageBroker.Subscribe<NetworkRemoveBattleWreckage>(Handle_NetworkRemoveBattleWreckage);
     }
 
     public void Dispose()
@@ -43,6 +48,11 @@ internal class BattleWreckageHandler : IHandler
         messageBroker.Unsubscribe<NetworkRequestStartWreckageEncounter>(Handle_NetworkRequestStartWreckageEncounter);
         messageBroker.Unsubscribe<WreckageEncounterStarted>(Handle_WreckageEncounterStarted);
         messageBroker.Unsubscribe<NetworkOpenWreckageEncounter>(Handle_NetworkOpenWreckageEncounter);
+
+        messageBroker.Unsubscribe<BattleWreckageAdded>(Handle_BattleWreckageAdded);
+        messageBroker.Unsubscribe<NetworkAddBattleWreckage>(Handle_NetworkAddBattleWreckage);
+        messageBroker.Unsubscribe<BattleWreckageRemoved>(Handle_BattleWreckageRemoved);
+        messageBroker.Unsubscribe<NetworkRemoveBattleWreckage>(Handle_NetworkRemoveBattleWreckage);
     }
 
     private void Handle_RequestStartWreckageEncounter(MessagePayload<RequestStartWreckageEncounter> obj)
@@ -89,6 +99,44 @@ internal class BattleWreckageHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<BattleWreckage>(data.BattleWreckageId, out var battleWreckage)) return;
 
             battleWreckageCampaignBehaviorInterface.OpenWreckageEncounter(battleWreckage, data.IsInterrupted, data.RequiredInvestigationDuration);
+        });
+    }
+
+    private void Handle_BattleWreckageAdded(MessagePayload<BattleWreckageAdded> obj)
+    {
+        if (!objectManager.TryGetIdWithLogging(obj.What.BattleWreckage, out var battleWreckageId)) return;
+
+        network.SendAll(new NetworkAddBattleWreckage(battleWreckageId));
+    }
+
+    private void Handle_NetworkAddBattleWreckage(MessagePayload<NetworkAddBattleWreckage> obj)
+    {
+        var data = obj.What;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<BattleWreckage>(data.BattleWreckageId, out var battleWreckage)) return;
+
+            battleWreckageCampaignBehaviorInterface.AddWreckageToMap(battleWreckage);
+        });
+    }
+
+    private void Handle_BattleWreckageRemoved(MessagePayload<BattleWreckageRemoved> obj)
+    {
+        if (!objectManager.TryGetIdWithLogging(obj.What.BattleWreckage, out var battleWreckageId)) return;
+
+        network.SendAll(new NetworkRemoveBattleWreckage(battleWreckageId));
+    }
+
+    private void Handle_NetworkRemoveBattleWreckage(MessagePayload<NetworkRemoveBattleWreckage> obj)
+    {
+        var data = obj.What;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<BattleWreckage>(data.BattleWreckageId, out var battleWreckage)) return;
+
+            battleWreckageCampaignBehaviorInterface.RemoveWreckageFromMap(battleWreckage);
         });
     }
 }
