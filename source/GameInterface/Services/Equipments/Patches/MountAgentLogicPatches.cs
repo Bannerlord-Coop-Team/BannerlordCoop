@@ -28,10 +28,10 @@ internal class MountAgentLogicPatches
         bool usesCivilianEquipment = Mission.Current.DoesMissionRequireCivilianEquipment;
         Equipment equipment = usesCivilianEquipment ? Hero.MainHero.CivilianEquipment : Hero.MainHero.BattleEquipment;
 
-        float bonus = Hero.MainHero.GetPerkValue(DefaultPerks.Riding.WellStraped) &&
-            PerkHelper.TryGetPerkEffectBonus(DefaultPerks.Riding.WellStraped, isPrimary: true, out var perkBonus, affectedAgent.CurrentBattleEnvironment)
-            ? perkBonus
-            : 0f;
+        float bonus = 0f;
+        if (Hero.MainHero.GetPerkValue(DefaultPerks.Riding.WellStraped) &&
+            PerkHelper.TryGetPerkEffectBonus(DefaultPerks.Riding.WellStraped, isPrimary: true, out var perkBonus, affectedAgent.CurrentBattleEnvironment))
+            bonus = perkBonus;
 
         EquipmentElement horse = equipment[EquipmentIndex.Horse];
         if (RollMountLoss(MBRandom.RandomFloat, bonus, horse) is not MountLoss loss) return false;

@@ -97,13 +97,13 @@ internal class InventoryScreenRosterRefresher : IInventoryScreenRosterRefresher
         {
             foreach (var characterEquipment in partyEquipment.CharacterEquipments)
             {
-                // Vanilla copies each hero's sets in battle, civilian, stealth order
                 var character = characterEquipment.Key;
-                int set = character.FirstBattleEquipment == equipment ? 0
-                    : character.FirstCivilianEquipment == equipment ? 1
-                    : character.FirstStealthEquipment == equipment ? 2
-                    : -1;
-                if (set >= 0) characterEquipment.Value[set]._itemSlots[index] = element;
+                if (character.FirstBattleEquipment != equipment &&
+                    character.FirstCivilianEquipment != equipment &&
+                    character.FirstStealthEquipment != equipment) continue;
+
+                var copy = characterEquipment.Value.FirstOrDefault(c => c._equipmentType == equipment._equipmentType);
+                if (copy != null) copy._itemSlots[index] = element;
             }
         }
 

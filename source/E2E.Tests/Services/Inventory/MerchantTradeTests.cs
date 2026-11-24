@@ -8,10 +8,12 @@ using HarmonyLib;
 using Helpers;
 using LiteNetLib;
 using System.Reflection;
+using TaleWorlds.CampaignSystem.Inventory;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
+using TaleWorlds.Localization;
 using TaleWorlds.ObjectSystem;
 using Xunit.Abstractions;
 
@@ -159,6 +161,7 @@ public class MerchantTradeTests : IDisposable
         var client = TestEnvironment.Clients.First();
 
         var armorId = TestEnvironment.CreateRegisteredObject<ItemObject>();
+        var oldArmorId = TestEnvironment.CreateRegisteredObject<ItemObject>();
         var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
         var townId = TestEnvironment.CreateRegisteredObject<Town>();
         var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
@@ -171,19 +174,40 @@ public class MerchantTradeTests : IDisposable
                 var armor = instance.GetRegisteredObject<ItemObject>(armorId);
                 armor.StringId = "trade_equipped_armor";
                 MBObjectManager.Instance.RegisterObject(armor);
+
+                using (new AllowedThread())
+                {
+                    var oldArmor = instance.GetRegisteredObject<ItemObject>(oldArmorId);
+                    foreach (var item in new[] { armor, oldArmor })
+                    {
+                        item.Type = ItemObject.ItemTypeEnum.BodyArmor;
+                        item.Name = new TextObject(item.StringId);
+                    }
+                    instance.GetRegisteredObject<MobileParty>(partyId).LeaderHero.BattleEquipment[EquipmentIndex.Body] = new EquipmentElement(oldArmor);
+                }
             });
         }
 
         var merchantRosterId = SetUpMerchant(settlementId, townId, new[] { partyId });
 
-        // The inventory screen equips the armor locally, then Done is pressed without buying anything
+        // The inventory screen equips the armor over the old one, then Done is pressed without buying anything
         client.Call(() =>
         {
+            var party = client.GetRegisteredObject<MobileParty>(partyId);
+            var armor = client.GetRegisteredObject<ItemObject>(armorId);
+            var logic = new InventoryLogic(party, party.LeaderHero.CharacterObject, null);
             using (new AllowedThread())
             {
-                var hero = client.GetRegisteredObject<MobileParty>(partyId).LeaderHero;
-                hero.BattleEquipment[EquipmentIndex.Body] = new EquipmentElement(client.GetRegisteredObject<ItemObject>(armorId));
+                logic._rosters[0] = new ItemRoster();
+                logic._rosters[1] = new ItemRoster();
+                logic._rosters[1].AddToCounts(armor, 1);
+                logic._useBasePrices = true;
             }
+
+            logic.AddTransferCommand(TransferCommand.Transfer(1, InventoryLogic.InventorySide.PlayerInventory, InventoryLogic.InventorySide.BattleEquipment,
+                new ItemRosterElement(armor, 1), EquipmentIndex.None, EquipmentIndex.Body, party.LeaderHero.CharacterObject));
+
+            Assert.Same(armor, party.LeaderHero.BattleEquipment[EquipmentIndex.Body].Item);
         });
 
         var trade = CaptureTrade(client, merchantRosterId, townId, partyId,
