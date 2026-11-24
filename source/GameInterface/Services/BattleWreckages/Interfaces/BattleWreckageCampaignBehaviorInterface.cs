@@ -32,6 +32,7 @@ public interface IBattleWreckageCampaignBehaviorInterface : IGameAbstraction
     void RemoveWreckageFromMap(BattleWreckage battleWreckage);
     void StartWreckageEncounter(BattleWreckage battleWreckage, Hero mainHero);
     void OpenWreckageEncounter(BattleWreckage battleWreckage, bool isInterrupted, CampaignTime requiredInvestigationDuration);
+    void ShowWreckageEncounterDenied();
     void OnHourlyTick();
     void OnPartyEncounter(PartyBase attackerParty, PartyBase defenderParty);
     void OnHeroPrisonerTakenEvent(Hero hero);
@@ -96,6 +97,16 @@ public class BattleWreckageCampaignBehaviorInterface : IBattleWreckageCampaignBe
 
     public void StartWreckageEncounter(BattleWreckage battleWreckage, Hero mainHero)
     {
+        // One player investigates a wreckage at a time, and an interrupted one keeps it for their resume.
+        // Investigated Epic remains only show the battle summary, so any number of players can view them
+        var isRemains = battleWreckage.IsInvestigated && battleWreckage.WreckageTypeCategory == BattleWreckage.WreckageType.Epic;
+        var isHeldByAnotherPlayer = encounterTracker.Encounters.Any(other => other.Hero != mainHero && other.BattleWreckage == battleWreckage);
+        if (!isRemains && isHeldByAnotherPlayer)
+        {
+            messageBroker.Publish(this, new WreckageEncounterDenied(mainHero));
+            return;
+        }
+
         // Server half of vanilla SetCurrentEncounteredBattleWreckage, returning to the interrupted wreckage resumes its remaining time
         var isInterrupted = encounterTracker.TryGetEncounter(mainHero, out var encounter) && encounter.BattleWreckage == battleWreckage;
         if (!isInterrupted)
@@ -132,6 +143,11 @@ public class BattleWreckageCampaignBehaviorInterface : IBattleWreckageCampaignBe
 
         // A new investigation rolls its own duration in vanilla, and the server's is the one its interrupt math uses
         behavior._requiredInvestigationDuration = requiredInvestigationDuration;
+    }
+
+    public void ShowWreckageEncounterDenied()
+    {
+        InformationManager.DisplayMessage(new InformationMessage("You cannot investigate this wreckage while another player is investigating it"));
     }
 
     public void OnHourlyTick()

@@ -379,6 +379,79 @@ public class BattleWreckageLifetimeTests : IDisposable
         });
     }
 
+    // An uninvestigated Epic wreckage is locked like any other, only its investigated remains are open to everyone
+    [Theory]
+    [InlineData(BattleWreckage.WreckageType.Small)]
+    [InlineData(BattleWreckage.WreckageType.Epic)]
+    public void ServerStart_WreckageHeldByInterruptedPlayer_DeniesSecondPlayer(BattleWreckage.WreckageType wreckageType)
+    {
+        // Arrange
+        var battleWreckageId = CreateServerWreckage();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<BattleWreckage>(battleWreckageId, out var battleWreckage));
+
+            // Creating one as Epic needs a settlement for its name, and the field is readonly
+            AccessTools.Field(typeof(BattleWreckage), nameof(BattleWreckage.WreckageTypeCategory)).SetValue(battleWreckage, wreckageType);
+
+            AddBattleWreckageBehavior();
+            var firstHero = CreatePartyLeader();
+            var secondHero = CreatePartyLeader();
+            var campaignBehaviorInterface = Server.Resolve<IBattleWreckageCampaignBehaviorInterface>();
+            var encounterTracker = Server.Resolve<IBattleWreckageEncounterTracker>();
+
+            // The interrupted player keeps the wreckage so they can come back and resume
+            campaignBehaviorInterface.StartWreckageEncounter(battleWreckage, firstHero);
+            campaignBehaviorInterface.LeaveWreckageEncounter(firstHero, BattleWreckageCampaignBehavior.WreckageLeaveReason.PlayerInterrupted);
+
+            // Act
+            campaignBehaviorInterface.StartWreckageEncounter(battleWreckage, secondHero);
+
+            // Assert
+            var denied = Assert.Single(Server.InternalMessages.GetMessages<WreckageEncounterDenied>());
+            Assert.Same(secondHero, denied.MainHero);
+            Assert.False(encounterTracker.TryGetEncounter(secondHero, out _));
+
+            Assert.True(encounterTracker.TryGetEncounter(firstHero, out var firstEncounter));
+            Assert.Same(battleWreckage, firstEncounter.BattleWreckage);
+            Assert.Single(Server.InternalMessages.GetMessages<WreckageEncounterStarted>());
+        });
+    }
+
+    [Fact]
+    public void ServerStart_InvestigatedEpicRemains_LetsSeveralPlayersView()
+    {
+        // Arrange
+        var battleWreckageId = CreateServerWreckage();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<BattleWreckage>(battleWreckageId, out var battleWreckage));
+
+            // Creating one as Epic needs a settlement for its name, and the field is readonly
+            AccessTools.Field(typeof(BattleWreckage), nameof(BattleWreckage.WreckageTypeCategory))
+                .SetValue(battleWreckage, BattleWreckage.WreckageType.Epic);
+            battleWreckage.OnWreckageInvestigated();
+
+            AddBattleWreckageBehavior();
+            var firstHero = CreatePartyLeader();
+            var secondHero = CreatePartyLeader();
+            var campaignBehaviorInterface = Server.Resolve<IBattleWreckageCampaignBehaviorInterface>();
+            var encounterTracker = Server.Resolve<IBattleWreckageEncounterTracker>();
+
+            // Act
+            campaignBehaviorInterface.StartWreckageEncounter(battleWreckage, firstHero);
+            campaignBehaviorInterface.StartWreckageEncounter(battleWreckage, secondHero);
+
+            // Assert
+            Assert.Empty(Server.InternalMessages.GetMessages<WreckageEncounterDenied>());
+            Assert.Equal(2, Server.InternalMessages.GetMessages<WreckageEncounterStarted>().Count());
+            Assert.True(encounterTracker.TryGetEncounter(firstHero, out _));
+            Assert.True(encounterTracker.TryGetEncounter(secondHero, out _));
+        });
+    }
+
     // Recover troops is the only consequence that can roll, and it always does, so no roll depends on chance.
     // Run inside Server.Call
     private (Hero Hero, BattleWreckageEncounter Encounter, BattleWreckageCampaignBehavior Behavior, CharacterObject WoundedTroop)

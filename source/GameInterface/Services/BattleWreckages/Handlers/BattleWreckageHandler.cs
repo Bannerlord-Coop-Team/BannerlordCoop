@@ -35,6 +35,8 @@ internal class BattleWreckageHandler : IHandler
         messageBroker.Subscribe<NetworkRequestStartWreckageEncounter>(Handle_NetworkRequestStartWreckageEncounter);
         messageBroker.Subscribe<WreckageEncounterStarted>(Handle_WreckageEncounterStarted);
         messageBroker.Subscribe<NetworkOpenWreckageEncounter>(Handle_NetworkOpenWreckageEncounter);
+        messageBroker.Subscribe<WreckageEncounterDenied>(Handle_WreckageEncounterDenied);
+        messageBroker.Subscribe<NetworkDenyWreckageEncounter>(Handle_NetworkDenyWreckageEncounter);
 
         messageBroker.Subscribe<BattleWreckageAdded>(Handle_BattleWreckageAdded);
         messageBroker.Subscribe<NetworkAddBattleWreckage>(Handle_NetworkAddBattleWreckage);
@@ -48,6 +50,8 @@ internal class BattleWreckageHandler : IHandler
         messageBroker.Unsubscribe<NetworkRequestStartWreckageEncounter>(Handle_NetworkRequestStartWreckageEncounter);
         messageBroker.Unsubscribe<WreckageEncounterStarted>(Handle_WreckageEncounterStarted);
         messageBroker.Unsubscribe<NetworkOpenWreckageEncounter>(Handle_NetworkOpenWreckageEncounter);
+        messageBroker.Unsubscribe<WreckageEncounterDenied>(Handle_WreckageEncounterDenied);
+        messageBroker.Unsubscribe<NetworkDenyWreckageEncounter>(Handle_NetworkDenyWreckageEncounter);
 
         messageBroker.Unsubscribe<BattleWreckageAdded>(Handle_BattleWreckageAdded);
         messageBroker.Unsubscribe<NetworkAddBattleWreckage>(Handle_NetworkAddBattleWreckage);
@@ -99,6 +103,22 @@ internal class BattleWreckageHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<BattleWreckage>(data.BattleWreckageId, out var battleWreckage)) return;
 
             battleWreckageCampaignBehaviorInterface.OpenWreckageEncounter(battleWreckage, data.IsInterrupted, data.RequiredInvestigationDuration);
+        });
+    }
+
+    private void Handle_WreckageEncounterDenied(MessagePayload<WreckageEncounterDenied> obj)
+    {
+        if (!playerManager.TryGetPlayer(obj.What.MainHero, out var player)) return;
+        if (!playerManager.TryGetPeer(player.ControllerId, out var peer)) return;
+
+        network.Send(peer, new NetworkDenyWreckageEncounter());
+    }
+
+    private void Handle_NetworkDenyWreckageEncounter(MessagePayload<NetworkDenyWreckageEncounter> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            battleWreckageCampaignBehaviorInterface.ShowWreckageEncounterDenied();
         });
     }
 
