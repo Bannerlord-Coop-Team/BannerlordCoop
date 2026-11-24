@@ -3,6 +3,7 @@ using E2E.Tests.Environment;
 using E2E.Tests.Services.MapEvents;
 using E2E.Tests.Util;
 using GameInterface.CoopSessionData;
+using GameInterface.Services.BloodFeuds.Data;
 using HarmonyLib;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
@@ -16,7 +17,7 @@ namespace E2E.Tests.Services.Actions;
 
 /// <summary>
 /// ExecutionCampaignBehavior charges the execution trait penalty only to Hero.MainHero.
-/// The server's KillCharacterAction replacement applies it to the executing player instead.
+/// The server's KillCharacterAction replacement applies it to the executing player instead, once per blood feud.
 /// </summary>
 public class KillCharacterActionExecutionTests : MapEventTestBase
 {
@@ -66,6 +67,48 @@ public class KillCharacterActionExecutionTests : MapEventTestBase
             Assert.True(mercy < 0);
             Assert.Equal(0, serverStore.GetPropertyValue(DefaultTraits.Honor));
             Assert.Equal(0, serverStore.GetPropertyValue(DefaultTraits.Mercy));
+        }, WithoutObituary);
+    }
+
+    [Fact]
+    public void PlayerExecutingALordOfAFeudedClan_GetsNoTraitPenalty()
+    {
+        var (killerId, _) = CreatePlayerHeroParty("Executioner");
+        var victimId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var victimLeaderId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var victimClanId = TestEnvironment.CreateRegisteredObject<Clan>();
+        var killerClanId = TestEnvironment.CreateRegisteredObject<Clan>();
+
+        Server.Call(() =>
+        {
+            var killer = Server.GetRegisteredObject<Hero>(killerId);
+            var victim = Server.GetRegisteredObject<Hero>(victimId);
+            RegisterTrait(DefaultTraits.Honor);
+            RegisterTrait(DefaultTraits.Mercy);
+            Campaign.Current.PlayerTraitDeveloper = new PropertyOwner<PropertyObject>();
+
+            using (new AllowedThread())
+            {
+                var victimClan = Server.GetRegisteredObject<Clan>(victimClanId);
+                var killerClan = Server.GetRegisteredObject<Clan>(killerClanId);
+                victimClan.InitMembers();
+                killerClan.InitMembers();
+                victim.Clan = victimClan;
+                victimClan.SetLeader(Server.GetRegisteredObject<Hero>(victimLeaderId));
+                killer.Clan = killerClan;
+                victim.SetTraitLevel(DefaultTraits.Honor, 1);
+            }
+
+            var session = Server.Resolve<ICoopSessionProvider>().CoopSession;
+            session.BloodFeudPlayerData.PlayerBloodFeuds[killerId] = new()
+            {
+                [victimClanId] = new BloodFeudData { HasBloodFeud = true },
+            };
+
+            KillCharacterAction.ApplyInternal(victim, killer, KillCharacterAction.KillCharacterActionDetail.Executed, false, true);
+
+            Assert.False(victim.IsAlive);
+            Assert.False(session.PlayerTraitData.PlayerTraitXp.ContainsKey(killerId));
         }, WithoutObituary);
     }
 
