@@ -1,4 +1,4 @@
-﻿using Common;
+using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -6,10 +6,23 @@ using Common.Network.Coalescing;
 using Coop.Core.Common.Network.Packets;
 using GameInterface.Services.Save.Messages;
 using GameInterface.CoopSessionData;
+using GameInterface.Services.Alleys;
+using GameInterface.Services.CampaignService.Data;
 using GameInterface.Services.CampaignService.Interfaces;
+using GameInterface.Services.Caravans;
+using GameInterface.Services.Clans;
+using GameInterface.Services.Heroes;
 using GameInterface.Services.Heroes.Interfaces;
+using GameInterface.Services.Inventory;
+using GameInterface.Services.Inventory.TradeSkills;
+using GameInterface.Services.MobileParties;
+using GameInterface.Services.NavalDLC;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.OrderOfBattle;
 using GameInterface.Services.Ships;
+using GameInterface.Services.Smithing;
+using GameInterface.Services.ViewData;
+using GameInterface.Services.Workshops;
 using LiteNetLib;
 using ProtoBuf;
 using Serilog;
@@ -42,8 +55,7 @@ public class TransferSaveState : ConnectionStateBase
         ILootShipHold lootShipHold)
         : base(connectionLogic)
     {
-        byte[] saveData = null;
-        GameSaveDataPacket snapshot = default;
+        JoinSaveSnapshot snapshot = null;
         var snapshotGate = new object();
         bool snapshotAbandoned = false;
         var peer = connectionLogic.Peer;
@@ -51,12 +63,13 @@ public class TransferSaveState : ConnectionStateBase
         try
         {
             GameThread.RunSafe(CaptureSnapshot, blocking: true, context: "Capture join save snapshot");
-            if (saveData == null || peer.ConnectionState is ConnectionState.Disconnected or ConnectionState.ShutdownRequested)
-                return;
+            if (snapshot == null) return;
+            if (peer.ConnectionState is ConnectionState.Disconnected or ConnectionState.ShutdownRequested) return;
 
-            int uncompressedSize = saveData.Length;
-            var (chunks, compressedSize) = SaveDataCompression.CompressChunks(saveData);
-            saveData = null;
+            int uncompressedSize = snapshot.SaveData.Length;
+            var (chunks, compressedSize) = SaveDataCompression.CompressChunks(
+                snapshot.SaveData, GameSaveDataChunkPacket.ChunkSize);
+            snapshot.SaveData = null;
             transferComplete = SendSaveChunks(network, snapshot, chunks, compressedSize, uncompressedSize);
         }
         catch (Exception ex)
@@ -116,26 +129,28 @@ public class TransferSaveState : ConnectionStateBase
 
                 // Clone the mutable session DTOs at the same boundary as the campaign save. Compression and
                 // packet serialization run after the game-thread action returns, while campaign ticks resume.
-                // Keep the raw save separate so it can be released before queuing the wire packets.
-                snapshot = new GameSaveDataPacket(
-                    gameSaveData: null,
-                    saveResults.CampaignId,
-                    Clone(coopSessionProvider.CoopSession?.CraftingPlayerData),
-                    Clone(coopSessionProvider.CoopSession?.WorkshopPlayerData),
-                    Clone(coopSessionProvider.CoopSession?.CaravansPlayerData),
-                    Clone(coopSessionProvider.CoopSession?.AlleyPlayerData),
-                    Clone(coopSessionProvider.CoopSession?.InteractionsPlayerData),
-                    Clone(coopSessionProvider.CoopSession?.TradePlayerData),
-                    Clone(coopSessionProvider.CoopSession?.InventoryPlayerData),
-                    Clone(coopSessionProvider.CoopSession?.HeroMeetingData),
-                    Clone(coopSessionProvider.CoopSession?.AgingPlayerData),
-                    Clone(coopSessionProvider.CoopSession?.NavalPlayerData),
-                    attachmentIdMapper.BuildServerMap(),
-                    serverOptionsProvider.GetServerOptions(),
-                    Clone(coopSessionProvider.CoopSession?.ClanFinance),
-                    Clone(coopSessionProvider.CoopSession?.OrderOfBattlePlayerData),
-                    heldLootShipIds,
-                    Clone(coopSessionProvider.CoopSession?.ViewDataPlayerData));
+                var session = coopSessionProvider.CoopSession;
+                var captured = new JoinSaveSnapshot
+                {
+                    SaveData = saveResults.Data,
+                    CampaignId = saveResults.CampaignId,
+                    CraftingPlayerData = Clone(session?.CraftingPlayerData),
+                    WorkshopPlayerData = Clone(session?.WorkshopPlayerData),
+                    CaravansPlayerData = Clone(session?.CaravansPlayerData),
+                    AlleyPlayerData = Clone(session?.AlleyPlayerData),
+                    InteractionsPlayerData = Clone(session?.InteractionsPlayerData),
+                    TradePlayerData = Clone(session?.TradePlayerData),
+                    InventoryPlayerData = Clone(session?.InventoryPlayerData),
+                    HeroMeetingData = Clone(session?.HeroMeetingData),
+                    AgingPlayerData = Clone(session?.AgingPlayerData),
+                    NavalPlayerData = Clone(session?.NavalPlayerData),
+                    AttachmentIdMap = attachmentIdMapper.BuildServerMap(),
+                    ServerOptions = serverOptionsProvider.GetServerOptions(),
+                    ClanFinance = Clone(session?.ClanFinance),
+                    OrderOfBattlePlayerData = Clone(session?.OrderOfBattlePlayerData),
+                    HeldLootShipIds = heldLootShipIds,
+                    ViewDataPlayerData = Clone(session?.ViewDataPlayerData),
+                };
 
                 // Start holding this peer's broadcasts now that the snapshot has been taken. The whole save
                 // runs in a blocking GameThread.Run call issued from the network thread, so the poller is
@@ -146,7 +161,7 @@ public class TransferSaveState : ConnectionStateBase
                 {
                     if (snapshotAbandoned) return;
                     connectionMessageQueue.BeginQueueing(peer);
-                    saveData = saveResults.Data;
+                    snapshot = captured;
                 }
             }
             finally
@@ -173,7 +188,7 @@ public class TransferSaveState : ConnectionStateBase
     }
 
     private bool SendSaveChunks(
-        INetwork network, GameSaveDataPacket snapshot, Queue<byte[]> chunks, int compressedSize, int uncompressedSize)
+        INetwork network, JoinSaveSnapshot snapshot, Queue<byte[]> chunks, int compressedSize, int uncompressedSize)
     {
         var peer = ConnectionLogic.Peer;
         int transferId = Interlocked.Increment(ref nextSaveTransferId);
@@ -199,7 +214,7 @@ public class TransferSaveState : ConnectionStateBase
                 compressedSize,
                 uncompressedSize,
                 chunks.Dequeue(),
-                chunkIndex == 0 ? snapshot.CampaignID : null,
+                chunkIndex == 0 ? snapshot.CampaignId : null,
                 chunkIndex == 0 ? snapshot.CraftingPlayerData : null,
                 chunkIndex == 0 ? snapshot.WorkshopPlayerData : null,
                 chunkIndex == 0 ? snapshot.CaravansPlayerData : null,
@@ -250,5 +265,28 @@ public class TransferSaveState : ConnectionStateBase
 
     public override void TransferSave()
     {
+    }
+
+    /// <summary>Owns the raw save and session data captured at the same point on the game thread.</summary>
+    private sealed class JoinSaveSnapshot
+    {
+        public byte[] SaveData { get; set; }
+        public string CampaignId { get; set; }
+        public CraftingPlayerData CraftingPlayerData { get; set; }
+        public WorkshopPlayerData WorkshopPlayerData { get; set; }
+        public CaravansPlayerData CaravansPlayerData { get; set; }
+        public AlleyPlayerData AlleyPlayerData { get; set; }
+        public InteractionsPlayerData InteractionsPlayerData { get; set; }
+        public TradePlayerData TradePlayerData { get; set; }
+        public InventoryPlayerData InventoryPlayerData { get; set; }
+        public HeroMeetingData HeroMeetingData { get; set; }
+        public AgingPlayerData AgingPlayerData { get; set; }
+        public NavalPlayerData NavalPlayerData { get; set; }
+        public AttachmentIdMap AttachmentIdMap { get; set; }
+        public ServerOptions ServerOptions { get; set; }
+        public Dictionary<string, ClanFinanceSettings> ClanFinance { get; set; }
+        public OrderOfBattlePlayerData OrderOfBattlePlayerData { get; set; }
+        public string[] HeldLootShipIds { get; set; }
+        public ViewDataPlayerData ViewDataPlayerData { get; set; }
     }
 }

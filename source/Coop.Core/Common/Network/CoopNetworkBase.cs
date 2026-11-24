@@ -245,7 +245,7 @@ public abstract class CoopNetworkBase : INetwork, IBufferedNetwork, INetEventLis
     public const byte BulkChannel = 1;
 
     internal static byte GetChannel(IPacket packet) =>
-        packet is GameSaveDataPacket or GameSaveDataChunkPacket ? BulkChannel : (byte)0;
+        packet is GameSaveDataChunkPacket ? BulkChannel : (byte)0;
 
     /// <summary>
     /// Sends every peer's buffered messages and prunes buffers of disconnected peers. Normally called

@@ -6,7 +6,7 @@ using System.IO.Compression;
 namespace Coop.Core.Common.Network.Packets;
 
 /// <summary>
-/// Deflate compression for the transfer save payload of <see cref="GameSaveDataPacket"/>.
+/// Deflate compression for campaign saves sent during join.
 /// </summary>
 /// <remarks>
 /// The raw save is tens of MB and LiteNetLib fragments it into MTU-sized reliable packets that drain
@@ -17,9 +17,11 @@ namespace Coop.Core.Common.Network.Packets;
 /// </remarks>
 public static class SaveDataCompression
 {
-    internal static (Queue<byte[]> Chunks, int CompressedSize) CompressChunks(byte[] data)
+    internal static (Queue<byte[]> Chunks, int CompressedSize) CompressChunks(byte[] data, int chunkSize)
     {
-        using var output = new ChunkWriteStream();
+        if (chunkSize <= 0) throw new ArgumentOutOfRangeException(nameof(chunkSize));
+
+        using var output = new ChunkWriteStream(chunkSize);
         using (var deflate = new DeflateStream(output, CompressionLevel.Fastest, leaveOpen: true))
         {
             deflate.Write(data, 0, data.Length);
@@ -36,13 +38,19 @@ public static class SaveDataCompression
         return output.ToArray();
     }
 
-    /// <summary>Collects Deflate output directly into independently owned wire chunks.</summary>
+    /// <summary>Collects Deflate output directly into independently owned chunks.</summary>
     private sealed class ChunkWriteStream : Stream
     {
+        private readonly int chunkSize;
         private readonly Queue<byte[]> chunks = new Queue<byte[]>();
         private byte[] chunk;
         private int chunkOffset;
         private long length;
+
+        public ChunkWriteStream(int chunkSize)
+        {
+            this.chunkSize = chunkSize;
+        }
 
         public override bool CanRead => false;
         public override bool CanSeek => false;
@@ -59,7 +67,7 @@ public static class SaveDataCompression
             length += count;
             while (count > 0)
             {
-                chunk ??= new byte[GameSaveDataChunkPacket.ChunkSize];
+                chunk ??= new byte[chunkSize];
                 int copied = Math.Min(count, chunk.Length - chunkOffset);
                 Buffer.BlockCopy(buffer, offset, chunk, chunkOffset, copied);
                 offset += copied;

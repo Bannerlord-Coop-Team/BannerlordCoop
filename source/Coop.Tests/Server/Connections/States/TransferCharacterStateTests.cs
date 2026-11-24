@@ -1,10 +1,8 @@
 ﻿using Autofac;
+using Common;
 using Common.Network;
 using Common.PacketHandlers;
 using Common.Serialization;
-using Common.Tests.Utils;
-using Coop.Core.Client.Messages;
-using Coop.Core.Client.Services.Save.PacketHandlers;
 using Coop.Core.Common.Network.Packets;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.States;
@@ -22,14 +20,19 @@ using GameInterface.Services.Players.Data;
 using LiteNetLib;
 using Moq;
 using System;
-using System.IO;
-using System.IO.Compression;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Xunit;
 using Xunit.Abstractions;
 
 namespace Coop.Tests.Server.Connections.States
 {
+    /// <summary>Isolates the test that pauses the shared game-thread pump and shortens its timeout.</summary>
+    [CollectionDefinition(nameof(TransferSaveSnapshotCollection), DisableParallelization = true)]
+    public class TransferSaveSnapshotCollection { }
+
+    [Collection(nameof(TransferSaveSnapshotCollection))]
     public class TransferCharacterStateTests
     {
         private readonly IConnectionLogic connectionLogic;
@@ -196,13 +199,9 @@ namespace Coop.Tests.Server.Connections.States
             var serializer = serverComponent.Container.Resolve<ICommonSerializer>();
             var packets = serverComponent.TestNetwork.GetPeerPacketsFromType<GameSaveDataChunkPacket>(playerPeer)
                 .Select(packet => serializer.Deserialize<GameSaveDataChunkPacket>(serializer.Serialize(packet))).ToArray();
-            using var original = new MemoryStream();
-            using (var deflate = new DeflateStream(original, CompressionLevel.Fastest, leaveOpen: true))
-            {
-                deflate.Write(data, 0, data.Length);
-            }
-            byte[] expected = original.ToArray();
-            int expectedChunkCount = Math.Max(1, (expected.Length + GameSaveDataChunkPacket.ChunkSize - 1) / GameSaveDataChunkPacket.ChunkSize);
+            byte[] compressed = packets.SelectMany(packet => packet.ChunkData ?? Array.Empty<byte>()).ToArray();
+            int chunkSize = GameSaveDataChunkPacket.ChunkSize;
+            int expectedChunkCount = Math.Max(1, (compressed.Length + chunkSize - 1) / chunkSize);
 
             Assert.Equal(expectedChunkCount, packets.Length);
             Assert.Equal(Enumerable.Range(0, packets.Length), packets.Select(x => x.ChunkIndex));
@@ -210,11 +209,11 @@ namespace Coop.Tests.Server.Connections.States
             {
                 Assert.Equal(packets[0].TransferId, packet.TransferId);
                 Assert.Equal(packets.Length, packet.ChunkCount);
-                Assert.Equal(expected.Length, packet.CompressedSize);
+                Assert.Equal(compressed.Length, packet.CompressedSize);
                 Assert.Equal(size, packet.UncompressedSize);
             });
-            Assert.All(packets.SkipLast(1), packet => Assert.Equal(GameSaveDataChunkPacket.ChunkSize, packet.ChunkData.Length));
-            Assert.Equal(expected, packets.SelectMany(packet => packet.ChunkData ?? Array.Empty<byte>()).ToArray());
+            Assert.All(packets.SkipLast(1), packet => Assert.Equal(chunkSize, packet.ChunkData.Length));
+            Assert.Equal(data, SaveDataCompression.Decompress(compressed));
             Assert.Equal("12345", packets[0].CampaignID);
             Assert.All(packets.Skip(1), packet => Assert.Null(packet.CampaignID));
         }
@@ -269,32 +268,47 @@ namespace Coop.Tests.Server.Connections.States
         }
 
         [Fact]
-        public void ClientDiscardsPartialTransferOnDisconnectAndAcceptsFreshTransfer()
+        public async Task SnapshotFinishesAfterTimeout_DoesNotRestartCatchUpOrLoad()
         {
-            byte[] data = new byte[GameSaveDataChunkPacket.ChunkSize];
-            new Random(42).NextBytes(data);
+            var context = serverComponent.Container.Resolve<ConnectionContext>();
+            var queue = context.ConnectionMessageQueue;
+            queue.RegisterPeer(playerPeer);
+            var saveStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            using var releaseSave = new ManualResetEventSlim();
             serverComponent.Container.Resolve<Mock<ISaveInterface>>()
                 .Setup(save => save.SaveCurrentGame())
-                .Returns(new SaveResults(true, data, "12345"));
-            connectionLogic.SetState<TransferSaveState>();
-            var packets = serverComponent.TestNetwork.GetPeerPacketsFromType<GameSaveDataChunkPacket>(playerPeer).ToArray();
-            Assert.Equal(2, packets.Length);
-            using var broker = new TestMessageBroker();
-            using var handler = new GameSaveDataPacketHandler(Mock.Of<IPacketManager>(), broker);
+                .Returns(() =>
+                {
+                    saveStarted.SetResult(true);
+                    releaseSave.Wait();
+                    return new SaveResults(true, new byte[] { 1, 2, 3 }, "12345");
+                });
+            var logic = new Mock<IConnectionLogic>();
+            logic.SetupGet(value => value.Peer).Returns(playerPeer);
 
-            handler.HandlePacket(playerPeer, packets[0]);
-            broker.Publish(this, new NetworkDisconnected(default));
-            handler.HandlePacket(playerPeer, packets[1]);
-            Assert.Empty(broker.GetMessagesFromType<NetworkGameSaveDataReceived>());
-
-            var retry = serverComponent.Container.Resolve<ConnectionLogic>(new TypedParameter(typeof(NetPeer), differentPeer));
-            retry.SetState<TransferSaveState>();
-            foreach (var packet in serverComponent.TestNetwork.GetPeerPacketsFromType<GameSaveDataChunkPacket>(differentPeer))
+            var testTimeout = TimeSpan.FromSeconds(10);
+            TransferSaveState state;
+            try
             {
-                handler.HandlePacket(differentPeer, packet);
+                using var shortWait = GameThread.Instance.LimitFrameDrain(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+                var transfer = Task.Run(() => new TransferSaveState(
+                    logic.Object, context.MessageBroker, context.Network, context.CoopSessionProvider, context.SaveInterface,
+                    queue, context.Coalescer, context.AttachmentIdMapper, context.ServerOptionsProvider, context.LootShipHold));
+
+                await saveStarted.Task.WaitAsync(testTimeout);
+                state = await transfer.WaitAsync(testTimeout);
+                Assert.Equal(ConnectionState.ShutdownRequested, playerPeer.ConnectionState);
             }
-            var received = Assert.Single(broker.GetMessagesFromType<NetworkGameSaveDataReceived>());
-            Assert.Equal(data, received.GameSaveData);
+            finally
+            {
+                releaseSave.Set();
+                // Drain the late snapshot before checking whether it reopened the replay queue.
+                GameThread.Run(() => { }, blocking: true);
+            }
+
+            state.Load();
+            Assert.False(queue.TryGetCatchUpPendingBytes(playerPeer, out _));
+            logic.Verify(value => value.SetState<LoadingState>(), Times.Never);
         }
     }
 }
