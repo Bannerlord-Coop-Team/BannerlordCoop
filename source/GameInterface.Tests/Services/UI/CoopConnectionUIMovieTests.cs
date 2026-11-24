@@ -13,7 +13,7 @@ public class CoopConnectionUIMovieTests
         var document = XDocument.Load(FindMoviePath());
 
         Assert.Single(document.Descendants("EditableTextWidget"),
-            element => element.Attribute("Text")?.Value == "@Ip");
+            element => element.Attribute("RealText")?.Value == "@Ip");
         Assert.DoesNotContain(document.Descendants("EditableTextWidget"),
             element => element.Attribute("Text")?.Value == "@Port");
         Assert.DoesNotContain(document.Descendants("TextWidget"),

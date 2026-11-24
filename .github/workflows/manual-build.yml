@@ -132,7 +132,7 @@ jobs:
           for required in Coop.dll Common.dll Coop.Core.dll Coop.Steam.dll GameInterface.dll Missions.dll Coop.CrashReporter.exe; do
             test -s "$binary/$required"
           done
-          cp 'deploy/Server Instructions.md' deploy/mod-config.default.json "$module/"
+          cp 'deploy/Server Instructions.md' deploy/mod-config.default.json deploy/managed-config-catalog.json "$module/"
           cp -R deploy/ModuleData deploy/ThirdPartyNotices deploy/GUI "$module/"
           cp -R UIMovies/. "$module/GUI/Prefabs/"
 

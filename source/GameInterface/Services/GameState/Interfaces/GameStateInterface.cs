@@ -23,8 +23,15 @@ namespace GameInterface.Services.GameState.Interfaces;
 
 public interface IGameStateInterface : IGameAbstraction
 {
+    /// <summary>
+    /// Ends the campaign on the game thread. Leaving is ordered ahead of any game-thread work queued after this
+    /// returns, but the main menu may not be active yet.
+    /// </summary>
     void GoToMainMenu();
     void StartNewGame();
+    /// <summary>
+    /// Queues loading a transferred save on the game thread and returns without waiting for it.
+    /// </summary>
     void LoadSaveData(byte[] saveData);
     void LoadGame(string saveName);
 
@@ -43,24 +50,27 @@ internal class GameStateInterface : IGameStateInterface
     private readonly Action endGame;
     private readonly Func<SaveGameFileInfo[]> getSaveFiles;
     private readonly Action<SaveGameFileInfo> forceLoadSave;
+    private readonly Action<byte[]> loadTransferredSave;
     private readonly INavalSaveCompatibility navalSaveCompatibility;
     private readonly ILoadingInterface loadingInterface;
 
     public GameStateInterface(IMessageBroker messageBroker, INavalSaveCompatibility navalSaveCompatibility,
         ILoadingInterface loadingInterface)
         : this(messageBroker, MBGameManager.EndGame, () => MBSaveLoad.GetSaveFiles(null), ForceLoadSave,
-            navalSaveCompatibility, loadingInterface)
+            LoadTransferredSave, navalSaveCompatibility, loadingInterface)
     {
     }
 
-    // Lets tests replace the engine's end-game, save listing and forced load.
+    // Lets tests replace the engine's end-game, save listing, forced load and transferred save load.
     internal GameStateInterface(IMessageBroker messageBroker, Action endGame, Func<SaveGameFileInfo[]> getSaveFiles,
-        Action<SaveGameFileInfo> forceLoadSave, INavalSaveCompatibility navalSaveCompatibility, ILoadingInterface loadingInterface)
+        Action<SaveGameFileInfo> forceLoadSave, Action<byte[]> loadTransferredSave,
+        INavalSaveCompatibility navalSaveCompatibility, ILoadingInterface loadingInterface)
     {
         this.messageBroker = messageBroker;
         this.endGame = endGame;
         this.getSaveFiles = getSaveFiles;
         this.forceLoadSave = forceLoadSave;
+        this.loadTransferredSave = loadTransferredSave;
         this.navalSaveCompatibility = navalSaveCompatibility;
         this.loadingInterface = loadingInterface;
     }
@@ -76,10 +86,11 @@ internal class GameStateInterface : IGameStateInterface
     public void LoadSaveData(byte[] saveData)
     {
         messageBroker.Publish(this, new GameLoadStarted());
-        GameThread.Run(() => InteralLoadSaveGame(saveData), blocking: true);
+        // Queued, not awaited, so the load is never dropped for starting late
+        GameThread.RunSafe(() => loadTransferredSave(saveData), context: nameof(LoadSaveData));
     }
 
-    private void InteralLoadSaveGame(byte[] saveData)
+    private static void LoadTransferredSave(byte[] saveData)
     {
         if (saveData == null) throw new ArgumentNullException($"Received save data was null");
 

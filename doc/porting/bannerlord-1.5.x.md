@@ -243,8 +243,8 @@ are registered later, at `CampaignReady` (`MapScreen.OnInitialize`), through
 - Empty clan parties are keyed on the local main hero. They run on the server only and are not
   multiplayer-aware yet.
 - War Sails v1.3.7 builds and loads on v1.5.7 (#4602), but sea play hasn't been checked live on v1.5.7
-  yet. Mooring (#4603), ferries (#4604), castle ports and blockades (#4605), hits on another player's
-  ropes (#4607) and naval incidents (#4608) stay off.
+  yet. Ferries (#4604), castle ports and blockades (#4605), hits on another player's ropes (#4607)
+  and naval incidents (#4608) stay off.
 - v1.5 leaves a `BattleWreckage` after a field battle with a winner and at least 15 casualties: a battle
   site on land, a wreckage at sea. `BattleWreckageCampaignBehavior` is disabled on the server and on
   clients (`BattleWreckageCampaignBehaviorPatches`). Co-op's `MBObjectBasePatches.StringIdPrefix` drops

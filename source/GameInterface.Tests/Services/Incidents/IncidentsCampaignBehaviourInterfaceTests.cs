@@ -7,6 +7,7 @@ using GameInterface.Services.Missions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Tests.Services.SiegeEvents;
 using LiteNetLib;
 using Moq;
 using System.Collections.Generic;
@@ -19,6 +20,8 @@ using TriggerId = TaleWorlds.CampaignSystem.CampaignBehaviors.IncidentsCampaignB
 
 namespace GameInterface.Tests.Services.Incidents;
 
+// The availability check reads Campaign.Current, which other tests swap for a bare campaign
+[Collection(nameof(CampaignCurrentCollection))]
 public class IncidentsCampaignBehaviourInterfaceTests
 {
     private const string ArrowProofingId = "Incident_incident_arrow_proofing";
@@ -94,7 +97,6 @@ public class IncidentsCampaignBehaviourInterfaceTests
     [Fact]
     public void TryInvokeIncident_LeavingBattleWhileInMission_DoesNotRollYet()
     {
-        // The held roll running later comes from OnHourlyTick, which needs ContainerProvider-resolved player parties
         missionMembership.Setup(registry => registry.IsControllerInMission(player.ControllerId)).Returns(true);
 
         incidentsInterface.TryInvokeIncident(player, playerParty, playerHero, new IncidentTrigger(TriggerId.LeavingBattle));
@@ -102,6 +104,20 @@ public class IncidentsCampaignBehaviourInterfaceTests
         sessionData.Verify(data => data.TryGetPendingIncident(It.IsAny<string>(), out It.Ref<string>.IsAny), Times.Never);
         sessionData.Verify(data => data.SetActiveIncidentSeed(It.IsAny<string>(), It.IsAny<long>()), Times.Never);
         Assert.Empty(sentMessages);
+    }
+
+    [Fact]
+    public void TryReleaseHeldBattleRoll_NavalBattleHeldInMission_ReleasesOnceLeft()
+    {
+        missionMembership.Setup(registry => registry.IsControllerInMission(player.ControllerId)).Returns(true);
+        incidentsInterface.TryInvokeIncident(player, playerParty, playerHero, new IncidentTrigger("LeavingNavalBattle"));
+
+        missionMembership.Setup(registry => registry.IsControllerInMission(player.ControllerId)).Returns(false);
+
+        Assert.True(incidentsInterface.TryReleaseHeldBattleRoll(player, playerParty, playerHero));
+        // The replay gets past the hold and the availability checks to the pending incident check
+        sessionData.Verify(data => data.TryGetPendingIncident(player.HeroId, out It.Ref<string>.IsAny), Times.Once);
+        Assert.False(incidentsInterface.TryReleaseHeldBattleRoll(player, playerParty, playerHero));
     }
 
     [Fact]

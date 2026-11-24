@@ -204,12 +204,15 @@ internal class ConversationRequestHandler : IHandler
 
         // The player did not ask for this encounter. Wait while either side is in another conversation,
         // otherwise the attacker retries every tick and each retry denies a request nobody made.
-        if (conversationPartyTracker.IsInOtherConversation(playerPeer, playerPartyId, aiPartyId))
+        if (conversationPartyTracker.TryDefer(playerPeer, playerPartyId, aiPartyId, out var firstDeferral))
         {
-            Logger.Verbose(
-                "Deferring server-detected conversation. AttackerId={AttackerId}, DefenderId={DefenderId}",
-                attackerId,
-                defenderId);
+            if (firstDeferral)
+            {
+                Logger.Verbose(
+                    "Deferring server-detected conversation. AttackerId={AttackerId}, DefenderId={DefenderId}",
+                    attackerId,
+                    defenderId);
+            }
             return;
         }
 
@@ -853,9 +856,10 @@ internal class ConversationRequestHandler : IHandler
     {
         if (ModInformation.IsClient) return;
 
-        ReleaseEngagementOnMainThread(payload.What.PlayerId);
-        EndPvpInteraction(payload.What.PlayerId);
-        EndPvpInteractionForDefender(payload.What.PlayerId);
+        var peer = payload.What.PlayerId;
+        ReleaseEngagementOnMainThread(peer);
+        EndPvpInteraction(peer);
+        EndPvpInteractionForDefender(peer);
     }
 
     /// <summary>[Server] The disconnected peer was a PvP defender: end the conversation and make the attacker (its
@@ -877,11 +881,12 @@ internal class ConversationRequestHandler : IHandler
         string requestId = null,
         bool requireRequestIdMatch = false)
     {
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
             ConversationPartyHold.EndEngagement(
                 conversationPartyTracker,
                 peer,
                 requestId,
-                requireRequestIdMatch));
+                requireRequestIdMatch),
+            context: nameof(ReleaseEngagementOnMainThread));
     }
 }

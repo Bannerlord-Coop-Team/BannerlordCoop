@@ -84,6 +84,9 @@ internal static class CoopSessionMigrationRules
         ClearWithMigration.Add(AccessTools.Property(typeof(AgingPlayerData), nameof(AgingPlayerData.PlayerSuccessions)));
         ClearWithMigration.Add(AccessTools.Property(typeof(AgingPlayerData), nameof(AgingPlayerData.PlayerMarriageOffers)));
 
+        // The heir's party isn't on the dead hero's ferry
+        ClearWithMigration.Add(AccessTools.Property(typeof(NavalPlayerData), nameof(NavalPlayerData.PlayerFerryDepartures)));
+
         ClearWithMigration.Add(AccessTools.Property(typeof(PlayerTraitData), nameof(PlayerTraitData.PlayerTraitXp)));
 
         ClearWithMigration.Add(AccessTools.Property(typeof(BloodFeudPlayerData), nameof(BloodFeudPlayerData.PlayerPendingExecutions)));

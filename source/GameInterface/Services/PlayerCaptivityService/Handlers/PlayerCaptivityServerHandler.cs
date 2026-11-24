@@ -12,15 +12,12 @@ using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MobilePartyAIs.Patches;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.PartyBases.Extensions;
-using GameInterface.Services.PartyVisuals.Extensions;
-using GameInterface.Services.PartyVisuals.Messages;
+using GameInterface.Services.PartyVisuals.Interfaces;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.TroopRosters.Messages;
 using Helpers;
 using LiteNetLib;
-using SandBox.View.Map.Managers;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -63,6 +60,7 @@ internal class PlayerCaptivityServerHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IPlayerManager playerManager;
     private readonly ConversationPartyTracker conversationPartyTracker;
+    private readonly IPartyVisualInterface partyVisuals;
     private readonly IExecutionCampaignBehaviorInterface executionInterface;
 
     public PlayerCaptivityServerHandler(
@@ -71,6 +69,7 @@ internal class PlayerCaptivityServerHandler : IHandler
         IMessageBroker messageBroker,
         IPlayerManager playerManager,
         ConversationPartyTracker conversationPartyTracker,
+        IPartyVisualInterface partyVisuals,
         IExecutionCampaignBehaviorInterface executionInterface)
     {
         this.objectManager = objectManager;
@@ -78,6 +77,7 @@ internal class PlayerCaptivityServerHandler : IHandler
         this.messageBroker = messageBroker;
         this.playerManager = playerManager;
         this.conversationPartyTracker = conversationPartyTracker;
+        this.partyVisuals = partyVisuals;
         this.executionInterface = executionInterface;
 
         // ModInformation is evaluated per call (tests flip it per instance), so each handler
@@ -171,21 +171,29 @@ internal class PlayerCaptivityServerHandler : IHandler
         // transferred — out of BR-061's scope, which covers the surrendered party's own heroes and troops.
         EmptyRoster(playerParty.MemberRoster);
         EmptyRoster(playerParty.PrisonRoster);
-        RemoveVisual(playerParty);
+        partyVisuals.RemoveVisual(playerParty);
         if (playerParty.LeaderHero != null)
             playerParty.ChangePartyLeader(null);
 
-        // Vanilla ExecutionCampaignBehavior.CalculatePlayerExecutionProbability against the captured player's clan
-        var executer = payload.What.CapturerParty?.LeaderHero;
+        RollPlayerExecution(hero, payload.What.CapturerParty);
+
+        partyVisuals.RefreshParkedNameplate(playerParty);
+    }
+
+    private void RollPlayerExecution(Hero hero, PartyBase captor)
+    {
+        var executer = captor?.LeaderHero;
         if (executer == null || executer.IsPlayerHero()) return;
 
         int mercy = executer.GetTraitLevel(DefaultTraits.Mercy);
+        // Against the captured player's clan instead of vanilla's Clan.PlayerClan
         int relation = executer.Clan.GetRelationWithClan(hero.Clan);
         bool hasBloodFeud = executionInterface.HasBloodFeud(hero, executer.Clan);
         if (MBRandom.RandomFloat <= PlayerExecutionChance(hasBloodFeud, mercy, relation))
             executionInterface.SetPendingPlayerExecution(hero, executer);
     }
 
+    // Vanilla ExecutionCampaignBehavior.CalculatePlayerExecutionProbability
     private static float PlayerExecutionChance(bool hasBloodFeud, int mercy, int relation)
     {
         if (hasBloodFeud) return 1f;
@@ -690,22 +698,6 @@ internal class PlayerCaptivityServerHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(playerParty, out string playerPartyId)) return;
 
         network.SendAll(new NetworkPlayerCaptivityReleasePositionSet(playerPartyId, releasePosition));
-    }
-
-    private void RemoveVisual(MobileParty party)
-    {
-        var partyVisual = party.Party.GetPartyVisual();
-        if (partyVisual == null) return;
-        if (!objectManager.TryGetHandleWithLogging(party, out var mobilePartyHandle)) return;
-
-        objectManager.Remove(partyVisual);
-
-        using (new AllowedThread())
-        {
-            MobilePartyVisualManager.Current?.RemovePartyVisualForParty(party);
-        }
-
-        network.SendAll(new NetworkDestroyPartyVisual(mobilePartyHandle));
     }
 
     /// <summary>

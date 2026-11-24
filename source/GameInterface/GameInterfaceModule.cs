@@ -15,6 +15,7 @@ using GameInterface.Configuration;
 using GameInterface.Registry;
 using GameInterface.Serialization;
 using GameInterface.Services;
+using GameInterface.Services.Villages;
 using GameInterface.Services.Armies;
 using GameInterface.Services.Alleys;
 using GameInterface.Services.Bandits;
@@ -56,6 +57,9 @@ using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.MapEventComponents;
 using GameInterface.Services.AnchorPoints.Handlers;
 using GameInterface.Services.MapEventComponents.Handlers;
+using GameInterface.Services.Ferries;
+using GameInterface.Services.Ferries.Handlers;
+using GameInterface.Services.Ferries.Interfaces;
 using GameInterface.Services.Rafts.Commands;
 using GameInterface.Services.Rafts.Handlers;
 using GameInterface.Services.Rafts.Interfaces;
@@ -124,6 +128,9 @@ public class GameInterfaceModule : Module
         typeof(SiegeBlockadeHandler),
         typeof(PlayerRaftFleetInterface),
         typeof(RaftDebugCommands.StrandOnRaftCoopCommand),
+        typeof(PlayerFerryHandler),
+        typeof(PlayerFerryInterface),
+        typeof(PlayerFerryTracker),
 #if DEBUG
         typeof(NavalScenarioClientHandler),
         typeof(NavalScenarioRejoinHandler),
@@ -174,6 +181,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<BinaryPackageFactory>().As<IBinaryPackageFactory>().SingleInstance();
         builder.RegisterType<ControllerIdProvider>().As<IControllerIdProvider>().SingleInstance();
         builder.RegisterType<TimeControlModeConverter>().As<ITimeControlModeConverter>().SingleInstance();
+        builder.RegisterType<OrderAttackRule>().As<IOrderAttackRule>().InstancePerDependency();
         builder.RegisterType<RomanceRetryHistory>().As<IRomanceRetryHistory>().SingleInstance();
         builder.RegisterType<RomanceRetryCooldown>().As<IRomanceRetryCooldown>().InstancePerDependency();
         builder.RegisterType<Services.Crime.CrimeRatingService>().As<Services.Crime.ICrimeRatingService>().InstancePerDependency();
@@ -254,6 +262,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<SiegeDefenderCommandAuthority>().As<ISiegeDefenderCommandAuthority>().InstancePerDependency();
         builder.RegisterType<AiSiegeTerminalPolicy>().As<IAiSiegeTerminalPolicy>().SingleInstance();
         builder.RegisterType<SiegeFinalizeTracker>().As<ISiegeFinalizeTracker>().InstancePerLifetimeScope();
+        builder.RegisterType<ClientVillageHostileActionTracker>().As<IClientVillageHostileActionTracker>().InstancePerLifetimeScope();
         builder.RegisterType<SiegeEventGraphSynchronizer>().As<ISiegeEventGraphSynchronizer>().InstancePerDependency();
         builder.RegisterType<MapEventContributionBarrier>().As<IMapEventContributionBarrier>().InstancePerDependency();
         builder.RegisterType<SiegeBreakOut>().As<ISiegeBreakOut>().InstancePerDependency();

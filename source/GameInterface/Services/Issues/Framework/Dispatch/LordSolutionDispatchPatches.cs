@@ -1,5 +1,4 @@
 ﻿using Common;
-using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.AcceptCoordination;
 using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
@@ -55,7 +54,5 @@ internal class LordSolutionDispatchPatches
         ContainerProvider.TryResolve<IQuestTypeRegistry>(out var registry) && registry.IsRegistered(issue.GetType());
 
     private static bool IsLocalOwner(IssueBase issue) =>
-        ContainerProvider.TryResolve<IIssueOwnerResolver>(out var resolver) &&
-        ContainerProvider.TryResolve<IControllerIdProvider>(out var controller) &&
-        resolver.TryGetOwnerControllerId(issue, out var owner) && owner == controller.ControllerId;
+        ContainerProvider.TryResolve<IIssueOwnerResolver>(out var resolver) && resolver.IsLocalOwner(issue);
 }
