@@ -167,6 +167,7 @@ internal class DefaultMobilePartyAIModelPatches
         return codes;
     }
 
+    // Mirrors the CalculateInitiativeScoresForEnemy stack with the model first and the injected search last.
     private static void ScoreEnemyWithNearbyPlayers(
         DefaultMobilePartyAIModel model,
         MobileParty mobileParty,
@@ -201,17 +202,26 @@ internal class DefaultMobilePartyAIModelPatches
         private ScanState state;
         private List<MobileParty> seenPlayers;
 
-        public bool HasStrongerPlayer(MobileParty attacker, MobileParty enemy)
+        public bool HasStrongerPlayer(MobileParty attacker, MobileParty enemy) =>
+            AnySeenPlayerStronger(attacker, enemy) || ScanForStrongerPlayer(attacker, enemy);
+
+        // Recheck eligibility for this enemy, which may be in a different map event.
+        private bool AnySeenPlayerStronger(MobileParty attacker, MobileParty enemy)
         {
-            if (seenPlayers != null)
+            if (seenPlayers == null) return false;
+
+            foreach (var player in seenPlayers)
             {
-                foreach (var player in seenPlayers)
-                {
-                    if (IsStrongerPlayerParty(player, attacker, enemy))
-                        return true;
-                }
+                if (IsStrongerPlayerParty(player, attacker, enemy))
+                    return true;
             }
 
+            return false;
+        }
+
+        // Keep the cursor at the first match so a later enemy can continue from there.
+        private bool ScanForStrongerPlayer(MobileParty attacker, MobileParty enemy)
+        {
             if (state == ScanState.Exhausted) return false;
 
             if (state == ScanState.NotStarted)
@@ -256,7 +266,7 @@ internal class DefaultMobilePartyAIModelPatches
         return joiningRadius * DefaultRadiusMultiplier;
     }
 
-    // Vanilla's stronger main party check and the skips it runs before it, read for an active player party.
+    // Applies vanilla's strength and eligibility checks to an active player party already filtered by the scan.
     private static bool IsStrongerPlayerParty(MobileParty party, MobileParty mobileParty, MobileParty enemyParty)
     {
         if (party.BesiegedSettlement != null && party.MapFaction == mobileParty.MapFaction) return false;

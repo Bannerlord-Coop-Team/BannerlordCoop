@@ -47,13 +47,15 @@ public class DefaultMobilePartyAIModelPatchesTests : IDisposable
     }
 
     [Fact]
-    public void ParkedPlayerDoesNotSuppressUntilActive()
+    public void OnlyActivePlayerPartiesInsideTheSearchRadiusSuppressAttacks()
     {
         var attacker = CreateParty(100f);
         var enemy = CreateParty(50f);
         var parkedPlayer = AddPlayer(300f, x: 101f, active: false);
-        AddPlayer(300f, x: 109f); // Default encounter radius is 3, and the locator excludes the boundary.
-        Campaign.Current.MobilePartyLocator.UpdateLocator(CreateParty(300f, x: 102f));
+        const float radiusEdgeX = 109f; // Default encounter radius is 3, and the locator excludes the boundary.
+        AddPlayer(300f, x: radiusEdgeX);
+        var strongerAiParty = CreateParty(300f, x: 102f);
+        Campaign.Current.MobilePartyLocator.UpdateLocator(strongerAiParty);
 
         NearbyPlayerSearch nearbyPlayers = default;
         Assert.Equal(UnsuppressedScore, Score(attacker, enemy, ref nearbyPlayers));
