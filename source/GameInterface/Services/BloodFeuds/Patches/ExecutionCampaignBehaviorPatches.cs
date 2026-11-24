@@ -136,16 +136,10 @@ internal class ExecutionCampaignBehaviorPatches
         return false;
     }
 
+    // HeroExecutionScenePatch executes with Executed, so nothing adds an ExecutionAfterMapEvent mark for this to track
     [HarmonyPatch(nameof(ExecutionCampaignBehavior.OnDeathMarkAdded))]
     [HarmonyPrefix]
-    private static bool OnDeathMarkAddedPrefix(Hero victim, Hero killer)
-    {
-        if (ModInformation.IsClient) return false;
-        if (!ContainerProvider.TryResolve<IExecutionCampaignBehaviorInterface>(out var executionInterface)) return true;
-
-        executionInterface.OnDeathMarkAdded(victim, killer);
-        return false;
-    }
+    private static bool OnDeathMarkAddedPrefix() => false;
 
     [HarmonyPatch(nameof(ExecutionCampaignBehavior.CanHeroBeReleased))]
     [HarmonyPrefix]
@@ -170,7 +164,7 @@ internal class ExecutionCampaignBehaviorPatches
         if (!ContainerProvider.TryResolve<IExecutionCampaignBehaviorInterface>(out var executionInterface)) return true;
 
         Clan selectedClan = __instance._selectedBloodFeudClan;
-        if (ModInformation.IsClient && selectedClan != null && selectedClan.HasBloodFeudWithPlayer)
+        if (selectedClan != null && selectedClan.HasBloodFeudWithPlayer)
         {
             executionInterface.RequestSettleBloodFeudByRansomPayment(selectedClan);
         }

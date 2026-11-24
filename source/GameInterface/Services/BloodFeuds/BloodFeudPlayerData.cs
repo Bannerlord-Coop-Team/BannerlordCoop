@@ -22,19 +22,13 @@ public class BloodFeudPlayerData
     [ProtoMember(3)]
     public Dictionary<string, List<string>> PlayerHeroesPendingMapEventEndExecution { get; }
 
-    // Dictionary<PlayerHeroId, ExecutorHeroId> for _isMainHeroExecuted
-    [ProtoMember(4)]
-    public Dictionary<string, string> PlayerPendingExecutions { get; }
-
     public BloodFeudPlayerData(
         Dictionary<string, Dictionary<string, BloodFeudData>> playerBloodFeuds,
         Dictionary<string, Dictionary<string, PendingSettlementExecution>> playerPendingSettlementExecutions,
-        Dictionary<string, List<string>> playerHeroesPendingMapEventEndExecution,
-        Dictionary<string, string> playerPendingExecutions)
+        Dictionary<string, List<string>> playerHeroesPendingMapEventEndExecution)
     {
         PlayerBloodFeuds = playerBloodFeuds ?? new();
         PlayerPendingSettlementExecutions = playerPendingSettlementExecutions ?? new();
         PlayerHeroesPendingMapEventEndExecution = playerHeroesPendingMapEventEndExecution ?? new();
-        PlayerPendingExecutions = playerPendingExecutions ?? new();
     }
 }

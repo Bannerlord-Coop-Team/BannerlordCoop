@@ -89,8 +89,6 @@ internal static class CoopSessionMigrationRules
 
         ClearWithMigration.Add(AccessTools.Property(typeof(PlayerTraitData), nameof(PlayerTraitData.PlayerTraitXp)));
 
-        ClearWithMigration.Add(AccessTools.Property(typeof(BloodFeudPlayerData), nameof(BloodFeudPlayerData.PlayerPendingExecutions)));
-
         ClearWithMigration.Add(AccessTools.Property(typeof(IncidentsPlayerData), nameof(IncidentsPlayerData.PlayerIncidentsOnCooldown)));
         ClearWithMigration.Add(AccessTools.Property(typeof(IncidentsPlayerData), nameof(IncidentsPlayerData.PlayerLastGlobalIncidentCooldown)));
         ClearWithMigration.Add(AccessTools.Property(typeof(IncidentsPlayerData), nameof(IncidentsPlayerData.PlayerActiveIncidentSeed)));

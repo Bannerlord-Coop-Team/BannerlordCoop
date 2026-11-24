@@ -35,7 +35,6 @@ public interface IExecutionCampaignBehaviorInterface : IGameAbstraction
     void UpdateAllPlayerClanMemberExecutionStates();
     void DailyTickHero(Hero hero);
     void QuarterHourlyTick();
-    void OnDeathMarkAdded(Hero victim, Hero killer);
     void CanHeroBeReleased(Hero hero, ref bool result);
     void SettleBloodFeudByRansomPayment(Hero playerHero, Clan clan);
     void RequestSettleBloodFeudByRansomPayment(Clan clan);
@@ -52,6 +51,9 @@ internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorIn
     private readonly IObjectManager objectManager;
     private readonly IPlayerManager playerManager;
     private readonly INetwork network;
+
+    // Dictionary<PlayerHeroId, ExecutorHeroId> for _isMainHeroExecuted, executed on the next CampaignTick
+    private readonly Dictionary<string, string> pendingPlayerExecutions = new();
 
     private BloodFeudPlayerData Data => coopSessionProvider.CoopSession.BloodFeudPlayerData;
 
@@ -227,13 +229,6 @@ internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorIn
                 }
 
                 PartyBase captorParty = hero.PartyBelongedToAsPrisoner;
-                if (hero.DeathMark == KillCharacterAction.KillCharacterActionDetail.ExecutionAfterMapEvent && hero.DeathMarkKillerHero != null &&
-                    (captorParty == null || captorParty.MapEvent != null))
-                {
-                    KillCharacterAction.ApplyByExecution(hero, hero.DeathMarkKillerHero);
-                    return;
-                }
-
                 if (hero.IsPrisoner && captorParty?.LeaderHero != null && captorParty.MapEvent == null &&
                     captorParty.LeaderHero.Clan == player.Clan && MBRandom.RandomFloat <= 0.125f)
                 {
@@ -241,20 +236,6 @@ internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorIn
                     return;
                 }
             }
-        }
-    }
-
-    public void OnDeathMarkAdded(Hero victim, Hero killer)
-    {
-        if (victim.DeathMark != KillCharacterAction.KillCharacterActionDetail.ExecutionAfterMapEvent) return;
-
-        // Only a player's execution scene marks a hero this way
-        foreach (var player in GetPlayers())
-        {
-            if (killer != player.Hero) continue;
-
-            AddPendingMapEventEndExecution(player.HeroId, victim);
-            OnPlayerExecutedHero(player, victim);
         }
     }
 
@@ -315,16 +296,16 @@ internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorIn
     {
         if (!TryGetIds(playerHero, executor, out var playerHeroId, out var executorId)) return;
 
-        Data.PlayerPendingExecutions[playerHeroId] = executorId;
+        pendingPlayerExecutions[playerHeroId] = executorId;
     }
 
     public void ExecutePendingPlayers()
     {
-        if (Data.PlayerPendingExecutions.Count == 0) return;
+        if (pendingPlayerExecutions.Count == 0) return;
 
-        foreach (var pendingExecution in Data.PlayerPendingExecutions.ToArray())
+        foreach (var pendingExecution in pendingPlayerExecutions.ToArray())
         {
-            Data.PlayerPendingExecutions.Remove(pendingExecution.Key);
+            pendingPlayerExecutions.Remove(pendingExecution.Key);
 
             if (!objectManager.TryGetObjectWithLogging<Hero>(pendingExecution.Key, out var playerHero)) continue;
             if (!objectManager.TryGetObjectWithLogging<Hero>(pendingExecution.Value, out var executor)) continue;

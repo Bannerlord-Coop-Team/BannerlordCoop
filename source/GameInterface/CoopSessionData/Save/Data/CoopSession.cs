@@ -146,6 +146,6 @@ public class CoopSession : ICoopSession
         StatisticsPlayerData = statisticsPlayerData ?? new StatisticsPlayerData(new());
         IncidentsPlayerData = incidentsPlayerData ?? new IncidentsPlayerData(new(), new(), new(), new(), new());
         ViewDataPlayerData = viewDataPlayerData ?? new ViewDataPlayerData(new());
-        BloodFeudPlayerData = bloodFeudPlayerData ?? new BloodFeudPlayerData(new(), new(), new(), new());
+        BloodFeudPlayerData = bloodFeudPlayerData ?? new BloodFeudPlayerData(new(), new(), new());
     }
 }
