@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Messaging;
 using GameInterface.Services.BattleWreckages.Messages;
+using GameInterface.Services.MobileParties.Messages.Behavior;
 using HarmonyLib;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -20,8 +21,10 @@ internal class BattleWreckagePatches
     {
         if (ModInformation.IsServer) return false;
 
-        // Stop interacting so the request isn't sent every tick until the server replies
-        mobileParty.Ai.AiBehaviorInteractable = null;
+        // Vanilla holds the party here. Publishing the hold makes it the latest move, otherwise the server's echo of the
+        // move to the wreckage puts the interaction back and the second request reopens it as a resumed investigation
+        mobileParty.SetMoveModeHold();
+        MessageBroker.Instance.Publish(mobileParty.Ai, new PartyBehaviorChangeAttempted(mobileParty));
 
         var message = new RequestStartWreckageEncounter(__instance, mobileParty.LeaderHero);
         MessageBroker.Instance.Publish(__instance, message);

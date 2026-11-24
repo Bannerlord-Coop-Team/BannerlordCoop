@@ -1,10 +1,16 @@
 ﻿using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
+using Common.Messaging;
 using E2E.Tests.Util;
 using GameInterface.Services.BattleWreckages;
 using GameInterface.Services.BattleWreckages.Data;
 using GameInterface.Services.BattleWreckages.Interfaces;
 using GameInterface.Services.BattleWreckages.Messages;
+using GameInterface.Services.Entity;
+using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Services.MobileParties.Messages.Behavior;
+using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.BattleWreckages;
@@ -217,6 +223,63 @@ public class BattleWreckageLifetimeTests : IDisposable
                 Assert.True(client.ObjectManager.TryGetObject<BattleWreckage>(battleWreckageId, out var battleWreckage));
                 Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
                 Assert.Same(battleWreckage, party.Ai.AiBehaviorInteractable);
+            });
+        }
+    }
+
+    [Fact]
+    public void ClientReachesWreckage_BeforeMoveEcho_KeepsHoldEverywhere()
+    {
+        // Arrange, the first client controls a party that the player sends to a wreckage
+        var battleWreckageId = CreateServerWreckage();
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var owner = Clients.First();
+        var player = new Player("WreckagePlayer", null, partyId, null, null);
+
+        Server.Call(() =>
+        {
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.AddPlayer(player));
+            playerManager.SetPeer(player.ControllerId, owner.NetPeer);
+        });
+
+        owner.Call(() =>
+        {
+            owner.Resolve<IControllerIdProvider>().SetControllerId(player.ControllerId);
+            Assert.True(owner.Resolve<IPlayerManager>().AddPlayer(player));
+
+            Assert.True(owner.ObjectManager.TryGetObject<BattleWreckage>(battleWreckageId, out var battleWreckage));
+            Assert.True(owner.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(party.IsControlledByThisInstance());
+
+            party.SetMoveGoToInteractablePoint(battleWreckage, MobileParty.NavigationType.Default);
+            MessageBroker.Instance.Publish(party.Ai, new PartyBehaviorChangeAttempted(party));
+        });
+
+        // The server echoes the move, but the client reaches the wreckage before it applies the echo
+        Server.PumpGameThread();
+        TestEnvironment.FlushCoalescer();
+
+        // Act
+        owner.Call(() =>
+        {
+            Assert.True(owner.ObjectManager.TryGetObject<BattleWreckage>(battleWreckageId, out var battleWreckage));
+            Assert.True(owner.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            battleWreckage.OnPartyInteraction(party);
+        });
+        owner.PumpGameThread();
+        Server.PumpGameThread();
+        TestEnvironment.FlushCoalescer();
+
+        // Assert, the echo doesn't put the wreckage back, which would start a second encounter that resumes the first
+        foreach (var instance in new[] { Server }.Concat(Clients))
+        {
+            instance.PumpGameThread();
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+                Assert.Null(party.Ai.AiBehaviorInteractable);
+                Assert.Equal(AiBehavior.Hold, party.DefaultBehavior);
             });
         }
     }
