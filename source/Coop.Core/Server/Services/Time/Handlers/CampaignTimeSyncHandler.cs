@@ -77,7 +77,7 @@ public class CampaignTimeSyncHandler : IHandler, IDisposable
                 // No campaign loaded yet, nothing authoritative to broadcast.
                 if (mapTimeTrackerInterface.TryGetCurrentTicks(out long currentTicks) == false) return;
 
-                foreach (var connection in connectionCollection)
+                foreach (var connection in connectionCollection.GetSnapshot())
                 {
                     int joinPacketsRemaining = connectionMessageQueue.TryGetCatchUpPacketsRemaining(
                         connection.Peer,

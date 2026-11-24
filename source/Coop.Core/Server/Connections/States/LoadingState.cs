@@ -66,7 +66,7 @@ public class LoadingState : ConnectionStateBase
 
     // The poller owns these observations, which expire with this loading state.
     private (long Version, DateTime LastProgressUtc)? observedJoinProgress;
-    internal DateTime? PreEntryBackpressureStartedUtc { get; set; }
+    private DateTime? preEntryBackpressureStartedUtc;
 #if DEBUG
 
     internal string DebugJoinState =>
@@ -114,6 +114,13 @@ public class LoadingState : ConnectionStateBase
 
     internal long JoinProgressVersion => Interlocked.Read(ref joinProgressVersion);
 
+    internal void StartPreEntryBackpressure(DateTime utcNow) => preEntryBackpressureStartedUtc ??= utcNow;
+
+    internal void ClearPreEntryBackpressure() => preEntryBackpressureStartedUtc = null;
+
+    internal TimeSpan? GetPreEntryBackpressureElapsed(DateTime utcNow) => utcNow - preEntryBackpressureStartedUtc;
+
+    // Measure the stall from the first poll that observes the latest join progress.
     internal TimeSpan ObserveJoinStall(DateTime utcNow)
     {
         long version = JoinProgressVersion;

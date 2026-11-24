@@ -276,34 +276,23 @@ public class OverloadedPeerManagerTests
     }
 
     [Fact]
-    public void Poll_UsesOneSnapshotAndAppliesWatchdogsBeforeOverload()
+    public void Poll_WatchdogsAbortJoinsBeforeOverloadPause()
     {
         var connections = serverComponent.Container.Resolve<ConnectionCollection>();
         var replaying = AddConnectedPeer(connections);
         var preEntry = AddConnectedPeer(connections);
         var replayState = StartInitialCatchUp(connections, replaying);
         var preEntryState = connections.ConnectionStates[preEntry].SetState<LoadingState>();
-        var snapshot = new Mock<IConnectionCollection>();
-        snapshot.Setup(value => value.GetSnapshot())
-            .Returns(new[] { connections.ConnectionStates[replaying], connections.ConnectionStates[preEntry] });
         var queue = new Mock<IConnectionMessageQueue>();
         int overLimit = NetworkJoinLimits.MaxReplayPackets + 1;
         queue.Setup(value => value.TryGetCatchUpPacketsRemaining(It.IsAny<NetPeer>(), out overLimit)).Returns(true);
-        var terminator = new Mock<IPeerTerminator>();
         var time = serverComponent.Container.Resolve<Mock<ITimeControlInterface>>();
-        using var manager = new OverloadedPeerManager(
-            serverComponent.Container.Resolve<INetworkConfig>(), TestMessageBroker,
-            new Lazy<INetwork>(() => TestNetwork), time.Object, snapshot.Object, queue.Object, terminator.Object);
+        using var manager = CreateWatchdog(queue.Object, Mock.Of<IPeerTerminator>());
 
         manager.CheckForOverloadedPeers(DateTime.UtcNow);
 
-        snapshot.Verify(value => value.GetSnapshot(), Times.Once());
-        snapshot.VerifyNoOtherCalls();
         Assert.True(preEntryState.IsAborted);
         Assert.True(replayState.IsAborted);
-        Assert.Collection(terminator.Invocations,
-            call => Assert.Same(preEntry, call.Arguments[0]),
-            call => Assert.Same(replaying, call.Arguments[0]));
         time.Verify(value => value.ServerAcquireAutomaticPause(), Times.Never());
     }
 

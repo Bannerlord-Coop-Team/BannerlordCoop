@@ -14,7 +14,6 @@ using LiteNetLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
 using Coop.Core.Common.Network;
@@ -247,9 +246,9 @@ public class ServerShutdownCoordinator : IServerShutdownCoordinator
         switch (Phase)
         {
             case ServerShutdownPhase.Countdown:
-                return $"phase=Countdown remaining={SecondsLeft(now)}s save={saveName} joins={joins} connections={connections.Count()}";
+                return $"phase=Countdown remaining={SecondsLeft(now)}s save={saveName} joins={joins} connections={connections.GetSnapshot().Count}";
             case ServerShutdownPhase.Draining:
-                return $"phase=Draining save={saveName} joins={joins} connections={connections.Count()} saving={saveInterface.IsSaving}";
+                return $"phase=Draining save={saveName} joins={joins} connections={connections.GetSnapshot().Count} saving={saveInterface.IsSaving}";
             case ServerShutdownPhase.Saving:
                 return $"phase=Saving save={saveName} joins={joins} started={saveStarted} saveWritten={gameSaveWritten} sessionWritten={sessionWritten}";
             case ServerShutdownPhase.Completed:
@@ -297,7 +296,7 @@ public class ServerShutdownCoordinator : IServerShutdownCoordinator
         }
 
         // Nobody to warn. While joins are open a player who dropped can still come back.
-        bool nobodyToWaitFor = !connections.Any() && (scheduling || remaining <= JoinCloseLead);
+        bool nobodyToWaitFor = connections.GetSnapshot().Count == 0 && (scheduling || remaining <= JoinCloseLead);
         if (remaining <= TimeSpan.Zero || nobodyToWaitFor)
         {
             BeginDrain(now);
@@ -329,7 +328,7 @@ public class ServerShutdownCoordinator : IServerShutdownCoordinator
         DisconnectLateConnections();
 
         bool saving = saveInterface.IsSaving;
-        if (!saving && !connections.Any())
+        if (!saving && connections.GetSnapshot().Count == 0)
         {
             BeginSave(now);
             return;
@@ -344,7 +343,7 @@ public class ServerShutdownCoordinator : IServerShutdownCoordinator
         }
 
         Logger.Warning("Server shutdown: {Connections} connection(s) still listed after 15 seconds; saving anyway",
-            connections.Count());
+            connections.GetSnapshot().Count);
         BeginSave(now);
     }
 
@@ -359,7 +358,7 @@ public class ServerShutdownCoordinator : IServerShutdownCoordinator
     private int DisconnectRemainingPeers()
     {
         int disconnected = 0;
-        foreach (IConnectionLogic connection in connections.ToArray())
+        foreach (IConnectionLogic connection in connections.GetSnapshot())
         {
             NetPeer peer = connection.Peer;
             if (peer == null || !disconnectedPeers.Add(peer)) continue;

@@ -5,7 +5,6 @@ using Coop.Core.Server.Connections.States;
 using LiteNetLib;
 using GameInterface.Services.Players;
 using System;
-using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -17,7 +16,7 @@ namespace Coop.Core.Server.Connections;
 /// through a save transfer. Exposes the live connection states for consumers that need to
 /// reason about who is loading.
 /// </summary>
-public interface IConnectionCollection : IEnumerable<IConnectionLogic>, IDisposable
+public interface IConnectionCollection : IDisposable
 {
     IEnumerable<IConnectionLogic> LoadingPeers { get; }
     bool HasCompletedCampaignSynchronization(NetPeer peer);
@@ -113,8 +112,4 @@ public class ConnectionCollection : IConnectionCollection, ICampaignSynchronizat
     }
 
     public ICollection<IConnectionLogic> GetSnapshot() => ConnectionStates.Values;
-
-    public IEnumerator<IConnectionLogic> GetEnumerator() => GetSnapshot().GetEnumerator();
-
-    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 }
