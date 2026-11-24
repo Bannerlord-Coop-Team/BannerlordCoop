@@ -27,6 +27,8 @@ namespace GameInterface.Services.BattleWreckages.Interfaces;
 
 public interface IBattleWreckageCampaignBehaviorInterface : IGameAbstraction
 {
+    void StartWreckageEncounter(BattleWreckage battleWreckage, Hero mainHero);
+    void OpenWreckageEncounter(BattleWreckage battleWreckage, bool isInterrupted, CampaignTime requiredInvestigationDuration);
     void OnHourlyTick();
     void OnPartyEncounter(PartyBase attackerParty, PartyBase defenderParty);
     void OnHeroPrisonerTakenEvent(Hero hero);
@@ -66,6 +68,46 @@ public class BattleWreckageCampaignBehaviorInterface : IBattleWreckageCampaignBe
         this.playerManager = playerManager;
         this.messageBroker = messageBroker;
         this.troopRosterInterface = troopRosterInterface;
+    }
+
+    public void StartWreckageEncounter(BattleWreckage battleWreckage, Hero mainHero)
+    {
+        // Server half of vanilla SetCurrentEncounteredBattleWreckage, returning to the interrupted wreckage resumes its remaining time
+        var isInterrupted = encounterTracker.TryGetEncounter(mainHero, out var encounter) && encounter.BattleWreckage == battleWreckage;
+        if (!isInterrupted)
+        {
+            if (!TryGetBattleWreckageBehavior(out var behavior)) return;
+
+            encounter = new BattleWreckageEncounter(mainHero, battleWreckage)
+            {
+                RequiredInvestigationDuration = GetInvestigationDuration(behavior, battleWreckage, mainHero),
+            };
+
+            // Replaces any encounter at another wreckage, like vanilla switching _encounteredBattleWreckage
+            encounterTracker.AddEncounter(encounter);
+        }
+
+        encounter.IsInterrupted = isInterrupted;
+        encounter.InvestigationStartTime = CampaignTime.Now;
+
+        var message = new WreckageEncounterStarted(battleWreckage, mainHero, isInterrupted, encounter.RequiredInvestigationDuration);
+        messageBroker.Publish(this, message);
+    }
+
+    public void OpenWreckageEncounter(BattleWreckage battleWreckage, bool isInterrupted, CampaignTime requiredInvestigationDuration)
+    {
+        if (!TryGetBattleWreckageBehavior(out var behavior)) return;
+
+        // Vanilla works out a resume from the kept wreckage, so the server's answer is loaded into it first,
+        // along with the remaining time the resume menu shows
+        behavior._encounteredBattleWreckage = isInterrupted ? battleWreckage : null;
+        behavior._requiredInvestigationDuration = requiredInvestigationDuration;
+
+        // Vanilla holds the party and opens the wreckage, remains or blocking menu
+        behavior.SetCurrentEncounteredBattleWreckage(battleWreckage);
+
+        // A new investigation rolls its own duration in vanilla, and the server's is the one its interrupt math uses
+        behavior._requiredInvestigationDuration = requiredInvestigationDuration;
     }
 
     public void OnHourlyTick()
@@ -309,6 +351,25 @@ public class BattleWreckageCampaignBehaviorInterface : IBattleWreckageCampaignBe
         {
             if (playerManager.IsOwnerOfHeroDisconnected(encounter.Hero))
                 encounterTracker.RemoveEncounter(encounter.Hero);
+        }
+    }
+
+    // Vanilla GetWreckageInvestigationDuration reads the encountered wreckage, MainHero and MainParty, which the server
+    // doesn't have, so the player's wreckage and party stand in while it runs
+    private static CampaignTime GetInvestigationDuration(BattleWreckageCampaignBehavior behavior, BattleWreckage battleWreckage, Hero mainHero)
+    {
+        using (new MainHeroSubstitutionScope(mainHero, mainHero.PartyBelongedTo))
+        {
+            var previousEncounteredBattleWreckage = behavior._encounteredBattleWreckage;
+            try
+            {
+                behavior._encounteredBattleWreckage = battleWreckage;
+                return CampaignTime.Hours(behavior.GetWreckageInvestigationDuration(isInterruptedWreckage: false).ResultNumber);
+            }
+            finally
+            {
+                behavior._encounteredBattleWreckage = previousEncounteredBattleWreckage;
+            }
         }
     }
 

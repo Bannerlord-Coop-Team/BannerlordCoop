@@ -246,6 +246,79 @@ public class BattleWreckageLifetimeTests : IDisposable
         });
     }
 
+    [Fact]
+    public void ServerStart_NewWreckage_TracksEncounterWithVanillaDuration()
+    {
+        // Arrange
+        var battleWreckageId = CreateServerWreckage();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<BattleWreckage>(battleWreckageId, out var battleWreckage));
+            var behavior = AddBattleWreckageBehavior();
+            var hero = CreatePartyLeader();
+            var mainParty = Campaign.Current.MainParty;
+
+            // Act
+            Server.Resolve<IBattleWreckageCampaignBehaviorInterface>().StartWreckageEncounter(battleWreckage, hero);
+
+            // Assert
+            Assert.True(Server.Resolve<IBattleWreckageEncounterTracker>().TryGetEncounter(hero, out var encounter));
+            Assert.Same(battleWreckage, encounter.BattleWreckage);
+            Assert.False(encounter.IsInterrupted);
+
+            // A small wreckage's base duration is 10 to 20 hours, and roguery takes off up to half of it
+            Assert.InRange(encounter.RequiredInvestigationDuration.ToHours, 5, 20);
+
+            var started = Assert.Single(Server.InternalMessages.GetMessages<WreckageEncounterStarted>());
+            Assert.False(started.IsInterrupted);
+            Assert.Equal(encounter.RequiredInvestigationDuration, started.RequiredInvestigationDuration);
+
+            // The substitution scope and the borrowed encountered wreckage are both put back
+            Assert.Same(mainParty, Campaign.Current.MainParty);
+            Assert.Null(behavior._encounteredBattleWreckage);
+        });
+    }
+
+    [Fact]
+    public void ServerStart_InterruptedWreckage_ResumesWithRemainingDuration()
+    {
+        // Arrange
+        var battleWreckageId = CreateServerWreckage();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<BattleWreckage>(battleWreckageId, out var battleWreckage));
+            AddBattleWreckageBehavior();
+            var hero = CreatePartyLeader();
+            var campaignBehaviorInterface = Server.Resolve<IBattleWreckageCampaignBehaviorInterface>();
+
+            campaignBehaviorInterface.StartWreckageEncounter(battleWreckage, hero);
+            campaignBehaviorInterface.LeaveWreckageEncounter(hero, BattleWreckageCampaignBehavior.WreckageLeaveReason.PlayerInterrupted);
+
+            Assert.True(Server.Resolve<IBattleWreckageEncounterTracker>().TryGetEncounter(hero, out var interruptedEncounter));
+
+            // Test time doesn't move, so the interrupt leaves the duration as rolled. A small wreckage never rolls
+            // 3 hours, so this only survives the resume if the remaining time is kept rather than rolled again
+            var remainingDuration = CampaignTime.Hours(3);
+            interruptedEncounter.RequiredInvestigationDuration = remainingDuration;
+
+            // Act
+            campaignBehaviorInterface.StartWreckageEncounter(battleWreckage, hero);
+
+            // Assert
+            Assert.True(Server.Resolve<IBattleWreckageEncounterTracker>().TryGetEncounter(hero, out var encounter));
+            Assert.Same(interruptedEncounter, encounter);
+            Assert.True(encounter.IsInterrupted);
+            Assert.Equal(remainingDuration, encounter.RequiredInvestigationDuration);
+
+            var started = Server.InternalMessages.GetMessages<WreckageEncounterStarted>().ToList();
+            Assert.Equal(2, started.Count);
+            Assert.True(started[1].IsInterrupted);
+            Assert.Equal(remainingDuration, started[1].RequiredInvestigationDuration);
+        });
+    }
+
     // Recover troops is the only consequence that can roll, and it always does, so no roll depends on chance.
     // Run inside Server.Call
     private (Hero Hero, BattleWreckageEncounter Encounter, BattleWreckageCampaignBehavior Behavior, CharacterObject WoundedTroop)
@@ -257,8 +330,7 @@ public class BattleWreckageLifetimeTests : IDisposable
         var woundedTroop = GameObjectCreator.CreateInitializedObject<CharacterObject>();
         battleWreckage.AttackerWoundedInBattle.AddToCounts(woundedTroop, 5, woundedCount: 5);
 
-        var behavior = new BattleWreckageCampaignBehavior();
-        Campaign.Current.AddCampaignBehaviorManager(new CampaignBehaviorManager(new CampaignBehaviorBase[] { behavior }));
+        var behavior = AddBattleWreckageBehavior();
 
         // NothingFound never rolls (chance -1) but stays as the fallback when nothing else is picked
         var recoverTroops = behavior.FindConsequenceWithId(BattleWreckageCampaignBehavior.RecoverTroopsConsequenceId);
@@ -267,15 +339,28 @@ public class BattleWreckageLifetimeTests : IDisposable
         behavior._wreckageConsequences.Add(new BattleWreckageCampaignBehavior.BattleWreckageConsequence(
             recoverTroops.StringId, recoverTroops.Condition, recoverTroops.Consequence, chance: 1f, canOverride: true));
 
-        // The host has no party, so the medic and the party size come from the player's party under substitution
-        var hero = GameObjectCreator.CreateInitializedObject<Hero>();
-        var party = GameObjectCreator.CreateInitializedObject<MobileParty>();
-        party.MemberRoster.AddToCounts(hero.CharacterObject, 1);
+        var hero = CreatePartyLeader();
 
         var encounter = new BattleWreckageEncounter(hero, battleWreckage);
         Server.Resolve<IBattleWreckageEncounterTracker>().AddEncounter(encounter);
 
         return (hero, encounter, behavior, woundedTroop);
+    }
+
+    private static BattleWreckageCampaignBehavior AddBattleWreckageBehavior()
+    {
+        var behavior = new BattleWreckageCampaignBehavior();
+        Campaign.Current.AddCampaignBehaviorManager(new CampaignBehaviorManager(new CampaignBehaviorBase[] { behavior }));
+        return behavior;
+    }
+
+    // The host has no party, so vanilla's MainParty and MainHero reads come from this party under substitution
+    private static Hero CreatePartyLeader()
+    {
+        var hero = GameObjectCreator.CreateInitializedObject<Hero>();
+        var party = GameObjectCreator.CreateInitializedObject<MobileParty>();
+        party.MemberRoster.AddToCounts(hero.CharacterObject, 1);
+        return hero;
     }
 
     private string CreateServerWreckage()

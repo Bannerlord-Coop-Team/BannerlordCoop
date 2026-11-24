@@ -16,20 +16,20 @@ internal class BattleWreckageHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly IPlayerManager playerManager;
-    private readonly IBattleWreckageInterface battleWreckageInterface;
+    private readonly IBattleWreckageCampaignBehaviorInterface battleWreckageCampaignBehaviorInterface;
 
     public BattleWreckageHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
         IPlayerManager playerManager,
-        IBattleWreckageInterface battleWreckageInterface)
+        IBattleWreckageCampaignBehaviorInterface battleWreckageCampaignBehaviorInterface)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.playerManager = playerManager;
-        this.battleWreckageInterface = battleWreckageInterface;
+        this.battleWreckageCampaignBehaviorInterface = battleWreckageCampaignBehaviorInterface;
 
         messageBroker.Subscribe<RequestStartWreckageEncounter>(Handle_RequestStartWreckageEncounter);
         messageBroker.Subscribe<NetworkRequestStartWreckageEncounter>(Handle_NetworkRequestStartWreckageEncounter);
@@ -65,7 +65,7 @@ internal class BattleWreckageHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<BattleWreckage>(data.BattleWreckageId, out var battleWreckage)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out var mainHero)) return;
 
-            battleWreckageInterface.StartWreckageEncounter(battleWreckage, mainHero);
+            battleWreckageCampaignBehaviorInterface.StartWreckageEncounter(battleWreckage, mainHero);
         });
     }
 
@@ -77,7 +77,7 @@ internal class BattleWreckageHandler : IHandler
         if (!playerManager.TryGetPeer(player.ControllerId, out var peer)) return;
         if (!objectManager.TryGetIdWithLogging(data.BattleWreckage, out var battleWreckageId)) return;
 
-        network.Send(peer, new NetworkOpenWreckageEncounter(battleWreckageId));
+        network.Send(peer, new NetworkOpenWreckageEncounter(battleWreckageId, data.IsInterrupted, data.RequiredInvestigationDuration));
     }
 
     private void Handle_NetworkOpenWreckageEncounter(MessagePayload<NetworkOpenWreckageEncounter> obj)
@@ -88,7 +88,7 @@ internal class BattleWreckageHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<BattleWreckage>(data.BattleWreckageId, out var battleWreckage)) return;
 
-            battleWreckageInterface.OpenWreckageEncounter(battleWreckage);
+            battleWreckageCampaignBehaviorInterface.OpenWreckageEncounter(battleWreckage, data.IsInterrupted, data.RequiredInvestigationDuration);
         });
     }
 }
