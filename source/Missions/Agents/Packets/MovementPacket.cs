@@ -80,11 +80,15 @@ namespace Missions.Agents.Packets
             PackedSnapshots = packedSnapshots;
         }
 
+        private MovementPacket(MovementPacket packet, long[] authorityRevisions)
+        {
+            this = packet;
+            AuthorityRevisions = authorityRevisions;
+        }
+
         internal MovementPacket WithPackedSnapshots(byte[] snapshots) => new MovementPacket(this, null, snapshots);
         internal MovementPacket WithRestoredSnapshots(AgentData[] agents) => new MovementPacket(this, agents, null);
 
-        internal MovementPacket WithAuthorityRevisions(long[] revisions) => AgentIds == null
-            ? new MovementPacket(AgentGuids, Agents, SenderControllerId, revisions, SampleSequence, DeckShips)
-            : new MovementPacket(IdentityScopeId, AgentIds, Agents, SenderControllerId, revisions, SampleSequence, DeckShips);
+        internal MovementPacket WithAuthorityRevisions(long[] revisions) => new MovementPacket(this, revisions);
     }
 }

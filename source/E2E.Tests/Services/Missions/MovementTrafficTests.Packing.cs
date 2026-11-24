@@ -86,11 +86,14 @@ public partial class MovementTrafficTests
     }
 
     [Fact]
-    public void PackedMovement_SchemaCoversProtobufSnapshotFields()
+    public void PackedMovement_ProtobufSnapshotTagsArePinned()
     {
         var model = RuntimeTypeModel.Default;
+        // Update AgentData.WriteSnapshot, WriteDeckSnapshot and ReadSnapshot when rider tags change.
         Assert.Equal(new[] { 1, 2, 3, 4, 7, 8, 9, 11, 12 },
             model[typeof(AgentData)].GetFields().Select(field => field.FieldNumber).OrderBy(tag => tag));
+
+        // Update AgentMountData.WriteSnapshot, ReadSnapshot and GetSnapshotExtraBytes when mount tags change.
         Assert.Equal(Enumerable.Range(1, 21),
             model[typeof(AgentMountData)].GetFields().Select(field => field.FieldNumber).OrderBy(tag => tag));
     }

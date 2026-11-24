@@ -217,6 +217,7 @@ namespace Missions.Agents.Packets
             columns.WriteUInt32(MovementFlag);
         }
 
+        // Read each column in the order used by WriteSnapshot and WriteDeckSnapshot.
         internal static AgentData ReadSnapshot(
             ref MovementSnapshotColumns columns,
             ref MovementSnapshotColumns deckColumns,

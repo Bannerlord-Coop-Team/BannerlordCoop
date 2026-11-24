@@ -7,7 +7,7 @@ namespace Missions.Agents.Packets;
 /// <summary>Packs and restores the rider, deck and mount columns of one datagram in snapshot order.</summary>
 public interface IMovementSnapshotPacking
 {
-    IPacket TryPack(IPacket packet, int limit);
+    bool TryPack(IPacket packet, int limit, out IPacket packed);
     IPacket Restore(IPacket packet);
 }
 
@@ -20,19 +20,23 @@ internal sealed class MovementSnapshotPacking : IMovementSnapshotPacking
     private const byte HasDeck = 1;
     private const byte HasMount = 2;
 
-    public IPacket TryPack(IPacket packet, int limit)
+    public bool TryPack(IPacket packet, int limit, out IPacket packed)
     {
         switch (packet)
         {
             case MovementPacket movement:
                 byte[] packedRiders = PackRiders(movement, limit);
-                return packedRiders == null ? null : movement.WithPackedSnapshots(packedRiders);
+                packed = packedRiders == null ? null : movement.WithPackedSnapshots(packedRiders);
+                break;
             case MountMovementPacket mounts:
                 byte[] packedMounts = PackMounts(mounts, limit);
-                return packedMounts == null ? null : mounts.WithPackedSnapshots(packedMounts);
+                packed = packedMounts == null ? null : mounts.WithPackedSnapshots(packedMounts);
+                break;
             default:
-                return null;
+                packed = null;
+                break;
         }
+        return packed != null;
     }
 
     public IPacket Restore(IPacket packet) => packet switch
@@ -51,7 +55,7 @@ internal sealed class MovementSnapshotPacking : IMovementSnapshotPacking
         if (count < MinimumCount) return null;
         if (agents?.Length != count) return null;
 
-        // Skip scanning extras when the fixed columns alone exceed the envelope limit.
+        // Skip scanning extras when the rider columns alone exceed the envelope limit.
         if (count > limit / AgentSnapshotBytes) return null;
 
         int decks = 0;

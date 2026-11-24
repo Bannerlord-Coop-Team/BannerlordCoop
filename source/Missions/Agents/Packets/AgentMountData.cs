@@ -625,6 +625,7 @@ namespace Missions.Agents.Packets
         internal static AgentMountData ReadSnapshot(ref MovementSnapshotColumns columns, BinaryReader extras)
         {
             byte flags = columns.ReadByte();
+            // Read each section in the order WriteSnapshot writes it.
             return new AgentMountData
             {
                 MountPosition = columns.ReadVec3(),

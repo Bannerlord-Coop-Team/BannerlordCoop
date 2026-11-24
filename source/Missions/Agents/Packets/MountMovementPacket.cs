@@ -76,11 +76,15 @@ namespace Missions.Agents.Packets
             PackedSnapshots = packedSnapshots;
         }
 
+        private MountMovementPacket(MountMovementPacket packet, long[] authorityRevisions)
+        {
+            this = packet;
+            AuthorityRevisions = authorityRevisions;
+        }
+
         internal MountMovementPacket WithPackedSnapshots(byte[] snapshots) => new MountMovementPacket(this, null, snapshots);
         internal MountMovementPacket WithRestoredSnapshots(AgentMountData[] mounts) => new MountMovementPacket(this, mounts, null);
 
-        internal MountMovementPacket WithAuthorityRevisions(long[] revisions) => MountIds == null
-            ? new MountMovementPacket(MountGuids, Mounts, SenderControllerId, revisions, SampleSequence)
-            : new MountMovementPacket(IdentityScopeId, MountIds, Mounts, SenderControllerId, revisions, SampleSequence);
+        internal MountMovementPacket WithAuthorityRevisions(long[] revisions) => new MountMovementPacket(this, revisions);
     }
 }

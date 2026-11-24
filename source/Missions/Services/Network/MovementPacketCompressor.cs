@@ -47,8 +47,7 @@ public class MovementPacketCompressor : IMovementPacketCompressor
     public byte[] Serialize(IPacket packet)
     {
         // Packed snapshots travel inside the envelope so the receiver restores the arrays before dispatch.
-        IPacket packed = snapshotPacking.TryPack(packet, MaxUncompressedBytes);
-        if (packed != null)
+        if (snapshotPacking.TryPack(packet, MaxUncompressedBytes, out IPacket packed))
         {
             byte[] compressed = TryCompress(serializer.Serialize(packed));
             if (compressed != null) return compressed;
