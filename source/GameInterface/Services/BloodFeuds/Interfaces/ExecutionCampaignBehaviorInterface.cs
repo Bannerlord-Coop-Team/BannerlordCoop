@@ -167,7 +167,8 @@ internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorIn
             }
             else if (prisoner.Clan == player.Clan && HasBloodFeud(player.HeroId, capturerLeader.Clan))
             {
-                if (!TryGetIds(prisoner, capturerLeader.Clan, out var prisonerId, out var feudedClanId)) continue;
+                if (!objectManager.TryGetIdWithLogging(prisoner, out var prisonerId)) continue;
+                if (!objectManager.TryGetIdWithLogging(capturerLeader.Clan, out var feudedClanId)) continue;
 
                 SendToPlayer(player.Player, new NetworkNotifyBloodFeudClanMemberCaptured(prisonerId, feudedClanId));
             }
@@ -294,7 +295,8 @@ internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorIn
 
     public void SetPendingPlayerExecution(Hero playerHero, Hero executor)
     {
-        if (!TryGetIds(playerHero, executor, out var playerHeroId, out var executorId)) return;
+        if (!objectManager.TryGetIdWithLogging(playerHero, out var playerHeroId)) return;
+        if (!objectManager.TryGetIdWithLogging(executor, out var executorId)) return;
 
         pendingPlayerExecutions[playerHeroId] = executorId;
     }
@@ -346,14 +348,16 @@ internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorIn
         }
 
         if (executedHero.IsPlayerHero()) return;
-        if (!TryGetIds(executedHero, executor, out var executedHeroId, out var executorId)) return;
+        if (!objectManager.TryGetIdWithLogging(executedHero, out var executedHeroId)) return;
+        if (!objectManager.TryGetIdWithLogging(executor, out var executorId)) return;
 
         SendToPlayer(player.Player, new NetworkNotifyBloodFeudClanMemberExecuted(executedHeroId, executorId));
     }
 
     private void OnPlayerMemberExecutedAHero(BloodFeudPlayer player, Hero heroToExecute, Hero clanMember)
     {
-        if (!TryGetIds(heroToExecute, clanMember, out var executedHeroId, out var clanMemberId)) return;
+        if (!objectManager.TryGetIdWithLogging(heroToExecute, out var executedHeroId)) return;
+        if (!objectManager.TryGetIdWithLogging(clanMember, out var clanMemberId)) return;
 
         SendToPlayer(player.Player, new NetworkNotifyBloodFeudLordExecuted(executedHeroId, clanMemberId));
     }
@@ -462,7 +466,8 @@ internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorIn
     private void StartClanMemberExecutionAtSettlement(BloodFeudPlayer player, Hero clanMember, Clan clanWithFeud)
     {
         Settlement settlement = clanMember.PartyBelongedToAsPrisoner.Settlement;
-        if (!TryGetIds(clanMember, clanWithFeud, out var clanMemberId, out var clanId)) return;
+        if (!objectManager.TryGetIdWithLogging(clanMember, out var clanMemberId)) return;
+        if (!objectManager.TryGetIdWithLogging(clanWithFeud, out var clanId)) return;
         if (!objectManager.TryGetIdWithLogging(settlement, out var settlementId)) return;
 
         CampaignTime executionDate = CampaignTime.DaysFromNow(ExecutionCampaignBehavior.DaysTillBloodFeudExecutionInSettlement);
@@ -478,7 +483,8 @@ internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorIn
 
     private void CancelClanMemberExecutionAtSettlement(BloodFeudPlayer player, Hero clanMember, Clan capturerClan)
     {
-        if (!TryGetIds(clanMember, capturerClan, out var clanMemberId, out var clanId)) return;
+        if (!objectManager.TryGetIdWithLogging(clanMember, out var clanMemberId)) return;
+        if (!objectManager.TryGetIdWithLogging(capturerClan, out var clanId)) return;
 
         Data.PlayerPendingSettlementExecutions[player.HeroId].Remove(clanMemberId);
 
@@ -571,12 +577,6 @@ internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorIn
             feuds[clanId] = feud;
         }
         return feud;
-    }
-
-    private bool TryGetIds(object first, object second, out string firstId, out string secondId)
-    {
-        secondId = null;
-        return objectManager.TryGetIdWithLogging(first, out firstId) && objectManager.TryGetIdWithLogging(second, out secondId);
     }
 
     private List<BloodFeudPlayer> GetPlayers()
