@@ -4,6 +4,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyVisuals.Extensions;
 using GameInterface.Services.PartyVisuals.Messages;
 using SandBox.View.Map.Managers;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.PartyVisuals.Interfaces;
@@ -17,11 +18,20 @@ public interface IPartyVisualInterface : IGameAbstraction
     /// <summary>Replicates visual removal when a party is destroyed on a headless server.</summary>
     void OnPartyDestroyed(MobileParty party);
 
+    /// <summary>Replicates a visual created by the graphical map.</summary>
+    void OnNativeVisualCreated(MobileParty party);
+
+    /// <summary>Replicates a visual removed by the graphical map.</summary>
+    void OnNativeVisualRemoved(MobileParty party);
+
     /// <summary>Replicates visual creation and creates the local visual when the server has a visual manager.</summary>
     void CreateVisual(MobileParty party);
 
     /// <summary>Replicates visual removal and removes the local visual when the server has a visual manager.</summary>
     void RemoveVisual(MobileParty party);
+
+    /// <summary>Refreshes the server nameplate after a player party is parked.</summary>
+    void RefreshParkedNameplate(MobileParty party);
 }
 
 /// <inheritdoc cref="IPartyVisualInterface"/>
@@ -50,6 +60,15 @@ internal sealed class PartyVisualInterface : IPartyVisualInterface
             SendDestroyVisual(party);
     }
 
+    public void OnNativeVisualCreated(MobileParty party)
+    {
+        // Map initialization can build visuals before the campaign registers their parties.
+        if (objectManager.TryGetHandle(party, out var partyHandle))
+            network.SendAll(new NetworkCreatePartyVisual(partyHandle));
+    }
+
+    public void OnNativeVisualRemoved(MobileParty party) => SendDestroyVisual(party);
+
     public void CreateVisual(MobileParty party)
     {
         if (IsHeadlessServer)
@@ -66,6 +85,13 @@ internal sealed class PartyVisualInterface : IPartyVisualInterface
         else
             // PartyVisualLifetimePatches replicates the native removal.
             party.RemovePartyVisual();
+    }
+
+    public void RefreshParkedNameplate(MobileParty party)
+    {
+        // PartyIsVisibleGetterPatch shows active parties on the server even when _isVisible is false.
+        // The native setter returns early when _isVisible is already false, so refresh explicitly.
+        CampaignEventDispatcher.Instance?.OnPartyVisibilityChanged(party.Party);
     }
 
     private void SendCreateVisual(MobileParty party)

@@ -6,7 +6,6 @@ using GameInterface.Services.Time.Interfaces;
 using LiteNetLib;
 using Moq;
 using System;
-using System.Collections.Generic;
 using System.Threading;
 using Xunit;
 
@@ -37,11 +36,10 @@ public class CampaignTimeSyncHandlerTests
             .Returns(true);
 
         var connection = new Mock<IConnectionLogic>();
-        IEnumerable<IConnectionLogic> connections = new[] { connection.Object };
         var connectionCollection = new Mock<IConnectionCollection>();
         connectionCollection
-            .Setup(c => c.GetEnumerator())
-            .Returns(() => connections.GetEnumerator());
+            .Setup(c => c.GetSnapshot())
+            .Returns(new[] { connection.Object });
         var connectionMessageQueue = new Mock<IConnectionMessageQueue>();
 
         var handler = new CampaignTimeSyncHandler(
