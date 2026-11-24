@@ -13,6 +13,7 @@ using Missions.Agents.Handlers;
 using Missions.Agents.Messages;
 using Missions.Battles;
 using Missions.Messages;
+using Missions.Agents.Packets;
 using Missions.Services.Network;
 using Moq;
 using TaleWorlds.Core;
@@ -48,7 +49,7 @@ public class BattleMessageBatchingTests
         var messagePacketHandler = new Mock<IMessagePacketHandler>();
         var controllerIdProvider = new Mock<IControllerIdProvider>();
         var steamBridge = new Mock<ISteamMissionBridge>();
-        var compressor = new MovementPacketCompressor(serializer);
+        var compressor = new MovementPacketCompressor(serializer, new MovementSnapshotPacking());
         var damageDataMapper = new BattleDamageDataMapper();
         var relayedPackets = new List<RelayPacket>();
         relayNetwork
@@ -137,7 +138,7 @@ public class BattleMessageBatchingTests
             messagePacketHandler.Object,
             controllerIdProvider.Object,
             steamBridge.Object,
-            new MovementPacketCompressor(serializer),
+            new MovementPacketCompressor(serializer, new MovementSnapshotPacking()),
             new ReliableMessageBatcher<string>(serializer), () => new Common.Logging.ReceivePathDiagnostics());
 
         client.Send(controllerId, CreateDeath(CreateGuid(10), 10));
@@ -185,7 +186,7 @@ public class BattleMessageBatchingTests
             messagePacketHandler,
             controllerIdProvider.Object,
             steamBridge.Object,
-            new MovementPacketCompressor(serializer),
+            new MovementPacketCompressor(serializer, new MovementSnapshotPacking()),
             new ReliableMessageBatcher<string>(serializer), () => new Common.Logging.ReceivePathDiagnostics());
         NetPeer peer = NetPeerExtensions.CreatePeer(99);
         Guid first = CreateGuid(1);

@@ -28,6 +28,7 @@ namespace Missions.Agents.Packets
         [ProtoMember(4)]
         public Guid[] MountGuids { get; }
 
+        // Count the ids because the snapshot array is null while packed.
         internal int SnapshotCount => MountIds?.Length ?? MountGuids?.Length ?? 0;
 
         [ProtoMember(5)]
@@ -40,6 +41,7 @@ namespace Missions.Agents.Packets
         [ProtoMember(7)]
         public long SampleSequence { get; }
 
+        /// <summary>Column-packed snapshots inside a <see cref="CompressedMovementPacket"/>. <see cref="Mounts"/> is null until restored.</summary>
         [ProtoMember(8)]
         internal byte[] PackedSnapshots { get; }
 

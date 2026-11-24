@@ -60,7 +60,12 @@ internal ref struct MovementSnapshotColumns
         WriteUInt32((uint)(value >> 32));
     }
 
-    public ulong ReadUInt64() => ReadUInt32() | ((ulong)ReadUInt32() << 32);
+    public ulong ReadUInt64()
+    {
+        uint low = ReadUInt32();
+        uint high = ReadUInt32();
+        return low | ((ulong)high << 32);
+    }
 
     public void WriteSingle(float value) => WriteUInt32(new FloatBits { Value = value }.Bits);
     public float ReadSingle() => new FloatBits { Bits = ReadUInt32() }.Value;

@@ -26,6 +26,7 @@ namespace Missions.Agents.Packets
         [ProtoMember(4)]
         public Guid[] AgentGuids { get; }
 
+        // Count the ids because the snapshot array is null while packed.
         internal int SnapshotCount => AgentIds?.Length ?? AgentGuids?.Length ?? 0;
 
         [ProtoMember(5)]
@@ -42,6 +43,7 @@ namespace Missions.Agents.Packets
         [ProtoMember(8)]
         public Guid[] DeckShips { get; }
 
+        /// <summary>Column-packed snapshots inside a <see cref="CompressedMovementPacket"/>. <see cref="Agents"/> is null until restored.</summary>
         [ProtoMember(9)]
         internal byte[] PackedSnapshots { get; }
 

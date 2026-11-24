@@ -11,6 +11,7 @@ using E2E.Tests.Environment.Extensions;
 using GameInterface.Services.Entity;
 using LiteNetLib;
 using Missions.Messages;
+using Missions.Agents.Packets;
 using Missions.Services.Network;
 using Moq;
 using System.Reflection;
@@ -167,7 +168,7 @@ public class BattleSpawnAdmissionOrderingTests
                 Mock.Of<INetworkConfig>(value => value.IsTunneled),
                 Mock.Of<IRelayNetwork>(), Context, serializer.Object, Broker,
                 packetManager, messageHandler, controllerIdProvider,
-                Mock.Of<ISteamMissionBridge>(), new MovementPacketCompressor(serializer.Object),
+                Mock.Of<ISteamMissionBridge>(), new MovementPacketCompressor(serializer.Object, new MovementSnapshotPacking()),
                 new ReliableMessageBatcher<string>(serializer.Object), () => new ReceivePathDiagnostics());
             Client.ConnectToInstance(InstanceId);
             PeerGate = GetField<object>("peerGate");

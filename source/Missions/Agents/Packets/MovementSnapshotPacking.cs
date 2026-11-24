@@ -5,7 +5,14 @@ using System.IO;
 namespace Missions.Agents.Packets;
 
 /// <summary>Packs and restores the rider, deck and mount columns of one datagram in snapshot order.</summary>
-internal static class MovementSnapshotPacking
+public interface IMovementSnapshotPacking
+{
+    IPacket TryPack(IPacket packet, int limit);
+    IPacket Restore(IPacket packet);
+}
+
+/// <inheritdoc/>
+internal sealed class MovementSnapshotPacking : IMovementSnapshotPacking
 {
     // Small batches retain protobuf's sparse encoding. The column layout has little repetition at those sizes.
     private const int MinimumCount = 4;
@@ -13,22 +20,22 @@ internal static class MovementSnapshotPacking
     private const byte HasDeck = 1;
     private const byte HasMount = 2;
 
-    public static IPacket TryPack(IPacket packet, int limit)
+    public IPacket TryPack(IPacket packet, int limit)
     {
         switch (packet)
         {
             case MovementPacket movement:
-                byte[] riders = PackRiders(movement, limit);
-                return riders == null ? null : movement.WithPackedSnapshots(riders);
+                byte[] packedRiders = PackRiders(movement, limit);
+                return packedRiders == null ? null : movement.WithPackedSnapshots(packedRiders);
             case MountMovementPacket mounts:
-                byte[] horses = PackMounts(mounts, limit);
-                return horses == null ? null : mounts.WithPackedSnapshots(horses);
+                byte[] packedMounts = PackMounts(mounts, limit);
+                return packedMounts == null ? null : mounts.WithPackedSnapshots(packedMounts);
             default:
                 return null;
         }
     }
 
-    public static IPacket Restore(IPacket packet) => packet switch
+    public IPacket Restore(IPacket packet) => packet switch
     {
         MovementPacket movement when movement.PackedSnapshots != null =>
             movement.WithRestoredSnapshots(RestoreRiders(movement)),
@@ -41,8 +48,11 @@ internal static class MovementSnapshotPacking
     {
         AgentData[] agents = packet.Agents;
         int count = packet.SnapshotCount;
-        if (count < MinimumCount || count > limit / AgentSnapshotBytes || agents?.Length != count)
-            return null;
+        if (count < MinimumCount) return null;
+        if (agents?.Length != count) return null;
+
+        // Skip scanning extras when the fixed columns alone exceed the envelope limit.
+        if (count > limit / AgentSnapshotBytes) return null;
 
         int decks = 0;
         int mounts = 0;
@@ -96,8 +106,11 @@ internal static class MovementSnapshotPacking
     {
         AgentMountData[] mounts = packet.Mounts;
         int count = packet.SnapshotCount;
-        if (count < MinimumCount || count > limit / AgentMountData.SnapshotBytes || mounts?.Length != count)
-            return null;
+        if (count < MinimumCount) return null;
+        if (mounts?.Length != count) return null;
+
+        // Skip scanning extras when the fixed columns alone exceed the envelope limit.
+        if (count > limit / AgentMountData.SnapshotBytes) return null;
 
         var layout = new SnapshotLayout(agents: 0, decks: 0, mounts: count);
         int extraBytes = 0;
@@ -142,18 +155,16 @@ internal static class MovementSnapshotPacking
         {
             agentColumns.BeginSnapshot(i);
             byte attachments = agentColumns.ReadByte();
-            AgentData agent = AgentData.ReadSnapshot(ref agentColumns);
-            if ((attachments & HasDeck) != 0)
-            {
-                deckColumns.BeginSnapshot(deckIndex++);
-                agent.ReadDeckSnapshot(ref deckColumns);
-            }
+            AgentMountData mount = null;
             if ((attachments & HasMount) != 0)
             {
                 mountColumns.BeginSnapshot(mountIndex++);
-                agent.SetSnapshotMount(AgentMountData.ReadSnapshot(ref mountColumns, extras));
+                mount = AgentMountData.ReadSnapshot(ref mountColumns, extras);
             }
-            agents[i] = agent;
+
+            bool hasDeck = (attachments & HasDeck) != 0;
+            if (hasDeck) deckColumns.BeginSnapshot(deckIndex++);
+            agents[i] = AgentData.ReadSnapshot(ref agentColumns, ref deckColumns, hasDeck, mount);
         }
         return agents;
     }

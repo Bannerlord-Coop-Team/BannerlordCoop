@@ -194,7 +194,7 @@ namespace Missions.Agents.Packets
         [ProtoMember(9)]
         public uint MovementFlag { get; private set; }
         // Deck pose: 0 is a world pose, otherwise a 1-based index into the packet's DeckShips with a hull-local position.
-        // Add deck pose fields to WriteDeckSnapshot, ReadDeckSnapshot and DeckSnapshotBytes too.
+        // Add deck pose fields to WriteDeckSnapshot, ReadSnapshot and DeckSnapshotBytes too.
         [ProtoMember(11)]
         public int DeckShipIndex { get; private set; }
         [ProtoMember(12)]
@@ -217,7 +217,11 @@ namespace Missions.Agents.Packets
             columns.WriteUInt32(MovementFlag);
         }
 
-        internal static AgentData ReadSnapshot(ref MovementSnapshotColumns columns) => new AgentData
+        internal static AgentData ReadSnapshot(
+            ref MovementSnapshotColumns columns,
+            ref MovementSnapshotColumns deckColumns,
+            bool hasDeck,
+            AgentMountData mount) => new AgentData
         {
             Position = columns.ReadVec3(),
             InputVector = columns.ReadVec2(),
@@ -225,6 +229,9 @@ namespace Missions.Agents.Packets
             MovementDirection = columns.ReadVec2(),
             Speed = columns.ReadSingle(),
             MovementFlag = columns.ReadUInt32(),
+            DeckShipIndex = hasDeck ? (int)deckColumns.ReadUInt32() : 0,
+            DeckLocal = hasDeck ? deckColumns.ReadVec3() : default,
+            MountData = mount,
         };
 
         internal const int DeckSnapshotBytes = sizeof(uint) + (3 * sizeof(float));
@@ -234,14 +241,6 @@ namespace Missions.Agents.Packets
             columns.WriteUInt32((uint)DeckShipIndex);
             columns.WriteVec3(DeckLocal);
         }
-
-        internal void ReadDeckSnapshot(ref MovementSnapshotColumns columns)
-        {
-            DeckShipIndex = (int)columns.ReadUInt32();
-            DeckLocal = columns.ReadVec3();
-        }
-
-        internal void SetSnapshotMount(AgentMountData mount) => MountData = mount;
 
         // Whether a received deck pose names a hull in its packet's table and carries a finite pose.
         internal bool HasValidDeck => DeckShipIndex >= 1 && DeckShip != System.Guid.Empty && DeckLocal.IsValid
