@@ -14,6 +14,7 @@ using GameInterface.Services.Issues.Quests.LadysKnightOut;
 using GameInterface.Services.Issues.Quests.HeadmanNeedsToDeliverAHerd;
 using GameInterface.Services.Issues.Quests.LandLordCompanyOfTrouble;
 using GameInterface.Services.Issues.Quests.MerchantNeedsHelpWithOutlaws;
+using GameInterface.Services.Issues.Quests.RaidAnEnemyTerritory;
 using GameInterface.Services.Issues.Quests.LesserNobleRevolt;
 using GameInterface.Services.Issues.Quests.TheConquestOfSettlement;
 using GameInterface.Services.Issues.Quests.VillageNeedsTools;
@@ -59,6 +60,7 @@ internal class IssuesModule : Module
         builder.RegisterType<IssueConversationTracker>().As<IIssueConversationTracker>().SingleInstance();
         builder.RegisterType<IssueConversationGuard>().As<IIssueConversationGuard>().SingleInstance();
         builder.RegisterType<MerchantOutlawsProgress>().As<IMerchantOutlawsProgress>().InstancePerLifetimeScope();
+        builder.RegisterType<RaidAnEnemyTerritoryProgress>().As<IRaidAnEnemyTerritoryProgress>().InstancePerDependency();
         builder.RegisterType<ExtortionByDesertersProgress>().As<IExtortionByDesertersProgress>().InstancePerLifetimeScope();
         builder.RegisterType<ExtortionByDesertersWorldEventService>().As<IExtortionByDesertersWorldEventService>().InstancePerLifetimeScope();
         builder.RegisterType<MerchantOutlawsHourlyTick>().As<IMerchantOutlawsHourlyTick>().InstancePerDependency();

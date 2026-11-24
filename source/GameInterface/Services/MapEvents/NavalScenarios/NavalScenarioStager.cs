@@ -208,7 +208,7 @@ public class NavalScenarioStager : INavalScenarioStager
         state.Advance(NavalScenarioPhase.Ended);
     }
 
-    // A player released at sea sails on a raft until it lands, and PlayerRaftVisibilityPatches turns an engage order on a
+    // A player released at sea sails on a raft until it lands, and PlayerNavalAutoTravelVisibilityPatches turns an engage order on a
     // player's raft into GoToPoint, which left the encounter preset's fleet idle (R41b P4). Ends the raft as landing does.
     private void LeaveRafts(NavalScenarioConfig config, MobileParty[] players, StringBuilder log)
     {

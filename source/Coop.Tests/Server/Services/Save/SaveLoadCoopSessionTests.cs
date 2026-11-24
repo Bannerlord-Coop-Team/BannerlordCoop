@@ -142,6 +142,7 @@ namespace Coop.Tests.Server.Services.Save
             navalPlayerData.PlayerUnlockedFigureHeads["MyHero1"] = new() { "figurehead_1", "figurehead_2" };
             navalPlayerData.PlayerLastFigureheadLootTimes["MyHero1"] = 2702;
             navalPlayerData.MooredShipOwnerClans["town_ES1"] = new() { "player_clan_1", string.Empty, "player_clan_2" };
+            navalPlayerData.PlayerFerryDepartures["MyHero1"] = "village_ES1_1";
 
             // A pending marriage offer, and a finished one that still has its cooldown
             var agingPlayerData = new AgingPlayerData(new());
@@ -202,6 +203,7 @@ namespace Coop.Tests.Server.Services.Save
             Assert.Equal(new[] { "figurehead_1", "figurehead_2" }, savedSession.NavalPlayerData.PlayerUnlockedFigureHeads["MyHero1"]);
             Assert.Equal(2702, savedSession.NavalPlayerData.PlayerLastFigureheadLootTimes["MyHero1"]);
             Assert.Equal(new[] { "player_clan_1", string.Empty, "player_clan_2" }, savedSession.NavalPlayerData.MooredShipOwnerClans["town_ES1"]);
+            Assert.Equal("village_ES1_1", savedSession.NavalPlayerData.PlayerFerryDepartures["MyHero1"]);
         }
 
         // A fleet stranded with no anchor caches NaN positions, which JSON has no number for

@@ -10,18 +10,16 @@ using Xunit;
 namespace GameInterface.Tests.Services.MobileParties;
 
 /// <summary>
-/// Tests for the forced-visible override on the IsVisible getter. On the server (and when debug visibility is on) live
-/// parties are always visible, but a destroyed party must read as hidden, or the map nameplate
-/// machinery keeps re-creating its banner after the destruction replicates. Release clients keep
-/// whatever the native visibility logic computed.
+/// Inactive parties read hidden on every side so clients stop rebuilding their nameplates.
+/// For active parties, the server and debug overrides force visibility and release clients keep the native result.
 /// </summary>
 [Collection(ModInformationRoleCollection.Name)]
-public class PartyIsVisibleGetterServerPatchTests : IDisposable
+public class PartyIsVisibleGetterPatchTests : IDisposable
 {
     private readonly bool wasServer;
     private readonly bool wasForceAllVisible;
 
-    public PartyIsVisibleGetterServerPatchTests()
+    public PartyIsVisibleGetterPatchTests()
     {
         wasServer = ModInformation.IsServer;
         wasForceAllVisible = DebugPartyVisibility.ForceAllVisible;
@@ -44,20 +42,22 @@ public class PartyIsVisibleGetterServerPatchTests : IDisposable
         ModInformation.IsServer = true;
 
         var result = false;
-        PartyIsVisibleGetterServerPatch.Postfix(party, ref result);
+        PartyIsVisibleGetterPatch.Postfix(party, ref result);
 
         Assert.True(result);
     }
 
-    [Fact]
-    public void Postfix_OnServer_DestroyedParty_IsNotVisible()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Postfix_InactiveParty_IsNotVisible(bool isServer)
     {
         // SkipConstructor leaves IsActive false, matching a party after RemoveParty ran.
         var party = ObjectHelper.SkipConstructor<MobileParty>();
-        ModInformation.IsServer = true;
+        ModInformation.IsServer = isServer;
 
         var result = true;
-        PartyIsVisibleGetterServerPatch.Postfix(party, ref result);
+        PartyIsVisibleGetterPatch.Postfix(party, ref result);
 
         Assert.False(result);
     }
@@ -70,11 +70,11 @@ public class PartyIsVisibleGetterServerPatchTests : IDisposable
         ModInformation.IsServer = false;
 
         var hidden = false;
-        PartyIsVisibleGetterServerPatch.Postfix(party, ref hidden);
+        PartyIsVisibleGetterPatch.Postfix(party, ref hidden);
         Assert.False(hidden);
 
         var visible = true;
-        PartyIsVisibleGetterServerPatch.Postfix(party, ref visible);
+        PartyIsVisibleGetterPatch.Postfix(party, ref visible);
         Assert.True(visible);
     }
 
@@ -87,7 +87,7 @@ public class PartyIsVisibleGetterServerPatchTests : IDisposable
         DebugPartyVisibility.ForceAllVisible = true;
 
         var result = false;
-        PartyIsVisibleGetterServerPatch.Postfix(party, ref result);
+        PartyIsVisibleGetterPatch.Postfix(party, ref result);
 
         Assert.True(result);
     }

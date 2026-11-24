@@ -10,6 +10,7 @@ namespace GameInterface.Services.NavalDLC;
 /// ClanFleetManagementCampaignBehavior._sentTroops assumes only one player sends troops away with ships
 /// RaftStateCampaignBehavior._playerCachedShips and _cachedAnchorPoint assumes only one player has cached ships that can be restored
 /// Settlement.ShipStash assumes only one player moors ships
+/// Campaign.PlayerDataForNavalAutoTravel assumes only one player takes a ferry
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
 public class NavalPlayerData
@@ -35,18 +36,24 @@ public class NavalPlayerData
     [ProtoMember(5)]
     public Dictionary<string, List<string>> MooredShipOwnerClans { get; }
 
+    // Dictionary<PlayerHeroId, DepartureVillageId> for players on a ferry
+    [ProtoMember(6)]
+    public Dictionary<string, string> PlayerFerryDepartures { get; }
+
     public NavalPlayerData(
         Dictionary<string, List<string>> playerUnlockedFigureHeads,
         Dictionary<string, long> playerLastFigureheadLootTimes,
         Dictionary<string, List<SentTroopsData>> playerSentTroops,
         Dictionary<string, PlayerCachedFleetData> playerCachedFleets,
-        Dictionary<string, List<string>> mooredShipOwnerClans = null)
+        Dictionary<string, List<string>> mooredShipOwnerClans = null,
+        Dictionary<string, string> playerFerryDepartures = null)
     {
         PlayerUnlockedFigureHeads = playerUnlockedFigureHeads ?? new();
         PlayerLastFigureheadLootTimes = playerLastFigureheadLootTimes ?? new();
         PlayerSentTroops = playerSentTroops ?? new();
         PlayerCachedFleets = playerCachedFleets ?? new();
         MooredShipOwnerClans = mooredShipOwnerClans ?? new();
+        PlayerFerryDepartures = playerFerryDepartures ?? new();
     }
 
     /// <summary>The clan that moored the ship at <paramref name="stashIndex"/>, or empty for a ship moored before co-op, which no player owns.</summary>

@@ -8,6 +8,7 @@ using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.PartyVisuals.Interfaces;
 using GameInterface.Services.PlayerCaptivityService.Handlers;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.Players;
@@ -128,7 +129,8 @@ public class SettlementSneakInTests
                 network.Object,
                 messageBroker,
                 playerManager.Object,
-                conversationPartyTracker);
+                conversationPartyTracker,
+                Mock.Of<IPartyVisualInterface>());
 
             using (ContainerProvider.UseContainerThreadSafe(container))
             {
