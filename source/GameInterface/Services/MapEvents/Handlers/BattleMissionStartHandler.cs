@@ -198,6 +198,13 @@ internal class BattleMissionStartHandler : IHandler
                     return;
                 }
 
+                if (mapEvent.IsNavalBattleWithoutShips(attackerMobileParty))
+                {
+                    Logger.Warning("Rejecting attack mission start for map event {MapEventId}: the requesting party has no ships", payload.What.MapEventId);
+                    network.Send(requester, new NetworkBattleStartReply(payload.What.RequestId, false));
+                    return;
+                }
+
                 // The lords-hall stage is not supported: CurrentSiegeState never advances past OnTheWalls in
                 // co-op (SiegeMissionEndPatches), so this only trips on a save that carried the state in.
                 // Rejected before the arbiter claim so the event stays open for auto-resolve.
@@ -369,7 +376,8 @@ internal class BattleMissionStartHandler : IHandler
         return mapEvent.FindMapEventParty(party.Party) != null;
     }
 
-    // The connected players in the map event that open the mission; a kept naval host waits for the conclusion instead.
+    // The connected players in the map event that open the mission; a kept naval host waits for the conclusion instead,
+    // and a ship-less player in a naval battle is left out.
     private IReadOnlyList<MissionParticipant> GetMissionParticipants(string mapEventId, MapEvent mapEvent)
     {
         var participants = new List<MissionParticipant>();
@@ -390,8 +398,7 @@ internal class BattleMissionStartHandler : IHandler
                 hideoutRaids?.IsAdmitted(mapEvent, party) != true)
                 continue;
 
-            // Co-op fields only each player's own ships, so a ship-less army member at sea has no hull to spawn on.
-            if (mapEvent.IsNavalMapEvent && party.Ships.Count == 0)
+            if (mapEvent.IsNavalBattleWithoutShips(party))
                 continue;
 
             participants.Add(new MissionParticipant(

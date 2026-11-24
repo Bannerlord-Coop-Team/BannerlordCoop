@@ -139,7 +139,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
             return null;
         }
 
-        if (MobileParty.MainParty.Ships.Count == 0)
+        if (mapEvent.IsNavalBattleWithoutShips(MobileParty.MainParty))
         {
             Logger.Error("[NavalBattle] Cannot open coop naval battle for {MapEventId}: the main party has no ships", mapEventId);
             return null;

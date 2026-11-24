@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using GameInterface.Configuration;
+using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
@@ -148,9 +149,7 @@ internal class BattleModeEncounterOptionsPatch
         // Already unavailable — nothing to do.
         if (__result == false) return;
 
-        // Co-op fields only each player's own ships, so a ship-less army member at sea has no hull to fight from.
-        var battle = GetPlayerEncounterBattle() ?? MobileParty.MainParty?.MapEvent;
-        if (name == AttackCondition && battle?.IsNavalMapEvent == true && MobileParty.MainParty.Ships.Count == 0)
+        if (name == AttackCondition && GetCurrentBattle()?.IsNavalBattleWithoutShips(MobileParty.MainParty) == true)
         {
             __0.IsEnabled = false;
             __0.Tooltip = NoShipsTooltip;
@@ -267,7 +266,7 @@ internal class BattleModeEncounterOptionsPatch
 
     private static bool TryApplyClientSiegeOrderAttackOptionState(MenuCallbackArgs args)
     {
-        var mapEvent = GetPlayerEncounterBattle() ?? MobileParty.MainParty?.MapEvent;
+        var mapEvent = GetCurrentBattle();
         var encounter = PlayerEncounter.Current;
         if (mapEvent == null || encounter == null)
             return false;
@@ -331,7 +330,7 @@ internal class BattleModeEncounterOptionsPatch
         if (Hero.MainHero?.IsWounded != true) return;
         if (PartyBase.MainParty.NumberOfHealthyMembers != 0) return;
 
-        var mapEvent = GetPlayerEncounterBattle() ?? MobileParty.MainParty?.MapEvent;
+        var mapEvent = GetCurrentBattle();
         if (mapEvent == null || !mapEvent.IsFieldBattle || mapEvent.IsNavalMapEvent || mapEvent.MapEventSettlement != null)
             return;
 
@@ -443,7 +442,7 @@ internal class BattleModeEncounterOptionsPatch
     {
         mapEventId = null;
 
-        var mapEvent = GetPlayerEncounterBattle() ?? MobileParty.MainParty?.MapEvent;
+        var mapEvent = GetCurrentBattle();
         if (mapEvent == null) return false;
 
         if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)) return false;
@@ -477,6 +476,9 @@ internal class BattleModeEncounterOptionsPatch
         => Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId == "encounter" ||
            PlayerEncounter.Current != null ||
            MobileParty.MainParty?.MapEvent != null;
+
+    // The battle the encounter menu is for: the player encounter's battle, else the main party's map event.
+    private static MapEvent GetCurrentBattle() => GetPlayerEncounterBattle() ?? MobileParty.MainParty?.MapEvent;
 
     private static MapEvent GetPlayerEncounterBattle()
     {
