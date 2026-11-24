@@ -549,8 +549,10 @@ public class MapEventEnvironmentTests : MapEventTestBase
         }
     }
 
-    [Fact]
-    public void CaptureRefreshesTheParkedPartyNameplateOnTheServer()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CaptureRefreshesTheParkedPartyNameplateOnTheServer(bool nativeVisibility)
     {
         var (heroId, partyId) = CreatePlayerHeroParty("MyControllerId");
         TestEnvironment.ConnectRegisteredPlayer(Clients.First(), "MyControllerId");
@@ -560,6 +562,8 @@ public class MapEventEnvironmentTests : MapEventTestBase
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var playerParty));
+            // The server getter shows active parties even when the native value is false.
+            playerParty._isVisible = nativeVisibility;
             Assert.True(playerParty.IsVisible);
             CampaignEvents.PartyVisibilityChangedEvent.AddNonSerializedListener(this, party =>
             {
