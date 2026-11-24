@@ -139,7 +139,7 @@ internal class ExecutionCampaignBehaviorPatches
     // HeroExecutionScenePatch executes with Executed, so nothing adds an ExecutionAfterMapEvent mark for this to track
     [HarmonyPatch(nameof(ExecutionCampaignBehavior.OnDeathMarkAdded))]
     [HarmonyPrefix]
-    private static bool OnDeathMarkAddedPrefix() => false;
+    private static bool OnDeathMarkAddedPrefix() => !ContainerProvider.TryResolve<IExecutionCampaignBehaviorInterface>(out _);
 
     [HarmonyPatch(nameof(ExecutionCampaignBehavior.CanHeroBeReleased))]
     [HarmonyPrefix]
