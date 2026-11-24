@@ -85,6 +85,7 @@ public class DefaultMobilePartyAIModelPatchesTests : IDisposable
         Assert.Equal(0f, Score(attacker, firstEnemy, ref nearbyPlayers));
         Assert.Equal(0f, Score(attacker, secondEnemy, ref nearbyPlayers));
         Assert.Equal(UnsuppressedScore, Score(attacker, enemyOutsideBothBattles, ref nearbyPlayers));
+        // The scan is exhausted, so only the cached first player can suppress this score.
         Assert.Equal(0f, Score(attacker, firstEnemy, ref nearbyPlayers));
     }
 
