@@ -40,7 +40,6 @@ public interface IBattleWreckageCampaignBehaviorInterface : IGameAbstraction
     void CloseWreckageEncounter(
         BattleWreckageCampaignBehavior.WreckageLeaveReason reason,
         CampaignTime requiredInvestigationDuration);
-    void ApplyWreckageInvestigationResults(Hero mainHero);
     void ShowWreckageInvestigationResults(
         TroopRosterData lootedTroops,
         IEnumerable<ItemRosterElement> lootedItems,
@@ -48,7 +47,6 @@ public interface IBattleWreckageCampaignBehaviorInterface : IGameAbstraction
         int lootedGoldAmount);
     void SelectWreckageConsequences(Hero mainHero);
     void ShowRecoverTroopsDecision(int recoverTroopCount, CampaignTime requiredInvestigationDuration);
-    void ShowWreckageResultsConnectionMenu();
     void AcceptRecoverTroops(Hero mainHero);
     void InterruptDisconnectedPlayers();
 }
@@ -236,10 +234,6 @@ public class BattleWreckageCampaignBehaviorInterface : IBattleWreckageCampaignBe
                 encounter.LastInteractionTime = CampaignTime.Now;
                 encounter.IsInvestigating = false;
                 encounter.InvestigationStartTime = CampaignTime.Zero;
-                encounter.LootedTroops = null;
-                encounter.LootedItems = null;
-                encounter.ConsequenceExplanations = null;
-                encounter.LootedGoldAmount = 0;
                 requiredInvestigationDuration = encounter.RequiredInvestigationDuration;
                 break;
         }
@@ -276,7 +270,6 @@ public class BattleWreckageCampaignBehaviorInterface : IBattleWreckageCampaignBe
         behavior._playerInvestigationStartTime = CampaignTime.Zero;
         behavior._selectedConsequences.Clear();
         behavior._lootedGoldAmount = 0;
-        // ApplyWreckageInvestigationResultsPrefix runs vanilla while this has entries, so the next investigation would replay old results
         behavior._consequenceExplanations.Clear();
         // Zero unless interrupted, when it's the time left that the server worked out
         behavior._requiredInvestigationDuration = requiredInvestigationDuration;
@@ -288,33 +281,6 @@ public class BattleWreckageCampaignBehaviorInterface : IBattleWreckageCampaignBe
         behavior._recoverTroopCountsToAdd = 0;
         behavior._currentOverriddenConsequenceId = string.Empty;
         behavior._isOverriddenConsequenceAccepted = false;
-    }
-
-    public void ApplyWreckageInvestigationResults(Hero mainHero)
-    {
-        if (!encounterTracker.TryGetEncounter(mainHero, out var encounter)) return;
-
-        // Nothing rolled yet, or already sent to the client by an earlier request
-        if (encounter.ConsequenceExplanations == null || encounter.ConsequenceExplanations.Count == 0) return;
-
-        if (encounter.LootedGoldAmount > 0)
-        {
-            GiveGoldAction.ApplyBetweenCharacters(null, mainHero, encounter.LootedGoldAmount, disableNotification: true);
-        }
-
-        var message = new WreckageInvestigationResultsApplied(
-            mainHero,
-            encounter.LootedTroops,
-            encounter.LootedItems,
-            encounter.ConsequenceExplanations,
-            encounter.LootedGoldAmount);
-        messageBroker.Publish(this, message);
-
-        // The results go to the client once, so a repeated request finds nothing left to send
-        encounter.LootedTroops = null;
-        encounter.LootedItems = null;
-        encounter.ConsequenceExplanations = null;
-        encounter.LootedGoldAmount = 0;
     }
 
     public void ShowWreckageInvestigationResults(
@@ -340,8 +306,9 @@ public class BattleWreckageCampaignBehaviorInterface : IBattleWreckageCampaignBe
         // The server already paid the gold and GiveGoldAction doesn't run on clients, so vanilla only shows the message
         behavior._lootedGoldAmount = lootedGoldAmount;
 
-        // Vanilla shows the troops screen, then the items screen, then the results menu as the connection menu reopens
-        behavior.ApplyWreckageInvestigationResults();
+        // Same as the end of vanilla SelectWreckageConsequences. The results are loaded first, so the connection menu's init opens
+        // the troops screen, then the items screen, then the results menu as it reopens, and its placeholder text never shows
+        GameMenu.SwitchToMenu(BattleWreckageCampaignBehavior.BattleWreckageResultsConnectionMenuId);
     }
 
     public void SelectWreckageConsequences(Hero mainHero)
@@ -352,9 +319,16 @@ public class BattleWreckageCampaignBehaviorInterface : IBattleWreckageCampaignBe
             return;
         }
 
+        // A second request, like a double-click on the recover troops decline, would pay out a second roll
+        if (!encounter.IsInvestigating)
+        {
+            Logger.Debug("Wreckage encounter for {Hero} has no running investigation to select consequences for", mainHero.StringId);
+            return;
+        }
+
         if (!TryGetBattleWreckageBehavior(out var behavior)) return;
 
-        var isRecoverTroopsDecision = RollForEncounter(behavior, encounter);
+        var isRecoverTroopsDecision = RollForEncounter(behavior, encounter, out var results);
 
         if (isRecoverTroopsDecision)
         {
@@ -363,7 +337,8 @@ public class BattleWreckageCampaignBehaviorInterface : IBattleWreckageCampaignBe
             return;
         }
 
-        messageBroker.Publish(this, new WreckageConsequencesSelected(mainHero));
+        encounter.IsInvestigating = false;
+        ApplyWreckageInvestigationResults(results);
     }
 
     public void ShowRecoverTroopsDecision(int recoverTroopCount, CampaignTime requiredInvestigationDuration)
@@ -376,12 +351,6 @@ public class BattleWreckageCampaignBehaviorInterface : IBattleWreckageCampaignBe
         behavior._requiredInvestigationDuration = requiredInvestigationDuration;
 
         GameMenu.SwitchToMenu(BattleWreckageCampaignBehavior.MenuIdRecoverTroopsDecision);
-    }
-
-    public void ShowWreckageResultsConnectionMenu()
-    {
-        // Its init calls ApplyWreckageInvestigationResults, which asks the server for the results
-        GameMenu.SwitchToMenu(BattleWreckageCampaignBehavior.BattleWreckageResultsConnectionMenuId);
     }
 
     public void AcceptRecoverTroops(Hero mainHero)
@@ -410,6 +379,18 @@ public class BattleWreckageCampaignBehaviorInterface : IBattleWreckageCampaignBe
         }
     }
 
+    // Server half of vanilla ApplyWreckageInvestigationResults, sent along with the roll so the client
+    // can open its results screens straight away
+    private void ApplyWreckageInvestigationResults(WreckageInvestigationResultsApplied results)
+    {
+        if (results.LootedGoldAmount > 0)
+        {
+            GiveGoldAction.ApplyBetweenCharacters(null, results.MainHero, results.LootedGoldAmount, disableNotification: true);
+        }
+
+        messageBroker.Publish(this, results);
+    }
+
     // Vanilla GetWreckageInvestigationDuration reads the encountered wreckage, MainHero and MainParty, which the server
     // doesn't have, so the player's wreckage and party stand in while it runs
     private static CampaignTime GetInvestigationDuration(BattleWreckageCampaignBehavior behavior, BattleWreckage battleWreckage, Hero mainHero)
@@ -431,7 +412,10 @@ public class BattleWreckageCampaignBehaviorInterface : IBattleWreckageCampaignBe
 
     // Vanilla consequences roll into the behavior's single player fields and read MainParty and MainHero,
     // so the player's encounter and party stand in for them while they run, then the behavior is put back
-    private static bool RollForEncounter(BattleWreckageCampaignBehavior behavior, BattleWreckageEncounter encounter)
+    private static bool RollForEncounter(
+        BattleWreckageCampaignBehavior behavior,
+        BattleWreckageEncounter encounter,
+        out WreckageInvestigationResultsApplied results)
     {
         var previousEncounteredBattleWreckage = behavior._encounteredBattleWreckage;
         var previousOverriddenConsequenceId = behavior._currentOverriddenConsequenceId;
@@ -466,10 +450,14 @@ public class BattleWreckageCampaignBehaviorInterface : IBattleWreckageCampaignBe
                 encounter.OverriddenConsequenceId = behavior._currentOverriddenConsequenceId;
                 encounter.RecoverTroopCountsToAdd = behavior._recoverTroopCountsToAdd;
                 encounter.RequiredInvestigationDuration = behavior._requiredInvestigationDuration;
-                encounter.LootedItems = behavior._lootedItems;
-                encounter.LootedTroops = behavior._lootedTroops;
-                encounter.LootedGoldAmount = behavior._lootedGoldAmount;
-                encounter.ConsequenceExplanations = behavior._consequenceExplanations;
+
+                // The loot is this roll's own, the finally puts the behavior's rosters back
+                results = new WreckageInvestigationResultsApplied(
+                    encounter.Hero,
+                    behavior._lootedTroops,
+                    behavior._lootedItems,
+                    behavior._consequenceExplanations,
+                    behavior._lootedGoldAmount);
 
                 return isRecoverTroopsDecision;
             }

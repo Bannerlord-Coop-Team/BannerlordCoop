@@ -15,6 +15,7 @@ using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.BattleWreckages;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
@@ -348,18 +349,18 @@ public class BattleWreckageLifetimeTests : IDisposable
             Assert.True(decision.RequiredInvestigationDuration.ToHours >= 2);
             Assert.Equal(decision.RequiredInvestigationDuration, encounter.RequiredInvestigationDuration);
             Assert.Equal(BattleWreckageCampaignBehavior.RecoverTroopsConsequenceId, encounter.OverriddenConsequenceId);
-            Assert.Empty(encounter.ConsequenceExplanations);
+            Assert.Empty(Server.InternalMessages.GetMessages<WreckageInvestigationResultsApplied>());
 
             // Act, the accepted recovery rolls the troops
             campaignBehaviorInterface.AcceptRecoverTroops(hero);
             campaignBehaviorInterface.SelectWreckageConsequences(hero);
 
-            // Assert
+            // Assert, the results go out with the roll
             Assert.Single(Server.InternalMessages.GetMessages<RecoverTroopsDecisionRequired>());
-            Assert.Single(Server.InternalMessages.GetMessages<WreckageConsequencesSelected>());
-            Assert.True(encounter.LootedTroops.TotalManCount > 0);
-            Assert.All(encounter.LootedTroops.GetTroopRoster(), element => Assert.Same(woundedTroop, element.Character));
-            Assert.Single(encounter.ConsequenceExplanations);
+            var results = Assert.Single(Server.InternalMessages.GetMessages<WreckageInvestigationResultsApplied>());
+            Assert.True(results.LootedTroops.TotalManCount > 0);
+            Assert.All(results.LootedTroops.GetTroopRoster(), element => Assert.Same(woundedTroop, element.Character));
+            Assert.Single(results.ConsequenceExplanations);
 
             Assert.Same(mainParty, Campaign.Current.MainParty);
             Assert.Same(behaviorLootedTroops, behavior._lootedTroops);
@@ -386,15 +387,65 @@ public class BattleWreckageLifetimeTests : IDisposable
             var (hero, encounter, _, _) = CreateRecoverTroopsEncounter(battleWreckageId);
             var campaignBehaviorInterface = Server.Resolve<IBattleWreckageCampaignBehaviorInterface>();
 
-            // Act, declining sends another select without accepting first
+            // Act, declining sends another select without accepting first, and a double-click sends it twice
+            campaignBehaviorInterface.SelectWreckageConsequences(hero);
             campaignBehaviorInterface.SelectWreckageConsequences(hero);
             campaignBehaviorInterface.SelectWreckageConsequences(hero);
 
-            // Assert
+            // Assert, only the first decline rolls and sends results
             Assert.Single(Server.InternalMessages.GetMessages<RecoverTroopsDecisionRequired>());
-            Assert.Single(Server.InternalMessages.GetMessages<WreckageConsequencesSelected>());
-            Assert.Equal(0, encounter.LootedTroops.TotalManCount);
-            Assert.Single(encounter.ConsequenceExplanations);
+            var results = Assert.Single(Server.InternalMessages.GetMessages<WreckageInvestigationResultsApplied>());
+            Assert.Equal(0, results.LootedTroops.TotalManCount);
+            Assert.Single(results.ConsequenceExplanations);
+            Assert.False(encounter.IsInvestigating);
+        });
+    }
+
+    [Fact]
+    public void ServerSelect_LoadsResultsOnTheClientWithTheRoll()
+    {
+        // Arrange
+        var battleWreckageId = CreateServerWreckage();
+        var owner = Clients.First();
+        string? woundedTroopId = null;
+        Hero? hero = null;
+
+        Server.Call(() =>
+        {
+            var (encounterHero, _, _, woundedTroop) = CreateRecoverTroopsEncounter(battleWreckageId);
+            hero = encounterHero;
+            Assert.True(Server.ObjectManager.TryGetId(woundedTroop, out woundedTroopId));
+            Assert.True(Server.ObjectManager.TryGetId(hero, out var heroId));
+
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.AddPlayer(new Player("wreckage_looter", heroId, null, null, null)));
+            playerManager.SetPeer("wreckage_looter", owner.NetPeer);
+
+            // The accepted recovery rolls the troops on the next select
+            var campaignBehaviorInterface = Server.Resolve<IBattleWreckageCampaignBehaviorInterface>();
+            campaignBehaviorInterface.SelectWreckageConsequences(hero);
+            campaignBehaviorInterface.AcceptRecoverTroops(hero);
+        });
+
+        // The client applies the decision before the results, so its menu switch is out of the way first
+        BattleWreckageCampaignBehavior? clientBehavior = null;
+        owner.Call(() => clientBehavior = AddBattleWreckageBehavior());
+        owner.PumpGameThread();
+        using var menus = new MethodCallRecorder(Priority.First, AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu)));
+
+        // Act
+        Server.Call(() => Server.Resolve<IBattleWreckageCampaignBehaviorInterface>().SelectWreckageConsequences(hero!));
+        owner.PumpGameThread();
+
+        // Assert, one message carries the results, so the client has them when it opens the connection menu
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkShowWreckageInvestigationResults>());
+        Assert.Equal(new[] { BattleWreckageCampaignBehavior.BattleWreckageResultsConnectionMenuId }, menus.MenusFor(owner));
+        owner.Call(() =>
+        {
+            Assert.True(owner.ObjectManager.TryGetObject<CharacterObject>(woundedTroopId!, out var woundedTroop));
+            Assert.True(clientBehavior!._lootedTroops.TotalManCount > 0);
+            Assert.All(clientBehavior._lootedTroops.GetTroopRoster(), element => Assert.Same(woundedTroop, element.Character));
+            Assert.Single(clientBehavior._consequenceExplanations);
         });
     }
 
@@ -670,7 +721,8 @@ public class BattleWreckageLifetimeTests : IDisposable
 
         var hero = CreatePartyLeader();
 
-        var encounter = new BattleWreckageEncounter(hero, battleWreckage);
+        // Running, as StartWreckageEncounter leaves it
+        var encounter = new BattleWreckageEncounter(hero, battleWreckage) { IsInvestigating = true };
         Server.Resolve<IBattleWreckageEncounterTracker>().AddEncounter(encounter);
 
         return (hero, encounter, behavior, woundedTroop);

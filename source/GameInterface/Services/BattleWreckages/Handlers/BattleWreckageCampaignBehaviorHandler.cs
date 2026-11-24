@@ -43,8 +43,6 @@ internal class BattleWreckageCampaignBehaviorHandler : IHandler
         messageBroker.Subscribe<WreckageEncounterLeft>(Handle_WreckageEncounterLeft);
         messageBroker.Subscribe<NetworkCloseWreckageEncounter>(Handle_NetworkCloseWreckageEncounter);
 
-        messageBroker.Subscribe<RequestApplyWreckageInvestigationResults>(Handle_RequestApplyWreckageInvestigationResults);
-        messageBroker.Subscribe<NetworkRequestApplyWreckageInvestigationResults>(Handle_NetworkRequestApplyWreckageInvestigationResults);
         messageBroker.Subscribe<WreckageInvestigationResultsApplied>(Handle_WreckageInvestigationResultsApplied);
         messageBroker.Subscribe<NetworkShowWreckageInvestigationResults>(Handle_NetworkShowWreckageInvestigationResults);
 
@@ -52,8 +50,6 @@ internal class BattleWreckageCampaignBehaviorHandler : IHandler
         messageBroker.Subscribe<NetworkRequestSelectWreckageConsequences>(Handle_NetworkRequestSelectWreckageConsequences);
         messageBroker.Subscribe<RecoverTroopsDecisionRequired>(Handle_RecoverTroopsDecisionRequired);
         messageBroker.Subscribe<NetworkShowRecoverTroopsDecision>(Handle_NetworkShowRecoverTroopsDecision);
-        messageBroker.Subscribe<WreckageConsequencesSelected>(Handle_WreckageConsequencesSelected);
-        messageBroker.Subscribe<NetworkShowWreckageResultsConnectionMenu>(Handle_NetworkShowWreckageResultsConnectionMenu);
 
         messageBroker.Subscribe<RequestAcceptRecoverTroops>(Handle_RequestAcceptRecoverTroops);
         messageBroker.Subscribe<NetworkRequestAcceptRecoverTroops>(Handle_NetworkRequestAcceptRecoverTroops);
@@ -68,8 +64,6 @@ internal class BattleWreckageCampaignBehaviorHandler : IHandler
         messageBroker.Unsubscribe<WreckageEncounterLeft>(Handle_WreckageEncounterLeft);
         messageBroker.Unsubscribe<NetworkCloseWreckageEncounter>(Handle_NetworkCloseWreckageEncounter);
 
-        messageBroker.Unsubscribe<RequestApplyWreckageInvestigationResults>(Handle_RequestApplyWreckageInvestigationResults);
-        messageBroker.Unsubscribe<NetworkRequestApplyWreckageInvestigationResults>(Handle_NetworkRequestApplyWreckageInvestigationResults);
         messageBroker.Unsubscribe<WreckageInvestigationResultsApplied>(Handle_WreckageInvestigationResultsApplied);
         messageBroker.Unsubscribe<NetworkShowWreckageInvestigationResults>(Handle_NetworkShowWreckageInvestigationResults);
 
@@ -77,8 +71,6 @@ internal class BattleWreckageCampaignBehaviorHandler : IHandler
         messageBroker.Unsubscribe<NetworkRequestSelectWreckageConsequences>(Handle_NetworkRequestSelectWreckageConsequences);
         messageBroker.Unsubscribe<RecoverTroopsDecisionRequired>(Handle_RecoverTroopsDecisionRequired);
         messageBroker.Unsubscribe<NetworkShowRecoverTroopsDecision>(Handle_NetworkShowRecoverTroopsDecision);
-        messageBroker.Unsubscribe<WreckageConsequencesSelected>(Handle_WreckageConsequencesSelected);
-        messageBroker.Unsubscribe<NetworkShowWreckageResultsConnectionMenu>(Handle_NetworkShowWreckageResultsConnectionMenu);
 
         messageBroker.Unsubscribe<RequestAcceptRecoverTroops>(Handle_RequestAcceptRecoverTroops);
         messageBroker.Unsubscribe<NetworkRequestAcceptRecoverTroops>(Handle_NetworkRequestAcceptRecoverTroops);
@@ -126,26 +118,6 @@ internal class BattleWreckageCampaignBehaviorHandler : IHandler
         GameThread.RunSafe(() =>
         {
             battleWreckageCampaignBehaviorInterface.CloseWreckageEncounter(data.Reason, data.RequiredInvestigationDuration);
-        });
-    }
-
-    private void Handle_RequestApplyWreckageInvestigationResults(MessagePayload<RequestApplyWreckageInvestigationResults> obj)
-    {
-        if (!objectManager.TryGetIdWithLogging(obj.What.MainHero, out var mainHeroId)) return;
-
-        network.SendAll(new NetworkRequestApplyWreckageInvestigationResults(mainHeroId));
-    }
-
-    private void Handle_NetworkRequestApplyWreckageInvestigationResults(MessagePayload<NetworkRequestApplyWreckageInvestigationResults> obj)
-    {
-        var data = obj.What;
-
-        GameThread.RunSafe(() =>
-        {
-            if (!playerManager.IsSenderControllingHero(obj.Who, data.MainHeroId)) return;
-            if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out var mainHero)) return;
-
-            battleWreckageCampaignBehaviorInterface.ApplyWreckageInvestigationResults(mainHero);
         });
     }
 
@@ -217,22 +189,6 @@ internal class BattleWreckageCampaignBehaviorHandler : IHandler
         GameThread.RunSafe(() =>
         {
             battleWreckageCampaignBehaviorInterface.ShowRecoverTroopsDecision(data.RecoverTroopCount, data.RequiredInvestigationDuration);
-        });
-    }
-
-    private void Handle_WreckageConsequencesSelected(MessagePayload<WreckageConsequencesSelected> obj)
-    {
-        if (!playerManager.TryGetPlayer(obj.What.MainHero, out var player)) return;
-        if (!playerManager.TryGetPeer(player.ControllerId, out var peer)) return;
-
-        network.Send(peer, new NetworkShowWreckageResultsConnectionMenu());
-    }
-
-    private void Handle_NetworkShowWreckageResultsConnectionMenu(MessagePayload<NetworkShowWreckageResultsConnectionMenu> obj)
-    {
-        GameThread.RunSafe(() =>
-        {
-            battleWreckageCampaignBehaviorInterface.ShowWreckageResultsConnectionMenu();
         });
     }
 

@@ -1,8 +1,5 @@
-﻿using System.Collections.Generic;
-using TaleWorlds.CampaignSystem;
+﻿using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.BattleWreckages;
-using TaleWorlds.CampaignSystem.Roster;
-using TaleWorlds.Localization;
 
 namespace GameInterface.Services.BattleWreckages.Data;
 
@@ -23,13 +20,9 @@ public class BattleWreckageEncounter
     public CampaignTime RequiredInvestigationDuration { get; set; }
     public CampaignTime LastInteractionTime { get; set; }
     public bool IsInterrupted { get; set; }
-    // False while interrupted, when the encounter only holds the time left for a resume
+    // False while interrupted, when the encounter only holds the time left for a resume, and once its results are sent
     public bool IsInvestigating { get; set; }
     public string OverriddenConsequenceId { get; set; }
     public bool IsOverriddenConsequenceAccepted { get; set; }
     public int RecoverTroopCountsToAdd { get; set; }
-    public ItemRoster LootedItems { get; set; }
-    public TroopRoster LootedTroops { get; set; }
-    public int LootedGoldAmount { get; set; }
-    public List<TextObject> ConsequenceExplanations { get; set; }
 }
