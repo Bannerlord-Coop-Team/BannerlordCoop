@@ -614,6 +614,51 @@ public sealed class HideoutMissionRuntimeTests : MissionTestEnvironment
         });
     }
 
+    [Fact]
+    public void BossCutscene_MovesAPeersHeroBehindTheLeaderOnce()
+    {
+        using var fixture = new MissionEngineFixture();
+        var client = Clients.Last();
+        client.Call(() =>
+        {
+            var mission = fixture.CreateMission(client);
+            var attackers = mission.AddTeam(BattleSideEnum.Attacker);
+            var hero = mission.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop).Team(attackers));
+            var leaderOrigin = Mock.Of<IAgentOriginBase>(value => value.Troop == Game.Current.PlayerTroop && value.UniqueSeed == 41);
+            mission.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop).Team(attackers).TroopOrigin(leaderOrigin)
+                .Controller(AgentControllerType.None).InitialPosition(new Vec3(10f, 10f, 1f)));
+            var boss = mission.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop).Team(mission.AddTeam(BattleSideEnum.Defender))
+                .Controller(AgentControllerType.None).InitialPosition(new Vec3(10f, 20f, 1f)));
+            mission.MainAgent = hero;
+            var logic = new CoopHideoutMissionLogic(Mock.Of<IBattleNetwork>(), Mock.Of<IMessageBroker>(), Mock.Of<IMissionContext>(),
+                new CoopTroopSupplier("raid", BattleSideEnum.Defender, null, null),
+                new CoopTroopSupplier("raid", BattleSideEnum.Attacker, null, null), false);
+            AccessTools.Property(typeof(MissionBehavior), nameof(MissionBehavior.Mission)).SetValue(logic, mission.Shell);
+            AccessTools.Field(typeof(CoopHideoutMissionLogic), "speakerSeed").SetValue(logic, 41);
+            var native = new PromotionController(() => { }) { Boss = boss };
+            logic.Native = native;
+            try
+            {
+                native.Apply(HideoutPhase.Camp, boss, 25);
+                logic.JoinBossScene(5f);
+                Assert.Equal(default, hero.Position);
+
+                native.Apply(HideoutPhase.Cinematic, boss, 25);
+                logic.JoinBossScene(0.5f);
+                Assert.Equal(default, hero.Position);
+                logic.JoinBossScene(0.5f);
+                // Two metres behind the leader, away from the boss, and two metres to the side for origin seed 0.
+                Assert.Equal(8f, hero.Position.y, 3);
+                Assert.Equal(2f, Math.Abs(hero.Position.x - 10f), 3);
+
+                hero.TeleportToPosition(new Vec3(50f, 50f, 1f));
+                logic.JoinBossScene(5f);
+                Assert.Equal(new Vec3(50f, 50f, 1f), hero.Position);
+            }
+            finally { logic.OnRemoveBehavior(); }
+        });
+    }
+
     // A stealth failure leaves both sides standing, so the verdict has to reach the native end logic directly.
     [Theory]
     [InlineData(BattleSideEnum.Defender, true)]

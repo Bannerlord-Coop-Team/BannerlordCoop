@@ -48,6 +48,8 @@ internal sealed class CoopHideoutMissionLogic : MissionLogic
     private bool hadPlayerHeroes;
     private bool heroEntered;
     private bool duelSurrenderSent;
+    private bool bossSceneJoined;
+    private float bossSceneDelay;
     private bool recoveringAuthority;
     private int authorityEpoch;
     private int speakerSeed;
@@ -185,6 +187,7 @@ internal sealed class CoopHideoutMissionLogic : MissionLogic
         else
         {
             ApplyLatest();
+            JoinBossScene(dt);
         }
         ApplySpectators();
         ConcludeResolved();
@@ -391,6 +394,35 @@ internal sealed class CoopHideoutMissionLogic : MissionLogic
         TeleportToBoss();
         return true;
     }
+
+    // Native's boss cutscene only places the host's main agent and AI troops, and each client owns its hero's
+    // position, so every other player moves its own hero in behind the host's leader.
+    internal void JoinBossScene(float dt)
+    {
+        if (bossSceneJoined || IsAuthority || Native.Phase is not (HideoutPhase.Cinematic or HideoutPhase.Conversation)) return;
+        var boss = Native.Boss;
+        var hero = Mission.MainAgent;
+        if (boss?.IsActive() != true || hero?.IsActive() != true) return;
+        // The leader's own cutscene teleport takes a moment to replicate here.
+        bossSceneDelay += dt;
+        if (bossSceneDelay < BossSceneJoinDelay) return;
+        bossSceneJoined = true;
+
+        var leader = Mission.Agents.FirstOrDefault(agent => agent != hero && agent.IsActive() && agent.Origin?.UniqueSeed == speakerSeed);
+        if (leader == null)
+        {
+            TeleportToBoss();
+            return;
+        }
+        var toBoss = (boss.Position - leader.Position).AsVec2;
+        if (toBoss.Normalize() < 0.01f) toBoss = new Vec2(0f, 1f);
+        // Spread several players sideways so they do not land on one spot.
+        float side = Math.Abs((hero.Origin?.UniqueSeed ?? 0) % 5) - 2;
+        var offset = toBoss * -2f + toBoss.LeftVec() * side;
+        hero.TeleportToPosition(leader.Position + offset.ToVec3());
+    }
+
+    internal const float BossSceneJoinDelay = 1f;
 
     internal bool TeleportToBoss()
     {
