@@ -3,7 +3,6 @@ using GameInterface.CoopSessionData;
 using GameInterface.Services;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.PartyBases.Extensions;
 using GameInterface.Services.Players;
 using NavalDLC.GameComponents;
 using System.Collections.Generic;
@@ -107,9 +106,7 @@ public class NavalDLCBattleRewardModelInterface : INavalDLCBattleRewardModelInte
         if (lootableShips.Count > 0)
         {
             lootableShips.Shuffle();
-            var playerParties = winnerParties.Where(x => x.Party.IsPlayerParty()).ToList();
-            int totalContribution = winnerParties.Sum(x => x.ContributionToBattle);
-            leftoverShipDistributor.GiveToPlayers(distributedShips, lootableShips, playerParties, () => MBRandom.RandomInt(totalContribution));
+            leftoverShipDistributor.GiveToPlayers(distributedShips, lootableShips, winnerParties, MBRandom.RandomInt);
         }
 
         return distributedShips.ToMBList();
