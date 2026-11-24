@@ -35,11 +35,10 @@ public class NavalLateHullDeployment : INavalLateHullDeployment
     /// <summary>How many formations wait for the next check (diagnostics, tests).</summary>
     internal int Noted => joined.Count;
 
-    // Runs once per hull: vanilla's removed-hull pool is emptied at deployment end, so no late hull has had the pass, the
-    // non-repeatable rope machine setup included.
     public void Deploy(MissionShip hull)
     {
-        hull.OnDeploymentFinished();
+        // Late hulls missed the mission's machine pass, which gives climbing nets control of the climber's frame and release.
+        hull.FinalizeDeployment(initializeMachines: true);
         targetsStale = true;
         Note(hull.Formation);
     }
