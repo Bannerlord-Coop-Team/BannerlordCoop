@@ -1,7 +1,9 @@
-﻿using HarmonyLib;
+﻿using Common.Logging;
+using HarmonyLib;
 using SandBox.CampaignBehaviors;
 using SandBox.Missions;
 using SandBox.Missions.MissionLogics.Hideout;
+using Serilog;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -76,15 +78,22 @@ internal static class HideoutLostRaidExitPatch
 internal static class HideoutBossDuelPatches
 {
     private const string DuelLineId = "bandit_hideout_start_defender_1";
+    private static readonly ILogger Logger = LogManager.GetLogger(typeof(HideoutBossDuelPatches));
 
     // Native's duel answer has no condition, so attach one that hides it while other players share the mission.
     [HarmonyPatch(nameof(HideoutConversationsCampaignBehavior.AddDialogs))]
     [HarmonyPostfix]
     private static void HideDuelWithOtherPlayers()
     {
-        var line = Campaign.Current?.ConversationManager?._sentences.FirstOrDefault(sentence => sentence.Id == DuelLineId);
-        if (line != null)
-            line.OnCondition = () => !HasOtherPlayers();
+        var sentences = Campaign.Current?.ConversationManager?._sentences;
+        if (sentences == null) return;
+        var line = sentences.FirstOrDefault(sentence => sentence.Id == DuelLineId);
+        if (line == null)
+        {
+            Logger.Warning("Hideout duel line {Id} was not found, so the duel stays on offer with other players present", DuelLineId);
+            return;
+        }
+        line.OnCondition = () => !HasOtherPlayers();
     }
 
     // Native only counts AI companions, so the battle answer must stay clickable when the other fighters are players.

@@ -50,13 +50,14 @@ public sealed class HideoutResolvedMigrationTests : MissionTestEnvironment
         Assert.NotEqual(AgentControllerType.AI, mirror.Controller);
     }
 
-    // Once the spectators are restored, a won duel's guards stay teamless and are no longer tracked as spectators
+    // Once the spectators are restored, a won duel's guards stay teamless but still count as surrendered
     [Fact]
     public void PromotedAfterADuelWin_LeavesARestoredTeamlessBanditIdle()
     {
         var (mirror, formation, _) = AdoptDefender(HideoutPhase.Resolved, BattleSideEnum.Attacker,
             teamlessSpectator: true, restoreSpectators: true);
 
+        Assert.Equal(BattleSideEnum.None, mirror.Team?.Side);
         Assert.NotEqual(AgentControllerType.AI, mirror.Controller);
         Assert.False(formation?.IsAIControlled ?? false);
     }
