@@ -57,6 +57,11 @@ public interface ISettlementInterface : IGameAbstraction
     void PartyDisembark(MobileParty party, Settlement settlement);
 
     /// <summary>
+    /// Server-only: docks the fleet of a party that lands from the sea in a settlement, the way vanilla's EnterSettlementAction.ApplyForParty does.
+    /// </summary>
+    void DockLandingFleet(MobileParty party, Settlement settlement);
+
+    /// <summary>
     /// Server-only: sends the party's server position and sea state to clients, pulling an owner whose copy drifted back.
     /// </summary>
     void CorrectPartyPosition(MobileParty party);
@@ -154,6 +159,15 @@ internal class SettlementInterface : ISettlementInterface
         party.Anchor.Settlement = settlement;
 
         messageBroker.Publish(this, new PartyBehaviorChangeAttempted(party, forcePosition: true, isCurrentlyAtSea: false));
+    }
+
+    public void DockLandingFleet(MobileParty party, Settlement settlement)
+    {
+        // Same checks as EnterSettlementAction.ApplyForParty, which then finds the fleet already docked
+        if (!party.IsCurrentlyAtSea || settlement.IsVillage || !party.HasLandNavigationCapability) return;
+        if (party.Ships.Count == 0 || party.Anchor.IsAtSettlement(settlement)) return;
+
+        party.Anchor.Settlement = settlement;
     }
 
     public void CorrectPartyPosition(MobileParty party)
