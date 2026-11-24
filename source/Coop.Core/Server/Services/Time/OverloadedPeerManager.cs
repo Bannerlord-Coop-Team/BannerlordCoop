@@ -166,28 +166,23 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
         }
 
         TimeSpan? elapsed = state.GetPreEntryBackpressureElapsed(utcNow);
-        bool timedOut = false;
-        if (!safetyLimitExceeded)
+        if (!safetyLimitExceeded && elapsed == null)
         {
-            if (!elapsed.HasValue)
-            {
-                // While paused, a peer above the resume threshold holds the pause, so it needs the deadline too.
-                if (queueDepth > config.MaxPacketsInQueue || automaticPauseLease != null)
-                    state.StartPreEntryBackpressure(utcNow);
-                return;
-            }
-
-            timedOut = elapsed.Value >= NetworkJoinLimits.CampaignEntryTimeout;
-            if (!timedOut) return;
+            // While paused, a peer above the resume threshold holds the pause, so it needs the deadline too.
+            if (queueDepth > config.MaxPacketsInQueue || automaticPauseLease != null)
+                state.StartPreEntryBackpressure(utcNow);
+            return;
         }
+
+        if (!safetyLimitExceeded && elapsed < NetworkJoinLimits.CampaignEntryTimeout) return;
 
         if (!state.TryAbortPreEntryJoin()) return;
 
         string queueDescription = connectionMessageQueue.DescribeCatchUp(peer);
         int clearedPackets = connectionMessageQueue.AbortCatchUp(peer);
-        string disconnectCode = timedOut
-            ? DisconnectReasons.JoinCampaignEntryTimeout
-            : DisconnectReasons.JoinReplayQueueLimit;
+        string disconnectCode = safetyLimitExceeded
+            ? DisconnectReasons.JoinReplayQueueLimit
+            : DisconnectReasons.JoinCampaignEntryTimeout;
 
         Logger.Warning(
             "Aborting stalled pre-entry campaign join for peer {Peer}: reason={Reason} phase={Phase} " +
