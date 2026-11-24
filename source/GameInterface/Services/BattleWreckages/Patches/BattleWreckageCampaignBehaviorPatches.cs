@@ -104,6 +104,9 @@ internal class BattleWreckageCampaignBehaviorPatches
         // Server side results are applied in BattleWreckageCampaignBehaviorInterface.ApplyWreckageInvestigationResults
         if (ModInformation.IsServer) return false;
 
+        // Results arrive from the server once, then vanilla steps through them each time the connection menu reopens
+        if (__instance._consequenceExplanations.Count > 0) return true;
+
         var message = new RequestApplyWreckageInvestigationResults(Hero.MainHero);
         MessageBroker.Instance.Publish(__instance, message);
 

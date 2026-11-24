@@ -6,7 +6,11 @@ using GameInterface.Services.BattleWreckages.Interfaces;
 using GameInterface.Services.BattleWreckages.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.TroopRosters.Interfaces;
+using System;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.BattleWreckages.Handlers;
 
@@ -17,19 +21,22 @@ internal class BattleWreckageCampaignBehaviorHandler : IHandler
     private readonly INetwork network;
     private readonly IPlayerManager playerManager;
     private readonly IBattleWreckageCampaignBehaviorInterface battleWreckageCampaignBehaviorInterface;
+    private readonly ITroopRosterInterface troopRosterInterface;
 
     public BattleWreckageCampaignBehaviorHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
         IPlayerManager playerManager,
-        IBattleWreckageCampaignBehaviorInterface battleWreckageCampaignBehaviorInterface)
+        IBattleWreckageCampaignBehaviorInterface battleWreckageCampaignBehaviorInterface,
+        ITroopRosterInterface troopRosterInterface)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.playerManager = playerManager;
         this.battleWreckageCampaignBehaviorInterface = battleWreckageCampaignBehaviorInterface;
+        this.troopRosterInterface = troopRosterInterface;
 
         messageBroker.Subscribe<RequestLeaveWreckageEncounter>(Handle_RequestLeaveWreckageEncounter);
         messageBroker.Subscribe<NetworkRequestLeaveWreckageEncounter>(Handle_NetworkRequestLeaveWreckageEncounter);
@@ -144,17 +151,32 @@ internal class BattleWreckageCampaignBehaviorHandler : IHandler
 
     private void Handle_WreckageInvestigationResultsApplied(MessagePayload<WreckageInvestigationResultsApplied> obj)
     {
-        if (!playerManager.TryGetPlayer(obj.What.MainHero, out var player)) return;
+        var data = obj.What;
+
+        if (!playerManager.TryGetPlayer(data.MainHero, out var player)) return;
         if (!playerManager.TryGetPeer(player.ControllerId, out var peer)) return;
 
-        network.Send(peer, new NetworkShowWreckageInvestigationResults());
+        var lootedTroops = data.LootedTroops == null ? default : troopRosterInterface.PackTroopRosterData(data.LootedTroops);
+        var lootedItems = data.LootedItems?.ToArray();
+
+        network.Send(peer, new NetworkShowWreckageInvestigationResults(
+            lootedTroops,
+            lootedItems,
+            data.ConsequenceExplanations,
+            data.LootedGoldAmount));
     }
 
     private void Handle_NetworkShowWreckageInvestigationResults(MessagePayload<NetworkShowWreckageInvestigationResults> obj)
     {
+        var data = obj.What;
+
         GameThread.RunSafe(() =>
         {
-            battleWreckageCampaignBehaviorInterface.ShowWreckageInvestigationResults();
+            battleWreckageCampaignBehaviorInterface.ShowWreckageInvestigationResults(
+                data.LootedTroops,
+                data.LootedItems ?? Array.Empty<ItemRosterElement>(), // An empty item array arrives as null
+                data.ConsequenceExplanations,
+                data.LootedGoldAmount);
         });
     }
 
