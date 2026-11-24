@@ -22,6 +22,7 @@ public interface IRemoteAgentActionProcessor : IDisposable
     void BindPilotSeats(string battleId, ISiegeMachineStateReplicator machineState);
     AgentPilotSeatData? CapturePilotSeat(CoopAgentInfo info, AgentPilotSeatData? previous);
     int GetOutgoingBattleHostEpoch();
+    void ClearTransferredAgentStates();
     void ApplyRemoteGuardStates();
     void RefreshRemoteGuardStatesAfterMovement();
     void AdvanceRemoteGuardStatesAfterNativeTick();
@@ -45,6 +46,7 @@ public partial class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
     // These indexes keep the per-tick paths scoped to agents that currently need work.
     private readonly HashSet<Guid> _pendingActionAgentIds = new HashSet<Guid>();
     private readonly HashSet<Guid> _retainedGuardAgentIds = new HashSet<Guid>();
+    private readonly Queue<CoopAgentInfo> _localAuthorityChanges = new Queue<CoopAgentInfo>();
     private readonly Dictionary<int, MigrationLineage> _migrationLineages =
         new Dictionary<int, MigrationLineage>();
     private readonly HashSet<string> _knownBattleHostControllers =
@@ -273,9 +275,27 @@ public partial class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
     private void OnAgentBecameLocallyControlled(CoopAgentInfo info) =>
         GameThread.RunSafe(() =>
         {
-            if (!_disposed && info.CurrentAuthority == controllerIdProvider.ControllerId)
-                ClearRemoteAgentState(info);
+            if (_disposed || info.CurrentAuthority != controllerIdProvider.ControllerId
+                || !_agentStates.TryGetValue(info.AgentId, out var state)) return;
+
+            SetPendingPilotSeat(info.AgentId, state, null);
+            ReleasePilotSeat(state, preserveLocalUser: true);
+            _localAuthorityChanges.Enqueue(info);
         });
+
+    public void ClearTransferredAgentStates()
+    {
+        while (_localAuthorityChanges.Count > 0)
+        {
+            CoopAgentInfo info = _localAuthorityChanges.Dequeue();
+            if (info.CurrentAuthority == controllerIdProvider.ControllerId
+                && agentRegistry.TryGetAgentInfo(info.AgentId, out var registered)
+                && ReferenceEquals(info, registered))
+            {
+                ClearRemoteAgentState(info);
+            }
+        }
+    }
 
     private void OnAgentRemoved(CoopAgentInfo info) =>
         GameThread.RunSafe(() =>
@@ -1589,5 +1609,6 @@ public partial class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         _agentStates.Clear();
         _pendingActionAgentIds.Clear();
         _retainedGuardAgentIds.Clear();
+        _localAuthorityChanges.Clear();
     }
 }

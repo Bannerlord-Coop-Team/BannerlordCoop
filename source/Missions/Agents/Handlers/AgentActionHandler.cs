@@ -180,6 +180,9 @@ public class AgentActionHandler : IAgentActionHandler
         Mission mission = Mission.Current;
         if (mission == null) return;
 
+        // Keep inherited guard state through collision and clear it before capturing the new owner's actions.
+        remoteActionProcessor.ClearTransferredAgentStates();
+
         List<Guid> ids = null;
         List<AgentActionData> actions = null;
         List<long> sequences = null;
