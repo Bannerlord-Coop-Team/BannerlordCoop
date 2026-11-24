@@ -1,11 +1,14 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using Common.Util;
+using GameInterface.Services.BattleWreckages.Data;
 using GameInterface.Services.BattleWreckages.Messages;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Players;
 using GameInterface.Services.TroopRosters.Data;
 using GameInterface.Services.TroopRosters.Interfaces;
 using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -15,6 +18,7 @@ using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
@@ -248,22 +252,55 @@ public class BattleWreckageCampaignBehaviorInterface : IBattleWreckageCampaignBe
 
     public void SelectWreckageConsequences(Hero mainHero)
     {
-        // TODO: Roll the player's consequences server side, publishing RecoverTroopsDecisionRequired when recover troops is rolled, otherwise WreckageConsequencesSelected
+        if (!encounterTracker.TryGetEncounter(mainHero, out var encounter))
+        {
+            Logger.Debug("No wreckage encounter for {Hero} to select consequences for", mainHero.StringId);
+            return;
+        }
+
+        if (!TryGetBattleWreckageBehavior(out var behavior)) return;
+
+        var isRecoverTroopsDecision = RollForEncounter(behavior, encounter);
+
+        if (isRecoverTroopsDecision)
+        {
+            var decision = new RecoverTroopsDecisionRequired(mainHero, encounter.RecoverTroopCountsToAdd, encounter.RequiredInvestigationDuration);
+            messageBroker.Publish(this, decision);
+            return;
+        }
+
+        messageBroker.Publish(this, new WreckageConsequencesSelected(mainHero));
     }
 
     public void ShowRecoverTroopsDecision(int recoverTroopCount, CampaignTime requiredInvestigationDuration)
     {
-        // TODO: Client side, set the local troop count and duration and switch to battle_wreckage_recover_troops_decision
+        if (!TryGetBattleWreckageBehavior(out var behavior)) return;
+
+        // Vanilla's wreckage menu reads the override id to resume an interrupted recovery
+        behavior._currentOverriddenConsequenceId = BattleWreckageCampaignBehavior.RecoverTroopsConsequenceId;
+        behavior._recoverTroopCountsToAdd = recoverTroopCount;
+        behavior._requiredInvestigationDuration = requiredInvestigationDuration;
+
+        GameMenu.SwitchToMenu(BattleWreckageCampaignBehavior.MenuIdRecoverTroopsDecision);
     }
 
     public void ShowWreckageResultsConnectionMenu()
     {
-        // TODO: Client side, switch to battle_wreckage_results_connection_menu, whose init steps through the results screens
+        // Its init calls ApplyWreckageInvestigationResults, which asks the server for the results
+        GameMenu.SwitchToMenu(BattleWreckageCampaignBehavior.BattleWreckageResultsConnectionMenuId);
     }
 
     public void AcceptRecoverTroops(Hero mainHero)
     {
-        // TODO: Mark the player's recover troops consequence as accepted and restart their investigation time
+        if (!encounterTracker.TryGetEncounter(mainHero, out var encounter))
+        {
+            Logger.Debug("No wreckage encounter for {Hero} to accept recover troops for", mainHero.StringId);
+            return;
+        }
+
+        // Same as vanilla game_menu_recover_troops_accept_consequence, the next roll then applies the recovered troops
+        encounter.IsOverriddenConsequenceAccepted = true;
+        encounter.InvestigationStartTime = CampaignTime.Now;
     }
 
     public void RemoveDisconnectedPlayers()
@@ -273,6 +310,122 @@ public class BattleWreckageCampaignBehaviorInterface : IBattleWreckageCampaignBe
             if (playerManager.IsOwnerOfHeroDisconnected(encounter.Hero))
                 encounterTracker.RemoveEncounter(encounter.Hero);
         }
+    }
+
+    // Vanilla consequences roll into the behavior's single player fields and read MainParty and MainHero,
+    // so the player's encounter and party stand in for them while they run, then the behavior is put back
+    private static bool RollForEncounter(BattleWreckageCampaignBehavior behavior, BattleWreckageEncounter encounter)
+    {
+        var previousEncounteredBattleWreckage = behavior._encounteredBattleWreckage;
+        var previousOverriddenConsequenceId = behavior._currentOverriddenConsequenceId;
+        var previousIsOverriddenConsequenceAccepted = behavior._isOverriddenConsequenceAccepted;
+        var previousRecoverTroopCountsToAdd = behavior._recoverTroopCountsToAdd;
+        var previousRequiredInvestigationDuration = behavior._requiredInvestigationDuration;
+        var previousLootedItems = behavior._lootedItems;
+        var previousLootedTroops = behavior._lootedTroops;
+        var previousLootedGoldAmount = behavior._lootedGoldAmount;
+        var previousConsequenceExplanations = behavior._consequenceExplanations;
+
+        using (new MainHeroSubstitutionScope(encounter.Hero, encounter.Hero.PartyBelongedTo))
+        {
+            try
+            {
+                behavior._encounteredBattleWreckage = encounter.BattleWreckage;
+                behavior._currentOverriddenConsequenceId = encounter.OverriddenConsequenceId;
+                behavior._isOverriddenConsequenceAccepted = encounter.IsOverriddenConsequenceAccepted;
+                behavior._recoverTroopCountsToAdd = encounter.RecoverTroopCountsToAdd;
+                behavior._requiredInvestigationDuration = encounter.RequiredInvestigationDuration;
+                // Every roll starts with empty results. Plain rosters aren't registered, so the loot stays off the
+                // network until ApplyWreckageInvestigationResults sends it
+                behavior._lootedItems = new ItemRoster();
+                behavior._lootedTroops = new TroopRoster();
+                behavior._lootedGoldAmount = 0;
+                behavior._consequenceExplanations = new List<TextObject>();
+                behavior._selectedConsequences.Clear();
+
+                var isRecoverTroopsDecision = RollWreckageConsequences(behavior);
+
+                // Only what the roll writes goes back to the encounter
+                encounter.OverriddenConsequenceId = behavior._currentOverriddenConsequenceId;
+                encounter.RecoverTroopCountsToAdd = behavior._recoverTroopCountsToAdd;
+                encounter.RequiredInvestigationDuration = behavior._requiredInvestigationDuration;
+                encounter.LootedItems = behavior._lootedItems;
+                encounter.LootedTroops = behavior._lootedTroops;
+                encounter.LootedGoldAmount = behavior._lootedGoldAmount;
+                encounter.ConsequenceExplanations = behavior._consequenceExplanations;
+
+                return isRecoverTroopsDecision;
+            }
+            finally
+            {
+                behavior._encounteredBattleWreckage = previousEncounteredBattleWreckage;
+                behavior._currentOverriddenConsequenceId = previousOverriddenConsequenceId;
+                behavior._isOverriddenConsequenceAccepted = previousIsOverriddenConsequenceAccepted;
+                behavior._recoverTroopCountsToAdd = previousRecoverTroopCountsToAdd;
+                behavior._requiredInvestigationDuration = previousRequiredInvestigationDuration;
+                behavior._lootedItems = previousLootedItems;
+                behavior._lootedTroops = previousLootedTroops;
+                behavior._lootedGoldAmount = previousLootedGoldAmount;
+                behavior._consequenceExplanations = previousConsequenceExplanations;
+                behavior._selectedConsequences.Clear();
+            }
+        }
+    }
+
+    // Vanilla SelectWreckageConsequences without its menu switches, which stop campaign time on the server.
+    // Returns true when recover troops was rolled and the player has to decide on it first
+    private static bool RollWreckageConsequences(BattleWreckageCampaignBehavior behavior)
+    {
+        var isOverridden = !string.IsNullOrEmpty(behavior._currentOverriddenConsequenceId);
+        if (isOverridden && behavior._isOverriddenConsequenceAccepted)
+        {
+            behavior._selectedConsequences.Add(behavior.FindConsequenceWithId(behavior._currentOverriddenConsequenceId));
+        }
+
+        behavior._wreckageConsequences.Shuffle();
+        foreach (var consequence in behavior._wreckageConsequences)
+        {
+            if (consequence.Chance <= 0f) continue;
+            if (consequence.CanOverride && isOverridden) continue;
+            if (consequence.Condition != null && !consequence.Condition(behavior._encounteredBattleWreckage)) continue;
+            if (MBRandom.RandomFloat >= consequence.Chance) continue;
+
+            if (consequence.CanOverride)
+            {
+                // Recover troops is vanilla's only overriding consequence, and its Consequence would switch to the
+                // decision menu, so only the calculation runs here
+                behavior._selectedConsequences.Clear();
+                behavior._currentOverriddenConsequenceId = consequence.StringId;
+                CalculateRecoverTroopsDecision(behavior);
+                return true;
+            }
+
+            behavior._selectedConsequences.Add(consequence);
+        }
+
+        if (behavior._selectedConsequences.Count == 0)
+        {
+            behavior._selectedConsequences.Add(behavior.FindConsequenceWithId(BattleWreckageCampaignBehavior.NothingFoundConsequenceId));
+        }
+
+        behavior.InvokeSelectedConsequences();
+        return false;
+    }
+
+    // Vanilla CalculateAndShowRecoverTroopsDecision without its menu switch
+    private static void CalculateRecoverTroopsDecision(BattleWreckageCampaignBehavior behavior)
+    {
+        var (minTroopCount, maxTroopCount) = behavior.GetEffectiveWreckageTypeForConsequence() switch
+        {
+            BattleWreckage.WreckageType.Epic => (10, 15),
+            BattleWreckage.WreckageType.Normal => (5, 10),
+            _ => (2, 5),
+        };
+
+        var recoverTroopCount = MBRandom.RandomInt(minTroopCount, maxTroopCount);
+        var effectiveTroopCount = behavior.GetEffectiveTroopCountToRecover(recoverTroopCount);
+        behavior._recoverTroopCountsToAdd = recoverTroopCount;
+        behavior._requiredInvestigationDuration = CampaignTime.Hours(Math.Max(2, effectiveTroopCount));
     }
 
     private bool TryGetBattleWreckageBehavior(out BattleWreckageCampaignBehavior battleWreckageBehavior)

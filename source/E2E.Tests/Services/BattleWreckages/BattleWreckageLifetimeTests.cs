@@ -4,6 +4,7 @@ using E2E.Tests.Util;
 using GameInterface.Services.BattleWreckages;
 using GameInterface.Services.BattleWreckages.Data;
 using GameInterface.Services.BattleWreckages.Interfaces;
+using GameInterface.Services.BattleWreckages.Messages;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.BattleWreckages;
@@ -167,6 +168,114 @@ public class BattleWreckageLifetimeTests : IDisposable
                 Assert.True(battleWreckage.IsInvestigated);
             });
         }
+    }
+
+    [Fact]
+    public void ServerSelect_RecoverTroops_DecidesThenRollsTroopsAndRestoresBehavior()
+    {
+        // Arrange
+        var battleWreckageId = CreateServerWreckage();
+
+        Server.Call(() =>
+        {
+            var (hero, encounter, behavior, woundedTroop) = CreateRecoverTroopsEncounter(battleWreckageId);
+            var campaignBehaviorInterface = Server.Resolve<IBattleWreckageCampaignBehaviorInterface>();
+
+            var mainParty = Campaign.Current.MainParty;
+            var behaviorLootedTroops = behavior._lootedTroops;
+            var behaviorLootedItems = behavior._lootedItems;
+            var behaviorConsequenceExplanations = behavior._consequenceExplanations;
+
+            // Act, the first roll asks the player to decide on recovering troops
+            campaignBehaviorInterface.SelectWreckageConsequences(hero);
+
+            // Assert
+            var decision = Assert.Single(Server.InternalMessages.GetMessages<RecoverTroopsDecisionRequired>());
+            // A small wreckage rolls RandomInt(2, 5), whose max is exclusive
+            Assert.InRange(decision.RecoverTroopCount, 2, 4);
+            Assert.True(decision.RequiredInvestigationDuration.ToHours >= 2);
+            Assert.Equal(decision.RequiredInvestigationDuration, encounter.RequiredInvestigationDuration);
+            Assert.Equal(BattleWreckageCampaignBehavior.RecoverTroopsConsequenceId, encounter.OverriddenConsequenceId);
+            Assert.Empty(encounter.ConsequenceExplanations);
+
+            // Act, the accepted recovery rolls the troops
+            campaignBehaviorInterface.AcceptRecoverTroops(hero);
+            campaignBehaviorInterface.SelectWreckageConsequences(hero);
+
+            // Assert
+            Assert.Single(Server.InternalMessages.GetMessages<RecoverTroopsDecisionRequired>());
+            Assert.Single(Server.InternalMessages.GetMessages<WreckageConsequencesSelected>());
+            Assert.True(encounter.LootedTroops.TotalManCount > 0);
+            Assert.All(encounter.LootedTroops.GetTroopRoster(), element => Assert.Same(woundedTroop, element.Character));
+            Assert.Single(encounter.ConsequenceExplanations);
+
+            Assert.Same(mainParty, Campaign.Current.MainParty);
+            Assert.Same(behaviorLootedTroops, behavior._lootedTroops);
+            Assert.Same(behaviorLootedItems, behavior._lootedItems);
+            Assert.Same(behaviorConsequenceExplanations, behavior._consequenceExplanations);
+            Assert.Null(behavior._encounteredBattleWreckage);
+            Assert.True(string.IsNullOrEmpty(behavior._currentOverriddenConsequenceId));
+            Assert.False(behavior._isOverriddenConsequenceAccepted);
+            Assert.Equal(0, behavior._recoverTroopCountsToAdd);
+            Assert.Equal(CampaignTime.Zero, behavior._requiredInvestigationDuration);
+            Assert.Equal(0, behavior._lootedGoldAmount);
+            Assert.Empty(behavior._selectedConsequences);
+        });
+    }
+
+    [Fact]
+    public void ServerSelect_DeclinedRecoverTroops_RollsNothingFoundWithoutAskingAgain()
+    {
+        // Arrange
+        var battleWreckageId = CreateServerWreckage();
+
+        Server.Call(() =>
+        {
+            var (hero, encounter, _, _) = CreateRecoverTroopsEncounter(battleWreckageId);
+            var campaignBehaviorInterface = Server.Resolve<IBattleWreckageCampaignBehaviorInterface>();
+
+            // Act, declining sends another select without accepting first
+            campaignBehaviorInterface.SelectWreckageConsequences(hero);
+            campaignBehaviorInterface.SelectWreckageConsequences(hero);
+
+            // Assert
+            Assert.Single(Server.InternalMessages.GetMessages<RecoverTroopsDecisionRequired>());
+            Assert.Single(Server.InternalMessages.GetMessages<WreckageConsequencesSelected>());
+            Assert.Equal(0, encounter.LootedTroops.TotalManCount);
+            Assert.Single(encounter.ConsequenceExplanations);
+        });
+    }
+
+    // Recover troops is the only consequence that can roll, and it always does, so no roll depends on chance.
+    // Run inside Server.Call
+    private (Hero Hero, BattleWreckageEncounter Encounter, BattleWreckageCampaignBehavior Behavior, CharacterObject WoundedTroop)
+        CreateRecoverTroopsEncounter(string battleWreckageId)
+    {
+        Assert.True(Server.ObjectManager.TryGetObject<BattleWreckage>(battleWreckageId, out var battleWreckage));
+
+        // Wounded low tier troops let vanilla RecoverTroopsCondition pass and are what gets recovered
+        var woundedTroop = GameObjectCreator.CreateInitializedObject<CharacterObject>();
+        battleWreckage.AttackerWoundedInBattle.AddToCounts(woundedTroop, 5, woundedCount: 5);
+
+        var behavior = new BattleWreckageCampaignBehavior();
+        Campaign.Current.AddCampaignBehaviorManager(new CampaignBehaviorManager(new CampaignBehaviorBase[] { behavior }));
+
+        // NothingFound never rolls (chance -1) but stays as the fallback when nothing else is picked
+        var recoverTroops = behavior.FindConsequenceWithId(BattleWreckageCampaignBehavior.RecoverTroopsConsequenceId);
+        behavior._wreckageConsequences.RemoveAll(consequence =>
+            consequence.StringId != BattleWreckageCampaignBehavior.NothingFoundConsequenceId);
+        behavior._wreckageConsequences.Add(new BattleWreckageCampaignBehavior.BattleWreckageConsequence(
+            recoverTroops.StringId, recoverTroops.Condition, recoverTroops.Consequence, chance: 1f, canOverride: true));
+
+        // The host has no party, so the medic and the party size come from the player's party under substitution
+        var hero = GameObjectCreator.CreateInitializedObject<Hero>();
+        var party = GameObjectCreator.CreateInitializedObject<MobileParty>();
+        party.MemberRoster.AddToCounts(hero.CharacterObject, 1);
+
+        var encounter = new BattleWreckageEncounter(hero, battleWreckage);
+        Server.Resolve<IBattleWreckageEncounterTracker>().AddEncounter(encounter);
+
+        return (hero, encounter, behavior, woundedTroop);
     }
 
     private string CreateServerWreckage()
