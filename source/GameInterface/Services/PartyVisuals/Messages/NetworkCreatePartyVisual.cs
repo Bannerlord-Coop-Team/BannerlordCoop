@@ -3,25 +3,16 @@ using ProtoBuf;
 
 namespace GameInterface.Services.PartyVisuals.Messages
 {
+    /// <summary>Creates a map visual for the party identified by its handle.</summary>
     [ProtoContract(SkipConstructor = true)]
     public record NetworkCreatePartyVisual : ICommand
     {
-        [ProtoMember(1)]
-        public string PartyVisualId { get; }
-
-        [ProtoMember(2)]
-        public uint PartyVisualHandle { get; }
-
+        // Tags 1 and 2 belonged to the retired visual id and handle.
         [ProtoMember(3)]
         public uint MobilePartyHandle { get; }
 
-        public NetworkCreatePartyVisual(
-            string partyVisualId,
-            uint partyVisualHandle,
-            uint mobilePartyHandle)
+        public NetworkCreatePartyVisual(uint mobilePartyHandle)
         {
-            PartyVisualId = partyVisualId;
-            PartyVisualHandle = partyVisualHandle;
             MobilePartyHandle = mobilePartyHandle;
         }
     }

@@ -208,12 +208,12 @@ public class ServerJoinAdmissionTests
         race.Register();
         // Refused inside the registration call, before any pump.
         Assert.DoesNotContain("registered", race.ServerEvents);
-        Assert.Empty(race.Connections);
+        Assert.Empty(race.Connections.GetSnapshot());
         race.PumpUntil(() => race.ClientDisconnectReason != null);
 
         Assert.Equal(DisconnectReasons.ServerRestarting, race.ClientDisconnectReason);
         Assert.Equal(new[] { "save queued", "disconnected" }, race.ServerEvents);
-        Assert.Empty(race.Connections);
+        Assert.Empty(race.Connections.GetSnapshot());
         Assert.Equal(ended, race.Coordinator.Phase);
     }
 
@@ -251,7 +251,7 @@ public class ServerJoinAdmissionTests
         }
         await Task.WhenAll(registration, shutdown).WaitAsync(TimeSpan.FromSeconds(5));
 
-        race.PumpUntil(() => race.ClientDisconnectReason != null && !race.Connections.Any());
+        race.PumpUntil(() => race.ClientDisconnectReason != null && race.Connections.GetSnapshot().Count == 0);
         // Starts the save if the server only saw the disconnect during the pump.
         race.Coordinator.Tick();
         race.CompleteSave();

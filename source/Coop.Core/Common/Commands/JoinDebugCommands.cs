@@ -62,7 +62,7 @@ public static class JoinDebugCommands
                     return Failed("Failed to get connection collection");
                 }
 
-                string connectionState = string.Join(" | ", connections.Select(connection =>
+                string connectionState = string.Join(" | ", connections.GetSnapshot().Select(connection =>
                 {
                     string state = connection.State?.GetType().Name ?? "none";
                     string details = connection.State is ServerLoadingState loading
