@@ -51,8 +51,6 @@ public class TransferSaveState : ConnectionStateBase
     private readonly IServerOptionsProvider serverOptionsProvider;
     private readonly ILootShipHold lootShipHold;
 
-    private readonly object snapshotGate = new object();
-    private bool snapshotAbandoned;
     private readonly bool saveSent;
 
     public TransferSaveState(
@@ -78,10 +76,10 @@ public class TransferSaveState : ConnectionStateBase
         this.serverOptionsProvider = serverOptionsProvider;
         this.lootShipHold = lootShipHold;
 
-        saveSent = TrySendSave();
+        saveSent = SendSaveOrDisconnect();
     }
 
-    private bool TrySendSave()
+    private bool SendSaveOrDisconnect()
     {
         var peer = ConnectionLogic.Peer;
         bool sent = false;
@@ -90,7 +88,7 @@ public class TransferSaveState : ConnectionStateBase
             JoinSaveSnapshot? snapshot = null;
             GameThread.RunSafe(() => snapshot = CaptureSnapshot(), blocking: true, context: "Capture join save snapshot");
             if (snapshot == null) return false;
-            if (!IsPeerConnected(peer)) return false;
+            if (peer.ConnectionState != ConnectionState.Connected) return false;
 
             int uncompressedSize = snapshot.SaveData.Length;
             var (chunks, compressedSize) = SaveDataCompression.CompressChunks(
@@ -107,15 +105,12 @@ public class TransferSaveState : ConnectionStateBase
         }
         finally
         {
-            if (!sent) AbortSaveTransfer(peer);
+            if (!sent)
+            {
+                connectionMessageQueue.AbortCatchUp(peer);
+                peer.Disconnect();
+            }
         }
-    }
-
-    private void AbortSaveTransfer(NetPeer peer)
-    {
-        lock (snapshotGate) snapshotAbandoned = true;
-        connectionMessageQueue.AbortCatchUp(peer);
-        peer.Disconnect();
     }
 
     private JoinSaveSnapshot? CaptureSnapshot()
@@ -125,10 +120,7 @@ public class TransferSaveState : ConnectionStateBase
 
         try
         {
-            BeginSnapshot();
-
-            // A held loot ship has no owner, so neither the save nor the id map would carry it to the joining client.
-            heldLootShipIds = lootShipHold.AttachForJoinSnapshot();
+            heldLootShipIds = BeginSnapshot();
 
             var saveResults = saveInterface.SaveCurrentGame();
             if (!saveResults.Success || saveResults.Data == null)
@@ -139,14 +131,10 @@ public class TransferSaveState : ConnectionStateBase
 
             JoinSaveSnapshot snapshot = BuildSnapshot(saveResults, heldLootShipIds);
 
-            // The poller is blocked, so queueing here separates changes in the snapshot from later replay.
-            lock (snapshotGate)
-            {
-                // The poll thread can abort while capture is still running. A late capture must leave replay closed.
-                if (snapshotAbandoned) return null;
-                connectionMessageQueue.BeginQueueing(peer);
-                return snapshot;
-            }
+            // The poller normally waits for this cut. If its wait timed out or was canceled,
+            // BeginQueueing leaves the aborted peer's replay closed.
+            connectionMessageQueue.BeginQueueing(peer);
+            return snapshot;
         }
         finally
         {
@@ -154,7 +142,7 @@ public class TransferSaveState : ConnectionStateBase
         }
     }
 
-    private void BeginSnapshot()
+    private string[] BeginSnapshot()
     {
         // Flush pending deltas while this peer is still Dropping so they only reach it through the snapshot.
         try
@@ -176,6 +164,9 @@ public class TransferSaveState : ConnectionStateBase
         {
             Logger.Error(ex, "Failed to broadcast the join save start");
         }
+
+        // A held loot ship has no owner, so neither the save nor the id map would carry it to the joining client.
+        return lootShipHold.AttachForJoinSnapshot();
     }
 
     private void EndSnapshot(string[] heldLootShipIds)
@@ -245,7 +236,7 @@ public class TransferSaveState : ConnectionStateBase
 
         for (int chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++)
         {
-            if (!IsPeerConnected(peer)) return false;
+            if (peer.ConnectionState != ConnectionState.Connected) return false;
 
             var chunkPacket = new GameSaveDataChunkPacket(
                 transferId,
@@ -276,8 +267,6 @@ public class TransferSaveState : ConnectionStateBase
         }
         return true;
     }
-
-    private static bool IsPeerConnected(NetPeer peer) => peer.ConnectionState == ConnectionState.Connected;
 
     private static T Clone<T>(T value) where T : class =>
         value == null ? null : Serializer.DeepClone(value);

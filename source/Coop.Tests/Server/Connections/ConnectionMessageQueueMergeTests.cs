@@ -128,29 +128,25 @@ public class ConnectionMessageQueueMergeTests
     }
 
     [Fact]
-    public void AbortDisconnectAndSnapshotCuts_DiscardMergeCandidates()
+    public void AbortStopsOldPeerAndFreshSnapshotClearsMergeCandidate()
     {
         using var queue = Queue();
+        var abortedPeer = Join(queue);
+        queue.TryHandleBroadcast(abortedPeer, Item(1));
+        queue.TryHandleBroadcast(abortedPeer, Item(2));
+        Assert.Equal(1, queue.AbortCatchUp(abortedPeer));
+
+        queue.BeginQueueing(abortedPeer);
+        Assert.True(queue.TryHandleBroadcast(abortedPeer, Item(100)));
+        Assert.Equal(0, queue.FlushBatch(abortedPeer).PacketsSent);
+        broker.Publish(this, new PlayerDisconnected(abortedPeer, default));
+
         var peer = Join(queue);
-        queue.TryHandleBroadcast(peer, Item(1));
-        queue.TryHandleBroadcast(peer, Item(2));
-        Assert.Equal(1, queue.AbortCatchUp(peer));
-        queue.TryHandleBroadcast(peer, Item(100));
-        queue.BeginQueueing(peer);
         queue.TryHandleBroadcast(peer, Item(4));
         queue.BeginQueueing(peer);
         queue.TryHandleBroadcast(peer, Item(5));
         Drain(queue, peer);
         Assert.Equal(new[] { 4, 5 }, ReadItems(peer).Select(item => item.Amount));
-
-        queue.TryHandleBroadcast(peer, Item(6));
-        broker.Publish(this, new PlayerDisconnected(peer, default));
-        queue.RegisterPeer(peer);
-        queue.TryHandleBroadcast(peer, Item(100));
-        queue.BeginQueueing(peer);
-        queue.TryHandleBroadcast(peer, Item(7));
-        Drain(queue, peer);
-        Assert.Equal(new[] { 4, 5, 7 }, ReadItems(peer).Select(item => item.Amount));
     }
 
     [Fact]

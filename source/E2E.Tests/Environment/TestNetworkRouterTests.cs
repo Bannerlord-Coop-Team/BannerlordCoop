@@ -661,9 +661,9 @@ public class TestNetworkRouterTests : E2ETestEnvironment
 
             Assert.Equal(2, Router.AdvanceBy(TimeSpan.FromMilliseconds(100)));
             Assert.Equal(1, Assert.Single(client.InternalMessages.GetMessages<QueuedApplyMessage>()).Value);
-            WireProbePacket orderedProbe = Assert.IsType<WireProbePacket>(
-                Assert.Single(packetHandler.Packets.Skip(1)));
-            Assert.Equal(3, orderedProbe.Included);
+            Assert.Collection(packetHandler.Packets,
+                received => Assert.Equal(2, Assert.IsType<WireProbePacket>(received).Included),
+                received => Assert.Equal(3, Assert.IsType<WireProbePacket>(received).Included));
             Assert.Contains(Router.Trace, entry => entry.Channel == "ReliableOrdered:channel-0");
             Assert.Contains(Router.Trace, entry => entry.Channel == "Unreliable:channel-0");
             Assert.Contains(Router.Trace, entry => entry.Channel == "ReliableOrdered:channel-1");

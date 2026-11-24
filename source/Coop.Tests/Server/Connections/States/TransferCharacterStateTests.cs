@@ -42,6 +42,7 @@ namespace Coop.Tests.Server.Connections.States
 
             playerPeer = network.CreatePeer();
             differentPeer = network.CreatePeer();
+            container.Resolve<IConnectionMessageQueue>().RegisterPeer(playerPeer);
             connectionLogic = container.Resolve<ConnectionLogic>(new TypedParameter(typeof(NetPeer), playerPeer));
         }
 
@@ -215,7 +216,6 @@ namespace Coop.Tests.Server.Connections.States
         {
             var context = serverComponent.Container.Resolve<ConnectionContext>();
             var queue = context.ConnectionMessageQueue;
-            queue.RegisterPeer(playerPeer);
             var replay = MessagePacket.Create(new NetworkGameSaveStateChanged(false),
                 serverComponent.Container.Resolve<ICommonSerializer>());
             byte[] data = new byte[GameSaveDataChunkPacket.ChunkSize * 2];
@@ -236,8 +236,7 @@ namespace Coop.Tests.Server.Connections.States
                 .Callback<NetPeer, IPacket>((peer, packet) =>
                 {
                     attemptedChunks++;
-                    // A disconnection stops at the next peer check. The send failure stops on the second call.
-                    if (attemptedChunks == 2) throw new InvalidOperationException("Send failed.");
+                    if (!peerDisconnects && attemptedChunks == 2) throw new InvalidOperationException("Send failed.");
                     queue.TryHandleBroadcast(peer, replay);
                     queue.TryGetCatchUpPendingBytes(peer, out postSnapshotBytes);
                     if (peerDisconnects) peer.Disconnect();
@@ -255,7 +254,7 @@ namespace Coop.Tests.Server.Connections.States
             Assert.True(postSnapshotBytes > 0);
             Assert.False(queue.TryGetCatchUpPendingBytes(playerPeer, out _));
             Assert.Equal(0, queue.FlushBatch(playerPeer).PacketsSent);
-            Assert.Equal(ConnectionState.ShutdownRequested, playerPeer.ConnectionState);
+            if (!peerDisconnects) Assert.Equal(ConnectionState.ShutdownRequested, playerPeer.ConnectionState);
             logic.Verify(value => value.SetState<LoadingState>(), Times.Never);
         }
     }

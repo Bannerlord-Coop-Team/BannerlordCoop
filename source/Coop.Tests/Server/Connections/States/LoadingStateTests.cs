@@ -47,7 +47,9 @@ namespace Coop.Tests.Server.Connections.States
             playerPeer = network.CreatePeer();
             differentPeer = network.CreatePeer();
             connectionLogic = container.Resolve<ConnectionLogic>(new TypedParameter(typeof(NetPeer), playerPeer));
-            container.Resolve<IConnectionMessageQueue>().BeginQueueing(playerPeer);
+            var queue = container.Resolve<IConnectionMessageQueue>();
+            queue.RegisterPeer(playerPeer);
+            queue.BeginQueueing(playerPeer);
             baselineSender = container.Resolve<Mock<IJoinCampaignBaselineSender>>();
             kingdomBaselineSender = container.Resolve<Mock<IJoinCampaignKingdomBaseLineSender>>();
 
