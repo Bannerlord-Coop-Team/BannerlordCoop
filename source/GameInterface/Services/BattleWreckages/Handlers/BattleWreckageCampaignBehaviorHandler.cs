@@ -10,6 +10,7 @@ using GameInterface.Services.TroopRosters.Interfaces;
 using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.BattleWreckages;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.BattleWreckages.Handlers;
@@ -38,6 +39,13 @@ internal class BattleWreckageCampaignBehaviorHandler : IHandler
         this.battleWreckageCampaignBehaviorInterface = battleWreckageCampaignBehaviorInterface;
         this.troopRosterInterface = troopRosterInterface;
 
+        messageBroker.Subscribe<RequestStartWreckageEncounter>(Handle_RequestStartWreckageEncounter);
+        messageBroker.Subscribe<NetworkRequestStartWreckageEncounter>(Handle_NetworkRequestStartWreckageEncounter);
+        messageBroker.Subscribe<WreckageEncounterStarted>(Handle_WreckageEncounterStarted);
+        messageBroker.Subscribe<NetworkOpenWreckageEncounter>(Handle_NetworkOpenWreckageEncounter);
+        messageBroker.Subscribe<WreckageEncounterDenied>(Handle_WreckageEncounterDenied);
+        messageBroker.Subscribe<NetworkDenyWreckageEncounter>(Handle_NetworkDenyWreckageEncounter);
+
         messageBroker.Subscribe<RequestLeaveWreckageEncounter>(Handle_RequestLeaveWreckageEncounter);
         messageBroker.Subscribe<NetworkRequestLeaveWreckageEncounter>(Handle_NetworkRequestLeaveWreckageEncounter);
         messageBroker.Subscribe<WreckageEncounterLeft>(Handle_WreckageEncounterLeft);
@@ -59,6 +67,13 @@ internal class BattleWreckageCampaignBehaviorHandler : IHandler
 
     public void Dispose()
     {
+        messageBroker.Unsubscribe<RequestStartWreckageEncounter>(Handle_RequestStartWreckageEncounter);
+        messageBroker.Unsubscribe<NetworkRequestStartWreckageEncounter>(Handle_NetworkRequestStartWreckageEncounter);
+        messageBroker.Unsubscribe<WreckageEncounterStarted>(Handle_WreckageEncounterStarted);
+        messageBroker.Unsubscribe<NetworkOpenWreckageEncounter>(Handle_NetworkOpenWreckageEncounter);
+        messageBroker.Unsubscribe<WreckageEncounterDenied>(Handle_WreckageEncounterDenied);
+        messageBroker.Unsubscribe<NetworkDenyWreckageEncounter>(Handle_NetworkDenyWreckageEncounter);
+
         messageBroker.Unsubscribe<RequestLeaveWreckageEncounter>(Handle_RequestLeaveWreckageEncounter);
         messageBroker.Unsubscribe<NetworkRequestLeaveWreckageEncounter>(Handle_NetworkRequestLeaveWreckageEncounter);
         messageBroker.Unsubscribe<WreckageEncounterLeft>(Handle_WreckageEncounterLeft);
@@ -76,6 +91,67 @@ internal class BattleWreckageCampaignBehaviorHandler : IHandler
         messageBroker.Unsubscribe<NetworkRequestAcceptRecoverTroops>(Handle_NetworkRequestAcceptRecoverTroops);
 
         messageBroker.Unsubscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
+    }
+
+    private void Handle_RequestStartWreckageEncounter(MessagePayload<RequestStartWreckageEncounter> obj)
+    {
+        var data = obj.What;
+
+        if (!objectManager.TryGetIdWithLogging(data.BattleWreckage, out var battleWreckageId)) return;
+        if (!objectManager.TryGetIdWithLogging(data.MainHero, out var mainHeroId)) return;
+
+        network.SendAll(new NetworkRequestStartWreckageEncounter(battleWreckageId, mainHeroId));
+    }
+
+    private void Handle_NetworkRequestStartWreckageEncounter(MessagePayload<NetworkRequestStartWreckageEncounter> obj)
+    {
+        var data = obj.What;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!playerManager.IsSenderControllingHero(obj.Who, data.MainHeroId)) return;
+            if (!objectManager.TryGetObjectWithLogging<BattleWreckage>(data.BattleWreckageId, out var battleWreckage)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out var mainHero)) return;
+
+            battleWreckageCampaignBehaviorInterface.StartWreckageEncounter(battleWreckage, mainHero);
+        });
+    }
+
+    private void Handle_WreckageEncounterStarted(MessagePayload<WreckageEncounterStarted> obj)
+    {
+        var data = obj.What;
+
+        if (!playerManager.TryGetPeer(data.MainHero, out var peer)) return;
+        if (!objectManager.TryGetIdWithLogging(data.BattleWreckage, out var battleWreckageId)) return;
+
+        network.Send(peer, new NetworkOpenWreckageEncounter(battleWreckageId, data.IsInterrupted, data.RequiredInvestigationDuration));
+    }
+
+    private void Handle_NetworkOpenWreckageEncounter(MessagePayload<NetworkOpenWreckageEncounter> obj)
+    {
+        var data = obj.What;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<BattleWreckage>(data.BattleWreckageId, out var battleWreckage)) return;
+
+            battleWreckageCampaignBehaviorInterface.OpenWreckageEncounter(battleWreckage, data.IsInterrupted, data.RequiredInvestigationDuration);
+        });
+    }
+
+    private void Handle_WreckageEncounterDenied(MessagePayload<WreckageEncounterDenied> obj)
+    {
+        if (!playerManager.TryGetPeer(obj.What.MainHero, out var peer)) return;
+
+        network.Send(peer, new NetworkDenyWreckageEncounter());
+    }
+
+    private void Handle_NetworkDenyWreckageEncounter(MessagePayload<NetworkDenyWreckageEncounter> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            battleWreckageCampaignBehaviorInterface.ShowWreckageEncounterDenied();
+        });
     }
 
     private void Handle_RequestLeaveWreckageEncounter(MessagePayload<RequestLeaveWreckageEncounter> obj)
@@ -105,8 +181,7 @@ internal class BattleWreckageCampaignBehaviorHandler : IHandler
     {
         var data = obj.What;
 
-        if (!playerManager.TryGetPlayer(data.MainHero, out var player)) return;
-        if (!playerManager.TryGetPeer(player.ControllerId, out var peer)) return;
+        if (!playerManager.TryGetPeer(data.MainHero, out var peer)) return;
 
         network.Send(peer, new NetworkCloseWreckageEncounter(data.Reason, data.RequiredInvestigationDuration));
     }
@@ -125,15 +200,11 @@ internal class BattleWreckageCampaignBehaviorHandler : IHandler
     {
         var data = obj.What;
 
-        if (!playerManager.TryGetPlayer(data.MainHero, out var player)) return;
-        if (!playerManager.TryGetPeer(player.ControllerId, out var peer)) return;
-
-        var lootedTroops = data.LootedTroops == null ? default : troopRosterInterface.PackTroopRosterData(data.LootedTroops);
-        var lootedItems = data.LootedItems?.ToArray();
+        if (!playerManager.TryGetPeer(data.MainHero, out var peer)) return;
 
         network.Send(peer, new NetworkShowWreckageInvestigationResults(
-            lootedTroops,
-            lootedItems,
+            troopRosterInterface.PackTroopRosterData(data.LootedTroops),
+            data.LootedItems.ToArray(),
             data.ConsequenceExplanations,
             data.LootedGoldAmount));
     }
@@ -176,8 +247,7 @@ internal class BattleWreckageCampaignBehaviorHandler : IHandler
     {
         var data = obj.What;
 
-        if (!playerManager.TryGetPlayer(data.MainHero, out var player)) return;
-        if (!playerManager.TryGetPeer(player.ControllerId, out var peer)) return;
+        if (!playerManager.TryGetPeer(data.MainHero, out var peer)) return;
 
         network.Send(peer, new NetworkShowRecoverTroopsDecision(data.RecoverTroopCount, data.RequiredInvestigationDuration));
     }

@@ -65,8 +65,7 @@ public sealed partial class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSn
         if (!TryGetInteractableReference(
             party.Ai.AiBehaviorInteractable,
             out string interactablePointId,
-            out bool isInteractableAnchor,
-            out bool isInteractableWreckage))
+            out bool isInteractableAnchor))
         {
             return FailCreation(
                 $"AI interactable '{party.Ai.AiBehaviorInteractable?.GetType().Name}' is not registered",
@@ -116,7 +115,7 @@ public sealed partial class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSn
             PartyMoveMode = partyMoveMode,
             MoveTargetPartyId = moveTargetPartyId,
             IsInteractableAnchor = isInteractableAnchor,
-            IsInteractableWreckage = isInteractableWreckage,
+            IsInteractableWreckage = party.Ai.AiBehaviorInteractable is BattleWreckage,
             IsCurrentlyAtSea = party.IsCurrentlyAtSea,
         };
         return true;
@@ -231,7 +230,7 @@ public sealed partial class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSn
         var invalidReferences = new List<string>();
         IInteractablePoint interactable = party.Ai.AiBehaviorInteractable;
         if (interactable != null &&
-            (!TryGetInteractableReference(interactable, out _, out _, out _) ||
+            (!TryGetInteractableReference(interactable, out _, out _) ||
              !IsLiveInteractable(interactable, liveParties, liveSettlements)))
         {
             invalidReferences.Add(nameof(MobilePartyAi.AiBehaviorInteractable));
@@ -575,11 +574,9 @@ public sealed partial class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSn
     private bool TryGetInteractableReference(
         IInteractablePoint interactable,
         out string id,
-        out bool isAnchor,
-        out bool isWreckage)
+        out bool isAnchor)
     {
         isAnchor = interactable is AnchorPoint;
-        isWreckage = interactable is BattleWreckage;
         if (interactable is PartyBase partyBase)
             return TryGetCompactId(partyBase, out id);
         if (interactable is AnchorPoint anchor && anchor.Owner != null)

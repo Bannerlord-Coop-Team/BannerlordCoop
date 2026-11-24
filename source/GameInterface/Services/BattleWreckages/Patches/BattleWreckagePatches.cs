@@ -61,15 +61,21 @@ internal class BattleWreckagePatches
 
         bool isOnLand = __instance.Position.IsOnLand;
         var navigationType = isOnLand ? MobileParty.NavigationType.Default : MobileParty.NavigationType.Naval;
-        if (Campaign.Current.Models.MapDistanceModel.GetClosestEntranceToFace(__instance.Position.Face, navigationType).Item1 != null) return true;
+        var closestEntrance = Campaign.Current.Models.MapDistanceModel.GetClosestEntranceToFace(__instance.Position.Face, navigationType).Item1;
+        if (closestEntrance != null) return true;
 
         var settlement = Campaign.Current.Settlements
             .Where(x => isOnLand || x.HasPort)
             .MinBy(x => x.Position.Distance(__instance.Position));
 
-        __result = isOnLand
-            ? new TextObject("{=Um9djvw8}Aftermath of the battle of {CLOSEST_SETTLEMENT_NAME}")
-            : new TextObject("{=DStYh5rg}Aftermath of the naval battle of {CLOSEST_SETTLEMENT_NAME}");
+        if (isOnLand)
+        {
+            __result = new TextObject("{=Um9djvw8}Aftermath of the battle of {CLOSEST_SETTLEMENT_NAME}");
+        }
+        else
+        {
+            __result = new TextObject("{=DStYh5rg}Aftermath of the naval battle of {CLOSEST_SETTLEMENT_NAME}");
+        }
         __result.SetTextVariable("CLOSEST_SETTLEMENT_NAME", settlement.Name);
 
         return false;

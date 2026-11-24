@@ -280,8 +280,10 @@ internal class ConversationRequestHandler : IHandler
             return;
         }
 
+        var isApproved = HoldAndApprove(requestingPeer, request, aiPartyId, playerPartyId, serverDetected);
+
         // StartPartyEncounterPrefix skips vanilla StartPartyEncounter for server detected encounters, so fire its OnPartyEncounter here
-        if (HoldAndApprove(requestingPeer, request, aiPartyId, playerPartyId, serverDetected) && serverDetected)
+        if (isApproved && serverDetected)
             CampaignEventDispatcher.Instance.OnPartyEncounter(attacker, defender);
     }
 

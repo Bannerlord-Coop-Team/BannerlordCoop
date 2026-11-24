@@ -19,7 +19,6 @@ public class BattleWreckageEncounter
     public CampaignTime InvestigationStartTime { get; set; }
     public CampaignTime RequiredInvestigationDuration { get; set; }
     public CampaignTime LastInteractionTime { get; set; }
-    public bool IsInterrupted { get; set; }
     // False while interrupted, when the encounter only holds the time left for a resume, and once its results are sent
     public bool IsInvestigating { get; set; }
     public string OverriddenConsequenceId { get; set; }

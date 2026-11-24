@@ -2,11 +2,13 @@
 using Common.Messaging;
 using GameInterface.Services.BattleWreckages.Interfaces;
 using GameInterface.Services.BattleWreckages.Messages;
+using GameInterface.Services.MapEvents;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.BattleWreckages.Patches;
@@ -15,11 +17,12 @@ namespace GameInterface.Services.BattleWreckages.Patches;
 internal class BattleWreckageCampaignBehaviorPatches
 {
     /// <summary>
-    /// IsPlayerMapEvent call covered by IsPlayerMapEventPatch
+    /// Only the server creates and removes wreckages after a battle. Vanilla leaves no wreckage after a player battle,
+    /// which its IsPlayerMapEvent check can't see on the server, so player battles are skipped here
     /// </summary>
     [HarmonyPatch(nameof(BattleWreckageCampaignBehavior.OnMapEventEnded))]
     [HarmonyPrefix]
-    public static bool OnMapEventEndedPrefix() => ModInformation.IsServer;
+    public static bool OnMapEventEndedPrefix(MapEvent mapEvent) => ModInformation.IsServer && !mapEvent.ContainsPlayerParty();
 
     [HarmonyPatch(nameof(BattleWreckageCampaignBehavior.OnSessionLaunched))]
     [HarmonyPrefix]
