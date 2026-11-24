@@ -23,7 +23,7 @@ public class PartyVisualLifetimePatches
         if (partyBase.MobileParty is { } party &&
             ContainerProvider.TryResolve<IPartyVisualInterface>(out var partyVisuals))
         {
-            partyVisuals.SendCreateVisual(party);
+            partyVisuals.OnNativeVisualCreated(party);
         }
     }
 
@@ -41,7 +41,7 @@ public class PartyVisualLifetimePatches
         if (__instance.MapEntity.MobileParty is { } party &&
             ContainerProvider.TryResolve<IPartyVisualInterface>(out var partyVisuals))
         {
-            partyVisuals.SendDestroyVisual(party);
+            partyVisuals.OnNativeVisualRemoved(party);
         }
     }
 }

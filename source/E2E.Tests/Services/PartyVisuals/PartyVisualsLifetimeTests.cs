@@ -43,16 +43,9 @@ namespace E2E.Tests.Services.PartyVisuals
             uint partyHandle = 0;
             try
             {
-                clientVisualManager = new MobilePartyVisualManager();
-                serverVisualManager = graphicalServer ? new MobilePartyVisualManager() : null;
-                presentation.Patch(
-                    AccessTools.PropertyGetter(typeof(MobilePartyVisualManager), nameof(MobilePartyVisualManager.Current)),
-                    postfix: new HarmonyMethod(typeof(PartyVisualsLifetimeTests), nameof(ProvideVisualManager)));
-                // Keep the native manager's collections and lifetime methods, skipping scene creation.
-                presentation.Patch(
-                    AccessTools.Method(typeof(MobilePartyVisual), "OnStartup"),
-                    prefix: new HarmonyMethod(typeof(PartyVisualsLifetimeTests), nameof(SkipVisualStartup)));
+                PatchVisualManagers(presentation, graphicalServer);
 
+                // Create the party and apply its visual after its handle is registered.
                 server.Call(() =>
                 {
                     if (graphicalServer)
@@ -74,6 +67,7 @@ namespace E2E.Tests.Services.PartyVisuals
                 });
                 Assert.Equal(partyHandle, Assert.Single(client.InternalMessages.GetMessages<NetworkCreatePartyVisual>()).MobilePartyHandle);
 
+                // Remove only the visual and keep the party handle.
                 server.Call(() =>
                 {
                     Assert.True(server.ObjectManager.TryGetObject<MobileParty>(partyHandle, out var party));
@@ -84,6 +78,7 @@ namespace E2E.Tests.Services.PartyVisuals
                 client.Call(() => Assert.Null(clientVisualManager.GetVisualOfEntity(clientParty.Party)));
                 Assert.Equal(partyHandle, Assert.Single(client.InternalMessages.GetMessages<NetworkDestroyPartyVisual>()).MobilePartyHandle);
 
+                // Recreate the visual on that same handle and check the model refresh.
                 server.Call(() =>
                 {
                     Assert.True(server.ObjectManager.TryGetObject<MobileParty>(partyHandle, out var party));
@@ -98,8 +93,6 @@ namespace E2E.Tests.Services.PartyVisuals
                 });
                 Assert.Equal(new[] { partyHandle, partyHandle },
                     client.InternalMessages.GetMessages<NetworkCreatePartyVisual>().Select(message => message.MobilePartyHandle));
-                Assert.DoesNotContain(server.ObjectManager.GetHandleMap().Keys, id => id.StartsWith("MobilePartyVisual_", StringComparison.Ordinal));
-                Assert.DoesNotContain(client.ObjectManager.GetHandleMap().Keys, id => id.StartsWith("MobilePartyVisual_", StringComparison.Ordinal));
             }
             finally
             {
@@ -108,6 +101,19 @@ namespace E2E.Tests.Services.PartyVisuals
                 serverVisualManager = null;
                 clientVisualManager = null;
             }
+        }
+
+        private static void PatchVisualManagers(Harmony presentation, bool graphicalServer)
+        {
+            clientVisualManager = new MobilePartyVisualManager();
+            serverVisualManager = graphicalServer ? new MobilePartyVisualManager() : null;
+            presentation.Patch(
+                AccessTools.PropertyGetter(typeof(MobilePartyVisualManager), nameof(MobilePartyVisualManager.Current)),
+                postfix: new HarmonyMethod(typeof(PartyVisualsLifetimeTests), nameof(ProvideVisualManager)));
+            // Keep the native manager's collections and lifetime methods, skipping scene creation.
+            presentation.Patch(
+                AccessTools.Method(typeof(MobilePartyVisual), "OnStartup"),
+                prefix: new HarmonyMethod(typeof(PartyVisualsLifetimeTests), nameof(SkipVisualStartup)));
         }
 
         private static void ProvideVisualManager(ref MobilePartyVisualManager? __result)

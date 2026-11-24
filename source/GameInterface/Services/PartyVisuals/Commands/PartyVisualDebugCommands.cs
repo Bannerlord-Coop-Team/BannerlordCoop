@@ -4,7 +4,6 @@ using GameInterface.Services.PartyVisuals.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
-using SandBox.View.Map.Visuals;
 using GameInterface.Utils.Commands;
 using SandBox.View.Map.Managers;
 using System;
@@ -84,7 +83,7 @@ internal class PartyVisualDebugCommands
     }
 
 #if DEBUG
-    /// <summary>Reports per-player visual lifetime and headless registry state without changing them.</summary>
+    /// <summary>Reports each player's party visuals without changing them.</summary>
     public sealed class PlayerStateCoopCommand : ICoopCommand
     {
         private readonly IObjectManager objectManager;
@@ -98,21 +97,18 @@ internal class PartyVisualDebugCommands
 
         public string Prefix => "coop.debug.party_visuals";
         public string Name => "player_state";
-        public string Description => "Reports player party visuals and registered visual objects without changing them.";
+        public string Description => "Reports player party visuals without changing them.";
         public CoopCommandSide Side => CoopCommandSide.Both;
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             var manager = MobilePartyVisualManager.Current;
-            int registeredVisualCount = objectManager.GetHandleMap().Values.Count(handle =>
-                objectManager.TryGetObject<object>(handle, out var value) && value is MobilePartyVisual);
             var players = playerManager.Players.Select(player => DescribePlayer(player, manager)).ToArray();
             return Succeeded("LIVE_TEST_JSON=" + JsonSerializer.Serialize(new
             {
                 isServer = ModInformation.IsServer,
                 managerPresent = manager != null,
-                registeredVisualCount,
                 players,
             }));
         }
