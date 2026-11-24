@@ -18,23 +18,37 @@ namespace Missions.Agents.Packets
         internal const Agent.MovementControlFlag DefendMovementFlagsMask =
             Agent.MovementControlFlag.DefendMask | Agent.MovementControlFlag.DefendBlock;
 
+        /// <summary>The action index and type captured for one channel.</summary>
+        internal readonly struct ActionChannel
+        {
+            public readonly int Index;
+            public readonly Agent.ActionCodeType Type;
+
+            public ActionChannel(int index, Agent.ActionCodeType type)
+            {
+                Index = index;
+                Type = type;
+            }
+        }
+
         /// <summary>The action index and type for each channel in one agent observation.</summary>
         internal readonly struct ActionChannels
         {
-            public readonly (int Index, Agent.ActionCodeType Type) Channel0;
-            public readonly (int Index, Agent.ActionCodeType Type) Channel1;
+            public readonly ActionChannel Channel0;
+            public readonly ActionChannel Channel1;
 
             public ActionChannels(Agent agent)
             {
-                Channel0 = (agent.GetCurrentAction(0).Index, agent.GetCurrentActionType(0));
-                Channel1 = (agent.GetCurrentAction(1).Index, agent.GetCurrentActionType(1));
+                Channel0 = new ActionChannel(agent.GetCurrentAction(0).Index, agent.GetCurrentActionType(0));
+                Channel1 = new ActionChannel(agent.GetCurrentAction(1).Index, agent.GetCurrentActionType(1));
             }
 
-            public (int Index, Agent.ActionCodeType Type) ForChannel(int channel) => channel switch
+            public ActionChannel ForChannel(int channel) => channel switch
             {
                 0 => Channel0,
                 1 => Channel1,
-                _ => (ActionIndexCache.act_none.Index, Agent.ActionCodeType.Other)
+                // The missing channel (-1) uses Other so both guard flags stay false.
+                _ => new ActionChannel(ActionIndexCache.act_none.Index, Agent.ActionCodeType.Other)
             };
         }
 
@@ -339,31 +353,25 @@ namespace Missions.Agents.Packets
 
         internal static Agent.GuardMode GetGuardModeFromDefendingAction(
             Agent agent) =>
-            GetGuardModeFromDefendingActions(agent, agent.GetCurrentActionType(0), agent.GetCurrentActionType(1));
+            GetGuardModeFromDefendingAction(agent, new ActionChannels(agent));
 
         internal static Agent.GuardMode GetGuardModeFromDefendingAction(
             Agent agent,
-            ActionChannels actionChannels) =>
-            GetGuardModeFromDefendingActions(agent, actionChannels.Channel0.Type, actionChannels.Channel1.Type);
-
-        private static Agent.GuardMode GetGuardModeFromDefendingActions(
-            Agent agent,
-            Agent.ActionCodeType channel0Type,
-            Agent.ActionCodeType channel1Type)
+            ActionChannels actionChannels)
         {
             Agent.GuardMode guardMode =
-                GetGuardModeFromDefendingAction(agent, 1, channel1Type);
+                GetGuardModeForDefendingChannel(agent, 1, actionChannels.Channel1.Type);
             return IsGuardMode(guardMode)
                 ? guardMode
-                : GetGuardModeFromDefendingAction(agent, 0, channel0Type);
+                : GetGuardModeForDefendingChannel(agent, 0, actionChannels.Channel0.Type);
         }
 
         internal static Agent.GuardMode GetGuardModeFromDefendingAction(
             Agent agent,
             int channel) =>
-            GetGuardModeFromDefendingAction(agent, channel, agent.GetCurrentActionType(channel));
+            GetGuardModeForDefendingChannel(agent, channel, agent.GetCurrentActionType(channel));
 
-        private static Agent.GuardMode GetGuardModeFromDefendingAction(
+        private static Agent.GuardMode GetGuardModeForDefendingChannel(
             Agent agent,
             int channel,
             Agent.ActionCodeType actionType)

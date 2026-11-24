@@ -900,7 +900,7 @@ public class AgentActionHandler : IAgentActionHandler
     }
 
     // Ranged siege use is also Other; recognize its actions without publishing ordinary locomotion.
-    private static bool IsDiscreteAction((int Index, Agent.ActionCodeType Type) action) =>
+    private static bool IsDiscreteAction(AgentActionData.ActionChannel action) =>
         IsDiscreteActionType(action.Type) || AgentActionData.IsRangedSiegeUsageAction(action.Index);
 
     private static bool IsDiscreteActionType(Agent.ActionCodeType type) =>
@@ -1093,7 +1093,7 @@ public class AgentActionHandler : IAgentActionHandler
     }
 
     private static void UpdateDefendingAction(
-        (int Index, Agent.ActionCodeType Type) action,
+        AgentActionData.ActionChannel action,
         ref bool hasDefendingAction,
         ref int defendingAction)
     {
