@@ -8,16 +8,20 @@ using GameInterface.Services.Issues.Framework.Gating;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Framework.Registries;
 using GameInterface.Services.Issues.Framework.Resolvers;
+using GameInterface.Services.Issues.Quests.CaravanAmbush;
 using GameInterface.Services.Issues.Quests.ArtisanProducts;
 using GameInterface.Services.Issues.Quests.LadysKnightOut;
 using GameInterface.Services.Issues.Quests.HeadmanNeedsToDeliverAHerd;
 using GameInterface.Services.Issues.Quests.MerchantNeedsHelpWithOutlaws;
+using GameInterface.Services.Issues.Quests.RaidAnEnemyTerritory;
 using GameInterface.Services.Issues.Quests.LesserNobleRevolt;
 using GameInterface.Services.Issues.Quests.TheConquestOfSettlement;
 using GameInterface.Services.Issues.Quests.VillageNeedsTools;
 using System;
 using GameInterface.Services.Issues.Quests.RevenueFarming;
 using GameInterface.Services.Issues.Quests.EscortMerchantCaravan;
+using GameInterface.Services.Issues.Quests.ExtortionByDeserters;
+using GameInterface.Services.Issues.Framework.Visibility;
 
 namespace GameInterface.Services.Issues;
 
@@ -41,14 +45,26 @@ internal class IssuesModule : Module
         builder.RegisterType<IssueAcceptPreconditions>().As<IIssueAcceptPreconditions>().InstancePerDependency();
         builder.RegisterType<ArtisanProductsProgress>().As<IArtisanProductsProgress>().InstancePerDependency();
         builder.RegisterType<OutcomeDispatcher>().As<IOutcomeDispatcher>().SingleInstance();
+        builder.RegisterType<IssueMissionVisibility>().As<IIssueMissionVisibility>().InstancePerDependency();
+        builder.RegisterType<ClientIssueDailyTickService>()
+            .As<IClientIssueDailyTickService>()
+            .InstancePerDependency();
+        builder.Register(context => context.Resolve<CaravanAmbushRewardConversation>()).As<ICaravanAmbushRewardConversation>();
+        builder.RegisterType<CaravanAmbushMapConversation>().As<ICaravanAmbushMapConversation>().InstancePerDependency();
+        builder.RegisterType<CaravanAmbushProgress>().As<ICaravanAmbushProgress>().InstancePerLifetimeScope();
+        builder.RegisterType<CaravanAmbushWorldEventService>().As<ICaravanAmbushWorldEventService>().InstancePerLifetimeScope();
         builder.RegisterType<HeadmanHerdCleanup>().As<IHeadmanHerdCleanup>().SingleInstance();
         builder.RegisterType<IssueCancellationCoordinator>().As<IIssueCancellationCoordinator>().InstancePerLifetimeScope();
         builder.Register(context => context.Resolve<ActiveIssueDismisser>()).As<IActiveIssueDismisser>();
         builder.RegisterType<IssueConversationTracker>().As<IIssueConversationTracker>().SingleInstance();
         builder.RegisterType<IssueConversationGuard>().As<IIssueConversationGuard>().SingleInstance();
         builder.RegisterType<MerchantOutlawsProgress>().As<IMerchantOutlawsProgress>().InstancePerLifetimeScope();
+        builder.RegisterType<RaidAnEnemyTerritoryProgress>().As<IRaidAnEnemyTerritoryProgress>().InstancePerDependency();
+        builder.RegisterType<ExtortionByDesertersProgress>().As<IExtortionByDesertersProgress>().InstancePerLifetimeScope();
+        builder.RegisterType<ExtortionByDesertersWorldEventService>().As<IExtortionByDesertersWorldEventService>().InstancePerLifetimeScope();
         builder.RegisterType<MerchantOutlawsHourlyTick>().As<IMerchantOutlawsHourlyTick>().InstancePerDependency();
         builder.Register(context => context.Resolve<LordSolutionCoordinator>()).As<ILordSolutionCoordinator>();
+        builder.Register(context => context.Resolve<FinalizationCoordinator>()).As<IIssueFinalizationReplay>();
         builder.Register(context => context.Resolve<QuestSolutionAcceptCoordinator>()).As<IQuestSolutionAcceptCoordinator>();
         builder.RegisterType<TheConquestOfSettlementService>()
             .As<ITheConquestOfSettlementService>()
@@ -57,7 +73,6 @@ internal class IssuesModule : Module
             .As<ILesserNobleRevoltWorldEventService>()
             .SingleInstance();
         builder.RegisterType<EscortProgress>().As<IEscortProgress>().InstancePerDependency();
-        builder.RegisterType<EscortOwnerParty>().As<IEscortOwnerParty>().InstancePerDependency();
         builder.RegisterType<QuestEventRelay>().As<IQuestEventRelay>().InstancePerDependency();
         builder.RegisterType<VillageNeedsToolsService>().As<IVillageNeedsToolsService>().InstancePerDependency();
         builder.RegisterType<LadysKnightOutTournamentProgress>().As<ILadysKnightOutTournamentProgress>().InstancePerLifetimeScope();

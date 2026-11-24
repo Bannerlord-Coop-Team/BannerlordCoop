@@ -273,7 +273,7 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
         if (data.CultureId != null && !objectManager.TryGetObjectWithLogging(data.CultureId, out culture)) return false;
 
         CraftingOrder craftingOrder = null;
-        if (!data.IsFreeMode && (!objectManager.TryGetObjectWithLogging(data.CraftingOrderId, out craftingOrder) || !craftingOrder.IsReady)) return false;
+        if (!data.IsFreeMode && !objectManager.TryGetObjectWithLogging(data.CraftingOrderId, out craftingOrder)) return false;
 
         // Replace original TaleWorlds implementation
         string nextCraftedItemId = craftingCampaignBehavior.GetNextCraftedItemId();

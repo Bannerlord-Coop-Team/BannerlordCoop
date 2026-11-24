@@ -43,7 +43,8 @@ public class ServerMainHeroCaptivityTests : IDisposable
             AccessTools.Method(typeof(CampaignPeriodicEventManager), nameof(CampaignPeriodicEventManager.TickPartialHourlyAi)),
             AccessTools.Method(typeof(CampaignTickCacheDataStore), nameof(CampaignTickCacheDataStore.Tick)),
             AccessTools.Method(typeof(MapEventManager), nameof(MapEventManager.Tick)),
-            AccessTools.Method(typeof(EncounterManager), nameof(EncounterManager.Tick)),
+            // The wrapper can inline into Campaign.Tick. Skip the actual encounter work.
+            AccessTools.Method(typeof(EncounterManager), nameof(EncounterManager.HandleEncounterForMobileParty)),
         };
 
         server.Call(() =>

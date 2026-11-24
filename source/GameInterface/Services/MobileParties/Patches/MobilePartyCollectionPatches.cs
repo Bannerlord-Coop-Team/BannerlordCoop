@@ -2,6 +2,7 @@
 using GameInterface.Utils;
 using HarmonyLib;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.Party;
 
@@ -12,7 +13,9 @@ internal class MobilePartyCollectionPatches : GenericPatches<MobilePartyCollecti
 {
     static IEnumerable<MethodBase> TargetMethods()
     {
-        return AccessTools.GetDeclaredMethods(typeof(MobileParty));
+        // MobilePartyMapUpdatePatch owns CheckAiForMapChangeAndUpdateIfNeeded.
+        return AccessTools.GetDeclaredMethods(typeof(MobileParty))
+            .Where(method => method.Name != nameof(MobileParty.CheckAiForMapChangeAndUpdateIfNeeded));
     }
 
     [HarmonyTranspiler]

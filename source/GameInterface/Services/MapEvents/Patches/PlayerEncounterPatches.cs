@@ -247,12 +247,7 @@ internal class PlayerEncounterPatches
             return false;
         }
 
-        var encounteredParty = encounter._encounteredParty;
-        var encounteredBattle = encounteredParty?.MapEvent;
-        if (encounteredBattle == null && encounteredParty?.IsSettlement == true)
-            encounteredBattle = encounteredParty.SiegeEvent?.BesiegerCamp?.LeaderParty?.MapEvent;
-
-        if (encounter._mapEvent != null || encounteredBattle != null)
+        if (encounter._mapEvent != null || encounter.GetEncounteredBattleOrNull() != null)
             return true;
 
         var mainParty = MobileParty.MainParty;
@@ -517,20 +512,7 @@ internal class PlayerEncounterPatches
 
     private static MapEvent GetCurrentMapEventForTrace()
     {
-        var encounter = PlayerEncounter.Current;
-        return encounter?._mapEvent ?? GetPlayerEncounterBattleForTrace() ?? MobileParty.MainParty?.MapEvent;
-    }
-
-    private static MapEvent GetPlayerEncounterBattleForTrace()
-    {
-        try
-        {
-            return PlayerEncounter.Battle;
-        }
-        catch (NullReferenceException)
-        {
-            return null;
-        }
+        return PlayerEncounter.Current?._mapEvent ?? MobileParty.MainParty?.MapEvent;
     }
 
     private static string DescribePartyForTrace(PartyBase party)

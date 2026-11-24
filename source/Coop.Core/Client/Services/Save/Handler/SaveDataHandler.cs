@@ -73,6 +73,7 @@ internal class SaveDataHandler : IHandler
         messageBroker.Publish(this, new InitializeClientAgingData(saveDataMessage.AgingPlayerData));
         messageBroker.Publish(this, new InitializeClientClanFinance(saveDataMessage.ClanFinance));
         messageBroker.Publish(this, new InitializeClientNavalData(saveDataMessage.NavalPlayerData));
+        messageBroker.Publish(this, new InitializeClientMooredShips(saveDataMessage.NavalPlayerData));
         messageBroker.Publish(this, new InitializeClientOrderOfBattleData(saveDataMessage.OrderOfBattlePlayerData));
         messageBroker.Publish(this, new InitializeClientViewData(saveDataMessage.ViewDataPlayerData));
         messageBroker.Publish(this, new InitializeClientAttachmentIdMap(saveDataMessage.AttachmentIdMap));

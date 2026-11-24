@@ -13,6 +13,7 @@ using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using LiteNetLib;
 using Serilog;
 using System;
@@ -56,6 +57,7 @@ internal class BattleSimulationRunHandler : IHandler
     private readonly IMapEventLogger mapEventLogger;
     private readonly IPlayerManager playerManager;
     private readonly IRetreatedMapEventPartyTracker retreatedPartyTracker;
+    private readonly IOrderAttackRule orderAttackRule;
 
     private sealed class ActiveSimulation
     {
@@ -74,7 +76,8 @@ internal class BattleSimulationRunHandler : IHandler
         IObjectManager objectManager,
         IMapEventLogger mapEventLogger,
         IPlayerManager playerManager,
-        IRetreatedMapEventPartyTracker retreatedPartyTracker)
+        IRetreatedMapEventPartyTracker retreatedPartyTracker,
+        IOrderAttackRule orderAttackRule)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -82,6 +85,7 @@ internal class BattleSimulationRunHandler : IHandler
         this.mapEventLogger = mapEventLogger;
         this.playerManager = playerManager;
         this.retreatedPartyTracker = retreatedPartyTracker;
+        this.orderAttackRule = orderAttackRule;
 
         messageBroker.Subscribe<RequestAdvanceBattleSimulation>(Handle_RequestAdvanceBattleSimulation);
         messageBroker.Subscribe<RequestCancelBattleSimulation>(Handle_RequestCancelBattleSimulation);
@@ -186,13 +190,21 @@ internal class BattleSimulationRunHandler : IHandler
                 }
             }
 
-            if (!TryGetRequestingParticipant(requestingPeer, payload.What, mapEvent, out var attackerParty))
+            if (!TryGetRequestingParticipant(requestingPeer, payload.What, mapEvent, out var attackerParty, out var player))
             {
                 Logger.Warning("Rejecting battle simulation start for map event {MapEventId}: requester is not an authoritative participant", mapEventId);
                 return;
             }
 
+            if (!objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out var requesterHero))
+                return;
+
+            var requesterCharacter = requesterHero.CharacterObject;
             MapEventHostileActionConsequences.Apply(mapEvent, attackerParty.Party, "battle simulation attack");
+
+            // Match vanilla MenuHelper.EncounterOrderAttackCondition: only a valid player attack clears protection.
+            if (orderAttackRule.CanOrderAttack(mapEvent, attackerParty, requesterCharacter))
+                mapEvent.IsInvulnerable = false;
 
             // v1: simulate the full participating troop count (null), not the player's selected subset.
             var previousObserver = mapEvent.BattleObserver;
@@ -284,11 +296,13 @@ internal class BattleSimulationRunHandler : IHandler
         NetPeer requester,
         NetworkBattleStartRequest request,
         MapEvent mapEvent,
-        out MobileParty party)
+        out MobileParty party,
+        out Player player)
     {
         party = null;
+        player = null;
         if (requester == null ||
-            !playerManager.TryGetPlayer(requester, out var player) ||
+            !playerManager.TryGetPlayer(requester, out player) ||
             !string.Equals(player.MobilePartyId, request.AttackerPartyId, StringComparison.Ordinal) ||
             !objectManager.TryGetObject(player.MobilePartyId, out party))
         {

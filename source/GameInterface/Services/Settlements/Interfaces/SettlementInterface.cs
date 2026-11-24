@@ -47,6 +47,11 @@ public interface ISettlementInterface : IGameAbstraction
     void PartySetSail(MobileParty party, Settlement settlement);
 
     /// <summary>
+    /// Server-only: leaves the port settlement the party is in and sets sail in front of it, the way vanilla's Set sail option does.
+    /// </summary>
+    void PartyLeaveAndSetSail(MobileParty party);
+
+    /// <summary>
     /// Server-only: puts a party ashore at a settlement's gate, anchors its fleet in the port and replicates the position.
     /// </summary>
     void PartyDisembark(MobileParty party, Settlement settlement);
@@ -133,6 +138,15 @@ internal class SettlementInterface : ISettlementInterface
         messageBroker.Publish(this, new PartyBehaviorChangeAttempted(party, forcePosition: true, isCurrentlyAtSea: true));
     }
 
+    public void PartyLeaveAndSetSail(MobileParty party)
+    {
+        var port = party.CurrentSettlement;
+        if (port == null) return;
+
+        PartyLeaveSettlement(party);
+        PartySetSail(party, port);
+    }
+
     public void PartyDisembark(MobileParty party, Settlement settlement)
     {
         // Same as PlayerTownVisitCampaignBehavior.game_menu_disembark_on_consequence
@@ -169,6 +183,12 @@ internal class SettlementInterface : ISettlementInterface
             // Setting sail mirrors NavalTransitionCampaignBehavior.SetSail, which leaves from the port instead
             if (leaveType == SettlementLeaveType.SetSail)
                 mainParty.SetSailAtPosition(leftSettlement.PortPosition);
+            // The ferry leaves from the port at sea, which the server also moves the party to
+            else if (leaveType == SettlementLeaveType.Ferry)
+            {
+                mainParty.Position = leftSettlement.PortPosition;
+                mainParty.IsCurrentlyAtSea = true;
+            }
             else if (leaveType == SettlementLeaveType.Disembark)
                 mainParty.DisembarkToPosition(leftSettlement.GatePosition);
             else

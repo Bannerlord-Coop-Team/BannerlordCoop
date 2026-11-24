@@ -856,8 +856,6 @@ public class NavalShipEngine : INavalShipEngine
 
     public string CampaignShipIdOf(MissionObject hull) => snapshots.CampaignShipIdOf(((MissionShip)hull).ShipOrigin as Ship);
 
-    public float ReadMitigatedDamage(MissionObject hull) => snapshots.MitigatedDamageOf(((MissionShip)hull).ShipOrigin as Ship);
-
     // NavalTeamAgents.OnShipRemoved fades a removed hull's crew this way.
     public void WithdrawAgent(Agent agent)
     {

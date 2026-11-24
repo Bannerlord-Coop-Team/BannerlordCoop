@@ -144,6 +144,40 @@ public class MerchantOutlawsTests : IDisposable
     public void Dispose() => environment.Dispose();
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void OwnerDailyTickClearsTroopEffectsAndKeepsTheServerJournal(bool returnDatePassed)
+    {
+        ClientA.Call(() =>
+        {
+            Campaign.Current.MapTimeTracker._numTicks = 0;
+            var issue = Get<Hero>(ClientA, scenario.NotableId).Issue;
+            Assert.True(ClientA.Resolve<IIssueOwnershipRegistry>()
+                .TrySetOwner(scenario.NotableId, issue.StringId, QuestScenario.ControllerA));
+            using (new AllowedThread())
+            {
+                issue._issueState = IssueBase.IssueState.SolvingWithAlternativeSolution;
+                issue.AlternativeSolutionReturnTimeForTroops = CampaignTime.Days(returnDatePassed ? -1 : 5);
+                issue.AlternativeSolutionIssueEffectClearTime = CampaignTime.Now;
+                issue._areIssueEffectsResolved = false;
+                issue._journalEntries.Add(new JournalLog(CampaignTime.Now, new TaleWorlds.Localization.TextObject("Troops sent"),
+                    currentProgress: 2, range: 10));
+            }
+
+            Assert.False(ClientA.Resolve<IIssueMissionVisibility>().IsAnotherPlayersTroopsMission(issue));
+            Assert.Equal(returnDatePassed, issue.AlternativeSolutionReturnTimeForTroops.IsPast);
+            var journal = Assert.Single(issue.JournalEntries);
+
+            Campaign.Current.IssueManager.DailyTick();
+
+            Assert.True(issue.IsSolvingWithAlternative);
+            Assert.True(issue._areIssueEffectsResolved);
+            Assert.Same(journal, Assert.Single(issue.JournalEntries));
+            Assert.Equal(2, journal.CurrentProgress);
+        }, TextHelpers);
+    }
+
+    [Theory]
     [InlineData(true)]
     [InlineData(false)]
     public void CompanionReturnProgressIsAuthoritativeInEitherSnapshotAndDailyTickOrder(bool snapshotFirst)

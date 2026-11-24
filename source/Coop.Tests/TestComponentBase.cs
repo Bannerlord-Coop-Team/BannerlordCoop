@@ -38,6 +38,7 @@ using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.PartyVisuals.Interfaces;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Players.Interfaces;
@@ -143,6 +144,7 @@ internal abstract class TestComponentBase
         RegisterMock<IGameStateInterface>(builder);
         RegisterMock<ISettlementInterface>(builder);
         RegisterMock<ISiegeEventInterface>(builder);
+        RegisterMock<IPartyVisualInterface>(builder);
         RegisterMock<ISiegeBreakOut>(builder);
         RegisterMock<IAttachmentIdMapper>(builder);
         RegisterMock<ILootShipHold>(builder);
@@ -176,7 +178,7 @@ internal abstract class TestComponentBase
         RegisterMock<IRaidAiInterventionConfigInterface>(builder);
         RegisterMock<ITacticalUnitSymbolsConfigInterface>(builder);
         RegisterMock<IVillageHostileActionInterface>(builder);
-        RegisterMock<IHostileActionRequestTracker>(builder);
+        RegisterMock<IClientVillageHostileActionTracker>(builder);
         RegisterMock<IIssueOwnershipRegistry>(builder);
         RegisterMock<IQuestFeatureFlag>(builder);
         RegisterMock<IEducationCampaignBehaviorInterface>(builder);

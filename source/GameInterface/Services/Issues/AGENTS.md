@@ -111,8 +111,9 @@ Keep patches thin. Owner lookups, issue scans and main hero swaps belong in a DI
 `IssueCancellationCoordinator` handles registered giver deaths and issue cancellation as the owner. When the
 owner has no party or the sent troops cannot return, it retains the issue and retries hourly. Its pending set
 belongs to the session's DI scope and is never saved. A missing owner uses `ActiveIssueDismisser` to release
-the issue and any disabled companion. Clients only cancel when replaying `NetworkIssueFinalized`, and do not
-run the alternative troop return again. An ongoing quest announces its own cancellation, so the enclosing
+the issue and any disabled companion. Clients cancel through `NetworkIssueFinalized` or when an ownership join
+snapshot drops a remembered issue; the snapshot path captures local ownership before replacing the mirror and
+queues the same replay. Clients do not run the alternative troop return again. An ongoing quest announces its own cancellation, so the enclosing
 issue cancellation does not announce it a second time.
 
 ## Verification

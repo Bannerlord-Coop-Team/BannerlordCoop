@@ -4,12 +4,9 @@ using Common.Util;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Services.MapEvents;
 using GameInterface.Services.Players;
-using HarmonyLib;
-using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
 using Xunit;
 using Xunit.Abstractions;
@@ -22,13 +19,6 @@ namespace E2E.Tests.Services.SiegeEvents;
 /// </summary>
 public abstract class SiegeTestBase : MapEventTestBase
 {
-    protected static IReadOnlyList<MethodBase> SiegeCreationDisabledMethods => new[]
-    {
-        AccessTools.Method(typeof(MobileParty), nameof(MobileParty.OnPartyJoinedSiegeInternal)),
-        AccessTools.Method(typeof(BesiegerCamp), nameof(BesiegerCamp.InitializeSiegeEventSide)),
-        AccessTools.Method(typeof(Settlement), nameof(Settlement.InitializeSiegeEventSide)),
-    };
-
     protected SiegeTestBase(ITestOutputHelper output) : base(output)
     {
     }

@@ -6,6 +6,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
 using HarmonyLib;
@@ -135,6 +136,30 @@ public class ShipSyncTests : SyncTestBase
             Assert.True(instance.ObjectManager.TryGetObject(shipId, out Ship ship));
             Assert.Null(ship._unlockedUpgradePieces);
         }
+    }
+
+    // The coop trade prefix replaces vanilla ApplyInternal, so a ship bought at a shipyard needs its own unlocked pieces rule
+    [Fact]
+    public void Server_ShipBoughtFromSettlement_SyncsUnlockedPieces()
+    {
+        SetShipHullLimits();
+        var playerPartyId = CreateServerPlayerParty();
+        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject(shipId, out Ship ship));
+            Assert.True(Server.ObjectManager.TryGetObject(upgradePieceId, out ShipUpgradePiece piece));
+            Assert.True(Server.ObjectManager.TryGetObject(playerPartyId, out MobileParty playerParty));
+            Assert.True(Server.ObjectManager.TryGetObject(settlementId, out Settlement shipyard));
+            ship.SetPieceAtSlot("slot1", piece);
+            ChangeShipOwnerAction.ApplyByProduction(shipyard.Party, ship);
+            Assert.False(ship.CanHaveUnlockedPieces);
+
+            ChangeShipOwnerAction.ApplyByTrade(playerParty.Party, ship);
+        });
+
+        AssertUnlockedPieces(upgradePieceId);
     }
 
     [Fact]

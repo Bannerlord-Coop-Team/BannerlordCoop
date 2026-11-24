@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Commands;
+using GameInterface.Services.AnchorPoints.Interfaces;
 using GameInterface.Services.Party.Commands;
 using System.Collections;
 using System.Collections.Generic;
@@ -15,7 +16,7 @@ public class PartyShipCommandsTests
     [InlineData(true, false, "NavalDLC is not active on the server.")]
     public void AddShip_RejectsInvalidRequestsBeforeTouchingTheCampaign(bool isServer, bool navalEnabled, string expectedOutput)
     {
-        var result = RunWithRole(isServer, navalEnabled, new PartyShipCommands.AddShipCoopCommand(), "PlayerOne");
+        var result = RunWithRole(isServer, navalEnabled, new PartyShipCommands.AddShipCoopCommand(new AnchorPointInterface()), "PlayerOne");
 
         Assert.False(result.Succeeded);
         Assert.Equal(expectedOutput, result.Output);

@@ -31,6 +31,8 @@ using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
@@ -171,6 +173,29 @@ public abstract class MapEventTestBase : IDisposable
     /// </summary>
     protected static GauntletMapEventVisual MockMapEventVisual()
         => ObjectHelper.SkipConstructor<GauntletMapEventVisual>();
+
+    // Stub camp joins and side initialization so fixtures can create sieges without town positions or a siege model.
+    protected static IReadOnlyList<MethodBase> SiegeCreationDisabledMethods => new[]
+    {
+        AccessTools.Method(typeof(MobileParty), nameof(MobileParty.OnPartyJoinedSiegeInternal)),
+        AccessTools.Method(typeof(BesiegerCamp), nameof(BesiegerCamp.InitializeSiegeEventSide)),
+        AccessTools.Method(typeof(Settlement), nameof(Settlement.InitializeSiegeEventSide)),
+    };
+
+    /// <summary>
+    /// Creates a registered siege graph. Callers must disable <see cref="SiegeCreationDisabledMethods"/>.
+    /// </summary>
+    protected static void CreateReplicableSiegeEvent(Settlement settlement, MobileParty besieger)
+    {
+        var siegeEvent = new SiegeEvent(settlement, besieger);
+        siegeEvent.BesiegerCamp.SiegeEngines = new SiegeEvent.SiegeEnginesContainer(
+            BattleSideEnum.Attacker, null);
+        settlement.SiegeEngines = new SiegeEvent.SiegeEnginesContainer(
+            BattleSideEnum.Defender, null);
+        siegeEvent.BesiegerCamp._besiegerParties.Add(besieger);
+        siegeEvent.BesiegerCamp._leaderParty = besieger;
+        siegeEvent.BesiegerCamp._faction = besieger.MapFaction;
+    }
 
     // The harness campaign has no encounter model, which distance checks and party searches read.
     protected static void EnsureEncounterModel()
