@@ -124,6 +124,29 @@ public class BattleWreckageLifetimeTests : BattleWreckageTestBase
         }
     }
 
+    // Co-op blocks the StringId vanilla's constructor gives a wreckage, and saves holding id-less wreckages
+    // crashed every later load, so the registry's id is the one that has to be saved and found again
+    [Fact]
+    public void ServerCreate_BattleWreckage_RegistersUnderTheSameIdWhenItsSaveLoads()
+    {
+        // Arrange
+        var battleWreckageId = CreateServerWreckage();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<BattleWreckage>(battleWreckageId, out var battleWreckage));
+            Assert.False(string.IsNullOrEmpty(battleWreckage.StringId));
+
+            // Act, loading a save registers the wreckages in CampaignObjectManager by their saved StringId
+            Assert.True(Server.ObjectManager.Remove(battleWreckage));
+            Server.Resolve<BattleWreckageRegistry>().RegisterAllObjects();
+
+            // Assert
+            Assert.True(Server.ObjectManager.TryGetId(battleWreckage, out var loadedId));
+            Assert.Equal(battleWreckageId, loadedId);
+        });
+    }
+
     [Fact]
     public void ServerDestroy_BattleWreckage_SyncAllClients()
     {
