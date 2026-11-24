@@ -6,7 +6,6 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
-using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.Equipments.Handlers;
 
@@ -74,7 +73,7 @@ internal class MainHeroMountHandler : IHandler
                     }
                     break;
                 case MountLoss.Lamed:
-                    ItemModifier lameModifier = MBObjectManager.Instance.GetObject<ItemModifier>(MainHeroMountKilled.LameHorseModifierId);
+                    if (!objectManager.TryGetObjectWithLogging<ItemModifier>(MainHeroMountKilled.LameHorseModifierId, out var lameModifier)) return;
                     equipment[EquipmentIndex.Horse] = new EquipmentElement(equipment[EquipmentIndex.Horse].Item, lameModifier);
                     break;
             }

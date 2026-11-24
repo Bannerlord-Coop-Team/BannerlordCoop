@@ -41,25 +41,22 @@ public class MainHeroMountHandlerTests : IDisposable
         var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         var horseId = TestEnvironment.CreateRegisteredObject<ItemObject>();
         var harnessId = TestEnvironment.CreateRegisteredObject<ItemObject>();
-        var lameId = TestEnvironment.CreateRegisteredObject<ItemModifier>();
 
-        // Roster packets resolve items through the native catalog, as a loaded campaign does
         foreach (var instance in TestEnvironment.Clients.Prepend(Server))
         {
-            instance.Call(() => MBObjectManager.Instance.RegisterObject(instance.GetRegisteredObject<ItemObject>(harnessId)));
+            instance.Call(() =>
+            {
+                // Roster packets resolve items through the native catalog, as a loaded campaign does
+                MBObjectManager.Instance.RegisterObject(instance.GetRegisteredObject<ItemObject>(harnessId));
+
+                // A loaded campaign registers every modifier under its vanilla id
+                Assert.True(instance.ObjectManager.AddExisting(MainHeroMountKilled.LameHorseModifierId, ObjectHelper.SkipConstructor<ItemModifier>()));
+            });
         }
 
         string? heroId = null;
         Server.Call(() =>
         {
-            // The server's lame write looks the modifier up by its vanilla id
-            var lame = Server.GetRegisteredObject<ItemModifier>(lameId);
-            using (new AllowedThread())
-            {
-                lame.StringId = MainHeroMountKilled.LameHorseModifierId;
-            }
-            MBObjectManager.Instance.RegisterObject(lame);
-
             var party = Server.GetRegisteredObject<MobileParty>(partyId);
             var hero = party.LeaderHero;
             Assert.Same(party, hero.PartyBelongedTo);
@@ -92,7 +89,7 @@ public class MainHeroMountHandlerTests : IDisposable
                 else
                 {
                     Assert.Same(instance.GetRegisteredObject<ItemObject>(horseId), equipment[EquipmentIndex.Horse].Item);
-                    Assert.Same(instance.GetRegisteredObject<ItemModifier>(lameId), equipment[EquipmentIndex.Horse].ItemModifier);
+                    Assert.Same(instance.GetRegisteredObject<ItemModifier>(MainHeroMountKilled.LameHorseModifierId), equipment[EquipmentIndex.Horse].ItemModifier);
                     Assert.Same(harness, equipment[EquipmentIndex.HorseHarness].Item);
                     Assert.Equal(0, party.ItemRoster.GetItemNumber(harness));
                 }

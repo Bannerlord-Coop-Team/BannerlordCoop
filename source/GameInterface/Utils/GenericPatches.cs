@@ -982,6 +982,14 @@ namespace GameInterface.Utils
 
         }
 
+        // Reference elements are stored with stelem.ref, struct elements with a stelem typed to the element
+        private static bool StoresArrayElement(CodeInstruction instruction, Type elementType)
+        {
+            if (instruction.opcode == OpCodes.Stelem_Ref) return true;
+
+            return instruction.opcode == OpCodes.Stelem && instruction.operand as Type == elementType;
+        }
+
         /// <summary>
         /// Used to transpile arrays
         /// </summary>
@@ -1086,13 +1094,6 @@ namespace GameInterface.Utils
             items[index] = item;
         }
 
-        // Reference elements are stored with stelem.ref, struct elements with a stelem typed to the element
-        private static bool StoresArrayElement(CodeInstruction instruction, Type elementType)
-        {
-            if (instruction.opcode == OpCodes.Stelem_Ref) return true;
-
-            return instruction.opcode == OpCodes.Stelem && instruction.operand as Type == elementType;
-        }
         /// <summary>
         /// Used to transpile <see cref="PropertyOwner{T}"/> typed fields. Intercepts both mutation
         /// methods on the owner: <c>SetPropertyValue(attribute, value)</c> (value 0 removes the key)

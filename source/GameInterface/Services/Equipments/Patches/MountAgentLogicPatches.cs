@@ -28,21 +28,13 @@ internal class MountAgentLogicPatches
         bool usesCivilianEquipment = Mission.Current.DoesMissionRequireCivilianEquipment;
         Equipment equipment = usesCivilianEquipment ? Hero.MainHero.CivilianEquipment : Hero.MainHero.BattleEquipment;
 
-        float roll = MBRandom.RandomFloat;
-        float lossChance = 0.05f;
-        float lameChance = 0.2f;
-        if (Hero.MainHero.GetPerkValue(DefaultPerks.Riding.WellStraped) &&
-            PerkHelper.TryGetPerkEffectBonus(DefaultPerks.Riding.WellStraped, isPrimary: true, out var bonus, affectedAgent.CurrentBattleEnvironment))
-        {
-            lossChance += lossChance * bonus;
-            lameChance += lameChance * bonus;
-        }
+        float bonus = Hero.MainHero.GetPerkValue(DefaultPerks.Riding.WellStraped) &&
+            PerkHelper.TryGetPerkEffectBonus(DefaultPerks.Riding.WellStraped, isPrimary: true, out var perkBonus, affectedAgent.CurrentBattleEnvironment)
+            ? perkBonus
+            : 0f;
 
         EquipmentElement horse = equipment[EquipmentIndex.Horse];
-        MountLoss loss;
-        if (roll < lossChance || horse.ItemModifier?.StringId == MainHeroMountKilled.LameHorseModifierId) loss = MountLoss.Lost;
-        else if (roll < lameChance) loss = MountLoss.Lamed;
-        else return false;
+        if (RollMountLoss(MBRandom.RandomFloat, bonus, horse) is not MountLoss loss) return false;
 
         MessageBroker.Instance.Publish(__instance, new MainHeroMountKilled(Hero.MainHero, usesCivilianEquipment, loss));
 
@@ -59,5 +51,16 @@ internal class MountAgentLogicPatches
         }
 
         return false;
+    }
+
+    // Vanilla's odds, raised by the WellStraped bonus, and vanilla always loses a horse that is already lame
+    private static MountLoss? RollMountLoss(float roll, float bonus, EquipmentElement horse)
+    {
+        float lossChance = 0.05f + (0.05f * bonus);
+        float lameChance = 0.2f + (0.2f * bonus);
+
+        if (roll < lossChance || horse.ItemModifier?.StringId == MainHeroMountKilled.LameHorseModifierId) return MountLoss.Lost;
+        if (roll < lameChance) return MountLoss.Lamed;
+        return null;
     }
 }
