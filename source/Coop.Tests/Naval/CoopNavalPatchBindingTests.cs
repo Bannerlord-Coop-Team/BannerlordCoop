@@ -23,6 +23,9 @@ public class CoopNavalPatchBindingTests
         AccessTools.Method(typeof(ClanFleetManagementCampaignBehaviorPatches), nameof(ClanFleetManagementCampaignBehaviorPatches.HourlyTickPrefix)),
         AccessTools.Method(typeof(NavalTransitionCampaignBehaviorPatches), nameof(NavalTransitionCampaignBehaviorPatches.SetSailConsequencePrefix)),
         AccessTools.Method(typeof(RaftStateCampaignBehaviorPatches), nameof(RaftStateCampaignBehaviorPatches.PlayerRaftStateContinueOnConsequencePrefix)),
+        AccessTools.Method(typeof(FerryCampaignBehaviorPatches), nameof(FerryCampaignBehaviorPatches.GameMenuFerryTargetOnConsequencePrefix)),
+        AccessTools.Method(typeof(FerryCampaignBehaviorPatches), nameof(FerryCampaignBehaviorPatches.PlayerFerryStateMenuOnTickPrefix)),
+        AccessTools.Method(typeof(FerryCampaignBehaviorPatches), nameof(FerryCampaignBehaviorPatches.PlayerFerryStateEndContinueOnConsequencePrefix)),
         AccessTools.Method(typeof(NavalDLCFigureheadCampaignBehaviorPatches), "OnFigureheadUnlockedPrefix"),
         // The vanilla naval roller stays off on both sides because IncidentsCampaignBehaviourInterface rolls those triggers per player on the server
         AccessTools.Method(typeof(NavalIncidentsCampaignBehaviourPatches), nameof(NavalIncidentsCampaignBehaviourPatches.TryInvokeIncidentPrefix)),

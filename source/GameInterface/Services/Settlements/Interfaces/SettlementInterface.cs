@@ -183,6 +183,12 @@ internal class SettlementInterface : ISettlementInterface
             // Setting sail mirrors NavalTransitionCampaignBehavior.SetSail, which leaves from the port instead
             if (leaveType == SettlementLeaveType.SetSail)
                 mainParty.SetSailAtPosition(leftSettlement.PortPosition);
+            // The ferry leaves from the port at sea, which the server also moves the party to
+            else if (leaveType == SettlementLeaveType.Ferry)
+            {
+                mainParty.Position = leftSettlement.PortPosition;
+                mainParty.IsCurrentlyAtSea = true;
+            }
             else if (leaveType == SettlementLeaveType.Disembark)
                 mainParty.DisembarkToPosition(leftSettlement.GatePosition);
             else

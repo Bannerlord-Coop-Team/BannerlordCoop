@@ -15,4 +15,7 @@ public interface IIssueOwnerResolver
 
     // The controller id of the player that owns the issue, fails when nobody is known to own it
     bool TryGetOwnerControllerId(IssueBase issue, out string controllerId);
+
+    // True when this machine's player owns the issue, false when nobody is known to own it
+    bool IsLocalOwner(IssueBase issue);
 }

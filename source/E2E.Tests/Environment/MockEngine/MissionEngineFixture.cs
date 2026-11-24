@@ -1286,10 +1286,12 @@ public sealed class MissionEngineFixture : IDisposable
         if (!AgentMirror.TryGet(__instance, out var m)) return true;
         if (channelNo == 0)
         {
+            m.Action0TypeReads++;
             __result = m.Action0CodeType;
         }
         else
         {
+            m.Action1TypeReads++;
             __result = m.Action1CodeType;
         }
         return false;
