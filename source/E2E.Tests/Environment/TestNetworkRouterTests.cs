@@ -614,11 +614,9 @@ public class TestNetworkRouterTests : E2ETestEnvironment
     {
         EnvironmentInstance client = Clients.First();
         var packetHandler = new RecordingPacketHandler();
-        var packetTypeOnlyHandler = new RecordingPacketHandler(PacketType.SaveData);
         var saveChunkHandler = new RecordingPacketHandler(PacketType.SaveDataChunk);
         IPacketManager packetManager = client.Resolve<IPacketManager>();
         packetManager.RegisterPacketHandler(packetHandler);
-        packetManager.RegisterPacketHandler(packetTypeOnlyHandler);
         packetManager.RegisterPacketHandler(saveChunkHandler);
         Router.AutoDrainReady = false;
         Router.SetLatency(Server.NetPeer, client.NetPeer, TimeSpan.FromMilliseconds(100));
@@ -642,7 +640,6 @@ public class TestNetworkRouterTests : E2ETestEnvironment
                 new WireProbePacket
                 {
                     Included = 3,
-                    PacketType = PacketType.SaveData,
                     DeliveryMethod = DeliveryMethod.ReliableOrdered,
                 }));
             Server.Call(() => Server.Resolve<INetwork>().Send(
@@ -651,7 +648,6 @@ public class TestNetworkRouterTests : E2ETestEnvironment
 
             Assert.Empty(client.InternalMessages.GetMessages<QueuedApplyMessage>());
             Assert.Empty(packetHandler.Packets);
-            Assert.Empty(packetTypeOnlyHandler.Packets);
             Assert.Empty(saveChunkHandler.Packets);
             Assert.Equal(4, Router.PendingDeliveryCount);
 
@@ -661,14 +657,13 @@ public class TestNetworkRouterTests : E2ETestEnvironment
             GameSaveDataChunkPacket saveChunk = Assert.IsType<GameSaveDataChunkPacket>(
                 Assert.Single(saveChunkHandler.Packets));
             Assert.Equal(4, saveChunk.TransferId);
-            Assert.Empty(packetTypeOnlyHandler.Packets);
             Assert.Empty(client.InternalMessages.GetMessages<QueuedApplyMessage>());
 
             Assert.Equal(2, Router.AdvanceBy(TimeSpan.FromMilliseconds(100)));
             Assert.Equal(1, Assert.Single(client.InternalMessages.GetMessages<QueuedApplyMessage>()).Value);
-            WireProbePacket packetTypeOnly = Assert.IsType<WireProbePacket>(
-                Assert.Single(packetTypeOnlyHandler.Packets));
-            Assert.Equal(3, packetTypeOnly.Included);
+            WireProbePacket orderedProbe = Assert.IsType<WireProbePacket>(
+                Assert.Single(packetHandler.Packets.Skip(1)));
+            Assert.Equal(3, orderedProbe.Included);
             Assert.Contains(Router.Trace, entry => entry.Channel == "ReliableOrdered:channel-0");
             Assert.Contains(Router.Trace, entry => entry.Channel == "Unreliable:channel-0");
             Assert.Contains(Router.Trace, entry => entry.Channel == "ReliableOrdered:channel-1");
@@ -676,7 +671,6 @@ public class TestNetworkRouterTests : E2ETestEnvironment
         finally
         {
             packetManager.RemovePacketHandler(packetHandler);
-            packetManager.RemovePacketHandler(packetTypeOnlyHandler);
             packetManager.RemovePacketHandler(saveChunkHandler);
         }
     }

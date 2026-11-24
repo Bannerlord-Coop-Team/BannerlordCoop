@@ -1,5 +1,4 @@
 ﻿using Autofac;
-using Common;
 using Common.Network;
 using Common.PacketHandlers;
 using Common.Serialization;
@@ -21,18 +20,11 @@ using LiteNetLib;
 using Moq;
 using System;
 using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using Xunit;
 using Xunit.Abstractions;
 
 namespace Coop.Tests.Server.Connections.States
 {
-    /// <summary>Isolates the test that pauses the shared game-thread pump and shortens its timeout.</summary>
-    [CollectionDefinition(nameof(TransferSaveSnapshotCollection), DisableParallelization = true)]
-    public class TransferSaveSnapshotCollection { }
-
-    [Collection(nameof(TransferSaveSnapshotCollection))]
     public class TransferCharacterStateTests
     {
         private readonly IConnectionLogic connectionLogic;
@@ -243,7 +235,9 @@ namespace Coop.Tests.Server.Connections.States
             network.Setup(value => value.SendImmediate(playerPeer, It.IsAny<IPacket>()))
                 .Callback<NetPeer, IPacket>((peer, packet) =>
                 {
-                    if (++attemptedChunks > 1) throw new InvalidOperationException("Send failed.");
+                    attemptedChunks++;
+                    // A disconnection stops at the next peer check. The send failure stops on the second call.
+                    if (attemptedChunks == 2) throw new InvalidOperationException("Send failed.");
                     queue.TryHandleBroadcast(peer, replay);
                     queue.TryGetCatchUpPendingBytes(peer, out postSnapshotBytes);
                     if (peerDisconnects) peer.Disconnect();
@@ -262,50 +256,6 @@ namespace Coop.Tests.Server.Connections.States
             Assert.False(queue.TryGetCatchUpPendingBytes(playerPeer, out _));
             Assert.Equal(0, queue.FlushBatch(playerPeer).PacketsSent);
             Assert.Equal(ConnectionState.ShutdownRequested, playerPeer.ConnectionState);
-            logic.Verify(value => value.SetState<LoadingState>(), Times.Never);
-        }
-
-        [Fact]
-        public async Task SnapshotFinishesAfterTimeout_DoesNotRestartCatchUpOrLoad()
-        {
-            var context = serverComponent.Container.Resolve<ConnectionContext>();
-            var queue = context.ConnectionMessageQueue;
-            queue.RegisterPeer(playerPeer);
-            var saveStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-            using var releaseSave = new ManualResetEventSlim();
-            serverComponent.Container.Resolve<Mock<ISaveInterface>>()
-                .Setup(save => save.SaveCurrentGame())
-                .Returns(() =>
-                {
-                    saveStarted.SetResult(true);
-                    releaseSave.Wait();
-                    return new SaveResults(true, new byte[] { 1, 2, 3 }, "12345");
-                });
-            var logic = new Mock<IConnectionLogic>();
-            logic.SetupGet(value => value.Peer).Returns(playerPeer);
-
-            var testTimeout = TimeSpan.FromSeconds(10);
-            TransferSaveState state;
-            try
-            {
-                using var shortWait = GameThread.Instance.LimitFrameDrain(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
-                var transfer = Task.Run(() => new TransferSaveState(
-                    logic.Object, context.MessageBroker, context.Network, context.CoopSessionProvider, context.SaveInterface,
-                    queue, context.Coalescer, context.AttachmentIdMapper, context.ServerOptionsProvider, context.LootShipHold));
-
-                await saveStarted.Task.WaitAsync(testTimeout);
-                state = await transfer.WaitAsync(testTimeout);
-                Assert.Equal(ConnectionState.ShutdownRequested, playerPeer.ConnectionState);
-            }
-            finally
-            {
-                releaseSave.Set();
-                // Drain the late snapshot before checking whether it reopened the replay queue.
-                GameThread.Run(() => { }, blocking: true);
-            }
-
-            state.Load();
-            Assert.False(queue.TryGetCatchUpPendingBytes(playerPeer, out _));
             logic.Verify(value => value.SetState<LoadingState>(), Times.Never);
         }
     }

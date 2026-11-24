@@ -53,7 +53,7 @@ public class TransferSaveState : ConnectionStateBase
 
     private readonly object snapshotGate = new object();
     private bool snapshotAbandoned;
-    private readonly bool transferComplete;
+    private readonly bool saveSent;
 
     public TransferSaveState(
         IConnectionLogic connectionLogic,
@@ -78,7 +78,7 @@ public class TransferSaveState : ConnectionStateBase
         this.serverOptionsProvider = serverOptionsProvider;
         this.lootShipHold = lootShipHold;
 
-        transferComplete = TrySendSave();
+        saveSent = TrySendSave();
     }
 
     private bool TrySendSave()
@@ -95,6 +95,7 @@ public class TransferSaveState : ConnectionStateBase
             int uncompressedSize = snapshot.SaveData.Length;
             var (chunks, compressedSize) = SaveDataCompression.CompressChunks(
                 snapshot.SaveData, GameSaveDataChunkPacket.ChunkSize);
+            // Drop the raw save so the GC can reclaim it while the chunks are sent.
             snapshot.SaveData = null;
             sent = SendSaveChunks(snapshot, chunks, compressedSize, uncompressedSize);
             return sent;
@@ -227,6 +228,9 @@ public class TransferSaveState : ConnectionStateBase
 
     private bool SendSaveChunks(JoinSaveSnapshot snapshot, Queue<byte[]> chunks, int compressedSize, int uncompressedSize)
     {
+        // The client needs chunk zero for the session data even if compression produced no bytes.
+        if (chunks.Count == 0) chunks.Enqueue(Array.Empty<byte>());
+
         var peer = ConnectionLogic.Peer;
         int transferId = Interlocked.Increment(ref nextSaveTransferId);
         int chunkCount = chunks.Count;
@@ -298,7 +302,7 @@ public class TransferSaveState : ConnectionStateBase
 
     public override void Load()
     {
-        if (transferComplete) ConnectionLogic.SetState<LoadingState>();
+        if (saveSent) ConnectionLogic.SetState<LoadingState>();
     }
 
     public override void TransferSave()

@@ -19,8 +19,6 @@ public static class SaveDataCompression
 {
     internal static (Queue<byte[]> Chunks, int CompressedSize) CompressChunks(byte[] data, int chunkSize)
     {
-        if (chunkSize <= 0) throw new ArgumentOutOfRangeException(nameof(chunkSize));
-
         using var output = new ChunkWriteStream(chunkSize);
         using (var deflate = new DeflateStream(output, CompressionLevel.Fastest, leaveOpen: true))
         {
@@ -91,7 +89,6 @@ public static class SaveDataCompression
                 chunks.Enqueue(chunk);
                 chunk = null;
             }
-            if (chunks.Count == 0) chunks.Enqueue(Array.Empty<byte>());
             return chunks;
         }
 
