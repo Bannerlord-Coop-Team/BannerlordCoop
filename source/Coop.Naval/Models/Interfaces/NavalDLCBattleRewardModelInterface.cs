@@ -16,14 +16,20 @@ using TaleWorlds.Library;
 
 namespace Coop.Naval.Models.Interfaces;
 
+/// <summary>[Server] Vanilla's naval battle rewards for the main party, given to every winning player instead.</summary>
 public interface INavalDLCBattleRewardModelInterface : IGameAbstraction
 {
-    MBReadOnlyList<KeyValuePair<Ship, MapEventParty>> DistributeDefeatedPartyShipsAmongWinners(NavalDLCBattleRewardModel model, MapEventParty mainParty, MBReadOnlyList<Ship> shipsToLoot, MBReadOnlyList<MapEventParty> winnerParties);
+    /// <summary>Vanilla's ship distribution, with the main party's share of the leftover ships split among <paramref name="playerParties"/>.</summary>
+    MBReadOnlyList<KeyValuePair<Ship, MapEventParty>> DistributeDefeatedPartyShipsAmongWinners(NavalDLCBattleRewardModel model, List<MapEventParty> playerParties, MBReadOnlyList<Ship> shipsToLoot, MBReadOnlyList<MapEventParty> winnerParties);
     void CalculatePlayerFigureheadShare(MapEvent mapEvent, MBReadOnlyList<MapEventParty> defeatedParties, PartyBase defeatedLeaderParty);
 }
 
+/// <inheritdoc cref="INavalDLCBattleRewardModelInterface"/>
 public class NavalDLCBattleRewardModelInterface : INavalDLCBattleRewardModelInterface
 {
+    // Vanilla's cap on the ships the main party's loot screen offers.
+    private const int MaxLootShips = 25;
+
     private readonly ICoopSessionProvider coopSessionProvider;
     private readonly IObjectManager objectManager;
     private readonly IPlayerManager playerManager;
@@ -41,7 +47,7 @@ public class NavalDLCBattleRewardModelInterface : INavalDLCBattleRewardModelInte
         this.sessionNavalPlayerDataInterface = sessionNavalPlayerDataInterface;
     }
 
-    public MBReadOnlyList<KeyValuePair<Ship, MapEventParty>> DistributeDefeatedPartyShipsAmongWinners(NavalDLCBattleRewardModel model, MapEventParty mainParty, MBReadOnlyList<Ship> shipsToLoot, MBReadOnlyList<MapEventParty> winnerParties)
+    public MBReadOnlyList<KeyValuePair<Ship, MapEventParty>> DistributeDefeatedPartyShipsAmongWinners(NavalDLCBattleRewardModel model, List<MapEventParty> playerParties, MBReadOnlyList<Ship> shipsToLoot, MBReadOnlyList<MapEventParty> winnerParties)
     {
         Dictionary<Ship, MapEventParty> distributedShips = new();
         MBList<Ship> lootableShips = new();
@@ -96,25 +102,36 @@ public class NavalDLCBattleRewardModelInterface : INavalDLCBattleRewardModelInte
             }
         }
 
-        // Replace PartyBase.MainParty usage with the winning player's party
+        // Vanilla gives PartyBase.MainParty each leftover ship while the contribution roll lands on its share; a roll on any
+        // winning player's share gives it that player, so players winning together keep what one player would alone
         if (lootableShips.Count > 0)
         {
             lootableShips.Shuffle();
-            int mainPartyShipCount = distributedShips.Count(x => x.Value == mainParty);
-            if (lootableShips.Count + mainPartyShipCount > 25)
-            {
-                lootableShips = lootableShips.Take(25 - mainPartyShipCount).ToMBList();
-            }
             int totalContribution = winnerParties.Sum(x => x.ContributionToBattle);
             foreach (Ship ship in lootableShips)
             {
-                if (MBRandom.RandomInt(totalContribution) >= mainParty.ContributionToBattle) break;
+                MapEventParty looter = PlayerAtContributionRoll(playerParties, MBRandom.RandomInt(totalContribution));
+                if (looter == null) break;
+                if (distributedShips.Count(x => x.Value == looter) >= MaxLootShips) continue;
 
-                distributedShips[ship] = mainParty;
+                distributedShips[ship] = looter;
             }
         }
 
         return distributedShips.ToMBList();
+    }
+
+    // The winning player whose part of the winners' total contribution the roll falls in, or null for an AI winner's part.
+    private static MapEventParty PlayerAtContributionRoll(List<MapEventParty> playerParties, int roll)
+    {
+        foreach (MapEventParty playerParty in playerParties)
+        {
+            if (roll < playerParty.ContributionToBattle) return playerParty;
+
+            roll -= playerParty.ContributionToBattle;
+        }
+
+        return null;
     }
 
     public void CalculatePlayerFigureheadShare(MapEvent mapEvent, MBReadOnlyList<MapEventParty> defeatedParties, PartyBase defeatedLeaderParty)
