@@ -14,6 +14,7 @@ using TaleWorlds.CampaignSystem.BattleWreckages;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using Xunit.Abstractions;
 
@@ -205,6 +206,68 @@ public class BattleWreckageEncounterTests : BattleWreckageTestBase
             Assert.Equal(results.LootedTroops.TotalManCount, clientBehavior!._lootedTroops.TotalManCount);
             Assert.All(clientBehavior._lootedTroops.GetTroopRoster(), element => Assert.Same(woundedTroop, element.Character));
             Assert.Single(clientBehavior._consequenceExplanations);
+        });
+    }
+
+    [Fact]
+    public void ServerSelect_RevealedHideout_PinsItOnTheFindersMap()
+    {
+        // Arrange
+        var battleWreckageId = CreateServerWreckage();
+        var hideoutId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        var owner = Clients.First();
+        Hero? hero = null;
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<BattleWreckage>(battleWreckageId, out var battleWreckage));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(hideoutId, out var hideout));
+            hideout.SetSettlementComponent(GameObjectCreator.CreateInitializedObject<Hideout>());
+            hideout.IsVisible = false;
+            Campaign.Current._hideouts.Add(hideout.Hideout);
+
+            // What vanilla GainGoldConsequence does on its 50% hideout roll, so the roll doesn't depend on chance
+            var behavior = AddBattleWreckageBehavior();
+            behavior._wreckageConsequences.RemoveAll(consequence =>
+                consequence.StringId != BattleWreckageCampaignBehavior.NothingFoundConsequenceId);
+            behavior._wreckageConsequences.Add(new BattleWreckageCampaignBehavior.BattleWreckageConsequence(
+                "RevealHideout",
+                condition: null,
+                () =>
+                {
+                    hideout.IsVisible = true;
+                    Campaign.Current.VisualTrackerManager.RegisterObject(hideout);
+                },
+                chance: 1f));
+
+            hero = CreatePartyLeader();
+            Assert.True(Server.ObjectManager.TryGetId(hero, out var heroId));
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.AddPlayer(new Player("hideout_finder", heroId, null, null, null)));
+            playerManager.SetPeer("hideout_finder", owner.NetPeer);
+
+            var encounter = new BattleWreckageEncounter(hero, battleWreckage) { IsInvestigating = true };
+            Server.Resolve<IBattleWreckageEncounterTracker>().AddEncounter(encounter);
+        });
+
+        owner.Call(() => AddBattleWreckageBehavior());
+        using var menus = new MethodCallRecorder(Priority.First, AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu)));
+
+        // Act
+        Server.Call(() => Server.Resolve<IBattleWreckageCampaignBehaviorInterface>().SelectWreckageConsequences(hero!));
+        owner.PumpGameThread();
+
+        // Assert, the server's pin isn't the finder's, so the hideout goes with the results and the client pins it
+        var results = Assert.Single(Server.InternalMessages.GetMessages<WreckageInvestigationResultsApplied>());
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(hideoutId, out var hideout));
+            Assert.Same(hideout, results.FoundHideout);
+        });
+        owner.Call(() =>
+        {
+            Assert.True(owner.ObjectManager.TryGetObject<Settlement>(hideoutId, out var hideout));
+            Assert.True(Campaign.Current.VisualTrackerManager.CheckTracked(hideout));
         });
     }
 

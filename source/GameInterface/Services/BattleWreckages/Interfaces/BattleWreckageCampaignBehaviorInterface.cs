@@ -20,6 +20,7 @@ using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.LogEntries;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
@@ -44,7 +45,8 @@ public interface IBattleWreckageCampaignBehaviorInterface : IGameAbstraction
         TroopRosterData lootedTroops,
         IEnumerable<ItemRosterElement> lootedItems,
         IEnumerable<TextObject> consequenceExplanations,
-        int lootedGoldAmount);
+        int lootedGoldAmount,
+        Settlement foundHideout);
     void SelectWreckageConsequences(Hero mainHero);
     void ShowRecoverTroopsDecision(int recoverTroopCount, CampaignTime requiredInvestigationDuration);
     void AcceptRecoverTroops(Hero mainHero);
@@ -258,9 +260,16 @@ public class BattleWreckageCampaignBehaviorInterface : IBattleWreckageCampaignBe
         TroopRosterData lootedTroops,
         IEnumerable<ItemRosterElement> lootedItems,
         IEnumerable<TextObject> consequenceExplanations,
-        int lootedGoldAmount)
+        int lootedGoldAmount,
+        Settlement foundHideout)
     {
         if (!TryGetBattleWreckageBehavior(out var behavior)) return;
+
+        // The rest of vanilla GainGoldConsequence's hideout reveal, IsVisible is synced and the spotted notification is relayed
+        if (foundHideout != null)
+        {
+            Campaign.Current.VisualTrackerManager.RegisterObject(foundHideout);
+        }
 
         // Roster writes are patched, and these rosters are the client's own copy of the server's results
         using (new AllowedThread())
@@ -426,6 +435,9 @@ public class BattleWreckageCampaignBehaviorInterface : IBattleWreckageCampaignBe
             behavior._consequenceExplanations = new List<TextObject>();
             behavior._lootedGoldAmount = 0;
 
+            // Vanilla GainGoldConsequence can reveal one of these and pin it, which on the server pins it on the server's own map
+            var hiddenHideouts = Hideout.All.Where(hideout => !hideout.Settlement.IsVisible).ToList();
+
             try
             {
                 var hasResults = TryRollWreckageConsequences(behavior);
@@ -440,7 +452,8 @@ public class BattleWreckageCampaignBehaviorInterface : IBattleWreckageCampaignBe
                     behavior._lootedTroops,
                     behavior._lootedItems,
                     behavior._consequenceExplanations,
-                    behavior._lootedGoldAmount);
+                    behavior._lootedGoldAmount,
+                    hiddenHideouts.FirstOrDefault(hideout => hideout.Settlement.IsVisible)?.Settlement);
 
                 return hasResults;
             }

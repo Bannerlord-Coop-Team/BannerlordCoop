@@ -11,6 +11,7 @@ using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.BattleWreckages;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.BattleWreckages.Handlers;
@@ -202,11 +203,16 @@ internal class BattleWreckageCampaignBehaviorHandler : IHandler
 
         if (!playerManager.TryGetPeer(data.MainHero, out var peer)) return;
 
+        // The gold is already paid, so a missed lookup only loses the hideout pin
+        string foundHideoutId = null;
+        if (data.FoundHideout != null) objectManager.TryGetIdWithLogging(data.FoundHideout, out foundHideoutId);
+
         network.Send(peer, new NetworkShowWreckageInvestigationResults(
             troopRosterInterface.PackTroopRosterData(data.LootedTroops),
             data.LootedItems.ToArray(),
             data.ConsequenceExplanations,
-            data.LootedGoldAmount));
+            data.LootedGoldAmount,
+            foundHideoutId));
     }
 
     private void Handle_NetworkShowWreckageInvestigationResults(MessagePayload<NetworkShowWreckageInvestigationResults> obj)
@@ -215,11 +221,16 @@ internal class BattleWreckageCampaignBehaviorHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
+            // A missed lookup only loses the hideout pin, the results still show
+            Settlement foundHideout = null;
+            if (data.FoundHideoutId != null) objectManager.TryGetObjectWithLogging(data.FoundHideoutId, out foundHideout);
+
             battleWreckageCampaignBehaviorInterface.ShowWreckageInvestigationResults(
                 data.LootedTroops,
                 data.LootedItems ?? Array.Empty<ItemRosterElement>(), // An empty item array arrives as null
                 data.ConsequenceExplanations,
-                data.LootedGoldAmount);
+                data.LootedGoldAmount,
+                foundHideout);
         });
     }
 

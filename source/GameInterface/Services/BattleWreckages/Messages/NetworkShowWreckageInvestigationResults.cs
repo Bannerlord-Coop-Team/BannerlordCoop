@@ -22,15 +22,21 @@ internal readonly struct NetworkShowWreckageInvestigationResults : ICommand
     [ProtoMember(4)]
     public readonly int LootedGoldAmount;
 
+    // Null unless the roll revealed a hideout
+    [ProtoMember(5)]
+    public readonly string FoundHideoutId;
+
     public NetworkShowWreckageInvestigationResults(
         TroopRosterData lootedTroops,
         ItemRosterElement[] lootedItems,
         List<TextObject> consequenceExplanations,
-        int lootedGoldAmount)
+        int lootedGoldAmount,
+        string foundHideoutId)
     {
         LootedTroops = lootedTroops;
         LootedItems = lootedItems;
         ConsequenceExplanations = consequenceExplanations;
         LootedGoldAmount = lootedGoldAmount;
+        FoundHideoutId = foundHideoutId;
     }
 }
