@@ -18,10 +18,10 @@ internal static class MovementSnapshotPacking
         switch (packet)
         {
             case MovementPacket movement:
-                byte[] riders = Pack(movement, limit);
+                byte[] riders = PackRiders(movement, limit);
                 return riders == null ? null : movement.WithPackedSnapshots(riders);
             case MountMovementPacket mounts:
-                byte[] horses = Pack(mounts, limit);
+                byte[] horses = PackMounts(mounts, limit);
                 return horses == null ? null : mounts.WithPackedSnapshots(horses);
             default:
                 return null;
@@ -31,14 +31,13 @@ internal static class MovementSnapshotPacking
     public static IPacket Restore(IPacket packet) => packet switch
     {
         MovementPacket movement when movement.PackedSnapshots != null =>
-            movement.WithRestoredSnapshots(Restore(movement)),
+            movement.WithRestoredSnapshots(RestoreRiders(movement)),
         MountMovementPacket mounts when mounts.PackedSnapshots != null =>
-            mounts.WithRestoredSnapshots(Restore(mounts)),
-        MovementPacket or MountMovementPacket => packet,
-        _ => null,
+            mounts.WithRestoredSnapshots(RestoreMounts(mounts)),
+        _ => packet,
     };
 
-    private static byte[] Pack(MovementPacket packet, int limit)
+    private static byte[] PackRiders(MovementPacket packet, int limit)
     {
         AgentData[] agents = packet.Agents;
         int count = packet.SnapshotCount;
@@ -69,28 +68,30 @@ internal static class MovementSnapshotPacking
         for (int i = 0; i < count; i++)
         {
             AgentData agent = agents[i];
-            byte attachments = 0;
-            if (agent.DeckShipIndex != 0)
+            bool hasDeck = agent.DeckShipIndex != 0;
+            AgentMountData mount = agent.MountData;
+            byte attachments = hasDeck ? HasDeck : (byte)0;
+            if (mount != null) attachments |= HasMount;
+
+            agentColumns.BeginSnapshot(i);
+            agentColumns.WriteByte(attachments);
+            agent.WriteSnapshot(ref agentColumns);
+
+            if (hasDeck)
             {
-                attachments |= HasDeck;
                 deckColumns.BeginSnapshot(deckIndex++);
                 agent.WriteDeckSnapshot(ref deckColumns);
             }
-            if (agent.MountData != null)
+            if (mount != null)
             {
-                attachments |= HasMount;
                 mountColumns.BeginSnapshot(mountIndex++);
-                agent.MountData.WriteSnapshot(ref mountColumns, extras);
+                mount.WriteSnapshot(ref mountColumns, extras);
             }
-
-            packed[i] = attachments;
-            agentColumns.BeginSnapshot(i);
-            agent.WriteSnapshot(ref agentColumns);
         }
         return packed;
     }
 
-    private static byte[] Pack(MountMovementPacket packet, int limit)
+    private static byte[] PackMounts(MountMovementPacket packet, int limit)
     {
         AgentMountData[] mounts = packet.Mounts;
         int count = packet.SnapshotCount;
@@ -114,20 +115,18 @@ internal static class MovementSnapshotPacking
         return packed;
     }
 
-    private static AgentData[] Restore(MovementPacket packet)
+    private static AgentData[] RestoreRiders(MovementPacket packet)
     {
         byte[] packed = packet.PackedSnapshots;
         int count = packet.SnapshotCount;
-        if (count == 0 || count > packed.Length / AgentSnapshotBytes)
-            throw new InvalidDataException("Packed movement has no snapshots for its ids.");
 
         // The first column identifies the rows with deck or mount state, which are stored densely.
         int decks = 0;
         int mounts = 0;
-        for (int i = 0; i < count; i++)
+        foreach (byte attachments in packed.AsSpan(0, count))
         {
-            if ((packed[i] & HasDeck) != 0) decks++;
-            if ((packed[i] & HasMount) != 0) mounts++;
+            if ((attachments & HasDeck) != 0) decks++;
+            if ((attachments & HasMount) != 0) mounts++;
         }
 
         var layout = new SnapshotLayout(count, decks, mounts);
@@ -141,7 +140,7 @@ internal static class MovementSnapshotPacking
         for (int i = 0; i < count; i++)
         {
             agentColumns.BeginSnapshot(i);
-            byte attachments = packed[i];
+            byte attachments = agentColumns.ReadByte();
             AgentData agent = AgentData.ReadSnapshot(ref agentColumns);
             if ((attachments & HasDeck) != 0)
             {
@@ -158,12 +157,10 @@ internal static class MovementSnapshotPacking
         return agents;
     }
 
-    private static AgentMountData[] Restore(MountMovementPacket packet)
+    private static AgentMountData[] RestoreMounts(MountMovementPacket packet)
     {
         byte[] packed = packet.PackedSnapshots;
         int count = packet.SnapshotCount;
-        if (count == 0 || count > packed.Length / AgentMountData.SnapshotBytes)
-            throw new InvalidDataException("Packed mount movement has no snapshots for its ids.");
 
         var layout = new SnapshotLayout(0, 0, count);
         var columns = layout.MountColumns(packed);
@@ -197,9 +194,8 @@ internal static class MovementSnapshotPacking
             ExtrasOffset = mountOffset + (mounts * AgentMountData.SnapshotBytes);
         }
 
-        // The first byte per rider is its attachment flag, before the rider's own columns.
         public MovementSnapshotColumns AgentColumns(byte[] packed) =>
-            new MovementSnapshotColumns(packed.AsSpan(agents, deckOffset - agents), agents);
+            new MovementSnapshotColumns(packed.AsSpan(0, deckOffset), agents);
 
         public MovementSnapshotColumns DeckColumns(byte[] packed) =>
             new MovementSnapshotColumns(packed.AsSpan(deckOffset, mountOffset - deckOffset), decks);

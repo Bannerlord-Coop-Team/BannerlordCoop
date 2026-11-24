@@ -559,6 +559,7 @@ namespace Missions.Agents.Packets
         [ProtoMember(21)]
         public long? MountAuthorityRevision { get; private set; }
 
+        private const int GuidBytes = 16;
         private const byte HasScope = 1;
         private const byte HasGuid = 2;
         private const byte HasRevision = 4;
@@ -574,7 +575,7 @@ namespace Missions.Agents.Packets
                 int utf8Length = Encoding.UTF8.GetByteCount(MountIdentityScopeId);
                 length += ProtoBufSerializer.GetVarintLength((uint)utf8Length) + utf8Length;
             }
-            if (MountAgentId != Guid.Empty) length += 16;
+            if (MountAgentId != Guid.Empty) length += GuidBytes;
             if (MountAuthorityRevision.HasValue) length += sizeof(long);
             return length;
         }
@@ -643,7 +644,7 @@ namespace Missions.Agents.Packets
                 MountAction1Flag = columns.ReadUInt64(),
                 MountAction1Progress = columns.ReadSingle(),
                 MountIdentityScopeId = (flags & HasScope) != 0 ? extras.ReadString() : null,
-                MountAgentId = (flags & HasGuid) != 0 ? new Guid(extras.ReadBytes(16)) : Guid.Empty,
+                MountAgentId = (flags & HasGuid) != 0 ? new Guid(extras.ReadBytes(GuidBytes)) : Guid.Empty,
                 MountAuthorityRevision = (flags & HasRevision) != 0 ? extras.ReadInt64() : (long?)null,
                 MountAction0IsLocomotion = (flags & IsLocomotion) != 0,
                 MountAction0IsSyntheticTurn = (flags & IsSyntheticTurn) != 0,

@@ -92,8 +92,11 @@ public class MovementPacketCompressor : IMovementPacketCompressor
             if (decodedLength != decompressed.Length)
                 return false;
 
-            restored = MovementSnapshotPacking.Restore(serializer.Deserialize<IPacket>(decompressed));
-            return restored != null;
+            IPacket movement = serializer.Deserialize<IPacket>(decompressed);
+            if (movement == null || !IsMovement(movement)) return false;
+
+            restored = MovementSnapshotPacking.Restore(movement);
+            return true;
         }
         catch (Exception ex)
         {

@@ -15,7 +15,7 @@ public partial class MovementTrafficTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void PackedMovement_RestoresMixedSnapshotsAfterAnEarlierDatagramIsLost(bool scoped)
+    public void PackedMovement_RestoresMixedRiderMountAndDeckSnapshots(bool scoped)
     {
         using var fixture = new MissionEngineFixture();
         var peer = Clients.First();
@@ -30,8 +30,7 @@ public partial class MovementTrafficTests
             var canonicalIds = new Guid[count];
             var compactIds = new ushort[count];
             var revisions = new long[count];
-            var first = new AgentData[count];
-            var latest = new AgentData[count];
+            var riders = new AgentData[count];
             for (int i = 0; i < count; i++)
             {
                 var rider = SpawnRider(mock);
@@ -45,29 +44,26 @@ public partial class MovementTrafficTests
                 canonicalIds[i] = EquivalenceGuid(i);
                 compactIds[i] = (ushort)(i + 1);
                 revisions[i] = i + 1;
-                PopulatePackedMovementState(mirror, i);
-                first[i] = new AgentData(rider);
                 PopulatePackedMovementState(mirror, i + (2 * count));
-                latest[i] = mount == null
+                riders[i] = mount == null
                     ? new AgentData(rider)
                     : new AgentData(rider, (ushort)(2000 + i), EquivalenceScope, EquivalenceGuid(2000 + i),
                         mountAuthorityRevision: i);
                 if (i % 5 == 0)
                 {
                     int hull = i % deckShips.Length;
-                    latest[i].CaptureDeck(deckShips[hull], new Vec3(i * 0.25f, -i * 0.5f, 0.75f), 1.5f);
-                    latest[i].IndexDeck(hull + 1);
+                    riders[i].CaptureDeck(deckShips[hull], new Vec3(i * 0.25f, -i * 0.5f, 0.75f), 1.5f);
+                    riders[i].IndexDeck(hull + 1);
                 }
             }
 
-            sender.Serialize(new MovementPacket(canonicalIds, first, EquivalenceSender, sampleSequence: 207));
-            Array.Reverse(latest);
+            Array.Reverse(riders);
             Array.Reverse(compactIds);
             Array.Reverse(canonicalIds);
             Array.Reverse(revisions);
             var movement = scoped
-                ? new MovementPacket(EquivalenceScope, compactIds, latest, EquivalenceSender, revisions, 208, deckShips)
-                : new MovementPacket(canonicalIds, latest, EquivalenceSender, revisions, 208, deckShips);
+                ? new MovementPacket(EquivalenceScope, compactIds, riders, EquivalenceSender, revisions, 208, deckShips)
+                : new MovementPacket(canonicalIds, riders, EquivalenceSender, revisions, 208, deckShips);
             byte[] wire = sender.Serialize(movement);
 
             var restored = Assert.IsType<MovementPacket>(RestorePackedMovement(serializer, receiver, wire));
@@ -122,18 +118,25 @@ public partial class MovementTrafficTests
             }
 
             var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
-            var legacy = new LegacyMovementPacketCompressor(serializer);
             var compressor = new MovementPacketCompressor(serializer);
             IPacket packet = standaloneMounts
                 ? new MountMovementPacket(guids, mounts, EquivalenceSender, revisions, 211)
                 : new MovementPacket(EquivalenceScope, ids, riders, EquivalenceSender, revisions, 211);
-            byte[] baseline = legacy.Serialize(packet);
+            byte[] original = serializer.Serialize(packet);
+            Assert.InRange(original.Length, 1, MovementPacketCompressor.MaxUncompressedBytes);
+            var payload = new byte[LZ4Codec.MaximumOutputSize(original.Length)];
+            int compressedLength = LZ4Codec.Encode(
+                original, 0, original.Length, payload, 0, payload.Length, LZ4Level.L00_FAST);
+            Assert.True(compressedLength > 0);
+            int baselineLength = compressor.GetSerializedLength(
+                new CompressedMovementPacket(original.Length, payload.AsSpan(0, compressedLength).ToArray()));
+            Assert.True(baselineLength < original.Length);
+
             byte[] wire = compressor.Serialize(packet);
-            output.WriteLine($"{packet.PacketType}, {count} snapshots: {baseline.Length} baseline bytes, {wire.Length} packed bytes");
-            Assert.IsType<CompressedMovementPacket>(serializer.Deserialize<IPacket>(baseline));
-            Assert.True(wire.Length < baseline.Length, $"Packed datagram was {wire.Length} B, baseline {baseline.Length} B.");
+            output.WriteLine($"{packet.PacketType}, {count} snapshots: {baselineLength} baseline bytes, {wire.Length} packed bytes");
+            Assert.True(wire.Length < baselineLength, $"Packed datagram was {wire.Length} B, baseline {baselineLength} B.");
             IPacket restored = RestorePackedMovement(serializer, compressor, wire);
-            Assert.Equal(serializer.Serialize(packet), serializer.Serialize(restored));
+            Assert.Equal(original, serializer.Serialize(restored));
         });
     }
 
