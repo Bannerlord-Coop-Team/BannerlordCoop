@@ -116,7 +116,7 @@ internal class BattleWreckageCampaignBehaviorHandler : IHandler
         if (!playerManager.TryGetPlayer(data.MainHero, out var player)) return;
         if (!playerManager.TryGetPeer(player.ControllerId, out var peer)) return;
 
-        network.Send(peer, new NetworkCloseWreckageEncounter(data.Reason));
+        network.Send(peer, new NetworkCloseWreckageEncounter(data.Reason, data.RequiredInvestigationDuration));
     }
 
     private void Handle_NetworkCloseWreckageEncounter(MessagePayload<NetworkCloseWreckageEncounter> obj)
@@ -125,7 +125,7 @@ internal class BattleWreckageCampaignBehaviorHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
-            battleWreckageCampaignBehaviorInterface.CloseWreckageEncounter(data.Reason);
+            battleWreckageCampaignBehaviorInterface.CloseWreckageEncounter(data.Reason, data.RequiredInvestigationDuration);
         });
     }
 

@@ -1,8 +1,13 @@
 ﻿using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
+using GameInterface.Services.BattleWreckages;
+using GameInterface.Services.BattleWreckages.Data;
+using GameInterface.Services.BattleWreckages.Interfaces;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.BattleWreckages;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
@@ -122,6 +127,44 @@ public class BattleWreckageLifetimeTests : IDisposable
             {
                 Assert.False(client.ObjectManager.TryGetObject<BattleWreckage>(battleWreckageId, out _));
                 Assert.DoesNotContain(clientWreckages[client], Campaign.Current.Wreckages);
+            });
+        }
+    }
+
+    [Fact]
+    public void ServerLeave_InvestigationCompleted_SyncsInvestigatedToAllClients()
+    {
+        // Arrange
+        var battleWreckageId = CreateServerWreckage();
+
+        // Act
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<BattleWreckage>(battleWreckageId, out var battleWreckage));
+
+            // Epic wreckages stay on the map once investigated, so clients still have one to check. Creating one as Epic
+            // needs a settlement for its name, and the field is readonly
+            AccessTools.Field(typeof(BattleWreckage), nameof(BattleWreckage.WreckageTypeCategory))
+                .SetValue(battleWreckage, BattleWreckage.WreckageType.Epic);
+
+            var hero = GameObjectCreator.CreateInitializedObject<Hero>();
+            var encounterTracker = Server.Resolve<IBattleWreckageEncounterTracker>();
+            encounterTracker.AddEncounter(new BattleWreckageEncounter(hero, battleWreckage));
+
+            Server.Resolve<IBattleWreckageCampaignBehaviorInterface>().LeaveWreckageEncounter(
+                hero,
+                BattleWreckageCampaignBehavior.WreckageLeaveReason.InvestigationCompleted);
+
+            Assert.False(encounterTracker.TryGetEncounter(hero, out _));
+        });
+
+        // Assert
+        foreach (var client in Clients)
+        {
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<BattleWreckage>(battleWreckageId, out var battleWreckage));
+                Assert.True(battleWreckage.IsInvestigated);
             });
         }
     }

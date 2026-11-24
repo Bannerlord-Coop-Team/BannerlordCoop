@@ -9,9 +9,13 @@ using Serilog;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.BattleWreckages;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using TaleWorlds.Localization;
 
 namespace GameInterface.Services.BattleWreckages.Interfaces;
@@ -22,7 +26,9 @@ public interface IBattleWreckageCampaignBehaviorInterface : IGameAbstraction
     void OnPartyEncounter(PartyBase attackerParty, PartyBase defenderParty);
     void OnHeroPrisonerTakenEvent(Hero hero);
     void LeaveWreckageEncounter(Hero mainHero, BattleWreckageCampaignBehavior.WreckageLeaveReason reason);
-    void CloseWreckageEncounter(BattleWreckageCampaignBehavior.WreckageLeaveReason reason);
+    void CloseWreckageEncounter(
+        BattleWreckageCampaignBehavior.WreckageLeaveReason reason,
+        CampaignTime requiredInvestigationDuration);
     void ApplyWreckageInvestigationResults(Hero mainHero);
     void ShowWreckageInvestigationResults(
         TroopRosterData lootedTroops,
@@ -78,13 +84,88 @@ public class BattleWreckageCampaignBehaviorInterface : IBattleWreckageCampaignBe
 
     public void LeaveWreckageEncounter(Hero mainHero, BattleWreckageCampaignBehavior.WreckageLeaveReason reason)
     {
-        // TODO: Clear the player's encounter and publish WreckageEncounterLeft. Use vanilla OnWreckageInvestigated so AutoSync sends _isInvestigated
+        if (!encounterTracker.TryGetEncounter(mainHero, out var encounter))
+        {
+            Logger.Debug("No wreckage encounter for {Hero} to leave with {Reason}", mainHero.StringId, reason);
+            return;
+        }
+
+        var requiredInvestigationDuration = CampaignTime.Zero;
+
+        // World half of vanilla LeaveWreckageEncounter
+        switch (reason)
+        {
+            case BattleWreckageCampaignBehavior.WreckageLeaveReason.InvestigationCompleted:
+                encounter.BattleWreckage.OnWreckageInvestigated();
+                if (encounter.BattleWreckage.WreckageTypeCategory != BattleWreckage.WreckageType.Epic)
+                {
+                    encounter.BattleWreckage.DestroyWreckage();
+                }
+                break;
+            case BattleWreckageCampaignBehavior.WreckageLeaveReason.AbandonInvestigation:
+                if (mainHero.PartyBelongedTo is MobileParty party && !party.IsDisorganized)
+                {
+                    party.SetDisorganized(isDisorganized: true);
+                }
+                break;
+            case BattleWreckageCampaignBehavior.WreckageLeaveReason.PlayerInterrupted:
+                var elapsed = CampaignTime.Now - encounter.InvestigationStartTime;
+                var remainingHours = MathF.Max(1f, (float)(encounter.RequiredInvestigationDuration.ToHours - elapsed.ToHours));
+                encounter.RequiredInvestigationDuration = CampaignTime.Hours(remainingHours);
+                encounter.LastInteractionTime = CampaignTime.Now;
+                encounter.InvestigationStartTime = CampaignTime.Zero;
+                encounter.LootedTroops = null;
+                encounter.LootedItems = null;
+                encounter.ConsequenceExplanations = null;
+                encounter.LootedGoldAmount = 0;
+                requiredInvestigationDuration = encounter.RequiredInvestigationDuration;
+                break;
+        }
+
+        // An interrupted investigation keeps its encounter so it can resume
+        if (reason != BattleWreckageCampaignBehavior.WreckageLeaveReason.PlayerInterrupted)
+        {
+            encounterTracker.RemoveEncounter(mainHero);
+        }
+
+        var message = new WreckageEncounterLeft(mainHero, reason, requiredInvestigationDuration);
+        messageBroker.Publish(this, message);
     }
 
-    public void CloseWreckageEncounter(BattleWreckageCampaignBehavior.WreckageLeaveReason reason)
+    public void CloseWreckageEncounter(
+        BattleWreckageCampaignBehavior.WreckageLeaveReason reason,
+        CampaignTime requiredInvestigationDuration)
     {
-        // TODO: Client side, clear the local encounter and exit the wreckage menu. Clear _consequenceExplanations too,
-        // since ApplyWreckageInvestigationResultsPrefix runs vanilla locally while it has entries
+        // Local half of vanilla LeaveWreckageEncounter, the server marks the wreckage investigated, removes it and disorganises the party
+        if (!TryGetBattleWreckageBehavior(out var behavior)) return;
+
+        if (PlayerEncounter.Current == null && Campaign.Current.CurrentMenuContext != null)
+        {
+            GameMenu.ExitToLast();
+        }
+
+        // Roster writes are patched, and these rosters are the client's own copy of the server's results
+        using (new AllowedThread())
+        {
+            behavior._lootedItems.Clear();
+            behavior._lootedTroops.Clear();
+        }
+
+        behavior._playerInvestigationStartTime = CampaignTime.Zero;
+        behavior._selectedConsequences.Clear();
+        behavior._lootedGoldAmount = 0;
+        // ApplyWreckageInvestigationResultsPrefix runs vanilla while this has entries, so the next investigation would replay old results
+        behavior._consequenceExplanations.Clear();
+        // Zero unless interrupted, when it's the time left that the server worked out
+        behavior._requiredInvestigationDuration = requiredInvestigationDuration;
+
+        // An interrupted investigation keeps its wreckage so it can resume
+        if (reason == BattleWreckageCampaignBehavior.WreckageLeaveReason.PlayerInterrupted) return;
+
+        behavior._encounteredBattleWreckage = null;
+        behavior._recoverTroopCountsToAdd = 0;
+        behavior._currentOverriddenConsequenceId = string.Empty;
+        behavior._isOverriddenConsequenceAccepted = false;
     }
 
     public void ApplyWreckageInvestigationResults(Hero mainHero)
