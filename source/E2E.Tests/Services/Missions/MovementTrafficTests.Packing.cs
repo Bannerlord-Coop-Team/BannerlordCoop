@@ -6,6 +6,7 @@ using Missions.Agents.Packets;
 using Missions.Services.Network;
 using ProtoBuf.Meta;
 using TaleWorlds.Library;
+using TaleWorlds.MountAndBlade;
 using Xunit;
 using AgentData = Missions.Agents.Packets.AgentData;
 
@@ -112,7 +113,7 @@ public partial class MovementTrafficTests
     public void PackedMovement_ProtobufSnapshotTagsArePinned()
     {
         var model = RuntimeTypeModel.Default;
-        // Update AgentData.WriteSnapshot, WriteDeckSnapshot and ReadSnapshot when rider tags change.
+        // Update AgentData.WriteSnapshot, ReadSnapshot, WriteDeckSnapshot and ReadDeckSnapshot when rider tags change.
         Assert.Equal(new[] { 1, 2, 3, 4, 7, 8, 9, 11, 12 },
             model[typeof(AgentData)].GetFields().Select(field => field.FieldNumber).OrderBy(tag => tag));
 
@@ -142,9 +143,10 @@ public partial class MovementTrafficTests
             compactIds[i] = (ushort)(i + 1);
             revisions[i] = i + 1;
             PopulatePackedMovementState(mirror, i + (2 * count));
-            riders[i] = mount == null
-                ? new AgentData(rider)
-                : new AgentData(rider, (ushort)(2000 + i), EquivalenceScope, EquivalenceGuid(2000 + i),
+            if (mount == null)
+                riders[i] = new AgentData(rider);
+            else
+                riders[i] = new AgentData(rider, (ushort)(2000 + i), EquivalenceScope, EquivalenceGuid(2000 + i),
                     mountAuthorityRevision: i);
             if (i % 5 == 0)
             {
@@ -159,9 +161,9 @@ public partial class MovementTrafficTests
         Array.Reverse(compactIds);
         Array.Reverse(canonicalIds);
         Array.Reverse(revisions);
-        return scoped
-            ? new MovementPacket(EquivalenceScope, compactIds, riders, EquivalenceSender, revisions, 208, deckShips)
-            : new MovementPacket(canonicalIds, riders, EquivalenceSender, revisions, 208, deckShips);
+        if (scoped)
+            return new MovementPacket(EquivalenceScope, compactIds, riders, EquivalenceSender, revisions, 208, deckShips);
+        return new MovementPacket(canonicalIds, riders, EquivalenceSender, revisions, 208, deckShips);
     }
 
     private static MovementPacket CreatePackedRiderPacket(MockMission mock, int count)
@@ -252,5 +254,8 @@ public partial class MovementTrafficTests
         mirror.Action0Progress = Jitter(0.42f);
         mirror.Action1Progress = Jitter(0.75f);
         mirror.Action1Index = 1234 + seed;
+        ulong flagBits = ((ulong)(uint)seed << 32) | (uint)seed;
+        mirror.Action0Flags = (AnimFlags)(0x0123456789ABCDEFUL ^ flagBits);
+        mirror.Action1Flags = (AnimFlags)(0xFEDCBA9876543210UL ^ flagBits);
     }
 }

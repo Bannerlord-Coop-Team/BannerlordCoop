@@ -194,7 +194,7 @@ namespace Missions.Agents.Packets
         [ProtoMember(9)]
         public uint MovementFlag { get; private set; }
         // Deck pose: 0 is a world pose, otherwise a 1-based index into the packet's DeckShips with a hull-local position.
-        // Add deck pose fields to WriteDeckSnapshot, ReadSnapshot and DeckSnapshotBytes too.
+        // Add deck pose fields to WriteDeckSnapshot, ReadDeckSnapshot and DeckSnapshotBytes too.
         [ProtoMember(11)]
         public int DeckShipIndex { get; private set; }
         [ProtoMember(12)]
@@ -217,11 +217,10 @@ namespace Missions.Agents.Packets
             columns.WriteUInt32(MovementFlag);
         }
 
-        // Read each column in the order used by WriteSnapshot and WriteDeckSnapshot.
+        // Read each column in the order used by WriteSnapshot.
         internal static AgentData ReadSnapshot(
             ref MovementSnapshotColumns columns,
-            ref MovementSnapshotColumns deckColumns,
-            bool hasDeck,
+            (int ShipIndex, Vec3 Local) deck,
             AgentMountData mount) => new AgentData
         {
             Position = columns.ReadVec3(),
@@ -230,8 +229,8 @@ namespace Missions.Agents.Packets
             MovementDirection = columns.ReadVec2(),
             Speed = columns.ReadSingle(),
             MovementFlag = columns.ReadUInt32(),
-            DeckShipIndex = hasDeck ? (int)deckColumns.ReadUInt32() : 0,
-            DeckLocal = hasDeck ? deckColumns.ReadVec3() : default,
+            DeckShipIndex = deck.ShipIndex,
+            DeckLocal = deck.Local,
             MountData = mount,
         };
 
@@ -241,6 +240,13 @@ namespace Missions.Agents.Packets
         {
             columns.WriteUInt32((uint)DeckShipIndex);
             columns.WriteVec3(DeckLocal);
+        }
+
+        internal static (int ShipIndex, Vec3 Local) ReadDeckSnapshot(ref MovementSnapshotColumns columns)
+        {
+            int shipIndex = (int)columns.ReadUInt32();
+            Vec3 local = columns.ReadVec3();
+            return (shipIndex, local);
         }
 
         // Whether a received deck pose names a hull in its packet's table and carries a finite pose.

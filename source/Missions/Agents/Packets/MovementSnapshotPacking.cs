@@ -1,6 +1,7 @@
 ﻿using Common.PacketHandlers;
 using System;
 using System.IO;
+using Vec3 = TaleWorlds.Library.Vec3;
 
 namespace Missions.Agents.Packets;
 
@@ -68,7 +69,12 @@ internal sealed class MovementSnapshotPacking : IMovementSnapshotPacking
         var agentColumns = layout.AgentColumns(packed);
         var deckColumns = layout.DeckColumns(packed);
         var mountColumns = layout.MountColumns(packed);
-        using var extras = mounts == 0 ? null : new BinaryWriter(new MemoryStream(packed, layout.ExtrasOffset, extraBytes));
+        BinaryWriter extrasWriter;
+        if (mounts != 0)
+            extrasWriter = new BinaryWriter(new MemoryStream(packed, layout.ExtrasOffset, extraBytes));
+        else
+            extrasWriter = null;
+        using var extras = extrasWriter;
         int deckIndex = 0;
         int mountIndex = 0;
         for (int i = 0; i < count; i++)
@@ -143,7 +149,12 @@ internal sealed class MovementSnapshotPacking : IMovementSnapshotPacking
         var agentColumns = layout.AgentColumns(packed);
         var deckColumns = layout.DeckColumns(packed);
         var mountColumns = layout.MountColumns(packed);
-        using var extras = mounts == 0 ? null : new BinaryReader(new MemoryStream(packed, layout.ExtrasOffset, packed.Length - layout.ExtrasOffset));
+        BinaryReader extrasReader;
+        if (mounts != 0)
+            extrasReader = new BinaryReader(new MemoryStream(packed, layout.ExtrasOffset, packed.Length - layout.ExtrasOffset));
+        else
+            extrasReader = null;
+        using var extras = extrasReader;
         var agents = new AgentData[count];
         int deckIndex = 0;
         int mountIndex = 0;
@@ -151,6 +162,14 @@ internal sealed class MovementSnapshotPacking : IMovementSnapshotPacking
         {
             agentColumns.BeginSnapshot(i);
             byte attachments = agentColumns.ReadByte();
+
+            (int ShipIndex, Vec3 Local) deck = default;
+            if ((attachments & HasDeck) != 0)
+            {
+                deckColumns.BeginSnapshot(deckIndex++);
+                deck = AgentData.ReadDeckSnapshot(ref deckColumns);
+            }
+
             AgentMountData mount = null;
             if ((attachments & HasMount) != 0)
             {
@@ -158,9 +177,7 @@ internal sealed class MovementSnapshotPacking : IMovementSnapshotPacking
                 mount = AgentMountData.ReadSnapshot(ref mountColumns, extras);
             }
 
-            bool hasDeck = (attachments & HasDeck) != 0;
-            if (hasDeck) deckColumns.BeginSnapshot(deckIndex++);
-            agents[i] = AgentData.ReadSnapshot(ref agentColumns, ref deckColumns, hasDeck, mount);
+            agents[i] = AgentData.ReadSnapshot(ref agentColumns, deck, mount);
         }
         return agents;
     }
