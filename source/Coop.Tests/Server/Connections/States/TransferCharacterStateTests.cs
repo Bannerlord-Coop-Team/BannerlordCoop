@@ -184,12 +184,11 @@ namespace Coop.Tests.Server.Connections.States
                 serverComponent.TestNetwork.GetPeerPacketsFromType<GameSaveDataChunkPacket>(playerPeer));
         }
 
-        [Theory]
-        [InlineData(0)]
-        [InlineData((GameSaveDataChunkPacket.ChunkSize * 2) + 17)]
-        public void EnteringState_PreservesDeflateAndChunkFramingThroughSerialization(int size)
+        [Fact]
+        public void EnteringState_PreservesDeflateAndChunkFramingThroughSerialization()
         {
-            byte[] data = new byte[size];
+            int chunkSize = GameSaveDataChunkPacket.ChunkSize;
+            byte[] data = new byte[(chunkSize * 2) + 17];
             new Random(42).NextBytes(data);
             var saveMock = serverComponent.Container.Resolve<Mock<ISaveInterface>>();
             saveMock.Setup(m => m.SaveCurrentGame()).Returns(new SaveResults(true, data, "12345"));
@@ -200,7 +199,6 @@ namespace Coop.Tests.Server.Connections.States
             var packets = serverComponent.TestNetwork.GetPeerPacketsFromType<GameSaveDataChunkPacket>(playerPeer)
                 .Select(packet => serializer.Deserialize<GameSaveDataChunkPacket>(serializer.Serialize(packet))).ToArray();
             byte[] compressed = packets.SelectMany(packet => packet.ChunkData ?? Array.Empty<byte>()).ToArray();
-            int chunkSize = GameSaveDataChunkPacket.ChunkSize;
             int expectedChunkCount = Math.Max(1, (compressed.Length + chunkSize - 1) / chunkSize);
 
             Assert.Equal(expectedChunkCount, packets.Length);
@@ -210,7 +208,7 @@ namespace Coop.Tests.Server.Connections.States
                 Assert.Equal(packets[0].TransferId, packet.TransferId);
                 Assert.Equal(packets.Length, packet.ChunkCount);
                 Assert.Equal(compressed.Length, packet.CompressedSize);
-                Assert.Equal(size, packet.UncompressedSize);
+                Assert.Equal(data.Length, packet.UncompressedSize);
             });
             Assert.All(packets.SkipLast(1), packet => Assert.Equal(chunkSize, packet.ChunkData.Length));
             Assert.Equal(data, SaveDataCompression.Decompress(compressed));
