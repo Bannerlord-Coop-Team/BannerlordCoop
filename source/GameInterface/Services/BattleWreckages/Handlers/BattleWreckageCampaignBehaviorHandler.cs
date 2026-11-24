@@ -260,7 +260,7 @@ internal class BattleWreckageCampaignBehaviorHandler : IHandler
     {
         GameThread.RunSafe(() =>
         {
-            battleWreckageCampaignBehaviorInterface.RemoveDisconnectedPlayers();
+            battleWreckageCampaignBehaviorInterface.InterruptDisconnectedPlayers();
         });
     }
 }

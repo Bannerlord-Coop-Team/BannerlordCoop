@@ -512,6 +512,110 @@ public class BattleWreckageLifetimeTests : IDisposable
     }
 
     [Fact]
+    public void DisconnectedPlayer_KeepsTheirInvestigationToResumeOnReturn()
+    {
+        // Arrange
+        const int elapsedHours = 2;
+        var battleWreckageId = CreateServerWreckage();
+        var otherBattleWreckageId = CreateServerWreckage();
+
+        // The test bootstrap pins CampaignTime.Now, so read the map time tracker as RomanceRetryCooldownTests does
+        var clock = new Harmony($"e2e.wreckage-disconnect.{Guid.NewGuid():N}");
+        clock.Patch(AccessTools.PropertyGetter(typeof(CampaignTime), nameof(CampaignTime.Now)),
+            postfix: new HarmonyMethod(typeof(BattleWreckageLifetimeTests), nameof(ProvideCampaignTime)));
+        try
+        {
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<BattleWreckage>(battleWreckageId, out var battleWreckage));
+                Assert.True(Server.ObjectManager.TryGetObject<BattleWreckage>(otherBattleWreckageId, out var otherBattleWreckage));
+                AddBattleWreckageBehavior();
+                var hero = CreateDisconnectedPlayerLeader("wreckage_leaver");
+                var connectedHero = CreatePartyLeader();
+                var campaignBehaviorInterface = Server.Resolve<IBattleWreckageCampaignBehaviorInterface>();
+                var encounterTracker = Server.Resolve<IBattleWreckageEncounterTracker>();
+
+                // Start off zero, because the hourly expiry ignores a LastInteractionTime of CampaignTime.Zero
+                Campaign.Current.MapTimeTracker._numTicks = CampaignTime.Days(1).NumTicks;
+                campaignBehaviorInterface.StartWreckageEncounter(battleWreckage, hero);
+                campaignBehaviorInterface.StartWreckageEncounter(otherBattleWreckage, connectedHero);
+                Assert.True(encounterTracker.TryGetEncounter(hero, out var encounter));
+                Assert.True(encounterTracker.TryGetEncounter(connectedHero, out var connectedEncounter));
+                var rolledDuration = encounter.RequiredInvestigationDuration;
+                var connectedStartTime = connectedEncounter.InvestigationStartTime;
+                Campaign.Current.MapTimeTracker._numTicks += CampaignTime.Hours(elapsedHours).NumTicks;
+
+                // Act
+                campaignBehaviorInterface.InterruptDisconnectedPlayers();
+
+                // Assert, the encounter is kept as interrupted with the time it has left, and the hourly tick expires it from here
+                Assert.False(encounter.IsInvestigating);
+                Assert.Equal(CampaignTime.Now, encounter.LastInteractionTime);
+                var remainingDuration = encounter.RequiredInvestigationDuration;
+                Assert.Equal(rolledDuration.ToHours - elapsedHours, remainingDuration.ToHours, 3);
+
+                // A connected player's investigation keeps running
+                Assert.True(connectedEncounter.IsInvestigating);
+                Assert.Equal(connectedStartTime, connectedEncounter.InvestigationStartTime);
+                Assert.Equal(CampaignTime.Zero, connectedEncounter.LastInteractionTime);
+
+                // A second sweep has to skip it, otherwise the elapsed time counts from CampaignTime.Zero and
+                // the 1 hour floor in LeaveWreckageEncounter replaces the time left
+                Campaign.Current.MapTimeTracker._numTicks += CampaignTime.Hours(1).NumTicks;
+                campaignBehaviorInterface.InterruptDisconnectedPlayers();
+                Assert.Equal(remainingDuration, encounter.RequiredInvestigationDuration);
+
+                // Coming back resumes it
+                campaignBehaviorInterface.StartWreckageEncounter(battleWreckage, hero);
+                var started = Server.InternalMessages.GetMessages<WreckageEncounterStarted>().ToList();
+                Assert.Equal(3, started.Count);
+                Assert.Same(hero, started[2].MainHero);
+                Assert.True(started[2].IsInterrupted);
+                Assert.Equal(remainingDuration, started[2].RequiredInvestigationDuration);
+            });
+        }
+        finally
+        {
+            clock.UnpatchAll(clock.Id);
+        }
+    }
+
+    [Fact]
+    public void ServerStart_WreckageHeldByDisconnectedPlayer_GivesItToSecondPlayer()
+    {
+        // Arrange
+        var battleWreckageId = CreateServerWreckage();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<BattleWreckage>(battleWreckageId, out var battleWreckage));
+            AddBattleWreckageBehavior();
+            var offlineHero = CreateDisconnectedPlayerLeader("wreckage_holder");
+            var secondHero = CreatePartyLeader();
+            var campaignBehaviorInterface = Server.Resolve<IBattleWreckageCampaignBehaviorInterface>();
+            var encounterTracker = Server.Resolve<IBattleWreckageEncounterTracker>();
+
+            campaignBehaviorInterface.StartWreckageEncounter(battleWreckage, offlineHero);
+            campaignBehaviorInterface.InterruptDisconnectedPlayers();
+            Assert.True(encounterTracker.TryGetEncounter(offlineHero, out var offlineEncounter));
+            Assert.False(offlineEncounter.IsInvestigating);
+
+            // Act
+            campaignBehaviorInterface.StartWreckageEncounter(battleWreckage, secondHero);
+
+            // Assert, the second player starts fresh and the offline player loses the wreckage
+            Assert.Empty(Server.InternalMessages.GetMessages<WreckageEncounterDenied>());
+            Assert.False(encounterTracker.TryGetEncounter(offlineHero, out _));
+            Assert.True(encounterTracker.TryGetEncounter(secondHero, out var encounter));
+            Assert.Same(battleWreckage, encounter.BattleWreckage);
+            var started = Server.InternalMessages.GetMessages<WreckageEncounterStarted>().ToList();
+            Assert.Equal(2, started.Count);
+            Assert.Same(secondHero, started[1].MainHero);
+            Assert.False(started[1].IsInterrupted);
+        });
+    }
+
+    [Fact]
     public void ServerStart_InvestigatedEpicRemains_LetsSeveralPlayersView()
     {
         // Arrange
@@ -585,6 +689,18 @@ public class BattleWreckageLifetimeTests : IDisposable
         var hero = GameObjectCreator.CreateInitializedObject<Hero>();
         var party = GameObjectCreator.CreateInitializedObject<MobileParty>();
         party.MemberRoster.AddToCounts(hero.CharacterObject, 1);
+        return hero;
+    }
+
+    private static void ProvideCampaignTime(ref CampaignTime __result) => __result = Campaign.Current.MapTimeTracker.Now;
+
+    // A registered player with no peer, which is how the player manager sees one that disconnected. Run inside Server.Call
+    private Hero CreateDisconnectedPlayerLeader(string controllerId)
+    {
+        var hero = CreatePartyLeader();
+        Assert.True(Server.ObjectManager.TryGetId(hero, out var heroId));
+        Assert.True(Server.Resolve<IPlayerManager>().AddPlayer(new Player(controllerId, heroId, null, null, null)));
+        Assert.True(Server.Resolve<IPlayerManager>().IsOwnerOfHeroDisconnected(hero));
         return hero;
     }
 

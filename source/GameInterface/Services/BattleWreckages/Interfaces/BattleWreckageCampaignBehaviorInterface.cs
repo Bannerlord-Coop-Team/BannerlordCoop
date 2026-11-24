@@ -50,7 +50,7 @@ public interface IBattleWreckageCampaignBehaviorInterface : IGameAbstraction
     void ShowRecoverTroopsDecision(int recoverTroopCount, CampaignTime requiredInvestigationDuration);
     void ShowWreckageResultsConnectionMenu();
     void AcceptRecoverTroops(Hero mainHero);
-    void RemoveDisconnectedPlayers();
+    void InterruptDisconnectedPlayers();
 }
 
 public class BattleWreckageCampaignBehaviorInterface : IBattleWreckageCampaignBehaviorInterface
@@ -97,14 +97,24 @@ public class BattleWreckageCampaignBehaviorInterface : IBattleWreckageCampaignBe
 
     public void StartWreckageEncounter(BattleWreckage battleWreckage, Hero mainHero)
     {
-        // One player investigates a wreckage at a time, and an interrupted one keeps it for their resume.
+        // One player investigates a wreckage at a time, and an interrupted one keeps it for their resume unless they disconnected.
         // Investigated Epic remains only show the battle summary, so any number of players can view them
         var isRemains = battleWreckage.IsInvestigated && battleWreckage.WreckageTypeCategory == BattleWreckage.WreckageType.Epic;
-        var isHeldByAnotherPlayer = encounterTracker.Encounters.Any(other => other.Hero != mainHero && other.BattleWreckage == battleWreckage);
-        if (!isRemains && isHeldByAnotherPlayer)
+        if (!isRemains)
         {
-            messageBroker.Publish(this, new WreckageEncounterDenied(mainHero));
-            return;
+            var holders = encounterTracker.Encounters.Where(other => other.Hero != mainHero && other.BattleWreckage == battleWreckage).ToList();
+            var isHeldByConnectedPlayer = holders.Any(holder => !playerManager.IsOwnerOfHeroDisconnected(holder.Hero));
+            if (isHeldByConnectedPlayer)
+            {
+                messageBroker.Publish(this, new WreckageEncounterDenied(mainHero));
+                return;
+            }
+
+            // A disconnected player's interrupted investigation ends early so whoever comes next can take the wreckage
+            foreach (var holder in holders)
+            {
+                LeaveWreckageEncounter(holder.Hero, BattleWreckageCampaignBehavior.WreckageLeaveReason.WreckageExpired);
+            }
         }
 
         // Server half of vanilla SetCurrentEncounteredBattleWreckage, returning to the interrupted wreckage resumes its remaining time
@@ -123,6 +133,7 @@ public class BattleWreckageCampaignBehaviorInterface : IBattleWreckageCampaignBe
         }
 
         encounter.IsInterrupted = isInterrupted;
+        encounter.IsInvestigating = true;
         encounter.InvestigationStartTime = CampaignTime.Now;
 
         var message = new WreckageEncounterStarted(battleWreckage, mainHero, isInterrupted, encounter.RequiredInvestigationDuration);
@@ -223,6 +234,7 @@ public class BattleWreckageCampaignBehaviorInterface : IBattleWreckageCampaignBe
                 var remainingHours = MathF.Max(1f, (float)(encounter.RequiredInvestigationDuration.ToHours - elapsed.ToHours));
                 encounter.RequiredInvestigationDuration = CampaignTime.Hours(remainingHours);
                 encounter.LastInteractionTime = CampaignTime.Now;
+                encounter.IsInvestigating = false;
                 encounter.InvestigationStartTime = CampaignTime.Zero;
                 encounter.LootedTroops = null;
                 encounter.LootedItems = null;
@@ -385,12 +397,16 @@ public class BattleWreckageCampaignBehaviorInterface : IBattleWreckageCampaignBe
         encounter.InvestigationStartTime = CampaignTime.Now;
     }
 
-    public void RemoveDisconnectedPlayers()
+    public void InterruptDisconnectedPlayers()
     {
         foreach (var encounter in encounterTracker.Encounters)
         {
-            if (playerManager.IsOwnerOfHeroDisconnected(encounter.Hero))
-                encounterTracker.RemoveEncounter(encounter.Hero);
+            // An interrupted encounter keeps the time it has left, interrupting it again would count from CampaignTime.Zero
+            if (!encounter.IsInvestigating) continue;
+            if (!playerManager.IsOwnerOfHeroDisconnected(encounter.Hero)) continue;
+
+            // Kept like being attacked mid investigation, so the player resumes on reconnect until it expires
+            LeaveWreckageEncounter(encounter.Hero, BattleWreckageCampaignBehavior.WreckageLeaveReason.PlayerInterrupted);
         }
     }
 
