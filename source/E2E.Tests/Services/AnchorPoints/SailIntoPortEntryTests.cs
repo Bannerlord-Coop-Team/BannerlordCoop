@@ -101,7 +101,6 @@ public class SailIntoPortEntryTests : MapEventTestBase
                 party.IsCurrentlyAtSea = true;
                 party.IsActive = true;
             }
-            party.Anchor.ResetPosition();
         });
 
         return (partyId, settlementId);
