@@ -20,7 +20,9 @@ using Moq;
 using Newtonsoft.Json.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
@@ -41,6 +43,10 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment, IDisp
     protected const string PirateId = "pirates";
 
     protected const float TickSeconds = 0.05f;
+
+    // The full condition of a ship from GiveShip.
+    protected const float MaxHitPoints = 1000f;
+    protected const float MaxSailHitPoints = 500f;
 
     private readonly bool previousNavalEnabled = ModInformation.IsNavalEnabled;
 
@@ -161,6 +167,39 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment, IDisp
         Server.Call(() => Server.SimulateMessage(this, new PlayerDisconnected(departed.Instance.NetPeer, default)),
             VictoryConclusionDisabledMethods());
         Server.PumpGameThread();
+    }
+
+    // A registered ship at full condition, given to the party through the vanilla production ownership path on the server.
+    protected string GiveShip(string mobilePartyId)
+    {
+        var shipId = CreateRegisteredObject<Ship>();
+        foreach (var instance in new[] { Server }.Concat(Clients))
+            instance.Call(() =>
+            {
+                var hull = instance.GetRegisteredObject<Ship>(shipId).ShipHull;
+                hull.MaxHitPoints = (int)MaxHitPoints;
+                hull.MaxSailHitPoints = (int)MaxSailHitPoints;
+            });
+        Server.Call(() =>
+        {
+            var ship = Server.GetRegisteredObject<Ship>(shipId);
+            ChangeShipOwnerAction.ApplyByProduction(Server.GetRegisteredObject<MobileParty>(mobilePartyId).Party, ship);
+            ship.HitPoints = MaxHitPoints;
+            ship.SailHitPoints = MaxSailHitPoints;
+        });
+        return shipId;
+    }
+
+    // The party the server registered for the player.
+    protected string PlayerPartyOf(string controllerId)
+    {
+        string partyId = null!;
+        Server.Call(() =>
+        {
+            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(controllerId, out var player));
+            partyId = player.MobilePartyId;
+        });
+        return partyId;
     }
 
     protected void AssertMapEventRemoved(string mapEventId) =>

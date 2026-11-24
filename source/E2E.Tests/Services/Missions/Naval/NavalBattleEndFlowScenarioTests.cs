@@ -10,9 +10,7 @@ using GameInterface.Services.PlayerCaptivityService.Messages;
 using HarmonyLib;
 using Missions.Messages;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.MapEvents;
-using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
@@ -127,26 +125,16 @@ public class NavalBattleEndFlowScenarioTests : NavalBattleTestEnvironment
     public void KeptHost_CannotEnterAgain_AndAnotherMembersAttackLeavesItOut()
     {
         using var battle = StartServerBattle(atSea: true, out var a, out var b, out var concluded);
-        GiveShip(a);
+        GiveShip(PlayerPartyOf(a.Id));
+        GiveShip(PlayerPartyOf(b.Id));
         a.Commit();
         battle.TickAll();
         ReportWin(a);
         LeaveMission(battle, a);
-        Server.Call(() => Server.Resolve<BattleMissionStartHandler>().GetOrCreateMissionInitializerSnapshot(battle.MapEventId,
-            () => new MissionInitializerRecord("test-naval")));
         int startsToA = a.Instance.InternalMessages.GetMessages<NetworkStartAttackMission>().Count();
 
-        bool navalEnabled = ModInformation.IsNavalEnabled;
-        try
-        {
-            ModInformation.IsNavalEnabled = true;
-            RequestAttack(battle, a, "kept-host-attack");
-            RequestAttack(battle, b, "member-attack");
-        }
-        finally
-        {
-            ModInformation.IsNavalEnabled = navalEnabled;
-        }
+        RequestAttack(battle, a, "kept-host-attack");
+        RequestAttack(battle, b, "member-attack");
 
         var replies = Server.NetworkSentMessages.GetMessages<NetworkBattleStartReply>().ToArray();
         Assert.False(replies.Single(reply => reply.RequestId == "kept-host-attack").Accepted);
@@ -170,23 +158,12 @@ public class NavalBattleEndFlowScenarioTests : NavalBattleTestEnvironment
     public void HostRejoiningBeforeItsOldPeerTimesOut_IsNotRefused()
     {
         using var battle = StartServerBattle(atSea: true, out var a, out _, out var concluded);
-        GiveShip(a);
+        GiveShip(PlayerPartyOf(a.Id));
         a.Commit();
         battle.TickAll();
-        Server.Call(() => Server.Resolve<BattleMissionStartHandler>().GetOrCreateMissionInitializerSnapshot(battle.MapEventId,
-            () => new MissionInitializerRecord("test-naval")));
         int startsToA = a.Instance.InternalMessages.GetMessages<NetworkStartAttackMission>().Count();
 
-        bool navalEnabled = ModInformation.IsNavalEnabled;
-        try
-        {
-            ModInformation.IsNavalEnabled = true;
-            RequestAttack(battle, a, "rejoined-host-attack");
-        }
-        finally
-        {
-            ModInformation.IsNavalEnabled = navalEnabled;
-        }
+        RequestAttack(battle, a, "rejoined-host-attack");
 
         var reply = Server.NetworkSentMessages.GetMessages<NetworkBattleStartReply>()
             .Single(sent => sent.RequestId == "rejoined-host-attack");
@@ -202,22 +179,12 @@ public class NavalBattleEndFlowScenarioTests : NavalBattleTestEnvironment
     public void ShiplessMember_IsLeftOutOfAnotherMembersAttack()
     {
         using var battle = StartServerBattle(atSea: true, out var a, out var b, out _);
-        GiveShip(a);
-        Server.Call(() => Server.Resolve<BattleMissionStartHandler>().GetOrCreateMissionInitializerSnapshot(battle.MapEventId,
-            () => new MissionInitializerRecord("test-naval")));
+        // B keeps the harness default of no ships.
+        GiveShip(PlayerPartyOf(a.Id));
         int startsToA = a.Instance.InternalMessages.GetMessages<NetworkStartAttackMission>().Count();
         int startsToB = b.Instance.InternalMessages.GetMessages<NetworkStartAttackMission>().Count();
 
-        bool navalEnabled = ModInformation.IsNavalEnabled;
-        try
-        {
-            ModInformation.IsNavalEnabled = true;
-            RequestAttack(battle, a, "armed-member-attack");
-        }
-        finally
-        {
-            ModInformation.IsNavalEnabled = navalEnabled;
-        }
+        RequestAttack(battle, a, "armed-member-attack");
 
         Assert.True(Server.NetworkSentMessages.GetMessages<NetworkBattleStartReply>()
             .Single(sent => sent.RequestId == "armed-member-attack").Accepted);
@@ -225,25 +192,16 @@ public class NavalBattleEndFlowScenarioTests : NavalBattleTestEnvironment
         Assert.Equal(startsToB, b.Instance.InternalMessages.GetMessages<NetworkStartAttackMission>().Count());
     }
 
-    // The player's party owns one ship on the server, the fleet a naval mission participant spawns from.
-    private void GiveShip(NavalPeer player)
-    {
-        var shipId = CreateRegisteredObject<Ship>();
-        Server.Call(() =>
-        {
-            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(player.Id, out var registered));
-            ChangeShipOwnerAction.ApplyByProduction(Server.GetRegisteredObject<MobileParty>(registered.MobilePartyId).Party,
-                Server.GetRegisteredObject<Ship>(shipId));
-        });
-    }
-
-    // The player presses Attack at the battle's encounter menu.
+    // The player presses Attack at the battle's encounter menu. The mission initializer is seeded first, so the server
+    // reuses it instead of building one from the campaign.
     private void RequestAttack(NavalBattle battle, NavalPeer player, string requestId)
     {
         // The headless manager uses Default without loading the engine's BannerlordConfig.
         var spawnSettings = new[] { AccessTools.PropertyGetter(typeof(MBGameManager), nameof(MBGameManager.UnitSpawnPrioritization)) };
         Server.Call(() =>
         {
+            Server.Resolve<BattleMissionStartHandler>().GetOrCreateMissionInitializerSnapshot(battle.MapEventId,
+                () => new MissionInitializerRecord("test-naval"));
             Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(player.Id, out var registered));
             Server.SimulateMessage(player.Instance.NetPeer, new NetworkBattleStartRequest(requestId, (int)BattleStartMode.Mission,
                 battle.MapEventId, registered.MobilePartyId));
