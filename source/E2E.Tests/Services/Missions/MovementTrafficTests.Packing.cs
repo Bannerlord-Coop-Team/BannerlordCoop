@@ -26,27 +26,50 @@ public partial class MovementTrafficTests
             var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
             var sender = new MovementPacketCompressor(serializer);
             var receiver = new MovementPacketCompressor(serializer);
-            var capture = CreateEncodeOnceCaptures(mock, riders: 72, mounts: 24, frames: 2);
-            var skipped = capture[0].RiderBatches[1];
-            var latest = capture[1].RiderBatches[1];
             const int count = 18;
-            Guid[] canonicalIds = latest.CanonicalIds.Take(count).Reverse().ToArray();
-            AgentData[] riders = latest.Data.Take(count).Reverse().ToArray();
-            Guid[] deckShips = IndexEncodeOnceDecks(riders)!;
-            Assert.Equal(2, deckShips.Length);
-            Assert.Contains(riders, rider => rider.MountData != null);
-            Assert.Contains(riders, rider => rider.MountData == null);
-            long[] revisions = latest.AuthorityRevisions.Take(count).Reverse().ToArray();
-            var movement = scoped
-                ? new MovementPacket(EquivalenceScope, latest.CompactIds.Take(count).Reverse().ToArray(),
-                    riders, EquivalenceSender, revisions, 208, deckShips)
-                : new MovementPacket(canonicalIds, riders, EquivalenceSender, revisions, 208, deckShips);
+            var deckShips = new[] { EquivalenceGuid(9001), EquivalenceGuid(9002) };
+            var canonicalIds = new Guid[count];
+            var compactIds = new ushort[count];
+            var revisions = new long[count];
+            var first = new AgentData[count];
+            var latest = new AgentData[count];
+            for (int i = 0; i < count; i++)
+            {
+                var rider = SpawnRider(mock);
+                var mount = i % 3 == 0 ? mock.SpawnMount(rider) : null;
+                Assert.True(AgentMirror.TryGet(rider, out var mirror));
+                if (mount != null)
+                {
+                    Assert.True(AgentMirror.TryGet(mount, out var mountMirror));
+                    PopulatePackedMovementState(mountMirror, i + count);
+                }
+                canonicalIds[i] = EquivalenceGuid(i);
+                compactIds[i] = (ushort)(i + 1);
+                revisions[i] = i + 1;
+                PopulatePackedMovementState(mirror, i);
+                first[i] = new AgentData(rider);
+                PopulatePackedMovementState(mirror, i + (2 * count));
+                latest[i] = mount == null
+                    ? new AgentData(rider)
+                    : new AgentData(rider, (ushort)(2000 + i), EquivalenceScope, EquivalenceGuid(2000 + i),
+                        mountAuthorityRevision: i);
+                if (i % 5 == 0)
+                {
+                    int hull = i % deckShips.Length;
+                    latest[i].CaptureDeck(deckShips[hull], new Vec3(i * 0.25f, -i * 0.5f, 0.75f), 1.5f);
+                    latest[i].IndexDeck(hull + 1);
+                }
+            }
 
-            AgentData[] skippedRiders = skipped.Data.Take(count).ToArray();
-            sender.SerializeSnapshots(new MovementPacket(
-                skipped.CanonicalIds.Take(count).ToArray(), skippedRiders, EquivalenceSender, sampleSequence: 207,
-                deckShips: IndexEncodeOnceDecks(skippedRiders)!), skipped.CanonicalIds.Take(count).ToArray());
-            byte[] wire = sender.SerializeSnapshots(movement, canonicalIds);
+            sender.Serialize(new MovementPacket(canonicalIds, first, EquivalenceSender, sampleSequence: 207));
+            Array.Reverse(latest);
+            Array.Reverse(compactIds);
+            Array.Reverse(canonicalIds);
+            Array.Reverse(revisions);
+            var movement = scoped
+                ? new MovementPacket(EquivalenceScope, compactIds, latest, EquivalenceSender, revisions, 208, deckShips)
+                : new MovementPacket(canonicalIds, latest, EquivalenceSender, revisions, 208, deckShips);
+            byte[] wire = sender.Serialize(movement);
 
             var restored = Assert.IsType<MovementPacket>(RestorePackedMovement(serializer, receiver, wire));
             Assert.Equal(serializer.Serialize(movement), serializer.Serialize(restored));
@@ -55,7 +78,7 @@ public partial class MovementTrafficTests
             {
                 AgentData snapshot = restored.Agents[i];
                 snapshot.ResolveDeckShip(restored.DeckShips);
-                Assert.Equal(riders[i].DeckShip, snapshot.DeckShip);
+                Assert.Equal(latest[i].DeckShip, snapshot.DeckShip);
             }
         });
     }
@@ -86,7 +109,15 @@ public partial class MovementTrafficTests
                 revisions[i] = i * 17L;
                 if (standaloneMounts)
                 {
-                    mounts[i] = new AgentMountData(agent, ids[i], i % 3 == 0 ? "mount-scope-é" : null,
+                    // Exercise both sides of the length-prefix boundary in UTF-8 bytes.
+                    string? scope = i switch
+                    {
+                        0 => new string('é', 63) + "a",
+                        3 => new string('é', 62) + "😀",
+                        6 => string.Empty,
+                        _ => i % 3 == 0 ? "mount-scope-é" : null,
+                    };
+                    mounts[i] = new AgentMountData(agent, ids[i], scope,
                         i % 3 == 1 ? guids[i] : Guid.Empty, mountAction0Speed: 1.2f,
                         mountAction0IsLocomotion: i % 2 == 0, mountAction0TurnDirection: (i % 3) - 1,
                         mountAction0TurnActionIndex: i + 100, mountAction0TurnProgress: 0.42f,

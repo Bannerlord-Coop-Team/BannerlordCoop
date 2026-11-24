@@ -558,7 +558,6 @@ namespace Missions.Agents.Packets
         [ProtoMember(21)]
         public long? MountAuthorityRevision { get; private set; }
 
-        internal const int SnapshotBytes = 97;
         private const byte HasScope = 1;
         private const byte HasGuid = 2;
         private const byte HasRevision = 4;
@@ -570,6 +569,7 @@ namespace Missions.Agents.Packets
             int length = 0;
             if (MountIdentityScopeId != null)
             {
+                // BinaryWriter prefixes strings with their UTF-8 byte count as a 7-bit integer.
                 int utf8Length = Encoding.UTF8.GetByteCount(MountIdentityScopeId);
                 length += ProtoBufSerializer.GetVarintLength((uint)utf8Length) + utf8Length;
             }
@@ -577,6 +577,8 @@ namespace Missions.Agents.Packets
             if (MountAuthorityRevision.HasValue) length += sizeof(long);
             return length;
         }
+
+        internal const int SnapshotBytes = sizeof(byte) + (14 * sizeof(float)) + (6 * sizeof(uint)) + (2 * sizeof(ulong));
 
         internal void WriteSnapshot(ref MovementSnapshotColumns columns, BinaryWriter extras)
         {

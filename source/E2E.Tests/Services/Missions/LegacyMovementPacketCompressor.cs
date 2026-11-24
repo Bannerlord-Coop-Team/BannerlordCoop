@@ -20,8 +20,6 @@ internal sealed class LegacyMovementPacketCompressor : IMovementPacketCompressor
         this.serializer = serializer;
     }
 
-    public byte[] SerializeSnapshots(IPacket packet, Guid[] snapshotIds) => Serialize(packet);
-
     public byte[] Serialize(IPacket packet)
     {
         byte[] original = serializer.Serialize(packet);

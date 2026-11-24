@@ -26,6 +26,8 @@ namespace Missions.Agents.Packets
         [ProtoMember(4)]
         public Guid[] AgentGuids { get; }
 
+        internal int SnapshotCount => AgentIds?.Length ?? AgentGuids?.Length ?? 0;
+
         [ProtoMember(5)]
         public string SenderControllerId { get; }
 
@@ -82,9 +84,5 @@ namespace Missions.Agents.Packets
         internal MovementPacket WithAuthorityRevisions(long[] revisions) => AgentIds == null
             ? new MovementPacket(AgentGuids, Agents, SenderControllerId, revisions, SampleSequence, DeckShips)
             : new MovementPacket(IdentityScopeId, AgentIds, Agents, SenderControllerId, revisions, SampleSequence, DeckShips);
-        // The packet without its snapshot array, so cached snapshot encodings can be spliced in.
-        internal MovementPacket WithoutAgents() => AgentIds == null
-            ? new MovementPacket(AgentGuids, null, SenderControllerId, AuthorityRevisions, SampleSequence, DeckShips)
-            : new MovementPacket(IdentityScopeId, AgentIds, null, SenderControllerId, AuthorityRevisions, SampleSequence, DeckShips);
     }
 }

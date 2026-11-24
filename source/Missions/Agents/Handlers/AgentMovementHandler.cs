@@ -903,21 +903,6 @@ public partial class AgentMovementHandler : IAgentMovementHandler
             return traffic;
         }
 
-        // Sharing snapshot encodings only pays off when two or more recipients send this capture's agents.
-        int sendingRecipients = includeAuthoritativeAgents ? 0 : recipientIds.Count;
-        if (includeAuthoritativeAgents)
-        {
-            foreach (string recipientId in recipientIds)
-            {
-                if (!recipientMovementStates.TryGetValue(recipientId, out RecipientMovementState state) ||
-                    IsBulkIntervalElapsed(state, movementRateController.GetReceiverCapHz(recipientId), out _))
-                {
-                    sendingRecipients++;
-                }
-            }
-        }
-        movementBatchSender.SetCaptureRecipients(sendingRecipients);
-
         int recipientOffset = includeAuthoritativeAgents
             ? bulkRecipientSendOffset
             : priorityRecipientSendOffset;

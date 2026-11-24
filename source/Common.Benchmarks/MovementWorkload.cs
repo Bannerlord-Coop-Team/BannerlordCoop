@@ -38,7 +38,7 @@ internal sealed class MovementWorkload
     private readonly int payloadBudget;
     private readonly int[] preferredCounts;
     private readonly bool encodeOnce;
-    // Each agent's encoding for the current frame, back to back, indexed by agent id like the production cache.
+    // Each agent's encoding for the current frame, back to back, indexed by agent id as in #4487.
     private readonly MemoryStream agentEncodings = new MemoryStream();
     private readonly Dictionary<Guid, (int Offset, int Length)> encodings = new Dictionary<Guid, (int Offset, int Length)>();
     private readonly Guid[] agentIds;
@@ -157,11 +157,11 @@ internal sealed class MovementWorkload
         return encodeOnce ? CompressFromCache(start, count, packet) : Compress(packet);
     }
 
-    // Same steps as MovementPacketCompressor.SerializeSnapshots.
+    // Replays the protobuf snapshot splice cache from #4487.
     private byte[] CompressFromCache(int start, int count, MovementShapePacket packet)
     {
         long t0 = Stopwatch.GetTimestamp();
-        // MovementBatchSender copies each compact candidate's canonical ids; a guid candidate's packet ids are that copy.
+        // Model the extra canonical id copy #4487 made for compact candidates.
         Guid[] ids = agentIds;
         int idStart = start;
         if (packet.AgentGuids == null)
@@ -233,7 +233,7 @@ internal sealed class MovementWorkload
         }
     }
 
-    // Same steps as MovementPacketCompressor.Compress, which writes the envelope without protobuf-net.
+    // Writes the envelope without protobuf-net, as in #4487.
     private byte[] CompressDirect(byte[] original, int length)
     {
         if (length == 0 || length > MaxUncompressedBytes) return original.AsSpan(0, length).ToArray();
@@ -321,7 +321,7 @@ internal sealed class MovementWorkload
         return offset;
     }
 
-    // Same steps as MovementPacketCompressor.Serialize.
+    // Serializes the protobuf packet, then compresses it if the envelope is smaller.
     private byte[] Compress(MovementShapePacket packet)
     {
         long t0 = Stopwatch.GetTimestamp();

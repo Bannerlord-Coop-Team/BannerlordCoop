@@ -203,12 +203,10 @@ namespace Missions.Agents.Packets
         [ProtoIgnore]
         public System.Guid DeckShip { get; private set; }
 
-        internal const int SnapshotBytes = 49;
-        internal const int DeckSnapshotBytes = 16;
+        internal const int SnapshotBytes = (11 * sizeof(float)) + sizeof(uint);
 
-        internal void WriteSnapshot(ref MovementSnapshotColumns columns, byte attachments)
+        internal void WriteSnapshot(ref MovementSnapshotColumns columns)
         {
-            columns.WriteByte(attachments);
             columns.WriteVec3(Position);
             columns.WriteVec2(InputVector);
             columns.WriteVec3(LookDirection);
@@ -226,6 +224,8 @@ namespace Missions.Agents.Packets
             Speed = columns.ReadSingle(),
             MovementFlag = columns.ReadUInt32(),
         };
+
+        internal const int DeckSnapshotBytes = sizeof(uint) + (3 * sizeof(float));
 
         internal void WriteDeckSnapshot(ref MovementSnapshotColumns columns)
         {
