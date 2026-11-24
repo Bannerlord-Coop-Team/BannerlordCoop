@@ -10,7 +10,10 @@ using GameInterface.Services.PlayerCaptivityService.Messages;
 using HarmonyLib;
 using Missions.Messages;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Naval;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
@@ -124,6 +127,7 @@ public class NavalBattleEndFlowScenarioTests : NavalBattleTestEnvironment
     public void KeptHost_CannotEnterAgain_AndAnotherMembersAttackLeavesItOut()
     {
         using var battle = StartServerBattle(atSea: true, out var a, out var b, out var concluded);
+        GiveShip(a);
         a.Commit();
         battle.TickAll();
         ReportWin(a);
@@ -166,6 +170,7 @@ public class NavalBattleEndFlowScenarioTests : NavalBattleTestEnvironment
     public void HostRejoiningBeforeItsOldPeerTimesOut_IsNotRefused()
     {
         using var battle = StartServerBattle(atSea: true, out var a, out _, out var concluded);
+        GiveShip(a);
         a.Commit();
         battle.TickAll();
         Server.Call(() => Server.Resolve<BattleMissionStartHandler>().GetOrCreateMissionInitializerSnapshot(battle.MapEventId,
@@ -189,6 +194,47 @@ public class NavalBattleEndFlowScenarioTests : NavalBattleTestEnvironment
         Assert.Equal(startsToA + 1, a.Instance.InternalMessages.GetMessages<NetworkStartAttackMission>().Count());
         AssertHost(Server, battle.MapEventId, "A", "B");
         Assert.Equal(0, concluded());
+    }
+
+    // #4890: co-op fields only each player's own ships, so a ship-less army member at sea is left out of another member's
+    // Attack instead of being sent a mission it can't open.
+    [Fact]
+    public void ShiplessMember_IsLeftOutOfAnotherMembersAttack()
+    {
+        using var battle = StartServerBattle(atSea: true, out var a, out var b, out _);
+        GiveShip(a);
+        Server.Call(() => Server.Resolve<BattleMissionStartHandler>().GetOrCreateMissionInitializerSnapshot(battle.MapEventId,
+            () => new MissionInitializerRecord("test-naval")));
+        int startsToA = a.Instance.InternalMessages.GetMessages<NetworkStartAttackMission>().Count();
+        int startsToB = b.Instance.InternalMessages.GetMessages<NetworkStartAttackMission>().Count();
+
+        bool navalEnabled = ModInformation.IsNavalEnabled;
+        try
+        {
+            ModInformation.IsNavalEnabled = true;
+            RequestAttack(battle, a, "armed-member-attack");
+        }
+        finally
+        {
+            ModInformation.IsNavalEnabled = navalEnabled;
+        }
+
+        Assert.True(Server.NetworkSentMessages.GetMessages<NetworkBattleStartReply>()
+            .Single(sent => sent.RequestId == "armed-member-attack").Accepted);
+        Assert.Equal(startsToA + 1, a.Instance.InternalMessages.GetMessages<NetworkStartAttackMission>().Count());
+        Assert.Equal(startsToB, b.Instance.InternalMessages.GetMessages<NetworkStartAttackMission>().Count());
+    }
+
+    // The player's party owns one ship on the server, the fleet a naval mission participant spawns from.
+    private void GiveShip(NavalPeer player)
+    {
+        var shipId = CreateRegisteredObject<Ship>();
+        Server.Call(() =>
+        {
+            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(player.Id, out var registered));
+            ChangeShipOwnerAction.ApplyByProduction(Server.GetRegisteredObject<MobileParty>(registered.MobilePartyId).Party,
+                Server.GetRegisteredObject<Ship>(shipId));
+        });
     }
 
     // The player presses Attack at the battle's encounter menu.

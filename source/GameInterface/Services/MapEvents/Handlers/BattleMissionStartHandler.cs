@@ -390,6 +390,10 @@ internal class BattleMissionStartHandler : IHandler
                 hideoutRaids?.IsAdmitted(mapEvent, party) != true)
                 continue;
 
+            // Co-op fields only each player's own ships, so a ship-less army member at sea has no hull to spawn on.
+            if (mapEvent.IsNavalMapEvent && party.Ships.Count == 0)
+                continue;
+
             participants.Add(new MissionParticipant(
                 player.ControllerId,
                 peer,

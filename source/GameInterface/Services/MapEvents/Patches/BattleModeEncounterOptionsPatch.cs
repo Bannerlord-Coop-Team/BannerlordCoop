@@ -28,7 +28,8 @@ namespace GameInterface.Services.MapEvents.Patches;
 /// from the server's <see cref="Messages.Start.NetworkBattleModeSet"/>. The surrender option gets the inverse
 /// treatment: forced available for a defender that cannot fight (see <see cref="PostfixSurrenderCondition"/>) and
 /// refused while either mode owns the event. Abandon army is hidden while a destroyed battle waits for deferred
-/// encounter cleanup; other options (join, regular leave, talk) are untouched.
+/// encounter cleanup, and Attack greys out for a ship-less party in a naval battle; other options (join, regular
+/// leave, talk) are untouched.
 /// </summary>
 /// <remarks>
 /// One shared postfix per option-condition in <see cref="MissionStartConditions"/> / <see cref="SimulationStartConditions"/> /
@@ -45,6 +46,7 @@ internal class BattleModeEncounterOptionsPatch
     private static readonly TextObject LowMoraleTooltip = new("{=xnRtINwH}Your men lack the courage to continue the battle without you. (Low Morale)");
     private static readonly TextObject WoundedTooltip = new("{=UL8za0AO}You are wounded.");
     private static readonly TextObject RaftTooltip = new("{=x9ePfpw5}You are on a raft, in desperate circumstances, and cannot fight");
+    private static readonly TextObject NoShipsTooltip = new("{=Yu10hbHI}You don't own any ships!");
     private const string AttackCondition = "game_menu_encounter_attack_on_condition";
     private const string OrderAttackCondition = "game_menu_encounter_order_attack_on_condition";
 
@@ -145,6 +147,15 @@ internal class BattleModeEncounterOptionsPatch
 
         // Already unavailable — nothing to do.
         if (__result == false) return;
+
+        // Co-op fields only each player's own ships, so a ship-less army member at sea has no hull to fight from.
+        var battle = GetPlayerEncounterBattle() ?? MobileParty.MainParty?.MapEvent;
+        if (name == AttackCondition && battle?.IsNavalMapEvent == true && MobileParty.MainParty.Ships.Count == 0)
+        {
+            __0.IsEnabled = false;
+            __0.Tooltip = NoShipsTooltip;
+            return;
+        }
 
         if (!TryGetCurrentMapEventId(out var mapEventId)) return;
 
