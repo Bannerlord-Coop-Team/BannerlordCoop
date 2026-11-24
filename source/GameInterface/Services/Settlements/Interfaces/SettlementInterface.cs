@@ -58,7 +58,8 @@ public interface ISettlementInterface : IGameAbstraction
 
     /// <summary>
     /// Server-only: anchors the fleet of a party about to land from the sea in a settlement, the way vanilla's
-    /// EnterSettlementAction.ApplyForParty does. Call it only right before that party's <see cref="PartyEnterSettlement"/>.
+    /// EnterSettlementAction.ApplyForParty does. Only for a party whose <see cref="PartyEnterSettlement"/> into that
+    /// settlement follows, otherwise the fleet stays anchored at a settlement the party never entered.
     /// </summary>
     void AnchorLandingFleet(MobileParty party, Settlement settlement);
 
@@ -164,6 +165,9 @@ internal class SettlementInterface : ISettlementInterface
 
     public void AnchorLandingFleet(MobileParty party, Settlement settlement)
     {
+        // PartyEnterSettlement keeps a besieger outside, so its fleet doesn't land either
+        if (party.BesiegedSettlement == settlement) return;
+
         // Same checks as EnterSettlementAction.ApplyForParty, which then finds the fleet already anchored
         if (!party.IsCurrentlyAtSea || settlement.IsVillage || !party.HasLandNavigationCapability) return;
         if (party.Ships.Count == 0 || party.Anchor.IsAtSettlement(settlement)) return;
