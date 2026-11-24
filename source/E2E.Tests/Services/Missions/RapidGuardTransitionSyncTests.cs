@@ -101,9 +101,9 @@ public class RapidGuardTransitionSyncTests : MissionTestEnvironment
             puppetMirror.SetActionChannelCalls = 0;
             var release = new AgentActionData(
                 owner,
+                new AgentActionData.ActionTypes(owner),
                 Agent.MovementControlFlag.None,
-                Agent.GuardMode.None,
-                new AgentActionData.ActionTypes(owner));
+                Agent.GuardMode.None);
 
             context.Component.AgentActionHandler.HandlePacket(null,
                 new AgentActionPacket(

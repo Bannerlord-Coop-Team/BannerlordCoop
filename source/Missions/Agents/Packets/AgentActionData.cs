@@ -29,6 +29,13 @@ namespace Missions.Agents.Packets
                 Channel0 = agent.GetCurrentActionType(0);
                 Channel1 = agent.GetCurrentActionType(1);
             }
+
+            public Agent.ActionCodeType ForChannel(int channel) => channel switch
+            {
+                0 => Channel0,
+                1 => Channel1,
+                _ => Agent.ActionCodeType.Other
+            };
         }
 
         // MBAPI.IMBAnimation is a non-public static field. The publicizer makes it compile, but the
@@ -410,26 +417,26 @@ namespace Missions.Agents.Packets
             Agent.MovementControlFlag defendFlags)
             : this(
                 agent,
+                actionTypes,
                 defendFlags,
                 GetEffectiveGuardMode(
                     agent,
                     defendFlags,
-                    GetGuardModeFromDefendingAction(agent, actionTypes)),
-                actionTypes)
+                    GetGuardModeFromDefendingAction(agent, actionTypes)))
         {
         }
 
         internal AgentActionData(
             Agent agent,
+            ActionTypes actionTypes,
             Agent.MovementControlFlag defendFlags,
             Agent.GuardMode guardMode,
-            ActionTypes actionTypes,
             int guardReactionChannel = -1)
             : this(
                 agent,
+                actionTypes,
                 defendFlags,
                 guardMode,
-                actionTypes,
                 guardReactionChannel,
                 GetCurrentActionSpeed(agent, 0),
                 GetCurrentActionSpeed(agent, 1),
@@ -440,9 +447,9 @@ namespace Missions.Agents.Packets
         // The equipment is passed in by the caller that already captured it this frame, so it isn't read twice.
         internal AgentActionData(
             Agent agent,
+            ActionTypes actionTypes,
             Agent.MovementControlFlag defendFlags,
             Agent.GuardMode guardMode,
-            ActionTypes actionTypes,
             int guardReactionChannel,
             float? action0Speed,
             float? action1Speed,
@@ -497,14 +504,10 @@ namespace Missions.Agents.Packets
                 ? validGuardReactionChannel
                 : GetGuardActionChannel(actionTypes, guardPresentationChannel);
             GuardActionChannelWire = guardActionChannel + 1;
-            Agent.ActionCodeType guardActionType = guardActionChannel == 0
-                ? actionTypes.Channel0
-                : actionTypes.Channel1;
-            GuardActionIsDefending =
-                guardActionChannel >= 0 && IsDefendingAction(guardActionType);
+            Agent.ActionCodeType guardActionType = actionTypes.ForChannel(guardActionChannel);
+            GuardActionIsDefending = IsDefendingAction(guardActionType);
             GuardActionIsReaction =
-                guardActionChannel >= 0
-                && (validGuardReactionChannel >= 0 || IsGuardReactionAction(guardActionType));
+                validGuardReactionChannel >= 0 || IsGuardReactionAction(guardActionType);
             IsMounted = agent.HasMount;
             IsPlayerControlled = isPlayerControlled;
         }
