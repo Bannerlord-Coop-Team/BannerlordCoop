@@ -1,4 +1,5 @@
 ﻿using GameInterface.Services.ObjectManager;
+using TaleWorlds.CampaignSystem.BattleWreckages;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 
@@ -33,6 +34,10 @@ internal sealed class PartyBehaviorWireMapper : IPartyBehaviorWireMapper
         {
             if (!TryGetHandle<MobileParty>(source.InteractablePointId, out interactablePointId)) return false;
         }
+        else if (source.IsInteractableWreckage)
+        {
+            if (!TryGetHandle<BattleWreckage>(source.InteractablePointId, out interactablePointId)) return false;
+        }
         else if (!TryGetHandle<PartyBase>(source.InteractablePointId, out interactablePointId))
         {
             return false;
@@ -57,6 +62,7 @@ internal sealed class PartyBehaviorWireMapper : IPartyBehaviorWireMapper
             PartyMoveMode = source.PartyMoveMode,
             MoveTargetPartyId = moveTargetPartyId,
             IsInteractableAnchor = source.IsInteractableAnchor,
+            IsInteractableWreckage = source.IsInteractableWreckage,
             IsCurrentlyAtSea = source.IsCurrentlyAtSea,
             ResetMovementToHold = source.ResetMovementToHold,
         };
@@ -76,6 +82,10 @@ internal sealed class PartyBehaviorWireMapper : IPartyBehaviorWireMapper
         if (source.IsInteractableAnchor)
         {
             if (!TryGetId<MobileParty>(source.InteractablePointId, out interactablePointId)) return false;
+        }
+        else if (source.IsInteractableWreckage)
+        {
+            if (!TryGetId<BattleWreckage>(source.InteractablePointId, out interactablePointId)) return false;
         }
         else if (!TryGetId<PartyBase>(source.InteractablePointId, out interactablePointId))
         {
@@ -101,6 +111,7 @@ internal sealed class PartyBehaviorWireMapper : IPartyBehaviorWireMapper
             PartyMoveMode = source.PartyMoveMode,
             MoveTargetPartyId = moveTargetPartyId,
             IsInteractableAnchor = source.IsInteractableAnchor,
+            IsInteractableWreckage = source.IsInteractableWreckage,
             IsCurrentlyAtSea = source.IsCurrentlyAtSea,
             ResetMovementToHold = source.ResetMovementToHold,
         };

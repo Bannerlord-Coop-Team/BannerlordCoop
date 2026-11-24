@@ -193,6 +193,35 @@ public class BattleWreckageLifetimeTests : IDisposable
     }
 
     [Fact]
+    public void ServerMoveToWreckage_SyncsInteractableToAllClients()
+    {
+        // Arrange, a client's move to a wreckage goes through the same snapshot and wire mapping
+        var battleWreckageId = CreateServerWreckage();
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+
+        // Act
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<BattleWreckage>(battleWreckageId, out var battleWreckage));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+
+            party.SetMoveGoToInteractablePoint(battleWreckage, MobileParty.NavigationType.Default);
+            TestEnvironment.FlushCoalescer();
+        });
+
+        // Assert
+        foreach (var client in Clients)
+        {
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<BattleWreckage>(battleWreckageId, out var battleWreckage));
+                Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+                Assert.Same(battleWreckage, party.Ai.AiBehaviorInteractable);
+            });
+        }
+    }
+
+    [Fact]
     public void ServerLeave_InvestigationCompleted_SyncsInvestigatedToAllClients()
     {
         // Arrange
