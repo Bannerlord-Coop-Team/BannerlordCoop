@@ -69,17 +69,26 @@ public sealed class NavalLateHullProbe : INavalLateHullProbe
 
         if (operation == "release")
         {
-            if (!Stations(hull, "climb").Concat(Stations(hull, "rope")).Concat(Stations(hull, "oar"))
-                .Any(point => point == agent.CurrentlyUsedGameObject)) return Failed("The agent is not using a station on this hull.");
-            agent.StopUsingGameObject(isSuccessful: true, Agent.StopUsingGameObjectFlags.None);
+            var used = agent.CurrentlyUsedGameObject as StandingPoint;
+            if (used == null) return Failed("The agent is not using a station on this hull.");
+            if (Stations(hull, "climb").Contains(used)) agent.HandleStopUsingAction();
+            else if (Stations(hull, "rope").Concat(Stations(hull, "oar")).Contains(used))
+                agent.StopUsingGameObject(isSuccessful: true, Agent.StopUsingGameObjectFlags.None);
+            else return Failed("The agent is not using a station on this hull.");
             return Success(new { operation, ship = shipId, agent = AgentState(agent, controller) });
         }
 
-        var stations = Stations(hull, operation);
+        bool isClimbInteraction = operation is "approach" or "interact";
+        var stations = Stations(hull, isClimbInteraction ? "climb" : operation);
         if (stationIndex < 0 || stationIndex >= stations.Length) return Failed("No station has that index; inspect this hull first.");
         if (agent.CurrentlyUsedGameObject != null) return Failed("Release the agent's current station first.");
         var point = stations[stationIndex];
         if (point.HasUser || !point.GameEntity.IsValid) return Failed("The chosen station is occupied or removed.");
+        if (isClimbInteraction)
+        {
+            var machine = hull.ClimbingMachines.First(climber => climber.StandingPoints.Contains(point));
+            return InteractWithClimbPoint(agent, point, machine, operation);
+        }
         if (operation != "climb" && (!agent.IsAIControlled || info.CurrentAuthority != controller.Session.OwnControllerId))
             return Failed("Rope and oar staging needs an AI agent on the hull authority client.");
 
@@ -88,6 +97,47 @@ public sealed class NavalLateHullProbe : INavalLateHullProbe
         if (agent.CurrentlyUsedGameObject != point) return Failed("Vanilla refused station use.");
         return Success(new { operation, ship = shipId, station = stationIndex, agent = AgentState(agent, controller),
             note = "Wait for the normal station tick before release or hull removal." });
+    }
+
+    private CoopCommandResult InteractWithClimbPoint(Agent agent, StandingPoint point, ClimbingMachine machine, string operation)
+    {
+        const float netClearance = 0.35f;
+        var frame = point.GameEntity.GetGlobalFrame();
+        if (operation == "approach")
+        {
+            var direction = frame.rotation.f.AsVec2.Normalized();
+            var position = frame.origin;
+            position.x -= netClearance * direction.x;
+            position.y -= netClearance * direction.y;
+            position.z = agent.Mission.Scene.GetWaterLevelAtPosition(position.AsVec2, true, false);
+            agent.TeleportToPosition(position);
+            agent.SetMovementDirection(in direction);
+            return Success(new { operation, position = position.ToString() });
+        }
+
+        // The view resolves its standing point with this selector before it calls HandleStartUsingAction.
+        bool inWater = agent.IsInWater();
+        bool ready = inWater && agent.IsAbleToUseMachine() && !machine.IsDisabled && !machine.IsDeactivated
+            && (agent.IsAIControlled || (agent.Mission.IsMainAgentObjectInteractionEnabled && point.IsFocusable))
+            && agent.ObjectHasVacantPosition(point) && machine.GetValidVacantReachableStandingPointForAgent(agent) == point.GameEntity;
+        var end = machine.GameEntity.GetFirstChildEntityWithTag("climb_end");
+        if (!end.IsValid) return Failed("The net has no climb_end marker.");
+
+        var start = agent.Position;
+        var receipt = new
+        {
+            operation, ready, inWater, time = agent.Mission.CurrentTime, position = start.ToString(),
+            net = frame.origin.ToString(), climbEnd = end.GlobalPosition.ToString(),
+            reach = agent.GetInteractionDistanceToUsable(point),
+            horizontalDistance = start.AsVec2.Distance(frame.origin.AsVec2),
+            verticalDistance = Math.Abs(start.z - frame.origin.z),
+        };
+        if (ready)
+        {
+            agent.HandleStartUsingAction(point, -1);
+            if (agent.CurrentlyUsedGameObject != point) return Failed("Vanilla refused the selected net.");
+        }
+        return Success(receipt);
     }
 
     /// <summary>Reports setup components, current users and the ballista's cached and selected hull identities.</summary>

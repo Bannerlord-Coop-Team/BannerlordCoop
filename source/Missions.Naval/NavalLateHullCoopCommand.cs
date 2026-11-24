@@ -8,7 +8,7 @@ namespace Missions.Naval;
 /// <summary>Stages and observes the late-deployment station checks on the client simulating the chosen agent.</summary>
 public sealed class NavalLateHullCoopCommand : ICoopCommand
 {
-    internal const string Usage = "Usage: coop.debug.naval.late_hull [shipId-prefix [climb|rope|oar|release <agent-index> [station-index]]]";
+    internal const string Usage = "Usage: coop.debug.naval.late_hull [shipId-prefix [approach|interact|climb|rope|oar|release <agent-index> [station-index]]]";
     private readonly INavalLateHullProbe probe;
 
     /// <summary>Uses the local mission probe for state reads and authoritative station actions.</summary>
@@ -21,7 +21,7 @@ public sealed class NavalLateHullCoopCommand : ICoopCommand
     public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
     {
         new ExpectedArgs("shipId-prefix", "Full hull id or unique prefix from inspect; omit to inspect all hulls and agents.", false),
-        new ExpectedArgs("operation", "climb, rope, oar or release; omit to inspect.", false),
+        new ExpectedArgs("operation", "approach stages a swimmer, interact uses a reachable net; climb, rope and oar force use; release stops use.", false),
         new ExpectedArgs("agent-index", "Local agent index from late_hull output, on its authority client.", false),
         new ExpectedArgs("station-index", "Index in the chosen kind's station list; defaults to zero.", false),
     };
@@ -49,7 +49,7 @@ public sealed class NavalLateHullCoopCommand : ICoopCommand
         if (args.Count < 3) return false;
 
         operation = args[1].ToLowerInvariant();
-        if (operation != "climb" && operation != "rope" && operation != "oar" && operation != "release") return false;
+        if (operation is not ("approach" or "interact" or "climb" or "rope" or "oar" or "release")) return false;
         if (!int.TryParse(args[2], NumberStyles.None, CultureInfo.InvariantCulture, out agent)) return false;
         if (args.Count == 3) return true;
         return operation != "release" && int.TryParse(args[3], NumberStyles.None, CultureInfo.InvariantCulture, out station);
