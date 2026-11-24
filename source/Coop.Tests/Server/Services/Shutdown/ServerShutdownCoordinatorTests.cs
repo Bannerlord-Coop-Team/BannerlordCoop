@@ -47,8 +47,8 @@ public class ServerShutdownCoordinatorTests : IDisposable
 
     public ServerShutdownCoordinatorTests()
     {
-        connections.Setup(collection => collection.GetEnumerator())
-            .Returns(() => connectionList.ToList().GetEnumerator());
+        connections.Setup(collection => collection.GetSnapshot())
+            .Returns(() => connectionList.ToArray());
         terminator.Setup(value => value.Disconnect(It.IsAny<NetPeer>(), It.IsAny<string>()))
             .Callback<NetPeer, string>((peer, reason) =>
             {
