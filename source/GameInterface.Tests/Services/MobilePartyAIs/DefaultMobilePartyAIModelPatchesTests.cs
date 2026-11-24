@@ -24,6 +24,7 @@ namespace GameInterface.Tests.Services.MobilePartyAIs;
 public class DefaultMobilePartyAIModelPatchesTests : IDisposable
 {
     private const float UnsuppressedScore = 4f;
+    private const float SearchRadius = 9f; // Three times the default encounter radius.
 
     private static readonly ConditionalWeakTable<object, ControlledObjectInfo> PlayerObjects =
         (ConditionalWeakTable<object, ControlledObjectInfo>)AccessTools.Field(typeof(PlayerManager), "PlayerObjects").GetValue(null)!;
@@ -52,8 +53,7 @@ public class DefaultMobilePartyAIModelPatchesTests : IDisposable
         var attacker = CreateParty(100f);
         var enemy = CreateParty(50f);
         var parkedPlayer = AddPlayer(300f, x: 101f, active: false);
-        const float radiusEdgeX = 109f; // Default encounter radius is 3, and the locator excludes the boundary.
-        AddPlayer(300f, x: radiusEdgeX);
+        AddPlayer(300f, x: 100f + SearchRadius); // The locator excludes the boundary.
         var strongerAiParty = CreateParty(300f, x: 102f);
         Campaign.Current.MobilePartyLocator.UpdateLocator(strongerAiParty);
 
@@ -71,9 +71,11 @@ public class DefaultMobilePartyAIModelPatchesTests : IDisposable
         var attacker = CreateParty(100f);
         var firstEnemy = CreateParty(50f);
         var secondEnemy = CreateParty(60f);
+        var enemyOutsideBothBattles = CreateParty(60f);
         AddPlayer(300f, x: 101f);
         AddPlayer(300f, x: 102f);
-        var order = MobileParty.StartFindingLocatablesAroundPosition(attacker.Position.ToVec2(), 9f);
+        // The locator's visit order determines which player is checked first.
+        var order = MobileParty.StartFindingLocatablesAroundPosition(attacker.Position.ToVec2(), SearchRadius);
         var firstPlayer = MobileParty.FindNextLocatable(ref order);
         var secondPlayer = MobileParty.FindNextLocatable(ref order);
         AssignMapEvent(firstPlayer, firstEnemy);
@@ -82,7 +84,7 @@ public class DefaultMobilePartyAIModelPatchesTests : IDisposable
         NearbyPlayerSearch nearbyPlayers = default;
         Assert.Equal(0f, Score(attacker, firstEnemy, ref nearbyPlayers));
         Assert.Equal(0f, Score(attacker, secondEnemy, ref nearbyPlayers));
-        Assert.Equal(UnsuppressedScore, Score(attacker, CreateParty(60f), ref nearbyPlayers));
+        Assert.Equal(UnsuppressedScore, Score(attacker, enemyOutsideBothBattles, ref nearbyPlayers));
         Assert.Equal(0f, Score(attacker, firstEnemy, ref nearbyPlayers));
     }
 

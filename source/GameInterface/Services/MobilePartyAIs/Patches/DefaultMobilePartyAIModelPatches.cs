@@ -154,10 +154,11 @@ internal class DefaultMobilePartyAIModelPatches
             nameof(DefaultMobilePartyAIModel.CalculateInitiativeScoresForEnemy));
         var scoreWithNearbyPlayers = AccessTools.Method(typeof(DefaultMobilePartyAIModelPatches),
             nameof(ScoreEnemyWithNearbyPlayers));
-        int callIndex = codes.FindIndex(code => code.Calls(scoreEnemy));
-        if (callIndex < 0 || callIndex != codes.FindLastIndex(code => code.Calls(scoreEnemy)))
-            throw new InvalidOperationException("Expected one enemy scoring call in GetBestInitiativeBehavior.");
+        int matches = codes.Count(code => code.Calls(scoreEnemy));
+        if (matches != 1)
+            throw new InvalidOperationException($"Expected one CalculateInitiativeScoresForEnemy call in GetBestInitiativeBehavior, found {matches}.");
 
+        int callIndex = codes.FindIndex(code => code.Calls(scoreEnemy));
         // Each attacker decision starts with a default search that runs only for a positive attack score.
         var nearbyPlayers = generator.DeclareLocal(typeof(NearbyPlayerSearch));
         var loadNearbyPlayers = new CodeInstruction(OpCodes.Ldloca, nearbyPlayers);
@@ -182,6 +183,7 @@ internal class DefaultMobilePartyAIModelPatches
         attackScore = SuppressAttackNearStrongerPlayer(mobileParty, enemyParty, attackScore, ref nearbyPlayers);
     }
 
+    // Zeroes a positive attack score when a stronger eligible player is nearby.
     internal static float SuppressAttackNearStrongerPlayer(
         MobileParty mobileParty,
         MobileParty enemyParty,
@@ -202,6 +204,7 @@ internal class DefaultMobilePartyAIModelPatches
         private ScanState state;
         private List<MobileParty> seenPlayers;
 
+        // Checks cached players first, then advances the shared cursor and caches newly seen players if needed.
         public bool HasStrongerPlayer(MobileParty attacker, MobileParty enemy) =>
             AnySeenPlayerStronger(attacker, enemy) || ScanForStrongerPlayer(attacker, enemy);
 
