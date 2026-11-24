@@ -35,6 +35,29 @@ public partial class MovementTrafficTests
     }
 
     [Fact]
+    public void PackedMovement_RestoresRiderOnlySnapshots()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        peer.Call(() =>
+        {
+            var mock = CreateMovementMission(fixture, peer);
+            var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
+            var compressor = new MovementPacketCompressor(serializer, new MovementSnapshotPacking());
+            MovementPacket movement = CreatePackedRiderPacket(mock, count: 18);
+            Assert.All(movement.Agents, rider =>
+            {
+                Assert.Null(rider.MountData);
+                Assert.Equal(0, rider.DeckShipIndex);
+            });
+
+            byte[] wire = compressor.Serialize(movement);
+            var restored = Assert.IsType<MovementPacket>(RestorePackedMovement(serializer, compressor, wire));
+            Assert.Equal(serializer.Serialize(movement), serializer.Serialize(restored));
+        });
+    }
+
+    [Fact]
     public void PackedMountMovement_RestoresScopeGuidAndRevisionExtras()
     {
         using var fixture = new MissionEngineFixture();

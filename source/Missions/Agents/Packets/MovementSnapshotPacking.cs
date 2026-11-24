@@ -22,20 +22,12 @@ internal sealed class MovementSnapshotPacking : IMovementSnapshotPacking
 
     public bool TryPack(IPacket packet, int limit, out IPacket packed)
     {
-        switch (packet)
+        packed = packet switch
         {
-            case MovementPacket movement:
-                byte[] packedRiders = PackRiders(movement, limit);
-                packed = packedRiders == null ? null : movement.WithPackedSnapshots(packedRiders);
-                break;
-            case MountMovementPacket mounts:
-                byte[] packedMounts = PackMounts(mounts, limit);
-                packed = packedMounts == null ? null : mounts.WithPackedSnapshots(packedMounts);
-                break;
-            default:
-                packed = null;
-                break;
-        }
+            MovementPacket movement => PackRiders(movement, limit),
+            MountMovementPacket mounts => PackMounts(mounts, limit),
+            _ => null,
+        };
         return packed != null;
     }
 
@@ -48,7 +40,7 @@ internal sealed class MovementSnapshotPacking : IMovementSnapshotPacking
         _ => packet,
     };
 
-    private static byte[] PackRiders(MovementPacket packet, int limit)
+    private static IPacket PackRiders(MovementPacket packet, int limit)
     {
         AgentData[] agents = packet.Agents;
         int count = packet.SnapshotCount;
@@ -103,10 +95,10 @@ internal sealed class MovementSnapshotPacking : IMovementSnapshotPacking
                 mount.WriteSnapshot(ref mountColumns, extras);
             }
         }
-        return packed;
+        return packet.WithPackedSnapshots(packed);
     }
 
-    private static byte[] PackMounts(MountMovementPacket packet, int limit)
+    private static IPacket PackMounts(MountMovementPacket packet, int limit)
     {
         AgentMountData[] mounts = packet.Mounts;
         int count = packet.SnapshotCount;
@@ -130,7 +122,7 @@ internal sealed class MovementSnapshotPacking : IMovementSnapshotPacking
             columns.BeginSnapshot(i);
             mounts[i].WriteSnapshot(ref columns, extras);
         }
-        return packed;
+        return packet.WithPackedSnapshots(packed);
     }
 
     private static AgentData[] RestoreRiders(MovementPacket packet)
