@@ -173,6 +173,9 @@ internal class PlayerCaptivityServerHandler : IHandler
             playerParty.ChangePartyLeader(null);
 
         RollPlayerExecution(hero, payload.What.CapturerParty);
+
+        // Parking hides IsVisible immediately, but the host nameplate needs the visibility event to refresh.
+        CampaignEventDispatcher.Instance?.OnPartyVisibilityChanged(playerParty.Party);
     }
 
     private void RollPlayerExecution(Hero hero, PartyBase captor)

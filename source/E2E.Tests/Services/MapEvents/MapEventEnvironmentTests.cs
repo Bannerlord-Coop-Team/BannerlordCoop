@@ -550,6 +550,38 @@ public class MapEventEnvironmentTests : MapEventTestBase
     }
 
     [Fact]
+    public void CaptureRefreshesTheParkedPartyNameplateOnTheServer()
+    {
+        var (heroId, partyId) = CreatePlayerHeroParty("MyControllerId");
+        TestEnvironment.ConnectRegisteredPlayer(Clients.First(), "MyControllerId");
+        var captorPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var visibilityAtRefresh = new List<bool>();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var playerParty));
+            Assert.True(playerParty.IsVisible);
+            CampaignEvents.PartyVisibilityChangedEvent.AddNonSerializedListener(this, party =>
+            {
+                if (ReferenceEquals(party, playerParty.Party))
+                    visibilityAtRefresh.Add(playerParty.IsVisible);
+            });
+        });
+
+        try
+        {
+            DefeatPlayerPartyInBattle(heroId, partyId, captorPartyId);
+
+            AssertCaptivity(Server, heroId, captorPartyId);
+            Assert.False(Assert.Single(visibilityAtRefresh));
+        }
+        finally
+        {
+            Server.Call(() => CampaignEvents.PartyVisibilityChangedEvent.ClearListeners(this));
+        }
+    }
+
+    [Fact]
     public void CaptureWithDepletedHeroElement_RecalculatesEmptyRosterTotal()
     {
         var (heroId, partyId) = CreatePlayerHeroParty("MyControllerId");
