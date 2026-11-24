@@ -1,7 +1,15 @@
-﻿using Common.Messaging;
+﻿using Autofac;
+using Common;
+using Common.Network;
 using E2E.Tests.Environment;
+using GameInterface;
+using GameInterface.Registry.Auto;
+using GameInterface.Services.PartyVisuals.Extensions;
 using GameInterface.Services.PartyVisuals.Interfaces;
 using GameInterface.Services.PartyVisuals.Messages;
+using HarmonyLib;
+using Moq;
+using SandBox.View.Map.Managers;
 using SandBox.View.Map.Visuals;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
@@ -9,12 +17,16 @@ using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.PartyVisuals
 {
+    /// <summary>Exercises visual lifetime replication through the managed map visual collections.</summary>
     public class PartyVisualsLifetimeTests : IDisposable
     {
+        private static MobilePartyVisualManager? clientVisualManager;
+        private static MobilePartyVisualManager? serverVisualManager;
+
         E2ETestEnvironment TestEnvironment { get; }
         public PartyVisualsLifetimeTests(ITestOutputHelper output)
         {
-            TestEnvironment = new E2ETestEnvironment(output);
+            TestEnvironment = new E2ETestEnvironment(output, numClients: 1);
         }
 
         public void Dispose()
@@ -22,53 +34,165 @@ namespace E2E.Tests.Services.PartyVisuals
             TestEnvironment.Dispose();
         }
 
-        [Fact]
-        public void HeadlessLifetime_UsesPartyHandleWithoutRegisteringVisualObjects()
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void PartyVisualLifecycle_AppliesInOrderByPartyHandle(bool graphicalServer)
         {
             var server = TestEnvironment.Server;
             var client = TestEnvironment.Clients.First();
-            var created = new List<NetworkCreatePartyVisual>();
-            var destroyed = new List<NetworkDestroyPartyVisual>();
-            client.Resolve<IMessageBroker>().Subscribe<NetworkCreatePartyVisual>(payload => created.Add(payload.What));
-            client.Resolve<IMessageBroker>().Subscribe<NetworkDestroyPartyVisual>(payload => destroyed.Add(payload.What));
+            // Poller delivery leaves the visual apply queued until the client pumps its game thread.
+            server.Resolve<TestNetworkRouter>().ReceiveContext = TestNetworkReceiveContext.PollerThread;
+            var presentation = new Harmony($"e2e.party-visual-lifetime.{Guid.NewGuid():N}");
 
-            var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
             uint partyHandle = 0;
-            server.Call(() =>
+            try
             {
-                Assert.True(server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
-                Assert.True(server.ObjectManager.TryGetHandle(party, out partyHandle));
-                Assert.DoesNotContain(server.ObjectManager.GetHandleMap().Values, handle =>
-                    server.ObjectManager.TryGetObject<object>(handle, out var value) && value is MobilePartyVisual);
-                party.RemoveParty();
-            });
+                PatchVisualManagers(presentation, graphicalServer);
 
-            var createdVisual = Assert.Single(created);
-            Assert.Null(createdVisual.PartyVisualId);
-            Assert.Equal(0u, createdVisual.PartyVisualHandle);
-            Assert.Equal(partyHandle, createdVisual.MobilePartyHandle);
-            Assert.Equal(partyHandle, Assert.Single(destroyed).MobilePartyHandle);
+                // Create the party and apply its visual after its handle is registered.
+                server.Call(() =>
+                {
+                    if (graphicalServer)
+                    {
+                        CampaignEvents.MobilePartyCreated.AddNonSerializedListener(this, party => party.CreateNewPartyVisual());
+                    }
+
+                    var party = MobileParty.CreateParty("visual_lifecycle_test", null);
+                    Assert.True(server.ObjectManager.TryGetHandle(party, out partyHandle));
+                });
+
+                Assert.False(client.ObjectManager.TryGetObject<MobileParty>(partyHandle, out _));
+                client.PumpGameThread();
+                Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyHandle, out var clientParty));
+                client.Call(() =>
+                {
+                    Assert.NotNull(clientVisualManager.GetVisualOfEntity(clientParty.Party));
+                    // Clear the first creation's dirty flag so only recreation satisfies the later check.
+                    clientParty.Party.OnVisualsUpdated();
+                });
+                Assert.Equal(partyHandle, Assert.Single(client.InternalMessages.GetMessages<NetworkCreatePartyVisual>()).MobilePartyHandle);
+
+                // Remove only the visual and keep the party handle.
+                server.Call(() =>
+                {
+                    Assert.True(server.ObjectManager.TryGetObject<MobileParty>(partyHandle, out var party));
+                    server.Resolve<IPartyVisualInterface>().RemoveVisual(party);
+                });
+
+                client.PumpGameThread();
+                client.Call(() => Assert.Null(clientVisualManager.GetVisualOfEntity(clientParty.Party)));
+                Assert.Equal(partyHandle, Assert.Single(client.InternalMessages.GetMessages<NetworkDestroyPartyVisual>()).MobilePartyHandle);
+
+                // Recreate the visual on that same handle and check the model refresh.
+                server.Call(() =>
+                {
+                    Assert.True(server.ObjectManager.TryGetObject<MobileParty>(partyHandle, out var party));
+                    server.Resolve<IPartyVisualInterface>().CreateVisual(party);
+                });
+
+                client.PumpGameThread();
+                client.Call(() =>
+                {
+                    Assert.NotNull(clientVisualManager.GetVisualOfEntity(clientParty.Party));
+                    Assert.True(clientParty.Party.IsVisualDirty);
+                });
+                Assert.Equal(new[] { partyHandle, partyHandle },
+                    client.InternalMessages.GetMessages<NetworkCreatePartyVisual>().Select(message => message.MobilePartyHandle));
+            }
+            finally
+            {
+                server.Call(() => CampaignEvents.MobilePartyCreated.ClearListeners(this));
+                presentation.UnpatchAll(presentation.Id);
+                serverVisualManager = null;
+                clientVisualManager = null;
+            }
+        }
+
+        private static void PatchVisualManagers(Harmony presentation, bool graphicalServer)
+        {
+            clientVisualManager = new MobilePartyVisualManager();
+            serverVisualManager = graphicalServer ? new MobilePartyVisualManager() : null;
+            presentation.Patch(
+                AccessTools.PropertyGetter(typeof(MobilePartyVisualManager), nameof(MobilePartyVisualManager.Current)),
+                postfix: new HarmonyMethod(typeof(PartyVisualsLifetimeTests), nameof(ProvideVisualManager)));
+            // Keep the native manager's collections and lifetime methods, skipping scene creation.
+            presentation.Patch(
+                AccessTools.Method(typeof(MobilePartyVisual), "OnStartup"),
+                prefix: new HarmonyMethod(typeof(PartyVisualsLifetimeTests), nameof(SkipVisualStartup)));
+        }
+
+        private static void ProvideVisualManager(ref MobilePartyVisualManager? __result)
+        {
+            __result = ModInformation.IsServer ? serverVisualManager : clientVisualManager;
+        }
+
+        private static bool SkipVisualStartup() => false;
+
+        [Fact]
+        public void GraphicalVisualLifecycle_CompletesWhenReplicationThrows()
+        {
+            var server = TestEnvironment.Server;
+            var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+            var network = new Mock<INetwork>();
+            var sendFailure = new InvalidOperationException("visual send failed");
+            network.Setup(n => n.SendAll(It.IsAny<NetworkCreatePartyVisual>())).Throws(sendFailure);
+            network.Setup(n => n.SendAll(It.IsAny<NetworkDestroyPartyVisual>())).Throws(sendFailure);
+            using var scope = server.Container.BeginLifetimeScope(builder =>
+            {
+                builder.RegisterInstance(network.Object).As<INetwork>();
+                builder.RegisterType<PartyVisualInterface>().As<IPartyVisualInterface>();
+            });
+            var presentation = new Harmony($"e2e.party-visual-send-failure.{Guid.NewGuid():N}");
+
+            try
+            {
+                PatchVisualManagers(presentation, graphicalServer: true);
+                server.Call(() =>
+                {
+                    var party = server.GetRegisteredObject<MobileParty>(partyId);
+
+                    ContainerProvider.SetContainer(scope);
+                    try
+                    {
+                        party.CreateNewPartyVisual();
+                        Assert.NotNull(serverVisualManager.GetVisualOfEntity(party.Party));
+
+                        party.RemovePartyVisual();
+                        Assert.Null(serverVisualManager.GetVisualOfEntity(party.Party));
+                    }
+                    finally
+                    {
+                        ContainerProvider.SetContainer(server.Container);
+                    }
+                });
+
+                network.Verify(n => n.SendAll(It.IsAny<NetworkCreatePartyVisual>()), Times.Once);
+                network.Verify(n => n.SendAll(It.IsAny<NetworkDestroyPartyVisual>()), Times.Once);
+            }
+            finally
+            {
+                presentation.UnpatchAll(presentation.Id);
+                serverVisualManager = null;
+                clientVisualManager = null;
+            }
         }
 
         [Fact]
-        public void RecreatingAHeadlessVisual_QueuesModelRefreshForTheExistingClientParty()
+        public void DestroyingAHeadlessParty_SendsVisualRemovalBeforePartyDestruction()
         {
             var server = TestEnvironment.Server;
             var client = TestEnvironment.Clients.First();
             var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
-            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var clientParty));
+            var partyHandle = server.GetHandle<MobileParty>(partyId);
 
-            client.Call(() => clientParty.Party.OnVisualsUpdated());
+            server.Call(() => server.GetRegisteredObject<MobileParty>(partyId).RemoveParty());
 
-            server.Call(() =>
-            {
-                Assert.True(server.ObjectManager.TryGetObject<MobileParty>(partyId, out var serverParty));
-                var visuals = server.Resolve<IPartyVisualInterface>();
-                visuals.RemoveVisual(serverParty);
-                visuals.CreateVisual(serverParty);
-            });
-
-            client.Call(() => Assert.True(clientParty.Party.IsVisualDirty));
+            Assert.Collection(
+                client.InternalMessages.Where(message =>
+                    message is NetworkDestroyPartyVisual or NetworkDestroyInstance<MobileParty>),
+                message => Assert.Equal(partyHandle, Assert.IsType<NetworkDestroyPartyVisual>(message).MobilePartyHandle),
+                message => Assert.Equal(partyHandle, Assert.IsType<NetworkDestroyInstance<MobileParty>>(message).InstanceHandle));
         }
 
         [Fact]
@@ -102,66 +226,6 @@ namespace E2E.Tests.Services.PartyVisuals
             {
                 client.Call(() => CampaignEvents.PartyVisibilityChangedEvent.ClearListeners(this));
             }
-        }
-
-        [Fact]
-        public void ServerCreatePartyVisual_RegistersServerSide_ClientsWithoutVisualManagerSkip()
-        {
-            // Arrange
-            var server = TestEnvironment.Server;
-
-            // Act
-            string? visualId = null;
-            server.Call(() =>
-            {
-                var MobileParty = new MobileParty();
-                var partyBase = new PartyBase(MobileParty);
-                var mobilePartyVisual = new MobilePartyVisual(partyBase);
-
-                Assert.True(server.ObjectManager.TryGetId(mobilePartyVisual, out visualId));
-            });
-
-            // Assert
-            Assert.NotNull(visualId);
-
-            // The test harness has no map visuals manager (MobilePartyVisualManager.Current is null), so a
-            // received create cannot build a visual and the client does not register one. Real clients (with
-            // a visuals manager) register via the main create path, which the harness cannot exercise.
-            foreach (var client in TestEnvironment.Clients)
-            {
-                Assert.False(client.ObjectManager.TryGetObject<MobilePartyVisual>(visualId, out var _));
-            }
-        }
-
-        [Fact]
-        public void ServerCreatePartyVisual_UnregisteredOwner_SkipsCreateAndPreservesDestroyIdentity()
-        {
-            var server = TestEnvironment.Server;
-            var client = TestEnvironment.Clients.First();
-            NetworkDestroyPartyVisual? destroyed = null;
-            uint expectedMobilePartyHandle = 0;
-            client.Resolve<IMessageBroker>().Subscribe<NetworkDestroyPartyVisual>(payload => destroyed = payload.What);
-
-            server.Call(() =>
-            {
-                var mobileParty = new MobileParty();
-                var partyBase = new PartyBase(mobileParty);
-                mobileParty.StringId = "mountain_bandits_24";
-                Assert.True(server.ObjectManager.TryGetId(mobileParty, out string mobilePartyId));
-                Assert.True(server.ObjectManager.TryGetHandle(mobileParty, out expectedMobilePartyHandle));
-                Assert.True(server.ObjectManager.Remove(mobileParty));
-
-                var mobilePartyVisual = new MobilePartyVisual(partyBase);
-
-                Assert.False(server.ObjectManager.TryGetId(mobilePartyVisual, out _));
-                Assert.True(server.ObjectManager.AddExisting(mobilePartyId, mobileParty));
-                server.Resolve<IMessageBroker>().Publish(
-                    this,
-                    new PartyVisualDestroyed(mobilePartyVisual, mobileParty));
-            });
-
-            Assert.NotNull(destroyed);
-            Assert.Equal(expectedMobilePartyHandle, destroyed.MobilePartyHandle);
         }
     }
 }
