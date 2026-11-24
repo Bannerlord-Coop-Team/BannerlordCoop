@@ -69,12 +69,14 @@ public class AgentActionPacketSerializationTests
 
         AgentActionData result = RoundTrip(new AgentActionData(
             owner,
+            new AgentActionData.ActionChannels(owner),
             Agent.MovementControlFlag.None,
             Agent.GuardMode.None,
             guardReactionChannel: channel));
 
         Assert.Equal(channel, result.GuardPresentationChannel);
         Assert.Equal(channel, result.GuardActionChannel);
+        Assert.Equal(channel >= 0, result.GuardActionIsReaction);
     }
 
     [Fact]

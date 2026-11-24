@@ -289,9 +289,10 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
     }
 
     [Theory]
-    [InlineData(Agent.ActionCodeType.ReleaseMelee)]
-    [InlineData(Agent.ActionCodeType.EquipUnequip)]
+    [InlineData(0, Agent.ActionCodeType.ReleaseMelee)]
+    [InlineData(1, Agent.ActionCodeType.EquipUnequip)]
     public void PollActionsAfterNativeTick_LocalAiDiscreteAction_SendsOnce(
+        int channel,
         Agent.ActionCodeType actionType)
     {
         RunScenario("owner", context =>
@@ -310,21 +311,34 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
                 AgentControllerType.AI,
                 out MirrorAgent aiMirror);
 
-            context.Component.AgentActionHandler.PollActionsAfterNativeTick();
+            PollReadingEachActionTypeOnce(
+                aiMirror,
+                () => context.Component.AgentActionHandler.PollActionsAfterNativeTick());
             Assert.Empty(
                 context.Network.NetworkSentPackets
                     .GetPackets<AgentActionPacket>());
 
-            aiMirror.Action0Index = 1001;
-            aiMirror.Action0CodeType = actionType;
+            if (channel == 0)
+            {
+                aiMirror.Action0Index = 1001;
+                aiMirror.Action0CodeType = actionType;
+            }
+            else
+            {
+                aiMirror.Action1Index = 1001;
+                aiMirror.Action1CodeType = actionType;
+            }
 
-            context.Component.AgentActionHandler.PollActionsAfterNativeTick();
+            PollReadingEachActionTypeOnce(
+                aiMirror,
+                () => context.Component.AgentActionHandler.PollActionsAfterNativeTick());
 
             AgentActionPacket packet = Assert.Single(
                 context.Network.NetworkSentPackets
                     .GetPackets<AgentActionPacket>());
             Assert.Equal(aiId, Assert.Single(packet.AgentIds));
-            Assert.Equal(1001, Assert.Single(packet.Actions).Action0Index);
+            AgentActionData action = Assert.Single(packet.Actions);
+            Assert.Equal(1001, channel == 0 ? action.Action0Index : action.Action1Index);
             Assert.Equal(1L, Assert.Single(packet.Sequences));
 
             context.Network.NetworkSentPackets.Packets.Clear();
