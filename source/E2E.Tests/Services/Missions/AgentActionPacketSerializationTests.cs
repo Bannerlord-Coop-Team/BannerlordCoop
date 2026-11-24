@@ -71,6 +71,7 @@ public class AgentActionPacketSerializationTests
             owner,
             Agent.MovementControlFlag.None,
             Agent.GuardMode.None,
+            new AgentActionData.ActionTypes(owner),
             guardReactionChannel: channel));
 
         Assert.Equal(channel, result.GuardPresentationChannel);

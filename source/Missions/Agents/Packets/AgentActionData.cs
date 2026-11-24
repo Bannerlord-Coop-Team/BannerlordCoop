@@ -331,14 +331,8 @@ namespace Missions.Agents.Packets
             };
 
         internal static Agent.GuardMode GetGuardModeFromDefendingAction(
-            Agent agent)
-        {
-            Agent.GuardMode guardMode =
-                GetGuardModeFromDefendingAction(agent, 1);
-            return IsGuardMode(guardMode)
-                ? guardMode
-                : GetGuardModeFromDefendingAction(agent, 0);
-        }
+            Agent agent) =>
+            GetGuardModeFromDefendingAction(agent, new ActionTypes(agent));
 
         internal static Agent.GuardMode GetGuardModeFromDefendingAction(
             Agent agent,
@@ -420,19 +414,8 @@ namespace Missions.Agents.Packets
                 GetEffectiveGuardMode(
                     agent,
                     defendFlags,
-                    agent.HasMount && defendFlags != Agent.MovementControlFlag.None
-                        ? GetGuardModeFromDefendingAction(agent, actionTypes)
-                        : Agent.GuardMode.None),
+                    GetGuardModeFromDefendingAction(agent, actionTypes)),
                 actionTypes)
-        {
-        }
-
-        internal AgentActionData(
-            Agent agent,
-            Agent.MovementControlFlag defendFlags,
-            Agent.GuardMode guardMode,
-            int guardReactionChannel = -1)
-            : this(agent, defendFlags, guardMode, new ActionTypes(agent), guardReactionChannel)
         {
         }
 

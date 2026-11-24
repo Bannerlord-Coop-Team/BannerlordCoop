@@ -102,7 +102,8 @@ public class RapidGuardTransitionSyncTests : MissionTestEnvironment
             var release = new AgentActionData(
                 owner,
                 Agent.MovementControlFlag.None,
-                Agent.GuardMode.None);
+                Agent.GuardMode.None,
+                new AgentActionData.ActionTypes(owner));
 
             context.Component.AgentActionHandler.HandlePacket(null,
                 new AgentActionPacket(
@@ -222,7 +223,11 @@ public class RapidGuardTransitionSyncTests : MissionTestEnvironment
             mirror.MovementFlags =
                 Agent.MovementControlFlag.DefendBlock
                 | Agent.MovementControlFlag.DefendRight;
+            mirror.Action0TypeReads = 0;
+            mirror.Action1TypeReads = 0;
             context.Component.AgentActionHandler.PollActions();
+            Assert.Equal(1, mirror.Action0TypeReads);
+            Assert.Equal(1, mirror.Action1TypeReads);
 
             AgentActionPacket requestedRightPacket = Assert.Single(
                 context.Network.NetworkSentPackets
@@ -231,15 +236,17 @@ public class RapidGuardTransitionSyncTests : MissionTestEnvironment
                 Assert.Single(requestedRightPacket.Actions);
             Assert.Equal(Agent.GuardMode.Right, requestedRight.GuardMode);
             Assert.Equal(2L, Assert.Single(requestedRightPacket.Sequences));
-            Assert.Equal(2, mirror.Action0TypeReads);
-            Assert.Equal(2, mirror.Action1TypeReads);
             context.Network.NetworkSentPackets.Packets.Clear();
 
             mirror.MovementFlags =
                 Agent.MovementControlFlag.DefendBlock
                 | Agent.MovementControlFlag.DefendUp;
+            mirror.Action0TypeReads = 0;
+            mirror.Action1TypeReads = 0;
             context.Component.AgentActionHandler
                 .PollActionsAfterNativeTick();
+            Assert.Equal(1, mirror.Action0TypeReads);
+            Assert.Equal(1, mirror.Action1TypeReads);
 
             Assert.Empty(
                 context.Network.NetworkSentPackets
@@ -249,8 +256,12 @@ public class RapidGuardTransitionSyncTests : MissionTestEnvironment
             mirror.Action1Index = 3070;
             mirror.Action1CodeType = Agent.ActionCodeType.DefendRight1h;
             mirror.Action1Direction = Agent.UsageDirection.DefendRight;
+            mirror.Action0TypeReads = 0;
+            mirror.Action1TypeReads = 0;
             context.Component.AgentActionHandler
                 .PollActionsAfterNativeTick();
+            Assert.Equal(1, mirror.Action0TypeReads);
+            Assert.Equal(1, mirror.Action1TypeReads);
 
             AgentActionPacket realizedRightPacket = Assert.Single(
                 context.Network.NetworkSentPackets
@@ -260,8 +271,6 @@ public class RapidGuardTransitionSyncTests : MissionTestEnvironment
             Assert.Equal(3070, realizedRight.Action1Index);
             Assert.Equal(Agent.GuardMode.Right, realizedRight.GuardMode);
             Assert.Equal(3L, Assert.Single(realizedRightPacket.Sequences));
-            Assert.Equal(4, mirror.Action0TypeReads);
-            Assert.Equal(4, mirror.Action1TypeReads);
             context.Network.NetworkSentPackets.Packets.Clear();
 
             mirror.MovementFlags =
