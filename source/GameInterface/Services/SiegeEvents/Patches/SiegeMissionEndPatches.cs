@@ -19,9 +19,8 @@ namespace GameInterface.Services.SiegeEvents.Patches;
 [HarmonyPatch]
 internal class SiegeMissionEndPatches
 {
-    // The lords-hall stage is not supported in co-op: the walls mission runs until a side is depleted
-    // and capture happens at the walls, exactly like vanilla's AI-led and auto-resolved assaults. This
-    // state is the only route into the lords-hall mission, so it never advances on any machine.
+    // Each machine's walls mission would advance the hall stage on its own. The server moves the siege into the
+    // lord's hall once every walls member reported the defenders falling back (SiegeKeepHandler).
     [HarmonyPatch(typeof(Settlement), nameof(Settlement.SetNextSiegeState))]
     [HarmonyPrefix]
     private static bool SetNextSiegeStatePrefix() => false;

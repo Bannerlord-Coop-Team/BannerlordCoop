@@ -3,14 +3,17 @@ using Common.Logging;
 using GameInterface.Policies;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.SiegeEvents.Handlers;
 using HarmonyLib;
 using Helpers;
 using Serilog;
 using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.MapEvents.Patches;
 
@@ -21,7 +24,7 @@ internal class EncounterAttackConsequencePatch
 
     [HarmonyPatch(nameof(MenuHelper.EncounterAttackConsequence))]
     [HarmonyPrefix]
-    private static bool Prefix()
+    private static bool Prefix(MenuCallbackArgs args)
     {
         if (CallOriginalPolicy.IsOriginalAllowed())
             return true;
@@ -52,6 +55,14 @@ internal class EncounterAttackConsequencePatch
         // NavalRaidMissionPatches has the server claim the battle before the mission opens
         if (MapEventHelper.IsNavalRaid(battle))
             return true;
+
+        // Past the walls, Attack picks the keep troops the way vanilla's hall menu does.
+        if (battle.IsSiegeAssault && battle.MapEventSettlement?.CurrentSiegeState == Settlement.SiegeState.InTheLordsHall)
+        {
+            if (ContainerProvider.TryResolve<SiegeKeepHandler>(out var keep))
+                keep.OpenTroopSelection(args);
+            return false;
+        }
 
         if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
             return true;

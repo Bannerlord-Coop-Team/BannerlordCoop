@@ -11,6 +11,7 @@ using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
+using GameInterface.Services.SiegeEvents.Messages;
 using LiteNetLib;
 using Missions.Messages;
 using Serilog;
@@ -19,6 +20,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 
 namespace Coop.Core.Server.Services.Instances.Handlers;
@@ -77,6 +79,7 @@ public class ServerBattleCompletionHandler : IHandler
         messageBroker.Subscribe<MapEventFinalized>(Handle_MapEventFinalized);
         messageBroker.Subscribe<BattleStateChangeProcessed>(Handle_BattleStateChangeProcessed);
         messageBroker.Subscribe<CampaignTick>(Handle_CampaignTick);
+        messageBroker.Subscribe<SiegeKeepStageOpened>(Handle_SiegeKeepStageOpened);
     }
 
     public void Dispose()
@@ -92,6 +95,7 @@ public class ServerBattleCompletionHandler : IHandler
         messageBroker.Unsubscribe<MapEventFinalized>(Handle_MapEventFinalized);
         messageBroker.Unsubscribe<BattleStateChangeProcessed>(Handle_BattleStateChangeProcessed);
         messageBroker.Unsubscribe<CampaignTick>(Handle_CampaignTick);
+        messageBroker.Unsubscribe<SiegeKeepStageOpened>(Handle_SiegeKeepStageOpened);
     }
 
     private void Handle_NetworkBattleResultReady(MessagePayload<NetworkBattleResultReady> payload)
@@ -162,11 +166,15 @@ public class ServerBattleCompletionHandler : IHandler
         if (battleState == BattleState.AttackerVictory || battleState == BattleState.DefenderVictory)
             return true;
 
+        // A completed ambush, or the walls of an assault whose defenders fell back to the keep.
         return battleState == BattleState.DefenderPullBack
             && objectManager.TryGetObject<MapEvent>(instanceId, out var mapEvent)
-            && mapEvent.IsSiegeAmbush
-            && mapEvent.BattleState == BattleState.None;
+            && mapEvent.BattleState == BattleState.None
+            && (mapEvent.IsSiegeAmbush || IsWallsAssault(mapEvent));
     }
+
+    private static bool IsWallsAssault(MapEvent mapEvent) =>
+        mapEvent.IsSiegeAssault && mapEvent.MapEventSettlement?.CurrentSiegeState == Settlement.SiegeState.OnTheWalls;
 
     private void Handle_MissionMemberDeparted(MessagePayload<MissionMemberDeparted> payload)
     {
@@ -611,11 +619,31 @@ public class ServerBattleCompletionHandler : IHandler
             memberCount, concludedState, instanceId, hostEpoch);
         if (concludedState == BattleState.DefenderPullBack)
         {
-            messageBroker.Publish(this, new AuthoritativeSiegeAmbushCompletionRequested(instanceId));
+            if (objectManager.TryGetObject<MapEvent>(instanceId, out var mapEvent) && IsWallsAssault(mapEvent))
+                messageBroker.Publish(this, new AuthoritativeSiegeKeepRequested(instanceId, hostEpoch));
+            else
+                messageBroker.Publish(this, new AuthoritativeSiegeAmbushCompletionRequested(instanceId));
             return;
         }
 
         messageBroker.Publish(this, new AuthoritativeBattleConclusionRequested(instanceId, concludedState, hostEpoch));
+    }
+
+    // The walls concluded into the keep, which is fought as a new mission on the same map event id. The walls
+    // instance ends without the conclusion record that would refuse that entry, and its host and reports go.
+    private void Handle_SiegeKeepStageOpened(MessagePayload<SiegeKeepStageOpened> payload)
+    {
+        var mapEventId = payload.What.MapEventId;
+        RunSerialized(() =>
+        {
+            missionManager.CompleteInstanceConclusion(mapEventId, succeeded: false);
+            hostRegistry.Remove(mapEventId);
+            completionTracker.Clear(mapEventId);
+            conclusionRetries.Remove(mapEventId);
+            keptHostDeadlines.Remove(mapEventId);
+            lock (pendingJoinersGate)
+                pendingJoiners.Remove(mapEventId);
+        });
     }
 
     private void ConcludeAbandonedBattle(

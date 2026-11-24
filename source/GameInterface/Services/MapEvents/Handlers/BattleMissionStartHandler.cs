@@ -15,6 +15,7 @@ using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.SiegeEvents;
 using Helpers;
 using LiteNetLib;
 using Serilog;
@@ -61,6 +62,7 @@ internal class BattleMissionStartHandler : IHandler
     private readonly IBattleTroopReserveBuilder reserveBuilder;
     private readonly IBattleHostRetentionPolicy retentionPolicy;
     private readonly HideoutRaidHandler hideoutRaids;
+    private readonly ISiegeKeepTroopSelection keepSelection;
     private static long attackMissionStartSequence;
 
     // Server-side: the complete mission initializer chosen once per map event and reused for late entrants.
@@ -81,7 +83,8 @@ internal class BattleMissionStartHandler : IHandler
         IBattleMissionInitializerResolver missionInitializerResolver,
         IBattleTroopReserveBuilder reserveBuilder,
         IBattleHostRetentionPolicy retentionPolicy,
-        HideoutRaidHandler hideoutRaids = null)
+        HideoutRaidHandler hideoutRaids = null,
+        ISiegeKeepTroopSelection keepSelection = null)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -92,6 +95,7 @@ internal class BattleMissionStartHandler : IHandler
         this.reserveBuilder = reserveBuilder;
         this.retentionPolicy = retentionPolicy;
         this.hideoutRaids = hideoutRaids;
+        this.keepSelection = keepSelection;
 
         messageBroker.Subscribe<NetworkBattleStartRequest>(Handle_NetworkBattleStartRequest);
         messageBroker.Subscribe<NetworkStartAttackMission>(Handle_NetworkStartAttackMission);
@@ -198,13 +202,15 @@ internal class BattleMissionStartHandler : IHandler
                     return;
                 }
 
-                // The lords-hall stage is not supported: CurrentSiegeState never advances past OnTheWalls in
-                // co-op (SiegeMissionEndPatches), so this only trips on a save that carried the state in.
+                // A siege in the lord's hall only opens the keep for the players its locked keep roster seated.
                 // Rejected before the arbiter claim so the event stays open for auto-resolve.
                 operation = "validate siege stage";
-                if (mapEvent.IsSiegeAssault && mapEvent.MapEventSettlement?.CurrentSiegeState == Settlement.SiegeState.InTheLordsHall)
+                bool isKeep = mapEvent.IsSiegeAssault &&
+                    mapEvent.MapEventSettlement?.CurrentSiegeState == Settlement.SiegeState.InTheLordsHall;
+                if (isKeep && keepSelection?.IsAdmitted(mapEvent, attackerMobileParty) != true)
                 {
-                    Logger.Error("Rejecting siege mission for {MapEventId}: lords-hall stage is not supported", payload.What.MapEventId);
+                    Logger.Information("Rejecting keep mission for {MapEventId}: the requester has no place in a locked keep roster",
+                        payload.What.MapEventId);
                     network.Send(requester, new NetworkBattleStartReply(payload.What.RequestId, false));
                     return;
                 }
@@ -246,7 +252,8 @@ internal class BattleMissionStartHandler : IHandler
                 operation = "apply attack hostile-action consequences";
                 ApplyClientAttackHostileConsequences(mapEvent, attackerMobileParty.Party);
 
-                if (isNewMissionClaim)
+                // Wounded players were never seated in the keep, and they stay in the siege to see its result.
+                if (isNewMissionClaim && !isKeep)
                 {
                     operation = "remove wounded non-initiating players";
                     if (!RemoveWoundedNonInitiatorParties(
@@ -287,9 +294,11 @@ internal class BattleMissionStartHandler : IHandler
                     operation = "build siege mission snapshot";
                     // A new claim means no mission is open, so re-read the engine and wall damage the last one wrote
                     // back, keeping the siege kind it opened with.
-                    var snapshot = isNewMissionClaim
-                        ? siegeMissionSnapshots[payload.What.MapEventId] = BuildSiegeMissionSnapshot(payload.What.MapEventId, mapEvent)
-                        : siegeMissionSnapshots.GetOrAdd(payload.What.MapEventId, _ => BuildSiegeMissionSnapshot(payload.What.MapEventId, mapEvent));
+                    // A walls snapshot left from before the keep must not open the keep on the walls scene.
+                    var snapshot = isNewMissionClaim ||
+                        (siegeMissionSnapshots.TryGetValue(payload.What.MapEventId, out var cached) && cached.IsLordsHall != isKeep)
+                        ? siegeMissionSnapshots[payload.What.MapEventId] = BuildSiegeMissionSnapshot(payload.What.MapEventId, mapEvent, isKeep)
+                        : siegeMissionSnapshots.GetOrAdd(payload.What.MapEventId, _ => BuildSiegeMissionSnapshot(payload.What.MapEventId, mapEvent, isKeep));
                     // Wounded non-initiators were removed above; the client-side eligibility check remains a fallback.
                     missionStartMessage = new NetworkStartSiegeMission(
                         snapshot.MapEventId,
@@ -299,7 +308,8 @@ internal class BattleMissionStartHandler : IHandler
                         snapshot.DefenderEngines,
                         payload.What.AttackerPartyId,
                         snapshot.SettlementId,
-                        snapshot.IsSallyOut);
+                        snapshot.IsSallyOut,
+                        snapshot.IsLordsHall);
                 }
                 else
                 {
@@ -388,6 +398,10 @@ internal class BattleMissionStartHandler : IHandler
 
             if (mapEvent.EventType == MapEvent.BattleTypes.Hideout &&
                 hideoutRaids?.IsAdmitted(mapEvent, party) != true)
+                continue;
+
+            // Walls players without a keep place watch for the result instead.
+            if (keepSelection?.IsLocked(mapEvent) == true && !keepSelection.IsAdmitted(mapEvent, party))
                 continue;
 
             participants.Add(new MissionParticipant(
@@ -603,7 +617,7 @@ internal class BattleMissionStartHandler : IHandler
     }
 
     /// <summary>[Server] Snapshot the mission-defining siege inputs for one map event.</summary>
-    private NetworkStartSiegeMission BuildSiegeMissionSnapshot(string mapEventId, MapEvent mapEvent)
+    private NetworkStartSiegeMission BuildSiegeMissionSnapshot(string mapEventId, MapEvent mapEvent, bool isLordsHall)
     {
         var settlement = mapEvent.MapEventSettlement;
         if (settlement == null || settlement.SiegeEvent == null)
@@ -619,7 +633,8 @@ internal class BattleMissionStartHandler : IHandler
 
         return new NetworkStartSiegeMission(mapEventId, wallLevel,
             settlement.SettlementWallSectionHitPointsRatioList.ToArray(), attackerEngines, defenderEngines,
-            initiatingPartyId: null, settlementId: settlementId, isSallyOut: mapEvent.IsSiegeAmbush);
+            initiatingPartyId: null, settlementId: settlementId, isSallyOut: mapEvent.IsSiegeAmbush,
+            isLordsHall: isLordsHall);
     }
 
     private void Handle_NetworkStartSiegeMission(MessagePayload<NetworkStartSiegeMission> payload)
@@ -667,11 +682,14 @@ internal class BattleMissionStartHandler : IHandler
 
             // The scene is the fixed settlement scene keyed by wall level — no terrain seed on the siege
             // path. Mirrors vanilla CreateSandBoxMissionInitializerRecord; atmosphere is client-local,
-            // same tolerance as the field path.
-            string sceneName = settlement.LocationComplex.GetLocationWithId("center").GetSceneName(payload.WallLevel);
+            // same tolerance as the field path. The keep loads the lord's hall the way vanilla's hall menu does.
+            string sceneName = settlement.LocationComplex
+                .GetLocationWithId(payload.IsLordsHall ? "lordshall" : "center").GetSceneName(payload.WallLevel);
             var rec = new MissionInitializerRecord(sceneName)
             {
-                SceneLevels = Campaign.Current.Models.LocationModel.GetUpgradeLevelTag(payload.WallLevel) + " siege",
+                SceneLevels = payload.IsLordsHall
+                    ? "siege"
+                    : Campaign.Current.Models.LocationModel.GetUpgradeLevelTag(payload.WallLevel) + " siege",
                 DamageToFriendsMultiplier = Campaign.Current.Models.DifficultyModel.GetPlayerTroopsReceivedDamageMultiplier(),
                 DamageFromPlayerToFriendsMultiplier = Campaign.Current.Models.DifficultyModel.GetPlayerTroopsReceivedDamageMultiplier(),
                 PlayingInCampaignMode = true,
@@ -694,8 +712,10 @@ internal class BattleMissionStartHandler : IHandler
             // counts and never attach the coop behaviors, so a missing launcher is a hard error.
             if (ContainerProvider.TryResolve(out ICoopSiegeBattleLauncher siegeLauncher))
             {
-                var mission = siegeLauncher.OpenCoopSiegeBattle(rec, payload.WallHitPointRatios,
-                    attackerWeapons, defenderWeapons, payload.IsSallyOut);
+                var mission = payload.IsLordsHall
+                    ? siegeLauncher.OpenCoopLordsHallBattle(rec)
+                    : siegeLauncher.OpenCoopSiegeBattle(rec, payload.WallHitPointRatios,
+                        attackerWeapons, defenderWeapons, payload.IsSallyOut);
                 if (mission != null)
                     spawnGateEngaged = false; // the attached mission lifecycle owns EndBattle from here
                 else

@@ -5,7 +5,7 @@ using TaleWorlds.MountAndBlade;
 namespace GameInterface.Services.MapEvents;
 
 /// <summary>
-/// Opens a coop walls-assault or siege-ambush mission. Implemented in the Missions assembly and resolved from the
+/// Opens a coop walls-assault, keep or siege-ambush mission. Implemented in the Missions assembly and resolved from the
 /// shared container by the GameInterface battle flow, like <see cref="ICoopFieldBattleLauncher"/>.
 /// <para>
 /// The implementation mirrors <c>SandBoxMissions.OpenSiegeMissionWithDeployment</c> but installs coop
@@ -20,4 +20,7 @@ public interface ICoopSiegeBattleLauncher
     Mission OpenCoopSiegeBattle(MissionInitializerRecord rec, float[] wallHitPointRatios,
         List<MissionSiegeWeapon> attackerWeapons, List<MissionSiegeWeapon> defenderWeapons,
         bool isSallyOut);
+
+    /// <summary>[Client, game thread] Build and open the coop keep (lord's hall) mission that follows the walls.</summary>
+    Mission OpenCoopLordsHallBattle(MissionInitializerRecord rec);
 }
