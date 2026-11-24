@@ -71,6 +71,25 @@ public partial class MovementTrafficTests
         });
     }
 
+    [Fact]
+    public void PackedMountMovement_RestoresScopeGuidAndRevisionExtras()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        peer.Call(() =>
+        {
+            var mock = CreateMovementMission(fixture, peer);
+            var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
+            var compressor = new MovementPacketCompressor(serializer);
+            MountMovementPacket packet = CreatePackedMountPacket(mock, count: 18);
+            byte[] original = serializer.Serialize(packet);
+            byte[] wire = compressor.Serialize(packet);
+
+            var restored = Assert.IsType<MountMovementPacket>(RestorePackedMovement(serializer, compressor, wire));
+            Assert.Equal(original, serializer.Serialize(restored));
+        });
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -82,46 +101,11 @@ public partial class MovementTrafficTests
         {
             var mock = CreateMovementMission(fixture, peer);
             const int count = 18;
-            var ids = new ushort[count];
-            var guids = new Guid[count];
-            var revisions = new long[count];
-            var riders = new AgentData[count];
-            var mounts = new AgentMountData[count];
-            for (int i = 0; i < count; i++)
-            {
-                var agent = standaloneMounts ? mock.SpawnMount() : SpawnRider(mock);
-                Assert.True(AgentMirror.TryGet(agent, out var mirror));
-                PopulatePackedMovementState(mirror, i);
-                ids[i] = (ushort)(173 - (i * 3));
-                guids[i] = EquivalenceGuid(ids[i]);
-                revisions[i] = i * 17L;
-                if (standaloneMounts)
-                {
-                    // Exercise both sides of the length-prefix boundary in UTF-8 bytes.
-                    string? scope = i switch
-                    {
-                        0 => new string('é', 63) + "a",
-                        3 => new string('é', 62) + "😀",
-                        6 => string.Empty,
-                        _ => i % 3 == 0 ? "mount-scope-é" : null,
-                    };
-                    mounts[i] = new AgentMountData(agent, ids[i], scope,
-                        i % 3 == 1 ? guids[i] : Guid.Empty, mountAction0Speed: 1.2f,
-                        mountAction0IsLocomotion: i % 2 == 0, mountAction0TurnDirection: (i % 3) - 1,
-                        mountAction0TurnActionIndex: i + 100, mountAction0TurnProgress: 0.42f,
-                        mountAction0IsSyntheticTurn: i % 4 == 0, mountAuthorityRevision: i % 2 == 0 ? revisions[i] : null);
-                }
-                else
-                {
-                    riders[i] = new AgentData(agent);
-                }
-            }
-
             var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
             var compressor = new MovementPacketCompressor(serializer);
             IPacket packet = standaloneMounts
-                ? new MountMovementPacket(guids, mounts, EquivalenceSender, revisions, 211)
-                : new MovementPacket(EquivalenceScope, ids, riders, EquivalenceSender, revisions, 211);
+                ? CreatePackedMountPacket(mock, count)
+                : CreatePackedRiderPacket(mock, count);
             byte[] original = serializer.Serialize(packet);
             Assert.InRange(original.Length, 1, MovementPacketCompressor.MaxUncompressedBytes);
             var payload = new byte[LZ4Codec.MaximumOutputSize(original.Length)];
@@ -135,9 +119,58 @@ public partial class MovementTrafficTests
             byte[] wire = compressor.Serialize(packet);
             output.WriteLine($"{packet.PacketType}, {count} snapshots: {baselineLength} baseline bytes, {wire.Length} packed bytes");
             Assert.True(wire.Length < baselineLength, $"Packed datagram was {wire.Length} B, baseline {baselineLength} B.");
-            IPacket restored = RestorePackedMovement(serializer, compressor, wire);
-            Assert.Equal(original, serializer.Serialize(restored));
         });
+    }
+
+    private static MovementPacket CreatePackedRiderPacket(MockMission mock, int count)
+    {
+        var ids = new ushort[count];
+        var revisions = new long[count];
+        var riders = new AgentData[count];
+        for (int i = 0; i < count; i++)
+        {
+            var rider = SpawnRider(mock);
+            Assert.True(AgentMirror.TryGet(rider, out var mirror));
+            PopulatePackedMovementState(mirror, i);
+            ids[i] = (ushort)(173 - (i * 3));
+            revisions[i] = i * 17L;
+            riders[i] = new AgentData(rider);
+        }
+
+        return new MovementPacket(EquivalenceScope, ids, riders, EquivalenceSender, revisions, 211);
+    }
+
+    private static MountMovementPacket CreatePackedMountPacket(MockMission mock, int count)
+    {
+        // Include both sides of the 127/128 UTF-8 byte boundary and a row without extras.
+        var extras = new (string? Scope, Guid MountGuid, long? MountRevision)[]
+        {
+            (new string('é', 63) + "a", Guid.Empty, null),
+            (new string('é', 62) + "😀", EquivalenceGuid(8501), 21L),
+            (string.Empty, Guid.Empty, 37L),
+            (null, EquivalenceGuid(8502), null),
+            (null, Guid.Empty, 0L),
+            (null, Guid.Empty, null),
+        };
+        var guids = new Guid[count];
+        var revisions = new long[count];
+        var mounts = new AgentMountData[count];
+        for (int i = 0; i < count; i++)
+        {
+            var mount = mock.SpawnMount();
+            Assert.True(AgentMirror.TryGet(mount, out var mirror));
+            PopulatePackedMovementState(mirror, i);
+            ushort movementId = (ushort)(173 - (i * 3));
+            guids[i] = EquivalenceGuid(movementId);
+            revisions[i] = i * 17L;
+            (string? scope, Guid mountGuid, long? mountRevision) = extras[i % extras.Length];
+            mounts[i] = new AgentMountData(mount, movementId, scope, mountGuid, mountAction0Speed: 1.2f,
+                mountAction0IsLocomotion: i % 2 == 0, mountAction0TurnDirection: (i % 3) - 1,
+                mountAction0TurnActionIndex: i + 100, mountAction0TurnProgress: 0.42f,
+                mountAction0IsSyntheticTurn: i % 4 == 0, mountAuthorityRevision: mountRevision);
+        }
+
+        return new MountMovementPacket(guids, mounts, EquivalenceSender, revisions, 211);
     }
 
     private static IPacket RestorePackedMovement(

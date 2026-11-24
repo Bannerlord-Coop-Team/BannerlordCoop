@@ -70,7 +70,8 @@ internal static class MovementSnapshotPacking
             AgentData agent = agents[i];
             bool hasDeck = agent.DeckShipIndex != 0;
             AgentMountData mount = agent.MountData;
-            byte attachments = hasDeck ? HasDeck : (byte)0;
+            byte attachments = 0;
+            if (hasDeck) attachments |= HasDeck;
             if (mount != null) attachments |= HasMount;
 
             agentColumns.BeginSnapshot(i);
@@ -98,7 +99,7 @@ internal static class MovementSnapshotPacking
         if (count < MinimumCount || count > limit / AgentMountData.SnapshotBytes || mounts?.Length != count)
             return null;
 
-        var layout = new SnapshotLayout(0, 0, count);
+        var layout = new SnapshotLayout(agents: 0, decks: 0, mounts: count);
         int extraBytes = 0;
         foreach (AgentMountData mount in mounts)
             extraBytes += mount.GetSnapshotExtraBytes();
@@ -162,7 +163,7 @@ internal static class MovementSnapshotPacking
         byte[] packed = packet.PackedSnapshots;
         int count = packet.SnapshotCount;
 
-        var layout = new SnapshotLayout(0, 0, count);
+        var layout = new SnapshotLayout(agents: 0, decks: 0, mounts: count);
         var columns = layout.MountColumns(packed);
         using var extras = new BinaryReader(new MemoryStream(packed, layout.ExtrasOffset, packed.Length - layout.ExtrasOffset));
         var mounts = new AgentMountData[count];
