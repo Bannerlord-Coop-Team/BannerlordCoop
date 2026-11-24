@@ -10,6 +10,7 @@ using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameComponents;
+using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobilePartyAIs.Patches;
@@ -158,7 +159,7 @@ internal class DefaultMobilePartyAIModelPatches
             throw new InvalidOperationException("Expected one enemy scoring call in GetBestInitiativeBehavior.");
 
         // This local belongs to one attacker decision and stays null until an enemy has a positive attack score.
-        var nearbyPlayers = generator.DeclareLocal(typeof(IReadOnlyList<MobileParty>));
+        var nearbyPlayers = generator.DeclareLocal(typeof(NearbyPlayerSearch));
         var loadNearbyPlayers = new CodeInstruction(OpCodes.Ldloca, nearbyPlayers);
         codes[callIndex].MoveLabelsTo(loadNearbyPlayers).MoveBlocksTo(loadNearbyPlayers);
         codes[callIndex] = new CodeInstruction(OpCodes.Call, scoreWithNearbyPlayers);
@@ -174,7 +175,7 @@ internal class DefaultMobilePartyAIModelPatches
         out float attackScore,
         float localAdvantage,
         float maxAggressiveness,
-        ref IReadOnlyList<MobileParty> nearbyPlayers)
+        ref NearbyPlayerSearch nearbyPlayers)
     {
         model.CalculateInitiativeScoresForEnemy(mobileParty, enemyParty, out avoidScore, out attackScore, localAdvantage, maxAggressiveness);
         SuppressAttackNearStrongerPlayer(mobileParty, enemyParty, ref attackScore, ref nearbyPlayers);
@@ -184,36 +185,63 @@ internal class DefaultMobilePartyAIModelPatches
         MobileParty mobileParty,
         MobileParty enemyParty,
         ref float attackScore,
-        ref IReadOnlyList<MobileParty> nearbyPlayers)
+        ref NearbyPlayerSearch nearbyPlayers)
     {
         if (attackScore <= 0f) return;
 
-        nearbyPlayers ??= FindNearbyPlayerParties(mobileParty);
-        for (int i = 0; i < nearbyPlayers.Count; i++)
-        {
-            if (!IsStrongerPlayerParty(nearbyPlayers[i], mobileParty, enemyParty)) continue;
+        if (nearbyPlayers.HasStrongerPlayer(mobileParty, enemyParty))
             attackScore = 0f;
-            return;
-        }
     }
 
-    private static IReadOnlyList<MobileParty> FindNearbyPlayerParties(MobileParty mobileParty)
+    /// <summary>Resumes one attacker's locator scan only when the players already seen cannot suppress an enemy.</summary>
+    internal struct NearbyPlayerSearch
     {
-        List<MobileParty> nearbyPlayers = null;
-        var searchData = MobileParty.StartFindingLocatablesAroundPosition(
-            mobileParty.Position.ToVec2(),
-            NearbyPartySearchRadius(mobileParty));
+        private LocatableSearchData<MobileParty> searchData;
+        private bool started;
+        private bool exhausted;
+        private MobileParty firstPlayer;
+        private List<MobileParty> otherPlayers;
 
-        for (var party = MobileParty.FindNextLocatable(ref searchData);
-             party != null;
-             party = MobileParty.FindNextLocatable(ref searchData))
+        public bool HasStrongerPlayer(MobileParty attacker, MobileParty enemy)
         {
-            if (!party.IsActive || !party.IsPlayerParty()) continue;
-            nearbyPlayers ??= new List<MobileParty>();
-            nearbyPlayers.Add(party);
-        }
+            if (firstPlayer != null && IsStrongerPlayerParty(firstPlayer, attacker, enemy))
+                return true;
 
-        return nearbyPlayers ?? (IReadOnlyList<MobileParty>)Array.Empty<MobileParty>();
+            if (otherPlayers != null)
+            {
+                foreach (var player in otherPlayers)
+                {
+                    if (IsStrongerPlayerParty(player, attacker, enemy))
+                        return true;
+                }
+            }
+
+            if (exhausted) return false;
+
+            if (!started)
+            {
+                searchData = MobileParty.StartFindingLocatablesAroundPosition(
+                    attacker.Position.ToVec2(), NearbyPartySearchRadius(attacker));
+                started = true;
+            }
+
+            for (var party = MobileParty.FindNextLocatable(ref searchData);
+                 party != null;
+                 party = MobileParty.FindNextLocatable(ref searchData))
+            {
+                if (!party.IsActive || !party.IsPlayerParty()) continue;
+                if (firstPlayer == null)
+                    firstPlayer = party;
+                else
+                    (otherPlayers ??= new List<MobileParty>()).Add(party);
+
+                if (IsStrongerPlayerParty(party, attacker, enemy))
+                    return true;
+            }
+
+            exhausted = true;
+            return false;
+        }
     }
 
     // The radius GetBestInitiativeBehavior searches around the attacker, wider for sea patrols and port defenders.

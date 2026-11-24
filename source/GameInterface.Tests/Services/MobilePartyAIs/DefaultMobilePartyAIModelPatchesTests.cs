@@ -15,6 +15,7 @@ using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using Xunit;
+using NearbyPlayerSearch = GameInterface.Services.MobilePartyAIs.Patches.DefaultMobilePartyAIModelPatches.NearbyPlayerSearch;
 
 namespace GameInterface.Tests.Services.MobilePartyAIs;
 
@@ -48,18 +49,17 @@ public class DefaultMobilePartyAIModelPatchesTests : IDisposable
     {
         var attacker = CreateParty(100f);
         var enemy = CreateParty(50f);
-        IReadOnlyList<MobileParty>? nearbyPlayers = null;
+        NearbyPlayerSearch nearbyPlayers = default;
         float score = 0f;
 
         DefaultMobilePartyAIModelPatches.SuppressAttackNearStrongerPlayer(attacker, enemy, ref score, ref nearbyPlayers);
 
         Assert.Equal(0f, score);
-        Assert.Null(nearbyPlayers);
         Assert.Null(Campaign.Current._mobilePartyLocator);
     }
 
     [Fact]
-    public void EmptySearchIsReusedUntilTheNextDecision()
+    public void ParkedPlayerDoesNotSuppressUntilActive()
     {
         var attacker = CreateParty(100f);
         var enemy = CreateParty(50f);
@@ -67,38 +67,33 @@ public class DefaultMobilePartyAIModelPatchesTests : IDisposable
         AddPlayer(300f, x: 109f); // Default encounter radius is 3, and the locator excludes the boundary.
         Campaign.Current.MobilePartyLocator.UpdateLocator(CreateParty(300f, x: 102f));
 
-        IReadOnlyList<MobileParty>? nearbyPlayers = null;
+        NearbyPlayerSearch nearbyPlayers = default;
         Assert.Equal(4f, Score(attacker, enemy, ref nearbyPlayers));
-        Assert.Empty(nearbyPlayers!);
-
-        var otherEnemy = CreateParty(60f);
-        Assert.Equal(4f, Score(attacker, otherEnemy, ref nearbyPlayers));
 
         parkedPlayer.IsActive = true;
-        nearbyPlayers = null;
+        nearbyPlayers = default;
         Assert.Equal(0f, Score(attacker, enemy, ref nearbyPlayers));
-        Assert.Same(parkedPlayer, Assert.Single(nearbyPlayers!));
     }
 
     [Fact]
-    public void SharedCandidatesAllowSuppressionOnlyForTheEnemyInThePlayersMapEvent()
+    public void SharedSearchResumesWhenThePreviouslySeenPlayerCannotSuppressAnotherEnemy()
     {
         var attacker = CreateParty(100f);
-        var sameEventEnemy = CreateParty(50f);
-        var otherEnemy = CreateParty(60f);
-        var player = AddPlayer(300f, x: 101f);
-        var battle = ObjectHelper.SkipConstructor<MapEvent>();
-        player.Party._mapEventSide = new MapEventSide(battle, BattleSideEnum.Defender, player.Party);
-        sameEventEnemy.Party._mapEventSide = new MapEventSide(battle, BattleSideEnum.Attacker, sameEventEnemy.Party);
+        var firstEnemy = CreateParty(50f);
+        var secondEnemy = CreateParty(60f);
+        AddPlayer(300f, x: 101f);
+        AddPlayer(300f, x: 102f);
+        var order = MobileParty.StartFindingLocatablesAroundPosition(attacker.Position.ToVec2(), 9f);
+        var firstPlayer = MobileParty.FindNextLocatable(ref order);
+        var secondPlayer = MobileParty.FindNextLocatable(ref order);
+        AssignMapEvent(firstPlayer, firstEnemy);
+        AssignMapEvent(secondPlayer, secondEnemy);
 
-        IReadOnlyList<MobileParty>? nearbyPlayers = null;
-        Assert.Equal(4f, Score(attacker, otherEnemy, ref nearbyPlayers));
-        var collected = nearbyPlayers;
-        Assert.Same(player, Assert.Single(collected!));
-
-        Assert.Equal(0f, Score(attacker, sameEventEnemy, ref nearbyPlayers));
-        Assert.Equal(4f, Score(attacker, otherEnemy, ref nearbyPlayers));
-        Assert.Same(collected, nearbyPlayers);
+        NearbyPlayerSearch nearbyPlayers = default;
+        Assert.Equal(0f, Score(attacker, firstEnemy, ref nearbyPlayers));
+        Assert.Equal(0f, Score(attacker, secondEnemy, ref nearbyPlayers));
+        Assert.Equal(4f, Score(attacker, CreateParty(60f), ref nearbyPlayers));
+        Assert.Equal(0f, Score(attacker, firstEnemy, ref nearbyPlayers));
     }
 
     [Fact]
@@ -106,16 +101,21 @@ public class DefaultMobilePartyAIModelPatchesTests : IDisposable
     {
         var attacker = CreateParty(100f);
         var enemy = CreateParty(50f);
-        var seaPlayer = AddPlayer(300f, x: 101f, atSea: true);
-        var landPlayer = AddPlayer(100f, x: 102f);
+        AddPlayer(300f, x: 101f, atSea: true);
+        AddPlayer(100f, x: 102f);
 
-        IReadOnlyList<MobileParty>? nearbyPlayers = null;
+        NearbyPlayerSearch nearbyPlayers = default;
         Assert.Equal(4f, Score(attacker, enemy, ref nearbyPlayers));
-        Assert.Contains(seaPlayer, nearbyPlayers!);
-        Assert.Contains(landPlayer, nearbyPlayers!);
     }
 
-    private static float Score(MobileParty attacker, MobileParty enemy, ref IReadOnlyList<MobileParty>? nearbyPlayers)
+    private static void AssignMapEvent(MobileParty player, MobileParty enemy)
+    {
+        var battle = ObjectHelper.SkipConstructor<MapEvent>();
+        player.Party._mapEventSide = new MapEventSide(battle, BattleSideEnum.Defender, player.Party);
+        enemy.Party._mapEventSide = new MapEventSide(battle, BattleSideEnum.Attacker, enemy.Party);
+    }
+
+    private static float Score(MobileParty attacker, MobileParty enemy, ref NearbyPlayerSearch nearbyPlayers)
     {
         float score = 4f;
         DefaultMobilePartyAIModelPatches.SuppressAttackNearStrongerPlayer(attacker, enemy, ref score, ref nearbyPlayers);
