@@ -311,11 +311,9 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
                 AgentControllerType.AI,
                 out MirrorAgent aiMirror);
 
-            aiMirror.Action0TypeReads = 0;
-            aiMirror.Action1TypeReads = 0;
-            context.Component.AgentActionHandler.PollActionsAfterNativeTick();
-            Assert.Equal(1, aiMirror.Action0TypeReads);
-            Assert.Equal(1, aiMirror.Action1TypeReads);
+            PollReadingEachActionTypeOnce(
+                aiMirror,
+                () => context.Component.AgentActionHandler.PollActionsAfterNativeTick());
             Assert.Empty(
                 context.Network.NetworkSentPackets
                     .GetPackets<AgentActionPacket>());
@@ -331,11 +329,9 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
                 aiMirror.Action1CodeType = actionType;
             }
 
-            aiMirror.Action0TypeReads = 0;
-            aiMirror.Action1TypeReads = 0;
-            context.Component.AgentActionHandler.PollActionsAfterNativeTick();
-            Assert.Equal(1, aiMirror.Action0TypeReads);
-            Assert.Equal(1, aiMirror.Action1TypeReads);
+            PollReadingEachActionTypeOnce(
+                aiMirror,
+                () => context.Component.AgentActionHandler.PollActionsAfterNativeTick());
 
             AgentActionPacket packet = Assert.Single(
                 context.Network.NetworkSentPackets

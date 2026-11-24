@@ -52,6 +52,15 @@ public class MissionTestEnvironment : E2ETestEnvironment
         };
     }
 
+    protected static void PollReadingEachActionTypeOnce(MirrorAgent mirror, Action poll)
+    {
+        mirror.Action0TypeReads = 0;
+        mirror.Action1TypeReads = 0;
+        poll();
+        Assert.Equal(1, mirror.Action0TypeReads);
+        Assert.Equal(1, mirror.Action1TypeReads);
+    }
+
     /// <summary>
     /// <see cref="MapEventDisabledMethods"/> plus the reward, loot and menu steps a victory finalization runs, which need
     /// campaign state the headless server does not have.

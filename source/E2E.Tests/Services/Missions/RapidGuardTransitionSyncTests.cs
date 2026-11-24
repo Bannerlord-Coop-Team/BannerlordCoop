@@ -101,7 +101,7 @@ public class RapidGuardTransitionSyncTests : MissionTestEnvironment
             puppetMirror.SetActionChannelCalls = 0;
             var release = new AgentActionData(
                 owner,
-                new AgentActionData.ActionTypes(owner),
+                new AgentActionData.ActionChannels(owner),
                 Agent.MovementControlFlag.None,
                 Agent.GuardMode.None);
 
@@ -223,11 +223,9 @@ public class RapidGuardTransitionSyncTests : MissionTestEnvironment
             mirror.MovementFlags =
                 Agent.MovementControlFlag.DefendBlock
                 | Agent.MovementControlFlag.DefendRight;
-            mirror.Action0TypeReads = 0;
-            mirror.Action1TypeReads = 0;
-            context.Component.AgentActionHandler.PollActions();
-            Assert.Equal(1, mirror.Action0TypeReads);
-            Assert.Equal(1, mirror.Action1TypeReads);
+            PollReadingEachActionTypeOnce(
+                mirror,
+                context.Component.AgentActionHandler.PollActions);
 
             AgentActionPacket requestedRightPacket = Assert.Single(
                 context.Network.NetworkSentPackets
@@ -241,12 +239,9 @@ public class RapidGuardTransitionSyncTests : MissionTestEnvironment
             mirror.MovementFlags =
                 Agent.MovementControlFlag.DefendBlock
                 | Agent.MovementControlFlag.DefendUp;
-            mirror.Action0TypeReads = 0;
-            mirror.Action1TypeReads = 0;
-            context.Component.AgentActionHandler
-                .PollActionsAfterNativeTick();
-            Assert.Equal(1, mirror.Action0TypeReads);
-            Assert.Equal(1, mirror.Action1TypeReads);
+            PollReadingEachActionTypeOnce(
+                mirror,
+                () => context.Component.AgentActionHandler.PollActionsAfterNativeTick());
 
             Assert.Empty(
                 context.Network.NetworkSentPackets
@@ -256,12 +251,9 @@ public class RapidGuardTransitionSyncTests : MissionTestEnvironment
             mirror.Action1Index = 3070;
             mirror.Action1CodeType = Agent.ActionCodeType.DefendRight1h;
             mirror.Action1Direction = Agent.UsageDirection.DefendRight;
-            mirror.Action0TypeReads = 0;
-            mirror.Action1TypeReads = 0;
-            context.Component.AgentActionHandler
-                .PollActionsAfterNativeTick();
-            Assert.Equal(1, mirror.Action0TypeReads);
-            Assert.Equal(1, mirror.Action1TypeReads);
+            PollReadingEachActionTypeOnce(
+                mirror,
+                () => context.Component.AgentActionHandler.PollActionsAfterNativeTick());
 
             AgentActionPacket realizedRightPacket = Assert.Single(
                 context.Network.NetworkSentPackets

@@ -259,8 +259,7 @@ public class AgentActionHandler : IAgentActionHandler
 #endif
         if (!actionSyncedAgent || stationSeats?.IsOwnSeat(info.AgentId) == true) return;
 
-        int action0 = agent.GetCurrentAction(0).Index;
-        int action1 = agent.GetCurrentAction(1).Index;
+        var actionChannels = new AgentActionData.ActionChannels(agent);
         _localAgentStates.TryGetValue(info.AgentId, out var state);
         bool hadState = state.HasObservation;
         AgentPilotSeatData? pilotSeat = remoteActionProcessor.CapturePilotSeat(info, state.PilotSeat);
@@ -287,9 +286,8 @@ public class AgentActionHandler : IAgentActionHandler
             && isPlayerControlled
             && agent == Mission.Current.MainAgent
             && state.HasInputBoundaryObservation;
-        var actionTypes = new AgentActionData.ActionTypes(agent);
         Agent.GuardMode actionGuardMode =
-            AgentActionData.GetGuardModeFromDefendingAction(agent, actionTypes);
+            AgentActionData.GetGuardModeFromDefendingAction(agent, actionChannels);
         Agent.MovementControlFlag defendFlags;
         Agent.GuardMode guardMode;
         if (!afterNativeTick && isPlayerControlled)
@@ -312,7 +310,7 @@ public class AgentActionHandler : IAgentActionHandler
         else
         {
             defendFlags =
-                AgentActionData.GetEffectiveDefendMovementFlags(agent, actionTypes);
+                AgentActionData.GetEffectiveDefendMovementFlags(agent, actionChannels);
             guardMode = GetEffectiveGuardMode(
                 info.AgentId,
                 agent,
@@ -374,16 +372,16 @@ public class AgentActionHandler : IAgentActionHandler
                 || AgentActionData.IsGuardMode(guardMode)
                 || state.DefendFlags != Agent.MovementControlFlag.None
                 || AgentActionData.IsGuardMode(state.GuardMode));
-        bool action0Changed = !hadState || state.Action0 != action0;
-        bool action1Changed = !hadState || state.Action1 != action1;
-        bool action0Discrete = IsDiscreteAction(actionTypes.Channel0, action0);
-        bool action1Discrete = IsDiscreteAction(actionTypes.Channel1, action1);
+        bool action0Changed = !hadState || state.Action0 != actionChannels.Channel0.Index;
+        bool action1Changed = !hadState || state.Action1 != actionChannels.Channel1.Index;
+        bool action0Discrete = IsDiscreteAction(actionChannels.Channel0);
+        bool action1Discrete = IsDiscreteAction(actionChannels.Channel1);
 
         // Native command actions are untyped, so recognize the main agent's order gesture by action name.
         if (agent == Mission.Current.MainAgent)
         {
-            action0Discrete |= AgentActionData.IsOrderGestureAction(action0);
-            action1Discrete |= AgentActionData.IsOrderGestureAction(action1);
+            action0Discrete |= AgentActionData.IsOrderGestureAction(actionChannels.Channel0.Index);
+            action1Discrete |= AgentActionData.IsOrderGestureAction(actionChannels.Channel1.Index);
         }
 
         // Point-driven location performances replicate semantically. Only non-point ambient actions use this stream.
@@ -393,12 +391,12 @@ public class AgentActionHandler : IAgentActionHandler
             && agent.CurrentlyUsedGameObject == null;
         bool publishAction0Speed =
             CanPublishActionSpeed(
-                action0,
+                actionChannels.Channel0.Index,
                 action0Discrete,
                 locationAmbientAgent);
         bool publishAction1Speed =
             CanPublishActionSpeed(
-                action1,
+                actionChannels.Channel1.Index,
                 action1Discrete,
                 locationAmbientAgent);
         float action0Speed = ReadActionSpeed(
@@ -443,14 +441,12 @@ public class AgentActionHandler : IAgentActionHandler
         }
 
         bool action0Defending =
-            AgentActionData.IsDefendingAction(actionTypes.Channel0);
+            AgentActionData.IsDefendingAction(actionChannels.Channel0.Type);
         bool action1Defending =
-            AgentActionData.IsDefendingAction(actionTypes.Channel1);
+            AgentActionData.IsDefendingAction(actionChannels.Channel1.Type);
         int guardReactionChannel = GetGuardReactionChannel(
             agent,
-            actionTypes,
-            action0,
-            action1,
+            actionChannels,
             hadState,
             state);
 
@@ -465,7 +461,7 @@ public class AgentActionHandler : IAgentActionHandler
             IsMountedGuardLocomotionChurn(
                 heldMountedGuardUnchanged,
                 action0Changed,
-                action0,
+                actionChannels.Channel0.Index,
                 action0Discrete,
                 action0Defending,
                 state.Action0WasDefending,
@@ -475,7 +471,7 @@ public class AgentActionHandler : IAgentActionHandler
             IsMountedGuardLocomotionChurn(
                 heldMountedGuardUnchanged,
                 action1Changed,
-                action1,
+                actionChannels.Channel1.Index,
                 action1Discrete,
                 action1Defending,
                 state.Action1WasDefending,
@@ -509,8 +505,8 @@ public class AgentActionHandler : IAgentActionHandler
         state.HasObservation = true;
         state.PilotSeat = pilotSeat;
         state.Equipment = equipment;
-        state.Action0 = action0;
-        state.Action1 = action1;
+        state.Action0 = actionChannels.Channel0.Index;
+        state.Action1 = actionChannels.Channel1.Index;
         UpdateActionSpeedObservation(
             ref state.Action0Speed,
             ref state.HasAction0PublishedSpeed,
@@ -533,13 +529,11 @@ public class AgentActionHandler : IAgentActionHandler
         state.IsMounted = agent.HasMount;
         state.IsPlayerControlled = isPlayerControlled;
         UpdateDefendingAction(
-            action0,
-            actionTypes.Channel0,
+            actionChannels.Channel0,
             ref state.HasAction0DefendingAction,
             ref state.Action0DefendingAction);
         UpdateDefendingAction(
-            action1,
-            actionTypes.Channel1,
+            actionChannels.Channel1,
             ref state.HasAction1DefendingAction,
             ref state.Action1DefendingAction);
         if (defendFlags == Agent.MovementControlFlag.None
@@ -558,7 +552,7 @@ public class AgentActionHandler : IAgentActionHandler
         long sequence = NextActionSequence(info.AgentId);
         var actionData = new AgentActionData(
             agent,
-            actionTypes,
+            actionChannels,
             defendFlags,
             guardMode,
             guardReactionChannel,
@@ -597,7 +591,7 @@ public class AgentActionHandler : IAgentActionHandler
                 bool useInputBoundary =
                     agent.Controller == AgentControllerType.Player
                     && state.HasInputBoundaryObservation;
-                var actionTypes = new AgentActionData.ActionTypes(agent);
+                var actionChannels = new AgentActionData.ActionChannels(agent);
                 Agent.MovementControlFlag defendFlags;
                 Agent.GuardMode guardMode;
                 if (useInputBoundary)
@@ -608,9 +602,9 @@ public class AgentActionHandler : IAgentActionHandler
                 else
                 {
                     defendFlags =
-                        AgentActionData.GetEffectiveDefendMovementFlags(agent, actionTypes);
+                        AgentActionData.GetEffectiveDefendMovementFlags(agent, actionChannels);
                     Agent.GuardMode actionGuardMode =
-                        AgentActionData.GetGuardModeFromDefendingAction(agent, actionTypes);
+                        AgentActionData.GetGuardModeFromDefendingAction(agent, actionChannels);
                     guardMode = GetEffectiveGuardMode(
                         info.AgentId,
                         agent,
@@ -625,8 +619,8 @@ public class AgentActionHandler : IAgentActionHandler
                     locationAuthorityState.IsCoopLocationMissionActive
                     && agent.Controller != AgentControllerType.Player
                     && agent.CurrentlyUsedGameObject == null
-                    && (agent.GetCurrentAction(0) != ActionIndexCache.act_none
-                        || agent.GetCurrentAction(1) != ActionIndexCache.act_none);
+                    && (actionChannels.Channel0.Index != ActionIndexCache.act_none.Index
+                        || actionChannels.Channel1.Index != ActionIndexCache.act_none.Index);
                 if (defendFlags == Agent.MovementControlFlag.None
                     && !AgentActionData.IsGuardMode(guardMode)
                     && !locationAmbient
@@ -638,7 +632,7 @@ public class AgentActionHandler : IAgentActionHandler
                 (actions ??= new List<AgentActionData>()).Add(
                     PrepareEquipmentSnapshot(
                         info,
-                        new AgentActionData(agent, actionTypes, defendFlags, guardMode).WithPilotSeat(pilotSeat),
+                        new AgentActionData(agent, actionChannels, defendFlags, guardMode).WithPilotSeat(pilotSeat),
                         catchUp: true));
                 (sequences ??= new List<long>()).Add(NextActionSequence(info.AgentId));
             }
@@ -906,11 +900,11 @@ public class AgentActionHandler : IAgentActionHandler
     }
 
     // Ranged siege use is also Other; recognize its actions without publishing ordinary locomotion.
-    private static bool IsDiscreteAction(Agent.ActionCodeType type, int actionIndex = -1)
-    {
-        if (type != Agent.ActionCodeType.Other && type != Agent.ActionCodeType.Idle) return true;
-        return AgentActionData.IsRangedSiegeUsageAction(actionIndex);
-    }
+    private static bool IsDiscreteAction((int Index, Agent.ActionCodeType Type) action) =>
+        IsDiscreteActionType(action.Type) || AgentActionData.IsRangedSiegeUsageAction(action.Index);
+
+    private static bool IsDiscreteActionType(Agent.ActionCodeType type) =>
+        type != Agent.ActionCodeType.Other && type != Agent.ActionCodeType.Idle;
 
     internal static bool IsRangedSiegeUsage(string actionName)
     {
@@ -942,17 +936,14 @@ public class AgentActionHandler : IAgentActionHandler
 
     private static int GetGuardReactionChannel(
         Agent agent,
-        AgentActionData.ActionTypes actionTypes,
-        int action0,
-        int action1,
+        AgentActionData.ActionChannels actionChannels,
         bool hadState,
         LocalAgentActionState state)
     {
         if (IsGuardReactionTransition(
                 agent,
-                actionTypes,
+                actionChannels,
                 channel: 1,
-                action1,
                 hadState,
                 state.Action1,
                 state.Action1WasDefending))
@@ -962,9 +953,8 @@ public class AgentActionHandler : IAgentActionHandler
 
         return IsGuardReactionTransition(
             agent,
-            actionTypes,
+            actionChannels,
             channel: 0,
-            action0,
             hadState,
             state.Action0,
             state.Action0WasDefending)
@@ -974,22 +964,21 @@ public class AgentActionHandler : IAgentActionHandler
 
     private static bool IsGuardReactionTransition(
         Agent agent,
-        AgentActionData.ActionTypes actionTypes,
+        AgentActionData.ActionChannels actionChannels,
         int channel,
-        int action,
         bool hadState,
         int previousAction,
         bool previousActionWasDefending)
     {
-        Agent.ActionCodeType actionType = actionTypes.ForChannel(channel);
-        if (AgentActionData.IsGuardReactionAction(actionType))
+        var action = actionChannels.ForChannel(channel);
+        if (AgentActionData.IsGuardReactionAction(action.Type))
             return true;
 
         return hadState
             && previousActionWasDefending
-            && action >= 0
-            && action != previousAction
-            && AgentActionData.IsDefendingAction(actionType)
+            && action.Index >= 0
+            && action.Index != previousAction
+            && AgentActionData.IsDefendingAction(action.Type)
             && agent.GetCurrentActionStage(channel)
                 == Agent.ActionStage.DefendParry;
     }
@@ -1104,17 +1093,16 @@ public class AgentActionHandler : IAgentActionHandler
     }
 
     private static void UpdateDefendingAction(
-        int action,
-        Agent.ActionCodeType actionType,
+        (int Index, Agent.ActionCodeType Type) action,
         ref bool hasDefendingAction,
         ref int defendingAction)
     {
-        if (AgentActionData.IsDefendingAction(actionType))
+        if (AgentActionData.IsDefendingAction(action.Type))
         {
             hasDefendingAction = true;
-            defendingAction = action;
+            defendingAction = action.Index;
         }
-        else if (IsDiscreteAction(actionType))
+        else if (IsDiscreteActionType(action.Type))
         {
             // A strike or reaction ended the retained episode. The next guard action must be sent.
             hasDefendingAction = false;
