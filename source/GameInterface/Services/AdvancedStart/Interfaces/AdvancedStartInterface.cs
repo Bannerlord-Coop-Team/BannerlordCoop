@@ -1,14 +1,12 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
-using Common.Network;
 using GameInterface.Configuration;
 using GameInterface.Services.AdvancedStart.Data;
 using GameInterface.Services.AdvancedStart.Messages;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Messages.Behavior;
-using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.UI.Interfaces;
 using SandBox.AdvancedStartOptions;
@@ -19,7 +17,6 @@ using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
-using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
 using TaleWorlds.ScreenSystem;
@@ -105,8 +102,6 @@ internal class AdvancedStartInterface : IAdvancedStartInterface
 
     private readonly IModConfig modConfig;
     private readonly ILoadingInterface loadingInterface;
-    private readonly INetwork network;
-    private readonly IObjectManager objectManager;
     private readonly IMessageBroker messageBroker;
     private readonly IMobilePartyBehaviorSnapshot behaviorSnapshot;
     private readonly IPlayerManager playerManager;
@@ -120,16 +115,12 @@ internal class AdvancedStartInterface : IAdvancedStartInterface
     public AdvancedStartInterface(
         IModConfig modConfig,
         ILoadingInterface loadingInterface,
-        INetwork network,
-        IObjectManager objectManager,
         IMessageBroker messageBroker,
         IMobilePartyBehaviorSnapshot behaviorSnapshot,
         IPlayerManager playerManager)
     {
         this.modConfig = modConfig;
         this.loadingInterface = loadingInterface;
-        this.network = network;
-        this.objectManager = objectManager;
         this.messageBroker = messageBroker;
         this.behaviorSnapshot = behaviorSnapshot;
         this.playerManager = playerManager;
@@ -473,25 +464,8 @@ internal class AdvancedStartInterface : IAdvancedStartInterface
             messageBroker.Publish(this, new UpdatePartyBehavior(ref movement));
         }
 
-        // The party visual was built in hero setup, before the start changed the hero's equipment.
+        // The party visual was built in hero setup, before the start changed the hero's equipment. Clients redraw
+        // theirs as each equipment slot write reaches them.
         party.Party.SetVisualAsDirty();
-
-        SendEquipment(hero, party);
-    }
-
-    // Equipment slot writes don't replicate, so send the hero's sets for clients to apply.
-    // Stopgap until equipment sync (#4786) lands; remove with NetworkAdvancedStartApplied and AdvancedStartHandler.
-    private void SendEquipment(Hero hero, MobileParty party)
-    {
-        var character = hero.CharacterObject;
-        if (!objectManager.TryGetIdWithLogging(hero, out var heroId)) return;
-        if (!objectManager.TryGetIdWithLogging(party, out var partyId)) return;
-
-        network.SendAll(new NetworkAdvancedStartApplied(heroId, partyId, new[]
-        {
-            new EquipmentData(character.FirstBattleEquipment._equipmentType, character.FirstBattleEquipment._itemSlots),
-            new EquipmentData(character.FirstCivilianEquipment._equipmentType, character.FirstCivilianEquipment._itemSlots),
-            new EquipmentData(character.FirstStealthEquipment._equipmentType, character.FirstStealthEquipment._itemSlots),
-        }));
     }
 }
