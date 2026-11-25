@@ -162,7 +162,7 @@ public class NetworkAgentRegistryTests
     }
 
     [Fact]
-    public void ReturnRetainedPlayer_NotifiesAfterCommittingRiderAndMountTogether()
+    public void ReturnRetainedPlayer_NotifiesOnceAfterCommittingRiderAndMountTogether()
     {
         var (registry, _, riderId) = RegisterAgent("host", "me");
         Guid mountId = Guid.NewGuid();

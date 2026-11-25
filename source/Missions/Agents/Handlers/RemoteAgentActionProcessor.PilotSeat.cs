@@ -19,7 +19,7 @@ public partial class RemoteAgentActionProcessor
     private readonly List<Guid> pilotSeatRefreshIds = new();
     private bool refreshingPilotSeats;
 
-    internal sealed class PilotSeatAttachment
+    private sealed class PilotSeatAttachment
     {
         public CoopAgentInfo Info;
         public StandingPoint Point;

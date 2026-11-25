@@ -288,6 +288,7 @@ public partial class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         while (_localAuthorityChanges.Count > 0)
         {
             CoopAgentInfo info = _localAuthorityChanges.Dequeue();
+            // A new local registration gets its own notification, so skip the replaced registration.
             if (agentRegistry.IsLocallyControlled(info.AgentId)
                 && agentRegistry.TryGetAgentInfo(info.AgentId, out var registered)
                 && ReferenceEquals(info, registered))
@@ -1606,6 +1607,7 @@ public partial class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
     {
         ClearPilotSeats();
         _agentStates.Clear();
+        pilotSeatAgentIds.Clear();
         _pendingActionAgentIds.Clear();
         _retainedGuardAgentIds.Clear();
         _localAuthorityChanges.Clear();
