@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using Common.Network.Messages;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
@@ -20,7 +21,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem.MapEvents;
-using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 
 namespace Coop.Core.Server.Services.Instances.Handlers;
@@ -170,11 +170,8 @@ public class ServerBattleCompletionHandler : IHandler
         return battleState == BattleState.DefenderPullBack
             && objectManager.TryGetObject<MapEvent>(instanceId, out var mapEvent)
             && mapEvent.BattleState == BattleState.None
-            && (mapEvent.IsSiegeAmbush || IsWallsAssault(mapEvent));
+            && (mapEvent.IsSiegeAmbush || mapEvent.IsSiegeWallsStage());
     }
-
-    private static bool IsWallsAssault(MapEvent mapEvent) =>
-        mapEvent.IsSiegeAssault && mapEvent.MapEventSettlement?.CurrentSiegeState == Settlement.SiegeState.OnTheWalls;
 
     private void Handle_MissionMemberDeparted(MessagePayload<MissionMemberDeparted> payload)
     {
@@ -615,7 +612,7 @@ public class ServerBattleCompletionHandler : IHandler
             memberCount, concludedState, instanceId, hostEpoch);
         if (concludedState == BattleState.DefenderPullBack)
         {
-            if (objectManager.TryGetObject<MapEvent>(instanceId, out var mapEvent) && IsWallsAssault(mapEvent))
+            if (objectManager.TryGetObject<MapEvent>(instanceId, out var mapEvent) && mapEvent.IsSiegeWallsStage())
                 messageBroker.Publish(this, new AuthoritativeSiegeKeepRequested(instanceId, hostEpoch));
             else
                 messageBroker.Publish(this, new AuthoritativeSiegeAmbushCompletionRequested(instanceId));
@@ -625,8 +622,8 @@ public class ServerBattleCompletionHandler : IHandler
         messageBroker.Publish(this, new AuthoritativeBattleConclusionRequested(instanceId, concludedState, hostEpoch));
     }
 
-    // The walls concluded into the keep, which is fought as a new mission on the same map event id. The walls
-    // instance ends without the conclusion record that would refuse that entry, and its host and reports go.
+    // `succeeded: false` so the walls instance isnt recorded as concluded, otherwise the keep mission on the same
+    // map event id gets refused. The walls host and reports are dropped too.
     private void Handle_SiegeKeepStageOpened(MessagePayload<SiegeKeepStageOpened> payload)
     {
         var mapEventId = payload.What.MapEventId;

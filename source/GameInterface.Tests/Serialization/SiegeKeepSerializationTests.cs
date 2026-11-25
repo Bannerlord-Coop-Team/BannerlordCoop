@@ -1,4 +1,5 @@
-﻿using GameInterface.Services.MapEvents.Messages.Start;
+﻿using GameInterface.Services.Hideouts;
+using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.SiegeEvents.Messages;
 using ProtoBuf;
 using System;
@@ -26,7 +27,7 @@ public class SiegeKeepSerializationTests
     [Fact]
     public void PhaseChanged_RoundTripPreservesPhaseAndSeat()
     {
-        var original = new NetworkSiegeKeepPhaseChanged("map-event-1", SiegeKeepPhase.Locked, true, 4, 0);
+        var original = new NetworkSiegeKeepPhaseChanged("map-event-1", SiegeKeepPhase.Locked, true, 4, 73);
 
         var result = RoundTrip(original);
 
@@ -34,6 +35,32 @@ public class SiegeKeepSerializationTests
         Assert.Equal(SiegeKeepPhase.Locked, result.Phase);
         Assert.True(result.IsSeated);
         Assert.Equal(4, result.EscortAllowance);
+        Assert.Equal(73, result.SecondsRemaining);
+    }
+
+    [Fact]
+    public void EntryRequest_RoundTripPreservesOrderedSelection()
+    {
+        var original = new NetworkSiegeKeepEntryRequest("request-1", "map-event-1", false,
+            new[] { new HideoutTroopSelectionEntry("player-hero", 1), new HideoutTroopSelectionEntry("escort", 6) });
+
+        var result = RoundTrip(original);
+
+        Assert.Equal(original.RequestId, result.RequestId);
+        Assert.Equal(original.MapEventId, result.MapEventId);
+        Assert.False(result.QueryOnly);
+        Assert.Equal(original.Troops, result.Troops);
+    }
+
+    // protobuf-net writes nothing for an empty struct array, so a query arrives with no troops at all.
+    [Fact]
+    public void EntryRequest_EmptySelectionArrivesAsNull()
+    {
+        var result = RoundTrip(new NetworkSiegeKeepEntryRequest("request-1", "map-event-1", true,
+            Array.Empty<HideoutTroopSelectionEntry>()));
+
+        Assert.True(result.QueryOnly);
+        Assert.Null(result.Troops);
     }
 
     [Fact]

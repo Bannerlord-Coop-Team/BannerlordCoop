@@ -1,5 +1,4 @@
-﻿using GameInterface.Configuration;
-using GameInterface.Services.Hideouts;
+﻿using GameInterface.Services.Hideouts;
 using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.ObjectManager;
 using System;
@@ -38,10 +37,10 @@ public interface ISiegeKeepTroopSelection : IGameAbstraction
     bool IsLocked(MapEvent mapEvent);
     bool TryGetDeadline(MapEvent mapEvent, out DateTime deadlineUtc);
     IReadOnlyList<SiegeKeepSeat> GetSeats(MapEvent mapEvent);
-    bool TryGetSeat(MapEvent mapEvent, string mobilePartyId, out SiegeKeepSeat seat,
-        out HideoutTroopSelectionEntry[] selection);
-    bool TrySelect(MapEvent mapEvent, MobileParty party, IReadOnlyList<HideoutTroopSelectionEntry> requested,
-        out HideoutTroopSelectionEntry[] accepted);
+    bool TryGetSeat(MapEvent mapEvent, string mobilePartyId, out SiegeKeepSeat seat);
+    /// <summary>Whether the seated player already chose its squad.</summary>
+    bool HasAnswered(MapEvent mapEvent, string mobilePartyId);
+    bool TrySelect(MapEvent mapEvent, MobileParty party, IReadOnlyList<HideoutTroopSelectionEntry> requested);
     /// <summary>Gives up a seat that has not locked, for a player who left before the roster did.</summary>
     void RemoveSeat(MapEvent mapEvent, string mobilePartyId);
     bool HaveAllAnswered(MapEvent mapEvent);
@@ -70,12 +69,14 @@ public sealed class SiegeKeepTroopSelection : ISiegeKeepTroopSelection
     }
 
     private readonly IObjectManager objectManager;
+    private readonly ITroopSelectionRules rules;
     private readonly Dictionary<MapEvent, Attempt> attempts = new();
     private readonly object gate = new();
 
-    public SiegeKeepTroopSelection(IObjectManager objectManager)
+    public SiegeKeepTroopSelection(IObjectManager objectManager, ITroopSelectionRules rules)
     {
         this.objectManager = objectManager;
+        this.rules = rules;
     }
 
     public void Open(MapEvent mapEvent, IReadOnlyList<SiegeKeepSeat> seats,
@@ -93,13 +94,13 @@ public sealed class SiegeKeepTroopSelection : ISiegeKeepTroopSelection
     public bool IsOpen(MapEvent mapEvent)
     {
         lock (gate)
-            return mapEvent != null && attempts.ContainsKey(mapEvent);
+            return attempts.ContainsKey(mapEvent);
     }
 
     public bool IsLocked(MapEvent mapEvent)
     {
         lock (gate)
-            return mapEvent != null && attempts.TryGetValue(mapEvent, out var attempt) && attempt.Locked;
+            return attempts.TryGetValue(mapEvent, out var attempt) && attempt.Locked;
     }
 
     public bool TryGetDeadline(MapEvent mapEvent, out DateTime deadlineUtc)
@@ -107,7 +108,7 @@ public sealed class SiegeKeepTroopSelection : ISiegeKeepTroopSelection
         deadlineUtc = default;
         lock (gate)
         {
-            if (mapEvent == null || !attempts.TryGetValue(mapEvent, out var attempt)) return false;
+            if (!attempts.TryGetValue(mapEvent, out var attempt)) return false;
             deadlineUtc = attempt.DeadlineUtc;
             return true;
         }
@@ -116,36 +117,34 @@ public sealed class SiegeKeepTroopSelection : ISiegeKeepTroopSelection
     public IReadOnlyList<SiegeKeepSeat> GetSeats(MapEvent mapEvent)
     {
         lock (gate)
-            return mapEvent != null && attempts.TryGetValue(mapEvent, out var attempt)
+            return attempts.TryGetValue(mapEvent, out var attempt)
                 ? attempt.Seats.ToArray()
                 : Array.Empty<SiegeKeepSeat>();
     }
 
-    public bool TryGetSeat(MapEvent mapEvent, string mobilePartyId, out SiegeKeepSeat seat,
-        out HideoutTroopSelectionEntry[] selection)
+    public bool TryGetSeat(MapEvent mapEvent, string mobilePartyId, out SiegeKeepSeat seat)
     {
         seat = default;
-        selection = Array.Empty<HideoutTroopSelectionEntry>();
         lock (gate)
         {
-            if (mapEvent == null || !attempts.TryGetValue(mapEvent, out var attempt)) return false;
+            if (!attempts.TryGetValue(mapEvent, out var attempt)) return false;
             var index = attempt.Seats.FindIndex(value => value.MobilePartyId == mobilePartyId);
             if (index < 0) return false;
 
             seat = attempt.Seats[index];
-            if (attempt.Selections.TryGetValue(mobilePartyId, out var existing))
-                selection = existing.ToArray();
             return true;
         }
     }
 
-    public bool TrySelect(MapEvent mapEvent, MobileParty party, IReadOnlyList<HideoutTroopSelectionEntry> requested,
-        out HideoutTroopSelectionEntry[] accepted)
+    public bool HasAnswered(MapEvent mapEvent, string mobilePartyId)
     {
-        accepted = Array.Empty<HideoutTroopSelectionEntry>();
-        if (mapEvent == null || party == null || requested == null ||
-            !objectManager.TryGetId(party, out var partyId))
-            return false;
+        lock (gate)
+            return attempts.TryGetValue(mapEvent, out var attempt) && attempt.Selections.ContainsKey(mobilePartyId);
+    }
+
+    public bool TrySelect(MapEvent mapEvent, MobileParty party, IReadOnlyList<HideoutTroopSelectionEntry> requested)
+    {
+        if (!objectManager.TryGetId(party, out var partyId)) return false;
 
         lock (gate)
         {
@@ -154,46 +153,11 @@ public sealed class SiegeKeepTroopSelection : ISiegeKeepTroopSelection
             if (index < 0) return false;
             var seat = attempt.Seats[index];
 
-            var healthy = new Dictionary<string, int>();
-            foreach (var element in party.MemberRoster.GetTroopRoster())
-            {
-                if (element.Character == null || !objectManager.TryGetId(element.Character, out var characterId))
-                    continue;
-
-                var count = element.Number - element.WoundedNumber;
-                if (characterId == seat.HeroCharacterId && ModConfigProvider.ModOptions.PlayerWoundedBattleEntry)
-                    count = element.Number;
-                healthy[characterId] = count;
-            }
-
-            if (!healthy.TryGetValue(seat.HeroCharacterId, out var heroes) || heroes < 1)
+            var healthy = rules.CountHealthy(party, seat.HeroCharacterId);
+            if (!rules.TryAccept(healthy, seat.HeroCharacterId, seat.EscortAllowance, requested, out var accepted))
                 return false;
 
-            var selection = new List<HideoutTroopSelectionEntry> { new(seat.HeroCharacterId, 1) };
-            var selectedCounts = new Dictionary<string, int>();
-            var escorts = 0;
-            foreach (var entry in requested)
-            {
-                if (string.IsNullOrEmpty(entry.CharacterId) || entry.Count < 1)
-                    return false;
-                if (entry.CharacterId == seat.HeroCharacterId)
-                {
-                    if (entry.Count != 1) return false;
-                    continue;
-                }
-
-                selectedCounts.TryGetValue(entry.CharacterId, out var alreadySelected);
-                if (!healthy.TryGetValue(entry.CharacterId, out var available) ||
-                    entry.Count > available - alreadySelected || entry.Count > seat.EscortAllowance - escorts)
-                    return false;
-
-                selectedCounts[entry.CharacterId] = alreadySelected + entry.Count;
-                escorts += entry.Count;
-                selection.Add(entry);
-            }
-
-            accepted = selection.ToArray();
-            attempt.Selections[partyId] = accepted.ToArray();
+            attempt.Selections[partyId] = accepted;
             return true;
         }
     }
@@ -202,7 +166,7 @@ public sealed class SiegeKeepTroopSelection : ISiegeKeepTroopSelection
     {
         lock (gate)
         {
-            if (mapEvent == null || !attempts.TryGetValue(mapEvent, out var attempt) || attempt.Locked) return;
+            if (!attempts.TryGetValue(mapEvent, out var attempt) || attempt.Locked) return;
             attempt.Seats.RemoveAll(seat => seat.MobilePartyId == mobilePartyId);
             attempt.Selections.Remove(mobilePartyId);
         }
@@ -211,45 +175,42 @@ public sealed class SiegeKeepTroopSelection : ISiegeKeepTroopSelection
     public bool HaveAllAnswered(MapEvent mapEvent)
     {
         lock (gate)
-            return mapEvent != null && attempts.TryGetValue(mapEvent, out var attempt) &&
+            return attempts.TryGetValue(mapEvent, out var attempt) &&
                    attempt.Seats.All(seat => attempt.Selections.ContainsKey(seat.MobilePartyId));
     }
 
     public void Lock(MapEvent mapEvent)
     {
+        // Vanilla's hall supplier draws its defender list from every mobile party on the side in order.
+        var defendingParties = mapEvent.DefenderSide.Parties
+            .Select(mapEventParty => mapEventParty.Party)
+            .Where(party => party?.IsMobile == true)
+            .ToList();
+        var healthyByParty = defendingParties.Select(CountHealthyDefenders).ToList();
+
         lock (gate)
         {
-            if (mapEvent == null || !attempts.TryGetValue(mapEvent, out var attempt) || attempt.Locked) return;
+            if (!attempts.TryGetValue(mapEvent, out var attempt) || attempt.Locked) return;
             attempt.Locked = true;
 
-            // Vanilla's hall supplier draws its defender list from every mobile party on the side in order.
-            var remaining = new Dictionary<string, int>(attempt.DefenderBudget);
-            foreach (var mapEventParty in mapEvent.DefenderSide.Parties)
-            {
-                var party = mapEventParty.Party;
-                if (party?.IsMobile != true) continue;
-
-                var allocation = new Dictionary<string, int>();
-                foreach (var element in party.MemberRoster.GetTroopRoster())
-                {
-                    if (element.Character == null || !objectManager.TryGetId(element.Character, out var characterId) ||
-                        !remaining.TryGetValue(characterId, out var budget) || budget <= 0)
-                        continue;
-
-                    allocation.TryGetValue(characterId, out var already);
-                    var take = Math.Min(budget, element.Number - element.WoundedNumber);
-                    if (take <= 0) continue;
-                    allocation[characterId] = already + take;
-                    remaining[characterId] = budget - take;
-                }
-                attempt.DefenderAllocations[party] = allocation;
-            }
+            var allocations = SplitDefenders(attempt.DefenderBudget, healthyByParty);
+            for (var index = 0; index < defendingParties.Count; index++)
+                attempt.DefenderAllocations[defendingParties[index]] = allocations[index];
         }
+    }
+
+    private IReadOnlyList<(string CharacterId, int Healthy)> CountHealthyDefenders(PartyBase party)
+    {
+        var troops = new List<(string, int)>();
+        foreach (var element in party.MemberRoster.GetTroopRoster())
+            if (element.Character != null && objectManager.TryGetId(element.Character, out var characterId))
+                troops.Add((characterId, element.Number - element.WoundedNumber));
+        return troops;
     }
 
     public bool IsAdmitted(MapEvent mapEvent, MobileParty party)
     {
-        if (mapEvent == null || party == null || !objectManager.TryGetId(party, out var partyId)) return false;
+        if (!objectManager.TryGetId(party, out var partyId)) return false;
         lock (gate)
             return attempts.TryGetValue(mapEvent, out var attempt) && attempt.Locked &&
                    attempt.Selections.ContainsKey(partyId);
@@ -259,31 +220,9 @@ public sealed class SiegeKeepTroopSelection : ISiegeKeepTroopSelection
     {
         lock (gate)
         {
-            if (mapEvent == null || party?.Party == null || !attempts.TryGetValue(mapEvent, out var attempt) ||
-                !attempt.Locked)
-                return;
+            if (!attempts.TryGetValue(mapEvent, out var attempt) || !attempt.Locked) return;
 
-            Dictionary<string, int> allowed;
-            if (party.Party.Side == BattleSideEnum.Defender)
-            {
-                attempt.DefenderAllocations.TryGetValue(party.Party, out allowed);
-            }
-            else
-            {
-                allowed = null;
-                var mobileParty = party.Party.MobileParty;
-                if (mobileParty != null && objectManager.TryGetId(mobileParty, out var partyId) &&
-                    attempt.Selections.TryGetValue(partyId, out var selection))
-                {
-                    allowed = new Dictionary<string, int>();
-                    foreach (var entry in selection)
-                    {
-                        allowed.TryGetValue(entry.CharacterId, out var count);
-                        allowed[entry.CharacterId] = count + entry.Count;
-                    }
-                }
-            }
-
+            var allowed = GetAllowedTroops(attempt, party.Party);
             if (allowed == null)
             {
                 entries.Clear();
@@ -300,6 +239,25 @@ public sealed class SiegeKeepTroopSelection : ISiegeKeepTroopSelection
         }
     }
 
+    // The troops a party may field in the keep, or null when the party has no part in it.
+    private Dictionary<string, int> GetAllowedTroops(Attempt attempt, PartyBase party)
+    {
+        if (party.Side == BattleSideEnum.Defender)
+            return attempt.DefenderAllocations.TryGetValue(party, out var allocation) ? allocation : null;
+
+        if (party.MobileParty == null || !objectManager.TryGetId(party.MobileParty, out var partyId) ||
+            !attempt.Selections.TryGetValue(partyId, out var selection))
+            return null;
+
+        var allowed = new Dictionary<string, int>();
+        foreach (var entry in selection)
+        {
+            allowed.TryGetValue(entry.CharacterId, out var count);
+            allowed[entry.CharacterId] = count + entry.Count;
+        }
+        return allowed;
+    }
+
     public IReadOnlyList<MapEvent> GetOpenMapEvents()
     {
         lock (gate)
@@ -308,9 +266,21 @@ public sealed class SiegeKeepTroopSelection : ISiegeKeepTroopSelection
 
     public void Forget(MapEvent mapEvent)
     {
-        if (mapEvent == null) return;
         lock (gate)
             attempts.Remove(mapEvent);
+    }
+
+    /// <summary>
+    /// Vanilla's hall attacker places for <paramref name="defenderCount"/> defenders, with a seat for each player in
+    /// order while places last and the rest shared as escorts. Returns each seated player's escort allowance.
+    /// </summary>
+    internal static int[] PlanSeats(int defenderCount, float attackerDefenderRatio, int maxAttackers,
+        IReadOnlyList<int> escortsPerCandidate)
+    {
+        var attackerPlaces = Math.Max(1, Math.Min(maxAttackers,
+            TaleWorlds.Library.MathF.Round(defenderCount * attackerDefenderRatio)));
+        var seated = Math.Min(attackerPlaces, escortsPerCandidate.Count);
+        return ShareEscortPlaces(attackerPlaces - seated, escortsPerCandidate.Take(seated).ToList());
     }
 
     /// <summary>
@@ -333,5 +303,31 @@ public sealed class SiegeKeepTroopSelection : ISiegeKeepTroopSelection
             }
         }
         return shares;
+    }
+
+    /// <summary>
+    /// Splits the hall's defender budget greedily across the defending parties in order, each taking what its healthy
+    /// troops of a character allow.
+    /// </summary>
+    internal static List<Dictionary<string, int>> SplitDefenders(IReadOnlyDictionary<string, int> budget,
+        IReadOnlyList<IReadOnlyList<(string CharacterId, int Healthy)>> healthyByParty)
+    {
+        var remaining = budget.ToDictionary(pair => pair.Key, pair => pair.Value);
+        var allocations = new List<Dictionary<string, int>>();
+        foreach (var party in healthyByParty)
+        {
+            var allocation = new Dictionary<string, int>();
+            foreach (var (characterId, healthy) in party)
+            {
+                if (!remaining.TryGetValue(characterId, out var left) || left <= 0) continue;
+                var take = Math.Min(left, healthy);
+                if (take <= 0) continue;
+                allocation.TryGetValue(characterId, out var already);
+                allocation[characterId] = already + take;
+                remaining[characterId] = left - take;
+            }
+            allocations.Add(allocation);
+        }
+        return allocations;
     }
 }

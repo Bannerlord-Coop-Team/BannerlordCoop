@@ -20,7 +20,7 @@ namespace GameInterface.Services.SiegeEvents.Patches;
 internal class SiegeMissionEndPatches
 {
     // Each machine's walls mission would advance the hall stage on its own. The server moves the siege into the
-    // lord's hall once every walls member reported the defenders falling back (SiegeKeepHandler).
+    // lord's hall once every walls member reported the defenders falling back (SiegeKeepStageHandler).
     [HarmonyPatch(typeof(Settlement), nameof(Settlement.SetNextSiegeState))]
     [HarmonyPrefix]
     private static bool SetNextSiegeStatePrefix() => false;

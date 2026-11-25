@@ -1,7 +1,6 @@
 ﻿using Common.Commands;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.SiegeEvents.Handlers;
 using GameInterface.Utils.Commands;
 using System.Linq;
 using TaleWorlds.Core;
@@ -16,15 +15,15 @@ internal static class SiegeKeepCommands
     {
         private readonly ICommandObjectResolver resolver;
         private readonly IObjectManager objectManager;
-        private readonly SiegeKeepHandler keepHandler;
+        private readonly ISiegeKeepStage keepStage;
         private readonly ISiegeKeepTroopSelection keepSelection;
 
         public OpenKeepCoopCommand(ICommandObjectResolver resolver, IObjectManager objectManager,
-            SiegeKeepHandler keepHandler, ISiegeKeepTroopSelection keepSelection)
+            ISiegeKeepStage keepStage, ISiegeKeepTroopSelection keepSelection)
         {
             this.resolver = resolver;
             this.objectManager = objectManager;
-            this.keepHandler = keepHandler;
+            this.keepStage = keepStage;
             this.keepSelection = keepSelection;
         }
 
@@ -48,7 +47,7 @@ internal static class SiegeKeepCommands
             if (ServerBattleModeArbiter.IsClaimed(mapEventId))
                 return Failed("The siege assault is still being fought; end its walls mission first.");
             if (keepSelection.IsOpen(mapEvent)) return Failed("The keep stage is already open.");
-            if (!keepHandler.TryOpenStage(mapEvent))
+            if (!keepStage.TryOpen(mapEvent))
                 return Failed("The keep stage needs an attacking player, no defending player, and defenders left.");
 
             var seats = keepSelection.GetSeats(mapEvent)

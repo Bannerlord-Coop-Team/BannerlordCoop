@@ -301,10 +301,12 @@ internal class BattleMissionStartHandler : IHandler
                     // A new claim means no mission is open, so re-read the engine and wall damage the last one wrote
                     // back, keeping the siege kind it opened with.
                     // A walls snapshot left from before the keep must not open the keep on the walls scene.
-                    var snapshot = isNewMissionClaim ||
-                        (siegeMissionSnapshots.TryGetValue(payload.What.MapEventId, out var cached) && cached.IsLordsHall != isKeep)
-                        ? siegeMissionSnapshots[payload.What.MapEventId] = BuildSiegeMissionSnapshot(payload.What.MapEventId, mapEvent, isKeep)
-                        : siegeMissionSnapshots.GetOrAdd(payload.What.MapEventId, _ => BuildSiegeMissionSnapshot(payload.What.MapEventId, mapEvent, isKeep));
+                    bool rebuild = isNewMissionClaim ||
+                        (siegeMissionSnapshots.TryGetValue(payload.What.MapEventId, out var cached) && cached.IsLordsHall != isKeep);
+                    if (rebuild)
+                        siegeMissionSnapshots[payload.What.MapEventId] = BuildSiegeMissionSnapshot(payload.What.MapEventId, mapEvent, isKeep);
+                    var snapshot = siegeMissionSnapshots.GetOrAdd(payload.What.MapEventId,
+                        _ => BuildSiegeMissionSnapshot(payload.What.MapEventId, mapEvent, isKeep));
                     // Wounded non-initiators were removed above; the client-side eligibility check remains a fallback.
                     missionStartMessage = new NetworkStartSiegeMission(
                         snapshot.MapEventId,
