@@ -14,6 +14,10 @@ public readonly struct PlayerRegistrationHandles
     [ProtoMember(7)] public readonly uint PartyBase;
     [ProtoMember(8)] public readonly uint MemberRoster;
     [ProtoMember(9)] public readonly uint PrisonRoster;
+    // 0 when the hero has no equipment of that type
+    [ProtoMember(10)] public readonly uint BattleEquipment;
+    [ProtoMember(11)] public readonly uint CivilianEquipment;
+    [ProtoMember(12)] public readonly uint StealthEquipment;
 
     public PlayerRegistrationHandles(
         uint hero,
@@ -24,7 +28,10 @@ public readonly struct PlayerRegistrationHandles
         uint itemRoster,
         uint partyBase,
         uint memberRoster,
-        uint prisonRoster)
+        uint prisonRoster,
+        uint battleEquipment,
+        uint civilianEquipment,
+        uint stealthEquipment)
     {
         Hero = hero;
         MobileParty = mobileParty;
@@ -35,5 +42,8 @@ public readonly struct PlayerRegistrationHandles
         PartyBase = partyBase;
         MemberRoster = memberRoster;
         PrisonRoster = prisonRoster;
+        BattleEquipment = battleEquipment;
+        CivilianEquipment = civilianEquipment;
+        StealthEquipment = stealthEquipment;
     }
 }

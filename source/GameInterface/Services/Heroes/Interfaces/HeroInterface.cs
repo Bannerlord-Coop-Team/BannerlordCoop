@@ -6,6 +6,7 @@ using Common.Util;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
 using GameInterface.Services.CharacterObjects;
+using GameInterface.Services.Equipments;
 using GameInterface.Services.Heroes.Data;
 using GameInterface.Services.Issues.Framework.Gating;
 using GameInterface.Services.MobileParties;
@@ -124,6 +125,20 @@ internal class HeroInterface : IHeroInterface
             return false;
         }
 
+        // A hero can lack an equipment set, which leaves its handle 0, but a set it has must be registered
+        uint battleEquipmentHandle = 0;
+        uint civilianEquipmentHandle = 0;
+        uint stealthEquipmentHandle = 0;
+        if (hero._battleEquipment != null &&
+            !objectManager.TryGetHandleWithLogging(hero._battleEquipment, out battleEquipmentHandle))
+            return false;
+        if (hero._civilianEquipment != null &&
+            !objectManager.TryGetHandleWithLogging(hero._civilianEquipment, out civilianEquipmentHandle))
+            return false;
+        if (hero._stealthEquipment != null &&
+            !objectManager.TryGetHandleWithLogging(hero._stealthEquipment, out stealthEquipmentHandle))
+            return false;
+
         handles = new PlayerRegistrationHandles(
             heroHandle,
             partyHandle,
@@ -133,7 +148,10 @@ internal class HeroInterface : IHeroInterface
             itemRosterHandle,
             partyBaseHandle,
             memberRosterHandle,
-            prisonRosterHandle);
+            prisonRosterHandle,
+            battleEquipmentHandle,
+            civilianEquipmentHandle,
+            stealthEquipmentHandle);
         return true;
     }
 
@@ -367,9 +385,12 @@ internal class HeroInterface : IHeroInterface
         RegisterPrimary(hero.CharacterObject, hero.StringId);
 
         // HeroDeveloper is not a child of MBObjectBase, can't use RegisterPrimary
-        objectManager.AddExisting($"{nameof(HeroDeveloper)}_{hero.StringId}", hero.HeroDeveloper); 
+        objectManager.AddExisting($"{nameof(HeroDeveloper)}_{hero.StringId}", hero.HeroDeveloper);
 
         RegisterPartyChildren(party);
+
+        // The unpack runs under AllowedThread, so the equipment constructors registered nothing and slot writes couldn't sync
+        RegisterHeroEquipment(hero);
     }
 
     /// <summary>
@@ -395,6 +416,8 @@ internal class HeroInterface : IHeroInterface
             handles.HeroDeveloper);
 
         RegisterPartyChildren(party, handles);
+
+        RegisterHeroEquipment(hero, handles);
     }
 
     /// <summary>The id prefix the host gives every joined player's hero, and so its character.</summary>
@@ -437,6 +460,42 @@ internal class HeroInterface : IHeroInterface
             party.PrisonRoster,
             $"{nameof(MobileParty.PrisonRoster)}_{party.StringId}",
             handles.PrisonRoster);
+    }
+
+    private void RegisterHeroEquipment(Hero hero)
+    {
+        if (hero._battleEquipment != null)
+            RegisterChild(
+                hero._battleEquipment,
+                EquipmentRegistry.GetHeroEquipmentId(hero, Equipment.EquipmentType.Battle));
+        if (hero._civilianEquipment != null)
+            RegisterChild(
+                hero._civilianEquipment,
+                EquipmentRegistry.GetHeroEquipmentId(hero, Equipment.EquipmentType.Civilian));
+        if (hero._stealthEquipment != null)
+            RegisterChild(
+                hero._stealthEquipment,
+                EquipmentRegistry.GetHeroEquipmentId(hero, Equipment.EquipmentType.Stealth));
+    }
+
+    // A 0 handle means the host's hero had no equipment of that type
+    private void RegisterHeroEquipment(Hero hero, PlayerRegistrationHandles handles)
+    {
+        if (handles.BattleEquipment != 0)
+            RegisterChild(
+                hero._battleEquipment,
+                EquipmentRegistry.GetHeroEquipmentId(hero, Equipment.EquipmentType.Battle),
+                handles.BattleEquipment);
+        if (handles.CivilianEquipment != 0)
+            RegisterChild(
+                hero._civilianEquipment,
+                EquipmentRegistry.GetHeroEquipmentId(hero, Equipment.EquipmentType.Civilian),
+                handles.CivilianEquipment);
+        if (handles.StealthEquipment != 0)
+            RegisterChild(
+                hero._stealthEquipment,
+                EquipmentRegistry.GetHeroEquipmentId(hero, Equipment.EquipmentType.Stealth),
+                handles.StealthEquipment);
     }
 
     private void RegisterChild(object obj, string suffix)

@@ -29,8 +29,6 @@ internal readonly struct CompleteTrade : ICommand
     public readonly bool IsManagingWarehouse;
     [ProtoMember(10)]
     public readonly string HeroId;
-    [ProtoMember(11)]
-    public readonly string InitialHeroId;
     [ProtoMember(12)]
     public readonly int TotalAmount;
     [ProtoMember(13)]
@@ -67,7 +65,6 @@ internal readonly struct CompleteTrade : ICommand
         bool canGainXpFromDiscarding,
         bool isManagingWarehouse,
         string heroId,
-        string initialHeroId,
         int totalAmount,
         int merchantGold,
         string ownerPartyId,
@@ -90,7 +87,6 @@ internal readonly struct CompleteTrade : ICommand
         CanGainXpFromDiscarding = canGainXpFromDiscarding;
         IsManagingWarehouse = isManagingWarehouse;
         HeroId = heroId;
-        InitialHeroId = initialHeroId;
         TotalAmount = totalAmount;
         MerchantGold = merchantGold;
         OwnerPartyId = ownerPartyId;

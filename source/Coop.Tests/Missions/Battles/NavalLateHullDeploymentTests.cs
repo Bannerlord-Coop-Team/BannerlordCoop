@@ -1,5 +1,4 @@
 ﻿#if COOP_NAVAL
-using HarmonyLib;
 using Missions.Naval;
 using NavalDLC.Missions.Objects;
 using System;
@@ -8,17 +7,9 @@ using Xunit;
 
 namespace Coop.Tests.Missions.Battles;
 
-/// <summary>Late hulls get vanilla's deployment pass, which runs only on hulls spawned before deployment ends.</summary>
+/// <summary>Late-hull formations are checked once per tick, and only weightless formations with units ask the tactic to re-apply.</summary>
 public class NavalLateHullDeploymentTests
 {
-    // Late hulls get vanilla's own deployment pass, and the ballistas fielded before them re-read their targets.
-    [Fact]
-    public void Target_VanillaDeploymentPassExists()
-    {
-        Assert.NotNull(AccessTools.DeclaredMethod(typeof(MissionShip), nameof(MissionShip.OnDeploymentFinished)));
-        Assert.NotNull(AccessTools.DeclaredMethod(typeof(RangedSiegeWeaponAi), nameof(RangedSiegeWeaponAi.ResetThreatSeeker)));
-    }
-
     // A formation noted twice is checked once; one without a formation AI is left alone, and the next tick starts empty.
     [Fact]
     public void Apply_ChecksEachNotedFormationOnce_ThenForgetsThem()
