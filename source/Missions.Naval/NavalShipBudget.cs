@@ -139,7 +139,8 @@ public class NavalShipBudget : INavalShipBudget
         return IsPlayerParty(party) && objectManager.TryGetIdWithLogging(party.MobileParty, out partyId);
     }
 
-    // Whether the player registry holds the party; a ship-less player counts too, since it fields no hull in the share math.
+    // Whether the player registry holds the party; a ship-less player counts too, since it adds no hull to the share and its
+    // id still travels in the fleet attempt.
     private bool IsPlayerParty(PartyBase party) => playerManager.Contains(party.MobileParty);
 
     /// <summary>

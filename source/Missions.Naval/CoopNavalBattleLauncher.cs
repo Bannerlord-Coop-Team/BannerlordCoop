@@ -162,7 +162,6 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         bool isPlayerAttacker = playerSide == BattleSideEnum.Attacker;
         var deploymentModel = NavalDLCManager.Instance.GameModels.ShipDeploymentModel;
 
-        var sideParties = mapEvent.GetMapEventSide(playerSide).Parties;
         deploymentSlot.Rank = NavalSideDeploymentSlots.RankOf(mapEvent, playerSide, PartyBase.MainParty, playerManager);
         deploymentSlot.PlayerCount = NavalSideDeploymentSlots.PlayerCountOf(mapEvent, playerSide, playerManager);
 #if DEBUG
@@ -172,6 +171,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         var enemyLimit = deploymentModel.GetTeamShipDeploymentLimit(mapEvent.GetMapEventSide(playerSide.GetOppositeSide()).Parties);
 
         // The battle host's AI share of this side subtracts this same fleet, so both come from the budget.
+        var sideParties = mapEvent.GetMapEventSide(playerSide).Parties;
         var ownFleet = shipBudget.PlayerFleet(sideParties, PartyBase.MainParty);
         var ownShips = ownFleet.Ships.Select(ship => (IShipOrigin)shipSnapshotBuilder.Build(ship)).ToMBList();
         var captains = OrderOwnCaptains(CoopFieldBattleLauncher.OwnPartyHeroesByPriority(),

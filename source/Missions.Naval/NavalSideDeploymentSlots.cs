@@ -34,22 +34,22 @@ internal static class NavalSideDeploymentSlots
     internal static int PlayerCountOf(MapEvent mapEvent, BattleSideEnum side, IPlayerManager playerManager) =>
         PlayerCountOf(PartiesOf(mapEvent, side), party => TakesSlot(mapEvent, party, playerManager));
 
-    /// <summary>How many player parties precede <paramref name="own"/> in the side's party order.</summary>
-    internal static int RankOf<T>(IEnumerable<T> sideParties, T own, Func<T, bool> isPlayerParty) where T : class
+    /// <summary>How many slot-taking parties precede <paramref name="own"/> in the side's party order.</summary>
+    internal static int RankOf<T>(IEnumerable<T> sideParties, T own, Func<T, bool> takesSlot) where T : class
     {
         int rank = 0;
         foreach (var party in sideParties)
         {
             if (ReferenceEquals(party, own)) return rank;
-            if (isPlayerParty(party)) rank++;
+            if (takesSlot(party)) rank++;
         }
 
         return 0;
     }
 
-    /// <summary>How many of the side's parties are player parties.</summary>
-    internal static int PlayerCountOf<T>(IEnumerable<T> sideParties, Func<T, bool> isPlayerParty) =>
-        sideParties.Count(isPlayerParty);
+    /// <summary>How many of the side's parties are slot-taking players.</summary>
+    internal static int PlayerCountOf<T>(IEnumerable<T> sideParties, Func<T, bool> takesSlot) =>
+        sideParties.Count(takesSlot);
 
     /// <summary>A team's range from its ships' deployment lengths, as vanilla's GetTeamSpawnPathOffsetRange takes it.</summary>
     internal static float LongestTeamRange(IEnumerable<float> shipDeploymentLengths) =>
