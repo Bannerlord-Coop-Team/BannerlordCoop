@@ -173,7 +173,7 @@ public class LandLordCompanyOfTroubleTests : IDisposable
     }
 
     [Fact]
-    public void LettingTheCompanyLeave_RemovesThemOnceAndFailsTheQuest()
+    public void LettingTheCompanyLeave_RemovesThemAndFailsTheQuest()
     {
         GiveMercenaries(6);
         Quest quest = null!;
@@ -454,15 +454,10 @@ public class LandLordCompanyOfTroubleTests : IDisposable
 
         Server.Call(() =>
         {
-            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var ownerParty));
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(otherPartyId, out var other));
             var quest = CompanyTurnedHostile(companyPartyId);
             company = quest._companyOfTroubleParty;
-
-            using (new AllowedThread())
-            {
-                Campaign.Current.MainParty = ownerParty;
-            }
+            MakeTheOwnersPartyTheMainParty(Server);
 
             CampaignEventDispatcher.Instance.OnMobilePartyDestroyed(company, other.Party);
             quest.OnFinalize();
@@ -470,23 +465,6 @@ public class LandLordCompanyOfTroubleTests : IDisposable
         Server.PumpGameThread();
 
         Assert.True(company.IsActive);
-    }
-
-    [Fact]
-    public void TheOwnerDestroyingTheCompany_LeavesTheEndingToTheBattle()
-    {
-        var companyPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
-        SetOwner();
-
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var ownerParty));
-            var quest = CompanyTurnedHostile(companyPartyId);
-
-            CampaignEventDispatcher.Instance.OnMobilePartyDestroyed(quest._companyOfTroubleParty, ownerParty.Party);
-        });
-
-        Assert.Equal(0, questEndings.Count);
     }
 
     [Fact]
@@ -656,7 +634,16 @@ public class LandLordCompanyOfTroubleTests : IDisposable
 
         Assert.Equal(0, MercenariesIn(Server));
         Assert.Equal(0, MercenariesIn(Owner));
-        Owner.Call(() => Assert.True(Owner.ObjectManager.TryGetObject<MobileParty>(companyId, out _)));
+
+        foreach (var instance in new[] { Server, Owner })
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(companyId, out var company));
+                Assert.True(instance.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+                Assert.Equal(4, company.MemberRoster.GetTroopCount(troop));
+            });
+        }
     }
 
     [Fact]

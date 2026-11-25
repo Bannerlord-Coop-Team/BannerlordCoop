@@ -94,20 +94,13 @@ internal class LandLordCompanyOfTroubleService : ILandLordCompanyOfTroubleServic
 
     private void OnMapEventEnded(Quest quest, MapEvent mapEvent)
     {
-        var owner = Hero.MainHero;
-        if (owner.PartyBelongedTo != null)
-        {
-            EndAfterBattle(quest, mapEvent);
-            return;
-        }
-
-        // Losing a battle takes the owner prisoner, which leaves them without a party, so the party they fought with stands in
+        // Keep the registered party even when losing the battle takes the owner prisoner
         if (!ownerResolver.TryResolveOwnerParty(IssueManager.GetIssueOfQuest(quest), out var ownerParty))
         {
             return;
         }
 
-        using (new MainHeroSubstitutionScope(owner, ownerParty))
+        using (new MainHeroSubstitutionScope(Hero.MainHero, ownerParty))
         {
             EndAfterBattle(quest, mapEvent);
         }
