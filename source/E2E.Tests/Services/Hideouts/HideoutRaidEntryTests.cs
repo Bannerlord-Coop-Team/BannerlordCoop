@@ -28,13 +28,15 @@ public class HideoutRaidEntryTests : MapEventTestBase
     public HideoutRaidEntryTests(ITestOutputHelper output) : base(output) { }
 
     [Theory]
-    [InlineData(true, 14, 0, false)]
-    [InlineData(true, 10, 4, false)]
-    [InlineData(false, 39, 0, false)]
-    [InlineData(false, 30, 9, false)]
-    [InlineData(true, 14, 0, true)]
+    [InlineData(true, 14, 0, false, false)]
+    [InlineData(true, 10, 4, false, false)]
+    [InlineData(false, 39, 0, false, false)]
+    [InlineData(false, 30, 9, false, false)]
+    [InlineData(true, 14, 0, true, false)]
+    [InlineData(true, 14, 0, false, true)]
     public void FirstRaidCreation_LeavesWaitingPlayerInsideAndAdmitsOnlyRemainingSharedTroops(
-        bool isDirectAssault, int firstEscortCount, int joiningEscortCount, bool abortFirstCreation)
+        bool isDirectAssault, int firstEscortCount, int joiningEscortCount, bool abortFirstCreation,
+        bool singleBanditParty)
     {
         var first = CreatePlayerHeroParty("hideout-entry-first");
         var joining = CreatePlayerHeroParty("hideout-entry-joining");
@@ -65,7 +67,10 @@ public class HideoutRaidEntryTests : MapEventTestBase
             var bandit = GameObjectCreator.CreateInitializedObject<CharacterObject>();
             bandit.Culture = banditCulture;
             banditCulture.BanditBandit = bandit;
-            for (var index = 0; index < Campaign.Current.Models.BanditDensityModel.NumberOfMinimumBanditPartiesInAHideoutToInfestIt; index++)
+            // Native attack menus open with one bandit party, below the IsInfested minimum.
+            var banditPartyCount = singleBanditParty ? 1
+                : Campaign.Current.Models.BanditDensityModel.NumberOfMinimumBanditPartiesInAHideoutToInfestIt;
+            for (var index = 0; index < banditPartyCount; index++)
             {
                 var clan = GameObjectCreator.CreateInitializedObject<Clan>();
                 clan.Culture = banditCulture;
@@ -79,6 +84,7 @@ public class HideoutRaidEntryTests : MapEventTestBase
                     VillageHostileFactionStanceHelper.ApplyWarStance(playerParty.MapFaction, party.MapFaction);
                 }
             }
+            Assert.Equal(!singleBanditParty, settlement.Hideout.IsInfested);
             Campaign.Current.MainParty = null;
         });
 

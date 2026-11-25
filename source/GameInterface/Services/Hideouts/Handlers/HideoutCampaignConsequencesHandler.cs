@@ -248,7 +248,7 @@ internal sealed class HideoutCampaignConsequencesHandler : IHandler
         {
             case HideoutCampaignConsequence.PrepareMission:
             case HideoutCampaignConsequence.PrepareDirectAssaultMission:
-                if (!settlement.Hideout.IsInfested || !settlement.Hideout.NextPossibleAttackTime.IsPast)
+                if (!CanBeAttacked(settlement))
                     return ConsequenceResult.Rejected;
 
                 behavior.ArrangeHideoutTroopCountsForMission();
@@ -266,9 +266,9 @@ internal sealed class HideoutCampaignConsequencesHandler : IHandler
                 return ConsequenceResult.AcceptedWith(GetHealthyDefenderCount(settlement));
 
             case HideoutCampaignConsequence.SetAttackCooldown:
-                if (!settlement.Hideout.IsInfested || !settlement.Hideout.NextPossibleAttackTime.IsPast)
+                if (!CanBeAttacked(settlement))
                 {
-                    Logger.Warning("Rejected hideout cooldown for {SettlementId}, it is not infested or already cooling down",
+                    Logger.Warning("Rejected hideout cooldown for {SettlementId}, it has no bandits or is already cooling down",
                         request.SettlementId);
                     return ConsequenceResult.Rejected;
                 }
@@ -408,10 +408,15 @@ internal sealed class HideoutCampaignConsequencesHandler : IHandler
         return true;
     }
 
+    /// <summary>Matches the native hideout attack menu conditions: a bandit party is inside and the cooldown is over.</summary>
+    // Not Hideout.IsInfested, which needs two bandit parties while the native attack menus allow one.
+    internal bool CanBeAttacked(Settlement settlement) =>
+        settlement.Parties.Any(party => party.IsBandit) && settlement.Hideout.NextPossibleAttackTime.IsPast;
+
     internal bool TryPrepareRaid(Settlement settlement, bool isDirectAssault)
     {
         var behavior = Campaign.Current?.GetCampaignBehavior<HideoutCampaignBehavior>();
-        if (behavior == null || !settlement.Hideout.IsInfested || !settlement.Hideout.NextPossibleAttackTime.IsPast)
+        if (behavior == null || !CanBeAttacked(settlement))
             return false;
         behavior.ArrangeHideoutTroopCountsForMission();
         if (isDirectAssault && !EnsureDirectAssaultMinimum(settlement)) return false;
