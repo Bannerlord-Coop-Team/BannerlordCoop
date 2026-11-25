@@ -142,5 +142,6 @@
     <string id="str_coop_prison_break_prisoner_lost" text="{=str_coop_prison_break_prisoner_lost}{PRISONER.NAME} is no longer held in this prison." />
     <string id="str_coop_prison_break_player_prisoner" text="{=str_coop_prison_break_player_prisoner}Players can't be broken out of prison." />
     <string id="str_coop_prison_break_in_progress" text="{=str_coop_prison_break_in_progress}Another player is breaking a prisoner out of this dungeon." />
+    <string id="str_coop_battle_wreckage_in_use" text="{=str_coop_battle_wreckage_in_use}You cannot investigate this wreckage while another player is investigating it." />
     <!-- Add other custom text here in the future-->
 </strings>

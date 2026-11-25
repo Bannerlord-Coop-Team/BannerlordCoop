@@ -139,7 +139,7 @@ public class BattleWreckageCampaignBehaviorInterface : IBattleWreckageCampaignBe
 
     public void ShowWreckageEncounterDenied()
     {
-        InformationManager.DisplayMessage(new InformationMessage("You cannot investigate this wreckage while another player is investigating it"));
+        InformationManager.DisplayMessage(new InformationMessage(GameTexts.FindText("str_coop_battle_wreckage_in_use").ToString()));
     }
 
     public void OnHourlyTick()
