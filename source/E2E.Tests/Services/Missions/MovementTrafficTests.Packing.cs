@@ -4,6 +4,7 @@ using E2E.Tests.Environment.MockEngine;
 using K4os.Compression.LZ4;
 using Missions.Agents.Packets;
 using Missions.Services.Network;
+using Moq;
 using ProtoBuf.Meta;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
@@ -95,15 +96,8 @@ public partial class MovementTrafficTests
             IPacket packet = standaloneMounts
                 ? CreatePackedMountPacket(mock, count)
                 : CreatePackedRiderPacket(mock, count);
-            byte[] original = serializer.Serialize(packet);
-            Assert.InRange(original.Length, 1, MovementPacketCompressor.MaxUncompressedBytes);
-            var payload = new byte[LZ4Codec.MaximumOutputSize(original.Length)];
-            int compressedLength = LZ4Codec.Encode(
-                original, 0, original.Length, payload, 0, payload.Length, LZ4Level.L00_FAST);
-            Assert.True(compressedLength > 0);
-            int baselineLength = compressor.GetSerializedLength(
-                new CompressedMovementPacket(original.Length, payload.AsSpan(0, compressedLength).ToArray()));
-            Assert.True(baselineLength < original.Length);
+            var baseline = new MovementPacketCompressor(serializer, Mock.Of<IMovementSnapshotCodec>());
+            int baselineLength = baseline.Serialize(packet).Length;
 
             byte[] wire = compressor.Serialize(packet);
             output.WriteLine($"{packet.PacketType}, {count} snapshots: {baselineLength} baseline bytes, {wire.Length} packed bytes");

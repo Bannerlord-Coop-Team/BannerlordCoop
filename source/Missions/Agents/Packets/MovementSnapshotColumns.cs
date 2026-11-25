@@ -35,6 +35,20 @@ internal ref struct MovementSnapshotColumns
         return value;
     }
 
+    public void WriteUInt16(ushort value)
+    {
+        bytes[offset] = (byte)value;
+        bytes[offset + count] = (byte)(value >> 8);
+        offset += 2 * count;
+    }
+
+    public ushort ReadUInt16()
+    {
+        int value = bytes[offset] | (bytes[offset + count] << 8);
+        offset += 2 * count;
+        return (ushort)value;
+    }
+
     public void WriteUInt32(uint value)
     {
         bytes[offset] = (byte)value;

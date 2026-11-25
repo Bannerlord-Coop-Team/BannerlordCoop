@@ -29,7 +29,7 @@ namespace Missions.Agents.Packets
         }
 
         internal const int SnapshotBytes =
-            sizeof(byte) + (14 * sizeof(float)) + (2 * sizeof(uint)) + (4 * sizeof(int)) + (2 * sizeof(ulong));
+            sizeof(byte) + (14 * sizeof(float)) + sizeof(uint) + sizeof(ushort) + (4 * sizeof(int)) + (2 * sizeof(ulong));
 
         internal void WriteSnapshot(ref MovementSnapshotColumns columns, BinaryWriter extras)
         {
@@ -59,7 +59,7 @@ namespace Missions.Agents.Packets
             columns.WriteVec2(MountMovementDirection);
             columns.WriteSingle(MountSpeed);
             columns.WriteUInt32(MountMovementFlag);
-            columns.WriteUInt32(MountMovementId);
+            columns.WriteUInt16(MountMovementId);
             columns.WriteInt32(MountAction0Index);
             columns.WriteUInt64(MountAction0Flag);
             columns.WriteSingle(MountAction0Progress);
@@ -90,7 +90,7 @@ namespace Missions.Agents.Packets
                 MountMovementDirection = columns.ReadVec2(),
                 MountSpeed = columns.ReadSingle(),
                 MountMovementFlag = columns.ReadUInt32(),
-                MountMovementId = (ushort)columns.ReadUInt32(),
+                MountMovementId = columns.ReadUInt16(),
                 MountAction0Index = columns.ReadInt32(),
                 MountAction0Flag = columns.ReadUInt64(),
                 MountAction0Progress = columns.ReadSingle(),

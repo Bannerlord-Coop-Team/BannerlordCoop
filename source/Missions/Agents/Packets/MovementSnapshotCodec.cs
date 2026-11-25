@@ -49,7 +49,6 @@ internal sealed class MovementSnapshotCodec : IMovementSnapshotCodec
         AgentData[] agents = packet.Agents;
         int count = packet.SnapshotCount;
         if (count < MinimumCount) return null;
-        if (agents?.Length != count) return null;
 
         // Skip scanning extras when the rider columns alone exceed the envelope limit.
         if (count > limit / AgentSnapshotBytes) return null;
@@ -66,9 +65,10 @@ internal sealed class MovementSnapshotCodec : IMovementSnapshotCodec
         }
 
         var layout = new SnapshotLayout(count, decks, mounts);
-        if (extraBytes > limit - layout.ExtrasOffset) return null;
+        int packedBytes = layout.ExtrasOffset + extraBytes;
+        if (packedBytes > limit) return null;
 
-        var packed = new byte[layout.ExtrasOffset + extraBytes];
+        var packed = new byte[packedBytes];
         var agentColumns = layout.AgentColumns(packed);
         var deckColumns = layout.DeckColumns(packed);
         var mountColumns = layout.MountColumns(packed);
@@ -113,7 +113,6 @@ internal sealed class MovementSnapshotCodec : IMovementSnapshotCodec
         AgentMountData[] mounts = packet.Mounts;
         int count = packet.SnapshotCount;
         if (count < MinimumCount) return null;
-        if (mounts?.Length != count) return null;
 
         // Skip scanning extras when the fixed columns alone exceed the envelope limit.
         if (count > limit / AgentMountData.SnapshotBytes) return null;
@@ -122,9 +121,10 @@ internal sealed class MovementSnapshotCodec : IMovementSnapshotCodec
         int extraBytes = 0;
         foreach (AgentMountData mount in mounts)
             extraBytes += mount.GetSnapshotExtraBytes();
-        if (extraBytes > limit - layout.ExtrasOffset) return null;
+        int packedBytes = layout.ExtrasOffset + extraBytes;
+        if (packedBytes > limit) return null;
 
-        var packed = new byte[layout.ExtrasOffset + extraBytes];
+        var packed = new byte[packedBytes];
         var columns = layout.MountColumns(packed);
         using var extras = new BinaryWriter(new MemoryStream(packed, layout.ExtrasOffset, extraBytes));
         for (int i = 0; i < count; i++)

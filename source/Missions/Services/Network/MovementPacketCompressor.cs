@@ -81,6 +81,8 @@ public class MovementPacketCompressor : IMovementPacketCompressor
             compressed.UncompressedLength <= 0 ||
             compressed.UncompressedLength > MaxUncompressedBytes)
         {
+            Logger.Warning("Discarding a compressed movement packet with missing payload or invalid uncompressed length {UncompressedLength}",
+                compressed.UncompressedLength);
             return false;
         }
 
@@ -91,10 +93,19 @@ public class MovementPacketCompressor : IMovementPacketCompressor
                 compressed.Payload, 0, compressed.Payload.Length,
                 decompressed, 0, decompressed.Length);
             if (decodedLength != decompressed.Length)
+            {
+                Logger.Warning("Discarding a compressed movement packet with decoded length {DecodedLength} and expected length {UncompressedLength}",
+                    decodedLength, decompressed.Length);
                 return false;
+            }
 
             IPacket movement = serializer.Deserialize<IPacket>(decompressed);
-            if (movement == null || !IsMovement(movement)) return false;
+            if (movement == null || !IsMovement(movement))
+            {
+                Logger.Warning("Discarding a compressed movement packet with unexpected payload type {PacketType}",
+                    movement?.PacketType);
+                return false;
+            }
 
             restored = snapshotCodec.Restore(movement);
             return true;
