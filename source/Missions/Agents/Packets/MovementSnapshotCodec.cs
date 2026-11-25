@@ -54,18 +54,7 @@ internal sealed class MovementSnapshotCodec : IMovementSnapshotCodec
         // Skip scanning extras when the rider columns alone exceed the envelope limit.
         if (count > limit / RiderRowBytes) return null;
 
-        int decks = 0;
-        int mounts = 0;
-        int extraBytes = 0;
-        foreach (AgentData agent in agents)
-        {
-            if (agent.HasDeckPose) decks++;
-            if (agent.MountData == null) continue;
-            mounts++;
-            extraBytes += agent.MountData.GetSnapshotExtraBytes();
-        }
-
-        var layout = new SnapshotLayout(count, decks, mounts);
+        var layout = SnapshotLayout.ForRiders(agents, count, out int extraBytes);
         int packedBytes = layout.ExtrasOffset + extraBytes;
         if (packedBytes > limit) return null;
 
@@ -75,7 +64,7 @@ internal sealed class MovementSnapshotCodec : IMovementSnapshotCodec
         var mountColumns = layout.MountColumns(packed);
         // Rider-only batches skip the extras allocations because only mounts write extras.
         BinaryWriter extrasWriter;
-        if (mounts != 0)
+        if (layout.HasMounts)
             extrasWriter = new BinaryWriter(new MemoryStream(packed, layout.ExtrasOffset, extraBytes));
         else
             extrasWriter = null;
@@ -141,22 +130,13 @@ internal sealed class MovementSnapshotCodec : IMovementSnapshotCodec
         byte[] packed = packet.PackedSnapshots;
         int count = packet.SnapshotCount;
 
-        // The first column identifies the rows with deck or mount state, which are stored densely.
-        int decks = 0;
-        int mounts = 0;
-        foreach (byte attachments in packed.AsSpan(0, count))
-        {
-            if ((attachments & HasDeck) != 0) decks++;
-            if ((attachments & HasMount) != 0) mounts++;
-        }
-
-        var layout = new SnapshotLayout(count, decks, mounts);
+        var layout = SnapshotLayout.ForPackedRiders(packed, count);
         var agentColumns = layout.AgentColumns(packed);
         var deckColumns = layout.DeckColumns(packed);
         var mountColumns = layout.MountColumns(packed);
         // Rider-only batches skip the extras allocations because only mounts read extras.
         BinaryReader extrasReader;
-        if (mounts != 0)
+        if (layout.HasMounts)
             extrasReader = new BinaryReader(new MemoryStream(packed, layout.ExtrasOffset, packed.Length - layout.ExtrasOffset));
         else
             extrasReader = null;
@@ -214,6 +194,7 @@ internal sealed class MovementSnapshotCodec : IMovementSnapshotCodec
         private readonly int mountOffset;
 
         public int ExtrasOffset { get; }
+        public bool HasMounts => mounts != 0;
 
         public SnapshotLayout(int agents, int decks, int mounts)
         {
@@ -223,6 +204,37 @@ internal sealed class MovementSnapshotCodec : IMovementSnapshotCodec
             deckOffset = agents * RiderRowBytes;
             mountOffset = deckOffset + (decks * AgentData.DeckSnapshotBytes);
             ExtrasOffset = mountOffset + (mounts * AgentMountData.SnapshotBytes);
+        }
+
+        public static SnapshotLayout ForRiders(AgentData[] agents, int count, out int extraBytes)
+        {
+            int decks = 0;
+            int mounts = 0;
+            extraBytes = 0;
+            foreach (AgentData agent in agents)
+            {
+                if (agent.HasDeckPose) decks++;
+                if (agent.MountData == null) continue;
+                mounts++;
+                extraBytes += agent.MountData.GetSnapshotExtraBytes();
+            }
+            return new SnapshotLayout(count, decks, mounts);
+        }
+
+        public static SnapshotLayout ForPackedRiders(byte[] packed, int count)
+        {
+            // The rider section can be read before the attachment counts are known.
+            var columns = new SnapshotLayout(agents: count, decks: 0, mounts: 0).AgentColumns(packed);
+            int decks = 0;
+            int mounts = 0;
+            for (int i = 0; i < count; i++)
+            {
+                columns.BeginSnapshot(i);
+                byte attachments = columns.ReadByte();
+                if ((attachments & HasDeck) != 0) decks++;
+                if ((attachments & HasMount) != 0) mounts++;
+            }
+            return new SnapshotLayout(count, decks, mounts);
         }
 
         public MovementSnapshotColumns AgentColumns(byte[] packed) =>
