@@ -556,9 +556,9 @@ public class BattleDamageRouter : IBattleDamageRouter
         if (!coopMissionComponent.AgentRegistry.TryGetAgentInfo(damage.VictimAgentId, out var info))
         {
             // A dead victim means the sender hit the puppet before this owner's death broadcast reached it.
-            bool victimAlreadyDead = IsVictimAlreadyDead(damage);
+            var (level, reason) = ClassifyUnregisteredVictimDrop(damage, "unregistered-victim");
             Logger.Write(
-                victimAlreadyDead ? LogEventLevel.Debug : LogEventLevel.Warning,
+                level,
                 "[BattleDamage] Dropping routed blow at receive: victimId={VictimId} attackerId={AttackerId} " +
                 "localController={LocalController} damage={Damage} riderKeyedMount={RiderKeyedMount} " +
                 "missile={Missile} reason={Reason}",
@@ -568,40 +568,39 @@ public class BattleDamageRouter : IBattleDamageRouter
                 damage.Blow.InflictedDamage,
                 damage.IsMount,
                 IsMissileDamage(damage),
-                victimAlreadyDead ? "victim-already-dead" : "unregistered-victim");
+                reason);
             return false;
         }
 
         return info.CurrentAuthority == session.OwnControllerId;
     }
 
-    // Tells whether an unregistered victim is a corpse, so its dropped blow is expected rather than lost.
+    // Picks the log level and reason for an unregistered-victim drop, at Debug when the victim is already a corpse.
     // Mounts are excluded because a mount blow is keyed by its rider's id, so a dead rider says nothing about the mount.
-    private bool IsVictimAlreadyDead(NetworkApplyBattleDamage damage) =>
-        !damage.IsMount
-        && coopMissionComponent.AgentRegistry.TryGetCosmeticAgent(damage.VictimAgentId, out Agent corpse)
-        && !corpse.IsActive();
+    private (LogEventLevel Level, string Reason) ClassifyUnregisteredVictimDrop(
+        NetworkApplyBattleDamage damage,
+        string fallbackReason)
+    {
+        if (!damage.IsMount
+            && coopMissionComponent.AgentRegistry.TryGetCosmeticAgent(damage.VictimAgentId, out Agent corpse)
+            && !corpse.IsActive())
+            return (LogEventLevel.Debug, "victim-already-dead");
+
+        return (LogEventLevel.Warning, fallbackReason);
+    }
 
     // Resolves the routed blow's attacker to its live registered agent, else its corpse, else null.
-    private Agent ResolveRoutedAttacker(NetworkApplyBattleDamage damage, out string attackerControllerId)
+    private Agent ResolveRoutedAttacker(NetworkApplyBattleDamage damage)
     {
-        attackerControllerId = null;
         if (damage.AttackerAgentId == Guid.Empty)
             return null;
 
         var registry = coopMissionComponent.AgentRegistry;
         if (registry.TryGetAgentInfo(damage.AttackerAgentId, out var attackerInfo) && attackerInfo.Agent != null)
-        {
-            attackerControllerId = attackerInfo.CurrentAuthority;
             return attackerInfo.Agent;
-        }
 
-        // A dead attacker is deregistered but its corpse remains, and HandleBlow calls IsEnemyOf on the blow owner for an AI victim.
-        if (!registry.TryGetCosmeticAgent(damage.AttackerAgentId, out Agent deadAttacker))
-            return null;
-
-        attackerControllerId = damage.SourceControllerId;
-        return deadAttacker;
+        // A dead attacker is deregistered but its corpse stays in the mission until native deletion.
+        return registry.TryGetCosmeticAgent(damage.AttackerAgentId, out Agent deadAttacker) ? deadAttacker : null;
     }
 
     private void ApplyDeferredDamage(NetworkApplyBattleDamage damage)
@@ -641,16 +640,16 @@ public class BattleDamageRouter : IBattleDamageRouter
             if (authorityWasVerified)
             {
                 // An earlier queued blow can kill the victim after this one was accepted.
-                bool victimAlreadyDead = IsVictimAlreadyDead(damage);
+                var (level, reason) = ClassifyUnregisteredVictimDrop(damage, "registry-lost-after-accept");
                 Logger.Write(
-                    victimAlreadyDead ? LogEventLevel.Debug : LogEventLevel.Warning,
+                    level,
                     "[BattleDamage] Dropping routed blow at apply: victimId={VictimId} attackerId={AttackerId} " +
                     "localController={LocalController} damage={Damage} reason={Reason}",
                     damage.VictimAgentId,
                     damage.AttackerAgentId,
                     session.OwnControllerId,
                     damage.Blow.InflictedDamage,
-                    victimAlreadyDead ? "victim-already-dead" : "registry-lost-after-accept");
+                    reason);
             }
             return;
         }
@@ -709,21 +708,18 @@ public class BattleDamageRouter : IBattleDamageRouter
                 damage.AttackerAgentId);
         }
 
-        Agent attacker = ResolveRoutedAttacker(damage, out string attackerControllerId);
+        Agent attacker = ResolveRoutedAttacker(damage);
         blow.OwnerId = attacker?.Index ?? -1;
         // Vanilla HandleBlow calls IsEnemyOf on the blow owner for an AI victim in a formation, which throws without one.
         if (attacker == null && victim.Controller == AgentControllerType.AI && victim.Formation != null)
         {
-            if (authorityWasVerified)
-            {
-                Logger.Warning(
-                    "[BattleDamage] Dropping routed blow at apply: victimId={VictimId} attackerId={AttackerId} " +
-                    "localController={LocalController} damage={Damage} reason=unresolved-attacker",
-                    damage.VictimAgentId,
-                    damage.AttackerAgentId,
-                    session.OwnControllerId,
-                    damage.Blow.InflictedDamage);
-            }
+            Logger.Warning(
+                "[BattleDamage] Dropping routed blow at apply: victimId={VictimId} attackerId={AttackerId} " +
+                "localController={LocalController} damage={Damage} reason=unresolved-attacker",
+                damage.VictimAgentId,
+                damage.AttackerAgentId,
+                session.OwnControllerId,
+                damage.Blow.InflictedDamage);
             return;
         }
         int routedDamage = blow.InflictedDamage;
@@ -738,7 +734,7 @@ public class BattleDamageRouter : IBattleDamageRouter
             attacker,
             in blow,
             in collisionData,
-            attackerControllerId);
+            damage.SourceControllerId);
         if (wasMissile)
         {
             blow.WeaponRecord._isMissile = false;
@@ -769,7 +765,7 @@ public class BattleDamageRouter : IBattleDamageRouter
             Logger.Debug(
                 "[BattleDamage] Applied routed blow: victimId={VictimId} victimAuthority={VictimAuthority} " +
                 "victimIndex={VictimIndex} victimName={VictimName} attackerId={AttackerId} " +
-                "attackerAuthority={AttackerAuthority} routedDamage={RoutedDamage} inputDamage={InputDamage} " +
+                "sourceController={SourceController} routedDamage={RoutedDamage} inputDamage={InputDamage} " +
                 "appliedDamage={AppliedDamage:0.0} " +
                 "victimIsMount={VictimIsMount} riderKeyedMount={RiderKeyedMount} missile={Missile} " +
                 "healthBefore={HealthBefore:0.0} healthAfter={HealthAfter:0.0} activeAfter={ActiveAfter} " +
@@ -780,7 +776,7 @@ public class BattleDamageRouter : IBattleDamageRouter
                 victim.Index,
                 victim.Name,
                 damage.AttackerAgentId,
-                attackerControllerId,
+                damage.SourceControllerId,
                 routedDamage,
                 inputDamage,
                 appliedDamage,
