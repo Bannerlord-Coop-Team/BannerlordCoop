@@ -136,10 +136,13 @@ public class BattleDamageMirrorTests : MissionTestEnvironment
             var victimId = Guid.NewGuid();
             Assert.True(registry.TryRegisterAgent("owner", victimId, victim));
 
-            // The attacker's death deregisters it before its in-flight blow applies, but its corpse stays in the mission.
+            // The attacker dies and is deregistered before its in-flight blow applies, but its corpse stays in the mission.
             var attacker = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.None));
             var attackerId = Guid.NewGuid();
             Assert.True(registry.TryRegisterAgent("peer", attackerId, attacker));
+            Assert.True(AgentMirror.TryGet(attacker, out var attackerMirror));
+            attackerMirror.IsActive = false;
+            attackerMirror.Health = 0f;
             Assert.True(registry.RemoveAgent(attackerId));
 
             var blow = new Blow(0) { InflictedDamage = 30, DamageType = DamageTypes.Cut };
@@ -155,7 +158,7 @@ public class BattleDamageMirrorTests : MissionTestEnvironment
                     sourceControllerId: "peer"));
 
             Assert.True(AgentMirror.TryGet(victim, out var mirror));
-            Assert.Equal(70f, mirror.Health);
+            Assert.Equal(70f, mirror.Health); // 100 - 30: damage landed
             Assert.Equal(attacker.Index, mock.LastRegisteredBlow.OwnerId);
             GC.KeepAlive(controller);
         });

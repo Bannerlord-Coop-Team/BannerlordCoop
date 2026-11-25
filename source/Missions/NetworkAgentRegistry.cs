@@ -44,6 +44,7 @@ public interface INetworkAgentRegistry : IDisposable
     bool TryGetAgentInfo(Agent agent, out CoopAgentInfo agentInfo);
     bool TryGetAgentInfo(Guid agentId, out CoopAgentInfo agentInfo);
     // Cosmetic identities survive deregistration, but never native deletion or a mission reset.
+    // Routed damage relies on this to resolve dead attackers and victims.
     bool TryGetCosmeticAgent(Guid agentId, out Agent agent);
     bool TryGetCosmeticAgentId(Agent agent, out Guid agentId);
     void ForgetCosmeticAgent(Agent agent);

@@ -779,7 +779,7 @@ public sealed class MissionEngineFixture : IDisposable
         Agent blowAffector = blow.OwnerId != -1 ? mission.FindAgentWithIndex(blow.OwnerId) : null;
         // Models HandleBlow calling IsEnemyOf(attacker) for an AI victim in a formation, which throws for a blow with no owner agent.
         if (blowAffector == null && __instance.Controller == AgentControllerType.AI && __instance.Formation != null)
-            throw new NullReferenceException("Agent.IsEnemyOf dereferences the blow owner Agent.HandleBlow passes it");
+            throw new NullReferenceException("Agent.HandleBlow passed a null blow owner to Agent.IsEnemyOf");
         float damage = Math.Min(blow.InflictedDamage, victim.Health);
         if (__instance.CurrentMortalityState == Agent.MortalityState.Immortal
             || victim.Mission.DisableDying

@@ -553,13 +553,10 @@ public class BattleDamageRouter : IBattleDamageRouter
 
     private bool IsLocallyAuthoritativeFor(NetworkApplyBattleDamage damage)
     {
-        var registry = coopMissionComponent.AgentRegistry;
-        if (!registry.TryGetAgentInfo(damage.VictimAgentId, out var info))
+        if (!coopMissionComponent.AgentRegistry.TryGetAgentInfo(damage.VictimAgentId, out var info))
         {
-            // The sender hit the puppet before this owner's death broadcast reached it, so nothing is lost.
-            bool victimAlreadyDead = !damage.IsMount
-                && registry.TryGetCosmeticAgent(damage.VictimAgentId, out Agent corpse)
-                && !corpse.IsActive();
+            // A dead victim means the sender hit the puppet before this owner's death broadcast reached it.
+            bool victimAlreadyDead = IsVictimAlreadyDead(damage);
             Logger.Write(
                 victimAlreadyDead ? LogEventLevel.Debug : LogEventLevel.Warning,
                 "[BattleDamage] Dropping routed blow at receive: victimId={VictimId} attackerId={AttackerId} " +
@@ -576,6 +573,35 @@ public class BattleDamageRouter : IBattleDamageRouter
         }
 
         return info.CurrentAuthority == session.OwnControllerId;
+    }
+
+    // Tells whether an unregistered victim is a corpse, so its dropped blow is expected rather than lost.
+    // Mounts are excluded because a mount blow is keyed by its rider's id, so a dead rider says nothing about the mount.
+    private bool IsVictimAlreadyDead(NetworkApplyBattleDamage damage) =>
+        !damage.IsMount
+        && coopMissionComponent.AgentRegistry.TryGetCosmeticAgent(damage.VictimAgentId, out Agent corpse)
+        && !corpse.IsActive();
+
+    // Resolves the routed blow's attacker to its live registered agent, else its corpse, else null.
+    private Agent ResolveRoutedAttacker(NetworkApplyBattleDamage damage, out string attackerControllerId)
+    {
+        attackerControllerId = null;
+        if (damage.AttackerAgentId == Guid.Empty)
+            return null;
+
+        var registry = coopMissionComponent.AgentRegistry;
+        if (registry.TryGetAgentInfo(damage.AttackerAgentId, out var attackerInfo) && attackerInfo.Agent != null)
+        {
+            attackerControllerId = attackerInfo.CurrentAuthority;
+            return attackerInfo.Agent;
+        }
+
+        // A dead attacker is deregistered but its corpse remains, and HandleBlow calls IsEnemyOf on the blow owner for an AI victim.
+        if (!registry.TryGetCosmeticAgent(damage.AttackerAgentId, out Agent deadAttacker))
+            return null;
+
+        attackerControllerId = damage.SourceControllerId;
+        return deadAttacker;
     }
 
     private void ApplyDeferredDamage(NetworkApplyBattleDamage damage)
@@ -615,9 +641,7 @@ public class BattleDamageRouter : IBattleDamageRouter
             if (authorityWasVerified)
             {
                 // An earlier queued blow can kill the victim after this one was accepted.
-                bool victimAlreadyDead = !damage.IsMount
-                    && registry.TryGetCosmeticAgent(damage.VictimAgentId, out Agent corpse)
-                    && !corpse.IsActive();
+                bool victimAlreadyDead = IsVictimAlreadyDead(damage);
                 Logger.Write(
                     victimAlreadyDead ? LogEventLevel.Debug : LogEventLevel.Warning,
                     "[BattleDamage] Dropping routed blow at apply: victimId={VictimId} attackerId={AttackerId} " +
@@ -685,23 +709,23 @@ public class BattleDamageRouter : IBattleDamageRouter
                 damage.AttackerAgentId);
         }
 
-        Agent attacker = null;
-        string attackerControllerId = null;
-        if (damage.AttackerAgentId != Guid.Empty &&
-            registry.TryGetAgentInfo(damage.AttackerAgentId, out var attackerInfo) &&
-            attackerInfo.Agent != null)
-        {
-            attacker = attackerInfo.Agent;
-            attackerControllerId = attackerInfo.CurrentAuthority;
-        }
-        else if (damage.AttackerAgentId != Guid.Empty &&
-            registry.TryGetCosmeticAgent(damage.AttackerAgentId, out Agent deadAttacker))
-        {
-            // A dead attacker is deregistered but its corpse remains, and HandleBlow calls IsEnemyOf on the blow owner for an AI victim.
-            attacker = deadAttacker;
-            attackerControllerId = damage.SourceControllerId;
-        }
+        Agent attacker = ResolveRoutedAttacker(damage, out string attackerControllerId);
         blow.OwnerId = attacker?.Index ?? -1;
+        // Vanilla HandleBlow calls IsEnemyOf on the blow owner for an AI victim in a formation, which throws without one.
+        if (attacker == null && victim.Controller == AgentControllerType.AI && victim.Formation != null)
+        {
+            if (authorityWasVerified)
+            {
+                Logger.Warning(
+                    "[BattleDamage] Dropping routed blow at apply: victimId={VictimId} attackerId={AttackerId} " +
+                    "localController={LocalController} damage={Damage} reason=unresolved-attacker",
+                    damage.VictimAgentId,
+                    damage.AttackerAgentId,
+                    session.OwnControllerId,
+                    damage.Blow.InflictedDamage);
+            }
+            return;
+        }
         int routedDamage = blow.InflictedDamage;
         // The source calculated this blow against a puppet, so vanilla could not apply its main-agent multiplier.
         ApplyPlayerReceivedDamageMultiplier(victim, ref blow, ref collisionData);
