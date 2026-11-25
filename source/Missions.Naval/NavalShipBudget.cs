@@ -20,7 +20,7 @@ namespace Missions.Naval;
 /// <summary>
 /// Splits a naval battle side's eight ships: each player fields its share against the side's other players, the side's AI
 /// parties get what the players leave, and a player who joins after the side's AI fleet attempt gets only what the recorded
-/// attempt leaves.
+/// attempt leaves. It also decides which players take a side's deployment slots, while the share math counts every player.
 /// </summary>
 public interface INavalShipBudget
 {
@@ -38,10 +38,10 @@ public interface INavalShipBudget
     NavalShipDeploymentLimit AiLimit(NavalSidePlayerFleets players, MBReadOnlyList<MapEventParty> aiParties);
 
     /// <summary>
-    /// Whether the party is a player's that opens the mission with a fleet of its own and so takes a player slot; the server
+    /// Whether the party is a player's that takes a deployment slot, i.e. opens the mission with ships of its own; the server
     /// leaves a ship-less player out of the mission.
     /// </summary>
-    bool IsFleetPlayer(MapEvent mapEvent, PartyBase party);
+    bool TakesDeploymentSlot(MapEvent mapEvent, PartyBase party);
 }
 
 /// <inheritdoc cref="INavalShipBudget"/>
@@ -104,7 +104,7 @@ public class NavalShipBudget : INavalShipBudget
     }
 
     // Narrower than the share math's IsPlayerParty, which keeps a ship-less player since it fields no hull there anyway.
-    public bool IsFleetPlayer(MapEvent mapEvent, PartyBase party) =>
+    public bool TakesDeploymentSlot(MapEvent mapEvent, PartyBase party) =>
         IsPlayerParty(party) && !mapEvent.IsNavalBattleWithoutShips(party.MobileParty);
 
     /// <summary>What the players' fielded ships leave of the side's eight, at most the AI parties' own limit and never below none.</summary>

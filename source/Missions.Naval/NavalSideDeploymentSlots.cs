@@ -9,7 +9,8 @@ namespace Missions.Naval;
 
 /// <summary>
 /// The spawn path slot math for a side's fleets: each player's by rank and the allied AI fleet's a gap ahead of the front-most
-/// player, which every client derives alike. Stateless; the own rank lives in <see cref="INavalPlayerDeploymentSlotTracker"/>.
+/// player, which every client derives alike. Stateless; the own rank lives in <see cref="INavalPlayerDeploymentSlotTracker"/>,
+/// and callers pass <see cref="INavalShipBudget.TakesDeploymentSlot"/> as the player test.
 /// </summary>
 internal static class NavalSideDeploymentSlots
 {

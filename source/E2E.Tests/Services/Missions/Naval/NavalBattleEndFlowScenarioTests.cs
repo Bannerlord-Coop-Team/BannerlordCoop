@@ -172,24 +172,25 @@ public class NavalBattleEndFlowScenarioTests : NavalBattleTestEnvironment
     }
 
     // #4890: co-op fields only each player's own ships, so a ship-less army member still at the encounter is left out of
-    // another member's Attack, neither sent a mission it can't open nor held for as a joiner when the battle concludes.
+    // another member's Attack: it isn't sent a mission it can't open, and the battle doesn't wait for it as a joiner before concluding.
     [Fact]
     public void ShiplessMember_IsLeftOutOfAnotherMembersAttack()
     {
-        using var battle = StartServerBattle(atSea: true, new[] { "A", "B" }, new[] { "B" }, out var concluded);
+        using var battle = StartServerBattle(atSea: true, playerIds: new[] { "A", "B" }, lateJoiners: new[] { "B" }, out var concluded);
         var a = battle["A"];
-        // B keeps the harness default of no ships.
-        var b = battle.Players["B"].Instance;
+        // B is still at the encounter with only its client and no mission peer, and keeps the harness default of no ships.
+        var bClient = battle.Players["B"].Instance;
         GiveShip(PlayerPartyOf(a.Id));
         int startsToA = a.Instance.InternalMessages.GetMessages<NetworkStartAttackMission>().Count();
-        int startsToB = b.InternalMessages.GetMessages<NetworkStartAttackMission>().Count();
+        int startsToB = bClient.InternalMessages.GetMessages<NetworkStartAttackMission>().Count();
 
         RequestAttack(battle, a, "armed-member-attack");
 
-        Assert.True(Server.NetworkSentMessages.GetMessages<NetworkBattleStartReply>()
-            .Single(sent => sent.RequestId == "armed-member-attack").Accepted);
+        var reply = Server.NetworkSentMessages.GetMessages<NetworkBattleStartReply>()
+            .Single(sent => sent.RequestId == "armed-member-attack");
+        Assert.True(reply.Accepted);
         Assert.Equal(startsToA + 1, a.Instance.InternalMessages.GetMessages<NetworkStartAttackMission>().Count());
-        Assert.Equal(startsToB, b.InternalMessages.GetMessages<NetworkStartAttackMission>().Count());
+        Assert.Equal(startsToB, bClient.InternalMessages.GetMessages<NetworkStartAttackMission>().Count());
 
         ReportWin(a);
         Assert.Equal(1, concluded());
