@@ -1,8 +1,6 @@
 ﻿using Common;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Interface;
-using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Players;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -37,15 +35,11 @@ internal class LandLordCompanyOfTroubleService : ILandLordCompanyOfTroubleServic
 {
     private readonly IOutcomeDispatcher dispatcher;
     private readonly IIssueOwnerResolver ownerResolver;
-    private readonly IPlayerManager players;
-    private readonly IObjectManager objectManager;
 
-    public LandLordCompanyOfTroubleService(IOutcomeDispatcher dispatcher, IIssueOwnerResolver ownerResolver, IPlayerManager players, IObjectManager objectManager)
+    public LandLordCompanyOfTroubleService(IOutcomeDispatcher dispatcher, IIssueOwnerResolver ownerResolver)
     {
         this.dispatcher = dispatcher;
         this.ownerResolver = ownerResolver;
-        this.players = players;
-        this.objectManager = objectManager;
     }
 
     public void RemoveCompanyOf(Quest quest)
@@ -108,7 +102,7 @@ internal class LandLordCompanyOfTroubleService : ILandLordCompanyOfTroubleServic
         }
 
         // Losing a battle takes the owner prisoner, which leaves them without a party, so the party they fought with stands in
-        if (!players.TryGetPlayer(owner, out var player) || !objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var ownerParty))
+        if (!ownerResolver.TryResolveOwnerParty(IssueManager.GetIssueOfQuest(quest), out var ownerParty))
         {
             return;
         }
