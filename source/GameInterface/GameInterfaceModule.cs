@@ -202,6 +202,13 @@ public class GameInterfaceModule : Module
         builder.RegisterType<NetworkOptionsTabProvider>().As<ICoopOptionsTabProvider>().InstancePerDependency();
         foreach (var startType in VanillaAdvancedStartType.All)
             builder.RegisterInstance(startType).As<IAdvancedStartType>();
+        builder.RegisterAssemblyTypes(typeof(GameInterfaceModule).Assembly)
+            .Where(type => type.IsClass &&
+                           !type.IsAbstract &&
+                           typeof(IAdvancedStartModifier).IsAssignableFrom(type) &&
+                           ShouldRegister(type))
+            .As<IAdvancedStartModifier>()
+            .InstancePerDependency();
         builder.RegisterType<LocalMovementBandwidth>().As<ILocalMovementBandwidth>().InstancePerDependency();
         // Only naval battle services use it. Also in the server container, which never opens a naval battle; the patch
         // itself refuses to install on a server.
