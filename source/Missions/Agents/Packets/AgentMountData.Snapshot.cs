@@ -29,23 +29,23 @@ namespace Missions.Agents.Packets
         }
 
         internal const int SnapshotBytes =
-            sizeof(byte) +
-            MovementSnapshotColumns.Vec3Bytes +
-            MovementSnapshotColumns.Vec2Bytes +
-            MovementSnapshotColumns.Vec3Bytes +
-            MovementSnapshotColumns.Vec2Bytes +
-            sizeof(float) +
-            sizeof(uint) +
-            sizeof(ushort) +
-            sizeof(int) +
-            sizeof(ulong) +
-            sizeof(float) +
-            sizeof(float) +
-            sizeof(int) +
-            sizeof(int) +
-            sizeof(int) +
-            sizeof(ulong) +
-            sizeof(float);
+            sizeof(byte) +                      // flags
+            MovementSnapshotColumns.Vec3Bytes + // MountPosition
+            MovementSnapshotColumns.Vec2Bytes + // MountInputVector
+            MovementSnapshotColumns.Vec3Bytes + // MountLookDirection
+            MovementSnapshotColumns.Vec2Bytes + // MountMovementDirection
+            sizeof(float) +                     // MountSpeed
+            sizeof(uint) +                      // MountMovementFlag
+            sizeof(ushort) +                    // MountMovementId
+            sizeof(int) +                       // MountAction0Index
+            sizeof(ulong) +                     // MountAction0Flag
+            sizeof(float) +                     // MountAction0Progress
+            sizeof(float) +                     // MountAction0Speed
+            sizeof(int) +                       // MountAction0TurnDirection
+            sizeof(int) +                       // MountAction0TurnActionIndexWire
+            sizeof(int) +                       // MountAction1IndexWire
+            sizeof(ulong) +                     // MountAction1Flag
+            sizeof(float);                      // MountAction1Progress
 
         internal void WriteSnapshot(ref MovementSnapshotColumns columns, BinaryWriter extras)
         {

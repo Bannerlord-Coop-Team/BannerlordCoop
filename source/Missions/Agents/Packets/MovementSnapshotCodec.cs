@@ -107,10 +107,7 @@ internal sealed class MovementSnapshotCodec : IMovementSnapshotCodec
         // Skip scanning extras when the fixed columns alone exceed the envelope limit.
         if (count > limit / AgentMountData.SnapshotBytes) return null;
 
-        var layout = new SnapshotLayout(agents: 0, decks: 0, mounts: count);
-        int extraBytes = 0;
-        foreach (AgentMountData mount in mounts)
-            extraBytes += mount.GetSnapshotExtraBytes();
+        var layout = SnapshotLayout.ForMounts(mounts, count, out int extraBytes);
         int packedBytes = layout.ExtrasOffset + extraBytes;
         if (packedBytes > limit) return null;
 
@@ -219,6 +216,14 @@ internal sealed class MovementSnapshotCodec : IMovementSnapshotCodec
                 extraBytes += agent.MountData.GetSnapshotExtraBytes();
             }
             return new SnapshotLayout(count, decks, mounts);
+        }
+
+        public static SnapshotLayout ForMounts(AgentMountData[] mounts, int count, out int extraBytes)
+        {
+            extraBytes = 0;
+            foreach (AgentMountData mount in mounts)
+                extraBytes += mount.GetSnapshotExtraBytes();
+            return new SnapshotLayout(agents: 0, decks: 0, mounts: count);
         }
 
         public static SnapshotLayout ForPackedRiders(byte[] packed, int count)

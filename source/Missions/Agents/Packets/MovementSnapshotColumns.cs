@@ -23,6 +23,7 @@ internal ref struct MovementSnapshotColumns
         offset = 0;
     }
 
+    // Row i starts at byte i and advances by count bytes per column.
     public void BeginSnapshot(int index) => offset = index;
 
     public void WriteByte(byte value)
