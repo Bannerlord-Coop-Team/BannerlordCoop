@@ -149,6 +149,7 @@ internal class BattleModeEncounterOptionsPatch
         // Already unavailable — nothing to do.
         if (__result == false) return;
 
+        // Vanilla lets a ship-less army member attack, but co-op fields only each player's own ships.
         if (name == AttackCondition && GetCurrentBattle()?.IsNavalBattleWithoutShips(MobileParty.MainParty) == true)
         {
             __0.IsEnabled = false;

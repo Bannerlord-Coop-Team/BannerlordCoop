@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.ObjectSystem;
@@ -9,8 +11,7 @@ namespace Missions.Naval;
 
 /// <summary>
 /// The spawn path slot math for a side's fleets: each player's by rank and the allied AI fleet's a gap ahead of the front-most
-/// player, which every client derives alike. Stateless; the own rank lives in <see cref="INavalPlayerDeploymentSlotTracker"/>,
-/// and callers pass <see cref="INavalShipBudget.TakesDeploymentSlot"/> as the player test.
+/// player, which every client derives alike. Stateless; the own rank lives in <see cref="INavalPlayerDeploymentSlotTracker"/>.
 /// </summary>
 internal static class NavalSideDeploymentSlots
 {
@@ -22,6 +23,14 @@ internal static class NavalSideDeploymentSlots
 
     // NavalShipsLogic.ComputeSpawnPathDeploymentOffset's distance between the two sides for a battle of two ships or fewer.
     internal const float SmallBattleSideDistance = 400f;
+
+    /// <summary>How many of the side's slot-taking players precede <paramref name="own"/>, as every client counts them.</summary>
+    internal static int RankOf(MapEvent mapEvent, BattleSideEnum side, PartyBase own, INavalShipBudget budget) =>
+        RankOf(PartiesOf(mapEvent, side), own, party => budget.TakesDeploymentSlot(mapEvent, party));
+
+    /// <summary>How many of the side's players take a deployment slot, as every client counts them.</summary>
+    internal static int PlayerCountOf(MapEvent mapEvent, BattleSideEnum side, INavalShipBudget budget) =>
+        PlayerCountOf(PartiesOf(mapEvent, side), party => budget.TakesDeploymentSlot(mapEvent, party));
 
     /// <summary>How many player parties precede <paramref name="own"/> in the side's party order.</summary>
     internal static int RankOf<T>(IEnumerable<T> sideParties, T own, Func<T, bool> isPlayerParty) where T : class
@@ -99,6 +108,10 @@ internal static class NavalSideDeploymentSlots
 
         return (SlotAhead(spawnPath, frontMost + InterTeamGap, allyRange, layout.ForwardLimit), layout.OpposingBase);
     }
+
+    // The side's parties in the map event's order, which every client shares.
+    private static IEnumerable<PartyBase> PartiesOf(MapEvent mapEvent, BattleSideEnum side) =>
+        mapEvent.GetMapEventSide(side).Parties.Select(party => party.Party);
 
     // Vanilla's base and opposing base for the shared offset, and the offset no fleet as deep as the range goes past.
     private static (float SideBase, float OpposingBase, float ForwardLimit) Bounds(SpawnPathData spawnPath, float range)
