@@ -229,10 +229,11 @@ internal class AdvancedStartInterface : IAdvancedStartInterface
         if (InformationManager.IsAnyInquiryActive()) return;
 
         InformationManager.ShowInquiry(new InquiryData(
-            "Start the campaign?",
-            "Once time starts, players who join later can no longer pick starting options that change the world. " +
-            "Make sure everyone who wants one has joined first.",
-            true, true, "Start", "Wait",
+            GameTexts.FindText("str_coop_advanced_start_resume_title").ToString(),
+            GameTexts.FindText("str_coop_advanced_start_resume_text").ToString(),
+            true, true,
+            GameTexts.FindText("str_coop_advanced_start_resume_confirm").ToString(),
+            GameTexts.FindText("str_coop_advanced_start_resume_wait").ToString(),
             () =>
             {
                 firstResumeConfirmed = true;

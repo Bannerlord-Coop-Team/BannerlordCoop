@@ -5,9 +5,12 @@ using GameInterface.Services.AdvancedStart.Interfaces;
 using SandBox.AdvancedStartOptions;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Xml;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
 using Xunit;
 
@@ -61,10 +64,17 @@ public class AdvancedStartInterfaceTests
         int starts = 0;
         // Through reflection, since the publicized event's backing field makes the plain name ambiguous.
         EventInfo showInquiry = typeof(InformationManager).GetEvent("OnShowInquiry", BindingFlags.Public | BindingFlags.Static);
+        var previousTexts = GameTexts._gameTextManager;
 
         showInquiry.AddEventHandler(null, capture);
         try
         {
+            // The popup's text comes from the shipped strings.
+            GameTexts._gameTextManager = new GameTextManager();
+            var strings = new XmlDocument();
+            strings.Load(Path.Combine(AppContext.BaseDirectory, "global_strings.xml"));
+            GameTexts._gameTextManager.LoadFromXML(strings);
+
             advancedStart.ConfirmFirstResume(() => starts++);
             shown[0].NegativeAction?.Invoke();
             advancedStart.ConfirmFirstResume(() => starts++);
@@ -73,9 +83,11 @@ public class AdvancedStartInterfaceTests
         finally
         {
             showInquiry.RemoveEventHandler(null, capture);
+            GameTexts._gameTextManager = previousTexts;
         }
 
         Assert.Equal(2, shown.Count);
+        Assert.Equal(("Start", "Wait"), (shown[0].AffirmativeText, shown[0].NegativeText));
         Assert.Equal(1, starts);
         // Confirmed, so the next resume goes straight through without reading the clock.
         Assert.False(advancedStart.ResumeLocksWorldStarts());

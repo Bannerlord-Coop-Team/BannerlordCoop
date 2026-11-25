@@ -1,5 +1,6 @@
 ﻿using SandBox.ViewModelCollection.CampaignStartingOptions;
 using System;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using StartOptions = SandBox.AdvancedStartOptions.AdvancedStartOptions;
@@ -8,12 +9,12 @@ namespace GameInterface.Services.AdvancedStart;
 
 /// <summary>
 /// Vanilla's starting options view model with its buttons labelled for joining a co-op server:
-/// whichever button sends the hero to the server reads "Join Coop".
+/// whichever button sends the hero to the server reads "Join Coop" (str_coop_advanced_start_join).
 /// </summary>
 internal sealed class CoopCampaignStartingOptionsVM : CampaignStartingOptionsVM
 {
     // Also the review stage's button text, so both buttons that send the hero read the same.
-    internal const string JoinLabel = "Join Coop";
+    internal static string JoinLabel => GameTexts.FindText("str_coop_advanced_start_join").ToString();
     internal const string NextLabel = "{=Rvr1bcu8}Next";
 
     public CoopCampaignStartingOptionsVM(StartOptions startOptions, Action<StartOptions> onConfirm, Action onClose)

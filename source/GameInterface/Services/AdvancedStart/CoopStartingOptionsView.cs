@@ -133,8 +133,11 @@ internal sealed class CoopStartingOptionsView : GlobalLayer
     private void ShowLockedPick(ListAdvancedStartOption option, string pick, TextObject reason)
     {
         ShowPopup(new InquiryData(
-            "Starting option not available",
-            $"{startOptions.GetItemName(option.StringId, pick)} can't be picked. {reason}",
+            GameTexts.FindText("str_coop_advanced_start_locked_title").ToString(),
+            GameTexts.FindText("str_coop_advanced_start_locked_text")
+                .SetTextVariable("OPTION", startOptions.GetItemName(option.StringId, pick))
+                .SetTextVariable("REASON", reason)
+                .ToString(),
             true, false, GameTexts.FindText("str_ok").ToString(), null,
             ClosePopup, null));
     }
@@ -143,9 +146,11 @@ internal sealed class CoopStartingOptionsView : GlobalLayer
     private void AskToLeave()
     {
         ShowPopup(new InquiryData(
-            "Leave the server?",
-            "Your new character will be lost and you will return to the main menu.",
-            true, true, "Leave", GameTexts.FindText("str_cancel").ToString(),
+            GameTexts.FindText("str_coop_advanced_start_leave_title").ToString(),
+            GameTexts.FindText("str_coop_advanced_start_leave_text").ToString(),
+            true, true,
+            GameTexts.FindText("str_coop_advanced_start_leave_confirm").ToString(),
+            GameTexts.FindText("str_cancel").ToString(),
             () =>
             {
                 ClosePopup();
