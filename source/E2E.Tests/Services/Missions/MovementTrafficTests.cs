@@ -817,6 +817,7 @@ public partial class MovementTrafficTests : MissionTestEnvironment
                 $"Expected fewer than three-agent batching's 42 packets, got {packets.Length}");
             Assert.Contains(packets, packet => packet.AgentIds.Length > 3);
             AssertSerializedBatchesFitRelay(serializer, network);
+            AssertSendsAreEnvelopesOrUnpacked(serializer, network);
             output.WriteLine(
                 $"125 incompressible agents: {packets.Length} packets; batch sizes " +
                 string.Join(",", packets.Select(packet => packet.AgentIds.Length)));
@@ -932,6 +933,7 @@ public partial class MovementTrafficTests : MissionTestEnvironment
             Assert.NotEmpty(packets);
             Assert.Contains(packets, packet => packet.MountIds.Length > 3);
             AssertSerializedBatchesFitRelay(serializer, network);
+            AssertSendsAreEnvelopesOrUnpacked(serializer, network);
             output.WriteLine(
                 $"48 incompressible mounts: {packets.Length} packets; batch sizes " +
                 string.Join(",", packets.Select(packet => packet.MountIds.Length)));
@@ -1020,7 +1022,7 @@ public partial class MovementTrafficTests : MissionTestEnvironment
                 compressor.SerializeCalls,
                 packets.Length,
                 packets.Length + 1);
-            AssertSerializedBatchesFitRelay(serializer, network, syntheticPayloads: true);
+            AssertSerializedBatchesFitRelay(serializer, network);
         });
     }
 
@@ -1110,6 +1112,7 @@ public partial class MovementTrafficTests : MissionTestEnvironment
             Assert.Equal((ushort)2, mountData.MountMovementId);
             Assert.Null(mountData.MountIdentityScopeId);
             AssertSerializedBatchesFitRelay(serializer, network);
+            AssertSendsAreEnvelopesOrUnpacked(serializer, network);
         });
     }
 
@@ -1408,24 +1411,13 @@ public partial class MovementTrafficTests : MissionTestEnvironment
 
     private static void AssertSerializedBatchesFitRelay(
         ProtoBufSerializer serializer,
-        MockBattleNetwork network,
-        bool syntheticPayloads = false)
+        MockBattleNetwork network)
     {
         Assert.NotEmpty(network.SerializedPacketSends);
         foreach (SerializedPacketSend send in network.SerializedPacketSends)
         {
             Assert.True(send.Payload.Length <= network.MaxUnreliablePayloadBytes,
                 $"Direct payload was {send.Payload.Length} bytes");
-
-            if (!syntheticPayloads)
-            {
-                IPacket packet = serializer.Deserialize<IPacket>(send.Payload);
-                Assert.True(
-                    packet is CompressedMovementPacket or
-                        MovementPacket { PackedSnapshots: null } or
-                        MountMovementPacket { PackedSnapshots: null },
-                    "Expected a compressed envelope or unpacked movement snapshots.");
-            }
 
             byte[] relay = serializer.Serialize(new RelayPacket(
                 send.Packet.DeliveryMethod,
@@ -1434,6 +1426,21 @@ public partial class MovementTrafficTests : MissionTestEnvironment
                 send.Payload));
             Assert.True(relay.Length <= LiteNetP2PClient.SafeSinglePacketBytes,
                 $"Relay payload was {relay.Length} bytes");
+        }
+    }
+
+    private static void AssertSendsAreEnvelopesOrUnpacked(
+        ProtoBufSerializer serializer,
+        MockBattleNetwork network)
+    {
+        foreach (SerializedPacketSend send in network.SerializedPacketSends)
+        {
+            IPacket packet = serializer.Deserialize<IPacket>(send.Payload);
+            Assert.True(
+                packet is CompressedMovementPacket or
+                    MovementPacket { PackedSnapshots: null } or
+                    MountMovementPacket { PackedSnapshots: null },
+                "Expected a compressed envelope or unpacked movement snapshots.");
         }
     }
 

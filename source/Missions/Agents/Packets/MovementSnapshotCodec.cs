@@ -54,21 +54,15 @@ internal sealed class MovementSnapshotCodec : IMovementSnapshotCodec
         // Skip scanning extras when the rider columns alone exceed the envelope limit.
         if (count > limit / RiderRowBytes) return null;
 
-        var layout = SnapshotLayout.ForRiders(agents, count, out int extraBytes);
-        int packedBytes = layout.ExtrasOffset + extraBytes;
+        var layout = SnapshotLayout.ForRiders(agents, count);
+        int packedBytes = layout.TotalBytes;
         if (packedBytes > limit) return null;
 
         var packed = new byte[packedBytes];
         var agentColumns = layout.AgentColumns(packed);
         var deckColumns = layout.DeckColumns(packed);
         var mountColumns = layout.MountColumns(packed);
-        // Rider-only batches skip the extras allocations because only mounts write extras.
-        BinaryWriter extrasWriter;
-        if (layout.HasMounts)
-            extrasWriter = new BinaryWriter(new MemoryStream(packed, layout.ExtrasOffset, extraBytes));
-        else
-            extrasWriter = null;
-        using var extras = extrasWriter;
+        using var extras = layout.ExtrasWriter(packed);
         int deckIndex = 0;
         int mountIndex = 0;
         for (int i = 0; i < count; i++)
@@ -107,13 +101,13 @@ internal sealed class MovementSnapshotCodec : IMovementSnapshotCodec
         // Skip scanning extras when the fixed columns alone exceed the envelope limit.
         if (count > limit / AgentMountData.SnapshotBytes) return null;
 
-        var layout = SnapshotLayout.ForMounts(mounts, count, out int extraBytes);
-        int packedBytes = layout.ExtrasOffset + extraBytes;
+        var layout = SnapshotLayout.ForMounts(mounts, count);
+        int packedBytes = layout.TotalBytes;
         if (packedBytes > limit) return null;
 
         var packed = new byte[packedBytes];
         var columns = layout.MountColumns(packed);
-        using var extras = new BinaryWriter(new MemoryStream(packed, layout.ExtrasOffset, extraBytes));
+        using var extras = layout.ExtrasWriter(packed);
         for (int i = 0; i < count; i++)
         {
             columns.BeginSnapshot(i);
@@ -131,13 +125,7 @@ internal sealed class MovementSnapshotCodec : IMovementSnapshotCodec
         var agentColumns = layout.AgentColumns(packed);
         var deckColumns = layout.DeckColumns(packed);
         var mountColumns = layout.MountColumns(packed);
-        // Rider-only batches skip the extras allocations because only mounts read extras.
-        BinaryReader extrasReader;
-        if (layout.HasMounts)
-            extrasReader = new BinaryReader(new MemoryStream(packed, layout.ExtrasOffset, packed.Length - layout.ExtrasOffset));
-        else
-            extrasReader = null;
-        using var extras = extrasReader;
+        using var extras = layout.ExtrasReader(packed);
         var agents = new AgentData[count];
         int deckIndex = 0;
         int mountIndex = 0;
@@ -172,7 +160,7 @@ internal sealed class MovementSnapshotCodec : IMovementSnapshotCodec
 
         var layout = new SnapshotLayout(agents: 0, decks: 0, mounts: count);
         var columns = layout.MountColumns(packed);
-        using var extras = new BinaryReader(new MemoryStream(packed, layout.ExtrasOffset, packed.Length - layout.ExtrasOffset));
+        using var extras = layout.ExtrasReader(packed);
         var mounts = new AgentMountData[count];
         for (int i = 0; i < count; i++)
         {
@@ -189,25 +177,27 @@ internal sealed class MovementSnapshotCodec : IMovementSnapshotCodec
         private readonly int mounts;
         private readonly int deckOffset;
         private readonly int mountOffset;
+        private readonly int extrasOffset;
+        private readonly int extraBytes;
 
-        public int ExtrasOffset { get; }
-        public bool HasMounts => mounts != 0;
+        public int TotalBytes => extrasOffset + extraBytes;
 
-        public SnapshotLayout(int agents, int decks, int mounts)
+        public SnapshotLayout(int agents, int decks, int mounts, int extraBytes = 0)
         {
             this.agents = agents;
             this.decks = decks;
             this.mounts = mounts;
             deckOffset = agents * RiderRowBytes;
             mountOffset = deckOffset + (decks * AgentData.DeckSnapshotBytes);
-            ExtrasOffset = mountOffset + (mounts * AgentMountData.SnapshotBytes);
+            extrasOffset = mountOffset + (mounts * AgentMountData.SnapshotBytes);
+            this.extraBytes = extraBytes;
         }
 
-        public static SnapshotLayout ForRiders(AgentData[] agents, int count, out int extraBytes)
+        public static SnapshotLayout ForRiders(AgentData[] agents, int count)
         {
             int decks = 0;
             int mounts = 0;
-            extraBytes = 0;
+            int extraBytes = 0;
             for (int i = 0; i < count; i++)
             {
                 AgentData agent = agents[i];
@@ -216,15 +206,15 @@ internal sealed class MovementSnapshotCodec : IMovementSnapshotCodec
                 mounts++;
                 extraBytes += agent.MountData.GetSnapshotExtraBytes();
             }
-            return new SnapshotLayout(count, decks, mounts);
+            return new SnapshotLayout(count, decks, mounts, extraBytes);
         }
 
-        public static SnapshotLayout ForMounts(AgentMountData[] mounts, int count, out int extraBytes)
+        public static SnapshotLayout ForMounts(AgentMountData[] mounts, int count)
         {
-            extraBytes = 0;
+            int extraBytes = 0;
             for (int i = 0; i < count; i++)
                 extraBytes += mounts[i].GetSnapshotExtraBytes();
-            return new SnapshotLayout(agents: 0, decks: 0, mounts: count);
+            return new SnapshotLayout(agents: 0, decks: 0, mounts: count, extraBytes: extraBytes);
         }
 
         public static SnapshotLayout ForPackedRiders(byte[] packed, int count)
@@ -250,6 +240,19 @@ internal sealed class MovementSnapshotCodec : IMovementSnapshotCodec
             new MovementSnapshotColumns(packed.AsSpan(deckOffset, mountOffset - deckOffset), decks);
 
         public MovementSnapshotColumns MountColumns(byte[] packed) =>
-            new MovementSnapshotColumns(packed.AsSpan(mountOffset, ExtrasOffset - mountOffset), mounts);
+            new MovementSnapshotColumns(packed.AsSpan(mountOffset, extrasOffset - mountOffset), mounts);
+
+        // Rider-only batches skip the extras streams because only mounts have extras.
+        public BinaryWriter ExtrasWriter(byte[] packed)
+        {
+            if (mounts == 0) return null;
+            return new BinaryWriter(new MemoryStream(packed, extrasOffset, extraBytes));
+        }
+
+        public BinaryReader ExtrasReader(byte[] packed)
+        {
+            if (mounts == 0) return null;
+            return new BinaryReader(new MemoryStream(packed, extrasOffset, packed.Length - extrasOffset));
+        }
     }
 }
