@@ -11,6 +11,7 @@ using TaleWorlds.Core;
 
 namespace GameInterface.Services.Hideouts;
 
+/// <summary>Answers whether a hideout can be attacked and which entry state a player party sees while an attack is set up.</summary>
 internal interface IHideoutPreparation
 {
     Hero GetAttackLeader(Settlement settlement);
@@ -19,6 +20,7 @@ internal interface IHideoutPreparation
     bool CanBeAttacked(Settlement settlement);
 }
 
+/// <summary>Reads hideout attack eligibility and attack setup state from the settlement and the registered players.</summary>
 internal sealed class HideoutPreparation : IHideoutPreparation
 {
     private readonly IPlayerManager players;
