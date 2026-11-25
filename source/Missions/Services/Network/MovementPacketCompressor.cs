@@ -46,6 +46,16 @@ public class MovementPacketCompressor : IMovementPacketCompressor
 
     public byte[] Serialize(IPacket packet)
     {
+        if (!IsMovement(packet))
+        {
+            byte[] plain = serializer.Serialize(packet);
+#if DEBUG
+            if (packet is AgentActionPacket actionPacket)
+                MissionActionDiagnostics.RecordActionPacketSent(actionPacket, plain.Length);
+#endif
+            return plain;
+        }
+
         // Packed snapshots travel inside the envelope so the receiver restores the arrays before dispatch.
         if (snapshotCodec.TryPack(packet, MaxUncompressedBytes, out IPacket packed))
         {
@@ -53,18 +63,8 @@ public class MovementPacketCompressor : IMovementPacketCompressor
             if (compressed != null) return compressed;
         }
 
+        // Fall back to the protobuf arrays if packing is skipped or the packed body fails compression.
         byte[] original = serializer.Serialize(packet);
-#if DEBUG
-        if (packet is AgentActionPacket actionPacket)
-        {
-            MissionActionDiagnostics.RecordActionPacketSent(
-                actionPacket,
-                original.Length);
-        }
-#endif
-        if (!IsMovement(packet))
-            return original;
-
         return TryCompress(original) ?? original;
     }
 

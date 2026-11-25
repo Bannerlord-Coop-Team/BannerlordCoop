@@ -4,7 +4,13 @@ namespace Missions.Agents.Packets
 {
     public partial struct AgentData
     {
-        internal const int SnapshotBytes = (11 * sizeof(float)) + sizeof(uint);
+        internal const int SnapshotBytes =
+            MovementSnapshotColumns.Vec3Bytes +
+            MovementSnapshotColumns.Vec2Bytes +
+            MovementSnapshotColumns.Vec3Bytes +
+            MovementSnapshotColumns.Vec2Bytes +
+            sizeof(float) +
+            sizeof(uint);
 
         internal void WriteSnapshot(ref MovementSnapshotColumns columns)
         {
@@ -33,7 +39,7 @@ namespace Missions.Agents.Packets
             MountData = mount,
         };
 
-        internal const int DeckSnapshotBytes = sizeof(int) + (3 * sizeof(float));
+        internal const int DeckSnapshotBytes = sizeof(int) + MovementSnapshotColumns.Vec3Bytes;
 
         internal void WriteDeckSnapshot(ref MovementSnapshotColumns columns)
         {

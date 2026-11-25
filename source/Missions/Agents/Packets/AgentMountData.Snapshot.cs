@@ -29,7 +29,23 @@ namespace Missions.Agents.Packets
         }
 
         internal const int SnapshotBytes =
-            sizeof(byte) + (14 * sizeof(float)) + sizeof(uint) + sizeof(ushort) + (4 * sizeof(int)) + (2 * sizeof(ulong));
+            sizeof(byte) +
+            MovementSnapshotColumns.Vec3Bytes +
+            MovementSnapshotColumns.Vec2Bytes +
+            MovementSnapshotColumns.Vec3Bytes +
+            MovementSnapshotColumns.Vec2Bytes +
+            sizeof(float) +
+            sizeof(uint) +
+            sizeof(ushort) +
+            sizeof(int) +
+            sizeof(ulong) +
+            sizeof(float) +
+            sizeof(float) +
+            sizeof(int) +
+            sizeof(int) +
+            sizeof(int) +
+            sizeof(ulong) +
+            sizeof(float);
 
         internal void WriteSnapshot(ref MovementSnapshotColumns columns, BinaryWriter extras)
         {

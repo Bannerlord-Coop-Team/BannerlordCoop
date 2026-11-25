@@ -60,8 +60,10 @@ public partial class MovementTrafficTests
         });
     }
 
-    [Fact]
-    public void PackedMountMovement_RestoresScopeGuidAndRevisionExtras()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void PackedMountMovement_RestoresScopeGuidAndRevisionExtras(bool scoped)
     {
         using var fixture = new MissionEngineFixture();
         var peer = Clients.First();
@@ -70,7 +72,7 @@ public partial class MovementTrafficTests
             var mock = CreateMovementMission(fixture, peer);
             var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
             var compressor = new MovementPacketCompressor(serializer, new MovementSnapshotCodec());
-            MountMovementPacket packet = CreatePackedMountPacket(mock, count: 18);
+            MountMovementPacket packet = CreatePackedMountPacket(mock, count: 18, scoped);
             Assert.Contains(packet.Mounts, mount => mount.MountAction0TurnDirection == AgentMountData.TurnLeft);
             byte[] original = serializer.Serialize(packet);
             byte[] wire = compressor.Serialize(packet);
@@ -94,7 +96,7 @@ public partial class MovementTrafficTests
             var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
             var compressor = new MovementPacketCompressor(serializer, new MovementSnapshotCodec());
             IPacket packet = standaloneMounts
-                ? CreatePackedMountPacket(mock, count)
+                ? CreatePackedMountPacket(mock, count, scoped: false)
                 : CreatePackedRiderPacket(mock, count);
             var baseline = new MovementPacketCompressor(serializer, Mock.Of<IMovementSnapshotCodec>());
             int baselineLength = baseline.Serialize(packet).Length;
@@ -180,7 +182,7 @@ public partial class MovementTrafficTests
         return new MovementPacket(EquivalenceScope, ids, riders, EquivalenceSender, revisions, 211);
     }
 
-    private static MountMovementPacket CreatePackedMountPacket(MockMission mock, int count)
+    private static MountMovementPacket CreatePackedMountPacket(MockMission mock, int count, bool scoped)
     {
         // Include both sides of the 127/128 UTF-8 byte boundary and a row without extras.
         var extras = new (string? Scope, Guid MountGuid, long? MountRevision)[]
@@ -192,6 +194,7 @@ public partial class MovementTrafficTests
             (null, Guid.Empty, 0L),
             (null, Guid.Empty, null),
         };
+        var ids = new ushort[count];
         var guids = new Guid[count];
         var revisions = new long[count];
         var mounts = new AgentMountData[count];
@@ -201,6 +204,7 @@ public partial class MovementTrafficTests
             Assert.True(AgentMirror.TryGet(mount, out var mirror));
             PopulatePackedMovementState(mirror, i);
             ushort movementId = (ushort)(173 - (i * 3));
+            ids[i] = movementId;
             guids[i] = EquivalenceGuid(movementId);
             revisions[i] = i * 17L;
             (string? scope, Guid mountGuid, long? mountRevision) = extras[i % extras.Length];
@@ -210,6 +214,8 @@ public partial class MovementTrafficTests
                 mountAction0IsSyntheticTurn: i % 4 == 0, mountAuthorityRevision: mountRevision);
         }
 
+        if (scoped)
+            return new MountMovementPacket(EquivalenceScope, ids, mounts, EquivalenceSender, revisions, 211);
         return new MountMovementPacket(guids, mounts, EquivalenceSender, revisions, 211);
     }
 

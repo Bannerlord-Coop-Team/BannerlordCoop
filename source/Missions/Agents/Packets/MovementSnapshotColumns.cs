@@ -9,6 +9,9 @@ namespace Missions.Agents.Packets;
 /// </summary>
 internal ref struct MovementSnapshotColumns
 {
+    public const int Vec2Bytes = 2 * sizeof(float);
+    public const int Vec3Bytes = 3 * sizeof(float);
+
     private readonly Span<byte> bytes;
     private readonly int count;
     private int offset;
