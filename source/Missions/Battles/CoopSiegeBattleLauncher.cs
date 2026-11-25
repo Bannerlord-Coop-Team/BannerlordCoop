@@ -181,17 +181,15 @@ internal class CoopSiegeBattleLauncher : ICoopSiegeBattleLauncher
     // attacking players with no player defending, so the walls keep their plain end otherwise.
     private static BattleEndLogic CreateWallsEndLogic(MapEvent mapEvent, bool isSallyOut)
     {
-        var endLogic = new BattleEndLogic();
         var settlement = mapEvent.MapEventSettlement;
-        if (!isSallyOut && mapEvent.IsSiegeAssault && PartyBase.MainParty.Side == BattleSideEnum.Attacker &&
-            settlement?.LocationComplex?.GetLocationWithId("lordshall") != null &&
-            !mapEvent.DefenderSide.Parties.Any(party => party.Party.IsPlayerParty()))
-        {
-            endLogic.EnableEnemyDefenderPullBack(
-                Campaign.Current.Models.SiegeLordsHallFightModel.DefenderTroopNumberForSuccessfulPullBack);
-        }
+        if (isSallyOut || !mapEvent.IsSiegeAssault || PartyBase.MainParty.Side != BattleSideEnum.Attacker ||
+            settlement?.LocationComplex?.GetLocationWithId("lordshall") == null ||
+            mapEvent.DefenderSide.Parties.Any(party => party.Party.IsPlayerParty()))
+            return new BattleEndLogic();
 
-        return endLogic;
+        Logger.Information("[BattleSync] Armed the defender pull-back to the keep for {Settlement}", settlement.StringId);
+        return new CoopSiegeWallsEndLogic(
+            Campaign.Current.Models.SiegeLordsHallFightModel.DefenderTroopNumberForSuccessfulPullBack);
     }
 
     public Mission OpenCoopLordsHallBattle(MissionInitializerRecord rec)
