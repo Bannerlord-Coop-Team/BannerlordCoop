@@ -275,11 +275,11 @@ public partial class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
     private void OnAgentBecameLocallyControlled(CoopAgentInfo info) =>
         GameThread.RunSafe(() =>
         {
-            if (_disposed || info.CurrentAuthority != controllerIdProvider.ControllerId
-                || !_agentStates.TryGetValue(info.AgentId, out var state)) return;
+            if (_disposed || !_agentStates.TryGetValue(info.AgentId, out var state)
+                || !agentRegistry.IsLocallyControlled(info.AgentId)) return;
 
-            SetPendingPilotSeat(info.AgentId, state, null);
-            ReleasePilotSeat(state, preserveLocalUser: true);
+            ClearPilotSeat(info.AgentId, state);
+            // Keep the inherited guard through native collision and clear it at the next action poll.
             _localAuthorityChanges.Enqueue(info);
         });
 
@@ -288,7 +288,7 @@ public partial class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         while (_localAuthorityChanges.Count > 0)
         {
             CoopAgentInfo info = _localAuthorityChanges.Dequeue();
-            if (info.CurrentAuthority == controllerIdProvider.ControllerId
+            if (agentRegistry.IsLocallyControlled(info.AgentId)
                 && agentRegistry.TryGetAgentInfo(info.AgentId, out var registered)
                 && ReferenceEquals(info, registered))
             {
@@ -318,8 +318,7 @@ public partial class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         _agentStates.Remove(agentId);
         _pendingActionAgentIds.Remove(agentId);
         _retainedGuardAgentIds.Remove(agentId);
-        SetPendingPilotSeat(agentId, state, null);
-        ReleasePilotSeat(state, preserveLocalUser: true);
+        ClearPilotSeat(agentId, state);
 
         if (state.RetainedGuard == null) return;
         Agent agent = info.Agent;

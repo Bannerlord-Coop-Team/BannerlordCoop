@@ -522,9 +522,10 @@ public class NetworkAgentRegistry : INetworkAgentRegistry
         {
             if (!MatchesReturn(agentId, previousRevision)
                 || (mountAgentId != Guid.Empty && !MatchesReturn(mountAgentId, previousMountRevision))) return false;
-            succeeded = TryTransferAuthorityLocked(returningControllerId, agentId, previousRevision + 1, out changedRider)
-                && (mountAgentId == Guid.Empty || TryTransferAuthorityLocked(returningControllerId,
-                    mountAgentId, previousMountRevision + 1, out changedMount));
+            succeeded = TryTransferAuthorityLocked(returningControllerId, agentId, previousRevision + 1, out changedRider);
+            if (succeeded && mountAgentId != Guid.Empty)
+                succeeded = TryTransferAuthorityLocked(returningControllerId,
+                    mountAgentId, previousMountRevision + 1, out changedMount);
         }
         if (returningControllerId == controllerIdProvider.ControllerId)
         {
@@ -602,7 +603,7 @@ public class NetworkAgentRegistry : INetworkAgentRegistry
             return true;
         }
 
-        // Drop the old controller key with its last agent.
+        // Prune empty entries to stay consistent with RemoveController, which drops the whole key.
         if (ControllerAgentMap.TryGetValue(agentInfo.CurrentAuthority, out var currentAgents))
         {
             currentAgents.Remove(agentInfo);
