@@ -88,7 +88,11 @@ public class TransferSaveState : ConnectionStateBase
             JoinSaveSnapshot? snapshot = null;
             GameThread.RunSafe(() => snapshot = CaptureSnapshot(), blocking: true, context: "Capture join save snapshot");
             if (snapshot == null) return false;
-            if (peer.ConnectionState != ConnectionState.Connected) return false;
+            if (peer.ConnectionState != ConnectionState.Connected)
+            {
+                Logger.Warning("Join save transfer to peer {PeerId} stopped after snapshot because the peer is no longer connected", peer.Id);
+                return false;
+            }
 
             int uncompressedSize = snapshot.SaveData.Length;
             var (chunks, compressedSize) = SaveDataCompression.CompressChunks(
@@ -236,7 +240,13 @@ public class TransferSaveState : ConnectionStateBase
 
         for (int chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++)
         {
-            if (peer.ConnectionState != ConnectionState.Connected) return false;
+            if (peer.ConnectionState != ConnectionState.Connected)
+            {
+                Logger.Warning(
+                    "Join save transfer {TransferId} to peer {PeerId} stopped before chunk {ChunkIndex} because the peer is no longer connected",
+                    transferId, peer.Id, chunkIndex);
+                return false;
+            }
 
             var chunkPacket = new GameSaveDataChunkPacket(
                 transferId,
@@ -291,6 +301,7 @@ public class TransferSaveState : ConnectionStateBase
 
     public override void Load()
     {
+        // Callers invoke Load immediately after SetState, including when the send failed and the peer is disconnecting.
         if (saveSent) ConnectionLogic.SetState<LoadingState>();
     }
 

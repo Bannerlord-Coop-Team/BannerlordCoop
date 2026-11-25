@@ -277,15 +277,7 @@ internal sealed class ConnectionMessageQueue : IConnectionMessageQueue, IDisposa
         // Stop world replication for deleted player.
         // Game state at game over should be preserved for statistics screen when supported
         var channel = channels.GetOrAdd(payload.What.Peer, _ => new PeerChannel());
-        lock (channel.Gate)
-        {
-            channel.Pending.Clear();
-            channel.PendingMerge = null;
-            Interlocked.Exchange(ref channel.PendingCount, 0);
-            Interlocked.Exchange(ref channel.PendingBytes, 0);
-            channel.Overflowed = false;
-            channel.Phase = Phase.Stopped;
-        }
+        StopChannel(channel);
     }
 
     public void BeginQueueing(NetPeer peer)
@@ -445,28 +437,28 @@ internal sealed class ConnectionMessageQueue : IConnectionMessageQueue, IDisposa
 
     public int AbortCatchUp(NetPeer peer)
     {
-        if (channels.TryGetValue(peer, out var channel) == false)
-        {
-            (network.Value as IBufferedNetwork)?.DiscardPendingMessages(peer);
-            return 0;
-        }
+        int cleared = channels.TryGetValue(peer, out var channel) ? StopChannel(channel) : 0;
 
-        int cleared;
+        // Replay Drain uses normal message aggregation. Remove anything it buffered before the
+        // watchdog was able to abort so the end-of-update aggregate flush cannot send stale replay.
+        (network.Value as IBufferedNetwork)?.DiscardPendingMessages(peer);
+        return cleared;
+    }
+
+    /// <summary>Clears held replay and stops the channel until the peer disconnects.</summary>
+    private static int StopChannel(PeerChannel channel)
+    {
         lock (channel.Gate)
         {
-            cleared = channel.Pending.Count;
+            int cleared = channel.Pending.Count;
             channel.Pending.Clear();
             channel.PendingMerge = null;
             Interlocked.Exchange(ref channel.PendingCount, 0);
             Interlocked.Exchange(ref channel.PendingBytes, 0);
             channel.Overflowed = false;
             channel.Phase = Phase.Stopped;
+            return cleared;
         }
-
-        // Replay Drain uses normal message aggregation. Remove anything it buffered before the
-        // watchdog was able to abort so the end-of-update aggregate flush cannot send stale replay.
-        (network.Value as IBufferedNetwork)?.DiscardPendingMessages(peer);
-        return cleared;
     }
 
     private JoinReplayBatchResult DrainBatch(
