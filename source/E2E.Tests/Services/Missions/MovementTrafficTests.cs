@@ -302,7 +302,7 @@ public partial class MovementTrafficTests : MissionTestEnvironment
                 peer.Resolve<IAgentEquipmentApplier>(),
                 new MovementBatchSender(
                     network,
-                    new MovementPacketCompressor(serializer),
+                    new MovementPacketCompressor(serializer, new MovementSnapshotCodec()),
                     () => new MovementTrafficBudget()),
                 peer.Resolve<IPuppetMountStateRepairer>(),
                 peer.Resolve<IAgentVisualActionAccessor>(),
@@ -817,6 +817,7 @@ public partial class MovementTrafficTests : MissionTestEnvironment
                 $"Expected fewer than three-agent batching's 42 packets, got {packets.Length}");
             Assert.Contains(packets, packet => packet.AgentIds.Length > 3);
             AssertSerializedBatchesFitRelay(serializer, network);
+            AssertSendsAreEnvelopesOrUnpacked(serializer, network);
             output.WriteLine(
                 $"125 incompressible agents: {packets.Length} packets; batch sizes " +
                 string.Join(",", packets.Select(packet => packet.AgentIds.Length)));
@@ -932,6 +933,7 @@ public partial class MovementTrafficTests : MissionTestEnvironment
             Assert.NotEmpty(packets);
             Assert.Contains(packets, packet => packet.MountIds.Length > 3);
             AssertSerializedBatchesFitRelay(serializer, network);
+            AssertSendsAreEnvelopesOrUnpacked(serializer, network);
             output.WriteLine(
                 $"48 incompressible mounts: {packets.Length} packets; batch sizes " +
                 string.Join(",", packets.Select(packet => packet.MountIds.Length)));
@@ -1110,6 +1112,7 @@ public partial class MovementTrafficTests : MissionTestEnvironment
             Assert.Equal((ushort)2, mountData.MountMovementId);
             Assert.Null(mountData.MountIdentityScopeId);
             AssertSerializedBatchesFitRelay(serializer, network);
+            AssertSendsAreEnvelopesOrUnpacked(serializer, network);
         });
     }
 
@@ -1190,7 +1193,7 @@ public partial class MovementTrafficTests : MissionTestEnvironment
             }
 
             var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
-            var compressor = new MovementPacketCompressor(serializer);
+            var compressor = new MovementPacketCompressor(serializer, new MovementSnapshotCodec());
             var movement = new MovementPacket(
                 "76561198000000042",
                 new ushort[] { 1, 2, 3 },
@@ -1260,7 +1263,7 @@ public partial class MovementTrafficTests : MissionTestEnvironment
             }
 
             var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
-            var compressor = new MovementPacketCompressor(serializer);
+            var compressor = new MovementPacketCompressor(serializer, new MovementSnapshotCodec());
             const string senderControllerId = "76561198000000042";
             var authorityRevisions = new long[] { 1, 2, 3 };
             peer.Resolve<IMessageBroker>().Publish(
@@ -1313,7 +1316,7 @@ public partial class MovementTrafficTests : MissionTestEnvironment
             }
 
             var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
-            var compressor = new MovementPacketCompressor(serializer);
+            var compressor = new MovementPacketCompressor(serializer, new MovementSnapshotCodec());
             var recorder = new Mock<IBattleBenchmarkRecorder>();
             recorder.SetupGet(value => value.IsRecording).Returns(true);
             using var handler = new CompressedMovementPacketHandler(Mock.Of<IPacketManager>(), compressor, recorder.Object);
@@ -1426,6 +1429,21 @@ public partial class MovementTrafficTests : MissionTestEnvironment
         }
     }
 
+    private static void AssertSendsAreEnvelopesOrUnpacked(
+        ProtoBufSerializer serializer,
+        MockBattleNetwork network)
+    {
+        foreach (SerializedPacketSend send in network.SerializedPacketSends)
+        {
+            IPacket packet = serializer.Deserialize<IPacket>(send.Payload);
+            Assert.True(
+                packet is CompressedMovementPacket or
+                    MovementPacket { PackedSnapshots: null } or
+                    MountMovementPacket { PackedSnapshots: null },
+                "Expected a compressed envelope or unpacked movement snapshots.");
+        }
+    }
+
     private static void PopulateIncompressibleMovementState(MirrorAgent mirror, int seed)
     {
         uint state = unchecked((uint)(seed * 747796405) + 2891336453u);
@@ -1508,8 +1526,6 @@ public partial class MovementTrafficTests : MissionTestEnvironment
             return new byte[Math.Max(1, snapshots) * bytesPerSnapshot];
         }
 
-        public byte[] SerializeSnapshots(IPacket packet, Guid[] snapshotIds) => Serialize(packet);
-
         public bool TryRestore(IPacket packet, out IPacket restored)
         {
             restored = packet;
@@ -1534,12 +1550,6 @@ public partial class MovementTrafficTests : MissionTestEnvironment
         {
             SerializeCalls++;
             return inner.Serialize(packet);
-        }
-
-        public byte[] SerializeSnapshots(IPacket packet, Guid[] snapshotIds)
-        {
-            SerializeCalls++;
-            return inner.SerializeSnapshots(packet, snapshotIds);
         }
 
         public bool TryRestore(IPacket packet, out IPacket restored)

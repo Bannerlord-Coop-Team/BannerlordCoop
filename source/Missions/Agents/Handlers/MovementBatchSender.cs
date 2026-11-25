@@ -15,12 +15,6 @@ public interface IMovementBatchSender
 
     void BeginFrame(float elapsedSeconds);
 
-    /// <summary>
-    /// Sets how many recipients the current capture goes to. With two or more, each snapshot is encoded once and shared;
-    /// with one, encoding the whole packet is cheaper because nothing reuses the snapshot encodings.
-    /// </summary>
-    void SetCaptureRecipients(int recipientCount);
-
     void ConfigureRecipient(
         string controllerId,
         double bytesPerSecond,
@@ -182,7 +176,6 @@ public sealed class MovementBatchSender : IMovementBatchSender
     private readonly IMovementTrafficBudget outgoingTrafficBudget;
     private readonly Dictionary<string, RecipientState> recipients =
         new Dictionary<string, RecipientState>(StringComparer.Ordinal);
-    private bool encodeSnapshotsOnce;
 
     private sealed class RecipientState
     {
@@ -296,8 +289,6 @@ public sealed class MovementBatchSender : IMovementBatchSender
             recipient.TrafficBudget.Advance(elapsedSeconds);
         routeBackoff.Advance(elapsedSeconds);
     }
-
-    public void SetCaptureRecipients(int recipientCount) => encodeSnapshotsOnce = recipientCount >= 2;
 
     public void ConfigureRecipient(
         string controllerId,
@@ -1091,17 +1082,11 @@ public sealed class MovementBatchSender : IMovementBatchSender
     {
         var data = new T[count];
         CopyCircular(batch.Data, offset, start, data);
-        // Encode-once looks snapshots up by canonical id, so compact packets only need the ids on that path.
-        Guid[] canonicalIds = null;
-        if (idFormat == MovementIdFormat.Canonical || encodeSnapshotsOnce)
-        {
-            canonicalIds = new Guid[count];
-            CopyCircular(batch.CanonicalIds, offset, start, canonicalIds);
-        }
-
         IPacket packet;
         if (idFormat == MovementIdFormat.Canonical)
         {
+            var canonicalIds = new Guid[count];
+            CopyCircular(batch.CanonicalIds, offset, start, canonicalIds);
             packet = createPacket(null, null, canonicalIds, data);
         }
         else
@@ -1127,9 +1112,7 @@ public sealed class MovementBatchSender : IMovementBatchSender
         return new SerializedMovementBatch(
             count,
             packet,
-            encodeSnapshotsOnce
-                ? packetCompressor.SerializeSnapshots(packet, canonicalIds)
-                : packetCompressor.Serialize(packet));
+            packetCompressor.Serialize(packet));
     }
 
     private static T GetCircular<T>(

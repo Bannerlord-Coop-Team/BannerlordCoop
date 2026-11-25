@@ -136,7 +136,7 @@ public class ProtoBufSerializer : ICommonSerializer
             throw new InvalidOperationException("Unexpected ProtoMessageWrapper length.");
     }
 
-    public static ulong ReadVarint(byte[] data, ref int offset)
+    private static ulong ReadVarint(byte[] data, ref int offset)
     {
         ulong value = 0;
         for (int shift = 0; ; shift += 7)

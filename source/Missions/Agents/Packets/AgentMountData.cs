@@ -11,7 +11,7 @@ using TaleWorlds.MountAndBlade;
 namespace Missions.Agents.Packets
 {
     [ProtoContract(SkipConstructor = true)]
-    public class AgentMountData
+    public partial class AgentMountData
     {
         internal const float StationarySpeedThreshold = 0.05f;
         internal const int TurnLeft = -1;
@@ -497,50 +497,51 @@ namespace Missions.Agents.Packets
             public bool IsStationary { get; }
         }
 
+        // Add mount fields to WriteSnapshot, ReadSnapshot and SnapshotBytes or GetSnapshotExtraBytes too.
         [ProtoMember(1)]
-        public Vec2 MountInputVector { get; }
+        public Vec2 MountInputVector { get; private set; }
         [ProtoMember(2)]
-        public ulong MountAction1Flag { get; }
+        public ulong MountAction1Flag { get; private set; }
         [ProtoMember(3)]
-        public float MountAction1Progress { get; }
+        public float MountAction1Progress { get; private set; }
         // Shift by one so protobuf omits the common act_none (-1) value.
         [ProtoMember(4)]
         private int MountAction1IndexWire { get; set; }
         public int MountAction1Index => MountAction1IndexWire - 1;
         [ProtoMember(5)]
-        public Vec3 MountLookDirection { get; }
+        public Vec3 MountLookDirection { get; private set; }
         [ProtoMember(6)]
-        public Vec2 MountMovementDirection { get; }
+        public Vec2 MountMovementDirection { get; private set; }
         [ProtoMember(7)]
-        public Vec3 MountPosition { get; }
+        public Vec3 MountPosition { get; private set; }
         /// <summary>The mount's owner-scoped movement id, or zero when the horse is unregistered.</summary>
         [ProtoMember(8)]
-        public ushort MountMovementId { get; }
+        public ushort MountMovementId { get; private set; }
         [ProtoMember(9)]
-        public ulong MountAction0Flag { get; }
+        public ulong MountAction0Flag { get; private set; }
         [ProtoMember(10)]
-        public float MountAction0Progress { get; }
+        public float MountAction0Progress { get; private set; }
         [ProtoMember(11)]
-        public int MountAction0Index { get; }
+        public int MountAction0Index { get; private set; }
         /// <summary>The owner's horizontal mount speed, used as the puppet's absolute native speed limit.</summary>
         [ProtoMember(12)]
-        public float MountSpeed { get; }
+        public float MountSpeed { get; private set; }
         /// <summary>Only populated when the mount's original owner differs from the rider's identity scope.</summary>
         [ProtoMember(13)]
-        public string MountIdentityScopeId { get; }
+        public string MountIdentityScopeId { get; private set; }
         [ProtoMember(14)]
-        public Guid MountAgentId { get; }
+        public Guid MountAgentId { get; private set; }
         [ProtoMember(15)]
-        public uint MountMovementFlag { get; }
+        public uint MountMovementFlag { get; private set; }
         /// <summary>The owner's rendered gait playback speed for action channel zero.</summary>
         [ProtoMember(16)]
-        public float MountAction0Speed { get; }
+        public float MountAction0Speed { get; private set; }
         /// <summary>Whether the owner's rendered channel-zero animation is a locomotion gait.</summary>
         [ProtoMember(17)]
-        public bool MountAction0IsLocomotion { get; }
+        public bool MountAction0IsLocomotion { get; private set; }
         /// <summary>The owner's rendered stationary turn direction: -1 left, 0 none, 1 right.</summary>
         [ProtoMember(18)]
-        public int MountAction0TurnDirection { get; }
+        public int MountAction0TurnDirection { get; private set; }
         // Shift by one so protobuf omits the common no-turn value.
         [ProtoMember(19)]
         private int MountAction0TurnActionIndexWire { get; set; }
@@ -548,10 +549,12 @@ namespace Missions.Agents.Packets
         public int MountAction0TurnActionIndex => MountAction0TurnActionIndexWire - 1;
         /// <summary>Whether channel zero is being driven through the bounded synthetic turn timeline.</summary>
         [ProtoMember(20)]
-        public bool MountAction0IsSyntheticTurn { get; }
+        public bool MountAction0IsSyntheticTurn { get; private set; }
 
         // Embedded poses may share ordering with the horse stream only in this authority generation.
         [ProtoMember(21)]
-        public long? MountAuthorityRevision { get; }
+        public long? MountAuthorityRevision { get; private set; }
+
+        private AgentMountData() { }
     }
 }
