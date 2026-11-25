@@ -69,13 +69,13 @@ public class SiegeKeepStageTests : MapEventTestBase
         Assert.Equal(new[] { JoinerEscorts, LeaderEscorts }, choosing.Select(message => message.EscortAllowance).OrderBy(x => x));
 
         Server.SimulateMessage(clients[0].NetPeer, new NetworkSiegeKeepEntryRequest("leader-pick", keep.Battle.MapEventId,
-            false, new[] { new HideoutTroopSelectionEntry(keep.LeaderCharacterId, 1), new HideoutTroopSelectionEntry(keep.EscortId, 5) }));
+            queryOnly: false, new[] { new HideoutTroopSelectionEntry(keep.LeaderCharacterId, 1), new HideoutTroopSelectionEntry(keep.EscortId, 5) }));
         var leaderReply = Reply("leader-pick");
         Assert.True(leaderReply.Accepted, leaderReply.Reason);
         Assert.False(leaderReply.IsLocked);
 
         Server.SimulateMessage(clients[1].NetPeer, new NetworkSiegeKeepEntryRequest("joiner-pick", keep.Battle.MapEventId,
-            false, new[] { new HideoutTroopSelectionEntry(keep.EscortId, 2) }));
+            queryOnly: false, new[] { new HideoutTroopSelectionEntry(keep.EscortId, 2) }));
         var joinerReply = Reply("joiner-pick");
         Assert.True(joinerReply.Accepted, joinerReply.Reason);
         Assert.True(joinerReply.IsLocked);
@@ -86,10 +86,10 @@ public class SiegeKeepStageTests : MapEventTestBase
         {
             Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(keep.Battle.MapEventId, out var mapEvent));
             var reserves = Server.Resolve<IBattleTroopReserveBuilder>();
-            Assert.Equal(6, OwnedEntries(reserves.GetOwnedReserves(mapEvent, "keep-leader", true), BattleSideEnum.Attacker));
-            Assert.Equal(3, OwnedEntries(reserves.GetOwnedReserves(mapEvent, "keep-joiner", false), BattleSideEnum.Attacker));
-            Assert.Equal(27, OwnedEntries(reserves.GetOwnedReserves(mapEvent, "keep-leader", true), BattleSideEnum.Defender));
-            Assert.Contains(keep.JoinerCharacterId, reserves.GetOwnedReserves(mapEvent, "keep-joiner", false)
+            Assert.Equal(6, OwnedEntries(reserves.GetOwnedReserves(mapEvent, "keep-leader", isHost: true), BattleSideEnum.Attacker));
+            Assert.Equal(3, OwnedEntries(reserves.GetOwnedReserves(mapEvent, "keep-joiner", isHost: false), BattleSideEnum.Attacker));
+            Assert.Equal(27, OwnedEntries(reserves.GetOwnedReserves(mapEvent, "keep-leader", isHost: true), BattleSideEnum.Defender));
+            Assert.Contains(keep.JoinerCharacterId, reserves.GetOwnedReserves(mapEvent, "keep-joiner", isHost: false)
                 .Single(side => side.Side == BattleSideEnum.Attacker).Parties.Single().Entries
                 .Select(entry => entry.CharacterId));
         }, keep.DisabledMethods);
@@ -158,8 +158,8 @@ public class SiegeKeepStageTests : MapEventTestBase
         {
             Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(keep.Battle.MapEventId, out var mapEvent));
             var reserves = Server.Resolve<IBattleTroopReserveBuilder>();
-            Assert.Equal(4, OwnedEntries(reserves.GetOwnedReserves(mapEvent, "keep-leader", true), BattleSideEnum.Attacker));
-            Assert.Equal(3, OwnedEntries(reserves.GetOwnedReserves(mapEvent, "keep-joiner", false), BattleSideEnum.Attacker));
+            Assert.Equal(4, OwnedEntries(reserves.GetOwnedReserves(mapEvent, "keep-leader", isHost: true), BattleSideEnum.Attacker));
+            Assert.Equal(3, OwnedEntries(reserves.GetOwnedReserves(mapEvent, "keep-joiner", isHost: false), BattleSideEnum.Attacker));
         }, keep.DisabledMethods);
     }
 
@@ -195,7 +195,7 @@ public class SiegeKeepStageTests : MapEventTestBase
         Assert.Single(choosing, message => !message.IsSeated);
 
         Server.SimulateMessage(clients[0].NetPeer, new NetworkSiegeKeepEntryRequest("leader-alone", keep.Battle.MapEventId,
-            false, Array.Empty<HideoutTroopSelectionEntry>()));
+            queryOnly: false, Array.Empty<HideoutTroopSelectionEntry>()));
         Assert.True(Reply("leader-alone").IsLocked);
         StartKeepMission(keep, expectedStarts: 1);
     }
@@ -214,7 +214,7 @@ public class SiegeKeepStageTests : MapEventTestBase
         }, keep.DisabledMethods);
 
         Server.SimulateMessage(clients[0].NetPeer, new NetworkSiegeKeepEntryRequest("leader-after-leave",
-            keep.Battle.MapEventId, false, new[] { new HideoutTroopSelectionEntry(keep.LeaderCharacterId, 1) }));
+            keep.Battle.MapEventId, queryOnly: false, new[] { new HideoutTroopSelectionEntry(keep.LeaderCharacterId, 1) }));
         Assert.True(Reply("leader-after-leave").IsLocked);
         Assert.Equal(1, LockedSeats());
         StartKeepMission(keep, expectedStarts: 1);
@@ -253,7 +253,7 @@ public class SiegeKeepStageTests : MapEventTestBase
         }, keep.DisabledMethods);
 
         Server.SimulateMessage(clients[0].NetPeer, new NetworkSiegeKeepEntryRequest("hall-query", keep.Battle.MapEventId,
-            true, Array.Empty<HideoutTroopSelectionEntry>()));
+            queryOnly: true, Array.Empty<HideoutTroopSelectionEntry>()));
 
         var reply = Reply("hall-query");
         Assert.True(reply.Accepted, reply.Reason);

@@ -34,6 +34,7 @@ public class ServerBattleCompletionHandlerSiegeKeepTests : IDisposable
 {
     private const string MapEventId = "map-event-keep";
     private const string HostControllerId = "host";
+    private const string KeepControllerId = "keep-player";
 
     private static readonly ConstructorInfo PeerConstructor = typeof(NetPeer).GetConstructor(
         BindingFlags.NonPublic | BindingFlags.Instance,
@@ -75,9 +76,9 @@ public class ServerBattleCompletionHandlerSiegeKeepTests : IDisposable
     public void Dispose() => handler.Dispose();
 
     [Fact]
-    public void WallsPullBack_OpensTheKeepAndLeavesItsInstanceFreeForTheKeepMission()
+    public void WallsPullBack_OpensTheKeepAndTheKeepConcludesOnItsOwnResult()
     {
-        GiveTheMapEventSiegeAssaultWalls();
+        var settlement = GiveTheMapEventSiegeAssaultWalls();
         Assert.True(missionManager.TryEnterMission(peer, HostControllerId, MapEventId, out _));
 
         broker.Publish(peer, new NetworkBattleResultReady(MapEventId, BattleState.DefenderPullBack, 1));
@@ -90,8 +91,22 @@ public class ServerBattleCompletionHandlerSiegeKeepTests : IDisposable
         broker.Publish(this, new SiegeKeepStageOpened(MapEventId));
         Drain();
 
+        settlement.CurrentSiegeState = Settlement.SiegeState.InTheLordsHall;
         Assert.True(missionManager.TryLeaveMission(peer, HostControllerId, MapEventId, out _));
-        Assert.True(missionManager.TryEnterMission(CreatePeer(52201), "keep-player", MapEventId, out _));
+        var keepPeer = CreatePeer(52201);
+        Assert.True(missionManager.TryEnterMission(keepPeer, KeepControllerId, MapEventId, out _));
+
+        // The keep elects its own host, and its result alone has to conclude the siege.
+        var keepPlayer = new Player(KeepControllerId, "keep-hero", "keep-party", "clan", "keep-character");
+        playerManager.Setup(manager => manager.TryGetPlayer(keepPeer, out keepPlayer)).Returns(true);
+        var keepHost = new BattleHostAssignment(KeepControllerId, Array.Empty<string>(), epoch: 1);
+        hostRegistry.Setup(registry => registry.TryGet(MapEventId, out keepHost)).Returns(true);
+        broker.Publish(this, new BattleHostAssignmentChanged(MapEventId));
+        broker.Publish(keepPeer, new NetworkBattleResultReady(MapEventId, BattleState.AttackerVictory, 1));
+        Drain();
+
+        var conclusion = Assert.Single(broker.Messages.GetMessages<AuthoritativeBattleConclusionRequested>());
+        Assert.Equal(BattleState.AttackerVictory, conclusion.BattleState);
     }
 
     // The first keep attempt already moved the siege into the hall, so a retry has to ask for the keep again

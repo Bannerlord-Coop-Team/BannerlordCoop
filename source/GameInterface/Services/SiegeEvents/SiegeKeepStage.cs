@@ -83,8 +83,7 @@ public sealed class SiegeKeepStage : ISiegeKeepStage
     public bool TryOpen(MapEvent mapEvent)
     {
         var settlement = mapEvent.MapEventSettlement;
-        if (!mapEvent.CanFallBackToKeep() || mapEvent.IsFinalized || mapEvent.BattleState != BattleState.None ||
-            settlement.SiegeEvent == null)
+        if (!mapEvent.IsRunningSiegeAssault() || !mapEvent.CanFallBackToKeep() || settlement.SiegeEvent == null)
             return false;
 
         var candidates = GetAttackingPlayers(mapEvent);
@@ -196,14 +195,27 @@ public sealed class SiegeKeepStage : ISiegeKeepStage
 
     public void Forget(MapEvent mapEvent) => selection.Forget(mapEvent);
 
-    // Gives a player who never answered vanilla's suggested squad, then fixes the roster.
+    // A throw while locking would come back every tick, so the stage closes instead and a later Attack reopens it.
     private void Lock(MapEvent mapEvent)
+    {
+        try
+        {
+            LockRoster(mapEvent);
+        }
+        catch (Exception exception)
+        {
+            Logger.Error(exception, "Unable to lock the keep roster for {MapEventId}", mapEvent.StringId);
+            selection.Forget(mapEvent);
+            SendPhase(mapEvent, SiegeKeepPhase.Closed);
+        }
+    }
+
+    // Gives a player who never answered vanilla's suggested squad, then fixes the roster.
+    private void LockRoster(MapEvent mapEvent)
     {
         foreach (var seat in selection.GetSeats(mapEvent))
         {
-            if (!IsConnected(seat.ControllerId) ||
-                !objectManager.TryGetObject<MobileParty>(seat.MobilePartyId, out var party) ||
-                !ReferenceEquals(party.MapEvent, mapEvent))
+            if (!IsConnected(seat.ControllerId) || !TryGetPartyInBattle(seat.MobilePartyId, mapEvent, out var party))
             {
                 selection.RemoveSeat(mapEvent, seat.MobilePartyId);
                 continue;
@@ -245,13 +257,19 @@ public sealed class SiegeKeepStage : ISiegeKeepStage
         return MobilePartyHelper.GetStrongestAndPriorTroops(roster, seat.EscortAllowance, includePlayer: false);
     }
 
-    public int SecondsRemaining(MapEvent mapEvent) =>
-        selection.TryGetDeadline(mapEvent, out var deadline)
-            ? Math.Max(0, (int)Math.Ceiling((deadline - utcNow()).TotalSeconds))
-            : 0;
+    public int SecondsRemaining(MapEvent mapEvent)
+    {
+        if (!selection.TryGetDeadline(mapEvent, out var deadline)) return 0;
+        var left = deadline - utcNow();
+        return Math.Max(0, (int)Math.Ceiling(left.TotalSeconds));
+    }
 
     private bool IsConnected(string controllerId) =>
         playerManager.TryGetPlayer(controllerId, out var player) && playerManager.IsConnected(player);
+
+    // The player's party, while it still fights in this map event.
+    private bool TryGetPartyInBattle(string mobilePartyId, MapEvent mapEvent, out MobileParty party) =>
+        objectManager.TryGetObject(mobilePartyId, out party) && ReferenceEquals(party.MapEvent, mapEvent);
 
     // Every player in the map event hears where the keep stands, seated or not.
     private void SendPhase(MapEvent mapEvent, SiegeKeepPhase phase)
@@ -262,8 +280,7 @@ public sealed class SiegeKeepStage : ISiegeKeepStage
         foreach (var player in playerManager.Players)
         {
             if (!playerManager.TryGetPeer(player.ControllerId, out var peer) ||
-                !objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party) ||
-                !ReferenceEquals(party.MapEvent, mapEvent))
+                !TryGetPartyInBattle(player.MobilePartyId, mapEvent, out _))
                 continue;
 
             var isSeated = selection.TryGetSeat(mapEvent, player.MobilePartyId, out var seat);

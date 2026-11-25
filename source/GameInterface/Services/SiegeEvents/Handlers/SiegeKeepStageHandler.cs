@@ -124,8 +124,7 @@ internal sealed class SiegeKeepStageHandler : IHandler
             !objectManager.TryGetObject<MapEvent>(request.MapEventId, out var mapEvent))
             return Reject(request, "This siege assault is no longer open.");
 
-        bool assaultOpen = mapEvent.IsSiegeAssault && !mapEvent.IsFinalized &&
-            mapEvent.BattleState == BattleState.None && ReferenceEquals(party.MapEvent, mapEvent);
+        bool assaultOpen = mapEvent.IsRunningSiegeAssault() && ReferenceEquals(party.MapEvent, mapEvent);
         if (!assaultOpen) return Reject(request, "This siege assault is no longer open.");
 
         if (!stage.IsOpen(mapEvent))

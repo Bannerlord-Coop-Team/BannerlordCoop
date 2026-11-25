@@ -696,7 +696,7 @@ internal class BattleMissionStartHandler : IHandler
             string sceneLevels = Campaign.Current.Models.LocationModel.GetUpgradeLevelTag(payload.WallLevel) + " siege";
             if (payload.IsLordsHall)
             {
-                locationId = "lordshall";
+                locationId = Extensions.MapEventExtensions.LordsHallLocationId;
                 sceneLevels = "siege";
             }
 

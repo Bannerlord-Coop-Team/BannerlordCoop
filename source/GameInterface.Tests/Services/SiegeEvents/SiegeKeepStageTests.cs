@@ -6,6 +6,7 @@ using GameInterface.Services.Players;
 using GameInterface.Services.SiegeEvents;
 using Moq;
 using System;
+using System.Collections.Generic;
 using TaleWorlds.CampaignSystem.MapEvents;
 using Xunit;
 
@@ -44,5 +45,31 @@ public class SiegeKeepStageTests
         now = deadline;
         stage.Tick();
         selection.Verify(store => store.Forget(mapEvent), Times.Once);
+    }
+
+    // A lock that throws closes the stage once, instead of throwing again on every tick after it.
+    [Fact]
+    public void Tick_ClosesAStageWhoseLockThrows()
+    {
+        var mapEvent = ObjectHelper.SkipConstructor<MapEvent>();
+        var deadline = new DateTime(2026, 11, 25, 12, 0, 0, DateTimeKind.Utc);
+        var open = new List<MapEvent> { mapEvent };
+        var seat = new SiegeKeepSeat("player", "party", "hero", 2);
+        var selection = new Mock<ISiegeKeepTroopSelection>();
+        selection.Setup(store => store.GetOpenMapEvents()).Returns(() => open.ToArray());
+        selection.Setup(store => store.GetSeats(mapEvent)).Returns(new[] { seat });
+        selection.Setup(store => store.TryGetDeadline(mapEvent, out deadline)).Returns(true);
+        selection.Setup(store => store.Forget(mapEvent)).Callback(() => open.Remove(mapEvent));
+        var reserves = new Mock<IBattleTroopReserveBuilder>();
+        reserves.Setup(builder => builder.ForgetMapEvent(mapEvent, true)).Throws(new InvalidOperationException("reserves failed"));
+        var stage = new SiegeKeepStage(Mock.Of<INetwork>(), Mock.Of<IObjectManager>(), Mock.Of<IPlayerManager>(),
+            selection.Object, reserves.Object, Mock.Of<ITroopSelectionEntries>(), () => deadline);
+
+        stage.Tick();
+        stage.Tick();
+
+        reserves.Verify(builder => builder.ForgetMapEvent(mapEvent, true), Times.Once);
+        selection.Verify(store => store.Forget(mapEvent), Times.Once);
+        selection.Verify(store => store.Lock(mapEvent), Times.Never);
     }
 }

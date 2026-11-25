@@ -1,9 +1,9 @@
 ﻿using Common.Commands;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Utils.Commands;
 using System.Linq;
-using TaleWorlds.Core;
 
 namespace GameInterface.Services.SiegeEvents.Commands;
 
@@ -39,7 +39,7 @@ internal static class SiegeKeepCommands
             if (!resolver.TryResolveSettlement(args[0], out var settlement, out var error)) return Failed(error);
 
             var mapEvent = settlement.Party.MapEvent;
-            if (mapEvent?.IsSiegeAssault != true || mapEvent.IsFinalized || mapEvent.BattleState != BattleState.None)
+            if (mapEvent?.IsRunningSiegeAssault() != true)
                 return Failed($"{settlement.Name} has no running siege assault.");
             if (!objectManager.TryGetId(mapEvent, out var mapEventId)) return Failed("The siege assault is not registered.");
             if (ServerBattleModeArbiter.IsClaimed(mapEventId))
