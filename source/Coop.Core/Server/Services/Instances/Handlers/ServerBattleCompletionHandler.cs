@@ -611,10 +611,11 @@ public class ServerBattleCompletionHandler : IHandler
             memberCount, concludedState, instanceId, hostEpoch);
         if (concludedState == BattleState.DefenderPullBack)
         {
-            if (objectManager.TryGetObject<MapEvent>(instanceId, out var mapEvent) && mapEvent.IsSiegeWallsStage())
-                messageBroker.Publish(this, new AuthoritativeSiegeKeepRequested(instanceId, hostEpoch));
-            else
+            // Branch on what can't change between attempts: a retried keep has already moved the siege into the hall.
+            if (objectManager.TryGetObject<MapEvent>(instanceId, out var mapEvent) && mapEvent.IsSiegeAmbush)
                 messageBroker.Publish(this, new AuthoritativeSiegeAmbushCompletionRequested(instanceId));
+            else
+                messageBroker.Publish(this, new AuthoritativeSiegeKeepRequested(instanceId, hostEpoch));
             return;
         }
 

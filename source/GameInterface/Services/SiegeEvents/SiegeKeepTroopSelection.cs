@@ -28,13 +28,20 @@ public readonly struct SiegeKeepSeat
     }
 }
 
-public interface ISiegeKeepTroopSelection : IGameAbstraction
+/// <summary>What the battle path reads of the keep roster; its writes go through <see cref="ISiegeKeepStage"/>.</summary>
+public interface ISiegeKeepRoster
+{
+    bool IsLocked(MapEvent mapEvent);
+    bool IsAdmitted(MapEvent mapEvent, MobileParty party);
+    void FilterReserve(MapEvent mapEvent, MapEventParty party, List<TroopReserveEntry> entries);
+}
+
+public interface ISiegeKeepTroopSelection : IGameAbstraction, ISiegeKeepRoster
 {
     /// <summary>Opens the keep stage with its seated players and the defender troops vanilla puts in the hall.</summary>
     void Open(MapEvent mapEvent, IReadOnlyList<SiegeKeepSeat> seats, IReadOnlyDictionary<string, int> defenderBudget,
         DateTime deadlineUtc);
     bool IsOpen(MapEvent mapEvent);
-    bool IsLocked(MapEvent mapEvent);
     bool TryGetDeadline(MapEvent mapEvent, out DateTime deadlineUtc);
     IReadOnlyList<SiegeKeepSeat> GetSeats(MapEvent mapEvent);
     bool TryGetSeat(MapEvent mapEvent, string mobilePartyId, out SiegeKeepSeat seat);
@@ -46,8 +53,6 @@ public interface ISiegeKeepTroopSelection : IGameAbstraction
     bool HaveAllAnswered(MapEvent mapEvent);
     /// <summary>Fixes the roster and splits the defender troops between the defending parties in the map event.</summary>
     void Lock(MapEvent mapEvent);
-    bool IsAdmitted(MapEvent mapEvent, MobileParty party);
-    void FilterReserve(MapEvent mapEvent, MapEventParty party, List<TroopReserveEntry> entries);
     IReadOnlyList<MapEvent> GetOpenMapEvents();
     void Forget(MapEvent mapEvent);
 }
@@ -223,9 +228,11 @@ public sealed class SiegeKeepTroopSelection : ISiegeKeepTroopSelection
     private IEnumerable<HideoutTroopSelectionEntry> GetChosenTroops(Attempt attempt, PartyBase party)
     {
         if (party.Side == BattleSideEnum.Defender)
-            return attempt.DefenderAllocations.TryGetValue(party, out var allocation)
-                ? allocation.Select(pair => new HideoutTroopSelectionEntry(pair.Key, pair.Value))
-                : Array.Empty<HideoutTroopSelectionEntry>();
+        {
+            if (!attempt.DefenderAllocations.TryGetValue(party, out var allocation))
+                return Array.Empty<HideoutTroopSelectionEntry>();
+            return allocation.Select(pair => new HideoutTroopSelectionEntry(pair.Key, pair.Value));
+        }
 
         if (party.MobileParty == null || !objectManager.TryGetId(party.MobileParty, out var partyId) ||
             !attempt.Selections.TryGetValue(partyId, out var selection))
@@ -264,8 +271,7 @@ public sealed class SiegeKeepTroopSelection : ISiegeKeepTroopSelection
                 if (!remaining.TryGetValue(characterId, out var left) || left <= 0) continue;
                 var take = Math.Min(left, healthy);
                 if (take <= 0) continue;
-                allocation.TryGetValue(characterId, out var already);
-                allocation[characterId] = already + take;
+                allocation[characterId] = take;
                 remaining[characterId] = left - take;
             }
             allocations.Add(allocation);

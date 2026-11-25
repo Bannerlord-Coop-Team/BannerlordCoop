@@ -62,7 +62,7 @@ internal class BattleMissionStartHandler : IHandler
     private readonly IBattleTroopReserveBuilder reserveBuilder;
     private readonly IBattleHostRetentionPolicy retentionPolicy;
     private readonly HideoutRaidHandler hideoutRaids;
-    private readonly ISiegeKeepTroopSelection keepSelection;
+    private readonly ISiegeKeepRoster keepSelection;
     private static long attackMissionStartSequence;
 
     // Server-side: the complete mission initializer chosen once per map event and reused for late entrants.
@@ -84,7 +84,7 @@ internal class BattleMissionStartHandler : IHandler
         IBattleTroopReserveBuilder reserveBuilder,
         IBattleHostRetentionPolicy retentionPolicy,
         HideoutRaidHandler hideoutRaids = null,
-        ISiegeKeepTroopSelection keepSelection = null)
+        ISiegeKeepRoster keepSelection = null)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -715,9 +715,6 @@ internal class BattleMissionStartHandler : IHandler
                 DecalAtlasGroup = 3,
             };
 
-            var attackerWeapons = SiegeEngineStateConverter.ToMissionWeapons(payload.AttackerEngines);
-            var defenderWeapons = SiegeEngineStateConverter.ToMissionWeapons(payload.DefenderEngines);
-
             if (BattleSpawnConfig.Enabled)
             {
                 BattleSpawnGate.BeginBattle(payload.MapEventId);
@@ -731,10 +728,16 @@ internal class BattleMissionStartHandler : IHandler
             {
                 Mission mission;
                 if (payload.IsLordsHall)
+                {
                     mission = siegeLauncher.OpenCoopLordsHallBattle(rec);
+                }
                 else
+                {
+                    var attackerWeapons = SiegeEngineStateConverter.ToMissionWeapons(payload.AttackerEngines);
+                    var defenderWeapons = SiegeEngineStateConverter.ToMissionWeapons(payload.DefenderEngines);
                     mission = siegeLauncher.OpenCoopSiegeBattle(rec, payload.WallHitPointRatios,
                         attackerWeapons, defenderWeapons, payload.IsSallyOut);
+                }
                 if (mission != null)
                     spawnGateEngaged = false; // the attached mission lifecycle owns EndBattle from here
                 else

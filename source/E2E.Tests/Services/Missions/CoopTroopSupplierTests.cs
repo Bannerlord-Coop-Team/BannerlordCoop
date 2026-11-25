@@ -643,4 +643,21 @@ public class CoopTroopSupplierTests
         Assert.Equal(7, generationThree.SuppliedTroops);
         Assert.Equal(13, generationThree.OwnedShareOf(50));
     }
+
+    // A mission that spawns its first wave once (a hideout ambush, the siege keep) waits for both reserves, and the host
+    // also for the expanded defender reserve a promoted host receives after its assignment.
+    [Fact]
+    public void ReservesReady_WaitsForThePromotedHostsExpandedDefenderReserve()
+    {
+        var attacker = new CoopTroopSupplier("raid", BattleSideEnum.Attacker, null, null);
+        var defender = new CoopTroopSupplier("raid", BattleSideEnum.Defender, null, null);
+        attacker.SetReserve(System.Array.Empty<PartyReserve>(), 1, 1, 1000);
+        Assert.False(CoopTroopSupplier.ReservesReady(true, attacker, defender));
+        defender.SetReserve(System.Array.Empty<PartyReserve>(), 25, 0, 1000);
+        Assert.True(CoopTroopSupplier.ReservesReady(false, attacker, defender));
+        Assert.False(CoopTroopSupplier.ReservesReady(true, attacker, defender));
+        defender.SetReserve(new[] { new PartyReserve("defenders", 0,
+            Enumerable.Range(1, 25).Select(seed => new TroopReserveEntry(seed, "guard", 0)).ToArray()) }, 25, 0, 1000);
+        Assert.True(CoopTroopSupplier.ReservesReady(true, attacker, defender));
+    }
 }

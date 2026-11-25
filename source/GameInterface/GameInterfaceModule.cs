@@ -189,6 +189,9 @@ public class GameInterfaceModule : Module
         builder.RegisterType<PlayerManager>().As<IPlayerManager>().SingleInstance();
         builder.RegisterType<HideoutPreparation>().As<IHideoutPreparation>().InstancePerDependency();
         builder.RegisterType<TroopSelectionRules>().As<ITroopSelectionRules>().InstancePerDependency();
+        builder.RegisterType<TroopSelectionEntries>().As<ITroopSelectionEntries>().InstancePerDependency();
+        // The battle path only reads the keep roster; its writes go through ISiegeKeepStage.
+        builder.Register<ISiegeKeepRoster>(context => context.Resolve<ISiegeKeepTroopSelection>());
         builder.RegisterType<PartyConfigurationService>().As<IPartyConfigurationService>().InstancePerDependency();
         builder.RegisterType<BugReportService>().As<IBugReportService>().SingleInstance().AutoActivate();
         builder.RegisterType<BugReportOverlay>().As<IBugReportOverlay>().SingleInstance();

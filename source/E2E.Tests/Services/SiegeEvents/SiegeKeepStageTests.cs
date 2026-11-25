@@ -15,8 +15,10 @@ using GameInterface.Services.Players.Data;
 using GameInterface.Services.SiegeEvents;
 using GameInterface.Services.SiegeEvents.Messages;
 using HarmonyLib;
+using Moq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.ComponentInterfaces;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -146,12 +148,147 @@ public class SiegeKeepStageTests : MapEventTestBase
         StartKeepMission(keep, expectedStarts: 1);
     }
 
+    // A seated player who leaves while the others choose gives up the seat, and the keep starts for those still here.
+    [Fact]
+    public void SeatedPlayerLeavingWhileChoosing_StartsTheKeepForThePlayersStillHere()
+    {
+        var keep = OpenKeepStage(TimeSpan.FromSeconds(90), DefenderTroops);
+        var clients = Clients.ToArray();
+
+        Server.Call(() =>
+        {
+            Server.Resolve<IPlayerManager>().ClearPeer(clients[1].NetPeer);
+            Server.Resolve<IMessageBroker>().Publish(this, new CampaignTick());
+        }, keep.DisabledMethods);
+
+        Server.SimulateMessage(clients[0].NetPeer, new NetworkSiegeKeepEntryRequest("leader-after-leave",
+            keep.Battle.MapEventId, false, new[] { new HideoutTroopSelectionEntry(keep.LeaderCharacterId, 1) }));
+        Assert.True(Reply("leader-after-leave").IsLocked);
+        Assert.Equal(1, LockedSeats());
+        StartKeepMission(keep, expectedStarts: 1);
+    }
+
+    // When the only seated player leaves, nobody is left to lead the keep and the players still watching hear it closed.
+    [Fact]
+    public void LastSeatedPlayerLeaving_ClosesTheStage()
+    {
+        var keep = OpenKeepStage(TimeSpan.FromSeconds(90), defenders: 1);
+        var clients = Clients.ToArray();
+
+        Server.Call(() =>
+        {
+            Server.Resolve<IPlayerManager>().ClearPeer(clients[0].NetPeer);
+            Server.Resolve<IMessageBroker>().Publish(this, new CampaignTick());
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(keep.Battle.MapEventId, out var mapEvent));
+            Assert.False(Server.Resolve<ISiegeKeepStage>().IsOpen(mapEvent));
+        }, keep.DisabledMethods);
+
+        var closed = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkSiegeKeepPhaseChanged>(),
+            message => message.Phase == SiegeKeepPhase.Closed);
+        Assert.False(closed.IsSeated);
+    }
+
+    // A later assault on a siege already in the hall has no walls mission to report a pull-back, so Attack opens the keep.
+    [Fact]
+    public void AttackQueryInTheHall_OpensTheKeepStage()
+    {
+        var keep = OpenKeepStage(TimeSpan.FromSeconds(90), DefenderTroops, openStage: false);
+        var clients = Clients.ToArray();
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(keep.SettlementId, out var settlement));
+            settlement.CurrentSiegeState = Settlement.SiegeState.InTheLordsHall;
+        }, keep.DisabledMethods);
+
+        Server.SimulateMessage(clients[0].NetPeer, new NetworkSiegeKeepEntryRequest("hall-query", keep.Battle.MapEventId,
+            true, Array.Empty<HideoutTroopSelectionEntry>()));
+
+        var reply = Reply("hall-query");
+        Assert.True(reply.Accepted, reply.Reason);
+        Assert.Equal(LeaderEscorts, reply.EscortAllowance);
+        Assert.Equal(2, Server.NetworkSentMessages.GetMessages<NetworkSiegeKeepPhaseChanged>()
+            .Count(message => message.Phase == SiegeKeepPhase.Choosing));
+    }
+
+    // A keep that throws while opening ends the walls once, instead of retrying into the same throw.
+    [Fact]
+    public void HallModelThatThrows_ConcludesTheWallsOnce()
+    {
+        var conclusions = new List<AuthoritativeBattleConclusionRequested>();
+        var processed = new List<BattleStateChangeProcessed>();
+        Server.Call(() =>
+        {
+            var broker = Server.Resolve<IMessageBroker>();
+            broker.Subscribe<AuthoritativeBattleConclusionRequested>(payload => conclusions.Add(payload.What));
+            broker.Subscribe<BattleStateChangeProcessed>(payload => processed.Add(payload.What));
+        });
+        var keep = OpenKeepStage(TimeSpan.FromSeconds(90), DefenderTroops, openStage: false);
+
+        Server.Call(() =>
+        {
+            var brokenModel = new Mock<SiegeLordsHallFightModel>();
+            brokenModel.Setup(model => model.GetPriorityListForLordsHallFightMission(
+                    It.IsAny<MapEvent>(), It.IsAny<BattleSideEnum>(), It.IsAny<int>()))
+                .Throws(new InvalidOperationException("hall model failed"));
+            var models = Campaign.Current.Models.GetGameModels()
+                .Where(model => model is not SiegeLordsHallFightModel)
+                .Append(brokenModel.Object)
+                .ToList();
+            Campaign.Current._gameModels = new GameModels(models);
+            Server.Resolve<IMessageBroker>().Publish(this,
+                new AuthoritativeSiegeKeepRequested(keep.Battle.MapEventId, 1));
+        }, keep.DisabledMethods);
+
+        Assert.Equal(BattleState.AttackerVictory, Assert.Single(conclusions).BattleState);
+        Assert.DoesNotContain(processed, message => message.BattleState == BattleState.DefenderPullBack);
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkSiegeKeepPhaseChanged>());
+    }
+
+    // The client side of the stage: choosing clears the walls' local pull-back, and a seated lock asks for the keep.
+    [Fact]
+    public void ClientPhaseChanges_ResetTheWallsResultAndRequestTheKeepMission()
+    {
+        var keep = OpenKeepStage(TimeSpan.FromSeconds(90), DefenderTroops);
+        var client = Clients.First();
+        MobileParty previousMainParty = null!;
+        client.Call(() =>
+        {
+            previousMainParty = Campaign.Current.MainParty;
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(keep.Battle.AttackerPartyId, out var party));
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(keep.Battle.MapEventId, out var mapEvent));
+            Assert.Same(mapEvent, party.MapEvent);
+            Campaign.Current.MainParty = party;
+            mapEvent._battleState = BattleState.DefenderPullBack;
+        });
+
+        try
+        {
+            client.SimulateMessage(this, new NetworkSiegeKeepPhaseChanged(keep.Battle.MapEventId,
+                SiegeKeepPhase.Choosing, true, LeaderEscorts, 90));
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<MapEvent>(keep.Battle.MapEventId, out var mapEvent));
+                Assert.Equal(BattleState.None, mapEvent.BattleState);
+            });
+
+            client.SimulateMessage(this, new NetworkSiegeKeepPhaseChanged(keep.Battle.MapEventId,
+                SiegeKeepPhase.Locked, true, LeaderEscorts, 0));
+            var start = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkBattleStartRequest>());
+            Assert.Equal(keep.Battle.MapEventId, start.MapEventId);
+            Assert.Equal((int)BattleStartMode.Mission, start.Mode);
+        }
+        finally
+        {
+            client.Call(() => Campaign.Current.MainParty = previousMainParty);
+        }
+    }
+
     private sealed record KeepStage(MapEventContext Battle, string SettlementId, string EscortId,
         string LeaderCharacterId, string JoinerCharacterId, List<MethodBase> DisabledMethods);
 
     // Two attacking players at a besieged town whose walls just fell back, with the keep stage opened by the server.
     private KeepStage OpenKeepStage(TimeSpan selectionWindow, int defenders, bool startWallsFirst = false,
-        bool woundHeroes = false)
+        bool woundHeroes = false, bool openStage = true)
     {
         var battle = CreateServerMapEvent();
         var leaderHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
@@ -202,7 +339,8 @@ public class SiegeKeepStageTests : MapEventTestBase
         Server.Call(() =>
         {
             ((SiegeKeepStage)Server.Resolve<ISiegeKeepStage>()).SelectionWindow = selectionWindow;
-            Server.Resolve<IMessageBroker>().Publish(this, new AuthoritativeSiegeKeepRequested(battle.MapEventId, 1));
+            if (openStage)
+                Server.Resolve<IMessageBroker>().Publish(this, new AuthoritativeSiegeKeepRequested(battle.MapEventId, 1));
         }, disabledMethods);
         return keep;
     }

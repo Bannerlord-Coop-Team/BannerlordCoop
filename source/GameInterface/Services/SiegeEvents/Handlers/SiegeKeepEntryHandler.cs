@@ -36,18 +36,18 @@ internal sealed class SiegeKeepEntryHandler : IHandler
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly INetworkConfig configuration;
-    private readonly ITroopSelectionRules selectionRules;
+    private readonly ITroopSelectionEntries selectionEntries;
     private readonly BattleStartCoordinator battleStarts;
     private readonly ConcurrentDictionary<string, PendingEntry> pendingEntries = new();
 
     public SiegeKeepEntryHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager,
-        INetworkConfig configuration, ITroopSelectionRules selectionRules, BattleStartCoordinator battleStarts)
+        INetworkConfig configuration, ITroopSelectionEntries selectionEntries, BattleStartCoordinator battleStarts)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.configuration = configuration;
-        this.selectionRules = selectionRules;
+        this.selectionEntries = selectionEntries;
         this.battleStarts = battleStarts;
         messageBroker.Subscribe<NetworkSiegeKeepEntryReply>(Handle_EntryReply);
         messageBroker.Subscribe<NetworkSiegeKeepPhaseChanged>(Handle_PhaseChanged);
@@ -65,7 +65,7 @@ internal sealed class SiegeKeepEntryHandler : IHandler
         var battle = PlayerEncounter.Battle ?? MobileParty.MainParty?.MapEvent;
         if (battle == null || !objectManager.TryGetIdWithLogging(battle, out var mapEventId)) return;
         Logger.Information("Attack on the keep of {MapEventId}: asking the server for this player's place", mapEventId);
-        if (!RequestBlocking(mapEventId, true, Array.Empty<HideoutTroopSelectionEntry>(), out var reply)) return;
+        if (!RequestBlocking(mapEventId, queryOnly: true, Array.Empty<HideoutTroopSelectionEntry>(), out var reply)) return;
 
         if (reply.IsLocked)
         {
@@ -75,7 +75,7 @@ internal sealed class SiegeKeepEntryHandler : IHandler
 
         if (reply.EscortAllowance == 0)
         {
-            SubmitSelection(mapEventId, selectionRules.CreateHeroOnlyRoster(Hero.MainHero));
+            SubmitSelection(mapEventId, selectionEntries.CreateHeroOnlyRoster(Hero.MainHero));
             return;
         }
 
@@ -89,8 +89,8 @@ internal sealed class SiegeKeepEntryHandler : IHandler
 
     private void SubmitSelection(string mapEventId, TroopRoster selected)
     {
-        if (selected == null || !selectionRules.TryCreateEntries(selected, out var troops)) return;
-        if (!RequestBlocking(mapEventId, false, troops, out var reply)) return;
+        if (selected == null || !selectionEntries.TryCreateEntries(selected, out var troops)) return;
+        if (!RequestBlocking(mapEventId, queryOnly: false, troops, out var reply)) return;
         if (!reply.IsLocked)
             ShowMessage("Your keep troops are ready. Waiting for the other players.");
     }
@@ -133,9 +133,8 @@ internal sealed class SiegeKeepEntryHandler : IHandler
         var message = payload.What;
         GameThread.RunSafe(() =>
         {
-            if (!objectManager.TryGetObject<MapEvent>(message.MapEventId, out var mapEvent) ||
-                !ReferenceEquals(MobileParty.MainParty?.MapEvent, mapEvent))
-                return;
+            if (!objectManager.TryGetObjectWithLogging<MapEvent>(message.MapEventId, out var mapEvent)) return;
+            if (!ReferenceEquals(MobileParty.MainParty?.MapEvent, mapEvent)) return;
 
             Logger.Information("Keep stage {Phase} for {MapEventId}: seated={Seated} escorts={Escorts}",
                 message.Phase, message.MapEventId, message.IsSeated, message.EscortAllowance);

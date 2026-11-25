@@ -59,8 +59,7 @@ public class BattleResultCommitter : IBattleResultCommitter
             return;
         }
 
-        // The walls' fall back to the keep is neither a win nor a loss, but it still ends the walls mission.
-        if (!result.BattleResolved && result.BattleState != BattleState.DefenderPullBack)
+        if (!EndsMission(result))
         {
             return;
         }
@@ -131,6 +130,13 @@ public class BattleResultCommitter : IBattleResultCommitter
 
         return IsSupportedResultState(battleState);
     }
+
+    /// <summary>
+    /// Whether the result ends the mission: a win or a loss, or the walls' fall back to the keep, which is neither but
+    /// still ends the walls.
+    /// </summary>
+    internal static bool EndsMission(MissionResult result)
+        => result.BattleResolved || result.BattleState == BattleState.DefenderPullBack;
 
     internal static bool IsSupportedResultState(BattleState battleState)
         => battleState == BattleState.AttackerVictory

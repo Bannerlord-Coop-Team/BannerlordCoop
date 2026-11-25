@@ -8,6 +8,7 @@ using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.SiegeEvents.Messages;
@@ -15,6 +16,7 @@ using LiteNetLib;
 using Missions.Messages;
 using Moq;
 using System;
+using System.Linq;
 using System.Net;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -92,7 +94,28 @@ public class ServerBattleCompletionHandlerSiegeKeepTests : IDisposable
         Assert.True(missionManager.TryEnterMission(CreatePeer(52201), "keep-player", MapEventId, out _));
     }
 
-    private void GiveTheMapEventSiegeAssaultWalls()
+    // The first keep attempt already moved the siege into the hall, so a retry has to ask for the keep again
+    // instead of reading the hall as a different kind of pull-back.
+    [Fact]
+    public void KeepThatDidNotApply_RetriesTheKeepAfterTheSiegeMovedIntoTheHall()
+    {
+        var settlement = GiveTheMapEventSiegeAssaultWalls();
+        Assert.True(missionManager.TryEnterMission(peer, HostControllerId, MapEventId, out _));
+        handler.ConclusionRetryDelay = TimeSpan.Zero;
+
+        broker.Publish(peer, new NetworkBattleResultReady(MapEventId, BattleState.DefenderPullBack, 1));
+        Drain();
+        settlement.CurrentSiegeState = Settlement.SiegeState.InTheLordsHall;
+        broker.Publish(this, new BattleStateChangeProcessed(MapEventId, BattleState.DefenderPullBack, false));
+        Drain();
+        broker.Publish(this, new CampaignTick());
+        Drain();
+
+        Assert.Equal(2, broker.Messages.GetMessages<AuthoritativeSiegeKeepRequested>().Count());
+        Assert.Empty(broker.Messages.GetMessages<AuthoritativeSiegeAmbushCompletionRequested>());
+    }
+
+    private Settlement GiveTheMapEventSiegeAssaultWalls()
     {
         var component = ObjectHelper.SkipConstructor<SiegeAssaultEventComponent>();
         component._eventType = MapEvent.BattleTypes.Siege;
@@ -102,6 +125,7 @@ public class ServerBattleCompletionHandlerSiegeKeepTests : IDisposable
         Assert.True(mapEvent.IsSiegeAssault);
         Assert.Equal(Settlement.SiegeState.OnTheWalls, mapEvent.MapEventSettlement.CurrentSiegeState);
         objectManager.Setup(manager => manager.TryGetObject(MapEventId, out mapEvent)).Returns(true);
+        return component.MapEventSettlement;
     }
 
     private static NetPeer CreatePeer(int port) => (NetPeer)PeerConstructor.Invoke(new object[]

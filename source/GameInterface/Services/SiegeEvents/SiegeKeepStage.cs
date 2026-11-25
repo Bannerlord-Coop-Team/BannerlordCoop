@@ -15,6 +15,7 @@ using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 
@@ -51,18 +52,31 @@ public sealed class SiegeKeepStage : ISiegeKeepStage
     private readonly IPlayerManager playerManager;
     private readonly ISiegeKeepTroopSelection selection;
     private readonly IBattleTroopReserveBuilder reserveBuilder;
+    private readonly ITroopSelectionEntries selectionEntries;
+    private readonly Func<DateTime> utcNow;
 
     /// <summary>The same 90 s the hideout assault waits for its leader, so a player who never answers can't stall the keep.</summary>
     internal TimeSpan SelectionWindow { get; set; } = TimeSpan.FromSeconds(90);
 
     public SiegeKeepStage(INetwork network, IObjectManager objectManager, IPlayerManager playerManager,
-        ISiegeKeepTroopSelection selection, IBattleTroopReserveBuilder reserveBuilder)
+        ISiegeKeepTroopSelection selection, IBattleTroopReserveBuilder reserveBuilder,
+        ITroopSelectionEntries selectionEntries)
+        : this(network, objectManager, playerManager, selection, reserveBuilder, selectionEntries,
+            () => DateTime.UtcNow)
+    {
+    }
+
+    internal SiegeKeepStage(INetwork network, IObjectManager objectManager, IPlayerManager playerManager,
+        ISiegeKeepTroopSelection selection, IBattleTroopReserveBuilder reserveBuilder,
+        ITroopSelectionEntries selectionEntries, Func<DateTime> utcNow)
     {
         this.network = network;
         this.objectManager = objectManager;
         this.playerManager = playerManager;
         this.selection = selection;
         this.reserveBuilder = reserveBuilder;
+        this.selectionEntries = selectionEntries;
+        this.utcNow = utcNow;
     }
 
     public bool TryOpen(MapEvent mapEvent)
@@ -96,7 +110,7 @@ public sealed class SiegeKeepStage : ISiegeKeepStage
             candidate.Player.ControllerId, candidate.Player.MobilePartyId, candidate.Player.CharacterObjectId,
             shares[index])).ToList();
 
-        selection.Open(mapEvent, seats, defenderBudget, DateTime.UtcNow + SelectionWindow);
+        selection.Open(mapEvent, seats, defenderBudget, utcNow() + SelectionWindow);
         settlement.CurrentSiegeState = Settlement.SiegeState.InTheLordsHall;
 
         Logger.Information("Opened keep stage for {Settlement}: {Defenders} defenders, {Seated} of {Players} players seated",
@@ -149,11 +163,13 @@ public sealed class SiegeKeepStage : ISiegeKeepStage
 
             // A player who left before the roster locked frees the wait for the others.
             foreach (var seat in selection.GetSeats(mapEvent))
+            {
                 if (!IsConnected(seat.ControllerId))
                     selection.RemoveSeat(mapEvent, seat.MobilePartyId);
+            }
 
-            if (selection.HaveAllAnswered(mapEvent) ||
-                (selection.TryGetDeadline(mapEvent, out var deadline) && DateTime.UtcNow >= deadline))
+            bool windowClosed = selection.TryGetDeadline(mapEvent, out var deadline) && utcNow() >= deadline;
+            if (selection.HaveAllAnswered(mapEvent) || windowClosed)
                 Lock(mapEvent);
         }
     }
@@ -174,7 +190,8 @@ public sealed class SiegeKeepStage : ISiegeKeepStage
             }
 
             if (selection.HasAnswered(mapEvent, seat.MobilePartyId)) continue;
-            if (!selection.TrySelect(mapEvent, party, SuggestSquad(party, seat)))
+            if (!selectionEntries.TryCreateEntries(SuggestSquad(party, seat), out var squad) ||
+                !selection.TrySelect(mapEvent, party, squad))
                 selection.RemoveSeat(mapEvent, seat.MobilePartyId);
         }
 
@@ -195,22 +212,17 @@ public sealed class SiegeKeepStage : ISiegeKeepStage
     }
 
     // The strongest healthy troops, companions first, as vanilla's hall picker suggests them.
-    private HideoutTroopSelectionEntry[] SuggestSquad(MobileParty party, SiegeKeepSeat seat)
+    private TroopRoster SuggestSquad(MobileParty party, SiegeKeepSeat seat)
     {
         var roster = party.MemberRoster.ToFlattenedRoster();
         roster.RemoveIf(element => element.IsWounded ||
             (objectManager.TryGetId(element.Troop, out var characterId) && characterId == seat.HeroCharacterId));
-        var squad = MobilePartyHelper.GetStrongestAndPriorTroops(roster, seat.EscortAllowance, includePlayer: false);
-        var entries = new List<HideoutTroopSelectionEntry>();
-        foreach (var element in squad.GetTroopRoster())
-            if (element.Number > 0 && objectManager.TryGetIdWithLogging(element.Character, out var characterId))
-                entries.Add(new HideoutTroopSelectionEntry(characterId, element.Number));
-        return entries.ToArray();
+        return MobilePartyHelper.GetStrongestAndPriorTroops(roster, seat.EscortAllowance, includePlayer: false);
     }
 
     public int SecondsRemaining(MapEvent mapEvent) =>
         selection.TryGetDeadline(mapEvent, out var deadline)
-            ? Math.Max(0, (int)Math.Ceiling((deadline - DateTime.UtcNow).TotalSeconds))
+            ? Math.Max(0, (int)Math.Ceiling((deadline - utcNow()).TotalSeconds))
             : 0;
 
     private bool IsConnected(string controllerId) =>

@@ -41,7 +41,7 @@ internal sealed class HideoutRaidHandler : IHandler
     private readonly INetworkConfig configuration;
     private readonly IHideoutTroopSelection troopSelection;
     private readonly IHideoutPreparation preparation;
-    private readonly ITroopSelectionRules selectionRules;
+    private readonly ITroopSelectionEntries selectionEntries;
     private readonly HideoutCampaignConsequencesHandler consequences;
     private readonly Dictionary<MapEvent, HideoutRaidState> raids = new();
     private readonly ConcurrentDictionary<string, PendingEntry> pendingEntries = new();
@@ -49,7 +49,7 @@ internal sealed class HideoutRaidHandler : IHandler
     public HideoutRaidHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager,
         IPlayerManager playerManager, INetworkConfig configuration, IHideoutTroopSelection troopSelection,
         HideoutCampaignConsequencesHandler consequences, IHideoutPreparation preparation,
-        ITroopSelectionRules selectionRules)
+        ITroopSelectionEntries selectionEntries)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -59,7 +59,7 @@ internal sealed class HideoutRaidHandler : IHandler
         this.troopSelection = troopSelection;
         this.consequences = consequences;
         this.preparation = preparation;
-        this.selectionRules = selectionRules;
+        this.selectionEntries = selectionEntries;
         messageBroker.Subscribe<NetworkHideoutRaidEntryRequest>(HandleRequest);
         messageBroker.Subscribe<NetworkHideoutRaidEntryReply>(HandleReply);
         messageBroker.Subscribe<MapEventFinalized>(HandleFinalized);
@@ -105,7 +105,7 @@ internal sealed class HideoutRaidHandler : IHandler
         if (behavior == null) return;
         if (reply.IsAdmitted || (reply.IsJoining && reply.RemainingTroops == 0))
         {
-            StartRaid(behavior, selectionRules.CreateHeroOnlyRoster(Hero.MainHero), reply.IsDirectAssault);
+            StartRaid(behavior, selectionEntries.CreateHeroOnlyRoster(Hero.MainHero), reply.IsDirectAssault);
             return;
         }
 
@@ -120,7 +120,7 @@ internal sealed class HideoutRaidHandler : IHandler
 
     internal void StartRaid(HideoutCampaignBehavior behavior, TroopRoster selected, bool isDirectAssault)
     {
-        if (selected == null || !selectionRules.TryCreateEntries(selected, out var troops)) return;
+        if (selected == null || !selectionEntries.TryCreateEntries(selected, out var troops)) return;
 
         if (!RequestBlocking(Settlement.CurrentSettlement, isDirectAssault, false, troops, out var reply))
             return;

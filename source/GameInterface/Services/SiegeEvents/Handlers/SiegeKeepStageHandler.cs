@@ -60,33 +60,40 @@ internal sealed class SiegeKeepStageHandler : IHandler
         var request = payload.What;
         GameThread.RunSafe(() =>
         {
-            var concluded = false;
-            try
+            if (!objectManager.TryGetObjectWithLogging<MapEvent>(request.MapEventId, out var mapEvent))
             {
-                if (!objectManager.TryGetObjectWithLogging<MapEvent>(request.MapEventId, out var mapEvent)) return;
-
-                if (stage.TryOpen(mapEvent))
-                {
-                    concluded = true;
-                    messageBroker.Publish(this, new SiegeKeepStageOpened(request.MapEventId));
-                    return;
-                }
-
-                // Nobody can lead the keep, so the walls end the way an AI-led assault does.
-                Logger.Information("Keep stage for {MapEventId} has no attacking player to lead it; concluding the walls as an attacker victory",
-                    request.MapEventId);
-                concluded = true;
-                messageBroker.Publish(this, new AuthoritativeBattleConclusionRequested(
-                    request.MapEventId, BattleState.AttackerVictory, request.HostEpoch));
+                // Otherwise the walls conclusion waits out its whole deadline before it is cleaned up.
+                messageBroker.Publish(this, new BattleStateChangeProcessed(
+                    request.MapEventId, BattleState.DefenderPullBack, false));
+                return;
             }
-            finally
+
+            if (TryOpenStage(mapEvent))
             {
-                // Otherwise the walls conclusion waits out its whole deadline before it is tried again.
-                if (!concluded)
-                    messageBroker.Publish(this, new BattleStateChangeProcessed(
-                        request.MapEventId, BattleState.DefenderPullBack, false));
+                messageBroker.Publish(this, new SiegeKeepStageOpened(request.MapEventId));
+                return;
             }
+
+            // Nobody can lead the keep, so the walls end the way an AI-led assault does.
+            Logger.Information("Keep stage for {MapEventId} did not open; concluding the walls as an attacker victory",
+                request.MapEventId);
+            messageBroker.Publish(this, new AuthoritativeBattleConclusionRequested(
+                request.MapEventId, BattleState.AttackerVictory, request.HostEpoch));
         }, context: nameof(Handle_AuthoritativeSiegeKeepRequested));
+    }
+
+    // A keep that throws while opening ends the walls instead of retrying, otherwise the same throw comes back each retry.
+    private bool TryOpenStage(MapEvent mapEvent)
+    {
+        try
+        {
+            return stage.TryOpen(mapEvent);
+        }
+        catch (Exception exception)
+        {
+            Logger.Error(exception, "Unable to open the keep stage for {MapEventId}", mapEvent.StringId);
+            return false;
+        }
     }
 
     private void Handle_EntryRequest(MessagePayload<NetworkSiegeKeepEntryRequest> payload)

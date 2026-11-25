@@ -98,7 +98,7 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
     private readonly IObjectManager objectManager;
     private readonly IPlayerManager playerManager;
     private readonly IHideoutTroopSelection hideoutSelection;
-    private readonly ISiegeKeepTroopSelection keepSelection;
+    private readonly ISiegeKeepRoster keepSelection;
 
     // Parties already flattened into the ledger (by object-manager id). Per-PARTY, not per-map-event, so a
     // party that joins AFTER the battle started (a mid-battle joiner) gets flattened on demand the next time
@@ -112,7 +112,7 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
     private readonly object gate = new object();
 
     public BattleTroopReserveBuilder(IBattleTroopLedger ledger, IObjectManager objectManager, IPlayerManager playerManager,
-        IHideoutTroopSelection hideoutSelection = null, ISiegeKeepTroopSelection keepSelection = null)
+        IHideoutTroopSelection hideoutSelection = null, ISiegeKeepRoster keepSelection = null)
     {
         this.ledger = ledger;
         this.objectManager = objectManager;

@@ -444,8 +444,7 @@ public class CoopBattleController : CoopMissionController
         // The host counted the defenders falling back to the keep; this client ends the walls the same way.
         if (state == BattleState.DefenderPullBack && MapEvent.PlayerMapEvent?.IsSiegeAssault == true)
         {
-            battleEndLogic._enemyDefenderPullbackEnabled = true;
-            battleEndLogic._troopNumberNeededForEnemyDefenderPullBack = 0;
+            battleEndLogic.EnableEnemyDefenderPullBack(0);
             battleEndLogic._isEnemyDefenderPulledBack = true;
             return;
         }

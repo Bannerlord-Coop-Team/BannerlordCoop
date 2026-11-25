@@ -9,10 +9,7 @@ using TaleWorlds.CampaignSystem.Roster;
 
 namespace GameInterface.Services.MapEvents.TroopSupply;
 
-/// <summary>
-/// What a player may bring into a battle fought with chosen squads (hideouts and the siege keep), and how the troop
-/// picker's roster travels as entries.
-/// </summary>
+/// <summary>What a player may bring into a battle fought with chosen squads (hideouts and the siege keep).</summary>
 public interface ITroopSelectionRules
 {
     /// <summary>The healthy troops of the party by character id; the player's hero counts when wounded entry is on.</summary>
@@ -24,12 +21,6 @@ public interface ITroopSelectionRules
     /// </summary>
     bool TryAccept(IReadOnlyDictionary<string, int> healthy, string heroCharacterId, int escortLimit,
         IReadOnlyList<HideoutTroopSelectionEntry> requested, out HideoutTroopSelectionEntry[] accepted);
-
-    /// <summary>The picker's chosen roster as entries, false if a character isn't registered.</summary>
-    bool TryCreateEntries(TroopRoster selected, out HideoutTroopSelectionEntry[] entries);
-
-    /// <summary>A roster holding only the hero, for a player with no escort place.</summary>
-    TroopRoster CreateHeroOnlyRoster(Hero hero);
 
     /// <summary>Keeps only the chosen troops of a party's reserve, in the order they were chosen.</summary>
     void TrimReserve(List<TroopReserveEntry> entries, IEnumerable<HideoutTroopSelectionEntry> chosen);
@@ -93,28 +84,6 @@ public class TroopSelectionRules : ITroopSelectionRules
 
         accepted = selection.ToArray();
         return true;
-    }
-
-    public bool TryCreateEntries(TroopRoster selected, out HideoutTroopSelectionEntry[] entries)
-    {
-        entries = null;
-        var troops = new List<HideoutTroopSelectionEntry>();
-        foreach (var element in selected.GetTroopRoster())
-        {
-            if (element.Number <= 0) continue;
-            if (!objectManager.TryGetIdWithLogging(element.Character, out var characterId)) return false;
-            troops.Add(new HideoutTroopSelectionEntry(characterId, element.Number));
-        }
-
-        entries = troops.ToArray();
-        return true;
-    }
-
-    public TroopRoster CreateHeroOnlyRoster(Hero hero)
-    {
-        var heroOnly = TroopRoster.CreateDummyTroopRoster();
-        heroOnly.AddToCounts(hero.CharacterObject, 1);
-        return heroOnly;
     }
 
     public void TrimReserve(List<TroopReserveEntry> entries, IEnumerable<HideoutTroopSelectionEntry> chosen)
