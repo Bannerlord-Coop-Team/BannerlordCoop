@@ -33,7 +33,7 @@ public class HideoutRaidEntryTests : MapEventTestBase
     [InlineData(false, 39, 0, false, false)]
     [InlineData(false, 30, 9, false, false)]
     [InlineData(true, 14, 0, true, false)]
-    [InlineData(true, 14, 0, false, true)]
+    [InlineData(true, 14, 0, false, true)] // one bandit party, below the IsInfested minimum
     public void FirstRaidCreation_LeavesWaitingPlayerInsideAndAdmitsOnlyRemainingSharedTroops(
         bool isDirectAssault, int firstEscortCount, int joiningEscortCount, bool abortFirstCreation,
         bool singleBanditParty)
@@ -68,8 +68,8 @@ public class HideoutRaidEntryTests : MapEventTestBase
             bandit.Culture = banditCulture;
             banditCulture.BanditBandit = bandit;
             // Native attack menus open with one bandit party, below the IsInfested minimum.
-            var banditPartyCount = singleBanditParty ? 1
-                : Campaign.Current.Models.BanditDensityModel.NumberOfMinimumBanditPartiesInAHideoutToInfestIt;
+            var infestedMinimum = Campaign.Current.Models.BanditDensityModel.NumberOfMinimumBanditPartiesInAHideoutToInfestIt;
+            var banditPartyCount = singleBanditParty ? 1 : infestedMinimum;
             for (var index = 0; index < banditPartyCount; index++)
             {
                 var clan = GameObjectCreator.CreateInitializedObject<Clan>();

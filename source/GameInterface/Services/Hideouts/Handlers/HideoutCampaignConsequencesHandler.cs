@@ -42,6 +42,7 @@ internal sealed class HideoutCampaignConsequencesHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly IPlayerManager playerManager;
     private readonly INetworkConfig configuration;
+    private readonly IHideoutPreparation preparation;
     private readonly ISendCoalescer sendCoalescer;
     private readonly ConcurrentDictionary<string, PendingPreparation> pendingPreparations = new();
     private readonly Dictionary<MapEvent, ClearRewardSnapshot> pendingClearRewards = new();
@@ -53,6 +54,7 @@ internal sealed class HideoutCampaignConsequencesHandler : IHandler
         IObjectManager objectManager,
         IPlayerManager playerManager,
         INetworkConfig configuration,
+        IHideoutPreparation preparation,
         ISendCoalescer sendCoalescer = null)
     {
         this.messageBroker = messageBroker;
@@ -60,6 +62,7 @@ internal sealed class HideoutCampaignConsequencesHandler : IHandler
         this.objectManager = objectManager;
         this.playerManager = playerManager;
         this.configuration = configuration;
+        this.preparation = preparation;
         this.sendCoalescer = sendCoalescer;
 
         messageBroker.Subscribe<HideoutCampaignConsequenceRequested>(Handle_HideoutCampaignConsequenceRequested);
@@ -248,7 +251,7 @@ internal sealed class HideoutCampaignConsequencesHandler : IHandler
         {
             case HideoutCampaignConsequence.PrepareMission:
             case HideoutCampaignConsequence.PrepareDirectAssaultMission:
-                if (!CanBeAttacked(settlement))
+                if (!preparation.CanBeAttacked(settlement))
                     return ConsequenceResult.Rejected;
 
                 behavior.ArrangeHideoutTroopCountsForMission();
@@ -266,7 +269,7 @@ internal sealed class HideoutCampaignConsequencesHandler : IHandler
                 return ConsequenceResult.AcceptedWith(GetHealthyDefenderCount(settlement));
 
             case HideoutCampaignConsequence.SetAttackCooldown:
-                if (!CanBeAttacked(settlement))
+                if (!preparation.CanBeAttacked(settlement))
                 {
                     Logger.Warning("Rejected hideout cooldown for {SettlementId}, it has no bandits or is already cooling down",
                         request.SettlementId);
@@ -278,7 +281,7 @@ internal sealed class HideoutCampaignConsequencesHandler : IHandler
                 return ConsequenceResult.AcceptedWithoutParity;
 
             case HideoutCampaignConsequence.GrantClearRewards:
-                if (settlement.Hideout.IsInfested)
+                if (preparation.HasBandits(settlement))
                     return ConsequenceResult.Rejected;
 
                 var rewards = clearRewards.GetValue(settlement, _ => new ClearRewardSnapshot(settlement));
@@ -408,15 +411,10 @@ internal sealed class HideoutCampaignConsequencesHandler : IHandler
         return true;
     }
 
-    /// <summary>Matches the native hideout attack menu conditions: a bandit party is inside and the cooldown is over.</summary>
-    // Not Hideout.IsInfested, which needs two bandit parties while the native attack menus allow one.
-    internal bool CanBeAttacked(Settlement settlement) =>
-        settlement.Parties.Any(party => party.IsBandit) && settlement.Hideout.NextPossibleAttackTime.IsPast;
-
     internal bool TryPrepareRaid(Settlement settlement, bool isDirectAssault)
     {
         var behavior = Campaign.Current?.GetCampaignBehavior<HideoutCampaignBehavior>();
-        if (behavior == null || !CanBeAttacked(settlement))
+        if (behavior == null || !preparation.CanBeAttacked(settlement))
             return false;
         behavior.ArrangeHideoutTroopCountsForMission();
         if (isDirectAssault && !EnsureDirectAssaultMinimum(settlement)) return false;

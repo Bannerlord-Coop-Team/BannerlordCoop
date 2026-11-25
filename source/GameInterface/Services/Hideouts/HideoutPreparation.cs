@@ -15,6 +15,8 @@ internal interface IHideoutPreparation
 {
     Hero GetAttackLeader(Settlement settlement);
     HideoutEntryState GetState(Settlement settlement, MobileParty party);
+    bool HasBandits(Settlement settlement);
+    bool CanBeAttacked(Settlement settlement);
 }
 
 internal sealed class HideoutPreparation : IHideoutPreparation
@@ -53,6 +55,13 @@ internal sealed class HideoutPreparation : IHideoutPreparation
         var preparing = GetPreparingParty(settlement);
         return preparing != null && preparing != party ? HideoutEntryState.Waiting : HideoutEntryState.Start;
     }
+
+    /// <summary>Whether any bandit party is inside. Not Hideout.IsInfested, which needs more parties than native attacks do.</summary>
+    public bool HasBandits(Settlement settlement) => settlement.Parties.Any(party => party.IsBandit);
+
+    /// <summary>Matches the native hideout attack menus: a bandit party is inside and the cooldown is over.</summary>
+    public bool CanBeAttacked(Settlement settlement) =>
+        HasBandits(settlement) && settlement.Hideout.NextPossibleAttackTime.IsPast;
 }
 
 internal enum HideoutEntryState
