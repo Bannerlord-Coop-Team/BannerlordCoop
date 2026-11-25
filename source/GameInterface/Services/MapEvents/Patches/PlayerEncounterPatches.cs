@@ -552,12 +552,17 @@ internal class PlayerEncounterPatches
         __instance._helpedHeroes?.RemoveAll(hero => hero.IsPlayerHero());
     }
 
+    // A member back on the map before the server concluded waits for the server's loot, which advances this encounter;
+    // native would generate it again locally.
     [HarmonyPatch(nameof(PlayerEncounter.DoApplyMapEventResults))]
     [HarmonyPrefix]
-    private static bool WaitForHideoutResults(PlayerEncounter __instance)
+    private static bool WaitForServerResults(PlayerEncounter __instance)
     {
-        if (ModInformation.IsServer || __instance._mapEvent?.IsHideoutBattle != true) return true;
-        // The server advances this encounter after delivering its loot; native would generate it again locally.
+        if (ModInformation.IsServer) return true;
+        var mapEvent = __instance._mapEvent;
+        if (mapEvent == null) return true;
+        if (!mapEvent.WaitsForServerResults()) return true;
+
         __instance._stateHandled = true;
         return false;
     }

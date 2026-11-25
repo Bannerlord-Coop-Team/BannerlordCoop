@@ -15,8 +15,7 @@ namespace Common.PacketHandlers
         RequestUpdatePartyBehavior,
         FieldAutoSync,
         PropertyAutoSync,
-        SaveData,
-        SaveDataChunk,
+        SaveDataChunk = 12, // 11 was the unchunked save packet.
         Relay,
         AgentAction,
         MountMovement,

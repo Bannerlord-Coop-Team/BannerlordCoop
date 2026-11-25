@@ -3,8 +3,10 @@ using GameInterface.Services.MapEvents;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MapEvents.Patches;
 using HarmonyLib;
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameComponents;
@@ -138,69 +140,34 @@ internal class DefaultMobilePartyAIModelPatches
             PersistedDisablePlayerAttackTimes.Remove(attackerParty);
     }
 
-    // Vanilla zeroes an AI party's attack scores while a main party stronger than itself is near it. The server has
-    // no main party on the map, so the same check runs for active player parties; a parked offline party doesn't count.
-    [HarmonyPatch(nameof(DefaultMobilePartyAIModel.CalculateInitiativeScoresForEnemy))]
-    [HarmonyPostfix]
-    private static void CalculateInitiativeScoresForEnemy_Postfix(
-        MobileParty mobileParty,
-        MobileParty enemyParty,
-        ref float attackScore)
+    // Vanilla suppresses attacks when IsMainParty && nearby.Party.EstimatedStrength > attacker.Party.EstimatedStrength.
+    [HarmonyPatch(nameof(DefaultMobilePartyAIModel.GetBestInitiativeBehavior))]
+    [HarmonyTranspiler]
+    internal static IEnumerable<CodeInstruction> ReplaceStrongerMainPartyCheck(IEnumerable<CodeInstruction> instructions)
     {
-        if (attackScore <= 0f) return;
-        if (!IsStrongerPlayerPartyNearby(mobileParty, enemyParty)) return;
+        var codes = new List<CodeInstruction>(instructions);
+        var isMainParty = AccessTools.PropertyGetter(typeof(MobileParty), nameof(MobileParty.IsMainParty));
+        int matches = codes.Count(code => code.Calls(isMainParty));
+        if (matches != 2)
+            throw new InvalidOperationException($"Expected two IsMainParty reads in GetBestInitiativeBehavior, found {matches}.");
 
-        attackScore = 0f;
-    }
+        var party = AccessTools.PropertyGetter(typeof(MobileParty), nameof(MobileParty.Party));
+        var strength = AccessTools.PropertyGetter(typeof(PartyBase), nameof(PartyBase.EstimatedStrength));
+        int index = codes.FindIndex(code => code.Calls(isMainParty));
+        if (index + 4 >= codes.Count || !codes[index + 3].Calls(party) || !codes[index + 4].Calls(strength))
+            throw new InvalidOperationException("Expected the first IsMainParty read to guard the stronger-party comparison.");
 
-    // Searches the parties GetBestInitiativeBehavior checks around the attacker for a stronger player party.
-    private static bool IsStrongerPlayerPartyNearby(MobileParty mobileParty, MobileParty enemyParty)
-    {
-        var searchData = MobileParty.StartFindingLocatablesAroundPosition(
-            mobileParty.Position.ToVec2(),
-            NearbyPartySearchRadius(mobileParty));
-
-        for (var party = MobileParty.FindNextLocatable(ref searchData);
-             party != null;
-             party = MobileParty.FindNextLocatable(ref searchData))
+        // The server has no main party on the map. Keep the second read for vanilla's ally-strength sum.
+        codes[index] = new CodeInstruction(codes[index])
         {
-            if (IsStrongerPlayerParty(party, mobileParty, enemyParty)) return true;
-        }
-
-        return false;
+            opcode = OpCodes.Call,
+            operand = AccessTools.Method(typeof(DefaultMobilePartyAIModelPatches), nameof(IsActivePlayerParty))
+        };
+        return codes;
     }
 
-    // The radius GetBestInitiativeBehavior searches around the attacker, wider for sea patrols and port defenders.
-    private static float NearbyPartySearchRadius(MobileParty mobileParty)
-    {
-        const float SeaPatrolRadiusMultiplier = 5f;
-        const float DefaultRadiusMultiplier = 3f;
-
-        var joiningRadius = Campaign.Current.Models.EncounterModel.GetEncounterJoiningRadius;
-
-        bool isPortDefenderAtSea = mobileParty.DefaultBehavior == AiBehavior.DefendSettlement && mobileParty.IsCurrentlyAtSea && mobileParty.IsTargetingPort;
-        if (isPortDefenderAtSea)
-            return joiningRadius * (Campaign.Current.Models.MobilePartyAIModel.SettlementDefendingNearbyPartyCheckRadius + 1f);
-
-        bool isSeaPatrol = mobileParty.DefaultBehavior == AiBehavior.PatrolAroundPoint && mobileParty.IsCurrentlyAtSea && !mobileParty.AiBehaviorTarget.IsOnLand;
-        if (isSeaPatrol)
-            return joiningRadius * SeaPatrolRadiusMultiplier;
-
-        return joiningRadius * DefaultRadiusMultiplier;
-    }
-
-    // Vanilla's stronger main party check and the skips it runs before it, read for an active player party.
-    internal static bool IsStrongerPlayerParty(MobileParty party, MobileParty mobileParty, MobileParty enemyParty)
-    {
-        if (!party.IsActive || !party.IsPlayerParty()) return false;
-        if (party.BesiegedSettlement != null && party.MapFaction == mobileParty.MapFaction) return false;
-        if (party.MapEvent != null && party.MapEvent != enemyParty.MapEvent) return false;
-        if (party.AttachedTo != null || party.IsInNavalAutoTravel) return false;
-        if (party.IsCurrentlyAtSea != mobileParty.IsCurrentlyAtSea) return false;
-        if (party.CurrentSettlement?.SiegeEvent != null) return false;
-
-        return party.Party.EstimatedStrength > mobileParty.Party.EstimatedStrength;
-    }
+    // Parked offline player parties are inactive and cannot suppress an attack.
+    private static bool IsActivePlayerParty(MobileParty party) => party.IsActive && party.IsPlayerParty();
 
     [HarmonyPatch(nameof(DefaultMobilePartyAIModel.ShouldConsiderAttacking))]
     [HarmonyPostfix]

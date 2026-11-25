@@ -3,13 +3,11 @@ using E2E.Tests.Environment.Instance;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
-using GameInterface.Services.Players;
 using GameInterface.Services.Ships.Data;
 using Common.Network.Messages;
 using Missions.Battles;
 using Missions.Messages;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
@@ -26,9 +24,6 @@ namespace E2E.Tests.Services.Missions.Naval;
 /// </summary>
 public class NavalShipFateScenarioTests : NavalBattleTestEnvironment
 {
-    private const float MaxHitPoints = 1000f;
-    private const float MaxSailHitPoints = 500f;
-
     public NavalShipFateScenarioTests(ITestOutputHelper output) : base(output, numClients: 2) { }
 
     [Fact]
@@ -422,38 +417,6 @@ public class NavalShipFateScenarioTests : NavalBattleTestEnvironment
     }
 
     private const float BattleShipFateReporterInterval = BattleShipFateReporter.ReportIntervalSeconds;
-
-    // A registered ship at full condition, given to the party through the vanilla production ownership path on the server.
-    private string GiveShip(string mobilePartyId)
-    {
-        var shipId = CreateRegisteredObject<Ship>();
-        foreach (var instance in new[] { Server }.Concat(Clients))
-            instance.Call(() =>
-            {
-                var hull = instance.GetRegisteredObject<Ship>(shipId).ShipHull;
-                hull.MaxHitPoints = (int)MaxHitPoints;
-                hull.MaxSailHitPoints = (int)MaxSailHitPoints;
-            });
-        Server.Call(() =>
-        {
-            var ship = Server.GetRegisteredObject<Ship>(shipId);
-            ChangeShipOwnerAction.ApplyByProduction(Server.GetRegisteredObject<MobileParty>(mobilePartyId).Party, ship);
-            ship.HitPoints = MaxHitPoints;
-            ship.SailHitPoints = MaxSailHitPoints;
-        });
-        return shipId;
-    }
-
-    private string PlayerPartyOf(string controllerId)
-    {
-        string partyId = null!;
-        Server.Call(() =>
-        {
-            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(controllerId, out var player));
-            partyId = player.MobilePartyId;
-        });
-        return partyId;
-    }
 
     // An AI party on the defender side; the battle's pirate party is registered like a player, so it cannot stand for one.
     private string AddAiParty(NavalBattle battle)

@@ -152,16 +152,19 @@ public class ServerSettlementExitEnterHandler : IHandler
             Logger.Debug("SettlementEncounterRecovery phase=approve branch=validated-entry partyHandle={PartyHandle} settlementHandle={SettlementHandle}",
                 payload.PartyId, payload.SettlementId);
 #endif
-            network.Send(peer, new NetworkStartSettlementEncounter(payload));
-
             // Vanilla starts under-siege and under-raid encounters outside the settlement.
-            if (settlement.IsUnderSiege || (settlement.IsVillage && settlement.IsUnderRaid)) return;
+            bool startsOutside = settlement.IsUnderSiege || (settlement.IsVillage && settlement.IsUnderRaid);
+            if (!startsOutside)
+            {
+                network.SendAllBut(peer, new NetworkPartyEnterSettlement(
+                    payload.SettlementId,
+                    payload.PartyId));
 
-            network.SendAllBut(peer, new NetworkPartyEnterSettlement(
-                payload.SettlementId,
-                payload.PartyId));
+                settlementInterface.PartyEnterSettlement(mobileParty, settlement);
+            }
 
-            settlementInterface.PartyEnterSettlement(mobileParty, settlement);
+            // The approval opens the client's town menu, whose Set sail option reads the fleet the entry anchored, so it goes last
+            network.Send(peer, new NetworkStartSettlementEncounter(payload));
         }, context: nameof(NetworkRequestStartSettlementEncounter));
     }
 

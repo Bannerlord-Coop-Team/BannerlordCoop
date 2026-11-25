@@ -33,7 +33,7 @@ namespace Coop.Core.Server.Connections;
 /// is appended, and later broadcasts pass through while the client applies the tail.</item>
 /// <item><b>Live</b> (after <see cref="CompleteCatchUp"/>): the retained channel keeps passing broadcasts
 /// through until disconnect.</item>
-/// <item><b>Stopped</b> (on deletion): world updates are discarded until the peer disconnects.</item>
+/// <item><b>Stopped</b> (on deletion or join abort): updates are discarded until the peer disconnects.</item>
 /// </list>
 /// Unknown peers drop world broadcasts: LiteNetLib can expose an accepted peer to fan-out before
 /// raising <see cref="PlayerConnected"/>. Campaign time and lobby membership bypass this gate.
@@ -62,6 +62,7 @@ public interface IConnectionMessageQueue
     /// the transfer-save snapshot is taken. Because that save runs under a blocking GameThread.Run
     /// call issued from the network thread the poller is parked, so world-history sends stay behind the
     /// capture and this cut cleanly separates "in the save" (dropped) from "after the save" (queued).
+    /// Aborted or disconnected peers are ignored, including after a late snapshot.
     /// </summary>
     void BeginQueueing(NetPeer peer);
 
@@ -102,7 +103,7 @@ public interface IConnectionMessageQueue
     /// <summary>Stops progress tracking after the client applies the ordered join tail.</summary>
     void CompleteCatchUp(NetPeer peer);
 
-    /// <summary>Clears a failed join's replay and keeps later broadcasts isolated until disconnect.</summary>
+    /// <summary>Clears a failed join's replay and stops queueing until the peer disconnects.</summary>
     int AbortCatchUp(NetPeer peer);
 }
 
@@ -276,22 +277,12 @@ internal sealed class ConnectionMessageQueue : IConnectionMessageQueue, IDisposa
         // Stop world replication for deleted player.
         // Game state at game over should be preserved for statistics screen when supported
         var channel = channels.GetOrAdd(payload.What.Peer, _ => new PeerChannel());
-        lock (channel.Gate)
-        {
-            channel.Pending.Clear();
-            channel.PendingMerge = null;
-            Interlocked.Exchange(ref channel.PendingCount, 0);
-            Interlocked.Exchange(ref channel.PendingBytes, 0);
-            channel.Overflowed = false;
-            channel.Phase = Phase.Stopped;
-        }
+        StopChannel(channel);
     }
 
     public void BeginQueueing(NetPeer peer)
     {
-        // GetOrAdd guards the (not expected) case where BeginQueueing runs before PlayerConnected was
-        // handled: the peer still ends up Queueing rather than silently receiving live broadcasts.
-        var channel = channels.GetOrAdd(peer, _ => new PeerChannel());
+        if (!channels.TryGetValue(peer, out var channel)) return;
 
         lock (channel.Gate)
         {
@@ -446,30 +437,29 @@ internal sealed class ConnectionMessageQueue : IConnectionMessageQueue, IDisposa
 
     public int AbortCatchUp(NetPeer peer)
     {
-        if (channels.TryGetValue(peer, out var channel) == false)
-        {
-            (network.Value as IBufferedNetwork)?.DiscardPendingMessages(peer);
-            return 0;
-        }
-
-        int cleared;
-        lock (channel.Gate)
-        {
-            bool stopped = channel.Phase == Phase.Stopped;
-            cleared = channel.Pending.Count;
-            channel.Pending.Clear();
-            channel.PendingMerge = null;
-            Interlocked.Exchange(ref channel.PendingCount, 0);
-            Interlocked.Exchange(ref channel.PendingBytes, 0);
-            channel.Overflowed = false;
-            channel.Phase = stopped ? Phase.Stopped : Phase.Dropping;
-            channel.FinalBaselineCoverageActive = true;
-        }
+        int cleared = 0;
+        if (channels.TryGetValue(peer, out var channel)) cleared = StopChannel(channel);
 
         // Replay Drain uses normal message aggregation. Remove anything it buffered before the
         // watchdog was able to abort so the end-of-update aggregate flush cannot send stale replay.
         (network.Value as IBufferedNetwork)?.DiscardPendingMessages(peer);
         return cleared;
+    }
+
+    /// <summary>Clears held replay and stops the channel until the peer disconnects.</summary>
+    private static int StopChannel(PeerChannel channel)
+    {
+        lock (channel.Gate)
+        {
+            int cleared = channel.Pending.Count;
+            channel.Pending.Clear();
+            channel.PendingMerge = null;
+            Interlocked.Exchange(ref channel.PendingCount, 0);
+            Interlocked.Exchange(ref channel.PendingBytes, 0);
+            channel.Overflowed = false;
+            channel.Phase = Phase.Stopped;
+            return cleared;
+        }
     }
 
     private JoinReplayBatchResult DrainBatch(
