@@ -45,6 +45,7 @@ internal class IssuesModule : Module
         builder.RegisterType<IssueAcceptPreconditions>().As<IIssueAcceptPreconditions>().InstancePerDependency();
         builder.RegisterType<ArtisanProductsProgress>().As<IArtisanProductsProgress>().InstancePerDependency();
         builder.RegisterType<OutcomeDispatcher>().As<IOutcomeDispatcher>().SingleInstance();
+        builder.RegisterType<OwnerCaptureValidator>().As<IOwnerCaptureValidator>().InstancePerDependency();
         builder.RegisterType<IssueMissionVisibility>().As<IIssueMissionVisibility>().InstancePerDependency();
         builder.RegisterType<ClientIssueDailyTickService>()
             .As<IClientIssueDailyTickService>()

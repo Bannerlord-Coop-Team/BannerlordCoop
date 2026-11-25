@@ -188,10 +188,10 @@ public class NearbyBanditBaseTests : IDisposable
         CreateIssueOnServer();
         AcceptOnClientA();
 
-        var otherPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var aiPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         var powerBefore = PowerOfHeadman(Server);
 
-        EndHideoutBattleOnServer(otherPartyId, BattleState.AttackerVictory);
+        EndHideoutBattleOnServer(aiPartyId, BattleState.AttackerVictory);
 
         var finalized = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
         Assert.Equal(IssueOutcome.QuestFail, finalized.Outcome);
