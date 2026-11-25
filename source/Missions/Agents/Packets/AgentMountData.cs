@@ -1,21 +1,17 @@
-﻿using Common.Serialization;
-using ProtoBuf;
+﻿using ProtoBuf;
 #if DEBUG
 using Missions.Diagnostics;
 #endif
 using System;
 using System.Collections.Concurrent;
-using System.Text;
 using TaleWorlds.Engine;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
-using BinaryReader = System.IO.BinaryReader;
-using BinaryWriter = System.IO.BinaryWriter;
 
 namespace Missions.Agents.Packets
 {
     [ProtoContract(SkipConstructor = true)]
-    public class AgentMountData
+    public partial class AgentMountData
     {
         internal const float StationarySpeedThreshold = 0.05f;
         internal const int TurnLeft = -1;
@@ -558,106 +554,6 @@ namespace Missions.Agents.Packets
         // Embedded poses may share ordering with the horse stream only in this authority generation.
         [ProtoMember(21)]
         public long? MountAuthorityRevision { get; private set; }
-
-        private const int GuidBytes = 16;
-        private const byte HasScope = 1;
-        private const byte HasGuid = 2;
-        private const byte HasRevision = 4;
-        private const byte IsLocomotion = 8;
-        private const byte IsSyntheticTurn = 16;
-
-        internal int GetSnapshotExtraBytes()
-        {
-            int length = 0;
-            if (MountIdentityScopeId != null)
-            {
-                // BinaryWriter prefixes strings with their UTF-8 byte count as a 7-bit integer.
-                int utf8Length = Encoding.UTF8.GetByteCount(MountIdentityScopeId);
-                length += ProtoBufSerializer.GetVarintLength((uint)utf8Length) + utf8Length;
-            }
-            if (MountAgentId != Guid.Empty) length += GuidBytes;
-            if (MountAuthorityRevision.HasValue) length += sizeof(long);
-            return length;
-        }
-
-        internal const int SnapshotBytes = sizeof(byte) + (14 * sizeof(float)) + (6 * sizeof(uint)) + (2 * sizeof(ulong));
-
-        internal void WriteSnapshot(ref MovementSnapshotColumns columns, BinaryWriter extras)
-        {
-            byte flags = 0;
-            if (MountIdentityScopeId != null)
-            {
-                flags |= HasScope;
-                extras.Write(MountIdentityScopeId);
-            }
-            if (MountAgentId != Guid.Empty)
-            {
-                flags |= HasGuid;
-                extras.Write(MountAgentId.ToByteArray());
-            }
-            if (MountAuthorityRevision.HasValue)
-            {
-                flags |= HasRevision;
-                extras.Write(MountAuthorityRevision.Value);
-            }
-            if (MountAction0IsLocomotion) flags |= IsLocomotion;
-            if (MountAction0IsSyntheticTurn) flags |= IsSyntheticTurn;
-
-            columns.WriteByte(flags);
-            columns.WriteVec3(MountPosition);
-            columns.WriteVec2(MountInputVector);
-            columns.WriteVec3(MountLookDirection);
-            columns.WriteVec2(MountMovementDirection);
-            columns.WriteSingle(MountSpeed);
-            columns.WriteUInt32(MountMovementFlag);
-            columns.WriteUInt32(MountMovementId);
-            columns.WriteUInt32((uint)MountAction0Index);
-            columns.WriteUInt64(MountAction0Flag);
-            columns.WriteSingle(MountAction0Progress);
-            columns.WriteSingle(MountAction0Speed);
-            columns.WriteUInt32((uint)MountAction0TurnDirection);
-            columns.WriteUInt32((uint)MountAction0TurnActionIndexWire);
-            columns.WriteUInt32((uint)MountAction1IndexWire);
-            columns.WriteUInt64(MountAction1Flag);
-            columns.WriteSingle(MountAction1Progress);
-        }
-
-        internal static AgentMountData ReadSnapshot(ref MovementSnapshotColumns columns, BinaryReader extras)
-        {
-            byte flags = columns.ReadByte();
-            // Read extras, then the remaining columns, in WriteSnapshot order.
-            string scopeId = null;
-            if ((flags & HasScope) != 0) scopeId = extras.ReadString();
-            Guid agentId = Guid.Empty;
-            if ((flags & HasGuid) != 0) agentId = new Guid(extras.ReadBytes(GuidBytes));
-            long? revision = null;
-            if ((flags & HasRevision) != 0) revision = extras.ReadInt64();
-
-            return new AgentMountData
-            {
-                MountPosition = columns.ReadVec3(),
-                MountInputVector = columns.ReadVec2(),
-                MountLookDirection = columns.ReadVec3(),
-                MountMovementDirection = columns.ReadVec2(),
-                MountSpeed = columns.ReadSingle(),
-                MountMovementFlag = columns.ReadUInt32(),
-                MountMovementId = (ushort)columns.ReadUInt32(),
-                MountAction0Index = (int)columns.ReadUInt32(),
-                MountAction0Flag = columns.ReadUInt64(),
-                MountAction0Progress = columns.ReadSingle(),
-                MountAction0Speed = columns.ReadSingle(),
-                MountAction0TurnDirection = (int)columns.ReadUInt32(),
-                MountAction0TurnActionIndexWire = (int)columns.ReadUInt32(),
-                MountAction1IndexWire = (int)columns.ReadUInt32(),
-                MountAction1Flag = columns.ReadUInt64(),
-                MountAction1Progress = columns.ReadSingle(),
-                MountIdentityScopeId = scopeId,
-                MountAgentId = agentId,
-                MountAuthorityRevision = revision,
-                MountAction0IsLocomotion = (flags & IsLocomotion) != 0,
-                MountAction0IsSyntheticTurn = (flags & IsSyntheticTurn) != 0,
-            };
-        }
 
         private AgentMountData() { }
     }

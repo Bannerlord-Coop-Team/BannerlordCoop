@@ -9,6 +9,7 @@ using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using Xunit;
 using AgentData = Missions.Agents.Packets.AgentData;
+using MathF = System.MathF;
 
 namespace E2E.Tests.Services.Missions;
 
@@ -69,6 +70,7 @@ public partial class MovementTrafficTests
             var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
             var compressor = new MovementPacketCompressor(serializer, new MovementSnapshotCodec());
             MountMovementPacket packet = CreatePackedMountPacket(mock, count: 18);
+            Assert.Contains(packet.Mounts, mount => mount.MountAction0TurnDirection == AgentMountData.TurnLeft);
             byte[] original = serializer.Serialize(packet);
             byte[] wire = compressor.Serialize(packet);
 
@@ -246,11 +248,19 @@ public partial class MovementTrafficTests
         PopulateMovementState(mirror, seed + 1);
         var random = new Random(1289 + seed);
         float Jitter(float value) => value + ((float)random.NextDouble() * 0.02f);
-        mirror.Position = new Vec3(Jitter(433f), Jitter(-105f), Jitter(15f));
-        mirror.LookDirection = new Vec3(Jitter(0.93f), Jitter(-0.22f), Jitter(0.18f));
-        mirror.InputVector = new Vec2(Jitter(0.37f), Jitter(-0.91f));
-        mirror.MovementDirection = new Vec2(Jitter(0.92f), Jitter(-0.17f));
-        mirror.RealGlobalVelocity = new Vec3(Jitter(3.2f), Jitter(-0.7f), 0f);
+        // Spread the agents along ranks with 1.5 metres between neighbours.
+        float column = (seed % 6) * 1.5f;
+        float rank = (seed / 6) * 1.5f;
+        float heading = -0.3f + ((seed % 7) * 0.1f);
+        float lookHeading = heading + (((seed % 3) - 1) * 0.12f);
+        float speed = 2.8f + ((seed % 5) * 0.2f);
+        var direction = new Vec2(MathF.Cos(heading), MathF.Sin(heading));
+
+        mirror.Position = new Vec3(Jitter(433f + column), Jitter(-105f + rank), Jitter(15f));
+        mirror.LookDirection = new Vec3(Jitter(MathF.Cos(lookHeading)), Jitter(MathF.Sin(lookHeading)), Jitter(0.18f));
+        mirror.InputVector = new Vec2(Jitter(((seed % 5) - 2) * 0.2f), Jitter(0.75f + ((seed % 4) * 0.05f)));
+        mirror.MovementDirection = new Vec2(Jitter(direction.X), Jitter(direction.Y));
+        mirror.RealGlobalVelocity = new Vec3(Jitter(speed * direction.X), Jitter(speed * direction.Y), 0f);
         mirror.Action0Progress = Jitter(0.42f);
         mirror.Action1Progress = Jitter(0.75f);
         mirror.Action1Index = 1234 + seed;

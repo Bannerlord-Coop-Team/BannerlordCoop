@@ -54,6 +54,10 @@ internal ref struct MovementSnapshotColumns
         return value;
     }
 
+    // Signed columns preserve the same four bytes as the unsigned representation.
+    public void WriteInt32(int value) => WriteUInt32(unchecked((uint)value));
+    public int ReadInt32() => unchecked((int)ReadUInt32());
+
     public void WriteUInt64(ulong value)
     {
         WriteUInt32((uint)value);

@@ -199,7 +199,9 @@ namespace Missions.Agents.Packets
         public int DeckShipIndex { get; private set; }
         [ProtoMember(12)]
         public Vec3 DeckLocal { get; private set; }
-        public bool ShouldSerializeDeckLocal() => DeckShipIndex != 0;
+        public bool ShouldSerializeDeckLocal() => HasDeckPose;
+
+        internal bool HasDeckPose => DeckShipIndex != 0;
 
         /// <summary>The hull this deck pose is relative to, resolved from the packet's DeckShips on receive.</summary>
         [ProtoIgnore]
@@ -234,17 +236,17 @@ namespace Missions.Agents.Packets
             MountData = mount,
         };
 
-        internal const int DeckSnapshotBytes = sizeof(uint) + (3 * sizeof(float));
+        internal const int DeckSnapshotBytes = sizeof(int) + (3 * sizeof(float));
 
         internal void WriteDeckSnapshot(ref MovementSnapshotColumns columns)
         {
-            columns.WriteUInt32((uint)DeckShipIndex);
+            columns.WriteInt32(DeckShipIndex);
             columns.WriteVec3(DeckLocal);
         }
 
         internal static (int ShipIndex, Vec3 Local) ReadDeckSnapshot(ref MovementSnapshotColumns columns)
         {
-            int shipIndex = (int)columns.ReadUInt32();
+            int shipIndex = columns.ReadInt32();
             Vec3 local = columns.ReadVec3();
             return (shipIndex, local);
         }

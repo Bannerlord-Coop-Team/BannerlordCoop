@@ -8,7 +8,10 @@ namespace Missions.Agents.Packets;
 /// <summary>Packs and restores the rider, deck and mount columns of one datagram in snapshot order.</summary>
 public interface IMovementSnapshotCodec
 {
+    /// <summary>Packs columns and extras up to <paramref name="limit"/> bytes. Returns false for small or oversized batches so the caller can serialize the protobuf arrays.</summary>
     bool TryPack(IPacket packet, int limit, out IPacket packed);
+
+    /// <summary>Restores packed snapshots or returns an unpacked packet unchanged.</summary>
     IPacket Restore(IPacket packet);
 }
 
@@ -56,7 +59,7 @@ internal sealed class MovementSnapshotCodec : IMovementSnapshotCodec
         int extraBytes = 0;
         foreach (AgentData agent in agents)
         {
-            if (agent.DeckShipIndex != 0) decks++;
+            if (agent.HasDeckPose) decks++;
             if (agent.MountData == null) continue;
             mounts++;
             extraBytes += agent.MountData.GetSnapshotExtraBytes();
@@ -81,7 +84,7 @@ internal sealed class MovementSnapshotCodec : IMovementSnapshotCodec
         for (int i = 0; i < count; i++)
         {
             AgentData agent = agents[i];
-            bool hasDeck = agent.DeckShipIndex != 0;
+            bool hasDeck = agent.HasDeckPose;
             AgentMountData mount = agent.MountData;
             byte attachments = 0;
             if (hasDeck) attachments |= HasDeck;
