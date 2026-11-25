@@ -154,20 +154,17 @@ public class ServerSettlementExitEnterHandler : IHandler
 #endif
             // Vanilla starts under-siege and under-raid encounters outside the settlement.
             bool startsOutside = settlement.IsUnderSiege || (settlement.IsVillage && settlement.IsUnderRaid);
-
-            // The approval opens the client's town menu, whose Set sail option reads the anchored fleet, so it has to be synced first
             if (!startsOutside)
-                settlementInterface.AnchorLandingFleet(mobileParty, settlement);
+            {
+                network.SendAllBut(peer, new NetworkPartyEnterSettlement(
+                    payload.SettlementId,
+                    payload.PartyId));
 
+                settlementInterface.PartyEnterSettlement(mobileParty, settlement);
+            }
+
+            // The approval opens the client's town menu, whose Set sail option reads the fleet the entry anchored, so it goes last
             network.Send(peer, new NetworkStartSettlementEncounter(payload));
-
-            if (startsOutside) return;
-
-            network.SendAllBut(peer, new NetworkPartyEnterSettlement(
-                payload.SettlementId,
-                payload.PartyId));
-
-            settlementInterface.PartyEnterSettlement(mobileParty, settlement);
         }, context: nameof(NetworkRequestStartSettlementEncounter));
     }
 
