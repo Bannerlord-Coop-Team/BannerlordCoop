@@ -1932,7 +1932,7 @@ public partial class AgentMovementHandler : IAgentMovementHandler
                 }
 
                 // The interpolator owns a deck pose and its rebased directions every tick.
-                if (data.DeckShipIndex != 0)
+                if (data.HasDeckPose)
                 {
                     RecordMovementSequence(agentInfo, snapshot.SampleSequence);
                     ApplyDeckMovement(agentInfo.AgentId, agent, data);

@@ -158,7 +158,7 @@ internal sealed class MovementSnapshotCodec : IMovementSnapshotCodec
         byte[] packed = packet.PackedSnapshots;
         int count = packet.SnapshotCount;
 
-        var layout = new SnapshotLayout(agents: 0, decks: 0, mounts: count);
+        var layout = SnapshotLayout.ForPackedMounts(count);
         var columns = layout.MountColumns(packed);
         using var extras = layout.ExtrasReader(packed);
         var mounts = new AgentMountData[count];
@@ -182,7 +182,7 @@ internal sealed class MovementSnapshotCodec : IMovementSnapshotCodec
 
         public int TotalBytes => extrasOffset + extraBytes;
 
-        public SnapshotLayout(int agents, int decks, int mounts, int extraBytes = 0)
+        private SnapshotLayout(int agents, int decks, int mounts, int extraBytes = 0)
         {
             this.agents = agents;
             this.decks = decks;
@@ -233,6 +233,9 @@ internal sealed class MovementSnapshotCodec : IMovementSnapshotCodec
             return new SnapshotLayout(count, decks, mounts);
         }
 
+        public static SnapshotLayout ForPackedMounts(int count) =>
+            new SnapshotLayout(agents: 0, decks: 0, mounts: count);
+
         public MovementSnapshotColumns AgentColumns(byte[] packed) =>
             new MovementSnapshotColumns(packed.AsSpan(0, deckOffset), agents);
 
@@ -249,6 +252,7 @@ internal sealed class MovementSnapshotCodec : IMovementSnapshotCodec
             return new BinaryWriter(new MemoryStream(packed, extrasOffset, extraBytes));
         }
 
+        // The packed buffer ends with the extras, so restore uses the remaining bytes as their length.
         public BinaryReader ExtrasReader(byte[] packed)
         {
             if (mounts == 0) return null;
