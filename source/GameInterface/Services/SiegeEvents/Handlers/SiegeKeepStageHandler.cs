@@ -31,17 +31,15 @@ internal sealed class SiegeKeepStageHandler : IHandler
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly IPlayerManager playerManager;
-    private readonly ISiegeKeepTroopSelection selection;
     private readonly ISiegeKeepStage stage;
 
     public SiegeKeepStageHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager,
-        IPlayerManager playerManager, ISiegeKeepTroopSelection selection, ISiegeKeepStage stage)
+        IPlayerManager playerManager, ISiegeKeepStage stage)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.playerManager = playerManager;
-        this.selection = selection;
         this.stage = stage;
         messageBroker.Subscribe<AuthoritativeSiegeKeepRequested>(Handle_AuthoritativeSiegeKeepRequested);
         messageBroker.Subscribe<NetworkSiegeKeepEntryRequest>(Handle_EntryRequest);
@@ -121,37 +119,40 @@ internal sealed class SiegeKeepStageHandler : IHandler
             !ReferenceEquals(party.MapEvent, mapEvent))
             return Reject(request, "This siege assault is no longer open.");
 
-        if (!selection.IsOpen(mapEvent))
+        if (!stage.IsOpen(mapEvent))
         {
             // A later assault on a siege that already reached the hall goes straight to the keep.
             bool opened = mapEvent.IsSiegeKeepStage() && stage.TryOpen(mapEvent);
             if (!opened) return Reject(request, "Nobody can lead the keep battle right now.");
         }
 
-        if (!selection.TryGetSeat(mapEvent, player.MobilePartyId, out var seat))
-            return Reject(request, selection.IsLocked(mapEvent)
-                ? "The keep battle has started without you. You will see the result."
-                : "The keep has no place left for you. You will see the result.");
+        if (!stage.TryGetSeat(mapEvent, player.MobilePartyId, out var seat))
+        {
+            if (stage.IsLocked(mapEvent))
+                return Reject(request, "The keep battle has started without you. You will see the result.");
+            return Reject(request, "The keep has no place left for you. You will see the result.");
+        }
 
-        if (selection.IsLocked(mapEvent))
-            return new NetworkSiegeKeepEntryReply(request.RequestId, true, null, seat.EscortAllowance, 0, isLocked: true);
+        if (stage.IsLocked(mapEvent))
+            return Accept(request, seat, secondsRemaining: 0, isLocked: true);
 
         var seconds = stage.SecondsRemaining(mapEvent);
         if (request.QueryOnly)
-            return new NetworkSiegeKeepEntryReply(request.RequestId, true, null, seat.EscortAllowance, seconds);
+            return Accept(request, seat, seconds, isLocked: false);
 
-        if (!selection.TrySelect(mapEvent, party, request.Troops ?? Array.Empty<HideoutTroopSelectionEntry>()))
+        if (!stage.TrySelect(mapEvent, party, request.Troops ?? Array.Empty<HideoutTroopSelectionEntry>()))
             return Reject(request, "That troop selection is no longer available.");
 
-        if (selection.HaveAllAnswered(mapEvent))
-            stage.Lock(mapEvent);
-
-        return new NetworkSiegeKeepEntryReply(request.RequestId, true, null, seat.EscortAllowance, seconds,
-            isLocked: selection.IsLocked(mapEvent));
+        return Accept(request, seat, seconds, stage.IsLocked(mapEvent));
     }
 
+    private static NetworkSiegeKeepEntryReply Accept(NetworkSiegeKeepEntryRequest request, SiegeKeepSeat seat,
+        int secondsRemaining, bool isLocked) =>
+        new(request.RequestId, accepted: true, reason: null, escortAllowance: seat.EscortAllowance,
+            secondsRemaining: secondsRemaining, isLocked: isLocked);
+
     private static NetworkSiegeKeepEntryReply Reject(NetworkSiegeKeepEntryRequest request, string reason) =>
-        new(request.RequestId, false, reason, 0, 0);
+        new(request.RequestId, accepted: false, reason: reason, escortAllowance: 0, secondsRemaining: 0);
 
     private void Handle_CampaignTick(MessagePayload<CampaignTick> payload)
     {
@@ -160,5 +161,5 @@ internal sealed class SiegeKeepStageHandler : IHandler
     }
 
     private void Handle_MapEventFinalized(MessagePayload<MapEventFinalized> payload) =>
-        selection.Forget(payload.What.MapEvent);
+        stage.Forget(payload.What.MapEvent);
 }

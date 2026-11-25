@@ -3,6 +3,7 @@ using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.ObjectManager;
 using Moq;
 using System.Collections.Generic;
+using System.Linq;
 using Xunit;
 
 namespace GameInterface.Tests.Services.MapEvents;
@@ -35,6 +36,24 @@ public class TroopSelectionRulesTests
         Assert.False(rules.TryAccept(healthy, Hero, 4,
             new[] { new HideoutTroopSelectionEntry(first, firstCount), new HideoutTroopSelectionEntry(second, secondCount) },
             out _));
+    }
+
+    // Only the chosen counts stay, the first entries of each troop, in the order they were chosen.
+    [Fact]
+    public void TrimReserve_KeepsTheFirstChosenEntriesOfEachTroopInChosenOrder()
+    {
+        var entries = new List<TroopReserveEntry>
+        {
+            new(1, "recruit", 0), new(2, Hero, 0), new(3, "recruit", 0), new(4, "archer", 1), new(5, "recruit", 0),
+        };
+
+        rules.TrimReserve(entries, new[]
+        {
+            new HideoutTroopSelectionEntry(Hero, 1), new HideoutTroopSelectionEntry("recruit", 2),
+            new HideoutTroopSelectionEntry("knight", 1),
+        });
+
+        Assert.Equal(new[] { 2, 1, 3 }, entries.Select(entry => entry.Seed));
     }
 
     [Fact]

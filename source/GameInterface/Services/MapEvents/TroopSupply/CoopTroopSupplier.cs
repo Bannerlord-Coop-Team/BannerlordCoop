@@ -517,6 +517,14 @@ public class CoopTroopSupplier : IMissionTroopSupplier
     public int OwnedShareOf(int sideAllocation)
         => CaptureAllocationSnapshot().OwnedShareOf(sideAllocation);
 
+    /// <summary>
+    /// Whether a mission that spawns its first wave once can start: both suppliers got their reserve, and the host also
+    /// has every defender it fields, because a promoted host's expanded reserve arrives after its assignment.
+    /// </summary>
+    public static bool ReservesReady(bool authority, CoopTroopSupplier attacker, CoopTroopSupplier defender)
+        => attacker.IsPopulated && defender.IsPopulated &&
+            (!authority || defender.TotalTroops == defender.SideTotalTroops);
+
     public int NumTroopsNotSupplied
     {
         get

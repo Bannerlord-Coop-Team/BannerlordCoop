@@ -2,6 +2,7 @@
 using GameInterface.Services.Hideouts;
 using GameInterface.Services.ObjectManager;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
@@ -29,6 +30,9 @@ public interface ITroopSelectionRules
 
     /// <summary>A roster holding only the hero, for a player with no escort place.</summary>
     TroopRoster CreateHeroOnlyRoster(Hero hero);
+
+    /// <summary>Keeps only the chosen troops of a party's reserve, in the order they were chosen.</summary>
+    void TrimReserve(List<TroopReserveEntry> entries, IEnumerable<HideoutTroopSelectionEntry> chosen);
 }
 
 /// <inheritdoc cref="ITroopSelectionRules"/>
@@ -111,5 +115,20 @@ public class TroopSelectionRules : ITroopSelectionRules
         var heroOnly = TroopRoster.CreateDummyTroopRoster();
         heroOnly.AddToCounts(hero.CharacterObject, 1);
         return heroOnly;
+    }
+
+    public void TrimReserve(List<TroopReserveEntry> entries, IEnumerable<HideoutTroopSelectionEntry> chosen)
+    {
+        var available = entries.GroupBy(entry => entry.CharacterId)
+            .ToDictionary(group => group.Key, group => new Queue<TroopReserveEntry>(group));
+        var selected = new List<TroopReserveEntry>();
+        foreach (var entry in chosen)
+        {
+            if (!available.TryGetValue(entry.CharacterId, out var queue)) continue;
+            for (var count = 0; count < entry.Count && queue.Count > 0; count++)
+                selected.Add(queue.Dequeue());
+        }
+        entries.Clear();
+        entries.AddRange(selected);
     }
 }

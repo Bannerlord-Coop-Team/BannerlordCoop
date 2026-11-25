@@ -186,7 +186,9 @@ public sealed class SiegeKeepTroopSelection : ISiegeKeepTroopSelection
             .Select(mapEventParty => mapEventParty.Party)
             .Where(party => party?.IsMobile == true)
             .ToList();
-        var healthyByParty = defendingParties.Select(CountHealthyDefenders).ToList();
+        var healthyByParty = defendingParties
+            .Select(party => (IReadOnlyDictionary<string, int>)rules.CountHealthy(party.MobileParty, heroCharacterId: null))
+            .ToList();
 
         lock (gate)
         {
@@ -197,15 +199,6 @@ public sealed class SiegeKeepTroopSelection : ISiegeKeepTroopSelection
             for (var index = 0; index < defendingParties.Count; index++)
                 attempt.DefenderAllocations[defendingParties[index]] = allocations[index];
         }
-    }
-
-    private IReadOnlyList<(string CharacterId, int Healthy)> CountHealthyDefenders(PartyBase party)
-    {
-        var troops = new List<(string, int)>();
-        foreach (var element in party.MemberRoster.GetTroopRoster())
-            if (element.Character != null && objectManager.TryGetId(element.Character, out var characterId))
-                troops.Add((characterId, element.Number - element.WoundedNumber));
-        return troops;
     }
 
     public bool IsAdmitted(MapEvent mapEvent, MobileParty party)
@@ -222,40 +215,23 @@ public sealed class SiegeKeepTroopSelection : ISiegeKeepTroopSelection
         {
             if (!attempts.TryGetValue(mapEvent, out var attempt) || !attempt.Locked) return;
 
-            var allowed = GetAllowedTroops(attempt, party.Party);
-            if (allowed == null)
-            {
-                entries.Clear();
-                return;
-            }
-
-            var left = new Dictionary<string, int>(allowed);
-            entries.RemoveAll(entry =>
-            {
-                if (!left.TryGetValue(entry.CharacterId, out var count) || count <= 0) return true;
-                left[entry.CharacterId] = count - 1;
-                return false;
-            });
+            rules.TrimReserve(entries, GetChosenTroops(attempt, party.Party));
         }
     }
 
-    // The troops a party may field in the keep, or null when the party has no part in it.
-    private Dictionary<string, int> GetAllowedTroops(Attempt attempt, PartyBase party)
+    // The troops a party fields in the keep, none when the party has no part in it.
+    private IEnumerable<HideoutTroopSelectionEntry> GetChosenTroops(Attempt attempt, PartyBase party)
     {
         if (party.Side == BattleSideEnum.Defender)
-            return attempt.DefenderAllocations.TryGetValue(party, out var allocation) ? allocation : null;
+            return attempt.DefenderAllocations.TryGetValue(party, out var allocation)
+                ? allocation.Select(pair => new HideoutTroopSelectionEntry(pair.Key, pair.Value))
+                : Array.Empty<HideoutTroopSelectionEntry>();
 
         if (party.MobileParty == null || !objectManager.TryGetId(party.MobileParty, out var partyId) ||
             !attempt.Selections.TryGetValue(partyId, out var selection))
-            return null;
+            return Array.Empty<HideoutTroopSelectionEntry>();
 
-        var allowed = new Dictionary<string, int>();
-        foreach (var entry in selection)
-        {
-            allowed.TryGetValue(entry.CharacterId, out var count);
-            allowed[entry.CharacterId] = count + entry.Count;
-        }
-        return allowed;
+        return selection;
     }
 
     public IReadOnlyList<MapEvent> GetOpenMapEvents()
@@ -271,54 +247,20 @@ public sealed class SiegeKeepTroopSelection : ISiegeKeepTroopSelection
     }
 
     /// <summary>
-    /// Vanilla's hall attacker places for <paramref name="defenderCount"/> defenders, with a seat for each player in
-    /// order while places last and the rest shared as escorts. Returns each seated player's escort allowance.
-    /// </summary>
-    internal static int[] PlanSeats(int defenderCount, float attackerDefenderRatio, int maxAttackers,
-        IReadOnlyList<int> escortsPerCandidate)
-    {
-        var attackerPlaces = Math.Max(1, Math.Min(maxAttackers,
-            TaleWorlds.Library.MathF.Round(defenderCount * attackerDefenderRatio)));
-        var seated = Math.Min(attackerPlaces, escortsPerCandidate.Count);
-        return ShareEscortPlaces(attackerPlaces - seated, escortsPerCandidate.Take(seated).ToList());
-    }
-
-    /// <summary>
-    /// Shares <paramref name="escortPlaces"/> out one at a time in seat order, skipping a seat once it has no troop
-    /// left to bring, so the places spread as evenly as each party's healthy troops allow.
-    /// </summary>
-    internal static int[] ShareEscortPlaces(int escortPlaces, IReadOnlyList<int> availableTroops)
-    {
-        var shares = new int[availableTroops.Count];
-        var placed = true;
-        while (escortPlaces > 0 && placed)
-        {
-            placed = false;
-            for (var seat = 0; seat < shares.Length && escortPlaces > 0; seat++)
-            {
-                if (shares[seat] >= availableTroops[seat]) continue;
-                shares[seat]++;
-                escortPlaces--;
-                placed = true;
-            }
-        }
-        return shares;
-    }
-
-    /// <summary>
     /// Splits the hall's defender budget greedily across the defending parties in order, each taking what its healthy
     /// troops of a character allow.
     /// </summary>
     internal static List<Dictionary<string, int>> SplitDefenders(IReadOnlyDictionary<string, int> budget,
-        IReadOnlyList<IReadOnlyList<(string CharacterId, int Healthy)>> healthyByParty)
+        IReadOnlyList<IReadOnlyDictionary<string, int>> healthyByParty)
     {
         var remaining = budget.ToDictionary(pair => pair.Key, pair => pair.Value);
         var allocations = new List<Dictionary<string, int>>();
         foreach (var party in healthyByParty)
         {
             var allocation = new Dictionary<string, int>();
-            foreach (var (characterId, healthy) in party)
+            foreach (var pair in party)
             {
+                var (characterId, healthy) = (pair.Key, pair.Value);
                 if (!remaining.TryGetValue(characterId, out var left) || left <= 0) continue;
                 var take = Math.Min(left, healthy);
                 if (take <= 0) continue;

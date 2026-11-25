@@ -37,16 +37,18 @@ internal sealed class SiegeKeepEntryHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetworkConfig configuration;
     private readonly ITroopSelectionRules selectionRules;
+    private readonly BattleStartCoordinator battleStarts;
     private readonly ConcurrentDictionary<string, PendingEntry> pendingEntries = new();
 
     public SiegeKeepEntryHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager,
-        INetworkConfig configuration, ITroopSelectionRules selectionRules)
+        INetworkConfig configuration, ITroopSelectionRules selectionRules, BattleStartCoordinator battleStarts)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.configuration = configuration;
         this.selectionRules = selectionRules;
+        this.battleStarts = battleStarts;
         messageBroker.Subscribe<NetworkSiegeKeepEntryReply>(Handle_EntryReply);
         messageBroker.Subscribe<NetworkSiegeKeepPhaseChanged>(Handle_PhaseChanged);
     }
@@ -183,9 +185,8 @@ internal sealed class SiegeKeepEntryHandler : IHandler
     // The server answers through the normal mission start, which opens the keep for every seated player.
     private void RequestKeepMission(string mapEventId)
     {
-        if (!ContainerProvider.TryResolve<BattleStartCoordinator>(out var coordinator) ||
-            !objectManager.TryGetIdWithLogging(MobileParty.MainParty, out var partyId) ||
-            !coordinator.RequestBlocking(BattleStartMode.Mission, mapEventId, partyId))
+        if (!objectManager.TryGetIdWithLogging(MobileParty.MainParty, out var partyId) ||
+            !battleStarts.RequestBlocking(BattleStartMode.Mission, mapEventId, partyId))
             ShowMessage("Unable to open the keep battle. Press Attack to try again.");
     }
 

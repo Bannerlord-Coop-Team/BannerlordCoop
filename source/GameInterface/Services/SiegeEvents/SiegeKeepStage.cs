@@ -20,19 +20,25 @@ using TaleWorlds.Core;
 
 namespace GameInterface.Services.SiegeEvents;
 
-/// <summary>[Server] Opens, times and locks the keep stage of a siege assault on the game thread.</summary>
+/// <summary>[Server] Opens, answers, times and locks the keep stage of a siege assault on the game thread.</summary>
 public interface ISiegeKeepStage : IGameAbstraction
 {
     /// <summary>Seats the walls players inside vanilla's hall limits and moves the siege into the lord's hall.</summary>
     bool TryOpen(MapEvent mapEvent);
 
+    bool IsOpen(MapEvent mapEvent);
+    bool IsLocked(MapEvent mapEvent);
+    bool TryGetSeat(MapEvent mapEvent, string mobilePartyId, out SiegeKeepSeat seat);
+    IReadOnlyList<SiegeKeepSeat> GetSeats(MapEvent mapEvent);
+    int SecondsRemaining(MapEvent mapEvent);
+
+    /// <summary>Takes a seated player's squad, and locks the roster once every seated player answered.</summary>
+    bool TrySelect(MapEvent mapEvent, MobileParty party, IReadOnlyList<HideoutTroopSelectionEntry> troops);
+
     /// <summary>Drops seats of players who left, and locks each stage once everyone answered or its window ran out.</summary>
     void Tick();
 
-    /// <summary>Gives a player who never answered vanilla's suggested squad, then fixes the roster.</summary>
-    void Lock(MapEvent mapEvent);
-
-    int SecondsRemaining(MapEvent mapEvent);
+    void Forget(MapEvent mapEvent);
 }
 
 /// <inheritdoc cref="ISiegeKeepStage"/>
@@ -74,7 +80,7 @@ public sealed class SiegeKeepStage : ISiegeKeepStage
         foreach (var element in model.GetPriorityListForLordsHallFightMission(mapEvent, BattleSideEnum.Defender,
                      model.MaxDefenderSideTroopCount))
         {
-            if (!objectManager.TryGetId(element.Troop, out var characterId)) continue;
+            if (!objectManager.TryGetIdWithLogging(element.Troop, out var characterId)) continue;
             defenderBudget.TryGetValue(characterId, out var count);
             defenderBudget[characterId] = count + 1;
         }
@@ -84,7 +90,7 @@ public sealed class SiegeKeepStage : ISiegeKeepStage
         // Escorts a candidate could bring: every healthy member but the player's own hero.
         var escortsPerCandidate = candidates
             .Select(candidate => Math.Max(0, candidate.Party.MemberRoster.TotalHealthyCount - 1)).ToList();
-        var shares = SiegeKeepTroopSelection.PlanSeats(defenderCount, model.AttackerDefenderTroopCountRatio,
+        var shares = PlanSeats(defenderCount, model.AttackerDefenderTroopCountRatio,
             model.MaxAttackerSideTroopCount, escortsPerCandidate);
         var seats = candidates.Take(shares.Length).Select((candidate, index) => new SiegeKeepSeat(
             candidate.Player.ControllerId, candidate.Player.MobilePartyId, candidate.Player.CharacterObjectId,
@@ -117,6 +123,24 @@ public sealed class SiegeKeepStage : ISiegeKeepStage
         return players;
     }
 
+    public bool IsOpen(MapEvent mapEvent) => selection.IsOpen(mapEvent);
+
+    public bool IsLocked(MapEvent mapEvent) => selection.IsLocked(mapEvent);
+
+    public bool TryGetSeat(MapEvent mapEvent, string mobilePartyId, out SiegeKeepSeat seat) =>
+        selection.TryGetSeat(mapEvent, mobilePartyId, out seat);
+
+    public IReadOnlyList<SiegeKeepSeat> GetSeats(MapEvent mapEvent) => selection.GetSeats(mapEvent);
+
+    public bool TrySelect(MapEvent mapEvent, MobileParty party, IReadOnlyList<HideoutTroopSelectionEntry> troops)
+    {
+        if (!selection.TrySelect(mapEvent, party, troops)) return false;
+
+        if (selection.HaveAllAnswered(mapEvent))
+            Lock(mapEvent);
+        return true;
+    }
+
     public void Tick()
     {
         foreach (var mapEvent in selection.GetOpenMapEvents())
@@ -134,7 +158,10 @@ public sealed class SiegeKeepStage : ISiegeKeepStage
         }
     }
 
-    public void Lock(MapEvent mapEvent)
+    public void Forget(MapEvent mapEvent) => selection.Forget(mapEvent);
+
+    // Gives a player who never answered vanilla's suggested squad, then fixes the roster.
+    private void Lock(MapEvent mapEvent)
     {
         foreach (var seat in selection.GetSeats(mapEvent))
         {
@@ -176,7 +203,7 @@ public sealed class SiegeKeepStage : ISiegeKeepStage
         var squad = MobilePartyHelper.GetStrongestAndPriorTroops(roster, seat.EscortAllowance, includePlayer: false);
         var entries = new List<HideoutTroopSelectionEntry>();
         foreach (var element in squad.GetTroopRoster())
-            if (element.Number > 0 && objectManager.TryGetId(element.Character, out var characterId))
+            if (element.Number > 0 && objectManager.TryGetIdWithLogging(element.Character, out var characterId))
                 entries.Add(new HideoutTroopSelectionEntry(characterId, element.Number));
         return entries.ToArray();
     }
@@ -192,7 +219,7 @@ public sealed class SiegeKeepStage : ISiegeKeepStage
     // Every player in the map event hears where the keep stands, seated or not.
     private void SendPhase(MapEvent mapEvent, SiegeKeepPhase phase)
     {
-        if (!objectManager.TryGetId(mapEvent, out var mapEventId)) return;
+        if (!objectManager.TryGetIdWithLogging(mapEvent, out var mapEventId)) return;
 
         var seconds = SecondsRemaining(mapEvent);
         foreach (var player in playerManager.Players)
@@ -206,5 +233,40 @@ public sealed class SiegeKeepStage : ISiegeKeepStage
             network.Send(peer, new NetworkSiegeKeepPhaseChanged(mapEventId, phase, isSeated,
                 isSeated ? seat.EscortAllowance : 0, seconds));
         }
+    }
+
+    /// <summary>
+    /// Vanilla's hall attacker places for <paramref name="defenderCount"/> defenders, with a seat for each player in
+    /// order while places last and the rest shared as escorts. Returns each seated player's escort allowance.
+    /// </summary>
+    internal static int[] PlanSeats(int defenderCount, float attackerDefenderRatio, int maxAttackers,
+        IReadOnlyList<int> escortsPerCandidate)
+    {
+        var attackerPlaces = Math.Max(1, Math.Min(maxAttackers,
+            TaleWorlds.Library.MathF.Round(defenderCount * attackerDefenderRatio)));
+        var seated = Math.Min(attackerPlaces, escortsPerCandidate.Count);
+        return ShareEscortPlaces(attackerPlaces - seated, escortsPerCandidate.Take(seated).ToList());
+    }
+
+    /// <summary>
+    /// Shares <paramref name="escortPlaces"/> out one at a time in seat order, skipping a seat once it has no troop
+    /// left to bring, so the places spread as evenly as each party's healthy troops allow.
+    /// </summary>
+    internal static int[] ShareEscortPlaces(int escortPlaces, IReadOnlyList<int> availableTroops)
+    {
+        var shares = new int[availableTroops.Count];
+        var placed = true;
+        while (escortPlaces > 0 && placed)
+        {
+            placed = false;
+            for (var seat = 0; seat < shares.Length && escortPlaces > 0; seat++)
+            {
+                if (shares[seat] >= availableTroops[seat]) continue;
+                shares[seat]++;
+                escortPlaces--;
+                placed = true;
+            }
+        }
+        return shares;
     }
 }

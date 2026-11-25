@@ -90,7 +90,7 @@ internal sealed class CoopHideoutMissionLogic : MissionLogic
         TryApplyPending();
         // The assignment arrives before the successor's expanded reserve. An old explicit-empty
         // defender reply must not initialize the ambush's permanently cached troop lists.
-        if (!ReservesReady(IsAuthority, attackerSource, defenderSource)) return;
+        if (!CoopTroopSupplier.ReservesReady(IsAuthority, attackerSource, defenderSource)) return;
         if (!IsAuthority && ledger.Latest == null) return;
 
         // A returning mission lost its pending escorts, but the accepted history still excludes prior spawns.
@@ -240,10 +240,6 @@ internal sealed class CoopHideoutMissionLogic : MissionLogic
     internal static bool ShouldSpawnEscorts(bool direct, HideoutPhase phase)
         => phase != HideoutPhase.Resolved && (direct || phase is HideoutPhase.Camp or HideoutPhase.CallingTroops
             or HideoutPhase.Cinematic or HideoutPhase.Conversation or HideoutPhase.Duel or HideoutPhase.BossBattle);
-
-    internal static bool ReservesReady(bool authority, CoopTroopSupplier attacker, CoopTroopSupplier defender)
-        => attacker.IsPopulated && defender.IsPopulated &&
-            (!authority || defender.TotalTroops == defender.SideTotalTroops);
 
     public bool PreserveStealthPosture => Native.Phase is HideoutPhase.Stealth ||
         (direct && Native.Phase == HideoutPhase.Camp);

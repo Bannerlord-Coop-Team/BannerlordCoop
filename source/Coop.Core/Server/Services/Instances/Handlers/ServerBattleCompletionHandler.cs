@@ -166,11 +166,10 @@ public class ServerBattleCompletionHandler : IHandler
         if (battleState == BattleState.AttackerVictory || battleState == BattleState.DefenderVictory)
             return true;
 
-        // A completed ambush, or the walls of an assault whose defenders fell back to the keep.
         return battleState == BattleState.DefenderPullBack
             && objectManager.TryGetObject<MapEvent>(instanceId, out var mapEvent)
             && mapEvent.BattleState == BattleState.None
-            && (mapEvent.IsSiegeAmbush || mapEvent.IsSiegeWallsStage());
+            && mapEvent.ConcludesPullBackOnServer();
     }
 
     private void Handle_MissionMemberDeparted(MessagePayload<MissionMemberDeparted> payload)

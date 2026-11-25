@@ -16,15 +16,13 @@ internal static class SiegeKeepCommands
         private readonly ICommandObjectResolver resolver;
         private readonly IObjectManager objectManager;
         private readonly ISiegeKeepStage keepStage;
-        private readonly ISiegeKeepTroopSelection keepSelection;
 
         public OpenKeepCoopCommand(ICommandObjectResolver resolver, IObjectManager objectManager,
-            ISiegeKeepStage keepStage, ISiegeKeepTroopSelection keepSelection)
+            ISiegeKeepStage keepStage)
         {
             this.resolver = resolver;
             this.objectManager = objectManager;
             this.keepStage = keepStage;
-            this.keepSelection = keepSelection;
         }
 
         public string Prefix => "coop.debug.siege";
@@ -46,11 +44,11 @@ internal static class SiegeKeepCommands
             if (!objectManager.TryGetId(mapEvent, out var mapEventId)) return Failed("The siege assault is not registered.");
             if (ServerBattleModeArbiter.IsClaimed(mapEventId))
                 return Failed("The siege assault is still being fought; end its walls mission first.");
-            if (keepSelection.IsOpen(mapEvent)) return Failed("The keep stage is already open.");
+            if (keepStage.IsOpen(mapEvent)) return Failed("The keep stage is already open.");
             if (!keepStage.TryOpen(mapEvent))
                 return Failed("The keep stage needs an attacking player, no defending player, and defenders left.");
 
-            var seats = keepSelection.GetSeats(mapEvent)
+            var seats = keepStage.GetSeats(mapEvent)
                 .Select(seat => $"{seat.ControllerId}:{seat.MobilePartyId}+{seat.EscortAllowance}");
             return Succeeded($"Opened the keep stage of {settlement.StringId} for map event {mapEventId}: {string.Join(", ", seats)}");
         }

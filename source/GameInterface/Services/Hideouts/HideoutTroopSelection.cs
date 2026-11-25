@@ -158,17 +158,7 @@ public sealed class HideoutTroopSelection : IHideoutTroopSelection
                 return;
             }
 
-            var selected = new List<TroopReserveEntry>();
-            var available = entries.GroupBy(entry => entry.CharacterId)
-                .ToDictionary(group => group.Key, group => new Queue<TroopReserveEntry>(group));
-            foreach (var entry in selection)
-            {
-                if (!available.TryGetValue(entry.CharacterId, out var queue)) continue;
-                for (var count = 0; count < entry.Count && queue.Count > 0; count++)
-                    selected.Add(queue.Dequeue());
-            }
-            entries.Clear();
-            entries.AddRange(selected);
+            rules.TrimReserve(entries, selection);
         }
     }
 

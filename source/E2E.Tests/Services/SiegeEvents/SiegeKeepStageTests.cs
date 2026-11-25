@@ -6,6 +6,7 @@ using GameInterface.Services.Hideouts;
 using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Tests.Utils;
 using GameInterface.Services.MapEvents.Handlers;
+using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.PlayerCaptivityService.Messages;
@@ -45,7 +46,8 @@ public class SiegeKeepStageTests : MapEventTestBase
     [Fact]
     public void WallsPullBack_SeatsBothPlayersAndStartsTheKeepWithTheirSquads()
     {
-        var keep = OpenKeepStage(TimeSpan.FromSeconds(90), DefenderTroops);
+        // Every real keep follows a walls mission on the same map event, whose start snapshot it must not reuse.
+        var keep = OpenKeepStage(TimeSpan.FromSeconds(90), DefenderTroops, startWallsFirst: true);
         var clients = Clients.ToArray();
 
         Server.Call(() =>
@@ -107,6 +109,25 @@ public class SiegeKeepStageTests : MapEventTestBase
         }, keep.DisabledMethods);
     }
 
+    // With every walls player's hero wounded nobody can lead the keep, so the walls end the way an AI-led assault does.
+    [Fact]
+    public void NoHealthyAttackingPlayer_ConcludesTheWallsAsAnAttackerVictory()
+    {
+        var conclusions = new List<AuthoritativeBattleConclusionRequested>();
+        Server.Call(() => Server.Resolve<IMessageBroker>().Subscribe<AuthoritativeBattleConclusionRequested>(
+            payload => conclusions.Add(payload.What)));
+
+        var keep = OpenKeepStage(TimeSpan.FromSeconds(90), DefenderTroops, woundHeroes: true);
+
+        Assert.Equal(BattleState.AttackerVictory, Assert.Single(conclusions).BattleState);
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkSiegeKeepPhaseChanged>());
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(keep.SettlementId, out var settlement));
+            Assert.Equal(Settlement.SiegeState.OnTheWalls, settlement.CurrentSiegeState);
+        });
+    }
+
     // A single defender leaves one attacker place, so the siege leader goes in alone and the joiner watches.
     [Fact]
     public void SingleHallPlace_SeatsOnlyTheSiegeLeader()
@@ -129,7 +150,8 @@ public class SiegeKeepStageTests : MapEventTestBase
         string LeaderCharacterId, string JoinerCharacterId, List<MethodBase> DisabledMethods);
 
     // Two attacking players at a besieged town whose walls just fell back, with the keep stage opened by the server.
-    private KeepStage OpenKeepStage(TimeSpan selectionWindow, int defenders)
+    private KeepStage OpenKeepStage(TimeSpan selectionWindow, int defenders, bool startWallsFirst = false,
+        bool woundHeroes = false)
     {
         var battle = CreateServerMapEvent();
         var leaderHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
@@ -162,31 +184,46 @@ public class SiegeKeepStageTests : MapEventTestBase
             defenderParty.MemberRoster.AddToCounts(defenderTroop, defenders);
 
             Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(escortId, out var escort));
-            leaderCharacterId = PreparePlayer("keep-leader", escort, LeaderEscorts);
-            joinerCharacterId = PreparePlayer("keep-joiner", escort, JoinerEscorts);
+            leaderCharacterId = PreparePlayer("keep-leader", escort, LeaderEscorts, woundHeroes);
+            joinerCharacterId = PreparePlayer("keep-joiner", escort, JoinerEscorts, woundHeroes);
             // The reserves flatten each battle party's own roster, which the seeding above did not refresh.
             foreach (var party in mapEvent.InvolvedParties)
                 mapEvent.FindMapEventParty(party)?.Update();
+        }, disabledMethods);
+
+        var keep = new KeepStage(battle, settlementId, escortId, leaderCharacterId, joinerCharacterId, disabledMethods);
+        if (startWallsFirst)
+        {
+            StartMission(keep, "walls-start");
+            Assert.All(Server.NetworkSentMessages.GetMessages<NetworkStartSiegeMission>(),
+                start => Assert.False(start.IsLordsHall));
+        }
+
+        Server.Call(() =>
+        {
             ((SiegeKeepStage)Server.Resolve<ISiegeKeepStage>()).SelectionWindow = selectionWindow;
             Server.Resolve<IMessageBroker>().Publish(this, new AuthoritativeSiegeKeepRequested(battle.MapEventId, 1));
         }, disabledMethods);
-
-        return new KeepStage(battle, settlementId, escortId, leaderCharacterId, joinerCharacterId, disabledMethods);
+        return keep;
     }
 
     // The leader asks for the keep mission, which the server opens for every seated player.
     private void StartKeepMission(KeepStage keep, int expectedStarts)
     {
+        StartMission(keep, "keep-start");
+        Assert.Equal(expectedStarts, Server.NetworkSentMessages.GetMessages<NetworkStartSiegeMission>()
+            .Count(start => start.IsLordsHall));
+    }
+
+    private void StartMission(KeepStage keep, string requestId)
+    {
         var spawnSettings = keep.DisabledMethods
             .Append(AccessTools.PropertyGetter(typeof(MBGameManager), nameof(MBGameManager.UnitSpawnPrioritization)))
             .ToList();
-        Server.Call(() => Server.SimulateMessage(Clients.First().NetPeer, new NetworkBattleStartRequest("keep-start",
+        Server.Call(() => Server.SimulateMessage(Clients.First().NetPeer, new NetworkBattleStartRequest(requestId,
             (int)BattleStartMode.Mission, keep.Battle.MapEventId, keep.Battle.AttackerPartyId)), spawnSettings);
         Assert.True(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleStartReply>(),
-            reply => reply.RequestId == "keep-start").Accepted);
-        var starts = Server.NetworkSentMessages.GetMessages<NetworkStartSiegeMission>().ToArray();
-        Assert.Equal(expectedStarts, starts.Length);
-        Assert.All(starts, start => Assert.True(start.IsLordsHall));
+            reply => reply.RequestId == requestId).Accepted);
     }
 
     private int LockedSeats() => Server.NetworkSentMessages.GetMessages<NetworkSiegeKeepPhaseChanged>()
@@ -228,7 +265,7 @@ public class SiegeKeepStageTests : MapEventTestBase
     }
 
     // Gives the player its real hero character id, a healthy hero, and escorts in its party.
-    private string PreparePlayer(string controllerId, CharacterObject escort, int escorts)
+    private string PreparePlayer(string controllerId, CharacterObject escort, int escorts, bool wounded)
     {
         var players = Server.Resolve<IPlayerManager>();
         Assert.True(players.TryGetPlayer(controllerId, out var player));
@@ -237,7 +274,7 @@ public class SiegeKeepStageTests : MapEventTestBase
         Assert.True(Server.ObjectManager.TryGetId(hero.CharacterObject, out var characterId));
         Assert.True(players.ReplacePlayer(player,
             new Player(player.ControllerId, player.HeroId, player.MobilePartyId, player.ClanId, characterId)));
-        hero.HitPoints = 100;
+        hero.HitPoints = wounded ? 1 : 100;
         party.IsActive = true;
         party.MemberRoster.Clear();
         party.MemberRoster.AddToCounts(hero.CharacterObject, 1);

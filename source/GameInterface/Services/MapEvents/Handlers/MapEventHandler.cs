@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.ObjectManager;
@@ -140,7 +141,7 @@ internal class MapEventHandler : IHandler
                 // server keeps the map event unresolved until the coop completion barrier finalizes the ambush
                 // or opens the keep after the walls.
                 if (ModInformation.IsServer && battleState == BattleState.DefenderPullBack &&
-                    (mapEvent.IsSiegeAmbush || mapEvent.IsSiegeAssault))
+                    mapEvent.ConcludesPullBackOnServer())
                     return;
 
                 // Only the elected battle host's conclusion is authoritative: a non-host's local mission can

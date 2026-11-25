@@ -695,13 +695,18 @@ internal class BattleMissionStartHandler : IHandler
             // The scene is the fixed settlement scene keyed by wall level — no terrain seed on the siege
             // path. Mirrors vanilla CreateSandBoxMissionInitializerRecord; atmosphere is client-local,
             // same tolerance as the field path. The keep loads the lord's hall the way vanilla's hall menu does.
-            string sceneName = settlement.LocationComplex
-                .GetLocationWithId(payload.IsLordsHall ? "lordshall" : "center").GetSceneName(payload.WallLevel);
+            string locationId = "center";
+            string sceneLevels = Campaign.Current.Models.LocationModel.GetUpgradeLevelTag(payload.WallLevel) + " siege";
+            if (payload.IsLordsHall)
+            {
+                locationId = "lordshall";
+                sceneLevels = "siege";
+            }
+
+            string sceneName = settlement.LocationComplex.GetLocationWithId(locationId).GetSceneName(payload.WallLevel);
             var rec = new MissionInitializerRecord(sceneName)
             {
-                SceneLevels = payload.IsLordsHall
-                    ? "siege"
-                    : Campaign.Current.Models.LocationModel.GetUpgradeLevelTag(payload.WallLevel) + " siege",
+                SceneLevels = sceneLevels,
                 DamageToFriendsMultiplier = Campaign.Current.Models.DifficultyModel.GetPlayerTroopsReceivedDamageMultiplier(),
                 DamageFromPlayerToFriendsMultiplier = Campaign.Current.Models.DifficultyModel.GetPlayerTroopsReceivedDamageMultiplier(),
                 PlayingInCampaignMode = true,
@@ -724,9 +729,11 @@ internal class BattleMissionStartHandler : IHandler
             // counts and never attach the coop behaviors, so a missing launcher is a hard error.
             if (ContainerProvider.TryResolve(out ICoopSiegeBattleLauncher siegeLauncher))
             {
-                var mission = payload.IsLordsHall
-                    ? siegeLauncher.OpenCoopLordsHallBattle(rec)
-                    : siegeLauncher.OpenCoopSiegeBattle(rec, payload.WallHitPointRatios,
+                Mission mission;
+                if (payload.IsLordsHall)
+                    mission = siegeLauncher.OpenCoopLordsHallBattle(rec);
+                else
+                    mission = siegeLauncher.OpenCoopSiegeBattle(rec, payload.WallHitPointRatios,
                         attackerWeapons, defenderWeapons, payload.IsSallyOut);
                 if (mission != null)
                     spawnGateEngaged = false; // the attached mission lifecycle owns EndBattle from here

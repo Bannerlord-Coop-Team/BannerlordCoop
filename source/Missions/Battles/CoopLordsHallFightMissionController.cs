@@ -1,5 +1,4 @@
 ﻿using GameInterface.Services.MapEvents.TroopSupply;
-using Missions.Hideouts;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
@@ -55,10 +54,10 @@ internal sealed class CoopLordsHallFightMissionController : LordsHallFightMissio
     // Spawning before the reserves arrive would place nothing and never retry, as native initializes only once.
     private bool IsReadyToSpawn() =>
         battle != null && battle.Session.HasInstance && battle.Session.HostEpoch > 0 &&
-        CoopHideoutMissionLogic.ReservesReady(battle.Session.IsLocalHost, attackerSupplier, defenderSupplier);
+        CoopTroopSupplier.ReservesReady(battle.Session.IsLocalHost, attackerSupplier, defenderSupplier);
 
     // Native counts only the agents this client spawned, so a side fielded by another client would read as beaten.
-    public new bool IsSideDepleted(BattleSideEnum side)
+    bool IMissionAgentSpawnLogic.IsSideDepleted(BattleSideEnum side)
     {
         if (!_isMissionInitialized || (side != BattleSideEnum.Attacker && side != BattleSideEnum.Defender))
             return false;

@@ -28,6 +28,13 @@ public static class MapEventExtensions
     public static bool IsSiegeWallsStage(this MapEvent mapEvent)
         => mapEvent.IsSiegeAssault && mapEvent.MapEventSettlement?.CurrentSiegeState == Settlement.SiegeState.OnTheWalls;
 
+    /// <summary>
+    /// Whether a defender pull-back here signals a finished ambush or walls that fell back to the keep, which the server
+    /// concludes once every mission member reported it, instead of a battle state to apply.
+    /// </summary>
+    public static bool ConcludesPullBackOnServer(this MapEvent mapEvent)
+        => mapEvent.IsSiegeAmbush || mapEvent.IsSiegeWallsStage();
+
     /// <summary>Whether a siege assault is past its walls and fought in the lord's hall.</summary>
     public static bool IsSiegeKeepStage(this MapEvent mapEvent)
         => mapEvent.IsSiegeAssault && mapEvent.MapEventSettlement?.CurrentSiegeState == Settlement.SiegeState.InTheLordsHall;
