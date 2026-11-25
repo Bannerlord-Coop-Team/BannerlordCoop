@@ -57,7 +57,6 @@ internal class TradeHandler : IHandler
 
         messageBroker.Subscribe<TradeAttempted>(Handle_TradeAttempted);
         messageBroker.Subscribe<CompleteTrade>(Handle_CompleteTrade);
-        messageBroker.Subscribe<UpdateEquipmentClients>(Handle_UpdateEquipmentClients);
         messageBroker.Subscribe<NetworkTradeCompleted>(Handle_TradeCompleted);
     }
 
@@ -65,7 +64,6 @@ internal class TradeHandler : IHandler
     {
         messageBroker.Unsubscribe<TradeAttempted>(Handle_TradeAttempted);
         messageBroker.Unsubscribe<CompleteTrade>(Handle_CompleteTrade);
-        messageBroker.Unsubscribe<UpdateEquipmentClients>(Handle_UpdateEquipmentClients);
         messageBroker.Unsubscribe<NetworkTradeCompleted>(Handle_TradeCompleted);
     }
 
@@ -85,7 +83,6 @@ internal class TradeHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(what.ToRoster, out var toRosterId)) return;
         if (!objectManager.TryGetIdWithLogging(what.Hero, out var heroId)) return;
         if (!objectManager.TryGetIdWithLogging(what.OwnerParty, out var ownerPartyId)) return;
-        if (!objectManager.TryGetIdWithLogging(what.InitialCharacterEquipment.HeroObject, out var initialHeroId)) return;
 
         // CurrentMobileParty can be already destroyed when this logic runs. Attempt to get an id without logging
         objectManager.TryGetId(what.CurrentMobileParty, out var currentMobilePartyId);
@@ -117,7 +114,6 @@ internal class TradeHandler : IHandler
             what.CanGainXpFromDiscarding,
             isManagingWarehouse,
             heroId,
-            initialHeroId,
             what.TotalAmount,
             what.MerchantGold,
             ownerPartyId,
@@ -146,8 +142,6 @@ internal class TradeHandler : IHandler
 
             if (!objectManager.TryGetObjectWithLogging<ItemRoster>(message.ToItemRosterId, out var toRoster)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(message.HeroId, out var hero)) return;
-            if (!objectManager.TryGetObjectWithLogging<MobileParty>(message.OwnerPartyId, out var ownerParty)) return;
-            if (!objectManager.TryGetObjectWithLogging<Hero>(message.InitialHeroId, out var initialHero)) return;
 
             SettlementComponent currentSettlementComponent = null;
             if (!message.IsSettlementComponentNull &&
@@ -214,8 +208,7 @@ internal class TradeHandler : IHandler
             }
 
             // Update hero equipment with new data
-            inventoryLogicInterface.UpdateEquipmentWithData(ownerParty, characterEquipmentsData, initialHero);
-            network.SendAll(new UpdateEquipmentClients(message.CharacterIdEquipmentsData, message.OwnerPartyId, message.InitialHeroId));
+            inventoryLogicInterface.UpdateEquipmentWithData(characterEquipmentsData);
 
             inventoryLogicInterface.ApplyDoneLogic(
                 fromRoster,
@@ -442,20 +435,6 @@ internal class TradeHandler : IHandler
         }
 
         return true;
-    }
-
-    private void Handle_UpdateEquipmentClients(MessagePayload<UpdateEquipmentClients> obj)    {
-        GameThread.RunSafe(() =>
-        {
-            using (new AllowedThread())
-            {
-                if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out var mobileParty)) return;
-                if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.InitialHeroId, out var initialHero)) return;
-
-                ResolveCharacterEquipmentsData(obj.What.CharacterIdEquipmentsData, out var characterEquipmentsData);
-                inventoryLogicInterface.UpdateEquipmentWithData(mobileParty, characterEquipmentsData, initialHero);
-            }
-        });
     }
 
     /// <summary>

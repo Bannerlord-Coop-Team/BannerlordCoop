@@ -62,11 +62,14 @@ internal class EquipmentRegistry : AutoRegistryBase<Equipment>
             var heroCivilianEquipment = hero.CivilianEquipment;
             var heroStealthEquipment = hero.StealthEquipment;
 
-            RegisterExistingObject($"{hero.StringId}_BattleEquipment", heroBattleEquipment);
-            RegisterExistingObject($"{hero.StringId}_CivilianEquipment", heroCivilianEquipment);
-            RegisterExistingObject($"{hero.StringId}_StealthEquipment", heroStealthEquipment);
+            RegisterExistingObject(GetHeroEquipmentId(hero, Equipment.EquipmentType.Battle), heroBattleEquipment);
+            RegisterExistingObject(GetHeroEquipmentId(hero, Equipment.EquipmentType.Civilian), heroCivilianEquipment);
+            RegisterExistingObject(GetHeroEquipmentId(hero, Equipment.EquipmentType.Stealth), heroStealthEquipment);
         }
     }
+
+    // A joined player's equipment is registered under this id too, so it matches what a client loading the save registers
+    public static string GetHeroEquipmentId(Hero hero, Equipment.EquipmentType type) => $"{hero.StringId}_{type}Equipment";
 
     public override void OnClientCreated(Equipment obj, string id)
     {

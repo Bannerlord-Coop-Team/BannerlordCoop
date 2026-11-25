@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Utils.LocalEvents;
 using HarmonyLib;
 using Serilog;
@@ -944,23 +945,30 @@ namespace GameInterface.Utils
         public static IEnumerable<CodeInstruction> ArrayFieldChangeTranspiler<TItem, TMessage>(IEnumerable<CodeInstruction> instructions, string fieldName)
             where TMessage : GenericArrayChangedEvent<TInstance, TItem>
         {
+            var arrayAssignIntercept = typeof(GenericPatches<TPatch, TInstance>).GetMethod(nameof(ArrayAssignIntercept)).MakeGenericMethod(typeof(TItem), typeof(TMessage));
+            return ArrayFieldChangeTranspiler<TItem>(instructions, fieldName, arrayAssignIntercept);
+        }
+
+        /// <summary>
+        /// Same as <see cref="ArrayFieldChangeTranspiler{TItem, TMessage}"/>, but calls <paramref name="arrayAssignIntercept"/>, a patch's own
+        /// (items, index, item, instance) wrapper that ends in <see cref="ArrayAssignIntercept{TItem, TMessage}"/>
+        /// </summary>
+        public static IEnumerable<CodeInstruction> ArrayFieldChangeTranspiler<TItem>(IEnumerable<CodeInstruction> instructions, string fieldName, MethodInfo arrayAssignIntercept)
+        {
             var loadStack = new Stack<CodeInstruction>();
             var fieldInfo = AccessTools.Field(typeof(TInstance), fieldName);
-            var arrayAssignIntercept = typeof(GenericPatches<TPatch, TInstance>).GetMethod(nameof(ArrayAssignIntercept)).MakeGenericMethod(typeof(TItem), typeof(TMessage));
             GenericPatchHelpers.ArrayChangeInterceptCache.TryAdd(fieldInfo, arrayAssignIntercept);
             // TODO: Implement properly with loading the correct instance onto the stack before call the method
 
             foreach (var instruction in instructions)
             {
-                if (loadStack.Count > 0 && instruction.opcode == OpCodes.Stelem_Ref)
+                if (loadStack.Count > 0 && StoresArrayElement(instruction, typeof(TItem)))
                 {
                     loadStack.Pop();
 
-                    var newInstr = new CodeInstruction(OpCodes.Call, arrayAssignIntercept);
-                    newInstr.labels = instruction.labels;
-
-                    yield return new CodeInstruction(OpCodes.Ldarg_0);
-                    yield return newInstr;
+                    // A branch that targeted the store has to land on the instance load, otherwise it skips it
+                    yield return new CodeInstruction(OpCodes.Ldarg_0) { labels = instruction.labels, blocks = instruction.blocks };
+                    yield return new CodeInstruction(OpCodes.Call, arrayAssignIntercept);
                     continue;
                 }
 
@@ -972,6 +980,14 @@ namespace GameInterface.Utils
                 yield return instruction;
             }
 
+        }
+
+        // Reference elements are stored with stelem.ref, struct elements with a stelem typed to the element
+        private static bool StoresArrayElement(CodeInstruction instruction, Type elementType)
+        {
+            if (instruction.opcode == OpCodes.Stelem_Ref) return true;
+
+            return instruction.opcode == OpCodes.Stelem && instruction.operand as Type == elementType;
         }
 
         /// <summary>
@@ -997,15 +1013,13 @@ namespace GameInterface.Utils
 
             foreach (var instruction in instructions)
             {
-                if (loadStack.Count > 0 && instruction.opcode == OpCodes.Stelem_Ref)
+                if (loadStack.Count > 0 && StoresArrayElement(instruction, typeof(TItem)))
                 {
                     loadStack.Pop();
 
-                    var newInstr = new CodeInstruction(OpCodes.Call, arrayAssignIntercept);
-                    newInstr.labels = instruction.labels;
-
-                    yield return new CodeInstruction(OpCodes.Ldarg_0);
-                    yield return newInstr;
+                    // A branch that targeted the store has to land on the instance load, otherwise it skips it
+                    yield return new CodeInstruction(OpCodes.Ldarg_0) { labels = instruction.labels, blocks = instruction.blocks };
+                    yield return new CodeInstruction(OpCodes.Call, arrayAssignIntercept);
                     continue;
                 }
 
@@ -1061,14 +1075,25 @@ namespace GameInterface.Utils
 
             if (ModInformation.IsClient)
             {
-                Logger.Error("Client updated unmanaged {type}", typeof(TItem));
+                // Local copies like clones and previews have no network id, so their writes are not synced state
+                if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager) || !objectManager.Contains(instance))
+                {
+                    items[index] = item;
+                    return;
+                }
+
+                objectManager.TryGetId(instance, out var id);
+                Logger.Error("Client wrote synced {type} {id} at index {index}, write dropped", typeof(TInstance).Name, id, index);
                 return;
             }
+
+            // Unchanged values still publish, because a client can hold a stale local copy, like an inventory reset on Done
             var message = (TMessage)Activator.CreateInstance(typeof(TMessage), instance, item, index);
             MessageBroker.Instance.Publish(instance, message);
 
             items[index] = item;
         }
+
         /// <summary>
         /// Used to transpile <see cref="PropertyOwner{T}"/> typed fields. Intercepts both mutation
         /// methods on the owner: <c>SetPropertyValue(attribute, value)</c> (value 0 removes the key)

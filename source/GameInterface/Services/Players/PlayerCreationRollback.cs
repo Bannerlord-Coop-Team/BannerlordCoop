@@ -131,6 +131,10 @@ internal class PlayerCreationRollback : IPlayerCreationRollback
         CaptureIfPresent(registrations, "prison roster", () => party?.PrisonRoster);
         CaptureIfPresent(registrations, "party base", () => party?.Party);
         CaptureIfPresent(registrations, "hero developer", () => hero?.HeroDeveloper);
+        // Backing fields, because the public getters fall back to the campaign's shared dead and default equipment
+        CaptureIfPresent(registrations, "battle equipment", () => hero?._battleEquipment);
+        CaptureIfPresent(registrations, "civilian equipment", () => hero?._civilianEquipment);
+        CaptureIfPresent(registrations, "stealth equipment", () => hero?._stealthEquipment);
         AddIfPresent(registrations, characterObject);
         AddIfPresent(registrations, party);
         AddIfPresent(registrations, hero);
