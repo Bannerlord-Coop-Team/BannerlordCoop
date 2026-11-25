@@ -64,7 +64,8 @@ public interface IObjectManager
     /// <returns>True if successful, false if failed</returns>
     bool AddNewObject(object obj, out string newId);
 
-    IReadOnlyDictionary<string, uint> GetHandleMap();
+    /// <summary>Returns a new, caller-owned snapshot of the registered handles.</summary>
+    Dictionary<string, uint> GetHandleMap();
     void SetJoinHandleMap(IReadOnlyDictionary<string, uint> handles);
     void ClearJoinHandleMap();
 
@@ -431,7 +432,7 @@ public class ObjectManager : IObjectManager
         }
     }
 
-    public IReadOnlyDictionary<string, uint> GetHandleMap()
+    public Dictionary<string, uint> GetHandleMap()
     {
         var handles = new Dictionary<string, uint>(StringComparer.Ordinal);
         lock (_gate)

@@ -104,7 +104,7 @@ sequenceDiagram
     end
 
     Note over S: TransferSaveState
-    S-->>C: GameSaveDataPacket
+    S-->>C: GameSaveDataChunkPacket
     Note over C: ReceivingSavedDataState → LoadingState
     Note over S: LoadingState
 
@@ -124,6 +124,6 @@ sequenceDiagram
 | Module check | `NetworkModuleVersionsValidate` | `NetworkModuleVersionsValidated` |
 | Client/hero check | `NetworkClientValidate` | `NetworkClientValidated` |
 | New character | `NetworkTransferNewHero` | `NetworkHeroRecieved` (+ `NetworkNewPlayerHeroCreated` to peers) |
-| Save transfer | — | `GameSaveDataPacket` |
+| Save transfer | — | `GameSaveDataChunkPacket` |
 | Joined map | `NetworkPlayerCampaignEntered` | — |
 | Entered battle | `NetworkPlayerMissionEntered` | — |
