@@ -302,7 +302,7 @@ public partial class MovementTrafficTests : MissionTestEnvironment
                 peer.Resolve<IAgentEquipmentApplier>(),
                 new MovementBatchSender(
                     network,
-                    new MovementPacketCompressor(serializer, new MovementSnapshotPacking()),
+                    new MovementPacketCompressor(serializer, new MovementSnapshotCodec()),
                     () => new MovementTrafficBudget()),
                 peer.Resolve<IPuppetMountStateRepairer>(),
                 peer.Resolve<IAgentVisualActionAccessor>(),
@@ -1190,7 +1190,7 @@ public partial class MovementTrafficTests : MissionTestEnvironment
             }
 
             var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
-            var compressor = new MovementPacketCompressor(serializer, new MovementSnapshotPacking());
+            var compressor = new MovementPacketCompressor(serializer, new MovementSnapshotCodec());
             var movement = new MovementPacket(
                 "76561198000000042",
                 new ushort[] { 1, 2, 3 },
@@ -1260,7 +1260,7 @@ public partial class MovementTrafficTests : MissionTestEnvironment
             }
 
             var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
-            var compressor = new MovementPacketCompressor(serializer, new MovementSnapshotPacking());
+            var compressor = new MovementPacketCompressor(serializer, new MovementSnapshotCodec());
             const string senderControllerId = "76561198000000042";
             var authorityRevisions = new long[] { 1, 2, 3 };
             peer.Resolve<IMessageBroker>().Publish(
@@ -1313,7 +1313,7 @@ public partial class MovementTrafficTests : MissionTestEnvironment
             }
 
             var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
-            var compressor = new MovementPacketCompressor(serializer, new MovementSnapshotPacking());
+            var compressor = new MovementPacketCompressor(serializer, new MovementSnapshotCodec());
             var recorder = new Mock<IBattleBenchmarkRecorder>();
             recorder.SetupGet(value => value.IsRecording).Returns(true);
             using var handler = new CompressedMovementPacketHandler(Mock.Of<IPacketManager>(), compressor, recorder.Object);

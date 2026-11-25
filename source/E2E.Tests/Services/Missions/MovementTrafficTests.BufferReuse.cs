@@ -119,7 +119,7 @@ public partial class MovementTrafficTests
             peer.Resolve<IAgentEquipmentApplier>(),
             new MovementBatchSender(
                 network,
-                new MovementPacketCompressor(serializer, new MovementSnapshotPacking()),
+                new MovementPacketCompressor(serializer, new MovementSnapshotCodec()),
                 () => new MovementTrafficBudget()),
             peer.Resolve<IPuppetMountStateRepairer>(),
             peer.Resolve<IAgentVisualActionAccessor>(),

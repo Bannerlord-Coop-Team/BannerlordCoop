@@ -49,8 +49,8 @@ public partial class MovementTrafficTests
                 new MovementPacket(Array.Empty<Guid>(), Array.Empty<AgentData>()),
                 new CompressedMovementPacket(512, new byte[] { 1, 2, 3 }),
             };
-            var legacyCompressor = new MovementPacketCompressor(legacy, new MovementSnapshotPacking());
-            var currentCompressor = new MovementPacketCompressor(current, new MovementSnapshotPacking());
+            var legacyCompressor = new MovementPacketCompressor(legacy, new MovementSnapshotCodec());
+            var currentCompressor = new MovementPacketCompressor(current, new MovementSnapshotCodec());
             int envelopes = 0;
 
             foreach (IPacket packet in packets)
@@ -177,7 +177,7 @@ public partial class MovementTrafficTests
         var network = new RecordingBattleNetwork(serializer, run);
         var sender = new MovementBatchSender(
             network,
-            new RecordingMovementCompressor(new MovementPacketCompressor(serializer, new MovementSnapshotPacking()), serializer, run),
+            new RecordingMovementCompressor(new MovementPacketCompressor(serializer, new MovementSnapshotCodec()), serializer, run),
             budgetFactory);
         int payloadBudget = LiteNetP2PClient.CalculateMaxRelayPayloadBytes(
             serializer,

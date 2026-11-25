@@ -189,7 +189,7 @@ public sealed class BattleSpawnSendOrderingTests
                 config.Object, relay.Object, context.Object, Serializer,
                 new Mock<IMessageBroker>().Object, new Mock<IPacketManager>().Object,
                 new Mock<IMessagePacketHandler>().Object, new Mock<IControllerIdProvider>().Object,
-                new Mock<ISteamMissionBridge>().Object, new MovementPacketCompressor(Serializer, new MovementSnapshotPacking()),
+                new Mock<ISteamMissionBridge>().Object, new MovementPacketCompressor(Serializer, new MovementSnapshotCodec()),
                 new ReliableMessageBatcher<string>(Serializer), () => new ReceivePathDiagnostics());
             Client.ConnectToInstance("spawn-ordering-battle");
         }

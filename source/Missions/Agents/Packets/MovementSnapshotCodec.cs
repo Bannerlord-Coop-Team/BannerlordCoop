@@ -6,14 +6,14 @@ using Vec3 = TaleWorlds.Library.Vec3;
 namespace Missions.Agents.Packets;
 
 /// <summary>Packs and restores the rider, deck and mount columns of one datagram in snapshot order.</summary>
-public interface IMovementSnapshotPacking
+public interface IMovementSnapshotCodec
 {
     bool TryPack(IPacket packet, int limit, out IPacket packed);
     IPacket Restore(IPacket packet);
 }
 
 /// <inheritdoc/>
-internal sealed class MovementSnapshotPacking : IMovementSnapshotPacking
+internal sealed class MovementSnapshotCodec : IMovementSnapshotCodec
 {
     // Small batches retain protobuf's sparse encoding. The column layout has little repetition at those sizes.
     private const int MinimumCount = 4;
@@ -69,6 +69,7 @@ internal sealed class MovementSnapshotPacking : IMovementSnapshotPacking
         var agentColumns = layout.AgentColumns(packed);
         var deckColumns = layout.DeckColumns(packed);
         var mountColumns = layout.MountColumns(packed);
+        // Rider-only batches skip the extras allocations because only mounts write extras.
         BinaryWriter extrasWriter;
         if (mounts != 0)
             extrasWriter = new BinaryWriter(new MemoryStream(packed, layout.ExtrasOffset, extraBytes));
@@ -149,6 +150,7 @@ internal sealed class MovementSnapshotPacking : IMovementSnapshotPacking
         var agentColumns = layout.AgentColumns(packed);
         var deckColumns = layout.DeckColumns(packed);
         var mountColumns = layout.MountColumns(packed);
+        // Rider-only batches skip the extras allocations because only mounts read extras.
         BinaryReader extrasReader;
         if (mounts != 0)
             extrasReader = new BinaryReader(new MemoryStream(packed, layout.ExtrasOffset, packed.Length - layout.ExtrasOffset));

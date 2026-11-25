@@ -625,7 +625,14 @@ namespace Missions.Agents.Packets
         internal static AgentMountData ReadSnapshot(ref MovementSnapshotColumns columns, BinaryReader extras)
         {
             byte flags = columns.ReadByte();
-            // Read each section in the order WriteSnapshot writes it.
+            // Read extras, then the remaining columns, in WriteSnapshot order.
+            string scopeId = null;
+            if ((flags & HasScope) != 0) scopeId = extras.ReadString();
+            Guid agentId = Guid.Empty;
+            if ((flags & HasGuid) != 0) agentId = new Guid(extras.ReadBytes(GuidBytes));
+            long? revision = null;
+            if ((flags & HasRevision) != 0) revision = extras.ReadInt64();
+
             return new AgentMountData
             {
                 MountPosition = columns.ReadVec3(),
@@ -644,9 +651,9 @@ namespace Missions.Agents.Packets
                 MountAction1IndexWire = (int)columns.ReadUInt32(),
                 MountAction1Flag = columns.ReadUInt64(),
                 MountAction1Progress = columns.ReadSingle(),
-                MountIdentityScopeId = (flags & HasScope) != 0 ? extras.ReadString() : null,
-                MountAgentId = (flags & HasGuid) != 0 ? new Guid(extras.ReadBytes(GuidBytes)) : Guid.Empty,
-                MountAuthorityRevision = (flags & HasRevision) != 0 ? extras.ReadInt64() : (long?)null,
+                MountIdentityScopeId = scopeId,
+                MountAgentId = agentId,
+                MountAuthorityRevision = revision,
                 MountAction0IsLocomotion = (flags & IsLocomotion) != 0,
                 MountAction0IsSyntheticTurn = (flags & IsSyntheticTurn) != 0,
             };

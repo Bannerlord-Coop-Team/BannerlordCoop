@@ -62,7 +62,7 @@ public class MovementRelayPayloadTests
         const string usableControllerId = "76561198000000042";
         string unusableControllerId = new string('x', LiteNetP2PClient.SafeSinglePacketBytes);
         var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
-        var compressor = new MovementPacketCompressor(serializer, new MovementSnapshotPacking());
+        var compressor = new MovementPacketCompressor(serializer, new MovementSnapshotCodec());
         int usableBudget = LiteNetP2PClient.CalculateMaxRelayPayloadBytes(
             serializer,
             instanceId,
@@ -128,7 +128,7 @@ public class MovementRelayPayloadTests
         const string instanceId = "MapEvent_Created_0000";
         const string controllerId = "76561198000000042";
         var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
-        var compressor = new MovementPacketCompressor(serializer, new MovementSnapshotPacking());
+        var compressor = new MovementPacketCompressor(serializer, new MovementSnapshotCodec());
         int relayBudget = LiteNetP2PClient.CalculateMaxRelayPayloadBytes(
             serializer,
             instanceId,
@@ -185,7 +185,7 @@ public class MovementRelayPayloadTests
     public void Lz4MovementCompression_RejectsCorruptEnvelope()
     {
         var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
-        var compressor = new MovementPacketCompressor(serializer, new MovementSnapshotPacking());
+        var compressor = new MovementPacketCompressor(serializer, new MovementSnapshotCodec());
         var corrupt = new CompressedMovementPacket(512, new byte[] { 1, 2, 3 });
 
         Assert.False(compressor.TryRestore(corrupt, out _));
@@ -235,7 +235,7 @@ public class MovementRelayPayloadTests
         const string directControllerId = "76561198000000041";
         const string relayControllerId = "76561198000000042";
         var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
-        var compressor = new MovementPacketCompressor(serializer, new MovementSnapshotPacking());
+        var compressor = new MovementPacketCompressor(serializer, new MovementSnapshotCodec());
         var typeSends = new List<(Type Type, int Bytes)>();
         var routeSends = new List<(string Route, int Bytes)>();
         var recorder = new Mock<IBattleBenchmarkRecorder>();

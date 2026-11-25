@@ -35,19 +35,19 @@ public class MovementPacketCompressor : IMovementPacketCompressor
     private static readonly ILogger Logger = LogManager.GetLogger<MovementPacketCompressor>();
 
     private readonly ICommonSerializer serializer;
-    private readonly IMovementSnapshotPacking snapshotPacking;
+    private readonly IMovementSnapshotCodec snapshotCodec;
     private byte[] compressedTypeField;
 
-    public MovementPacketCompressor(ICommonSerializer serializer, IMovementSnapshotPacking snapshotPacking)
+    public MovementPacketCompressor(ICommonSerializer serializer, IMovementSnapshotCodec snapshotCodec)
     {
         this.serializer = serializer;
-        this.snapshotPacking = snapshotPacking;
+        this.snapshotCodec = snapshotCodec;
     }
 
     public byte[] Serialize(IPacket packet)
     {
         // Packed snapshots travel inside the envelope so the receiver restores the arrays before dispatch.
-        if (snapshotPacking.TryPack(packet, MaxUncompressedBytes, out IPacket packed))
+        if (snapshotCodec.TryPack(packet, MaxUncompressedBytes, out IPacket packed))
         {
             byte[] compressed = TryCompress(serializer.Serialize(packed));
             if (compressed != null) return compressed;
@@ -96,7 +96,7 @@ public class MovementPacketCompressor : IMovementPacketCompressor
             IPacket movement = serializer.Deserialize<IPacket>(decompressed);
             if (movement == null || !IsMovement(movement)) return false;
 
-            restored = snapshotPacking.Restore(movement);
+            restored = snapshotCodec.Restore(movement);
             return true;
         }
         catch (Exception ex)

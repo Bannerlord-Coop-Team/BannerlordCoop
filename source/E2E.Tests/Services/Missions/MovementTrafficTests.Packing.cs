@@ -25,8 +25,8 @@ public partial class MovementTrafficTests
         {
             var mock = CreateMovementMission(fixture, peer);
             var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
-            var sender = new MovementPacketCompressor(serializer, new MovementSnapshotPacking());
-            var receiver = new MovementPacketCompressor(serializer, new MovementSnapshotPacking());
+            var sender = new MovementPacketCompressor(serializer, new MovementSnapshotCodec());
+            var receiver = new MovementPacketCompressor(serializer, new MovementSnapshotCodec());
             MovementPacket movement = CreatePackedMixedRiderPacket(mock, count: 18, scoped);
             byte[] wire = sender.Serialize(movement);
 
@@ -44,7 +44,7 @@ public partial class MovementTrafficTests
         {
             var mock = CreateMovementMission(fixture, peer);
             var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
-            var compressor = new MovementPacketCompressor(serializer, new MovementSnapshotPacking());
+            var compressor = new MovementPacketCompressor(serializer, new MovementSnapshotCodec());
             MovementPacket movement = CreatePackedRiderPacket(mock, count: 18);
             Assert.All(movement.Agents, rider =>
             {
@@ -67,7 +67,7 @@ public partial class MovementTrafficTests
         {
             var mock = CreateMovementMission(fixture, peer);
             var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
-            var compressor = new MovementPacketCompressor(serializer, new MovementSnapshotPacking());
+            var compressor = new MovementPacketCompressor(serializer, new MovementSnapshotCodec());
             MountMovementPacket packet = CreatePackedMountPacket(mock, count: 18);
             byte[] original = serializer.Serialize(packet);
             byte[] wire = compressor.Serialize(packet);
@@ -89,7 +89,7 @@ public partial class MovementTrafficTests
             var mock = CreateMovementMission(fixture, peer);
             const int count = 18;
             var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
-            var compressor = new MovementPacketCompressor(serializer, new MovementSnapshotPacking());
+            var compressor = new MovementPacketCompressor(serializer, new MovementSnapshotCodec());
             IPacket packet = standaloneMounts
                 ? CreatePackedMountPacket(mock, count)
                 : CreatePackedRiderPacket(mock, count);

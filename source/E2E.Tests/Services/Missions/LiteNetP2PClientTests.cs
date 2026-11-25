@@ -53,7 +53,7 @@ public class LiteNetP2PClientTests
             Mock.Of<IMessagePacketHandler>(),
             Mock.Of<IControllerIdProvider>(),
             Mock.Of<ISteamMissionBridge>(),
-            new MovementPacketCompressor(serializer, new MovementSnapshotPacking()),
+            new MovementPacketCompressor(serializer, new MovementSnapshotCodec()),
             Mock.Of<IReliableMessageBatcher<string>>(),
             () => new ReceivePathDiagnostics());
         var requestField = typeof(LiteNetP2PClient).GetField(
@@ -143,7 +143,7 @@ public class LiteNetP2PClientTests
             messagePacketHandler.Object,
             controllerIdProvider.Object,
             steamBridge.Object,
-            new MovementPacketCompressor(serializer, new MovementSnapshotPacking()),
+            new MovementPacketCompressor(serializer, new MovementSnapshotCodec()),
             batcher, () => new Common.Logging.ReceivePathDiagnostics());
         NetPeer peer = NetPeerExtensions.CreatePeer(97);
         GetPendingPeerControllers(client)[peer] = controllerId;

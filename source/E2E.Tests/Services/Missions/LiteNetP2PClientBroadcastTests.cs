@@ -180,7 +180,7 @@ public class LiteNetP2PClientBroadcastTests
                 Mock.Of<IMessagePacketHandler>(),
                 Mock.Of<IControllerIdProvider>(),
                 Mock.Of<ISteamMissionBridge>(),
-                new MovementPacketCompressor(CountingSerializer, new MovementSnapshotPacking()),
+                new MovementPacketCompressor(CountingSerializer, new MovementSnapshotCodec()),
                 new ReliableMessageBatcher<string>(PlainSerializer),
                 () => new Common.Logging.ReceivePathDiagnostics(),
                 battleBenchmark);

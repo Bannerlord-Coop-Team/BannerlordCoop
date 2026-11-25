@@ -49,7 +49,7 @@ public class BattleMessageBatchingTests
         var messagePacketHandler = new Mock<IMessagePacketHandler>();
         var controllerIdProvider = new Mock<IControllerIdProvider>();
         var steamBridge = new Mock<ISteamMissionBridge>();
-        var compressor = new MovementPacketCompressor(serializer, new MovementSnapshotPacking());
+        var compressor = new MovementPacketCompressor(serializer, new MovementSnapshotCodec());
         var damageDataMapper = new BattleDamageDataMapper();
         var relayedPackets = new List<RelayPacket>();
         relayNetwork
@@ -138,7 +138,7 @@ public class BattleMessageBatchingTests
             messagePacketHandler.Object,
             controllerIdProvider.Object,
             steamBridge.Object,
-            new MovementPacketCompressor(serializer, new MovementSnapshotPacking()),
+            new MovementPacketCompressor(serializer, new MovementSnapshotCodec()),
             new ReliableMessageBatcher<string>(serializer), () => new Common.Logging.ReceivePathDiagnostics());
 
         client.Send(controllerId, CreateDeath(CreateGuid(10), 10));
@@ -186,7 +186,7 @@ public class BattleMessageBatchingTests
             messagePacketHandler,
             controllerIdProvider.Object,
             steamBridge.Object,
-            new MovementPacketCompressor(serializer, new MovementSnapshotPacking()),
+            new MovementPacketCompressor(serializer, new MovementSnapshotCodec()),
             new ReliableMessageBatcher<string>(serializer), () => new Common.Logging.ReceivePathDiagnostics());
         NetPeer peer = NetPeerExtensions.CreatePeer(99);
         Guid first = CreateGuid(1);

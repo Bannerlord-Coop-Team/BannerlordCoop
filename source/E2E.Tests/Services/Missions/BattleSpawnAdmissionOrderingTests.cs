@@ -168,7 +168,7 @@ public class BattleSpawnAdmissionOrderingTests
                 Mock.Of<INetworkConfig>(value => value.IsTunneled),
                 Mock.Of<IRelayNetwork>(), Context, serializer.Object, Broker,
                 packetManager, messageHandler, controllerIdProvider,
-                Mock.Of<ISteamMissionBridge>(), new MovementPacketCompressor(serializer.Object, new MovementSnapshotPacking()),
+                Mock.Of<ISteamMissionBridge>(), new MovementPacketCompressor(serializer.Object, new MovementSnapshotCodec()),
                 new ReliableMessageBatcher<string>(serializer.Object), () => new ReceivePathDiagnostics());
             Client.ConnectToInstance(InstanceId);
             PeerGate = GetField<object>("peerGate");

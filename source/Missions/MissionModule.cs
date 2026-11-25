@@ -90,8 +90,8 @@ public class MissionModule : Module
         builder.RegisterType<BattleBenchmarkMissionProbe>().As<IBattleBenchmarkMissionProbe>().InstancePerDependency();
         builder.RegisterType<JsonFileIO>().As<IJsonFileIO>().InstancePerDependency();
         builder.RegisterType<LiteNetP2PClient>().As<IBattleNetwork>().SingleInstance();
-        builder.RegisterType<MovementSnapshotPacking>()
-            .As<IMovementSnapshotPacking>()
+        builder.RegisterType<MovementSnapshotCodec>()
+            .As<IMovementSnapshotCodec>()
             .InstancePerDependency();
         builder.RegisterType<MovementPacketCompressor>()
             .As<IMovementPacketCompressor>()
