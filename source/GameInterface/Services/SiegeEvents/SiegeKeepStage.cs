@@ -13,6 +13,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.ComponentInterfaces;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
@@ -55,7 +56,7 @@ public sealed class SiegeKeepStage : ISiegeKeepStage
     private readonly ITroopSelectionEntries selectionEntries;
     private readonly Func<DateTime> utcNow;
 
-    /// <summary>The same 90 s the hideout assault waits for its leader, so a player who never answers can't stall the keep.</summary>
+    /// <summary>How long seated players have to choose, so a player who never answers can't stall the keep.</summary>
     internal TimeSpan SelectionWindow { get; set; } = TimeSpan.FromSeconds(90);
 
     public SiegeKeepStage(INetwork network, IObjectManager objectManager, IPlayerManager playerManager,
@@ -90,25 +91,11 @@ public sealed class SiegeKeepStage : ISiegeKeepStage
         if (candidates.Count == 0) return false;
 
         var model = Campaign.Current.Models.SiegeLordsHallFightModel;
-        var defenderBudget = new Dictionary<string, int>();
-        foreach (var element in model.GetPriorityListForLordsHallFightMission(mapEvent, BattleSideEnum.Defender,
-                     model.MaxDefenderSideTroopCount))
-        {
-            if (!objectManager.TryGetIdWithLogging(element.Troop, out var characterId)) continue;
-            defenderBudget.TryGetValue(characterId, out var count);
-            defenderBudget[characterId] = count + 1;
-        }
+        var defenderBudget = BuildDefenderBudget(mapEvent, model);
         var defenderCount = defenderBudget.Values.Sum();
         if (defenderCount == 0) return false;
 
-        // Escorts a candidate could bring: every healthy member but the player's own hero.
-        var escortsPerCandidate = candidates
-            .Select(candidate => Math.Max(0, candidate.Party.MemberRoster.TotalHealthyCount - 1)).ToList();
-        var shares = PlanSeats(defenderCount, model.AttackerDefenderTroopCountRatio,
-            model.MaxAttackerSideTroopCount, escortsPerCandidate);
-        var seats = candidates.Take(shares.Length).Select((candidate, index) => new SiegeKeepSeat(
-            candidate.Player.ControllerId, candidate.Player.MobilePartyId, candidate.Player.CharacterObjectId,
-            shares[index])).ToList();
+        var seats = SeatCandidates(candidates, defenderCount, model);
 
         selection.Open(mapEvent, seats, defenderBudget, utcNow() + SelectionWindow);
         settlement.CurrentSiegeState = Settlement.SiegeState.InTheLordsHall;
@@ -119,6 +106,40 @@ public sealed class SiegeKeepStage : ISiegeKeepStage
         return true;
     }
 
+    // The defender troops vanilla's hall model puts in the keep, counted by character.
+    private Dictionary<string, int> BuildDefenderBudget(MapEvent mapEvent, SiegeLordsHallFightModel model)
+    {
+        var defenderBudget = new Dictionary<string, int>();
+        foreach (var element in model.GetPriorityListForLordsHallFightMission(mapEvent, BattleSideEnum.Defender,
+                     model.MaxDefenderSideTroopCount))
+        {
+            if (!objectManager.TryGetIdWithLogging(element.Troop, out var characterId)) continue;
+            defenderBudget.TryGetValue(characterId, out var count);
+            defenderBudget[characterId] = count + 1;
+        }
+        return defenderBudget;
+    }
+
+    // Seats the candidates in order while the hall has places, each with its share of the escort places.
+    private static List<SiegeKeepSeat> SeatCandidates(List<(Player Player, MobileParty Party)> candidates,
+        int defenderCount, SiegeLordsHallFightModel model)
+    {
+        // Escorts a candidate could bring: every healthy member but the player's own hero.
+        var escortsPerCandidate = candidates
+            .Select(candidate => Math.Max(0, candidate.Party.MemberRoster.TotalHealthyCount - 1)).ToList();
+        var shares = PlanSeats(defenderCount, model.AttackerDefenderTroopCountRatio,
+            model.MaxAttackerSideTroopCount, escortsPerCandidate);
+
+        var seats = new List<SiegeKeepSeat>();
+        for (var index = 0; index < shares.Length; index++)
+        {
+            var player = candidates[index].Player;
+            seats.Add(new SiegeKeepSeat(player.ControllerId, player.MobilePartyId, player.CharacterObjectId,
+                shares[index]));
+        }
+        return seats;
+    }
+
     // The siege leader first, then the other walls players in the attacker side's order.
     private List<(Player Player, MobileParty Party)> GetAttackingPlayers(MapEvent mapEvent)
     {
@@ -127,10 +148,9 @@ public sealed class SiegeKeepStage : ISiegeKeepStage
         foreach (var mapEventParty in mapEvent.AttackerSide.Parties.OrderBy(party => party.Party?.MobileParty == leader ? 0 : 1))
         {
             var party = mapEventParty.Party?.MobileParty;
-            if (party == null || !party.IsActive || !playerManager.TryGetPlayer(party, out var player) ||
-                !playerManager.IsConnected(player) ||
-                !objectManager.TryGetObject<Hero>(player.HeroId, out var hero) || hero.IsWounded)
-                continue;
+            if (party == null || !party.IsActive) continue;
+            if (!playerManager.TryGetPlayer(party, out var player) || !playerManager.IsConnected(player)) continue;
+            if (!objectManager.TryGetObject<Hero>(player.HeroId, out var hero) || hero.IsWounded) continue;
 
             players.Add((player, party));
         }
@@ -190,8 +210,13 @@ public sealed class SiegeKeepStage : ISiegeKeepStage
             }
 
             if (selection.HasAnswered(mapEvent, seat.MobilePartyId)) continue;
-            if (!selectionEntries.TryCreateEntries(SuggestSquad(party, seat), out var squad) ||
-                !selection.TrySelect(mapEvent, party, squad))
+            if (!selectionEntries.TryCreateEntries(SuggestSquad(party, seat), out var squad))
+            {
+                selection.RemoveSeat(mapEvent, seat.MobilePartyId);
+                continue;
+            }
+
+            if (!selection.TrySelect(mapEvent, party, squad))
                 selection.RemoveSeat(mapEvent, seat.MobilePartyId);
         }
 

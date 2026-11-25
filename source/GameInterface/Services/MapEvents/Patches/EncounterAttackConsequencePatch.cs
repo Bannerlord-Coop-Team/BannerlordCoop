@@ -59,8 +59,13 @@ internal class EncounterAttackConsequencePatch
         // Past the walls, Attack picks the keep troops the way vanilla's hall menu does.
         if (battle.IsSiegeKeepStage())
         {
-            if (ContainerProvider.TryResolve<SiegeKeepEntryHandler>(out var keep))
-                keep.OpenTroopSelection(args);
+            if (!ContainerProvider.TryResolve<SiegeKeepEntryHandler>(out var keep))
+            {
+                Logger.Error("Unable to resolve SiegeKeepEntryHandler for the keep attack");
+                return false;
+            }
+
+            keep.OpenTroopSelection(args);
             return false;
         }
 

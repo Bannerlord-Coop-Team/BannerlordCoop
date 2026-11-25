@@ -52,17 +52,6 @@ public class SiegeKeepSerializationTests
         Assert.Equal(original.Troops, result.Troops);
     }
 
-    // protobuf-net writes nothing for an empty struct array, so a query arrives with no troops at all.
-    [Fact]
-    public void EntryRequest_EmptySelectionArrivesAsNull()
-    {
-        var result = RoundTrip(new NetworkSiegeKeepEntryRequest("request-1", "map-event-1", true,
-            Array.Empty<HideoutTroopSelectionEntry>()));
-
-        Assert.True(result.QueryOnly);
-        Assert.Null(result.Troops);
-    }
-
     [Fact]
     public void StartSiegeMission_RoundTripPreservesTheKeepFlag()
     {

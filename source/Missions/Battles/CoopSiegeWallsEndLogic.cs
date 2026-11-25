@@ -28,9 +28,9 @@ internal sealed class CoopSiegeWallsEndLogic : BattleEndLogic
     {
         // The same wait vanilla gives a retreating side before it counts as fled.
         var retreatWait = _missionAgentSpawnLogic.GetReinforcementInterval(BattleSideEnum.Defender) + 3f;
-        if (!_canCheckForEndCondition || !_isEnemyDefenderPulledBack ||
-            Mission.CurrentTime - lastDefenderStandTime <= retreatWait)
-            return base.MissionEnded(ref missionResult);
+        bool defendersFled = _canCheckForEndCondition && _isEnemyDefenderPulledBack &&
+            Mission.CurrentTime - lastDefenderStandTime > retreatWait;
+        if (!defendersFled) return base.MissionEnded(ref missionResult);
 
         missionResult = MissionResult.CreateDefenderPushedBack();
         _missionAgentSpawnLogic.StopSpawner(BattleSideEnum.Attacker);

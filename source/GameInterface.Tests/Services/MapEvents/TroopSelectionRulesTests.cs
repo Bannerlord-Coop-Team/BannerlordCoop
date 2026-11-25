@@ -20,10 +20,11 @@ public class TroopSelectionRulesTests
     {
         Assert.True(rules.TryAccept(healthy, Hero, 5,
             new[] { new HideoutTroopSelectionEntry("recruit", 3), new HideoutTroopSelectionEntry(Hero, 1) },
-            out var accepted));
+            out var accepted, out var escorts));
 
         Assert.Equal(new[] { new HideoutTroopSelectionEntry(Hero, 1), new HideoutTroopSelectionEntry("recruit", 3) },
             accepted);
+        Assert.Equal(3, escorts);
     }
 
     [Theory]
@@ -35,7 +36,7 @@ public class TroopSelectionRulesTests
     {
         Assert.False(rules.TryAccept(healthy, Hero, 4,
             new[] { new HideoutTroopSelectionEntry(first, firstCount), new HideoutTroopSelectionEntry(second, secondCount) },
-            out _));
+            out _, out _));
     }
 
     // Only the chosen counts stay, the first entries of each troop, in the order they were chosen.
@@ -61,6 +62,6 @@ public class TroopSelectionRulesTests
     {
         var withoutHero = new Dictionary<string, int>(healthy) { [Hero] = 0 };
 
-        Assert.False(rules.TryAccept(withoutHero, Hero, 4, System.Array.Empty<HideoutTroopSelectionEntry>(), out _));
+        Assert.False(rules.TryAccept(withoutHero, Hero, 4, System.Array.Empty<HideoutTroopSelectionEntry>(), out _, out _));
     }
 }

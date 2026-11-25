@@ -71,6 +71,31 @@ public class CoopBattleResultCommitTests : MissionTestEnvironment
         Assert.Equal(BattleState.DefenderPullBack, report.BattleState);
     }
 
+    // Vanilla ends the walls with a pushed-back result that is neither a victory nor a defeat, and that report opens the keep.
+    [Fact]
+    public void WallsPushedBack_ReportsDefenderPullBack()
+    {
+        using var fixture = new MissionEngineFixture();
+        var host = Clients.First();
+        SetControllerId(host, "host");
+
+        host.Call(() =>
+        {
+            var mock = fixture.CreateMission(host);
+            mock.Shell.MissionResult = MissionResult.CreateDefenderPushedBack();
+
+            var controller = host.Resolve<CoopBattleController>();
+            controller.Session.TryBegin("walls");
+            host.NetworkSentMessages.Clear();
+            controller.ResultCommitter.ReportResolvedResult(mock.Shell.MissionResult);
+
+            GC.KeepAlive(controller);
+        });
+
+        var report = Assert.Single(host.NetworkSentMessages.GetMessages<NetworkBattleResultReady>());
+        Assert.Equal(BattleState.DefenderPullBack, report.BattleState);
+    }
+
     [Fact]
     public void UnresolvedMissionExit_DoesNotReportResult()
     {

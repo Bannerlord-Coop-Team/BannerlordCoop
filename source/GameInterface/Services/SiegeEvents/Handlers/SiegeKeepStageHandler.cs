@@ -121,10 +121,12 @@ internal sealed class SiegeKeepStageHandler : IHandler
     {
         if (!playerManager.TryGetPlayer(peer, out var player) ||
             !objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party) ||
-            !objectManager.TryGetObject<MapEvent>(request.MapEventId, out var mapEvent) ||
-            !mapEvent.IsSiegeAssault || mapEvent.IsFinalized || mapEvent.BattleState != BattleState.None ||
-            !ReferenceEquals(party.MapEvent, mapEvent))
+            !objectManager.TryGetObject<MapEvent>(request.MapEventId, out var mapEvent))
             return Reject(request, "This siege assault is no longer open.");
+
+        bool assaultOpen = mapEvent.IsSiegeAssault && !mapEvent.IsFinalized &&
+            mapEvent.BattleState == BattleState.None && ReferenceEquals(party.MapEvent, mapEvent);
+        if (!assaultOpen) return Reject(request, "This siege assault is no longer open.");
 
         if (!stage.IsOpen(mapEvent))
         {

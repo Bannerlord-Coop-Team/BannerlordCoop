@@ -2,6 +2,7 @@
 using Common.Util;
 using E2E.Tests.Services.MapEvents;
 using E2E.Tests.Util;
+using GameInterface.Services.Entity;
 using GameInterface.Services.Hideouts;
 using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Tests.Utils;
@@ -14,7 +15,10 @@ using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.SiegeEvents;
 using GameInterface.Services.SiegeEvents.Messages;
+using Common.Network;
+using GameInterface.Services.MapEvents;
 using HarmonyLib;
+using Missions.Messages;
 using Moq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
@@ -89,6 +93,54 @@ public class SiegeKeepStageTests : MapEventTestBase
                 .Single(side => side.Side == BattleSideEnum.Attacker).Parties.Single().Entries
                 .Select(entry => entry.CharacterId));
         }, keep.DisabledMethods);
+    }
+
+    // A walls member's early pull-back apply reaches the server before the results, which must not move the map event
+    // off None, otherwise the keep can't open and the walls end as an attacker victory.
+    [Fact]
+    public void WallsResultsAfterAnEarlyPullBackApply_OpenTheKeepStage()
+    {
+        var keep = OpenKeepStage(TimeSpan.FromSeconds(90), DefenderTroops, openStage: false);
+        var clients = Clients.ToArray();
+        var controllers = new[] { "keep-leader", "keep-joiner" };
+        for (var index = 0; index < clients.Length; index++)
+        {
+            var client = clients[index];
+            var controllerId = controllers[index];
+            client.Call(() =>
+            {
+                client.Resolve<IControllerIdProvider>().SetControllerId(controllerId);
+                Assert.True(client.ObjectManager.TryGetObject<MapEvent>(keep.Battle.MapEventId, out var mapEvent));
+                var broker = client.Resolve<IMessageBroker>();
+                broker.Publish(this, new PlayerEnteredBattle(mapEvent));
+                broker.Publish(this, new BattleMissionReady(keep.Battle.MapEventId));
+            });
+            Server.SimulateMessage(client.NetPeer, new NetworkMissionEntered(controllerId, keep.Battle.MapEventId));
+        }
+
+        for (var index = 0; index < clients.Length; index++)
+        {
+            var client = clients[index];
+            var sendEarlyApply = index == 0;
+            client.Call(() =>
+            {
+                Assert.True(client.Resolve<IBattleHostRegistry>().TryGet(keep.Battle.MapEventId, out var assignment));
+                var network = client.Resolve<INetwork>();
+                if (sendEarlyApply)
+                    network.SendAll(new NetworkChangeBattleState(keep.Battle.MapEventId, BattleState.DefenderPullBack,
+                        assignment.Epoch));
+                network.SendAll(new NetworkBattleResultReady(keep.Battle.MapEventId, BattleState.DefenderPullBack,
+                    assignment.Epoch));
+            }, keep.DisabledMethods);
+        }
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(keep.SettlementId, out var settlement));
+            Assert.Equal(Settlement.SiegeState.InTheLordsHall, settlement.CurrentSiegeState);
+        });
+        Assert.Equal(2, Server.NetworkSentMessages.GetMessages<NetworkSiegeKeepPhaseChanged>()
+            .Count(message => message.Phase == SiegeKeepPhase.Choosing && message.IsSeated));
     }
 
     // Players who never answer before the selection window ends bring vanilla's suggested squad, sized to the escort

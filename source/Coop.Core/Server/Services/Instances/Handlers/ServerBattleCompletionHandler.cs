@@ -622,14 +622,14 @@ public class ServerBattleCompletionHandler : IHandler
         messageBroker.Publish(this, new AuthoritativeBattleConclusionRequested(instanceId, concludedState, hostEpoch));
     }
 
-    // `succeeded: false` so the walls instance isnt recorded as concluded, otherwise the keep mission on the same
-    // map event id gets refused. The walls host and reports are dropped too.
+    // The walls instance isnt recorded as concluded, otherwise the keep mission on the same map event id gets
+    // refused. The walls host and reports are dropped too.
     private void Handle_SiegeKeepStageOpened(MessagePayload<SiegeKeepStageOpened> payload)
     {
         var mapEventId = payload.What.MapEventId;
         RunSerialized(() =>
         {
-            missionManager.CompleteInstanceConclusion(mapEventId, succeeded: false);
+            missionManager.ReleaseInstanceForNextStage(mapEventId);
             hostRegistry.Remove(mapEventId);
             ForgetConclusionState(mapEventId);
         });

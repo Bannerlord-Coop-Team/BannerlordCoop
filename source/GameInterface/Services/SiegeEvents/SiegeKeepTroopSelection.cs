@@ -159,7 +159,7 @@ public sealed class SiegeKeepTroopSelection : ISiegeKeepTroopSelection
             var seat = attempt.Seats[index];
 
             var healthy = rules.CountHealthy(party, seat.HeroCharacterId);
-            if (!rules.TryAccept(healthy, seat.HeroCharacterId, seat.EscortAllowance, requested, out var accepted))
+            if (!rules.TryAccept(healthy, seat.HeroCharacterId, seat.EscortAllowance, requested, out var accepted, out _))
                 return false;
 
             attempt.Selections[partyId] = accepted;
@@ -187,19 +187,22 @@ public sealed class SiegeKeepTroopSelection : ISiegeKeepTroopSelection
     public void Lock(MapEvent mapEvent)
     {
         // Vanilla's hall supplier draws its defender list from every mobile party on the side in order.
-        var defendingParties = mapEvent.DefenderSide.Parties
-            .Select(mapEventParty => mapEventParty.Party)
-            .Where(party => party?.IsMobile == true)
-            .ToList();
-        var healthyByParty = defendingParties
-            .Select(party => (IReadOnlyDictionary<string, int>)rules.CountHealthy(party.MobileParty, heroCharacterId: null))
-            .ToList();
+        var defendingParties = new List<PartyBase>();
+        var healthyByParty = new List<IReadOnlyDictionary<string, int>>();
+        foreach (var mapEventParty in mapEvent.DefenderSide.Parties)
+        {
+            var party = mapEventParty.Party;
+            if (party?.IsMobile != true) continue;
+            defendingParties.Add(party);
+            healthyByParty.Add(rules.CountHealthy(party.MobileParty, heroCharacterId: null));
+        }
 
         lock (gate)
         {
             if (!attempts.TryGetValue(mapEvent, out var attempt) || attempt.Locked) return;
             attempt.Locked = true;
 
+            // One allocation per defending party, in the same order.
             var allocations = SplitDefenders(attempt.DefenderBudget, healthyByParty);
             for (var index = 0; index < defendingParties.Count; index++)
                 attempt.DefenderAllocations[defendingParties[index]] = allocations[index];

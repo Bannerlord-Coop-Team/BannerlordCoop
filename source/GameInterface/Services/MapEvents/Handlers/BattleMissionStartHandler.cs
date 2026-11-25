@@ -62,7 +62,7 @@ internal class BattleMissionStartHandler : IHandler
     private readonly IBattleTroopReserveBuilder reserveBuilder;
     private readonly IBattleHostRetentionPolicy retentionPolicy;
     private readonly HideoutRaidHandler hideoutRaids;
-    private readonly ISiegeKeepRoster keepSelection;
+    private readonly ISiegeKeepRoster keepRoster;
     private static long attackMissionStartSequence;
 
     // Server-side: the complete mission initializer chosen once per map event and reused for late entrants.
@@ -84,7 +84,7 @@ internal class BattleMissionStartHandler : IHandler
         IBattleTroopReserveBuilder reserveBuilder,
         IBattleHostRetentionPolicy retentionPolicy,
         HideoutRaidHandler hideoutRaids = null,
-        ISiegeKeepRoster keepSelection = null)
+        ISiegeKeepRoster keepRoster = null)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -95,7 +95,7 @@ internal class BattleMissionStartHandler : IHandler
         this.reserveBuilder = reserveBuilder;
         this.retentionPolicy = retentionPolicy;
         this.hideoutRaids = hideoutRaids;
-        this.keepSelection = keepSelection;
+        this.keepRoster = keepRoster;
 
         messageBroker.Subscribe<NetworkBattleStartRequest>(Handle_NetworkBattleStartRequest);
         messageBroker.Subscribe<NetworkStartAttackMission>(Handle_NetworkStartAttackMission);
@@ -212,8 +212,8 @@ internal class BattleMissionStartHandler : IHandler
                 // A siege in the lord's hall only opens the keep for the players its locked keep roster seated.
                 // Rejected before the arbiter claim so the event stays open for auto-resolve.
                 operation = "validate siege stage";
-                bool isKeep = mapEvent.IsSiegeKeepStage();
-                if (isKeep && keepSelection?.IsAdmitted(mapEvent, attackerMobileParty) != true)
+                bool isLordsHall = mapEvent.IsSiegeKeepStage();
+                if (isLordsHall && keepRoster?.IsAdmitted(mapEvent, attackerMobileParty) != true)
                 {
                     Logger.Information("Rejecting keep mission for {MapEventId}: the requester has no place in a locked keep roster",
                         payload.What.MapEventId);
@@ -259,7 +259,7 @@ internal class BattleMissionStartHandler : IHandler
                 ApplyClientAttackHostileConsequences(mapEvent, attackerMobileParty.Party);
 
                 // Wounded players were never seated in the keep, and they stay in the siege to see its result.
-                if (isNewMissionClaim && !isKeep)
+                if (isNewMissionClaim && !isLordsHall)
                 {
                     operation = "remove wounded non-initiating players";
                     if (!RemoveWoundedNonInitiatorParties(
@@ -300,13 +300,11 @@ internal class BattleMissionStartHandler : IHandler
                     operation = "build siege mission snapshot";
                     // A new claim means no mission is open, so re-read the engine and wall damage the last one wrote
                     // back, keeping the siege kind it opened with.
-                    // A walls snapshot left from before the keep must not open the keep on the walls scene.
-                    bool rebuild = isNewMissionClaim ||
-                        (siegeMissionSnapshots.TryGetValue(payload.What.MapEventId, out var cached) && cached.IsLordsHall != isKeep);
-                    if (rebuild)
-                        siegeMissionSnapshots[payload.What.MapEventId] = BuildSiegeMissionSnapshot(payload.What.MapEventId, mapEvent, isKeep);
-                    var snapshot = siegeMissionSnapshots.GetOrAdd(payload.What.MapEventId,
-                        _ => BuildSiegeMissionSnapshot(payload.What.MapEventId, mapEvent, isKeep));
+                    if (isNewMissionClaim || !siegeMissionSnapshots.TryGetValue(payload.What.MapEventId, out var snapshot))
+                    {
+                        snapshot = BuildSiegeMissionSnapshot(payload.What.MapEventId, mapEvent);
+                        siegeMissionSnapshots[payload.What.MapEventId] = snapshot;
+                    }
                     // Wounded non-initiators were removed above; the client-side eligibility check remains a fallback.
                     missionStartMessage = new NetworkStartSiegeMission(
                         snapshot.MapEventId,
@@ -317,7 +315,7 @@ internal class BattleMissionStartHandler : IHandler
                         payload.What.AttackerPartyId,
                         snapshot.SettlementId,
                         snapshot.IsSallyOut,
-                        snapshot.IsLordsHall);
+                        isLordsHall);
                 }
                 else
                 {
@@ -413,7 +411,7 @@ internal class BattleMissionStartHandler : IHandler
                 continue;
 
             // Walls players without a keep place watch for the result instead.
-            if (keepSelection?.IsLocked(mapEvent) == true && !keepSelection.IsAdmitted(mapEvent, party))
+            if (keepRoster?.IsLocked(mapEvent) == true && !keepRoster.IsAdmitted(mapEvent, party))
                 continue;
 
             participants.Add(new MissionParticipant(
@@ -629,7 +627,7 @@ internal class BattleMissionStartHandler : IHandler
     }
 
     /// <summary>[Server] Snapshot the mission-defining siege inputs for one map event.</summary>
-    private NetworkStartSiegeMission BuildSiegeMissionSnapshot(string mapEventId, MapEvent mapEvent, bool isLordsHall)
+    private NetworkStartSiegeMission BuildSiegeMissionSnapshot(string mapEventId, MapEvent mapEvent)
     {
         var settlement = mapEvent.MapEventSettlement;
         if (settlement == null || settlement.SiegeEvent == null)
@@ -645,8 +643,7 @@ internal class BattleMissionStartHandler : IHandler
 
         return new NetworkStartSiegeMission(mapEventId, wallLevel,
             settlement.SettlementWallSectionHitPointsRatioList.ToArray(), attackerEngines, defenderEngines,
-            initiatingPartyId: null, settlementId: settlementId, isSallyOut: mapEvent.IsSiegeAmbush,
-            isLordsHall: isLordsHall);
+            initiatingPartyId: null, settlementId: settlementId, isSallyOut: mapEvent.IsSiegeAmbush);
     }
 
     private void Handle_NetworkStartSiegeMission(MessagePayload<NetworkStartSiegeMission> payload)

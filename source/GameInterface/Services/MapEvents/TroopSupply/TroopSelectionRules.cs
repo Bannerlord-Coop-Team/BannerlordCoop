@@ -17,10 +17,10 @@ public interface ITroopSelectionRules
 
     /// <summary>
     /// The player's hero followed by the requested escorts, if every entry is healthy, the hero comes once and the
-    /// escorts fit <paramref name="escortLimit"/>.
+    /// escorts fit <paramref name="escortLimit"/>. <paramref name="escorts"/> counts the accepted troops besides the hero.
     /// </summary>
     bool TryAccept(IReadOnlyDictionary<string, int> healthy, string heroCharacterId, int escortLimit,
-        IReadOnlyList<HideoutTroopSelectionEntry> requested, out HideoutTroopSelectionEntry[] accepted);
+        IReadOnlyList<HideoutTroopSelectionEntry> requested, out HideoutTroopSelectionEntry[] accepted, out int escorts);
 
     /// <summary>Keeps only the chosen troops of a party's reserve, in the order they were chosen.</summary>
     void TrimReserve(List<TroopReserveEntry> entries, IEnumerable<HideoutTroopSelectionEntry> chosen);
@@ -53,15 +53,15 @@ public class TroopSelectionRules : ITroopSelectionRules
     }
 
     public bool TryAccept(IReadOnlyDictionary<string, int> healthy, string heroCharacterId, int escortLimit,
-        IReadOnlyList<HideoutTroopSelectionEntry> requested, out HideoutTroopSelectionEntry[] accepted)
+        IReadOnlyList<HideoutTroopSelectionEntry> requested, out HideoutTroopSelectionEntry[] accepted, out int escorts)
     {
         accepted = null;
+        escorts = 0;
         if (!healthy.TryGetValue(heroCharacterId, out var heroes) || heroes < 1)
             return false;
 
         var selection = new List<HideoutTroopSelectionEntry> { new(heroCharacterId, 1) };
         var selectedCounts = new Dictionary<string, int>();
-        var escorts = 0;
         foreach (var entry in requested)
         {
             if (string.IsNullOrEmpty(entry.CharacterId) || entry.Count < 1)

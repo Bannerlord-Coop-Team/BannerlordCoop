@@ -86,9 +86,8 @@ public sealed class HideoutTroopSelection : IHideoutTroopSelection
 
             remaining = attempt == null ? escortLimit : attempt.Limit - attempt.Used;
             var healthy = rules.CountHealthy(party, player.CharacterObjectId);
-            if (!rules.TryAccept(healthy, player.CharacterObjectId, remaining, requested, out var selection))
+            if (!rules.TryAccept(healthy, player.CharacterObjectId, remaining, requested, out var selection, out var escorts))
                 return false;
-            var escorts = selection.Sum(entry => entry.Count) - 1;
 
             if (attempt == null)
             {
