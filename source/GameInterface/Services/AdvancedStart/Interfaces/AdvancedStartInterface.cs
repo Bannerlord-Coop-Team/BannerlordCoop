@@ -17,6 +17,7 @@ using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using TaleWorlds.ScreenSystem;
 using StartOptionIds = TaleWorlds.CampaignSystem.AdvancedStartOptions.DefaultAdvancedStartOptions;
@@ -59,6 +60,21 @@ public interface IAdvancedStartInterface : IGameAbstraction
     /// <summary>Client: closes the window without running its callbacks and forgets this join's policy.</summary>
     void EndJoin();
 
+    /// <summary>Server: whether the host's config offers any start that changes the world. Unlike <see cref="CreatePolicy"/>
+    /// it reads only the config, so it can't fail a joiner's save snapshot.</summary>
+    bool OffersWorldStarts();
+
+    /// <summary>Client: stores whether the server offers world-changing starts, from its join-time server options.</summary>
+    void UpdateWorldStartsOffered(bool offered);
+
+    /// <summary>Client: whether resuming the campaign now would lock the world-changing starts for players who
+    /// haven't joined yet, so the player should confirm it first.</summary>
+    bool ResumeLocksWorldStarts();
+
+    /// <summary>Client: asks the player to confirm the campaign's first resume and runs <paramref name="onStart"/>
+    /// if they do. Waiting leaves the campaign paused, and the next resume asks again.</summary>
+    void ConfirmFirstResume(Action onStart);
+
     /// <summary>Server: applies the picked start and ticked modifiers to a newly joined hero. Returns false when the
     /// start can no longer be applied, such as a king start for a kingdom another player took first, and the hero
     /// keeps the default start.</summary>
@@ -88,6 +104,10 @@ internal class AdvancedStartInterface : IAdvancedStartInterface
     private bool startOptionsSkipped;
     // Server: the campaign whose clock is being watched for its first move.
     private Campaign worldStartWatchCampaign;
+    // Client: the server offers world-changing starts.
+    private bool worldStartsOffered;
+    // Client: the player agreed to the first resume, so they aren't asked again while the clock catches up.
+    private bool firstResumeConfirmed;
 
     public AdvancedStartInterface(
         IModConfig modConfig,
@@ -188,6 +208,38 @@ internal class AdvancedStartInterface : IAdvancedStartInterface
     }
 
     public bool WillShowStartOptions() => !startOptionsSkipped && OffersPickableStart(ServerPolicy);
+
+    public bool OffersWorldStarts() => OffersWorldStarts(startTypes, modConfig.Data.AdvancedStart);
+
+    /// <summary>Whether the config offers any start that changes the world, by the same rule as the policy's
+    /// world start types.</summary>
+    internal static bool OffersWorldStarts(IEnumerable<IAdvancedStartType> startTypes, AdvancedStartConfigData config) =>
+        config?.Enabled != false && startTypes.Any(startType => startType.ChangesWorld && startType.IsOffered(config));
+
+    public void UpdateWorldStartsOffered(bool offered)
+    {
+        worldStartsOffered = offered;
+    }
+
+    public bool ResumeLocksWorldStarts() => worldStartsOffered && !firstResumeConfirmed && !HasWorldStarted();
+
+    public void ConfirmFirstResume(Action onStart)
+    {
+        // A second press while the popup is up would stack another one.
+        if (InformationManager.IsAnyInquiryActive()) return;
+
+        InformationManager.ShowInquiry(new InquiryData(
+            "Start the campaign?",
+            "Once time starts, players who join later can no longer pick starting options that change the world. " +
+            "Make sure everyone who wants one has joined first.",
+            true, true, "Start", "Wait",
+            () =>
+            {
+                firstResumeConfirmed = true;
+                onStart();
+            },
+            null));
+    }
 
     /// <summary>Whether the policy offers a modifier, or any start other than the default that can be picked right now.</summary>
     internal static bool OffersPickableStart(AdvancedStartPolicy policy)

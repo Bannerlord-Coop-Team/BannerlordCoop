@@ -3,12 +3,14 @@ using Common.Tests.Utils;
 using Coop.Core.Client.Services.Time.Handlers;
 using Coop.Core.Server.Services.Time.Messages;
 using Coop.Tests.Mocks;
+using GameInterface.Services.AdvancedStart.Interfaces;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.MapEvents;
 using Moq;
+using System;
 using System.Linq;
 using Xunit;
 
@@ -23,7 +25,7 @@ namespace Coop.Tests.Client.Services.Time
             var broker = new TestMessageBroker();
             var network = new TestNetwork();
             var mockTimeControlInterface = new Mock<ITimeControlInterface>();
-            var handler = new TimeHandler(broker, network, mockTimeControlInterface.Object);
+            var handler = new TimeHandler(broker, network, mockTimeControlInterface.Object, Mock.Of<IAdvancedStartInterface>());
 
             Assert.True(broker.GetTotalSubscribers() > 0);
 
@@ -41,7 +43,7 @@ namespace Coop.Tests.Client.Services.Time
             var broker = new TestMessageBroker();
             var network = new TestNetwork();
             var mockTimeControlInterface = new Mock<ITimeControlInterface>();
-            var handler = new TimeHandler(broker, network, mockTimeControlInterface.Object);
+            var handler = new TimeHandler(broker, network, mockTimeControlInterface.Object, Mock.Of<IAdvancedStartInterface>());
             var payload = new TimeSpeedChangedAttempted(TimeControlEnum.Play_1x);
             var message = new MessagePayload<TimeSpeedChangedAttempted>(null, payload);
 
@@ -65,7 +67,7 @@ namespace Coop.Tests.Client.Services.Time
             var broker = new TestMessageBroker();
             var network = new TestNetwork();
             var mockTimeControlInterface = new Mock<ITimeControlInterface>();
-            var handler = new TimeHandler(broker, network, mockTimeControlInterface.Object);
+            var handler = new TimeHandler(broker, network, mockTimeControlInterface.Object, Mock.Of<IAdvancedStartInterface>());
             var payload = new NetworkChangeTimeControlMode(TimeControlEnum.Play_2x);
             var message = new MessagePayload<NetworkChangeTimeControlMode>(null, payload);
 
@@ -83,7 +85,7 @@ namespace Coop.Tests.Client.Services.Time
             var broker = new TestMessageBroker();
             var network = new TestNetwork();
             var mockTimeControlInterface = new Mock<ITimeControlInterface>();
-            var handler = new TimeHandler(broker, network, mockTimeControlInterface.Object);
+            var handler = new TimeHandler(broker, network, mockTimeControlInterface.Object, Mock.Of<IAdvancedStartInterface>());
 
             // Act
             handler.Handle_NetworkMapEventLockChanged(
@@ -101,7 +103,7 @@ namespace Coop.Tests.Client.Services.Time
             var broker = new TestMessageBroker();
             var network = new TestNetwork();
             var mockTimeControlInterface = new Mock<ITimeControlInterface>();
-            var handler = new TimeHandler(broker, network, mockTimeControlInterface.Object);
+            var handler = new TimeHandler(broker, network, mockTimeControlInterface.Object, Mock.Of<IAdvancedStartInterface>());
 
             handler.Handle_NetworkMapEventLockChanged(
                 new MessagePayload<NetworkMapEventLockChanged>(null, new NetworkMapEventLockChanged(1)));
@@ -123,7 +125,7 @@ namespace Coop.Tests.Client.Services.Time
             var broker = new TestMessageBroker();
             var network = new TestNetwork();
             var mockTimeControlInterface = new Mock<ITimeControlInterface>();
-            var handler = new TimeHandler(broker, network, mockTimeControlInterface.Object);
+            var handler = new TimeHandler(broker, network, mockTimeControlInterface.Object, Mock.Of<IAdvancedStartInterface>());
 
             // Act
             handler.Handle_NetworkMapEventLockChanged(
@@ -145,7 +147,7 @@ namespace Coop.Tests.Client.Services.Time
             var network = new TestNetwork();
             var peer = network.CreatePeer();
             var mockTimeControlInterface = new Mock<ITimeControlInterface>();
-            var handler = new TimeHandler(broker, network, mockTimeControlInterface.Object);
+            var handler = new TimeHandler(broker, network, mockTimeControlInterface.Object, Mock.Of<IAdvancedStartInterface>());
 
             handler.Handle_NetworkMapEventLockChanged(
                 new MessagePayload<NetworkMapEventLockChanged>(null, new NetworkMapEventLockChanged(3)));
@@ -169,7 +171,7 @@ namespace Coop.Tests.Client.Services.Time
             var network = new TestNetwork();
             var peer = network.CreatePeer();
             var mockTimeControlInterface = new Mock<ITimeControlInterface>();
-            var handler = new TimeHandler(broker, network, mockTimeControlInterface.Object);
+            var handler = new TimeHandler(broker, network, mockTimeControlInterface.Object, Mock.Of<IAdvancedStartInterface>());
 
             handler.Handle_NetworkMapEventLockChanged(
                 new MessagePayload<NetworkMapEventLockChanged>(null, new NetworkMapEventLockChanged(1)));
@@ -183,6 +185,53 @@ namespace Coop.Tests.Client.Services.Time
             Assert.Single(sent);
             Assert.IsType<NetworkRequestTimeSpeedChange>(sent.First());
             Assert.Equal(TimeControlEnum.Play_1x, ((NetworkRequestTimeSpeedChange)sent.First()).NewControlMode);
+        }
+
+        [Fact]
+        public void TimeSpeedChanged_FirstResumeThatLocksWorldStarts_SendsOnlyOnceConfirmed()
+        {
+            // Arrange
+            var broker = new TestMessageBroker();
+            var network = new TestNetwork();
+            var peer = network.CreatePeer();
+            var advancedStart = new Mock<IAdvancedStartInterface>();
+            advancedStart.Setup(m => m.ResumeLocksWorldStarts()).Returns(true);
+            Action onStart = null;
+            advancedStart.Setup(m => m.ConfirmFirstResume(It.IsAny<Action>())).Callback<Action>(action => onStart = action);
+            var handler = new TimeHandler(broker, network, new Mock<ITimeControlInterface>().Object, advancedStart.Object);
+
+            // Act
+            handler.Handle_TimeSpeedChanged(
+                new MessagePayload<TimeSpeedChangedAttempted>(null, new TimeSpeedChangedAttempted(TimeControlEnum.Play_1x)));
+
+            // Assert
+            Assert.False(network.SentNetworkMessages.ContainsKey(peer.Id));
+
+            onStart();
+
+            var sent = Assert.Single(network.GetPeerMessages(peer));
+            Assert.Equal(TimeControlEnum.Play_1x, Assert.IsType<NetworkRequestTimeSpeedChange>(sent).NewControlMode);
+        }
+
+        [Fact]
+        public void TimeSpeedChanged_PauseWhileWorldStartsOpen_SendsWithoutAsking()
+        {
+            // Arrange
+            var broker = new TestMessageBroker();
+            var network = new TestNetwork();
+            var peer = network.CreatePeer();
+            var advancedStart = new Mock<IAdvancedStartInterface>();
+            advancedStart.Setup(m => m.ResumeLocksWorldStarts()).Returns(true);
+            var handler = new TimeHandler(broker, network, new Mock<ITimeControlInterface>().Object, advancedStart.Object);
+
+            // Act
+            handler.Handle_TimeSpeedChanged(
+                new MessagePayload<TimeSpeedChangedAttempted>(null, new TimeSpeedChangedAttempted(TimeControlEnum.Pause)));
+
+            // Assert
+            var sent = Assert.Single(network.GetPeerMessages(peer));
+            Assert.Equal(TimeControlEnum.Pause, Assert.IsType<NetworkRequestTimeSpeedChange>(sent).NewControlMode);
+            advancedStart.Verify(m => m.ConfirmFirstResume(It.IsAny<Action>()), Times.Never);
         }
     }
 }

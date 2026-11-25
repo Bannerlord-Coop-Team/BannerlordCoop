@@ -6,7 +6,9 @@ using SandBox.AdvancedStartOptions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Library;
 using Xunit;
 
 namespace GameInterface.Tests.Services.AdvancedStart;
@@ -22,6 +24,61 @@ public class AdvancedStartInterfaceTests
         Assert.Equal(new[] { "default", "outlaw", "beggar", "trader", "mercenary", "vassal", "king" }, policy.StartTypes);
         Assert.Equal(new[] { "trader", "mercenary", "vassal", "king" }, policy.WorldStartTypes);
         Assert.Equal(new[] { "mercenary", "vassal", "king" }, policy.KingdomStartTypes);
+    }
+
+    [Theory]
+    // Every vanilla start offered, four of which change the world.
+    [InlineData(null, false, true)]
+    // The host turned the window off.
+    [InlineData(false, false, false)]
+    // Only outlaw and beggar left, neither of which changes the world.
+    [InlineData(null, true, false)]
+    public void OffersWorldStarts_FollowsTheConfig(bool? enabled, bool onlyLocalStarts, bool expected)
+    {
+        var config = new AdvancedStartConfigData
+        {
+            Enabled = enabled,
+            StartTypes = onlyLocalStarts
+                ? new AdvancedStartTypesConfigData { Trader = false, Mercenary = false, Vassal = false, King = false }
+                : null,
+        };
+
+        Assert.Equal(expected, AdvancedStartInterface.OffersWorldStarts(VanillaAdvancedStartType.All, config));
+    }
+
+    [Fact]
+    public void ConfirmFirstResume_WaitAsksAgain_StartRunsOnceAndStopsAsking()
+    {
+        var advancedStart = new AdvancedStartInterface(null, null, null, null, null,
+            Array.Empty<IAdvancedStartType>(), Array.Empty<IAdvancedStartModifier>());
+        advancedStart.UpdateWorldStartsOffered(true);
+        var shown = new List<InquiryData>();
+        // The event is static, so only this test's popup is captured.
+        Action<InquiryData, bool, bool> capture = (inquiry, _, _) =>
+        {
+            if (inquiry.TitleText == "Start the campaign?") shown.Add(inquiry);
+        };
+        int starts = 0;
+        // Through reflection, since the publicized event's backing field makes the plain name ambiguous.
+        EventInfo showInquiry = typeof(InformationManager).GetEvent("OnShowInquiry", BindingFlags.Public | BindingFlags.Static);
+
+        showInquiry.AddEventHandler(null, capture);
+        try
+        {
+            advancedStart.ConfirmFirstResume(() => starts++);
+            shown[0].NegativeAction?.Invoke();
+            advancedStart.ConfirmFirstResume(() => starts++);
+            shown[1].AffirmativeAction();
+        }
+        finally
+        {
+            showInquiry.RemoveEventHandler(null, capture);
+        }
+
+        Assert.Equal(2, shown.Count);
+        Assert.Equal(1, starts);
+        // Confirmed, so the next resume goes straight through without reading the clock.
+        Assert.False(advancedStart.ResumeLocksWorldStarts());
     }
 
     [Fact]

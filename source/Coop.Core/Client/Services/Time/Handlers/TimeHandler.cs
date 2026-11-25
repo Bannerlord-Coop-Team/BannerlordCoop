@@ -3,6 +3,7 @@ using Common.Messaging;
 using Common.Network;
 using Coop.Core.Server.Services.Time.Messages;
 using GameInterface.Configuration;
+using GameInterface.Services.AdvancedStart.Interfaces;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
@@ -24,13 +25,16 @@ namespace Coop.Core.Client.Services.Time.Handlers
         private readonly IMessageBroker messageBroker;
         private readonly INetwork network;
         private readonly ITimeControlInterface timeControlInterface;
+        private readonly IAdvancedStartInterface advancedStartInterface;
         private MapEventFastForwardState mapEventState = MapEventFastForwardState.NotBlocked;
 
-        public TimeHandler(IMessageBroker messageBroker, INetwork network, ITimeControlInterface timeControlInterface)
+        public TimeHandler(IMessageBroker messageBroker, INetwork network, ITimeControlInterface timeControlInterface,
+            IAdvancedStartInterface advancedStartInterface)
         {
             this.messageBroker = messageBroker;
             this.network = network;
             this.timeControlInterface = timeControlInterface;
+            this.advancedStartInterface = advancedStartInterface;
             messageBroker.Subscribe<TimeSpeedChangedAttempted>(Handle_TimeSpeedChanged);
             messageBroker.Subscribe<NetworkChangeTimeControlMode>(Handle_NetworkTimeSpeedChanged);
             messageBroker.Subscribe<NetworkMapEventLockChanged>(Handle_NetworkMapEventLockChanged);
@@ -63,6 +67,13 @@ namespace Coop.Core.Client.Services.Time.Handlers
             Logger.Verbose("Client changing time to {mode} from server", newMode);
 
             var payload = new NetworkRequestTimeSpeedChange(newMode);
+            // The first resume locks the world-changing starts for good, so the player confirms it.
+            if (newMode != TimeControlEnum.Pause && advancedStartInterface.ResumeLocksWorldStarts())
+            {
+                advancedStartInterface.ConfirmFirstResume(() => network.SendAll(payload));
+                return;
+            }
+
             network.SendAll(payload);
         }
 

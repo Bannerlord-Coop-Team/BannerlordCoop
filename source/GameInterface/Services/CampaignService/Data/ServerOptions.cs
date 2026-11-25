@@ -11,9 +11,13 @@ public class ServerOptions
 {
     [ProtoMember(1)]
     public readonly int PlayerReceivedDamage;
+    /// <summary>The host offers starting options that change the world, which lock once the campaign is first resumed.</summary>
+    [ProtoMember(2)]
+    public readonly bool WorldStartsOffered;
 
-    public ServerOptions(int playerReceivedDamage)
+    public ServerOptions(int playerReceivedDamage, bool worldStartsOffered)
     {
         PlayerReceivedDamage = playerReceivedDamage;
+        WorldStartsOffered = worldStartsOffered;
     }
 }
