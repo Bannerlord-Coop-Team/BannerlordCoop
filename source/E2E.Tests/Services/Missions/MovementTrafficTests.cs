@@ -1020,7 +1020,7 @@ public partial class MovementTrafficTests : MissionTestEnvironment
                 compressor.SerializeCalls,
                 packets.Length,
                 packets.Length + 1);
-            AssertSerializedBatchesFitRelay(serializer, network);
+            AssertSerializedBatchesFitRelay(serializer, network, syntheticPayloads: true);
         });
     }
 
@@ -1408,13 +1408,24 @@ public partial class MovementTrafficTests : MissionTestEnvironment
 
     private static void AssertSerializedBatchesFitRelay(
         ProtoBufSerializer serializer,
-        MockBattleNetwork network)
+        MockBattleNetwork network,
+        bool syntheticPayloads = false)
     {
         Assert.NotEmpty(network.SerializedPacketSends);
         foreach (SerializedPacketSend send in network.SerializedPacketSends)
         {
             Assert.True(send.Payload.Length <= network.MaxUnreliablePayloadBytes,
                 $"Direct payload was {send.Payload.Length} bytes");
+
+            if (!syntheticPayloads)
+            {
+                IPacket packet = serializer.Deserialize<IPacket>(send.Payload);
+                Assert.True(
+                    packet is CompressedMovementPacket or
+                        MovementPacket { PackedSnapshots: null } or
+                        MountMovementPacket { PackedSnapshots: null },
+                    "Expected a compressed envelope or unpacked movement snapshots.");
+            }
 
             byte[] relay = serializer.Serialize(new RelayPacket(
                 send.Packet.DeliveryMethod,

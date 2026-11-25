@@ -108,6 +108,37 @@ public partial class MovementTrafficTests
     }
 
     [Fact]
+    public void PackedMovement_FallsBackToProtobufWhenPackedBodyDoesNotCompress()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        peer.Call(() =>
+        {
+            var mock = CreateMovementMission(fixture, peer);
+            const int count = 4;
+            var ids = new ushort[count];
+            var riders = new AgentData[count];
+            for (int i = 0; i < count; i++)
+            {
+                var rider = SpawnRider(mock);
+                Assert.True(AgentMirror.TryGet(rider, out var mirror));
+                PopulateIncompressibleMovementState(mirror, i + 1);
+                ids[i] = (ushort)(i + 1);
+                riders[i] = new AgentData(rider);
+            }
+
+            var packet = new MovementPacket(EquivalenceScope, ids, riders, EquivalenceSender);
+            var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
+            var codec = new MovementSnapshotCodec();
+            var compressor = new MovementPacketCompressor(serializer, codec);
+            var baseline = new MovementPacketCompressor(serializer, Mock.Of<IMovementSnapshotCodec>());
+
+            Assert.True(codec.TryPack(packet, MovementPacketCompressor.MaxUncompressedBytes, out _));
+            Assert.Equal(baseline.Serialize(packet), compressor.Serialize(packet));
+        });
+    }
+
+    [Fact]
     public void PackedMovement_ProtobufSnapshotTagsArePinned()
     {
         var model = RuntimeTypeModel.Default;

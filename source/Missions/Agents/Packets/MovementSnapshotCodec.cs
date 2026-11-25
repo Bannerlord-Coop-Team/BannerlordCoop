@@ -208,8 +208,9 @@ internal sealed class MovementSnapshotCodec : IMovementSnapshotCodec
             int decks = 0;
             int mounts = 0;
             extraBytes = 0;
-            foreach (AgentData agent in agents)
+            for (int i = 0; i < count; i++)
             {
+                AgentData agent = agents[i];
                 if (agent.HasDeckPose) decks++;
                 if (agent.MountData == null) continue;
                 mounts++;
@@ -221,8 +222,8 @@ internal sealed class MovementSnapshotCodec : IMovementSnapshotCodec
         public static SnapshotLayout ForMounts(AgentMountData[] mounts, int count, out int extraBytes)
         {
             extraBytes = 0;
-            foreach (AgentMountData mount in mounts)
-                extraBytes += mount.GetSnapshotExtraBytes();
+            for (int i = 0; i < count; i++)
+                extraBytes += mounts[i].GetSnapshotExtraBytes();
             return new SnapshotLayout(agents: 0, decks: 0, mounts: count);
         }
 
