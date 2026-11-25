@@ -55,7 +55,7 @@ public class RemotePlayerHeroHandlerTests
     {
         player = new Player("ctrl", "hero1", "party1", "clan1", "char1");
         heroData = new byte[] { 1, 2, 3 };
-        handles = new PlayerRegistrationHandles(1, 2, 3, 4, 5, 6, 7, 8, 9);
+        handles = new PlayerRegistrationHandles(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12);
         return new NetworkNewPlayerHeroCreated("ctrl", player, heroData, handles);
     }
 

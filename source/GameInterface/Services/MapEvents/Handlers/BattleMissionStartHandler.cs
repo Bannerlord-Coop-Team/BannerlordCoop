@@ -202,6 +202,13 @@ internal class BattleMissionStartHandler : IHandler
                     return;
                 }
 
+                if (mapEvent.IsNavalBattleWithoutShips(attackerMobileParty))
+                {
+                    Logger.Warning("Rejecting attack mission start for map event {MapEventId}: the requesting party has no ships", payload.What.MapEventId);
+                    network.Send(requester, new NetworkBattleStartReply(payload.What.RequestId, false));
+                    return;
+                }
+
                 // A siege in the lord's hall only opens the keep for the players its locked keep roster seated.
                 // Rejected before the arbiter claim so the event stays open for auto-resolve.
                 operation = "validate siege stage";
@@ -378,7 +385,8 @@ internal class BattleMissionStartHandler : IHandler
         return mapEvent.FindMapEventParty(party.Party) != null;
     }
 
-    // The connected players in the map event that open the mission; a kept naval host waits for the conclusion instead.
+    // The connected players in the map event that open the mission; a kept naval host waits for the conclusion instead,
+    // and a ship-less player in a naval battle is left out.
     private IReadOnlyList<MissionParticipant> GetMissionParticipants(string mapEventId, MapEvent mapEvent)
     {
         var participants = new List<MissionParticipant>();
@@ -397,6 +405,9 @@ internal class BattleMissionStartHandler : IHandler
 
             if (mapEvent.EventType == MapEvent.BattleTypes.Hideout &&
                 hideoutRaids?.IsAdmitted(mapEvent, party) != true)
+                continue;
+
+            if (mapEvent.IsNavalBattleWithoutShips(party))
                 continue;
 
             // Walls players without a keep place watch for the result instead.

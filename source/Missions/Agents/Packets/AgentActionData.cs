@@ -18,6 +18,40 @@ namespace Missions.Agents.Packets
         internal const Agent.MovementControlFlag DefendMovementFlagsMask =
             Agent.MovementControlFlag.DefendMask | Agent.MovementControlFlag.DefendBlock;
 
+        /// <summary>The action index and type captured for one channel.</summary>
+        internal readonly struct ActionChannel
+        {
+            public readonly int Index;
+            public readonly Agent.ActionCodeType Type;
+
+            public ActionChannel(int index, Agent.ActionCodeType type)
+            {
+                Index = index;
+                Type = type;
+            }
+        }
+
+        /// <summary>The action index and type for each channel in one agent observation.</summary>
+        internal readonly struct ActionChannels
+        {
+            public readonly ActionChannel Channel0;
+            public readonly ActionChannel Channel1;
+
+            public ActionChannels(Agent agent)
+            {
+                Channel0 = new ActionChannel(agent.GetCurrentAction(0).Index, agent.GetCurrentActionType(0));
+                Channel1 = new ActionChannel(agent.GetCurrentAction(1).Index, agent.GetCurrentActionType(1));
+            }
+
+            public ActionChannel ForChannel(int channel) => channel switch
+            {
+                0 => Channel0,
+                1 => Channel1,
+                // The missing channel (-1) uses Other so both guard flags stay false.
+                _ => new ActionChannel(ActionIndexCache.act_none.Index, Agent.ActionCodeType.Other)
+            };
+        }
+
         // MBAPI.IMBAnimation is a non-public static field. The publicizer makes it compile, but the
         // emitted IgnoresAccessChecksTo isn't honored in every runtime load context (it throws
         // FieldAccessException in live play). Reflecting a non-public static field always works, so
@@ -87,7 +121,8 @@ namespace Missions.Agents.Packets
         }
 
         internal static Agent.MovementControlFlag GetEffectiveDefendMovementFlags(
-            Agent agent)
+            Agent agent,
+            ActionChannels actionChannels)
         {
             Agent.MovementControlFlag defendFlags =
                 GetDefendMovementFlags(agent.MovementFlags);
@@ -103,9 +138,7 @@ namespace Missions.Agents.Packets
                     return defendFlags;
             }
 
-            Agent.ActionCodeType action0Type = agent.GetCurrentActionType(0);
-            Agent.ActionCodeType action1Type = agent.GetCurrentActionType(1);
-            if (!IsDefendingAction(action0Type) && !IsDefendingAction(action1Type))
+            if (!IsDefendingAction(actionChannels.Channel0.Type) && !IsDefendingAction(actionChannels.Channel1.Type))
                 return Agent.MovementControlFlag.None;
 
             // Guard actions can outlive the frame's defend flags, so recompute them while the action is active.
@@ -204,7 +237,8 @@ namespace Missions.Agents.Packets
 
         internal static Agent.GuardMode GetEffectiveGuardMode(
             Agent agent,
-            Agent.MovementControlFlag defendFlags)
+            Agent.MovementControlFlag defendFlags,
+            Agent.GuardMode actionGuardMode)
         {
             Agent.GuardMode guardMode = agent.CurrentGuardMode;
             if (!agent.HasMount && IsGuardMode(guardMode))
@@ -217,12 +251,8 @@ namespace Missions.Agents.Packets
                     : Agent.GuardMode.None;
             }
 
-            if (agent.HasMount)
-            {
-                guardMode = GetGuardModeFromDefendingAction(agent);
-                if (IsGuardMode(guardMode))
-                    return guardMode;
-            }
+            if (agent.HasMount && IsGuardMode(actionGuardMode))
+                return actionGuardMode;
 
             guardMode = agent.CurrentGuardMode;
             if (IsGuardMode(guardMode))
@@ -278,35 +308,33 @@ namespace Missions.Agents.Packets
                 || actionType == Agent.ActionCodeType.BlockedMelee;
         }
 
-        private static int GetGuardPresentationChannel(Agent agent)
+        private static int GetGuardPresentationChannel(Agent agent, ActionChannels actionChannels)
         {
             if (!agent.HasMount)
                 return -1;
 
-            Agent.ActionCodeType action1Type = agent.GetCurrentActionType(1);
-            Agent.ActionCodeType action0Type = agent.GetCurrentActionType(0);
-            if (IsGuardReactionAction(action1Type))
+            if (IsGuardReactionAction(actionChannels.Channel1.Type))
                 return 1;
-            if (IsGuardReactionAction(action0Type))
+            if (IsGuardReactionAction(actionChannels.Channel0.Type))
                 return 0;
-            if (IsDefendingAction(action1Type))
+            if (IsDefendingAction(actionChannels.Channel1.Type))
                 return 1;
-            if (IsDefendingAction(action0Type))
+            if (IsDefendingAction(actionChannels.Channel0.Type))
                 return 0;
 
             return -1;
         }
 
         private static int GetGuardActionChannel(
-            Agent agent,
+            ActionChannels actionChannels,
             int guardPresentationChannel)
         {
             if (guardPresentationChannel >= 0)
                 return guardPresentationChannel;
 
-            if (IsDefendingAction(agent.GetCurrentActionType(1)))
+            if (IsDefendingAction(actionChannels.Channel1.Type))
                 return 1;
-            if (IsDefendingAction(agent.GetCurrentActionType(0)))
+            if (IsDefendingAction(actionChannels.Channel0.Type))
                 return 0;
 
             return -1;
@@ -324,20 +352,31 @@ namespace Missions.Agents.Packets
             };
 
         internal static Agent.GuardMode GetGuardModeFromDefendingAction(
-            Agent agent)
+            Agent agent) =>
+            GetGuardModeFromDefendingAction(agent, new ActionChannels(agent));
+
+        internal static Agent.GuardMode GetGuardModeFromDefendingAction(
+            Agent agent,
+            ActionChannels actionChannels)
         {
             Agent.GuardMode guardMode =
-                GetGuardModeFromDefendingAction(agent, 1);
+                GetGuardModeForDefendingChannel(agent, 1, actionChannels.Channel1.Type);
             return IsGuardMode(guardMode)
                 ? guardMode
-                : GetGuardModeFromDefendingAction(agent, 0);
+                : GetGuardModeForDefendingChannel(agent, 0, actionChannels.Channel0.Type);
         }
 
         internal static Agent.GuardMode GetGuardModeFromDefendingAction(
             Agent agent,
-            int channel)
+            int channel) =>
+            GetGuardModeForDefendingChannel(agent, channel, agent.GetCurrentActionType(channel));
+
+        private static Agent.GuardMode GetGuardModeForDefendingChannel(
+            Agent agent,
+            int channel,
+            Agent.ActionCodeType actionType)
         {
-            if (!IsDefendingAction(agent.GetCurrentActionType(channel)))
+            if (!IsDefendingAction(actionType))
                 return Agent.GuardMode.None;
 
             return GetGuardModeFromDefendDirection(
@@ -377,49 +416,44 @@ namespace Missions.Agents.Packets
             guardState > 0 ? (Agent.GuardMode)(guardState - 1) : Agent.GuardMode.None;
 
         public AgentActionData(Agent agent)
-            : this(agent, GetEffectiveDefendMovementFlags(agent))
+            : this(agent, new ActionChannels(agent))
+        {
+        }
+
+        private AgentActionData(Agent agent, ActionChannels actionChannels)
+            : this(agent, actionChannels, GetEffectiveDefendMovementFlags(agent, actionChannels))
         {
         }
 
         private AgentActionData(
             Agent agent,
+            ActionChannels actionChannels,
             Agent.MovementControlFlag defendFlags)
             : this(
                 agent,
+                actionChannels,
                 defendFlags,
-                GetEffectiveGuardMode(agent, defendFlags))
+                GetEffectiveGuardMode(
+                    agent,
+                    defendFlags,
+                    GetGuardModeFromDefendingAction(agent, actionChannels)))
         {
         }
 
         internal AgentActionData(
             Agent agent,
+            ActionChannels actionChannels,
             Agent.MovementControlFlag defendFlags,
             Agent.GuardMode guardMode,
             int guardReactionChannel = -1)
             : this(
                 agent,
+                actionChannels,
                 defendFlags,
                 guardMode,
                 guardReactionChannel,
                 GetCurrentActionSpeed(agent, 0),
-                GetCurrentActionSpeed(agent, 1))
-        {
-        }
-
-        internal AgentActionData(
-            Agent agent,
-            Agent.MovementControlFlag defendFlags,
-            Agent.GuardMode guardMode,
-            int guardReactionChannel,
-            float? action0Speed,
-            float? action1Speed)
-            : this(
-                agent,
-                defendFlags,
-                guardMode,
-                guardReactionChannel,
-                action0Speed,
-                action1Speed,
+                GetCurrentActionSpeed(agent, 1),
                 AgentEquipmentData.TryCapture(agent, out var equipment) ? equipment : (AgentEquipmentData?)null)
         {
         }
@@ -427,6 +461,7 @@ namespace Missions.Agents.Packets
         // The equipment is passed in by the caller that already captured it this frame, so it isn't read twice.
         internal AgentActionData(
             Agent agent,
+            ActionChannels actionChannels,
             Agent.MovementControlFlag defendFlags,
             Agent.GuardMode guardMode,
             int guardReactionChannel,
@@ -435,8 +470,6 @@ namespace Missions.Agents.Packets
             AgentEquipmentData? capturedEquipment)
         {
             Equipment = capturedEquipment;
-            ActionIndexCache cache0 = agent.GetCurrentAction(0);
-            ActionIndexCache cache1 = agent.GetCurrentAction(1);
             bool isPlayerControlled =
                 agent.Controller == AgentControllerType.Player;
 
@@ -461,11 +494,11 @@ namespace Missions.Agents.Packets
             CrouchMode = agent.CrouchMode;
             GuardState = ToWireGuardState(guardMode);
 
-            Action0Index = cache0.Index;
+            Action0Index = actionChannels.Channel0.Index;
             Action0Progress = agent.GetCurrentActionProgress(0);
             Action0Flag = (ulong)agent.GetCurrentAnimationFlag(0);
             Action0Speed = action0Speed;
-            Action1IndexWire = cache1.Index + 1;
+            Action1IndexWire = actionChannels.Channel1.Index + 1;
             Action1Progress = agent.GetCurrentActionProgress(1);
             Action1Flag = (ulong)agent.GetCurrentAnimationFlag(1);
             Action1Speed = action1Speed;
@@ -477,25 +510,16 @@ namespace Missions.Agents.Packets
             int guardPresentationChannel =
                 agent.HasMount && validGuardReactionChannel >= 0
                     ? validGuardReactionChannel
-                    : GetGuardPresentationChannel(agent);
+                    : GetGuardPresentationChannel(agent, actionChannels);
             GuardPresentationChannelWire = guardPresentationChannel + 1;
-            GuardActionChannelWire =
-                (validGuardReactionChannel >= 0
-                    ? validGuardReactionChannel
-                    : GetGuardActionChannel(
-                        agent,
-                        guardPresentationChannel)) + 1;
-            GuardActionIsDefending =
-                GuardActionChannel >= 0
-                && IsDefendingAction(
-                    agent.GetCurrentActionType(
-                        GuardActionChannel));
+            int guardActionChannel = validGuardReactionChannel >= 0
+                ? validGuardReactionChannel
+                : GetGuardActionChannel(actionChannels, guardPresentationChannel);
+            GuardActionChannelWire = guardActionChannel + 1;
+            Agent.ActionCodeType guardActionType = actionChannels.ForChannel(guardActionChannel).Type;
+            GuardActionIsDefending = IsDefendingAction(guardActionType);
             GuardActionIsReaction =
-                GuardActionChannel >= 0
-                && (guardReactionChannel == GuardActionChannel
-                    || IsGuardReactionAction(
-                        agent.GetCurrentActionType(
-                            GuardActionChannel)));
+                validGuardReactionChannel >= 0 || IsGuardReactionAction(guardActionType);
             IsMounted = agent.HasMount;
             IsPlayerControlled = isPlayerControlled;
         }

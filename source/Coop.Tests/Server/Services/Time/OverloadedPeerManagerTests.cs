@@ -558,7 +558,9 @@ public class OverloadedPeerManagerTests
 
     private LoadingState StartInitialCatchUp(ConnectionCollection connections, LiteNetLib.NetPeer peer)
     {
-        serverComponent.Container.Resolve<IConnectionMessageQueue>().BeginQueueing(peer);
+        var queue = serverComponent.Container.Resolve<IConnectionMessageQueue>();
+        queue.RegisterPeer(peer);
+        queue.BeginQueueing(peer);
         var state = connections.ConnectionStates[peer].SetState<LoadingState>();
 
         state.PlayerCampaignEnteredHandler(

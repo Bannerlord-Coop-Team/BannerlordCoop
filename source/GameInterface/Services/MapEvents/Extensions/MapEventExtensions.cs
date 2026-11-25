@@ -32,6 +32,14 @@ public static class MapEventExtensions
     public static bool IsSendTroopsHideout(this MapEvent mapEvent)
         => mapEvent.Component is HideoutEventComponent { IsSendTroops: true };
 
+    /// <summary>Whether the party has no hull to fight from in this naval battle, because co-op fields only each player's own ships.</summary>
+    public static bool IsNavalBattleWithoutShips(this MapEvent mapEvent, MobileParty party)
+        => mapEvent.IsNavalMapEvent && party.Ships.Count == 0;
+
+    /// <summary>Whether a player on either side waits for the server's results instead of applying its own: hideout and naval battles.</summary>
+    public static bool WaitsForServerResults(this MapEvent mapEvent)
+        => mapEvent.IsHideoutBattle || mapEvent.IsNavalMapEvent;
+
     /// <summary>
     /// Finds a party's MapEventParty on either side of the event, without going through PartiesOnSide(side) —
     /// safe to call even after the party's own MapEventSide has already been nulled elsewhere.
