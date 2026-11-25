@@ -140,6 +140,7 @@ internal class DefaultMobilePartyAIModelPatches
             PersistedDisablePlayerAttackTimes.Remove(attackerParty);
     }
 
+    // Vanilla suppresses attacks when IsMainParty && nearby.Party.EstimatedStrength > attacker.Party.EstimatedStrength.
     [HarmonyPatch(nameof(DefaultMobilePartyAIModel.GetBestInitiativeBehavior))]
     [HarmonyTranspiler]
     internal static IEnumerable<CodeInstruction> ReplaceStrongerMainPartyCheck(IEnumerable<CodeInstruction> instructions)
