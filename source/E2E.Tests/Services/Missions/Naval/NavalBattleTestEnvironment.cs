@@ -111,20 +111,30 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment, IDisp
     }
 
     /// <summary>A battle at sea or on land of <paramref name="playerIds"/> on one side, elected in that order, every member on the mesh.</summary>
-    protected NavalBattle StartServerBattle(bool atSea, out Func<int> concluded, params string[] playerIds)
+    protected NavalBattle StartServerBattle(bool atSea, out Func<int> concluded, params string[] playerIds) =>
+        StartServerBattle(atSea, playerIds, Array.Empty<string>(), out concluded);
+
+    /// <summary>
+    /// A battle at sea or on land of <paramref name="playerIds"/> on one side, its members elected in that order. Players in
+    /// <paramref name="lateJoiners"/> are connected to the server but still at the encounter, off the mesh and the mission.
+    /// </summary>
+    protected NavalBattle StartServerBattle(bool atSea, string[] playerIds, string[] lateJoiners, out Func<int> concluded)
     {
-        var battle = StartNavalBattle(playerIds.Select(id => (id, BattleSideEnum.Attacker)).ToArray());
+        var battle = StartNavalBattle(playerIds.Select(id => (id, BattleSideEnum.Attacker)).ToArray(), lateJoiners: lateJoiners);
         Server.Call(() => Server.GetRegisteredObject<MapEvent>(battle.MapEventId).Position =
             new CampaignVec2(Vec2.Zero, isOnLand: !atSea));
 
-        foreach (var peer in battle.Peers)
+        foreach (var id in playerIds)
         {
-            var member = peer;
-            Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer(member.Id, member.Instance.NetPeer));
-            EnterBattle(member.Instance, battle.MapEventId);
-            Server.SimulateMessage(member.Instance.NetPeer, new NetworkMissionEntered(member.Id, battle.MapEventId));
+            var client = battle.Players[id].Instance;
+            Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer(id, client.NetPeer));
+            if (lateJoiners.Contains(id)) continue;
+
+            EnterBattle(client, battle.MapEventId);
+            Server.SimulateMessage(client.NetPeer, new NetworkMissionEntered(id, battle.MapEventId));
         }
-        AssertHost(Server, battle.MapEventId, playerIds[0], playerIds.Skip(1).ToArray());
+        var members = playerIds.Except(lateJoiners).ToArray();
+        AssertHost(Server, battle.MapEventId, members[0], members.Skip(1).ToArray());
 
         int conclusions = 0;
         Server.Resolve<IMessageBroker>().Subscribe<MapEventConcluded>(_ => conclusions++);
