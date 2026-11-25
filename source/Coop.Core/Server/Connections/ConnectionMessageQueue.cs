@@ -437,7 +437,8 @@ internal sealed class ConnectionMessageQueue : IConnectionMessageQueue, IDisposa
 
     public int AbortCatchUp(NetPeer peer)
     {
-        int cleared = channels.TryGetValue(peer, out var channel) ? StopChannel(channel) : 0;
+        int cleared = 0;
+        if (channels.TryGetValue(peer, out var channel)) cleared = StopChannel(channel);
 
         // Replay Drain uses normal message aggregation. Remove anything it buffered before the
         // watchdog was able to abort so the end-of-update aggregate flush cannot send stale replay.
