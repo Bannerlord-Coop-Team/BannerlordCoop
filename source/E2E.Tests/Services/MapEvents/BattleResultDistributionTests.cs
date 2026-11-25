@@ -563,6 +563,62 @@ public class BattleResultDistributionTests : MapEventTestBase
             nameof(CampaignEventDispatcher.OnPlayerBattleEnd))).ToArray());
     }
 
+    // #4860: a naval member back on the map before the server concluded (the kept host) ran native results locally, and
+    // the battle's teardown closed its encounter, so the server's loot and ships never reached it.
+    [Fact]
+    public void NavalResults_WaitForServerOnTheMap_AndKeepTheStagedLootThroughTheTeardown()
+    {
+        var (ctx, _) = SetupTwoAlliedPlayersOnAttackerSide();
+        var client = Clients.First();
+        var shipId = TestEnvironment.CreateRegisteredObject<Ship>();
+        Server.Call(() =>
+        {
+            // An off-land position makes the battle naval, which syncs to the client.
+            Server.GetRegisteredObject<MapEvent>(ctx.MapEventId).Position = new CampaignVec2(default, isOnLand: false);
+        }, MapEventDisabledMethods);
+        SetMockPlayerEncounter(client, mapEventId: ctx.MapEventId);
+        client.Call(() =>
+        {
+            var mapEvent = client.GetRegisteredObject<MapEvent>(ctx.MapEventId);
+            Assert.True(mapEvent.IsNavalMapEvent);
+            mapEvent._battleState = BattleState.AttackerVictory;
+            var encounter = PlayerEncounter.Current;
+            encounter._alternativeReceivedLootShips = new List<Ship>();
+            encounter.EncounterState = PlayerEncounterState.ApplyResults;
+            encounter._stateHandled = false;
+
+            encounter.DoApplyMapEventResults();
+
+            Assert.Equal(PlayerEncounterState.ApplyResults, encounter.EncounterState);
+            Assert.True(encounter._stateHandled);
+            Assert.False(mapEvent._mapEventResultsApplied);
+        }, MapEventDisabledMethods.Append(AccessTools.Method(typeof(CampaignEventDispatcher),
+            nameof(CampaignEventDispatcher.OnPlayerBattleEnd))).ToArray());
+
+        Server.Call(() =>
+        {
+            var mapEvent = Server.GetRegisteredObject<MapEvent>(ctx.MapEventId);
+            var mapEventPartyId = ResolveMapEventPartyId(mapEvent.AttackerSide, ctx.AttackerPartyId);
+            var loot = new NetworkPlayerLootData(new(), new(), new(), new()
+            {
+                [mapEventPartyId] = new LootedShipsData(new[] { shipId }),
+            });
+            Server.Resolve<INetwork>().Send(client.NetPeer, new NetworkCommitMapEventResults(
+                ctx.MapEventId, BattleSideEnum.Attacker, BattleSideEnum.Attacker, mapEventPartyId, loot));
+        }, MapEventDisabledMethods);
+
+        client.Call(() =>
+        {
+            var mapEvent = client.GetRegisteredObject<MapEvent>(ctx.MapEventId);
+            client.Resolve<MapEventRegistry>().OnClientDestroyed(mapEvent, ctx.MapEventId);
+
+            var encounter = PlayerEncounter.Current;
+            Assert.NotNull(encounter);
+            Assert.Equal(PlayerEncounterState.CaptureHeroes, encounter.EncounterState);
+            Assert.Equal(new[] { client.GetRegisteredObject<Ship>(shipId) }, encounter.ReceivedLootShips);
+        }, MapEventDisabledMethods);
+    }
+
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
