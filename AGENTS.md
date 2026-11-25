@@ -159,7 +159,7 @@ Before any `gh pr edit`, re-fetch the live PR (`gh pr view --json title,body`) a
 
 Don't update any repo documentation, including `AGENTS.md` files, `doc/` and READMEs, without explicit authorization from the user.
 
-Every PR must retain an exact `## Bot Changelog Entry` heading and at least one bullet under it, because the bot publishes the section verbatim in the nightly changelog. Write it for testers in plain words. For a change they can't see directly, such as performance, sync or a refactor, describe the effect they'd notice, like "Large battles use less network traffic" or "Joining a server uses less memory", not the implementation. Only leave the section empty for War Sails updates, because we are not officially supporting War Sails yet, and for PRs that only change CI, tests, docs or developer tooling.
+Every PR must retain an exact `## Bot Changelog Entry` heading.
 
 ### GitHub Etiquette
 
