@@ -1,4 +1,5 @@
 ﻿using Common.Logging;
+using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Ships;
@@ -35,6 +36,12 @@ public interface INavalShipBudget
 
     /// <summary>[Game thread] The AI parties' share of the side: the eight ships less the players' fleets, at most their own limit.</summary>
     NavalShipDeploymentLimit AiLimit(NavalSidePlayerFleets players, MBReadOnlyList<MapEventParty> aiParties);
+
+    /// <summary>
+    /// Whether the party is a player's that opens the mission with a fleet of its own and so takes a player slot; the server
+    /// leaves a ship-less player out of the mission.
+    /// </summary>
+    bool IsFleetPlayer(MapEvent mapEvent, PartyBase party);
 }
 
 /// <inheritdoc cref="INavalShipBudget"/>
@@ -96,6 +103,10 @@ public class NavalShipBudget : INavalShipBudget
         return new NavalShipDeploymentLimit(limit.PartiesLimit, limit.SkeletalCrewLimit, LeftForAi(players.Hulls, limit.NetDeploymentLimit));
     }
 
+    // Narrower than the share math's IsPlayerParty, which keeps a ship-less player since it fields no hull there anyway.
+    public bool IsFleetPlayer(MapEvent mapEvent, PartyBase party) =>
+        IsPlayerParty(party) && !mapEvent.IsNavalBattleWithoutShips(party.MobileParty);
+
     /// <summary>What the players' fielded ships leave of the side's eight, at most the AI parties' own limit and never below none.</summary>
     internal static int LeftForAi(int playerHulls, int aiLimit) => Math.Max(0, Math.Min(aiLimit, SideShips - playerHulls));
 
@@ -139,7 +150,7 @@ public class NavalShipBudget : INavalShipBudget
         return IsPlayerParty(party) && objectManager.TryGetIdWithLogging(party.MobileParty, out partyId);
     }
 
-    // Whether the player registry holds the party, the same check the launcher and the fielder make.
+    // Whether the player registry holds the party, with or without ships.
     private bool IsPlayerParty(PartyBase party) => playerManager.Contains(party.MobileParty);
 
     /// <summary>
