@@ -119,6 +119,49 @@ public class BattleDamageMirrorTests : MissionTestEnvironment
     }
 
     [Fact]
+    public void RoutedBlow_FromAttackerThatAlreadyDied_DamagesAiVictimInFormation()
+    {
+        using var fixture = new MissionEngineFixture();
+        var client = Clients.First();
+        SetControllerId(client, "owner");
+
+        client.Call(() =>
+        {
+            var mock = fixture.CreateMission(client);
+            var controller = client.Resolve<CoopBattleController>();
+            var registry = client.Resolve<INetworkAgentRegistry>();
+
+            var victim = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.AI));
+            victim.Formation = mock.DefenderTeam.GetFormation(FormationClass.Infantry).Shell;
+            var victimId = Guid.NewGuid();
+            Assert.True(registry.TryRegisterAgent("owner", victimId, victim));
+
+            // The attacker's death deregisters it before its in-flight blow applies, but its corpse stays in the mission.
+            var attacker = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.None));
+            var attackerId = Guid.NewGuid();
+            Assert.True(registry.TryRegisterAgent("peer", attackerId, attacker));
+            Assert.True(registry.RemoveAgent(attackerId));
+
+            var blow = new Blow(0) { InflictedDamage = 30, DamageType = DamageTypes.Cut };
+            AttackCollisionData collisionData = default;
+            var damageData = client.Resolve<IBattleDamageDataMapper>().Pack(in blow, in collisionData);
+            client.Resolve<IMessageBroker>().Publish(
+                this,
+                new NetworkApplyBattleDamage(
+                    victimId,
+                    attackerId,
+                    damageData,
+                    blow.IsMissile,
+                    sourceControllerId: "peer"));
+
+            Assert.True(AgentMirror.TryGet(victim, out var mirror));
+            Assert.Equal(70f, mirror.Health);
+            Assert.Equal(attacker.Index, mock.LastRegisteredBlow.OwnerId);
+            GC.KeepAlive(controller);
+        });
+    }
+
+    [Fact]
     public void RoutedDismount_PreservesTheRiderlessMountAiComponent()
     {
         using var fixture = new MissionEngineFixture();
