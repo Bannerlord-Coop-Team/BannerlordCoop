@@ -15,6 +15,11 @@ namespace Missions;
 /// </summary>
 public interface INetworkAgentRegistry : IDisposable
 {
+    // Raised after the registry lock is released, on the thread that made the change.
+    event Action<CoopAgentInfo> AgentBecameLocallyControlled;
+    event Action<CoopAgentInfo> AgentRemoved;
+    event Action AgentsCleared;
+
     /// <summary>Clears all data.</summary>
     void Clear();
     bool TryRegisterAgent(string controllerId, Guid agentId, Agent agent);
@@ -82,6 +87,10 @@ public class NetworkAgentRegistry : INetworkAgentRegistry
     private readonly Dictionary<string, List<CoopAgentInfo>> ControllerAgentMap = new();
     private readonly IControllerIdProvider controllerIdProvider;
 
+    public event Action<CoopAgentInfo> AgentBecameLocallyControlled;
+    public event Action<CoopAgentInfo> AgentRemoved;
+    public event Action AgentsCleared;
+
     public NetworkAgentRegistry(IControllerIdProvider controllerIdProvider)
     {
         this.controllerIdProvider = controllerIdProvider;
@@ -101,6 +110,7 @@ public class NetworkAgentRegistry : INetworkAgentRegistry
             MovementIdToInfo.Clear();
             ControllerAgentMap.Clear();
         }
+        AgentsCleared?.Invoke();
     }
 
     /// <inheritdoc/>
@@ -253,32 +263,36 @@ public class NetworkAgentRegistry : INetworkAgentRegistry
             }
 
             controlledAgents.Add(agentInfo);
-
-            return true;
         }
+
+        if (controllerId == controllerIdProvider.ControllerId)
+            AgentBecameLocallyControlled?.Invoke(agentInfo);
+        return true;
     }
 
     public bool RemoveAgent(Agent agent)
     {
+        CoopAgentInfo stored;
         lock (gate)
         {
-            if (!AgentToInfo.TryGetValue(agent, out var stored))
+            if (!AgentToInfo.TryGetValue(agent, out stored) || !RemoveAgentInternal(stored))
                 return false;
-
-            return RemoveAgentInternal(stored);
         }
+        AgentRemoved?.Invoke(stored);
+        return true;
     }
 
     /// <inheritdoc/>
     public bool RemoveAgent(Guid agentId)
     {
+        CoopAgentInfo stored;
         lock (gate)
         {
-            if (!IdToInfo.TryGetValue(agentId, out var stored))
+            if (!IdToInfo.TryGetValue(agentId, out stored) || !RemoveAgentInternal(stored))
                 return false;
-
-            return RemoveAgentInternal(stored);
         }
+        AgentRemoved?.Invoke(stored);
+        return true;
     }
 
     private bool RemoveAgentInternal(CoopAgentInfo agentInfo)
@@ -417,9 +431,10 @@ public class NetworkAgentRegistry : INetworkAgentRegistry
             return false;
         }
 
+        List<CoopAgentInfo> controlledAgents;
         lock (gate)
         {
-            if (!ControllerAgentMap.TryGetValue(controllerId, out var controlledAgents))
+            if (!ControllerAgentMap.TryGetValue(controllerId, out controlledAgents))
                 return false;
 
             foreach (var agentInfo in controlledAgents)
@@ -430,8 +445,11 @@ public class NetworkAgentRegistry : INetworkAgentRegistry
                     MovementIdToInfo.Remove((agentInfo.MovementScopeId, agentInfo.MovementId));
             }
 
-            return ControllerAgentMap.Remove(controllerId);
+            ControllerAgentMap.Remove(controllerId);
         }
+        foreach (CoopAgentInfo agentInfo in controlledAgents)
+            AgentRemoved?.Invoke(agentInfo);
+        return true;
     }
 
     /// <inheritdoc/>
@@ -497,14 +515,24 @@ public class NetworkAgentRegistry : INetworkAgentRegistry
             || mountAgentId == agentId || previousRevision < 0 || previousRevision == long.MaxValue
             || previousMountRevision < 0 || previousMountRevision == long.MaxValue) return false;
 
+        CoopAgentInfo changedRider;
+        CoopAgentInfo changedMount = null;
+        bool succeeded;
         lock (gate)
         {
             if (!MatchesReturn(agentId, previousRevision)
                 || (mountAgentId != Guid.Empty && !MatchesReturn(mountAgentId, previousMountRevision))) return false;
-            if (!TryTransferAuthority(returningControllerId, agentId, previousRevision + 1)) return false;
-            return mountAgentId == Guid.Empty
-                || TryTransferAuthority(returningControllerId, mountAgentId, previousMountRevision + 1);
+            succeeded = TryTransferAuthorityLocked(returningControllerId, agentId, previousRevision + 1, out changedRider);
+            if (succeeded && mountAgentId != Guid.Empty)
+                succeeded = TryTransferAuthorityLocked(returningControllerId,
+                    mountAgentId, previousMountRevision + 1, out changedMount);
         }
+        if (returningControllerId == controllerIdProvider.ControllerId)
+        {
+            if (changedRider != null) AgentBecameLocallyControlled?.Invoke(changedRider);
+            if (changedMount != null) AgentBecameLocallyControlled?.Invoke(changedMount);
+        }
+        return succeeded;
 
         bool MatchesReturn(Guid id, long revision)
         {
@@ -534,57 +562,68 @@ public class NetworkAgentRegistry : INetworkAgentRegistry
             return false;
         }
 
+        CoopAgentInfo changedAgent;
         lock (gate)
         {
-            if (!IdToInfo.TryGetValue(agentId, out var agentInfo))
-            {
-                Logger.Warning("Failed to transfer authority: agent {AgentId} is not registered.", agentId);
+            if (!TryTransferAuthorityLocked(controllerId, agentId, authorityRevision, out changedAgent))
                 return false;
-            }
+        }
+        if (changedAgent != null && controllerId == controllerIdProvider.ControllerId)
+            AgentBecameLocallyControlled?.Invoke(changedAgent);
+        return true;
+    }
 
-            if (authorityRevision < agentInfo.AuthorityRevision)
+    private bool TryTransferAuthorityLocked(string controllerId, Guid agentId, long? authorityRevision,
+        out CoopAgentInfo changedAgent)
+    {
+        changedAgent = null;
+        if (!IdToInfo.TryGetValue(agentId, out var agentInfo))
+        {
+            Logger.Warning("Failed to transfer authority: agent {AgentId} is not registered.", agentId);
+            return false;
+        }
+
+        if (authorityRevision < agentInfo.AuthorityRevision)
+        {
+            Logger.Warning(
+                "Failed to transfer authority for agent {AgentId}: revision {Revision} is older than {CurrentRevision}.",
+                agentId,
+                authorityRevision,
+                agentInfo.AuthorityRevision);
+            return false;
+        }
+
+        if (agentInfo.CurrentAuthority == controllerId)
+        {
+            if (authorityRevision > agentInfo.AuthorityRevision)
             {
-                Logger.Warning(
-                    "Failed to transfer authority for agent {AgentId}: revision {Revision} is older than {CurrentRevision}.",
-                    agentId,
-                    authorityRevision,
-                    agentInfo.AuthorityRevision);
-                return false;
+                agentInfo.AuthorityRevision = authorityRevision.Value;
+                agentInfo.ClearAuthoritativeEquipment();
             }
-
-            if (agentInfo.CurrentAuthority == controllerId)
-            {
-                if (authorityRevision > agentInfo.AuthorityRevision)
-                {
-                    agentInfo.AuthorityRevision = authorityRevision.Value;
-                    agentInfo.ClearAuthoritativeEquipment();
-                }
-                return true;
-            }
-
-            // Detach from the current authority's list, pruning the entry when it empties so the map
-            // stays consistent with RemoveController (which drops the whole key).
-            if (ControllerAgentMap.TryGetValue(agentInfo.CurrentAuthority, out var currentAgents))
-            {
-                currentAgents.Remove(agentInfo);
-                if (currentAgents.Count == 0)
-                    ControllerAgentMap.Remove(agentInfo.CurrentAuthority);
-            }
-
-            agentInfo.CurrentAuthority = controllerId;
-            agentInfo.AuthorityRevision = authorityRevision ?? agentInfo.AuthorityRevision + 1;
-            agentInfo.ClearAuthoritativeEquipment();
-
-            if (!ControllerAgentMap.TryGetValue(controllerId, out var newAgents))
-            {
-                newAgents = new();
-                ControllerAgentMap[controllerId] = newAgents;
-            }
-
-            newAgents.Add(agentInfo);
-
             return true;
         }
+
+        // Prune empty entries to stay consistent with RemoveController, which drops the whole key.
+        if (ControllerAgentMap.TryGetValue(agentInfo.CurrentAuthority, out var currentAgents))
+        {
+            currentAgents.Remove(agentInfo);
+            if (currentAgents.Count == 0)
+                ControllerAgentMap.Remove(agentInfo.CurrentAuthority);
+        }
+
+        agentInfo.CurrentAuthority = controllerId;
+        agentInfo.AuthorityRevision = authorityRevision ?? agentInfo.AuthorityRevision + 1;
+        agentInfo.ClearAuthoritativeEquipment();
+
+        if (!ControllerAgentMap.TryGetValue(controllerId, out var newAgents))
+        {
+            newAgents = new();
+            ControllerAgentMap[controllerId] = newAgents;
+        }
+
+        newAgents.Add(agentInfo);
+        changedAgent = agentInfo;
+        return true;
     }
 }
 
