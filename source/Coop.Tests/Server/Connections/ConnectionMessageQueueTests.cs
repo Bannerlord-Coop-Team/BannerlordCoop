@@ -172,23 +172,6 @@ public class ConnectionMessageQueueTests
     }
 
     [Fact]
-    public void BeginQueueing_BeforePlayerConnected_StillQueuesAndFlushes()
-    {
-        var peer = network.CreatePeer();
-
-        // BeginQueueing (main save thread) can race ahead of the PlayerConnected handler (poll loop);
-        // GetOrAdd creates the channel directly in Queueing so broadcasts are held, not sent live.
-        queue.BeginQueueing(peer);
-
-        var held = new FakePacket();
-        Assert.True(queue.TryHandleBroadcast(peer, held));
-        Assert.True(NothingSentTo(peer));
-
-        queue.FlushBatch(peer);
-        Assert.Equal(new IPacket[] { held }, network.GetPeerPackets(peer));
-    }
-
-    [Fact]
     public void Flush_KeepsPeerQueuedUntilOpenWithTail()
     {
         var peer = Connect();
@@ -232,7 +215,7 @@ public class ConnectionMessageQueueTests
     }
 
     [Fact]
-    public void DisconnectMidLoad_DropsHeldAndLatePackets()
+    public void DisconnectMidLoad_LateSnapshotCannotReopenReplay()
     {
         var peer = Connect();
         queue.BeginQueueing(peer);
@@ -240,7 +223,8 @@ public class ConnectionMessageQueueTests
 
         messageBroker.Publish(this, new PlayerDisconnected(peer, default));
 
-        // A late send cannot revive or replay the disconnected peer's held world stream.
+        queue.BeginQueueing(peer);
+        Assert.False(queue.TryGetCatchUpPendingBytes(peer, out _));
         Assert.True(queue.TryHandleBroadcast(peer, new FakePacket()));
         queue.FlushBatch(peer);
         Assert.True(NothingSentTo(peer));

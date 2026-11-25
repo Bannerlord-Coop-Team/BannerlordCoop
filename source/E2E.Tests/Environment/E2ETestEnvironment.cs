@@ -13,6 +13,7 @@ using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface;
 using GameInterface.AutoSync;
+using GameInterface.Registry.Auto;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
 using GameInterface.Services.Players;
@@ -309,6 +310,21 @@ public class E2ETestEnvironment : IDisposable
 
         AddToStringIdLists<T>(id);
         return id;
+    }
+
+    /// <summary>
+    /// Registers the objects <typeparamref name="TRegistry"/> picks up after a save loads, on the server and every client.
+    /// </summary>
+    /// <remarks>
+    /// A live game runs this for every registry after loading, but the test campaign doesn't, so game-defined objects such as
+    /// the default <see cref="CharacterAttribute"/>s have no network id until a test registers them.
+    /// </remarks>
+    public void RegisterLoadedObjects<TRegistry, T>() where TRegistry : AutoRegistryBase<T> where T : class
+    {
+        foreach (var instance in Clients.Prepend(Server))
+        {
+            instance.Call(() => instance.Resolve<TRegistry>().RegisterAllObjects());
+        }
     }
 
     /// <summary>
