@@ -20,7 +20,8 @@ internal sealed class MovementSnapshotCodec : IMovementSnapshotCodec
 {
     // Small batches retain protobuf's sparse encoding. The column layout has little repetition at those sizes.
     private const int MinimumCount = 4;
-    private const int AgentSnapshotBytes = sizeof(byte) + AgentData.SnapshotBytes;
+    // The attachments column, then the rider columns.
+    private const int RiderRowBytes = sizeof(byte) + AgentData.SnapshotBytes;
     private const byte HasDeck = 1;
     private const byte HasMount = 2;
 
@@ -51,7 +52,7 @@ internal sealed class MovementSnapshotCodec : IMovementSnapshotCodec
         if (count < MinimumCount) return null;
 
         // Skip scanning extras when the rider columns alone exceed the envelope limit.
-        if (count > limit / AgentSnapshotBytes) return null;
+        if (count > limit / RiderRowBytes) return null;
 
         int decks = 0;
         int mounts = 0;
@@ -219,7 +220,7 @@ internal sealed class MovementSnapshotCodec : IMovementSnapshotCodec
             this.agents = agents;
             this.decks = decks;
             this.mounts = mounts;
-            deckOffset = agents * AgentSnapshotBytes;
+            deckOffset = agents * RiderRowBytes;
             mountOffset = deckOffset + (decks * AgentData.DeckSnapshotBytes);
             ExtrasOffset = mountOffset + (mounts * AgentMountData.SnapshotBytes);
         }
