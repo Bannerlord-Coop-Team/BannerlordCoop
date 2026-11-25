@@ -589,18 +589,15 @@ public class BattleDamageRouter : IBattleDamageRouter
         return (LogEventLevel.Warning, fallbackReason);
     }
 
-    // Resolves the routed blow's attacker to its live registered agent, else its corpse, else null.
+    // Resolves the attacker's live agent or its corpse, since the cosmetic identity outlives deregistration until native deletion.
     private Agent ResolveRoutedAttacker(NetworkApplyBattleDamage damage)
     {
         if (damage.AttackerAgentId == Guid.Empty)
             return null;
 
-        var registry = coopMissionComponent.AgentRegistry;
-        if (registry.TryGetAgentInfo(damage.AttackerAgentId, out var attackerInfo) && attackerInfo.Agent != null)
-            return attackerInfo.Agent;
-
-        // A dead attacker is deregistered but its corpse stays in the mission until native deletion.
-        return registry.TryGetCosmeticAgent(damage.AttackerAgentId, out Agent deadAttacker) ? deadAttacker : null;
+        return coopMissionComponent.AgentRegistry.TryGetCosmeticAgent(damage.AttackerAgentId, out Agent attacker)
+            ? attacker
+            : null;
     }
 
     private void ApplyDeferredDamage(NetworkApplyBattleDamage damage)
@@ -709,7 +706,6 @@ public class BattleDamageRouter : IBattleDamageRouter
         }
 
         Agent attacker = ResolveRoutedAttacker(damage);
-        blow.OwnerId = attacker?.Index ?? -1;
         // Vanilla HandleBlow calls IsEnemyOf on the blow owner for an AI victim in a formation, which throws without one.
         if (attacker == null && victim.Controller == AgentControllerType.AI && victim.Formation != null)
         {
@@ -722,6 +718,7 @@ public class BattleDamageRouter : IBattleDamageRouter
                 damage.Blow.InflictedDamage);
             return;
         }
+        blow.OwnerId = attacker?.Index ?? -1;
         int routedDamage = blow.InflictedDamage;
         // The source calculated this blow against a puppet, so vanilla could not apply its main-agent multiplier.
         ApplyPlayerReceivedDamageMultiplier(victim, ref blow, ref collisionData);
