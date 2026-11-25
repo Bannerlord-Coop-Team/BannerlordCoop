@@ -589,17 +589,6 @@ public class BattleDamageRouter : IBattleDamageRouter
         return (LogEventLevel.Warning, fallbackReason);
     }
 
-    // Resolves the attacker's live agent or its corpse, since the cosmetic identity outlives deregistration until native deletion.
-    private Agent ResolveRoutedAttacker(NetworkApplyBattleDamage damage)
-    {
-        if (damage.AttackerAgentId == Guid.Empty)
-            return null;
-
-        return coopMissionComponent.AgentRegistry.TryGetCosmeticAgent(damage.AttackerAgentId, out Agent attacker)
-            ? attacker
-            : null;
-    }
-
     private void ApplyDeferredDamage(NetworkApplyBattleDamage damage)
     {
         TryApplyNetworkDamage(damage, authorityWasVerified: true);
@@ -705,7 +694,8 @@ public class BattleDamageRouter : IBattleDamageRouter
                 damage.AttackerAgentId);
         }
 
-        Agent attacker = ResolveRoutedAttacker(damage);
+        // The cosmetic identity outlives deregistration until native deletion, so this resolves a live attacker or its corpse.
+        Agent attacker = registry.TryGetCosmeticAgent(damage.AttackerAgentId, out Agent cosmeticAttacker) ? cosmeticAttacker : null;
         // Vanilla HandleBlow calls IsEnemyOf on the blow owner for an AI victim in a formation, which throws without one.
         if (attacker == null && victim.Controller == AgentControllerType.AI && victim.Formation != null)
         {
