@@ -1,5 +1,4 @@
-﻿using Common;
-using Common.Commands;
+﻿using Common.Commands;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.SiegeEvents.Handlers;
@@ -40,7 +39,6 @@ internal static class SiegeKeepCommands
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            if (!ModInformation.IsServer) return Failed("This command can only be used by the server");
             if (!resolver.TryResolveSettlement(args[0], out var settlement, out var error)) return Failed(error);
 
             var mapEvent = settlement.Party.MapEvent;

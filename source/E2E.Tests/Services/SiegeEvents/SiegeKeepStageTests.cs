@@ -8,11 +8,13 @@ using GameInterface.Tests.Utils;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MapEvents.TroopSupply;
+using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.SiegeEvents.Handlers;
 using GameInterface.Services.SiegeEvents.Messages;
 using HarmonyLib;
-using SandBox.GameComponents;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -42,6 +44,75 @@ public class SiegeKeepStageTests : MapEventTestBase
 
     [Fact]
     public void WallsPullBack_SeatsBothPlayersAndStartsTheKeepWithTheirSquads()
+    {
+        var keep = OpenKeepStage(TimeSpan.FromSeconds(90));
+        var clients = Clients.ToArray();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(keep.SettlementId, out var settlement));
+            Assert.Equal(Settlement.SiegeState.InTheLordsHall, settlement.CurrentSiegeState);
+        });
+        var choosing = Server.NetworkSentMessages.GetMessages<NetworkSiegeKeepPhaseChanged>()
+            .Where(message => message.Phase == SiegeKeepPhase.Choosing).ToArray();
+        Assert.Equal(2, choosing.Length);
+        Assert.All(choosing, message => Assert.True(message.IsSeated));
+        // 30 defenders put 27 in the hall, so 19 attacker places: 2 heroes and the 13 escorts both parties have.
+        Assert.Equal(new[] { JoinerEscorts, LeaderEscorts }, choosing.Select(message => message.EscortAllowance).OrderBy(x => x));
+
+        Server.SimulateMessage(clients[0].NetPeer, new NetworkSiegeKeepEntryRequest("leader-pick", keep.Battle.MapEventId,
+            false, new[] { new HideoutTroopSelectionEntry(keep.LeaderCharacterId, 1), new HideoutTroopSelectionEntry(keep.EscortId, 5) }));
+        var leaderReply = Reply("leader-pick");
+        Assert.True(leaderReply.Accepted, leaderReply.Reason);
+        Assert.False(leaderReply.IsLocked);
+
+        Server.SimulateMessage(clients[1].NetPeer, new NetworkSiegeKeepEntryRequest("joiner-pick", keep.Battle.MapEventId,
+            false, new[] { new HideoutTroopSelectionEntry(keep.EscortId, 2) }));
+        var joinerReply = Reply("joiner-pick");
+        Assert.True(joinerReply.Accepted, joinerReply.Reason);
+        Assert.True(joinerReply.IsLocked);
+        Assert.Equal(2, LockedSeats());
+
+        StartKeepMission(keep);
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(keep.Battle.MapEventId, out var mapEvent));
+            var reserves = Server.Resolve<IBattleTroopReserveBuilder>();
+            Assert.Equal(6, OwnedEntries(reserves.GetOwnedReserves(mapEvent, "keep-leader", true), BattleSideEnum.Attacker));
+            Assert.Equal(3, OwnedEntries(reserves.GetOwnedReserves(mapEvent, "keep-joiner", false), BattleSideEnum.Attacker));
+            Assert.Equal(27, OwnedEntries(reserves.GetOwnedReserves(mapEvent, "keep-leader", true), BattleSideEnum.Defender));
+            Assert.Contains(keep.JoinerCharacterId, reserves.GetOwnedReserves(mapEvent, "keep-joiner", false)
+                .Single(side => side.Side == BattleSideEnum.Attacker).Parties.Single().Entries
+                .Select(entry => entry.CharacterId));
+        }, keep.DisabledMethods);
+    }
+
+    // Players who never answer before the selection window ends bring vanilla's suggested squad instead of stalling the keep.
+    [Fact]
+    public void SelectionDeadline_LocksTheRosterWithSuggestedSquads()
+    {
+        var keep = OpenKeepStage(TimeSpan.Zero);
+
+        Server.Call(() => Server.Resolve<IMessageBroker>().Publish(this, new CampaignTick()));
+
+        Assert.Equal(2, LockedSeats());
+        StartKeepMission(keep);
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(keep.Battle.MapEventId, out var mapEvent));
+            var reserves = Server.Resolve<IBattleTroopReserveBuilder>();
+            Assert.Equal(LeaderEscorts + 1,
+                OwnedEntries(reserves.GetOwnedReserves(mapEvent, "keep-leader", true), BattleSideEnum.Attacker));
+            Assert.Equal(JoinerEscorts + 1,
+                OwnedEntries(reserves.GetOwnedReserves(mapEvent, "keep-joiner", false), BattleSideEnum.Attacker));
+        }, keep.DisabledMethods);
+    }
+
+    private sealed record KeepStage(MapEventContext Battle, string SettlementId, string EscortId,
+        string LeaderCharacterId, string JoinerCharacterId, List<MethodBase> DisabledMethods);
+
+    // Two attacking players at a besieged town whose walls just fell back, with the keep stage opened by the server.
+    private KeepStage OpenKeepStage(TimeSpan selectionWindow)
     {
         var battle = CreateServerMapEvent();
         var leaderHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
@@ -74,62 +145,30 @@ public class SiegeKeepStageTests : MapEventTestBase
             // The reserves flatten each battle party's own roster, which the seeding above did not refresh.
             foreach (var party in mapEvent.InvolvedParties)
                 mapEvent.FindMapEventParty(party)?.Update();
+            Server.Resolve<SiegeKeepHandler>().SelectionWindow = selectionWindow;
             Server.Resolve<IMessageBroker>().Publish(this, new AuthoritativeSiegeKeepRequested(battle.MapEventId, 1));
         }, disabledMethods);
 
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
-            Assert.Equal(Settlement.SiegeState.InTheLordsHall, settlement.CurrentSiegeState);
-        });
-        var choosing = Server.NetworkSentMessages.GetMessages<NetworkSiegeKeepPhaseChanged>()
-            .Where(message => message.Phase == SiegeKeepPhase.Choosing).ToArray();
-        Assert.Equal(2, choosing.Length);
-        Assert.All(choosing, message => Assert.True(message.IsSeated));
-        // 30 defenders put 27 in the hall, so 19 attacker places: 2 heroes and the 13 escorts both parties have.
-        Assert.Equal(new[] { JoinerEscorts, LeaderEscorts }, choosing.Select(message => message.EscortAllowance).OrderBy(x => x));
+        return new KeepStage(battle, settlementId, escortId, leaderCharacterId, joinerCharacterId, disabledMethods);
+    }
 
-        Server.SimulateMessage(clients[1].NetPeer, new NetworkSiegeKeepEntryRequest("joiner-overfull", battle.MapEventId,
-            false, new[] { new HideoutTroopSelectionEntry(escortId, JoinerEscorts + 1) }));
-        Assert.False(Reply("joiner-overfull").Accepted);
-
-        Server.SimulateMessage(clients[0].NetPeer, new NetworkSiegeKeepEntryRequest("leader-pick", battle.MapEventId,
-            false, new[] { new HideoutTroopSelectionEntry(leaderCharacterId, 1), new HideoutTroopSelectionEntry(escortId, 5) }));
-        var leaderReply = Reply("leader-pick");
-        Assert.True(leaderReply.Accepted, leaderReply.Reason);
-        Assert.False(leaderReply.IsLocked);
-
-        Server.SimulateMessage(clients[1].NetPeer, new NetworkSiegeKeepEntryRequest("joiner-pick", battle.MapEventId,
-            false, new[] { new HideoutTroopSelectionEntry(escortId, 2) }));
-        var joinerReply = Reply("joiner-pick");
-        Assert.True(joinerReply.Accepted, joinerReply.Reason);
-        Assert.True(joinerReply.IsLocked);
-        Assert.Equal(2, Server.NetworkSentMessages.GetMessages<NetworkSiegeKeepPhaseChanged>()
-            .Count(message => message.Phase == SiegeKeepPhase.Locked && message.IsSeated));
-
-        var spawnSettings = disabledMethods
+    // The leader asks for the keep mission, which the server opens for every seated player.
+    private void StartKeepMission(KeepStage keep)
+    {
+        var spawnSettings = keep.DisabledMethods
             .Append(AccessTools.PropertyGetter(typeof(MBGameManager), nameof(MBGameManager.UnitSpawnPrioritization)))
             .ToList();
-        Server.Call(() => Server.SimulateMessage(clients[0].NetPeer, new NetworkBattleStartRequest("keep-start",
-            (int)BattleStartMode.Mission, battle.MapEventId, battle.AttackerPartyId)), spawnSettings);
+        Server.Call(() => Server.SimulateMessage(Clients.First().NetPeer, new NetworkBattleStartRequest("keep-start",
+            (int)BattleStartMode.Mission, keep.Battle.MapEventId, keep.Battle.AttackerPartyId)), spawnSettings);
         Assert.True(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleStartReply>(),
             reply => reply.RequestId == "keep-start").Accepted);
         var starts = Server.NetworkSentMessages.GetMessages<NetworkStartSiegeMission>().ToArray();
         Assert.Equal(2, starts.Length);
         Assert.All(starts, start => Assert.True(start.IsLordsHall));
-
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
-            var reserves = Server.Resolve<IBattleTroopReserveBuilder>();
-            Assert.Equal(6, OwnedEntries(reserves.GetOwnedReserves(mapEvent, "keep-leader", true), BattleSideEnum.Attacker));
-            Assert.Equal(3, OwnedEntries(reserves.GetOwnedReserves(mapEvent, "keep-joiner", false), BattleSideEnum.Attacker));
-            Assert.Equal(27, OwnedEntries(reserves.GetOwnedReserves(mapEvent, "keep-leader", true), BattleSideEnum.Defender));
-            Assert.Contains(joinerCharacterId, reserves.GetOwnedReserves(mapEvent, "keep-joiner", false)
-                .Single(side => side.Side == BattleSideEnum.Attacker).Parties.Single().Entries
-                .Select(entry => entry.CharacterId));
-        }, disabledMethods);
     }
+
+    private int LockedSeats() => Server.NetworkSentMessages.GetMessages<NetworkSiegeKeepPhaseChanged>()
+        .Count(message => message.Phase == SiegeKeepPhase.Locked && message.IsSeated);
 
     private NetworkSiegeKeepEntryReply Reply(string requestId) =>
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkSiegeKeepEntryReply>(),

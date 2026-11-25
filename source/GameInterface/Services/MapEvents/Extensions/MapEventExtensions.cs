@@ -1,7 +1,9 @@
 ﻿using GameInterface.Services.PartyBases.Extensions;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 
@@ -16,6 +18,15 @@ public static class MapEventExtensions
     /// <summary>Whether the battle's results were calculated or applied, after which no battle report may change what they read.</summary>
     public static bool HasCalculatedResults(this MapEvent mapEvent)
         => mapEvent._mapEventResultsCalculated || mapEvent._mapEventResultsApplied;
+
+    /// <summary>Whether a siege assault can fall back into the keep: the town has a lord's hall and no player defends it.</summary>
+    public static bool CanFallBackToKeep(this MapEvent mapEvent)
+        => mapEvent.IsSiegeAssault && mapEvent.MapEventSettlement?.LocationComplex?.GetLocationWithId("lordshall") != null &&
+           !mapEvent.DefenderSide.Parties.Any(party => party.Party.IsPlayerParty());
+
+    /// <summary>Whether a siege assault is past its walls and fought in the lord's hall.</summary>
+    public static bool IsSiegeKeepStage(this MapEvent mapEvent)
+        => mapEvent.IsSiegeAssault && mapEvent.MapEventSettlement?.CurrentSiegeState == Settlement.SiegeState.InTheLordsHall;
 
     /// <summary>Whether the battle is a send troops hideout raid.</summary>
     public static bool IsSendTroopsHideout(this MapEvent mapEvent)

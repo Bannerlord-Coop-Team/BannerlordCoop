@@ -4,7 +4,7 @@ using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.PartyBases.Extensions;
+using GameInterface.Services.MapEvents.Extensions;
 using SandBox.Missions.MissionLogics;
 using SandBox.Missions.MissionLogics.Towns;
 using Serilog;
@@ -181,13 +181,11 @@ internal class CoopSiegeBattleLauncher : ICoopSiegeBattleLauncher
     // attacking players with no player defending, so the walls keep their plain end otherwise.
     private static BattleEndLogic CreateWallsEndLogic(MapEvent mapEvent, bool isSallyOut)
     {
-        var settlement = mapEvent.MapEventSettlement;
-        if (isSallyOut || !mapEvent.IsSiegeAssault || PartyBase.MainParty.Side != BattleSideEnum.Attacker ||
-            settlement?.LocationComplex?.GetLocationWithId("lordshall") == null ||
-            mapEvent.DefenderSide.Parties.Any(party => party.Party.IsPlayerParty()))
+        if (isSallyOut || PartyBase.MainParty.Side != BattleSideEnum.Attacker || !mapEvent.CanFallBackToKeep())
             return new BattleEndLogic();
 
-        Logger.Information("[BattleSync] Armed the defender pull-back to the keep for {Settlement}", settlement.StringId);
+        Logger.Information("[BattleSync] Armed the defender pull-back to the keep for {Settlement}",
+            mapEvent.MapEventSettlement.StringId);
         return new CoopSiegeWallsEndLogic(
             Campaign.Current.Models.SiegeLordsHallFightModel.DefenderTroopNumberForSuccessfulPullBack);
     }

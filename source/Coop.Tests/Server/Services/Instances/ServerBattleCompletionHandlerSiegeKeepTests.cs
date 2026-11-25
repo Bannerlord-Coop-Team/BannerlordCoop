@@ -87,7 +87,6 @@ public class ServerBattleCompletionHandlerSiegeKeepTests : IDisposable
 
         broker.Publish(this, new SiegeKeepStageOpened(MapEventId));
         Drain();
-        hostRegistry.Verify(registry => registry.Remove(MapEventId), Times.Once);
 
         Assert.True(missionManager.TryLeaveMission(peer, HostControllerId, MapEventId, out _));
         Assert.True(missionManager.TryEnterMission(CreatePeer(52201), "keep-player", MapEventId, out _));

@@ -205,8 +205,7 @@ internal class BattleMissionStartHandler : IHandler
                 // A siege in the lord's hall only opens the keep for the players its locked keep roster seated.
                 // Rejected before the arbiter claim so the event stays open for auto-resolve.
                 operation = "validate siege stage";
-                bool isKeep = mapEvent.IsSiegeAssault &&
-                    mapEvent.MapEventSettlement?.CurrentSiegeState == Settlement.SiegeState.InTheLordsHall;
+                bool isKeep = mapEvent.IsSiegeKeepStage();
                 if (isKeep && keepSelection?.IsAdmitted(mapEvent, attackerMobileParty) != true)
                 {
                     Logger.Information("Rejecting keep mission for {MapEventId}: the requester has no place in a locked keep roster",

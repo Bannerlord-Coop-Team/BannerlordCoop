@@ -1,5 +1,4 @@
-﻿using GameInterface.Services.Hideouts;
-using GameInterface.Services.MapEvents.Messages.Start;
+﻿using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.SiegeEvents.Messages;
 using ProtoBuf;
 using System;
@@ -11,11 +10,9 @@ namespace GameInterface.Tests.Serialization;
 public class SiegeKeepSerializationTests
 {
     [Fact]
-    public void EntryReply_RoundTripPreservesAllowanceSelectionAndLock()
+    public void EntryReply_RoundTripPreservesAllowanceAndLock()
     {
-        var original = new NetworkSiegeKeepEntryReply("request-1", true, null, 6, 42,
-            new[] { new HideoutTroopSelectionEntry("player-hero", 1), new HideoutTroopSelectionEntry("escort", 6) },
-            isLocked: true);
+        var original = new NetworkSiegeKeepEntryReply("request-1", true, null, 6, 42, isLocked: true);
 
         var result = RoundTrip(original);
 
@@ -23,7 +20,6 @@ public class SiegeKeepSerializationTests
         Assert.True(result.Accepted);
         Assert.Equal(6, result.EscortAllowance);
         Assert.Equal(42, result.SecondsRemaining);
-        Assert.Equal(original.Selection, result.Selection);
         Assert.True(result.IsLocked);
     }
 

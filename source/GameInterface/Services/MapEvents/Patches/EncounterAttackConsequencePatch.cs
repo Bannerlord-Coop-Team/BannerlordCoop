@@ -1,6 +1,7 @@
 using Common;
 using Common.Logging;
 using GameInterface.Policies;
+using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.SiegeEvents.Handlers;
@@ -13,7 +14,6 @@ using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.MapEvents.Patches;
 
@@ -57,7 +57,7 @@ internal class EncounterAttackConsequencePatch
             return true;
 
         // Past the walls, Attack picks the keep troops the way vanilla's hall menu does.
-        if (battle.IsSiegeAssault && battle.MapEventSettlement?.CurrentSiegeState == Settlement.SiegeState.InTheLordsHall)
+        if (battle.IsSiegeKeepStage())
         {
             if (ContainerProvider.TryResolve<SiegeKeepHandler>(out var keep))
                 keep.OpenTroopSelection(args);

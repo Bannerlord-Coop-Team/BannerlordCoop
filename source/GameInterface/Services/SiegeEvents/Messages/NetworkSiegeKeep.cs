@@ -47,20 +47,17 @@ internal readonly struct NetworkSiegeKeepEntryReply : ICommand
     /// <summary>How many troops besides the player's hero this player may bring.</summary>
     [ProtoMember(4)] public readonly int EscortAllowance;
     [ProtoMember(5)] public readonly int SecondsRemaining;
-    /// <summary>The selection the server holds for this player, empty before it answered.</summary>
-    [ProtoMember(6)] public readonly HideoutTroopSelectionEntry[] Selection;
     /// <summary>The roster is final, so an admitted player goes straight into the keep battle.</summary>
-    [ProtoMember(7)] public readonly bool IsLocked;
+    [ProtoMember(6)] public readonly bool IsLocked;
 
     public NetworkSiegeKeepEntryReply(string requestId, bool accepted, string reason, int escortAllowance,
-        int secondsRemaining, HideoutTroopSelectionEntry[] selection, bool isLocked = false)
+        int secondsRemaining, bool isLocked = false)
     {
         RequestId = requestId;
         Accepted = accepted;
         Reason = reason;
         EscortAllowance = escortAllowance;
         SecondsRemaining = secondsRemaining;
-        Selection = selection;
         IsLocked = isLocked;
     }
 }

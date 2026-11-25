@@ -537,11 +537,7 @@ public class ServerBattleCompletionHandler : IHandler
             mapEvent.BattleState == BattleState.AttackerVictory ||
             mapEvent.BattleState == BattleState.DefenderVictory)
         {
-            conclusionRetries.Remove(mapEventId);
-            keptHostDeadlines.Remove(mapEventId);
-            lock (pendingJoinersGate)
-                pendingJoiners.Remove(mapEventId);
-            completionTracker.Clear(mapEventId);
+            ForgetConclusionState(mapEventId);
             Logger.Warning("Battle conclusion for {Instance} was not applied because the map event is no longer active",
                 mapEventId);
             return;
@@ -638,12 +634,18 @@ public class ServerBattleCompletionHandler : IHandler
         {
             missionManager.CompleteInstanceConclusion(mapEventId, succeeded: false);
             hostRegistry.Remove(mapEventId);
-            completionTracker.Clear(mapEventId);
-            conclusionRetries.Remove(mapEventId);
-            keptHostDeadlines.Remove(mapEventId);
-            lock (pendingJoinersGate)
-                pendingJoiners.Remove(mapEventId);
+            ForgetConclusionState(mapEventId);
         });
+    }
+
+    // Everything this handler holds for one battle's conclusion: its retry, kept-host deadline, joins and reports.
+    private void ForgetConclusionState(string mapEventId)
+    {
+        conclusionRetries.Remove(mapEventId);
+        keptHostDeadlines.Remove(mapEventId);
+        lock (pendingJoinersGate)
+            pendingJoiners.Remove(mapEventId);
+        completionTracker.Clear(mapEventId);
     }
 
     private void ConcludeAbandonedBattle(

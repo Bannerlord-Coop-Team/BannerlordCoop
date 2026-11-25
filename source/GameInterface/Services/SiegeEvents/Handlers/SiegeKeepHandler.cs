@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.Hideouts;
+using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
@@ -110,9 +111,8 @@ internal sealed class SiegeKeepHandler : IHandler
     internal bool TryOpenStage(MapEvent mapEvent)
     {
         var settlement = mapEvent.MapEventSettlement;
-        if (!mapEvent.IsSiegeAssault || mapEvent.IsFinalized || mapEvent.BattleState != BattleState.None ||
-            settlement?.SiegeEvent == null || settlement.LocationComplex?.GetLocationWithId("lordshall") == null ||
-            HasPlayerDefender(mapEvent))
+        if (!mapEvent.CanFallBackToKeep() || mapEvent.IsFinalized || mapEvent.BattleState != BattleState.None ||
+            settlement.SiegeEvent == null)
             return false;
 
         var candidates = GetAttackingPlayers(mapEvent);
@@ -150,10 +150,6 @@ internal sealed class SiegeKeepHandler : IHandler
         SendPhase(mapEvent, SiegeKeepPhase.Choosing);
         return true;
     }
-
-    private bool HasPlayerDefender(MapEvent mapEvent) =>
-        mapEvent.DefenderSide.Parties.Any(party =>
-            party.Party?.MobileParty != null && playerManager.TryGetPlayer(party.Party.MobileParty, out _));
 
     // The siege leader first, then the other walls players in the attacker side's order.
     private List<(Player Player, MobileParty Party)> GetAttackingPlayers(MapEvent mapEvent)
@@ -205,37 +201,34 @@ internal sealed class SiegeKeepHandler : IHandler
 
         // A later assault on a siege that already reached the hall goes straight to the keep.
         if (!selection.IsOpen(mapEvent) &&
-            (mapEvent.MapEventSettlement?.CurrentSiegeState != Settlement.SiegeState.InTheLordsHall ||
-             !TryOpenStage(mapEvent)))
+            (!mapEvent.IsSiegeKeepStage() || !TryOpenStage(mapEvent)))
             return Reject(request, "Nobody can lead the keep battle right now.");
 
-        if (!selection.TryGetSeat(mapEvent, player.MobilePartyId, out var seat, out var existing))
+        if (!selection.TryGetSeat(mapEvent, player.MobilePartyId, out var seat, out _))
             return Reject(request, selection.IsLocked(mapEvent)
                 ? "The keep battle has started without you. You will see the result."
                 : "The keep has no place left for you. You will see the result.");
 
         var seconds = SecondsRemaining(mapEvent);
         if (selection.IsLocked(mapEvent))
-            return new NetworkSiegeKeepEntryReply(request.RequestId, true, null, seat.EscortAllowance, 0, existing,
-                isLocked: true);
+            return new NetworkSiegeKeepEntryReply(request.RequestId, true, null, seat.EscortAllowance, 0, isLocked: true);
 
         if (request.QueryOnly)
-            return new NetworkSiegeKeepEntryReply(request.RequestId, true, null, seat.EscortAllowance, seconds,
-                existing);
+            return new NetworkSiegeKeepEntryReply(request.RequestId, true, null, seat.EscortAllowance, seconds);
 
         if (!selection.TrySelect(mapEvent, party, request.Troops ?? Array.Empty<HideoutTroopSelectionEntry>(),
-                out var accepted))
+                out _))
             return Reject(request, "That troop selection is no longer available.");
 
         if (selection.HaveAllAnswered(mapEvent))
             LockStage(mapEvent);
 
-        return new NetworkSiegeKeepEntryReply(request.RequestId, true, null, seat.EscortAllowance, seconds, accepted,
+        return new NetworkSiegeKeepEntryReply(request.RequestId, true, null, seat.EscortAllowance, seconds,
             isLocked: selection.IsLocked(mapEvent));
     }
 
     private static NetworkSiegeKeepEntryReply Reject(NetworkSiegeKeepEntryRequest request, string reason) =>
-        new(request.RequestId, false, reason, 0, 0, Array.Empty<HideoutTroopSelectionEntry>());
+        new(request.RequestId, false, reason, 0, 0);
 
     private int SecondsRemaining(MapEvent mapEvent) =>
         selection.TryGetDeadline(mapEvent, out var deadline)
@@ -339,6 +332,7 @@ internal sealed class SiegeKeepHandler : IHandler
     {
         var battle = PlayerEncounter.Battle ?? MobileParty.MainParty?.MapEvent;
         if (battle == null || !objectManager.TryGetIdWithLogging(battle, out var mapEventId)) return;
+        Logger.Information("Attack on the keep of {MapEventId}: asking the server for this player's place", mapEventId);
         if (!RequestBlocking(mapEventId, true, Array.Empty<HideoutTroopSelectionEntry>(), out var reply)) return;
 
         if (reply.IsLocked)
@@ -357,9 +351,7 @@ internal sealed class SiegeKeepHandler : IHandler
 
         var maximum = reply.EscortAllowance + 1;
         var selected = MobilePartyHelper.GetStrongestAndPriorTroops(MobileParty.MainParty, maximum, includePlayer: true);
-        var menuContext = args?.MenuContext ?? Campaign.Current.CurrentMenuContext;
-        if (menuContext == null) return;
-        menuContext.OpenTroopSelection(MobileParty.MainParty.MemberRoster, selected,
+        args.MenuContext.OpenTroopSelection(MobileParty.MainParty.MemberRoster, selected,
             character => !character.IsPlayerCharacter,
             roster => SubmitSelection(mapEventId, roster), maximum, 1);
         ShowMessage($"Choose up to {reply.EscortAllowance} troops for the keep. The assault starts in {reply.SecondsRemaining} seconds.");
@@ -423,6 +415,8 @@ internal sealed class SiegeKeepHandler : IHandler
                 !ReferenceEquals(MobileParty.MainParty?.MapEvent, mapEvent))
                 return;
 
+            Logger.Information("Keep stage {Phase} for {MapEventId}: seated={Seated} escorts={Escorts}",
+                message.Phase, message.MapEventId, message.IsSeated, message.EscortAllowance);
             switch (message.Phase)
             {
                 case SiegeKeepPhase.Choosing:
