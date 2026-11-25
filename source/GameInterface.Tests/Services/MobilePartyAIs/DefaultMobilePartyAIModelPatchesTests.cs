@@ -26,10 +26,25 @@ public class DefaultMobilePartyAIModelPatchesTests
         var mainPartyReads = original.Where(code => code.Calls(getter)).ToArray();
         Assert.Equal(2, mainPartyReads.Length);
 
+        var strength = AccessTools.PropertyGetter(typeof(PartyBase), nameof(PartyBase.EstimatedStrength));
+        var strengthReads = Enumerable.Range(0, original.Count - 4)
+            .Where(index => original[index].Calls(getter) && original[index + 4].Calls(strength));
+        int strongerCheckIndex = Assert.Single(strengthReads);
+
         var patched = DefaultMobilePartyAIModelPatches.ReplaceStrongerMainPartyCheck(original).ToList();
-        Assert.Same(mainPartyReads[1], Assert.Single(patched, code => code.Calls(getter)));
-        var strongerPartyCheck = patched[original.IndexOf(mainPartyReads[0])];
+        var untouchedRead = Assert.Single(patched, code => code.Calls(getter));
+        Assert.Same(mainPartyReads[1], untouchedRead);
+        Assert.Equal(original.Count, patched.Count);
+        for (int i = 0; i < original.Count; i++)
+        {
+            if (i != strongerCheckIndex)
+                Assert.Same(original[i], patched[i]);
+        }
+
+        var strongerPartyCheck = patched[strongerCheckIndex];
         Assert.Equal(OpCodes.Call, strongerPartyCheck.opcode);
+        Assert.Equal(original[strongerCheckIndex].labels, strongerPartyCheck.labels);
+        Assert.Equal(original[strongerCheckIndex].blocks, strongerPartyCheck.blocks);
         var recognizesPlayer = (Func<MobileParty, bool>)((MethodInfo)strongerPartyCheck.operand)
             .CreateDelegate(typeof(Func<MobileParty, bool>));
 
@@ -52,19 +67,22 @@ public class DefaultMobilePartyAIModelPatchesTests
         }
     }
 
-    [Theory]
-    [InlineData(0)]
-    [InlineData(1)]
-    [InlineData(3)]
-    public void UnexpectedMainPartyReadCountReportsDrift(int count)
+    [Fact]
+    public void ReorderedMainPartyReadsRejectTheAllyCheck()
     {
+        const int readAndFollowingInstructions = 5;
         var getter = AccessTools.PropertyGetter(typeof(MobileParty), nameof(MobileParty.IsMainParty));
-        var instructions = Enumerable.Range(0, count).Select(_ => new CodeInstruction(OpCodes.Callvirt, getter)).ToArray();
+        var scorer = AccessTools.Method(typeof(DefaultMobilePartyAIModel), nameof(DefaultMobilePartyAIModel.GetBestInitiativeBehavior));
+        var original = PatchProcessor.GetOriginalInstructions(scorer).ToArray();
+        int first = Array.FindIndex(original, code => code.Calls(getter));
+        int second = Array.FindLastIndex(original, code => code.Calls(getter));
+        var reordered = original.ToArray();
+        Array.Copy(original, second, reordered, first, readAndFollowingInstructions);
+        Array.Copy(original, first, reordered, second, readAndFollowingInstructions);
 
         var error = Assert.Throws<InvalidOperationException>(
-            () => DefaultMobilePartyAIModelPatches.ReplaceStrongerMainPartyCheck(instructions).ToArray());
+            () => DefaultMobilePartyAIModelPatches.ReplaceStrongerMainPartyCheck(reordered));
 
-        Assert.EndsWith($"found {count}.", error.Message);
-        Assert.All(instructions, instruction => Assert.True(instruction.Calls(getter)));
+        Assert.Contains("guard the stronger-party comparison", error.Message);
     }
 }

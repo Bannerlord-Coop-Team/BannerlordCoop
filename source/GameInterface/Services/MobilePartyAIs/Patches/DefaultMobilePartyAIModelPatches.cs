@@ -150,8 +150,13 @@ internal class DefaultMobilePartyAIModelPatches
         if (matches != 2)
             throw new InvalidOperationException($"Expected two IsMainParty reads in GetBestInitiativeBehavior, found {matches}.");
 
-        // The first read suppresses attacks near a stronger party. The second controls the ally-strength sum.
+        var party = AccessTools.PropertyGetter(typeof(MobileParty), nameof(MobileParty.Party));
+        var strength = AccessTools.PropertyGetter(typeof(PartyBase), nameof(PartyBase.EstimatedStrength));
         int index = codes.FindIndex(code => code.Calls(isMainParty));
+        if (index + 4 >= codes.Count || !codes[index + 3].Calls(party) || !codes[index + 4].Calls(strength))
+            throw new InvalidOperationException("Expected the first IsMainParty read to guard the stronger-party comparison.");
+
+        // The server has no main party on the map. Keep the second read for vanilla's ally-strength sum.
         codes[index] = new CodeInstruction(codes[index])
         {
             opcode = OpCodes.Call,
@@ -160,6 +165,7 @@ internal class DefaultMobilePartyAIModelPatches
         return codes;
     }
 
+    // Parked offline player parties are inactive and cannot suppress an attack.
     private static bool IsActivePlayerParty(MobileParty party) => party.IsActive && party.IsPlayerParty();
 
     [HarmonyPatch(nameof(DefaultMobilePartyAIModel.ShouldConsiderAttacking))]
