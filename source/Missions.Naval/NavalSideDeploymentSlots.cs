@@ -1,4 +1,6 @@
-﻿using System;
+﻿using GameInterface.Services.MapEvents.Extensions;
+using GameInterface.Services.Players;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -25,12 +27,12 @@ internal static class NavalSideDeploymentSlots
     internal const float SmallBattleSideDistance = 400f;
 
     /// <summary>How many of the side's slot-taking players precede <paramref name="own"/>, as every client counts them.</summary>
-    internal static int RankOf(MapEvent mapEvent, BattleSideEnum side, PartyBase own, INavalShipBudget budget) =>
-        RankOf(PartiesOf(mapEvent, side), own, party => budget.TakesDeploymentSlot(mapEvent, party));
+    internal static int RankOf(MapEvent mapEvent, BattleSideEnum side, PartyBase own, IPlayerManager playerManager) =>
+        RankOf(PartiesOf(mapEvent, side), own, party => TakesSlot(mapEvent, party, playerManager));
 
     /// <summary>How many of the side's players take a deployment slot, as every client counts them.</summary>
-    internal static int PlayerCountOf(MapEvent mapEvent, BattleSideEnum side, INavalShipBudget budget) =>
-        PlayerCountOf(PartiesOf(mapEvent, side), party => budget.TakesDeploymentSlot(mapEvent, party));
+    internal static int PlayerCountOf(MapEvent mapEvent, BattleSideEnum side, IPlayerManager playerManager) =>
+        PlayerCountOf(PartiesOf(mapEvent, side), party => TakesSlot(mapEvent, party, playerManager));
 
     /// <summary>How many player parties precede <paramref name="own"/> in the side's party order.</summary>
     internal static int RankOf<T>(IEnumerable<T> sideParties, T own, Func<T, bool> isPlayerParty) where T : class
@@ -112,6 +114,10 @@ internal static class NavalSideDeploymentSlots
     // The side's parties in the map event's order, which every client shares.
     private static IEnumerable<PartyBase> PartiesOf(MapEvent mapEvent, BattleSideEnum side) =>
         mapEvent.GetMapEventSide(side).Parties.Select(party => party.Party);
+
+    // A ship-less player takes no slot, because the server leaves it out of the mission; the ship budget still counts it.
+    private static bool TakesSlot(MapEvent mapEvent, PartyBase party, IPlayerManager playerManager) =>
+        playerManager.Contains(party.MobileParty) && !mapEvent.IsNavalBattleWithoutShips(party.MobileParty);
 
     // Vanilla's base and opposing base for the shared offset, and the offset no fleet as deep as the range goes past.
     private static (float SideBase, float OpposingBase, float ForwardLimit) Bounds(SpawnPathData spawnPath, float range)

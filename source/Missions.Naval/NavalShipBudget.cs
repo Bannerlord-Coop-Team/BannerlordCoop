@@ -1,5 +1,4 @@
 ﻿using Common.Logging;
-using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Ships;
@@ -20,7 +19,7 @@ namespace Missions.Naval;
 /// <summary>
 /// Splits a naval battle side's eight ships: each player fields its share against the side's other players, the side's AI
 /// parties get what the players leave, and a player who joins after the side's AI fleet attempt gets only what the recorded
-/// attempt leaves. It also decides which players take a side's deployment slots, while the share math counts every player.
+/// attempt leaves.
 /// </summary>
 public interface INavalShipBudget
 {
@@ -36,12 +35,6 @@ public interface INavalShipBudget
 
     /// <summary>[Game thread] The AI parties' share of the side: the eight ships less the players' fleets, at most their own limit.</summary>
     NavalShipDeploymentLimit AiLimit(NavalSidePlayerFleets players, MBReadOnlyList<MapEventParty> aiParties);
-
-    /// <summary>
-    /// Whether the party is a player's that takes a deployment slot, i.e. opens the mission with ships of its own; the server
-    /// leaves a ship-less player out of the mission.
-    /// </summary>
-    bool TakesDeploymentSlot(MapEvent mapEvent, PartyBase party);
 }
 
 /// <inheritdoc cref="INavalShipBudget"/>
@@ -103,10 +96,6 @@ public class NavalShipBudget : INavalShipBudget
         return new NavalShipDeploymentLimit(limit.PartiesLimit, limit.SkeletalCrewLimit, LeftForAi(players.Hulls, limit.NetDeploymentLimit));
     }
 
-    // Narrower than the share math's IsPlayerParty, which keeps a ship-less player since it fields no hull there anyway.
-    public bool TakesDeploymentSlot(MapEvent mapEvent, PartyBase party) =>
-        IsPlayerParty(party) && !mapEvent.IsNavalBattleWithoutShips(party.MobileParty);
-
     /// <summary>What the players' fielded ships leave of the side's eight, at most the AI parties' own limit and never below none.</summary>
     internal static int LeftForAi(int playerHulls, int aiLimit) => Math.Max(0, Math.Min(aiLimit, SideShips - playerHulls));
 
@@ -150,7 +139,7 @@ public class NavalShipBudget : INavalShipBudget
         return IsPlayerParty(party) && objectManager.TryGetIdWithLogging(party.MobileParty, out partyId);
     }
 
-    // Whether the player registry holds the party, with or without ships.
+    // Whether the player registry holds the party; a ship-less player counts too, since it fields no hull in the share math.
     private bool IsPlayerParty(PartyBase party) => playerManager.Contains(party.MobileParty);
 
     /// <summary>

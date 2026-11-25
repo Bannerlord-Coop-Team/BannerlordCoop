@@ -163,8 +163,8 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         var deploymentModel = NavalDLCManager.Instance.GameModels.ShipDeploymentModel;
 
         var sideParties = mapEvent.GetMapEventSide(playerSide).Parties;
-        deploymentSlot.Rank = NavalSideDeploymentSlots.RankOf(mapEvent, playerSide, PartyBase.MainParty, shipBudget);
-        deploymentSlot.PlayerCount = NavalSideDeploymentSlots.PlayerCountOf(mapEvent, playerSide, shipBudget);
+        deploymentSlot.Rank = NavalSideDeploymentSlots.RankOf(mapEvent, playerSide, PartyBase.MainParty, playerManager);
+        deploymentSlot.PlayerCount = NavalSideDeploymentSlots.PlayerCountOf(mapEvent, playerSide, playerManager);
 #if DEBUG
         // The ignore_limits knob turns on vanilla's own switch, set on every launch so a later battle without it has its limits back.
         ShipDeploymentModel.IgnoreDeploymentLimits = scenarioState.Current is { IgnoreShipLimits: true } scenario && scenario.MapEventId == mapEventId;
