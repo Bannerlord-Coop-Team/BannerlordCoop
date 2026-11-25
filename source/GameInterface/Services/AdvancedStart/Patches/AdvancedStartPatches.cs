@@ -65,7 +65,7 @@ internal class AdvancedStartPatches
 /// <summary>
 /// Rewrites vanilla's start methods for a shared world. Vanilla rolls each start from the campaign seed, which would
 /// give every player with the same start the same town, castle or workshop, so each start reads a seed mixed with
-/// the hero it's applied to instead. The trader start's workshop also skips one another player owns. Public so other
+/// the hero it's applied to instead. A start's workshop also skips one another player owns. Public so other
 /// start types' patches, such as War Sails', can run the same <see cref="Transpiler"/> over their start methods.
 /// </summary>
 [HarmonyPatch]
@@ -87,7 +87,7 @@ public class AdvancedStartMethodPatches
         var getSeed = AccessTools.PropertyGetter(typeof(CampaignOptions), nameof(CampaignOptions.Seed));
         var getPlayerSeed = AccessTools.Method(typeof(AdvancedStartMethodPatches), nameof(GetPlayerSeed));
         var applyByFree = AccessTools.Method(typeof(ChangeOwnerOfWorkshopAction), nameof(ChangeOwnerOfWorkshopAction.ApplyByFree));
-        var giveTraderWorkshop = AccessTools.Method(typeof(AdvancedStartMethodPatches), nameof(GiveTraderWorkshop));
+        var giveStartWorkshop = AccessTools.Method(typeof(AdvancedStartMethodPatches), nameof(GiveStartWorkshop));
 
         foreach (var instruction in instructions)
         {
@@ -98,7 +98,7 @@ public class AdvancedStartMethodPatches
             }
             else if (instruction.Calls(applyByFree))
             {
-                instruction.operand = giveTraderWorkshop;
+                instruction.operand = giveStartWorkshop;
             }
 
             yield return instruction;
@@ -109,8 +109,8 @@ public class AdvancedStartMethodPatches
     private static uint GetPlayerSeed(CampaignOptions options) =>
         options.Seed ^ (uint)Hero.MainHero.StringId.GetHashCode();
 
-    // Vanilla hands the trader a random workshop whoever owns it, so a second trader could take the first one's.
-    private static void GiveTraderWorkshop(Workshop workshop, Hero newOwner)
+    // Vanilla hands a start a random workshop whoever owns it, so a second player with that start could take the first one's.
+    private static void GiveStartWorkshop(Workshop workshop, Hero newOwner)
     {
         if (ContainerProvider.TryResolve<IPlayerManager>(out var playerManager) && playerManager.Contains(workshop.Owner))
         {

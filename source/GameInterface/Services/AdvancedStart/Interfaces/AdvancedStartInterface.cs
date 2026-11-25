@@ -221,12 +221,13 @@ internal class AdvancedStartInterface : IAdvancedStartInterface
         return null;
     }
 
-    /// <summary>The start type the window opens on: the host's default when it can be picked, otherwise vanilla's.</summary>
+    /// <summary>The start type the window opens on: the host's default when it can be picked, otherwise vanilla's.
+    /// The host's default matches ignoring case, since the config keys spell ids like fleetadmiral as fleetAdmiral.</summary>
     internal static string GetDefaultStartType(AdvancedStartPolicy policy)
     {
-        bool hostDefaultOffered = policy.StartTypes.Contains(policy.DefaultStartType) &&
-                                  !IsWorldLocked(policy, policy.DefaultStartType);
-        if (hostDefaultOffered) return policy.DefaultStartType;
+        string hostDefault = policy.StartTypes.FirstOrDefault(startType =>
+            string.Equals(startType, policy.DefaultStartType, StringComparison.OrdinalIgnoreCase));
+        if (hostDefault != null && !IsWorldLocked(policy, hostDefault)) return hostDefault;
 
         return StartOptionIds.StartTypeDefaultId;
     }
@@ -330,44 +331,34 @@ internal class AdvancedStartInterface : IAdvancedStartInterface
 
     public bool ApplySelections(Hero hero, AdvancedStartSelection[] selections)
     {
-        string startTypeId = selections.FirstOrDefault(selection => selection?.Id == StartOptionIds.StartTypeId)?.Value;
-        string kingdomId = selections.FirstOrDefault(selection => selection?.Id == StartOptionIds.KingdomIdKey)?.Value;
-        // A modifier's value is its ticked state as text.
-        var tickedOptionIds = selections
-            .Where(selection => bool.TryParse(selection?.Value, out bool ticked) && ticked)
-            .Select(selection => selection.Id)
-            .ToArray();
-        bool defaultStart = startTypeId == null || startTypeId == StartOptionIds.StartTypeDefaultId;
-        if (defaultStart && tickedOptionIds.Length == 0) return true;
-
         bool applied = false;
         // Patches stay live so every change to the hero, party and factions replicates as its own message.
         GameThread.RunSafe(() =>
         {
-            // Checked again here because the world can move on, or another player take the kingdom, after the window opened.
-            var policy = CreatePolicy();
-            var startType = defaultStart ? null : startTypes.FirstOrDefault(candidate => candidate.Id == startTypeId);
-            bool startApplies = defaultStart || (startType != null && CanApply(policy, startType, kingdomId));
-            if (!startApplies)
-            {
+            // Picked against a fresh policy because the world can move on, or another player take the kingdom, after the window opened.
+            var pick = PickStart(CreatePolicy(), startTypes, modifiers, selections);
+            if (!pick.StartApplies)
                 Logger.Warning("Start type {StartType} with kingdom {KingdomId} can't be applied to {Hero}; keeping the default start",
-                    startTypeId, kingdomId, hero.StringId);
-                startType = null;
-            }
+                    pick.StartTypeId, pick.KingdomId, hero.StringId);
 
-            var tickedModifiers = modifiers
-                .Where(modifier => tickedOptionIds.Contains(modifier.OptionId) && policy?.ModifierIds?.Contains(modifier.OptionId) == true)
-                .ToArray();
-            if (startType == null && tickedModifiers.Length == 0)
+            if (pick.StartType == null && pick.Modifiers.Length == 0)
             {
-                applied = startApplies;
+                applied = pick.StartApplies;
                 return;
             }
 
+            var party = hero.PartyBelongedTo;
             try
             {
-                RunStart(hero, startType, kingdomId, tickedModifiers);
-                applied = startApplies;
+                using (new MainHeroSubstitutionScope(hero, party))
+                {
+                    pick.StartType?.Run(hero, pick.KingdomId);
+                    // Before the modifiers, so one that throws doesn't report a start that did apply as failed.
+                    applied = pick.StartApplies;
+                    foreach (var modifier in pick.Modifiers)
+                        modifier.Run(hero);
+                    party.MemberRoster.UpdateVersion();
+                }
             }
             finally
             {
@@ -379,7 +370,33 @@ internal class AdvancedStartInterface : IAdvancedStartInterface
         return applied;
     }
 
-    // Server, game thread: whether the pick is still offered and, for a kingdom start, its kingdom can still take the player.
+    /// <summary>The start and ticked modifiers to give a joining player. A start the policy no longer allows falls back
+    /// to the default start, reported as not applied, and the ticked modifiers still apply.</summary>
+    internal static (IAdvancedStartType StartType, string StartTypeId, string KingdomId, IAdvancedStartModifier[] Modifiers, bool StartApplies)
+        PickStart(AdvancedStartPolicy policy, IEnumerable<IAdvancedStartType> startTypes,
+            IEnumerable<IAdvancedStartModifier> modifiers, AdvancedStartSelection[] selections)
+    {
+        selections = selections ?? Array.Empty<AdvancedStartSelection>();
+        string startTypeId = selections.FirstOrDefault(selection => selection?.Id == StartOptionIds.StartTypeId)?.Value;
+        string kingdomId = selections.FirstOrDefault(selection => selection?.Id == StartOptionIds.KingdomIdKey)?.Value;
+
+        // A modifier's value is its ticked state as text.
+        var offeredModifierIds = policy?.ModifierIds ?? Array.Empty<string>();
+        var tickedModifiers = modifiers
+            .Where(modifier => offeredModifierIds.Contains(modifier.OptionId) &&
+                               selections.Any(selection => selection?.Id == modifier.OptionId &&
+                                                           bool.TryParse(selection.Value, out bool ticked) && ticked))
+            .ToArray();
+
+        if (startTypeId == null || startTypeId == StartOptionIds.StartTypeDefaultId)
+            return (null, startTypeId, kingdomId, tickedModifiers, true);
+
+        var startType = startTypes.FirstOrDefault(candidate => candidate.Id == startTypeId);
+        bool startApplies = startType != null && CanApply(policy, startType, kingdomId);
+        return (startApplies ? startType : null, startTypeId, kingdomId, tickedModifiers, startApplies);
+    }
+
+    // Whether the pick is still offered and, for a kingdom start, its kingdom can still take the player.
     private static bool CanApply(AdvancedStartPolicy policy, IAdvancedStartType startType, string kingdomId)
     {
         if (policy == null || !policy.StartTypes.Contains(startType.Id)) return false;
@@ -387,19 +404,6 @@ internal class AdvancedStartInterface : IAdvancedStartInterface
         if (!startType.CanRunInWorld()) return false;
 
         return !startType.NeedsKingdom || GetKingdomLockId(policy, startType.Id, kingdomId) == null;
-    }
-
-    // Runs the start, if any, then the modifiers, with the joining hero standing in as the main hero.
-    private static void RunStart(Hero hero, IAdvancedStartType startType, string kingdomId, IAdvancedStartModifier[] tickedModifiers)
-    {
-        var party = hero.PartyBelongedTo;
-        using (new MainHeroSubstitutionScope(hero, party))
-        {
-            startType?.Run(hero, kingdomId);
-            foreach (var modifier in tickedModifiers)
-                modifier.Run(hero);
-            party.MemberRoster.UpdateVersion();
-        }
     }
 
     // Sends what the start changed that doesn't replicate by itself.

@@ -90,7 +90,39 @@ public class AdvancedStartInterfaceTests
     }
 
     [Theory]
+    // The default start with a ticked modifier gets only the modifier.
+    [InlineData("default", "True", true, true, false, true, true)]
+    // A start the world can no longer run falls back to the default start and still gets the ticked modifier.
+    [InlineData("outlaw", "True", true, false, false, true, false)]
+    // A ticked modifier the host doesn't offer is skipped.
+    [InlineData("outlaw", "True", false, true, true, false, true)]
+    // The client sends an unticked modifier as "False".
+    [InlineData("outlaw", "False", true, true, true, false, true)]
+    public void PickStart_RunsTickedOfferedModifiersWhateverTheStart(string startTypeId, string shipValue, bool shipOffered,
+        bool startCanRun, bool expectStart, bool expectShip, bool expectApplies)
+    {
+        var outlaw = new FakeStartType("outlaw", startCanRun);
+        var ship = new FakeModifier("PersonalShip", offered: shipOffered);
+        var policy = AdvancedStartInterface.CreatePolicy(new[] { outlaw }, new[] { ship }, null,
+            false, Array.Empty<string>(), new[] { "vlandia" });
+        var selections = new[]
+        {
+            new AdvancedStartSelection("StartType", startTypeId),
+            new AdvancedStartSelection("KingdomId", "vlandia"),
+            new AdvancedStartSelection("PersonalShip", shipValue),
+        };
+
+        var pick = AdvancedStartInterface.PickStart(policy, new[] { outlaw }, new[] { ship }, selections);
+
+        Assert.Equal(expectStart ? outlaw : null, pick.StartType);
+        Assert.Equal(expectShip ? new IAdvancedStartModifier[] { ship } : Array.Empty<IAdvancedStartModifier>(), pick.Modifiers);
+        Assert.Equal(expectApplies, pick.StartApplies);
+    }
+
+    [Theory]
     [InlineData("king", false, "king")]
+    // Config keys spell ids in camel case, so the host's default matches ignoring case.
+    [InlineData("KING", false, "king")]
     // The host's default is a world start and the clock has moved.
     [InlineData("king", true, "default")]
     // The host's default isn't offered.
@@ -109,6 +141,24 @@ public class AdvancedStartInterfaceTests
         AdvancedStartInterface.CreatePolicy(VanillaAdvancedStartType.All.Where(startType => startTypes.Contains(startType.Id)),
             Array.Empty<IAdvancedStartModifier>(), new AdvancedStartConfigData { DefaultStartType = defaultStartType },
             worldStarted, playerRuled, joinable);
+
+    private sealed class FakeStartType : IAdvancedStartType
+    {
+        private readonly bool canRunInWorld;
+
+        public FakeStartType(string id, bool canRunInWorld)
+        {
+            Id = id;
+            this.canRunInWorld = canRunInWorld;
+        }
+
+        public string Id { get; }
+        public bool ChangesWorld => false;
+        public bool NeedsKingdom => false;
+        public bool IsOffered(AdvancedStartConfigData config) => true;
+        public bool CanRunInWorld() => canRunInWorld;
+        public void Run(Hero hero, string kingdomId) => throw new NotSupportedException();
+    }
 
     private sealed class FakeModifier : IAdvancedStartModifier
     {
