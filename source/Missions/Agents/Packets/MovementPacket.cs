@@ -86,8 +86,10 @@ namespace Missions.Agents.Packets
             AuthorityRevisions = authorityRevisions;
         }
 
-        internal MovementPacket WithPackedSnapshots(byte[] snapshots) => new MovementPacket(this, null, snapshots);
-        internal MovementPacket WithRestoredSnapshots(AgentData[] agents) => new MovementPacket(this, agents, null);
+        internal MovementPacket WithPackedSnapshots(byte[] snapshots) =>
+            new MovementPacket(this, agents: null, packedSnapshots: snapshots);
+        internal MovementPacket WithRestoredSnapshots(AgentData[] agents) =>
+            new MovementPacket(this, agents, packedSnapshots: null);
 
         internal MovementPacket WithAuthorityRevisions(long[] revisions) => new MovementPacket(this, revisions);
     }
