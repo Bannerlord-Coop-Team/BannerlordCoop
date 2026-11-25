@@ -20,11 +20,19 @@ public class AdvancedStartPolicy
     /// scenarios eliminate some and merge others, such as the imperial kingdoms in a United Empire world.</summary>
     [ProtoMember(5)]
     public readonly string[] JoinableKingdomIds;
+    /// <summary>Offered start types that change the world, locked once <see cref="WorldStarted"/>.</summary>
+    [ProtoMember(6)]
+    public readonly string[] WorldStartTypes;
+    /// <summary>Offered start types that join the kingdom picked in the KingdomId option.</summary>
+    [ProtoMember(7)]
+    public readonly string[] KingdomStartTypes;
 
-    public AdvancedStartPolicy(string[] startTypes, string defaultStartType, bool worldStarted,
-        string[] playerRuledKingdomIds, string[] joinableKingdomIds)
+    public AdvancedStartPolicy(string[] startTypes, string[] worldStartTypes, string[] kingdomStartTypes,
+        string defaultStartType, bool worldStarted, string[] playerRuledKingdomIds, string[] joinableKingdomIds)
     {
         StartTypes = startTypes;
+        WorldStartTypes = worldStartTypes;
+        KingdomStartTypes = kingdomStartTypes;
         DefaultStartType = defaultStartType;
         WorldStarted = worldStarted;
         PlayerRuledKingdomIds = playerRuledKingdomIds;

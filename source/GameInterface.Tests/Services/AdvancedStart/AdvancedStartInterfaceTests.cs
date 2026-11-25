@@ -1,13 +1,26 @@
 ﻿using GameInterface.Configuration;
+using GameInterface.Services.AdvancedStart;
 using GameInterface.Services.AdvancedStart.Data;
 using GameInterface.Services.AdvancedStart.Interfaces;
 using System;
+using System.Linq;
 using Xunit;
 
 namespace GameInterface.Tests.Services.AdvancedStart;
 
 public class AdvancedStartInterfaceTests
 {
+    [Fact]
+    public void CreatePolicy_OffersDefaultFirst_AndListsEachStartTypeTrait()
+    {
+        var policy = AdvancedStartInterface.CreatePolicy(VanillaAdvancedStartType.All, null, false,
+            Array.Empty<string>(), new[] { "vlandia" });
+
+        Assert.Equal(new[] { "default", "outlaw", "beggar", "trader", "mercenary", "vassal", "king" }, policy.StartTypes);
+        Assert.Equal(new[] { "trader", "mercenary", "vassal", "king" }, policy.WorldStartTypes);
+        Assert.Equal(new[] { "mercenary", "vassal", "king" }, policy.KingdomStartTypes);
+    }
+
     [Fact]
     public void OffersPickableStart_NullPolicy_IsFalse()
     {
@@ -28,30 +41,29 @@ public class AdvancedStartInterfaceTests
     public void OffersPickableStart_FollowsWorldAndKingdomLocks(
         string[] startTypes, bool worldStarted, string[] playerRuled, string[] joinable, bool expected)
     {
-        var policy = new AdvancedStartPolicy(startTypes, "default", worldStarted, playerRuled, joinable);
+        var policy = CreateVanillaPolicy(startTypes, "default", worldStarted, playerRuled, joinable);
 
         Assert.Equal(expected, AdvancedStartInterface.OffersPickableStart(policy));
     }
 
-    [Fact]
-    public void OffersPickableStart_NullArraysFromTheWire_CountAsEmpty()
+    [Theory]
+    // A king start with no joinable kingdom.
+    [InlineData(new[] { "default", "king" }, new[] { "king" }, false, false)]
+    // A host offering only outlaw sends every start type trait array empty.
+    [InlineData(new[] { "default", "outlaw" }, null, true, true)]
+    public void OffersPickableStart_NullArraysFromTheWire_CountAsEmpty(
+        string[] startTypes, string[] traitStartTypes, bool worldStarted, bool expected)
     {
         // Empty arrays arrive as null over protobuf.
-        var policy = new AdvancedStartPolicy(new[] { "default", "king" }, "default", false, null, null);
+        var policy = new AdvancedStartPolicy(startTypes,
+            worldStartTypes: traitStartTypes,
+            kingdomStartTypes: traitStartTypes,
+            defaultStartType: "default",
+            worldStarted: worldStarted,
+            playerRuledKingdomIds: null,
+            joinableKingdomIds: null);
 
-        Assert.False(AdvancedStartInterface.OffersPickableStart(policy));
-    }
-
-    [Fact]
-    public void GetOfferedStartTypes_KeepsDefaultAndDropsSwitchedOff()
-    {
-        var config = new AdvancedStartConfigData
-        {
-            StartTypes = new AdvancedStartTypesConfigData { Beggar = false, King = false },
-        };
-
-        Assert.Equal(new[] { "default", "outlaw", "trader", "mercenary", "vassal" },
-            AdvancedStartInterface.GetOfferedStartTypes(config));
+        Assert.Equal(expected, AdvancedStartInterface.OffersPickableStart(policy));
     }
 
     [Theory]
@@ -62,9 +74,15 @@ public class AdvancedStartInterfaceTests
     [InlineData("beggar", false, "default")]
     public void GetDefaultStartType_FallsBackWhenHostDefaultCantBePicked(string hostDefault, bool worldStarted, string expected)
     {
-        var policy = new AdvancedStartPolicy(new[] { "default", "outlaw", "king" }, hostDefault, worldStarted,
+        var policy = CreateVanillaPolicy(new[] { "default", "outlaw", "king" }, hostDefault, worldStarted,
             Array.Empty<string>(), new[] { "vlandia" });
 
         Assert.Equal(expected, AdvancedStartInterface.GetDefaultStartType(policy));
     }
+
+    // The policy the server builds when it offers these vanilla start types.
+    private static AdvancedStartPolicy CreateVanillaPolicy(string[] startTypes, string defaultStartType, bool worldStarted,
+        string[] playerRuled, string[] joinable) =>
+        AdvancedStartInterface.CreatePolicy(VanillaAdvancedStartType.All.Where(startType => startTypes.Contains(startType.Id)),
+            new AdvancedStartConfigData { DefaultStartType = defaultStartType }, worldStarted, playerRuled, joinable);
 }

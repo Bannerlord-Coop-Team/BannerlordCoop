@@ -39,12 +39,19 @@ namespace Coop.IntegrationTests.Serialization
         [Fact]
         public void NetworkAdvancedStartPolicy_RoundTrips_EmptyArraysAsNull()
         {
-            var policy = new AdvancedStartPolicy(new[] { "default", "king" }, "king", true,
-                Array.Empty<string>(), new[] { "vlandia" });
+            var policy = new AdvancedStartPolicy(new[] { "default", "king" },
+                worldStartTypes: new[] { "king" },
+                kingdomStartTypes: new[] { "king" },
+                defaultStartType: "king",
+                worldStarted: true,
+                playerRuledKingdomIds: Array.Empty<string>(),
+                joinableKingdomIds: new[] { "vlandia" });
 
             var copy = RoundTrip(new NetworkAdvancedStartPolicy(policy)).Policy;
 
             Assert.Equal(new[] { "default", "king" }, copy.StartTypes);
+            Assert.Equal(new[] { "king" }, copy.WorldStartTypes);
+            Assert.Equal(new[] { "king" }, copy.KingdomStartTypes);
             Assert.Equal("king", copy.DefaultStartType);
             Assert.True(copy.WorldStarted);
             // protobuf-net writes nothing for an empty array, so readers have to treat null as empty.
