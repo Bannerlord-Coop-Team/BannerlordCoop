@@ -31,7 +31,7 @@ Resolves #
 
 
 ## Bot Changelog Entry
-<!-- The bot publishes these entries verbatim in the nightly release changelog. Add concise, nontechnical bullet points for tester-visible changes. Prefer one bullet unless this PR has multiple distinct tester-visible changes. Leave this section empty when there is no useful tester-facing entry. -->
+<!-- The bot publishes these entries verbatim in the nightly release changelog. Add concise, nontechnical bullet points for tester-visible changes. Prefer one bullet unless this PR has multiple distinct tester-visible changes. Every PR needs at least one entry. For changes testers can't see directly, describe the effect they'd notice. -->
 
 
 ## Other information
