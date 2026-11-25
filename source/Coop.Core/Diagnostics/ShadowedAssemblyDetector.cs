@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using GameInterface;
 
 namespace Coop.Core.Diagnostics;
 
@@ -22,9 +23,9 @@ public class ShadowedAssemblyDetector : IShadowedAssemblyDetector
 
     private readonly Version minimumHarmonyVersion;
 
-    // Read from metadata so this doesn't load 0Harmony before the check
+    // Read the patch assembly's reference without loading Harmony before the check.
     public ShadowedAssemblyDetector()
-        : this(typeof(ShadowedAssemblyDetector).Assembly.GetReferencedAssemblies()
+        : this(typeof(IGameInterface).Assembly.GetReferencedAssemblies()
             .FirstOrDefault(reference => reference.Name == "0Harmony")?.Version)
     {
     }

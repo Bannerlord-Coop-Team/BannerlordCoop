@@ -16,6 +16,7 @@ public interface IInventoryScreenRosterRefresher : IGameAbstraction
     void CaptureInventoryBaseline(InventoryLogic logic);
     ItemRosterElement[] GetInventoryBaseline(InventoryLogic logic);
     bool TryApplyInventoryUpdate(ItemRoster roster, EquipmentElement element, int amount);
+    bool TryApplyEquipmentUpdate(Equipment equipment, int index, EquipmentElement element);
     bool TryClearInventory(ItemRoster roster);
     void RestoreInventoryBackup(InventoryLogic logic);
 }
@@ -76,6 +77,38 @@ internal class InventoryScreenRosterRefresher : IInventoryScreenRosterRefresher
             // One item changed, so refresh its row; rebuilding the whole screen per update froze trading (#4124).
             screenView.RefreshItem(logic, (InventoryLogic.InventorySide)side, element, amount);
         }
+        return true;
+    }
+
+    public bool TryApplyEquipmentUpdate(Equipment equipment, int index, EquipmentElement element)
+        => TryApplyEquipmentUpdate(
+            (GameStateManager.Current?.ActiveState as InventoryState)?.InventoryLogic,
+            equipment,
+            index,
+            element);
+
+    internal bool TryApplyEquipmentUpdate(InventoryLogic logic, Equipment equipment, int index, EquipmentElement element)
+    {
+        if (logic == null || !inventoryBaselines.TryGetValue(logic, out var baseline)) return false;
+
+        // Reset and IsThereAnyChanges compare the live sets with these copies, so a received slot goes into them too
+        var partyEquipments = new[] { logic._partyInitialEquipment, logic._otherPartyInitialEquipment, baseline.PlayerEquipment, baseline.OtherPartyEquipment };
+        foreach (var partyEquipment in partyEquipments.Where(partyEquipment => partyEquipment != null).Distinct())
+        {
+            foreach (var characterEquipment in partyEquipment.CharacterEquipments)
+            {
+                var character = characterEquipment.Key;
+                if (character.FirstBattleEquipment != equipment &&
+                    character.FirstCivilianEquipment != equipment &&
+                    character.FirstStealthEquipment != equipment) continue;
+
+                var copy = characterEquipment.Value.FirstOrDefault(c => c._equipmentType == equipment._equipmentType);
+                if (copy != null) copy._itemSlots[index] = element;
+            }
+        }
+
+        equipment._itemSlots[index] = element;
+        screenView.RefreshEquipment(logic);
         return true;
     }
 

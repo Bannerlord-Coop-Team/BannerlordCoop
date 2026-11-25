@@ -1,6 +1,9 @@
 ﻿using Common.Commands;
 using Common;
 using GameInterface.Services.PartyVisuals.Patches;
+using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using GameInterface.Utils.Commands;
 using SandBox.View.Map.Managers;
 using System;
@@ -80,6 +83,71 @@ internal class PartyVisualDebugCommands
     }
 
 #if DEBUG
+    /// <summary>Reports each player's party visuals without changing them.</summary>
+    public sealed class PlayerStateCoopCommand : ICoopCommand
+    {
+        private readonly IObjectManager objectManager;
+        private readonly IPlayerManager playerManager;
+
+        public PlayerStateCoopCommand(IObjectManager objectManager, IPlayerManager playerManager)
+        {
+            this.objectManager = objectManager;
+            this.playerManager = playerManager;
+        }
+
+        public string Prefix => "coop.debug.party_visuals";
+        public string Name => "player_state";
+        public string Description => "Reports player party visuals without changing them.";
+        public CoopCommandSide Side => CoopCommandSide.Both;
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            var manager = MobilePartyVisualManager.Current;
+            var players = playerManager.Players.Select(player => DescribePlayer(player, manager)).ToArray();
+            return Succeeded("LIVE_TEST_JSON=" + JsonSerializer.Serialize(new
+            {
+                isServer = ModInformation.IsServer,
+                managerPresent = manager != null,
+                players,
+            }));
+        }
+
+        private object DescribePlayer(Player player, MobilePartyVisualManager manager)
+        {
+            bool found = objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party);
+            uint partyHandle = 0;
+            if (found)
+                objectManager.TryGetHandle(party, out partyHandle);
+
+            object Row(int visualCount = 0, int fadingVisualCount = 0, int dictionaryVisualCount = 0) => new
+            {
+                controllerId = player.ControllerId,
+                platformName = player.PlatformName,
+                partyId = player.MobilePartyId,
+                partyHandle,
+                found,
+                stringId = party?.StringId,
+                name = party?.Name?.ToString(),
+                active = party?.IsActive,
+                x = party?.Position.X,
+                y = party?.Position.Y,
+                isOnLand = party?.Position.IsOnLand,
+                visualCount,
+                fadingVisualCount,
+                dictionaryVisualCount,
+            };
+
+            if (!found || manager == null)
+                return Row();
+
+            return Row(
+                manager._visualsFlattened.Count(visual => visual.MapEntity == party.Party),
+                manager._fadingPartiesFlatten.Count(visual => visual.MapEntity == party.Party),
+                manager._partiesAndVisuals.ContainsKey(party.Party) ? 1 : 0);
+        }
+    }
+
     public sealed class FixtureStateCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.party_visuals";

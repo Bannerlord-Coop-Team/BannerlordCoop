@@ -11,15 +11,12 @@ using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MobilePartyAIs.Patches;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.PartyBases.Extensions;
-using GameInterface.Services.PartyVisuals.Extensions;
-using GameInterface.Services.PartyVisuals.Messages;
+using GameInterface.Services.PartyVisuals.Interfaces;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.TroopRosters.Messages;
 using Helpers;
 using LiteNetLib;
-using SandBox.View.Map.Managers;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -62,6 +59,7 @@ internal class PlayerCaptivityServerHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IPlayerManager playerManager;
     private readonly ConversationPartyTracker conversationPartyTracker;
+    private readonly IPartyVisualInterface partyVisuals;
     private readonly Dictionary<Hero, Hero> pendingExecutions = new();
 
     public PlayerCaptivityServerHandler(
@@ -69,13 +67,15 @@ internal class PlayerCaptivityServerHandler : IHandler
         INetwork network,
         IMessageBroker messageBroker,
         IPlayerManager playerManager,
-        ConversationPartyTracker conversationPartyTracker)
+        ConversationPartyTracker conversationPartyTracker,
+        IPartyVisualInterface partyVisuals)
     {
         this.objectManager = objectManager;
         this.network = network;
         this.messageBroker = messageBroker;
         this.playerManager = playerManager;
         this.conversationPartyTracker = conversationPartyTracker;
+        this.partyVisuals = partyVisuals;
 
         // ModInformation is evaluated per call (tests flip it per instance), so each handler
         // guards itself instead of gating the subscriptions here.
@@ -168,11 +168,13 @@ internal class PlayerCaptivityServerHandler : IHandler
         // transferred — out of BR-061's scope, which covers the surrendered party's own heroes and troops.
         EmptyRoster(playerParty.MemberRoster);
         EmptyRoster(playerParty.PrisonRoster);
-        RemoveVisual(playerParty);
+        partyVisuals.RemoveVisual(playerParty);
         if (playerParty.LeaderHero != null)
             playerParty.ChangePartyLeader(null);
 
         RollPlayerExecution(hero, payload.What.CapturerParty);
+
+        partyVisuals.RefreshParkedNameplate(playerParty);
     }
 
     private void RollPlayerExecution(Hero hero, PartyBase captor)
@@ -691,22 +693,6 @@ internal class PlayerCaptivityServerHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(playerParty, out string playerPartyId)) return;
 
         network.SendAll(new NetworkPlayerCaptivityReleasePositionSet(playerPartyId, releasePosition));
-    }
-
-    private void RemoveVisual(MobileParty party)
-    {
-        var partyVisual = party.Party.GetPartyVisual();
-        if (partyVisual == null) return;
-        if (!objectManager.TryGetHandleWithLogging(party, out var mobilePartyHandle)) return;
-
-        objectManager.Remove(partyVisual);
-
-        using (new AllowedThread())
-        {
-            MobilePartyVisualManager.Current?.RemovePartyVisualForParty(party);
-        }
-
-        network.SendAll(new NetworkDestroyPartyVisual(mobilePartyHandle));
     }
 
     /// <summary>

@@ -7,6 +7,7 @@ using GameInterface.Services.Missions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Tests.Services.SiegeEvents;
 using LiteNetLib;
 using Moq;
 using System.Collections.Generic;
@@ -19,6 +20,8 @@ using TriggerId = TaleWorlds.CampaignSystem.CampaignBehaviors.IncidentsCampaignB
 
 namespace GameInterface.Tests.Services.Incidents;
 
+// The availability check reads Campaign.Current, which other tests swap for a bare campaign
+[Collection(nameof(CampaignCurrentCollection))]
 public class IncidentsCampaignBehaviourInterfaceTests
 {
     private const string ArrowProofingId = "Incident_incident_arrow_proofing";
