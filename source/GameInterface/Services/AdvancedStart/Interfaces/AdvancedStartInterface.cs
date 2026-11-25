@@ -146,7 +146,10 @@ internal class AdvancedStartInterface : IAdvancedStartInterface
             startTypes: new[] { StartOptionIds.StartTypeDefaultId }.Concat(offered.Select(startType => startType.Id)).ToArray(),
             worldStartTypes: IdsWhere(startType => startType.ChangesWorld),
             kingdomStartTypes: IdsWhere(startType => startType.NeedsKingdom),
-            modifierIds: modifiers.Where(modifier => modifier.IsOffered(config)).Select(modifier => modifier.OptionId).ToArray(),
+            modifierLimits: modifiers
+                .Select(modifier => (modifier.OptionId, Limit: modifier.GetLimit(config)))
+                .Where(modifier => modifier.Limit > 0)
+                .ToDictionary(modifier => modifier.OptionId, modifier => modifier.Limit),
             defaultStartType: config?.DefaultStartType,
             worldStarted: worldStarted,
             playerRuledKingdomIds: playerRuledKingdomIds,
@@ -190,7 +193,7 @@ internal class AdvancedStartInterface : IAdvancedStartInterface
     internal static bool OffersPickableStart(AdvancedStartPolicy policy)
     {
         if (policy?.StartTypes == null) return false;
-        if (policy.ModifierIds?.Length > 0) return true;
+        if (policy.ModifierLimits?.Count > 0) return true;
 
         return policy.StartTypes.Any(startType => startType != StartOptionIds.StartTypeDefaultId &&
                                                   GetStartTypeLockId(policy, startType, policy.JoinableKingdomIds) == null);
@@ -244,9 +247,11 @@ internal class AdvancedStartInterface : IAdvancedStartInterface
             options.Add(CopyStartTypeOption(startTypeOption, policy));
         if (vanillaOptions.GetOption(StartOptionIds.KingdomIdKey) is ListAdvancedStartOption kingdomOption)
             options.Add(CopyKingdomOption(kingdomOption, policy));
-        foreach (var modifierId in policy.ModifierIds ?? Array.Empty<string>())
+        foreach (var modifier in modifiers)
         {
-            var modifierOption = vanillaOptions.GetOption(modifierId);
+            if (policy.ModifierLimits == null || !policy.ModifierLimits.TryGetValue(modifier.OptionId, out int limit)) continue;
+
+            var modifierOption = modifier.CreateOption(limit) ?? vanillaOptions.GetOption(modifier.OptionId);
             if (modifierOption != null) options.Add(modifierOption);
         }
 
@@ -355,8 +360,8 @@ internal class AdvancedStartInterface : IAdvancedStartInterface
                     pick.StartType?.Run(hero, pick.KingdomId);
                     // Before the modifiers, so one that throws doesn't report a start that did apply as failed.
                     applied = pick.StartApplies;
-                    foreach (var modifier in pick.Modifiers)
-                        modifier.Run(hero);
+                    foreach (var (modifier, value) in pick.Modifiers)
+                        modifier.Run(hero, value);
                     party.MemberRoster.UpdateVersion();
                 }
             }
@@ -370,9 +375,11 @@ internal class AdvancedStartInterface : IAdvancedStartInterface
         return applied;
     }
 
-    /// <summary>The start and ticked modifiers to give a joining player. A start the policy no longer allows falls back
-    /// to the default start, reported as not applied, and the ticked modifiers still apply.</summary>
-    internal static (IAdvancedStartType StartType, string StartTypeId, string KingdomId, IAdvancedStartModifier[] Modifiers, bool StartApplies)
+    /// <summary>The start and modifiers to give a joining player, each modifier with its picked value capped at the
+    /// host's limit. A start the policy no longer allows falls back to the default start, reported as not applied,
+    /// and the modifiers still apply.</summary>
+    internal static (IAdvancedStartType StartType, string StartTypeId, string KingdomId,
+        (IAdvancedStartModifier Modifier, int Value)[] Modifiers, bool StartApplies)
         PickStart(AdvancedStartPolicy policy, IEnumerable<IAdvancedStartType> startTypes,
             IEnumerable<IAdvancedStartModifier> modifiers, AdvancedStartSelection[] selections)
     {
@@ -380,20 +387,27 @@ internal class AdvancedStartInterface : IAdvancedStartInterface
         string startTypeId = selections.FirstOrDefault(selection => selection?.Id == StartOptionIds.StartTypeId)?.Value;
         string kingdomId = selections.FirstOrDefault(selection => selection?.Id == StartOptionIds.KingdomIdKey)?.Value;
 
-        // A modifier's value is its ticked state as text.
-        var offeredModifierIds = policy?.ModifierIds ?? Array.Empty<string>();
-        var tickedModifiers = modifiers
-            .Where(modifier => offeredModifierIds.Contains(modifier.OptionId) &&
-                               selections.Any(selection => selection?.Id == modifier.OptionId &&
-                                                           bool.TryParse(selection.Value, out bool ticked) && ticked))
+        var limits = policy?.ModifierLimits ?? new Dictionary<string, int>();
+        var pickedModifiers = modifiers
+            .Select(modifier => (Modifier: modifier, Value: Math.Min(
+                ReadModifierValue(selections.FirstOrDefault(selection => selection?.Id == modifier.OptionId)?.Value),
+                limits.TryGetValue(modifier.OptionId, out int limit) ? limit : 0)))
+            .Where(modifier => modifier.Value > 0)
             .ToArray();
 
         if (startTypeId == null || startTypeId == StartOptionIds.StartTypeDefaultId)
-            return (null, startTypeId, kingdomId, tickedModifiers, true);
+            return (null, startTypeId, kingdomId, pickedModifiers, true);
 
         var startType = startTypes.FirstOrDefault(candidate => candidate.Id == startTypeId);
         bool startApplies = startType != null && CanApply(policy, startType, kingdomId);
-        return (startApplies ? startType : null, startTypeId, kingdomId, tickedModifiers, startApplies);
+        return (startApplies ? startType : null, startTypeId, kingdomId, pickedModifiers, startApplies);
+    }
+
+    // The client sends an on/off option as "True" or "False" and a number option as its number.
+    private static int ReadModifierValue(string value)
+    {
+        if (bool.TryParse(value, out bool ticked)) return ticked ? 1 : 0;
+        return int.TryParse(value, out int number) ? number : 0;
     }
 
     // Whether the pick is still offered and, for a kingdom start, its kingdom can still take the player.

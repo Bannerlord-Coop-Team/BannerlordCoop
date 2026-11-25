@@ -2,7 +2,9 @@
 using GameInterface.Services.AdvancedStart;
 using GameInterface.Services.AdvancedStart.Data;
 using GameInterface.Services.AdvancedStart.Interfaces;
+using SandBox.AdvancedStartOptions;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using Xunit;
@@ -25,12 +27,12 @@ public class AdvancedStartInterfaceTests
     [Fact]
     public void CreatePolicy_ListsOnlyOfferedModifiers()
     {
-        var modifiers = new[] { new FakeModifier("PersonalShip", offered: true), new FakeModifier("SwitchedOff", offered: false) };
+        var modifiers = new[] { new FakeModifier("PersonalShip", limit: 1), new FakeModifier("SwitchedOff", limit: 0) };
 
         var policy = AdvancedStartInterface.CreatePolicy(Array.Empty<IAdvancedStartType>(), modifiers, null,
             false, Array.Empty<string>(), new[] { "vlandia" });
 
-        Assert.Equal(new[] { "PersonalShip" }, policy.ModifierIds);
+        Assert.Equal(new Dictionary<string, int> { ["PersonalShip"] = 1 }, policy.ModifierLimits);
     }
 
     [Fact]
@@ -44,7 +46,7 @@ public class AdvancedStartInterfaceTests
     {
         // The default start with a ship on top is still a pick worth opening the window for.
         var policy = AdvancedStartInterface.CreatePolicy(Array.Empty<IAdvancedStartType>(),
-            new[] { new FakeModifier("PersonalShip", offered: true) }, null, false, Array.Empty<string>(), new[] { "vlandia" });
+            new[] { new FakeModifier("PersonalShip", limit: 1) }, null, false, Array.Empty<string>(), new[] { "vlandia" });
 
         Assert.True(AdvancedStartInterface.OffersPickableStart(policy));
     }
@@ -80,7 +82,7 @@ public class AdvancedStartInterfaceTests
         var policy = new AdvancedStartPolicy(startTypes,
             worldStartTypes: traitStartTypes,
             kingdomStartTypes: traitStartTypes,
-            modifierIds: null,
+            modifierLimits: null,
             defaultStartType: "default",
             worldStarted: worldStarted,
             playerRuledKingdomIds: null,
@@ -102,7 +104,7 @@ public class AdvancedStartInterfaceTests
         bool startCanRun, bool expectStart, bool expectShip, bool expectApplies)
     {
         var outlaw = new FakeStartType("outlaw", startCanRun);
-        var ship = new FakeModifier("PersonalShip", offered: shipOffered);
+        var ship = new FakeModifier("PersonalShip", limit: shipOffered ? 1 : 0);
         var policy = AdvancedStartInterface.CreatePolicy(new[] { outlaw }, new[] { ship }, null,
             false, Array.Empty<string>(), new[] { "vlandia" });
         var selections = new[]
@@ -115,8 +117,26 @@ public class AdvancedStartInterfaceTests
         var pick = AdvancedStartInterface.PickStart(policy, new[] { outlaw }, new[] { ship }, selections);
 
         Assert.Equal(expectStart ? outlaw : null, pick.StartType);
-        Assert.Equal(expectShip ? new IAdvancedStartModifier[] { ship } : Array.Empty<IAdvancedStartModifier>(), pick.Modifiers);
+        Assert.Equal(expectShip ? new[] { ((IAdvancedStartModifier)ship, 1) } : Array.Empty<(IAdvancedStartModifier, int)>(), pick.Modifiers);
         Assert.Equal(expectApplies, pick.StartApplies);
+    }
+
+    [Theory]
+    [InlineData("2", 2)]
+    // A number above the host's limit is capped at the limit.
+    [InlineData("5", 3)]
+    [InlineData("0", 0)]
+    public void PickStart_CapsANumberAtTheHostsLimit(string pickedValue, int expected)
+    {
+        var siblings = new FakeModifier("CoopSiblings", limit: 3);
+        var policy = AdvancedStartInterface.CreatePolicy(Array.Empty<IAdvancedStartType>(), new[] { siblings }, null,
+            false, Array.Empty<string>(), new[] { "vlandia" });
+
+        var pick = AdvancedStartInterface.PickStart(policy, Array.Empty<IAdvancedStartType>(), new[] { siblings },
+            new[] { new AdvancedStartSelection("CoopSiblings", pickedValue) });
+
+        Assert.Equal(expected == 0 ? Array.Empty<(IAdvancedStartModifier, int)>() : new[] { ((IAdvancedStartModifier)siblings, expected) },
+            pick.Modifiers);
     }
 
     [Theory]
@@ -162,16 +182,17 @@ public class AdvancedStartInterfaceTests
 
     private sealed class FakeModifier : IAdvancedStartModifier
     {
-        private readonly bool offered;
+        private readonly int limit;
 
-        public FakeModifier(string optionId, bool offered)
+        public FakeModifier(string optionId, int limit)
         {
             OptionId = optionId;
-            this.offered = offered;
+            this.limit = limit;
         }
 
         public string OptionId { get; }
-        public bool IsOffered(AdvancedStartConfigData config) => offered;
-        public void Run(Hero hero) => throw new NotSupportedException();
+        public int GetLimit(AdvancedStartConfigData config) => limit;
+        public AdvancedStartOption CreateOption(int limit) => null;
+        public void Run(Hero hero, int value) => throw new NotSupportedException();
     }
 }

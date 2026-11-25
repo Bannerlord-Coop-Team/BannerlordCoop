@@ -1,4 +1,5 @@
 ﻿using ProtoBuf;
+using System.Collections.Generic;
 
 namespace GameInterface.Services.AdvancedStart.Data;
 
@@ -26,17 +27,18 @@ public class AdvancedStartPolicy
     /// <summary>Offered start types that join the kingdom picked in the KingdomId option.</summary>
     [ProtoMember(7)]
     public readonly string[] KingdomStartTypes;
-    /// <summary>Option ids of the on/off modifiers a joining player can tick on top of their start.</summary>
+    /// <summary>The modifiers a joining player can set on top of their start, by option id, with the most they can pick.</summary>
     [ProtoMember(8)]
-    public readonly string[] ModifierIds;
+    public readonly Dictionary<string, int> ModifierLimits;
 
-    public AdvancedStartPolicy(string[] startTypes, string[] worldStartTypes, string[] kingdomStartTypes, string[] modifierIds,
-        string defaultStartType, bool worldStarted, string[] playerRuledKingdomIds, string[] joinableKingdomIds)
+    public AdvancedStartPolicy(string[] startTypes, string[] worldStartTypes, string[] kingdomStartTypes,
+        Dictionary<string, int> modifierLimits, string defaultStartType, bool worldStarted, string[] playerRuledKingdomIds,
+        string[] joinableKingdomIds)
     {
         StartTypes = startTypes;
         WorldStartTypes = worldStartTypes;
         KingdomStartTypes = kingdomStartTypes;
-        ModifierIds = modifierIds;
+        ModifierLimits = modifierLimits;
         DefaultStartType = defaultStartType;
         WorldStarted = worldStarted;
         PlayerRuledKingdomIds = playerRuledKingdomIds;
