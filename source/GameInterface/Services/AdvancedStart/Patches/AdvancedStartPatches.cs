@@ -65,10 +65,11 @@ internal class AdvancedStartPatches
 /// <summary>
 /// Rewrites vanilla's start methods for a shared world. Vanilla rolls each start from the campaign seed, which would
 /// give every player with the same start the same town, castle or workshop, so each start reads a seed mixed with
-/// the hero it's applied to instead. The trader start's workshop also skips one another player owns.
+/// the hero it's applied to instead. The trader start's workshop also skips one another player owns. Public so other
+/// start types' patches, such as War Sails', can run the same <see cref="Transpiler"/> over their start methods.
 /// </summary>
 [HarmonyPatch]
-internal class AdvancedStartMethodPatches
+public class AdvancedStartMethodPatches
 {
     private static IEnumerable<MethodBase> TargetMethods()
     {
@@ -81,7 +82,7 @@ internal class AdvancedStartMethodPatches
         yield return AccessTools.Method(type, nameof(CampaignAdvancedStartingPlayerOptionsCampaignBehavior.StartGameAsBeggar));
     }
 
-    private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
+    public static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
     {
         var getSeed = AccessTools.PropertyGetter(typeof(CampaignOptions), nameof(CampaignOptions.Seed));
         var getPlayerSeed = AccessTools.Method(typeof(AdvancedStartMethodPatches), nameof(GetPlayerSeed));

@@ -4,6 +4,7 @@ using GameInterface.Services.AdvancedStart.Data;
 using GameInterface.Services.AdvancedStart.Interfaces;
 using System;
 using System.Linq;
+using TaleWorlds.CampaignSystem;
 using Xunit;
 
 namespace GameInterface.Tests.Services.AdvancedStart;
@@ -13,8 +14,8 @@ public class AdvancedStartInterfaceTests
     [Fact]
     public void CreatePolicy_OffersDefaultFirst_AndListsEachStartTypeTrait()
     {
-        var policy = AdvancedStartInterface.CreatePolicy(VanillaAdvancedStartType.All, null, false,
-            Array.Empty<string>(), new[] { "vlandia" });
+        var policy = AdvancedStartInterface.CreatePolicy(VanillaAdvancedStartType.All, Array.Empty<IAdvancedStartModifier>(), null,
+            false, Array.Empty<string>(), new[] { "vlandia" });
 
         Assert.Equal(new[] { "default", "outlaw", "beggar", "trader", "mercenary", "vassal", "king" }, policy.StartTypes);
         Assert.Equal(new[] { "trader", "mercenary", "vassal", "king" }, policy.WorldStartTypes);
@@ -22,9 +23,30 @@ public class AdvancedStartInterfaceTests
     }
 
     [Fact]
+    public void CreatePolicy_ListsOnlyOfferedModifiers()
+    {
+        var modifiers = new[] { new FakeModifier("PersonalShip", offered: true), new FakeModifier("SwitchedOff", offered: false) };
+
+        var policy = AdvancedStartInterface.CreatePolicy(Array.Empty<IAdvancedStartType>(), modifiers, null,
+            false, Array.Empty<string>(), new[] { "vlandia" });
+
+        Assert.Equal(new[] { "PersonalShip" }, policy.ModifierIds);
+    }
+
+    [Fact]
     public void OffersPickableStart_NullPolicy_IsFalse()
     {
         Assert.False(AdvancedStartInterface.OffersPickableStart(null));
+    }
+
+    [Fact]
+    public void OffersPickableStart_OnlyAModifier_IsTrue()
+    {
+        // The default start with a ship on top is still a pick worth opening the window for.
+        var policy = AdvancedStartInterface.CreatePolicy(Array.Empty<IAdvancedStartType>(),
+            new[] { new FakeModifier("PersonalShip", offered: true) }, null, false, Array.Empty<string>(), new[] { "vlandia" });
+
+        Assert.True(AdvancedStartInterface.OffersPickableStart(policy));
     }
 
     [Theory]
@@ -58,6 +80,7 @@ public class AdvancedStartInterfaceTests
         var policy = new AdvancedStartPolicy(startTypes,
             worldStartTypes: traitStartTypes,
             kingdomStartTypes: traitStartTypes,
+            modifierIds: null,
             defaultStartType: "default",
             worldStarted: worldStarted,
             playerRuledKingdomIds: null,
@@ -84,5 +107,21 @@ public class AdvancedStartInterfaceTests
     private static AdvancedStartPolicy CreateVanillaPolicy(string[] startTypes, string defaultStartType, bool worldStarted,
         string[] playerRuled, string[] joinable) =>
         AdvancedStartInterface.CreatePolicy(VanillaAdvancedStartType.All.Where(startType => startTypes.Contains(startType.Id)),
-            new AdvancedStartConfigData { DefaultStartType = defaultStartType }, worldStarted, playerRuled, joinable);
+            Array.Empty<IAdvancedStartModifier>(), new AdvancedStartConfigData { DefaultStartType = defaultStartType },
+            worldStarted, playerRuled, joinable);
+
+    private sealed class FakeModifier : IAdvancedStartModifier
+    {
+        private readonly bool offered;
+
+        public FakeModifier(string optionId, bool offered)
+        {
+            OptionId = optionId;
+            this.offered = offered;
+        }
+
+        public string OptionId { get; }
+        public bool IsOffered(AdvancedStartConfigData config) => offered;
+        public void Run(Hero hero) => throw new NotSupportedException();
+    }
 }

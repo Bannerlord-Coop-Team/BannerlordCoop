@@ -42,6 +42,7 @@ namespace Coop.IntegrationTests.Serialization
             var policy = new AdvancedStartPolicy(new[] { "default", "king" },
                 worldStartTypes: new[] { "king" },
                 kingdomStartTypes: new[] { "king" },
+                modifierIds: new[] { "PersonalShip" },
                 defaultStartType: "king",
                 worldStarted: true,
                 playerRuledKingdomIds: Array.Empty<string>(),
@@ -52,6 +53,7 @@ namespace Coop.IntegrationTests.Serialization
             Assert.Equal(new[] { "default", "king" }, copy.StartTypes);
             Assert.Equal(new[] { "king" }, copy.WorldStartTypes);
             Assert.Equal(new[] { "king" }, copy.KingdomStartTypes);
+            Assert.Equal(new[] { "PersonalShip" }, copy.ModifierIds);
             Assert.Equal("king", copy.DefaultStartType);
             Assert.True(copy.WorldStarted);
             // protobuf-net writes nothing for an empty array, so readers have to treat null as empty.

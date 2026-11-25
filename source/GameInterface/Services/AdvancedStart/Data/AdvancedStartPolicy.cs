@@ -26,13 +26,17 @@ public class AdvancedStartPolicy
     /// <summary>Offered start types that join the kingdom picked in the KingdomId option.</summary>
     [ProtoMember(7)]
     public readonly string[] KingdomStartTypes;
+    /// <summary>Option ids of the on/off modifiers a joining player can tick on top of their start.</summary>
+    [ProtoMember(8)]
+    public readonly string[] ModifierIds;
 
-    public AdvancedStartPolicy(string[] startTypes, string[] worldStartTypes, string[] kingdomStartTypes,
+    public AdvancedStartPolicy(string[] startTypes, string[] worldStartTypes, string[] kingdomStartTypes, string[] modifierIds,
         string defaultStartType, bool worldStarted, string[] playerRuledKingdomIds, string[] joinableKingdomIds)
     {
         StartTypes = startTypes;
         WorldStartTypes = worldStartTypes;
         KingdomStartTypes = kingdomStartTypes;
+        ModifierIds = modifierIds;
         DefaultStartType = defaultStartType;
         WorldStarted = worldStarted;
         PlayerRuledKingdomIds = playerRuledKingdomIds;
