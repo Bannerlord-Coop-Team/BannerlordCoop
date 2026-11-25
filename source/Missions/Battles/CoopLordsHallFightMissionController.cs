@@ -62,7 +62,7 @@ internal sealed class CoopLordsHallFightMissionController : LordsHallFightMissio
         if (!_isMissionInitialized || (side != BattleSideEnum.Attacker && side != BattleSideEnum.Defender))
             return false;
 
-        if (Mission.Teams.Any(team => team.Side == side && team.ActiveAgents.Any(agent => agent.IsHuman)))
+        if (Mission.Agents.Any(agent => agent.IsHuman && agent.IsActive() && agent.Team?.Side == side))
         {
             sideHadAgents[(int)side] = true;
             return false;

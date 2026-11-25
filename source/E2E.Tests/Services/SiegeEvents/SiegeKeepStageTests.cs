@@ -19,10 +19,8 @@ using Common.Network;
 using GameInterface.Services.MapEvents;
 using HarmonyLib;
 using Missions.Messages;
-using Moq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.ComponentInterfaces;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -262,40 +260,6 @@ public class SiegeKeepStageTests : MapEventTestBase
             .Count(message => message.Phase == SiegeKeepPhase.Choosing));
     }
 
-    // A keep that throws while opening ends the walls once, instead of retrying into the same throw.
-    [Fact]
-    public void HallModelThatThrows_ConcludesTheWallsOnce()
-    {
-        var conclusions = new List<AuthoritativeBattleConclusionRequested>();
-        var processed = new List<BattleStateChangeProcessed>();
-        Server.Call(() =>
-        {
-            var broker = Server.Resolve<IMessageBroker>();
-            broker.Subscribe<AuthoritativeBattleConclusionRequested>(payload => conclusions.Add(payload.What));
-            broker.Subscribe<BattleStateChangeProcessed>(payload => processed.Add(payload.What));
-        });
-        var keep = OpenKeepStage(TimeSpan.FromSeconds(90), DefenderTroops, openStage: false);
-
-        Server.Call(() =>
-        {
-            var brokenModel = new Mock<SiegeLordsHallFightModel>();
-            brokenModel.Setup(model => model.GetPriorityListForLordsHallFightMission(
-                    It.IsAny<MapEvent>(), It.IsAny<BattleSideEnum>(), It.IsAny<int>()))
-                .Throws(new InvalidOperationException("hall model failed"));
-            var models = Campaign.Current.Models.GetGameModels()
-                .Where(model => model is not SiegeLordsHallFightModel)
-                .Append(brokenModel.Object)
-                .ToList();
-            Campaign.Current._gameModels = new GameModels(models);
-            Server.Resolve<IMessageBroker>().Publish(this,
-                new AuthoritativeSiegeKeepRequested(keep.Battle.MapEventId, 1));
-        }, keep.DisabledMethods);
-
-        Assert.Equal(BattleState.AttackerVictory, Assert.Single(conclusions).BattleState);
-        Assert.DoesNotContain(processed, message => message.BattleState == BattleState.DefenderPullBack);
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkSiegeKeepPhaseChanged>());
-    }
-
     // The client side of the stage: choosing clears the walls' local pull-back, and a seated lock asks for the keep.
     [Fact]
     public void ClientPhaseChanges_ResetTheWallsResultAndRequestTheKeepMission()
@@ -445,7 +409,7 @@ public class SiegeKeepStageTests : MapEventTestBase
     }
 
     // The harness campaign has no hall model, which the keep reads for vanilla's limits.
-    private static void EnsureLordsHallModel()
+    internal static void EnsureLordsHallModel()
     {
         if (Campaign.Current.Models?.SiegeLordsHallFightModel != null) return;
 

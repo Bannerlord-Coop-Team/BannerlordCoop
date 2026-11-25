@@ -24,8 +24,13 @@ public static class MapEventExtensions
 
     /// <summary>Whether a siege assault can fall back into the keep: the town has a lord's hall and no player defends it.</summary>
     public static bool CanFallBackToKeep(this MapEvent mapEvent)
-        => mapEvent.IsSiegeAssault && mapEvent.MapEventSettlement?.LocationComplex?.GetLocationWithId(LordsHallLocationId) != null &&
-           !mapEvent.DefenderSide.Parties.Any(party => party.Party.IsPlayerParty());
+    {
+        if (!mapEvent.IsSiegeAssault) return false;
+
+        bool hasLordsHall = mapEvent.MapEventSettlement?.LocationComplex?.GetLocationWithId(LordsHallLocationId) != null;
+        bool playerDefends = mapEvent.DefenderSide.Parties.Any(party => party.Party.IsPlayerParty());
+        return hasLordsHall && !playerDefends;
+    }
 
     /// <summary>Whether a siege assault is still being fought, with no result applied to it yet.</summary>
     public static bool IsRunningSiegeAssault(this MapEvent mapEvent)

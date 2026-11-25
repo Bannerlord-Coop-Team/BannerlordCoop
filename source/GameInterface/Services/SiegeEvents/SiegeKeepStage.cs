@@ -34,7 +34,10 @@ public interface ISiegeKeepStage : IGameAbstraction
     IReadOnlyList<SiegeKeepSeat> GetSeats(MapEvent mapEvent);
     int SecondsRemaining(MapEvent mapEvent);
 
-    /// <summary>Takes a seated player's squad, and locks the roster once every seated player answered.</summary>
+    /// <summary>
+    /// Takes a seated player's squad, and locks the roster once every seated player answered. False when the squad
+    /// isn't taken or the lock it starts fails and closes the stage.
+    /// </summary>
     bool TrySelect(MapEvent mapEvent, MobileParty party, IReadOnlyList<HideoutTroopSelectionEntry> troops);
 
     /// <summary>Drops seats of players who left, and locks each stage once everyone answered or its window ran out.</summary>
@@ -168,10 +171,7 @@ public sealed class SiegeKeepStage : ISiegeKeepStage
     public bool TrySelect(MapEvent mapEvent, MobileParty party, IReadOnlyList<HideoutTroopSelectionEntry> troops)
     {
         if (!selection.TrySelect(mapEvent, party, troops)) return false;
-
-        if (selection.HaveAllAnswered(mapEvent))
-            Lock(mapEvent);
-        return true;
+        return !selection.HaveAllAnswered(mapEvent) || Lock(mapEvent);
     }
 
     public void Tick()
@@ -196,17 +196,19 @@ public sealed class SiegeKeepStage : ISiegeKeepStage
     public void Forget(MapEvent mapEvent) => selection.Forget(mapEvent);
 
     // A throw while locking would come back every tick, so the stage closes instead and a later Attack reopens it.
-    private void Lock(MapEvent mapEvent)
+    private bool Lock(MapEvent mapEvent)
     {
         try
         {
             LockRoster(mapEvent);
+            return true;
         }
         catch (Exception exception)
         {
             Logger.Error(exception, "Unable to lock the keep roster for {MapEventId}", mapEvent.StringId);
             selection.Forget(mapEvent);
             SendPhase(mapEvent, SiegeKeepPhase.Closed);
+            return false;
         }
     }
 
