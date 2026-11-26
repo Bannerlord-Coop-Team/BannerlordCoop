@@ -105,7 +105,11 @@
       "mercenary": true,
       "vassal": true,
       "king": true
-    }
+    },
+
+    // The most adult brothers and sisters a joining player can start with in their party.
+    // Default is 3. Set to 0 to hide the option.
+    "maxSiblings": 3
   },
 
   "modOptions": {

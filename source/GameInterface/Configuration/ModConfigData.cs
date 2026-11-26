@@ -59,6 +59,8 @@ public sealed class AdvancedStartConfigData
 
     public AdvancedStartTypesConfigData StartTypes { get; set; }
 
+    public int? MaxSiblings { get; set; }
+
     [JsonExtensionData]
     public IDictionary<string, JToken> UnknownKeys { get; set; }
 }

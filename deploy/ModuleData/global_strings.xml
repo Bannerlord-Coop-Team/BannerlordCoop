@@ -156,5 +156,8 @@
     <string id="str_coop_advanced_start_resume_text" text="{=str_coop_advanced_start_resume_text}Once time starts, players who join later can no longer pick starting options that change the world. Make sure everyone who wants one has joined first." />
     <string id="str_coop_advanced_start_resume_confirm" text="{=str_coop_advanced_start_resume_confirm}Start" />
     <string id="str_coop_advanced_start_resume_wait" text="{=str_coop_advanced_start_resume_wait}Wait" />
+    <string id="str_campaign_starting_options_category_name.coop" text="{=str_coop_advanced_start_category}Co-op Extras" />
+    <string id="str_campaign_starting_options_name.CoopSiblings" text="{=str_coop_advanced_start_siblings}Siblings" />
+    <string id="str_campaign_starting_options_description.CoopSiblings" text="{=str_coop_advanced_start_siblings_description}Start with this many adult brothers and sisters in your party." />
     <!-- Add other custom text here in the future-->
 </strings>

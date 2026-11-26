@@ -1,5 +1,6 @@
 ﻿using GameInterface.Configuration;
 using Common;
+using GameInterface.Services.AdvancedStart;
 using GameInterface.Services.Modules;
 using Newtonsoft.Json.Linq;
 using System;
@@ -88,6 +89,7 @@ public class ModConfigTests : IDisposable
         Assert.True(config.AdvancedStart.StartTypes.Mercenary);
         Assert.True(config.AdvancedStart.StartTypes.Vassal);
         Assert.True(config.AdvancedStart.StartTypes.King);
+        Assert.Equal(CoopSiblingsModifier.DefaultMaxSiblings, config.AdvancedStart.MaxSiblings);
     }
 
     [Fact]
