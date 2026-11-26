@@ -191,6 +191,36 @@ public class AdvancedStartInterfaceTests
     }
 
     [Theory]
+    // A king start for a kingdom no one rules still applies.
+    [InlineData("king", "sturgia", false, true, true)]
+    // Another player took the picked kingdom after the window opened, though a free one is left.
+    [InlineData("king", "vlandia", false, true, false)]
+    // The picked kingdom can't be joined.
+    [InlineData("vassal", "aserai", false, true, false)]
+    // The clock moved after the window opened.
+    [InlineData("trader", null, true, true, false)]
+    // The host no longer offers the picked start.
+    [InlineData("king", "sturgia", false, false, false)]
+    public void PickStart_StartThePolicyNoLongerAllows_FallsBackToDefault(string startTypeId, string kingdomId,
+        bool worldStarted, bool kingOffered, bool expectApplies)
+    {
+        string[] offered = kingOffered ? new[] { "default", "trader", "vassal", "king" } : new[] { "default", "outlaw" };
+        var policy = CreateVanillaPolicy(offered, "default", worldStarted,
+            playerRuled: new[] { "vlandia" }, joinable: new[] { "vlandia", "sturgia" });
+        var selections = new[]
+        {
+            new AdvancedStartSelection("StartType", startTypeId),
+            new AdvancedStartSelection("KingdomId", kingdomId),
+        };
+
+        var pick = AdvancedStartInterface.PickStart(policy, VanillaAdvancedStartType.All,
+            Array.Empty<IAdvancedStartModifier>(), selections);
+
+        Assert.Equal(expectApplies ? startTypeId : null, pick.StartType?.Id);
+        Assert.Equal(expectApplies, pick.StartApplies);
+    }
+
+    [Theory]
     [InlineData("2", 2)]
     // A number above the host's limit is capped at the limit.
     [InlineData("5", 3)]

@@ -16,6 +16,7 @@ using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
@@ -38,9 +39,6 @@ public interface IAdvancedStartInterface : IGameAbstraction
     /// clock moves, so players still picking a start lock the world starts. Does nothing once it has moved.</summary>
     void WatchForWorldStart();
 
-    /// <summary>Client: the joining server's latest policy.</summary>
-    AdvancedStartPolicy ServerPolicy { get; }
-
     /// <summary>Client: stores the server's latest policy and re-checks the window if it's open, locking what is
     /// no longer offered and telling the player if their pick was one of them.</summary>
     void UpdateServerPolicy(AdvancedStartPolicy policy);
@@ -52,7 +50,7 @@ public interface IAdvancedStartInterface : IGameAbstraction
     /// <summary>Client: whether the starting options window will open after character creation.</summary>
     bool WillShowStartOptions();
 
-    /// <summary>Client: opens the starting options window filtered by <see cref="ServerPolicy"/>.
+    /// <summary>Client: opens the starting options window filtered by the server's latest policy.
     /// Returns false when there is nothing to pick. Otherwise <paramref name="onJoin"/> gets the picks
     /// on confirm, and <paramref name="onLeave"/> runs if the player confirms going back to the main menu.</summary>
     bool TryShowStartOptions(Action<AdvancedStartSelection[]> onJoin, Action onLeave);
@@ -155,8 +153,7 @@ internal class AdvancedStartInterface : IAdvancedStartInterface
         var policy = CreatePolicy(startTypes, modifiers, config, HasWorldStarted(), playerRuledKingdomIds.ToArray(), joinableKingdomIds.ToArray());
 
         // Once, since the window quietly opens on the default start instead and the host has no other hint why.
-        if (!warnedDefaultStartType && config?.DefaultStartType != null && !policy.StartTypes.Any(startType =>
-                string.Equals(startType, config.DefaultStartType, StringComparison.OrdinalIgnoreCase)))
+        if (!warnedDefaultStartType && policy.DefaultStartType != null && FindHostDefaultStartType(policy) == null)
         {
             warnedDefaultStartType = true;
             Logger.Warning("mod-config.json: advancedStart.defaultStartType '{DefaultStartType}' isn't a start type this " +
@@ -207,7 +204,8 @@ internal class AdvancedStartInterface : IAdvancedStartInterface
         });
     }
 
-    public AdvancedStartPolicy ServerPolicy { get; private set; }
+    // Client: the joining server's latest policy.
+    private AdvancedStartPolicy ServerPolicy { get; set; }
 
     public void UpdateServerPolicy(AdvancedStartPolicy policy)
     {
@@ -274,8 +272,8 @@ internal class AdvancedStartInterface : IAdvancedStartInterface
     {
         if (IsWorldLocked(policy, startType)) return WorldStartedLockId;
 
-        if (policy.KingdomStartTypes?.Contains(startType) == true &&
-            !(kingdomIds ?? Array.Empty<string>()).Any(kingdomId => GetKingdomLockId(policy, startType, kingdomId) == null))
+        bool anyKingdomCanTakeIt = kingdomIds?.Any(kingdomId => GetKingdomLockId(policy, startType, kingdomId) == null) == true;
+        if (policy.KingdomStartTypes?.Contains(startType) == true && !anyKingdomCanTakeIt)
             return NoKingdomLockId;
 
         return null;
@@ -290,16 +288,20 @@ internal class AdvancedStartInterface : IAdvancedStartInterface
         return null;
     }
 
-    /// <summary>The start type the window opens on: the host's default when it can be picked, otherwise vanilla's.
-    /// The host's default matches ignoring case, since the config keys spell ids like fleetadmiral as fleetAdmiral.</summary>
+    /// <summary>The start type the window opens on: the host's default when it can be picked, otherwise vanilla's.</summary>
     internal static string GetDefaultStartType(AdvancedStartPolicy policy)
     {
-        string hostDefault = policy.StartTypes.FirstOrDefault(startType =>
-            string.Equals(startType, policy.DefaultStartType, StringComparison.OrdinalIgnoreCase));
+        string hostDefault = FindHostDefaultStartType(policy);
         if (hostDefault != null && !IsWorldLocked(policy, hostDefault)) return hostDefault;
 
         return StartOptionIds.StartTypeDefaultId;
     }
+
+    // The offered start type the host set as default, or null when it isn't offered. Matched ignoring case, since the
+    // config keys spell ids like fleetadmiral as fleetAdmiral.
+    private static string FindHostDefaultStartType(AdvancedStartPolicy policy) =>
+        policy.StartTypes.FirstOrDefault(startType =>
+            string.Equals(startType, policy.DefaultStartType, StringComparison.OrdinalIgnoreCase));
 
     public bool TryShowStartOptions(Action<AdvancedStartSelection[]> onJoin, Action onLeave)
     {
@@ -355,11 +357,18 @@ internal class AdvancedStartInterface : IAdvancedStartInterface
     // The start type option, keeping only the start types the policy offers.
     private ListAdvancedStartOption CopyStartTypeOption(ListAdvancedStartOption option, AdvancedStartPolicy policy)
     {
-        var items = option.GetItems()
-            .Where(item => policy.StartTypes.Contains(item.Identifier))
-            .Select(item => (item.Identifier, (ListAdvancedStartOption.ListItemCondition)((StartOptions options, out TextObject disabledText) =>
-                IsLocked(GetStartTypeLockId(ServerPolicy ?? policy, item.Identifier, ListedKingdomIds(options)), out disabledText))))
-            .ToList();
+        var items = new List<(string Identifier, ListAdvancedStartOption.ListItemCondition Condition)>();
+        foreach (var item in option.GetItems())
+        {
+            if (!policy.StartTypes.Contains(item.Identifier)) continue;
+
+            ListAdvancedStartOption.ListItemCondition locked = (StartOptions options, out TextObject disabledText) =>
+            {
+                string lockId = GetStartTypeLockId(ServerPolicy ?? policy, item.Identifier, ListedKingdomIds(options));
+                return IsLocked(lockId, out disabledText);
+            };
+            items.Add((item.Identifier, locked));
+        }
 
         return new ListAdvancedStartOption(option.StringId, option.CategoryId, items, option.GetIsHidden, GetDefaultStartType(policy));
     }
@@ -367,13 +376,16 @@ internal class AdvancedStartInterface : IAdvancedStartInterface
     // The kingdom option. Vanilla's defaults to no kingdom, which a kingdom start can't use.
     private ListAdvancedStartOption CopyKingdomOption(ListAdvancedStartOption option, AdvancedStartPolicy policy)
     {
-        var items = option.GetItems()
-            .Select(item => (item.Identifier, (ListAdvancedStartOption.ListItemCondition)((StartOptions options, out TextObject disabledText) =>
+        var items = new List<(string Identifier, ListAdvancedStartOption.ListItemCondition Condition)>();
+        foreach (var item in option.GetItems())
+        {
+            ListAdvancedStartOption.ListItemCondition locked = (StartOptions options, out TextObject disabledText) =>
             {
                 string startType = options.GetOption(StartOptionIds.StartTypeId)?.GetValue<string>();
                 return IsLocked(GetKingdomLockId(ServerPolicy ?? policy, startType, item.Identifier), out disabledText);
-            })))
-            .ToList();
+            };
+            items.Add((item.Identifier, locked));
+        }
 
         string defaultValue = option.GetDefaultValue<string>();
         if (string.IsNullOrEmpty(defaultValue) && items.Count > 0) defaultValue = items[0].Identifier;
@@ -433,7 +445,7 @@ internal class AdvancedStartInterface : IAdvancedStartInterface
             finally
             {
                 // What the start already changed stays even if it threw partway, so every client still gets it.
-                ReplicateAppliedStart(hero);
+                ReplicateAppliedStart(hero, party);
             }
         }, blocking: true, context: nameof(ApplySelections));
 
@@ -449,23 +461,27 @@ internal class AdvancedStartInterface : IAdvancedStartInterface
             IEnumerable<IAdvancedStartModifier> modifiers, AdvancedStartSelection[] selections)
     {
         selections = selections ?? Array.Empty<AdvancedStartSelection>();
-        string startTypeId = selections.FirstOrDefault(selection => selection?.Id == StartOptionIds.StartTypeId)?.Value;
-        string kingdomId = selections.FirstOrDefault(selection => selection?.Id == StartOptionIds.KingdomIdKey)?.Value;
+        string startTypeId = selections.FirstOrDefault(selection => selection.Id == StartOptionIds.StartTypeId)?.Value;
+        string kingdomId = selections.FirstOrDefault(selection => selection.Id == StartOptionIds.KingdomIdKey)?.Value;
 
         var limits = policy?.ModifierLimits ?? new Dictionary<string, int>();
-        var pickedModifiers = modifiers
-            .Select(modifier => (Modifier: modifier, Value: Math.Min(
-                ReadModifierValue(selections.FirstOrDefault(selection => selection?.Id == modifier.OptionId)?.Value),
-                limits.TryGetValue(modifier.OptionId, out int limit) ? limit : 0)))
-            .Where(modifier => modifier.Value > 0)
-            .ToArray();
+        var pickedModifiers = new List<(IAdvancedStartModifier Modifier, int Value)>();
+        foreach (var modifier in modifiers)
+        {
+            // A modifier the host doesn't offer is skipped, whatever the client sent for it.
+            if (!limits.TryGetValue(modifier.OptionId, out int limit)) continue;
+
+            string picked = selections.FirstOrDefault(selection => selection.Id == modifier.OptionId)?.Value;
+            int value = Math.Min(ReadModifierValue(picked), limit);
+            if (value > 0) pickedModifiers.Add((modifier, value));
+        }
 
         if (startTypeId == null || startTypeId == StartOptionIds.StartTypeDefaultId)
-            return (null, startTypeId, kingdomId, pickedModifiers, true);
+            return (null, startTypeId, kingdomId, pickedModifiers.ToArray(), true);
 
         var startType = startTypes.FirstOrDefault(candidate => candidate.Id == startTypeId);
         bool startApplies = startType != null && CanApply(policy, startType, kingdomId);
-        return (startApplies ? startType : null, startTypeId, kingdomId, pickedModifiers, startApplies);
+        return (startApplies ? startType : null, startTypeId, kingdomId, pickedModifiers.ToArray(), startApplies);
     }
 
     // The client sends an on/off option as "True" or "False" and a number option as its number.
@@ -486,10 +502,8 @@ internal class AdvancedStartInterface : IAdvancedStartInterface
     }
 
     // Sends what the start changed that doesn't replicate by itself.
-    private void ReplicateAppliedStart(Hero hero)
+    private void ReplicateAppliedStart(Hero hero, MobileParty party)
     {
-        var party = hero.PartyBelongedTo;
-
         // The start made the player a ruler, so players still picking a start can no longer take this kingdom.
         if (hero.Clan.Kingdom?.RulingClan == hero.Clan)
             messageBroker.Publish(this, new AdvancedStartPolicyChanged());

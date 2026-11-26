@@ -134,8 +134,12 @@ internal sealed class CoopStartingOptionsView : GlobalLayer
         // A pick stays on a locked item when nothing else in its list can be picked.
         foreach (var option in options.GetAllOptions().OfType<ListAdvancedStartOption>())
         {
+            if (option.GetIsHidden(options)) continue;
+
+            // The item condition returns true when the item is locked.
             string pick = option.GetValue<string>();
-            if (option.GetIsHidden(options) || !option.GetItemCondition(pick, options, out var reason)) continue;
+            bool locked = option.GetItemCondition(pick, options, out var reason);
+            if (!locked) continue;
 
             ShowLockedPick(option, pick, reason);
             return;

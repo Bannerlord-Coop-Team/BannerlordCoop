@@ -163,8 +163,7 @@ public class CreateCharacterState : ConnectionStateBase
             heroInterface.SetupServerHero(hero);
 
             // Before the joiner's save snapshot, so the picked start is part of the world it loads.
-            startApplied = advancedStartInterface.ApplySelections(
-                hero, obj.What.AdvancedStart ?? System.Array.Empty<AdvancedStartSelection>());
+            startApplied = advancedStartInterface.ApplySelections(hero, obj.What.AdvancedStart);
         }
         catch (System.Exception exception)
         {

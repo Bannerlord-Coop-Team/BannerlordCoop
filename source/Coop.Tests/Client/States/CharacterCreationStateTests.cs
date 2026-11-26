@@ -78,6 +78,8 @@ namespace Coop.Tests.Client.States
                 Assert.Empty(MockNetwork.GetPeerMessagesFromType<NetworkTransferNewHero>(serverPeer));
                 ReceivePolicy(characterCreationState);
             }
+            // The server pushes a new policy whenever it changes, which mustn't send the hero again.
+            ReceivePolicy(characterCreationState);
 
             // Assert
             Assert.Single(MockNetwork.GetPeerMessagesFromType<NetworkRequestAdvancedStartPolicy>(serverPeer));
