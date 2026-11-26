@@ -150,6 +150,11 @@ internal sealed class TournamentUIController : ITournamentUIController, IHandler
            IsActive(snapshot) &&
            !IsActiveLocalContestant(snapshot);
 
+    public bool CanResume(string townId)
+        => TryGetTownSession(townId, out var snapshot) &&
+           IsActive(snapshot) &&
+           IsActiveLocalContestant(snapshot);
+
     public void RequestJoin(string townId, string sessionId, long expectedRevision)
         => network.SendAll(new NetworkRequestJoinTournament(townId, sessionId, expectedRevision));
 

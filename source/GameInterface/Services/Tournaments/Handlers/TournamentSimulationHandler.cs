@@ -82,6 +82,12 @@ internal sealed partial class TournamentSessionHandler
             changed.Revision,
             changed.BracketRevision);
         ResolveBets(snapshot, bracket.MatchWinnerSlotIds);
+        foreach (TournamentContestantData contestant in snapshot.Contestants)
+        {
+            if (contestant.IsDisconnected && IsSlotInCurrentMatch(snapshot, contestant.SlotId) &&
+                !bracket.MatchWinnerSlotIds.Contains(contestant.SlotId))
+                pendingDisconnectLosses[contestant.ControllerId] = snapshot.TownId;
+        }
         BroadcastSnapshot(changed);
         if (bracket.IsCompleted)
             CompleteTournament(changed);

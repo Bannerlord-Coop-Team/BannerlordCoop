@@ -319,9 +319,9 @@ public class TournamentDebugCommand
                 controller.RequestJoin(townId, null, 0);
                 return Succeeded($"DANUSTICA_TOURNAMENT_JOIN_REQUESTED townId={townId}|sessionId=none|revision=0");
             }
-            if (snapshot.Phase != TournamentSessionPhase.Preparation)
+            if (snapshot.Phase != TournamentSessionPhase.Preparation && !controller.CanResume(townId))
             {
-                return Failed($"Danustica session {snapshot.SessionId} is in phase {snapshot.Phase}, not Preparation.");
+                return Failed($"Danustica session {snapshot.SessionId} is not open to this player.");
             }
 
             controller.RequestJoin(townId, snapshot.SessionId, snapshot.Revision);

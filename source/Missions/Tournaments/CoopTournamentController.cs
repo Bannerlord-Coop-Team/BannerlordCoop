@@ -270,6 +270,16 @@ public class CoopTournamentController : CoopMissionController
         TournamentSessionSnapshot previous,
         TournamentSessionSnapshot updated)
     {
+        if (updated.IsCompleted && previous.Phase == TournamentSessionPhase.LiveMatch &&
+            previous.Contestants.Any(contestant => !contestant.IsDisconnected &&
+                updated.Contestants.Any(candidate =>
+                    candidate.SlotId == contestant.SlotId && candidate.IsDisconnected)))
+        {
+            // A final resolved on disconnect never ran the local fight's end-of-match cleanup.
+            matchLifecycle.Dispose();
+            return;
+        }
+
         if (string.IsNullOrEmpty(updated.CurrentMatchId) ||
             TournamentMatchTransitionRules.PreservesRunningMatch(previous, updated))
             return;
@@ -2171,9 +2181,6 @@ public class CoopTournamentController : CoopMissionController
     protected override void OnLeaving()
     {
         ProcessPendingLocalDamage(force: true);
-
-        if (snapshot != null && !snapshot.IsCompleted && HasLocalMissionMember(snapshot) && !leaveRequested)
-            relayNetwork.SendAll(new NetworkRequestLeaveActiveTournament(snapshot.SessionId, snapshot.Revision));
 
         if (session.HasInstance)
             relayNetwork.SendAll(new NetworkMissionLeft(session.OwnControllerId, session.InstanceId));

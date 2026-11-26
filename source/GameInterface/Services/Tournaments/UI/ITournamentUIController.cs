@@ -19,6 +19,7 @@ internal interface ITournamentUIController
     string GetPreparationPlayerNames(string townId);
     bool CanStartPreparation(string townId);
     bool CanLeavePreparation(string townId);
+    bool CanResume(string townId);
     bool CanSpectate(string townId);
 
     void RequestJoin(string townId, string sessionId, long expectedRevision);

@@ -28,17 +28,21 @@ public sealed partial class TournamentGameInterface
         }
 
         var rankedTeams = new List<KeyValuePair<TournamentTeamData, float>>();
+        var contestants = snapshot.Contestants.ToDictionary(contestant => contestant.SlotId);
         foreach (TournamentTeamData team in match.Teams)
         {
             if (team?.ParticipantSlotIds == null || team.ParticipantSlotIds.Length == 0)
                 return false;
 
+            // Vanilla's skip removes the player's team from the simulation while keeping it in the bracket.
+            if (team.ParticipantSlotIds.Any(slotId =>
+                contestants.TryGetValue(slotId, out var contestant) && contestant.IsDisconnected))
+                continue;
+
             float simulationScore = 0f;
             foreach (string slotId in team.ParticipantSlotIds)
             {
-                TournamentContestantData contestant = snapshot.Contestants
-                    .FirstOrDefault(candidate => candidate.SlotId == slotId);
-                if (contestant == null ||
+                if (!contestants.TryGetValue(slotId, out var contestant) ||
                     !objectManager.TryGetObject(contestant.CharacterId, out CharacterObject character))
                 {
                     return false;
@@ -59,6 +63,9 @@ public sealed partial class TournamentGameInterface
         int winnerTeamCount = Math.Max(
             1,
             Math.Min(match.Teams.Length, (winnerParticipantCount + teamSize - 1) / teamSize));
+        if (rankedTeams.Count < winnerTeamCount)
+            return false;
+
         TournamentTeamData[] winnerTeams = rankedTeams
             .Take(winnerTeamCount)
             .Select(team => team.Key)

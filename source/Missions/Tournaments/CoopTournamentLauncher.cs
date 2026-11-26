@@ -68,6 +68,7 @@ public class CoopTournamentLauncher : ICoopTournamentLauncher
     {
         snapshot = TournamentSessionSnapshotNormalizer.Normalize(snapshot);
         if (snapshot == null || string.IsNullOrEmpty(snapshot.SceneName)) return null;
+        if (Mission.Current != null || MissionState.Current?.CurrentMission != null) return null;
         if (!objectManager.TryGetObject(snapshot.TownId, out Town town)) return null;
 
         TournamentGame nativeTournament = Campaign.Current?.TournamentManager?.GetTournamentGame(town);

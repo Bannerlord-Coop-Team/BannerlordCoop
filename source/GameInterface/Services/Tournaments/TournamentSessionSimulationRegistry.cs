@@ -39,7 +39,7 @@ public sealed partial class TournamentSessionRegistry
                 return status;
             if (session.Phase != TournamentSessionPhase.AwaitingChoices)
                 return TournamentMutationStatus.InvalidPhase;
-            if (session.Contestants.Exists(contestant => contestant.IsHuman) || session.Spectators.Count > 0)
+            if (session.HasViewersOrReservations())
                 return TournamentMutationStatus.Rejected;
 
             session.Phase = TournamentSessionPhase.SimulatingMatch;

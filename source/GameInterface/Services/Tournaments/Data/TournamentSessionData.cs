@@ -59,6 +59,8 @@ public sealed class TournamentContestantData
     public readonly string DisplacedCharacterId;
     [ProtoMember(10)]
     public readonly int Score;
+    [ProtoMember(11)]
+    public readonly bool IsDisconnected;
 
     public TournamentContestantData(
         string slotId,
@@ -70,7 +72,8 @@ public sealed class TournamentContestantData
         bool isReplaced,
         bool isLord,
         string displacedCharacterId,
-        int score = 0)
+        int score = 0,
+        bool isDisconnected = false)
     {
         SlotId = slotId;
         CharacterId = characterId;
@@ -82,6 +85,7 @@ public sealed class TournamentContestantData
         IsLord = isLord;
         DisplacedCharacterId = displacedCharacterId;
         Score = score;
+        IsDisconnected = isDisconnected;
     }
 }
 
