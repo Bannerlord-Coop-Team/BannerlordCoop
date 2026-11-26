@@ -169,8 +169,9 @@ public class SiegeAftermathEndRouteTests : IDisposable
             });
     }
 
+    // The scenario calls prompt once and leaves the encounter in End.
     private void AssertPromptedLeaderGetsChoice(
-        Action<EnvironmentInstance, PlayerEncounter, Action> finishBattle,
+        Action<EnvironmentInstance, PlayerEncounter, Action> promptThenEndBattle,
         Action<EnvironmentInstance, Settlement>? afterChoiceOpens = null)
     {
         var client = environment.Clients.First();
@@ -223,7 +224,7 @@ public class SiegeAftermathEndRouteTests : IDisposable
                     Assert.Equal("encounter", menuContext.GameMenu.StringId);
                 }
 
-                finishBattle(client, encounter, Prompt);
+                promptThenEndBattle(client, encounter, Prompt);
                 playerEncounters.UpdateInternalAfterBattle(encounter);
                 afterChoiceOpens?.Invoke(client, settlement);
             }

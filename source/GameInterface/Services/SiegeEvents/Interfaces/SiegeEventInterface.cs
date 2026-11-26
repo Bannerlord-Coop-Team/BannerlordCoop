@@ -435,13 +435,13 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
 
         if (!pending.MatchesCurrentCapture(settlement))
         {
-            Patches.SiegeAftermathPatches.DiscardPending(settlement);
+            SiegeAftermathPatches.DiscardPending(settlement);
             Logger.Warning("Rejected stale siege aftermath choice for {Settlement}: the capture owner or capturer changed",
                 settlement.Name?.ToString());
             return;
         }
 
-        Patches.SiegeAftermathPatches.PendingAftermaths.TryRemove(settlement, out _);
+        SiegeAftermathPatches.PendingAftermaths.TryRemove(settlement, out _);
 
         SiegeAftermathAction.ApplyAftermath(party, settlement, (SiegeAftermathAction.SiegeAftermath)aftermathType, pending.PreviousOwnerClan, pending.Contributions);
     }
@@ -462,7 +462,7 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
 
     public PendingSiegeAftermathPrompt[] GetPendingSiegeAftermathPrompts()
     {
-        return Patches.SiegeAftermathPatches.PendingAftermaths
+        return SiegeAftermathPatches.PendingAftermaths
             .Where(pair => pair.Value.MatchesCurrentCapture(pair.Key))
             .Select(pair => new PendingSiegeAftermathPrompt(pair.Value.LeaderParty, pair.Key, pair.Value.PreviousOwnerClan))
             .ToArray();
