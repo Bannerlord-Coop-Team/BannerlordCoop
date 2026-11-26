@@ -5,6 +5,7 @@ using Common.Network;
 using Common.Util;
 using GameInterface.Services.Barters;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
@@ -364,7 +365,8 @@ internal class BattleFinalizeHandler : IHandler
             knownPlayerPartyIds,
             MapEventPlayerPartyCollector.CollectPartyIds(mapEvent, objectManager));
 
-        var excludedIds = CollectExcludedPlayerPartyIds(mapEvent);
+        SiegeAftermathPatches.TryGetPlayerCaptureLeader(mapEvent, out var capturingLeader, out var capturedSettlement);
+        var excludedIds = CollectExcludedPlayerPartyIds(mapEvent, capturingLeader);
         if (excludedIds.Count > 0)
             playerPartyIds = playerPartyIds.Where(id => !excludedIds.Contains(id)).ToArray();
         var raidAftermath = CaptureRaidAftermath(mapEvent);
@@ -402,6 +404,15 @@ internal class BattleFinalizeHandler : IHandler
 
         using (CreateHideoutFinalizeContext(mapEvent))
             mapEvent.FinalizeEventAux();
+
+        // SiegeCompleted tries to enter before the battle detaches the capturer, so the entry patch refuses it.
+        if (capturedSettlement != null &&
+            SiegeAftermathPatches.PendingAftermaths.TryGetValue(capturedSettlement, out var capture) &&
+            capture.LeaderParty == capturingLeader && capture.MatchesCurrentCapture(capturedSettlement))
+        {
+            settlementInterface.PartyEnterSettlement(capturingLeader, capturedSettlement);
+        }
+
         ApplyRaidAftermath(raidAftermath);
 
         // After the destroy (same game thread, so behind it on the reliable-ordered channel).
@@ -508,12 +519,10 @@ internal class BattleFinalizeHandler : IHandler
     // [Server, game thread] Player parties that must keep their encounter through the finalize:
     // a capturing leader enters the settlement-taken flow, and a winning inside defender sits on
     // its vanilla victory menu — the close's Finish + ExitToLast would tear either down.
-    private HashSet<string> CollectExcludedPlayerPartyIds(MapEvent mapEvent)
+    private HashSet<string> CollectExcludedPlayerPartyIds(MapEvent mapEvent, MobileParty capturingLeader)
     {
         var excluded = new HashSet<string>();
         if (mapEvent?.AttackerSide == null || mapEvent.DefenderSide == null) return excluded;
-
-        SiegeAftermathPatches.TryGetPlayerCaptureLeader(mapEvent, out var capturingLeader, out _);
 
         foreach (var party in mapEvent.InvolvedParties)
         {
@@ -567,6 +576,11 @@ internal class BattleFinalizeHandler : IHandler
 
             // A late reply cannot identify or close the new village encounter opened by a raid continuation.
             if (ModInformation.IsClient && PlayerEncounter.Battle == null && mainParty?.CurrentSettlement?.IsVillage == true)
+                return;
+
+            // A late finalize reply has no battle id and must leave the pending capture choice open.
+            if (ModInformation.IsClient && (MapEventInitializationBarrier.IsStagedSiegeCaptureResult(PlayerEncounter.Current) ||
+                SiegeCaptureMenuHoldPatch.IsHeld(mainParty?.CurrentSettlement)))
                 return;
 
             // The local player's battle has ended — clear the recorded mode so the encounter-menu gate

@@ -1,8 +1,12 @@
 ﻿using Common.Util;
+using Coop.Core.Server.Services.SiegeEvents.Messages;
 using E2E.Tests.Environment;
 using E2E.Tests.Util;
+using GameInterface.Registry.Auto;
+using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Tests.Utils;
 using GameInterface.Services.MapEvents.Interfaces;
+using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.SiegeEvents.Handlers;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using GameInterface.Services.SiegeEvents.Patches;
@@ -104,12 +108,16 @@ public class SiegeAftermathEndRouteTests : IDisposable
         Assert.Equal(1, finishRecorder.CountFor(client));
     }
 
-    [Fact]
-    public void EndState_PromptedLeaderOfWonSiege_GetsTheChoiceAfterTheLootSteps()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void EndState_PromptedLeaderOfWonSiege_GetsTheChoiceAfterTheLootSteps(bool simulated)
     {
         var client = environment.Clients.First();
         var settlementId = environment.CreateRegisteredObject<Settlement>();
         var mainPartyId = environment.CreateRegisteredObject<MobileParty>();
+        var mapEventId = environment.CreateRegisteredObject<MapEvent>();
+        var defeatedClanId = environment.CreateRegisteredObject<Clan>();
 
         // record (and skip) the engine-side encounter calls; the menu switch runs for real
         using var finishRecorder = new MethodCallRecorder(Priority.First,
@@ -131,24 +139,52 @@ public class SiegeAftermathEndRouteTests : IDisposable
             Campaign.Current.MainParty = mainParty;
 
             // a vassal's capture: the fief has gone to the ruler, so the defeated owner only comes with the prompt
-            var defeatedClan = ObjectHelper.SkipConstructor<Clan>();
-            var wonSiege = CreateMapEvent(settlement);
+            var wonSiege = client.GetRegisteredObject<MapEvent>(mapEventId);
+            using (new AllowedThread())
+            {
+                wonSiege.SetBattleType(MapEvent.BattleTypes.Siege);
+                wonSiege.SetMapEventSettlement(settlement);
+                wonSiege.BattleState = BattleState.AttackerVictory;
+            }
             var aftermathBehavior = GetAftermathBehavior();
             aftermathBehavior._besiegerParty = mainParty;
             aftermathBehavior._wasPlayerArmyMember = false;
             var menuContext = SeedStaleEncounterMenu(aftermathBehavior);
 
-            // the client finalizes the won siege, then the server's prompt lands while the loot steps still run
-            siegeEvents.SetLocalAftermathNarrationContext(settlement, wonSiege);
+            // A played siege can dispatch OnMapEventEnded before the prompt. The simulation can be removed first.
+            if (!simulated)
+                siegeEvents.SetLocalAftermathNarrationContext(settlement, wonSiege);
             var encounter = CreateEndingEncounter(wonSiege);
+            encounter.PlayerSide = BattleSideEnum.Attacker;
             encounter.EncounterState = PlayerEncounterState.LootParty;
             Campaign.Current.PlayerEncounter = encounter;
             try
             {
-                siegeEvents.PromptLocalAftermathChoice(mainParty, settlement, defeatedClan);
+                client.SimulateMessage(environment.Server.NetPeer,
+                    new NetworkPromptSiegeAftermathChoice(settlementId, mainPartyId, defeatedClanId));
                 Assert.Equal("encounter", menuContext.GameMenu.StringId);
 
+                if (simulated)
+                {
+                    // Replicated removal can arrive while the simulation scoreboard still owns the encounter.
+                    var simulation = ObjectHelper.SkipConstructor<BattleSimulation>();
+                    AccessTools.Field(typeof(BattleSimulation), nameof(BattleSimulation._mapEvent)).SetValue(simulation, wonSiege);
+                    encounter.BattleSimulation = simulation;
+                    var mapState = (MapState)Game.Current.GameStateManager.ActiveState;
+                    mapState._battleSimulation = encounter.BattleSimulation;
+                    client.SimulateMessage(environment.Server.NetPeer,
+                        new NetworkDestroyInstance<MapEvent>(client.GetHandle<MapEvent>(mapEventId)));
+                    mapState._battleSimulation = null;
+                }
+                else
+                {
+                    // A solo mission host can receive the fallback reply when the server finalized first.
+                    client.SimulateMessage(environment.Server.NetPeer, new NetworkMapEventFinalized());
+                }
+
                 encounter.EncounterState = PlayerEncounterState.End;
+                if (simulated)
+                    client.Resolve<IMapEventInitializationBarrier>().CompleteDeferredEncounterCleanup();
                 playerEncounters.UpdateInternalAfterBattle(encounter);
             }
             finally
@@ -158,11 +194,11 @@ public class SiegeAftermathEndRouteTests : IDisposable
                 SiegeCaptureMenuHoldPatch.Release(settlement);
             }
 
-            Assert.Same(mainParty, aftermathBehavior._besiegerParty);
-            Assert.Same(defeatedClan, aftermathBehavior._prevSettlementOwnerClan);
             // vanilla menu_settlement_taken routes the besieger to the Devastate/Pillage/Mercy choice
             Assert.Same(menuContext, Campaign.Current.CurrentMenuContext);
             Assert.Equal("menu_settlement_taken_player_leader", menuContext.GameMenu.StringId);
+            Assert.Same(mainParty, aftermathBehavior._besiegerParty);
+            Assert.Same(client.GetRegisteredObject<Clan>(defeatedClanId), aftermathBehavior._prevSettlementOwnerClan);
         });
 
         // only the route's own Finish of the ended encounter, not the plain end-of-battle one as well
@@ -323,9 +359,12 @@ public class SiegeAftermathEndRouteTests : IDisposable
         menus.GetGameMenu("menu_settlement_taken_player_army_member").OnInit = _ => { };
         menus.GetGameMenu("menu_settlement_taken_player_leader").OnInit = _ => { };
 
+        var starter = new CampaignGameStarter(menus, Campaign.Current.ConversationManager);
+        if (menus.GetGameMenu("encounter") == null)
+            starter.AddGameMenu("encounter", "", _ => { });
+
         var context = Game.Current.ObjectManager.CreateObject<MenuContext>();
-        context.GameMenu = ObjectHelper.SkipConstructor<GameMenu>();
-        context.GameMenu.StringId = "encounter";
+        context.GameMenu = menus.GetGameMenu("encounter");
         var mapState = Game.Current.GameStateManager.CreateState<MapState>();
         mapState._menuContext = context;
         Game.Current.GameStateManager._gameStates.Add(mapState);

@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Util;
+using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.SiegeEvents.Handlers;
 using GameInterface.Services.SiegeEvents.Patches;
 using Serilog;
@@ -834,6 +835,15 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
         // finish before replacing the encounter menu, otherwise the menu reopens or the loot is dropped.
         if (SiegeCaptureTransitionRetryHandler.IsBattleStillResolving())
         {
+            var encounter = PlayerEncounter.Current;
+            if (MapEventInitializationBarrier.IsStagedSiegeCaptureResult(encounter) &&
+                encounter._mapEvent.MapEventSettlement == settlement)
+            {
+                // The replicated destroy can arrive before the client dispatches OnMapEventEnded.
+                pendingAftermathSiege = encounter._mapEvent;
+                pendingAftermathAsArmyMember = false;
+            }
+
             Logger.Information("Parked the capture aftermath menu for {Settlement} until the battle finishes resolving", settlement.StringId);
             SiegeCaptureTransitionRetryHandler.Arm(leaderParty, settlement);
             return;

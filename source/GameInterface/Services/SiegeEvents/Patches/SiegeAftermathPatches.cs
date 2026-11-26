@@ -121,7 +121,7 @@ internal class SiegeAftermathPatches
         if (mapEvent == null) return false;
         if (!TryGetAftermathSide(mapEvent, out var battleSide)) return false;
 
-        var lp = mapEvent.GetMapEventSide(battleSide).LeaderParty?.MobileParty;
+        var lp = mapEvent.GetMapEventSide(battleSide)?.LeaderParty?.MobileParty;
         if (lp?.LeaderHero == null || !lp.LeaderHero.IsPlayerHero()) return false;
 
         leaderParty = lp;
