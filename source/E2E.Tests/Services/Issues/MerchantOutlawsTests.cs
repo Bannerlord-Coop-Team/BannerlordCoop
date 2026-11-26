@@ -661,6 +661,22 @@ public class MerchantOutlawsTests : IDisposable
     }
 
     [Fact]
+    public void AuthoritativeEndingDoesNotMarkAnUnreadRowTwice()
+    {
+        var tracker = new ViewDataTrackerCampaignBehavior();
+        ClientA.Call(() => CampaignEvents.QuestLogAddedEvent.AddNonSerializedListener(tracker, tracker.OnQuestLogAdded));
+        Accept();
+        ClientA.Call(() => Assert.NotEmpty(tracker._unExaminedQuestLogs));
+
+        Server.Call(() => Quest(Server).CompleteQuestWithCancel(), TextHelpers);
+        var snapshot = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueJournal>());
+        ClientA.SimulateMessage(Server.NetPeer, Server.SerializeForWire(snapshot));
+
+        // The map bar keys a dictionary by these rows every frame, so a repeated row throws there.
+        ClientA.Call(() => Assert.Equal(tracker._unExaminedQuestLogs.Distinct().Count(), tracker._unExaminedQuestLogs.Count));
+    }
+
+    [Fact]
     public void SuccessRequestWithoutEnoughServerProgressDoesNotPay()
     {
         Accept();

@@ -273,8 +273,10 @@ internal class FinalizationCoordinator : IHandler, IIssueFinalizationReplay
                 if (quest != null)
                 {
                     var logs = data.Logs ?? Array.Empty<IssueJournalEntry>();
+                    var rowAdded = true;
                     if (descriptor is ISpecializedEndingJournalDescriptor)
                     {
+                        rowAdded = false;
                         var remaining = quest.JournalEntries.ToList();
                         foreach (var log in logs)
                         {
@@ -300,6 +302,7 @@ internal class FinalizationCoordinator : IHandler, IIssueFinalizationReplay
                             else if (matches.Length == 0)
                             {
                                 quest._journalEntries.Add(log.ToJournalLog());
+                                rowAdded = true;
                             }
                         }
                     }
@@ -309,7 +312,9 @@ internal class FinalizationCoordinator : IHandler, IIssueFinalizationReplay
                         foreach (var log in logs)
                             quest._journalEntries.Add(log.ToJournalLog());
                     }
-                    CampaignEventDispatcher.Instance.OnQuestLogAdded(quest, true);
+                    // Vanilla marks the last row unread on each QuestLogAdded without a duplicate check, and the map bar
+                    // throws on a repeated row every frame, so a snapshot that kept every existing row must not raise it.
+                    if (rowAdded) CampaignEventDispatcher.Instance.OnQuestLogAdded(quest, true);
                 }
                 else
                 {
