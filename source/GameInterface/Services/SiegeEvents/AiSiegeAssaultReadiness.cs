@@ -146,7 +146,8 @@ internal class AiSiegeAssaultReadiness : IAiSiegeAssaultReadiness
         if (powerRatioBeforeEquipment > 1f)
         {
             powerRatioAfterEquipment *= (float)MathF.Min(3, input.EquipmentBuilt) / 3f;
-            float equipmentProgress = input.MaximumEquipmentProgress + (0.25f * (float)(5 - input.EquipmentBuilt));
+            // Missing slots and an unfinished engine can add up past 100% and make the assault roll impossible.
+            float equipmentProgress = MathF.Min(1f, input.MaximumEquipmentProgress + (0.25f * (5 - input.EquipmentBuilt)));
             powerRatioAfterEquipment *= 1f - (0.85f * (equipmentProgress * equipmentProgress));
         }
 
