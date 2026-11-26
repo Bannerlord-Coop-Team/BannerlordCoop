@@ -17,8 +17,8 @@ using SandBox.ViewModelCollection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
-using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.GameMenus.GameMenuInitializationHandlers;
 using TaleWorlds.CampaignSystem.GameState;
@@ -149,7 +149,7 @@ public class BattleSimulationEncounterTests : MapEventTestBase
             }, MapEventDisabledMethods
                 // Headless campaigns have no navigation mesh for vanilla's post-encounter displacement.
                 .Append(AccessTools.Method(typeof(MobileParty), nameof(MobileParty.TeleportPartyToOutSideOfEncounterRadius)))
-                // The encounter texts read party names, which need encyclopedia data the headless heroes lack.
+                // Only a restarted battle reaches the encounter texts, which read party names the headless heroes can't build.
                 .Append(AccessTools.Method(typeof(PlayerEncounter), "SetEncounterMenuTexts"))
                 .Append(AccessTools.Method(typeof(DefaultEncounter), "game_menu_encounter_on_init")));
             Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkRequestCreateMapEvent>());

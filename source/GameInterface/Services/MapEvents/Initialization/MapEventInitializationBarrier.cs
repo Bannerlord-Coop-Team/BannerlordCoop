@@ -489,8 +489,8 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         if (cleanup != null)
             deferredEncounterCleanup = null;
         party._mapEventSide = null;
-        bool continuedEncounter = ContinueDestroyedSimulationDefeat(mapEvent, cleanup);
-        if (!continuedEncounter && CloseStaleDestroyedEncounter(mapEvent, cleanup)) return;
+        bool endedDefeat = EndDestroyedSimulationDefeat(mapEvent, cleanup);
+        if (!endedDefeat && CloseStaleDestroyedEncounter(mapEvent, cleanup)) return;
 
         ClearEngageOrder(party.MobileParty);
     }
@@ -504,7 +504,7 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
                    .Any(state => state._battleSimulation == battleSimulation) == true;
     }
 
-    private static bool ContinueDestroyedSimulationDefeat(
+    private static bool EndDestroyedSimulationDefeat(
         MapEvent mapEvent,
         DeferredEncounterCleanup cleanup)
     {
@@ -540,6 +540,11 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         encounter._mapEvent = null;
         encounter.BattleSimulation = null;
         PlayerEncounter.Finish();
+
+        // A client's settlement leave is dropped, so a defender still inside asks for its settlement again like native Leave.
+        var settlement = MobileParty.MainParty.CurrentSettlement;
+        if (settlement != null)
+            EncounterManager.StartSettlementEncounter(MobileParty.MainParty, settlement);
         return true;
     }
 
