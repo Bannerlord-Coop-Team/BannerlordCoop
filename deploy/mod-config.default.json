@@ -89,15 +89,13 @@
     // false: the window never shows and everyone gets the default start.
     "enabled": true,
 
-    // The start type selected when the window opens: "default", "outlaw", "beggar",
-    // "trader", "mercenary", "vassal" or "king".
+    // The start type selected when the window opens:
+    // "default", "outlaw", "beggar", "trader", "mercenary", "vassal" or "king".
     "defaultStartType": "default",
 
     // false hides a start type from the window.
     // trader, mercenary, vassal and king change the world (workshops, fiefs, kingdom
     // rulers, wars), so they can only be picked before the campaign is first resumed.
-    // A kingdom a player already rules can't be taken with a king start. Vanilla's
-    // single-player playthrough locks on king, vassal and mercenary don't apply here.
     "startTypes": {
       "outlaw": true,
       "beggar": true,
