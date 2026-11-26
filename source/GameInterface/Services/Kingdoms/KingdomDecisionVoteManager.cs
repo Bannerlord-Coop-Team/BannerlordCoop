@@ -53,6 +53,7 @@ namespace GameInterface.Services.Kingdoms
         void UnregisterDecisionItem(DecisionItemBaseVM decisionItem);
         bool HasPendingSettlementDecisionResult();
         void ShowNextSettlementDecisionResult(KingdomDecisionsVM decisionsVm);
+        bool IsShowingSettlementDecisionResult(DecisionItemBaseVM decisionItem);
         bool HandleVoteRequest(string controllerId, KingdomDecisionVoteData voteData);
         void ApplyRemoteVote(string clanId, KingdomDecisionVoteData voteData);
         bool TryResolveDecision(KingdomDecision decision);
@@ -414,7 +415,7 @@ namespace GameInterface.Services.Kingdoms
 
         public void DismissSubmittedDecisionItem(DecisionItemBaseVM decisionItem)
         {
-            if (decisionItem == null || !decisionItem.IsActive || decisionItem.IsKingsDecisionOver) return;
+            if (decisionItem == null || !decisionItem.IsActive || IsShowingSettlementDecisionResult(decisionItem)) return;
 
             KingdomDecision decision = decisionItem.KingdomDecisionMaker?._decision;
             TryGetKingdomId(decision?.Kingdom, out string kingdomId);
@@ -639,7 +640,8 @@ namespace GameInterface.Services.Kingdoms
                 return;
             }
             KingdomDecisionVoteState state = GetOrCreateState(decision);
-            if (state.IsResolved) return;
+            bool isSettlementResult = decision is SettlementClaimantDecision;
+            if (isSettlementResult && state.IsResolved) return;
 
             var result = new KingdomDecisionVoteData(
                 kingdomId,
@@ -649,7 +651,6 @@ namespace GameInterface.Services.Kingdoms
                 false,
                 true,
                 outcomeKey);
-            bool isSettlementResult = decision is SettlementClaimantDecision;
             if (!outcomeResolver.TryGetOutcome(result, state.Election, objectManager, out DecisionOutcome outcome,
                     requireKeyMatch: isSettlementResult))
             {
@@ -728,6 +729,13 @@ namespace GameInterface.Services.Kingdoms
             item.CanEndDecision = false;
             item.OnKingdomDecisionConcluded(election._decision, winner, isPlayerInvolved: true);
             return true;
+        }
+
+        public bool IsShowingSettlementDecisionResult(DecisionItemBaseVM decisionItem)
+        {
+            return decisionItem?.IsKingsDecisionOver == true &&
+                   decisionItem.KingdomDecisionMaker._decision is SettlementClaimantDecision &&
+                   decisionItem.DecisionOptionsList.Any(option => option.IsKingsOutcome);
         }
 
         public void ClearDecisionState(string kingdomId, int decisionIndex)
@@ -819,8 +827,7 @@ namespace GameInterface.Services.Kingdoms
                          .Where(item => item?.KingdomDecisionMaker?._decision == decision)
                          .ToList())
             {
-                if (decision is SettlementClaimantDecision && decisionItem.IsKingsDecisionOver &&
-                    decisionItem.DecisionOptionsList.Any(option => option.IsKingsOutcome)) continue;
+                if (IsShowingSettlementDecisionResult(decisionItem)) continue;
 
                 CloseDecisionItem(decisionItem);
             }
@@ -2004,7 +2011,7 @@ namespace GameInterface.Services.Kingdoms
 
         private KingdomDecisionWaitingFeedback GetWaitingFeedback(DecisionItemBaseVM decisionItem)
         {
-            if (decisionItem?.IsKingsDecisionOver == true) return null;
+            if (IsShowingSettlementDecisionResult(decisionItem)) return null;
 
             KingdomDecision decision = decisionItem?.KingdomDecisionMaker?._decision;
             if (decision == null || !DecisionStates.TryGetValue(decision, out KingdomDecisionVoteState state)) return null;
@@ -2021,7 +2028,7 @@ namespace GameInterface.Services.Kingdoms
 
         private int? TryGetRemainingSeconds(DecisionItemBaseVM decisionItem)
         {
-            if (decisionItem?.IsKingsDecisionOver == true) return null;
+            if (IsShowingSettlementDecisionResult(decisionItem)) return null;
 
             KingdomDecision decision = decisionItem?.KingdomDecisionMaker?._decision;
             if (decision == null || !DecisionStates.TryGetValue(decision, out KingdomDecisionVoteState state)) return null;

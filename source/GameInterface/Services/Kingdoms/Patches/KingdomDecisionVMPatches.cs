@@ -220,7 +220,7 @@ namespace GameInterface.Services.Kingdoms.Patches
         private static bool ExecuteFinalSelectionPrefix(DecisionItemBaseVM __instance)
         {
             if (!KingdomDecisionsVMPatches.TryGetVoteManager(out var voteManager)) return true;
-            if (__instance.IsKingsDecisionOver) return false;
+            if (voteManager.IsShowingSettlementDecisionResult(__instance)) return false;
             if (voteManager.IsSubmittedDecision(__instance.KingdomDecisionMaker?._decision))
             {
                 voteManager.DismissSubmittedDecisionItem(__instance);
@@ -237,8 +237,9 @@ namespace GameInterface.Services.Kingdoms.Patches
         [HarmonyPostfix]
         private static void RefreshCanEndDecisionPostfix(DecisionItemBaseVM __instance)
         {
-            if (!__instance._finalSelectionDone || !__instance.IsActive || __instance.IsKingsDecisionOver) return;
+            if (!__instance._finalSelectionDone || !__instance.IsActive) return;
             if (!KingdomDecisionsVMPatches.TryGetVoteManager(out var voteManager)) return;
+            if (voteManager.IsShowingSettlementDecisionResult(__instance)) return;
             if (!voteManager.IsSubmittedDecision(__instance.KingdomDecisionMaker?._decision)) return;
 
             __instance.CanEndDecision = true;
