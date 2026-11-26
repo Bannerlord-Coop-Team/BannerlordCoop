@@ -17,6 +17,14 @@ internal class GovernorKingdomCreationPatches
     private const string FinalizationMethodName = "governor_talk_kingdom_creation_finalization_on_consequence";
     private static readonly ILogger Logger = LogManager.GetLogger<GovernorKingdomCreationPatches>();
 
+    [HarmonyPatch(nameof(GovernorCampaignBehavior.governor_kingdom_creation_culture_selected_on_condition))]
+    [HarmonyPrefix]
+    private static bool CultureSelectedPrefix(GovernorCampaignBehavior __instance)
+    {
+        return !ContainerProvider.TryResolve<ICultureDefaultPolicies>(out var policies)
+            || policies.TryResolve(__instance._kingdomCreationChosenCulture);
+    }
+
     [HarmonyPatch(FinalizationMethodName)]
     [HarmonyPrefix]
     public static bool FinalizationPrefix(GovernorCampaignBehavior __instance)

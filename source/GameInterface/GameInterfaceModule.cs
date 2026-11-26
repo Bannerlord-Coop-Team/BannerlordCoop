@@ -312,6 +312,7 @@ public class GameInterfaceModule : Module
             .As<ISettlementHeroSpawnPool>()
             .InstancePerDependency();
         builder.RegisterType<KingdomCreationSettlementTracker>().AsSelf().As<IKingdomCreationSettlementTracker>().SingleInstance();
+        builder.RegisterType<CultureDefaultPolicies>().As<ICultureDefaultPolicies>();
         builder.RegisterType<KingdomCreator>().AsSelf().As<IKingdomCreator>().SingleInstance();
         builder.RegisterType<KingdomDecisionOutcomeResolver>().AsSelf().As<IKingdomDecisionOutcomeResolver>().SingleInstance();
         builder.RegisterType<KingdomDecisionOutcomeOrder>().AsSelf().As<IKingdomDecisionOutcomeOrder>().InstancePerDependency();

@@ -44,6 +44,7 @@ using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.Policies;
 using GameInterface.Services.Stances.Messages;
 using GameInterface.Services.UI.Notifications.Messages;
 using GameInterface.Services.Villages.Interfaces;
@@ -55,6 +56,7 @@ using SandBox.ViewModelCollection.Map.Tracker;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Xml;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -80,6 +82,7 @@ using TaleWorlds.Core.ViewModelCollection.Information;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
+using TaleWorlds.ObjectSystem;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Kingdoms;
@@ -353,27 +356,49 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     }
 
     [Fact]
-    public void ClientGovernorFinalization_CreatesPlayerKingdomOnServerAndSyncsClients()
+    public void GovernorCreationResolvesCultureDefaultsAndSyncsTheNewKingdom()
     {
         var player = CreateSyncedPlayerContext();
         var fiefId = CreateSyncedClanFief(player.ClanId);
         var client = Clients.First();
         client.Resolve<IControllerIdProvider>().SetControllerId(ControllerId);
+        TestEnvironment.RegisterLoadedObjects<PolicyObjectRegistry, PolicyObject>();
 
-        client.Call(() =>
+        var cultureXml = CreateAseraiCultureXml();
+        foreach (var instance in new[] { Server }.Concat(Clients))
         {
-            var behavior = ObjectHelper.SkipConstructor<GovernorCampaignBehavior>();
-            Assert.True(client.ObjectManager.TryGetObject<CultureObject>(player.CultureId, out var culture));
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<CultureObject>(player.CultureId, out var culture));
+                using (new AllowedThread())
+                {
+                    culture.StringId = "aserai";
+                    culture.Deserialize(new MBObjectManager(), cultureXml.DocumentElement!.FirstChild);
+                }
+            });
+        }
 
-            AccessTools.Field(typeof(GovernorCampaignBehavior), "_kingdomCreationChosenName")
-                .SetValue(behavior, new TextObject(KingdomName));
-            AccessTools.Field(typeof(GovernorCampaignBehavior), "_kingdomCreationChosenCulture")
-                .SetValue(behavior, culture);
-
-            bool runOriginal = GovernorKingdomCreationPatches.FinalizationPrefix(behavior);
-
-            Assert.False(runOriginal);
-        });
+        var xmlPatch = new Harmony("e2e.kingdom-creation-culture-xml");
+        var loadXml = AccessTools.Method(typeof(MBObjectManager), nameof(MBObjectManager.GetMergedXmlForManaged));
+        xmlPatch.Patch(loadXml, prefix: new HarmonyMethod(typeof(PlayerKingdomCreationFlowTests), nameof(LoadAseraiCultureXml)));
+        try
+        {
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<CultureObject>(player.CultureId, out var culture));
+                var behavior = new GovernorCampaignBehavior
+                {
+                    _kingdomCreationChosenName = new TextObject(KingdomName),
+                    _kingdomCreationChosenCulture = culture,
+                };
+                Assert.True(behavior.governor_kingdom_creation_culture_selected_on_condition());
+                behavior.governor_talk_kingdom_creation_finalization_on_consequence();
+            });
+        }
+        finally
+        {
+            xmlPatch.Unpatch(loadXml, HarmonyPatchType.Prefix, xmlPatch.Id);
+        }
 
         var request = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestCreateKingdom>());
         Assert.Equal(KingdomName, request.KingdomName);
@@ -397,6 +422,17 @@ public class PlayerKingdomCreationFlowTests : IDisposable
                            && message.ClanId == player.ClanId);
         }
 
+        foreach (var instance in new[] { Server }.Concat(Clients))
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Kingdom>(created.KingdomId, out var kingdom));
+                Assert.Equal(
+                    new[] { "policy_council_of_the_commons", "policy_senate" },
+                    kingdom.ActivePolicies.Select(policy => policy.StringId));
+            });
+        }
+
         var notification = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPlayerKingdomCreated>());
         Assert.Equal(created.ControllerId, notification.ControllerId);
         Assert.Equal(created.KingdomId, notification.KingdomId);
@@ -405,6 +441,29 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         Assert.Equal(created.CultureId, notification.CultureId);
 
         Server.PumpGameThread();
+    }
+
+    private static bool LoadAseraiCultureXml(string id, ref XmlDocument __result)
+    {
+        if (id != "SPCultures") return true;
+
+        __result = CreateAseraiCultureXml();
+        return false;
+    }
+
+    private static XmlDocument CreateAseraiCultureXml()
+    {
+        var xml = new XmlDocument();
+        xml.LoadXml(@"
+            <SPCultures>
+              <Culture id=""aserai"" name=""Aserai"">
+                <default_policies>
+                  <policy id=""policy_council_of_the_commons"" />
+                  <policy id=""policy_senate"" />
+                </default_policies>
+              </Culture>
+            </SPCultures>");
+        return xml;
     }
 
     [Fact]
