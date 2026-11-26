@@ -1,7 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Util;
-using GameInterface.Services.MapEvents.Initialization;
+using GameInterface.Services.Settlements.Interfaces;
 using GameInterface.Services.SiegeEvents.Handlers;
 using GameInterface.Services.SiegeEvents.Patches;
 using Serilog;
@@ -116,6 +116,9 @@ public interface ISiegeEventInterface : IGameAbstraction
     /// </summary>
     void ApplySiegeAftermathChoice(MobileParty party, Settlement settlement, int aftermathType);
 
+    /// <summary>Enters the leader of a pending capture after the server finalizes the battle.</summary>
+    void EnterPendingCaptureLeader(MobileParty party, Settlement settlement);
+
     /// <summary>
     /// Returns a stable snapshot of valid server-owned aftermath prompts. Used to re-prompt a
     /// leader when that client enters the campaign after a reload or reconnect.
@@ -227,6 +230,7 @@ public interface ISiegeEventInterface : IGameAbstraction
 internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
 {
     private static readonly ILogger Logger = LogManager.GetLogger<SiegeEventInterface>();
+    private readonly ISettlementInterface settlementInterface;
     private bool reloadRestorePending;
     private bool reloadRestoreSubscribed;
     private Settlement localAftermathChoiceSettlement;
@@ -235,6 +239,11 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
     // from the narration identity, which the applied-aftermath broadcast clears, often before that End.
     private MapEvent pendingAftermathSiege;
     private bool pendingAftermathAsArmyMember;
+
+    public SiegeEventInterface(ISettlementInterface settlementInterface)
+    {
+        this.settlementInterface = settlementInterface;
+    }
 
     public bool IsCampaignMissionActive =>
         TaleWorlds.MountAndBlade.MissionState.Current != null ||
@@ -410,17 +419,12 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
 
     public void ApplySiegeAftermathChoice(MobileParty party, Settlement settlement, int aftermathType)
     {
-        if (!Patches.SiegeAftermathPatches.PendingAftermaths.TryGetValue(settlement, out var pending))
+        if (!TryGetPendingCaptureForLeader(party, settlement, out var pending))
         {
-            // Expected for a pick made after the server discarded the aftermath, before the release reached the client.
-            Logger.Warning("No pending siege aftermath for {Settlement}", settlement.Name?.ToString());
-            return;
-        }
-
-        // Validate before removing so a mismatched request cannot destroy the pending entry.
-        if (pending.LeaderParty != party)
-        {
-            Logger.Error("Party {Party} is not the pending aftermath leader for {Settlement}", party.StringId, settlement.Name?.ToString());
+            if (pending == null)
+                Logger.Warning("No pending siege aftermath for {Settlement}", settlement.Name?.ToString());
+            else
+                Logger.Error("Party {Party} is not the pending aftermath leader for {Settlement}", party.StringId, settlement.Name?.ToString());
             return;
         }
 
@@ -436,6 +440,18 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
 
         SiegeAftermathAction.ApplyAftermath(party, settlement, (SiegeAftermathAction.SiegeAftermath)aftermathType, pending.PreviousOwnerClan, pending.Contributions);
     }
+
+    public void EnterPendingCaptureLeader(MobileParty party, Settlement settlement)
+    {
+        if (!TryGetPendingCaptureForLeader(party, settlement, out var pending) || !pending.MatchesCurrentCapture(settlement))
+            return;
+
+        // SiegeCompleted tries to enter before the battle detaches the capturer, so the entry patch refuses it.
+        settlementInterface.PartyEnterSettlement(party, settlement);
+    }
+
+    private static bool TryGetPendingCaptureForLeader(MobileParty party, Settlement settlement, out SiegeAftermathPatches.PendingAftermath pending) =>
+        SiegeAftermathPatches.PendingAftermaths.TryGetValue(settlement, out pending) && pending.LeaderParty == party;
 
     public PendingSiegeAftermathPrompt[] GetPendingSiegeAftermathPrompts()
     {
@@ -836,12 +852,11 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
         if (SiegeCaptureTransitionRetryHandler.IsBattleStillResolving())
         {
             var encounter = PlayerEncounter.Current;
-            if (MapEventInitializationBarrier.IsStagedSiegeCaptureResult(encounter) &&
+            if (SiegeCaptureMenuHoldPatch.HoldsCaptureResult(encounter) &&
                 encounter._mapEvent.MapEventSettlement == settlement)
             {
                 // The replicated destroy can arrive before the client dispatches OnMapEventEnded.
-                pendingAftermathSiege = encounter._mapEvent;
-                pendingAftermathAsArmyMember = false;
+                SetLocalAftermathNarrationContext(settlement, encounter._mapEvent);
             }
 
             Logger.Information("Parked the capture aftermath menu for {Settlement} until the battle finishes resolving", settlement.StringId);

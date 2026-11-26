@@ -1,7 +1,9 @@
 ﻿using Common.Messaging;
+using GameInterface.Services.Settlements.Interfaces;
 using GameInterface.Services.SiegeEvents.Patches;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using GameInterface.Services.SiegeEvents.Messages;
+using Moq;
 using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
@@ -170,7 +172,7 @@ public sealed class SiegeAftermathPendingTests : IDisposable
         var recaptured = AddBoundPending();
         recaptured.Settlement.Town.LastCapturedBy = CreateUninitialized<Clan>();
 
-        var prompts = new SiegeEventInterface().GetPendingSiegeAftermathPrompts();
+        var prompts = new SiegeEventInterface(Mock.Of<ISettlementInterface>()).GetPendingSiegeAftermathPrompts();
 
         var prompt = Assert.Single(prompts);
         Assert.Same(current.Settlement, prompt.Settlement);
@@ -188,7 +190,7 @@ public sealed class SiegeAftermathPendingTests : IDisposable
         {
             var participantSettlement = CreateSettlement(CreateUninitialized<Clan>(), CreateUninitialized<Clan>());
             var unrelatedSettlement = CreateSettlement(CreateUninitialized<Clan>(), CreateUninitialized<Clan>());
-            var siegeEventInterface = new SiegeEventInterface();
+            var siegeEventInterface = new SiegeEventInterface(Mock.Of<ISettlementInterface>());
 
             siegeEventInterface.SetLocalAftermathNarrationContext(participantSettlement, null);
             siegeEventInterface.SetLocalAftermathNarration(unrelatedSettlement,

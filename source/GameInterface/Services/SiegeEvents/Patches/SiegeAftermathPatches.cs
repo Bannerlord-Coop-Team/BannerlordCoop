@@ -112,7 +112,7 @@ internal class SiegeAftermathPatches
     /// <summary>
     /// True when this map event captured a settlement for a co-op player. The same winner/settlement
     /// computation OnMapEventEndedPrefix uses; BattleFinalizeHandler calls it to keep the capturing
-    /// player's encounter open (it needs the settlement-taken flow, not the plain close).
+    /// player's encounter open and enter the leader into the captured settlement after finalization.
     /// </summary>
     internal static bool TryGetPlayerCaptureLeader(MapEvent mapEvent, out MobileParty leaderParty, out Settlement settlement)
     {
@@ -131,7 +131,7 @@ internal class SiegeAftermathPatches
 
     // Vanilla's aftermath trigger: a siege assault or sally out at a settlement, won by the attacker
     // (the defender on a sally out). aftermathSide is the side whose win runs the aftermath.
-    private static bool TryGetAftermathSide(MapEvent mapEvent, out BattleSideEnum aftermathSide)
+    internal static bool TryGetAftermathSide(MapEvent mapEvent, out BattleSideEnum aftermathSide)
     {
         bool isSallyOut = mapEvent.IsSallyOut || mapEvent.IsBlockadeSallyOut;
         aftermathSide = isSallyOut ? BattleSideEnum.Defender : BattleSideEnum.Attacker;

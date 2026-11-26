@@ -12,6 +12,7 @@ using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MapEvents.Participation;
 using GameInterface.Services.Players;
 using GameInterface.Services.Settlements.Messages;
+using GameInterface.Services.SiegeEvents.Handlers;
 using GameInterface.Services.SiegeEvents.Patches;
 using GameInterface.Tests.Utils;
 using HarmonyLib;
@@ -140,66 +141,78 @@ public class BattleSimulationCompletionTests : MapEventTestBase
             settlement.SetSettlementComponent(client.GetRegisteredObject<Town>(townId));
         });
 
-        Server.Call(() =>
+        try
         {
-            var mapEvent = Server.GetRegisteredObject<MapEvent>(context.MapEventId);
-            var settlement = Server.GetRegisteredObject<Settlement>(settlementId);
-            var town = Server.GetRegisteredObject<Town>(townId);
-            var previousOwner = Server.GetRegisteredObject<Hero>(previousOwnerId);
-            previousOwner.Clan.SetLeader(previousOwner);
-            settlement.SetSettlementComponent(town);
-            town.OwnerClan = previousOwner.Clan;
-
-            StartAcceptedSimulation(client, context);
-            mapEvent.SetBattleType(MapEvent.BattleTypes.Siege);
-            mapEvent.SetMapEventSettlement(settlement);
-            mapEvent.BattleState = BattleState.AttackerVictory;
-
-            var aftermath = new SiegeAftermathCampaignBehavior();
-            CampaignEvents.MapEventEnded.AddNonSerializedListener(this, aftermath.OnMapEventEnded);
-            // Keep the capture and the early enter attempt from SiegeCompleted without the campaign's NPC army logic.
-            CampaignEvents.SiegeCompletedEvent.AddNonSerializedListener(this, (captured, capturer, won, _) =>
+            Server.Call(() =>
             {
-                if (!won) return;
-                ChangeOwnerOfSettlementAction.ApplyBySiege(capturer.LeaderHero, capturer.LeaderHero, captured);
-                EnterSettlementAction.ApplyForParty(capturer, captured);
+                var mapEvent = Server.GetRegisteredObject<MapEvent>(context.MapEventId);
+                var settlement = Server.GetRegisteredObject<Settlement>(settlementId);
+                var town = Server.GetRegisteredObject<Town>(townId);
+                var previousOwner = Server.GetRegisteredObject<Hero>(previousOwnerId);
+                previousOwner.Clan.SetLeader(previousOwner);
+                settlement.SetSettlementComponent(town);
+                town.OwnerClan = previousOwner.Clan;
+
+                StartAcceptedSimulation(client, context);
+                mapEvent.SetBattleType(MapEvent.BattleTypes.Siege);
+                mapEvent.SetMapEventSettlement(settlement);
+                mapEvent.BattleState = BattleState.AttackerVictory;
+
+                var aftermath = new SiegeAftermathCampaignBehavior();
+                CampaignEvents.MapEventEnded.AddNonSerializedListener(this, aftermath.OnMapEventEnded);
+                // Keep the capture and the early enter attempt from SiegeCompleted without the campaign's NPC army logic.
+                CampaignEvents.SiegeCompletedEvent.AddNonSerializedListener(this, (captured, capturer, won, _) =>
+                {
+                    if (!won) return;
+                    ChangeOwnerOfSettlementAction.ApplyBySiege(capturer.LeaderHero, capturer.LeaderHero, captured);
+                    EnterSettlementAction.ApplyForParty(capturer, captured);
+                });
+                try
+                {
+                    AdvanceSimulation(client, context.MapEventId);
+
+                    Assert.True(mapEvent.IsFinalized);
+                    Assert.Same(settlement, Server.GetRegisteredObject<MobileParty>(context.AttackerPartyId).CurrentSettlement);
+                    Assert.NotNull(town.GarrisonParty);
+                }
+                finally
+                {
+                    CampaignEvents.MapEventEnded.ClearListeners(this);
+                    CampaignEvents.SiegeCompletedEvent.ClearListeners(this);
+                    SiegeAftermathPatches.PendingAftermaths.TryRemove(settlement, out _);
+                }
+            }, MapEventDisabledMethods);
+
+            // Exercise the real managed-menu reservation and consequence up to the party-screen presentation boundary.
+            using var screen = new MethodCallRecorder(Priority.First,
+                AccessTools.Method(typeof(PartyScreenHelper), nameof(PartyScreenHelper.OpenScreenAsManageTroops)));
+            client.Call(() =>
+            {
+                var menus = Campaign.Current.GameMenuManager;
+                var starter = new CampaignGameStarter(menus, Campaign.Current.ConversationManager);
+                starter.AddGameMenu("town_keep", "", _ => { });
+                starter.AddGameMenuOption("town_keep", "manage_garrison", "Manage garrison", _ => true,
+                    PlayerTownVisitCampaignBehavior.game_menu_manage_garrison_on_consequence);
+                var menu = Game.Current.ObjectManager.CreateObject<MenuContext>();
+                menu.GameMenu = menus.GetGameMenu("town_keep");
+                var mapState = Game.Current.GameStateManager.CreateState<MapState>();
+                mapState._menuContext = menu;
+                Game.Current.GameStateManager._gameStates.Add(mapState);
+
+                Assert.Same(client.GetRegisteredObject<Settlement>(settlementId), Hero.MainHero.CurrentSettlement);
+                menu.GameMenu.RunMenuOptionConsequence(menu, 0);
             });
-            try
-            {
-                AdvanceSimulation(client, context.MapEventId);
-
-                Assert.True(mapEvent.IsFinalized);
-                Assert.NotNull(town.GarrisonParty);
-            }
-            finally
-            {
-                CampaignEvents.MapEventEnded.ClearListeners(this);
-                CampaignEvents.SiegeCompletedEvent.ClearListeners(this);
-                SiegeAftermathPatches.PendingAftermaths.TryRemove(settlement, out _);
-            }
-        }, MapEventDisabledMethods);
-
-        // Exercise the real managed-menu reservation and consequence up to the party-screen presentation boundary.
-        using var screen = new MethodCallRecorder(Priority.First,
-            AccessTools.Method(typeof(PartyScreenHelper), nameof(PartyScreenHelper.OpenScreenAsManageTroops)));
-        client.Call(() =>
+            Assert.True(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkSettlementMenuAccess>()).Granted);
+            Assert.Equal(1, screen.CountFor(client));
+        }
+        finally
         {
-            var menus = Campaign.Current.GameMenuManager;
-            var starter = new CampaignGameStarter(menus, Campaign.Current.ConversationManager);
-            starter.AddGameMenu("town_keep", "", _ => { });
-            starter.AddGameMenuOption("town_keep", "manage_garrison", "Manage garrison", _ => true,
-                PlayerTownVisitCampaignBehavior.game_menu_manage_garrison_on_consequence);
-            var menu = Game.Current.ObjectManager.CreateObject<MenuContext>();
-            menu.GameMenu = menus.GetGameMenu("town_keep");
-            var mapState = Game.Current.GameStateManager.CreateState<MapState>();
-            mapState._menuContext = menu;
-            Game.Current.GameStateManager._gameStates.Add(mapState);
-
-            Assert.Same(client.GetRegisteredObject<Settlement>(settlementId), Hero.MainHero.CurrentSettlement);
-            menu.GameMenu.RunMenuOptionConsequence(menu, 0);
-        });
-        Assert.True(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkSettlementMenuAccess>()).Granted);
-        Assert.Equal(1, screen.CountFor(client));
+            client.Call(() =>
+            {
+                SiegeCaptureTransitionRetryHandler.TryTakeReady(out _, out _);
+                SiegeCaptureMenuHoldPatch.Release(client.GetRegisteredObject<Settlement>(settlementId));
+            });
+        }
     }
 
     /// <summary>Sends <see cref="MaxAdvancesToFinish"/> one-round advances from the client, enough for a decided battle to finish.</summary>

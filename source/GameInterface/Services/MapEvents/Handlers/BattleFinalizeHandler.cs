@@ -5,7 +5,6 @@ using Common.Network;
 using Common.Util;
 using GameInterface.Services.Barters;
 using GameInterface.Services.MapEvents;
-using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
@@ -16,6 +15,7 @@ using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Settlements.Interfaces;
+using GameInterface.Services.SiegeEvents.Interfaces;
 using GameInterface.Services.SiegeEvents.Patches;
 using GameInterface.Services.Villages.Messages;
 using LiteNetLib;
@@ -65,6 +65,7 @@ internal class BattleFinalizeHandler : IHandler
     private readonly IBattleHostRegistry hostRegistry;
     private readonly IPlayerManager playerManager;
     private readonly ISiegeMapEventLeaderReconciler siegeMapEventLeaderReconciler;
+    private readonly ISiegeEventInterface siegeEventInterface;
     private readonly IBattleHostRetentionPolicy retentionPolicy;
 
     public BattleFinalizeHandler(
@@ -78,6 +79,7 @@ internal class BattleFinalizeHandler : IHandler
         IBattleHostRegistry hostRegistry,
         IPlayerManager playerManager,
         ISiegeMapEventLeaderReconciler siegeMapEventLeaderReconciler,
+        ISiegeEventInterface siegeEventInterface,
         IBattleHostRetentionPolicy retentionPolicy)
     {
         this.messageBroker = messageBroker;
@@ -90,6 +92,7 @@ internal class BattleFinalizeHandler : IHandler
         this.hostRegistry = hostRegistry;
         this.playerManager = playerManager;
         this.siegeMapEventLeaderReconciler = siegeMapEventLeaderReconciler;
+        this.siegeEventInterface = siegeEventInterface;
         this.retentionPolicy = retentionPolicy;
 
         messageBroker.Subscribe<MapEventFinalizeAttempted>(Handle_MapEventFinalizeAttempted);
@@ -337,7 +340,7 @@ internal class BattleFinalizeHandler : IHandler
 
             try
             {
-                playerPartyIds = FinalizeOnGameThread(mapEvent, knownPlayerPartyIds);
+                FinalizeOnGameThread(mapEvent, knownPlayerPartyIds, out playerPartyIds);
             }
             finally
             {
@@ -348,7 +351,7 @@ internal class BattleFinalizeHandler : IHandler
         return playerPartyIds ?? Array.Empty<string>();
     }
 
-    private string[] FinalizeOnGameThread(MapEvent mapEvent, string[] knownPlayerPartyIds)
+    private void FinalizeOnGameThread(MapEvent mapEvent, string[] knownPlayerPartyIds, out string[] finalizedPlayerPartyIds)
     {
         if (siegeMapEventLeaderReconciler.RestoreBeforeFinalize(
                 mapEvent,
@@ -405,21 +408,15 @@ internal class BattleFinalizeHandler : IHandler
         using (CreateHideoutFinalizeContext(mapEvent))
             mapEvent.FinalizeEventAux();
 
-        // SiegeCompleted tries to enter before the battle detaches the capturer, so the entry patch refuses it.
-        if (capturedSettlement != null &&
-            SiegeAftermathPatches.PendingAftermaths.TryGetValue(capturedSettlement, out var capture) &&
-            capture.LeaderParty == capturingLeader && capture.MatchesCurrentCapture(capturedSettlement))
-        {
-            settlementInterface.PartyEnterSettlement(capturingLeader, capturedSettlement);
-        }
+        finalizedPlayerPartyIds = playerPartyIds;
+        if (capturedSettlement != null)
+            siegeEventInterface.EnterPendingCaptureLeader(capturingLeader, capturedSettlement);
 
         ApplyRaidAftermath(raidAftermath);
 
         // After the destroy (same game thread, so behind it on the reliable-ordered channel).
         if (!string.IsNullOrEmpty(defenderVictorySettlementId))
             network.SendAll(new NetworkPromptSiegeDefenderVictory(defenderVictorySettlementId, defenderVictoryPartyIds));
-
-        return playerPartyIds;
     }
 
     private RaidAftermath CaptureRaidAftermath(MapEvent mapEvent)
@@ -579,8 +576,7 @@ internal class BattleFinalizeHandler : IHandler
                 return;
 
             // A late finalize reply has no battle id and must leave the pending capture choice open.
-            if (ModInformation.IsClient && (MapEventInitializationBarrier.IsStagedSiegeCaptureResult(PlayerEncounter.Current) ||
-                SiegeCaptureMenuHoldPatch.IsHeld(mainParty?.CurrentSettlement)))
+            if (ModInformation.IsClient && SiegeCaptureMenuHoldPatch.HoldsLocalCapture(PlayerEncounter.Current, mainParty?.CurrentSettlement))
                 return;
 
             // The local player's battle has ended — clear the recorded mode so the encounter-menu gate

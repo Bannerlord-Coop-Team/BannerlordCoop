@@ -1,6 +1,7 @@
 ﻿using Common;
 using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Initialization;
+using GameInterface.Services.SiegeEvents.Patches;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
@@ -40,7 +41,7 @@ internal static class StagedBattleResultUpdatePatch
         encounter?._mapEvent is MapEvent mapEvent &&
         (mapEvent.WaitsForServerResults() ||
          MapEventInitializationBarrier.IsStagedRaidSimulationResult(encounter) ||
-         MapEventInitializationBarrier.IsStagedSiegeCaptureResult(encounter) ||
+         SiegeCaptureMenuHoldPatch.HoldsCaptureResult(encounter) ||
          (mapEvent.IsSiegeAssault && encounter.PlayerSide == BattleSideEnum.Defender)) &&
         MapEventInitializationBarrier.IsBattleResultEncounter(encounter);
 

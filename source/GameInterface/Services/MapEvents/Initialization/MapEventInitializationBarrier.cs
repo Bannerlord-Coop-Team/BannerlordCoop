@@ -523,7 +523,7 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         }
 
         // The result's End still needs its battle to continue the raid or open the siege aftermath.
-        if (IsStagedRaidSimulationResult(encounter) || IsStagedSiegeCaptureResult(encounter))
+        if (IsStagedRaidSimulationResult(encounter) || SiegeCaptureMenuHoldPatch.HoldsCaptureResult(encounter))
             return false;
 
         if (PlayerCaptivity.IsCaptive)
@@ -622,13 +622,6 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         mapEvent.IsRaidHostileAction() &&
         encounter.BattleSimulation != null &&
         mapEvent.WinningSide == encounter.PlayerSide;
-
-    internal static bool IsStagedSiegeCaptureResult(PlayerEncounter encounter) =>
-        encounter?._mapEvent is MapEvent mapEvent &&
-        mapEvent.IsSiegeAssault &&
-        encounter.PlayerSide == BattleSideEnum.Attacker &&
-        mapEvent.BattleState == BattleState.AttackerVictory &&
-        SiegeCaptureMenuHoldPatch.IsHeld(mapEvent.MapEventSettlement);
 
     private static void ForceCloseCurrentEncounterMenu()
     {

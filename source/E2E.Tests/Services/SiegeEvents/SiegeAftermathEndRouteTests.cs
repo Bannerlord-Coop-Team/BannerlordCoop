@@ -1,6 +1,7 @@
 ﻿using Common.Util;
 using Coop.Core.Server.Services.SiegeEvents.Messages;
 using E2E.Tests.Environment;
+using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.MapEvents.Initialization;
@@ -108,10 +109,42 @@ public class SiegeAftermathEndRouteTests : IDisposable
         Assert.Equal(1, finishRecorder.CountFor(client));
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void EndState_PromptedLeaderOfWonSiege_GetsTheChoiceAfterTheLootSteps(bool simulated)
+    [Fact]
+    public void EndState_PromptedLeader_LateFinalizeReply_KeepsTheChoice()
+    {
+        AssertPromptedLeaderGetsChoice((client, encounter, prompt) =>
+        {
+            var siege = encounter._mapEvent;
+            client.Resolve<ISiegeEventInterface>().SetLocalAftermathNarrationContext(siege.MapEventSettlement, siege);
+            prompt();
+            client.SimulateMessage(environment.Server.NetPeer, new NetworkMapEventFinalized());
+            encounter.EncounterState = PlayerEncounterState.End;
+        });
+    }
+
+    [Fact]
+    public void EndState_PromptedLeader_SimulationRemovedBeforeMapEventEnded_KeepsTheChoice()
+    {
+        AssertPromptedLeaderGetsChoice((client, encounter, prompt) =>
+        {
+            var siege = encounter._mapEvent;
+            var simulation = ObjectHelper.SkipConstructor<BattleSimulation>();
+            AccessTools.Field(typeof(BattleSimulation), nameof(BattleSimulation._mapEvent)).SetValue(simulation, siege);
+            encounter.BattleSimulation = simulation;
+            var mapState = (MapState)Game.Current.GameStateManager.ActiveState;
+            mapState._battleSimulation = simulation;
+
+            prompt();
+            Assert.True(client.ObjectManager.TryGetHandle(siege, out var handle));
+            client.SimulateMessage(environment.Server.NetPeer, new NetworkDestroyInstance<MapEvent>(handle));
+
+            mapState._battleSimulation = null;
+            encounter.EncounterState = PlayerEncounterState.End;
+            client.Resolve<IMapEventInitializationBarrier>().CompleteDeferredEncounterCleanup();
+        });
+    }
+
+    private void AssertPromptedLeaderGetsChoice(Action<EnvironmentInstance, PlayerEncounter, Action> finishBattle)
     {
         var client = environment.Clients.First();
         var settlementId = environment.CreateRegisteredObject<Settlement>();
@@ -126,7 +159,6 @@ public class SiegeAftermathEndRouteTests : IDisposable
             AccessTools.Method(typeof(EnterSettlementAction), nameof(EnterSettlementAction.ApplyForParty)),
             AccessTools.Method(typeof(EncounterManager), nameof(EncounterManager.StartSettlementEncounter)));
 
-        var siegeEvents = client.Resolve<ISiegeEventInterface>();
         var playerEncounters = client.Resolve<IPlayerEncounterInterface>();
 
         client.Call(() =>
@@ -151,40 +183,20 @@ public class SiegeAftermathEndRouteTests : IDisposable
             aftermathBehavior._wasPlayerArmyMember = false;
             var menuContext = SeedStaleEncounterMenu(aftermathBehavior);
 
-            // A played siege can dispatch OnMapEventEnded before the prompt. The simulation can be removed first.
-            if (!simulated)
-                siegeEvents.SetLocalAftermathNarrationContext(settlement, wonSiege);
             var encounter = CreateEndingEncounter(wonSiege);
             encounter.PlayerSide = BattleSideEnum.Attacker;
             encounter.EncounterState = PlayerEncounterState.LootParty;
             Campaign.Current.PlayerEncounter = encounter;
             try
             {
-                client.SimulateMessage(environment.Server.NetPeer,
-                    new NetworkPromptSiegeAftermathChoice(settlementId, mainPartyId, defeatedClanId));
-                Assert.Equal("encounter", menuContext.GameMenu.StringId);
-
-                if (simulated)
+                void Prompt()
                 {
-                    // Replicated removal can arrive while the simulation scoreboard still owns the encounter.
-                    var simulation = ObjectHelper.SkipConstructor<BattleSimulation>();
-                    AccessTools.Field(typeof(BattleSimulation), nameof(BattleSimulation._mapEvent)).SetValue(simulation, wonSiege);
-                    encounter.BattleSimulation = simulation;
-                    var mapState = (MapState)Game.Current.GameStateManager.ActiveState;
-                    mapState._battleSimulation = encounter.BattleSimulation;
                     client.SimulateMessage(environment.Server.NetPeer,
-                        new NetworkDestroyInstance<MapEvent>(client.GetHandle<MapEvent>(mapEventId)));
-                    mapState._battleSimulation = null;
-                }
-                else
-                {
-                    // A solo mission host can receive the fallback reply when the server finalized first.
-                    client.SimulateMessage(environment.Server.NetPeer, new NetworkMapEventFinalized());
+                        new NetworkPromptSiegeAftermathChoice(settlementId, mainPartyId, defeatedClanId));
+                    Assert.Equal("encounter", menuContext.GameMenu.StringId);
                 }
 
-                encounter.EncounterState = PlayerEncounterState.End;
-                if (simulated)
-                    client.Resolve<IMapEventInitializationBarrier>().CompleteDeferredEncounterCleanup();
+                finishBattle(client, encounter, Prompt);
                 playerEncounters.UpdateInternalAfterBattle(encounter);
             }
             finally
