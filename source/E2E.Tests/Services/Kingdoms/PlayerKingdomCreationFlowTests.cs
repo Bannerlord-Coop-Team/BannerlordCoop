@@ -22,7 +22,6 @@ using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Clans.Patches;
 using GameInterface.Services.Companions.Messages;
 using GameInterface.Services.Companions.Patches;
-using GameInterface.Services.CultureObjects;
 using GameInterface.Services.Entity;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameDebug.Commands;
@@ -359,7 +358,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     }
 
     [Fact]
-    public void CampaignLoadSkipsUnregisteredCulturePolicyAndAllowsKingdomCreation()
+    public void ClientGovernorFinalization_WithUnregisteredCulturePolicy_CreatesKingdomAndSyncsClients()
     {
         var player = CreateSyncedPlayerContext();
         var fiefId = CreateSyncedClanFief(player.ClanId);
@@ -369,9 +368,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
         foreach (var instance in new[] { Server }.Concat(Clients))
         {
-            SeedCultureWithUnresolvedDefaultPolicies(instance, player.CultureId);
-            instance.Call(() => Campaign.Current.ObjectManager.LoadXML(
-                CultureDefaultPolicyRepairer.CultureXmlId, isDevelopment: false, gameType: Campaign.Current.GameTypeStringId));
+            LoadCultureWithUnregisteredDefaultPolicy(instance, player.CultureId);
         }
 
         client.Call(() =>
@@ -6212,7 +6209,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         }
     }
 
-    private static void SeedCultureWithUnresolvedDefaultPolicies(EnvironmentInstance instance, string cultureId)
+    private static void LoadCultureWithUnregisteredDefaultPolicy(EnvironmentInstance instance, string cultureId)
     {
         instance.Call(() =>
         {
@@ -6220,11 +6217,11 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             var objectManager = Campaign.Current.ObjectManager;
             using (new AllowedThread())
             {
+                // Register the synced culture so LoadXml deserializes into this instance.
                 objectManager.RegisterObject(culture);
                 Assert.Null(objectManager.GetObject<PolicyObject>(UnregisteredCulturePolicyId));
-                // Run vanilla deserialization with an unregistered XML policy id (#3337).
                 objectManager.LoadXml(CreateAseraiCultureXml(culture.StringId));
-                Assert.Contains(null, culture.DefaultPolicyList);
+                Assert.Equal(AseraiDefaultPolicyIds, culture.DefaultPolicyList.Select(policy => policy?.StringId));
             }
         });
     }
@@ -6232,7 +6229,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     private static XmlDocument CreateAseraiCultureXml(string cultureId)
     {
         var xml = new XmlDocument();
-        var cultures = xml.AppendChild(xml.CreateElement(CultureDefaultPolicyRepairer.CultureXmlId));
+        var cultures = xml.AppendChild(xml.CreateElement("SPCultures"));
         var culture = (XmlElement)cultures.AppendChild(xml.CreateElement("Culture"));
         culture.SetAttribute("id", cultureId);
         culture.SetAttribute("name", "Aserai");
