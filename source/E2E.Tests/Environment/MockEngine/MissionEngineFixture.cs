@@ -43,6 +43,7 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Mission), "get_CurrentTime", nameof(Mission_get_CurrentTime));
         Prefix(typeof(Mission), "get_DamageToPlayerMultiplier", nameof(Mission_get_DamageToPlayerMultiplier));
         Prefix(typeof(Mission), nameof(Mission.EndMission), nameof(Mission_EndMission));
+        Prefix(typeof(Mission), nameof(Mission.IsPlayerCloseToAnEnemy), nameof(Mission_IsPlayerCloseToAnEnemy));
         Prefix(typeof(Mission), nameof(Mission.OnAgentFleeing), nameof(Mission_OnAgentFleeing));
         Prefix(typeof(Mission), nameof(Mission.SpawnAgent), nameof(Mission_SpawnAgent));
         // The BR-110 budget counts native objects until deletion via Mission.AllAgents.
@@ -326,6 +327,13 @@ public sealed class MissionEngineFixture : IDisposable
     {
         if (!MockMission.ForShell(__instance, out var mock)) return true;
         mock.EndMissionCalled = true;
+        return false;
+    }
+
+    private static bool Mission_IsPlayerCloseToAnEnemy(Mission __instance, ref bool __result)
+    {
+        if (!MockMission.ForShell(__instance, out var mock)) return true;
+        __result = mock.EnemyCloseToPlayer;
         return false;
     }
 

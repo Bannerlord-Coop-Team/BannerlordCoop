@@ -5,13 +5,16 @@ using Common.Network.Messages;
 using Coop.Core.Server.Services.Instances;
 using Coop.Core.Server.Services.Instances.Handlers;
 using E2E.Tests.Environment.Instance;
+using E2E.Tests.Environment.MockEngine;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
+using HarmonyLib;
 using Missions.Battles;
 using Missions.Messages;
+using Moq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -19,6 +22,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
+using TaleWorlds.MountAndBlade;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -478,6 +482,102 @@ public class BattleResultReadyTests : MissionTestEnvironment
             successorController.ResultCommitter.ReportAcceptedResult();
         }, VictoryConclusionDisabledMethods());
         AssertMapEventRemoved(mapEventId);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void EnemyRout_PeerCanLeaveWithVictoryEvenWithEnemiesNearby(bool hostLeavesFirst)
+    {
+        using var fixture = new MissionEngineFixture();
+        var (mapEventId, _) = SetupCoopBattle("host", "unconnected-defender", "successor");
+        var host = Clients.First();
+        var successor = Clients.Last();
+        SetControllerId(successor, "successor");
+        RegisterPeer(host, "host");
+        RegisterPeer(successor, "successor");
+
+        var missionProperty = AccessTools.Property(typeof(MissionBehavior), nameof(MissionBehavior.Mission));
+        var hostController = host.Resolve<CoopBattleController>();
+        var successorController = successor.Resolve<CoopBattleController>();
+        host.Call(() => AttachEndLogic(fixture.CreateMission(host), hostController));
+        MockMission successorMission = null;
+        BattleEndLogic successorEndLogic = null;
+        successor.Call(() =>
+        {
+            successorMission = fixture.CreateMission(successor);
+            successorEndLogic = AttachEndLogic(successorMission, successorController);
+            successorMission.EnemyCloseToPlayer = true;
+        });
+
+        EnterBattleWithMembership(host, "host", mapEventId);
+        EnterBattleWithMembership(successor, "successor", mapEventId);
+
+        host.Call(() =>
+        {
+            var mission = Mission.Current;
+            var endLogic = mission.GetMissionBehavior<BattleEndLogic>();
+            endLogic._isEnemySideRetreating = true;
+            MissionResult result = null;
+            Assert.True(endLogic.MissionEnded(ref result));
+            Assert.True(result.EnemyRetreated);
+            mission.MissionResult = result;
+            hostController.ResultCommitter.ReportResolvedResult(result);
+        }, VictoryConclusionDisabledMethods());
+
+        // The result must survive migration even if deployment kept this client from reporting it earlier.
+        if (hostLeavesFirst)
+        {
+            host.Call(hostController.OnEndMissionInternal, VictoryConclusionDisabledMethods());
+            AssertHost(Server, mapEventId, "successor");
+        }
+
+        AssertMapEventPresent(mapEventId);
+        successor.Call(() =>
+        {
+            successorController.OnDeploymentFinished();
+
+            MissionResult result = null;
+            Assert.True(successorEndLogic.MissionEnded(ref result));
+            Assert.Equal(BattleState.AttackerVictory, result.BattleState);
+            Assert.True(result.PlayerVictory);
+
+            successorMission.Shell.MissionResult = result;
+            successorMission.Shell._missionEnded = true;
+            BattleSpawnGate.BeginBattle(mapEventId);
+            try
+            {
+                Assert.False(successorMission.EndMissionCalled);
+                Assert.Equal(BattleEndLogic.ExitResult.True, successorEndLogic.TryExit());
+                Assert.True(successorMission.EndMissionCalled);
+                successorController.OnEndMissionInternal();
+            }
+            finally
+            {
+                BattleSpawnGate.EndBattle();
+            }
+        }, VictoryConclusionDisabledMethods());
+
+        if (!hostLeavesFirst)
+            host.Call(hostController.OnEndMissionInternal, VictoryConclusionDisabledMethods());
+        AssertMapEventRemoved(mapEventId);
+
+        BattleEndLogic AttachEndLogic(MockMission mock, CoopBattleController controller)
+        {
+            mock.PlayerTeam = mock.AttackerTeam;
+            mock.Shell.MissionTeamAIType = Mission.MissionTeamAITypeEnum.FieldBattle;
+            var player = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
+                .Controller(AgentControllerType.Player).Team(mock.PlayerTeam.Shell));
+            Assert.True(AgentMirror.TryGet(player, out var mirror));
+            NativeAgentFields.Back(player, mirror);
+            mock.Shell._mainAgent = mock.MainAgent = player;
+            var endLogic = new BattleEndLogic();
+            missionProperty.SetValue(endLogic, mock.Shell);
+            endLogic._missionAgentSpawnLogic = Mock.Of<IMissionAgentSpawnLogic>();
+            mock.Shell.MissionBehaviors.Add(endLogic);
+            missionProperty.SetValue(controller, mock.Shell);
+            return endLogic;
+        }
     }
 
     [Fact]
