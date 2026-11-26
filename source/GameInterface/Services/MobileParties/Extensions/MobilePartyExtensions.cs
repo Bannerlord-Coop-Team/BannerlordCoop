@@ -116,13 +116,11 @@ public static class MobilePartyExtensions
         party.Position = position;
 
         if (party.IsCurrentlyAtSea != isCurrentlyAtSea)
-        {
             party.ChangeIsCurrentlyAtSeaCheat();
 
-            // Settlement menu options like leave and set sail depend on the sea state
-            if (party == MobileParty.MainParty)
-                RefreshCurrentMenu();
-        }
+        // Port menu options read the sea state and the anchor, and a port entry syncs the docked anchor just before this
+        if (party == MobileParty.MainParty)
+            RefreshCurrentMenu();
     }
 
     // Refreshes the open menu through the shared refresher, which skips unbound menus
