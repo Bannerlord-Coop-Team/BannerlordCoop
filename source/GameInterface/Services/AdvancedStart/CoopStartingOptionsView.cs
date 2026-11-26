@@ -1,4 +1,5 @@
 ﻿using SandBox.AdvancedStartOptions;
+using SandBox.View.Map;
 using SandBox.ViewModelCollection.CampaignStartingOptions;
 using System;
 using System.Linq;
@@ -25,14 +26,18 @@ internal sealed class CoopStartingOptionsView : GlobalLayer
     private readonly CampaignStartingOptionsVM dataSource;
     private readonly Action<StartOptions> onJoin;
     private readonly Action onLeave;
+    private readonly Action onShown;
+    private bool shown;
     private bool finished;
     private int openPopups;
 
-    public CoopStartingOptionsView(StartOptions startOptions, Action<StartOptions> onJoin, Action onLeave)
+    /// <param name="onShown">Runs once the local map has loaded under the loading screen, to take that screen down.</param>
+    public CoopStartingOptionsView(StartOptions startOptions, Action<StartOptions> onJoin, Action onLeave, Action onShown)
     {
         this.startOptions = startOptions;
         this.onJoin = onJoin;
         this.onLeave = onLeave;
+        this.onShown = onShown;
 
         MBTextManager.SetTextVariable("newline", "\n");
         dataSource = new CoopCampaignStartingOptionsVM(startOptions, Join, AskToLeave);
@@ -56,8 +61,18 @@ internal sealed class CoopStartingOptionsView : GlobalLayer
     protected override void OnTick(float dt)
     {
         base.OnTick(dt);
+        if (finished) return;
+
+        // The map turns the loading screen back on until its scene is ready, which would flash it over the window.
+        if (!shown)
+        {
+            if (MapScreen.Instance is { IsReady: false }) return;
+            shown = true;
+            onShown();
+        }
+
         // An open popup has focus and handles its own keys.
-        if (finished || openPopups > 0) return;
+        if (openPopups > 0) return;
 
         ScreenManager.TrySetFocus(Layer);
         if (Layer.Input.IsHotKeyReleased("Confirm"))

@@ -314,8 +314,6 @@ internal class AdvancedStartInterface : IAdvancedStartInterface
             return false;
         }
 
-        loadingInterface.HideLoadingScreen();
-
         var view = new CoopStartingOptionsView(
             options,
             picked =>
@@ -330,7 +328,8 @@ internal class AdvancedStartInterface : IAdvancedStartInterface
             {
                 startOptionsView = null;
                 onLeave();
-            });
+            },
+            loadingInterface.HideLoadingScreen);
         ScreenManager.AddGlobalLayer(view, isFocusable: true);
         startOptionsView = view;
         return true;
