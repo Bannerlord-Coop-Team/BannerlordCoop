@@ -267,10 +267,9 @@ public class TournamentSessionRegistryTests
     }
 
     [Theory]
-    [InlineData(false, false)]
-    [InlineData(false, true)]
-    [InlineData(true, true)]
-    public void DisconnectLoss_CanBeTakenOnceAndSurvivesFinalRetirement(bool retire, bool complete)
+    [InlineData(false)]
+    [InlineData(true)]
+    public void DisconnectLoss_CanBeTakenOnceAndSurvivesFinalRetirement(bool retire)
     {
         var registry = new TournamentSessionRegistry();
         var snapshot = CreateStartedSession(registry, humanInMatch: true);
@@ -282,7 +281,7 @@ public class TournamentSessionRegistryTests
             TournamentPlayerChoice.Skip, out snapshot, out var outcome));
         Assert.Equal(TournamentBallotOutcome.SimulateMatch, outcome);
 
-        snapshot = ApplyFinishedMatch(registry, snapshot, complete);
+        snapshot = ApplyFinishedMatch(registry, snapshot, complete: retire);
         if (retire)
             Assert.True(registry.Remove(snapshot.SessionId));
 

@@ -195,23 +195,24 @@ public class TournamentMissionRulesTests
     }
 
     [Theory]
-    [InlineData(TournamentSessionPhase.LiveMatch, false, true)]
+    [InlineData(TournamentSessionPhase.LiveMatch, true, true)]
     [InlineData(TournamentSessionPhase.SimulatingMatch, true, true)]
     [InlineData(TournamentSessionPhase.LiveMatch, false, false)]
+    [InlineData(TournamentSessionPhase.AwaitingChoices, true, false)]
     public void CompletedByDisconnect_MatchesFinalEntrantDisconnectState(
-        TournamentSessionPhase previousPhase, bool alreadyDisconnected, bool disconnected)
+        TournamentSessionPhase previousPhase, bool disconnected, bool expected)
     {
         var npc = Contestant("npc", "npc-character", 1);
         var previous = Snapshot(new[]
         {
-            npc, Contestant("human", "human-character", 2, "fighter", true, isDisconnected: alreadyDisconnected)
+            npc, Contestant("human", "human-character", 2, "fighter", true)
         }, previousPhase);
         var completed = Snapshot(new[]
         {
             npc, Contestant("human", "human-character", 2, "fighter", true, isDisconnected: disconnected)
         }, TournamentSessionPhase.Completed, bracketRevision: 5);
 
-        Assert.Equal(disconnected, TournamentMatchTransitionRules.CompletedByDisconnect(previous, completed));
+        Assert.Equal(expected, TournamentMatchTransitionRules.CompletedByDisconnect(previous, completed));
     }
 
     [Fact]

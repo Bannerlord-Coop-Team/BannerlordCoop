@@ -9,12 +9,13 @@ using System.Linq;
 
 namespace GameInterface.Services.Tournaments.UI;
 
-internal sealed class TournamentRequestRejectedUIHandler : IHandler
+/// <summary>Displays notices from the authoritative tournament server.</summary>
+internal sealed class TournamentNoticeUIHandler : IHandler
 {
     private readonly IMessageBroker messageBroker;
     private readonly IRelayNetwork[] relayNetworks;
 
-    public TournamentRequestRejectedUIHandler(
+    public TournamentNoticeUIHandler(
         IMessageBroker messageBroker,
         IEnumerable<IRelayNetwork> relayNetworks = null)
     {
@@ -46,6 +47,6 @@ internal sealed class TournamentRequestRejectedUIHandler : IHandler
 
         GameThread.RunSafe(() => InformationManager.DisplayMessage(
             new InformationMessage(message)),
-            context: nameof(TournamentRequestRejectedUIHandler));
+            context: nameof(TournamentNoticeUIHandler));
     }
 }

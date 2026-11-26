@@ -26,22 +26,7 @@ using TaleWorlds.Library;
 
 namespace GameInterface.Services.Tournaments.Handlers;
 
-#if DEBUG
-/// <summary>Applies the ordered winners selected by the debug command.</summary>
-internal interface ITournamentMatchSimulation
-{
-    TournamentMutationStatus TryResolveMatch(
-        TournamentSessionSnapshot snapshot,
-        TournamentMatchData match,
-        string[] winnerTeamIds,
-        out TournamentSessionSnapshot advanced);
-}
-#endif
-
 internal sealed partial class TournamentSessionHandler : IHandler
-#if DEBUG
-    , ITournamentMatchSimulation
-#endif
 {
     private static readonly ILogger Logger = LogManager.GetLogger<TournamentSessionHandler>();
 
@@ -890,7 +875,9 @@ internal sealed partial class TournamentSessionHandler : IHandler
         {
             // A simulated match needs no client host or migrated spawn manifest.
             var simulated = SimulateCurrentMatchAndAdvance(snapshot, controllerId);
-            if (simulated.Revision == snapshot.Revision)
+            bool simulationFailed = simulated.Revision == snapshot.Revision;
+            // TryAdvanceSimulatedMatch broadcasts the updated snapshot on success.
+            if (simulationFailed)
                 BroadcastSnapshot(snapshot);
             snapshot = simulated;
         }
@@ -908,9 +895,12 @@ internal sealed partial class TournamentSessionHandler : IHandler
     {
         foreach (string controllerId in controllerIds)
         {
-            if (playerManager.TryGetPeer(controllerId, out var peer) && peer.ConnectionState == ConnectionState.Connected &&
-                sessionRegistry.TryTakeDisconnectLoss(controllerId, out var townId))
-                network.Send(peer, new NetworkTournamentDisconnectLoss(townId));
+            if (!playerManager.TryGetPeer(controllerId, out var peer) || peer.ConnectionState != ConnectionState.Connected)
+                continue;
+            if (!sessionRegistry.TryTakeDisconnectLoss(controllerId, out var townId))
+                continue;
+
+            network.Send(peer, new NetworkTournamentDisconnectLoss(townId));
         }
     }
 

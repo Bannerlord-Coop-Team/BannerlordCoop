@@ -3,12 +3,19 @@ using System.Linq;
 
 namespace GameInterface.Services.Tournaments.Handlers;
 
-internal sealed partial class TournamentSessionHandler
-{
-    private const int MaximumSimulationMatches = 64;
-    private long simulationSequence;
-
 #if DEBUG
+/// <summary>Applies the ordered winners selected by the debug command.</summary>
+internal interface ITournamentMatchSimulation
+{
+    TournamentMutationStatus TryResolveMatch(
+        TournamentSessionSnapshot snapshot,
+        TournamentMatchData match,
+        string[] winnerTeamIds,
+        out TournamentSessionSnapshot advanced);
+}
+
+internal sealed partial class TournamentSessionHandler : ITournamentMatchSimulation
+{
     TournamentMutationStatus ITournamentMatchSimulation.TryResolveMatch(
         TournamentSessionSnapshot snapshot,
         TournamentMatchData match,
@@ -27,7 +34,13 @@ internal sealed partial class TournamentSessionHandler
             simulating, match, winnerTeamIds, ++simulationSequence);
         return TryAdvanceSimulatedMatch(simulating, simulating.HostControllerId, result, out advanced);
     }
+}
 #endif
+
+internal sealed partial class TournamentSessionHandler
+{
+    private const int MaximumSimulationMatches = 64;
+    private long simulationSequence;
 
     private TournamentSessionSnapshot SimulateCurrentMatchAndAdvance(
         TournamentSessionSnapshot snapshot,
