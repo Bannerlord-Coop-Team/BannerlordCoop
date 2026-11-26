@@ -1950,6 +1950,90 @@ public class SiegeDebugCommand
         }
     }
 
+#if DEBUG
+    /// <summary>Stages the unfinished-equipment case for the AI siege assault roll.</summary>
+    public sealed class StageAiReadinessCoopCommand : ICoopCommand
+    {
+        private readonly ICommandObjectResolver resolver;
+        private readonly ISiegeEventInterface siegeEventInterface;
+
+        public StageAiReadinessCoopCommand(ICommandObjectResolver resolver, ISiegeEventInterface siegeEventInterface)
+        {
+            this.resolver = resolver;
+            this.siegeEventInterface = siegeEventInterface;
+        }
+
+        public string Prefix => "coop.debug.siege";
+
+        public string Name => "stage_ai_readiness";
+
+        public string Description => "Stages a prepared AI siege with an unfinished engine.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("settlementId", "Settlement name or id; quote names with spaces."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient)
+                return Failed("This command can only be used by the server");
+
+            if (!resolver.TryResolveSettlement(args[0], out var settlement, out var settlementError))
+                return Failed(settlementError);
+
+            var siegeEvent = settlement.SiegeEvent;
+            var camp = siegeEvent?.BesiegerCamp;
+            var leader = camp?.LeaderParty;
+            if (leader == null || leader.IsPlayerParty())
+                return Failed("The assault readiness fixture needs an AI siege leader.");
+
+            if (leader.MapEvent != null || settlement.Party.MapEvent != null)
+                return Failed($"{settlement.Name} already has an active map event.");
+
+            var engines = camp.SiegeEngines;
+            ClearSiegeEngines(engines);
+            if (engines.DeployedSiegeEngines.Count > 0 || engines.ReservedSiegeEngines.Count > 0)
+                return Failed($"Failed to clear the attacker siege engines at {settlement.Name}.");
+
+            var preparations = engines.SiegePreparations;
+            if (!preparations.IsConstructed)
+            {
+                preparations.SetProgress(1f);
+                siegeEvent.CreateSiegeObject(preparations, camp);
+            }
+
+            var machines = new (SiegeEngineType Type, int Index, float Progress)[]
+            {
+                (DefaultSiegeEngineTypes.Ram, 0, 1f),
+                (DefaultSiegeEngineTypes.Onager, 0, 1f),
+                (DefaultSiegeEngineTypes.Trebuchet, 1, 0.5f),
+            };
+            var staged = new List<string>();
+            foreach (var machine in machines)
+            {
+                siegeEventInterface.DeploySiegeEngine(siegeEvent, BattleSideEnum.Attacker, machine.Type, machine.Index);
+                var slots = machine.Type.IsRanged ? engines.DeployedRangedSiegeEngines : engines.DeployedMeleeSiegeEngines;
+                var engine = slots[machine.Index];
+                if (engine == null || engine.SiegeEngine != machine.Type)
+                    return Failed($"Failed to stage {machine.Type.StringId} at {settlement.Name}.");
+
+                engine.SetProgress(machine.Progress);
+                if (engine.IsConstructed)
+                    siegeEvent.CreateSiegeObject(engine, camp);
+
+                staged.Add($"{engine.SiegeEngine.StringId}={engine.Progress:P0}");
+            }
+
+            const int siegeAgeDays = 21;
+            siegeEvent.SiegeStartTime = CampaignTime.DaysFromNow(-siegeAgeDays);
+            return Succeeded($"Staged a {siegeAgeDays}-day AI siege at {settlement.Name}: {string.Join(", ", staged)}");
+        }
+    }
+#endif
+
     public sealed class StageMachinesCoopCommand : ICoopCommand
     {
         private readonly ICommandObjectResolver resolver;
@@ -1972,7 +2056,7 @@ public class SiegeDebugCommand
         {
             new ExpectedArgs("settlementId", "Settlement name or id; quote names with spaces."),
 #if DEBUG
-            new ExpectedArgs("profile", "Optional defender_interactables or ai_readiness profile.", isRequired: false),
+            new ExpectedArgs("profile", "Optional defender_interactables profile.", isRequired: false),
 #endif
         };
 
@@ -1985,8 +2069,7 @@ public class SiegeDebugCommand
             }
 
 #if DEBUG
-            var profile = args.Count > 1 ? args[1] : null;
-            if (profile != null && profile != "defender_interactables" && profile != "ai_readiness")
+            if (args.Count > 1 && args[1] != "defender_interactables")
                 return Failed("Unknown siege machine staging profile.");
 #endif
             if (!ContainerProvider.TryResolve<ISiegeEventInterface>(out var siegeEventInterface))
@@ -2006,15 +2089,6 @@ public class SiegeDebugCommand
             }
 
             var attacker = siegeEvent.GetSiegeEventSide(BattleSideEnum.Attacker);
-#if DEBUG
-            if (profile == "ai_readiness")
-            {
-                if (siegeEvent.BesiegerCamp.LeaderParty?.IsPlayerParty() != false)
-                    return Failed("The assault readiness fixture needs an AI siege leader.");
-
-                ClearSiegeEngines(attacker.SiegeEngines);
-            }
-#endif
             if (!attacker.SiegeEngines.SiegePreparations.IsConstructed)
             {
                 attacker.SiegeEngines.SiegePreparations.SetProgress(1f);
@@ -2028,7 +2102,7 @@ public class SiegeDebugCommand
                 (Side: BattleSideEnum.Defender, Type: DefaultSiegeEngineTypes.Ballista, Index: 0),
             };
 #if DEBUG
-            if (profile == "defender_interactables")
+            if (args.Count > 1)
                 machines.Add((BattleSideEnum.Defender, DefaultSiegeEngineTypes.Catapult, 1));
 #endif
             var staged = new List<string>();
@@ -2067,20 +2141,6 @@ public class SiegeDebugCommand
                 staged.Add($"{machine.Side}:{machine.Type.StringId}[{machine.Index}]");
             }
 
-#if DEBUG
-            if (profile == "ai_readiness")
-            {
-                var unfinishedType = DefaultSiegeEngineTypes.Trebuchet;
-                siegeEventInterface.DeploySiegeEngine(siegeEvent, BattleSideEnum.Attacker, unfinishedType, 1);
-                var unfinished = attacker.SiegeEngines.DeployedRangedSiegeEngines[1];
-                if (unfinished == null || unfinished.SiegeEngine != unfinishedType || unfinished.IsConstructed)
-                    return Failed("Failed to stage an unfinished trebuchet.");
-
-                unfinished.SetProgress(0.5f);
-                siegeEvent.SiegeStartTime = CampaignTime.DaysFromNow(-21f);
-                return Succeeded($"Staged a 21-day AI siege at {settlement.Name} with a ram, an onager and a half-built trebuchet.");
-            }
-#endif
             return Succeeded($"Staged {staged.Count} constructed siege engines at {settlement.Name}: {string.Join(", ", staged)}");
 
         }

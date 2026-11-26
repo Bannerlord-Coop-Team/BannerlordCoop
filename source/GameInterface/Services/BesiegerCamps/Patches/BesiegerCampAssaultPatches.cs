@@ -5,9 +5,8 @@ using TaleWorlds.CampaignSystem.Siege;
 namespace GameInterface.Services.BesiegerCamps.Patches;
 
 /// <summary>
-/// Vanilla's AI assault roll derefs MobileParty.MainParty, which is null on the dedicated host, so
-/// the server's own siege AI would crash the first time it weighed an assault. Same math with the
-/// player-inside discount derived from player-led parties instead of the main party.
+/// Replaces the vanilla AI assault roll on the dedicated host, which has no main party.
+/// Co-op derives the defender discount from player-led parties and caps the unfinished-equipment penalty.
 /// </summary>
 [HarmonyPatch(typeof(BesiegerCamp))]
 internal class BesiegerCampAssaultPatches

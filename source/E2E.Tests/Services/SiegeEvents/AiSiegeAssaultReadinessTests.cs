@@ -13,13 +13,13 @@ using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.SiegeEvents;
 
-/// <summary>Exercises the server's patched assault roll with an unfinished siege engine.</summary>
+/// <summary>Exercises the server's patched assault roll with modeled equipment progress.</summary>
 public class AiSiegeAssaultReadinessTests : MapEventTestBase
 {
     public AiSiegeAssaultReadinessTests(ITestOutputHelper output) : base(output) { }
 
     [Fact]
-    public void PreparedAiSiege_WithTwoBuiltEnginesAndOneStillBuilding_CanStartAssault()
+    public void PreparedAiSiege_WithEquipmentPenaltyOverOne_IsReadyToBesiege()
     {
         Server.Call(() =>
         {
