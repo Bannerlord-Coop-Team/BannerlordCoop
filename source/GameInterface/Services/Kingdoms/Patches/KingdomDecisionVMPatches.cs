@@ -32,7 +32,7 @@ namespace GameInterface.Services.Kingdoms.Patches
         {
             if (ModInformation.IsServer || ScreenManager.TopScreen != __instance) return;
             if (!KingdomDecisionsVMPatches.TryGetVoteManager(out var voteManager) ||
-                !voteManager.TryGetPendingSettlementDecision(out _)) return;
+                !voteManager.TryGetPendingSettlementDecisionResult(out _)) return;
             if (!CanOpenKingdomScreen(__instance)) return;
 
             __instance.OpenKingdom();
@@ -93,7 +93,7 @@ namespace GameInterface.Services.Kingdoms.Patches
         {
             MarkSubmittedDecisionsExamined(__instance);
             if (__instance.CurrentDecision != null || !__instance._shouldCheckForDecision) return;
-            if (!TryGetVoteManager(out var voteManager) || !voteManager.TryGetPendingSettlementDecision(out var decision)) return;
+            if (!TryGetVoteManager(out var voteManager) || !voteManager.TryGetPendingSettlementDecisionResult(out var decision)) return;
             if (InformationManager.IsAnyInquiryActive() || !CampaignUIHelper.GetMapScreenActionIsEnabledWithReason(out _)) return;
 
             DecisionItemBaseVM item = __instance.GetDecisionItemBasedOnType(decision);
@@ -168,7 +168,8 @@ namespace GameInterface.Services.Kingdoms.Patches
             if (currentDecision == null) return;
             if (voteManager.IsShowingSettlementDecisionResult(currentDecision))
             {
-                KingdomDecisionWaitingStatusWidgetPatch.Refresh(__instance, null, null);
+                // The result screen has no waiting status, so hide the overlay.
+                KingdomDecisionWaitingStatusWidgetPatch.Refresh(__instance, header: null, columns: null);
                 return;
             }
 

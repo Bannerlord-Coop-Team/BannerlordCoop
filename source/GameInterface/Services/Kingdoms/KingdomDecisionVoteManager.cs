@@ -51,7 +51,7 @@ namespace GameInterface.Services.Kingdoms
         bool ShouldBlockLocalResolution(DecisionItemBaseVM decisionItem);
         void RegisterDecisionItem(DecisionItemBaseVM decisionItem);
         void UnregisterDecisionItem(DecisionItemBaseVM decisionItem);
-        bool TryGetPendingSettlementDecision(out KingdomDecision decision);
+        bool TryGetPendingSettlementDecisionResult(out KingdomDecision decision);
         bool TryShowPendingSettlementDecisionResult(DecisionItemBaseVM item);
         bool IsShowingSettlementDecisionResult(DecisionItemBaseVM decisionItem);
         bool HandleVoteRequest(string controllerId, KingdomDecisionVoteData voteData);
@@ -697,11 +697,18 @@ namespace GameInterface.Services.Kingdoms
             if (!shown) PendingSettlementDecisionResults.Enqueue((state, outcomeKey));
         }
 
-        public bool TryGetPendingSettlementDecision(out KingdomDecision decision)
+        public bool TryGetPendingSettlementDecisionResult(out KingdomDecision decision)
         {
-            var pending = PendingSettlementDecisionResults.FirstOrDefault(result => IsLocalPlayerEligible(result.State.Decision));
-            decision = pending.State?.Decision;
-            return decision != null;
+            foreach (var (state, _) in PendingSettlementDecisionResults)
+            {
+                if (!IsLocalPlayerEligible(state.Decision)) continue;
+
+                decision = state.Decision;
+                return true;
+            }
+
+            decision = null;
+            return false;
         }
 
         public bool TryShowPendingSettlementDecisionResult(DecisionItemBaseVM item)
@@ -728,6 +735,7 @@ namespace GameInterface.Services.Kingdoms
         private bool TryShowSettlementDecisionResult(KingdomDecisionVoteState state, string outcomeKey, DecisionItemBaseVM item)
         {
             KingdomElection election = item.KingdomDecisionMaker;
+            // Vanilla marks the winner by reference to an option on this ballot.
             if (!outcomeResolver.TryGetOutcomeByKey(outcomeKey, election, objectManager, out DecisionOutcome winner))
             {
                 Logger.Warning("Could not show fief winner {OutcomeKey} on the ballot for {KingdomId} decision {DecisionIndex}",
@@ -735,7 +743,6 @@ namespace GameInterface.Services.Kingdoms
                 return false;
             }
 
-            // Vanilla marks the winner by reference to an option on this ballot.
             ActiveDecisionItems.Remove(item);
             SettlementResultItems.Add(item);
             // ExecuteDone reads _chosenOutcome, and _finalSelectionDone prevents RefreshCanEndDecision from enabling voting.
