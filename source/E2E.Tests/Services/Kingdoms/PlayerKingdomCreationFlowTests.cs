@@ -1,6 +1,4 @@
 ﻿using Common;
-using Autofac;
-using GameInterface;
 using GameInterface.Configuration;
 using GameInterface.CoopSessionData;
 using Common.Commands;
@@ -95,6 +93,8 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     private const string ControllerId = "Player";
     private const string SecondControllerId = "Player2";
     private const string KingdomName = "Real Kingdom";
+    private const string UnregisteredCulturePolicyId = "policy_missing_from_loaded_modules";
+    private static readonly string[] AseraiDefaultPolicyIds = { "policy_council_of_the_commons", "policy_senate" };
     private const string FullKingdomName = "Vlandia";
     private const string FullKingdomText = "Vlandia already has the most clans this server allows (1).";
 
@@ -359,7 +359,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     }
 
     [Fact]
-    public void CampaignLoadRepairsCultureDefaultsBeforeGovernorCreation()
+    public void CampaignLoadSkipsUnregisteredCulturePolicyAndAllowsKingdomCreation()
     {
         var player = CreateSyncedPlayerContext();
         var fiefId = CreateSyncedClanFief(player.ClanId);
@@ -369,7 +369,9 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
         foreach (var instance in new[] { Server }.Concat(Clients))
         {
-            LoadCultureWithUnresolvedDefaultPolicies(instance, player.CultureId);
+            SeedCultureWithUnresolvedDefaultPolicies(instance, player.CultureId);
+            instance.Call(() => Campaign.Current.ObjectManager.LoadXML(
+                CultureDefaultPolicyRepairer.CultureXmlId, isDevelopment: false, gameType: Campaign.Current.GameTypeStringId));
         }
 
         client.Call(() =>
@@ -412,7 +414,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             {
                 Assert.True(instance.ObjectManager.TryGetObject<Kingdom>(created.KingdomId, out var kingdom));
                 Assert.Equal(
-                    new[] { "policy_council_of_the_commons", "policy_senate" },
+                    AseraiDefaultPolicyIds,
                     kingdom.ActivePolicies.Select(policy => policy.StringId));
             });
         }
@@ -425,21 +427,6 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         Assert.Equal(created.CultureId, notification.CultureId);
 
         Server.PumpGameThread();
-    }
-
-    private static XmlDocument CreateAseraiCultureXml()
-    {
-        var xml = new XmlDocument();
-        xml.LoadXml(@"
-            <SPCultures>
-              <Culture id=""aserai"" name=""Aserai"">
-                <default_policies>
-                  <policy id=""policy_council_of_the_commons"" />
-                  <policy id=""policy_senate"" />
-                </default_policies>
-              </Culture>
-            </SPCultures>");
-        return xml;
     }
 
     [Fact]
@@ -6225,37 +6212,37 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         }
     }
 
-    private static void LoadCultureWithUnresolvedDefaultPolicies(EnvironmentInstance instance, string cultureId)
+    private static void SeedCultureWithUnresolvedDefaultPolicies(EnvironmentInstance instance, string cultureId)
     {
-        var cultureXml = CreateAseraiCultureXml();
-        using var scope = instance.Container.BeginLifetimeScope(builder => builder
-            .Register(_ => new CultureDefaultPolicyRepairer(
-                (_, _) => cultureXml, (manager, policyId) => manager.GetObject<PolicyObject>(policyId)))
-            .As<ICultureDefaultPolicyRepairer>());
-
         instance.Call(() =>
         {
             Assert.True(instance.ObjectManager.TryGetObject<CultureObject>(cultureId, out var culture));
             var objectManager = Campaign.Current.ObjectManager;
             using (new AllowedThread())
             {
-                // Give the generated culture the XML id and deserialize before its policies can resolve (#3337).
-                culture.StringId = "aserai";
-                culture.Deserialize(new MBObjectManager(), cultureXml.DocumentElement!.FirstChild);
-                Assert.Contains(null, culture.DefaultPolicyList);
                 objectManager.RegisterObject(culture);
-            }
-
-            ContainerProvider.SetContainer(scope);
-            try
-            {
-                objectManager.LoadXML("SPCultures", isDevelopment: false, gameType: Campaign.Current.GameTypeStringId);
-            }
-            finally
-            {
-                ContainerProvider.SetContainer(instance.Container);
+                Assert.Null(objectManager.GetObject<PolicyObject>(UnregisteredCulturePolicyId));
+                // Run vanilla deserialization with an unregistered XML policy id (#3337).
+                objectManager.LoadXml(CreateAseraiCultureXml(culture.StringId));
+                Assert.Contains(null, culture.DefaultPolicyList);
             }
         });
+    }
+
+    private static XmlDocument CreateAseraiCultureXml(string cultureId)
+    {
+        var xml = new XmlDocument();
+        var cultures = xml.AppendChild(xml.CreateElement(CultureDefaultPolicyRepairer.CultureXmlId));
+        var culture = (XmlElement)cultures.AppendChild(xml.CreateElement("Culture"));
+        culture.SetAttribute("id", cultureId);
+        culture.SetAttribute("name", "Aserai");
+        var defaults = culture.AppendChild(xml.CreateElement("default_policies"));
+        foreach (string policyId in AseraiDefaultPolicyIds.Append(UnregisteredCulturePolicyId))
+        {
+            var policy = (XmlElement)defaults.AppendChild(xml.CreateElement("policy"));
+            policy.SetAttribute("id", policyId);
+        }
+        return xml;
     }
 
     private static void SetClanCulture(EnvironmentInstance instance, string clanId, string cultureId)
