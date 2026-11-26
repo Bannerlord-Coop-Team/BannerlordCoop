@@ -111,7 +111,7 @@ public class TournamentDisconnectFlowTests : SyncTestBase
     {
         EnvironmentInstance host = Clients.First();
         EnvironmentInstance other = Clients.Skip(1).First();
-        var (_, heroCharacterId) = SetUpTournament(host, other, otherIsSpectator: true);
+        var (townId, heroCharacterId) = SetUpTournament(host, other, otherIsSpectator: true);
 
         Disconnect(host);
         var reserved = GetSnapshot();
@@ -130,9 +130,33 @@ public class TournamentDisconnectFlowTests : SyncTestBase
         Send(host, new NetworkRequestTournamentState());
         Send(host, new NetworkRequestTournamentState());
 
-        var notification = Assert.Single(host.InternalMessages.GetMessages<NetworkTournamentRequestRejected>());
-        Assert.Contains("while you were disconnected", notification.Reason);
-        Assert.Empty(other.InternalMessages.GetMessages<NetworkTournamentRequestRejected>());
+        var notification = Assert.Single(host.InternalMessages.GetMessages<NetworkTournamentDisconnectLoss>());
+        Assert.Equal(townId, notification.TownId);
+        Assert.Empty(other.InternalMessages.GetMessages<NetworkTournamentDisconnectLoss>());
+    }
+
+    [Fact]
+    public void ReconnectedEntrant_ReceivesLossWhenSpectatorSkipsBeforeTheyResume()
+    {
+        EnvironmentInstance host = Clients.First();
+        EnvironmentInstance spectator = Clients.Skip(1).First();
+        var (townId, _) = SetUpTournament(host, spectator, otherIsSpectator: true);
+
+        Disconnect(host);
+        Reconnect(host, host);
+        Send(host, new NetworkRequestTournamentState());
+        Assert.Empty(host.InternalMessages.GetMessages<NetworkTournamentDisconnectLoss>());
+        var reserved = GetSnapshot();
+        Assert.True(FindHostSlot(reserved).IsDisconnected);
+
+        Send(spectator, new NetworkRequestTournamentChoice(
+            SessionId, reserved.Revision, reserved.CurrentMatchId, TournamentPlayerChoice.Skip));
+        var notification = Assert.Single(host.InternalMessages.GetMessages<NetworkTournamentDisconnectLoss>());
+        Assert.Equal(townId, notification.TownId);
+
+        Send(host, new NetworkRequestTournamentState());
+        Assert.Single(host.InternalMessages.GetMessages<NetworkTournamentDisconnectLoss>());
+        Assert.Empty(spectator.InternalMessages.GetMessages<NetworkTournamentDisconnectLoss>());
     }
 
     [Fact]
@@ -140,7 +164,7 @@ public class TournamentDisconnectFlowTests : SyncTestBase
     {
         EnvironmentInstance host = Clients.First();
         EnvironmentInstance other = Clients.Skip(1).First();
-        var (_, heroCharacterId) = SetUpTournament(host, other, otherIsSpectator: false);
+        var (townId, heroCharacterId) = SetUpTournament(host, other, otherIsSpectator: false);
 
         var pending = GetSnapshot();
         var join = new NetworkRequestTournamentChoice(
@@ -164,8 +188,8 @@ public class TournamentDisconnectFlowTests : SyncTestBase
         Reconnect(host, host);
         Send(host, new NetworkRequestTournamentState());
         Send(host, new NetworkRequestTournamentState());
-        var notice = Assert.Single(host.InternalMessages.GetMessages<NetworkTournamentRequestRejected>());
-        Assert.Contains("while you were disconnected", notice.Reason);
+        var notice = Assert.Single(host.InternalMessages.GetMessages<NetworkTournamentDisconnectLoss>());
+        Assert.Equal(townId, notice.TownId);
     }
 
     private (string TownId, string CharacterId) SetUpTournament(
@@ -256,6 +280,7 @@ public class TournamentDisconnectFlowTests : SyncTestBase
     private void Disconnect(EnvironmentInstance client)
     {
         Server.Resolve<TestNetworkRouter>().Disconnect(client.NetPeer);
+        Server.Call(() => Server.Resolve<IPlayerManager>().ClearPeer(client.NetPeer));
         Server.SimulateMessage(this, new PlayerDisconnected(client.NetPeer, default));
         Server.PumpGameThread();
     }

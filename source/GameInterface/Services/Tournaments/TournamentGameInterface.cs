@@ -57,6 +57,11 @@ public interface ITournamentGameInterface : IGameAbstraction
         int winnerTeamCount,
         long sequence,
         out TournamentMatchResultData result);
+    TournamentMatchResultData BuildSimulatedMatchResult(
+        TournamentSessionSnapshot snapshot,
+        TournamentMatchData match,
+        string[] winnerTeamIds,
+        long sequence);
     bool TryGetBetQuote(TournamentSessionSnapshot snapshot, Hero hero, string slotId, out TournamentBetQuote quote);
 }
 

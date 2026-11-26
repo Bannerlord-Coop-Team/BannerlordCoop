@@ -26,15 +26,22 @@ using TaleWorlds.Library;
 
 namespace GameInterface.Services.Tournaments.Handlers;
 
+#if DEBUG
+/// <summary>Applies the ordered winners selected by the debug command.</summary>
 internal interface ITournamentMatchSimulation
 {
     TournamentMutationStatus TryResolveMatch(
         TournamentSessionSnapshot snapshot,
-        TournamentTeamScoreData[] scores,
+        TournamentMatchData match,
+        string[] winnerTeamIds,
         out TournamentSessionSnapshot advanced);
 }
+#endif
 
-internal sealed partial class TournamentSessionHandler : IHandler, ITournamentMatchSimulation
+internal sealed partial class TournamentSessionHandler : IHandler
+#if DEBUG
+    , ITournamentMatchSimulation
+#endif
 {
     private static readonly ILogger Logger = LogManager.GetLogger<TournamentSessionHandler>();
 
@@ -613,7 +620,8 @@ internal sealed partial class TournamentSessionHandler : IHandler, ITournamentMa
                 bracket.CurrentMatchId,
                 bracket.WinnerSlotId,
                 bracket.IsCompleted,
-                out var snapshot);
+                out var snapshot,
+                out var disconnectedLosers);
             if (status != TournamentMutationStatus.Applied)
             {
                 Logger.Warning(
@@ -629,6 +637,7 @@ internal sealed partial class TournamentSessionHandler : IHandler, ITournamentMa
             liveCombatSessions.Add(result.SessionId);
             ResolveBets(current, bracket.MatchWinnerSlotIds);
             BroadcastSnapshot(snapshot);
+            NotifyConnectedDisconnectLosers(disconnectedLosers);
             if (bracket.IsCompleted)
                 CompleteTournament(snapshot);
         }, context: nameof(Handle_MatchResult));
@@ -857,8 +866,7 @@ internal sealed partial class TournamentSessionHandler : IHandler, ITournamentMa
             MBRandom.RandomInt(int.MaxValue),
             replacementName,
             out var snapshot,
-            out var outcome,
-            out _);
+            out var outcome);
         if (status == TournamentMutationStatus.Applied)
             SettleBetLedger(current.SessionId, controllerId, snapshot.Revision, current.CurrentMatchId, "Tournament bet forfeited", peer);
         FinishViewerDeparture(current, snapshot, controllerId, status, outcome, peer);
@@ -880,7 +888,7 @@ internal sealed partial class TournamentSessionHandler : IHandler, ITournamentMa
 
         if (outcome == TournamentBallotOutcome.SimulateMatch)
         {
-            // A successful simulation broadcasts the resulting bracket.
+            // A simulated match needs no client host or migrated spawn manifest.
             var simulated = SimulateCurrentMatchAndAdvance(snapshot, controllerId);
             if (simulated.Revision == snapshot.Revision)
                 BroadcastSnapshot(snapshot);
@@ -894,6 +902,16 @@ internal sealed partial class TournamentSessionHandler : IHandler, ITournamentMa
 
         if (snapshot.VoterCount == 0)
             ResolveAfterLastHumanLeaves(snapshot);
+    }
+
+    private void NotifyConnectedDisconnectLosers(string[] controllerIds)
+    {
+        foreach (string controllerId in controllerIds)
+        {
+            if (playerManager.TryGetPeer(controllerId, out var peer) && peer.ConnectionState == ConnectionState.Connected &&
+                sessionRegistry.TryTakeDisconnectLoss(controllerId, out var townId))
+                network.Send(peer, new NetworkTournamentDisconnectLoss(townId));
+        }
     }
 
     private void PublishHostMigration(

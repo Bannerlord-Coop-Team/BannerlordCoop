@@ -82,8 +82,7 @@ internal sealed class TournamentStateSyncHandler : IHandler
 
             network.Send(peer, CreateStateSnapshot());
             if (sessionRegistry.TryTakeDisconnectLoss(controllerId, out var townId))
-                network.Send(peer, new NetworkTournamentRequestRejected(
-                    townId, "You lost your tournament match while you were disconnected."));
+                network.Send(peer, new NetworkTournamentDisconnectLoss(townId));
         }, context: nameof(Handle_StateRequest));
     }
 

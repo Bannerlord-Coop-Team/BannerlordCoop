@@ -43,32 +43,39 @@ public sealed partial class TournamentGameInterface
             rankedTeams.Add(new KeyValuePair<TournamentTeamData, float>(team, simulationScore));
         }
 
-        int winnerParticipantCount = Math.Max(1, match.NumberOfWinnerParticipants);
-
-        TournamentTeamData[] winnerTeams = rankedTeams
+        string[] winnerTeamIds = rankedTeams
             .OrderByDescending(team => team.Value)
             .Take(winnerTeamCount)
-            .Select(team => team.Key)
+            .Select(team => team.Key.TeamId)
             .ToArray();
-        string[] winnerTeamIds = winnerTeams.Select(team => team.TeamId).ToArray();
-        string[] winnerSlotIds = winnerTeams
-            .SelectMany(team => team.ParticipantSlotIds)
-            .Take(winnerParticipantCount)
+        result = BuildSimulatedMatchResult(snapshot, match, winnerTeamIds, sequence);
+        return true;
+    }
+
+    public TournamentMatchResultData BuildSimulatedMatchResult(
+        TournamentSessionSnapshot snapshot,
+        TournamentMatchData match,
+        string[] winnerTeamIds,
+        long sequence)
+    {
+        string[] winnerSlotIds = winnerTeamIds
+            .SelectMany(teamId => match.Teams.Single(team => team.TeamId == teamId).ParticipantSlotIds)
+            .Take(Math.Max(1, match.NumberOfWinnerParticipants))
             .ToArray();
 
         var scores = new TournamentTeamScoreData[match.Teams.Length];
         for (int i = 0; i < match.Teams.Length; i++)
         {
             TournamentTeamData team = match.Teams[i];
-            int winnerIndex = Array.FindIndex(winnerTeams, winner => winner.TeamId == team.TeamId);
+            int winnerIndex = Array.IndexOf(winnerTeamIds, team.TeamId);
             // each match counts from zero like native TournamentMatch.Start, so losers score 0 and winners rank down from winnerTeamCount
             int score = winnerIndex < 0
                 ? 0
-                : winnerTeamCount - winnerIndex;
+                : winnerTeamIds.Length - winnerIndex;
             scores[i] = new TournamentTeamScoreData(team.TeamId, score);
         }
 
-        result = new TournamentMatchResultData(
+        return new TournamentMatchResultData(
             snapshot.SessionId,
             snapshot.CurrentMatchId,
             snapshot.Revision,
@@ -77,7 +84,6 @@ public sealed partial class TournamentGameInterface
             winnerTeamIds,
             winnerSlotIds,
             scores);
-        return true;
     }
 
     public bool TryGetBetQuote(

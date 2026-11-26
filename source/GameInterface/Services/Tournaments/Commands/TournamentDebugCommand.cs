@@ -90,12 +90,7 @@ public class TournamentDebugCommand
                 .Take(winnerTeamCount)
                 .Select(team => team.TeamId)
                 .ToArray();
-            var scores = match.Teams.Select(team =>
-            {
-                int winnerIndex = Array.IndexOf(winnerTeamIds, team.TeamId);
-                return new TournamentTeamScoreData(team.TeamId, winnerIndex < 0 ? 0 : winnerTeamCount - winnerIndex);
-            }).ToArray();
-            var status = simulation.TryResolveMatch(snapshot, scores, out var advanced);
+            var status = simulation.TryResolveMatch(snapshot, match, winnerTeamIds, out var advanced);
             if (status != TournamentMutationStatus.Applied)
                 return Failed($"The authoritative simulation did not advance the bracket ({status}).");
 

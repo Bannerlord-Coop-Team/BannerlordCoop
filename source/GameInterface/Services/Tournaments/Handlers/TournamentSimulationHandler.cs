@@ -1,5 +1,4 @@
 using GameInterface.Services.Tournaments.Data;
-using System;
 using System.Linq;
 
 namespace GameInterface.Services.Tournaments.Handlers;
@@ -9,9 +8,11 @@ internal sealed partial class TournamentSessionHandler
     private const int MaximumSimulationMatches = 64;
     private long simulationSequence;
 
+#if DEBUG
     TournamentMutationStatus ITournamentMatchSimulation.TryResolveMatch(
         TournamentSessionSnapshot snapshot,
-        TournamentTeamScoreData[] scores,
+        TournamentMatchData match,
+        string[] winnerTeamIds,
         out TournamentSessionSnapshot advanced)
     {
         advanced = snapshot;
@@ -19,11 +20,14 @@ internal sealed partial class TournamentSessionHandler
         if (status != TournamentMutationStatus.Applied && status != TournamentMutationStatus.NoChange)
             return status;
 
-        var result = new TournamentMatchResultData(
-            simulating.SessionId, simulating.CurrentMatchId, simulating.Revision, simulating.BracketRevision,
-            ++simulationSequence, Array.Empty<string>(), Array.Empty<string>(), scores);
+        if (status == TournamentMutationStatus.Applied)
+            BroadcastSnapshot(simulating);
+
+        var result = tournamentGameInterface.BuildSimulatedMatchResult(
+            simulating, match, winnerTeamIds, ++simulationSequence);
         return TryAdvanceSimulatedMatch(simulating, simulating.HostControllerId, result, out advanced);
     }
+#endif
 
     private TournamentSessionSnapshot SimulateCurrentMatchAndAdvance(
         TournamentSessionSnapshot snapshot,
@@ -52,9 +56,11 @@ internal sealed partial class TournamentSessionHandler
             return snapshot;
         }
 
-        return TryAdvanceSimulatedMatch(snapshot, submittingControllerId, result, out var advanced) == TournamentMutationStatus.Applied
-            ? advanced
-            : snapshot;
+        var status = TryAdvanceSimulatedMatch(snapshot, submittingControllerId, result, out var advanced);
+        if (status != TournamentMutationStatus.Applied)
+            return snapshot;
+
+        return advanced;
     }
 
     private TournamentMutationStatus TryAdvanceSimulatedMatch(
@@ -98,7 +104,8 @@ internal sealed partial class TournamentSessionHandler
             bracket.CurrentMatchId,
             bracket.WinnerSlotId,
             bracket.IsCompleted,
-            out changed);
+            out changed,
+            out var disconnectedLosers);
         if (status != TournamentMutationStatus.Applied)
         {
             Logger.Warning(
@@ -117,6 +124,7 @@ internal sealed partial class TournamentSessionHandler
             changed.BracketRevision);
         ResolveBets(snapshot, bracket.MatchWinnerSlotIds);
         BroadcastSnapshot(changed);
+        NotifyConnectedDisconnectLosers(disconnectedLosers);
         if (bracket.IsCompleted)
             CompleteTournament(changed);
         return status;

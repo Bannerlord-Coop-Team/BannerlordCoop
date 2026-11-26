@@ -198,7 +198,7 @@ public class TournamentMissionRulesTests
     [InlineData(TournamentSessionPhase.LiveMatch, false, true)]
     [InlineData(TournamentSessionPhase.SimulatingMatch, true, true)]
     [InlineData(TournamentSessionPhase.LiveMatch, false, false)]
-    public void CompletedFinal_CleansUpAfterDisconnectRegardlessOfIntermediateSnapshot(
+    public void CompletedByDisconnect_MatchesFinalEntrantDisconnectState(
         TournamentSessionPhase previousPhase, bool alreadyDisconnected, bool disconnected)
     {
         var npc = Contestant("npc", "npc-character", 1);

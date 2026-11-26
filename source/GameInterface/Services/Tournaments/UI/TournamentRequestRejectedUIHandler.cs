@@ -22,22 +22,30 @@ internal sealed class TournamentRequestRejectedUIHandler : IHandler
         this.relayNetworks = relayNetworks?.ToArray() ?? Array.Empty<IRelayNetwork>();
 
         messageBroker.Subscribe<NetworkTournamentRequestRejected>(Handle_Rejected);
+        messageBroker.Subscribe<NetworkTournamentDisconnectLoss>(Handle_DisconnectLoss);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<NetworkTournamentRequestRejected>(Handle_Rejected);
+        messageBroker.Unsubscribe<NetworkTournamentDisconnectLoss>(Handle_DisconnectLoss);
     }
 
     private void Handle_Rejected(MessagePayload<NetworkTournamentRequestRejected> payload)
+        => ShowNotice(payload.Who, payload.What.Reason);
+
+    private void Handle_DisconnectLoss(MessagePayload<NetworkTournamentDisconnectLoss> payload)
+        => ShowNotice(payload.Who, "You lost your tournament match while you were away.");
+
+    private void ShowNotice(object sender, string message)
     {
         if (ModInformation.IsServer ||
-            !TournamentServerMessageGuard.IsTrusted(payload.Who, relayNetworks) ||
-            string.IsNullOrEmpty(payload.What.Reason))
+            !TournamentServerMessageGuard.IsTrusted(sender, relayNetworks) ||
+            string.IsNullOrEmpty(message))
             return;
 
         GameThread.RunSafe(() => InformationManager.DisplayMessage(
-            new InformationMessage(payload.What.Reason)),
+            new InformationMessage(message)),
             context: nameof(TournamentRequestRejectedUIHandler));
     }
 }
