@@ -1,4 +1,6 @@
 ﻿using Common;
+using Autofac;
+using GameInterface;
 using GameInterface.Configuration;
 using GameInterface.CoopSessionData;
 using Common.Commands;
@@ -22,6 +24,7 @@ using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Clans.Patches;
 using GameInterface.Services.Companions.Messages;
 using GameInterface.Services.Companions.Patches;
+using GameInterface.Services.CultureObjects;
 using GameInterface.Services.Entity;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameDebug.Commands;
@@ -356,7 +359,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     }
 
     [Fact]
-    public void GovernorCreationResolvesCultureDefaultsAndSyncsTheNewKingdom()
+    public void CampaignLoadRepairsCultureDefaultsBeforeGovernorCreation()
     {
         var player = CreateSyncedPlayerContext();
         var fiefId = CreateSyncedClanFief(player.ClanId);
@@ -364,41 +367,22 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         client.Resolve<IControllerIdProvider>().SetControllerId(ControllerId);
         TestEnvironment.RegisterLoadedObjects<PolicyObjectRegistry, PolicyObject>();
 
-        var cultureXml = CreateAseraiCultureXml();
         foreach (var instance in new[] { Server }.Concat(Clients))
         {
-            instance.Call(() =>
-            {
-                Assert.True(instance.ObjectManager.TryGetObject<CultureObject>(player.CultureId, out var culture));
-                using (new AllowedThread())
-                {
-                    culture.StringId = "aserai";
-                    culture.Deserialize(new MBObjectManager(), cultureXml.DocumentElement!.FirstChild);
-                }
-            });
+            LoadCultureWithUnresolvedDefaultPolicies(instance, player.CultureId);
         }
 
-        var xmlPatch = new Harmony("e2e.kingdom-creation-culture-xml");
-        var loadXml = AccessTools.Method(typeof(MBObjectManager), nameof(MBObjectManager.GetMergedXmlForManaged));
-        xmlPatch.Patch(loadXml, prefix: new HarmonyMethod(typeof(PlayerKingdomCreationFlowTests), nameof(LoadAseraiCultureXml)));
-        try
+        client.Call(() =>
         {
-            client.Call(() =>
+            Assert.True(client.ObjectManager.TryGetObject<CultureObject>(player.CultureId, out var culture));
+            var behavior = new GovernorCampaignBehavior
             {
-                Assert.True(client.ObjectManager.TryGetObject<CultureObject>(player.CultureId, out var culture));
-                var behavior = new GovernorCampaignBehavior
-                {
-                    _kingdomCreationChosenName = new TextObject(KingdomName),
-                    _kingdomCreationChosenCulture = culture,
-                };
-                Assert.True(behavior.governor_kingdom_creation_culture_selected_on_condition());
-                behavior.governor_talk_kingdom_creation_finalization_on_consequence();
-            });
-        }
-        finally
-        {
-            xmlPatch.Unpatch(loadXml, HarmonyPatchType.Prefix, xmlPatch.Id);
-        }
+                _kingdomCreationChosenName = new TextObject(KingdomName),
+                _kingdomCreationChosenCulture = culture,
+            };
+            Assert.True(behavior.governor_kingdom_creation_culture_selected_on_condition());
+            behavior.governor_talk_kingdom_creation_finalization_on_consequence();
+        });
 
         var request = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestCreateKingdom>());
         Assert.Equal(KingdomName, request.KingdomName);
@@ -441,14 +425,6 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         Assert.Equal(created.CultureId, notification.CultureId);
 
         Server.PumpGameThread();
-    }
-
-    private static bool LoadAseraiCultureXml(string id, ref XmlDocument __result)
-    {
-        if (id != "SPCultures") return true;
-
-        __result = CreateAseraiCultureXml();
-        return false;
     }
 
     private static XmlDocument CreateAseraiCultureXml()
@@ -6247,6 +6223,39 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         {
             SetClanCulture(client, clanId, cultureId);
         }
+    }
+
+    private static void LoadCultureWithUnresolvedDefaultPolicies(EnvironmentInstance instance, string cultureId)
+    {
+        var cultureXml = CreateAseraiCultureXml();
+        using var scope = instance.Container.BeginLifetimeScope(builder => builder
+            .Register(_ => new CultureDefaultPolicyRepairer(
+                (_, _) => cultureXml, (manager, policyId) => manager.GetObject<PolicyObject>(policyId)))
+            .As<ICultureDefaultPolicyRepairer>());
+
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<CultureObject>(cultureId, out var culture));
+            var objectManager = Campaign.Current.ObjectManager;
+            using (new AllowedThread())
+            {
+                // Give the generated culture the XML id and deserialize before its policies can resolve (#3337).
+                culture.StringId = "aserai";
+                culture.Deserialize(new MBObjectManager(), cultureXml.DocumentElement!.FirstChild);
+                Assert.Contains(null, culture.DefaultPolicyList);
+                objectManager.RegisterObject(culture);
+            }
+
+            ContainerProvider.SetContainer(scope);
+            try
+            {
+                objectManager.LoadXML("SPCultures", isDevelopment: false, gameType: Campaign.Current.GameTypeStringId);
+            }
+            finally
+            {
+                ContainerProvider.SetContainer(instance.Container);
+            }
+        });
     }
 
     private static void SetClanCulture(EnvironmentInstance instance, string clanId, string cultureId)

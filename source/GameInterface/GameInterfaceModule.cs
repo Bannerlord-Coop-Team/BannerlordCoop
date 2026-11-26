@@ -22,6 +22,7 @@ using GameInterface.Services.Bandits;
 using GameInterface.Services.Barters;
 using GameInterface.Services.BugReporting;
 using GameInterface.Services.Chat;
+using GameInterface.Services.CultureObjects;
 using GameInterface.Services.Entity;
 using GameInterface.Services.GameDebug.Metrics;
 using GameInterface.Services.GameMenus;
@@ -296,6 +297,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<WorkshopRepairer>().As<IWorkshopRepairer>().InstancePerDependency();
         builder.RegisterType<BloodFeudRepairer>().As<IBloodFeudRepairer>().InstancePerDependency();
         builder.RegisterType<PlayerCharacterLoadRepairer>().As<IPlayerCharacterLoadRepairer>().InstancePerDependency();
+        builder.RegisterType<CultureDefaultPolicyRepairer>().As<ICultureDefaultPolicyRepairer>().InstancePerDependency();
         builder.RegisterType<MapEventLogger>().As<IMapEventLogger>().SingleInstance();
         builder.RegisterType<TroopRosterLogger>().As<ITroopRosterLogger>().SingleInstance();
         builder.RegisterType<PartySyncPerformanceClock>().As<IPartySyncPerformanceClock>().SingleInstance();
@@ -312,7 +314,6 @@ public class GameInterfaceModule : Module
             .As<ISettlementHeroSpawnPool>()
             .InstancePerDependency();
         builder.RegisterType<KingdomCreationSettlementTracker>().AsSelf().As<IKingdomCreationSettlementTracker>().SingleInstance();
-        builder.RegisterType<CultureDefaultPolicies>().As<ICultureDefaultPolicies>();
         builder.RegisterType<KingdomCreator>().AsSelf().As<IKingdomCreator>().SingleInstance();
         builder.RegisterType<KingdomDecisionOutcomeResolver>().AsSelf().As<IKingdomDecisionOutcomeResolver>().SingleInstance();
         builder.RegisterType<KingdomDecisionOutcomeOrder>().AsSelf().As<IKingdomDecisionOutcomeOrder>().InstancePerDependency();

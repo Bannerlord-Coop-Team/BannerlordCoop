@@ -48,18 +48,15 @@ internal class KingdomCreator : IKingdomCreator
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly IKingdomMembershipState kingdomMembershipState;
-    private readonly ICultureDefaultPolicies cultureDefaultPolicies;
 
     public KingdomCreator(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
-        IKingdomMembershipState kingdomMembershipState,
-        ICultureDefaultPolicies cultureDefaultPolicies)
+        IKingdomMembershipState kingdomMembershipState)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.kingdomMembershipState = kingdomMembershipState;
-        this.cultureDefaultPolicies = cultureDefaultPolicies;
     }
 
     public bool TryCreateKingdom(
@@ -100,12 +97,6 @@ internal class KingdomCreator : IKingdomCreator
         if (!objectManager.TryGetIdWithLogging(rulingClan, out string clanId))
         {
             error = "ruling clan is not registered with the coop object manager";
-            return false;
-        }
-
-        if (!cultureDefaultPolicies.TryResolve(culture))
-        {
-            error = $"default policies for culture {culture.StringId} could not be resolved";
             return false;
         }
 
