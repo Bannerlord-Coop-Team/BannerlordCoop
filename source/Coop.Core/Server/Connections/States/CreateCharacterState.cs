@@ -84,8 +84,7 @@ public class CreateCharacterState : ConnectionStateBase
     {
         var netPeer = ConnectionLogic.Peer;
 
-        // On the game thread because the policy reads the campaign's kingdoms and clock. Immediate because
-        // the join queue drops ordinary sends to a peer until its save snapshot is taken.
+        // Immediate because the join queue drops ordinary sends to a peer until its save snapshot is taken.
         GameThread.RunSafe(() =>
         {
             AdvancedStartPolicy policy = null;

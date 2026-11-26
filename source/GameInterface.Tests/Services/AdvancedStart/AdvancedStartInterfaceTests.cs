@@ -254,7 +254,6 @@ public class AdvancedStartInterfaceTests
         Assert.Equal(expected, AdvancedStartInterface.GetDefaultStartType(policy));
     }
 
-    // The policy the server builds when it offers these vanilla start types.
     private static AdvancedStartPolicy CreateVanillaPolicy(string[] startTypes, string defaultStartType, bool worldStarted,
         string[] playerRuled, string[] joinable) =>
         AdvancedStartInterface.CreatePolicy(VanillaAdvancedStartType.All.Where(startType => startTypes.Contains(startType.Id)),

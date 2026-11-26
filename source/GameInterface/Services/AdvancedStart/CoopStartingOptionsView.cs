@@ -136,7 +136,6 @@ internal sealed class CoopStartingOptionsView : GlobalLayer
         {
             if (option.GetIsHidden(options)) continue;
 
-            // The item condition returns true when the item is locked.
             string pick = option.GetValue<string>();
             bool locked = option.GetItemCondition(pick, options, out var reason);
             if (!locked) continue;
