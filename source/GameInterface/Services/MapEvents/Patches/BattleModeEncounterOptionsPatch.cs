@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using GameInterface.Configuration;
+using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
@@ -28,7 +29,8 @@ namespace GameInterface.Services.MapEvents.Patches;
 /// from the server's <see cref="Messages.Start.NetworkBattleModeSet"/>. The surrender option gets the inverse
 /// treatment: forced available for a defender that cannot fight (see <see cref="PostfixSurrenderCondition"/>) and
 /// refused while either mode owns the event. Abandon army is hidden while a destroyed battle waits for deferred
-/// encounter cleanup; other options (join, regular leave, talk) are untouched.
+/// encounter cleanup, and Attack greys out for a ship-less party in a naval battle; other options (join, regular
+/// leave, talk) are untouched.
 /// </summary>
 /// <remarks>
 /// One shared postfix per option-condition in <see cref="MissionStartConditions"/> / <see cref="SimulationStartConditions"/> /
@@ -45,6 +47,7 @@ internal class BattleModeEncounterOptionsPatch
     private static readonly TextObject LowMoraleTooltip = new("{=xnRtINwH}Your men lack the courage to continue the battle without you. (Low Morale)");
     private static readonly TextObject WoundedTooltip = new("{=UL8za0AO}You are wounded.");
     private static readonly TextObject RaftTooltip = new("{=x9ePfpw5}You are on a raft, in desperate circumstances, and cannot fight");
+    private static readonly TextObject NoShipsTooltip = new("{=Yu10hbHI}You don't own any ships!");
     private const string AttackCondition = "game_menu_encounter_attack_on_condition";
     private const string OrderAttackCondition = "game_menu_encounter_order_attack_on_condition";
 
@@ -145,6 +148,14 @@ internal class BattleModeEncounterOptionsPatch
 
         // Already unavailable — nothing to do.
         if (__result == false) return;
+
+        // Vanilla lets a ship-less army member attack, but co-op fields only each player's own ships.
+        if (name == AttackCondition && GetCurrentBattle()?.IsNavalBattleWithoutShips(MobileParty.MainParty) == true)
+        {
+            __0.IsEnabled = false;
+            __0.Tooltip = NoShipsTooltip;
+            return;
+        }
 
         if (!TryGetCurrentMapEventId(out var mapEventId)) return;
 
@@ -256,7 +267,7 @@ internal class BattleModeEncounterOptionsPatch
 
     private static bool TryApplyClientSiegeOrderAttackOptionState(MenuCallbackArgs args)
     {
-        var mapEvent = GetPlayerEncounterBattle() ?? MobileParty.MainParty?.MapEvent;
+        var mapEvent = GetCurrentBattle();
         var encounter = PlayerEncounter.Current;
         if (mapEvent == null || encounter == null)
             return false;
@@ -320,7 +331,7 @@ internal class BattleModeEncounterOptionsPatch
         if (Hero.MainHero?.IsWounded != true) return;
         if (PartyBase.MainParty.NumberOfHealthyMembers != 0) return;
 
-        var mapEvent = GetPlayerEncounterBattle() ?? MobileParty.MainParty?.MapEvent;
+        var mapEvent = GetCurrentBattle();
         if (mapEvent == null || !mapEvent.IsFieldBattle || mapEvent.IsNavalMapEvent || mapEvent.MapEventSettlement != null)
             return;
 
@@ -432,7 +443,7 @@ internal class BattleModeEncounterOptionsPatch
     {
         mapEventId = null;
 
-        var mapEvent = GetPlayerEncounterBattle() ?? MobileParty.MainParty?.MapEvent;
+        var mapEvent = GetCurrentBattle();
         if (mapEvent == null) return false;
 
         if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)) return false;
@@ -466,6 +477,9 @@ internal class BattleModeEncounterOptionsPatch
         => Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId == "encounter" ||
            PlayerEncounter.Current != null ||
            MobileParty.MainParty?.MapEvent != null;
+
+    // The battle the encounter menu is for: the player encounter's battle, else the main party's map event.
+    private static MapEvent GetCurrentBattle() => GetPlayerEncounterBattle() ?? MobileParty.MainParty?.MapEvent;
 
     private static MapEvent GetPlayerEncounterBattle()
     {

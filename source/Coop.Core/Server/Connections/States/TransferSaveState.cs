@@ -6,13 +6,28 @@ using Common.Network.Coalescing;
 using Coop.Core.Common.Network.Packets;
 using GameInterface.Services.Save.Messages;
 using GameInterface.CoopSessionData;
+using GameInterface.Services.Alleys;
+using GameInterface.Services.CampaignService.Data;
 using GameInterface.Services.CampaignService.Interfaces;
+using GameInterface.Services.Caravans;
+using GameInterface.Services.Clans;
+using GameInterface.Services.Heroes;
 using GameInterface.Services.Heroes.Interfaces;
+using GameInterface.Services.Inventory;
+using GameInterface.Services.Inventory.TradeSkills;
+using GameInterface.Services.MobileParties;
+using GameInterface.Services.NavalDLC;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.OrderOfBattle;
 using GameInterface.Services.Ships;
+using GameInterface.Services.Smithing;
+using GameInterface.Services.ViewData;
+using GameInterface.Services.Workshops;
+using LiteNetLib;
 using ProtoBuf;
 using Serilog;
 using System;
+using System.Collections.Generic;
 using System.Threading;
 
 namespace Coop.Core.Server.Connections.States;
@@ -25,6 +40,18 @@ public class TransferSaveState : ConnectionStateBase
 {
     private static readonly ILogger Logger = LogManager.GetLogger<TransferSaveState>();
     private static int nextSaveTransferId;
+
+    private readonly IMessageBroker messageBroker;
+    private readonly INetwork network;
+    private readonly ICoopSessionProvider coopSessionProvider;
+    private readonly ISaveInterface saveInterface;
+    private readonly IConnectionMessageQueue connectionMessageQueue;
+    private readonly ISendCoalescer coalescer;
+    private readonly IAttachmentIdMapper attachmentIdMapper;
+    private readonly IServerOptionsProvider serverOptionsProvider;
+    private readonly ILootShipHold lootShipHold;
+
+    private readonly bool saveSent;
 
     public TransferSaveState(
         IConnectionLogic connectionLogic,
@@ -39,139 +66,196 @@ public class TransferSaveState : ConnectionStateBase
         ILootShipHold lootShipHold)
         : base(connectionLogic)
     {
-        GameSaveDataPacket snapshot = default;
-        bool snapshotCreated = false;
-        string[] heldLootShipIds = Array.Empty<string>();
+        this.messageBroker = messageBroker;
+        this.network = network;
+        this.coopSessionProvider = coopSessionProvider;
+        this.saveInterface = saveInterface;
+        this.connectionMessageQueue = connectionMessageQueue;
+        this.coalescer = coalescer;
+        this.attachmentIdMapper = attachmentIdMapper;
+        this.serverOptionsProvider = serverOptionsProvider;
+        this.lootShipHold = lootShipHold;
 
-        GameThread.Run(() =>
-        {
-            // Flush pending coalesced sends before the snapshot, while this peer is still Dropping: a deferred
-            // delta would otherwise be both captured in the snapshot and replayed to this peer after BeginQueueing
-            // (double-apply). Guarded so a throwing send can't strand this blocking GameThread.Run.
-            try
-            {
-                coalescer.Flush(network);
-            }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "Failed to flush coalesced sends before the join save snapshot");
-            }
-
-            try
-            {
-                try
-                {
-                    messageBroker.Publish(this, new GameSaveStateChanged(true));
-                    // The poll thread is blocked on this action, so flush before the save starts.
-                    network.FlushPendingMessages();
-                }
-                catch (Exception ex)
-                {
-                    Logger.Error(ex, "Failed to broadcast the join save start");
-                }
-
-                // A held loot ship has no owner, so neither the save nor the id map would carry it to the joining client
-                heldLootShipIds = lootShipHold.AttachForJoinSnapshot();
-
-                var saveResults = saveInterface.SaveCurrentGame();
-
-                // Disconnect peer on failure — before touching Data, which a failed snapshot may leave null.
-                if (!saveResults.Success)
-                {
-                    Logger.Error("Join save snapshot failed for peer {PeerId}; disconnecting", connectionLogic.Peer.Id);
-                    connectionLogic.Peer.Disconnect();
-                    return;
-                }
-
-                // Clone the mutable session DTOs at the same boundary as the campaign save. Compression and
-                // packet serialization run after the game-thread action returns, while campaign ticks resume.
-                snapshot = new GameSaveDataPacket(
-                    saveResults.Data,
-                    saveResults.CampaignId,
-                    Clone(coopSessionProvider.CoopSession?.CraftingPlayerData),
-                    Clone(coopSessionProvider.CoopSession?.WorkshopPlayerData),
-                    Clone(coopSessionProvider.CoopSession?.CaravansPlayerData),
-                    Clone(coopSessionProvider.CoopSession?.AlleyPlayerData),
-                    Clone(coopSessionProvider.CoopSession?.InteractionsPlayerData),
-                    Clone(coopSessionProvider.CoopSession?.TradePlayerData),
-                    Clone(coopSessionProvider.CoopSession?.InventoryPlayerData),
-                    Clone(coopSessionProvider.CoopSession?.HeroMeetingData),
-                    Clone(coopSessionProvider.CoopSession?.AgingPlayerData),
-                    Clone(coopSessionProvider.CoopSession?.NavalPlayerData),
-                    attachmentIdMapper.BuildServerMap(),
-                    serverOptionsProvider.GetServerOptions(),
-                    Clone(coopSessionProvider.CoopSession?.ClanFinance),
-                    Clone(coopSessionProvider.CoopSession?.OrderOfBattlePlayerData),
-                    heldLootShipIds,
-                    Clone(coopSessionProvider.CoopSession?.ViewDataPlayerData));
-
-                // Start holding this peer's broadcasts now that the snapshot has been taken. The whole save
-                // runs in a blocking GameThread.Run call issued from the network thread, so the poller is
-                // parked for its duration and cannot broadcast a received delta that races the snapshot;
-                // taking the cut right after the snapshot cleanly separates "in the save" (dropped while
-                // Dropping) from "after the save" (queued for replay).
-                connectionMessageQueue.BeginQueueing(ConnectionLogic.Peer);
-                snapshotCreated = true;
-            }
-            finally
-            {
-                try
-                {
-                    lootShipHold.DetachFromJoinSnapshot(heldLootShipIds);
-                }
-                catch (Exception ex)
-                {
-                    Logger.Error(ex, "Failed to detach the held loot ships after the join save");
-                }
-
-                try
-                {
-                    messageBroker.Publish(this, new GameSaveStateChanged(false));
-                }
-                catch (Exception ex)
-                {
-                    Logger.Error(ex, "Failed to broadcast the join save end");
-                }
-            }
-        }, blocking: true);
-
-        if (!snapshotCreated) return;
-
-        byte[] compressedSave = SaveDataCompression.Compress(snapshot.GameSaveData);
-        SendSaveChunks(network, snapshot, compressedSave);
+        saveSent = SendSaveOrDisconnect();
     }
 
-    private void SendSaveChunks(INetwork network, GameSaveDataPacket snapshot, byte[] compressedSave)
+    private bool SendSaveOrDisconnect()
     {
+        var peer = ConnectionLogic.Peer;
+        bool sent = false;
+        try
+        {
+            JoinSaveSnapshot? snapshot = null;
+            GameThread.RunSafe(() => snapshot = CaptureSnapshot(), blocking: true, context: "Capture join save snapshot");
+            if (snapshot == null) return false;
+            if (peer.ConnectionState != ConnectionState.Connected)
+            {
+                Logger.Warning("Join save transfer to peer {PeerId} stopped after snapshot because the peer is no longer connected", peer.Id);
+                return false;
+            }
+
+            int uncompressedSize = snapshot.SaveData.Length;
+            var (chunks, compressedSize) = SaveDataCompression.CompressChunks(
+                snapshot.SaveData, GameSaveDataChunkPacket.ChunkSize);
+            // Drop the raw save so the GC can reclaim it while the chunks are sent.
+            snapshot.SaveData = null;
+            sent = SendSaveChunks(snapshot, chunks, compressedSize, uncompressedSize);
+            return sent;
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "Join save transfer failed for peer {PeerId}; disconnecting", peer.Id);
+            return false;
+        }
+        finally
+        {
+            if (!sent)
+            {
+                connectionMessageQueue.AbortCatchUp(peer);
+                peer.Disconnect();
+            }
+        }
+    }
+
+    private JoinSaveSnapshot? CaptureSnapshot()
+    {
+        var peer = ConnectionLogic.Peer;
+        string[] heldLootShipIds = Array.Empty<string>();
+
+        try
+        {
+            heldLootShipIds = BeginSnapshot();
+
+            var saveResults = saveInterface.SaveCurrentGame();
+            if (!saveResults.Success || saveResults.Data == null)
+            {
+                Logger.Error("Join save snapshot failed for peer {PeerId}; disconnecting", peer.Id);
+                return null;
+            }
+
+            JoinSaveSnapshot snapshot = BuildSnapshot(saveResults, heldLootShipIds);
+
+            // The poller normally waits for this cut. If its wait timed out or was canceled,
+            // BeginQueueing leaves the aborted peer's replay closed.
+            connectionMessageQueue.BeginQueueing(peer);
+            return snapshot;
+        }
+        finally
+        {
+            EndSnapshot(heldLootShipIds);
+        }
+    }
+
+    private string[] BeginSnapshot()
+    {
+        // Flush pending deltas while this peer is still Dropping so they only reach it through the snapshot.
+        try
+        {
+            coalescer.Flush(network);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "Failed to flush coalesced sends before the join save snapshot");
+        }
+
+        try
+        {
+            messageBroker.Publish(this, new GameSaveStateChanged(true));
+            // The poll thread is blocked on this action, so flush before the save starts.
+            network.FlushPendingMessages();
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "Failed to broadcast the join save start");
+        }
+
+        // A held loot ship has no owner, so neither the save nor the id map would carry it to the joining client.
+        return lootShipHold.AttachForJoinSnapshot();
+    }
+
+    private void EndSnapshot(string[] heldLootShipIds)
+    {
+        try
+        {
+            lootShipHold.DetachFromJoinSnapshot(heldLootShipIds);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "Failed to detach the held loot ships after the join save");
+        }
+
+        try
+        {
+            messageBroker.Publish(this, new GameSaveStateChanged(false));
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "Failed to broadcast the join save end");
+        }
+    }
+
+    private JoinSaveSnapshot BuildSnapshot(SaveResults saveResults, string[] heldLootShipIds)
+    {
+        // Clone the session data before the game thread resumes and changes it.
+        var session = coopSessionProvider.CoopSession;
+        return new JoinSaveSnapshot
+        {
+            SaveData = saveResults.Data,
+            CampaignId = saveResults.CampaignId,
+            CraftingPlayerData = Clone(session?.CraftingPlayerData),
+            WorkshopPlayerData = Clone(session?.WorkshopPlayerData),
+            CaravansPlayerData = Clone(session?.CaravansPlayerData),
+            AlleyPlayerData = Clone(session?.AlleyPlayerData),
+            InteractionsPlayerData = Clone(session?.InteractionsPlayerData),
+            TradePlayerData = Clone(session?.TradePlayerData),
+            InventoryPlayerData = Clone(session?.InventoryPlayerData),
+            HeroMeetingData = Clone(session?.HeroMeetingData),
+            AgingPlayerData = Clone(session?.AgingPlayerData),
+            NavalPlayerData = Clone(session?.NavalPlayerData),
+            AttachmentIdMap = attachmentIdMapper.BuildServerMap(),
+            ServerOptions = serverOptionsProvider.GetServerOptions(),
+            ClanFinance = Clone(session?.ClanFinance),
+            OrderOfBattlePlayerData = Clone(session?.OrderOfBattlePlayerData),
+            HeldLootShipIds = heldLootShipIds,
+            ViewDataPlayerData = Clone(session?.ViewDataPlayerData),
+        };
+    }
+
+    private bool SendSaveChunks(JoinSaveSnapshot snapshot, Queue<byte[]> chunks, int compressedSize, int uncompressedSize)
+    {
+        // The client needs chunk zero for the session data even if compression produced no bytes.
+        if (chunks.Count == 0) chunks.Enqueue(Array.Empty<byte>());
+
+        var peer = ConnectionLogic.Peer;
         int transferId = Interlocked.Increment(ref nextSaveTransferId);
-        int chunkCount = Math.Max(1, (compressedSave.Length + GameSaveDataChunkPacket.ChunkSize - 1) / GameSaveDataChunkPacket.ChunkSize);
+        int chunkCount = chunks.Count;
 
         Logger.Information(
             "Sending join save transfer {TransferId} to peer {PeerId}: {ChunkCount} chunks, {CompressedSize:N0} compressed bytes, {UncompressedSize:N0} save bytes",
             transferId,
-            ConnectionLogic.Peer.Id,
+            peer.Id,
             chunkCount,
-            compressedSave.Length,
-            snapshot.GameSaveData?.Length ?? 0);
+            compressedSize,
+            uncompressedSize);
 
         for (int chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++)
         {
-            int offset = chunkIndex * GameSaveDataChunkPacket.ChunkSize;
-            int length = Math.Min(GameSaveDataChunkPacket.ChunkSize, compressedSave.Length - offset);
-            byte[] chunkData = length <= 0 ? Array.Empty<byte>() : new byte[length];
-            if (length > 0)
+            if (peer.ConnectionState != ConnectionState.Connected)
             {
-                Buffer.BlockCopy(compressedSave, offset, chunkData, 0, length);
+                Logger.Warning(
+                    "Join save transfer {TransferId} to peer {PeerId} stopped before chunk {ChunkIndex} because the peer is no longer connected",
+                    transferId, peer.Id, chunkIndex);
+                return false;
             }
 
             var chunkPacket = new GameSaveDataChunkPacket(
                 transferId,
                 chunkIndex,
                 chunkCount,
-                compressedSave.Length,
-                snapshot.GameSaveData?.Length ?? 0,
-                chunkData,
-                chunkIndex == 0 ? snapshot.CampaignID : null,
+                compressedSize,
+                uncompressedSize,
+                chunks.Dequeue(),
+                chunkIndex == 0 ? snapshot.CampaignId : null,
                 chunkIndex == 0 ? snapshot.CraftingPlayerData : null,
                 chunkIndex == 0 ? snapshot.WorkshopPlayerData : null,
                 chunkIndex == 0 ? snapshot.CaravansPlayerData : null,
@@ -189,8 +273,9 @@ public class TransferSaveState : ConnectionStateBase
                 chunkIndex == 0 ? snapshot.HeldLootShipIds : null,
                 chunkIndex == 0 ? snapshot.ViewDataPlayerData : null);
 
-            network.SendImmediate(ConnectionLogic.Peer, chunkPacket);
+            network.SendImmediate(peer, chunkPacket);
         }
+        return true;
     }
 
     private static T Clone<T>(T value) where T : class =>
@@ -216,10 +301,34 @@ public class TransferSaveState : ConnectionStateBase
 
     public override void Load()
     {
-        ConnectionLogic.SetState<LoadingState>();
+        // Callers invoke Load immediately after SetState, including when the send failed and the peer is disconnecting.
+        if (saveSent) ConnectionLogic.SetState<LoadingState>();
     }
 
     public override void TransferSave()
     {
+    }
+
+    /// <summary>Owns the raw save and session data captured at the same point on the game thread.</summary>
+    private sealed class JoinSaveSnapshot
+    {
+        public byte[] SaveData { get; set; }
+        public string CampaignId { get; set; }
+        public CraftingPlayerData CraftingPlayerData { get; set; }
+        public WorkshopPlayerData WorkshopPlayerData { get; set; }
+        public CaravansPlayerData CaravansPlayerData { get; set; }
+        public AlleyPlayerData AlleyPlayerData { get; set; }
+        public InteractionsPlayerData InteractionsPlayerData { get; set; }
+        public TradePlayerData TradePlayerData { get; set; }
+        public InventoryPlayerData InventoryPlayerData { get; set; }
+        public HeroMeetingData HeroMeetingData { get; set; }
+        public AgingPlayerData AgingPlayerData { get; set; }
+        public NavalPlayerData NavalPlayerData { get; set; }
+        public AttachmentIdMap AttachmentIdMap { get; set; }
+        public ServerOptions ServerOptions { get; set; }
+        public Dictionary<string, ClanFinanceSettings> ClanFinance { get; set; }
+        public OrderOfBattlePlayerData OrderOfBattlePlayerData { get; set; }
+        public string[] HeldLootShipIds { get; set; }
+        public ViewDataPlayerData ViewDataPlayerData { get; set; }
     }
 }

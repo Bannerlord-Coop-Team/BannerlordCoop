@@ -62,7 +62,7 @@ public class MovementAuthorityTransitionTests : MissionTestEnvironment
             relay.SetupGet(value => value.ServerEndpoint).Returns(relayPeer);
             using var handler = CreateHandler(observer, relay.Object);
             var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
-            var compressor = new MovementPacketCompressor(serializer);
+            var compressor = new MovementPacketCompressor(serializer, new MovementSnapshotCodec());
             void Deliver(IPacket packet)
             {
                 if (compressedRelay)
@@ -244,7 +244,7 @@ public class MovementAuthorityTransitionTests : MissionTestEnvironment
             relay.SetupGet(value => value.ServerEndpoint).Returns(relayPeer);
             using var handler = CreateHandler(observer, relay.Object);
             var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
-            var compressor = new MovementPacketCompressor(serializer);
+            var compressor = new MovementPacketCompressor(serializer, new MovementSnapshotCodec());
             byte[] oldPayload = RelayPayload(state.Packet, serializer, compressor);
 
             observer.SimulatePacket(relayPeer, oldPayload);
@@ -312,7 +312,7 @@ public class MovementAuthorityTransitionTests : MissionTestEnvironment
         {
             var state = CreateFixture(engine, observer, mount, compact);
             var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
-            var compressor = new MovementPacketCompressor(serializer);
+            var compressor = new MovementPacketCompressor(serializer, new MovementSnapshotCodec());
             var network = new Mock<IBattleNetwork>();
             var sent = new List<IPacket>();
             network.Setup(value => value.Send(It.IsAny<string>(), It.IsAny<IPacket>(), It.IsAny<byte[]>()))

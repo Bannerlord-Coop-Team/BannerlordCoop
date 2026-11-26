@@ -1802,8 +1802,10 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
         });
     }
 
-    [Fact]
-    public void LocalAuthorityTransfer_ClearsRemoteGuardBeforePolling()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void LocalAuthorityTransfer_ClearsRemoteGuardBeforePolling(bool afterNativeTick)
     {
         RunScenario("owner-b", context =>
         {
@@ -1831,10 +1833,14 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
 
             Assert.True(context.Registry.TryTransferAuthority("owner-b", agentId));
             controller.OnPreMissionTick(0f);
+            Assert.Equal(Agent.GuardMode.Left, puppetMirror.GuardMode);
             Assert.Equal(
                 defendFlags,
                 AgentActionData.GetDefendMovementFlags(puppetMirror.MovementFlags));
-            context.Component.AgentActionHandler.PollActions();
+            if (afterNativeTick)
+                context.Component.AgentActionHandler.PollActionsAfterNativeTick();
+            else
+                context.Component.AgentActionHandler.PollActions();
 
             Assert.Equal(Agent.GuardMode.None, puppetMirror.GuardMode);
             Assert.Equal(
