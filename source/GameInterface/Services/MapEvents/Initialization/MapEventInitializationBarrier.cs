@@ -489,8 +489,8 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         if (cleanup != null)
             deferredEncounterCleanup = null;
         party._mapEventSide = null;
-        bool endedDefeat = EndDestroyedSimulationDefeat(mapEvent, cleanup);
-        if (!endedDefeat && CloseStaleDestroyedEncounter(mapEvent, cleanup)) return;
+        if (EndDestroyedSimulationDefeat(mapEvent, cleanup, party.MobileParty) ||
+            CloseStaleDestroyedEncounter(mapEvent, cleanup)) return;
 
         ClearEngageOrder(party.MobileParty);
     }
@@ -504,9 +504,10 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
                    .Any(state => state._battleSimulation == battleSimulation) == true;
     }
 
-    private static bool EndDestroyedSimulationDefeat(
+    private bool EndDestroyedSimulationDefeat(
         MapEvent mapEvent,
-        DeferredEncounterCleanup cleanup)
+        DeferredEncounterCleanup cleanup,
+        MobileParty party)
     {
         var encounter = PlayerEncounter.Current;
         bool matchesDeferredSimulation = cleanup != null &&
@@ -532,9 +533,11 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
             Campaign.Current.PlayerEncounter = null;
             Campaign.Current.LocationEncounter = null;
             ShowCaptivityMenu();
+            ClearEngageOrder(party);
             return true;
         }
 
+        // Finish's postfix holds the party, like after CloseStaleDestroyedEncounter's Finish.
         FinishUncapturedDefeat(encounter);
         return true;
     }

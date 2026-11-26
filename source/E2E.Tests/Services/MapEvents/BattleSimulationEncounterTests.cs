@@ -2,7 +2,6 @@
 using System.Linq;
 using System.Reflection;
 using Common.Messaging;
-using Common.Util;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Registry.Auto;
@@ -101,7 +100,9 @@ public class BattleSimulationEncounterTests : MapEventTestBase
     {
         var context = CreateServerMapEvent();
         var client = Clients.First();
-        LoseSimulationWithoutCapture(client, context, context.AttackerPartyId);
+        LoseSimulationWithoutCapture(client, context, BattleSideEnum.Attacker);
+        var holds = new List<PartyBehaviorChangeAttempted>();
+        client.Resolve<IMessageBroker>().Subscribe<PartyBehaviorChangeAttempted>(payload => holds.Add(payload.What));
 
         client.NetworkSentMessages.Clear();
         client.Call(() =>
@@ -112,6 +113,7 @@ public class BattleSimulationEncounterTests : MapEventTestBase
             Assert.Null(PlayerEncounter.Current);
             Assert.Null(MobileParty.MainParty.MapEvent);
             Assert.False(Game.Current.GameStateManager.GameStates.OfType<MapState>().Single().AtMenu);
+            Assert.Same(MobileParty.MainParty, Assert.Single(holds).Party);
         }, ScoreboardCloseDisabledMethods);
         Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkRequestCreateMapEvent>());
     }
@@ -122,7 +124,7 @@ public class BattleSimulationEncounterTests : MapEventTestBase
         var context = CreateServerMapEvent();
         var client = Clients.First();
         var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
-        LoseSimulationWithoutCapture(client, context, context.DefenderPartyId, settlementId);
+        LoseSimulationWithoutCapture(client, context, BattleSideEnum.Defender, settlementId);
         var settlementRequests = new List<StartSettlementEncounterAttempted>();
         var leaves = new List<PartyLeaveSettlementAttempted>();
         client.Resolve<IMessageBroker>().Subscribe<StartSettlementEncounterAttempted>(payload => settlementRequests.Add(payload.What));
@@ -143,13 +145,22 @@ public class BattleSimulationEncounterTests : MapEventTestBase
     }
 
     /// <summary>
-    /// Has the client's party lose an accepted simulation without being taken prisoner, leaving its finished scoreboard open.
-    /// The player defends when <paramref name="playerPartyId"/> is the defender and stays inside <paramref name="settlementId"/>.
+    /// Has the client's party on <paramref name="playerSide"/> lose an accepted simulation without being taken prisoner,
+    /// leaving its finished scoreboard open. The party stays inside <paramref name="settlementId"/> when one is given.
     /// </summary>
-    private void LoseSimulationWithoutCapture(EnvironmentInstance client, MapEventContext context, string playerPartyId,
+    private void LoseSimulationWithoutCapture(EnvironmentInstance client, MapEventContext context, BattleSideEnum playerSide,
         string? settlementId = null)
     {
-        var playerDefends = playerPartyId == context.DefenderPartyId;
+        string playerPartyId = context.AttackerPartyId;
+        string enemyPartyId = context.DefenderPartyId;
+        BattleState enemyVictory = BattleState.DefenderVictory;
+        if (playerSide == BattleSideEnum.Defender)
+        {
+            playerPartyId = context.DefenderPartyId;
+            enemyPartyId = context.AttackerPartyId;
+            enemyVictory = BattleState.AttackerVictory;
+        }
+
         client.Resolve<IControllerIdProvider>().SetControllerId("1");
         RegisterAsPlayerParty("1", TestEnvironment.CreateRegisteredObject<Hero>(), playerPartyId);
         Server.Resolve<IPlayerManager>().SetPeer("1", client.NetPeer);
@@ -162,11 +173,10 @@ public class BattleSimulationEncounterTests : MapEventTestBase
             if (settlementId != null)
                 MobileParty.MainParty._currentSettlement = client.GetRegisteredObject<Settlement>(settlementId);
 
-            var enemyPartyId = playerDefends ? context.AttackerPartyId : context.DefenderPartyId;
             var encounter = SetMockPlayerEncounter(client, enemyPartyId, context.MapEventId);
-            encounter._attackerParty = playerDefends ? encounter._encounteredParty : MobileParty.MainParty.Party;
-            encounter._defenderParty = playerDefends ? MobileParty.MainParty.Party : encounter._encounteredParty;
-            encounter.PlayerSide = playerDefends ? BattleSideEnum.Defender : BattleSideEnum.Attacker;
+            encounter._attackerParty = client.GetRegisteredObject<MobileParty>(context.AttackerPartyId).Party;
+            encounter._defenderParty = client.GetRegisteredObject<MobileParty>(context.DefenderPartyId).Party;
+            encounter.PlayerSide = playerSide;
             encounter.EncounterState = PlayerEncounterState.End;
             encounter.BattleSimulation = new BattleSimulation(null, null);
             encounter.BattleSimulation.IsSimulationFinished = true;
@@ -186,8 +196,8 @@ public class BattleSimulationEncounterTests : MapEventTestBase
                 StartAcceptedSimulation(client, context, playerPartyId);
                 var mapEvent = Server.GetRegisteredObject<MapEvent>(context.MapEventId);
                 // The player's side ran away, so the server takes no prisoners.
-                mapEvent.RetreatingSide = playerDefends ? BattleSideEnum.Defender : BattleSideEnum.Attacker;
-                mapEvent.BattleState = playerDefends ? BattleState.AttackerVictory : BattleState.DefenderVictory;
+                mapEvent.RetreatingSide = playerSide;
+                mapEvent.BattleState = enemyVictory;
                 Server.Resolve<IMessageBroker>().Publish(client.NetPeer, new NetworkAdvanceBattleSimulation(context.MapEventId, 1));
                 Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleSimulationFinished>());
                 Assert.False(Server.ObjectManager.TryGetObject<MapEvent>(context.MapEventId, out _));
@@ -211,9 +221,10 @@ public class BattleSimulationEncounterTests : MapEventTestBase
     private IReadOnlyList<MethodBase> ScoreboardCloseDisabledMethods => MapEventDisabledMethods
         // Headless campaigns have no navigation mesh for vanilla's post-encounter displacement.
         .Append(AccessTools.Method(typeof(MobileParty), nameof(MobileParty.TeleportPartyToOutSideOfEncounterRadius)))
-        // Only a restarted battle reaches the encounter texts, which read party names the headless heroes can't build.
+        // Only the encounter texts are turned off, because they read party names the headless heroes can't build.
+        // EncounterGameMenuBehavior's own init still runs, so a restarted battle shows up as a NetworkRequestCreateMapEvent.
         .Append(AccessTools.Method(typeof(PlayerEncounter), "SetEncounterMenuTexts"))
-        .Append(AccessTools.Method(typeof(DefaultEncounter), "game_menu_encounter_on_init"))
+        .Append(AccessTools.Method(typeof(DefaultEncounter), nameof(DefaultEncounter.game_menu_encounter_on_init)))
         .ToList();
 
     [Fact]
@@ -336,35 +347,28 @@ public class BattleSimulationEncounterTests : MapEventTestBase
             Server.Resolve<IMessageBroker>().Publish(this, new BattlePartyRetreated(playerId, mapEventId));
         }, MapEventDisabledMethods);
 
+        EnableHeadlessEncounterFinish(client);
+        var encounter = SetMockPlayerEncounter(client, captorId, mapEventId);
         BattleSimulation simulation = null;
         client.Call(() =>
         {
-            var party = client.GetRegisteredObject<MobileParty>(partyId);
-            var captor = client.GetRegisteredObject<MobileParty>(captorId);
-            var mapEvent = client.GetRegisteredObject<MapEvent>(mapEventId);
-            Campaign.Current.MainParty = party;
-            Campaign.Current.MapStateData ??= new MapStateData();
-            Assert.Same(mapEvent, party.MapEvent);
+            Campaign.Current.MainParty = client.GetRegisteredObject<MobileParty>(partyId);
+            Assert.Same(client.GetRegisteredObject<MapEvent>(mapEventId), MobileParty.MainParty.MapEvent);
 
+            var behavior = new EncounterGameMenuBehavior();
             var starter = new CampaignGameStarter(Campaign.Current.GameMenuManager, Campaign.Current.ConversationManager);
-            new EncounterGameMenuBehavior().OnSessionLaunched(starter);
+            behavior.OnSessionLaunched(starter);
             // PlayerTownVisitCampaignBehavior registers prisoner_wait in game; an empty wait menu is enough here.
             starter.AddWaitGameMenu("prisoner_wait", "", null, null, null, null, GameMenu.MenuAndOptionType.WaitMenuHideProgressAndHoursOption);
 
-            var encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
-            encounter._mapEvent = mapEvent;
-            encounter._encounteredParty = captor.Party;
-            encounter._attackerParty = captor.Party;
-            encounter._defenderParty = party.Party;
             encounter._alternativeReceivedLootShips = new List<Ship>();
             encounter.PlayerSide = BattleSideEnum.Defender;
             encounter.OpponentSide = BattleSideEnum.Attacker;
             encounter.EncounterState = PlayerEncounterState.Wait;
-            Campaign.Current.PlayerEncounter = encounter;
             Game.Current.GameStateManager._gameStates.Add(Game.Current.GameStateManager.CreateState<MapState>());
 
             UseBattleStartCoordinatorOf(client);
-            new EncounterGameMenuBehavior().game_menu_encounter_order_attack_on_consequence(new MenuCallbackArgs((MenuContext)null, null));
+            behavior.game_menu_encounter_order_attack_on_consequence(new MenuCallbackArgs((MenuContext)null, null));
 
             simulation = encounter.BattleSimulation;
             Assert.NotNull(simulation);
@@ -391,14 +395,12 @@ public class BattleSimulationEncounterTests : MapEventTestBase
             BattleSimulationReplay.Tick(simulation, 0f);
             Assert.True(simulation.IsSimulationFinished);
 
-            // The scoreboard's Done closes the simulation and reopens the encounter menu.
-            var mapState = Game.Current.GameStateManager.GameStates.OfType<MapState>().Single();
-            mapState.EndBattleSimulation();
-            simulation.OnFinished();
+            CloseSimulationScoreboard();
 
             Assert.True(PlayerCaptivity.IsCaptive);
             Assert.Null(PlayerEncounter.Current);
             Assert.Null(MobileParty.MainParty.MapEvent);
+            var mapState = Game.Current.GameStateManager.GameStates.OfType<MapState>().Single();
             Assert.Equal("prisoner_wait", mapState.MenuContext?.GameMenu?.StringId);
         }, MapEventDisabledMethods);
     }
