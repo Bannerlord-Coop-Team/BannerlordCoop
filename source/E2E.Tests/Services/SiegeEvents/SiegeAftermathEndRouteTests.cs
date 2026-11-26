@@ -144,7 +144,33 @@ public class SiegeAftermathEndRouteTests : IDisposable
         });
     }
 
-    private void AssertPromptedLeaderGetsChoice(Action<EnvironmentInstance, PlayerEncounter, Action> finishBattle)
+    [Fact]
+    public void EnteredCaptureSettlement_LateFinalizeReplyWithoutEncounter_KeepsTheChoice()
+    {
+        AssertPromptedLeaderGetsChoice(
+            (client, encounter, prompt) =>
+            {
+                var siege = encounter._mapEvent;
+                client.Resolve<ISiegeEventInterface>().SetLocalAftermathNarrationContext(siege.MapEventSettlement, siege);
+                prompt();
+                encounter.EncounterState = PlayerEncounterState.End;
+            },
+            (client, settlement) =>
+            {
+                Assert.Equal("menu_settlement_taken_player_leader", Campaign.Current.CurrentMenuContext.GameMenu.StringId);
+                Campaign.Current.PlayerEncounter = null;
+                using (new AllowedThread())
+                    MobileParty.MainParty.CurrentSettlement = settlement;
+
+                client.SimulateMessage(environment.Server.NetPeer, new NetworkMapEventFinalized());
+
+                Assert.True(SiegeCaptureMenuHoldPatch.IsHeld(settlement));
+            });
+    }
+
+    private void AssertPromptedLeaderGetsChoice(
+        Action<EnvironmentInstance, PlayerEncounter, Action> finishBattle,
+        Action<EnvironmentInstance, Settlement>? afterChoiceOpens = null)
     {
         var client = environment.Clients.First();
         var settlementId = environment.CreateRegisteredObject<Settlement>();
@@ -198,6 +224,7 @@ public class SiegeAftermathEndRouteTests : IDisposable
 
                 finishBattle(client, encounter, Prompt);
                 playerEncounters.UpdateInternalAfterBattle(encounter);
+                afterChoiceOpens?.Invoke(client, settlement);
             }
             finally
             {

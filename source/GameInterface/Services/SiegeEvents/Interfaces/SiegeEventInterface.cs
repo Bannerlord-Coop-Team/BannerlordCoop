@@ -419,12 +419,17 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
 
     public void ApplySiegeAftermathChoice(MobileParty party, Settlement settlement, int aftermathType)
     {
-        if (!TryGetPendingCaptureForLeader(party, settlement, out var pending))
+        if (!SiegeAftermathPatches.PendingAftermaths.TryGetValue(settlement, out var pending))
         {
-            if (pending == null)
-                Logger.Warning("No pending siege aftermath for {Settlement}", settlement.Name?.ToString());
-            else
-                Logger.Error("Party {Party} is not the pending aftermath leader for {Settlement}", party.StringId, settlement.Name?.ToString());
+            // Expected for a pick made after the server discarded the aftermath, before the release reached the client.
+            Logger.Warning("No pending siege aftermath for {Settlement}", settlement.Name?.ToString());
+            return;
+        }
+
+        // Validate before removing so a mismatched request cannot destroy the pending entry.
+        if (pending.LeaderParty != party)
+        {
+            Logger.Error("Party {Party} is not the pending aftermath leader for {Settlement}", party.StringId, settlement.Name?.ToString());
             return;
         }
 
@@ -443,15 +448,13 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
 
     public void EnterPendingCaptureLeader(MobileParty party, Settlement settlement)
     {
-        if (!TryGetPendingCaptureForLeader(party, settlement, out var pending) || !pending.MatchesCurrentCapture(settlement))
+        if (!SiegeAftermathPatches.PendingAftermaths.TryGetValue(settlement, out var pending) ||
+            pending.LeaderParty != party || !pending.MatchesCurrentCapture(settlement))
             return;
 
         // SiegeCompleted tries to enter before the battle detaches the capturer, so the entry patch refuses it.
         settlementInterface.PartyEnterSettlement(party, settlement);
     }
-
-    private static bool TryGetPendingCaptureForLeader(MobileParty party, Settlement settlement, out SiegeAftermathPatches.PendingAftermath pending) =>
-        SiegeAftermathPatches.PendingAftermaths.TryGetValue(settlement, out pending) && pending.LeaderParty == party;
 
     public PendingSiegeAftermathPrompt[] GetPendingSiegeAftermathPrompts()
     {

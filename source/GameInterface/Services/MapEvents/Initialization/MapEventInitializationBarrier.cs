@@ -523,7 +523,7 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         }
 
         // The result's End still needs its battle to continue the raid or open the siege aftermath.
-        if (IsStagedRaidSimulationResult(encounter) || SiegeCaptureMenuHoldPatch.HoldsCaptureResult(encounter))
+        if (KeepsStagedResultBattle(encounter))
             return false;
 
         if (PlayerCaptivity.IsCaptive)
@@ -617,7 +617,10 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         }
     }
 
-    internal static bool IsStagedRaidSimulationResult(PlayerEncounter encounter) =>
+    internal static bool KeepsStagedResultBattle(PlayerEncounter encounter) =>
+        IsStagedRaidSimulationResult(encounter) || SiegeCaptureMenuHoldPatch.HoldsCaptureResult(encounter);
+
+    private static bool IsStagedRaidSimulationResult(PlayerEncounter encounter) =>
         encounter?._mapEvent is MapEvent mapEvent &&
         mapEvent.IsRaidHostileAction() &&
         encounter.BattleSimulation != null &&
