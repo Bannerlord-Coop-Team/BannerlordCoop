@@ -629,7 +629,12 @@ public class ServerBattleCompletionHandler : IHandler
         var mapEventId = payload.What.MapEventId;
         RunSerialized(() =>
         {
-            missionManager.ReleaseInstanceForNextStage(mapEventId);
+            if (!missionManager.ReleaseInstanceForNextStage(mapEventId))
+            {
+                // A stalled walls conclusion already rolled back, so its recovery must not retry the walls under the keep.
+                missionManager.TryTakeExpiredConclusion(mapEventId);
+                Logger.Warning("Walls conclusion for {Instance} was no longer concluding when its keep opened", mapEventId);
+            }
             hostRegistry.Remove(mapEventId);
             ForgetConclusionState(mapEventId);
         });

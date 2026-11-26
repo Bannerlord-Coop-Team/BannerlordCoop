@@ -157,6 +157,10 @@ public sealed class MockMission
 
     public bool DismountRiderOnNextBlow { get; set; }
 
+    /// <summary>While true, <see cref="Mission.SpawnTroop"/> spawns the troop on its side's team instead of reading
+    /// a spawn frame from the scene.</summary>
+    public bool SpawnTroopsOnTeams { get; set; }
+
     /// <summary>Headless replacement for <see cref="Mission.SpawnAgent"/>: mints a skip-ctor agent, mirrors the
     /// build data, assigns a mission-local index, and tracks it.</summary>
     public Agent SpawnAgent(AgentBuildData buildData)

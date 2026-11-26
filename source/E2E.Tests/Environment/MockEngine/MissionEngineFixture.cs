@@ -45,6 +45,7 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Mission), nameof(Mission.EndMission), nameof(Mission_EndMission));
         Prefix(typeof(Mission), nameof(Mission.OnAgentFleeing), nameof(Mission_OnAgentFleeing));
         Prefix(typeof(Mission), nameof(Mission.SpawnAgent), nameof(Mission_SpawnAgent));
+        Prefix(typeof(Mission), nameof(Mission.SpawnTroop), nameof(Mission_SpawnTroop));
         // The BR-110 budget counts native objects until deletion via Mission.AllAgents.
         Prefix(typeof(Mission), "get_Agents", nameof(Mission_get_Agents));
         Prefix(typeof(Mission), "get_AllAgents", nameof(Mission_get_AllAgents));
@@ -343,6 +344,18 @@ public sealed class MissionEngineFixture : IDisposable
     {
         if (!MockMission.ForShell(__instance, out var mock)) return true;
         __result = mock.SpawnAgent(agentBuildData);
+        return false;
+    }
+
+    private static bool Mission_SpawnTroop(Mission __instance, IAgentOriginBase troopOrigin, bool isPlayerSide,
+        ref Agent __result)
+    {
+        if (!MockMission.ForShell(__instance, out var mock) || !mock.SpawnTroopsOnTeams) return true;
+
+        var playerSide = mock.PlayerTeam?.Side ?? BattleSideEnum.Attacker;
+        var side = isPlayerSide ? playerSide : playerSide.GetOppositeSide();
+        var team = side == BattleSideEnum.Attacker ? mock.AttackerTeam : mock.DefenderTeam;
+        __result = mock.SpawnAgent(new AgentBuildData(troopOrigin).Team(team.Shell));
         return false;
     }
 

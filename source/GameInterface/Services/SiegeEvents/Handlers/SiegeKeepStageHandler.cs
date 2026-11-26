@@ -131,7 +131,7 @@ internal sealed class SiegeKeepStageHandler : IHandler
         if (!stage.IsOpen(mapEvent))
         {
             // A later assault on a siege that already reached the hall goes straight to the keep.
-            bool opened = mapEvent.IsSiegeKeepStage() && stage.TryOpen(mapEvent);
+            bool opened = mapEvent.IsSiegeKeepStage() && TryOpenStage(mapEvent);
             if (!opened) return Reject(request, "Nobody can lead the keep battle right now.");
         }
 

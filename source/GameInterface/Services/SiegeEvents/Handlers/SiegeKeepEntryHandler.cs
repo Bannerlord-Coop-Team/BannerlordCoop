@@ -79,8 +79,8 @@ internal sealed class SiegeKeepEntryHandler : IHandler
             return;
         }
 
+        // Both count the player's own hero, which the picker keeps selected.
         var maximum = reply.EscortAllowance + 1;
-        // The player's own hero, which the picker keeps selected.
         var minimum = 1;
         var selected = MobilePartyHelper.GetStrongestAndPriorTroops(MobileParty.MainParty, maximum, includePlayer: true);
         args.MenuContext.OpenTroopSelection(MobileParty.MainParty.MemberRoster, selected,

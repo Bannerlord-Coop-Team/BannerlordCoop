@@ -2,6 +2,7 @@
 using GameInterface.Services.MapEvents.TroopSupply;
 using HarmonyLib;
 using Missions.Battles;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
@@ -57,6 +58,40 @@ public class CoopLordsHallFightMissionControllerTests : MissionTestEnvironment
             Assert.True(spawnLogic.IsSideDepleted(BattleSideEnum.Defender));
             Assert.False(spawnLogic.IsSideDepleted(BattleSideEnum.Attacker));
             AssertBattleEndReadsTheDefendersBeaten(spawnLogic, mock.Shell);
+        }, new[] { AccessTools.Method(typeof(MBCommon), nameof(MBCommon.GetTotalMissionTime)) });
+    }
+
+    // Native sizes the first attacker wave from the defenders this client spawned, and a peer spawns none of the
+    // host's, so the follow-up spawn has to field the rest of the chosen squad.
+    [Fact]
+    public void NonHostClient_SpawnsItsWholeChosenSquadWithoutLocalDefenders()
+    {
+        const int squad = 6;
+        using var fixture = new MissionEngineFixture();
+        var client = Clients.First();
+        var characterId = CreateRegisteredObject<CharacterObject>();
+        client.Call(() =>
+        {
+            var mock = fixture.CreateMission(client);
+            var attackerTeam = mock.AddTeam(BattleSideEnum.Attacker);
+            mock.PlayerTeam = mock.AttackerTeam;
+            mock.AddTeam(BattleSideEnum.Defender);
+            mock.SpawnTroopsOnTeams = true;
+            var attacker = new CoopTroopSupplier("keep", BattleSideEnum.Attacker, client.ObjectManager, null);
+            var defender = new CoopTroopSupplier("keep", BattleSideEnum.Defender, client.ObjectManager, null);
+            attacker.SetReserve(new[] { new PartyReserve("squad", 0, Enumerable.Range(1, squad)
+                .Select(seed => new TroopReserveEntry(seed, characterId, 0)).ToArray()) }, squad, 0, 1000);
+            defender.SetReserve(Array.Empty<PartyReserve>(), 27, 0, 1000);
+            var controller = new CoopLordsHallFightMissionController(defender, attacker, BattleSideEnum.Attacker,
+                new DefaultSiegeLordsHallFightModel());
+            AccessTools.Property(typeof(MissionBehavior), nameof(MissionBehavior.Mission)).SetValue(controller, mock.Shell);
+            controller._isMissionInitialized = true;
+            controller._areaIndexList = new List<int>();
+
+            controller.OnMissionTick(0.1f);
+
+            Assert.Equal(squad, mock.Agents.Count(agent =>
+                AgentMirror.TryGet(agent, out var mirror) && mirror.Team == attackerTeam));
         }, new[] { AccessTools.Method(typeof(MBCommon), nameof(MBCommon.GetTotalMissionTime)) });
     }
 
