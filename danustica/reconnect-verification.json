@@ -1,0 +1,49 @@
+{
+  "testedHead": "1195838a912288da0f22c316c92d6a78ed1b47f4",
+  "settlement": "Danustica",
+  "settlementId": "town_ES1",
+  "round": 2,
+  "result": "passed",
+  "observations": [
+    {
+      "checkpoint": "before_disconnect",
+      "match": "round:1:match:0",
+      "phase": "AwaitingChoices",
+      "hero": "CharacterObject_Player",
+      "slot": "TournamentSessionIdentity_1:slot:15",
+      "disconnected": false,
+      "canJoin": true,
+      "playerAgentCharacter": "none"
+    },
+    {
+      "checkpoint": "disconnected",
+      "match": "round:1:match:0",
+      "phase": "AwaitingChoices",
+      "hero": "CharacterObject_Player",
+      "slot": "TournamentSessionIdentity_1:slot:15",
+      "disconnected": true,
+      "canJoin": false,
+      "playerAgentCharacter": null
+    },
+    {
+      "checkpoint": "after_reconnect",
+      "match": "round:1:match:0",
+      "phase": "AwaitingChoices",
+      "hero": "CharacterObject_Player",
+      "slot": "TournamentSessionIdentity_1:slot:15",
+      "disconnected": false,
+      "canJoin": true,
+      "playerAgentCharacter": "none"
+    },
+    {
+      "checkpoint": "entered_match",
+      "match": "round:1:match:0",
+      "phase": "LiveMatch",
+      "hero": "CharacterObject_Player",
+      "slot": "TournamentSessionIdentity_1:slot:15",
+      "disconnected": false,
+      "canJoin": false,
+      "playerAgentCharacter": "CharacterObject_Player"
+    }
+  ]
+}
