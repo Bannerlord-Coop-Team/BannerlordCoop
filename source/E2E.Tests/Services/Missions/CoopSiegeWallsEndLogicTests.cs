@@ -5,6 +5,7 @@ using HarmonyLib;
 using Missions.Battles;
 using Missions.Messages;
 using Moq;
+using System.Reflection;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 using Xunit.Abstractions;
@@ -19,6 +20,10 @@ public class CoopSiegeWallsEndLogicTests : MissionTestEnvironment
 {
     private const float ReinforcementInterval = 10f;
 
+    // Vanilla's end logic builds its timers from the native mission clock, which a headless mission doesn't have.
+    private static readonly MethodBase[] FixedMissionClock =
+        { AccessTools.Method(typeof(MBCommon), nameof(MBCommon.GetTotalMissionTime)) };
+
     public CoopSiegeWallsEndLogicTests(ITestOutputHelper output) : base(output) { }
 
     // Vanilla counts the routed defenders into the pull-back; the walls then end once the rest kept running for
@@ -28,7 +33,7 @@ public class CoopSiegeWallsEndLogicTests : MissionTestEnvironment
     {
         using var fixture = new MissionEngineFixture();
         var client = Clients.First();
-        client.Call(() => WithFixedMissionClock(() =>
+        client.Call(() =>
         {
             var mock = fixture.CreateMission(client);
             var attackerTeam = mock.AddTeam(BattleSideEnum.Attacker);
@@ -66,7 +71,7 @@ public class CoopSiegeWallsEndLogicTests : MissionTestEnvironment
             Assert.Equal(BattleState.DefenderPullBack, result.BattleState);
             Assert.False(result.PlayerVictory);
             Assert.False(result.PlayerDefeated);
-        }));
+        }, FixedMissionClock);
     }
 
     // A walls client whose own defenders are still standing ends on the host's pull-back once its deployment commits.
@@ -81,7 +86,7 @@ public class CoopSiegeWallsEndLogicTests : MissionTestEnvironment
         host.Call(() => CreateConnectedMission(fixture, host, mapEventId));
         EnterBattle(host, mapEventId);
 
-        joiner.Call(() => WithFixedMissionClock(() =>
+        joiner.Call(() =>
         {
             var mock = CreateConnectedMission(fixture, joiner, mapEventId);
             mock.PlayerTeam = mock.AttackerTeam;
@@ -112,7 +117,7 @@ public class CoopSiegeWallsEndLogicTests : MissionTestEnvironment
             Assert.True(end.MissionEnded(ref result));
             Assert.Equal(BattleState.DefenderPullBack, result.BattleState);
             Assert.False(result.PlayerVictory);
-        }));
+        }, FixedMissionClock);
     }
 
     // Restarting vanilla's retreat-check timer keeps its own depletion read, which needs a live mission, out of the tick.
@@ -122,22 +127,4 @@ public class CoopSiegeWallsEndLogicTests : MissionTestEnvironment
         end.OnMissionTick(0.1f);
     }
 
-    // Vanilla's end logic builds its timers from the native mission clock, which a headless mission doesn't have.
-    private static void WithFixedMissionClock(Action action)
-    {
-        var harmony = new Harmony($"walls-end-clock.{Guid.NewGuid()}");
-        try
-        {
-            harmony.Patch(AccessTools.Method(typeof(MBCommon), nameof(MBCommon.GetTotalMissionTime)),
-                prefix: new HarmonyMethod(typeof(CoopSiegeWallsEndLogicTests), nameof(FixedMissionTime)));
-            action();
-        }
-        finally { harmony.UnpatchAll(harmony.Id); }
-    }
-
-    private static bool FixedMissionTime(ref float __result)
-    {
-        __result = 0f;
-        return false;
-    }
 }

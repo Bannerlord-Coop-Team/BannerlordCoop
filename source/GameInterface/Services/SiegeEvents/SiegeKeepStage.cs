@@ -57,22 +57,16 @@ public sealed class SiegeKeepStage : ISiegeKeepStage
     private readonly ISiegeKeepTroopSelection selection;
     private readonly IBattleTroopReserveBuilder reserveBuilder;
     private readonly ITroopSelectionEntries selectionEntries;
-    private readonly Func<DateTime> utcNow;
 
     /// <summary>How long seated players have to choose, so a player who never answers can't stall the keep.</summary>
-    internal TimeSpan SelectionWindow { get; set; } = TimeSpan.FromSeconds(90);
+    private static readonly TimeSpan SelectionWindow = TimeSpan.FromSeconds(90);
+
+    /// <summary>The stage's clock; tests move it past the selection window.</summary>
+    internal Func<DateTime> UtcNow { get; set; } = () => DateTime.UtcNow;
 
     public SiegeKeepStage(INetwork network, IObjectManager objectManager, IPlayerManager playerManager,
         ISiegeKeepTroopSelection selection, IBattleTroopReserveBuilder reserveBuilder,
         ITroopSelectionEntries selectionEntries)
-        : this(network, objectManager, playerManager, selection, reserveBuilder, selectionEntries,
-            () => DateTime.UtcNow)
-    {
-    }
-
-    internal SiegeKeepStage(INetwork network, IObjectManager objectManager, IPlayerManager playerManager,
-        ISiegeKeepTroopSelection selection, IBattleTroopReserveBuilder reserveBuilder,
-        ITroopSelectionEntries selectionEntries, Func<DateTime> utcNow)
     {
         this.network = network;
         this.objectManager = objectManager;
@@ -80,7 +74,6 @@ public sealed class SiegeKeepStage : ISiegeKeepStage
         this.selection = selection;
         this.reserveBuilder = reserveBuilder;
         this.selectionEntries = selectionEntries;
-        this.utcNow = utcNow;
     }
 
     public bool TryOpen(MapEvent mapEvent)
@@ -99,7 +92,7 @@ public sealed class SiegeKeepStage : ISiegeKeepStage
 
         var seats = SeatCandidates(candidates, defenderCount, model);
 
-        selection.Open(mapEvent, seats, defenderBudget, utcNow() + SelectionWindow);
+        selection.Open(mapEvent, seats, defenderBudget, UtcNow() + SelectionWindow);
         settlement.CurrentSiegeState = Settlement.SiegeState.InTheLordsHall;
 
         Logger.Information("Opened keep stage for {Settlement}: {Defenders} defenders, {Seated} of {Players} players seated",
@@ -171,7 +164,8 @@ public sealed class SiegeKeepStage : ISiegeKeepStage
     public bool TrySelect(MapEvent mapEvent, MobileParty party, IReadOnlyList<HideoutTroopSelectionEntry> troops)
     {
         if (!selection.TrySelect(mapEvent, party, troops)) return false;
-        return !selection.HaveAllAnswered(mapEvent) || Lock(mapEvent);
+        if (!selection.HaveAllAnswered(mapEvent)) return true;
+        return Lock(mapEvent);
     }
 
     public void Tick()
@@ -187,7 +181,7 @@ public sealed class SiegeKeepStage : ISiegeKeepStage
                     selection.RemoveSeat(mapEvent, seat.MobilePartyId);
             }
 
-            bool windowClosed = selection.TryGetDeadline(mapEvent, out var deadline) && utcNow() >= deadline;
+            bool windowClosed = selection.TryGetDeadline(mapEvent, out var deadline) && UtcNow() >= deadline;
             if (selection.HaveAllAnswered(mapEvent) || windowClosed)
                 Lock(mapEvent);
         }
@@ -262,7 +256,7 @@ public sealed class SiegeKeepStage : ISiegeKeepStage
     public int SecondsRemaining(MapEvent mapEvent)
     {
         if (!selection.TryGetDeadline(mapEvent, out var deadline)) return 0;
-        var left = deadline - utcNow();
+        var left = deadline - UtcNow();
         return Math.Max(0, (int)Math.Ceiling(left.TotalSeconds));
     }
 

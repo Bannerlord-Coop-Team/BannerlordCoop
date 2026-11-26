@@ -1,8 +1,8 @@
 ﻿using E2E.Tests.Environment.MockEngine;
-using E2E.Tests.Services.SiegeEvents;
 using GameInterface.Services.MapEvents.TroopSupply;
 using HarmonyLib;
 using Missions.Battles;
+using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 using Xunit.Abstractions;
@@ -24,7 +24,6 @@ public class CoopLordsHallFightMissionControllerTests : MissionTestEnvironment
         var client = Clients.First();
         client.Call(() =>
         {
-            SiegeKeepStageTests.EnsureLordsHallModel();
             var mock = fixture.CreateMission(client);
             var attackerTeam = mock.AddTeam(BattleSideEnum.Attacker);
             mock.PlayerTeam = mock.AttackerTeam;
@@ -32,7 +31,8 @@ public class CoopLordsHallFightMissionControllerTests : MissionTestEnvironment
             var controller = new CoopLordsHallFightMissionController(
                 new CoopTroopSupplier("keep", BattleSideEnum.Defender, null, null),
                 new CoopTroopSupplier("keep", BattleSideEnum.Attacker, null, null),
-                BattleSideEnum.Attacker);
+                BattleSideEnum.Attacker,
+                new DefaultSiegeLordsHallFightModel());
             AccessTools.Property(typeof(MissionBehavior), nameof(MissionBehavior.Mission)).SetValue(controller, mock.Shell);
             controller._isMissionInitialized = true;
             mock.Shell.MissionBehaviors.Add(controller);
@@ -57,32 +57,19 @@ public class CoopLordsHallFightMissionControllerTests : MissionTestEnvironment
             Assert.True(spawnLogic.IsSideDepleted(BattleSideEnum.Defender));
             Assert.False(spawnLogic.IsSideDepleted(BattleSideEnum.Attacker));
             AssertBattleEndReadsTheDefendersBeaten(spawnLogic, mock.Shell);
-        });
+        }, new[] { AccessTools.Method(typeof(MBCommon), nameof(MBCommon.GetTotalMissionTime)) });
     }
 
     private static void AssertBattleEndReadsTheDefendersBeaten(IMissionAgentSpawnLogic spawnLogic, Mission mission)
     {
-        var harmony = new Harmony($"keep-end-check.{Guid.NewGuid()}");
-        try
-        {
-            harmony.Patch(AccessTools.Method(typeof(MBCommon), nameof(MBCommon.GetTotalMissionTime)),
-                prefix: new HarmonyMethod(typeof(CoopLordsHallFightMissionControllerTests), nameof(FixedMissionTime)));
-            var end = new BattleEndLogic();
-            AccessTools.Property(typeof(MissionBehavior), nameof(MissionBehavior.Mission)).SetValue(end, mission);
-            end.OnBehaviorInitialize();
-            Assert.Same(spawnLogic, end._missionAgentSpawnLogic);
-            end._canCheckForEndConditionSiege = true;
-            end.ChangeCanCheckForEndCondition(true);
-            end.CheckIsEnemySideRetreatingOrOneSideDepleted();
-            Assert.True(end._isEnemySideDepleted);
-            Assert.False(end._isPlayerSideDepleted);
-        }
-        finally { harmony.UnpatchAll(harmony.Id); }
-    }
-
-    private static bool FixedMissionTime(ref float __result)
-    {
-        __result = 0f;
-        return false;
+        var end = new BattleEndLogic();
+        AccessTools.Property(typeof(MissionBehavior), nameof(MissionBehavior.Mission)).SetValue(end, mission);
+        end.OnBehaviorInitialize();
+        Assert.Same(spawnLogic, end._missionAgentSpawnLogic);
+        end._canCheckForEndConditionSiege = true;
+        end.ChangeCanCheckForEndCondition(true);
+        end.CheckIsEnemySideRetreatingOrOneSideDepleted();
+        Assert.True(end._isEnemySideDepleted);
+        Assert.False(end._isPlayerSideDepleted);
     }
 }

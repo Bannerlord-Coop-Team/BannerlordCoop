@@ -80,10 +80,12 @@ internal sealed class SiegeKeepEntryHandler : IHandler
         }
 
         var maximum = reply.EscortAllowance + 1;
+        // The player's own hero, which the picker keeps selected.
+        var minimum = 1;
         var selected = MobilePartyHelper.GetStrongestAndPriorTroops(MobileParty.MainParty, maximum, includePlayer: true);
         args.MenuContext.OpenTroopSelection(MobileParty.MainParty.MemberRoster, selected,
             character => !character.IsPlayerCharacter,
-            roster => SubmitSelection(mapEventId, roster), maximum, 1);
+            roster => SubmitSelection(mapEventId, roster), maximum, minimum);
         ShowMessage($"Choose up to {reply.EscortAllowance} troops for the keep. The assault starts in {reply.SecondsRemaining} seconds.");
     }
 

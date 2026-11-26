@@ -1,6 +1,6 @@
 ﻿using GameInterface.Services.MapEvents.TroopSupply;
 using System.Linq;
-using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.ComponentInterfaces;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.MountAndBlade.Source.Missions.Handlers;
@@ -20,12 +20,12 @@ internal sealed class CoopLordsHallFightMissionController : LordsHallFightMissio
     private CoopBattleController battle;
 
     public CoopLordsHallFightMissionController(CoopTroopSupplier defenderSupplier, CoopTroopSupplier attackerSupplier,
-        BattleSideEnum playerSide)
+        BattleSideEnum playerSide, SiegeLordsHallFightModel hallModel)
         : base(new IMissionTroopSupplier[] { defenderSupplier, attackerSupplier },
-            Campaign.Current.Models.SiegeLordsHallFightModel.AreaLostRatio,
-            Campaign.Current.Models.SiegeLordsHallFightModel.AttackerDefenderTroopCountRatio,
-            Campaign.Current.Models.SiegeLordsHallFightModel.MaxAttackerSideTroopCount,
-            Campaign.Current.Models.SiegeLordsHallFightModel.MaxDefenderSideTroopCount,
+            hallModel.AreaLostRatio,
+            hallModel.AttackerDefenderTroopCountRatio,
+            hallModel.MaxAttackerSideTroopCount,
+            hallModel.MaxDefenderSideTroopCount,
             playerSide)
     {
         this.defenderSupplier = defenderSupplier;

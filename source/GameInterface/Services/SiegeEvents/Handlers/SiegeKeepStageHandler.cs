@@ -92,6 +92,7 @@ internal sealed class SiegeKeepStageHandler : IHandler
         catch (Exception exception)
         {
             Logger.Error(exception, "Unable to open the keep stage for {MapEventId}", mapEvent.StringId);
+            stage.Forget(mapEvent);
             return false;
         }
     }

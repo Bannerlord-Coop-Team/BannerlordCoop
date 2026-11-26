@@ -51,7 +51,7 @@ public class SiegeKeepStageTests : MapEventTestBase
     public void WallsPullBack_SeatsBothPlayersAndStartsTheKeepWithTheirSquads()
     {
         // Every real keep follows a walls mission on the same map event, whose start snapshot it must not reuse.
-        var keep = OpenKeepStage(TimeSpan.FromSeconds(90), DefenderTroops, startWallsFirst: true);
+        var keep = OpenKeepStage(DefenderTroops, startWallsFirst: true);
         var clients = Clients.ToArray();
 
         Server.Call(() =>
@@ -98,7 +98,7 @@ public class SiegeKeepStageTests : MapEventTestBase
     [Fact]
     public void WallsResultsAfterAnEarlyPullBackApply_OpenTheKeepStage()
     {
-        var keep = OpenKeepStage(TimeSpan.FromSeconds(90), DefenderTroops, openStage: false);
+        var keep = OpenKeepStage(DefenderTroops, openStage: false);
         var clients = Clients.ToArray();
         var controllers = new[] { "keep-leader", "keep-joiner" };
         for (var index = 0; index < clients.Length; index++)
@@ -146,9 +146,13 @@ public class SiegeKeepStageTests : MapEventTestBase
     [Fact]
     public void SelectionDeadline_LocksTheRosterWithSuggestedSquadsWithinEachShare()
     {
-        var keep = OpenKeepStage(TimeSpan.Zero, defenders: 10);
+        var keep = OpenKeepStage(defenders: 10);
 
-        Server.Call(() => Server.Resolve<IMessageBroker>().Publish(this, new CampaignTick()));
+        Server.Call(() =>
+        {
+            ((SiegeKeepStage)Server.Resolve<ISiegeKeepStage>()).UtcNow = () => DateTime.UtcNow.AddSeconds(91);
+            Server.Resolve<IMessageBroker>().Publish(this, new CampaignTick());
+        });
 
         Assert.Equal(2, LockedSeats());
         StartKeepMission(keep, expectedStarts: 2);
@@ -169,7 +173,7 @@ public class SiegeKeepStageTests : MapEventTestBase
         Server.Call(() => Server.Resolve<IMessageBroker>().Subscribe<AuthoritativeBattleConclusionRequested>(
             payload => conclusions.Add(payload.What)));
 
-        var keep = OpenKeepStage(TimeSpan.FromSeconds(90), DefenderTroops, woundHeroes: true);
+        var keep = OpenKeepStage(DefenderTroops, woundHeroes: true);
 
         Assert.Equal(BattleState.AttackerVictory, Assert.Single(conclusions).BattleState);
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkSiegeKeepPhaseChanged>());
@@ -184,7 +188,7 @@ public class SiegeKeepStageTests : MapEventTestBase
     [Fact]
     public void SingleHallPlace_SeatsOnlyTheSiegeLeader()
     {
-        var keep = OpenKeepStage(TimeSpan.FromSeconds(90), defenders: 1);
+        var keep = OpenKeepStage(defenders: 1);
         var clients = Clients.ToArray();
 
         var choosing = Server.NetworkSentMessages.GetMessages<NetworkSiegeKeepPhaseChanged>()
@@ -202,7 +206,7 @@ public class SiegeKeepStageTests : MapEventTestBase
     [Fact]
     public void SeatedPlayerLeavingWhileChoosing_StartsTheKeepForThePlayersStillHere()
     {
-        var keep = OpenKeepStage(TimeSpan.FromSeconds(90), DefenderTroops);
+        var keep = OpenKeepStage(DefenderTroops);
         var clients = Clients.ToArray();
 
         Server.Call(() =>
@@ -222,7 +226,7 @@ public class SiegeKeepStageTests : MapEventTestBase
     [Fact]
     public void LastSeatedPlayerLeaving_ClosesTheStage()
     {
-        var keep = OpenKeepStage(TimeSpan.FromSeconds(90), defenders: 1);
+        var keep = OpenKeepStage(defenders: 1);
         var clients = Clients.ToArray();
 
         Server.Call(() =>
@@ -242,7 +246,7 @@ public class SiegeKeepStageTests : MapEventTestBase
     [Fact]
     public void AttackQueryInTheHall_OpensTheKeepStage()
     {
-        var keep = OpenKeepStage(TimeSpan.FromSeconds(90), DefenderTroops, openStage: false);
+        var keep = OpenKeepStage(DefenderTroops, openStage: false);
         var clients = Clients.ToArray();
         Server.Call(() =>
         {
@@ -264,7 +268,7 @@ public class SiegeKeepStageTests : MapEventTestBase
     [Fact]
     public void ClientPhaseChanges_ResetTheWallsResultAndRequestTheKeepMission()
     {
-        var keep = OpenKeepStage(TimeSpan.FromSeconds(90), DefenderTroops);
+        var keep = OpenKeepStage(DefenderTroops);
         var client = Clients.First();
         MobileParty previousMainParty = null!;
         client.Call(() =>
@@ -303,7 +307,7 @@ public class SiegeKeepStageTests : MapEventTestBase
         string LeaderCharacterId, string JoinerCharacterId, List<MethodBase> DisabledMethods);
 
     // Two attacking players at a besieged town whose walls just fell back, with the keep stage opened by the server.
-    private KeepStage OpenKeepStage(TimeSpan selectionWindow, int defenders, bool startWallsFirst = false,
+    private KeepStage OpenKeepStage(int defenders, bool startWallsFirst = false,
         bool woundHeroes = false, bool openStage = true)
     {
         var battle = CreateServerMapEvent();
@@ -352,12 +356,9 @@ public class SiegeKeepStageTests : MapEventTestBase
                 start => Assert.False(start.IsLordsHall));
         }
 
-        Server.Call(() =>
-        {
-            ((SiegeKeepStage)Server.Resolve<ISiegeKeepStage>()).SelectionWindow = selectionWindow;
-            if (openStage)
-                Server.Resolve<IMessageBroker>().Publish(this, new AuthoritativeSiegeKeepRequested(battle.MapEventId, 1));
-        }, disabledMethods);
+        if (openStage)
+            Server.Call(() => Server.Resolve<IMessageBroker>().Publish(this,
+                new AuthoritativeSiegeKeepRequested(battle.MapEventId, 1)), disabledMethods);
         return keep;
     }
 
@@ -409,7 +410,7 @@ public class SiegeKeepStageTests : MapEventTestBase
     }
 
     // The harness campaign has no hall model, which the keep reads for vanilla's limits.
-    internal static void EnsureLordsHallModel()
+    private static void EnsureLordsHallModel()
     {
         if (Campaign.Current.Models?.SiegeLordsHallFightModel != null) return;
 
