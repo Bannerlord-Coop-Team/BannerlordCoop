@@ -137,11 +137,11 @@ internal class MapEventHandler : IHandler
                     return;
                 }
 
-                // CampaignMissionComponent sets this on an attacker client before its result-ready report. The
-                // server keeps the map event unresolved until the coop completion barrier finalizes the ambush
-                // or opens the keep after the walls.
+                // CampaignMissionComponent sets this on an attacker client before its result-ready report, and a walls
+                // peer's can land after the keep opened. The server keeps the map event unresolved until the coop
+                // completion barrier finalizes the ambush or the keep ends.
                 if (ModInformation.IsServer && battleState == BattleState.DefenderPullBack &&
-                    mapEvent.ConcludesPullBackOnServer())
+                    (mapEvent.IsSiegeAmbush || mapEvent.CanFallBackToKeep()))
                     return;
 
                 // Only the elected battle host's conclusion is authoritative: a non-host's local mission can

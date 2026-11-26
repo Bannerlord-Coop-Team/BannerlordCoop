@@ -141,6 +141,24 @@ public class SiegeKeepStageTests : MapEventTestBase
             .Count(message => message.Phase == SiegeKeepPhase.Choosing && message.IsSeated));
     }
 
+    // A walls peer's own pull-back can reach the server after the keep opened. Applying it there would end the assault,
+    // so every Attack on the keep would be refused as no longer open.
+    [Fact]
+    public void LatePullBackApplyAfterTheKeepOpened_LeavesTheKeepOpenForAttack()
+    {
+        var keep = OpenKeepStage(DefenderTroops);
+        var clients = Clients.ToArray();
+
+        Server.Call(() => Server.SimulateMessage(clients[1].NetPeer,
+            new NetworkChangeBattleState(keep.Battle.MapEventId, BattleState.DefenderPullBack, 1)), keep.DisabledMethods);
+        Server.SimulateMessage(clients[0].NetPeer, new NetworkSiegeKeepEntryRequest("query-after-late-apply",
+            keep.Battle.MapEventId, queryOnly: true, Array.Empty<HideoutTroopSelectionEntry>()));
+
+        var reply = Reply("query-after-late-apply");
+        Assert.True(reply.Accepted, reply.Reason);
+        Assert.Equal(LeaderEscorts, reply.EscortAllowance);
+    }
+
     // Players who never answer before the selection window ends bring vanilla's suggested squad, sized to the escort
     // places their seat got: 10 defenders give 7 places, so 5 escorts shared 3 and 2.
     [Fact]
