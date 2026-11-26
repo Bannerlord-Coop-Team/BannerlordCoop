@@ -195,22 +195,24 @@ public class TournamentMissionRulesTests
     }
 
     [Theory]
-    [InlineData(TournamentSessionPhase.LiveMatch, true, true)]
-    [InlineData(TournamentSessionPhase.SimulatingMatch, true, true)]
-    [InlineData(TournamentSessionPhase.LiveMatch, false, false)]
-    [InlineData(TournamentSessionPhase.AwaitingChoices, true, false)]
+    [InlineData(TournamentSessionPhase.LiveMatch, "human", true)]
+    [InlineData(TournamentSessionPhase.SimulatingMatch, "human", true)]
+    [InlineData(TournamentSessionPhase.LiveMatch, "", false)]
+    [InlineData(TournamentSessionPhase.LiveMatch, "earlier-entrant", false)]
+    [InlineData(TournamentSessionPhase.AwaitingChoices, "human", false)]
     public void CompletedByDisconnect_MatchesFinalEntrantDisconnectState(
-        TournamentSessionPhase previousPhase, bool disconnected, bool expected)
+        TournamentSessionPhase previousPhase, string disconnectedSlotId, bool expected)
     {
-        var npc = Contestant("npc", "npc-character", 1);
-        var previous = Snapshot(new[]
+        TournamentContestantData[] Contestants(string disconnectedSlot) => new[]
         {
-            npc, Contestant("human", "human-character", 2, "fighter", true)
-        }, previousPhase);
-        var completed = Snapshot(new[]
-        {
-            npc, Contestant("human", "human-character", 2, "fighter", true, isDisconnected: disconnected)
-        }, TournamentSessionPhase.Completed, bracketRevision: 5);
+            Contestant("npc", "npc-character", 1),
+            Contestant("human", "human-character", 2, "fighter", true,
+                isDisconnected: disconnectedSlot == "human"),
+            Contestant("earlier-entrant", "earlier-character", 3, "earlier-fighter", true,
+                isDisconnected: disconnectedSlot == "earlier-entrant")
+        };
+        var previous = Snapshot(Contestants(string.Empty), previousPhase);
+        var completed = Snapshot(Contestants(disconnectedSlotId), TournamentSessionPhase.Completed, bracketRevision: 5);
 
         Assert.Equal(expected, TournamentMatchTransitionRules.CompletedByDisconnect(previous, completed));
     }

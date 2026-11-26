@@ -212,11 +212,15 @@ internal sealed partial class TournamentSessionHandler : IHandler
             return;
         }
 
-        bool ownsBracketSlot = TryGetPlayerSlot(current, player.ControllerId, out var slot) &&
-            slot.CharacterId == player.CharacterObjectId;
-        if (!ownsBracketSlot)
+        if (!TryGetPlayerSlot(current, player.ControllerId, out var slot))
         {
             RequestActiveSpectate(peer, player.ControllerId, current);
+            return;
+        }
+
+        if (slot.CharacterId != player.CharacterObjectId)
+        {
+            SendRejection(peer, current.TownId, "A different character is registered for your tournament slot.");
             return;
         }
 
@@ -444,8 +448,8 @@ internal sealed partial class TournamentSessionHandler : IHandler
                 canonical.Revision);
             if (status == TournamentMutationStatus.Applied && outcome == TournamentBallotOutcome.SimulateMatch)
             {
-                TournamentSessionSnapshot simulated = SimulateCurrentMatchAndAdvance(snapshot, player.ControllerId);
-                if (simulated.Revision == snapshot.Revision)
+                var simulationStatus = SimulateCurrentMatchAndAdvance(snapshot, player.ControllerId, out _);
+                if (simulationStatus != TournamentMutationStatus.Applied)
                     BroadcastSnapshot(snapshot);
             }
             else
@@ -874,10 +878,8 @@ internal sealed partial class TournamentSessionHandler : IHandler
         if (outcome == TournamentBallotOutcome.SimulateMatch)
         {
             // A simulated match needs no client host or migrated spawn manifest.
-            var simulated = SimulateCurrentMatchAndAdvance(snapshot, controllerId);
-            bool simulationFailed = simulated.Revision == snapshot.Revision;
-            // TryAdvanceSimulatedMatch broadcasts the updated snapshot on success.
-            if (simulationFailed)
+            var simulationStatus = SimulateCurrentMatchAndAdvance(snapshot, controllerId, out var simulated);
+            if (simulationStatus != TournamentMutationStatus.Applied)
                 BroadcastSnapshot(snapshot);
             snapshot = simulated;
         }

@@ -153,7 +153,10 @@ internal sealed class TournamentUIController : ITournamentUIController, IHandler
     public bool CanResume(string townId)
         => TryGetTownSession(townId, out var snapshot) &&
            IsActive(snapshot) &&
-           IsActiveLocalContestant(snapshot);
+           GetLocalContestant(snapshot) is { } contestant &&
+           Hero.MainHero?.CharacterObject is { } character &&
+           objectManager.TryGetId(character, out var characterId) &&
+           contestant.CharacterId == characterId;
 
     public void RequestJoin(string townId, string sessionId, long expectedRevision)
         => network.SendAll(new NetworkRequestJoinTournament(townId, sessionId, expectedRevision));
@@ -446,7 +449,10 @@ internal sealed class TournamentUIController : ITournamentUIController, IHandler
     }
 
     private bool IsActiveLocalContestant(TournamentSessionSnapshot snapshot)
-        => snapshot.Contestants.Any(contestant =>
+        => GetLocalContestant(snapshot) != null;
+
+    private TournamentContestantData GetLocalContestant(TournamentSessionSnapshot snapshot)
+        => snapshot.Contestants.FirstOrDefault(contestant =>
             contestant.IsHuman &&
             !contestant.IsReplaced &&
             contestant.ControllerId == LocalControllerId);

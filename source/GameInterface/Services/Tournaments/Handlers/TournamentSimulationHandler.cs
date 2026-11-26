@@ -42,12 +42,14 @@ internal sealed partial class TournamentSessionHandler
     private const int MaximumSimulationMatches = 64;
     private long simulationSequence;
 
-    private TournamentSessionSnapshot SimulateCurrentMatchAndAdvance(
+    private TournamentMutationStatus SimulateCurrentMatchAndAdvance(
         TournamentSessionSnapshot snapshot,
-        string submittingControllerId)
+        string submittingControllerId,
+        out TournamentSessionSnapshot advanced)
     {
+        advanced = snapshot;
         if (snapshot == null)
-            return snapshot;
+            return TournamentMutationStatus.Rejected;
 
         Logger.Information(
             "[Tournament] Simulating match session={SessionId}, match={MatchId}, revision={Revision}, bracketRevision={BracketRevision}, bracket={Bracket}",
@@ -66,14 +68,13 @@ internal sealed partial class TournamentSessionHandler
                 snapshot.SessionId,
                 snapshot.CurrentMatchId,
                 DescribeBracket(snapshot.Rounds));
-            return snapshot;
+            return TournamentMutationStatus.Rejected;
         }
 
-        var status = TryAdvanceSimulatedMatch(snapshot, submittingControllerId, result, out var advanced);
-        if (status != TournamentMutationStatus.Applied)
-            return snapshot;
-
-        return advanced;
+        var status = TryAdvanceSimulatedMatch(snapshot, submittingControllerId, result, out var changed);
+        if (status == TournamentMutationStatus.Applied)
+            advanced = changed;
+        return status;
     }
 
     private TournamentMutationStatus TryAdvanceSimulatedMatch(
@@ -176,10 +177,8 @@ internal sealed partial class TournamentSessionHandler
                 return;
             }
 
-            string hostControllerId = snapshot.HostControllerId;
-            TournamentSessionSnapshot previous = snapshot;
-            snapshot = SimulateCurrentMatchAndAdvance(snapshot, hostControllerId);
-            if (snapshot.Revision == previous.Revision)
+            var simulationStatus = SimulateCurrentMatchAndAdvance(snapshot, snapshot.HostControllerId, out snapshot);
+            if (simulationStatus != TournamentMutationStatus.Applied)
                 return;
             simulatedMatches++;
         }
