@@ -2,8 +2,10 @@
 using System.Linq;
 using System.Reflection;
 using Common.Messaging;
+using Common.Util;
 using E2E.Tests.Util;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.Entity;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages;
@@ -11,12 +13,17 @@ using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.Players;
 using HarmonyLib;
 using Helpers;
+using Missions.Messages;
 using SandBox.ViewModelCollection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
@@ -254,6 +261,107 @@ public class BattleSimulationEncounterTests : MapEventTestBase
             Assert.False(BattleSimulationReplay.IsActiveFor(context.MapEventId));
         }, MapEventDisabledMethods);
     }
+
+    [Fact]
+    public void RetreatedDefender_LosesSendTroops_IsTakenPrisonerOffTheEncounterMenu()
+    {
+        const string playerId = "PlayerOne";
+        var client = Clients.First();
+        client.Resolve<IControllerIdProvider>().SetControllerId(playerId);
+        var (heroId, partyId) = CreatePlayerHeroParty(playerId);
+        Server.Resolve<IPlayerManager>().SetPeer(playerId, client.NetPeer);
+        var captorId = CreateServerParty();
+        var mapEventId = CreateBattleStateDefeatMapEvent(heroId, partyId, captorId);
+
+        Server.Call(() =>
+        {
+            EnsureEncounterModel();
+            Campaign.Current.MapEventManager.OnMapEventCreated(Server.GetRegisteredObject<MapEvent>(mapEventId));
+            // The knocked out player retreated from the mission before sending the troops.
+            Server.Resolve<IMessageBroker>().Publish(this, new BattlePartyRetreated(playerId, mapEventId));
+        }, MapEventDisabledMethods);
+
+        BattleSimulation simulation = null;
+        client.Call(() =>
+        {
+            var party = client.GetRegisteredObject<MobileParty>(partyId);
+            var captor = client.GetRegisteredObject<MobileParty>(captorId);
+            var mapEvent = client.GetRegisteredObject<MapEvent>(mapEventId);
+            Campaign.Current.MainParty = party;
+            Campaign.Current.MapStateData ??= new MapStateData();
+            Assert.Same(mapEvent, party.MapEvent);
+
+            var starter = new CampaignGameStarter(Campaign.Current.GameMenuManager, Campaign.Current.ConversationManager);
+            new EncounterGameMenuBehavior().OnSessionLaunched(starter);
+            // PlayerTownVisitCampaignBehavior registers prisoner_wait in game; an empty wait menu is enough here.
+            starter.AddWaitGameMenu("prisoner_wait", "", null, null, null, null, GameMenu.MenuAndOptionType.WaitMenuHideProgressAndHoursOption);
+
+            var encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
+            encounter._mapEvent = mapEvent;
+            encounter._encounteredParty = captor.Party;
+            encounter._attackerParty = captor.Party;
+            encounter._defenderParty = party.Party;
+            encounter._alternativeReceivedLootShips = new List<Ship>();
+            encounter.PlayerSide = BattleSideEnum.Defender;
+            encounter.OpponentSide = BattleSideEnum.Attacker;
+            encounter.EncounterState = PlayerEncounterState.Wait;
+            Campaign.Current.PlayerEncounter = encounter;
+            Game.Current.GameStateManager._gameStates.Add(Game.Current.GameStateManager.CreateState<MapState>());
+
+            // E2E clients share process statics, so select this client's coordinator for the patch.
+            AccessTools.Field(typeof(BattleStartCoordinator), "<Instance>k__BackingField")
+                .SetValue(null, client.Resolve<BattleStartCoordinator>());
+            AccessTools.Method(typeof(EncounterGameMenuBehavior), "game_menu_encounter_order_attack_on_consequence")
+                .Invoke(new EncounterGameMenuBehavior(), new object[] { new MenuCallbackArgs((MenuContext)null, null) });
+
+            simulation = encounter.BattleSimulation;
+            Assert.NotNull(simulation);
+            Assert.True(BattleSimulationReplay.IsActiveFor(mapEventId));
+        }, MapEventDisabledMethods
+            .Append(AccessTools.Method(typeof(BeHostileAction), nameof(BeHostileAction.ApplyEncounterHostileAction)))
+            // The client's local troop setup reads the engine config the harness lacks; the server owns the simulation.
+            .Append(AccessTools.Method(typeof(BattleSimulation), nameof(BattleSimulation.ResetSimulation))));
+
+        // Every sent troop died, so the attackers win the server's simulation on the next client paced advance.
+        Server.Call(() => Server.GetRegisteredObject<MapEvent>(mapEventId).BattleState = BattleState.AttackerVictory,
+            BattleResultDisabledMethods);
+        client.Call(() => BattleSimulationReplay.Tick(simulation, 1f), BattleResultDisabledMethods);
+
+        Server.Call(() =>
+        {
+            Assert.False(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out _));
+            Assert.Same(Server.GetRegisteredObject<MobileParty>(captorId).Party,
+                Server.GetRegisteredObject<Hero>(heroId).PartyBelongedToAsPrisoner);
+        });
+
+        client.Call(() =>
+        {
+            BattleSimulationReplay.Tick(simulation, 0f);
+            Assert.True(simulation.IsSimulationFinished);
+
+            // The scoreboard's Done closes the simulation and reopens the encounter menu.
+            var mapState = Game.Current.GameStateManager.GameStates.OfType<MapState>().Single();
+            mapState.EndBattleSimulation();
+            simulation.OnFinished();
+
+            Assert.True(PlayerCaptivity.IsCaptive);
+            Assert.Null(PlayerEncounter.Current);
+            Assert.Null(MobileParty.MainParty.MapEvent);
+            Assert.Equal("prisoner_wait", mapState.MenuContext?.GameMenu?.StringId);
+        }, MapEventDisabledMethods);
+    }
+
+    private IReadOnlyList<MethodBase> BattleResultDisabledMethods => MapEventDisabledMethods
+        .Append(AccessTools.Method(typeof(DefaultBattleRewardModel), nameof(DefaultBattleRewardModel.GetCaptureMemberChancesForWinnerParties)))
+        .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyCasualties"))
+        .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyItems"))
+        .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyPrisoners"))
+        .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyShips"))
+        .Append(AccessTools.Method(typeof(MapEvent), "CalculateMapEventResults"))
+        .Append(AccessTools.Method(typeof(MapEvent), "CommitCalculatedMapEventResults"))
+        // Headless campaigns have no navigation mesh for the finalize displacement of a defeated party.
+        .Append(AccessTools.Method(typeof(MapEvent), "MovePartyToSuitablePositionOnMapEventFinalize"))
+        .ToList();
 
     private sealed class InquiryRecorder : IDisposable
     {
