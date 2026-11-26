@@ -14,7 +14,8 @@ namespace GameInterface.Services.Kingdoms
             KingdomDecisionVoteData voteData,
             KingdomElection election,
             IObjectManager objectManager,
-            out DecisionOutcome outcome);
+            out DecisionOutcome outcome,
+            bool requireKeyMatch = false);
     }
 
     internal class KingdomDecisionOutcomeResolver : IKingdomDecisionOutcomeResolver
@@ -55,7 +56,8 @@ namespace GameInterface.Services.Kingdoms
             KingdomDecisionVoteData voteData,
             KingdomElection election,
             IObjectManager objectManager,
-            out DecisionOutcome outcome)
+            out DecisionOutcome outcome,
+            bool requireKeyMatch = false)
         {
             outcome = null;
             if (voteData == null || election == null) return false;
@@ -72,6 +74,7 @@ namespace GameInterface.Services.Kingdoms
                 }
             }
 
+            if (requireKeyMatch) return false;
             if (voteData.OutcomeIndex < 0 || voteData.OutcomeIndex >= election._possibleOutcomes.Count) return false;
 
             outcome = election._possibleOutcomes[voteData.OutcomeIndex];

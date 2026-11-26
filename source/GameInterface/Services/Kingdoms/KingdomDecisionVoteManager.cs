@@ -51,6 +51,8 @@ namespace GameInterface.Services.Kingdoms
         bool ShouldBlockLocalResolution(DecisionItemBaseVM decisionItem);
         void RegisterDecisionItem(DecisionItemBaseVM decisionItem);
         void UnregisterDecisionItem(DecisionItemBaseVM decisionItem);
+        bool HasPendingSettlementDecisionResult();
+        void ShowNextSettlementDecisionResult(KingdomDecisionsVM decisionsVm);
         bool HandleVoteRequest(string controllerId, KingdomDecisionVoteData voteData);
         void ApplyRemoteVote(string clanId, KingdomDecisionVoteData voteData);
         bool TryResolveDecision(KingdomDecision decision);
@@ -63,7 +65,8 @@ namespace GameInterface.Services.Kingdoms
             int outcomeIndex,
             bool isPlayerDecision,
             string outcomeKey = null,
-            string notificationText = null);
+            string notificationText = null,
+            KingdomDecision.SupportStatus supportStatus = KingdomDecision.SupportStatus.Equal);
         void CloseDecision(string kingdomId, int decisionIndex);
         void ClearDecisionState(string kingdomId, int decisionIndex);
         void ClearDecisionState(Kingdom kingdom, int decisionIndex);
@@ -82,6 +85,7 @@ namespace GameInterface.Services.Kingdoms
         private readonly List<DecisionItemBaseVM> ActiveDecisionItems = new List<DecisionItemBaseVM>();
         private readonly List<PendingKingdomDecisionVote> PendingRemoteVotes = new List<PendingKingdomDecisionVote>();
         private readonly List<KingdomDecisionRoundStatusData> PendingRoundStatuses = new List<KingdomDecisionRoundStatusData>();
+        private readonly Queue<(KingdomDecisionVoteState State, KingdomDecisionVoteData Result)> SettlementDecisionResults = new();
 
         private readonly IPlayerManager playerManager;
         private readonly IObjectManager objectManager;
@@ -120,6 +124,7 @@ namespace GameInterface.Services.Kingdoms
             ActiveDecisionItems.Clear();
             PendingRemoteVotes.Clear();
             PendingRoundStatuses.Clear();
+            SettlementDecisionResults.Clear();
         }
 
         public void RegisterDecision(KingdomDecision decision)
@@ -409,7 +414,7 @@ namespace GameInterface.Services.Kingdoms
 
         public void DismissSubmittedDecisionItem(DecisionItemBaseVM decisionItem)
         {
-            if (decisionItem == null || !decisionItem.IsActive) return;
+            if (decisionItem == null || !decisionItem.IsActive || decisionItem.IsKingsDecisionOver) return;
 
             KingdomDecision decision = decisionItem.KingdomDecisionMaker?._decision;
             TryGetKingdomId(decision?.Kingdom, out string kingdomId);
@@ -625,7 +630,8 @@ namespace GameInterface.Services.Kingdoms
             int outcomeIndex,
             bool isPlayerDecision,
             string outcomeKey = null,
-            string notificationText = null)
+            string notificationText = null,
+            KingdomDecision.SupportStatus supportStatus = KingdomDecision.SupportStatus.Equal)
         {
             if (!TryGetDecision(kingdomId, decisionIndex, out KingdomDecision decision))
             {
@@ -633,7 +639,9 @@ namespace GameInterface.Services.Kingdoms
                 return;
             }
             KingdomDecisionVoteState state = GetOrCreateState(decision);
-            var voteData = new KingdomDecisionVoteData(
+            if (state.IsResolved) return;
+
+            var result = new KingdomDecisionVoteData(
                 kingdomId,
                 decisionIndex,
                 outcomeIndex,
@@ -641,16 +649,85 @@ namespace GameInterface.Services.Kingdoms
                 false,
                 true,
                 outcomeKey);
-            if (!outcomeResolver.TryGetOutcome(voteData, state.Election, objectManager, out DecisionOutcome outcome))
+            bool isSettlementResult = decision is SettlementClaimantDecision;
+            if (!outcomeResolver.TryGetOutcome(result, state.Election, objectManager, out DecisionOutcome outcome,
+                    requireKeyMatch: isSettlementResult))
             {
                 PublishDecisionNotification(notificationText);
                 return;
             }
 
             state.IsResolved = true;
+            decision.SupportStatusOfFinalDecision = supportStatus;
             CampaignEventDispatcher.Instance.OnKingdomDecisionConcluded(decision, outcome, isPlayerDecision);
             PublishDecisionNotification(notificationText);
+
+            if (isSettlementResult && IsLocalPlayerEligible(decision))
+            {
+                bool shown = false;
+                foreach (DecisionItemBaseVM item in ActiveDecisionItems.ToArray())
+                {
+                    if (!item.IsActive || item.KingdomDecisionMaker._decision != decision) continue;
+                    shown |= ShowSettlementDecisionResult(item, result);
+                }
+                if (!shown)
+                {
+                    SettlementDecisionResults.Enqueue((state, result));
+                }
+                return;
+            }
+
             CloseDecision(decision);
+        }
+
+        public bool HasPendingSettlementDecisionResult()
+        {
+            while (SettlementDecisionResults.Count > 0)
+            {
+                if (IsLocalPlayerEligible(SettlementDecisionResults.Peek().State.Decision)) return true;
+                SettlementDecisionResults.Dequeue();
+            }
+
+            return false;
+        }
+
+        public void ShowNextSettlementDecisionResult(KingdomDecisionsVM decisionsVm)
+        {
+            if (SettlementDecisionResults.Count == 0 || decisionsVm.CurrentDecision != null ||
+                !decisionsVm._shouldCheckForDecision || InformationManager.IsAnyInquiryActive() ||
+                !CampaignUIHelper.GetMapScreenActionIsEnabledWithReason(out _)) return;
+
+            while (HasPendingSettlementDecisionResult())
+            {
+                var (state, result) = SettlementDecisionResults.Dequeue();
+                DecisionItemBaseVM item = decisionsVm.GetDecisionItemBasedOnType(state.Decision);
+                ApplyAuthoritativeOutcomes(state, item);
+                if (!ShowSettlementDecisionResult(item, result))
+                {
+                    CampaignEvents.KingdomDecisionConcluded.ClearListeners(item);
+                    item.OnFinalize();
+                    continue;
+                }
+
+                item.SetDoneInputKey(decisionsVm.DoneInputKey);
+                decisionsVm._shouldCheckForDecision = false;
+                decisionsVm.CurrentDecision = item;
+                return;
+            }
+        }
+
+        private bool ShowSettlementDecisionResult(DecisionItemBaseVM item, KingdomDecisionVoteData result)
+        {
+            KingdomElection election = item.KingdomDecisionMaker;
+            if (!outcomeResolver.TryGetOutcome(result, election, objectManager, out DecisionOutcome winner,
+                    requireKeyMatch: true)) return false;
+
+            // Vanilla marks the winner by reference to an option on this ballot.
+            election._chosenOutcome = winner;
+            item._finalSelectionDone = true;
+            item.CanEndDecision = false;
+            item.OnKingdomDecisionConcluded(election._decision, winner, isPlayerInvolved: true);
+            return true;
         }
 
         public void ClearDecisionState(string kingdomId, int decisionIndex)
@@ -742,6 +819,9 @@ namespace GameInterface.Services.Kingdoms
                          .Where(item => item?.KingdomDecisionMaker?._decision == decision)
                          .ToList())
             {
+                if (decision is SettlementClaimantDecision && decisionItem.IsKingsDecisionOver &&
+                    decisionItem.DecisionOptionsList.Any(option => option.IsKingsOutcome)) continue;
+
                 CloseDecisionItem(decisionItem);
             }
         }
@@ -1112,7 +1192,8 @@ namespace GameInterface.Services.Kingdoms
                 outcomeIndex,
                 true,
                 outcomeKey,
-                notificationText));
+                notificationText,
+                supportStatus));
 
             // A refused call to war on a player kingdom applies nothing, but native OnShowDecision would still offer it to them.
             if (!TryApplyDeclareWarOutcome(state.Decision, outcomeIndex)
@@ -1923,6 +2004,8 @@ namespace GameInterface.Services.Kingdoms
 
         private KingdomDecisionWaitingFeedback GetWaitingFeedback(DecisionItemBaseVM decisionItem)
         {
+            if (decisionItem?.IsKingsDecisionOver == true) return null;
+
             KingdomDecision decision = decisionItem?.KingdomDecisionMaker?._decision;
             if (decision == null || !DecisionStates.TryGetValue(decision, out KingdomDecisionVoteState state)) return null;
             if (state.RoundClans.Count == 0 || !state.RoundDeadlineUtc.HasValue) return null;
@@ -1938,6 +2021,8 @@ namespace GameInterface.Services.Kingdoms
 
         private int? TryGetRemainingSeconds(DecisionItemBaseVM decisionItem)
         {
+            if (decisionItem?.IsKingsDecisionOver == true) return null;
+
             KingdomDecision decision = decisionItem?.KingdomDecisionMaker?._decision;
             if (decision == null || !DecisionStates.TryGetValue(decision, out KingdomDecisionVoteState state)) return null;
             if (!state.RoundDeadlineUtc.HasValue) return null;

@@ -2807,6 +2807,97 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         Assert.Equal(3, client1.NetworkSentMessages.GetMessages<NetworkRequestKingdomDecisionVote>().Count());
     }
 
+    [Fact]
+    public void CastleElection_ShowsServerWinnerAndAwardsCastleToThatClan()
+    {
+        var (rulerClient, vassalClient, ruler, vassal, kingdomId) =
+            SetUpPlayerDeclareWarVotes("CastleElection", decisionCount: 0);
+        LeadPlayerPartiesEverywhere(ruler, vassal);
+        string settlementId = CreateSyncedKingdomTown(vassal.ClanId, vassal.CultureId);
+        var harmony = new Harmony($"e2e.castle-election.{Guid.NewGuid():N}");
+        harmony.Patch(
+            AccessTools.Method(typeof(SettlementClaimantDecision), nameof(SettlementClaimantDecision.CalculateMeritOfOutcome)),
+            prefix: new HarmonyMethod(AccessTools.Method(typeof(PlayerKingdomCreationFlowTests), nameof(FixedClaimantMeritPrefix))));
+        using var garrison = new MethodCallRecorder(AccessTools.Method(typeof(Settlement), nameof(Settlement.AddGarrisonParty)));
+
+        try
+        {
+            Server.Call(() =>
+            {
+                var kingdom = Server.GetRegisteredObject<Kingdom>(kingdomId);
+                var settlement = Server.GetRegisteredObject<Settlement>(settlementId);
+                settlement.Town._isCastle = true;
+                kingdom.AddDecision(new SettlementClaimantDecision(
+                    kingdom.RulingClan, settlement, settlement.OwnerClan.Leader, clanToExclude: null));
+            });
+
+            var views = new Dictionary<EnvironmentInstance, KingdomDecisionsVM>();
+            foreach (var client in new[] { vassalClient, rulerClient })
+            {
+                client.Call(() =>
+                {
+                    var settlement = client.GetRegisteredObject<Settlement>(settlementId);
+                    settlement.Town._isCastle = true;
+                    var decision = Assert.IsType<SettlementClaimantDecision>(
+                        Assert.Single(Clan.PlayerClan.Kingdom.UnresolvedDecisions));
+                    var view = new KingdomDecisionsVM(() => { });
+                    views.Add(client, view);
+                    view.RefreshWith(decision);
+                    SubmitCurrentDecisionVote(view, outcome =>
+                        outcome is SettlementClaimantDecision.ClanAsDecisionOutcome candidate &&
+                        candidate.Clan == Clan.PlayerClan);
+                    if (client == vassalClient)
+                    {
+                        view.RefreshWith(decision);
+                    }
+                });
+            }
+
+            Server.Call(() =>
+            {
+                var settlement = Server.GetRegisteredObject<Settlement>(settlementId);
+                Assert.Same(Server.GetRegisteredObject<Clan>(ruler.ClanId), settlement.OwnerClan);
+                Assert.Empty(settlement.OwnerClan.Kingdom.UnresolvedDecisions);
+            });
+            var resolution = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkKingdomDecisionResolved>(),
+                message => message.KingdomId == kingdomId);
+
+            foreach (var client in new[] { rulerClient, vassalClient })
+            {
+                client.Call(() =>
+                {
+                    var view = views[client];
+                    var settlement = client.GetRegisteredObject<Settlement>(settlementId);
+                    var winningClan = client.GetRegisteredObject<Clan>(ruler.ClanId);
+                    Assert.Same(winningClan, settlement.OwnerClan);
+                    Assert.Empty(winningClan.Kingdom.UnresolvedDecisions);
+
+                    view.OnFrameTick();
+                    var item = Assert.IsType<SettlementDecisionItemVM>(view.CurrentDecision);
+                    Assert.True(item.IsActive);
+                    Assert.True(item.IsKingsDecisionOver);
+                    Assert.Equal(1, item.CurrentStageIndex);
+                    var winner = Assert.Single(item.DecisionOptionsList, option => option.IsKingsOutcome);
+                    Assert.Same(winningClan, Assert.IsType<SettlementClaimantDecision.ClanAsDecisionOutcome>(winner.Option).Clan);
+                    Assert.Same(winner.Option, item.KingdomDecisionMaker._chosenOutcome);
+                    Assert.True(client.Resolve<IKingdomDecisionOutcomeResolver>().TryGetOutcomeKey(
+                        winner.Option, client.ObjectManager, out string winnerKey));
+                    Assert.Equal(resolution.OutcomeKey, winnerKey);
+                    Assert.Equal(resolution.SupportStatus, item.KingdomDecisionMaker._decision.SupportStatusOfFinalDecision);
+
+                    var inquiry = Assert.Single(CaptureInquiries(item.ExecuteDone));
+                    Assert.Equal(item.KingdomDecisionMaker.GetChosenOutcomeText().ToString(), inquiry.Text);
+                    inquiry.AffirmativeAction();
+                    Assert.Null(view.CurrentDecision);
+                });
+            }
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+        }
+    }
+
     private static bool FixedClaimantMeritPrefix(ref float __result)
     {
         __result = 1f;

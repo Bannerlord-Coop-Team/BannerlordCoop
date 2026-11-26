@@ -95,7 +95,8 @@ public class KingdomNetworkMessageSerializationTest
             2,
             true,
             "KingSelectionDecisionOutcome:King=hero_1",
-            "The council has reached a decision.");
+            "The council has reached a decision.",
+            KingdomDecision.SupportStatus.Minority);
 
         var copy = RoundTrip(original);
 
@@ -105,6 +106,7 @@ public class KingdomNetworkMessageSerializationTest
         Assert.True(copy.IsPlayerDecision);
         Assert.Equal("KingSelectionDecisionOutcome:King=hero_1", copy.OutcomeKey);
         Assert.Equal("The council has reached a decision.", copy.NotificationText);
+        Assert.Equal(KingdomDecision.SupportStatus.Minority, copy.SupportStatus);
     }
 
     [Fact]

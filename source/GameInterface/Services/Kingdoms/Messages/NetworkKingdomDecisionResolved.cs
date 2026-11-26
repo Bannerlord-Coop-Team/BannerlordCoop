@@ -1,5 +1,6 @@
 using Common.Messaging;
 using ProtoBuf;
+using TaleWorlds.CampaignSystem.Election;
 
 namespace GameInterface.Services.Kingdoms.Messages
 {
@@ -18,6 +19,8 @@ namespace GameInterface.Services.Kingdoms.Messages
         public string OutcomeKey { get; }
         [ProtoMember(6)]
         public string NotificationText { get; }
+        [ProtoMember(7)]
+        public KingdomDecision.SupportStatus SupportStatus { get; }
 
         public NetworkKingdomDecisionResolved(string kingdomId, int decisionIndex, int outcomeIndex, bool isPlayerDecision)
             : this(kingdomId, decisionIndex, outcomeIndex, isPlayerDecision, null)
@@ -35,7 +38,8 @@ namespace GameInterface.Services.Kingdoms.Messages
             int outcomeIndex,
             bool isPlayerDecision,
             string outcomeKey,
-            string notificationText)
+            string notificationText,
+            KingdomDecision.SupportStatus supportStatus = KingdomDecision.SupportStatus.Equal)
         {
             KingdomId = kingdomId;
             DecisionIndex = decisionIndex;
@@ -43,6 +47,7 @@ namespace GameInterface.Services.Kingdoms.Messages
             IsPlayerDecision = isPlayerDecision;
             OutcomeKey = outcomeKey;
             NotificationText = notificationText;
+            SupportStatus = supportStatus;
         }
     }
 }

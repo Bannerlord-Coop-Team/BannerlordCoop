@@ -494,7 +494,8 @@ public class KingdomHandler : IHandler
                 payload.OutcomeIndex,
                 payload.IsPlayerDecision,
                 payload.OutcomeKey,
-                payload.NotificationText);
+                payload.NotificationText,
+                payload.SupportStatus);
         });
     }
 
@@ -943,7 +944,8 @@ public class KingdomHandler : IHandler
             payload.OutcomeIndex,
             payload.IsPlayerDecision,
             payload.OutcomeKey,
-            payload.NotificationText);
+            payload.NotificationText,
+            payload.SupportStatus);
         network.SendAll(message);
     }
 
@@ -1261,7 +1263,8 @@ public class KingdomHandler : IHandler
             payload.OutcomeIndex,
             payload.IsPlayerDecision,
             payload.OutcomeKey,
-            payload.NotificationText);
+            payload.NotificationText,
+            payload.SupportStatus);
         messageBroker.Publish(this, message);
     }
 

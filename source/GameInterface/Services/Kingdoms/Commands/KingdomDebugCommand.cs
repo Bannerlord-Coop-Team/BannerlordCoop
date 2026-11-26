@@ -278,12 +278,18 @@ public class KingdomDebugCommand
             if (!ModInformation.IsClient) return Failed("Command can only be run on a client.");
 
             var kingdomScreen = ScreenManager.TopScreen as GauntletKingdomScreen;
+            DecisionItemBaseVM decisionItem = kingdomScreen?.DataSource?.Decision?.CurrentDecision;
+            var claimant = decisionItem?.KingdomDecisionMaker._decision as SettlementClaimantDecision;
+            var winner = decisionItem?.DecisionOptionsList.FirstOrDefault(option => option.IsKingsOutcome)?.Option
+                as SettlementClaimantDecision.ClanAsDecisionOutcome;
             return Succeeded($"KINGDOM_SCREEN_STATE active={Game.Current?.GameStateManager?.ActiveState is KingdomState} " +
                 $"topScreen={kingdomScreen != null} dataSource={kingdomScreen?.DataSource != null} " +
                 $"decisionActive={kingdomScreen?.DataSource?.Decision?.IsActive ?? false} " +
                 $"clanShown={kingdomScreen?.DataSource?.Clan?.Show ?? false} " +
                 $"kingdom={kingdomScreen?.DataSource?.Kingdom?.Name} " +
-                $"clans={kingdomScreen?.DataSource?.Clan?.Clans?.Count ?? -1}");
+                $"clans={kingdomScreen?.DataSource?.Clan?.Clans?.Count ?? -1} " +
+                $"result={decisionItem?.IsKingsDecisionOver ?? false} settlement={claimant?.Settlement.StringId} " +
+                $"winner={winner?.Clan.StringId} owner={claimant?.Settlement.OwnerClan?.StringId}");
         }
     }
 

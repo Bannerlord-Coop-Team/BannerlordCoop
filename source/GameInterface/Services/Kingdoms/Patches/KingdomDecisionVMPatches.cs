@@ -1,7 +1,9 @@
 ﻿using Common.Logging;
+using Common;
 using GameInterface.Services.Clans.Handlers;
 using GameInterface.Services.Kingdoms.Extentions;
 using HarmonyLib;
+using SandBox.View.Map;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -16,10 +18,33 @@ using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Decisions;
 using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Decisions.ItemTypes;
 using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Diplomacy;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using TaleWorlds.Localization;
+using TaleWorlds.ScreenSystem;
 
 namespace GameInterface.Services.Kingdoms.Patches
 {
+    /// <summary>Opens the kingdom screen when a fief result arrives while the player is on the map.</summary>
+    [HarmonyPatch(typeof(MapScreen), nameof(MapScreen.OnFrameTick))]
+    internal class SettlementDecisionResultMapPatch
+    {
+        private static void Postfix(MapScreen __instance)
+        {
+            if (ModInformation.IsServer || ScreenManager.TopScreen != __instance) return;
+            if (!KingdomDecisionsVMPatches.TryGetVoteManager(out var voteManager) ||
+                !voteManager.HasPendingSettlementDecisionResult()) return;
+
+            // Match the native map conditions for opening the kingdom decision screen.
+            if (__instance.IsInMenu || __instance.IsInBattleSimulation || __instance.IsInArmyManagement ||
+                __instance.IsMarriageOfferPopupActive || __instance.IsHeirSelectionPopupActive ||
+                __instance.IsMapCheatsActive || __instance.IsMapIncidentActive || __instance.IsOverlayContextMenuEnabled ||
+                __instance.EncyclopediaScreenManager.IsEncyclopediaOpen || InformationManager.IsAnyInquiryActive() ||
+                !CampaignUIHelper.GetMapScreenActionIsEnabledWithReason(out _)) return;
+
+            __instance.OpenKingdom();
+        }
+    }
+
     [HarmonyPatch(typeof(KingdomDecisionsVM))]
     internal class KingdomDecisionsVMPatches
     {
@@ -61,6 +86,10 @@ namespace GameInterface.Services.Kingdoms.Patches
         private static void OnFrameTickPrefix(KingdomDecisionsVM __instance)
         {
             MarkSubmittedDecisionsExamined(__instance);
+            if (TryGetVoteManager(out var voteManager))
+            {
+                voteManager.ShowNextSettlementDecisionResult(__instance);
+            }
         }
 
         // Vanilla prefers the last solved decision's follow-up without checking the examined list.
@@ -191,6 +220,7 @@ namespace GameInterface.Services.Kingdoms.Patches
         private static bool ExecuteFinalSelectionPrefix(DecisionItemBaseVM __instance)
         {
             if (!KingdomDecisionsVMPatches.TryGetVoteManager(out var voteManager)) return true;
+            if (__instance.IsKingsDecisionOver) return false;
             if (voteManager.IsSubmittedDecision(__instance.KingdomDecisionMaker?._decision))
             {
                 voteManager.DismissSubmittedDecisionItem(__instance);
@@ -207,7 +237,7 @@ namespace GameInterface.Services.Kingdoms.Patches
         [HarmonyPostfix]
         private static void RefreshCanEndDecisionPostfix(DecisionItemBaseVM __instance)
         {
-            if (!__instance._finalSelectionDone || !__instance.IsActive) return;
+            if (!__instance._finalSelectionDone || !__instance.IsActive || __instance.IsKingsDecisionOver) return;
             if (!KingdomDecisionsVMPatches.TryGetVoteManager(out var voteManager)) return;
             if (!voteManager.IsSubmittedDecision(__instance.KingdomDecisionMaker?._decision)) return;
 
