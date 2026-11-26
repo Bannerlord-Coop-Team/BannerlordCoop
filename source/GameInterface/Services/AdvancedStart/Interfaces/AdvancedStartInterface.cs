@@ -104,6 +104,8 @@ internal class AdvancedStartInterface : IAdvancedStartInterface
     private bool startOptionsSkipped;
     // Server: the campaign whose clock is being watched for its first move.
     private Campaign worldStartWatchCampaign;
+    // Server: the host's default start type was found not to be offered and logged.
+    private bool warnedDefaultStartType;
     // Client: the server offers world-changing starts.
     private bool worldStartsOffered;
     // Client: the player agreed to the first resume, so they aren't asked again while the clock catches up.
@@ -150,7 +152,18 @@ internal class AdvancedStartInterface : IAdvancedStartInterface
             }
         }
 
-        return CreatePolicy(startTypes, modifiers, config, HasWorldStarted(), playerRuledKingdomIds.ToArray(), joinableKingdomIds.ToArray());
+        var policy = CreatePolicy(startTypes, modifiers, config, HasWorldStarted(), playerRuledKingdomIds.ToArray(), joinableKingdomIds.ToArray());
+
+        // Once, since the window quietly opens on the default start instead and the host has no other hint why.
+        if (!warnedDefaultStartType && config?.DefaultStartType != null && !policy.StartTypes.Any(startType =>
+                string.Equals(startType, config.DefaultStartType, StringComparison.OrdinalIgnoreCase)))
+        {
+            warnedDefaultStartType = true;
+            Logger.Warning("mod-config.json: advancedStart.defaultStartType '{DefaultStartType}' isn't a start type this " +
+                           "server offers, so the window opens on '{Fallback}'", config.DefaultStartType, StartOptionIds.StartTypeDefaultId);
+        }
+
+        return policy;
     }
 
     /// <summary>The policy offering the default start first, then each start type and modifier the host's config
