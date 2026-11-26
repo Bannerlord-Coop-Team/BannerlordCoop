@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Tournaments.Data;
+using GameInterface.Services.Tournaments.Handlers;
 using GameInterface.Services.Tournaments.Messages;
 using GameInterface.Services.Tournaments.UI;
 using GameInterface.Utils.Commands;
@@ -28,6 +29,44 @@ public class TournamentDebugCommand
         new CoopCommandResult(false, output, "command_failed");
 
 #if DEBUG
+    /// <summary>Resolves a pending tournament match through the server's bracket simulation.</summary>
+    internal sealed class ResolveMatchCoopCommand : ICoopCommand
+    {
+        private readonly ICommandObjectResolver resolver;
+        private readonly IObjectManager objectManager;
+        private readonly TournamentSessionHandler handler;
+
+        public ResolveMatchCoopCommand(
+            ICommandObjectResolver resolver,
+            IObjectManager objectManager,
+            TournamentSessionHandler handler)
+        {
+            this.resolver = resolver;
+            this.objectManager = objectManager;
+            this.handler = handler;
+        }
+
+        public string Prefix => "coop.debug.tournaments";
+        public string Name => "resolve_match";
+        public string Description => "Simulates the current pending match and advances the tournament.";
+        public CoopCommandSide Side => CoopCommandSide.Server;
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("town", "Town name or id."),
+            new ExpectedArgs("winner_controller", "Guarantee this entrant's team advances if present in this match.", false)
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!resolver.TryResolveTown(args[0], out var town, out var error))
+                return Failed(error);
+            if (!objectManager.TryGetId(town, out var townId))
+                return Failed($"Town {town.StringId} is not registered.");
+
+            return handler.ResolveDebugMatch(townId, args.Count > 1 ? args[1] : null);
+        }
+    }
+
     private const string DanusticaSettlementId = "town_ES1";
     private static DanusticaTournamentFixture fixture;
 
@@ -515,6 +554,12 @@ public class TournamentDebugCommand
 
         int humans = snapshot.Contestants.Count(contestant =>
             contestant.IsHuman && !contestant.IsReplaced);
+        var currentRound = snapshot.Rounds.FirstOrDefault(round =>
+            round.Matches.Any(match => match.MatchId == snapshot.CurrentMatchId));
+        string competitors = string.Join(",", snapshot.Contestants
+            .Where(contestant => contestant.IsHuman && !contestant.IsReplaced)
+            .Select(contestant =>
+                $"{contestant.ControllerId}/{contestant.SlotId}/{contestant.CharacterId}/{contestant.IsDisconnected}"));
         string choices = string.Join(
             ",",
             snapshot.Choices
@@ -525,7 +570,8 @@ public class TournamentDebugCommand
             $"bracketRevision={snapshot.BracketRevision}|matchId={snapshot.CurrentMatchId ?? "none"}|" +
             $"host={snapshot.HostControllerId ?? "none"}|localChoice={localChoice}|humans={humans}|" +
             $"spectators={snapshot.SpectatorControllerIds.Length}|ready={snapshot.ReadyCount}|" +
-            $"skip={snapshot.SkipCount}|voters={snapshot.VoterCount}|choices={choices}");
+            $"skip={snapshot.SkipCount}|voters={snapshot.VoterCount}|choices={choices}|" +
+            $"roundIndex={currentRound?.RoundIndex ?? -1}|competitors={competitors}");
     }
 
     private static void AppendMissionState(StringBuilder output)
@@ -544,10 +590,14 @@ public class TournamentDebugCommand
                 .Where(name => name.IndexOf("Tournament", StringComparison.OrdinalIgnoreCase) >= 0)
                 .OrderBy(name => name, StringComparer.Ordinal));
         TournamentBehavior tournamentBehavior = mission.GetMissionBehavior<TournamentBehavior>();
+        string mainAgentCharacterId = null;
+        if (mission.MainAgent?.Character is CharacterObject character &&
+            ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
+            objectManager.TryGetId(character, out mainAgentCharacterId);
         output.AppendLine(
             $"mission=active|scene={mission.SceneName}|mode={mission.Mode}|" +
             $"ending={mission.IsMissionEnding}|agents={mission.Agents.Count}|" +
-            $"mainAgent={mission.MainAgent?.Name ?? "none"}|" +
+            $"mainAgent={mission.MainAgent?.Name ?? "none"}|mainAgentCharacterId={mainAgentCharacterId ?? "none"}|" +
             $"nativeBracketReady={IsNativeBracketReady(tournamentBehavior)}|" +
             $"tournamentBehaviors={tournamentBehaviors}");
     }

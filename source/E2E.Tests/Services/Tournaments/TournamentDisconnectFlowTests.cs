@@ -7,6 +7,7 @@ using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Tournaments;
 using GameInterface.Services.Tournaments.Data;
+using GameInterface.Services.Tournaments.Handlers;
 using GameInterface.Services.Tournaments.Messages;
 using System;
 using System.Linq;
@@ -31,6 +32,23 @@ public class TournamentDisconnectFlowTests : SyncTestBase
     public TournamentDisconnectFlowTests(ITestOutputHelper output) : base(output)
     {
     }
+
+#if DEBUG
+    [Fact]
+    public void DebugResolveMatch_AdvancesSelectedEntrantsTeam()
+    {
+        EnvironmentInstance host = Clients.First();
+        EnvironmentInstance other = Clients.Skip(1).First();
+        var (townId, _) = SetUpTournament(host, other, otherIsSpectator: false);
+
+        Server.Call(() => Assert.True(Server.Resolve<TournamentSessionHandler>()
+            .ResolveDebugMatch(townId, OtherControllerId).Succeeded));
+
+        var completed = GetSnapshot();
+        Assert.True(completed.IsCompleted);
+        Assert.Equal(OtherSlotId, completed.WinnerSlotId);
+    }
+#endif
 
     [Theory]
     [InlineData(true)]

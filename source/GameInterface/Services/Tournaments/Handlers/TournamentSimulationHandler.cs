@@ -1,5 +1,8 @@
 using GameInterface.Services.Tournaments.Data;
 using System.Linq;
+#if DEBUG
+using Common.Commands;
+#endif
 
 namespace GameInterface.Services.Tournaments.Handlers;
 
@@ -8,9 +11,39 @@ internal sealed partial class TournamentSessionHandler
     private const int MaximumSimulationMatches = 64;
     private long simulationSequence;
 
+#if DEBUG
+    internal CoopCommandResult ResolveDebugMatch(string townId, string controllerId)
+    {
+        if (!sessionRegistry.TryGetByTown(townId, out var snapshot) ||
+            (snapshot.Phase != TournamentSessionPhase.AwaitingChoices &&
+             snapshot.Phase != TournamentSessionPhase.SimulatingMatch))
+            return new CoopCommandResult(false, "The tournament has no pending match.", "no_pending_match");
+
+        string preferredSlotId = null;
+        if (controllerId != null)
+        {
+            if (!TryGetPlayerSlot(snapshot, controllerId, out var contestant) || contestant.IsDisconnected)
+                return new CoopCommandResult(false, $"No connected contestant for {controllerId}.", "contestant_not_found");
+            preferredSlotId = contestant.SlotId;
+        }
+
+        var status = sessionRegistry.TryForceSimulation(snapshot.SessionId, snapshot.Revision, out var simulating);
+        if (status != TournamentMutationStatus.Applied && status != TournamentMutationStatus.NoChange)
+            return new CoopCommandResult(false, $"Could not start simulation ({status}).", "simulation_rejected");
+
+        var advanced = SimulateCurrentMatchAndAdvance(simulating, simulating.HostControllerId, preferredSlotId);
+        if (advanced.Revision == simulating.Revision)
+            return new CoopCommandResult(false, "The authoritative simulation did not advance the bracket.", "simulation_failed");
+
+        return new CoopCommandResult(true,
+            $"Resolved {snapshot.CurrentMatchId}. Next match: {advanced.CurrentMatchId ?? "none"}.");
+    }
+#endif
+
     private TournamentSessionSnapshot SimulateCurrentMatchAndAdvance(
         TournamentSessionSnapshot snapshot,
-        string submittingControllerId)
+        string submittingControllerId,
+        string preferredSlotId = null)
     {
         if (snapshot == null)
             return snapshot;
@@ -22,8 +55,8 @@ internal sealed partial class TournamentSessionHandler
             snapshot.Revision,
             snapshot.BracketRevision,
             DescribeBracket(snapshot.Rounds));
-        bool simulated = tournamentGameInterface.TrySimulateCurrentMatchUnbiased(
-            snapshot, ++simulationSequence, out var result);
+        bool simulated = tournamentGameInterface.TrySimulateCurrentMatch(
+            snapshot, ++simulationSequence, out var result, preferredSlotId);
         TournamentBracketUpdate bracket = null;
         bool advanced = simulated && tournamentGameInterface.TryAdvanceBracket(snapshot, result, out bracket);
         if (!advanced)

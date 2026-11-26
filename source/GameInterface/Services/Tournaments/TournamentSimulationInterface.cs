@@ -11,10 +11,11 @@ namespace GameInterface.Services.Tournaments;
 
 public sealed partial class TournamentGameInterface
 {
-    public bool TrySimulateCurrentMatchUnbiased(
+    public bool TrySimulateCurrentMatch(
         TournamentSessionSnapshot snapshot,
         long sequence,
-        out TournamentMatchResultData result)
+        out TournamentMatchResultData result,
+        string preferredSlotId = null)
     {
         result = null;
         TournamentMatchData match = snapshot?.Rounds?
@@ -56,7 +57,8 @@ public sealed partial class TournamentGameInterface
         }
 
         rankedTeams = rankedTeams
-            .OrderByDescending(team => team.Value)
+            .OrderByDescending(team => preferredSlotId != null && team.Key.ParticipantSlotIds.Contains(preferredSlotId))
+            .ThenByDescending(team => team.Value)
             .ToList();
         int teamSize = Math.Max(1, match.TeamSize);
         int winnerParticipantCount = Math.Max(1, match.NumberOfWinnerParticipants);
