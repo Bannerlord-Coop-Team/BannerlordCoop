@@ -417,7 +417,7 @@ namespace GameInterface.Services.Kingdoms
 
         public void DismissSubmittedDecisionItem(DecisionItemBaseVM decisionItem)
         {
-            if (decisionItem == null || !decisionItem.IsActive || IsShowingSettlementDecisionResult(decisionItem)) return;
+            if (decisionItem == null || !decisionItem.IsActive) return;
 
             KingdomDecision decision = decisionItem.KingdomDecisionMaker?._decision;
             TryGetKingdomId(decision?.Kingdom, out string kingdomId);
@@ -738,6 +738,7 @@ namespace GameInterface.Services.Kingdoms
             // Vanilla marks the winner by reference to an option on this ballot.
             ActiveDecisionItems.Remove(item);
             SettlementResultItems.Add(item);
+            // ExecuteDone reads _chosenOutcome, and _finalSelectionDone prevents RefreshCanEndDecision from enabling voting.
             election._chosenOutcome = winner;
             item._finalSelectionDone = true;
             item.CanEndDecision = false;
