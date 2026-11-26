@@ -257,8 +257,34 @@ public class MerchantTradeTests : IDisposable
     [Fact]
     public void SellingTheSameHidesAgainWhileAPlayerJoins_PaysAndStocksThemOnce()
     {
-        var trader = TestEnvironment.Clients.First();
+        var trade = SetUpJoinWindowTrade(traderGold: 1000);
 
+        // The trader's screen resets to its 5 hides after each done, so it sells them again
+        CommitWhileTheServerIsHeld(commits: 3, () => TradeOnTrader(trade, soldHides: 5, boughtGrain: 0));
+
+        AssertTradeState(trade, (PartyHides: 0, PartyGrain: 0, MerchantHides: 5, MerchantGrain: 10, TraderGold: 1050, TownGold: 950));
+        var sale = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkTradeCompleted>(),
+            completed => completed.SoldItems?.Length > 0);
+        var (soldHides, soldPrice) = Assert.Single(sale.SoldItems);
+        Assert.Equal(5, soldHides.Amount);
+        Assert.Equal(50, soldPrice);
+    }
+
+    [Fact]
+    public void BuyingAgainWithGoldAlreadySpentWhileAPlayerJoins_IsRefused()
+    {
+        var trade = SetUpJoinWindowTrade(traderGold: 30);
+
+        // The trader's screen still shows its 30 gold after the first purchase, so it buys again
+        CommitWhileTheServerIsHeld(commits: 2, () => TradeOnTrader(trade, soldHides: 0, boughtGrain: 1));
+
+        AssertTradeState(trade, (PartyHides: 5, PartyGrain: 1, MerchantHides: 0, MerchantGrain: 9, TraderGold: 10, TownGold: 1020));
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkTradeCompleted>());
+    }
+
+    // The trader carries 5 hides, and the merchant has 10 grain and 1000 gold, on the server and every client
+    private JoinWindowTrade SetUpJoinWindowTrade(int traderGold)
+    {
         var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
         var townId = TestEnvironment.CreateRegisteredObject<Town>();
         var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
@@ -269,11 +295,14 @@ public class MerchantTradeTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetId(Server.GetRegisteredObject<Settlement>(settlementId).Party.ItemRoster, out rosterId));
 
             var hero = Server.GetRegisteredObject<MobileParty>(partyId).LeaderHero;
-            hero.Gold = 1000;
+            hero.Gold = traderGold;
             Assert.True(Server.ObjectManager.TryGetId(hero, out var heroId));
             Server.Resolve<ISessionTradePlayerDataInterface>().AddPlayerKeys(heroId);
 
-            Server.GetRegisteredObject<ItemRoster>(rosterId!).Clear();
+            var merchantRoster = Server.GetRegisteredObject<ItemRoster>(rosterId!);
+            merchantRoster.Clear();
+            merchantRoster.AddToCounts(DefaultItems.Grain, 10);
+
             var partyRoster = Server.GetRegisteredObject<MobileParty>(partyId).ItemRoster;
             partyRoster.Clear();
             partyRoster.AddToCounts(DefaultItems.Hides, 5);
@@ -281,68 +310,70 @@ public class MerchantTradeTests : IDisposable
             var town = Server.GetRegisteredObject<Town>(townId);
             town.ChangeGold(1000 - town.Gold);
         });
-        var merchantRosterId = rosterId!;
         TestEnvironment.FlushCoalescer();
-        AssertHidesSold(merchantRosterId, townId, partyId, sold: 0);
 
-        // The join save holds the server's game thread, so the commits wait there and no update reaches the trader,
-        // whose screen resets to its 5 hides after each done
+        var trade = new JoinWindowTrade(TestEnvironment.Clients.First(), rosterId!, townId, partyId);
+        AssertTradeState(trade, (PartyHides: 5, PartyGrain: 0, MerchantHides: 0, MerchantGrain: 10, TraderGold: traderGold, TownGold: 1000));
+        return trade;
+    }
+
+    // The join save holds the server's game thread, so the commits wait there and no update reaches the trader
+    private void CommitWhileTheServerIsHeld(int commits, Action commit)
+    {
         var router = Server.Resolve<TestNetworkRouter>();
         router.ReceiveContext = TestNetworkReceiveContext.PollerThread;
-        for (int i = 0; i < 3; i++)
+        for (int i = 0; i < commits; i++)
         {
-            SellHidesOnTrader(trader, merchantRosterId, townId, partyId, amount: 5, price: 50);
+            commit();
         }
         router.ReceiveContext = TestNetworkReceiveContext.GameThread;
-
-        Assert.Equal(3, trader.NetworkSentMessages.GetMessages<CompleteTrade>().Count());
-        Assert.Equal(3, Server.PendingGameThreadActionCount);
+        Assert.Equal(commits, Server.PendingGameThreadActionCount);
 
         Server.PumpGameThread();
         TestEnvironment.FlushCoalescer();
-
-        AssertHidesSold(merchantRosterId, townId, partyId, sold: 5);
-        var sale = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkTradeCompleted>(),
-            completed => completed.SoldItems?.Length > 0);
-        var (soldHides, soldPrice) = Assert.Single(sale.SoldItems);
-        Assert.Equal(5, soldHides.Amount);
-        Assert.Equal(50, soldPrice);
     }
 
-    // Each hide sold moves 10 gold from the town to the trader
-    private void AssertHidesSold(string merchantRosterId, string townId, string partyId, int sold)
+    private void AssertTradeState(
+        JoinWindowTrade trade,
+        (int PartyHides, int PartyGrain, int MerchantHides, int MerchantGrain, int TraderGold, int TownGold) expected)
     {
         foreach (var instance in TestEnvironment.Clients.Prepend(Server))
         {
             instance.Call(() =>
             {
-                var party = instance.GetRegisteredObject<MobileParty>(partyId);
-                Assert.Equal(
-                    (PartyHides: 5 - sold, MerchantHides: sold, TraderGold: 1000 + (10 * sold), TownGold: 1000 - (10 * sold)),
-                    (party.ItemRoster.GetItemNumber(DefaultItems.Hides),
-                        instance.GetRegisteredObject<ItemRoster>(merchantRosterId).GetItemNumber(DefaultItems.Hides),
-                        party.LeaderHero.Gold,
-                        instance.GetRegisteredObject<Town>(townId).Gold));
+                var party = instance.GetRegisteredObject<MobileParty>(trade.PartyId);
+                var merchantRoster = instance.GetRegisteredObject<ItemRoster>(trade.MerchantRosterId);
+                Assert.Equal(expected, (
+                    party.ItemRoster.GetItemNumber(DefaultItems.Hides),
+                    party.ItemRoster.GetItemNumber(DefaultItems.Grain),
+                    merchantRoster.GetItemNumber(DefaultItems.Hides),
+                    merchantRoster.GetItemNumber(DefaultItems.Grain),
+                    party.LeaderHero.Gold,
+                    instance.GetRegisteredObject<Town>(trade.TownId).Gold));
             });
         }
     }
 
-    // Commits a sale the way the done logic patch does: the screen's rosters are sent, then put back as they were
-    private void SellHidesOnTrader(EnvironmentInstance trader, string merchantRosterId, string townId, string partyId, int amount, int price)
+    // Commits the trader's screen the way the done logic patch does: the screen's rosters are sent, then put back as
+    // they were. Hides sell for 10 each and grain costs 20 each
+    private void TradeOnTrader(JoinWindowTrade trade, int soldHides, int boughtGrain)
     {
+        var trader = trade.Trader;
         trader.Call(() =>
         {
-            var item = DefaultItems.Hides;
-            var merchantRoster = trader.GetRegisteredObject<ItemRoster>(merchantRosterId);
-            var party = trader.GetRegisteredObject<MobileParty>(partyId);
-            var town = trader.GetRegisteredObject<Town>(townId);
+            var merchantRoster = trader.GetRegisteredObject<ItemRoster>(trade.MerchantRosterId);
+            var party = trader.GetRegisteredObject<MobileParty>(trade.PartyId);
+            var town = trader.GetRegisteredObject<Town>(trade.TownId);
             var initialPartyRoster = party.ItemRoster.ToArray();
-            var sold = new List<(ItemRosterElement, int)> { (new ItemRosterElement(item, amount), price) };
+
+            var bought = new List<(ItemRosterElement, int)>();
+            if (boughtGrain > 0) bought.Add((new ItemRosterElement(DefaultItems.Grain, boughtGrain), 20 * boughtGrain));
+            var sold = new List<(ItemRosterElement, int)>();
+            if (soldHides > 0) sold.Add((new ItemRosterElement(DefaultItems.Hides, soldHides), 10 * soldHides));
 
             using (new AllowedThread())
             {
-                merchantRoster.AddToCounts(item, amount);
-                party.ItemRoster.AddToCounts(item, -amount);
+                MoveScreenItems(merchantRoster, party.ItemRoster, soldHides, boughtGrain);
 
                 trader.Resolve<IMessageBroker>().Publish(this, new TradeAttempted(
                     merchantRoster,
@@ -352,20 +383,29 @@ public class MerchantTradeTests : IDisposable
                     InventoryScreenHelper.InventoryMode.Trade,
                     party.LeaderHero,
                     party.LeaderHero.CharacterObject,
-                    -price,
+                    (20 * boughtGrain) - (10 * soldHides),
                     town.Gold,
                     party,
                     currentMobileParty: null,
                     town,
-                    new List<(ItemRosterElement, int)>(),
+                    bought,
                     sold,
                     initialPlayerRoster: initialPartyRoster));
 
-                merchantRoster.AddToCounts(item, -amount);
-                party.ItemRoster.AddToCounts(item, amount);
+                MoveScreenItems(merchantRoster, party.ItemRoster, -soldHides, -boughtGrain);
             }
         });
     }
+
+    private static void MoveScreenItems(ItemRoster merchantRoster, ItemRoster partyRoster, int soldHides, int boughtGrain)
+    {
+        merchantRoster.AddToCounts(DefaultItems.Hides, soldHides);
+        partyRoster.AddToCounts(DefaultItems.Hides, -soldHides);
+        merchantRoster.AddToCounts(DefaultItems.Grain, -boughtGrain);
+        partyRoster.AddToCounts(DefaultItems.Grain, boughtGrain);
+    }
+
+    private sealed record JoinWindowTrade(EnvironmentInstance Trader, string MerchantRosterId, string TownId, string PartyId);
 
     // Gives the merchant the same opening stock and 100 gold everywhere, and each trading party 1000 gold
     private string SetUpMerchant(string settlementId, string townId, string[] partyIds, params (string itemId, int amount)[] stock)

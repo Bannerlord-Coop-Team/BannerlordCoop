@@ -222,27 +222,28 @@ public class TradeHandlerTests
     }
 
     [Fact]
-    public void ReconcileSales_KeepsASaleStraightFromAnEquipmentSlot()
+    public void ReconcileSales_KeepsSellingMeatSlaughteredOnTheScreen()
     {
-        var sword = new ItemObject("sword");
+        var sheep = new ItemObject("sheep");
+        var meat = new ItemObject("meat");
 
-        // The sword was sold out of the battle set, so the party roster never held it
-        var battleSlots = new EquipmentElement[Equipment.EquipmentSlotLength];
-        var preTradeBattleSlots = new EquipmentElement[Equipment.EquipmentSlotLength];
-        preTradeBattleSlots[0] = new EquipmentElement(sword, null);
-        var heroEquipments = new[] { new HeroTradeEquipment(new[] { battleSlots }, new[] { preTradeBattleSlots }) };
+        // Slaughter puts the meat straight into the screen's roster, so neither the opening nor the live roster has it
+        var partyRoster = new ItemRoster();
+        partyRoster.AddToCounts(new EquipmentElement(sheep, null), 2);
+        var initialRoster = new[] { new ItemRosterElement(new EquipmentElement(sheep, null), 2) };
+        var submittedRoster = new[] { new ItemRosterElement(new EquipmentElement(sheep, null), 1) };
 
         var soldItems = new List<(ItemRosterElement, int)>
         {
-            (new ItemRosterElement(new EquipmentElement(sword, null), 1), 200)
+            (new ItemRosterElement(new EquipmentElement(meat, null), 2), 60)
         };
 
-        int result = TradeHandler.ReconcileSales(new ItemRoster(), System.Array.Empty<ItemRosterElement>(), heroEquipments, soldItems, totalAmount: -200, out var keptSales);
+        int result = TradeHandler.ReconcileSales(partyRoster, initialRoster, submittedRoster, soldItems, totalAmount: -60, out var keptSales);
 
-        Assert.Equal(-200, result);
+        Assert.Equal(-60, result);
         var (kept, price) = Assert.Single(keptSales);
-        Assert.Equal(1, kept.Amount);
-        Assert.Equal(200, price);
+        Assert.Equal(2, kept.Amount);
+        Assert.Equal(60, price);
     }
 
     [Fact]

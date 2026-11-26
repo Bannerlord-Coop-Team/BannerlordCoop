@@ -193,11 +193,19 @@ internal class TradeHandler : IHandler
                 if (message.IsTrading)
                 {
                     // A screen that hasn't seen the player's last sale yet, like during a join, offers the same items again
-                    totalAmount = ReconcileSales(toRoster, toItemRosterData, heroEquipments, soldItems, totalAmount, out soldItems);
+                    totalAmount = ReconcileSales(toRoster, message.InitialPlayerRoster, message.ToItemRosterData, soldItems, totalAmount, out soldItems);
 
                     // Merchants are shared, the client's snapshot misses what other players traded since it was taken
                     fromItemRosterData = ApplyTradeToLiveStock(fromRoster, keptItems, soldItems);
                 }
+            }
+
+            if (message.IsTrading && hero.Gold - totalAmount < 0)
+            {
+                // Vanilla's done logic refuses this too, the screen's gold was stale
+                logger.Warning("Trade refused, {HeroId} owes {TotalAmount} with {Gold} gold", message.HeroId, totalAmount, hero.Gold);
+                if (peer != null) network.Send(peer, new SendInformationMessage("You don't have enough money for that trade."));
+                return;
             }
 
             if (message.IsTrading) merchantGold = GetLiveMerchantGold(currentSettlementComponent, currentMobileParty, merchantGold);
@@ -485,26 +493,29 @@ internal class TradeHandler : IHandler
     }
 
     /// <summary>
-    /// Cuts each sale down to what this trade took out of the party's live roster and equipment, and takes the unpaid
-    /// share of its price off the total. Outputs each sale that is kept, at its kept quantity and price.
+    /// Cuts each sale by how much more the screen took out of the party roster than the live roster still holds, the
+    /// same amount <see cref="RebaseInventoryData"/> can't remove, and takes the unpaid share of its price off the total.
+    /// Outputs each sale that is kept, at its kept quantity and price.
     /// </summary>
     internal static int ReconcileSales(
         ItemRoster partyRoster,
-        ItemRosterElement[] partyRosterData,
-        IEnumerable<HeroTradeEquipment> heroEquipments,
+        ItemRosterElement[] initialRoster,
+        ItemRosterElement[] submittedRoster,
         List<(ItemRosterElement, int)> soldItems,
         int totalAmount,
         out List<(ItemRosterElement, int)> keptSales)
     {
+        initialRoster ??= Array.Empty<ItemRosterElement>();
+        submittedRoster ??= Array.Empty<ItemRosterElement>();
         keptSales = new List<(ItemRosterElement, int)>();
 
         foreach (var (sold, price) in soldItems)
         {
             var element = sold.EquipmentElement;
             int amount = sold.Amount;
-            long removed = (long)FindAmount(partyRoster, element) - FindAmount(partyRosterData, element)
-                - heroEquipments.Sum(heroEquipment => heroEquipment.CountGained(element));
-            int kept = (int)Math.Max(0L, Math.Min(amount, removed));
+            long overdrawn = (long)FindAmount(initialRoster, element) - FindAmount(submittedRoster, element)
+                - FindAmount(partyRoster, element);
+            int kept = (int)Math.Max(0L, amount - Math.Max(0L, overdrawn));
 
             int unpaid = GetRefund(price, amount - kept, amount);
             totalAmount += unpaid;
