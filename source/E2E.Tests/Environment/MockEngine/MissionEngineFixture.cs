@@ -68,6 +68,7 @@ public sealed class MissionEngineFixture : IDisposable
         // BattleAgentLogic's hit reward reads the teams' validity and leader.
         Prefix(typeof(Team), "get_IsValid", nameof(Team_get_IsValid));
         Prefix(typeof(Team), "get_Leader", nameof(Team_get_Leader));
+        Prefix(typeof(Team), "get_ActiveAgents", nameof(Team_get_ActiveAgents));
         harmony.Patch(
             AccessTools.Method(typeof(Mission.TeamCollection), nameof(Mission.TeamCollection.Add), new[]
             {
@@ -310,8 +311,8 @@ public sealed class MissionEngineFixture : IDisposable
     // so building MovementOrder.MovementOrderCharge during host-migration adoption doesn't NRE headless.
     private static bool Mission_get_CurrentTime(Mission __instance, ref float __result)
     {
-        if (!MockMission.ForShell(__instance, out _)) return true;
-        __result = 0f;
+        if (!MockMission.ForShell(__instance, out var mock)) return true;
+        __result = mock.CurrentTime;
         return false;
     }
 
@@ -523,6 +524,20 @@ public sealed class MissionEngineFixture : IDisposable
             if (__result == null || mirror.Character?.IsHero == true) __result = agent;
             if (mirror.Character?.IsHero == true) break;
         }
+        return false;
+    }
+
+    private static bool Team_get_ActiveAgents(Team __instance, ref MBReadOnlyList<Agent> __result)
+    {
+        if (!MockTeam.ForShell(__instance, out _) || !TryActiveMock(out var mock)) return true;
+
+        var active = new MBList<Agent>();
+        foreach (var agent in mock.Agents)
+        {
+            if (AgentMirror.TryGet(agent, out var mirror) && mirror.IsActive && mirror.Team == __instance)
+                active.Add(agent);
+        }
+        __result = active;
         return false;
     }
 

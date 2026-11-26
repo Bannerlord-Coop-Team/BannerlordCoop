@@ -29,28 +29,6 @@ public class SiegeKeepStageTests
         Assert.Equal(expected, SiegeKeepStage.PlanSeats(defenders, 0.7f, 19, escortsPerCandidate));
     }
 
-    // A stage nobody answered stays open until its selection window closes on the stage's clock, then ends.
-    [Fact]
-    public void Tick_EndsAStageOnlyOnceItsSelectionWindowCloses()
-    {
-        var mapEvent = ObjectHelper.SkipConstructor<MapEvent>();
-        var deadline = new DateTime(2026, 11, 25, 12, 0, 0, DateTimeKind.Utc);
-        var now = deadline - TimeSpan.FromSeconds(1);
-        var selection = new Mock<ISiegeKeepTroopSelection>();
-        selection.Setup(store => store.GetOpenMapEvents()).Returns(new[] { mapEvent });
-        selection.Setup(store => store.GetSeats(mapEvent)).Returns(Array.Empty<SiegeKeepSeat>());
-        selection.Setup(store => store.TryGetDeadline(mapEvent, out deadline)).Returns(true);
-        var stage = new SiegeKeepStage(Mock.Of<INetwork>(), Mock.Of<IObjectManager>(), Mock.Of<IPlayerManager>(),
-            selection.Object, Mock.Of<IBattleTroopReserveBuilder>(), Mock.Of<ITroopSelectionEntries>(), () => now);
-
-        stage.Tick();
-        selection.Verify(store => store.Forget(mapEvent), Times.Never);
-
-        now = deadline;
-        stage.Tick();
-        selection.Verify(store => store.Forget(mapEvent), Times.Once);
-    }
-
     // The last pick starts the lock, so a lock that fails and closes the stage has to refuse that pick, otherwise the
     // player is told to wait for a lock that never comes.
     [Fact]

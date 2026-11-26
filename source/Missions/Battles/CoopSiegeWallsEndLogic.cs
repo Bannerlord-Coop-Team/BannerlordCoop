@@ -12,11 +12,15 @@ namespace Missions.Battles;
 internal sealed class CoopSiegeWallsEndLogic : BattleEndLogic
 {
     private float lastDefenderStandTime;
+    private bool pullBackAccepted;
 
     public CoopSiegeWallsEndLogic(int defenderTroopsForPullBack)
     {
         EnableEnemyDefenderPullBack(defenderTroopsForPullBack);
     }
+
+    /// <summary>Ends the walls with the pull-back the host's result reported, whatever this client's defenders do.</summary>
+    public void AcceptPullBack() => pullBackAccepted = true;
 
     public override void OnMissionTick(float dt)
     {
@@ -30,7 +34,7 @@ internal sealed class CoopSiegeWallsEndLogic : BattleEndLogic
         var retreatWait = _missionAgentSpawnLogic.GetReinforcementInterval(BattleSideEnum.Defender) + 3f;
         bool defendersFled = _canCheckForEndCondition && _isEnemyDefenderPulledBack &&
             Mission.CurrentTime - lastDefenderStandTime > retreatWait;
-        if (!defendersFled) return base.MissionEnded(ref missionResult);
+        if (!pullBackAccepted && !defendersFled) return base.MissionEnded(ref missionResult);
 
         missionResult = MissionResult.CreateDefenderPushedBack();
         _missionAgentSpawnLogic.StopSpawner(BattleSideEnum.Attacker);

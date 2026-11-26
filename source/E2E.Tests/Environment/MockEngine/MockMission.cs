@@ -29,6 +29,8 @@ public sealed class MockMission
     public int InitialPlayerBuildCount { get; private set; }
     public PartyBase MainParty { get; set; }
     public float DamageToPlayerMultiplier { get; set; } = 1f;
+    /// <summary>What <c>Mission.CurrentTime</c> returns for this shell.</summary>
+    public float CurrentTime { get; set; }
     public bool EndMissionCalled { get; set; }
     public int AgentFleeingCalls { get; set; }
     public Agent LastFleeingAgent { get; set; }
