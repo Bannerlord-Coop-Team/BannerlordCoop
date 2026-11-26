@@ -167,7 +167,7 @@ internal sealed class SiegeKeepEntryHandler : IHandler
                 RequestKeepMission(message.MapEventId);
                 return;
             case SiegeKeepPhase.Closed:
-                ShowMessage("Nobody is left to lead the keep assault.");
+                ShowMessage("The keep assault did not start. Press Attack to try again.");
                 return;
         }
     }

@@ -47,7 +47,7 @@ public interface ISiegeKeepStage : IGameAbstraction
 }
 
 /// <inheritdoc cref="ISiegeKeepStage"/>
-public sealed class SiegeKeepStage : ISiegeKeepStage
+internal sealed class SiegeKeepStage : ISiegeKeepStage
 {
     private static readonly ILogger Logger = LogManager.GetLogger<SiegeKeepStage>();
 

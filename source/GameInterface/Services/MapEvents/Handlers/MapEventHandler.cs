@@ -141,7 +141,7 @@ internal class MapEventHandler : IHandler
                 // peer's can land after the keep opened. The server keeps the map event unresolved until the coop
                 // completion barrier finalizes the ambush or the keep ends.
                 if (ModInformation.IsServer && battleState == BattleState.DefenderPullBack &&
-                    (mapEvent.IsSiegeAmbush || mapEvent.CanFallBackToKeep()))
+                    mapEvent.HoldsPullBackOnServer())
                     return;
 
                 // Only the elected battle host's conclusion is authoritative: a non-host's local mission can

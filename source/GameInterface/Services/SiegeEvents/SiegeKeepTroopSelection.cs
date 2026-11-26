@@ -36,7 +36,7 @@ public interface ISiegeKeepRoster
     void FilterReserve(MapEvent mapEvent, MapEventParty party, List<TroopReserveEntry> entries);
 }
 
-public interface ISiegeKeepTroopSelection : IGameAbstraction, ISiegeKeepRoster
+internal interface ISiegeKeepTroopSelection : IGameAbstraction, ISiegeKeepRoster
 {
     /// <summary>Opens the keep stage with its seated players and the defender troops vanilla puts in the hall.</summary>
     void Open(MapEvent mapEvent, IReadOnlyList<SiegeKeepSeat> seats, IReadOnlyDictionary<string, int> defenderBudget,
@@ -61,7 +61,7 @@ public interface ISiegeKeepTroopSelection : IGameAbstraction, ISiegeKeepRoster
 /// [Server] The keep (lord's hall) roster of each siege assault: which walls players have a place, the troops each
 /// chose, and the defender troops vanilla's hall model picked. The reserve builder reads it to field only those.
 /// </summary>
-public sealed class SiegeKeepTroopSelection : ISiegeKeepTroopSelection
+internal sealed class SiegeKeepTroopSelection : ISiegeKeepTroopSelection
 {
     private sealed class Attempt
     {

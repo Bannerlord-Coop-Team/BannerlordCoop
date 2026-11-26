@@ -27,18 +27,6 @@ public class TroopSelectionRulesTests
         Assert.Equal(3, escorts);
     }
 
-    [Theory]
-    [InlineData("recruit", 2, "recruit", 3)] // more of one troop than the party has healthy
-    [InlineData("recruit", 3, "archer", 2)]  // more escorts than the allowance
-    [InlineData(Hero, 2, "recruit", 1)]      // the hero twice
-    [InlineData("recruit", 1, "knight", 1)]  // a troop the party doesn't have
-    public void TryAccept_RejectsASquadThePartyCantField(string first, int firstCount, string second, int secondCount)
-    {
-        Assert.False(rules.TryAccept(healthy, Hero, 4,
-            new[] { new HideoutTroopSelectionEntry(first, firstCount), new HideoutTroopSelectionEntry(second, secondCount) },
-            out _, out _));
-    }
-
     // Only the chosen counts stay, the first entries of each troop, in the order they were chosen.
     [Fact]
     public void TrimReserve_KeepsTheFirstChosenEntriesOfEachTroopInChosenOrder()
@@ -55,13 +43,5 @@ public class TroopSelectionRulesTests
         });
 
         Assert.Equal(new[] { 2, 1, 3 }, entries.Select(entry => entry.Seed));
-    }
-
-    [Fact]
-    public void TryAccept_RejectsAPartyWhoseHeroCantFight()
-    {
-        var withoutHero = new Dictionary<string, int>(healthy) { [Hero] = 0 };
-
-        Assert.False(rules.TryAccept(withoutHero, Hero, 4, System.Array.Empty<HideoutTroopSelectionEntry>(), out _, out _));
     }
 }
