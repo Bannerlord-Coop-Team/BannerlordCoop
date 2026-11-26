@@ -44,13 +44,17 @@ public class AiSiegeAssaultReadinessTests : MapEventTestBase
             var encounter = new Mock<DefaultEncounterModel>();
             encounter.Setup(model => model.GetDefenderPartiesOfSettlement(settlement, MapEvent.BattleTypes.Siege))
                 .Returns(new[] { defender.Party });
+
+            // The 200:1 strength ratio puts the capped assault chance above 1, so the random roll always passes.
             var power = new Mock<DefaultMilitaryPowerModel>();
-            power.Setup(model => model.GetPowerOfParty(attacker.Party, BattleSideEnum.Defender, It.IsAny<MapEvent.PowerCalculationContext>()))
+            power.Setup(model => model.GetPowerOfParty(attacker.Party, It.IsAny<BattleSideEnum>(), It.IsAny<MapEvent.PowerCalculationContext>()))
                 .Returns(2000f);
-            power.Setup(model => model.GetPowerOfParty(defender.Party, BattleSideEnum.Defender, It.IsAny<MapEvent.PowerCalculationContext>()))
+            power.Setup(model => model.GetPowerOfParty(defender.Party, It.IsAny<BattleSideEnum>(), It.IsAny<MapEvent.PowerCalculationContext>()))
                 .Returns(10f);
+
             var combat = new Mock<DefaultCombatSimulationModel>();
             combat.Setup(model => model.GetSettlementAdvantage(settlement)).Returns(1f);
+            // Two built engines and one half built give 0.5 + 0.25 * 3 = 1.25 before the cap.
             combat.Setup(model => model.GetNumberOfEquipmentsBuilt(settlement)).Returns(2);
             combat.Setup(model => model.GetMaximumSiegeEquipmentProgress(settlement)).Returns(0.5f);
             var models = Campaign.Current.Models.GetGameModels().ToList();

@@ -1978,9 +1978,6 @@ public class SiegeDebugCommand
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            if (ModInformation.IsClient)
-                return Failed("This command can only be used by the server");
-
             if (!resolver.TryResolveSettlement(args[0], out var settlement, out var settlementError))
                 return Failed(settlementError);
 
