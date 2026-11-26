@@ -17,7 +17,6 @@ using Missions.Messages;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -487,6 +486,7 @@ public class BattleResultReadyTests : MissionTestEnvironment
     [Theory]
     [InlineData(true, Mission.MissionTeamAITypeEnum.FieldBattle)]
     [InlineData(false, Mission.MissionTeamAITypeEnum.FieldBattle)]
+    // The field rows cover both leave orders. One siege row guards the proximity check beyond field battles after victory and adoption.
     [InlineData(true, Mission.MissionTeamAITypeEnum.Siege)]
     public void EnemyRout_PeerCanLeaveWithVictoryNearRoutedEnemy(bool hostLeavesFirst, Mission.MissionTeamAITypeEnum missionType)
     {
@@ -509,8 +509,7 @@ public class BattleResultReadyTests : MissionTestEnvironment
         var agentId = SpawnRoutedEnemy();
         host.Call(ResolveHostRoutVictory, victoryDisabledMethods);
 
-        var originalAgentApi = MBAPI.IMBAgent;
-        MBAPI.IMBAgent = DispatchProxy.Create<IMBAgent, ProximityAgentApi>();
+        fixture.UseProximityAgentApi();
         BattleSpawnGate.BeginBattle(mapEventId);
         try
         {
@@ -538,7 +537,6 @@ public class BattleResultReadyTests : MissionTestEnvironment
         finally
         {
             BattleSpawnGate.EndBattle();
-            MBAPI.IMBAgent = originalAgentApi;
         }
 
         successor.Call(successorController.OnEndMissionInternal, victoryDisabledMethods);
@@ -617,19 +615,6 @@ public class BattleResultReadyTests : MissionTestEnvironment
             NativeAgentFields.BackForProximityCheck(player, mirror);
             mock.Shell._mainAgent = mock.MainAgent = player;
         }
-    }
-
-    /// <summary>Represents a nearby hostile agent before the engine has started moving it in retreat mode.</summary>
-    public class ProximityAgentApi : DispatchProxy
-    {
-        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args) => targetMethod?.Name switch
-        {
-            nameof(IMBAgent.IsEnemy) => true,
-            nameof(IMBAgent.GetAIStateFlags) => Agent.AIStateFlag.Alarmed,
-            nameof(IMBAgent.IsRetreating) => false,
-            nameof(IMBAgent.SetRetreatMode) => null,
-            _ => throw new NotSupportedException(targetMethod?.Name),
-        };
     }
 
     [Fact]

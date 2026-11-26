@@ -33,6 +33,7 @@ public sealed class MissionEngineFixture : IDisposable
     private const int FirstInvalidMockActionIndex = 1000000;
     private readonly Harmony harmony = new("e2e.mockengine");
     private static readonly Dictionary<ILifetimeScope, MockMission> ByContainer = new();
+    private Action? restoreProximityAgentApi;
 
     public MissionEngineFixture()
     {
@@ -330,6 +331,29 @@ public sealed class MissionEngineFixture : IDisposable
         if (!MockMission.ForShell(__instance, out var mock)) return true;
         mock.EndMissionCalled = true;
         return false;
+    }
+
+    /// <summary>Installs the headless agent API for vanilla proximity checks until the fixture is disposed.</summary>
+    public void UseProximityAgentApi()
+    {
+        if (restoreProximityAgentApi != null) return;
+
+        var originalAgentApi = MBAPI.IMBAgent;
+        MBAPI.IMBAgent = DispatchProxy.Create<IMBAgent, ProximityAgentApi>();
+        restoreProximityAgentApi = () => MBAPI.IMBAgent = originalAgentApi;
+    }
+
+    /// <summary>Represents a nearby hostile agent before the engine has started moving it in retreat mode.</summary>
+    public class ProximityAgentApi : DispatchProxy
+    {
+        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args) => targetMethod?.Name switch
+        {
+            nameof(IMBAgent.IsEnemy) => true,
+            nameof(IMBAgent.GetAIStateFlags) => Agent.AIStateFlag.Alarmed,
+            nameof(IMBAgent.IsRetreating) => false,
+            nameof(IMBAgent.SetRetreatMode) => null,
+            _ => throw new NotSupportedException(targetMethod?.Name),
+        };
     }
 
     private static bool AgentProximityMap_BeginSearch(Mission mission, ref AgentProximityMap.ProximityMapSearchStruct __result)
@@ -1613,6 +1637,8 @@ public sealed class MissionEngineFixture : IDisposable
 
     public void Dispose()
     {
+        restoreProximityAgentApi?.Invoke();
+        restoreProximityAgentApi = null;
         harmony.UnpatchAll(harmony.Id);
         ByContainer.Clear();
     }
