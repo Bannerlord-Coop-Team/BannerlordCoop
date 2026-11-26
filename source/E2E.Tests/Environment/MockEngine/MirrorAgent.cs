@@ -108,6 +108,7 @@ public sealed class MirrorAgent
     public float Action1Speed { get; set; } = 1f;
     public int GetCurrentActionSpeedCalls { get; set; }
     public int SetCurrentActionSpeedCalls { get; set; }
+    public bool HasVisualEntity { get; set; } = true;
     public bool HasVisualSkeleton { get; set; }
     public int SkeletonAction0Index { get; set; } = -1;
     public int SkeletonAction1Index { get; set; } = -1;

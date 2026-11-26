@@ -300,8 +300,10 @@ public partial class MissileOutcomeTests : MissionTestEnvironment
         });
     }
 
-    [Fact]
-    public void QueuedOutcome_ResolvesTheVictimOnTheGameThread()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void QueuedBodyOutcome_UsesTheVictimsStateOnTheGameThread(bool hasVisualEntity)
     {
         RunClients((shooter, peer, native) =>
         {
@@ -313,64 +315,48 @@ public partial class MissileOutcomeTests : MissionTestEnvironment
                     Mission.MissileCollisionReaction.Stick, Frame(true), shooter.Victim);
                 outcome = Assert.Single(shooter.Network.NetworkSentMessages.GetMessages<NetworkMissileOutcome>());
             });
-            peer.Instance.Call(() =>
-            {
-                peer.Handler.DrainPendingShots();
-                var registry = peer.Instance.Resolve<INetworkAgentRegistry>();
-                Assert.True(registry.RemoveAgent(peer.VictimId));
-                // The cosmetic id would still resolve after RemoveAgent, so a poll-thread lookup would pass unnoticed.
-                registry.ForgetCosmeticAgent(peer.Victim);
-                Assert.False(registry.TryGetCosmeticAgent(peer.VictimId, out _));
-            });
-            var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
-            byte[] wire = MessagePacket.Create(outcome!, serializer).Data;
-            peer.Instance.SimulateMessage(this, wire, markGameThread: false);
-            Assert.DoesNotContain(native.Attachments, value => ReferenceEquals(value.Victim, peer.Victim));
-            peer.Instance.Call(() => Assert.True(peer.Instance.Resolve<INetworkAgentRegistry>()
-                .TryRegisterAgent("peer", peer.VictimId, peer.Victim)));
-            peer.Instance.PumpGameThread();
-            NativeFixture.Attachment attached = Assert.Single(native.Attachments,
-                value => ReferenceEquals(value.Victim, peer.Victim));
-            AssertFrame(Frame(true), attached.Frame, exact: true);
-        });
-    }
-
-    [Fact]
-    public void QueuedBodyOutcome_RemovesTheMissileWhenTheVictimLosesItsVisualEntity()
-    {
-        RunClients((shooter, peer, native) =>
-        {
-            peer.Receive(shooter.Shoot());
-            NetworkMissileOutcome? outcome = null;
-            shooter.Instance.Call(() =>
-            {
-                shooter.Contact(Assert.Single(shooter.Mission.Shell._missilesDictionary).Value,
-                    Mission.MissileCollisionReaction.Stick, Frame(true), shooter.Victim);
-                outcome = Assert.Single(shooter.Network.NetworkSentMessages.GetMessages<NetworkMissileOutcome>());
-            });
+            var registry = peer.Instance.Resolve<INetworkAgentRegistry>();
             GameEntity? flying = null;
             peer.Instance.Call(() =>
             {
                 peer.Handler.DrainPendingShots();
                 flying = Assert.Single(peer.Mission.Shell._missilesDictionary).Value.Entity;
+                Assert.True(registry.RemoveAgent(peer.VictimId));
+                if (hasVisualEntity)
+                {
+                    // Force the id lookup to wait until the victim is registered on the game thread.
+                    registry.ForgetCosmeticAgent(peer.Victim);
+                    Assert.False(registry.TryGetCosmeticAgent(peer.VictimId, out _));
+                }
             });
 
             var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
             byte[] wire = MessagePacket.Create(outcome!, serializer).Data;
             peer.Instance.SimulateMessage(this, wire, markGameThread: false);
+            Assert.DoesNotContain(native.Attachments, value => ReferenceEquals(value.Victim, peer.Victim));
             peer.Instance.Call(() =>
             {
-                var registry = peer.Instance.Resolve<INetworkAgentRegistry>();
-                Assert.True(registry.RemoveAgent(peer.VictimId));
-                Assert.True(registry.TryGetCosmeticAgent(peer.VictimId, out var victim));
-                Assert.Same(peer.Victim, victim);
-                native.AgentsWithoutVisualEntity.Add(victim);
+                if (hasVisualEntity)
+                {
+                    Assert.True(registry.TryRegisterAgent("peer", peer.VictimId, peer.Victim));
+                }
+                else
+                {
+                    Assert.True(registry.TryGetCosmeticAgent(peer.VictimId, out var victim));
+                    Assert.True(AgentMirror.TryGet(victim, out var mirror));
+                    mirror.HasVisualEntity = false;
+                }
             });
             peer.Instance.PumpGameThread();
 
             peer.Instance.Call(() =>
             {
-                Assert.DoesNotContain(native.Attachments, value => ReferenceEquals(value.Victim, peer.Victim));
+                var attachments = native.Attachments.Where(value => ReferenceEquals(value.Victim, peer.Victim));
+                if (hasVisualEntity)
+                    AssertFrame(Frame(true), Assert.Single(attachments).Frame, exact: true);
+                else
+                    Assert.Empty(attachments);
+
                 Assert.Empty(peer.Mission.Shell._missilesDictionary);
                 Assert.Contains(flying!, native.RemovedEntities);
                 Assert.Empty(peer.Items.GetAll());
@@ -1134,7 +1120,7 @@ public partial class MissileOutcomeTests : MissionTestEnvironment
             native.Spawners[Mission.Shell] = Spawner;
             IWeaponDropWorldItemSpawner spawner = native.RealParenting ? new WeaponDropWorldItemSpawner() : Spawner;
             Handler = new MissileHandler(Network, Broker, agents, new MissileOrientationCodec(), spawner, Items,
-                new MissionObjectPath(), shipEngine);
+                new MissionObjectPath(), instance.Resolve<IAgentVisualActionAccessor>(), shipEngine);
             drops = new WeaponDropHandler(agents, Items, Broker, Network, instance.Resolve<IObjectManager>(), spawner);
             pickups = new WeaponPickupHandler(agents, Items, Network, Broker, instance.Resolve<IObjectManager>());
             var controller = ObjectHelper.SkipConstructor<CoopBattleController>();
@@ -1240,7 +1226,6 @@ public partial class MissileOutcomeTests : MissionTestEnvironment
         public Dictionary<SpawnedItemEntity, RecordingSpawner> ItemSpawners { get; } = new();
         public HashSet<GameEntity> RemovedEntities { get; } = new();
         public List<Attachment> Attachments { get; } = new();
-        public HashSet<Agent> AgentsWithoutVisualEntity { get; } = new();
         public Dictionary<Agent, EquipmentIndex> OffhandSlots { get; } = new();
         public Dictionary<Mission, int> MissionObjectReads { get; } = new();
         public int ReconstructedMissiles { get; private set; }
@@ -1255,20 +1240,12 @@ public partial class MissileOutcomeTests : MissionTestEnvironment
         private readonly Dictionary<UIntPtr, string> names = new();
         private FieldInfo? entityBridge;
         private object? originalEntityBridge;
-        private readonly MBAgentVisuals visualsWithEntity;
-        private readonly MBAgentVisuals visualsWithoutEntity;
         public bool RealParenting { get; private set; }
         public sealed record Attachment(Agent Victim, bool Shield, int Index, MatrixFrame Frame);
 
         public NativeFixture()
         {
             current = this;
-            InitializeNativeObject();
-            visualsWithEntity = ObjectHelper.SkipConstructor<MBAgentVisuals>();
-            visualsWithoutEntity = ObjectHelper.SkipConstructor<MBAgentVisuals>();
-            GC.SuppressFinalize(visualsWithEntity);
-            GC.SuppressFinalize(visualsWithoutEntity);
-
             Patch(typeof(ScriptComponentBehavior), "CacheEditableFieldsForAllScriptComponents", nameof(Skip));
             harmony.Patch(AccessTools.Method(typeof(GameEntity), nameof(GameEntity.GetFirstScriptOfType))
                 .MakeGenericMethod(typeof(SpawnedItemEntity)), prefix: Method(nameof(GetItem)));
@@ -1283,8 +1260,6 @@ public partial class MissileOutcomeTests : MissionTestEnvironment
             Patch(typeof(Mission), nameof(Mission.PrepareMissileWeaponForDrop), nameof(Skip));
             Patch(typeof(Mission), nameof(Mission.RemoveMissileAsClient), nameof(RemoveMissile));
             Patch(typeof(Mission), nameof(Mission.SpawnWeaponAsDropFromMissile), nameof(DropMissile));
-            Patch(typeof(Agent), "get_AgentVisuals", nameof(GetAgentVisuals));
-            Patch(typeof(MBAgentVisuals), nameof(MBAgentVisuals.GetWeakEntity), nameof(GetVisualEntity));
             Patch(typeof(Agent), nameof(Agent.AttachWeaponToBone), nameof(AttachBody));
             Patch(typeof(Agent), nameof(Agent.AttachWeaponToWeapon), nameof(AttachShield));
             Patch(typeof(Agent), nameof(Agent.GetOffhandWieldedItemIndex), nameof(Offhand));
@@ -1539,18 +1514,6 @@ public partial class MissileOutcomeTests : MissionTestEnvironment
                 current.DropFrameOverride ?? attachLocalFrame, out var item, attachedMissionObject);
             current.entities[missile.Entity] = item;
             __result = item.Id;
-            return false;
-        }
-        private static bool GetAgentVisuals(Agent __instance, ref MBAgentVisuals __result)
-        {
-            __result = current.AgentsWithoutVisualEntity.Contains(__instance)
-                ? current.visualsWithoutEntity : current.visualsWithEntity;
-            return false;
-        }
-        private static bool GetVisualEntity(MBAgentVisuals __instance, ref WeakGameEntity __result)
-        {
-            __result = ReferenceEquals(__instance, current.visualsWithoutEntity)
-                ? WeakGameEntity.Invalid : new WeakGameEntity((UIntPtr)1);
             return false;
         }
         private static bool AttachBody(Agent __instance, sbyte boneIndex, ref MatrixFrame attachLocalFrame)

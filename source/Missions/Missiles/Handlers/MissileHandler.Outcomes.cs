@@ -298,9 +298,11 @@ public partial class MissileHandler
                     return false;
                 victim.AttachWeaponToWeapon(shieldSlot, weapon, null, ref frame);
             }
-            // The cosmetic registry can still resolve a victim after its native visual entity is gone.
-            else if (victim.AgentVisuals?.GetWeakEntity().IsValid == true)
+            // A cosmetic id can outlive the visual entity. Finish the outcome and remove the missile if it is gone.
+            else if (agentVisualActionAccessor.HasVisualEntity(victim))
                 victim.AttachWeaponToBone(weapon, null, (sbyte)message.BoneIndex, ref frame);
+            else
+                Logger.Debug("[MissileOutcome] skipped body attach for {VictimId}: victim has no visual entity", message.VictimId);
         }
         else
         {

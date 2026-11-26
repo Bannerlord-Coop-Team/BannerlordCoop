@@ -102,7 +102,8 @@ public class MissileShotReplayTests : MissionTestEnvironment
                 using var broker = new MessageBroker();
                 using var handler = new MissileHandler(network, broker,
                     shooterClient.Resolve<INetworkAgentRegistry>(), new MissileOrientationCodec(),
-                    new WeaponDropWorldItemSpawner(), shooterClient.Resolve<INetworkWorldItemRegistry>(), new MissionObjectPath());
+                    new WeaponDropWorldItemSpawner(), shooterClient.Resolve<INetworkWorldItemRegistry>(),
+                    new MissionObjectPath(), shooterClient.Resolve<IAgentVisualActionAccessor>());
 
                 broker.Publish(this, new AgentShoot(shooter, wielded, position, direction, orientation,
                     55f, 61f, hasRigidBody, missileIndex: 7));
@@ -129,7 +130,7 @@ public class MissileShotReplayTests : MissionTestEnvironment
                 using var broker = new MessageBroker();
                 using var handler = new MissileHandler(peerClient.Resolve<MockBattleNetwork>(), broker, registry,
                     new MissileOrientationCodec(), new WeaponDropWorldItemSpawner(), peerClient.Resolve<INetworkWorldItemRegistry>(),
-                    new MissionObjectPath());
+                    new MissionObjectPath(), peerClient.Resolve<IAgentVisualActionAccessor>());
 
                 broker.Publish(this, received);
                 handler.DrainPendingShots();
