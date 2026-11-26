@@ -1255,14 +1255,20 @@ public partial class MissileOutcomeTests : MissionTestEnvironment
         private readonly Dictionary<UIntPtr, string> names = new();
         private FieldInfo? entityBridge;
         private object? originalEntityBridge;
-        private MBAgentVisuals? visualsWithEntity;
-        private MBAgentVisuals? visualsWithoutEntity;
+        private readonly MBAgentVisuals visualsWithEntity;
+        private readonly MBAgentVisuals visualsWithoutEntity;
         public bool RealParenting { get; private set; }
         public sealed record Attachment(Agent Victim, bool Shield, int Index, MatrixFrame Frame);
 
         public NativeFixture()
         {
             current = this;
+            InitializeNativeObject();
+            visualsWithEntity = ObjectHelper.SkipConstructor<MBAgentVisuals>();
+            visualsWithoutEntity = ObjectHelper.SkipConstructor<MBAgentVisuals>();
+            GC.SuppressFinalize(visualsWithEntity);
+            GC.SuppressFinalize(visualsWithoutEntity);
+
             Patch(typeof(ScriptComponentBehavior), "CacheEditableFieldsForAllScriptComponents", nameof(Skip));
             harmony.Patch(AccessTools.Method(typeof(GameEntity), nameof(GameEntity.GetFirstScriptOfType))
                 .MakeGenericMethod(typeof(SpawnedItemEntity)), prefix: Method(nameof(GetItem)));
@@ -1537,10 +1543,8 @@ public partial class MissileOutcomeTests : MissionTestEnvironment
         }
         private static bool GetAgentVisuals(Agent __instance, ref MBAgentVisuals __result)
         {
-            InitializeNativeObject();
             __result = current.AgentsWithoutVisualEntity.Contains(__instance)
-                ? current.visualsWithoutEntity ??= ObjectHelper.SkipConstructor<MBAgentVisuals>()
-                : current.visualsWithEntity ??= ObjectHelper.SkipConstructor<MBAgentVisuals>();
+                ? current.visualsWithoutEntity : current.visualsWithEntity;
             return false;
         }
         private static bool GetVisualEntity(MBAgentVisuals __instance, ref WeakGameEntity __result)
