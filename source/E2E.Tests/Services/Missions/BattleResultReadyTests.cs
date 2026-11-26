@@ -485,9 +485,10 @@ public class BattleResultReadyTests : MissionTestEnvironment
     }
 
     [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void EnemyRout_PeerCanLeaveWithVictoryNearRoutedEnemy(bool hostLeavesFirst)
+    [InlineData(true, Mission.MissionTeamAITypeEnum.FieldBattle)]
+    [InlineData(false, Mission.MissionTeamAITypeEnum.FieldBattle)]
+    [InlineData(true, Mission.MissionTeamAITypeEnum.Siege)]
+    public void EnemyRout_PeerCanLeaveWithVictoryNearRoutedEnemy(bool hostLeavesFirst, Mission.MissionTeamAITypeEnum missionType)
     {
         using var fixture = new MissionEngineFixture();
         var (mapEventId, _) = SetupCoopBattle("host", "unconnected-defender", "successor");
@@ -497,8 +498,8 @@ public class BattleResultReadyTests : MissionTestEnvironment
         RegisterPeer(host, "host");
         RegisterPeer(successor, "successor");
 
-        var (hostMission, hostController, hostEndLogic) = CreateFieldBattleMission(host);
-        var (successorMission, successorController, successorEndLogic) = CreateFieldBattleMission(successor);
+        var (hostMission, hostController, hostEndLogic) = CreateBattleMission(host);
+        var (successorMission, successorController, successorEndLogic) = CreateBattleMission(successor);
         var victoryDisabledMethods = VictoryConclusionDisabledMethods();
 
         EnterBattleWithMembership(host, "host", mapEventId);
@@ -524,7 +525,10 @@ public class BattleResultReadyTests : MissionTestEnvironment
             successor.Call(() =>
             {
                 ApplySuccessorVictory();
-                PrepareRoutedEnemyForProximity();
+                var registry = successor.Resolve<INetworkAgentRegistry>();
+                Assert.True(registry.TryGetAgentInfo(agentId, out var info));
+                Assert.Equal(hostLeavesFirst ? "successor" : "host", info.CurrentAuthority);
+                PrepareRoutedEnemyForProximity(info.Agent);
 
                 Assert.False(successorMission.EndMissionCalled);
                 Assert.Equal(BattleEndLogic.ExitResult.True, successorEndLogic.TryExit());
@@ -542,7 +546,7 @@ public class BattleResultReadyTests : MissionTestEnvironment
             host.Call(hostController.OnEndMissionInternal, victoryDisabledMethods);
         AssertMapEventRemoved(mapEventId);
 
-        (MockMission Mission, CoopBattleController Controller, BattleEndLogic EndLogic) CreateFieldBattleMission(EnvironmentInstance client)
+        (MockMission Mission, CoopBattleController Controller, BattleEndLogic EndLogic) CreateBattleMission(EnvironmentInstance client)
         {
             var controller = client.Resolve<CoopBattleController>();
             MockMission mission = null!;
@@ -551,7 +555,7 @@ public class BattleResultReadyTests : MissionTestEnvironment
             {
                 mission = fixture.CreateMission(client);
                 mission.PlayerTeam = mission.AttackerTeam;
-                mission.Shell.MissionTeamAIType = Mission.MissionTeamAITypeEnum.FieldBattle;
+                mission.Shell.MissionTeamAIType = missionType;
                 endLogic = AttachBattleEndLogic(mission, controller);
                 SpawnMainAgent(mission);
             });
@@ -565,7 +569,6 @@ public class BattleResultReadyTests : MissionTestEnvironment
             {
                 var enemy = successorMission.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
                     .Controller(AgentControllerType.None).Team(successorMission.DefenderTeam.Shell));
-                successorMission.NearbyAgent = enemy;
                 var registry = successor.Resolve<INetworkAgentRegistry>();
                 Assert.True(registry.TryRegisterAgent("host", id, enemy));
                 successor.Resolve<IMessageBroker>().Publish(this, new NetworkBattleAgentRetreatState(id, true, 0));
@@ -598,15 +601,12 @@ public class BattleResultReadyTests : MissionTestEnvironment
             successorMission.Shell._missionEnded = true;
         }
 
-        void PrepareRoutedEnemyForProximity()
+        void PrepareRoutedEnemyForProximity(Agent enemy)
         {
-            var registry = successor.Resolve<INetworkAgentRegistry>();
-            Assert.True(registry.TryGetAgentInfo(agentId, out var info));
-            Assert.Equal(hostLeavesFirst ? "successor" : "host", info.CurrentAuthority);
-            var enemy = info.Agent;
             Assert.True(enemy.IsActive());
             Assert.True(AgentMirror.TryGet(enemy, out var mirror));
             NativeAgentFields.BackForProximityCheck(enemy, mirror);
+            successorMission.NearbyAgent = enemy;
         }
 
         static void SpawnMainAgent(MockMission mock)
