@@ -298,7 +298,8 @@ public partial class MissileHandler
                     return false;
                 victim.AttachWeaponToWeapon(shieldSlot, weapon, null, ref frame);
             }
-            else
+            // The cosmetic registry can still resolve a victim after its native visual entity is gone.
+            else if (victim.AgentVisuals?.GetWeakEntity().IsValid == true)
                 victim.AttachWeaponToBone(weapon, null, (sbyte)message.BoneIndex, ref frame);
         }
         else

@@ -336,6 +336,49 @@ public partial class MissileOutcomeTests : MissionTestEnvironment
     }
 
     [Fact]
+    public void QueuedBodyOutcome_RemovesTheMissileWhenTheVictimLosesItsVisualEntity()
+    {
+        RunClients((shooter, peer, native) =>
+        {
+            peer.Receive(shooter.Shoot());
+            NetworkMissileOutcome? outcome = null;
+            shooter.Instance.Call(() =>
+            {
+                shooter.Contact(Assert.Single(shooter.Mission.Shell._missilesDictionary).Value,
+                    Mission.MissileCollisionReaction.Stick, Frame(true), shooter.Victim);
+                outcome = Assert.Single(shooter.Network.NetworkSentMessages.GetMessages<NetworkMissileOutcome>());
+            });
+            GameEntity? flying = null;
+            peer.Instance.Call(() =>
+            {
+                peer.Handler.DrainPendingShots();
+                flying = Assert.Single(peer.Mission.Shell._missilesDictionary).Value.Entity;
+            });
+
+            var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
+            byte[] wire = MessagePacket.Create(outcome!, serializer).Data;
+            peer.Instance.SimulateMessage(this, wire, markGameThread: false);
+            peer.Instance.Call(() =>
+            {
+                var registry = peer.Instance.Resolve<INetworkAgentRegistry>();
+                Assert.True(registry.RemoveAgent(peer.VictimId));
+                Assert.True(registry.TryGetCosmeticAgent(peer.VictimId, out var victim));
+                Assert.Same(peer.Victim, victim);
+                native.AgentsWithoutVisualEntity.Add(victim);
+            });
+            peer.Instance.PumpGameThread();
+
+            peer.Instance.Call(() =>
+            {
+                Assert.DoesNotContain(native.Attachments, value => ReferenceEquals(value.Victim, peer.Victim));
+                Assert.Empty(peer.Mission.Shell._missilesDictionary);
+                Assert.Contains(flying!, native.RemovedEntities);
+                Assert.Empty(peer.Items.GetAll());
+            });
+        });
+    }
+
+    [Fact]
     public void ShieldOutcome_WaitsWhileTheShootersShieldSlotIsEmpty()
     {
         RunClients((shooter, peer, native) =>
@@ -1197,6 +1240,7 @@ public partial class MissileOutcomeTests : MissionTestEnvironment
         public Dictionary<SpawnedItemEntity, RecordingSpawner> ItemSpawners { get; } = new();
         public HashSet<GameEntity> RemovedEntities { get; } = new();
         public List<Attachment> Attachments { get; } = new();
+        public HashSet<Agent> AgentsWithoutVisualEntity { get; } = new();
         public Dictionary<Agent, EquipmentIndex> OffhandSlots { get; } = new();
         public Dictionary<Mission, int> MissionObjectReads { get; } = new();
         public int ReconstructedMissiles { get; private set; }
@@ -1211,6 +1255,8 @@ public partial class MissileOutcomeTests : MissionTestEnvironment
         private readonly Dictionary<UIntPtr, string> names = new();
         private FieldInfo? entityBridge;
         private object? originalEntityBridge;
+        private MBAgentVisuals? visualsWithEntity;
+        private MBAgentVisuals? visualsWithoutEntity;
         public bool RealParenting { get; private set; }
         public sealed record Attachment(Agent Victim, bool Shield, int Index, MatrixFrame Frame);
 
@@ -1231,6 +1277,8 @@ public partial class MissileOutcomeTests : MissionTestEnvironment
             Patch(typeof(Mission), nameof(Mission.PrepareMissileWeaponForDrop), nameof(Skip));
             Patch(typeof(Mission), nameof(Mission.RemoveMissileAsClient), nameof(RemoveMissile));
             Patch(typeof(Mission), nameof(Mission.SpawnWeaponAsDropFromMissile), nameof(DropMissile));
+            Patch(typeof(Agent), "get_AgentVisuals", nameof(GetAgentVisuals));
+            Patch(typeof(MBAgentVisuals), nameof(MBAgentVisuals.GetWeakEntity), nameof(GetVisualEntity));
             Patch(typeof(Agent), nameof(Agent.AttachWeaponToBone), nameof(AttachBody));
             Patch(typeof(Agent), nameof(Agent.AttachWeaponToWeapon), nameof(AttachShield));
             Patch(typeof(Agent), nameof(Agent.GetOffhandWieldedItemIndex), nameof(Offhand));
@@ -1485,6 +1533,20 @@ public partial class MissileOutcomeTests : MissionTestEnvironment
                 current.DropFrameOverride ?? attachLocalFrame, out var item, attachedMissionObject);
             current.entities[missile.Entity] = item;
             __result = item.Id;
+            return false;
+        }
+        private static bool GetAgentVisuals(Agent __instance, ref MBAgentVisuals __result)
+        {
+            InitializeNativeObject();
+            __result = current.AgentsWithoutVisualEntity.Contains(__instance)
+                ? current.visualsWithoutEntity ??= ObjectHelper.SkipConstructor<MBAgentVisuals>()
+                : current.visualsWithEntity ??= ObjectHelper.SkipConstructor<MBAgentVisuals>();
+            return false;
+        }
+        private static bool GetVisualEntity(MBAgentVisuals __instance, ref WeakGameEntity __result)
+        {
+            __result = ReferenceEquals(__instance, current.visualsWithoutEntity)
+                ? WeakGameEntity.Invalid : new WeakGameEntity((UIntPtr)1);
             return false;
         }
         private static bool AttachBody(Agent __instance, sbyte boneIndex, ref MatrixFrame attachLocalFrame)
