@@ -124,8 +124,7 @@ public class ArmyHandler : IHandler
             if (!objectManager.TryGetIdWithLogging(obj.What.ClientMobileParty, out clientMobilePartyId)) return;
         }
 
-        var message = new NetworkRemovePartyInArmy(armyId, mobilePartyId, clientMobilePartyId);
-
+        var message = new NetworkRemovePartyInArmy(armyId, mobilePartyId, clientMobilePartyId, obj.What.AbandonArmy);
         // Broadcast to all the clients that the state was changed
         network.SendAll(message);
     }
@@ -142,6 +141,22 @@ public class ArmyHandler : IHandler
             {
                 objectManager.TryGetObjectWithLogging(data.ClientMobilePartyId, out clientMobileParty);
             }
+            //The only publishers that set abandonArmy: true are client menu prefixes,
+            // so there is no need for ChargeAbandonCost in HandleRemoveMobilePartyInArmy
+            if (data.AbandonArmy && ModInformation.IsServer)
+            {
+                var hero = mobileParty.LeaderHero;
+                if (hero != null
+                    && objectManager.TryGetIdWithLogging(hero, out var heroId)
+                    && playerManager.IsSenderControllingHero(payload.Who, heroId))
+                {
+                    ChargeAbandonCost(mobileParty, army);
+                }
+                else
+                {
+                    Logger.Warning("Abandon charge skipped for {PartyId}, sender does not control its leader", data.MobilePartyId);
+                }
+            }
             // Keep the receive allowance on the thread that performs the mutation.
             using (ModInformation.IsClient ? new AllowedThread() : null)
             {
@@ -149,9 +164,21 @@ public class ArmyHandler : IHandler
             }
             if (ModInformation.IsServer)
             {
-                network.SendAll(new NetworkRemovePartyInArmy(data.ArmyId, data.MobilePartyId, data.ClientMobilePartyId));
+                network.SendAll(new NetworkRemovePartyInArmy(data.ArmyId, data.MobilePartyId, data.ClientMobilePartyId, data.AbandonArmy));
             }
         });
+    }
+
+    private static void ChargeAbandonCost(MobileParty party, Army army)
+    {
+        // duplicate or late abandon for a party that already left must not bill again
+        if (party.Army != army) return;
+
+        var clan = party.LeaderHero?.Clan;
+        if (clan == null) return;
+
+        var cost = (float)Campaign.Current.Models.DiplomacyModel.GetInfluenceCostOfAbandoningArmy();
+        ChangeClanInfluenceAction.Apply(clan, -cost);
     }
 
     private void HandleArmyAiBehaviorObjectChanged(MessagePayload<ArmyAiBehaviorObjectChanged> payload)

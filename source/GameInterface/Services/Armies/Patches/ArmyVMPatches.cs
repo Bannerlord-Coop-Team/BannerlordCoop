@@ -1,6 +1,5 @@
 ﻿using Common;
 using Common.Messaging;
-using Common.Util;
 using GameInterface.Policies;
 using GameInterface.Services.Armies.Messages;
 using GameInterface.Services.MobileParties.Extensions;
@@ -68,11 +67,7 @@ internal class ArmyManagementVMPatch
                         MessageBroker.Instance.Publish(__instance, new MobilePartyInArmyAdded(
                         MobileParty.MainParty.Army,
                         party,
-                        false));
-                        using (new AllowedThread())
-                        {
-                            ArmyPatches.AddMobilePartyInArmy(party, MobileParty.MainParty.Army);
-                        }
+                        addPartyToMergedPartiesBool: false));
                     }
                 }
                 MessageBroker.Instance.Publish(__instance, new ChangeClanInfluence(Clan.PlayerClan, __instance.TotalCost - __instance._influenceSpentForCohesionBoosting));
@@ -88,11 +83,7 @@ internal class ArmyManagementVMPatch
             {
                 if (party == MobileParty.MainParty)
                 { 
-                    MessageBroker.Instance.Publish(__instance, new MobilePartyInArmyRemoved(MobileParty.MainParty.Army, party, MobileParty.MainParty));
-                    using (new AllowedThread())
-                    {
-                        ArmyPatches.RemoveMobilePartyInArmy(party, MobileParty.MainParty.Army, MobileParty.MainParty);
-                    }
+                    MessageBroker.Instance.Publish(__instance, new MobilePartyInArmyRemoved(MobileParty.MainParty.Army, party, MobileParty.MainParty, abandonArmy: false));
                     flag = true;
                 }
             }
@@ -103,11 +94,7 @@ internal class ArmyManagementVMPatch
                     Army army = MobileParty.MainParty.Army;
                     if (army != null && army.Parties.Contains(party2))
                     {
-                        MessageBroker.Instance.Publish(__instance, new MobilePartyInArmyRemoved(MobileParty.MainParty.Army, party2, MobileParty.MainParty));
-                        using (new AllowedThread())
-                        {
-                            ArmyPatches.RemoveMobilePartyInArmy(party2, MobileParty.MainParty.Army, MobileParty.MainParty);
-                        }
+                        MessageBroker.Instance.Publish(__instance, new MobilePartyInArmyRemoved(MobileParty.MainParty.Army, party2, MobileParty.MainParty, abandonArmy: false));
                     }
                 }
             }
@@ -132,11 +119,7 @@ public class GameMenuOverlayArmyDismissPatch
         var party = __instance._contextMenuItem?.Party?.MobileParty;
         if (party?.Army == null) return true;
         var army = party.Army;
-        MessageBroker.Instance.Publish(__instance, new MobilePartyInArmyRemoved(army, party, MobileParty.MainParty));
-        using (new AllowedThread())
-        {
-            ArmyPatches.RemoveMobilePartyInArmy(party, MobileParty.MainParty.Army, MobileParty.MainParty);
-        }
+        MessageBroker.Instance.Publish(__instance, new MobilePartyInArmyRemoved(army, party, MobileParty.MainParty, abandonArmy: false));
         // cleanup
         if (!__instance._closedHandled)
         {
