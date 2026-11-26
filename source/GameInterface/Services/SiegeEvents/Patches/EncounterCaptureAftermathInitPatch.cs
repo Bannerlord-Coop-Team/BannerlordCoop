@@ -50,7 +50,9 @@ internal class EncounterCaptureAftermathInitPatch
         var battle = PlayerEncounter.Battle;
         if (battle == null || !battle.IsSiegeAssault) return false;
 
-        // Our clan captured it, and we are outside it (the besieger). A winning defender is inside its own town.
+        // Our clan captured it, and we are outside it (the besieger). A relief party that joined from outside is the
+        // assault's defender and captured nothing. Like vanilla DoEnd, only the attacker goes to menu_settlement_taken.
+        if (!PlayerEncounter.PlayerIsAttacker) return false;
         if (settlement.OwnerClan == null || settlement.OwnerClan != Hero.MainHero?.Clan) return false;
         return MobileParty.MainParty?.CurrentSettlement != settlement;
     }

@@ -6,7 +6,9 @@ using GameInterface.Tests.Bootstrap;
 using Moq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
 using Xunit;
 
 namespace GameInterface.Tests.Services.SiegeEvents;
@@ -69,6 +71,67 @@ public class EncounterCaptureAftermathInitPatchTests
         siegeEventInterface.Verify(
             service => service.RouteCapturedSettlementToAftermathMenu(It.IsAny<Settlement>()),
             Times.Never);
+    }
+
+    [Fact]
+    public void OwnCastleSiegeAssault_JoinedAsDefenderFromOutside_RunsVanilla()
+    {
+        // a relief party joins the walls assault on its own clan's castle from outside, nothing was captured
+        var siegeEventInterface = new Mock<ISiegeEventInterface>();
+
+        Assert.True(RunOwnCastleSiegeAssault(siegeEventInterface.Object, BattleSideEnum.Defender));
+
+        siegeEventInterface.Verify(
+            service => service.RouteCapturedSettlementToAftermathMenu(It.IsAny<Settlement>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public void OwnCastleSiegeAssault_BesiegerOutside_RoutesToAftermathMenu()
+    {
+        var siegeEventInterface = new Mock<ISiegeEventInterface>();
+
+        Assert.False(RunOwnCastleSiegeAssault(siegeEventInterface.Object, BattleSideEnum.Attacker));
+
+        siegeEventInterface.Verify(
+            service => service.RouteCapturedSettlementToAftermathMenu(It.IsAny<Settlement>()),
+            Times.Once);
+    }
+
+    private static bool RunOwnCastleSiegeAssault(ISiegeEventInterface siegeEventInterface, BattleSideEnum playerSide)
+    {
+        GameBootStrap.Initialize();
+
+        var clan = ObjectHelper.SkipConstructor<Clan>();
+        var hero = ObjectHelper.SkipConstructor<Hero>();
+        hero._clan = clan;
+        var character = ObjectHelper.SkipConstructor<CharacterObject>();
+        character._heroObject = hero;
+
+        var town = ObjectHelper.SkipConstructor<Town>();
+        town._isCastle = true;
+        town._ownerClan = clan;
+        var settlement = ObjectHelper.SkipConstructor<Settlement>();
+        settlement.Town = town;
+
+        var mapEvent = ObjectHelper.SkipConstructor<MapEvent>();
+        mapEvent._mapEventType = MapEvent.BattleTypes.Siege;
+
+        var encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
+        encounter.EncounterSettlementAux = settlement;
+        encounter._mapEvent = mapEvent;
+        encounter.PlayerSide = playerSide;
+
+        var previousPlayerTroop = Game.Current.PlayerTroop;
+        Game.Current.PlayerTroop = character;
+        try
+        {
+            return RunPrefix(siegeEventInterface, encounter);
+        }
+        finally
+        {
+            Game.Current.PlayerTroop = previousPlayerTroop;
+        }
     }
 
     private static bool RunPrefix(ISiegeEventInterface siegeEventInterface, PlayerEncounter encounter = null)
