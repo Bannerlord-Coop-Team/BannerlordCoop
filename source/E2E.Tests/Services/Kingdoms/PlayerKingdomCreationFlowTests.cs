@@ -93,7 +93,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     private const string SecondControllerId = "Player2";
     private const string KingdomName = "Real Kingdom";
     private const string UnregisteredCulturePolicyId = "policy_missing_from_loaded_modules";
-    private static readonly string[] AseraiDefaultPolicyIds = { "policy_council_of_the_commons", "policy_senate" };
+    private static readonly string[] RegisteredDefaultPolicyIds = { "policy_council_of_the_commons", "policy_senate" };
     private const string FullKingdomName = "Vlandia";
     private const string FullKingdomText = "Vlandia already has the most clans this server allows (1).";
 
@@ -377,7 +377,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             instance.Call(() =>
             {
                 Assert.True(instance.ObjectManager.TryGetObject<CultureObject>(player.CultureId, out var culture));
-                Assert.Equal(AseraiDefaultPolicyIds, culture.DefaultPolicyList.Select(policy => policy?.StringId));
+                Assert.Equal(RegisteredDefaultPolicyIds, culture.DefaultPolicyList.Select(policy => policy?.StringId));
             });
         }
 
@@ -421,7 +421,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             {
                 Assert.True(instance.ObjectManager.TryGetObject<Kingdom>(created.KingdomId, out var kingdom));
                 Assert.Equal(
-                    AseraiDefaultPolicyIds,
+                    RegisteredDefaultPolicyIds,
                     kingdom.ActivePolicies.Select(policy => policy.StringId));
             });
         }
@@ -6230,20 +6230,20 @@ public class PlayerKingdomCreationFlowTests : IDisposable
                 // Register the synced culture so LoadXml deserializes into this instance.
                 objectManager.RegisterObject(culture);
                 Assert.Null(objectManager.GetObject<PolicyObject>(UnregisteredCulturePolicyId));
-                objectManager.LoadXml(CreateAseraiCultureXml(culture.StringId));
+                objectManager.LoadXml(CreateCultureXmlWithUnregisteredPolicy(culture.StringId));
             }
         });
     }
 
-    private static XmlDocument CreateAseraiCultureXml(string cultureId)
+    private static XmlDocument CreateCultureXmlWithUnregisteredPolicy(string cultureId)
     {
         var xml = new XmlDocument();
         var cultures = xml.AppendChild(xml.CreateElement("SPCultures"));
         var culture = (XmlElement)cultures.AppendChild(xml.CreateElement("Culture"));
         culture.SetAttribute("id", cultureId);
-        culture.SetAttribute("name", "Aserai");
+        culture.SetAttribute("name", cultureId);
         var defaults = culture.AppendChild(xml.CreateElement("default_policies"));
-        foreach (string policyId in AseraiDefaultPolicyIds.Append(UnregisteredCulturePolicyId))
+        foreach (string policyId in RegisteredDefaultPolicyIds.Append(UnregisteredCulturePolicyId))
         {
             var policy = (XmlElement)defaults.AppendChild(xml.CreateElement("policy"));
             policy.SetAttribute("id", policyId);

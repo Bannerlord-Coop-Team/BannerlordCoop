@@ -16,6 +16,7 @@ internal class CultureDefaultPolicyRepairer : ICultureDefaultPolicyRepairer
 {
     private static readonly ILogger Logger = LogManager.GetLogger<CultureDefaultPolicyRepairer>();
 
+    /// <inheritdoc/>
     public void Repair(CultureObject culture)
     {
         int removed = culture._defaultPolicyList.RemoveAll(policy => policy == null);
