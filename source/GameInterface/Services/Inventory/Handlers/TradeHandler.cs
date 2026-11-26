@@ -234,7 +234,7 @@ internal class TradeHandler : IHandler
                 merchantGold,
                 currentMobileParty,
                 currentSettlementComponent,
-                boughtItems,
+                purchasedItems,
                 soldItems
             );
 
@@ -516,6 +516,11 @@ internal class TradeHandler : IHandler
             long overdrawn = (long)FindAmount(initialRoster, element) - FindAmount(submittedRoster, element)
                 - FindAmount(partyRoster, element);
             int kept = (int)Math.Max(0L, amount - Math.Max(0L, overdrawn));
+            if (kept < amount)
+            {
+                logger.Warning("Sale of {Amount} {Item} cut to {Kept}, the party no longer had the rest",
+                    amount, element.Item?.StringId, kept);
+            }
 
             int unpaid = GetRefund(price, amount - kept, amount);
             totalAmount += unpaid;
