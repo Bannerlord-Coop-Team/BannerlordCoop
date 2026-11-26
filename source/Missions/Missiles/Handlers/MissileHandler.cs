@@ -63,6 +63,7 @@ public partial class MissileHandler : IMissileHandler
     private readonly IMessageBroker messageBroker;
     private readonly INetworkAgentRegistry networkAgentRegistry;
     private readonly IMissileOrientationCodec orientationCodec;
+    private readonly IAgentVisualActionAccessor agentVisualActionAccessor;
     private readonly ConcurrentQueue<(NetworkAgentShoot Shot, int Attempts)> pendingShots = new();
     private readonly ConcurrentDictionary<(Guid AgentId, long ShotSequence), byte> pendingReconstructions = new();
     private readonly ConcurrentDictionary<(Guid AgentId, long ShotSequence), ImpactHint> impactHints = new();
@@ -89,12 +90,14 @@ public partial class MissileHandler : IMissileHandler
     public MissileHandler(IBattleNetwork network, IMessageBroker messageBroker,
         INetworkAgentRegistry networkAgentRegistry, IMissileOrientationCodec orientationCodec,
         IWeaponDropWorldItemSpawner worldItemSpawner, INetworkWorldItemRegistry worldItemRegistry,
-        IMissionObjectPath objectPath, INavalShipEngine shipEngine = null)
+        IMissionObjectPath objectPath, IAgentVisualActionAccessor agentVisualActionAccessor,
+        INavalShipEngine shipEngine = null)
     {
         this.network = network;
         this.messageBroker = messageBroker;
         this.networkAgentRegistry = networkAgentRegistry;
         this.orientationCodec = orientationCodec;
+        this.agentVisualActionAccessor = agentVisualActionAccessor;
         this.worldItemSpawner = worldItemSpawner;
         this.worldItemRegistry = worldItemRegistry;
         this.shipEngine = shipEngine;
