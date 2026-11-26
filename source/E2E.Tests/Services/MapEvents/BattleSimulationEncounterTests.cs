@@ -12,7 +12,6 @@ using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.Players;
 using HarmonyLib;
-using Helpers;
 using Missions.Messages;
 using SandBox.ViewModelCollection;
 using TaleWorlds.CampaignSystem;
@@ -21,6 +20,7 @@ using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.GameMenus.GameMenuInitializationHandlers;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Naval;
@@ -95,7 +95,7 @@ public class BattleSimulationEncounterTests : MapEventTestBase
     }
 
     [Fact]
-    public void CompletedAdvance_NonCaptiveDefeat_CanLeaveAfterScoreboard()
+    public void CompletedAdvance_NonCaptiveDefeat_LeavesEncounterAfterScoreboard()
     {
         var context = CreateServerMapEvent();
         var client = Clients.First();
@@ -104,6 +104,8 @@ public class BattleSimulationEncounterTests : MapEventTestBase
         EnableHeadlessEncounterFinish(client);
         client.Call(() =>
         {
+            new EncounterGameMenuBehavior().OnSessionLaunched(
+                new CampaignGameStarter(Campaign.Current.GameMenuManager, Campaign.Current.ConversationManager));
             Campaign.Current.MainParty = client.GetRegisteredObject<MobileParty>(context.AttackerPartyId);
             var encounter = SetMockPlayerEncounter(client, context.DefenderPartyId, context.MapEventId);
             encounter._attackerParty = MobileParty.MainParty.Party;
@@ -132,27 +134,25 @@ public class BattleSimulationEncounterTests : MapEventTestBase
                 Assert.Single(ended);
             }, MapEventDisabledMethods);
 
+            client.NetworkSentMessages.Clear();
             client.Call(() =>
             {
-                var encounter = PlayerEncounter.Current;
-                Assert.NotNull(encounter);
-                var simulation = encounter.BattleSimulation;
-                Game.Current.GameStateManager.GameStates.OfType<MapState>().Single().EndBattleSimulation();
+                var simulation = PlayerEncounter.Current.BattleSimulation;
+                var mapState = Game.Current.GameStateManager.GameStates.OfType<MapState>().Single();
+                mapState.EndBattleSimulation();
+                // Reopens the encounter menu, whose init would start a new battle if the encounter stayed open.
                 simulation.OnFinished();
-                PlayerEncounter.Update();
-                Assert.Equal(PlayerEncounterState.Begin, encounter.EncounterState);
-                Assert.Null(encounter._mapEvent);
-                Assert.Null(encounter.BattleSimulation);
-
-                MenuHelper.EncounterLeaveConsequence();
 
                 Assert.Null(PlayerEncounter.Current);
-                Assert.Null(MobileParty.MainParty.Party.MapEventSide);
+                Assert.Null(MobileParty.MainParty.MapEvent);
+                Assert.False(mapState.AtMenu);
             }, MapEventDisabledMethods
-                .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu)))
-                .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu)))
                 // Headless campaigns have no navigation mesh for vanilla's post-encounter displacement.
-                .Append(AccessTools.Method(typeof(MobileParty), nameof(MobileParty.TeleportPartyToOutSideOfEncounterRadius))));
+                .Append(AccessTools.Method(typeof(MobileParty), nameof(MobileParty.TeleportPartyToOutSideOfEncounterRadius)))
+                // The encounter texts read party names, which need encyclopedia data the headless heroes lack.
+                .Append(AccessTools.Method(typeof(PlayerEncounter), "SetEncounterMenuTexts"))
+                .Append(AccessTools.Method(typeof(DefaultEncounter), "game_menu_encounter_on_init")));
+            Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkRequestCreateMapEvent>());
             Server.Call(() => Assert.Single(ended));
         }
         finally

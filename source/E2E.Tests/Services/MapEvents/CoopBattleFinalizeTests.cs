@@ -431,13 +431,11 @@ public class CoopBattleFinalizeTests : MapEventTestBase
     }
 
     [Theory]
-    [InlineData(BattleState.DefenderVictory, PlayerEncounterState.Begin)]
+    [InlineData(BattleState.DefenderVictory)]
     // The result message has already put the defeated encounter in End; do not let a stale local
     // map-event winner override that authoritative per-player result while the scoreboard closes.
-    [InlineData(BattleState.AttackerVictory, PlayerEncounterState.Begin)]
-    public void SiegeSimulationDefeat_DestroyDefersEncounterCleanupUntilScoreboardCloses(
-        BattleState localBattleState,
-        PlayerEncounterState expectedEncounterState)
+    [InlineData(BattleState.AttackerVictory)]
+    public void SiegeSimulationDefeat_DestroyDefersEncounterCleanupUntilScoreboardCloses(BattleState localBattleState)
     {
         var setup = SetupSiegeSimulationResultClient();
         var client = Clients.First();
@@ -496,14 +494,7 @@ public class CoopBattleFinalizeTests : MapEventTestBase
             PlayerEncounter.Update();
 
             Assert.Null(MobileParty.MainParty.Party.MapEventSide);
-            Assert.NotNull(PlayerEncounter.Current);
-            Assert.Equal(expectedEncounterState, PlayerEncounter.Current.EncounterState);
-
-            var continuedEncounter = PlayerEncounter.Current;
-            client.Resolve<IMessageBroker>().Publish(this, new CampaignTick());
-
-            Assert.Same(continuedEncounter, PlayerEncounter.Current);
-            Assert.Equal(expectedEncounterState, PlayerEncounter.Current.EncounterState);
+            Assert.Null(PlayerEncounter.Current);
         }, MapEventDisabledMethods
             .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu)))
             .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu))));
@@ -565,7 +556,7 @@ public class CoopBattleFinalizeTests : MapEventTestBase
             Game.Current.GameStateManager.GameStates.OfType<MapState>().Last().EndBattleSimulation();
             simulation.OnFinished();
 
-            Assert.Equal(PlayerEncounterState.Begin, PlayerEncounter.Current.EncounterState);
+            Assert.Null(PlayerEncounter.Current);
         }, MapEventDisabledMethods
             .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu)))
             .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu))));

@@ -535,11 +535,11 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
             return true;
         }
 
-        // Leave must not reuse battle references whose party sides were already removed.
+        // A defeat without capture ends the encounter like native DoPlayerDefeat, otherwise the encounter menu's init starts
+        // a new battle against the same enemy. Finish must not finalize the destroyed battle again.
         encounter._mapEvent = null;
         encounter.BattleSimulation = null;
-        encounter.EncounterState = PlayerEncounterState.Begin;
-        GameMenu.SwitchToMenu("encounter");
+        PlayerEncounter.Finish();
         return true;
     }
 
