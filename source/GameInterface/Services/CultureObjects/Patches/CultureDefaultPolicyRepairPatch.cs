@@ -12,12 +12,12 @@ internal class CultureDefaultPolicyRepairPatch
 {
     private static readonly ILogger Logger = LogManager.GetLogger<CultureDefaultPolicyRepairPatch>();
 
+    // Run after deserialization because vanilla appends null for unregistered policy IDs.
     [HarmonyPostfix]
     private static void RepairCultureDefaults(CultureObject __instance)
     {
         if (!ContainerProvider.TryResolve<ICultureDefaultPolicyRepairer>(out var repairer)) return;
 
-        // Vanilla adds the lookup result even when the policy ID is unregistered.
         try
         {
             repairer.Repair(__instance);

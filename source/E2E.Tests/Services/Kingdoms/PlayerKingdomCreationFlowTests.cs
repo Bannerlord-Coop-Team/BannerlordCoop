@@ -366,9 +366,19 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         client.Resolve<IControllerIdProvider>().SetControllerId(ControllerId);
         TestEnvironment.RegisterLoadedObjects<PolicyObjectRegistry, PolicyObject>();
 
-        foreach (var instance in new[] { Server }.Concat(Clients))
+        var instances = new[] { Server }.Concat(Clients);
+        foreach (var instance in instances)
         {
             LoadCultureWithUnregisteredDefaultPolicy(instance, player.CultureId);
+        }
+
+        foreach (var instance in instances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<CultureObject>(player.CultureId, out var culture));
+                Assert.Equal(AseraiDefaultPolicyIds, culture.DefaultPolicyList.Select(policy => policy?.StringId));
+            });
         }
 
         client.Call(() =>
@@ -405,7 +415,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
                            && message.ClanId == player.ClanId);
         }
 
-        foreach (var instance in new[] { Server }.Concat(Clients))
+        foreach (var instance in instances)
         {
             instance.Call(() =>
             {
@@ -6221,7 +6231,6 @@ public class PlayerKingdomCreationFlowTests : IDisposable
                 objectManager.RegisterObject(culture);
                 Assert.Null(objectManager.GetObject<PolicyObject>(UnregisteredCulturePolicyId));
                 objectManager.LoadXml(CreateAseraiCultureXml(culture.StringId));
-                Assert.Equal(AseraiDefaultPolicyIds, culture.DefaultPolicyList.Select(policy => policy?.StringId));
             }
         });
     }

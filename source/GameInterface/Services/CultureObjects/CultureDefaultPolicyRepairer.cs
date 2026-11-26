@@ -18,10 +18,7 @@ internal class CultureDefaultPolicyRepairer : ICultureDefaultPolicyRepairer
 
     public void Repair(CultureObject culture)
     {
-        var policies = culture._defaultPolicyList;
-        if (policies == null) return;
-
-        int removed = policies.RemoveAll(policy => policy == null);
+        int removed = culture._defaultPolicyList.RemoveAll(policy => policy == null);
         if (removed > 0)
         {
             Logger.Warning("Removed {Count} unresolved default policy references from culture {CultureId}", removed, culture.StringId);
