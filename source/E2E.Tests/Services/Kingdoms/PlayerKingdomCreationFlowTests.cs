@@ -2814,11 +2814,13 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             SetUpPlayerDeclareWarVotes("CastleElection", decisionCount: 0);
         LeadPlayerPartiesEverywhere(ruler, vassal);
         string settlementId = CreateSyncedKingdomTown(vassal.ClanId, vassal.CultureId);
+        // Claimant merit reads map distances, and the test campaign has no map.
         var harmony = new Harmony($"e2e.castle-election.{Guid.NewGuid():N}");
         harmony.Patch(
             AccessTools.Method(typeof(SettlementClaimantDecision), nameof(SettlementClaimantDecision.CalculateMeritOfOutcome)),
             prefix: new HarmonyMethod(AccessTools.Method(typeof(PlayerKingdomCreationFlowTests), nameof(FixedClaimantMeritPrefix))));
-        using var garrison = new MethodCallRecorder(AccessTools.Method(typeof(Settlement), nameof(Settlement.AddGarrisonParty)));
+        // The ownership action can run without spawning a garrison on the missing map.
+        using var blockGarrisonCreation = new MethodCallRecorder(AccessTools.Method(typeof(Settlement), nameof(Settlement.AddGarrisonParty)));
 
         try
         {
@@ -2843,9 +2845,11 @@ public class PlayerKingdomCreationFlowTests : IDisposable
                     var view = new KingdomDecisionsVM(() => { });
                     views.Add(client, view);
                     view.RefreshWith(decision);
+                    var rulerClan = client.GetRegisteredObject<Clan>(ruler.ClanId);
                     SubmitCurrentDecisionVote(view, outcome =>
                         outcome is SettlementClaimantDecision.ClanAsDecisionOutcome candidate &&
-                        candidate.Clan == Clan.PlayerClan);
+                        candidate.Clan == rulerClan);
+                    // The vassal gets the result in place. The ruler gets it from the queue.
                     if (client == vassalClient)
                     {
                         view.RefreshWith(decision);
@@ -2861,6 +2865,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             });
             var resolution = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkKingdomDecisionResolved>(),
                 message => message.KingdomId == kingdomId);
+            Assert.Equal(KingdomDecision.SupportStatus.Majority, resolution.SupportStatus);
 
             foreach (var client in new[] { rulerClient, vassalClient })
             {
@@ -2872,7 +2877,11 @@ public class PlayerKingdomCreationFlowTests : IDisposable
                     Assert.Same(winningClan, settlement.OwnerClan);
                     Assert.Empty(winningClan.Kingdom.UnresolvedDecisions);
 
-                    view.OnFrameTick();
+                    if (client == rulerClient)
+                    {
+                        Assert.Null(view.CurrentDecision);
+                        view.OnFrameTick();
+                    }
                     var item = Assert.IsType<SettlementDecisionItemVM>(view.CurrentDecision);
                     Assert.True(item.IsActive);
                     Assert.True(item.IsKingsDecisionOver);

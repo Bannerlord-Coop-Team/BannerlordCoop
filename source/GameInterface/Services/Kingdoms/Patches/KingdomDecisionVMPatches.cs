@@ -33,15 +33,21 @@ namespace GameInterface.Services.Kingdoms.Patches
             if (ModInformation.IsServer || ScreenManager.TopScreen != __instance) return;
             if (!KingdomDecisionsVMPatches.TryGetVoteManager(out var voteManager) ||
                 !voteManager.HasPendingSettlementDecisionResult()) return;
-
-            // Match the native map conditions for opening the kingdom decision screen.
-            if (__instance.IsInMenu || __instance.IsInBattleSimulation || __instance.IsInArmyManagement ||
-                __instance.IsMarriageOfferPopupActive || __instance.IsHeirSelectionPopupActive ||
-                __instance.IsMapCheatsActive || __instance.IsMapIncidentActive || __instance.IsOverlayContextMenuEnabled ||
-                __instance.EncyclopediaScreenManager.IsEncyclopediaOpen || InformationManager.IsAnyInquiryActive() ||
-                !CampaignUIHelper.GetMapScreenActionIsEnabledWithReason(out _)) return;
+            if (!CanOpenKingdomScreen(__instance)) return;
 
             __instance.OpenKingdom();
+        }
+
+        // Match the native map conditions for opening the kingdom decision screen.
+        private static bool CanOpenKingdomScreen(MapScreen mapScreen)
+        {
+            if (mapScreen.IsInMenu || mapScreen.IsInBattleSimulation || mapScreen.IsInArmyManagement) return false;
+            if (mapScreen.IsMarriageOfferPopupActive || mapScreen.IsHeirSelectionPopupActive ||
+                InformationManager.IsAnyInquiryActive()) return false;
+            if (mapScreen.IsMapCheatsActive || mapScreen.IsMapIncidentActive || mapScreen.IsOverlayContextMenuEnabled ||
+                mapScreen.EncyclopediaScreenManager.IsEncyclopediaOpen) return false;
+
+            return CampaignUIHelper.GetMapScreenActionIsEnabledWithReason(out _);
         }
     }
 
@@ -80,15 +86,30 @@ namespace GameInterface.Services.Kingdoms.Patches
             KingdomDecisionWaitingStatusWidgetPatch.EnsureAttached(__instance);
         }
 
-        // A submitted decision reopens only when clicked, so the automatic check skips it.
+        // Skip submitted ballots and show queued results before prompting for a new vote.
         [HarmonyPatch(nameof(KingdomDecisionsVM.OnFrameTick))]
         [HarmonyPrefix]
         private static void OnFrameTickPrefix(KingdomDecisionsVM __instance)
         {
             MarkSubmittedDecisionsExamined(__instance);
-            if (TryGetVoteManager(out var voteManager))
+            if (__instance.CurrentDecision != null || !__instance._shouldCheckForDecision) return;
+            if (!TryGetVoteManager(out var voteManager) || !voteManager.HasPendingSettlementDecisionResult()) return;
+            if (InformationManager.IsAnyInquiryActive() || !CampaignUIHelper.GetMapScreenActionIsEnabledWithReason(out _)) return;
+
+            while (voteManager.TryTakeSettlementDecisionResult(out var decision, out var showResult))
             {
-                voteManager.ShowNextSettlementDecisionResult(__instance);
+                DecisionItemBaseVM item = __instance.GetDecisionItemBasedOnType(decision);
+                if (!showResult(item))
+                {
+                    CampaignEvents.KingdomDecisionConcluded.ClearListeners(item);
+                    item.OnFinalize();
+                    continue;
+                }
+
+                item.SetDoneInputKey(__instance.DoneInputKey);
+                __instance._shouldCheckForDecision = false;
+                __instance.CurrentDecision = item;
+                return;
             }
         }
 
@@ -148,6 +169,11 @@ namespace GameInterface.Services.Kingdoms.Patches
             if (!TryGetVoteManager(out var voteManager)) return;
             DecisionItemBaseVM currentDecision = __instance.CurrentDecision;
             if (currentDecision == null) return;
+            if (voteManager.IsShowingSettlementDecisionResult(currentDecision))
+            {
+                KingdomDecisionWaitingStatusWidgetPatch.Refresh(__instance, null, null);
+                return;
+            }
 
             voteManager.RefreshDecisionTitle(currentDecision);
             string feedback = voteManager.RefreshDecisionWaitingStatus(currentDecision);

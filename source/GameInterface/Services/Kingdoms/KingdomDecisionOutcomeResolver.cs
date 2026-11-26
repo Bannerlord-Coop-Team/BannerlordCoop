@@ -14,8 +14,12 @@ namespace GameInterface.Services.Kingdoms
             KingdomDecisionVoteData voteData,
             KingdomElection election,
             IObjectManager objectManager,
-            out DecisionOutcome outcome,
-            bool requireKeyMatch = false);
+            out DecisionOutcome outcome);
+        bool TryGetOutcomeByKey(
+            string outcomeKey,
+            KingdomElection election,
+            IObjectManager objectManager,
+            out DecisionOutcome outcome);
     }
 
     internal class KingdomDecisionOutcomeResolver : IKingdomDecisionOutcomeResolver
@@ -56,29 +60,36 @@ namespace GameInterface.Services.Kingdoms
             KingdomDecisionVoteData voteData,
             KingdomElection election,
             IObjectManager objectManager,
-            out DecisionOutcome outcome,
-            bool requireKeyMatch = false)
+            out DecisionOutcome outcome)
         {
             outcome = null;
             if (voteData == null || election == null) return false;
-
-            if (!string.IsNullOrWhiteSpace(voteData.OutcomeKey))
-            {
-                foreach (DecisionOutcome possibleOutcome in election._possibleOutcomes)
-                {
-                    if (!TryGetOutcomeKey(possibleOutcome, objectManager, out string outcomeKey)) continue;
-                    if (!string.Equals(outcomeKey, voteData.OutcomeKey, StringComparison.Ordinal)) continue;
-
-                    outcome = possibleOutcome;
-                    return true;
-                }
-            }
-
-            if (requireKeyMatch) return false;
+            if (TryGetOutcomeByKey(voteData.OutcomeKey, election, objectManager, out outcome)) return true;
             if (voteData.OutcomeIndex < 0 || voteData.OutcomeIndex >= election._possibleOutcomes.Count) return false;
 
             outcome = election._possibleOutcomes[voteData.OutcomeIndex];
             return true;
+        }
+
+        public bool TryGetOutcomeByKey(
+            string outcomeKey,
+            KingdomElection election,
+            IObjectManager objectManager,
+            out DecisionOutcome outcome)
+        {
+            outcome = null;
+            if (string.IsNullOrWhiteSpace(outcomeKey) || election == null) return false;
+
+            foreach (DecisionOutcome possibleOutcome in election._possibleOutcomes)
+            {
+                if (!TryGetOutcomeKey(possibleOutcome, objectManager, out string candidateKey)) continue;
+                if (!string.Equals(candidateKey, outcomeKey, StringComparison.Ordinal)) continue;
+
+                outcome = possibleOutcome;
+                return true;
+            }
+
+            return false;
         }
 
         private static bool TryGetBooleanOutcome(DecisionOutcome outcome, out string fieldName, out bool value)
