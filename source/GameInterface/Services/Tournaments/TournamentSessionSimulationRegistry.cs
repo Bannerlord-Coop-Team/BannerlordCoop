@@ -49,4 +49,25 @@ public sealed partial class TournamentSessionRegistry
             return TournamentMutationStatus.Applied;
         }
     }
+
+    public bool TryGetSimulationTeams(
+        string sessionId,
+        long expectedRevision,
+        out TournamentMatchData match,
+        out TournamentTeamData[] eligibleTeams,
+        out int winnerTeamCount)
+    {
+        lock (gate)
+        {
+            match = null;
+            eligibleTeams = null;
+            winnerTeamCount = 0;
+            if (sessionId == null || !sessionsById.TryGetValue(sessionId, out var session) ||
+                session.Revision != expectedRevision)
+                return false;
+
+            match = session.GetCurrentMatch();
+            return match != null && session.TryGetEligibleTeams(match, out eligibleTeams, out winnerTeamCount);
+        }
+    }
 }

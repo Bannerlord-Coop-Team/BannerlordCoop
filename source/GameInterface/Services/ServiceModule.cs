@@ -5,6 +5,7 @@ using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Alleys.Handlers;
 using GameInterface.Services.Locations.Conversations;
+using GameInterface.Services.Tournaments.Handlers;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -37,6 +38,16 @@ internal class ServiceModule : Module
                 builder.RegisterType<AlleyHandler>()
                     .AsSelf()
                     .As<IAlleyAttacks>()
+                    .SingleInstance()
+                    .AutoActivate();
+                continue;
+            }
+
+            if (type == typeof(TournamentSessionHandler))
+            {
+                builder.RegisterType<TournamentSessionHandler>()
+                    .AsSelf()
+                    .As<ITournamentMatchSimulation>()
                     .SingleInstance()
                     .AutoActivate();
                 continue;

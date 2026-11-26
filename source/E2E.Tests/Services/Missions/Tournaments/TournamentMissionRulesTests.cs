@@ -26,9 +26,11 @@ public class TournamentMissionRulesTests
         int seed,
         string controllerId = null,
         bool isHuman = false,
-        bool isReplaced = false)
+        bool isReplaced = false,
+        bool isDisconnected = false)
         => new TournamentContestantData(
-            slotId, characterId, seed, controllerId, slotId, isHuman, isReplaced, false, null);
+            slotId, characterId, seed, controllerId, slotId, isHuman, isReplaced, false, null,
+            isDisconnected: isDisconnected);
 
     private static TournamentSessionSnapshot Snapshot(
         TournamentContestantData[] contestants,
@@ -41,14 +43,15 @@ public class TournamentMissionRulesTests
             new TournamentTeamData("red", new[] { "npc" }, 0, false, 1, null),
             new TournamentTeamData("blue", new[] { "human" }, 0, false, 2, null)
         };
+        bool completed = phase == TournamentSessionPhase.Completed;
         var match = new TournamentMatchData(currentMatchId, "round", 1, 1, 1, teams, Array.Empty<string>());
         return new TournamentSessionSnapshot(
             "session", "mission", "town", "scene", "prize",
-            phase, 8, bracketRevision, currentMatchId, "host",
+            phase, 8, bracketRevision, completed ? null : currentMatchId, "host",
             Array.Empty<string>(), contestants, Array.Empty<string>(),
             Array.Empty<TournamentPlayerChoiceData>(),
             new[] { new TournamentRoundData("round", 0, 0, new[] { match }) },
-            0, 0, 0, false, false, null);
+            0, 0, 0, false, completed, null);
     }
 
     private static TournamentAgentSpawnData Agent(
@@ -189,6 +192,26 @@ public class TournamentMissionRulesTests
             "round:0:match:1");
 
         Assert.True(TournamentMatchTransitionRules.RequiresArenaCleanup(previous, updated));
+    }
+
+    [Theory]
+    [InlineData(TournamentSessionPhase.LiveMatch, false, true)]
+    [InlineData(TournamentSessionPhase.SimulatingMatch, true, true)]
+    [InlineData(TournamentSessionPhase.LiveMatch, false, false)]
+    public void CompletedFinal_CleansUpAfterDisconnectRegardlessOfIntermediateSnapshot(
+        TournamentSessionPhase previousPhase, bool alreadyDisconnected, bool disconnected)
+    {
+        var npc = Contestant("npc", "npc-character", 1);
+        var previous = Snapshot(new[]
+        {
+            npc, Contestant("human", "human-character", 2, "fighter", true, isDisconnected: alreadyDisconnected)
+        }, previousPhase);
+        var completed = Snapshot(new[]
+        {
+            npc, Contestant("human", "human-character", 2, "fighter", true, isDisconnected: disconnected)
+        }, TournamentSessionPhase.Completed, bracketRevision: 5);
+
+        Assert.Equal(disconnected, TournamentMatchTransitionRules.CompletedByDisconnect(previous, completed));
     }
 
     [Fact]

@@ -34,16 +34,19 @@ public class TournamentDebugCommand
     {
         private readonly ICommandObjectResolver resolver;
         private readonly IObjectManager objectManager;
-        private readonly TournamentSessionHandler handler;
+        private readonly ITournamentSessionRegistry sessionRegistry;
+        private readonly ITournamentMatchSimulation simulation;
 
         public ResolveMatchCoopCommand(
             ICommandObjectResolver resolver,
             IObjectManager objectManager,
-            TournamentSessionHandler handler)
+            ITournamentSessionRegistry sessionRegistry,
+            ITournamentMatchSimulation simulation)
         {
             this.resolver = resolver;
             this.objectManager = objectManager;
-            this.handler = handler;
+            this.sessionRegistry = sessionRegistry;
+            this.simulation = simulation;
         }
 
         public string Prefix => "coop.debug.tournaments";
@@ -63,7 +66,40 @@ public class TournamentDebugCommand
             if (!objectManager.TryGetId(town, out var townId))
                 return Failed($"Town {town.StringId} is not registered.");
 
-            return handler.ResolveDebugMatch(townId, args.Count > 1 ? args[1] : null);
+            if (!sessionRegistry.TryGetByTown(townId, out var snapshot) ||
+                (snapshot.Phase != TournamentSessionPhase.AwaitingChoices &&
+                 snapshot.Phase != TournamentSessionPhase.SimulatingMatch) ||
+                !sessionRegistry.TryGetSimulationTeams(
+                    snapshot.SessionId, snapshot.Revision, out var match, out var eligibleTeams, out var winnerTeamCount))
+                return Failed("The tournament has no pending match that can be resolved.");
+
+            string preferredSlotId = null;
+            if (args.Count > 1)
+            {
+                string controllerId = args[1];
+                var contestant = snapshot.Contestants.FirstOrDefault(candidate =>
+                    candidate.ControllerId == controllerId && candidate.IsHuman &&
+                    !candidate.IsReplaced && !candidate.IsDisconnected);
+                if (contestant == null)
+                    return Failed($"No connected contestant for {controllerId}.");
+                preferredSlotId = contestant.SlotId;
+            }
+
+            var winnerTeamIds = eligibleTeams
+                .OrderByDescending(team => team.ParticipantSlotIds.Contains(preferredSlotId))
+                .Take(winnerTeamCount)
+                .Select(team => team.TeamId)
+                .ToArray();
+            var scores = match.Teams.Select(team =>
+            {
+                int winnerIndex = Array.IndexOf(winnerTeamIds, team.TeamId);
+                return new TournamentTeamScoreData(team.TeamId, winnerIndex < 0 ? 0 : winnerTeamCount - winnerIndex);
+            }).ToArray();
+            var status = simulation.TryResolveMatch(snapshot, scores, out var advanced);
+            if (status != TournamentMutationStatus.Applied)
+                return Failed($"The authoritative simulation did not advance the bracket ({status}).");
+
+            return Succeeded($"Resolved {snapshot.CurrentMatchId}. Next match: {advanced.CurrentMatchId ?? "none"}.");
         }
     }
 

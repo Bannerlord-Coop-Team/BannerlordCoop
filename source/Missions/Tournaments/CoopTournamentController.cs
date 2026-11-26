@@ -270,10 +270,7 @@ public class CoopTournamentController : CoopMissionController
         TournamentSessionSnapshot previous,
         TournamentSessionSnapshot updated)
     {
-        if (updated.IsCompleted && previous.Phase == TournamentSessionPhase.LiveMatch &&
-            previous.Contestants.Any(contestant => !contestant.IsDisconnected &&
-                updated.Contestants.Any(candidate =>
-                    candidate.SlotId == contestant.SlotId && candidate.IsDisconnected)))
+        if (TournamentMatchTransitionRules.CompletedByDisconnect(previous, updated))
         {
             // A final resolved on disconnect never ran the local fight's end-of-match cleanup.
             matchLifecycle.Dispose();

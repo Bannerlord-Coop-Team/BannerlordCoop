@@ -26,7 +26,15 @@ using TaleWorlds.Library;
 
 namespace GameInterface.Services.Tournaments.Handlers;
 
-internal sealed partial class TournamentSessionHandler : IHandler
+internal interface ITournamentMatchSimulation
+{
+    TournamentMutationStatus TryResolveMatch(
+        TournamentSessionSnapshot snapshot,
+        TournamentTeamScoreData[] scores,
+        out TournamentSessionSnapshot advanced);
+}
+
+internal sealed partial class TournamentSessionHandler : IHandler, ITournamentMatchSimulation
 {
     private static readonly ILogger Logger = LogManager.GetLogger<TournamentSessionHandler>();
 
@@ -41,7 +49,6 @@ internal sealed partial class TournamentSessionHandler : IHandler
     private readonly Dictionary<string, BetLedgerEntry> betLedger = new();
     private readonly Dictionary<string, TournamentCompletionTransaction> completionTransactions = new();
     private readonly HashSet<string> completionInProgress = new();
-    private readonly Dictionary<string, string> pendingDisconnectLosses = new();
     private readonly HashSet<string> liveCombatSessions = new();
     private readonly HashSet<string> acceptedHitProgression = new();
     private readonly System.Collections.Concurrent.ConcurrentDictionary<NetPeer, string> tournamentPeerControllers = new();
@@ -80,7 +87,6 @@ internal sealed partial class TournamentSessionHandler : IHandler
         messageBroker.Subscribe<NetworkTournamentSpawnManifest>(Handle_SpawnManifestSnapshot);
         messageBroker.Subscribe<NetworkEnterTournamentMission>(Handle_EnterMission);
         messageBroker.Subscribe<PlayerDisconnected>(Handle_Disconnected);
-        messageBroker.Subscribe<NetworkRequestTournamentState>(Handle_ReconnectStateRequest);
         messageBroker.Subscribe<CampaignTick>(Handle_CampaignTick);
     }
 
@@ -101,7 +107,6 @@ internal sealed partial class TournamentSessionHandler : IHandler
         messageBroker.Unsubscribe<NetworkTournamentSpawnManifest>(Handle_SpawnManifestSnapshot);
         messageBroker.Unsubscribe<NetworkEnterTournamentMission>(Handle_EnterMission);
         messageBroker.Unsubscribe<PlayerDisconnected>(Handle_Disconnected);
-        messageBroker.Unsubscribe<NetworkRequestTournamentState>(Handle_ReconnectStateRequest);
         messageBroker.Unsubscribe<CampaignTick>(Handle_CampaignTick);
     }
 
@@ -139,16 +144,7 @@ internal sealed partial class TournamentSessionHandler : IHandler
         }
         if (current.Phase != TournamentSessionPhase.Preparation)
         {
-            if (current.IsCompleted)
-                SendCanonical(peer, current);
-            else if (TryGetPlayerSlot(current, player.ControllerId, out var slot) &&
-                     slot.CharacterId == player.CharacterObjectId)
-            {
-                if (!IsConfirmedEntrant(current, player.ControllerId))
-                    network.Send(peer, new NetworkEnterTournamentMission(current, false));
-            }
-            else
-                RequestActiveSpectate(peer, player.ControllerId, current);
+            JoinActive(peer, player, current);
             return;
         }
 
@@ -214,6 +210,28 @@ internal sealed partial class TournamentSessionHandler : IHandler
 
         BroadcastSnapshot(current);
         network.Send(peer, new NetworkEnterTournamentMission(current, true));
+    }
+
+    private void JoinActive(NetPeer peer, Player player, TournamentSessionSnapshot current)
+    {
+        if (current.IsCompleted)
+        {
+            SendCanonical(peer, current);
+            return;
+        }
+
+        bool ownsBracketSlot = TryGetPlayerSlot(current, player.ControllerId, out var slot) &&
+            slot.CharacterId == player.CharacterObjectId;
+        if (!ownsBracketSlot)
+        {
+            RequestActiveSpectate(peer, player.ControllerId, current);
+            return;
+        }
+
+        if (IsConfirmedEntrant(current, player.ControllerId))
+            return;
+
+        network.Send(peer, new NetworkEnterTournamentMission(current, false));
     }
 
     private void JoinPreparation(
@@ -665,7 +683,7 @@ internal sealed partial class TournamentSessionHandler : IHandler
             }
 
             if (launcher.OpenCoopTournament(snapshot, payload.What.IsSpectator) == null)
-                return;
+                Logger.Debug("[Tournament] Could not open mission for session={SessionId}", snapshot.SessionId);
         }, context: nameof(Handle_EnterMission));
     }
 
@@ -712,7 +730,12 @@ internal sealed partial class TournamentSessionHandler : IHandler
             LeavePreparationAfterDisconnect(controllerId, snapshot);
             return;
         }
-        if (TryHandleCompletedLeave(snapshot, controllerId, involved, null))
+        DisconnectActive(controllerId, snapshot);
+    }
+
+    private void DisconnectActive(string controllerId, TournamentSessionSnapshot snapshot)
+    {
+        if (TryHandleCompletedLeave(snapshot, controllerId, isMember: true, peer: null))
             return;
 
         var status = sessionRegistry.TryDisconnect(
@@ -721,40 +744,7 @@ internal sealed partial class TournamentSessionHandler : IHandler
             controllerId,
             out var disconnected,
             out var outcome);
-        if (status != TournamentMutationStatus.Applied)
-            return;
-
-        if (outcome == TournamentBallotOutcome.SimulateMatch)
-        {
-            // Send the final result first so clients can clean up the live match when its bracket advances.
-            var simulated = SimulateCurrentMatchAndAdvance(disconnected, controllerId);
-            if (simulated.Revision == disconnected.Revision)
-                BroadcastSnapshot(disconnected);
-            disconnected = simulated;
-        }
-        else
-        {
-            BroadcastSnapshot(disconnected);
-            PublishHostMigration(snapshot, disconnected, status);
-        }
-        if (disconnected.VoterCount == 0)
-            ResolveAfterLastHumanLeaves(disconnected);
-    }
-
-    private void Handle_ReconnectStateRequest(MessagePayload<NetworkRequestTournamentState> payload)
-    {
-        if (ModInformation.IsClient || payload.Who is not NetPeer peer)
-            return;
-
-        GameThread.RunSafe(() =>
-        {
-            if (!playerManager.TryGetCurrentController(peer, out var controllerId) ||
-                !pendingDisconnectLosses.TryGetValue(controllerId, out var townId))
-                return;
-
-            SendRejection(peer, townId, "You lost your tournament match while you were disconnected.");
-            pendingDisconnectLosses.Remove(controllerId);
-        }, context: nameof(Handle_ReconnectStateRequest));
+        FinishViewerDeparture(snapshot, disconnected, controllerId, status, outcome, null);
     }
 
     private void LeavePreparationAfterDisconnect(
@@ -868,14 +858,41 @@ internal sealed partial class TournamentSessionHandler : IHandler
             replacementName,
             out var snapshot,
             out var outcome,
-            out var noViewers);
+            out _);
         if (status == TournamentMutationStatus.Applied)
             SettleBetLedger(current.SessionId, controllerId, snapshot.Revision, current.CurrentMatchId, "Tournament bet forfeited", peer);
-        PublishMutation(status, peer, snapshot);
-        PublishHostMigration(current, snapshot, status);
-        if (status == TournamentMutationStatus.Applied && outcome == TournamentBallotOutcome.SimulateMatch)
-            snapshot = SimulateCurrentMatchAndAdvance(snapshot, controllerId);
-        if (status == TournamentMutationStatus.Applied && noViewers && snapshot != null)
+        FinishViewerDeparture(current, snapshot, controllerId, status, outcome, peer);
+    }
+
+    private void FinishViewerDeparture(
+        TournamentSessionSnapshot previous,
+        TournamentSessionSnapshot snapshot,
+        string controllerId,
+        TournamentMutationStatus status,
+        TournamentBallotOutcome outcome,
+        NetPeer peer)
+    {
+        if (status != TournamentMutationStatus.Applied)
+        {
+            SendCanonical(peer, snapshot);
+            return;
+        }
+
+        if (outcome == TournamentBallotOutcome.SimulateMatch)
+        {
+            // A successful simulation broadcasts the resulting bracket.
+            var simulated = SimulateCurrentMatchAndAdvance(snapshot, controllerId);
+            if (simulated.Revision == snapshot.Revision)
+                BroadcastSnapshot(snapshot);
+            snapshot = simulated;
+        }
+        else
+        {
+            BroadcastSnapshot(snapshot);
+            PublishHostMigration(previous, snapshot, status);
+        }
+
+        if (snapshot.VoterCount == 0)
             ResolveAfterLastHumanLeaves(snapshot);
     }
 
@@ -900,7 +917,13 @@ internal sealed partial class TournamentSessionHandler : IHandler
             var status = sessionRegistry.TryBeginEmptySimulation(
                 snapshot.SessionId, snapshot.Revision, out var simulating);
             if (status != TournamentMutationStatus.Applied)
+            {
+                Logger.Information(
+                    "[Tournament] Last human left session={SessionId}; bracket parked, status={Status}",
+                    snapshot.SessionId,
+                    status);
                 return;
+            }
 
             snapshot = simulating;
             BroadcastSnapshot(snapshot);

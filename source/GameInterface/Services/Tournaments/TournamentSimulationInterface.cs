@@ -11,35 +11,22 @@ namespace GameInterface.Services.Tournaments;
 
 public sealed partial class TournamentGameInterface
 {
-    public bool TrySimulateCurrentMatch(
+    public bool TrySimulateCurrentMatchUnbiased(
         TournamentSessionSnapshot snapshot,
+        TournamentMatchData match,
+        TournamentTeamData[] eligibleTeams,
+        int winnerTeamCount,
         long sequence,
-        out TournamentMatchResultData result,
-        string preferredSlotId = null)
+        out TournamentMatchResultData result)
     {
         result = null;
-        TournamentMatchData match = snapshot?.Rounds?
-            .SelectMany(round => round.Matches ?? Array.Empty<TournamentMatchData>())
-            .FirstOrDefault(candidate => candidate.MatchId == snapshot.CurrentMatchId);
-        if (match?.Teams == null ||
-            match.Teams.Length < 2 ||
-            Campaign.Current?.Models?.TournamentModel == null)
-        {
+        if (Campaign.Current?.Models?.TournamentModel == null)
             return false;
-        }
 
         var rankedTeams = new List<KeyValuePair<TournamentTeamData, float>>();
         var contestants = snapshot.Contestants.ToDictionary(contestant => contestant.SlotId);
-        foreach (TournamentTeamData team in match.Teams)
+        foreach (TournamentTeamData team in eligibleTeams)
         {
-            if (team?.ParticipantSlotIds == null || team.ParticipantSlotIds.Length == 0)
-                return false;
-
-            // Vanilla's skip removes the player's team from the simulation while keeping it in the bracket.
-            if (team.ParticipantSlotIds.Any(slotId =>
-                contestants.TryGetValue(slotId, out var contestant) && contestant.IsDisconnected))
-                continue;
-
             float simulationScore = 0f;
             foreach (string slotId in team.ParticipantSlotIds)
             {
@@ -56,19 +43,10 @@ public sealed partial class TournamentGameInterface
             rankedTeams.Add(new KeyValuePair<TournamentTeamData, float>(team, simulationScore));
         }
 
-        rankedTeams = rankedTeams
-            .OrderByDescending(team => preferredSlotId != null && team.Key.ParticipantSlotIds.Contains(preferredSlotId))
-            .ThenByDescending(team => team.Value)
-            .ToList();
-        int teamSize = Math.Max(1, match.TeamSize);
         int winnerParticipantCount = Math.Max(1, match.NumberOfWinnerParticipants);
-        int winnerTeamCount = Math.Max(
-            1,
-            Math.Min(match.Teams.Length, (winnerParticipantCount + teamSize - 1) / teamSize));
-        if (rankedTeams.Count < winnerTeamCount)
-            return false;
 
         TournamentTeamData[] winnerTeams = rankedTeams
+            .OrderByDescending(team => team.Value)
             .Take(winnerTeamCount)
             .Select(team => team.Key)
             .ToArray();

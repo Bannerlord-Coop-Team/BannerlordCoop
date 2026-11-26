@@ -50,11 +50,13 @@ public interface ITournamentGameInterface : IGameAbstraction
         out TournamentBracketUpdate bracket);
     bool TryRehydrateGame(TournamentSessionSnapshot snapshot, out FightTournamentGame tournamentGame);
     bool TryApplyLockedPrize(TournamentSessionSnapshot snapshot);
-    bool TrySimulateCurrentMatch(
+    bool TrySimulateCurrentMatchUnbiased(
         TournamentSessionSnapshot snapshot,
+        TournamentMatchData match,
+        TournamentTeamData[] eligibleTeams,
+        int winnerTeamCount,
         long sequence,
-        out TournamentMatchResultData result,
-        string preferredSlotId = null);
+        out TournamentMatchResultData result);
     bool TryGetBetQuote(TournamentSessionSnapshot snapshot, Hero hero, string slotId, out TournamentBetQuote quote);
 }
 

@@ -7,7 +7,6 @@ using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Tournaments;
 using GameInterface.Services.Tournaments.Data;
-using GameInterface.Services.Tournaments.Handlers;
 using GameInterface.Services.Tournaments.Messages;
 using System;
 using System.Linq;
@@ -33,61 +32,72 @@ public class TournamentDisconnectFlowTests : SyncTestBase
     {
     }
 
-#if DEBUG
     [Fact]
-    public void DebugResolveMatch_AdvancesSelectedEntrantsTeam()
+    public void ReturningHost_WithSuccessor_RejoinsAsSuccessorAndCanFight()
     {
         EnvironmentInstance host = Clients.First();
         EnvironmentInstance other = Clients.Skip(1).First();
-        var (townId, _) = SetUpTournament(host, other, otherIsSpectator: false);
-
-        Server.Call(() => Assert.True(Server.Resolve<TournamentSessionHandler>()
-            .ResolveDebugMatch(townId, OtherControllerId).Succeeded));
-
-        var completed = GetSnapshot();
-        Assert.True(completed.IsCompleted);
-        Assert.Equal(OtherSlotId, completed.WinnerSlotId);
-    }
-#endif
-
-    [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void ReturningHost_KeepsHeroAndCanJoinNextMatch(bool withSuccessor)
-    {
-        EnvironmentInstance host = Clients.First();
-        EnvironmentInstance other = Clients.Skip(1).First();
-        var (townId, heroCharacterId) = SetUpTournament(
-            host, withSuccessor ? other : null, otherIsSpectator: false);
+        var (townId, heroCharacterId) = SetUpTournament(host, other, otherIsSpectator: false);
 
         Disconnect(host);
         var reserved = GetSnapshot();
         Assert.Equal(TournamentSessionPhase.AwaitingChoices, reserved.Phase);
-        Assert.Equal(withSuccessor ? OtherControllerId : null, reserved.HostControllerId);
+        Assert.Equal(OtherControllerId, reserved.HostControllerId);
         Assert.Equal(heroCharacterId, FindHostSlot(reserved).CharacterId);
         Assert.Empty(reserved.SuccessorControllerIds);
-        Assert.Equal(withSuccessor ? 1 : 0, reserved.VoterCount);
+        Assert.Equal(1, reserved.VoterCount);
 
-        EnvironmentInstance returning = withSuccessor ? host : other;
+        Reconnect(host, host);
+        var resumed = ResumeTournament(host, townId, reserved.Revision, heroCharacterId);
+        Assert.Equal(OtherControllerId, resumed.HostControllerId);
+        Assert.Equal(new[] { HostControllerId }, resumed.SuccessorControllerIds);
+        Send(host, new NetworkRequestTournamentChoice(
+            SessionId, resumed.Revision, resumed.CurrentMatchId, TournamentPlayerChoice.Join));
+        Send(other, new NetworkRequestTournamentChoice(
+            SessionId, resumed.Revision, resumed.CurrentMatchId, TournamentPlayerChoice.Join));
+
+        AssertOriginalHeroCanFight(heroCharacterId);
+    }
+
+    [Fact]
+    public void ReturningHost_Alone_ReclaimsHostAndCanFight()
+    {
+        EnvironmentInstance host = Clients.First();
+        EnvironmentInstance returning = Clients.Skip(1).First();
+        var (townId, heroCharacterId) = SetUpTournament(host, null, otherIsSpectator: false);
+
+        Disconnect(host);
+        var reserved = GetSnapshot();
+        Assert.Equal(TournamentSessionPhase.AwaitingChoices, reserved.Phase);
+        Assert.Null(reserved.HostControllerId);
+        Assert.Equal(heroCharacterId, FindHostSlot(reserved).CharacterId);
+        Assert.Empty(reserved.SuccessorControllerIds);
+        Assert.Equal(0, reserved.VoterCount);
+
+        // Use the fresh client instance to model restarting the game with the same controller.
         Reconnect(host, returning);
-        Send(returning, new NetworkRequestJoinTournament(townId, SessionId, reserved.Revision));
-        var entry = Assert.Single(returning.InternalMessages.GetMessages<NetworkEnterTournamentMission>());
-
-        Assert.False(entry.IsSpectator);
-        Assert.Equal(heroCharacterId, FindHostSlot(entry.Snapshot).CharacterId);
-
-        Send(returning, new NetworkTournamentMissionEntered(SessionId, entry.Snapshot.Revision));
-        var resumed = GetSnapshot();
-        Assert.Equal(withSuccessor ? OtherControllerId : HostControllerId, resumed.HostControllerId);
-        Assert.Equal(withSuccessor ? new[] { HostControllerId } : Array.Empty<string>(), resumed.SuccessorControllerIds);
+        var resumed = ResumeTournament(returning, townId, reserved.Revision, heroCharacterId);
+        Assert.Equal(HostControllerId, resumed.HostControllerId);
+        Assert.Empty(resumed.SuccessorControllerIds);
         Send(returning, new NetworkRequestTournamentChoice(
             SessionId, resumed.Revision, resumed.CurrentMatchId, TournamentPlayerChoice.Join));
-        if (withSuccessor)
-        {
-            Send(other, new NetworkRequestTournamentChoice(
-                SessionId, resumed.Revision, resumed.CurrentMatchId, TournamentPlayerChoice.Join));
-        }
 
+        AssertOriginalHeroCanFight(heroCharacterId);
+    }
+
+    private TournamentSessionSnapshot ResumeTournament(
+        EnvironmentInstance returning, string townId, long revision, string heroCharacterId)
+    {
+        Send(returning, new NetworkRequestJoinTournament(townId, SessionId, revision));
+        var entry = Assert.Single(returning.InternalMessages.GetMessages<NetworkEnterTournamentMission>());
+        Assert.False(entry.IsSpectator);
+        Assert.Equal(heroCharacterId, FindHostSlot(entry.Snapshot).CharacterId);
+        Send(returning, new NetworkTournamentMissionEntered(SessionId, entry.Snapshot.Revision));
+        return GetSnapshot();
+    }
+
+    private void AssertOriginalHeroCanFight(string heroCharacterId)
+    {
         var live = GetSnapshot();
         Assert.Equal(TournamentSessionPhase.LiveMatch, live.Phase);
         Assert.Contains(live.Choices, choice =>
@@ -125,6 +135,39 @@ public class TournamentDisconnectFlowTests : SyncTestBase
         Assert.Empty(other.InternalMessages.GetMessages<NetworkTournamentRequestRejected>());
     }
 
+    [Fact]
+    public void DisconnectDuringLiveMatch_ReplicatesForfeitAndNotifiesOnReconnect()
+    {
+        EnvironmentInstance host = Clients.First();
+        EnvironmentInstance other = Clients.Skip(1).First();
+        var (_, heroCharacterId) = SetUpTournament(host, other, otherIsSpectator: false);
+
+        var pending = GetSnapshot();
+        var join = new NetworkRequestTournamentChoice(
+            SessionId, pending.Revision, pending.CurrentMatchId, TournamentPlayerChoice.Join);
+        Send(host, join);
+        Send(other, join);
+        Assert.Equal(TournamentSessionPhase.LiveMatch, GetSnapshot().Phase);
+
+        Disconnect(host);
+
+        var completed = Assert.Single(other.InternalMessages.GetMessages<NetworkTournamentSessionSnapshot>(),
+            message => message.Snapshot.IsCompleted).Snapshot;
+        Assert.Equal(OtherSlotId, completed.WinnerSlotId);
+        var disconnected = FindHostSlot(completed);
+        Assert.Equal(heroCharacterId, disconnected.CharacterId);
+        Assert.True(disconnected.IsDisconnected);
+        var match = Assert.Single(Assert.Single(completed.Rounds).Matches);
+        Assert.Equal(new[] { OtherSlotId }, match.WinnerSlotIds);
+        Assert.Contains(match.Teams, team => team.ParticipantSlotIds.Contains(HeroSlotId));
+
+        Reconnect(host, host);
+        Send(host, new NetworkRequestTournamentState());
+        Send(host, new NetworkRequestTournamentState());
+        var notice = Assert.Single(host.InternalMessages.GetMessages<NetworkTournamentRequestRejected>());
+        Assert.Contains("while you were disconnected", notice.Reason);
+    }
+
     private (string TownId, string CharacterId) SetUpTournament(
         EnvironmentInstance host, EnvironmentInstance? other, bool otherIsSpectator)
     {
@@ -135,7 +178,9 @@ public class TournamentDisconnectFlowTests : SyncTestBase
         string troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
         string hostCharacterId = RegisterPlayer(HostControllerId, settlementId);
         bool otherCompetes = other != null && !otherIsSpectator;
-        string otherCharacterId = other == null ? troopId : RegisterPlayer(OtherControllerId, settlementId);
+        string otherCharacterId = troopId;
+        if (other != null)
+            otherCharacterId = RegisterPlayer(OtherControllerId, settlementId);
 
         Server.Call(() =>
         {

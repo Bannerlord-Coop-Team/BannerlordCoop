@@ -124,6 +124,12 @@ public interface ITournamentSessionRegistry : IGameAbstraction
         string sessionId,
         long expectedRevision,
         out TournamentSessionSnapshot snapshot);
+    bool TryGetSimulationTeams(
+        string sessionId,
+        long expectedRevision,
+        out TournamentMatchData match,
+        out TournamentTeamData[] eligibleTeams,
+        out int winnerTeamCount);
     TournamentMutationStatus TryStoreSpawnManifest(
         TournamentSpawnManifestData manifest,
         string controllerId,
@@ -138,6 +144,7 @@ public interface ITournamentSessionRegistry : IGameAbstraction
         bool completed,
         out TournamentSessionSnapshot snapshot);
     bool TryGetSpawnManifest(string sessionId, out TournamentSpawnManifestData manifest);
+    bool TryTakeDisconnectLoss(string controllerId, out string townId);
     bool ApplySnapshot(TournamentSessionSnapshot snapshot);
     bool Remove(string sessionId);
 }
@@ -149,6 +156,7 @@ public sealed partial class TournamentSessionRegistry : ITournamentSessionRegist
     private readonly object gate = new();
     private readonly Dictionary<string, TournamentSessionState> sessionsById = new();
     private readonly Dictionary<string, string> sessionIdsByTown = new();
+    private readonly Dictionary<string, string> completedDisconnectLosses = new();
 
     public TournamentSessionSnapshot[] GetAll()
     {
@@ -515,23 +523,8 @@ public sealed partial class TournamentSessionRegistry : ITournamentSessionRegist
                 changed = true;
             }
 
-            changed |= session.RemoveViewer(controllerId);
-
-            if (!changed)
-                return TournamentMutationStatus.NoChange;
-
-            if (session.Phase == TournamentSessionPhase.AwaitingChoices)
-            {
-                outcome = session.GetBallotOutcome();
-                session.ApplyBallotOutcome(outcome);
-            }
-
-            noViewers = !session.HasViewersOrReservations();
-            session.Revision++;
-            if (session.HostControllerId != previousHostControllerId)
-                RebindSpawnManifestAuthority(session);
-            snapshot = session.CreateSnapshot();
-            return TournamentMutationStatus.Applied;
+            return FinishViewerDeparture(session, controllerId, previousHostControllerId, changed, disconnected: false,
+                ref snapshot, out outcome, out noViewers);
         }
     }
 
@@ -551,28 +544,48 @@ public sealed partial class TournamentSessionRegistry : ITournamentSessionRegist
                 return TournamentMutationStatus.InvalidPhase;
 
             string previousHostControllerId = session.HostControllerId;
-            bool changed = session.RemoveViewer(controllerId);
+            bool changed = false;
             if (session.TryGetActiveContestant(controllerId, out var contestant) && !contestant.IsDisconnected)
             {
                 contestant.IsDisconnected = true;
                 changed = true;
             }
-            if (!changed)
-                return TournamentMutationStatus.NoChange;
-
-            if (session.Phase == TournamentSessionPhase.AwaitingChoices)
-                outcome = session.GetBallotOutcome();
-            else if (session.Phase == TournamentSessionPhase.LiveMatch &&
-                     (session.HostControllerId == null || session.IsControllerInCurrentMatch(controllerId)))
-                outcome = TournamentBallotOutcome.SimulateMatch;
-
-            session.ApplyBallotOutcome(outcome);
-            session.Revision++;
-            if (session.Phase == TournamentSessionPhase.LiveMatch && session.HostControllerId != previousHostControllerId)
-                RebindSpawnManifestAuthority(session);
-            snapshot = session.CreateSnapshot();
-            return TournamentMutationStatus.Applied;
+            return FinishViewerDeparture(session, controllerId, previousHostControllerId, changed, disconnected: true,
+                ref snapshot, out outcome, out _);
         }
+    }
+
+    private static TournamentMutationStatus FinishViewerDeparture(
+        TournamentSessionState session,
+        string controllerId,
+        string previousHostControllerId,
+        bool contestantChanged,
+        bool disconnected,
+        ref TournamentSessionSnapshot snapshot,
+        out TournamentBallotOutcome outcome,
+        out bool noViewers)
+    {
+        outcome = TournamentBallotOutcome.Open;
+        noViewers = false;
+        bool membershipChanged = session.RemoveViewer(controllerId);
+        if (!membershipChanged && !contestantChanged)
+            return TournamentMutationStatus.NoChange;
+
+        // Without a confirmed host there is nobody to run combat or submit its result.
+        bool liveMatchCannotContinue = disconnected && session.Phase == TournamentSessionPhase.LiveMatch &&
+            (session.HostControllerId == null || session.IsControllerInCurrentMatch(controllerId));
+        if (session.Phase == TournamentSessionPhase.AwaitingChoices)
+            outcome = session.GetBallotOutcome();
+        else if (liveMatchCannotContinue)
+            outcome = TournamentBallotOutcome.SimulateMatch;
+
+        session.ApplyBallotOutcome(outcome);
+        noViewers = !session.HasViewersOrReservations();
+        session.Revision++;
+        if (session.Phase == TournamentSessionPhase.LiveMatch && session.HostControllerId != previousHostControllerId)
+            RebindSpawnManifestAuthority(session);
+        snapshot = session.CreateSnapshot();
+        return TournamentMutationStatus.Applied;
     }
 
     private static void RebindSpawnManifestAuthority(TournamentSessionState session)
@@ -754,7 +767,7 @@ public sealed partial class TournamentSessionRegistry : ITournamentSessionRegist
         session.LastResultSequence = result.Sequence;
         session.SpawnManifest = null;
         session.LastManifestSequence = 0;
-        session.Rounds = rounds ?? session.Rounds;
+        session.ApplyRounds(rounds);
         session.BracketRevision++;
         session.Choices.Clear();
         session.WinnerSlotId = winnerSlotId;
@@ -779,6 +792,29 @@ public sealed partial class TournamentSessionRegistry : ITournamentSessionRegist
             }
 
             manifest = null;
+            return false;
+        }
+    }
+
+    public bool TryTakeDisconnectLoss(string controllerId, out string townId)
+    {
+        lock (gate)
+        {
+            foreach (var session in sessionsById.Values)
+            {
+                if (!session.PendingDisconnectLosses.Remove(controllerId))
+                    continue;
+
+                completedDisconnectLosses.Remove(controllerId);
+                townId = session.TownId;
+                return true;
+            }
+
+            if (completedDisconnectLosses.TryGetValue(controllerId, out townId))
+            {
+                completedDisconnectLosses.Remove(controllerId);
+                return true;
+            }
             return false;
         }
     }
@@ -849,6 +885,11 @@ public sealed partial class TournamentSessionRegistry : ITournamentSessionRegist
 
     private void RemoveSession(TournamentSessionState session)
     {
+        // A final can finish with everyone offline. Keep only the latest undelivered loss per player.
+        if (session.Phase == TournamentSessionPhase.Completed)
+            foreach (string controllerId in session.PendingDisconnectLosses)
+                completedDisconnectLosses[controllerId] = session.TownId;
+
         sessionsById.Remove(session.SessionId);
         sessionIdsByTown.Remove(session.TownId);
     }
@@ -865,6 +906,7 @@ public sealed partial class TournamentSessionRegistry : ITournamentSessionRegist
         public readonly HashSet<string> Spectators = new();
         public readonly HashSet<string> PendingSpectators = new();
         public readonly HashSet<string> DepartedControllers = new();
+        public readonly HashSet<string> PendingDisconnectLosses = new();
         public readonly List<string> Entrants = new();
         public readonly Dictionary<string, TournamentPlayerChoice> Choices = new();
 
@@ -945,13 +987,29 @@ public sealed partial class TournamentSessionRegistry : ITournamentSessionRegist
             return changed;
         }
 
-        public bool HasViewersOrReservations()
+        public bool HasViewersOrReservations() =>
+            Spectators.Count > 0 || Contestants.Any(contestant => contestant.IsHuman &&
+                (!contestant.IsDisconnected || !IsEliminated(contestant.SlotId)));
+
+        private bool IsEliminated(string slotId) =>
+            Rounds.SelectMany(round => round.Matches).Any(match => IsEliminatedByMatch(match, slotId));
+
+        private static bool IsEliminatedByMatch(TournamentMatchData match, string slotId) =>
+            match.State == (int)TournamentMatch.MatchState.Finished &&
+            match.Teams.Any(team => team.ParticipantSlotIds.Contains(slotId)) &&
+            !match.WinnerSlotIds.Contains(slotId);
+
+        public void ApplyRounds(TournamentRoundData[] rounds)
         {
-            return Spectators.Count > 0 || Contestants.Any(contestant => contestant.IsHuman &&
-                (!contestant.IsDisconnected || !Rounds.SelectMany(round => round.Matches).Any(match =>
-                    match.State == (int)TournamentMatch.MatchState.Finished &&
-                    match.Teams.Any(team => team.ParticipantSlotIds.Contains(contestant.SlotId)) &&
-                    !match.WinnerSlotIds.Contains(contestant.SlotId))));
+            if (rounds == null)
+                return;
+
+            var reservedContestants = Contestants.Where(contestant =>
+                contestant.IsHuman && contestant.IsDisconnected && !IsEliminated(contestant.SlotId)).ToArray();
+            Rounds = rounds;
+            foreach (var contestant in reservedContestants)
+                if (IsEliminated(contestant.SlotId))
+                    PendingDisconnectLosses.Add(contestant.ControllerId);
         }
 
         public bool IsControllerInCurrentMatch(string controllerId)
@@ -977,8 +1035,27 @@ public sealed partial class TournamentSessionRegistry : ITournamentSessionRegist
             if (!currentSlots.Overlaps(disconnectedSlots))
                 return true;
 
-            int eligibleTeams = match.Teams.Count(team => !team.ParticipantSlotIds.Any(disconnectedSlots.Contains));
-            return eligibleTeams * match.TeamSize >= match.NumberOfWinnerParticipants;
+            return TryGetEligibleTeams(match, out _, out _);
+        }
+
+        public bool TryGetEligibleTeams(
+            TournamentMatchData match,
+            out TournamentTeamData[] eligibleTeams,
+            out int winnerTeamCount)
+        {
+            eligibleTeams = Array.Empty<TournamentTeamData>();
+            winnerTeamCount = 0;
+            if (match.Teams.Length < 2 || match.Teams.Any(team => team?.ParticipantSlotIds?.Length is null or 0))
+                return false;
+
+            var disconnectedSlots = GetDisconnectedSlots();
+            eligibleTeams = match.Teams
+                .Where(team => !team.ParticipantSlotIds.Any(disconnectedSlots.Contains))
+                .ToArray();
+            int teamSize = Math.Max(1, match.TeamSize);
+            int winnerParticipants = Math.Max(1, match.NumberOfWinnerParticipants);
+            winnerTeamCount = Math.Max(1, Math.Min(match.Teams.Length, 1 + ((winnerParticipants - 1) / teamSize)));
+            return eligibleTeams.Length >= winnerTeamCount;
         }
 
         public TournamentBallotOutcome GetBallotOutcome()
@@ -1056,7 +1133,7 @@ public sealed partial class TournamentSessionRegistry : ITournamentSessionRegist
             .Where(contestant => contestant.IsDisconnected)
             .Select(contestant => contestant.SlotId));
 
-        private TournamentMatchData GetCurrentMatch() => Rounds
+        public TournamentMatchData GetCurrentMatch() => Rounds
             .SelectMany(round => round.Matches ?? Array.Empty<TournamentMatchData>())
             .FirstOrDefault(candidate => candidate.MatchId == CurrentMatchId);
 
