@@ -183,15 +183,24 @@ public class SiegeKeepStageTests : MapEventTestBase
         }, keep.DisabledMethods);
     }
 
-    // With every walls player's hero wounded nobody can lead the keep, so the walls end the way an AI-led assault does.
+    // With every walls player gone nobody can lead the keep, so the walls end the way an AI-led assault does.
     [Fact]
-    public void NoHealthyAttackingPlayer_ConcludesTheWallsAsAnAttackerVictory()
+    public void NoConnectedAttackingPlayer_ConcludesTheWallsAsAnAttackerVictory()
     {
         var conclusions = new List<AuthoritativeBattleConclusionRequested>();
         Server.Call(() => Server.Resolve<IMessageBroker>().Subscribe<AuthoritativeBattleConclusionRequested>(
             payload => conclusions.Add(payload.What)));
+        var keep = OpenKeepStage(DefenderTroops, openStage: false);
+        var clients = Clients.ToArray();
 
-        var keep = OpenKeepStage(DefenderTroops, woundHeroes: true);
+        Server.Call(() =>
+        {
+            var players = Server.Resolve<IPlayerManager>();
+            players.ClearPeer(clients[0].NetPeer);
+            players.ClearPeer(clients[1].NetPeer);
+            Server.Resolve<IMessageBroker>().Publish(this,
+                new AuthoritativeSiegeKeepRequested(keep.Battle.MapEventId, 1));
+        }, keep.DisabledMethods);
 
         Assert.Equal(BattleState.AttackerVictory, Assert.Single(conclusions).BattleState);
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkSiegeKeepPhaseChanged>());
@@ -325,8 +334,7 @@ public class SiegeKeepStageTests : MapEventTestBase
         string LeaderCharacterId, string JoinerCharacterId, List<MethodBase> DisabledMethods);
 
     // Two attacking players at a besieged town whose walls just fell back, with the keep stage opened by the server.
-    private KeepStage OpenKeepStage(int defenders, bool startWallsFirst = false,
-        bool woundHeroes = false, bool openStage = true)
+    private KeepStage OpenKeepStage(int defenders, bool startWallsFirst = false, bool openStage = true)
     {
         var battle = CreateServerMapEvent();
         var leaderHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
@@ -359,8 +367,8 @@ public class SiegeKeepStageTests : MapEventTestBase
             defenderParty.MemberRoster.AddToCounts(defenderTroop, defenders);
 
             Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(escortId, out var escort));
-            leaderCharacterId = PreparePlayer("keep-leader", escort, LeaderEscorts, woundHeroes);
-            joinerCharacterId = PreparePlayer("keep-joiner", escort, JoinerEscorts, woundHeroes);
+            leaderCharacterId = PreparePlayer("keep-leader", escort, LeaderEscorts);
+            joinerCharacterId = PreparePlayer("keep-joiner", escort, JoinerEscorts);
             // The reserves flatten each battle party's own roster, which the seeding above did not refresh.
             foreach (var party in mapEvent.InvolvedParties)
                 mapEvent.FindMapEventParty(party)?.Update();
@@ -438,7 +446,7 @@ public class SiegeKeepStageTests : MapEventTestBase
     }
 
     // Gives the player its real hero character id, a healthy hero, and escorts in its party.
-    private string PreparePlayer(string controllerId, CharacterObject escort, int escorts, bool wounded)
+    private string PreparePlayer(string controllerId, CharacterObject escort, int escorts)
     {
         var players = Server.Resolve<IPlayerManager>();
         Assert.True(players.TryGetPlayer(controllerId, out var player));
@@ -447,7 +455,7 @@ public class SiegeKeepStageTests : MapEventTestBase
         Assert.True(Server.ObjectManager.TryGetId(hero.CharacterObject, out var characterId));
         Assert.True(players.ReplacePlayer(player,
             new Player(player.ControllerId, player.HeroId, player.MobilePartyId, player.ClanId, characterId)));
-        hero.HitPoints = wounded ? 1 : 100;
+        hero.HitPoints = 100;
         party.IsActive = true;
         party.MemberRoster.Clear();
         party.MemberRoster.AddToCounts(hero.CharacterObject, 1);

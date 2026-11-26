@@ -626,9 +626,20 @@ public class ServerBattleCompletionHandler : IHandler
     // refused. The walls host and reports are dropped too.
     private void Handle_SiegeKeepStageOpened(MessagePayload<SiegeKeepStageOpened> payload)
     {
-        var mapEventId = payload.What.MapEventId;
+        var result = payload.What;
+        var mapEventId = result.MapEventId;
         RunSerialized(() =>
         {
+            if (!result.Opened)
+            {
+                // Nobody can lead the keep, so the walls end the way an AI-led assault does.
+                Logger.Information("Keep stage for {Instance} did not open; concluding the walls as an attacker victory",
+                    mapEventId);
+                messageBroker.Publish(this, new AuthoritativeBattleConclusionRequested(
+                    mapEventId, BattleState.AttackerVictory, result.HostEpoch));
+                return;
+            }
+
             if (!missionManager.ReleaseInstanceForNextStage(mapEventId))
             {
                 // A stalled walls conclusion already rolled back, so its recovery must not retry the walls under the keep.

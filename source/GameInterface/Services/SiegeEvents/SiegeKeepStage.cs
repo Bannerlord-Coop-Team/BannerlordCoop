@@ -25,8 +25,14 @@ namespace GameInterface.Services.SiegeEvents;
 /// <summary>[Server] Opens, answers, times and locks the keep stage of a siege assault on the game thread.</summary>
 public interface ISiegeKeepStage : IGameAbstraction
 {
-    /// <summary>Seats the walls players inside vanilla's hall limits and moves the siege into the lord's hall.</summary>
+    /// <summary>
+    /// Seats the walls players inside vanilla's hall limits and moves the siege into the lord's hall. A throw rolls the
+    /// half-open stage back and returns false.
+    /// </summary>
     bool TryOpen(MapEvent mapEvent);
+
+    /// <summary>Opens the keep again for a later assault on a siege that already reached the lord's hall.</summary>
+    bool TryReopen(MapEvent mapEvent);
 
     bool IsOpen(MapEvent mapEvent);
     bool IsLocked(MapEvent mapEvent);
@@ -57,6 +63,7 @@ internal sealed class SiegeKeepStage : ISiegeKeepStage
     private readonly ISiegeKeepTroopSelection selection;
     private readonly IBattleTroopReserveBuilder reserveBuilder;
     private readonly ITroopSelectionEntries selectionEntries;
+    private readonly ITroopSelectionRules rules;
 
     /// <summary>How long seated players have to choose, so a player who never answers can't stall the keep.</summary>
     private static readonly TimeSpan SelectionWindow = TimeSpan.FromSeconds(90);
@@ -66,7 +73,7 @@ internal sealed class SiegeKeepStage : ISiegeKeepStage
 
     public SiegeKeepStage(INetwork network, IObjectManager objectManager, IPlayerManager playerManager,
         ISiegeKeepTroopSelection selection, IBattleTroopReserveBuilder reserveBuilder,
-        ITroopSelectionEntries selectionEntries)
+        ITroopSelectionEntries selectionEntries, ITroopSelectionRules rules)
     {
         this.network = network;
         this.objectManager = objectManager;
@@ -74,9 +81,27 @@ internal sealed class SiegeKeepStage : ISiegeKeepStage
         this.selection = selection;
         this.reserveBuilder = reserveBuilder;
         this.selectionEntries = selectionEntries;
+        this.rules = rules;
     }
 
+    // A throw after the roster opened would leave a half-open stage, so it's forgotten the way a failed lock is.
     public bool TryOpen(MapEvent mapEvent)
+    {
+        try
+        {
+            return OpenStage(mapEvent);
+        }
+        catch (Exception exception)
+        {
+            Logger.Error(exception, "Unable to open the keep stage for {MapEventId}", mapEvent.StringId);
+            selection.Forget(mapEvent);
+            return false;
+        }
+    }
+
+    public bool TryReopen(MapEvent mapEvent) => mapEvent.IsSiegeKeepStage() && TryOpen(mapEvent);
+
+    private bool OpenStage(MapEvent mapEvent)
     {
         var settlement = mapEvent.MapEventSettlement;
         if (!mapEvent.IsRunningSiegeAssault() || !mapEvent.CanFallBackToKeep() || settlement.SiegeEvent == null)
@@ -116,12 +141,10 @@ internal sealed class SiegeKeepStage : ISiegeKeepStage
     }
 
     // Seats the candidates in order while the hall has places, each with its share of the escort places.
-    private static List<SiegeKeepSeat> SeatCandidates(List<(Player Player, MobileParty Party)> candidates,
+    private static List<SiegeKeepSeat> SeatCandidates(List<(Player Player, int Escorts)> candidates,
         int defenderCount, SiegeLordsHallFightModel model)
     {
-        // Escorts a candidate could bring: every healthy member but the player's own hero.
-        var escortsPerCandidate = candidates
-            .Select(candidate => Math.Max(0, candidate.Party.MemberRoster.TotalHealthyCount - 1)).ToList();
+        var escortsPerCandidate = candidates.Select(candidate => candidate.Escorts).ToList();
         var shares = PlanSeats(defenderCount, model.AttackerDefenderTroopCountRatio,
             model.MaxAttackerSideTroopCount, escortsPerCandidate);
 
@@ -135,19 +158,23 @@ internal sealed class SiegeKeepStage : ISiegeKeepStage
         return seats;
     }
 
-    // The siege leader first, then the other walls players in the attacker side's order.
-    private List<(Player Player, MobileParty Party)> GetAttackingPlayers(MapEvent mapEvent)
+    // The siege leader first, then the other walls players in the attacker side's order, each with the escorts it
+    // could bring. The picker's healthy rule decides both, so a wounded hero joins when wounded entry is on.
+    private List<(Player Player, int Escorts)> GetAttackingPlayers(MapEvent mapEvent)
     {
-        var players = new List<(Player, MobileParty)>();
+        var players = new List<(Player, int)>();
         var leader = mapEvent.AttackerSide.LeaderParty?.MobileParty;
         foreach (var mapEventParty in mapEvent.AttackerSide.Parties.OrderBy(party => party.Party?.MobileParty == leader ? 0 : 1))
         {
             var party = mapEventParty.Party?.MobileParty;
             if (party == null || !party.IsActive) continue;
             if (!playerManager.TryGetPlayer(party, out var player) || !playerManager.IsConnected(player)) continue;
-            if (!objectManager.TryGetObject<Hero>(player.HeroId, out var hero) || hero.IsWounded) continue;
 
-            players.Add((player, party));
+            var healthy = rules.CountHealthy(party, player.CharacterObjectId);
+            if (!healthy.TryGetValue(player.CharacterObjectId, out var heroes) || heroes < 1) continue;
+
+            var escorts = healthy.Where(pair => pair.Key != player.CharacterObjectId).Sum(pair => pair.Value);
+            players.Add((player, escorts));
         }
         return players;
     }

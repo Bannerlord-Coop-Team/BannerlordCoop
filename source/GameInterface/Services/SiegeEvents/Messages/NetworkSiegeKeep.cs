@@ -86,7 +86,7 @@ internal readonly struct NetworkSiegeKeepPhaseChanged : ICommand
 
 /// <summary>
 /// [Local, server] Every walls mission member reported the defenders falling back to the keep, so the keep stage
-/// should open. Carries the host epoch so the stage can fall back to an attacker victory when nobody can lead it.
+/// should open. Its host epoch comes back on <see cref="SiegeKeepStageOpened"/>.
 /// </summary>
 public readonly struct AuthoritativeSiegeKeepRequested : IEvent
 {
@@ -101,15 +101,20 @@ public readonly struct AuthoritativeSiegeKeepRequested : IEvent
 }
 
 /// <summary>
-/// [Local, server] The keep stage opened on a map event whose walls mission just concluded, so that mission
-/// instance ends without the conclusion record that would refuse the keep mission on the same id.
+/// [Local, server] Whether the keep stage opened on a map event whose walls mission just concluded. Opened, that
+/// mission instance ends without the conclusion record that would refuse the keep mission on the same id; not
+/// opened, the walls conclude as an attacker victory at the walls' host epoch.
 /// </summary>
 public readonly struct SiegeKeepStageOpened : IEvent
 {
     public readonly string MapEventId;
+    public readonly bool Opened;
+    public readonly int HostEpoch;
 
-    public SiegeKeepStageOpened(string mapEventId)
+    public SiegeKeepStageOpened(string mapEventId, bool opened, int hostEpoch)
     {
         MapEventId = mapEventId;
+        Opened = opened;
+        HostEpoch = hostEpoch;
     }
 }

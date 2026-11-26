@@ -68,33 +68,9 @@ internal sealed class SiegeKeepStageHandler : IHandler
                 return;
             }
 
-            if (TryOpenStage(mapEvent))
-            {
-                messageBroker.Publish(this, new SiegeKeepStageOpened(request.MapEventId));
-                return;
-            }
-
-            // Nobody can lead the keep, so the walls end the way an AI-led assault does.
-            Logger.Information("Keep stage for {MapEventId} did not open; concluding the walls as an attacker victory",
-                request.MapEventId);
-            messageBroker.Publish(this, new AuthoritativeBattleConclusionRequested(
-                request.MapEventId, BattleState.AttackerVictory, request.HostEpoch));
+            bool opened = stage.TryOpen(mapEvent);
+            messageBroker.Publish(this, new SiegeKeepStageOpened(request.MapEventId, opened, request.HostEpoch));
         }, context: nameof(Handle_AuthoritativeSiegeKeepRequested));
-    }
-
-    // A keep that throws while opening ends the walls instead of retrying, otherwise the same throw comes back each retry.
-    private bool TryOpenStage(MapEvent mapEvent)
-    {
-        try
-        {
-            return stage.TryOpen(mapEvent);
-        }
-        catch (Exception exception)
-        {
-            Logger.Error(exception, "Unable to open the keep stage for {MapEventId}", mapEvent.StringId);
-            stage.Forget(mapEvent);
-            return false;
-        }
     }
 
     private void Handle_EntryRequest(MessagePayload<NetworkSiegeKeepEntryRequest> payload)
@@ -128,12 +104,9 @@ internal sealed class SiegeKeepStageHandler : IHandler
         bool assaultOpen = mapEvent.IsRunningSiegeAssault() && ReferenceEquals(party.MapEvent, mapEvent);
         if (!assaultOpen) return Reject(request, "This siege assault is no longer open.");
 
-        if (!stage.IsOpen(mapEvent))
-        {
-            // A later assault on a siege that already reached the hall goes straight to the keep.
-            bool opened = mapEvent.IsSiegeKeepStage() && TryOpenStage(mapEvent);
-            if (!opened) return Reject(request, "Nobody can lead the keep battle right now.");
-        }
+        // A later assault on a siege that already reached the hall goes straight to the keep.
+        if (!stage.IsOpen(mapEvent) && !stage.TryReopen(mapEvent))
+            return Reject(request, "Nobody can lead the keep battle right now.");
 
         if (!stage.TryGetSeat(mapEvent, player.MobilePartyId, out var seat))
         {

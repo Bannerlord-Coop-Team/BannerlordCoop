@@ -208,17 +208,16 @@ internal class CoopSiegeBattleLauncher : ICoopSiegeBattleLauncher
             CoopTroopSupplierRegistry.Register(defenderSupplier);
             CoopTroopSupplierRegistry.Register(attackerSupplier);
 
-            var battle = MobileParty.MainParty.MapEvent;
             return new MissionBehavior[]
             {
                 new MissionOptionsComponent(),
                 new CampaignMissionComponent(),
                 new BattleEndLogic(),
                 new MissionCombatantsLogic(
-                    (IEnumerable<IBattleCombatant>)battle.InvolvedParties,
+                    (IEnumerable<IBattleCombatant>)mapEvent.InvolvedParties,
                     PartyBase.MainParty,
-                    battle.GetLeaderParty(BattleSideEnum.Defender),
-                    battle.GetLeaderParty(BattleSideEnum.Attacker),
+                    mapEvent.GetLeaderParty(BattleSideEnum.Defender),
+                    mapEvent.GetLeaderParty(BattleSideEnum.Attacker),
                     Mission.MissionTeamAITypeEnum.NoTeamAI,
                     isPlayerSergeant: false),
                 new AgentHumanAILogic(),

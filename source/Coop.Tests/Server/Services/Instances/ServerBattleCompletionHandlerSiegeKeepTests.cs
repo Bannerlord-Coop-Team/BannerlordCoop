@@ -88,7 +88,7 @@ public class ServerBattleCompletionHandlerSiegeKeepTests : IDisposable
         Assert.Equal(1, request.HostEpoch);
         Assert.Empty(broker.Messages.GetMessages<AuthoritativeSiegeAmbushCompletionRequested>());
 
-        broker.Publish(this, new SiegeKeepStageOpened(MapEventId));
+        broker.Publish(this, new SiegeKeepStageOpened(MapEventId, opened: true, hostEpoch: 1));
         Drain();
 
         settlement.CurrentSiegeState = Settlement.SiegeState.InTheLordsHall;
