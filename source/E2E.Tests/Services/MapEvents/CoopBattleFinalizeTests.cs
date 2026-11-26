@@ -253,7 +253,7 @@ public class CoopBattleFinalizeTests : MapEventTestBase
         {
             Assert.True(recipientClient.ObjectManager.TryGetObject<MapEvent>(setup.ctx.MapEventId, out var mapEvent));
             recipientClient.Resolve<IMessageBroker>().Publish(this, new PlayerSurrendered(mapEvent, MobileParty.MainParty));
-        }, BattleMenuSurrenderDisabledMethods());
+        }, BattleResultDisabledMethods);
 
         AssertMapEventRemoved(Server, setup.ctx.MapEventId);
         foreach (var client in Clients)
@@ -735,7 +735,7 @@ public class CoopBattleFinalizeTests : MapEventTestBase
         Clients.First().Resolve<IMessageBroker>().Subscribe<NetworkClosePvpEncounter>(_ => closeCount1++);
         Clients.Last().Resolve<IMessageBroker>().Subscribe<NetworkClosePvpEncounter>(_ => closeCount2++);
 
-        var disabled = BattleMenuSurrenderDisabledMethods()
+        var disabled = BattleResultDisabledMethods
             .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast)))
             .ToList();
 
@@ -825,18 +825,6 @@ public class CoopBattleFinalizeTests : MapEventTestBase
         Assert.Equal(1, closeCount1);
         Assert.Equal(1, closeCount2);
     }
-
-    private IReadOnlyList<MethodBase> BattleMenuSurrenderDisabledMethods()
-        => MapEventDisabledMethods
-            .Append(AccessTools.Method(typeof(DefaultBattleRewardModel), nameof(DefaultBattleRewardModel.GetCaptureMemberChancesForWinnerParties)))
-            .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyCasualties"))
-            .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyItems"))
-            .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyPrisoners"))
-            .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyShips"))
-            .Append(AccessTools.Method(typeof(MapEvent), "CalculateMapEventResults"))
-            .Append(AccessTools.Method(typeof(MapEvent), "CommitCalculatedMapEventResults"))
-            .Append(AccessTools.Method(typeof(MapEvent), "MovePartyToSuitablePositionOnMapEventFinalize"))
-            .ToList();
 
     /// <summary>
     /// Builds a shared battle with two opposing player parties, registers both as players, makes each client's

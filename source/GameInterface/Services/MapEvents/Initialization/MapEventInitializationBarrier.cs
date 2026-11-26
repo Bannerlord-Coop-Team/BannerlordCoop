@@ -535,16 +535,7 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
             return true;
         }
 
-        // A defeat without capture ends the encounter like native DoPlayerDefeat, otherwise the encounter menu's init starts
-        // a new battle against the same enemy. Finish must not finalize the destroyed battle again.
-        encounter._mapEvent = null;
-        encounter.BattleSimulation = null;
-        PlayerEncounter.Finish();
-
-        // A client's settlement leave is dropped, so a defender still inside asks for its settlement again like native Leave.
-        var settlement = MobileParty.MainParty.CurrentSettlement;
-        if (settlement != null)
-            EncounterManager.StartSettlementEncounter(MobileParty.MainParty, settlement);
+        FinishUncapturedDefeat(encounter);
         return true;
     }
 
@@ -558,6 +549,20 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
             GameMenu.SwitchToMenu(menuId);
         else
             GameMenu.ActivateGameMenu(menuId);
+    }
+
+    // Ends the encounter like native DoPlayerDefeat, otherwise the encounter menu's init starts a new battle against the same enemy.
+    private static void FinishUncapturedDefeat(PlayerEncounter encounter)
+    {
+        var settlement = MobileParty.MainParty.CurrentSettlement;
+        // Finish must not finalize the destroyed battle again.
+        encounter._mapEvent = null;
+        encounter.BattleSimulation = null;
+        PlayerEncounter.Finish(forcePlayerOutFromSettlement: false);
+
+        // A defender still inside gets its settlement encounter back, like native Leave.
+        if (settlement != null)
+            EncounterManager.StartSettlementEncounter(MobileParty.MainParty, settlement);
     }
 
     private void ClearEngageOrder(MobileParty party)
