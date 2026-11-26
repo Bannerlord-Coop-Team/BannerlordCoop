@@ -43,7 +43,9 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Mission), "get_CurrentTime", nameof(Mission_get_CurrentTime));
         Prefix(typeof(Mission), "get_DamageToPlayerMultiplier", nameof(Mission_get_DamageToPlayerMultiplier));
         Prefix(typeof(Mission), nameof(Mission.EndMission), nameof(Mission_EndMission));
-        Prefix(typeof(Mission), nameof(Mission.IsPlayerCloseToAnEnemy), nameof(Mission_IsPlayerCloseToAnEnemy));
+        Prefix(typeof(Mission), nameof(Mission.GetClosestFleePositionForAgent), nameof(Mission_GetClosestFleePositionForAgent));
+        Prefix(typeof(AgentProximityMap), nameof(AgentProximityMap.BeginSearch), nameof(AgentProximityMap_BeginSearch));
+        Prefix(typeof(AgentProximityMap), nameof(AgentProximityMap.FindNext), nameof(AgentProximityMap_FindNext));
         Prefix(typeof(Mission), nameof(Mission.OnAgentFleeing), nameof(Mission_OnAgentFleeing));
         Prefix(typeof(Mission), nameof(Mission.SpawnAgent), nameof(Mission_SpawnAgent));
         // The BR-110 budget counts native objects until deletion via Mission.AllAgents.
@@ -330,10 +332,24 @@ public sealed class MissionEngineFixture : IDisposable
         return false;
     }
 
-    private static bool Mission_IsPlayerCloseToAnEnemy(Mission __instance, ref bool __result)
+    private static bool AgentProximityMap_BeginSearch(Mission mission, ref AgentProximityMap.ProximityMapSearchStruct __result)
     {
-        if (!MockMission.ForShell(__instance, out var mock)) return true;
-        __result = mock.EnemyCloseToPlayer;
+        if (!MockMission.ForShell(mission, out var mock)) return true;
+        __result = new AgentProximityMap.ProximityMapSearchStruct { LastFoundAgent = mock.NearbyAgent };
+        return false;
+    }
+
+    private static bool Mission_GetClosestFleePositionForAgent(Mission __instance, ref TaleWorlds.Engine.WorldPosition __result)
+    {
+        if (!MockMission.ForShell(__instance, out _)) return true;
+        __result = TaleWorlds.Engine.WorldPosition.Invalid;
+        return false;
+    }
+
+    private static bool AgentProximityMap_FindNext(Mission mission, ref AgentProximityMap.ProximityMapSearchStruct searchStruct)
+    {
+        if (!MockMission.ForShell(mission, out _)) return true;
+        searchStruct.LastFoundAgent = null;
         return false;
     }
 

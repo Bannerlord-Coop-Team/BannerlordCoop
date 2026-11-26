@@ -11,13 +11,13 @@ using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
-using HarmonyLib;
+using Missions;
 using Missions.Battles;
 using Missions.Messages;
-using Moq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -487,7 +487,7 @@ public class BattleResultReadyTests : MissionTestEnvironment
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public void EnemyRout_PeerCanLeaveWithVictoryEvenWithEnemiesNearby(bool hostLeavesFirst)
+    public void EnemyRout_PeerCanLeaveWithVictoryNearRoutedEnemy(bool hostLeavesFirst)
     {
         using var fixture = new MissionEngineFixture();
         var (mapEventId, _) = SetupCoopBattle("host", "unconnected-defender", "successor");
@@ -497,21 +497,41 @@ public class BattleResultReadyTests : MissionTestEnvironment
         RegisterPeer(host, "host");
         RegisterPeer(successor, "successor");
 
-        var missionProperty = AccessTools.Property(typeof(MissionBehavior), nameof(MissionBehavior.Mission));
         var hostController = host.Resolve<CoopBattleController>();
         var successorController = successor.Resolve<CoopBattleController>();
-        host.Call(() => AttachEndLogic(fixture.CreateMission(host), hostController));
-        MockMission successorMission = null;
-        BattleEndLogic successorEndLogic = null;
+        host.Call(() =>
+        {
+            var mission = fixture.CreateMission(host);
+            mission.PlayerTeam = mission.AttackerTeam;
+            AttachBattleEndLogic(mission, hostController);
+            SpawnMainAgent(mission);
+        });
+        MockMission successorMission = null!;
+        BattleEndLogic successorEndLogic = null!;
         successor.Call(() =>
         {
             successorMission = fixture.CreateMission(successor);
-            successorEndLogic = AttachEndLogic(successorMission, successorController);
-            successorMission.EnemyCloseToPlayer = true;
+            successorMission.PlayerTeam = successorMission.AttackerTeam;
+            successorMission.Shell.MissionTeamAIType = Mission.MissionTeamAITypeEnum.FieldBattle;
+            successorEndLogic = AttachBattleEndLogic(successorMission, successorController);
+            SpawnMainAgent(successorMission);
         });
 
         EnterBattleWithMembership(host, "host", mapEventId);
+        host.Call(() => hostController.OnDeploymentFinished());
         EnterBattleWithMembership(successor, "successor", mapEventId);
+
+        var agentId = Guid.NewGuid();
+        successor.Call(() =>
+        {
+            var enemy = successorMission.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
+                .Controller(AgentControllerType.None).Team(successorMission.DefenderTeam.Shell));
+            successorMission.NearbyAgent = enemy;
+            var registry = successor.Resolve<INetworkAgentRegistry>();
+            Assert.True(registry.TryRegisterAgent("host", agentId, enemy));
+            successor.Resolve<IMessageBroker>().Publish(this, new NetworkBattleAgentRetreatState(agentId, true, 0));
+            Assert.True(enemy.IsRunningAway);
+        });
 
         host.Call(() =>
         {
@@ -525,59 +545,75 @@ public class BattleResultReadyTests : MissionTestEnvironment
             hostController.ResultCommitter.ReportResolvedResult(result);
         }, VictoryConclusionDisabledMethods());
 
-        // The result must survive migration even if deployment kept this client from reporting it earlier.
-        if (hostLeavesFirst)
+        var originalAgentApi = MBAPI.IMBAgent;
+        MBAPI.IMBAgent = DispatchProxy.Create<IMBAgent, ProximityAgentApi>();
+        BattleSpawnGate.BeginBattle(mapEventId);
+        try
         {
-            host.Call(hostController.OnEndMissionInternal, VictoryConclusionDisabledMethods());
-            AssertHost(Server, mapEventId, "successor");
-        }
-
-        AssertMapEventPresent(mapEventId);
-        successor.Call(() =>
-        {
-            successorController.OnDeploymentFinished();
-
-            MissionResult result = null;
-            Assert.True(successorEndLogic.MissionEnded(ref result));
-            Assert.Equal(BattleState.AttackerVictory, result.BattleState);
-            Assert.True(result.PlayerVictory);
-
-            successorMission.Shell.MissionResult = result;
-            successorMission.Shell._missionEnded = true;
-            BattleSpawnGate.BeginBattle(mapEventId);
-            try
+            if (hostLeavesFirst)
             {
+                // Deliver the host's real leave message without clearing the surviving client's shared test-process gate.
+                Server.SimulateMessage(host.NetPeer, new NetworkMissionLeft("host", mapEventId));
+                AssertHost(Server, mapEventId, "successor");
+            }
+
+            AssertMapEventPresent(mapEventId);
+            successor.Call(() =>
+            {
+                successorController.OnDeploymentFinished();
+
+                MissionResult result = null;
+                Assert.True(successorEndLogic.MissionEnded(ref result));
+                Assert.Equal(BattleState.AttackerVictory, result.BattleState);
+                Assert.True(result.PlayerVictory);
+
+                successorMission.Shell.MissionResult = result;
+                successorMission.Shell._missionEnded = true;
+                var registry = successor.Resolve<INetworkAgentRegistry>();
+                Assert.True(registry.TryGetAgentInfo(agentId, out var info));
+                Assert.Equal(hostLeavesFirst ? "successor" : "host", info.CurrentAuthority);
+                var enemy = info.Agent;
+                Assert.True(enemy.IsActive());
+                Assert.True(AgentMirror.TryGet(enemy, out var mirror));
+                NativeAgentFields.BackForProximityCheck(enemy, mirror);
+                Assert.False(enemy.IsRetreating());
                 Assert.False(successorMission.EndMissionCalled);
                 Assert.Equal(BattleEndLogic.ExitResult.True, successorEndLogic.TryExit());
                 Assert.True(successorMission.EndMissionCalled);
-                successorController.OnEndMissionInternal();
-            }
-            finally
-            {
-                BattleSpawnGate.EndBattle();
-            }
-        }, VictoryConclusionDisabledMethods());
+            }, VictoryConclusionDisabledMethods());
+        }
+        finally
+        {
+            BattleSpawnGate.EndBattle();
+            MBAPI.IMBAgent = originalAgentApi;
+        }
 
+        successor.Call(successorController.OnEndMissionInternal, VictoryConclusionDisabledMethods());
         if (!hostLeavesFirst)
             host.Call(hostController.OnEndMissionInternal, VictoryConclusionDisabledMethods());
         AssertMapEventRemoved(mapEventId);
 
-        BattleEndLogic AttachEndLogic(MockMission mock, CoopBattleController controller)
+        static void SpawnMainAgent(MockMission mock)
         {
-            mock.PlayerTeam = mock.AttackerTeam;
-            mock.Shell.MissionTeamAIType = Mission.MissionTeamAITypeEnum.FieldBattle;
             var player = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
                 .Controller(AgentControllerType.Player).Team(mock.PlayerTeam.Shell));
             Assert.True(AgentMirror.TryGet(player, out var mirror));
-            NativeAgentFields.Back(player, mirror);
+            NativeAgentFields.BackForProximityCheck(player, mirror);
             mock.Shell._mainAgent = mock.MainAgent = player;
-            var endLogic = new BattleEndLogic();
-            missionProperty.SetValue(endLogic, mock.Shell);
-            endLogic._missionAgentSpawnLogic = Mock.Of<IMissionAgentSpawnLogic>();
-            mock.Shell.MissionBehaviors.Add(endLogic);
-            missionProperty.SetValue(controller, mock.Shell);
-            return endLogic;
         }
+    }
+
+    /// <summary>Represents a nearby hostile agent before the engine has started moving it in retreat mode.</summary>
+    public class ProximityAgentApi : DispatchProxy
+    {
+        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args) => targetMethod?.Name switch
+        {
+            nameof(IMBAgent.IsEnemy) => true,
+            nameof(IMBAgent.GetAIStateFlags) => Agent.AIStateFlag.Alarmed,
+            nameof(IMBAgent.IsRetreating) => false,
+            nameof(IMBAgent.SetRetreatMode) => null,
+            _ => throw new NotSupportedException(targetMethod?.Name),
+        };
     }
 
     [Fact]
