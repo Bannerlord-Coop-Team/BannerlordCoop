@@ -22,8 +22,7 @@ internal class HeroTradeEquipment
     /// </summary>
     public int TakeGained(EquipmentElement element, int amount)
     {
-        int gained = CountOf(TradedSets, element) - CountOf(PreTradeSets, element);
-        int toTake = System.Math.Min(gained, amount);
+        int toTake = System.Math.Min(CountGained(element), amount);
         if (toTake <= 0) return 0;
 
         int removed = 0;
@@ -44,6 +43,11 @@ internal class HeroTradeEquipment
 
         return removed;
     }
+
+    /// <summary>
+    /// How many more slots hold the element after the trade than before it, negative when the trade emptied slots.
+    /// </summary>
+    public int CountGained(EquipmentElement element) => CountOf(TradedSets, element) - CountOf(PreTradeSets, element);
 
     // Counts the slots holding the element across every set
     private static int CountOf(EquipmentElement[][] sets, EquipmentElement element) =>

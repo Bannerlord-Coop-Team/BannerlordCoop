@@ -190,8 +190,14 @@ internal class TradeHandler : IHandler
                 totalAmount = ReconcilePurchases(fromRoster, toItemRosterData, heroEquipments, boughtItems, totalAmount, out var keptItems);
                 purchasedItems = GetKeptPurchases(boughtItems, keptItems);
 
-                // Merchants are shared, the client's snapshot misses what other players traded since it was taken
-                if (message.IsTrading) fromItemRosterData = ApplyTradeToLiveStock(fromRoster, keptItems, soldItems);
+                if (message.IsTrading)
+                {
+                    // A screen that hasn't seen the player's last sale yet, like during a join, offers the same items again
+                    totalAmount = ReconcileSales(toRoster, toItemRosterData, heroEquipments, soldItems, totalAmount, out soldItems);
+
+                    // Merchants are shared, the client's snapshot misses what other players traded since it was taken
+                    fromItemRosterData = ApplyTradeToLiveStock(fromRoster, keptItems, soldItems);
+                }
             }
 
             if (message.IsTrading) merchantGold = GetLiveMerchantGold(currentSettlementComponent, currentMobileParty, merchantGold);
@@ -478,7 +484,41 @@ internal class TradeHandler : IHandler
         return totalAmount;
     }
 
-    // The prorated price of the purchased quantity taken back, shared by the gold charge and the exchange event so both agree
+    /// <summary>
+    /// Cuts each sale down to what this trade took out of the party's live roster and equipment, and takes the unpaid
+    /// share of its price off the total. Outputs each sale that is kept, at its kept quantity and price.
+    /// </summary>
+    internal static int ReconcileSales(
+        ItemRoster partyRoster,
+        ItemRosterElement[] partyRosterData,
+        IEnumerable<HeroTradeEquipment> heroEquipments,
+        List<(ItemRosterElement, int)> soldItems,
+        int totalAmount,
+        out List<(ItemRosterElement, int)> keptSales)
+    {
+        keptSales = new List<(ItemRosterElement, int)>();
+
+        foreach (var (sold, price) in soldItems)
+        {
+            var element = sold.EquipmentElement;
+            int amount = sold.Amount;
+            long removed = (long)FindAmount(partyRoster, element) - FindAmount(partyRosterData, element)
+                - heroEquipments.Sum(heroEquipment => heroEquipment.CountGained(element));
+            int kept = (int)Math.Max(0L, Math.Min(amount, removed));
+
+            int unpaid = GetRefund(price, amount - kept, amount);
+            totalAmount += unpaid;
+            if (kept <= 0) continue;
+
+            var keptSale = sold;
+            keptSale.Amount = kept;
+            keptSales.Add((keptSale, price - unpaid));
+        }
+
+        return totalAmount;
+    }
+
+    // The prorated price of the quantity taken back or left unsold, shared by the gold and the exchange event so both agree
     private static int GetRefund(int price, int removed, int amount)
     {
         if (removed <= 0 || amount <= 0) return 0;

@@ -222,6 +222,30 @@ public class TradeHandlerTests
     }
 
     [Fact]
+    public void ReconcileSales_KeepsASaleStraightFromAnEquipmentSlot()
+    {
+        var sword = new ItemObject("sword");
+
+        // The sword was sold out of the battle set, so the party roster never held it
+        var battleSlots = new EquipmentElement[Equipment.EquipmentSlotLength];
+        var preTradeBattleSlots = new EquipmentElement[Equipment.EquipmentSlotLength];
+        preTradeBattleSlots[0] = new EquipmentElement(sword, null);
+        var heroEquipments = new[] { new HeroTradeEquipment(new[] { battleSlots }, new[] { preTradeBattleSlots }) };
+
+        var soldItems = new List<(ItemRosterElement, int)>
+        {
+            (new ItemRosterElement(new EquipmentElement(sword, null), 1), 200)
+        };
+
+        int result = TradeHandler.ReconcileSales(new ItemRoster(), System.Array.Empty<ItemRosterElement>(), heroEquipments, soldItems, totalAmount: -200, out var keptSales);
+
+        Assert.Equal(-200, result);
+        var (kept, price) = Assert.Single(keptSales);
+        Assert.Equal(1, kept.Amount);
+        Assert.Equal(200, price);
+    }
+
+    [Fact]
     public void ApplyTradeToLiveStock_KeepsWhatOtherPlayersTradedSinceTheSnapshot()
     {
         var grain = new ItemObject("grain");
