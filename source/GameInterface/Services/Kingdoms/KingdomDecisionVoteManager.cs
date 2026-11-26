@@ -51,8 +51,8 @@ namespace GameInterface.Services.Kingdoms
         bool ShouldBlockLocalResolution(DecisionItemBaseVM decisionItem);
         void RegisterDecisionItem(DecisionItemBaseVM decisionItem);
         void UnregisterDecisionItem(DecisionItemBaseVM decisionItem);
-        bool HasPendingSettlementDecisionResult();
-        bool TryTakeSettlementDecisionResult(out KingdomDecision decision, out Func<DecisionItemBaseVM, bool> showResult);
+        bool TryGetPendingSettlementDecision(out KingdomDecision decision);
+        bool TryShowPendingSettlementDecisionResult(DecisionItemBaseVM item);
         bool IsShowingSettlementDecisionResult(DecisionItemBaseVM decisionItem);
         bool HandleVoteRequest(string controllerId, KingdomDecisionVoteData voteData);
         void ApplyRemoteVote(string clanId, KingdomDecisionVoteData voteData);
@@ -87,7 +87,7 @@ namespace GameInterface.Services.Kingdoms
         private readonly HashSet<DecisionItemBaseVM> SettlementResultItems = new();
         private readonly List<PendingKingdomDecisionVote> PendingRemoteVotes = new List<PendingKingdomDecisionVote>();
         private readonly List<KingdomDecisionRoundStatusData> PendingRoundStatuses = new List<KingdomDecisionRoundStatusData>();
-        private readonly Queue<(KingdomDecisionVoteState State, string OutcomeKey)> SettlementDecisionResults = new();
+        private readonly Queue<(KingdomDecisionVoteState State, string OutcomeKey)> PendingSettlementDecisionResults = new();
 
         private readonly IPlayerManager playerManager;
         private readonly IObjectManager objectManager;
@@ -127,7 +127,7 @@ namespace GameInterface.Services.Kingdoms
             SettlementResultItems.Clear();
             PendingRemoteVotes.Clear();
             PendingRoundStatuses.Clear();
-            SettlementDecisionResults.Clear();
+            PendingSettlementDecisionResults.Clear();
         }
 
         public void RegisterDecision(KingdomDecision decision)
@@ -648,20 +648,8 @@ namespace GameInterface.Services.Kingdoms
             // A repeated fief result would queue a second copy of the same screen.
             if (isSettlementResult && state.IsResolved) return;
 
-            DecisionOutcome outcome;
-            bool found = isSettlementResult
-                ? outcomeResolver.TryGetOutcomeByKey(outcomeKey, state.Election, objectManager, out outcome)
-                : outcomeResolver.TryGetOutcome(
-                    new KingdomDecisionVoteData(kingdomId, decisionIndex, outcomeIndex,
-                        (int)Supporter.SupportWeights.StayNeutral, false, true, outcomeKey),
-                    state.Election, objectManager, out outcome);
-            if (!found)
+            if (!TryGetResolvedOutcome(state, outcomeIndex, outcomeKey, out DecisionOutcome outcome))
             {
-                if (isSettlementResult)
-                {
-                    Logger.Warning("Could not resolve fief winner {OutcomeKey} for {KingdomId} decision {DecisionIndex}",
-                        outcomeKey, kingdomId, decisionIndex);
-                }
                 PublishDecisionNotification(notificationText);
                 return;
             }
@@ -680,6 +668,23 @@ namespace GameInterface.Services.Kingdoms
             CloseDecision(decision);
         }
 
+        private bool TryGetResolvedOutcome(KingdomDecisionVoteState state, int outcomeIndex, string outcomeKey, out DecisionOutcome outcome)
+        {
+            if (state.Decision is SettlementClaimantDecision)
+            {
+                // A local candidate index can point at a different clan when the ballots differ.
+                if (outcomeResolver.TryGetOutcomeByKey(outcomeKey, state.Election, objectManager, out outcome)) return true;
+
+                Logger.Warning("Could not resolve fief winner {OutcomeKey} for {KingdomId} decision {DecisionIndex}",
+                    outcomeKey, state.KingdomId, state.DecisionIndex);
+                return false;
+            }
+
+            var result = new KingdomDecisionVoteData(state.KingdomId, state.DecisionIndex, outcomeIndex,
+                (int)Supporter.SupportWeights.StayNeutral, isAbstain: false, isFinal: true, outcomeKey: outcomeKey);
+            return outcomeResolver.TryGetOutcome(result, state.Election, objectManager, out outcome);
+        }
+
         private void ShowOrQueueSettlementDecisionResult(KingdomDecisionVoteState state, string outcomeKey)
         {
             bool shown = false;
@@ -689,32 +694,34 @@ namespace GameInterface.Services.Kingdoms
                 if (TryShowSettlementDecisionResult(state, outcomeKey, item)) shown = true;
             }
 
-            if (!shown) SettlementDecisionResults.Enqueue((state, outcomeKey));
+            if (!shown) PendingSettlementDecisionResults.Enqueue((state, outcomeKey));
         }
 
-        public bool HasPendingSettlementDecisionResult()
+        public bool TryGetPendingSettlementDecision(out KingdomDecision decision)
         {
-            return SettlementDecisionResults.Any(result => IsLocalPlayerEligible(result.State.Decision));
+            var pending = PendingSettlementDecisionResults.FirstOrDefault(result => IsLocalPlayerEligible(result.State.Decision));
+            decision = pending.State?.Decision;
+            return decision != null;
         }
 
-        public bool TryTakeSettlementDecisionResult(out KingdomDecision decision, out Func<DecisionItemBaseVM, bool> showResult)
+        public bool TryShowPendingSettlementDecisionResult(DecisionItemBaseVM item)
         {
-            while (SettlementDecisionResults.Count > 0)
+            while (PendingSettlementDecisionResults.Count > 0)
             {
-                var (state, outcomeKey) = SettlementDecisionResults.Dequeue();
-                if (!IsLocalPlayerEligible(state.Decision)) continue;
-
-                decision = state.Decision;
-                showResult = item =>
+                var (state, outcomeKey) = PendingSettlementDecisionResults.Peek();
+                if (!IsLocalPlayerEligible(state.Decision))
                 {
-                    ApplyAuthoritativeOutcomes(state, item);
-                    return TryShowSettlementDecisionResult(state, outcomeKey, item);
-                };
-                return true;
+                    PendingSettlementDecisionResults.Dequeue();
+                    continue;
+                }
+
+                if (state.Decision != item.KingdomDecisionMaker._decision) return false;
+
+                PendingSettlementDecisionResults.Dequeue();
+                ApplyAuthoritativeOutcomes(state, item);
+                return TryShowSettlementDecisionResult(state, outcomeKey, item);
             }
 
-            decision = null;
-            showResult = null;
             return false;
         }
 

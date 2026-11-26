@@ -2897,6 +2897,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
                     var inquiry = Assert.Single(CaptureInquiries(item.ExecuteDone));
                     Assert.Equal(item.KingdomDecisionMaker.GetChosenOutcomeText().ToString(), inquiry.Text);
                     inquiry.AffirmativeAction();
+                    view.OnFrameTick();
                     Assert.Null(view.CurrentDecision);
                 });
             }

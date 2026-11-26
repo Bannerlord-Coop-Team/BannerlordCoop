@@ -32,7 +32,7 @@ namespace GameInterface.Services.Kingdoms.Patches
         {
             if (ModInformation.IsServer || ScreenManager.TopScreen != __instance) return;
             if (!KingdomDecisionsVMPatches.TryGetVoteManager(out var voteManager) ||
-                !voteManager.HasPendingSettlementDecisionResult()) return;
+                !voteManager.TryGetPendingSettlementDecision(out _)) return;
             if (!CanOpenKingdomScreen(__instance)) return;
 
             __instance.OpenKingdom();
@@ -93,24 +93,21 @@ namespace GameInterface.Services.Kingdoms.Patches
         {
             MarkSubmittedDecisionsExamined(__instance);
             if (__instance.CurrentDecision != null || !__instance._shouldCheckForDecision) return;
-            if (!TryGetVoteManager(out var voteManager) || !voteManager.HasPendingSettlementDecisionResult()) return;
+            if (!TryGetVoteManager(out var voteManager) || !voteManager.TryGetPendingSettlementDecision(out var decision)) return;
             if (InformationManager.IsAnyInquiryActive() || !CampaignUIHelper.GetMapScreenActionIsEnabledWithReason(out _)) return;
 
-            while (voteManager.TryTakeSettlementDecisionResult(out var decision, out var showResult))
+            DecisionItemBaseVM item = __instance.GetDecisionItemBasedOnType(decision);
+            if (!voteManager.TryShowPendingSettlementDecisionResult(item))
             {
-                DecisionItemBaseVM item = __instance.GetDecisionItemBasedOnType(decision);
-                if (!showResult(item))
-                {
-                    CampaignEvents.KingdomDecisionConcluded.ClearListeners(item);
-                    item.OnFinalize();
-                    continue;
-                }
-
-                item.SetDoneInputKey(__instance.DoneInputKey);
-                __instance._shouldCheckForDecision = false;
-                __instance.CurrentDecision = item;
+                // Vanilla ExecuteDone clears this listener, and OnFinalize leaves it registered.
+                CampaignEvents.KingdomDecisionConcluded.ClearListeners(item);
+                item.OnFinalize();
                 return;
             }
+
+            item.SetDoneInputKey(__instance.DoneInputKey);
+            __instance._shouldCheckForDecision = false;
+            __instance.CurrentDecision = item;
         }
 
         // Vanilla prefers the last solved decision's follow-up without checking the examined list.
