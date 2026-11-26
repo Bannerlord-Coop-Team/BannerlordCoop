@@ -3,6 +3,7 @@ using Common.Util;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using GameInterface.Services.SiegeEvents.Patches;
 using GameInterface.Tests.Bootstrap;
+using GameInterface.Tests.Utils;
 using Moq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
@@ -115,7 +116,7 @@ public class EncounterCaptureAftermathInitPatchTests
         settlement.Town = town;
 
         var mapEvent = ObjectHelper.SkipConstructor<MapEvent>();
-        mapEvent._mapEventType = MapEvent.BattleTypes.Siege;
+        mapEvent.SetBattleType(MapEvent.BattleTypes.Siege);
 
         var encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
         encounter.EncounterSettlementAux = settlement;
