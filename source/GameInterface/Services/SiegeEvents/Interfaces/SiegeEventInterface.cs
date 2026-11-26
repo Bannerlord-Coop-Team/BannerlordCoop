@@ -450,7 +450,11 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
     {
         if (!SiegeAftermathPatches.PendingAftermaths.TryGetValue(settlement, out var pending) ||
             pending.LeaderParty != party || !pending.MatchesCurrentCapture(settlement))
+        {
+            Logger.Warning("Did not enter capture leader {Party} into {Settlement}: no matching pending aftermath",
+                party.StringId, settlement.StringId);
             return;
+        }
 
         // SiegeCompleted tries to enter before the battle detaches the capturer, so the entry patch refuses it.
         settlementInterface.PartyEnterSettlement(party, settlement);

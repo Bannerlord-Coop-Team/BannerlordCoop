@@ -164,6 +164,7 @@ public class SiegeAftermathEndRouteTests : IDisposable
 
                 client.SimulateMessage(environment.Server.NetPeer, new NetworkMapEventFinalized());
 
+                Assert.Equal("menu_settlement_taken_player_leader", Campaign.Current.CurrentMenuContext?.GameMenu.StringId);
                 Assert.True(SiegeCaptureMenuHoldPatch.IsHeld(settlement));
             });
     }
