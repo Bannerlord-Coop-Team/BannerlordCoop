@@ -46,8 +46,10 @@ internal class IssueDismisser : IIssueDismisser
         for (var index = troops.Count - 1; index >= 0; index--)
         {
             var hero = troops.GetCharacterAtIndex(index).HeroObject;
+            if (hero == null) continue;
             // Vanilla drops Dead heroes, and one whose death cleared it without making it Dead throws in OnHeroActivated
-            if (hero == null || (!hero.IsDead && hero.HeroDeveloper != null)) continue;
+            var deathAlreadyRan = hero.IsDead || hero.HeroDeveloper == null;
+            if (!deathAlreadyRan) continue;
 
             Logger.Warning("Leaving {hero} sent for {issue} behind, its death already ran", hero.StringId, issue.StringId);
             var element = troops.GetElementCopyAtIndex(index);

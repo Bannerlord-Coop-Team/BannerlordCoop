@@ -55,6 +55,7 @@ public class RemovedPlayerIssueTests : IDisposable
     private readonly E2ETestEnvironment environment;
     private readonly QuestScenario scenario;
     private readonly List<IssueBase.IssueUpdateDetails> updates = new();
+    private Hero.CharacterStates? companionStateWhenKilled;
 
     private IEnumerable<EnvironmentInstance> Instances => environment.Clients.Prepend(environment.Server);
 
@@ -67,46 +68,64 @@ public class RemovedPlayerIssueTests : IDisposable
     public void Dispose() => environment.Dispose();
 
     [Theory]
-    [InlineData(Removal.Delete)]
-    [InlineData(Removal.GameOver)]
-    [InlineData(Removal.Retire)]
-    public void RemovingThePlayerEndsItsSentTroopsQuietlyAndFreesTheCompanion(Removal removal)
+    [InlineData(Removal.Delete, Hero.CharacterStates.Active)]
+    [InlineData(Removal.Retire, Hero.CharacterStates.Active)]
+    public void RemovingThePlayerEndsItsSentTroopsQuietlyAndFreesTheCompanion(Removal removal, Hero.CharacterStates companionState)
+    {
+        var companionId = SendTroopsWithACompanion();
+
+        Remove(removal);
+
+        AssertSentTroopsEndedQuietly(companionId, companionState);
+        Assert.Null(companionStateWhenKilled);
+    }
+
+    [Fact]
+    public void GameOverFreesTheSentCompanionBeforeTheCleanupKillsIt()
+    {
+        var companionId = SendTroopsWithACompanion();
+        // A real companion is a wanderer of the owner's clan, so it is no heir and dies when the cleanup destroys the clan
+        foreach (var instance in Instances)
+        {
+            instance.Call(() =>
+            {
+                var owner = instance.GetRegisteredObject<Hero>(scenario.OwnerHeroId);
+                var companion = instance.GetRegisteredObject<Hero>(companionId);
+                using (new AllowedThread())
+                {
+                    companion.Occupation = Occupation.Wanderer;
+                    companion.CompanionOf = owner.Clan;
+                }
+            });
+        }
+        StageGameOver();
+
+        Remove(Removal.GameOver);
+
+        AssertSentTroopsEndedQuietly(companionId, Hero.CharacterStates.Dead);
+        // Freed by the dismissal before the cleanup killed it, never killed while still on the mission
+        Assert.Equal(Hero.CharacterStates.Active, companionStateWhenKilled);
+    }
+
+    // ControllerA's troops are out with a companion, whose state is recorded if anything kills it
+    private string SendTroopsWithACompanion()
     {
         var companionId = environment.CreateRegisteredObject<Hero>();
         scenario.SendTroops(companionId, environment.CreateRegisteredObject<CharacterObject>());
-        if (removal == Removal.GameOver)
-        {
-            // A real companion is a wanderer of the owner's clan, so it is no heir and dies when the cleanup destroys the clan
-            foreach (var instance in Instances)
-            {
-                instance.Call(() =>
-                {
-                    var owner = instance.GetRegisteredObject<Hero>(scenario.OwnerHeroId);
-                    var companion = instance.GetRegisteredObject<Hero>(companionId);
-                    using (new AllowedThread())
-                    {
-                        companion.Occupation = Occupation.Wanderer;
-                        companion.CompanionOf = owner.Clan;
-                    }
-                });
-            }
-            StageGameOver();
-        }
-        Hero.CharacterStates? stateWhenKilled = null;
         scenario.Server.Call(() =>
         {
             var companion = scenario.Server.GetRegisteredObject<Hero>(companionId);
             CampaignEvents.BeforeHeroKilledEvent.AddNonSerializedListener(this, (victim, _, _, _) =>
             {
-                if (victim == companion) stateWhenKilled = victim.HeroState;
+                if (victim == companion) companionStateWhenKilled = victim.HeroState;
             });
         });
+        return companionId;
+    }
 
-        Remove(removal);
-
+    private void AssertSentTroopsEndedQuietly(string companionId, Hero.CharacterStates companionState)
+    {
         AssertEnded(IssueOutcome.AlternativeSolution);
-        // The dismissal frees the companion before the game over cleanup kills it, never while it is still on the mission
-        Assert.Equal(removal == Removal.GameOver ? Hero.CharacterStates.Active : (Hero.CharacterStates?)null, stateWhenKilled);
         Assert.DoesNotContain(updates, detail => detail is IssueBase.IssueUpdateDetails.SentTroopsFinishedQuest
             or IssueBase.IssueUpdateDetails.SentTroopsFailedQuest);
         // Server only, the bootstrap stub on Hero.ChangeState skips the patches that sync hero state to clients
@@ -114,7 +133,7 @@ public class RemovedPlayerIssueTests : IDisposable
         {
             var companion = scenario.Server.GetRegisteredObject<Hero>(companionId);
             Assert.Null(companion.PartyBelongedTo);
-            Assert.Equal(removal == Removal.GameOver ? Hero.CharacterStates.Dead : Hero.CharacterStates.Active, companion.HeroState);
+            Assert.Equal(companionState, companion.HeroState);
         });
     }
 

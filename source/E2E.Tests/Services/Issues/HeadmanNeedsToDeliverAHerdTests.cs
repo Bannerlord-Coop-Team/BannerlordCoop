@@ -635,6 +635,36 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
             instance.Call(() => Assert.True(Object<Hero>(instance, secondGiver).Issue.IsSolvingWithQuest));
     }
 
+    [Fact]
+    public void CompanionWhoseDeathAlreadyRanStaysBehindWhenTheHerdTroopsReturn()
+    {
+        var (companionId, troopId) = StartCompanions();
+        using var nativeState = new NativeHeroStateScope();
+
+        Server.Call(() =>
+        {
+            var companion = Object<Hero>(Server, companionId);
+            using (new AllowedThread())
+            {
+                companion.SetBirthDay(CampaignTime.YearsFromNow(-30f));
+                companion._defaultAge = 30f;
+                // What vanilla's death clears, while the hero stays Disabled on the mission like in #4887
+                companion.OnDeath();
+            }
+            new CharacterDevelopmentCampaignBehavior().RegisterEvents();
+            var issue = Object<Hero>(Server, scenario.NotableId).Issue;
+            issue._failureChance = 1f;
+
+            // Without the herd's own step, activating the companion throws in CharacterDevelopmentCampaignBehavior.OnHeroActivated
+            issue.CompleteIssueWithAlternativeSolution();
+
+            var roster = Party(Server, QuestScenario.ControllerA).MemberRoster;
+            Assert.Equal(Hero.CharacterStates.Disabled, companion.HeroState);
+            Assert.Equal(0, roster.GetTroopCount(companion.CharacterObject));
+            Assert.Equal(40, roster.GetTroopCount(Object<CharacterObject>(Server, troopId)));
+        });
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

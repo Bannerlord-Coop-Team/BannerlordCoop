@@ -120,8 +120,9 @@ issue cancellation does not announce it a second time.
   `ActiveIssueDismisser` ends its issues at once, sent troops too.
 - Every issue that must end now goes through `IActiveIssueDismisser.EndWithoutOwner` or, inside the owner's scope,
   `EndAsOwner`. Each step runs even when one before it threw.
-- The troop completion patches and the sent troops cancel claim their issue (`IActiveIssueDismisser.TryClaim`) before
-  vanilla runs, so nothing is paid or returned twice.
+- The troop completion patches and the sent troops cancel claim their issue (`IIssueEndingClaimRegistry.TryClaim`) before
+  vanilla runs, so nothing is paid or returned twice. A quest prefix that replaces vanilla's troop return also calls
+  `NoteTroopReturn` and `LeaveBehindDeadCompanions`, since it skips the framework's prefix.
 - An ending is announced only once the issue is out of `IssueManager.Issues`. One still in the manager is taken out after
   the server daily tick, without running its ending again, and then announced.
 - A quest whose own cancel threw before it finalized stays until its own timeout, which is accepted.

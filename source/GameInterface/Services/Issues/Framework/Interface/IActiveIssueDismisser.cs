@@ -19,13 +19,6 @@ public interface IActiveIssueDismisser
     // Returns null, so the daily tick or the death that ran it goes on instead of picking the issue again.
     Exception EndAfterThrow(IssueBase issue, IssueOutcome outcome, IDisposable owner, Exception exception);
 
-    // Server: taken before a sent troops cancel or completion runs vanilla's consequences and troop return. False when
-    // one already started, so it must not run again, EndAfterThrow finishes it.
-    bool TryClaim(IssueBase issue);
-
-    // Server: every troop return notes it on the issue's claim, so EndAsOwner never returns the troops again
-    void NoteTroopReturn(IssueBase issue);
-
     // Server daily tick: takes every issue whose ending threw out of the manager without running that ending again
     void RetryFailedEndings();
 }

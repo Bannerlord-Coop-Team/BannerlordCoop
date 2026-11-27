@@ -7,6 +7,7 @@ using GameInterface.Registry.Messages;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.Issues.Framework.Registries;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Messages;
@@ -15,7 +16,6 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Issues;
@@ -38,18 +38,9 @@ internal class ActiveIssueDismisser : IHandler, IActiveIssueDismisser
     private readonly IObjectManager objectManager;
     private readonly IIssueDismisser issueDismisser;
     private readonly IIssueOwnerResolver ownerResolver;
+    private readonly IIssueEndingClaimRegistry claims;
     // Issues whose ending threw while they were still in the manager, with their outcome, until the daily retry removes them
     private readonly Dictionary<IssueBase, IssueOutcome> failedEndings = new(ReferenceComparer<IssueBase>.Instance);
-    // Issues whose one ending already started, so no cancel, completion or troop return runs for them again
-    private readonly ConditionalWeakTable<IssueBase, Claim> claims = new();
-
-    private sealed class Claim
-    {
-        // The first troop ending published for the owner, which the owner's journal row keeps
-        public IssueBase.IssueUpdateDetails? SentEnding;
-        // The issue's troop return ran, so the troops are never returned a second time
-        public bool ReturnStarted;
-    }
 
     public ActiveIssueDismisser(
         IMessageBroker messageBroker,
@@ -58,7 +49,8 @@ internal class ActiveIssueDismisser : IHandler, IActiveIssueDismisser
         IPlayerManager playerManager,
         IObjectManager objectManager,
         IIssueDismisser issueDismisser,
-        IIssueOwnerResolver ownerResolver)
+        IIssueOwnerResolver ownerResolver,
+        IIssueEndingClaimRegistry claims)
     {
         this.messageBroker = messageBroker;
         this.registry = registry;
@@ -67,11 +59,11 @@ internal class ActiveIssueDismisser : IHandler, IActiveIssueDismisser
         this.objectManager = objectManager;
         this.issueDismisser = issueDismisser;
         this.ownerResolver = ownerResolver;
+        this.claims = claims;
 
         messageBroker.Subscribe<AllGameObjectsRegistered>(Handle_AllGameObjectsRegistered);
         messageBroker.Subscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
         messageBroker.Subscribe<PlayerRemoved>(Handle_PlayerRemoved);
-        messageBroker.Subscribe<AlternativeSolutionEndingObserved>(RememberSentEnding);
     }
 
     public void Dispose()
@@ -79,25 +71,6 @@ internal class ActiveIssueDismisser : IHandler, IActiveIssueDismisser
         messageBroker.Unsubscribe<AllGameObjectsRegistered>(Handle_AllGameObjectsRegistered);
         messageBroker.Unsubscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
         messageBroker.Unsubscribe<PlayerRemoved>(Handle_PlayerRemoved);
-        messageBroker.Unsubscribe<AlternativeSolutionEndingObserved>(RememberSentEnding);
-    }
-
-    private void RememberSentEnding(MessagePayload<AlternativeSolutionEndingObserved> payload)
-    {
-        if (claims.TryGetValue(payload.What.Issue, out var claim)) claim.SentEnding ??= payload.What.Ending;
-    }
-
-    public bool TryClaim(IssueBase issue)
-    {
-        if (claims.TryGetValue(issue, out _)) return false;
-
-        claims.Add(issue, new Claim());
-        return true;
-    }
-
-    public void NoteTroopReturn(IssueBase issue)
-    {
-        if (claims.TryGetValue(issue, out var claim)) claim.ReturnStarted = true;
     }
 
     private void Handle_AllGameObjectsRegistered(MessagePayload<AllGameObjectsRegistered> payload)
@@ -186,17 +159,15 @@ internal class ActiveIssueDismisser : IHandler, IActiveIssueDismisser
         {
             if (failedEndings.ContainsKey(issue)) return;
 
-            var hasOwnerId = objectManager.TryGetIdWithLogging(issue.IssueOwner, out var issueOwnerId);
-            Claim claim = null;
+            IssueEndingClaim claim = null;
             if (issue.IsSolvingWithAlternative)
             {
                 claim = ReturnTroopsIfStillOut(issue);
                 CancelOpenJournal(issue, claim);
             }
-            Step(issue, "Ending {issue} failed", ending);
-            if (hasOwnerId) ownership.Remove(issueOwnerId, issue.StringId);
-            CloseJournal(issue, claim);
-            AnnounceOrQueueRetry(issue, outcome, issueOwnerId, announce: true);
+            // An ending already written stays, an open row ends with what the owner was sent, read once the ending ran
+            EndAndAnnounce(issue, outcome, ending,
+                () => issueDismisser.CloseJournal(issue, claim?.SentEnding ?? IssueBase.IssueUpdateDetails.IssueCancel), announce: true);
         }
     }
 
@@ -215,47 +186,18 @@ internal class ActiveIssueDismisser : IHandler, IActiveIssueDismisser
             FinishWithoutOwner(failed.Key, failed.Value, () => issueDismisser.ForceRemove(failed.Key), announce: true);
     }
 
-    private void FinishWithoutOwner(IssueBase issue, IssueOutcome outcome, Action ending, bool announce)
+    // With no owner hero left to end them, the issue's unfinished journal rows go
+    private void FinishWithoutOwner(IssueBase issue, IssueOutcome outcome, Action ending, bool announce) =>
+        EndAndAnnounce(issue, outcome, ending, () => issueDismisser.DropUnfinishedJournal(issue), announce);
+
+    // Clients still holding the issue would ignore the giver's next issue, so they hear once it is out of the manager
+    private void EndAndAnnounce(IssueBase issue, IssueOutcome outcome, Action ending, Action closeJournal, bool announce)
     {
         var hasOwnerId = objectManager.TryGetIdWithLogging(issue.IssueOwner, out var issueOwnerId);
         Step(issue, "Ending {issue} failed", ending);
         if (hasOwnerId) ownership.Remove(issueOwnerId, issue.StringId);
-        // With no owner hero left to end them, the issue's unfinished journal rows go
-        Step(issue, "Dropping the open journal of {issue} failed", () => issueDismisser.DropUnfinishedJournal(issue));
-        AnnounceOrQueueRetry(issue, outcome, issueOwnerId, announce);
-    }
+        Step(issue, "Closing the journal of {issue} failed", closeJournal);
 
-    // A throw before vanilla's troop return, or before the cancel claimed the issue, left the sent troops out
-    private Claim ReturnTroopsIfStillOut(IssueBase issue)
-    {
-        // Claimed before the return, so no later cancel or completion returns the troops again
-        var claim = claims.GetValue(issue, _ => new Claim());
-        if (claim.ReturnStarted) return claim;
-
-        var returned = Step(issue, "Returning the troops of {issue} failed", () => issueDismisser.ReturnTroops(issue));
-        // An ending the owner was already sent carries vanilla's own report of the troops
-        if (returned && claim.SentEnding == null) AddTroopsReturnedLog(issue);
-        return claim;
-    }
-
-    // A throw before vanilla's ending event left the owner's accepted journal row open, so it is cancelled like vanilla's cancel
-    private void CancelOpenJournal(IssueBase issue, Claim claim)
-    {
-        if (claim.SentEnding != null) return;
-
-        Step(issue, "Cancelling the journal of {issue} failed", () => issueDismisser.SendCancel(issue));
-    }
-
-    // An ending already written stays, an open row ends with what the owner was sent
-    private void CloseJournal(IssueBase issue, Claim claim)
-    {
-        var ending = claim?.SentEnding ?? IssueBase.IssueUpdateDetails.IssueCancel;
-        Step(issue, "Closing the journal of {issue} failed", () => issueDismisser.CloseJournal(issue, ending));
-    }
-
-    // Clients still holding the issue would ignore the giver's next issue, so they hear once it is out of the manager
-    private void AnnounceOrQueueRetry(IssueBase issue, IssueOutcome outcome, string issueOwnerId, bool announce)
-    {
         if (issueDismisser.IsInManager(issue))
         {
             Logger.Warning("{issue} is still in the manager, it is ended again after the next daily tick", issue.StringId);
@@ -265,6 +207,27 @@ internal class ActiveIssueDismisser : IHandler, IActiveIssueDismisser
 
         failedEndings.Remove(issue);
         if (announce) messageBroker.Publish(issue, new IssueOutcomeObserved(issue, outcome, issueOwnerId));
+    }
+
+    // A throw before vanilla's troop return, or before the cancel claimed the issue, left the sent troops out
+    private IssueEndingClaim ReturnTroopsIfStillOut(IssueBase issue)
+    {
+        // Claimed before the return, so no later cancel or completion returns the troops again
+        var claim = claims.GetOrClaim(issue);
+        if (claim.ReturnStarted) return claim;
+
+        var returned = Step(issue, "Returning the troops of {issue} failed", () => issueDismisser.ReturnTroops(issue));
+        // An ending the owner was already sent carries vanilla's own report of the troops
+        if (returned && claim.SentEnding == null) AddTroopsReturnedLog(issue);
+        return claim;
+    }
+
+    // A throw before vanilla's ending event left the owner's accepted journal row open, so it is cancelled like vanilla's cancel
+    private void CancelOpenJournal(IssueBase issue, IssueEndingClaim claim)
+    {
+        if (claim.SentEnding != null) return;
+
+        Step(issue, "Cancelling the journal of {issue} failed", () => issueDismisser.SendCancel(issue));
     }
 
     // One failing step must not skip the ones after it. True when the step ran through.

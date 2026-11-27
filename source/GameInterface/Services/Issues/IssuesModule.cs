@@ -39,6 +39,7 @@ internal class IssuesModule : Module
         builder.RegisterType<IssueResolver>().As<IIssueResolver>().SingleInstance();
         builder.RegisterType<IssueOwnerResolver>().As<IIssueOwnerResolver>().SingleInstance();
         builder.RegisterType<IssueOwnershipRegistry>().As<IIssueOwnershipRegistry>().SingleInstance();
+        builder.RegisterType<IssueEndingClaimRegistry>().As<IIssueEndingClaimRegistry>().SingleInstance();
         builder.RegisterType<AlternativeSolutionTroopValidator>().As<IAlternativeSolutionTroopValidator>().InstancePerDependency();
         builder.Register(context => context.Resolve<AlternativeSolutionCommitments>()).As<IAlternativeSolutionCommitments>();
         builder.Register(context => context.Resolve<AlternativeSolutionPicker>()).As<IAlternativeSolutionPicker>();

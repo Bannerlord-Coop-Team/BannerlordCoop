@@ -64,7 +64,7 @@ public class IssueOwnershipRegistryTests
     public void Remove_ForAnEndingIssueKeepsTheOwnerOfTheGiversNextIssue()
     {
         var registry = new IssueOwnershipRegistry();
-        registry.TrySetOwner("hero", "issue_next", "player-B");
+        Assert.True(registry.TrySetOwner("hero", "issue_next", "player-B"));
 
         registry.Remove("hero", "issue_1");
 

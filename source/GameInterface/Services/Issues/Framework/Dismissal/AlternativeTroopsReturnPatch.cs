@@ -6,20 +6,20 @@ using TaleWorlds.CampaignSystem.Issues;
 namespace GameInterface.Services.Issues.Framework.Dismissal;
 
 /// <summary>
-/// Every server troop return, vanilla's and the quests' own, would activate a sent companion whose death already ran
-/// and throw, so such companions stay behind before any of them runs. Quest prefixes on this method that skip the
-/// original must run after this one, so keep the priority first. The prefix also notes the return on the issue's claim.
+/// Every server troop return would activate a sent companion whose death already ran and throw, so such companions
+/// stay behind first, and the return is noted on the issue's claim. A quest prefix that replaces the return may skip
+/// this one, so it runs both steps itself.
 /// </summary>
 [HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(IssueManager), nameof(IssueManager.TryToMakeTroopsReturn))]
 internal class AlternativeTroopsReturnPatch
 {
-    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    [HarmonyPrefix]
     private static void Prefix(IssueBase issue)
     {
         if (ModInformation.IsClient) return;
 
-        if (ContainerProvider.TryResolve<IActiveIssueDismisser>(out var dismisser)) dismisser.NoteTroopReturn(issue);
+        if (ContainerProvider.TryResolve<IIssueEndingClaimRegistry>(out var claims)) claims.NoteTroopReturn(issue);
         if (ContainerProvider.TryResolve<IIssueDismisser>(out var issueDismisser)) issueDismisser.LeaveBehindDeadCompanions(issue);
     }
 }

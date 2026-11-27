@@ -30,11 +30,18 @@ internal interface IHeadmanHerdCleanup : IGameAbstraction
 internal class HeadmanHerdCleanup : IHeadmanHerdCleanup
 {
     private readonly IIssueOwnerResolver owners;
+    private readonly IIssueDismisser issueDismisser;
+    private readonly IIssueEndingClaimRegistry claims;
     private Dictionary<string, MobileParty> parties = new Dictionary<string, MobileParty>();
     private Dictionary<string, string> questIssueIds = new Dictionary<string, string>();
     private readonly Dictionary<string, (int HerdCount, int GrainCount)> grantSnapshots = new();
 
-    public HeadmanHerdCleanup(IIssueOwnerResolver owners) => this.owners = owners;
+    public HeadmanHerdCleanup(IIssueOwnerResolver owners, IIssueDismisser issueDismisser, IIssueEndingClaimRegistry claims)
+    {
+        this.owners = owners;
+        this.issueDismisser = issueDismisser;
+        this.claims = claims;
+    }
 
     public bool RememberOwnerParty(IssueBase issue)
     {
@@ -86,6 +93,10 @@ internal class HeadmanHerdCleanup : IHeadmanHerdCleanup
 
     public bool ReturnAlternativeTroops(IssueBase issue)
     {
+        // This return replaces vanilla's, so the framework's troop return prefix may be skipped and its steps run here
+        claims.NoteTroopReturn(issue);
+        issueDismisser.LeaveBehindDeadCompanions(issue);
+
         // Completion and cancellation establish the current owner's scope, including after heir replacement.
         var party = MobileParty.MainParty;
         if (party == null) return true;

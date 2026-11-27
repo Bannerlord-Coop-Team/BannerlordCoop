@@ -65,7 +65,8 @@ public class IssueCancellationCoordinatorTests
                         }
                     }
                 });
-            var service = new IssueCancellationCoordinator(registry.Object, owners.Object, dismisser.Object);
+            var service = new IssueCancellationCoordinator(registry.Object, owners.Object, dismisser.Object,
+                Mock.Of<IIssueEndingClaimRegistry>());
 
             service.CancelForPlayerDeath(controller, hero, party);
             service.CancelForPlayerDeath(controller, hero, party);

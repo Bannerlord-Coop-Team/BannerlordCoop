@@ -25,13 +25,16 @@ internal class IssueCancellationCoordinator : IIssueCancellationCoordinator
     private readonly IQuestTypeRegistry registry;
     private readonly IIssueOwnerResolver ownerResolver;
     private readonly IActiveIssueDismisser dismisser;
+    private readonly IIssueEndingClaimRegistry claims;
     private readonly Dictionary<IssueBase, TextObject> pending = new Dictionary<IssueBase, TextObject>();
 
-    public IssueCancellationCoordinator(IQuestTypeRegistry registry, IIssueOwnerResolver ownerResolver, IActiveIssueDismisser dismisser)
+    public IssueCancellationCoordinator(IQuestTypeRegistry registry, IIssueOwnerResolver ownerResolver, IActiveIssueDismisser dismisser,
+        IIssueEndingClaimRegistry claims)
     {
         this.registry = registry;
         this.ownerResolver = ownerResolver;
         this.dismisser = dismisser;
+        this.claims = claims;
     }
 
     public bool IsPending(IssueBase issue) => issue != null && pending.ContainsKey(issue);
@@ -97,7 +100,7 @@ internal class IssueCancellationCoordinator : IIssueCancellationCoordinator
         }
 
         // A troop cancel or completion of this issue already started and threw, so the troops are not returned again
-        if (owner != null && issue.IsSolvingWithAlternative && !dismisser.TryClaim(issue))
+        if (owner != null && issue.IsSolvingWithAlternative && !claims.TryClaim(issue))
         {
             owner.Dispose();
             owner = null;
