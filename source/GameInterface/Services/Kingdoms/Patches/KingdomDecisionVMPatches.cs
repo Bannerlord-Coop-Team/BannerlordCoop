@@ -132,7 +132,7 @@ namespace GameInterface.Services.Kingdoms.Patches
             return ContainerProvider.TryResolve(out voteManager);
         }
 
-        // Bypass vanilla's single-clan shortcut so the receiving player gets the normal peace decision UI and vote.
+        // Drops a suppressed decision and resumes the checks, otherwise bypasses vanilla's single-clan shortcut for a pending peace or alliance offer.
         [HarmonyPatch(typeof(KingdomDecisionsVM), nameof(KingdomDecisionsVM.RefreshWith))]
         [HarmonyPrefix]
         public static bool RefreshWithPrefix(KingdomDecisionsVM __instance, KingdomDecision decision)

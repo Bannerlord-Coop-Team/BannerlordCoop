@@ -2914,7 +2914,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         });
     }
 
-    // The ballot such a prompt opened could never be sent, and the kingdom screen ignores ESC while it is up.
+    // A resolve prompt confirmed after its vote ended opened a ballot that could never be sent, and the kingdom screen ignores ESC while it is up.
     [Fact]
     public void KingdomDecisionDeadline_ResolvePromptConfirmedAfterDeadlineOpensNoBallotAndOffersNextVote()
     {
