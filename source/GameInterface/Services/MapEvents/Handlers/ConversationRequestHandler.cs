@@ -667,9 +667,10 @@ internal class ConversationRequestHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
-            // Co-op ticks EncounterManager under other screens, but its meeting conversation throws unless the map is active
+            // Co-op ticks EncounterManager under screens and missions, but its meeting throws while they cover the map
+            var states = GameStateManager.Current;
             if (message.Source == ConversationRestartSource.EncounterManager &&
-                GameStateManager.Current?.ActiveState is not MapState)
+                states?.ActiveState is not MapState && states?.LastOrDefault<MapState>() != null)
             {
                 WaitForMap(message);
                 return;
