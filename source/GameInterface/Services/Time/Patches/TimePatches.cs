@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Messaging;
 using Common.Util;
+using GameInterface.Configuration;
 using GameInterface.Policies;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
@@ -186,21 +187,25 @@ internal class AllowTimeControlFromHotKeysPatches
 }
 
 /// <summary>
-/// Sends the time change vanilla makes after a travel or parley click to the server as a time request, like the time controls do.
+/// Sends the time change vanilla makes after a travel or parley click to the server as a time request, like the time controls do,
+/// when <see cref="ModOptions.MapClickChangesTime"/> is on.
 /// </summary>
 [HarmonyPatch(typeof(MapScreen), nameof(MapScreen.HandleClickTimeChange))]
 internal class AllowTimeControlFromMapClickPatches
 {
     [HarmonyPrefix]
-    private static void Prefix()
+    private static void Prefix(out AllowedThread __state)
     {
-        AllowedThread.AllowThisThread();
+        // Without the allowed thread the time setter drops the click's change, which is the behavior with the option off.
+        // Host-only servers skip it too, otherwise every click while paused shows the host-only message.
+        var options = ModConfigProvider.ModOptions;
+        __state = options.MapClickChangesTime && options.AllowClientTimeControls ? new AllowedThread() : null;
     }
 
     [HarmonyFinalizer]
-    private static void Finalizer()
+    private static void Finalizer(AllowedThread __state)
     {
-        AllowedThread.RevokeThisThread();
+        __state?.Dispose();
     }
 }
 
