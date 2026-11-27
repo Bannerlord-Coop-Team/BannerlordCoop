@@ -139,6 +139,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
         }
 
         LeaveSiegeBeforeParking(party);
+        LeaveArmyBeforeParking(party);
 
         var wasActive = party.IsActive;
         party.IsActive = false;
@@ -302,6 +303,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
             }
 
             LeaveSiegeBeforeParking(party);
+            LeaveArmyBeforeParking(party);
             party.IsActive = false;
             party.IsVisible = false;
             partyVisuals.RemoveVisual(party);
@@ -344,6 +346,22 @@ internal class PlayerPartyVisibilityHandler : IHandler
         }
 
         siegeEventInterface.BreakSiegeForPartyOnly(party);
+    }
+
+    // A parked follower leaves its army, otherwise vanilla keeps copying the leader's battle side and siege camp onto it while it is attached
+    private void LeaveArmyBeforeParking(MobileParty party)
+    {
+        var army = party.Army;
+        if (army == null || army.LeaderParty == party) return;
+
+        Logger.Information(
+            "Removing disconnected party {PartyId} from the army of {LeaderId} before parking",
+            party.StringId,
+            army.LeaderParty?.StringId);
+
+        // Same pair the army-removal network flow uses, the publish replicates it to clients
+        messageBroker.Publish(party, new MobilePartyInArmyRemoved(army, party, null));
+        ArmyPatches.RemoveMobilePartyInArmy(party, army, null);
     }
 
     private bool TryResolveParty(NetPeer peer, out Player player, out MobileParty party)
