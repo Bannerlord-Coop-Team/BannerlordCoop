@@ -1024,7 +1024,7 @@ public sealed partial class TournamentSessionRegistry : ITournamentSessionRegist
                 .ToArray();
             int teamSize = Math.Max(1, match.TeamSize);
             int winnerParticipants = Math.Max(1, match.NumberOfWinnerParticipants);
-            int winnerTeamsNeeded = 1 + (winnerParticipants - 1) / teamSize;
+            int winnerTeamsNeeded = 1 + ((winnerParticipants - 1) / teamSize);
             int winnerTeamCount = Math.Min(match.Teams.Length, winnerTeamsNeeded);
             input = new TournamentSimulationInput(match, eligibleTeams, winnerTeamCount, winnerParticipants);
             return eligibleTeams.Length >= winnerTeamCount;
