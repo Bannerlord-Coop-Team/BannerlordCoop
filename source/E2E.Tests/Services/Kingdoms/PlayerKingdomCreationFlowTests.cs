@@ -2921,11 +2921,12 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
         Server.Call(() => GetConcreteVoteManager(Server).ProcessVotingRounds(
             DateTime.UtcNow + KingdomDecisionVoteManager.VotingRoundDuration + TimeSpan.FromSeconds(1)));
-        AddDeclareWarDecision(kingdomId, player1.ClanId, "TargetKingdomDeadlinePromptNext");
-
         Assert.Single(
             client1.InternalMessages.GetMessages<ApplyKingdomDecisionResolved>(),
             message => message.KingdomId == kingdomId);
+
+        AddDeclareWarDecision(kingdomId, player1.ClanId, "TargetKingdomDeadlinePromptNext");
+
         client1.Call(() =>
         {
             KingdomDecision nextDecision = Assert.Single(Clan.PlayerClan.Kingdom.UnresolvedDecisions);
