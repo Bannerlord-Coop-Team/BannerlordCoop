@@ -1216,6 +1216,26 @@ public class HideoutMapEventTests : MapEventTestBase
             Assert.Same(mapEvent, MobileParty.MainParty.MapEvent);
             Assert.Null(MobileParty.MainParty.CurrentSettlement);
         }, MapEventDisabledMethods);
+
+        // The mission ends and the server clears the hideout for a party it already took out of it.
+        fixture.Dispose();
+        var lootItemId = CreateHideoutLootItem();
+        var prisonerId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        Server.Call(() =>
+        {
+            Campaign.Current.MainParty = null;
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(raid.MapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<ItemObject>(lootItemId, out var lootItem));
+            mapEvent._battleState = BattleState.AttackerVictory;
+            mapEvent._mapEventResultsApplied = true;
+            var broker = Server.Resolve<IMessageBroker>();
+            broker.Publish(this, new CommitMapEventResults(mapEvent));
+            SendHideoutLoot(mapEvent, client, raid.LeaderPartyId, lootItem, 2, prisonerId);
+            broker.Publish(this, new MapEventFinalizeAttempted(mapEvent));
+        });
+
+        CollectHideoutResultsFromMap(client, hasWaitingMenu: false, hasLoot: true);
+        client.Call(() => Assert.Equal(AiBehavior.Hold, MobileParty.MainParty.DefaultBehavior), MapEventDisabledMethods);
     }
 
     // Native's condition for the boss's "settle this one-on-one" line, without it only "I am not allowed to talk with you" is left.

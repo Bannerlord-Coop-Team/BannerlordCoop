@@ -1,6 +1,7 @@
 ﻿using Common.Logging;
 using Common.Util;
 using GameInterface.Services.MapEvents.Initialization;
+using SandBox.Missions.MissionLogics.Hideout;
 using Serilog;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
@@ -35,25 +36,25 @@ internal class HideoutResultEncounter : IHideoutResultEncounter
         if (party != mainParty || settlement == null)
             return false;
 
-        // Native's hideout boss line reads this encounter, without it the boss only says "I am not allowed to talk with you".
-        if (IsFightingInMission(encounter, mainParty))
+        if (IsHoldingResults(encounter))
         {
-            Logger.Debug("Kept hideout encounter {MapEventId} through replicated settlement leave while its mission runs",
+            // Same gate and hold as the settlement close, without finishing the encounter that holds the loot or the send troops result menu.
+            using (new AllowedThread())
+            {
+                mainParty.Position = settlement.GatePosition;
+                mainParty.SetMoveModeHold();
+            }
+
+            Logger.Debug("Kept hideout result encounter {MapEventId} through replicated settlement leave",
                 encounter._mapEvent.StringId);
             return true;
         }
 
-        if (!IsHoldingResults(encounter))
+        // Native's hideout boss line reads this encounter, without it the boss only says "I am not allowed to talk with you".
+        if (!IsFightingInMission(encounter, mainParty))
             return false;
 
-        // Same gate and hold as the settlement close, without finishing the encounter that holds the loot or the send troops result menu.
-        using (new AllowedThread())
-        {
-            mainParty.Position = settlement.GatePosition;
-            mainParty.SetMoveModeHold();
-        }
-
-        Logger.Debug("Kept hideout result encounter {MapEventId} through replicated settlement leave",
+        Logger.Debug("Kept hideout encounter {MapEventId} through replicated settlement leave while its mission runs",
             encounter._mapEvent.StringId);
         return true;
     }
@@ -62,8 +63,10 @@ internal class HideoutResultEncounter : IHideoutResultEncounter
         encounter?._mapEvent?.IsHideoutBattle == true &&
         MapEventInitializationBarrier.IsBattleResultEncounter(encounter);
 
+    // The same hideout mission check as native's boss line; co-op's hideout controllers subclass these.
     private static bool IsFightingInMission(PlayerEncounter encounter, MobileParty mainParty) =>
-        Mission.Current != null &&
+        (Mission.Current?.GetMissionBehavior<HideoutMissionController>() != null ||
+            Mission.Current?.GetMissionBehavior<HideoutAmbushMissionController>() != null) &&
         encounter._mapEvent is { IsHideoutBattle: true, IsFinalized: false } battle &&
         mainParty.MapEvent == battle;
 }
