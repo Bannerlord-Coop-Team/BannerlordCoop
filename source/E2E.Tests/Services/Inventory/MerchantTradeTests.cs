@@ -354,55 +354,30 @@ public class MerchantTradeTests : IDisposable
         }
     }
 
-    // Commits the trader's screen the way the done logic patch does: the screen's rosters are sent, then put back as
-    // they were. Hides sell for 10 each and grain costs 20 each
+    // Commits the trader's screen, then puts its rosters back as the done-logic patch does until the server answers.
+    // Hides sell for 10 each and grain costs 20 each
     private void TradeOnTrader(JoinWindowTrade trade, int soldHides, int boughtGrain)
     {
         var trader = trade.Trader;
         trader.Call(() =>
         {
-            var merchantRoster = trader.GetRegisteredObject<ItemRoster>(trade.MerchantRosterId);
-            var party = trader.GetRegisteredObject<MobileParty>(trade.PartyId);
-            var town = trader.GetRegisteredObject<Town>(trade.TownId);
-            var initialPartyRoster = party.ItemRoster.ToArray();
-
             var bought = new List<(ItemRosterElement, int)>();
             if (boughtGrain > 0) bought.Add((new ItemRosterElement(DefaultItems.Grain, boughtGrain), 20 * boughtGrain));
             var sold = new List<(ItemRosterElement, int)>();
             if (soldHides > 0) sold.Add((new ItemRosterElement(DefaultItems.Hides, soldHides), 10 * soldHides));
 
+            CommitScreen(trader, trade.MerchantRosterId, trade.TownId, trade.PartyId, bought, sold, (20 * boughtGrain) - (10 * soldHides));
+
             using (new AllowedThread())
             {
-                MoveScreenItems(merchantRoster, party.ItemRoster, soldHides, boughtGrain);
-
-                trader.Resolve<IMessageBroker>().Publish(this, new TradeAttempted(
-                    merchantRoster,
-                    party.ItemRoster,
-                    isTrading: true,
-                    canGainXpFromDiscarding: false,
-                    InventoryScreenHelper.InventoryMode.Trade,
-                    party.LeaderHero,
-                    party.LeaderHero.CharacterObject,
-                    (20 * boughtGrain) - (10 * soldHides),
-                    town.Gold,
-                    party,
-                    currentMobileParty: null,
-                    town,
+                MoveScreenItems(
+                    trader.GetRegisteredObject<ItemRoster>(trade.MerchantRosterId),
+                    trader.GetRegisteredObject<MobileParty>(trade.PartyId).ItemRoster,
                     bought,
                     sold,
-                    initialPlayerRoster: initialPartyRoster));
-
-                MoveScreenItems(merchantRoster, party.ItemRoster, -soldHides, -boughtGrain);
+                    direction: -1);
             }
         });
-    }
-
-    private static void MoveScreenItems(ItemRoster merchantRoster, ItemRoster partyRoster, int soldHides, int boughtGrain)
-    {
-        merchantRoster.AddToCounts(DefaultItems.Hides, soldHides);
-        partyRoster.AddToCounts(DefaultItems.Hides, -soldHides);
-        merchantRoster.AddToCounts(DefaultItems.Grain, -boughtGrain);
-        partyRoster.AddToCounts(DefaultItems.Grain, boughtGrain);
     }
 
     private sealed record JoinWindowTrade(EnvironmentInstance Trader, string MerchantRosterId, string TownId, string PartyId);
@@ -465,7 +440,8 @@ public class MerchantTradeTests : IDisposable
         }
     }
 
-    // Commits a trade on the client the way the done-logic patch does, and returns the undelivered server command
+    // Commits a trade on the client and returns the undelivered server command. The command shares the roster arrays
+    // instead of holding a serialized copy, so they are not reset the way the done-logic patch does
     private CompleteTrade CaptureTrade(
         EnvironmentInstance client,
         string merchantRosterId,
@@ -476,51 +452,68 @@ public class MerchantTradeTests : IDisposable
         int totalAmount)
     {
         client.NetworkSentMessages.Clear();
-        client.Call(() =>
-        {
-            var merchantRoster = client.GetRegisteredObject<ItemRoster>(merchantRosterId);
-            var town = client.GetRegisteredObject<Town>(townId);
-            var party = client.GetRegisteredObject<MobileParty>(partyId);
-            var initialPartyRoster = party.ItemRoster.ToArray();
-
-            var boughtItems = ToTradeItems(client, bought);
-            var soldItems = ToTradeItems(client, sold);
-
-            // The client's screen moves the items locally before committing. The undelivered command shares the
-            // roster arrays instead of holding a serialized copy, so they are not reset the way the done-logic patch does
-            using (new AllowedThread())
-            {
-                foreach (var (item, _) in boughtItems)
-                {
-                    merchantRoster.AddToCounts(item.EquipmentElement, -item.Amount);
-                    party.ItemRoster.AddToCounts(item.EquipmentElement, item.Amount);
-                }
-                foreach (var (item, _) in soldItems)
-                {
-                    merchantRoster.AddToCounts(item.EquipmentElement, item.Amount);
-                    party.ItemRoster.AddToCounts(item.EquipmentElement, -item.Amount);
-                }
-            }
-
-            client.Resolve<IMessageBroker>().Publish(this, new TradeAttempted(
-                merchantRoster,
-                party.ItemRoster,
-                isTrading: true,
-                canGainXpFromDiscarding: false,
-                InventoryScreenHelper.InventoryMode.Trade,
-                party.LeaderHero,
-                party.LeaderHero.CharacterObject,
-                totalAmount,
-                town.Gold,
-                party,
-                currentMobileParty: null,
-                town,
-                boughtItems,
-                soldItems,
-                initialPlayerRoster: initialPartyRoster));
-        }, WithoutNetworkDelivery());
+        client.Call(() => CommitScreen(client, merchantRosterId, townId, partyId,
+            ToTradeItems(client, bought), ToTradeItems(client, sold), totalAmount), WithoutNetworkDelivery());
 
         return Assert.Single(client.NetworkSentMessages.GetMessages<CompleteTrade>());
+    }
+
+    // Commits the screen the way the done-logic patch does: the screen moves the items locally, then its rosters are
+    // sent with the party roster it opened with. Runs inside the client's Call
+    private void CommitScreen(
+        EnvironmentInstance client,
+        string merchantRosterId,
+        string townId,
+        string partyId,
+        List<(ItemRosterElement, int)> boughtItems,
+        List<(ItemRosterElement, int)> soldItems,
+        int totalAmount)
+    {
+        var merchantRoster = client.GetRegisteredObject<ItemRoster>(merchantRosterId);
+        var town = client.GetRegisteredObject<Town>(townId);
+        var party = client.GetRegisteredObject<MobileParty>(partyId);
+        var initialPartyRoster = party.ItemRoster.ToArray();
+
+        using (new AllowedThread())
+        {
+            MoveScreenItems(merchantRoster, party.ItemRoster, boughtItems, soldItems, direction: 1);
+        }
+
+        client.Resolve<IMessageBroker>().Publish(this, new TradeAttempted(
+            merchantRoster,
+            party.ItemRoster,
+            isTrading: true,
+            canGainXpFromDiscarding: false,
+            InventoryScreenHelper.InventoryMode.Trade,
+            party.LeaderHero,
+            party.LeaderHero.CharacterObject,
+            totalAmount,
+            town.Gold,
+            party,
+            currentMobileParty: null,
+            town,
+            boughtItems,
+            soldItems,
+            initialPlayerRoster: initialPartyRoster));
+    }
+
+    private static void MoveScreenItems(
+        ItemRoster merchantRoster,
+        ItemRoster partyRoster,
+        List<(ItemRosterElement, int)> boughtItems,
+        List<(ItemRosterElement, int)> soldItems,
+        int direction)
+    {
+        foreach (var (item, _) in boughtItems)
+        {
+            merchantRoster.AddToCounts(item.EquipmentElement, -direction * item.Amount);
+            partyRoster.AddToCounts(item.EquipmentElement, direction * item.Amount);
+        }
+        foreach (var (item, _) in soldItems)
+        {
+            merchantRoster.AddToCounts(item.EquipmentElement, direction * item.Amount);
+            partyRoster.AddToCounts(item.EquipmentElement, -direction * item.Amount);
+        }
     }
 
     private static List<(ItemRosterElement, int)> ToTradeItems(EnvironmentInstance instance, (string itemId, int amount, int price)[] items)

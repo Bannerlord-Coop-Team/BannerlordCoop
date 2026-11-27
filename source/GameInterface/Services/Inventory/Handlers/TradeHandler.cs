@@ -151,7 +151,7 @@ internal class TradeHandler : IHandler
             if (message.CurrentMobilePartyId != null && !objectManager.TryGetObjectWithLogging<MobileParty>(message.CurrentMobilePartyId, out currentMobileParty)) return;
 
             var toItemRosterData = RebaseInventoryData(
-                toRoster, message.InitialPlayerRoster, message.ToItemRosterData);
+                toRoster, message.InitialPlayerRoster, message.ToItemRosterData, out var unremovedItems);
 
             var boughtItems = ResolveTradeItems(message.BoughtItems);
             var soldItems = ResolveTradeItems(message.SoldItems);
@@ -181,6 +181,7 @@ internal class TradeHandler : IHandler
             var totalAmount = message.TotalAmount;
             var merchantGold = message.MerchantGold;
             var purchasedItems = boughtItems;
+            var keptSales = soldItems;
 
             // Undo any purchases that are no longer present in the roster
             // When looting, taken items are treated as bought items
@@ -193,10 +194,10 @@ internal class TradeHandler : IHandler
                 if (message.IsTrading)
                 {
                     // A screen that hasn't seen the player's last sale yet, like during a join, offers the same items again
-                    totalAmount = ReconcileSales(toRoster, message.InitialPlayerRoster, message.ToItemRosterData, soldItems, totalAmount, out soldItems);
+                    totalAmount = ReconcileSales(unremovedItems, soldItems, totalAmount, out keptSales);
 
                     // Merchants are shared, the client's snapshot misses what other players traded since it was taken
-                    fromItemRosterData = ApplyTradeToLiveStock(fromRoster, keptItems, soldItems);
+                    fromItemRosterData = ApplyTradeToLiveStock(fromRoster, keptItems, keptSales);
                 }
             }
 
@@ -235,10 +236,10 @@ internal class TradeHandler : IHandler
                 currentMobileParty,
                 currentSettlementComponent,
                 purchasedItems,
-                soldItems
+                keptSales
             );
 
-            var exchangedSoldItems = message.CanGainXpFromDiscarding ? ResolveTradeItems(message.TransactionSoldItems) : soldItems;
+            var exchangedSoldItems = message.CanGainXpFromDiscarding ? ResolveTradeItems(message.TransactionSoldItems) : keptSales;
             SendTradeCompleted(peer, toRoster, hero, purchasedItems, exchangedSoldItems, message.IsTrading);
         });
     }
@@ -314,11 +315,17 @@ internal class TradeHandler : IHandler
         return purchases;
     }
 
+    /// <summary>
+    /// Applies the screen's roster changes to the live roster. Outputs, per element, how much of the screen's removal
+    /// the live roster no longer held.
+    /// </summary>
     internal static ItemRosterElement[] RebaseInventoryData(
         ItemRoster authoritativeRoster,
         ItemRosterElement[] initialRoster,
-        ItemRosterElement[] submittedRoster)
+        ItemRosterElement[] submittedRoster,
+        out List<ItemRosterElement> unremovedItems)
     {
+        unremovedItems = new List<ItemRosterElement>();
         initialRoster ??= Array.Empty<ItemRosterElement>();
         submittedRoster ??= Array.Empty<ItemRosterElement>();
         var elements = new List<EquipmentElement>();
@@ -332,7 +339,9 @@ internal class TradeHandler : IHandler
         {
             long delta = (long)FindAmount(submittedRoster, element) - FindAmount(initialRoster, element);
             int current = FindAmount(rebased, element);
-            int final = (int)Math.Max(0L, Math.Min(int.MaxValue, current + delta));
+            long wanted = current + delta;
+            if (wanted < 0) unremovedItems.Add(new ItemRosterElement(element, (int)Math.Min(int.MaxValue, -wanted)));
+            int final = (int)Math.Max(0L, Math.Min(int.MaxValue, wanted));
             if (final != current) rebased.AddToCounts(element, final - current);
         }
         return rebased.ToArray();
@@ -493,29 +502,22 @@ internal class TradeHandler : IHandler
     }
 
     /// <summary>
-    /// Cuts each sale by how much more the screen took out of the party roster than the live roster still holds, the
-    /// same amount <see cref="RebaseInventoryData"/> can't remove, and takes the unpaid share of its price off the total.
-    /// Outputs each sale that is kept, at its kept quantity and price.
+    /// Cuts each sale by what <see cref="RebaseInventoryData"/> could not remove from the party roster, and takes the
+    /// unpaid share of its price off the total. Outputs each sale that is kept, at its kept quantity and price.
     /// </summary>
     internal static int ReconcileSales(
-        ItemRoster partyRoster,
-        ItemRosterElement[] initialRoster,
-        ItemRosterElement[] submittedRoster,
+        List<ItemRosterElement> unremovedItems,
         List<(ItemRosterElement, int)> soldItems,
         int totalAmount,
         out List<(ItemRosterElement, int)> keptSales)
     {
-        initialRoster ??= Array.Empty<ItemRosterElement>();
-        submittedRoster ??= Array.Empty<ItemRosterElement>();
         keptSales = new List<(ItemRosterElement, int)>();
 
         foreach (var (sold, price) in soldItems)
         {
             var element = sold.EquipmentElement;
             int amount = sold.Amount;
-            long overdrawn = (long)FindAmount(initialRoster, element) - FindAmount(submittedRoster, element)
-                - FindAmount(partyRoster, element);
-            int kept = (int)Math.Max(0L, amount - Math.Max(0L, overdrawn));
+            int kept = Math.Max(0, amount - FindAmount(unremovedItems, element));
             if (kept < amount)
             {
                 logger.Warning("Sale of {Amount} {Item} cut to {Kept}, the party no longer had the rest",
