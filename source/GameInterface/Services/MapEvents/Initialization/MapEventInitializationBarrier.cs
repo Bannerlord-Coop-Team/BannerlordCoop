@@ -11,6 +11,7 @@ using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.SiegeEvents;
+using GameInterface.Services.SiegeEvents.Messages;
 using HarmonyLib;
 using SandBox.GauntletUI.Map;
 using Serilog;
@@ -489,8 +490,8 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         if (cleanup != null)
             deferredEncounterCleanup = null;
         party._mapEventSide = null;
-        if (EndDestroyedSimulationDefeat(mapEvent, cleanup, party.MobileParty) ||
-            CloseStaleDestroyedEncounter(mapEvent, cleanup)) return;
+        if (EndDestroyedSimulationDefeat(mapEvent, cleanup, party.MobileParty)) return;
+        if (CloseStaleDestroyedEncounter(mapEvent, cleanup)) return;
 
         ClearEngageOrder(party.MobileParty);
     }
@@ -537,8 +538,9 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
             return true;
         }
 
-        // Finish's postfix holds the party, like after CloseStaleDestroyedEncounter's Finish.
-        FinishUncapturedDefeat(encounter);
+        // PlayerEncounterPatches.FinishPostfix holds the party once its MapEvent is null, which CompleteDeferredEncounterCleanup
+        // cleared, so no ClearEngageOrder here.
+        FinishUncapturedDefeat(encounter, party);
         return true;
     }
 
@@ -555,17 +557,21 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
     }
 
     // Ends the encounter like native DoPlayerDefeat, otherwise the encounter menu's init starts a new battle against the same enemy.
-    private static void FinishUncapturedDefeat(PlayerEncounter encounter)
+    private void FinishUncapturedDefeat(PlayerEncounter encounter, MobileParty party)
     {
-        var settlement = MobileParty.MainParty.CurrentSettlement;
+        var settlement = party.CurrentSettlement;
         // Finish must not finalize the destroyed battle again.
         encounter._mapEvent = null;
         encounter.BattleSimulation = null;
         PlayerEncounter.Finish(forcePlayerOutFromSettlement: false);
 
+        // DoPlayerDefeat also leaves the besieger camp, which the server only clears on a break siege request.
+        if (party.BesiegerCamp != null)
+            messageBroker.Publish(this, new BreakSiegeAttempted(party, finishLocalMenus: false));
+
         // A defender still inside gets its settlement encounter back, like native Leave.
         if (settlement != null)
-            EncounterManager.StartSettlementEncounter(MobileParty.MainParty, settlement);
+            EncounterManager.StartSettlementEncounter(party, settlement);
     }
 
     private void ClearEngageOrder(MobileParty party)

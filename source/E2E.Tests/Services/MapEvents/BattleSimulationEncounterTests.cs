@@ -2,6 +2,7 @@
 using System.Linq;
 using System.Reflection;
 using Common.Messaging;
+using Coop.Core.Client.Services.SiegeEvents.Messages;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Registry.Auto;
@@ -26,6 +27,7 @@ using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade.ViewModelCollection.Scoreboard;
@@ -144,12 +146,32 @@ public class BattleSimulationEncounterTests : MapEventTestBase
         Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkRequestCreateMapEvent>());
     }
 
+    [Fact]
+    public void CompletedAdvance_NonCaptiveDefeatWhileBesieging_LeavesTheCamp()
+    {
+        var context = CreateServerMapEvent();
+        var client = Clients.First();
+        LoseSimulationWithoutCapture(client, context, BattleSideEnum.Defender, playerBesieges: true);
+
+        client.NetworkSentMessages.Clear();
+        client.Call(CloseSimulationScoreboard, ScoreboardCloseDisabledMethods
+            // Headless parties have no siege component to leave.
+            .Append(AccessTools.Method(typeof(MobileParty), nameof(MobileParty.OnPartyLeftSiegeInternal))));
+
+        var request = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestBreakSiege>());
+        Assert.Equal(context.DefenderPartyId, request.PartyId);
+        Assert.False(request.FinishLocalMenus);
+        foreach (var instance in Clients.Append(Server))
+            instance.Call(() => Assert.Null(instance.GetRegisteredObject<MobileParty>(context.DefenderPartyId).BesiegerCamp));
+    }
+
     /// <summary>
     /// Has the client's party on <paramref name="playerSide"/> lose an accepted simulation without being taken prisoner,
-    /// leaving its finished scoreboard open. The party stays inside <paramref name="settlementId"/> when one is given.
+    /// leaving its finished scoreboard open. The party stays inside <paramref name="settlementId"/> when one is given, and
+    /// starts in a besieger camp when <paramref name="playerBesieges"/> is set.
     /// </summary>
     private void LoseSimulationWithoutCapture(EnvironmentInstance client, MapEventContext context, BattleSideEnum playerSide,
-        string? settlementId = null)
+        string? settlementId = null, bool playerBesieges = false)
     {
         string playerPartyId = context.AttackerPartyId;
         string enemyPartyId = context.DefenderPartyId;
@@ -163,6 +185,16 @@ public class BattleSimulationEncounterTests : MapEventTestBase
 
         client.Resolve<IControllerIdProvider>().SetControllerId("1");
         RegisterAsPlayerParty("1", TestEnvironment.CreateRegisteredObject<Hero>(), playerPartyId);
+        if (playerBesieges)
+        {
+            var siegeEventId = TestEnvironment.CreateRegisteredObject<SiegeEvent>(SiegeCreationDisabledMethods);
+            string? campId = null;
+            Server.Call(() => Assert.True(Server.ObjectManager.TryGetId(
+                Server.GetRegisteredObject<SiegeEvent>(siegeEventId).BesiegerCamp, out campId)));
+            foreach (var instance in Clients.Append(Server))
+                instance.Call(() => instance.GetRegisteredObject<MobileParty>(playerPartyId)._besiegerCamp =
+                    instance.GetRegisteredObject<BesiegerCamp>(campId!));
+        }
         Server.Resolve<IPlayerManager>().SetPeer("1", client.NetPeer);
         EnableHeadlessEncounterFinish(client);
         client.Call(() =>
