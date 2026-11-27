@@ -37,6 +37,7 @@ using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Settlements.Interfaces;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.UI.Notifications.Messages;
@@ -829,6 +830,39 @@ public class VillageHostileActionTests : MapEventTestBase
         Assert.Equal(expectedForceRaid, request.ForceRaid);
         Assert.Equal(expectedForceVolunteers, request.ForceVolunteers);
         Assert.Equal(expectedForceSupplies, request.ForceSupplies);
+    }
+
+    // The client sets up the visit after the server put its party in the village, so vanilla reads it as defending.
+    // A won naval raid reports the encounter's side as the winner, so that side has to be the attacker.
+    [Fact]
+    public void BeginHostileActionPresentation_VisitSetUpInsideTheVillage_PlayerAttacks()
+    {
+        var client = Clients.First();
+        var (_, mobilePartyId) = CreatePlayerHeroParty("PlayerOne");
+        var target = CreateVillageTarget();
+        var disabledMethods = MapEventDisabledMethods
+            .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu)))
+            .ToList();
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var party));
+            Assert.True(client.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
+            using (new AllowedThread())
+            {
+                Campaign.Current.MainParty = party;
+                party._currentSettlement = settlement;
+                client.Resolve<ISettlementInterface>().StartSettlementEncounter(party, settlement);
+                Assert.Equal(BattleSideEnum.Defender, PlayerEncounter.Current.PlayerSide);
+
+                PlayerEncounter.Current._mapEvent = CreateHostileActionMapEvent(party.Party, settlement.Party, VillageHostileAction.Raid);
+            }
+
+            client.Resolve<IVillageHostileActionInterface>().BeginHostileActionPresentation(VillageHostileAction.Raid);
+
+            Assert.Equal(BattleSideEnum.Attacker, PlayerEncounter.Current.PlayerSide);
+            Assert.Equal(BattleSideEnum.Defender, PlayerEncounter.Current.OpponentSide);
+        }, disabledMethods);
     }
 
     [Fact]

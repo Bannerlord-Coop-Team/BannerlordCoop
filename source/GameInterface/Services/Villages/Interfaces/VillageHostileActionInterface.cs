@@ -167,11 +167,17 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
                 break;
         }
 
-        if (encounter._mapEvent == null)
+        var mapEvent = encounter._mapEvent ?? PlayerEncounter.StartBattle();
+        var playerSide = mapEvent?.PlayerSide ?? BattleSideEnum.None;
+        if (playerSide == BattleSideEnum.None)
         {
-            var mapEvent = PlayerEncounter.StartBattle();
-            if (mapEvent == null)
-                Logger.Warning("Village hostile action presentation started without a map event");
+            Logger.Warning("Village hostile action presentation started without a map event holding the main party");
+        }
+        else
+        {
+            // The visit was set up with the party already in the village, which vanilla reads as defending it
+            encounter.PlayerSide = playerSide;
+            encounter.OpponentSide = playerSide.GetOppositeSide();
         }
 
         GameMenu.SwitchToMenu("encounter");
