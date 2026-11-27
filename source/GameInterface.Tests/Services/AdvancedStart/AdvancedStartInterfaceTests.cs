@@ -254,10 +254,48 @@ public class AdvancedStartInterfaceTests
         Assert.Equal(expected, AdvancedStartInterface.GetDefaultStartType(policy));
     }
 
+    [Theory]
+    // Beggar can always be picked, so the default start stays locked.
+    [InlineData(new[] { "beggar" }, false, new string[0], new[] { "beggar" }, "beggar")]
+    // The only other start locked when the clock moved, so the default start is the fallback.
+    [InlineData(new[] { "king" }, true, new string[0], new[] { "default", "king" }, "default")]
+    // Every kingdom a king start could take is ruled by a player.
+    [InlineData(new[] { "king" }, false, new[] { "vlandia" }, new[] { "default", "king" }, "default")]
+    // With the host's default locked the window opens on the first start that can be picked.
+    [InlineData(new[] { "outlaw", "king" }, true, new string[0], new[] { "outlaw", "king" }, "outlaw")]
+    public void CreatePolicy_DefaultStartSwitchedOff_IsOnlyTheFallback(string[] startTypes, bool worldStarted,
+        string[] playerRuled, string[] expectedStartTypes, string expectedOpensOn)
+    {
+        var policy = CreateVanillaPolicy(startTypes, "king", worldStarted, playerRuled, new[] { "vlandia" });
+
+        Assert.Equal(expectedStartTypes, policy.StartTypes);
+        Assert.Equal(expectedOpensOn, AdvancedStartInterface.GetDefaultStartType(policy));
+        bool defaultOffered = expectedStartTypes.Contains("default");
+        Assert.Equal(defaultOffered ? null : AdvancedStartInterface.DefaultStartOffLockId,
+            AdvancedStartInterface.GetStartTypeLockId(policy, "default", new[] { "vlandia" }));
+    }
+
+    [Fact]
+    public void CreatePolicy_DefaultStartSwitchedOff_AModifierIsNoStartToPick()
+    {
+        var policy = AdvancedStartInterface.CreatePolicy(VanillaAdvancedStartType.All.Where(startType => startType.Id == "king"),
+            new[] { new FakeModifier("PersonalShip", limit: 1) },
+            new AdvancedStartConfigData { StartTypes = new AdvancedStartTypesConfigData { Default = false } },
+            true, Array.Empty<string>(), new[] { "vlandia" });
+
+        Assert.Equal(new[] { "default", "king" }, policy.StartTypes);
+    }
+
+    // The policy the server builds when it offers these start types, with the default start switched off when it isn't listed.
     private static AdvancedStartPolicy CreateVanillaPolicy(string[] startTypes, string defaultStartType, bool worldStarted,
         string[] playerRuled, string[] joinable) =>
         AdvancedStartInterface.CreatePolicy(VanillaAdvancedStartType.All.Where(startType => startTypes.Contains(startType.Id)),
-            Array.Empty<IAdvancedStartModifier>(), new AdvancedStartConfigData { DefaultStartType = defaultStartType },
+            Array.Empty<IAdvancedStartModifier>(),
+            new AdvancedStartConfigData
+            {
+                DefaultStartType = defaultStartType,
+                StartTypes = new AdvancedStartTypesConfigData { Default = startTypes.Contains("default") ? null : false },
+            },
             worldStarted, playerRuled, joinable);
 
     private sealed class FakeStartType : IAdvancedStartType
