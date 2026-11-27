@@ -408,7 +408,6 @@ internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorIn
 
     private void UpdateAllPlayerClanMemberExecutionStates(BloodFeudPlayer player)
     {
-        // Nothing can start or cancel without a feud or a pending execution
         bool hasBloodFeud = Data.PlayerBloodFeuds.TryGetValue(player.HeroId, out var feuds) && feuds.Values.Any(feud => feud.HasBloodFeud);
         bool hasPendingExecution = Data.PlayerPendingSettlementExecutions.TryGetValue(player.HeroId, out var pendingExecutions) && pendingExecutions.Count > 0;
         if (!hasBloodFeud && !hasPendingExecution) return;

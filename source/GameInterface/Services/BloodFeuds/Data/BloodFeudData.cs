@@ -3,7 +3,7 @@
 namespace GameInterface.Services.BloodFeuds.Data;
 
 /// <summary>
-/// One clan's blood feud with a player, the counts stay after a feud is settled by relations like vanilla
+/// The counts stay after a feud is settled by relations, like vanilla
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
 public class BloodFeudData
