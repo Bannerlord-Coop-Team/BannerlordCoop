@@ -3655,6 +3655,32 @@ public class VillageHostileActionTests : MapEventTestBase
         var request = client.NetworkSentMessages.GetMessages<NetworkRequestJoinBattle>().Single();
         Assert.Equal(mapEventId, request.MapEventId);
         Assert.Equal(BattleSideEnum.Defender, request.Side);
+
+        // The server answer adds the joiner to the defenders, and that add reaches the client replica.
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId!, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(joinerMobilePartyId, out var joinerParty));
+            joinerParty.Party.MapEventSide = mapEvent.DefenderSide;
+        }, MapEventDisabledMethods);
+
+        client.NetworkSentMessages.Clear();
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventId!, out var mapEvent));
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(joinerMobilePartyId, out var joinerParty));
+            Assert.Same(mapEvent.DefenderSide, joinerParty.Party.MapEventSide);
+
+            // Leave works again once the join is answered, and a click asks the server to remove the joiner.
+            var behavior = ObjectHelper.SkipConstructor<EncounterGameMenuBehavior>();
+            var leaveArgs = new MenuCallbackArgs((MenuContext)null, TextObject.GetEmpty());
+            Assert.True(behavior.game_menu_encounter_leave_on_condition(leaveArgs));
+            Assert.True(leaveArgs.IsEnabled);
+            behavior.game_menu_encounter_leave_on_consequence(leaveArgs);
+        }, disabledMethods);
+
+        var leave = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestLeaveBattle>());
+        Assert.Equal(GetPartyBaseId(joinerMobilePartyId), leave.PartyId);
     }
 
     // The pending join guard must not stop the raider, who already has a side.
