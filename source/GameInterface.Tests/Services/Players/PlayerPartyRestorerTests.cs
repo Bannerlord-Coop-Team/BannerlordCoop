@@ -21,6 +21,12 @@ namespace GameInterface.Tests.Services.Players;
 
 public class PlayerPartyRestorerTests
 {
+    public enum SavedDisband
+    {
+        Disbanding,
+        Waiting,
+    }
+
     public PlayerPartyRestorerTests()
     {
         GameBootStrap.Initialize();
@@ -58,14 +64,14 @@ public class PlayerPartyRestorerTests
     }
 
     [Theory]
-    [InlineData(true, false)]
-    [InlineData(false, true)]
-    public void Restore_SavedDisband_IsCancelled(bool isDisbanding, bool isWaitingForDisband)
+    [InlineData(SavedDisband.Disbanding)]
+    [InlineData(SavedDisband.Waiting)]
+    public void Restore_SavedDisband_IsCancelled(SavedDisband savedDisband)
     {
         var (hero, party, _, _) = CreatePlayerGraph();
-        party.IsDisbanding = isDisbanding;
+        party.IsDisbanding = savedDisband == SavedDisband.Disbanding;
         var cancelled = new List<MobileParty>();
-        var restorer = CreateDisbandRestorer(_ => isWaitingForDisband, cancelled);
+        var restorer = CreateDisbandRestorer(_ => savedDisband == SavedDisband.Waiting, cancelled);
 
         restorer.Restore(hero, party);
 
