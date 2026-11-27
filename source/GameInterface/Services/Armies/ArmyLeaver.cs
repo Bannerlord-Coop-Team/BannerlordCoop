@@ -52,7 +52,7 @@ internal sealed class ArmyLeaver : IArmyLeaver
     public void Remove(MobileParty party, Army army)
     {
         // RemoveMobilePartyInArmy edits army._parties directly, so OnRemovePartyInternalPrefix never publishes this
-        messageBroker.Publish(party, new MobilePartyInArmyRemoved(army, party, null));
-        ArmyPatches.RemoveMobilePartyInArmy(party, army, null);
+        messageBroker.Publish(party, new MobilePartyInArmyRemoved(army, party, clientMobileParty: null));
+        ArmyPatches.RemoveMobilePartyInArmy(party, army, clientMobileParty: null);
     }
 }
