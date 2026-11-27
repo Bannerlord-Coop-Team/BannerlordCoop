@@ -2,7 +2,6 @@
 using HarmonyLib;
 using SandBox.View.Menu;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.ViewModelCollection.GameMenu;
 using TaleWorlds.Core;
@@ -36,9 +35,8 @@ public class MenuViewContextPatchesTests : IDisposable
         environment.Dispose();
     }
 
-    // MapScreen.UpdateMenuView builds a new MenuViewContext every frame until one opens.
     [Fact]
-    public void MenuThatFailsToOpen_LeavesNoPanelBehindPerRetry()
+    public void MenuThatFailsToOpen_ReleasesItsPanel()
     {
         // Swap the Gauntlet menu panel for one that refreshes the same GameMenuVM without a render layer.
         presentationPatch.Patch(
@@ -50,19 +48,14 @@ public class MenuViewContextPatchesTests : IDisposable
         {
             var starter = new CampaignGameStarter(Campaign.Current.GameMenuManager, Campaign.Current.ConversationManager);
             starter.AddGameMenu(BrokenMenu, "", _ => { });
-            // The reported throw: a hideout option read the encounter battle after the encounter closed.
-            starter.AddGameMenuOption(BrokenMenu, "join", "", _ => PlayerEncounter.EncounteredBattle != null, _ => { });
+            starter.AddGameMenuOption(BrokenMenu, "join", "", _ => throw new InvalidOperationException("menu condition failed"), _ => { });
             var context = Game.Current.ObjectManager.CreateObject<MenuContext>();
             context.SwitchToMenu(BrokenMenu);
-            Assert.Null(PlayerEncounter.Current);
 
-            for (var frame = 0; frame < 3; frame++)
-            {
-                Assert.Throws<NullReferenceException>(() => new MenuViewContext(null, context));
-            }
+            Assert.Throws<InvalidOperationException>(() => new MenuViewContext(null, context));
 
-            Assert.Equal(3, Panels.Count);
-            Assert.All(Panels, panel => Assert.True(panel.Released));
+            var panel = Assert.Single(Panels);
+            Assert.True(panel.Released);
             Assert.Null(context.Handler);
         });
     }

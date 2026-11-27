@@ -34,6 +34,7 @@ internal class MenuViewContextPatches
             }
         }
 
-        if (menuContext?.Handler == __instance) menuContext.Handler = null;
+        // The failed constructor already made itself the context's handler.
+        if (menuContext.Handler == __instance) menuContext.Handler = null;
     }
 }
