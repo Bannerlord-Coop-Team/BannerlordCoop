@@ -97,7 +97,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party))
                 continue;
 
-            ParkParty(player, party, "its saved player is offline");
+            ParkParty(player, party, "its saved player is offline", queueArmyLeave: false);
         }
     }
 
@@ -121,11 +121,11 @@ internal class PlayerPartyVisibilityHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
-            ParkParty(player, party, $"peer {peer.Id} disconnected");
+            ParkParty(player, party, $"peer {peer.Id} disconnected", queueArmyLeave: false);
         });
     }
 
-    private void ParkParty(Player player, MobileParty party, string reason)
+    private void ParkParty(Player player, MobileParty party, string reason, bool queueArmyLeave)
     {
         var mapEvent = party.MapEvent;
         if (mapEvent != null)
@@ -141,7 +141,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
         }
 
         var wasActive = party.IsActive;
-        ParkOutsideMapEvent(party, queueArmyLeave: false);
+        ParkOutsideMapEvent(party, queueArmyLeave);
 
         if (!wasActive)
         {
@@ -168,7 +168,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
 
         if (!objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party)) return;
 
-        ParkParty(player, party, $"player hero {heroId} died");
+        ParkParty(player, party, $"player hero {heroId} died", queueArmyLeave: false);
     }
 
     private void Handle_PlayerHeirSelectionCompleted(MessagePayload<PlayerHeirSelectionCompleted> payload)
@@ -307,15 +307,6 @@ internal class PlayerPartyVisibilityHandler : IHandler
             // A queued park finds no entry when its player synchronized again first
             if (!deferredMapEventParking.TryGetValue(party, out var deferred)) continue;
 
-            if (party.MapEvent != null)
-            {
-                Logger.Warning(
-                    "Not parking disconnected party {PartyId} because it is in MapEvent {MapEventId}",
-                    party.StringId,
-                    party.MapEvent.StringId);
-                continue;
-            }
-
             deferredMapEventParking.Remove(party);
             if (!playerManager.TryGetPlayer(deferred.ControllerId, out var player) ||
                 (playerManager.IsConnected(player) && !IsPlayerHeroDead(player)))
@@ -323,11 +314,9 @@ internal class PlayerPartyVisibilityHandler : IHandler
                 continue;
             }
 
+            // A party already pulled into another battle is deferred again, to that battle's end.
             // The army leave is queued because the battle can finalize while vanilla is still looping over the leader's attached parties
-            ParkOutsideMapEvent(party, queueArmyLeave: true);
-            Logger.Information(
-                "Parked party {PartyId} after its MapEvent ended while its player was disconnected or dead",
-                party.StringId);
+            ParkParty(player, party, $"MapEvent {deferred.MapEvent.StringId} ended while its player was disconnected or dead", queueArmyLeave: true);
         }
     }
 
