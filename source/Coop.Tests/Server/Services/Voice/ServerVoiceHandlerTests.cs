@@ -69,8 +69,9 @@ public partial class ServerVoiceHandlerTests : IDisposable
         party.Party.MobileParty = party;
         party._position = new CampaignVec2(new Vec2(x, 0), true);
         objects.Setup(x => x.TryGetObject(id, out party)).Returns(true);
-        players.AddPlayer(new Player(id, "hero:" + id, id, "clan:" + id, "character:" + id));
-        players.SetPeer(id, peer);
+        var player = new Player(id, "hero:" + id, id, "clan:" + id, "character:" + id);
+        players.AddPlayer(player);
+        Assert.True(players.TrySetPeer(player, peer));
         return (peer, party);
     }
 

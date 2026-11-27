@@ -28,10 +28,9 @@ public interface IPlayerManager
     /// <param name="player">The player to be added to the registry</param>
     /// <returns>if the player was added to the registry</returns>
     bool AddPlayer(Player player);
-    /// <summary>
-    /// Swaps a registration for its replacement. Refused if <paramref name="registeredPlayer"/> is no longer the current
-    /// registration, or on the server if the replacement's hero or party is held by another registered player.
-    /// </summary>
+    /// <summary>Swaps a registration for its replacement.</summary>
+    /// <returns>false if <paramref name="registeredPlayer"/> is no longer the current registration, or on the server if
+    /// another registered player holds the replacement's hero or party</returns>
     bool ReplacePlayer(Player registeredPlayer, Player replacementPlayer);
     bool TryGetPlayer(string controllerId, out Player player);
 
@@ -41,12 +40,6 @@ public interface IPlayerManager
     /// <param name="obj">The game object to look up</param>
     /// <returns>true if the object is player controlled</returns>
     bool Contains(object obj);
-
-    /// <summary>
-    /// Associates a connected peer with the (already registered) player behind
-    /// controllerId. Joins bind with <see cref="TrySetPeer"/> instead, against the registration they checked.
-    /// </summary>
-    void SetPeer(string controllerId, NetPeer peer);
 
     /// <summary>
     /// Associates a peer with <paramref name="player"/>, but only while it is still its controller's registration.
@@ -369,17 +362,6 @@ public class PlayerManager : IPlayerManager
         // A coop clan can outlive its original player's registration after succession.
         if (obj is Clan clan && clan.Leader != null && PlayerObjects.TryGetValue(clan.Leader, out info)) return true;
         return PlayerObjects.TryGetValue(obj, out info);
-    }
-    public void SetPeer(string controllerId, NetPeer peer)
-    {
-        if (!TryGetPlayer(controllerId, out var player))
-        {
-            logger.Error("Cannot associate peer with unregistered controller {ControllerId}", controllerId);
-            return;
-        }
-
-        if (!TrySetPeer(player, peer))
-            logger.Error("Cannot associate peer with controller {ControllerId}: its registration changed", controllerId);
     }
 
     public bool TrySetPeer(Player player, NetPeer peer)

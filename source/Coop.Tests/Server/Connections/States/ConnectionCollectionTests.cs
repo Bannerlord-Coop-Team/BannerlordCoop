@@ -70,7 +70,7 @@ namespace Coop.Tests.Server.Connections.States
 
             // Act
             connectionCollection.PlayerJoiningHandler(connectPayload);
-            connectionCollection.ConnectionStates[playerPeer].SetState<TransferSaveState>();
+            connectionCollection.ConnectionStates[playerPeer].SetTransferSaveState(serverComponent.BindPeerToPlayer(playerPeer));
             Assert.NotEmpty(connectionCollection.LoadingPeers);
             connectionCollection.PlayerDisconnectedHandler(disconnectPayload);
 
@@ -139,7 +139,7 @@ namespace Coop.Tests.Server.Connections.States
 
             // The save is packaged in TransferSaveState and consumed through LoadingState,
             // so time must stay locked across that window.
-            connectionLogic.SetState<TransferSaveState>();
+            connectionLogic.SetTransferSaveState(serverComponent.BindPeerToPlayer(playerPeer));
             Assert.Contains(connectionCollection.LoadingPeers, logic => logic.Peer == playerPeer);
 
             connectionLogic.SetState<LoadingState>();
@@ -187,7 +187,7 @@ namespace Coop.Tests.Server.Connections.States
             serverComponent.TestMessageBroker.Messages.Clear();
 
             // Act & Assert: entering a loading state broadcasts a count of 1.
-            connectionLogic.SetState<TransferSaveState>();
+            connectionLogic.SetTransferSaveState(serverComponent.BindPeerToPlayer(playerPeer));
             var loadingMessage = Assert.Single(serverComponent.TestMessageBroker.GetMessagesFromType<LoadingPlayersChanged>());
             Assert.Equal(1, loadingMessage.LoadingPlayerCount);
 

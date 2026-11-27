@@ -199,12 +199,13 @@ internal class SaveGameHandler : IHandler
 
         foreach (var registration in restored)
         {
-            // A dead hero keeps its saved party through the restore, so check the campaign still gives it that party
+            // Checked once every row is restored, since restoring another row can hand this party to that row's hero
+            // (vanilla ChangePartyLeader also changes a lord party's owner)
             if (!playerPartyRestorer.TryGetOwnedParty(registration, playerHeroes, out _))
             {
                 Logger.Error(
                     "Skipped saved registration for hero {HeroId}: its saved party {PartyId} belongs to another hero. " +
-                    "The next save writes the session file without it, so copy the session .json now and fix the copy",
+                    SavedPlayerRegistrationSelector.CopySessionFileHint,
                     registration.HeroId,
                     registration.MobilePartyId);
                 continue;

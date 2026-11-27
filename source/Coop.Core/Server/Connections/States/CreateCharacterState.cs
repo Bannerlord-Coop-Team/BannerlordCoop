@@ -187,12 +187,12 @@ public class CreateCharacterState : ConnectionStateBase
     {
     }
 
-    public override void TransferSave()
+    public override void TransferSave(Player acknowledgedPlayer)
     {
-        // SetState packages and sends the save synchronously; then move to LoadingState to await the
+        // SetTransferSaveState packages and sends the save synchronously; then move to LoadingState to await the
         // client reporting it has entered the campaign. Load() must run here (not inside the
         // TransferSaveState ctor) so it resolves against TransferSaveState, not this state.
-        ConnectionLogic.SetState<TransferSaveState>();
+        ConnectionLogic.SetTransferSaveState(acknowledgedPlayer);
         ConnectionLogic.Load();
     }
 }

@@ -135,7 +135,7 @@ public class OverloadedPeerManagerTests
         var manager = serverComponent.Container.Resolve<IOverloadedPeerManager>();
 
         var peer = AddConnectedPeer(connections);
-        connections.ConnectionStates[peer].SetState<Coop.Core.Server.Connections.States.TransferSaveState>();
+        connections.ConnectionStates[peer].SetTransferSaveState(serverComponent.BindPeerToPlayer(peer));
         peer.SetQueueLength(AbovePauseThreshold);
 
         // Act

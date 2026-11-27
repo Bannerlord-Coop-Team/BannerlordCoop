@@ -21,10 +21,8 @@ public interface IPlayerPartyRestorer
     /// </summary>
     bool TryGetOwnedParty(Player player, IReadOnlyCollection<Hero> playerHeroes, out MobileParty party);
 
-    /// <summary>
-    /// True if the campaign still gives <paramref name="party"/> to <paramref name="hero"/>: the hero owns it, or the hero
-    /// is dead and waiting for heir selection, and none of <paramref name="playerHeroes"/> owns the party now.
-    /// </summary>
+    /// <summary>True if the campaign still gives <paramref name="party"/> to <paramref name="hero"/>: the hero owns it, or
+    /// the hero is dead and waiting for heir selection, and none of <paramref name="playerHeroes"/> owns the party now.</summary>
     bool KeepsParty(Hero hero, MobileParty party, IReadOnlyCollection<Hero> playerHeroes);
 
     void RestoreClanMembership(Hero hero);

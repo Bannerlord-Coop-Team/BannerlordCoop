@@ -77,7 +77,7 @@ namespace Coop.Tests.Server.Connections.States
 
             // Act
             connectionLogic.CreateCharacter();
-            connectionLogic.State.TransferSave();
+            connectionLogic.TransferSave(serverComponent.BindPeerToPlayer(playerPeer));
             connectionLogic.Load();
             connectionLogic.EnterMission();
 

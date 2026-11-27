@@ -32,6 +32,7 @@ namespace Coop.Tests.Server.Connections.States
         private readonly NetPeer playerPeer;
         private readonly NetPeer differentPeer;
         private readonly ServerTestComponent serverComponent;
+        private readonly Player acknowledgedPlayer;
 
         public TransferCharacterStateTests(ITestOutputHelper output)
         {
@@ -45,14 +46,14 @@ namespace Coop.Tests.Server.Connections.States
             differentPeer = network.CreatePeer();
             container.Resolve<IConnectionMessageQueue>().RegisterPeer(playerPeer);
             connectionLogic = container.Resolve<ConnectionLogic>(new TypedParameter(typeof(NetPeer), playerPeer));
-            connectionLogic.AcknowledgedPlayer = serverComponent.BindPeerToPlayer(playerPeer);
+            acknowledgedPlayer = serverComponent.BindPeerToPlayer(playerPeer);
         }
 
         [Fact]
         public void LoadMethod_TransitionState_LoadingState()
         {
             // Arrange
-            connectionLogic.SetState<TransferSaveState>();
+            connectionLogic.SetTransferSaveState(acknowledgedPlayer);
 
             // Act
             connectionLogic.Load();
@@ -65,11 +66,11 @@ namespace Coop.Tests.Server.Connections.States
         public void UnusedStatesMethods_DoNothing()
         {
             // Arrange
-            connectionLogic.SetState<TransferSaveState>();
+            connectionLogic.SetTransferSaveState(acknowledgedPlayer);
 
             // Act
             connectionLogic.CreateCharacter();
-            connectionLogic.State.TransferSave();
+            connectionLogic.TransferSave(acknowledgedPlayer);
             connectionLogic.EnterCampaign();
             connectionLogic.EnterMission();
 
@@ -113,7 +114,7 @@ namespace Coop.Tests.Server.Connections.States
                 .Returns(session);
 
             // Act — entering the state packages the save and sends it to the joining peer.
-            connectionLogic.SetState<TransferSaveState>();
+            connectionLogic.TransferSave(acknowledgedPlayer);
 
             // Assert — exactly one save chunk for this tiny save, carrying the deflate-compressed
             // save data to the joining peer.
@@ -146,7 +147,7 @@ namespace Coop.Tests.Server.Connections.States
                 .Setup(manager => manager.TryGetCurrentPlayer(playerPeer, out It.Ref<Player>.IsAny))
                 .Returns(false);
 
-            connectionLogic.SetState<TransferSaveState>();
+            connectionLogic.TransferSave(acknowledgedPlayer);
 
             AssertDisconnectedWithoutTakingTheSave();
         }
@@ -155,9 +156,7 @@ namespace Coop.Tests.Server.Connections.States
         public void EnteringState_AcknowledgedPlayerReplaced_DisconnectsWithoutTakingTheSave()
         {
             // An heir swap replaces the registration while the peer stays bound to it
-            connectionLogic.AcknowledgedPlayer = new Player("BoundController", "Hero_Heir", "MobileParty_Bound", "Clan_Bound", "Character_Heir");
-
-            connectionLogic.SetState<TransferSaveState>();
+            connectionLogic.TransferSave(new Player("BoundController", "Hero_Heir", "MobileParty_Bound", "Clan_Bound", "Character_Heir"));
 
             AssertDisconnectedWithoutTakingTheSave();
         }
@@ -186,7 +185,7 @@ namespace Coop.Tests.Server.Connections.States
                 })
                 .Returns(new SaveResults(true, new byte[] { 1, 2, 3 }, "12345"));
 
-            connectionLogic.SetState<TransferSaveState>();
+            connectionLogic.TransferSave(acknowledgedPlayer);
 
             var messages = serverComponent.TestNetwork
                 .GetPeerMessagesFromType<NetworkGameSaveStateChanged>(differentPeer)
@@ -200,7 +199,7 @@ namespace Coop.Tests.Server.Connections.States
             serverComponent.TestNetwork.FlushPendingMessagesException =
                 new InvalidOperationException("Flush failed.");
 
-            connectionLogic.SetState<TransferSaveState>();
+            connectionLogic.TransferSave(acknowledgedPlayer);
 
             var messages = serverComponent.TestNetwork
                 .GetPeerMessagesFromType<NetworkGameSaveStateChanged>(differentPeer)
@@ -219,7 +218,7 @@ namespace Coop.Tests.Server.Connections.States
             var saveMock = serverComponent.Container.Resolve<Mock<ISaveInterface>>();
             saveMock.Setup(m => m.SaveCurrentGame()).Returns(new SaveResults(true, data, "12345"));
 
-            connectionLogic.SetState<TransferSaveState>();
+            connectionLogic.TransferSave(acknowledgedPlayer);
 
             var serializer = serverComponent.Container.Resolve<ICommonSerializer>();
             var packets = serverComponent.TestNetwork.GetPeerPacketsFromType<GameSaveDataChunkPacket>(playerPeer)
@@ -276,12 +275,11 @@ namespace Coop.Tests.Server.Connections.States
                 });
             var logic = new Mock<IConnectionLogic>();
             logic.SetupGet(value => value.Peer).Returns(playerPeer);
-            logic.SetupGet(value => value.AcknowledgedPlayer).Returns(connectionLogic.AcknowledgedPlayer);
 
             var state = new TransferSaveState(
                 logic.Object, context.MessageBroker, network.Object, context.CoopSessionProvider, context.SaveInterface,
                 queue, context.Coalescer, context.AttachmentIdMapper, context.ServerOptionsProvider, context.LootShipHold,
-                context.PlayerManager);
+                context.PlayerManager, acknowledgedPlayer);
             state.Load();
 
             Assert.Equal(peerDisconnects ? 1 : 2, attemptedChunks);

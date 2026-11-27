@@ -129,7 +129,7 @@ public class PlayerManagerTests
     }
 
     [Fact]
-    public void SetPeer_KnownController_AssociatesPeerWithPlayer()
+    public void TrySetPeer_RegisteredPlayer_AssociatesPeerWithPlayer()
     {
         var playerManager = CreatePlayerManager(out _);
         var player = new Player(ControllerId, string.Empty, string.Empty, string.Empty, string.Empty);
@@ -138,25 +138,12 @@ public class PlayerManagerTests
 
         Assert.True(playerManager.AddPlayer(player));
 
-        playerManager.SetPeer(ControllerId, peer);
+        Assert.True(playerManager.TrySetPeer(player, peer));
 
         Assert.True(playerManager.TryGetPlayer(peer, out var resolvedPlayer));
         Assert.Same(player, resolvedPlayer);
         Assert.True(playerManager.TryGetPeer(ControllerId, out var resolvedPeer));
         Assert.Same(peer, resolvedPeer);
-    }
-
-    [Fact]
-    public void SetPeer_UnknownController_DoesNotAssociatePeer()
-    {
-        var playerManager = CreatePlayerManager(out _);
-        var network = new TestNetwork();
-        var peer = network.CreatePeer();
-
-        // No AddPlayer call, "UnknownController" was never registered.
-        playerManager.SetPeer("UnknownController", peer);
-
-        Assert.False(playerManager.TryGetPlayer(peer, out _));
     }
 
     // A join checks a registration on the network thread, and a deletion on the game thread can remove it before the peer is bound.
@@ -219,7 +206,7 @@ public class PlayerManagerTests
         var peer = network.CreatePeer();
 
         Assert.True(playerManager.AddPlayer(player));
-        playerManager.SetPeer(ControllerId, peer);
+        Assert.True(playerManager.TrySetPeer(player, peer));
 
         playerManager.ClearPeer(peer);
 
@@ -239,8 +226,8 @@ public class PlayerManagerTests
         Assert.True(playerManager.AddPlayer(player));
 
         // Simulates a reconnect: same controllerId, new NetPeer.
-        playerManager.SetPeer(ControllerId, firstPeer);
-        playerManager.SetPeer(ControllerId, secondPeer);
+        Assert.True(playerManager.TrySetPeer(player, firstPeer));
+        Assert.True(playerManager.TrySetPeer(player, secondPeer));
 
         Assert.True(playerManager.TryGetPlayer(secondPeer, out var resolvedPlayer));
         Assert.Same(player, resolvedPlayer);
@@ -263,8 +250,9 @@ public class PlayerManagerTests
         var playerManager = CreatePlayerManager(out _);
         var peer = new TestNetwork().CreatePeer();
 
-        Assert.True(playerManager.AddPlayer(new Player(ControllerId, string.Empty, string.Empty, string.Empty, string.Empty)));
-        playerManager.SetPeer(ControllerId, peer);
+        var player = new Player(ControllerId, string.Empty, string.Empty, string.Empty, string.Empty);
+        Assert.True(playerManager.AddPlayer(player));
+        Assert.True(playerManager.TrySetPeer(player, peer));
 
         Assert.True(playerManager.TryGetCurrentController(peer, out var controllerId));
         Assert.Equal(ControllerId, controllerId);
@@ -278,9 +266,10 @@ public class PlayerManagerTests
         var stalePeer = network.CreatePeer();
         var currentPeer = network.CreatePeer();
 
-        Assert.True(playerManager.AddPlayer(new Player(ControllerId, string.Empty, string.Empty, string.Empty, string.Empty)));
-        playerManager.SetPeer(ControllerId, stalePeer);
-        playerManager.SetPeer(ControllerId, currentPeer);
+        var player = new Player(ControllerId, string.Empty, string.Empty, string.Empty, string.Empty);
+        Assert.True(playerManager.AddPlayer(player));
+        Assert.True(playerManager.TrySetPeer(player, stalePeer));
+        Assert.True(playerManager.TrySetPeer(player, currentPeer));
 
         Assert.False(playerManager.TryGetCurrentController(stalePeer, out var controllerId));
         Assert.Null(controllerId);
@@ -295,9 +284,10 @@ public class PlayerManagerTests
         var stalePeer = network.CreatePeer("10.0.0.8");
         var currentPeer = network.CreatePeer();
 
-        Assert.True(playerManager.AddPlayer(new Player(ControllerId, string.Empty, PartyId, string.Empty, string.Empty)));
-        playerManager.SetPeer(ControllerId, stalePeer);
-        playerManager.SetPeer(ControllerId, currentPeer);
+        var player = new Player(ControllerId, string.Empty, PartyId, string.Empty, string.Empty);
+        Assert.True(playerManager.AddPlayer(player));
+        Assert.True(playerManager.TrySetPeer(player, stalePeer));
+        Assert.True(playerManager.TrySetPeer(player, currentPeer));
 
         Assert.False(playerManager.IsSenderControllingParty(stalePeer, PartyId));
         Assert.True(playerManager.IsSenderControllingParty(currentPeer, PartyId));
@@ -313,9 +303,10 @@ public class PlayerManagerTests
         var stalePeer = network.CreatePeer("10.0.0.8");
         var currentPeer = network.CreatePeer();
 
-        Assert.True(playerManager.AddPlayer(new Player(ControllerId, HeroId, string.Empty, string.Empty, string.Empty)));
-        playerManager.SetPeer(ControllerId, stalePeer);
-        playerManager.SetPeer(ControllerId, currentPeer);
+        var player = new Player(ControllerId, HeroId, string.Empty, string.Empty, string.Empty);
+        Assert.True(playerManager.AddPlayer(player));
+        Assert.True(playerManager.TrySetPeer(player, stalePeer));
+        Assert.True(playerManager.TrySetPeer(player, currentPeer));
 
         Assert.False(playerManager.IsSenderControllingHero(stalePeer, HeroId));
         Assert.False(playerManager.TryGetSenderHero(stalePeer, out _));
@@ -340,8 +331,9 @@ public class PlayerManagerTests
         var playerManager = new PlayerManager(logger.Object, new Mock<IObjectManager>().Object, new ControllerIdProvider());
         var peer = new TestNetwork().CreatePeer();
 
-        Assert.True(playerManager.AddPlayer(new Player(ControllerId, string.Empty, PartyId, string.Empty, string.Empty)));
-        playerManager.SetPeer(ControllerId, peer);
+        var player = new Player(ControllerId, string.Empty, PartyId, string.Empty, string.Empty);
+        Assert.True(playerManager.AddPlayer(player));
+        Assert.True(playerManager.TrySetPeer(player, peer));
 
         Assert.True(playerManager.IsSenderControllingParty(peer, PartyId));
         logger.Verify(log => log.Warning(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int?>()), Times.Never());
@@ -354,8 +346,9 @@ public class PlayerManagerTests
         var playerManager = new PlayerManager(logger.Object, new Mock<IObjectManager>().Object, new ControllerIdProvider());
         var peer = new TestNetwork().CreatePeer();
 
-        Assert.True(playerManager.AddPlayer(new Player(ControllerId, string.Empty, PartyId, string.Empty, string.Empty)));
-        playerManager.SetPeer(ControllerId, peer);
+        var player = new Player(ControllerId, string.Empty, PartyId, string.Empty, string.Empty);
+        Assert.True(playerManager.AddPlayer(player));
+        Assert.True(playerManager.TrySetPeer(player, peer));
 
         Assert.False(playerManager.IsSenderControllingParty(peer, "PartyTwo"));
         logger.Verify(log => log.Warning(
@@ -378,8 +371,9 @@ public class PlayerManagerTests
         var playerManager = new PlayerManager(new Mock<ILogger>().Object, new Mock<IObjectManager>().Object, new ControllerIdProvider());
         var peer = new TestNetwork().CreatePeer();
 
-        Assert.True(playerManager.AddPlayer(new Player(ControllerId, string.Empty, string.Empty, string.Empty, string.Empty)));
-        playerManager.SetPeer(ControllerId, peer);
+        var player = new Player(ControllerId, string.Empty, string.Empty, string.Empty, string.Empty);
+        Assert.True(playerManager.AddPlayer(player));
+        Assert.True(playerManager.TrySetPeer(player, peer));
 
         Assert.False(playerManager.IsSenderControllingParty(peer, string.Empty));
         Assert.False(playerManager.IsSenderControllingParty(peer, null));
@@ -667,7 +661,7 @@ public class PlayerManagerTests
         var peer = new TestNetwork().CreatePeer();
 
         Assert.True(playerManager.AddPlayer(registered));
-        playerManager.SetPeer(ControllerId, peer);
+        Assert.True(playerManager.TrySetPeer(registered, peer));
 
         Assert.True(playerManager.ReplacePlayer(registered, replacement));
 
@@ -806,8 +800,9 @@ public class PlayerManagerTests
         Resolve(objectManager, HeroId, hero);
         var peer = new TestNetwork().CreatePeer();
 
-        Assert.True(playerManager.AddPlayer(new Player(ControllerId, HeroId, string.Empty, string.Empty, string.Empty)));
-        playerManager.SetPeer(ControllerId, peer);
+        var player = new Player(ControllerId, HeroId, string.Empty, string.Empty, string.Empty);
+        Assert.True(playerManager.AddPlayer(player));
+        Assert.True(playerManager.TrySetPeer(player, peer));
 
         try
         {

@@ -1,3 +1,5 @@
+using GameInterface.Services.Players.Data;
+
 namespace Coop.Core.Server.Connections.States;
 
 /// <summary>
@@ -18,7 +20,7 @@ public abstract class ConnectionStateBase : IConnectionState
     public virtual bool IsLoading => false;
 
     public abstract void CreateCharacter();
-    public abstract void TransferSave();
+    public abstract void TransferSave(Player acknowledgedPlayer);
     public abstract void Load();
     public abstract void EnterCampaign();
     public abstract void EnterMission();

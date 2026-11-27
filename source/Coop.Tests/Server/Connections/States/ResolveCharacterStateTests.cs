@@ -599,6 +599,41 @@ namespace Coop.Tests.Server.Connections.States
         }
 
         [Fact]
+        public void NetworkClientValidate_RetiredWithAnHeirBeforeTheRepair_DisconnectsWithoutRestoringOrValidating()
+        {
+            // The retirement lands on the game thread right after the poll thread read the registration. The retired
+            // hero is disabled, not dead, so restoring it would build it a recovery party nobody plays.
+            var currentState = connectionLogic.SetState<ResolveCharacterState>();
+            var player = new Player("MyPlayer", "MyHero", "MyParty", "MyClan", "MyCharacter");
+            var heir = new Player("MyPlayer", "MyHeir", "HeirParty", "MyClan", "MyHeirCharacter");
+            var playerManager = SetupRegisteredPlayer(player);
+            var registered = player;
+            playerManager
+                .Setup(manager => manager.TryGetPlayer(player.ControllerId, out It.Ref<Player>.IsAny))
+                .Callback((string id, out Player current) =>
+                {
+                    current = registered;
+                    registered = heir;
+                })
+                .Returns(true);
+
+            currentState.Handle_ClientValidate(new MessagePayload<NetworkClientValidate>(
+                playerPeer,
+                new NetworkClientValidate(player.ControllerId)));
+
+            serverComponent.Container.Resolve<Mock<IPlayerPartyRestorer>>().Verify(
+                restorer => restorer.TryRestore(It.IsAny<Player>(), out It.Ref<Player>.IsAny), Times.Never);
+            playerManager.Verify(manager => manager.ReplacePlayer(It.IsAny<Player>(), It.IsAny<Player>()), Times.Never);
+            playerManager.Verify(manager => manager.RemovePlayer(It.IsAny<Player>()), Times.Never);
+            playerManager.Verify(manager => manager.TrySetPeer(It.IsAny<Player>(), It.IsAny<NetPeer>()), Times.Never);
+            var messages = serverComponent.TestNetwork.SentNetworkMessages
+                .GetValueOrDefault(playerPeer.Id) ?? Enumerable.Empty<IMessage>();
+            Assert.Empty(messages.OfType<NetworkClientValidated>());
+            Assert.IsType<ResolveCharacterState>(connectionLogic.State);
+            Assert.Equal(ConnectionState.ShutdownRequested, playerPeer.ConnectionState);
+        }
+
+        [Fact]
         public void NetworkClientValidate_RegisteredPlayerWithMissingHero_DropsStaleRegistration()
         {
             // Arrange

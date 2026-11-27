@@ -355,7 +355,7 @@ public class ServerChatHandlerTests : IDisposable
         foreach (var registration in registrations)
         {
             playerManager.AddPlayer(registration.Player);
-            playerManager.SetPeer(registration.Player.ControllerId, registration.Peer);
+            Assert.True(playerManager.TrySetPeer(registration.Player, registration.Peer));
         }
     }
 

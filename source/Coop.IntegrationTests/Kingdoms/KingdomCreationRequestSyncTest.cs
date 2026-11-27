@@ -27,8 +27,9 @@ public class KingdomCreationRequestSyncTest
         client1.Resolve<IControllerIdProvider>().SetControllerId("player1");
         // The server acts for the controller registered to the sending peer.
         var playerManager = server.Resolve<IPlayerManager>();
-        playerManager.AddPlayer(new Player("player1", "hero1", null, "clan1", "character1"));
-        playerManager.SetPeer("player1", client1.NetPeer);
+        var player = new Player("player1", "hero1", null, "clan1", "character1");
+        Assert.True(playerManager.AddPlayer(player));
+        Assert.True(playerManager.TrySetPeer(player, client1.NetPeer));
 
         GameThreadTestRunner.Run(() =>
             client1.SimulateMessage(this, new KingdomCreationRequested("Real Kingdom", "empire")));
@@ -58,8 +59,9 @@ public class KingdomCreationRequestSyncTest
         var party = server.CreateRegisteredObject<MobileParty>("party1");
         var settlement = server.CreateRegisteredObject<Settlement>("settlement1");
         settlement._partiesCache = new MBList<MobileParty>();
-        playerManager.AddPlayer(new Player("player1", "hero1", "party1", "clan1", "character1"));
-        playerManager.SetPeer("player1", TestEnvironment.Clients.First().NetPeer);
+        var player = new Player("player1", "hero1", "party1", "clan1", "character1");
+        Assert.True(playerManager.AddPlayer(player));
+        Assert.True(playerManager.TrySetPeer(player, TestEnvironment.Clients.First().NetPeer));
 
         Assert.Null(party.CurrentSettlement);
 
@@ -82,8 +84,9 @@ public class KingdomCreationRequestSyncTest
         var server = TestEnvironment.Server;
         var client1 = TestEnvironment.Clients.First();
         var playerManager = server.Resolve<IPlayerManager>();
-        playerManager.AddPlayer(new Player("player1", "hero1", null, "clan1", "character1"));
-        playerManager.SetPeer("player1", client1.NetPeer);
+        var player = new Player("player1", "hero1", null, "clan1", "character1");
+        Assert.True(playerManager.AddPlayer(player));
+        Assert.True(playerManager.TrySetPeer(player, client1.NetPeer));
 
         GameThreadTestRunner.Run(() =>
             server.SimulateMessage(client1.NetPeer, new NetworkRequestCreateKingdom("Real Kingdom", "empire")));
@@ -131,8 +134,9 @@ public class KingdomCreationRequestSyncTest
         var party = server.CreateRegisteredObject<MobileParty>("party1");
         var settlement = server.CreateRegisteredObject<Settlement>("settlement1");
         settlement._partiesCache = new MBList<MobileParty>();
-        playerManager.AddPlayer(new Player("player1", "hero1", "party1", "clan1", "character1"));
-        playerManager.SetPeer("player1", TestEnvironment.Clients.First().NetPeer);
+        var player = new Player("player1", "hero1", "party1", "clan1", "character1");
+        Assert.True(playerManager.AddPlayer(player));
+        Assert.True(playerManager.TrySetPeer(player, TestEnvironment.Clients.First().NetPeer));
 
         GameThreadTestRunner.Run(() =>
             server.SimulateMessage(

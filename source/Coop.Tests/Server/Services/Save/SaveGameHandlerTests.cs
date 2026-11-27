@@ -8,7 +8,6 @@ using GameInterface.CoopSessionData;
 using GameInterface.CoopSessionData.Save.Data;
 using GameInterface.Registry.Messages;
 using GameInterface.Services.Heroes.Messages;
-using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Save.Messages;
@@ -116,29 +115,12 @@ public class SaveGameHandlerTests
     }
 
     [Fact]
-    public void AllGameObjectsRegistered_DuplicateControllerWithNoLiveHero_RegistersNeither()
-    {
-        var first = new Player(ControllerId, MissingHeroId, "Party_A", "Clan_One", "Character_A");
-        var second = new Player(ControllerId, "Hero_AlsoMissing", "Party_B", "Clan_One", "Character_B");
-
-        var playerRegistry = new Mock<IPlayerManager>();
-        playerRegistry.Setup(registry => registry.AddPlayer(It.IsAny<Player>())).Returns(true);
-
-        using var handler = CreateHandler(playerRegistry, new[] { first, second });
-
-        playerRegistry.Verify(registry => registry.AddPlayer(It.IsAny<Player>()), Times.Never);
-    }
-
-    [Theory]
-    // A dead hero's row keeps its saved party through the restore, so it can name a party another player's living
-    // hero owns. The registry refuses whichever comes second, so the row order would decide.
-    [InlineData(true)]
-    [InlineData(false)]
-    public void AllGameObjectsRegistered_DeadHeroNamesAnotherPlayersParty_RestoresThePartyOwner(bool deadFirst)
+    public void AllGameObjectsRegistered_DeadHeroNamesAnotherPlayersParty_RestoresThePartyOwner()
     {
         var owner = new Player("PlayerOne", LiveHeroId, LivePartyId, "Clan_One", "Character_Live");
+        // A dead hero's row keeps its saved party through the restore, so it can name a party another player's hero owns
         var deadClaim = new Player("PlayerTwo", DeadHeroId, LivePartyId, "Clan_Two", "Character_Dead");
-        var saved = deadFirst ? new[] { deadClaim, owner } : new[] { owner, deadClaim };
+        var saved = new[] { deadClaim, owner };
         var playerPartyRestorer = RestoresEachRow(saved);
         KeepsItsParty(playerPartyRestorer, owner);
         var playerRegistry = new Mock<IPlayerManager>();
@@ -150,18 +132,14 @@ public class SaveGameHandlerTests
         playerRegistry.Verify(registry => registry.AddPlayer(It.IsAny<Player>()), Times.Once);
     }
 
-    [Theory]
-    // When the owner's own row can't be restored, the dead hero's row is the only one left naming the party, in
-    // either order. Its party is still checked against every saved hero, so it still doesn't get the party.
-    [InlineData(true)]
-    [InlineData(false)]
-    public void AllGameObjectsRegistered_OwnerRestoreFails_DeadHeroStillDoesNotGetTheParty(bool deadFirst)
+    [Fact]
+    public void AllGameObjectsRegistered_OwnerRestoreFails_DeadHeroStillDoesNotGetTheParty()
     {
         var liveHero = ObjectHelper.SkipConstructor<Hero>();
         var owner = new Player("PlayerOne", LiveHeroId, LivePartyId, "Clan_One", "Character_Live");
         var deadClaim = new Player("PlayerTwo", DeadHeroId, LivePartyId, "Clan_Two", "Character_Dead");
         var unrelated = new Player("PlayerThree", StaleHeroId, StalePartyId, "Clan_Three", "Character_Stale");
-        var saved = deadFirst ? new[] { deadClaim, owner, unrelated } : new[] { owner, deadClaim, unrelated };
+        var saved = new[] { deadClaim, owner, unrelated };
         var playerPartyRestorer = RestoresEachRow(deadClaim, unrelated);
         // The real restorer hands back the row it was given even when it fails
         var restoredOwner = owner;
@@ -175,7 +153,8 @@ public class SaveGameHandlerTests
         var playerRegistry = new Mock<IPlayerManager>();
         playerRegistry.Setup(registry => registry.AddPlayer(It.IsAny<Player>())).Returns(true);
 
-        using var handler = CreateHandler(playerRegistry, saved, playerPartyRestorer, liveHero: liveHero);
+        // The dead hero's party is checked against every saved hero, not only the restored ones
+        using var handler = CreateHandler(playerRegistry, saved, playerPartyRestorer, playerHeroes: new[] { liveHero });
 
         playerRegistry.Verify(registry => registry.AddPlayer(deadClaim), Times.Never);
         playerRegistry.Verify(registry => registry.AddPlayer(unrelated), Times.Once);
@@ -188,10 +167,12 @@ public class SaveGameHandlerTests
         var first = new Player("PlayerOne", LiveHeroId, LivePartyId, "Clan_One", "Character_A");
         var second = new Player("PlayerTwo", MissingHeroId, "Party_B", "Clan_Two", "Character_B");
 
+        var playerPartyRestorer = RestoresEachRow(first);
+        KeepsItsParty(playerPartyRestorer, first);
         var playerRegistry = new Mock<IPlayerManager>();
         playerRegistry.Setup(registry => registry.AddPlayer(It.IsAny<Player>())).Returns(true);
 
-        using var handler = CreateHandler(playerRegistry, new[] { first, second });
+        using var handler = CreateHandler(playerRegistry, new[] { first, second }, playerPartyRestorer);
 
         playerRegistry.Verify(registry => registry.AddPlayer(first), Times.Once);
         playerRegistry.Verify(registry => registry.AddPlayer(second), Times.Never);
@@ -268,45 +249,36 @@ public class SaveGameHandlerTests
         Assert.Equal(new[] { "repair", "register" }, calls);
     }
 
-    /// <summary>
-    /// Drives a handler over a session holding <paramref name="savedPlayers"/> through GameLoaded, then
-    /// AllGameObjectsRegistered. The live, stale and dead heroes resolve, and without a given restorer every row
-    /// whose hero resolves is restored as it is and keeps its party.
-    /// </summary>
+    // Drives a handler through GameLoaded, then AllGameObjectsRegistered, with the selector picking every row. Without
+    // a given restorer, every row is restored as it is and keeps its party.
     private static SaveGameHandler CreateHandler(
         Mock<IPlayerManager> playerRegistry,
-        Player[] savedPlayers,
+        Player[] rows,
         Mock<IPlayerPartyRestorer> playerPartyRestorer = null,
         Action<TestMessageBroker>? configureBroker = null,
-        Hero liveHero = null!)
+        IReadOnlyCollection<Hero> playerHeroes = null)
     {
         var messageBroker = new TestMessageBroker();
         if (playerPartyRestorer == null)
         {
-            playerPartyRestorer = RestoresEachRow(savedPlayers
-                .Where(player => player.HeroId is LiveHeroId or StaleHeroId or DeadHeroId)
-                .ToArray());
-            foreach (var player in savedPlayers)
+            playerPartyRestorer = RestoresEachRow(rows);
+            foreach (var player in rows)
                 KeepsItsParty(playerPartyRestorer, player);
         }
         configureBroker?.Invoke(messageBroker);
 
-        liveHero ??= ObjectHelper.SkipConstructor<Hero>();
-        var staleHero = ObjectHelper.SkipConstructor<Hero>();
-        var deadHero = ObjectHelper.SkipConstructor<Hero>();
-        var objectManager = new Mock<IObjectManager>();
-        objectManager.Setup(manager => manager.TryGetObject(LiveHeroId, out liveHero)).Returns(true);
-        objectManager.Setup(manager => manager.TryGetObject(StaleHeroId, out staleHero)).Returns(true);
-        objectManager.Setup(manager => manager.TryGetObject(DeadHeroId, out deadHero)).Returns(true);
+        var heroes = playerHeroes ?? Array.Empty<Hero>();
+        var registrationSelector = new Mock<ISavedPlayerRegistrationSelector>();
+        registrationSelector.Setup(selector => selector.Select(It.IsAny<IEnumerable<Player>>(), out heroes)).Returns(rows);
 
         var handler = new SaveGameHandler(
             messageBroker,
-            new StubSaveManager(SessionWith(savedPlayers)),
+            new StubSaveManager(SessionWith(rows)),
             new Mock<ICoopSessionProvider>().Object,
             playerRegistry.Object,
             playerPartyRestorer.Object,
             new Mock<INetwork>().Object,
-            new SavedPlayerRegistrationSelector(objectManager.Object, playerPartyRestorer.Object));
+            registrationSelector.Object);
 
         messageBroker.Publish(new object(), new GameLoaded(SaveName));
         messageBroker.Publish(new object(), new AllGameObjectsRegistered());

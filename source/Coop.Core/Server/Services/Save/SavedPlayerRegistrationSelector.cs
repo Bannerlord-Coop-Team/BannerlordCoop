@@ -13,13 +13,11 @@ namespace Coop.Core.Server.Services.Save;
 /// <summary>
 /// Picks the rows of a loaded co-op session to restore as player registrations.
 /// </summary>
-internal interface ISavedPlayerRegistrationSelector
+public interface ISavedPlayerRegistrationSelector
 {
-    /// <summary>
-    /// Returns one row per controller, and none for a hero or party that two controllers name. Every hero the saved
-    /// rows name goes to <paramref name="playerHeroes"/>, the player heroes
-    /// <see cref="IPlayerPartyRestorer.TryGetOwnedParty"/> takes.
-    /// </summary>
+    /// <summary>Returns one row per controller, and none for a hero or party that two controllers name.</summary>
+    /// <param name="playerHeroes">Every hero the saved rows name, the player heroes
+    /// <see cref="IPlayerPartyRestorer.TryGetOwnedParty"/> takes</param>
     IReadOnlyList<Player> Select(IEnumerable<Player> savedPlayers, out IReadOnlyCollection<Hero> playerHeroes);
 }
 
@@ -27,6 +25,10 @@ internal interface ISavedPlayerRegistrationSelector
 internal class SavedPlayerRegistrationSelector : ISavedPlayerRegistrationSelector
 {
     private static readonly ILogger Logger = LogManager.GetLogger<SavedPlayerRegistrationSelector>();
+
+    // The fix hint for a skipped saved row the host can still repair by hand
+    internal const string CopySessionFileHint =
+        "The next save writes the session file without it, so copy the session .json now and fix the copy";
 
     private readonly IObjectManager objectManager;
     private readonly IPlayerPartyRestorer playerPartyRestorer;
@@ -52,7 +54,7 @@ internal class SavedPlayerRegistrationSelector : ISavedPlayerRegistrationSelecto
             if (shared.Add(player))
                 Logger.Error(
                     "Skipped saved registration for hero {HeroId}: another saved controller names the same hero or party. " +
-                    "The next save writes the session file without it, so copy the session .json now and fix the copy",
+                    CopySessionFileHint,
                     player.HeroId);
         }
 
@@ -86,11 +88,8 @@ internal class SavedPlayerRegistrationSelector : ISavedPlayerRegistrationSelecto
             .Where(group => group.Select(claim => claim.Player.ControllerId).Distinct().Count() > 1)
             .SelectMany(group => group.Select(claim => claim.Player));
 
-    /// <summary>
-    /// A save written before controller ids were unique can carry several rows for one controller, in either order.
-    /// The campaign decides which is real: a row whose party it still gives to that row, then one whose hero and party
-    /// both exist, then one whose hero exists.
-    /// </summary>
+    // A save written before controller ids were unique can carry several rows for one controller. The campaign decides
+    // which is real: a row whose party it still gives to that row, then one whose hero and party exist, then its hero.
     private static IEnumerable<Player> SelectOneRowPerController(IEnumerable<SavedRowClaim> claims)
     {
         foreach (var group in claims.GroupBy(claim => claim.Player.ControllerId))

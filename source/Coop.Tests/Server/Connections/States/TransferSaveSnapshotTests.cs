@@ -50,7 +50,7 @@ public class TransferSaveSnapshotTests
             });
         var logic = new Mock<IConnectionLogic>();
         logic.SetupGet(value => value.Peer).Returns(playerPeer);
-        logic.SetupGet(value => value.AcknowledgedPlayer).Returns(serverComponent.BindPeerToPlayer(playerPeer));
+        var acknowledgedPlayer = serverComponent.BindPeerToPlayer(playerPeer);
 
         var testTimeout = TimeSpan.FromSeconds(10);
         TransferSaveState state;
@@ -60,7 +60,7 @@ public class TransferSaveSnapshotTests
             var transfer = Task.Run(() => new TransferSaveState(
                 logic.Object, context.MessageBroker, context.Network, context.CoopSessionProvider, context.SaveInterface,
                 queue, context.Coalescer, context.AttachmentIdMapper, context.ServerOptionsProvider, context.LootShipHold,
-                context.PlayerManager));
+                context.PlayerManager, acknowledgedPlayer));
 
             await saveStarted.Task.WaitAsync(testTimeout);
             state = await transfer.WaitAsync(testTimeout);

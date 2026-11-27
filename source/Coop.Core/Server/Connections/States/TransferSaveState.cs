@@ -20,6 +20,7 @@ using GameInterface.Services.NavalDLC;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.OrderOfBattle;
 using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using GameInterface.Services.Ships;
 using GameInterface.Services.Smithing;
 using GameInterface.Services.ViewData;
@@ -52,6 +53,7 @@ public class TransferSaveState : ConnectionStateBase
     private readonly IServerOptionsProvider serverOptionsProvider;
     private readonly ILootShipHold lootShipHold;
     private readonly IPlayerManager playerManager;
+    private readonly Player acknowledgedPlayer;
 
     private readonly bool saveSent;
 
@@ -66,7 +68,8 @@ public class TransferSaveState : ConnectionStateBase
         IAttachmentIdMapper attachmentIdMapper,
         IServerOptionsProvider serverOptionsProvider,
         ILootShipHold lootShipHold,
-        IPlayerManager playerManager)
+        IPlayerManager playerManager,
+        Player acknowledgedPlayer)
         : base(connectionLogic)
     {
         this.messageBroker = messageBroker;
@@ -79,6 +82,7 @@ public class TransferSaveState : ConnectionStateBase
         this.serverOptionsProvider = serverOptionsProvider;
         this.lootShipHold = lootShipHold;
         this.playerManager = playerManager;
+        this.acknowledgedPlayer = acknowledgedPlayer;
 
         saveSent = SendSaveOrDisconnect();
     }
@@ -129,7 +133,7 @@ public class TransferSaveState : ConnectionStateBase
         // A game over, deletion or heir swap can remove or replace the registration this peer was told it plays,
         // and a replacement keeps the peer bound, so check the exact registration here on the game thread
         var stillPlaysIt = playerManager.TryGetCurrentPlayer(peer, out var registered) &&
-            ReferenceEquals(registered, ConnectionLogic.AcknowledgedPlayer);
+            ReferenceEquals(registered, acknowledgedPlayer);
         if (!stillPlaysIt)
         {
             Logger.Warning("Peer {PeerId} no longer plays the player it was told; disconnecting it instead of sending the join save", peer.Id);
@@ -319,7 +323,7 @@ public class TransferSaveState : ConnectionStateBase
         if (saveSent) ConnectionLogic.SetState<LoadingState>();
     }
 
-    public override void TransferSave()
+    public override void TransferSave(Player acknowledgedPlayer)
     {
     }
 

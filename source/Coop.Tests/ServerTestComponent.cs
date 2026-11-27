@@ -30,10 +30,8 @@ internal class ServerTestComponent : TestComponentBase
         Container = BuildContainer(builder);
     }
 
-    /// <summary>
-    /// Makes the player manager mock bind <paramref name="peer"/> to a registration and returns it, to pass as the
-    /// connection's acknowledged player, since the join save only goes to a peer that still plays it.
-    /// </summary>
+    /// <summary>Makes the player manager mock bind <paramref name="peer"/> to a registration and returns it.</summary>
+    /// <remarks>Pass it as the acknowledged player, since the join save only goes to a peer that still plays it.</remarks>
     public Player BindPeerToPlayer(NetPeer peer)
     {
         var player = new Player("BoundController", "Hero_Bound", "MobileParty_Bound", "Clan_Bound", "Character_Bound");

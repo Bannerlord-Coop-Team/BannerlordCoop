@@ -130,9 +130,9 @@ public class MissionMembershipTests
             TestEnvironment.Server.Call(() =>
             {
                 var playerManager = TestEnvironment.Server.Resolve<IPlayerManager>();
-                Assert.True(playerManager.AddPlayer(
-                    new Player(controllerId, string.Empty, string.Empty, string.Empty, string.Empty)));
-                playerManager.SetPeer(controllerId, client.NetPeer);
+                var player = new Player(controllerId, string.Empty, string.Empty, string.Empty, string.Empty);
+                Assert.True(playerManager.AddPlayer(player));
+                Assert.True(playerManager.TrySetPeer(player, client.NetPeer));
             });
             members.Add(new Member(client, controllerId));
         }

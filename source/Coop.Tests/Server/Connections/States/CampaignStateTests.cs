@@ -39,7 +39,7 @@ namespace Coop.Tests.Server.Connections.States
             connectionLogic.SetState<CampaignState>();
 
             connectionLogic.CreateCharacter();
-            connectionLogic.State.TransferSave();
+            connectionLogic.TransferSave(serverComponent.BindPeerToPlayer(playerPeer));
             connectionLogic.Load();
             connectionLogic.EnterCampaign();
 

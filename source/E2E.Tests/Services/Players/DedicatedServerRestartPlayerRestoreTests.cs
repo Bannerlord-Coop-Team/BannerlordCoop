@@ -161,10 +161,8 @@ public class DedicatedServerRestartPlayerRestoreTests : IDisposable
         Assert.False(validated.HeroExists);
     }
 
-    /// <summary>
-    /// A player rejoins while its crashed connection still lingers: the old connection is dropped and only the new
-    /// one controls the hero, and the party parked by the old connection's disconnect comes back once the new one syncs.
-    /// </summary>
+    /// <summary>A rejoin drops the crashed player's lingering connection, and only the new one controls the hero.</summary>
+    /// <remarks>The party parked by the old connection's disconnect comes back once the new one syncs.</remarks>
     [Fact]
     public void ReturningPlayerRejoinsWhileOldConnectionLingers_OnlyTheNewConnectionControlsTheHero()
     {

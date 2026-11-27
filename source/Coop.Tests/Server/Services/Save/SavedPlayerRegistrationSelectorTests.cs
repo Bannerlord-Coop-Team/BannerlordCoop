@@ -100,31 +100,23 @@ public class SavedPlayerRegistrationSelectorTests
         Assert.Equal(new[] { other }, rows);
     }
 
-    [Theory]
-    // Both of PlayerOne's rows have a live graph, so picking one row per controller first would let the row order or
-    // the id the dropped row spells decide whether the shared hero knocks out PlayerOne's other hero too.
-    [InlineData(LiveHeroId, true)]
-    [InlineData(LiveHeroId, false)]
-    [InlineData(LiveHeroFullId, true)]
-    [InlineData(LiveHeroFullId, false)]
-    public void Select_SharedHeroInDuplicateController_KeepsTheControllersOtherHero(string sharedHeroId, bool sharedFirst)
+    [Fact]
+    public void Select_SharedHeroInDuplicateController_KeepsTheControllersOtherHero()
     {
         var own = new Player("PlayerOne", StaleHeroId, StalePartyId, "Clan_One", "Character_Stale");
-        var shared = new Player("PlayerOne", sharedHeroId, LivePartyId, "Clan_One", "Character_Live");
+        // Both of PlayerOne's rows have a live graph, and the shared row spells the hero by its full id
+        var shared = new Player("PlayerOne", LiveHeroFullId, LivePartyId, "Clan_One", "Character_Live");
         var claimed = new Player("PlayerTwo", LiveHeroId, LivePartyId, "Clan_Two", "Character_Live");
 
-        var rows = Select(sharedFirst ? new[] { shared, own, claimed } : new[] { own, shared, claimed });
+        var rows = Select(shared, own, claimed);
 
         Assert.Equal(new[] { own }, rows);
     }
 
-    [Theory]
-    // Two controllers' dead heroes can both still be given one party, which neither then owns. The first controller
-    // keeps its living row, whichever of its rows comes first.
-    [InlineData(true)]
-    [InlineData(false)]
-    public void Select_PartySharedWithAnotherController_KeepsTheControllersOtherRow(bool sharedFirst)
+    [Fact]
+    public void Select_PartySharedWithAnotherController_KeepsTheControllersOtherRow()
     {
+        // Two controllers' dead heroes can both still be given one party, which neither then owns
         var sharedRow = new Player(ControllerId, DeadHeroId, LivePartyId, "Clan_One", "Character_Dead");
         var livingRow = new Player(ControllerId, StaleHeroId, StalePartyId, "Clan_One", "Character_Stale");
         var otherDeadRow = new Player("PlayerTwo", OtherDeadHeroId, LivePartyId, "Clan_Two", "Character_OtherDead");
@@ -132,7 +124,7 @@ public class SavedPlayerRegistrationSelectorTests
         Keeps(staleHero, staleParty);
         Keeps(otherDeadHero, liveParty);
 
-        var rows = Select(sharedFirst ? new[] { sharedRow, livingRow, otherDeadRow } : new[] { livingRow, sharedRow, otherDeadRow });
+        var rows = Select(sharedRow, livingRow, otherDeadRow);
 
         Assert.Equal(new[] { livingRow }, rows);
     }

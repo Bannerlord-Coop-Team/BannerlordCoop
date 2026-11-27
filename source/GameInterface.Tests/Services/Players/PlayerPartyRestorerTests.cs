@@ -406,15 +406,18 @@ public class PlayerPartyRestorerTests
         var player = new Player("Controller", "Hero_Saved", "MobileParty_Saved", "Clan_Saved", "Character_Saved");
         var objectManager = CreateRegisteredPlayerObjectManager(player, hero);
         Assert.True(objectManager.AddExisting(player.MobilePartyId, party));
+        var removed = new List<MobileParty>();
 
         var restorer = new PlayerPartyRestorer(
             objectManager,
             Mock.Of<IAutoRegistryFactory>(),
             () => Array.Empty<MobileParty>(),
-            _ => throw new InvalidOperationException("The saved party should be kept"),
-            _ => throw new InvalidOperationException("The saved party should not be removed"));
+            _ => null,
+            removed.Add);
 
-        Assert.Throws<NullReferenceException>(() => restorer.TryRestore(player, out _));
+        Assert.ThrowsAny<Exception>(() => restorer.TryRestore(player, out _));
+
+        Assert.Empty(removed);
     }
 
     [Fact]

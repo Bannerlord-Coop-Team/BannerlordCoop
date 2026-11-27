@@ -94,7 +94,8 @@ public partial class ServerVoiceHandlerTests
         Frame(speaker.peer, epoch: 20);
         long first = Assert.IsType<VoicePacket>(Assert.Single(network.ImmediateSends).Payload).StreamGeneration;
         var replacement = network.CreatePeer(); replacement.Setup(replacement.Id, "127.0.0.99");
-        players.SetPeer("platform:1", replacement);
+        Assert.True(players.TryGetPlayer("platform:1", out var speakerPlayer));
+        Assert.True(players.TrySetPeer(speakerPlayer, replacement));
         Context(replacement); Frame(replacement);
         var second = Assert.IsType<VoicePacket>(network.ImmediateSends.Last().Payload);
         Assert.Equal("platform:1", second.Speaker);

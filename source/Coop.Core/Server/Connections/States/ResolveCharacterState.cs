@@ -224,6 +224,7 @@ public class ResolveCharacterState : ConnectionStateBase
         {
             if (!TryTakeOverPreviousConnection(peer, controllerId, player)) return;
 
+            var registrationCurrent = false;
             var heroExists = false;
             var partyRestored = false;
             var registrationReplaced = false;
@@ -234,6 +235,11 @@ public class ResolveCharacterState : ConnectionStateBase
             // validation has already arrived.
             GameThread.Run(() =>
             {
+                // A retirement with an heir or a deletion queued ahead of this step can replace the registration read
+                // above, and restoring its retired hero would build a party nobody plays
+                registrationCurrent = playerManager.TryGetPlayer(controllerId, out var current) && ReferenceEquals(current, player);
+                if (!registrationCurrent) return;
+
                 heroExists = objectManager.TryGetObjectWithLogging(player.HeroId, out Hero _);
                 if (!heroExists) return;
 
@@ -246,6 +252,15 @@ public class ResolveCharacterState : ConnectionStateBase
                 if (registrationReplaced)
                     network.SendAllBut(peer, new NetworkPlayerRegistrationUpdated(restoredPlayer));
             }, blocking: true);
+
+            if (!registrationCurrent)
+            {
+                Logger.Warning(
+                    "The registration for hero {HeroId} changed before peer {Peer} rejoined it; disconnecting the joiner",
+                    player.HeroId, peer.Id);
+                peer.Disconnect();
+                return;
+            }
 
             if (heroExists)
             {
@@ -322,12 +337,12 @@ public class ResolveCharacterState : ConnectionStateBase
         ConnectionLogic.SetState<CreateCharacterState>();
     }
 
-    public override void TransferSave()
+    public override void TransferSave(Player acknowledgedPlayer)
     {
-        // SetState packages and sends the save synchronously; then move to LoadingState to await the
+        // SetTransferSaveState packages and sends the save synchronously; then move to LoadingState to await the
         // client reporting it has entered the campaign. Load() must run here (not inside the
         // TransferSaveState ctor) so it resolves against TransferSaveState, not this state.
-        ConnectionLogic.SetState<TransferSaveState>();
+        ConnectionLogic.SetTransferSaveState(acknowledgedPlayer);
         ConnectionLogic.Load();
     }
 
