@@ -344,31 +344,33 @@ internal class PlayerPartyVisibilityHandler : IHandler
     private void ParkOutsideMapEvent(MobileParty party, bool queueArmyLeave)
     {
         LeaveSiegeBeforeParking(party);
-
-        // A follower leaves its army, otherwise vanilla keeps copying the leader's battle side and siege camp onto it while it is attached
-        var army = party.Army;
-        if (army != null && army.LeaderParty != party)
-        {
-            Logger.Information("Removing parked party {PartyId} from the army of {LeaderId}", party.StringId, army.LeaderParty?.StringId);
-
-            // A queued leave runs on a later frame, after the party is parked, so it skips an army the party already left
-            if (queueArmyLeave)
-            {
-                GameThread.EnqueueSafe(() =>
-                {
-                    if (party.Army != army) return;
-                    armyLeaver.Remove(party, army);
-                });
-            }
-            else
-            {
-                armyLeaver.Remove(party, army);
-            }
-        }
+        LeaveFollowedArmy(party, queueArmyLeave);
 
         party.IsActive = false;
         party.IsVisible = false;
         partyVisuals.RemoveVisual(party);
+    }
+
+    // A follower leaves its army, otherwise vanilla keeps copying the leader's battle side and siege camp onto it while it is attached
+    private void LeaveFollowedArmy(MobileParty party, bool queue)
+    {
+        var army = party.Army;
+        if (army == null || army.LeaderParty == party) return;
+
+        Logger.Information("Removing parked party {PartyId} from the army of {LeaderId}", party.StringId, army.LeaderParty?.StringId);
+
+        if (!queue)
+        {
+            armyLeaver.Remove(party, army);
+            return;
+        }
+
+        // A queued leave runs on a later frame, after the party is parked, so it skips an army the party already left
+        GameThread.EnqueueSafe(() =>
+        {
+            if (party.Army != army) return;
+            armyLeaver.Remove(party, army);
+        });
     }
 
     private bool TryResolveParty(NetPeer peer, out Player player, out MobileParty party)

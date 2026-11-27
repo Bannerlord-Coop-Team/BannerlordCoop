@@ -22,9 +22,8 @@ public interface IArmyLeaver
 }
 
 /// <summary>
-/// A client's own army leave asks the server for it and applies it locally ahead of the server's echo, because
-/// <see cref="ArmyPatches"/> drops a client's native <see cref="MobileParty.Army"/> write without publishing it. The server's
-/// removal publishes first, because <see cref="ArmyPatches.RemoveMobilePartyInArmy"/> never reaches the publishing prefix.
+/// A client's own army leave: asks the server for it and applies it locally ahead of the server's echo,
+/// because <see cref="ArmyPatches"/> drops a client's native <see cref="MobileParty.Army"/> write without publishing it.
 /// </summary>
 internal sealed class ArmyLeaver : IArmyLeaver
 {
@@ -52,6 +51,7 @@ internal sealed class ArmyLeaver : IArmyLeaver
 
     public void Remove(MobileParty party, Army army)
     {
+        // RemoveMobilePartyInArmy edits army._parties directly, so OnRemovePartyInternalPrefix never publishes this
         messageBroker.Publish(party, new MobilePartyInArmyRemoved(army, party, null));
         ArmyPatches.RemoveMobilePartyInArmy(party, army, null);
     }
