@@ -1502,10 +1502,13 @@ public class VillageHostileActionTests : MapEventTestBase
             prefix: new HarmonyMethod(typeof(MapEventTestBase), nameof(OpenLootPartyScreen)));
         lootScreens.Patch(AccessTools.Method(typeof(InventoryScreenHelper), nameof(InventoryScreenHelper.OpenScreenAsLoot)),
             prefix: new HarmonyMethod(typeof(MapEventTestBase), nameof(OpenLootInventoryScreen)));
-        menus = new MethodCallRecorder(Priority.First,
-            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu)),
-            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu)));
+        menus = RecordMenuSwitches();
     }
+
+    // Records, and skips, every menu the client opens.
+    private static MethodCallRecorder RecordMenuSwitches() => new MethodCallRecorder(Priority.First,
+        AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu)),
+        AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu)));
 
     private void AdvanceSimulationUntilFinished(EnvironmentInstance pacer, string mapEventId)
     {
@@ -1745,8 +1748,8 @@ public class VillageHostileActionTests : MapEventTestBase
             Server.Call(() =>
             {
                 var mapEvent = Server.GetRegisteredObject<MapEvent>(context.MapEventId);
-                Server.Resolve<IMessageBroker>().Publish(client.NetPeer,
-                    new NetworkAdvanceBattleSimulation(context.MapEventId, 1));
+                // The harness cant simulate a combat round, so the attackers win outright and the next advance
+                // finishes the simulation the way a won auto resolve does.
                 mapEvent.BattleState = BattleState.AttackerVictory;
                 AdvanceSimulationUntilFinished(client, context.MapEventId);
                 Assert.True(mapEvent.IsFinalized);
@@ -1808,9 +1811,7 @@ public class VillageHostileActionTests : MapEventTestBase
             mapState._menuContext = Game.Current.ObjectManager.CreateObject<MenuContext>();
             mapState._menuContext.GameMenu = gameMenus.GetGameMenu(forceSuppliesMenu);
         }, MapEventDisabledMethods);
-        using var menus = new MethodCallRecorder(Priority.First,
-            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu)),
-            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu)));
+        using var menus = RecordMenuSwitches();
         client.NetworkSentMessages.Clear();
 
         // Vanilla's give in (UpdateVillageHostileActionEncounter) sets this winner as it opens the menu.
