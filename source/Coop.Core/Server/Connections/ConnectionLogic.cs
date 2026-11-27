@@ -1,6 +1,7 @@
 ﻿using Common.Logging;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
+using GameInterface.Services.Players.Data;
 using LiteNetLib;
 using Serilog;
 using System;
@@ -16,6 +17,12 @@ public interface IConnectionLogic : IConnectionState
     NetPeer Peer { get; }
     IConnectionState State { get; }
     TState SetState<TState>() where TState : IConnectionState;
+
+    /// <summary>
+    /// The registration this peer was told it plays, set just before the server tells it. The join save is only
+    /// sent while this exact registration is still the peer's.
+    /// </summary>
+    Player AcknowledgedPlayer { get; set; }
 }
 
 /// <inheritdoc cref="IConnectionLogic"/>
@@ -23,6 +30,7 @@ public class ConnectionLogic : IConnectionLogic
 {
     private readonly ILogger Logger = LogManager.GetLogger<ConnectionLogic>();
     public NetPeer Peer { get; }
+    public Player AcknowledgedPlayer { get; set; }
 
     private readonly ConnectionContext context;
     private readonly IReadOnlyDictionary<Type, Func<IConnectionState>> stateFactories;
@@ -82,7 +90,7 @@ public class ConnectionLogic : IConnectionLogic
         {
             [typeof(ResolveCharacterState)] = () => new ResolveCharacterState(this, context.MessageBroker, context.Network, context.ModuleValidator, context.PlayerManager, context.PlayerPartyRestorer, context.ObjectManager, context.ModuleInfoProvider, context.ModuleNameProvider, context.ExistingPlayerSender, context.SteamBanList, context.JoinValidationDenialLog),
             [typeof(CreateCharacterState)] = () => new CreateCharacterState(this, context.ObjectManager, context.MessageBroker, context.Network, context.HeroInterface, context.PlayerManager, context.PlayerCreationRollback, context.ExistingPlayerSender),
-            [typeof(TransferSaveState)] = () => new TransferSaveState(this, context.MessageBroker, context.Network, context.CoopSessionProvider, context.SaveInterface, context.ConnectionMessageQueue, context.Coalescer, context.AttachmentIdMapper, context.ServerOptionsProvider, context.LootShipHold),
+            [typeof(TransferSaveState)] = () => new TransferSaveState(this, context.MessageBroker, context.Network, context.CoopSessionProvider, context.SaveInterface, context.ConnectionMessageQueue, context.Coalescer, context.AttachmentIdMapper, context.ServerOptionsProvider, context.LootShipHold, context.PlayerManager),
             [typeof(LoadingState)] = () => new LoadingState(this, context.MessageBroker, context.Network, context.JoinCampaignBaselineSender, context.JoinCampaignKingdomBaseLineSender, context.ConnectionMessageQueue, context.Coalescer),
             [typeof(CampaignState)] = () => new CampaignState(this, context.MessageBroker),
             [typeof(MissionState)] = () => new MissionState(this, context.MessageBroker),

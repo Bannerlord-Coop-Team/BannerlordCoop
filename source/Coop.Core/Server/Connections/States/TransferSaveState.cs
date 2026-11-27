@@ -19,6 +19,7 @@ using GameInterface.Services.MobileParties;
 using GameInterface.Services.NavalDLC;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.OrderOfBattle;
+using GameInterface.Services.Players;
 using GameInterface.Services.Ships;
 using GameInterface.Services.Smithing;
 using GameInterface.Services.ViewData;
@@ -50,6 +51,7 @@ public class TransferSaveState : ConnectionStateBase
     private readonly IAttachmentIdMapper attachmentIdMapper;
     private readonly IServerOptionsProvider serverOptionsProvider;
     private readonly ILootShipHold lootShipHold;
+    private readonly IPlayerManager playerManager;
 
     private readonly bool saveSent;
 
@@ -63,7 +65,8 @@ public class TransferSaveState : ConnectionStateBase
         ISendCoalescer coalescer,
         IAttachmentIdMapper attachmentIdMapper,
         IServerOptionsProvider serverOptionsProvider,
-        ILootShipHold lootShipHold)
+        ILootShipHold lootShipHold,
+        IPlayerManager playerManager)
         : base(connectionLogic)
     {
         this.messageBroker = messageBroker;
@@ -75,6 +78,7 @@ public class TransferSaveState : ConnectionStateBase
         this.attachmentIdMapper = attachmentIdMapper;
         this.serverOptionsProvider = serverOptionsProvider;
         this.lootShipHold = lootShipHold;
+        this.playerManager = playerManager;
 
         saveSent = SendSaveOrDisconnect();
     }
@@ -121,6 +125,17 @@ public class TransferSaveState : ConnectionStateBase
     {
         var peer = ConnectionLogic.Peer;
         string[] heldLootShipIds = Array.Empty<string>();
+
+        // A game over, deletion or heir swap on the game thread can remove or replace the registration this
+        // peer was told it plays, and a replacement keeps the peer bound. So check that exact registration is
+        // still the peer's here, where nothing else can run.
+        if (!playerManager.TryGetCurrentController(peer, out var controllerId) ||
+            !playerManager.TryGetPlayer(controllerId, out var registered) ||
+            !ReferenceEquals(registered, ConnectionLogic.AcknowledgedPlayer))
+        {
+            Logger.Warning("Peer {PeerId} no longer plays the player it was told; disconnecting it instead of sending the join save", peer.Id);
+            return null;
+        }
 
         try
         {

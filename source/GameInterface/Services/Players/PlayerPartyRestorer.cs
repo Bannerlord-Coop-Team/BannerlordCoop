@@ -53,12 +53,33 @@ internal class PlayerPartyRestorer : IPlayerPartyRestorer
         restoredPlayer = player;
         if (player == null) return false;
         if (!objectManager.TryGetObjectWithLogging(player.HeroId, out Hero hero)) return false;
+        // A saved row can name the hero by its short id, and hero ids are compared as strings everywhere else
+        // (heir selection, sender checks), so the restored registration uses the id the hero is registered under
+        if (!objectManager.TryGetIdWithLogging(hero, out var heroId)) return false;
 
         // A dead registered hero is waiting for heir selection. Keep its saved party association
         // intact instead of restoring the dead hero into the roster as its leader.
         if (hero.IsDead)
         {
-            return objectManager.TryGetObjectWithLogging(player.MobilePartyId, out MobileParty _);
+            if (!objectManager.TryGetObjectWithLogging(player.MobilePartyId, out MobileParty deadHeroParty)) return false;
+            // Heir selection compares the heir's party id with this one, so it has to be the registered id too
+            if (!objectManager.TryGetIdWithLogging(deadHeroParty, out var deadHeroPartyId)) return false;
+
+            if (heroId != player.HeroId || deadHeroPartyId != player.MobilePartyId)
+                restoredPlayer = new Player(
+                    player.ControllerId,
+                    heroId,
+                    deadHeroPartyId,
+                    player.ClanId,
+                    player.CharacterObjectId,
+                    player.OriginalClanId)
+                {
+                    PlatformName = player.PlatformName,
+                    CrimeRatings = player.CrimeRatings,
+                    MapTrackedControllerIds = player.MapTrackedControllerIds
+                };
+
+            return true;
         }
 
         if (hero.Clan == null || hero.CharacterObject == null)
@@ -125,19 +146,22 @@ internal class PlayerPartyRestorer : IPlayerPartyRestorer
 
         Restore(hero, party);
 
-        if (partyId != player.MobilePartyId ||
+        if (heroId != player.HeroId ||
+            partyId != player.MobilePartyId ||
             clanId != player.ClanId ||
             characterObjectId != player.CharacterObjectId)
         {
             restoredPlayer = new Player(
                 player.ControllerId,
-                player.HeroId,
+                heroId,
                 partyId,
                 clanId,
                 characterObjectId,
                 player.OriginalClanId ?? player.ClanId)
             {
-                CrimeRatings = player.CrimeRatings
+                PlatformName = player.PlatformName,
+                CrimeRatings = player.CrimeRatings,
+                MapTrackedControllerIds = player.MapTrackedControllerIds
             };
         }
 

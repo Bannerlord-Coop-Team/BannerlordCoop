@@ -88,13 +88,14 @@ public class CreateCharacterState : ConnectionStateBase
 
         if (!playerManager.AddPlayer(player))
         {
-            // The controller already holds a registration — two joins for it raced into character
-            // creation before either finished. Everything below assumes this peer owns the player
-            // it just created, so continuing would bind the peer to the *other* registration and
+            // The registry refused it: two joins for this controller raced into character creation, or
+            // the created hero or party is already another player's. Everything below assumes this peer
+            // owns the player it just created, so continuing would bind the peer to the *other* registration and
             // announce this refused one to the joiner and every other client. Drop the connection
             // instead, exactly as a failed create does above.
             Logger.Error(
-                "Controller {ControllerId} is already registered; disconnecting the joining peer",
+                "The player registry refused controller {ControllerId} (duplicate controller, or its hero or party " +
+                "is already controlled); disconnecting the joining peer",
                 controllerId);
             ConnectionLogic.Peer.Disconnect();
             return;
@@ -138,6 +139,7 @@ public class CreateCharacterState : ConnectionStateBase
         }
 
         // Respond with ids for the creating client
+        ConnectionLogic.AcknowledgedPlayer = player;
         network.SendImmediate(netPeer, new NetworkHeroRecieved(player));
 
         ConnectionLogic.TransferSave();

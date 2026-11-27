@@ -23,11 +23,16 @@ public interface IPlayerManager
     /// <summary>
     /// Adds a player to the registry. A controller id maps to exactly one player, so a
     /// registration for a controller that already has one is refused; deregister the old one
-    /// first (<see cref="RemovePlayer"/>) when replacing it.
+    /// first (<see cref="RemovePlayer"/>) when replacing it. The server also refuses a registration whose
+    /// hero or party another registered player already controls.
     /// </summary>
     /// <param name="player">The player to be added to the registry</param>
     /// <returns>if the player was added to the registry</returns>
     bool AddPlayer(Player player);
+    /// <summary>
+    /// Swaps a registration for its replacement. Refused if <paramref name="registeredPlayer"/> is no longer the current
+    /// registration, or on the server if the replacement's hero or party is held by another registered player.
+    /// </summary>
     bool ReplacePlayer(Player registeredPlayer, Player replacementPlayer);
     bool TryGetPlayer(string controllerId, out Player player);
 
@@ -40,10 +45,17 @@ public interface IPlayerManager
 
     /// <summary>
     /// Associates a connected peer with the (already registered) player behind
-    /// controllerId. Call once the peer's identity is known: on first character creation and
-    /// on every reconnect, since a rejoin gets a new NetPeer.
+    /// controllerId. Call once the peer's identity is known on first character creation. A
+    /// reconnect gets a new NetPeer and binds it with <see cref="TrySetPeer"/> instead, against the
+    /// registration it validated.
     /// </summary>
     void SetPeer(string controllerId, NetPeer peer);
+
+    /// <summary>
+    /// Associates a peer with <paramref name="player"/>, but only while it is still its controller's registration.
+    /// </summary>
+    /// <returns>false, binding nothing, if the registration was removed or replaced since the caller read it</returns>
+    bool TrySetPeer(Player player, NetPeer peer);
 
     /// <summary>
     /// Resolves the currently associated peer for a registered controller.
@@ -189,13 +201,16 @@ public class PlayerManager : IPlayerManager
                 return false;
             }
 
-            _players.Add(player.ControllerId, player);
-        }
+            if (IsHeroOrPartyHeldByAnotherPlayer(player)) return false;
 
-        // Add player objects for IsPlayer extension (i.e. MobilePartyExtensions)
-        AddPlayerObject<MobileParty>(player.ControllerId, player.MobilePartyId);
-        AddPlayerObject<Hero>(player.ControllerId, player.HeroId);
-        AddPlayerObject<Clan>(player.ControllerId, player.OriginalClanId ?? player.ClanId);
+            _players.Add(player.ControllerId, player);
+
+            // Add player objects for IsPlayer extension (i.e. MobilePartyExtensions). Marked under the
+            // lock so a second registration can't pass the hold check before these markers exist.
+            AddPlayerObject<MobileParty>(player.ControllerId, player.MobilePartyId);
+            AddPlayerObject<Hero>(player.ControllerId, player.HeroId);
+            AddPlayerObject<Clan>(player.ControllerId, player.OriginalClanId ?? player.ClanId);
+        }
 
         return true;
     }
@@ -213,6 +228,8 @@ public class PlayerManager : IPlayerManager
                 !ReferenceEquals(current, registeredPlayer))
                 return false;
 
+            if (IsHeroOrPartyHeldByAnotherPlayer(replacementPlayer)) return false;
+
             replacementPlayer.PlatformName = registeredPlayer.PlatformName;
             replacementPlayer.MapTrackedControllerIds = registeredPlayer.MapTrackedControllerIds;
             if (ModInformation.IsServer && replacementPlayer.HeroId == registeredPlayer.HeroId)
@@ -225,21 +242,50 @@ public class PlayerManager : IPlayerManager
             {
                 peerToPlayer[peer] = replacementPlayer;
             }
+
+            ReplacePlayerObject<MobileParty>(registeredPlayer.ControllerId, registeredPlayer.MobilePartyId, replacementPlayer.MobilePartyId);
+            ReplacePlayerObject<Hero>(registeredPlayer.ControllerId, registeredPlayer.HeroId, replacementPlayer.HeroId);
+            ReplacePlayerObject<Clan>(registeredPlayer.ControllerId,
+                registeredPlayer.OriginalClanId ?? registeredPlayer.ClanId,
+                replacementPlayer.OriginalClanId ?? replacementPlayer.ClanId);
         }
 
-        ReplacePlayerObject<MobileParty>(registeredPlayer.ControllerId, registeredPlayer.MobilePartyId, replacementPlayer.MobilePartyId);
-        ReplacePlayerObject<Hero>(registeredPlayer.ControllerId, registeredPlayer.HeroId, replacementPlayer.HeroId);
-        ReplacePlayerObject<Clan>(registeredPlayer.ControllerId,
-            registeredPlayer.OriginalClanId ?? registeredPlayer.ClanId,
-            replacementPlayer.OriginalClanId ?? replacementPlayer.ClanId);
         return true;
+    }
+
+    // Two controllers on one hero or party would both pass every sender check, so the server refuses it.
+    // Clients mirror the server's registry, so they keep it and only log. The clan is left out because a
+    // player can keep another player's clan as its original clan. Call it under registrySync, so the hold
+    // check and the marker write are one step.
+    private bool IsHeroOrPartyHeldByAnotherPlayer(Player player)
+    {
+        if (ModInformation.IsClient) return false;
+
+        if (!IsHeldByAnotherPlayer<Hero>(player.ControllerId, player.HeroId) &&
+            !IsHeldByAnotherPlayer<MobileParty>(player.ControllerId, player.MobilePartyId))
+            return false;
+
+        logger.Error(
+            "Refusing to register hero {HeroId} with party {PartyId}: another registered player already controls it",
+            player.HeroId, player.MobilePartyId);
+        return true;
+    }
+
+    // A marker left by a controller that is no longer registered doesn't count, AddPlayerObject replaces it.
+    private bool IsHeldByAnotherPlayer<T>(string controllerId, string networkId)
+    {
+        return !string.IsNullOrEmpty(networkId) &&
+            objectManager.TryGetObject<T>(networkId, out var obj) &&
+            PlayerObjects.TryGetValue(obj, out var control) &&
+            control.ObjectControllerId != controllerId &&
+            _players.ContainsKey(control.ObjectControllerId);
     }
 
     private void ReplacePlayerObject<T>(string controllerId, string oldId, string newId)
     {
         if (oldId == newId) return;
 
-        RemovePlayerObject<T>(oldId);
+        RemovePlayerObject<T>(controllerId, oldId);
         AddPlayerObject<T>(controllerId, newId);
     }
 
@@ -252,11 +298,16 @@ public class PlayerManager : IPlayerManager
         if (!objectManager.TryGetObjectWithLogging<T>(networkId, out var obj))
             return;
 
-        // Sets the value if it does not exist
-        if (PlayerObjects.TryGetValue(obj, out var _))
+        // Keep a registered player's marker, but take over one whose controller is gone
+        if (PlayerObjects.TryGetValue(obj, out var control))
         {
-            logger.Error("{objType} was already added to {field}", obj.GetType(), nameof(PlayerObjects));
-            return;
+            if (_players.ContainsKey(control.ObjectControllerId))
+            {
+                logger.Error("{objType} was already added to {field}", obj.GetType(), nameof(PlayerObjects));
+                return;
+            }
+
+            PlayerObjects.Remove(obj);
         }
 
         PlayerObjects.Add(obj, new ControlledObjectInfo(controllerId, controllerIdProvider));
@@ -326,11 +377,24 @@ public class PlayerManager : IPlayerManager
             return;
         }
 
+        TrySetPeer(player, peer);
+    }
+
+    public bool TrySetPeer(Player player, NetPeer peer)
+    {
+        if (player == null || string.IsNullOrEmpty(player.ControllerId)) return false;
+
         lock (registrySync)
         {
+            // Checked under the same lock as the write, so a removal or replacement can't slip in between
+            if (!_players.TryGetValue(player.ControllerId, out var registered) || !ReferenceEquals(registered, player))
+                return false;
+
             peerToPlayer[peer] = player;
-            controllerToPeer[controllerId] = peer;
+            controllerToPeer[player.ControllerId] = peer;
         }
+
+        return true;
     }
 
     public bool TryGetPeer(string controllerId, out NetPeer peer)
@@ -377,21 +441,24 @@ public class PlayerManager : IPlayerManager
             {
                 peerToPlayer.TryRemove(stalePeer, out _);
             }
-        }
 
-        RemovePlayerObject<MobileParty>(player.MobilePartyId);
-        RemovePlayerObject<Hero>(player.HeroId);
-        RemovePlayerObject<Clan>(player.OriginalClanId ?? player.ClanId);
+            RemovePlayerObject<MobileParty>(player.ControllerId, player.MobilePartyId);
+            RemovePlayerObject<Hero>(player.ControllerId, player.HeroId);
+            RemovePlayerObject<Clan>(player.ControllerId, player.OriginalClanId ?? player.ClanId);
+        }
 
         return true;
     }
 
-    private void RemovePlayerObject<T>(string networkId)
+    private void RemovePlayerObject<T>(string controllerId, string networkId)
     {
         if (string.IsNullOrEmpty(networkId)) return;
 
         // The object may already be gone (e.g. a destroyed party); nothing to unmark then.
         if (!objectManager.TryGetObject<T>(networkId, out var obj)) return;
+
+        // A client can keep a registration for an object another player holds, so only unmark this controller's.
+        if (!PlayerObjects.TryGetValue(obj, out var control) || control.ObjectControllerId != controllerId) return;
 
         PlayerObjects.Remove(obj);
 
@@ -438,7 +505,8 @@ public class PlayerManager : IPlayerManager
 
     public bool IsSenderControllingHero(object sender, string heroId)
     {
-        if (sender is NetPeer peer && TryGetPlayer(peer, out var player) && player.HeroId == heroId) return true;
+        if (sender is NetPeer peer && TryGetCurrentController(peer, out var controllerId) &&
+            TryGetPlayer(controllerId, out var player) && player.HeroId == heroId) return true;
 
         logger.Warning("Ignoring a request for hero {HeroId} from a peer that does not control it", heroId);
         return false;
@@ -457,8 +525,8 @@ public class PlayerManager : IPlayerManager
     public bool TryGetSenderHero(object sender, out Hero hero)
     {
         hero = null;
-        return sender is NetPeer peer && TryGetPlayer(peer, out var player) &&
-            objectManager.TryGetObject(player.HeroId, out hero);
+        return sender is NetPeer peer && TryGetCurrentController(peer, out var controllerId) &&
+            TryGetPlayer(controllerId, out var player) && objectManager.TryGetObjectWithLogging(player.HeroId, out hero);
     }
 
     public bool IsConnected(Player player)

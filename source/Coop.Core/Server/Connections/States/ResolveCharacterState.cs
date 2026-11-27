@@ -28,6 +28,9 @@ public class ResolveCharacterState : ConnectionStateBase
 {
     private static readonly ILogger Logger = LogManager.GetLogger<ResolveCharacterState>();
 
+    // LiteNetLib pings every NetworkConfig.PingInterval off the game thread, so a live client is never this quiet.
+    private const float LivePeerSilenceMs = 5000f;
+
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IModuleValidator moduleValidator;
@@ -218,6 +221,26 @@ public class ResolveCharacterState : ConnectionStateBase
     {
         if (playerManager.TryGetPlayer(controllerId, out var player))
         {
+            // One connection per player. A quiet old connection is this player back from a crash, so
+            // drop it and let its disconnect cleanup run; one still talking keeps playing instead.
+            if (playerManager.TryGetPeer(controllerId, out var previousPeer) &&
+                previousPeer.ConnectionState == ConnectionState.Connected)
+            {
+                if (previousPeer.TimeSinceLastPacket < LivePeerSilenceMs)
+                {
+                    Logger.Warning(
+                        "Hero {HeroId} is still played from peer {PreviousPeer}; refusing the second connection from peer {Peer}",
+                        player.HeroId, previousPeer.Id, peer.Id);
+                    peer.Disconnect();
+                    return;
+                }
+
+                Logger.Warning(
+                    "Hero {HeroId} rejoined from peer {Peer}; dropping its silent old connection, peer {PreviousPeer}",
+                    player.HeroId, peer.Id, previousPeer.Id);
+                previousPeer.Disconnect();
+            }
+
             var heroExists = false;
             var partyRestored = false;
             var registrationReplaced = false;
@@ -249,12 +272,23 @@ public class ResolveCharacterState : ConnectionStateBase
                     return;
                 }
 
+                // This peer is a new NetPeer for an already registered player, so the
+                // peer-Player link must be established here. A deletion or heir swap on the game
+                // thread can change the registration checked above, so bind only to that one.
+                if (!playerManager.TrySetPeer(restoredPlayer, peer))
+                {
+                    Logger.Warning(
+                        "The registration for hero {HeroId} changed while peer {Peer} was joining; disconnecting the joiner",
+                        restoredPlayer.HeroId, peer.Id);
+                    peer.Disconnect();
+                    return;
+                }
+
+                // Sent only once bound, so a change that won the race isn't overwritten by this older update
                 if (registrationReplaced)
                     network.SendAllBut(peer, new NetworkPlayerRegistrationUpdated(restoredPlayer));
 
-                // This peer is a new NetPeer for an already registered player, so the
-                // peer-Player link must be established here
-                playerManager.SetPeer(controllerId, peer);
+                ConnectionLogic.AcknowledgedPlayer = restoredPlayer;
                 network.SendImmediate(peer, new NetworkClientValidated(true, restoredPlayer));
                 ConnectionLogic.TransferSave();
 
