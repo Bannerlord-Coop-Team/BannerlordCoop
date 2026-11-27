@@ -201,15 +201,18 @@ internal class TradeHandler : IHandler
                 }
             }
 
-            if (message.IsTrading && hero.Gold - totalAmount < 0)
+            if (message.IsTrading)
             {
-                // Vanilla's done logic refuses this too, the screen's gold was stale
-                logger.Warning("Trade refused, {HeroId} owes {TotalAmount} with {Gold} gold", message.HeroId, totalAmount, hero.Gold);
-                if (peer != null) network.Send(peer, new SendInformationMessage("You don't have enough money for that trade."));
-                return;
-            }
+                if (hero.Gold - totalAmount < 0)
+                {
+                    // Vanilla's done logic refuses this too, the screen's gold was stale
+                    logger.Warning("Trade refused, {HeroId} owes {TotalAmount} with {Gold} gold", message.HeroId, totalAmount, hero.Gold);
+                    if (peer != null) network.Send(peer, new SendInformationMessage("You don't have enough money for that trade."));
+                    return;
+                }
 
-            if (message.IsTrading) merchantGold = GetLiveMerchantGold(currentSettlementComponent, currentMobileParty, merchantGold);
+                merchantGold = GetLiveMerchantGold(currentSettlementComponent, currentMobileParty, merchantGold);
+            }
 
             ResolveCharacterEquipmentsData(message.CharacterIdEquipmentsData, out var characterEquipmentsData);
 
@@ -309,7 +312,7 @@ internal class TradeHandler : IHandler
             var kept = keptItems[i];
             if (kept.Amount <= 0) continue;
 
-            purchases.Add((kept, price - GetRefund(price, bought.Amount - kept.Amount, bought.Amount)));
+            purchases.Add((kept, price - GetProratedPrice(price, bought.Amount - kept.Amount, bought.Amount)));
         }
 
         return purchases;
@@ -491,7 +494,7 @@ internal class TradeHandler : IHandler
                     shortfall - removed, element.Item?.StringId);
             }
 
-            totalAmount -= GetRefund(boughtItem.Item2, removed, amount);
+            totalAmount -= GetProratedPrice(boughtItem.Item2, removed, amount);
 
             var kept = boughtItem.Item1;
             kept.Amount = amount - removed;
@@ -502,8 +505,9 @@ internal class TradeHandler : IHandler
     }
 
     /// <summary>
-    /// Cuts each sale by what <see cref="RebaseInventoryData"/> could not remove from the party roster, and takes the
-    /// unpaid share of its price off the total. Outputs each sale that is kept, at its kept quantity and price.
+    /// Cuts each sale by what <see cref="RebaseInventoryData"/> could not remove from the party roster, and adds the
+    /// unpaid share of its price back to the total the hero pays, which is negative when the hero is paid.
+    /// Outputs each sale that is kept, at its kept quantity and price.
     /// </summary>
     internal static int ReconcileSales(
         List<ItemRosterElement> unremovedItems,
@@ -524,7 +528,7 @@ internal class TradeHandler : IHandler
                     amount, element.Item?.StringId, kept);
             }
 
-            int unpaid = GetRefund(price, amount - kept, amount);
+            int unpaid = GetProratedPrice(price, amount - kept, amount);
             totalAmount += unpaid;
             if (kept <= 0) continue;
 
@@ -536,12 +540,12 @@ internal class TradeHandler : IHandler
         return totalAmount;
     }
 
-    // The prorated price of the quantity taken back or left unsold, shared by the gold and the exchange event so both agree
-    private static int GetRefund(int price, int removed, int amount)
+    // The share of an entry's price for quantity of its amount, shared by the gold and the exchange event so both agree
+    private static int GetProratedPrice(int price, int quantity, int amount)
     {
-        if (removed <= 0 || amount <= 0) return 0;
+        if (quantity <= 0 || amount <= 0) return 0;
 
-        return (int)((long)price * removed / amount);
+        return (int)((long)price * quantity / amount);
     }
 
     /// <summary>
