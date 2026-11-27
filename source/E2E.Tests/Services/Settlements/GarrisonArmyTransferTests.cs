@@ -5,15 +5,18 @@ using GameInterface.Services.Players.Data;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.ComponentInterfaces;
+using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.Core;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Settlements;
 
+/// <summary>
+/// Covers which parties an AI army moves troops between and the garrison when its leader enters a friendly fortification.
+/// </summary>
 public class GarrisonArmyTransferTests : IDisposable
 {
     private readonly E2ETestEnvironment environment;
