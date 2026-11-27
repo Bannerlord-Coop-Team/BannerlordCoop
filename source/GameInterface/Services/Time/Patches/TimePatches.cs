@@ -29,10 +29,8 @@ internal class TimePatches
     [HarmonyPatch(MethodType.Setter)]
     private static bool Prefix(ref Campaign __instance, ref CampaignTimeControlMode value)
     {
-        // We only want ExecuteTimeControlChange, which is called from the time control button clicks,
-        // to publish the TimeSpeedChanged message.
-        // To do this we skip this method if this thread is not "allowed"
-        // We set this thread to "allowed" in AllowTimeControlFromControlsPatches
+        // Only player time input publishes a request: the time controls, hotkeys and map clicks allow this thread
+        // in the AllowTimeControlFrom*Patches classes
         if (CallOriginalPolicy.IsOriginalAllowed() == false) return false;
 
         if (value != __instance._timeControlMode)
@@ -187,10 +185,12 @@ internal class AllowTimeControlFromHotKeysPatches
     private static bool AllowTimeControlInMenu(GameMenu _) => true;
 }
 
+/// <summary>
+/// Sends the time change vanilla makes after a travel or parley click to the server as a time request, like the time controls do.
+/// </summary>
 [HarmonyPatch(typeof(MapScreen), nameof(MapScreen.HandleClickTimeChange))]
 internal class AllowTimeControlFromMapClickPatches
 {
-    // Vanilla resumes time after a travel or parley click, so send that as a time request like the time controls do
     [HarmonyPrefix]
     private static void Prefix()
     {
