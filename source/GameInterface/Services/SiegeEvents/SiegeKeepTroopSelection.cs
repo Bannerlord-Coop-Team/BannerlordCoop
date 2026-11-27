@@ -32,6 +32,7 @@ public readonly struct SiegeKeepSeat
 public interface ISiegeKeepRoster
 {
     bool IsLocked(MapEvent mapEvent);
+    /// <summary>Whether the roster is locked and this party chose a squad for the keep.</summary>
     bool IsAdmitted(MapEvent mapEvent, MobileParty party);
     void FilterReserve(MapEvent mapEvent, MapEventParty party, List<TroopReserveEntry> entries);
 }

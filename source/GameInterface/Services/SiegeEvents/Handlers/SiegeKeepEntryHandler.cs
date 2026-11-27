@@ -14,7 +14,6 @@ using System;
 using System.Collections.Concurrent;
 using System.Threading;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -60,10 +59,9 @@ internal sealed class SiegeKeepEntryHandler : IHandler
     }
 
     /// <summary>Opens the troop picker for the keep, called from the encounter's Attack option.</summary>
-    internal void OpenTroopSelection(MenuCallbackArgs args)
+    internal void OpenTroopSelection(MenuCallbackArgs args, MapEvent battle)
     {
-        var battle = PlayerEncounter.Battle ?? MobileParty.MainParty?.MapEvent;
-        if (battle == null || !objectManager.TryGetIdWithLogging(battle, out var mapEventId)) return;
+        if (!objectManager.TryGetIdWithLogging(battle, out var mapEventId)) return;
         Logger.Information("Attack on the keep of {MapEventId}: asking the server for this player's place", mapEventId);
         if (!RequestBlocking(mapEventId, queryOnly: true, Array.Empty<HideoutTroopSelectionEntry>(), out var reply)) return;
 

@@ -65,7 +65,7 @@ internal class EncounterAttackConsequencePatch
                 return false;
             }
 
-            keep.OpenTroopSelection(args);
+            keep.OpenTroopSelection(args, battle);
             return false;
         }
 
