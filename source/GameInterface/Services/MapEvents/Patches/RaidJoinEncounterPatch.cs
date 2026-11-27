@@ -33,29 +33,32 @@ internal class RaidJoinEncounterPatch
 
         var mapEvent = PlayerEncounter.Current.GetEncounteredBattleOrNull();
         var mainParty = MobileParty.MainParty?.Party;
-        if (!mapEvent.IsRaidHostileAction() || mainParty == null)
+        if (!mapEvent.IsVillageHostileAction() || mainParty == null)
             return true;
 
-        var side = __originalMethod.Name == HelpAttackersConsequence ? BattleSideEnum.Attacker : BattleSideEnum.Defender;
-        if (mapEvent.IsActiveSlowVillageRaid() && side == BattleSideEnum.Attacker)
+        if (__originalMethod.Name == HelpDefendersConsequence)
+        {
+            // Encounter menu init reads the joiner's side, so MapEventSideDataHandler opens it once the server's add lands.
+            PlayerEncounter.JoinBattle(BattleSideEnum.Defender);
+            return false;
+        }
+
+        if (!mapEvent.IsRaidHostileAction())
+            return true;
+
+        if (mapEvent.IsActiveSlowVillageRaid())
         {
             GameMenu.SwitchToMenu("raid_occupied");
             return false;
         }
 
-        PlayerEncounter.JoinBattle(side);
-        SwitchToJoinedEncounterMenu(mapEvent, side);
+        PlayerEncounter.JoinBattle(BattleSideEnum.Attacker);
+        SwitchToJoinedEncounterMenu(mapEvent);
         return false;
     }
 
-    private static void SwitchToJoinedEncounterMenu(MapEvent mapEvent, BattleSideEnum side)
+    private static void SwitchToJoinedEncounterMenu(MapEvent mapEvent)
     {
-        if (side == BattleSideEnum.Defender)
-        {
-            GameMenu.ActivateGameMenu("encounter");
-            return;
-        }
-
         if (mapEvent?.DefenderSide?.TroopCount > 0 && !mapEvent.IsActiveSlowVillageRaid())
         {
             GameMenu.SwitchToMenu("encounter");

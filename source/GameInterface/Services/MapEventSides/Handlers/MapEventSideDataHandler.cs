@@ -191,15 +191,12 @@ internal class MapEventSideDataHandler : IHandler
         if (ModInformation.IsServer)
             return;
 
-        SwitchRaiderToEncounterIfNeeded(mapEvent);
+        SwitchVillageJoinerToEncounterIfNeeded(mapEvent);
         encounterMenuConditionRefresher.RefreshForMapEvent(mapEvent);
     }
 
-    private static void SwitchRaiderToEncounterIfNeeded(MapEvent mapEvent)
+    private static void SwitchVillageJoinerToEncounterIfNeeded(MapEvent mapEvent)
     {
-        if (!mapEvent.IsRaidHostileAction() || mapEvent.IsActiveSlowVillageRaid())
-            return;
-
         if (MobileParty.MainParty?.MapEvent != mapEvent)
             return;
 
@@ -210,9 +207,11 @@ internal class MapEventSideDataHandler : IHandler
         if (encounter.GetBattleOrPlayerMapEvent() != mapEvent)
             return;
 
-        if (Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId != "raiding_village")
-            return;
-
-        GameMenu.SwitchToMenu("encounter");
+        var menuId = Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId;
+        var raiderWaits = menuId == "raiding_village" && mapEvent.IsRaidHostileAction() && !mapEvent.IsActiveSlowVillageRaid();
+        // RaidJoinEncounterPatch keeps a village defender in join_encounter until this add gives it a side.
+        var defenderWaits = menuId == "join_encounter" && mapEvent.IsVillageHostileAction();
+        if (raiderWaits || defenderWaits)
+            GameMenu.SwitchToMenu("encounter");
     }
 }
