@@ -147,6 +147,12 @@ public interface ISiegeEventInterface : IGameAbstraction
         bool interruptedActiveAssault = false);
 
     /// <summary>
+    /// [Game thread] Shows the main party the vanilla "no longer enemies" menu after the server's continuity check
+    /// pulled it out of its own siege because it is no longer at war with <paramref name="faction"/>.
+    /// </summary>
+    void PromptSiegeLeftByDiplomacy(IFaction faction);
+
+    /// <summary>
     /// Whether a rendered mission still owns the screen while an interrupted assault is unwinding.
     /// </summary>
     bool IsCampaignMissionActive { get; }
@@ -667,6 +673,19 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
 
             if (!interruptedActiveAssault)
                 GameMenu.ExitToLast();
+        }
+    }
+
+    public void PromptSiegeLeftByDiplomacy(IFaction faction)
+    {
+        // The menu's text names the faction vanilla's own continuity check would have recorded here.
+        var diplomaticHandler = Campaign.Current.GetCampaignBehavior<PartyDiplomaticHandlerCampaignBehavior>();
+        if (diplomaticHandler != null)
+            diplomaticHandler._lastFactionMadePeaceWithCausedPlayerToLeaveEvent = faction;
+
+        using (new AllowedThread())
+        {
+            SwitchOrActivateMenu("hostile_action_end_by_peace");
         }
     }
 
