@@ -46,6 +46,18 @@ internal class PlayerLeaveSettlementPatch
     }
 }
 
+/// <summary>
+/// Leaves a town or castle through the server from the slink away menu a war or a severe crime rating opens.
+/// </summary>
+[HarmonyPatch(typeof(EncounterGameMenuBehavior))]
+internal class PlayerSlinkAwayLeavePatch
+{
+    // Vanilla's Finish keeps a party attached to an army with its leader, so that one only closes its menu locally
+    [HarmonyPatch(nameof(EncounterGameMenuBehavior.game_menu_fortification_high_crime_rating_continue_on_consequence))]
+    [HarmonyPrefix]
+    public static bool Prefix() => MobileParty.MainParty.AttachedTo != null || PlayerLeaveSettlementPatch.RequestLeave();
+}
+
 [HarmonyPatch(typeof(PlayerTownVisitCampaignBehavior))]
 [HarmonyPatchCategory(GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class PlayerVillageLandSeaLeavePatch
