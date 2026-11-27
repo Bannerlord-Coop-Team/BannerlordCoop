@@ -77,7 +77,6 @@ namespace E2E.Tests.Services.Heroes
             TestEnvironment.AssertReferenceProperty<Hero, Hero>(nameof(Hero.DeathMarkKillerHero));
             TestEnvironment.AssertReferenceProperty<Hero, Settlement>(nameof(Hero.LastKnownClosestSettlement));
             TestEnvironment.AssertProperty<Hero, int>(nameof(Hero.HitPoints), 5, defaultValue: hero.HitPoints);
-            TestEnvironment.AssertProperty<Hero, long>(nameof(Hero.LastExaminedLogEntryID), 50);
             TestEnvironment.AssertReferenceProperty<Hero, Clan>(nameof(Hero.Clan));
             TestEnvironment.AssertReferenceProperty<Hero, Clan>(nameof(Hero.SupporterOf));
             TestEnvironment.AssertReferenceProperty<Hero, Town>(nameof(Hero.GovernorOf));
@@ -263,6 +262,42 @@ namespace E2E.Tests.Services.Heroes
             finally
             {
                 OutputSinkManager.RemoveLogCallback(captureDiagnostic);
+            }
+        }
+
+        [Fact]
+        public void Client_LastExaminedLogEntryID_StaysLocalWithoutMutationDiagnostic()
+        {
+            int diagnosticCount = 0;
+            Action<string> capture = message =>
+            {
+                if (message.Contains("Client updated managed") && message.Contains("LastExaminedLogEntryID"))
+                    Interlocked.Increment(ref diagnosticCount);
+            };
+            OutputSinkManager.AddLogCallback(capture);
+            try
+            {
+                var clientA = Clients.First();
+                clientA.Call(() =>
+                {
+                    Assert.True(clientA.ObjectManager.TryGetObject(HeroId, out Hero hero));
+                    Assert.False(CallOriginalPolicy.IsOriginalAllowed());
+                    hero.LastExaminedLogEntryID = 77;
+                });
+
+                Assert.Equal(0, Volatile.Read(ref diagnosticCount));
+                foreach (var instance in Clients.Prepend(Server))
+                {
+                    instance.Call(() =>
+                    {
+                        Assert.True(instance.ObjectManager.TryGetObject(HeroId, out Hero hero));
+                        Assert.Equal(instance == clientA ? 77L : 0L, hero.LastExaminedLogEntryID);
+                    });
+                }
+            }
+            finally
+            {
+                OutputSinkManager.RemoveLogCallback(capture);
             }
         }
 
