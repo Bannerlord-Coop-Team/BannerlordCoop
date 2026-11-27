@@ -97,7 +97,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party))
                 continue;
 
-            ParkParty(player, party, "its saved player is offline");
+            ParkParty(player, party, "its saved player is offline", queueArmyLeave: false);
         }
     }
 
@@ -121,11 +121,11 @@ internal class PlayerPartyVisibilityHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
-            ParkParty(player, party, $"peer {peer.Id} disconnected");
+            ParkParty(player, party, $"peer {peer.Id} disconnected", queueArmyLeave: false);
         });
     }
 
-    private void ParkParty(Player player, MobileParty party, string reason, bool queueArmyLeave = false)
+    private void ParkParty(Player player, MobileParty party, string reason, bool queueArmyLeave)
     {
         var mapEvent = party.MapEvent;
         if (mapEvent != null)
@@ -168,7 +168,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
 
         if (!objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party)) return;
 
-        ParkParty(player, party, $"player hero {heroId} died");
+        ParkParty(player, party, $"player hero {heroId} died", queueArmyLeave: false);
     }
 
     private void Handle_PlayerHeirSelectionCompleted(MessagePayload<PlayerHeirSelectionCompleted> payload)

@@ -14,13 +14,13 @@ namespace E2E.Tests.Services.MapEvents;
 /// <summary>
 /// A disconnected player's follower leaves its battle with its leader before its deferred park runs (#4945, #4952).
 /// </summary>
-public class DisconnectedLastBattlePartyTests : MapEventTestBase
+public class DisconnectedFollowerParkingTests : MapEventTestBase
 {
     private const string ControllerId = "PlayerOne";
 
     private EnvironmentInstance Client => Clients.First();
 
-    public DisconnectedLastBattlePartyTests(ITestOutputHelper output) : base(output) { }
+    public DisconnectedFollowerParkingTests(ITestOutputHelper output) : base(output) { }
 
     [Fact]
     public void LastFollowerOnItsSide_LeaderLeavesBattle_IsParkedAfterBattleEnds()
@@ -48,7 +48,7 @@ public class DisconnectedLastBattlePartyTests : MapEventTestBase
         JoinOtherBattle(first.AttackerPartyId, second.MapEventId);
         PumpAll();
 
-        AssertStaysActiveUntilSecondBattleEnds(partyId, first.MapEventId, second.MapEventId);
+        EndSecondBattleAndAssertParkedOnlyThen(partyId, first.MapEventId, second.MapEventId);
     }
 
     [Fact]
@@ -67,7 +67,7 @@ public class DisconnectedLastBattlePartyTests : MapEventTestBase
         DestroyServerMapEvent(first.MapEventId);
         PumpAll();
 
-        AssertStaysActiveUntilSecondBattleEnds(partyId, first.MapEventId, second.MapEventId);
+        EndSecondBattleAndAssertParkedOnlyThen(partyId, first.MapEventId, second.MapEventId);
     }
 
     // A disconnected player's party following the leader, kept active in the leader's battle until it ends
@@ -90,7 +90,7 @@ public class DisconnectedLastBattlePartyTests : MapEventTestBase
         JoinServerPartyToSide(mapEventId, leaderId, BattleSideEnum.Attacker);
     }
 
-    private void AssertStaysActiveUntilSecondBattleEnds(string partyId, string firstMapEventId, string secondMapEventId)
+    private void EndSecondBattleAndAssertParkedOnlyThen(string partyId, string firstMapEventId, string secondMapEventId)
     {
         AssertFinalized(firstMapEventId);
         AssertParty(partyId, active: true, inBattle: true);
