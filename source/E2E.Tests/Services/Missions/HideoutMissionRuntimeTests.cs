@@ -564,7 +564,7 @@ public sealed class HideoutMissionRuntimeTests : MissionTestEnvironment
         var harmony = new Harmony($"hideout-signal-fire.{Guid.NewGuid()}");
         // native StealthAreaMissionLogic.OnObjectUsed refuses the fire while any active agent reads as alarmed
         harmony.Patch(AccessTools.PropertyGetter(typeof(Agent), nameof(Agent.AIStateFlags)),
-            prefix: new HarmonyMethod(typeof(HideoutMissionRuntimeTests), nameof(NotAlarmed)));
+            prefix: new HarmonyMethod(typeof(HideoutMissionRuntimeTests), nameof(AlarmFlags)));
         try
         {
             RunWithSceneShims(() => Clients.First().Call(() =>
@@ -618,13 +618,6 @@ public sealed class HideoutMissionRuntimeTests : MissionTestEnvironment
         AccessTools.Field(typeof(StealthAreaMissionLogic.StealthAreaData), nameof(area.StealthAreaMarkers))
             .SetValue(area, new Dictionary<StealthAreaMarker, List<Agent>> { [marker] = sentries.ToList() });
         return area;
-    }
-
-    private static bool NotAlarmed(Agent __instance, ref Agent.AIStateFlag __result)
-    {
-        if (!AgentMirror.TryGet(__instance, out _)) return true;
-        __result = default;
-        return false;
     }
 
     private static float stealthClock;
@@ -734,15 +727,6 @@ public sealed class HideoutMissionRuntimeTests : MissionTestEnvironment
         native._stealthAreaData.Add(SignalFireArea(fire, marker));
         areaLogic._stealthAreaData.Add(SignalFireArea(fire, marker));
         return (logic, native, hero, sentry);
-    }
-
-    private static StealthAreaMissionLogic.StealthAreaData SignalFireArea(StealthAreaUsePoint fire, StealthAreaMarker marker)
-    {
-        var area = ObjectHelper.SkipConstructor<StealthAreaMissionLogic.StealthAreaData>();
-        AccessTools.Field(typeof(StealthAreaMissionLogic.StealthAreaData), nameof(area.StealthAreaUsePoint)).SetValue(area, fire);
-        AccessTools.Field(typeof(StealthAreaMissionLogic.StealthAreaData), nameof(area.StealthAreaMarkers))
-            .SetValue(area, new Dictionary<StealthAreaMarker, List<Agent>> { [marker] = new() });
-        return area;
     }
 
     private static readonly HashSet<Agent> alarmedAgents = new();
