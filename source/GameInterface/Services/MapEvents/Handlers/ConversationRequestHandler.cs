@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using Common.Network.Messages;
 using Common.Util;
+using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
@@ -17,11 +18,10 @@ using Serilog;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
-using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.Core;
 
 namespace GameInterface.Services.MapEvents.Handlers;
 
@@ -53,6 +53,7 @@ internal class ConversationRequestHandler : IHandler
     private readonly IConversationRestartContextTracker restartContextTracker;
     private readonly PlayerPartyInteractionHandler playerPartyInteractionHandler;
     private readonly IPlayerManager playerManager;
+    private readonly IMapStateInterface mapStateInterface;
     private readonly object pvpInteractionSync = new object();
 
     // Client request state is game-thread-only; patch publishers run there and receive handlers use GameThread.RunSafe.
@@ -92,7 +93,8 @@ internal class ConversationRequestHandler : IHandler
         ConversationPartyTracker conversationPartyTracker,
         IConversationRestartContextTracker restartContextTracker,
         PlayerPartyInteractionHandler playerPartyInteractionHandler,
-        IPlayerManager playerManager)
+        IPlayerManager playerManager,
+        IMapStateInterface mapStateInterface)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -101,6 +103,7 @@ internal class ConversationRequestHandler : IHandler
         this.restartContextTracker = restartContextTracker;
         this.playerPartyInteractionHandler = playerPartyInteractionHandler;
         this.playerManager = playerManager;
+        this.mapStateInterface = mapStateInterface;
 
         messageBroker.Subscribe<ConversationRequested>(Handle_ConversationRequested);
         messageBroker.Subscribe<NetworkRequestConversation>(Handle_NetworkRequestConversation);
@@ -660,7 +663,7 @@ internal class ConversationRequestHandler : IHandler
         }
     }
 
-    /// <summary>[Client] Server approved: re-run RestartPlayerEncounter with the same parameters.</summary>
+    /// <summary>[Client] Server approved: apply it now, or keep it until the map is active again.</summary>
     private void Handle_NetworkAllowConversation(MessagePayload<NetworkAllowConversation> payload)
     {
         var message = payload.What;
@@ -668,11 +671,9 @@ internal class ConversationRequestHandler : IHandler
         GameThread.RunSafe(() =>
         {
             // Co-op ticks EncounterManager under screens and missions, but its meeting throws while they cover the map.
-            // Later approvals queue behind a waiting one so they still apply in the order they came.
-            var states = GameStateManager.Current;
+            // While one approval waits, a later one replaces it, so an older approval never opens after a newer one.
             if (approvalWaitingForMap.HasValue ||
-                (message.Source == ConversationRestartSource.EncounterManager &&
-                 states?.ActiveState is not MapState && states?.LastOrDefault<MapState>() != null))
+                (message.Source == ConversationRestartSource.EncounterManager && mapStateInterface.IsMapCovered()))
             {
                 WaitForMap(message);
                 return;
@@ -699,12 +700,13 @@ internal class ConversationRequestHandler : IHandler
     private void Handle_CampaignTick(MessagePayload<CampaignTick> payload)
     {
         if (approvalWaitingForMap is not NetworkAllowConversation message) return;
-        if (GameStateManager.Current?.ActiveState is not MapState) return;
+        if (!mapStateInterface.IsMapActive()) return;
 
         approvalWaitingForMap = null;
         ApplyConversationApproval(message);
     }
 
+    /// <summary>[Client] Re-runs RestartPlayerEncounter with the approved parameters.</summary>
     private void ApplyConversationApproval(NetworkAllowConversation message)
     {
         var observedActivationVersion = conversationActivationVersion;
@@ -795,23 +797,23 @@ internal class ConversationRequestHandler : IHandler
         approvalWaitingForMap = null;
         var finishedMapEventId = payload.What.FinishedMapEventId;
 
-        // Release every request id the server may still hold; null only covers legacy or server-detected engagements.
-        var releasedRequestIds = new List<string>();
+        // Release every request id the server may still hold, each once.
+        var heldRequestIds = new List<string>();
         if (pendingRequestId != null)
-            releasedRequestIds.Add(pendingRequestId);
+            heldRequestIds.Add(pendingRequestId);
 
-        if (hadActiveConversationRequest &&
-            (pendingRequestId == null || activeRequestId != pendingRequestId))
-            releasedRequestIds.Add(activeRequestId);
+        if (hadActiveConversationRequest)
+            heldRequestIds.Add(activeRequestId);
 
+        // null only covers legacy or server-detected engagements
         if (pendingRequestId == null && !hadActiveConversationRequest)
-            releasedRequestIds.Add(null);
+            heldRequestIds.Add(null);
 
         // An approval waiting for the map is dropped with the encounter, otherwise it would open without its hold
-        if (waitingApproval is NetworkAllowConversation waiting && !releasedRequestIds.Contains(waiting.RequestId))
-            releasedRequestIds.Add(waiting.RequestId);
+        if (waitingApproval is NetworkAllowConversation waiting)
+            heldRequestIds.Add(waiting.RequestId);
 
-        foreach (var requestId in releasedRequestIds)
+        foreach (var requestId in heldRequestIds.Distinct())
             SendConversationEndedToServer(requestId, finishedMapEventId);
     }
 

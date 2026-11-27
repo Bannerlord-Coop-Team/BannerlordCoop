@@ -2,6 +2,7 @@
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages.Conversation;
@@ -48,7 +49,8 @@ public class ConversationRestartContinuationTests : IDisposable
         var resolvedAttacker = attacker;
         objects.Setup(manager => manager.TryGetObjectWithLogging(defenderId, out resolvedDefender)).Returns(true);
         objects.Setup(manager => manager.TryGetObjectWithLogging(attackerId, out resolvedAttacker)).Returns(true);
-        handler = new ConversationRequestHandler(messages, network.Object, objects.Object, null!, tracker, null!, null!);
+        handler = new ConversationRequestHandler(messages, network.Object, objects.Object, null!, tracker, null!, null!,
+            Mock.Of<IMapStateInterface>());
         harmony.Patch(AccessTools.Method(typeof(PlayerEncounter), nameof(PlayerEncounter.RestartPlayerEncounter)),
             prefix: new HarmonyMethod(typeof(ConversationRestartContinuationTests), nameof(SkipNativeRestart)));
     }

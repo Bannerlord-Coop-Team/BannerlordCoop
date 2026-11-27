@@ -3218,9 +3218,7 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
         var aiPartyId = CreateMobilePartyBase();
         SetMainParty(client, playerPartyId);
 
-        // The dialog flow needs real conversation agents, so only its start is skipped. Its caller is inlined.
-        using var conversations = new MethodCallRecorder(AccessTools.Method(
-            typeof(ConversationManager), nameof(ConversationManager.StartNew)));
+        using var conversations = RecordMapConversationStarts();
         var previousStates = CoverMapWithInventory(client);
         client.NetworkSentMessages.Clear();
 
@@ -3234,6 +3232,9 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
                 requestId: null!,
                 ConversationRestartSource.EncounterManager,
                 forcePlayerOutFromSettlement: false);
+
+            // Co-op keeps ticking the campaign under the inventory.
+            client.Call(() => client.Resolve<IMessageBroker>().Publish(this, new CampaignTick()), MapEventDisabledMethods);
 
             AssertHasPlayerEncounter(client, expected: false);
             Assert.Equal(0, conversations.CountFor(client));
@@ -3254,14 +3255,13 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
     }
 
     [Fact]
-    public void ApprovalAfterInventoryCloses_QueuesBehindWaitingApproval()
+    public void ApprovalAfterInventoryCloses_ReplacesWaitingApprovalAndReleasesOlder()
     {
         var (client, _, playerPartyId, _) = CreateTwoPlayerParties();
         var aiPartyId = CreateMobilePartyBase();
         SetMainParty(client, playerPartyId);
 
-        using var conversations = new MethodCallRecorder(AccessTools.Method(
-            typeof(ConversationManager), nameof(ConversationManager.StartNew)));
+        using var conversations = RecordMapConversationStarts();
         var previousStates = CoverMapWithInventory(client);
         var olderRequestId = CaptureConversationRestart(client);
         var newerRequestId = CaptureConversationRestart(client);
@@ -3301,6 +3301,51 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
             GameStateManager._current = previousStates;
         }
     }
+
+    [Fact]
+    public void EncounterFinishWhileApprovalWaits_DropsApprovalAndReleasesItsHoldOnce()
+    {
+        var (client, _, playerPartyId, _) = CreateTwoPlayerParties();
+        var aiPartyId = CreateMobilePartyBase();
+        SetMainParty(client, playerPartyId);
+
+        using var conversations = RecordMapConversationStarts();
+        var previousStates = CoverMapWithInventory(client);
+        client.NetworkSentMessages.Clear();
+
+        try
+        {
+            DeliverConversationApproval(
+                client,
+                playerPartyId,
+                aiPartyId,
+                requestId: null!,
+                ConversationRestartSource.EncounterManager,
+                forcePlayerOutFromSettlement: false);
+
+            client.Call(() => client.Resolve<IMessageBroker>().Publish(this, new ConversationEnded()));
+
+            // The waiting approval's null id is the same one the server-detected fallback releases.
+            var ended = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkConversationEnded>());
+            Assert.Null(ended.RequestId);
+
+            CloseInventory(client);
+            client.Call(() => client.Resolve<IMessageBroker>().Publish(this, new CampaignTick()), MapEventDisabledMethods);
+
+            AssertHasPlayerEncounter(client, expected: false);
+            Assert.Equal(0, conversations.CountFor(client));
+        }
+        finally
+        {
+            client.Call(() => Campaign.Current.PlayerEncounter = null);
+            GameStateManager._current = previousStates;
+        }
+    }
+
+    // The patched OpenMapConversation inlines SetupAndStartMapConversation, so a patch on it never runs and the
+    // recorder sits on StartNew, its next call. Skipping it also keeps the dialog flow, which needs real agents, out.
+    private static MethodCallRecorder RecordMapConversationStarts() => new(AccessTools.Method(
+        typeof(ConversationManager), nameof(ConversationManager.StartNew)));
 
     // Opens the inventory over the client's map and adds the vanilla meeting menu an approved restart opens.
     // Returns the static state manager to restore, since E2E instances share it.
