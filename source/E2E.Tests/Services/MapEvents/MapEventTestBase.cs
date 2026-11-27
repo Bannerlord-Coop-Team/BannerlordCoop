@@ -77,6 +77,18 @@ public abstract class MapEventTestBase : IDisposable
         AccessTools.Method(typeof(Campaign), nameof(Campaign.Tick)),
     }).ToList();
 
+    /// <summary>The map event methods plus the battle-result steps that need a live campaign world, so a decided battle can finalize.</summary>
+    protected IReadOnlyList<MethodBase> BattleResultDisabledMethods => MapEventDisabledMethods
+        .Append(AccessTools.Method(typeof(DefaultBattleRewardModel), nameof(DefaultBattleRewardModel.GetCaptureMemberChancesForWinnerParties)))
+        .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyCasualties"))
+        .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyItems"))
+        .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyPrisoners"))
+        .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyShips"))
+        .Append(AccessTools.Method(typeof(MapEvent), "CalculateMapEventResults"))
+        .Append(AccessTools.Method(typeof(MapEvent), "CommitCalculatedMapEventResults"))
+        .Append(AccessTools.Method(typeof(MapEvent), "MovePartyToSuitablePositionOnMapEventFinalize"))
+        .ToList();
+
     protected IReadOnlyList<MethodBase> WithoutNetworkDelivery() => MapEventDisabledMethods
         .Append(AccessTools.Method(typeof(TestNetworkRouter), nameof(TestNetworkRouter.SendReliablePayload),
             new[] { typeof(NetPeer), typeof(NetPeer), typeof(byte[]) }))
@@ -368,14 +380,28 @@ public abstract class MapEventTestBase : IDisposable
         return (heroId, partyId);
     }
 
-    /// <summary>Requests a simulation of the context's battle for the client's attacker party and asserts the server accepts it.</summary>
-    protected void StartAcceptedSimulation(EnvironmentInstance client, MapEventContext context)
+    /// <summary>
+    /// Requests a simulation of the context's battle for the client's party (the attacker unless <paramref name="partyId"/>
+    /// is given) and asserts the server accepts it.
+    /// </summary>
+    protected void StartAcceptedSimulation(EnvironmentInstance client, MapEventContext context, string? partyId = null)
     {
         var requestId = System.Guid.NewGuid().ToString();
         Server.Resolve<IMessageBroker>().Publish(client.NetPeer, new NetworkBattleStartRequest(
-            requestId, (int)BattleStartMode.Simulation, context.MapEventId, context.AttackerPartyId));
+            requestId, (int)BattleStartMode.Simulation, context.MapEventId, partyId ?? context.AttackerPartyId));
         Assert.True(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleStartReply>(),
             reply => reply.RequestId == requestId).Accepted);
+    }
+
+    /// <summary>
+    /// Points the static <see cref="BattleStartCoordinator.Instance"/> the consequence patches read at
+    /// <paramref name="client"/>'s coordinator, because E2E clients share process statics.
+    /// </summary>
+    private protected static BattleStartCoordinator UseBattleStartCoordinatorOf(EnvironmentInstance client)
+    {
+        var coordinator = client.Resolve<BattleStartCoordinator>();
+        AccessTools.Property(typeof(BattleStartCoordinator), nameof(BattleStartCoordinator.Instance)).SetValue(null, coordinator);
+        return coordinator;
     }
 
     /// <summary>
