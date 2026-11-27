@@ -18,7 +18,6 @@ using GameInterface.Services.SiegeEvents.Interfaces;
 using LiteNetLib;
 using Serilog;
 using System;
-using System.Collections.Concurrent;
 using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -51,7 +50,7 @@ internal class BattleJoinLeaveHandler : IHandler
     private readonly ISiegeEventInterface siegeEventInterface;
     private readonly ISiegeMapEventLeaderReconciler siegeMapEventLeaderReconciler;
     private readonly ISiegeJoinMenuDeferralTracker siegeJoinMenuDeferralTracker;
-    private readonly ConcurrentDictionary<string, string> pendingJoinRequests = new ConcurrentDictionary<string, string>();
+    private readonly IBattleJoinRequestTracker joinRequests;
 
     public BattleJoinLeaveHandler(
         IMessageBroker messageBroker,
@@ -62,7 +61,8 @@ internal class BattleJoinLeaveHandler : IHandler
         IMapEventInitializationBarrier initializationBarrier,
         ISiegeEventInterface siegeEventInterface,
         ISiegeMapEventLeaderReconciler siegeMapEventLeaderReconciler,
-        ISiegeJoinMenuDeferralTracker siegeJoinMenuDeferralTracker)
+        ISiegeJoinMenuDeferralTracker siegeJoinMenuDeferralTracker,
+        IBattleJoinRequestTracker joinRequests)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -73,6 +73,7 @@ internal class BattleJoinLeaveHandler : IHandler
         this.siegeEventInterface = siegeEventInterface;
         this.siegeMapEventLeaderReconciler = siegeMapEventLeaderReconciler;
         this.siegeJoinMenuDeferralTracker = siegeJoinMenuDeferralTracker;
+        this.joinRequests = joinRequests;
 
         messageBroker.Subscribe<NetworkAddInvolvedParties>(Handle_NetworkAddInvolvedParties);
         messageBroker.Subscribe<PlayerJoinBattleAttempted>(Handle_PlayerJoinBattleAttempted);
@@ -92,7 +93,7 @@ internal class BattleJoinLeaveHandler : IHandler
         messageBroker.Unsubscribe<PlayerLeaveBattleAttempted>(Handle_PlayerLeaveBattleAttempted);
         messageBroker.Unsubscribe<NetworkRequestLeaveBattle>(Handle_NetworkRequestLeaveBattle);
         messageBroker.Unsubscribe<NetworkPartyLeftBattle>(Handle_NetworkPartyLeftBattle);
-        pendingJoinRequests.Clear();
+        joinRequests.Clear();
     }
 
     private void Handle_NetworkAddInvolvedParties(MessagePayload<NetworkAddInvolvedParties> payload)
@@ -214,7 +215,7 @@ internal class BattleJoinLeaveHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(data.JoiningParty, out var partyId)) return;
 
         var requestId = Guid.NewGuid().ToString();
-        if (!pendingJoinRequests.TryAdd(partyId, requestId))
+        if (!joinRequests.TryStart(partyId, requestId))
         {
             mapEventLogger.DebugMapEvent(data.MapEvent, "Battle join is already pending for PartyId={PartyId}", partyId);
             return;
@@ -235,14 +236,15 @@ internal class BattleJoinLeaveHandler : IHandler
         var reply = payload.What;
         GameThread.RunSafe(() =>
         {
-            if (!pendingJoinRequests.TryGetValue(reply.PartyId, out var pendingRequestId) ||
-                !string.Equals(pendingRequestId, reply.RequestId, StringComparison.Ordinal))
+            if (!joinRequests.TryComplete(reply.PartyId, reply.RequestId, out var cancelled)) return;
+
+            if (reply.Accepted)
             {
+                // The player left while this join waited, so the accepted join is undone without reopening any menu.
+                if (cancelled)
+                    network.SendAll(new NetworkRequestLeaveBattle(reply.PartyId, finishLocalMenus: false));
                 return;
             }
-
-            pendingJoinRequests.TryRemove(reply.PartyId, out _);
-            if (reply.Accepted) return;
 
             siegeJoinMenuDeferralTracker.Clear();
 

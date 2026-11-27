@@ -376,6 +376,12 @@ internal class PlayerEncounterPatches
         if (ModInformation.IsServer || CallOriginalPolicy.IsOriginalAllowedForOwnershipGate())
             return true;
 
+        // Leaving while the join waits for the server cancels it, so Finish only closes this client's encounter.
+        var cancelsPendingJoin = ContainerProvider.TryResolve<IBattleJoinRequestTracker>(out var joinRequests) &&
+            joinRequests.TryCancel(PartyBase.MainParty);
+        if (cancelsPendingJoin && PlayerEncounter.Current != null)
+            PlayerEncounter.Current._mapEvent = null;
+
         // Receive callbacks must not finalize a live raid owned by this encounter.
         var mapEvent = PlayerEncounter.Battle;
         if (!mapEvent.IsRaidHostileAction() || mapEvent.IsFinalized)

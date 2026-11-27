@@ -207,11 +207,11 @@ internal class MapEventSideDataHandler : IHandler
         if (encounter.GetBattleOrPlayerMapEvent() != mapEvent)
             return;
 
-        var menuId = Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId;
+        var menuId = Campaign.Current.CurrentMenuContext?.GameMenu?.StringId;
         var raiderWaits = menuId == "raiding_village" && mapEvent.IsRaidHostileAction() && !mapEvent.IsActiveSlowVillageRaid();
-        // RaidJoinEncounterPatch keeps a village defender in join_encounter until this add gives it a side.
-        var defenderWaits = menuId == "join_encounter" && mapEvent.IsVillageHostileAction();
-        if (raiderWaits || defenderWaits)
+        // VillageHostileActionJoinEncounterPatch keeps a village joiner in join_encounter until this add gives it a side.
+        var joinerWaits = menuId == "join_encounter" && mapEvent.IsVillageHostileAction();
+        if (raiderWaits || joinerWaits)
             GameMenu.SwitchToMenu("encounter");
     }
 }

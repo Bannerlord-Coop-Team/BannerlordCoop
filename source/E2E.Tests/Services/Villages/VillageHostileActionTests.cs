@@ -3127,7 +3127,7 @@ public class VillageHostileActionTests : MapEventTestBase
             Assert.Same(mapEvent, PlayerEncounter.EncounteredBattle);
             Assert.True(mapEvent.IsRaidHostileAction());
 
-            var runOriginal = InvokeRaidJoinEncounterConsequencePrefix("game_menu_join_encounter_help_attackers_on_consequence");
+            var runOriginal = InvokeVillageHostileActionJoinEncounterConsequencePrefix("game_menu_join_encounter_help_attackers_on_consequence");
 
             Assert.False(runOriginal);
             Assert.NotNull(PlayerEncounter.Current);
@@ -3181,7 +3181,7 @@ public class VillageHostileActionTests : MapEventTestBase
             Assert.Null(joinerParty.MapEvent);
             Assert.Null(joinerParty.Party.MapEventSide);
 
-            var runOriginal = InvokeRaidJoinEncounterConsequencePrefix("game_menu_join_encounter_help_attackers_on_consequence");
+            var runOriginal = InvokeVillageHostileActionJoinEncounterConsequencePrefix("game_menu_join_encounter_help_attackers_on_consequence");
             Assert.False(runOriginal);
             Assert.True(PlayerEncounter.Current.IsJoinedBattle);
             Assert.Same(mapEvent, PlayerEncounter.Battle);
@@ -3460,7 +3460,7 @@ public class VillageHostileActionTests : MapEventTestBase
             Assert.False(attackerShown);
             Assert.False(attackerArgs.IsEnabled);
 
-            Assert.False(InvokeRaidJoinEncounterConsequencePrefix(
+            Assert.False(InvokeVillageHostileActionJoinEncounterConsequencePrefix(
                 "game_menu_join_encounter_help_defenders_on_consequence"));
             Assert.True(PlayerEncounter.Current.IsJoinedBattle);
             Assert.Same(mapEvent, PlayerEncounter.Battle);
@@ -3573,13 +3573,179 @@ public class VillageHostileActionTests : MapEventTestBase
     [InlineData(VillageHostileAction.ForceSupplies)]
     public void VillageEncounterMenu_PendingDefenderJoin_OpensAfterServerAddWithLeaveEnabled(VillageHostileAction action)
     {
+        // The raid row needs no defenders, otherwise the existing raid check skips vanilla before it reads the side.
+        var join = OpenVillageJoinEncounter(action, defended: false);
+        var client = join.Client;
+        var disabledMethods = WithoutNetworkDelivery();
+
+        client.NetworkSentMessages.Clear();
+        client.Call(() =>
+        {
+            join.Behavior.game_menu_join_encounter_help_defenders_on_consequence(new MenuCallbackArgs((MenuContext)null, null));
+            AssertJoinerWaitsInJoinEncounter(join);
+        }, disabledMethods);
+
+        var request = client.NetworkSentMessages.GetMessages<NetworkRequestJoinBattle>().Single();
+        Assert.Equal(join.MapEventId, request.MapEventId);
+        Assert.Equal(BattleSideEnum.Defender, request.Side);
+
+        AddJoinerOnServer(join, BattleSideEnum.Defender);
+
+        client.NetworkSentMessages.Clear();
+        client.Call(() =>
+        {
+            var mapEvent = client.GetRegisteredObject<MapEvent>(join.MapEventId);
+            var joinerParty = client.GetRegisteredObject<MobileParty>(join.JoinerMobilePartyId);
+            Assert.Same(mapEvent.DefenderSide, joinerParty.Party.MapEventSide);
+
+            // The add opens the encounter menu, whose init now reads the defender side, and a Leave click asks the server to remove the joiner.
+            var menuContext = Campaign.Current.CurrentMenuContext;
+            Assert.Equal("encounter", menuContext.GameMenu.StringId);
+            Assert.Equal(1, join.EncounterInits);
+            var leaveOption = menuContext.GameMenu.MenuOptions.Single();
+            Assert.True(leaveOption.IsEnabled);
+            Assert.True(Campaign.Current.GameMenuManager.GetVirtualMenuOptionConditionsHold(menuContext, 0));
+            leaveOption.OnConsequence(new MenuCallbackArgs(menuContext, leaveOption.Text));
+        }, disabledMethods);
+
+        var leave = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestLeaveBattle>());
+        Assert.Equal(GetPartyBaseId(join.JoinerMobilePartyId), leave.PartyId);
+    }
+
+    // Vanilla opens the encounter menu at once when the village has defenders, and that init reads the attacker's side.
+    [Theory]
+    [InlineData(VillageHostileAction.ForceSupplies)]
+    [InlineData(VillageHostileAction.ForceVolunteers)]
+    public void VillageEncounterMenu_PendingAttackerJoin_OpensAfterServerAdd(VillageHostileAction action)
+    {
+        var join = OpenVillageJoinEncounter(action, defended: true);
+        var client = join.Client;
+        var disabledMethods = WithoutNetworkDelivery();
+
+        client.NetworkSentMessages.Clear();
+        client.Call(() =>
+        {
+            join.Behavior.game_menu_join_encounter_help_attackers_on_consequence(new MenuCallbackArgs((MenuContext)null, null));
+            AssertJoinerWaitsInJoinEncounter(join);
+        }, disabledMethods);
+
+        var request = client.NetworkSentMessages.GetMessages<NetworkRequestJoinBattle>().Single();
+        Assert.Equal(join.MapEventId, request.MapEventId);
+        Assert.Equal(BattleSideEnum.Attacker, request.Side);
+
+        AddJoinerOnServer(join, BattleSideEnum.Attacker);
+
+        client.Call(() =>
+        {
+            var mapEvent = client.GetRegisteredObject<MapEvent>(join.MapEventId);
+            var joinerParty = client.GetRegisteredObject<MobileParty>(join.JoinerMobilePartyId);
+            Assert.Same(mapEvent.AttackerSide, joinerParty.Party.MapEventSide);
+            Assert.Equal("encounter", Campaign.Current.CurrentMenuContext.GameMenu.StringId);
+            Assert.Equal(1, join.EncounterInits);
+        }, disabledMethods);
+    }
+
+    // The raid would get a finalize request from Finish, and the force supplies join would land after the encounter closed.
+    [Theory]
+    [InlineData(VillageHostileAction.Raid)]
+    [InlineData(VillageHostileAction.ForceSupplies)]
+    public void VillageJoinEncounter_LeaveWhileDefenderJoinPending_CancelsJoinAndLeavesAfterLateAccept(VillageHostileAction action)
+    {
+        var join = OpenVillageJoinEncounter(action, defended: false);
+        var client = join.Client;
+        var request = LeaveWhileDefenderJoinPending(join);
+
+        // The server ran the join before the player left, so its add and acceptance arrive after the encounter closed.
+        AddJoinerOnServer(join, BattleSideEnum.Defender);
+        client.NetworkSentMessages.Clear();
+        client.SimulateMessage(Server.NetPeer, new NetworkJoinBattleReply(
+            request.RequestId,
+            request.MapEventId,
+            request.PartyId,
+            accepted: true));
+        Server.PumpGameThread();
+
+        var leave = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestLeaveBattle>());
+        Assert.Equal(request.PartyId, leave.PartyId);
+        Assert.False(leave.FinishLocalMenus);
+        Server.Call(() => Assert.Null(Server.GetRegisteredObject<MobileParty>(join.JoinerMobilePartyId).Party.MapEventSide));
+        client.Call(() =>
+        {
+            Assert.Null(client.GetRegisteredObject<MobileParty>(join.JoinerMobilePartyId).Party.MapEventSide);
+            Assert.Null(PlayerEncounter.Current);
+            Assert.Null(Campaign.Current.CurrentMenuContext);
+            Assert.Equal(0, join.EncounterInits);
+        });
+    }
+
+    // A rejected join left nothing on the server, so the cancel sends no leave that would stop the party there.
+    [Fact]
+    public void VillageJoinEncounter_LeaveWhileDefenderJoinPending_RejectedReplySendsNoLeave()
+    {
+        var join = OpenVillageJoinEncounter(VillageHostileAction.Raid, defended: false);
+        var client = join.Client;
+        var request = LeaveWhileDefenderJoinPending(join);
+
+        client.NetworkSentMessages.Clear();
+        client.SimulateMessage(Server.NetPeer, new NetworkJoinBattleReply(
+            request.RequestId,
+            request.MapEventId,
+            request.PartyId,
+            accepted: false));
+
+        Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkRequestLeaveBattle>());
+        client.Call(() =>
+        {
+            Assert.Null(PlayerEncounter.Current);
+            Assert.Null(Campaign.Current.CurrentMenuContext);
+        });
+    }
+
+    // Clicks Help defenders, then vanilla's "Don't get involved" while that join waits, and returns the join request.
+    private NetworkRequestJoinBattle LeaveWhileDefenderJoinPending(VillageJoinEncounter join)
+    {
+        var client = join.Client;
+        client.NetworkSentMessages.Clear();
+        client.Call(() =>
+        {
+            join.Behavior.game_menu_join_encounter_help_defenders_on_consequence(new MenuCallbackArgs((MenuContext)null, null));
+            var menuContext = Campaign.Current.CurrentMenuContext;
+            // Finish exits the menu, which unregisters its context by id.
+            menuContext.StringId = "village_join_menu_context";
+            var leaveOption = menuContext.GameMenu.MenuOptions.Single();
+            leaveOption.OnConsequence(new MenuCallbackArgs(menuContext, leaveOption.Text));
+
+            Assert.Null(PlayerEncounter.Current);
+            Assert.Null(Campaign.Current.CurrentMenuContext);
+        }, WithoutNetworkDelivery());
+
+        Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkMapEventFinalizeAttempted>());
+        Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkRequestLeaveBattle>());
+        return client.NetworkSentMessages.GetMessages<NetworkRequestJoinBattle>().Single();
+    }
+
+    /// <summary>PlayerTwo's client in join_encounter on PlayerOne's village action.</summary>
+    private sealed class VillageJoinEncounter
+    {
+        public EnvironmentInstance Client { get; init; } = null!;
+        public string MapEventId { get; init; } = null!;
+        public string JoinerMobilePartyId { get; init; } = null!;
+        public EncounterGameMenuBehavior Behavior { get; init; } = null!;
+
+        /// <summary>How many times the encounter menu's init ran.</summary>
+        public int EncounterInits { get; set; }
+    }
+
+    // The encounter menu's init runs the vanilla step that reads the joiner's side, and both Leave options run their vanilla calls.
+    private VillageJoinEncounter OpenVillageJoinEncounter(VillageHostileAction action, bool defended)
+    {
         var client = Clients.First();
         var (raiderHeroId, raiderMobilePartyId) = CreatePlayerHeroParty("PlayerOne");
         var (joinerHeroId, joinerMobilePartyId) = CreatePlayerHeroParty("PlayerTwo");
         TestEnvironment.ConnectRegisteredPlayer(client, "PlayerTwo");
         var target = CreateVillageTarget();
+        var defenderTroopId = defended ? TestEnvironment.CreateRegisteredObject<CharacterObject>() : null;
         string? mapEventId = null;
-        var initializations = 0;
 
         Server.Call(() =>
         {
@@ -3597,34 +3763,49 @@ public class VillageHostileActionTests : MapEventTestBase
             Assert.True(Server.ObjectManager.TryGetId(mapEvent, out mapEventId));
         }, MapEventDisabledMethods);
 
-        var disabledMethods = WithoutNetworkDelivery();
+        var join = new VillageJoinEncounter
+        {
+            Client = client,
+            MapEventId = mapEventId!,
+            JoinerMobilePartyId = joinerMobilePartyId,
+            Behavior = ObjectHelper.SkipConstructor<EncounterGameMenuBehavior>(),
+        };
 
-        client.NetworkSentMessages.Clear();
         client.Call(() =>
         {
-            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventId!, out var mapEvent));
-            Assert.True(client.ObjectManager.TryGetObject<Hero>(joinerHeroId, out var joinerHero));
-            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(joinerMobilePartyId, out var joinerParty));
+            var mapEvent = client.GetRegisteredObject<MapEvent>(join.MapEventId);
+            var joinerHero = client.GetRegisteredObject<Hero>(joinerHeroId);
+            var joinerParty = client.GetRegisteredObject<MobileParty>(joinerMobilePartyId);
 
             using (new AllowedThread())
             {
                 Campaign.Current.MainParty = joinerParty;
                 joinerHero.PartyBelongedTo = joinerParty;
                 Game.Current.PlayerTroop = joinerHero.CharacterObject;
+                // Enough defenders that the encounter init doesn't take vanilla's village surrender path.
+                if (defenderTroopId != null)
+                    mapEvent.MapEventSettlement.Party.MemberRoster.AddToCounts(client.GetRegisteredObject<CharacterObject>(defenderTroopId), 50);
             }
 
-            // The encounter menu's init runs the vanilla step that reads the side, and its Leave is the vanilla option.
-            var behavior = ObjectHelper.SkipConstructor<EncounterGameMenuBehavior>();
+            // PlayerEncounter.Finish writes the menu id, which the harness campaign doesn't have.
+            Campaign.Current.MapStateData ??= new MapStateData();
+
             var starter = new CampaignGameStarter(Campaign.Current.GameMenuManager, Campaign.Current.ConversationManager);
             starter.AddGameMenu("join_encounter", "Join encounter", _ => { });
+            // Vanilla's "Don't get involved" option is a lambda that makes these two calls.
+            starter.AddGameMenuOption("join_encounter", "join_encounter_leave", "Don't get involved.", _ => true, _ =>
+            {
+                PlayerEncounter.Finish();
+                MobileParty.MainParty.SetMoveModeHold();
+            }, isLeave: true);
             starter.AddGameMenu("encounter", "Encounter", initArgs =>
             {
-                behavior.UpdateVillageHostileActionEncounter(initArgs);
-                initializations++;
+                join.Behavior.UpdateVillageHostileActionEncounter(initArgs);
+                join.EncounterInits++;
             });
             starter.AddGameMenuOption("encounter", "leave", "Leave...",
-                leaveArgs => behavior.game_menu_encounter_leave_on_condition(leaveArgs),
-                leaveArgs => behavior.game_menu_encounter_leave_on_consequence(leaveArgs), isLeave: true);
+                leaveArgs => join.Behavior.game_menu_encounter_leave_on_condition(leaveArgs),
+                leaveArgs => join.Behavior.game_menu_encounter_leave_on_consequence(leaveArgs), isLeave: true);
 
             var gameStateManager = Game.Current.GameStateManager;
             var mapState = gameStateManager.CreateState<MapState>();
@@ -3638,50 +3819,31 @@ public class VillageHostileActionTests : MapEventTestBase
 
             Assert.False(mapState.MapConversationActive);
             Assert.True(mapEvent.DefenderSide.LeaderParty.IsSettlement);
-            // The raid row needs no defenders, otherwise the existing raid check skips vanilla before it reads the side.
-            if (action == VillageHostileAction.Raid) Assert.Equal(0, mapEvent.DefenderSide.TroopCount);
-
-            behavior.game_menu_join_encounter_help_defenders_on_consequence(new MenuCallbackArgs((MenuContext)null, null));
-
-            // The joiner waits in join_encounter, because opening the encounter menu with side None throws in its init.
-            Assert.Equal("join_encounter", Campaign.Current.CurrentMenuContext.GameMenu.StringId);
-            Assert.Equal(0, initializations);
-            Assert.Same(mapEvent, PlayerEncounter.Battle);
-            Assert.Null(joinerParty.Party.MapEventSide);
-            Assert.Equal(BattleSideEnum.None, mapEvent.PlayerSide);
-        }, disabledMethods);
-
-        var request = client.NetworkSentMessages.GetMessages<NetworkRequestJoinBattle>().Single();
-        Assert.Equal(mapEventId, request.MapEventId);
-        Assert.Equal(BattleSideEnum.Defender, request.Side);
-
-        // The server answer adds the joiner to the defenders, and that add reaches the client replica.
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId!, out var mapEvent));
-            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(joinerMobilePartyId, out var joinerParty));
-            joinerParty.Party.MapEventSide = mapEvent.DefenderSide;
+            Assert.Equal(defended, mapEvent.DefenderSide.TroopCount > 0);
         }, MapEventDisabledMethods);
 
-        client.NetworkSentMessages.Clear();
-        client.Call(() =>
+        return join;
+    }
+
+    // The joiner waits in join_encounter, because opening the encounter menu with side None throws in its init.
+    private static void AssertJoinerWaitsInJoinEncounter(VillageJoinEncounter join)
+    {
+        var mapEvent = join.Client.GetRegisteredObject<MapEvent>(join.MapEventId);
+        Assert.Equal("join_encounter", Campaign.Current.CurrentMenuContext?.GameMenu.StringId);
+        Assert.Equal(0, join.EncounterInits);
+        Assert.Same(mapEvent, PlayerEncounter.Battle);
+        Assert.Null(join.Client.GetRegisteredObject<MobileParty>(join.JoinerMobilePartyId).Party.MapEventSide);
+        Assert.Equal(BattleSideEnum.None, mapEvent.PlayerSide);
+    }
+
+    // The server answer adds the joiner to the side, and that add reaches the client replica.
+    private void AddJoinerOnServer(VillageJoinEncounter join, BattleSideEnum side)
+    {
+        Server.Call(() =>
         {
-            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventId!, out var mapEvent));
-            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(joinerMobilePartyId, out var joinerParty));
-            Assert.Same(mapEvent.DefenderSide, joinerParty.Party.MapEventSide);
-
-            // The add opens the encounter menu, whose init now reads the defender side, and a Leave click asks the server to remove the joiner.
-            var menuContext = Campaign.Current.CurrentMenuContext;
-            Assert.Equal("encounter", menuContext.GameMenu.StringId);
-            Assert.Equal(1, initializations);
-            var leaveOption = menuContext.GameMenu.MenuOptions.Single();
-            Assert.True(leaveOption.IsEnabled);
-            Assert.True(Campaign.Current.GameMenuManager.GetVirtualMenuOptionConditionsHold(menuContext, 0));
-            leaveOption.OnConsequence(new MenuCallbackArgs(menuContext, leaveOption.Text));
-        }, disabledMethods);
-
-        var leave = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestLeaveBattle>());
-        Assert.Equal(GetPartyBaseId(joinerMobilePartyId), leave.PartyId);
+            var mapEvent = Server.GetRegisteredObject<MapEvent>(join.MapEventId);
+            Server.GetRegisteredObject<MobileParty>(join.JoinerMobilePartyId).Party.MapEventSide = mapEvent.GetMapEventSide(side);
+        }, MapEventDisabledMethods);
     }
 
     // Only multi-player non-raid starts are rejected, so one single-player non-raid row covers the accept path.
@@ -4903,12 +5065,12 @@ public class VillageHostileActionTests : MapEventTestBase
         return ((bool)invocationArgs[2], args);
     }
 
-    private static bool InvokeRaidJoinEncounterConsequencePrefix(string methodName)
+    private static bool InvokeVillageHostileActionJoinEncounterConsequencePrefix(string methodName)
     {
         var originalMethod = AccessTools.Method(typeof(EncounterGameMenuBehavior), methodName);
         Assert.NotNull(originalMethod);
 
-        var patchType = AccessTools.TypeByName("GameInterface.Services.MapEvents.Patches.RaidJoinEncounterPatch");
+        var patchType = AccessTools.TypeByName("GameInterface.Services.MapEvents.Patches.VillageHostileActionJoinEncounterPatch");
         var prefix = AccessTools.Method(patchType, "Prefix");
         Assert.NotNull(prefix);
 

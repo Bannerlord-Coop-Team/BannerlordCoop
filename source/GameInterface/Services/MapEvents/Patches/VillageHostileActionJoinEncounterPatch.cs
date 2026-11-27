@@ -13,8 +13,11 @@ using TaleWorlds.Core;
 
 namespace GameInterface.Services.MapEvents.Patches;
 
+/// <summary>
+/// Joins a client to a village raid, force supplies or force volunteers event through the server's party add.
+/// </summary>
 [HarmonyPatch]
-internal class RaidJoinEncounterPatch
+internal class VillageHostileActionJoinEncounterPatch
 {
     private const string HelpAttackersConsequence = nameof(EncounterGameMenuBehavior.game_menu_join_encounter_help_attackers_on_consequence);
     private const string HelpDefendersConsequence = nameof(EncounterGameMenuBehavior.game_menu_join_encounter_help_defenders_on_consequence);
@@ -35,15 +38,14 @@ internal class RaidJoinEncounterPatch
         if (!mapEvent.IsVillageHostileAction())
             return true;
 
-        if (__originalMethod.Name == HelpDefendersConsequence)
+        var side = __originalMethod.Name == HelpAttackersConsequence ? BattleSideEnum.Attacker : BattleSideEnum.Defender;
+        var joinsRaidAttackers = side == BattleSideEnum.Attacker && mapEvent.IsRaidHostileAction();
+        if (!joinsRaidAttackers)
         {
             // Encounter menu init reads the joiner's side, so MapEventSideDataHandler opens it once the server's add lands.
-            PlayerEncounter.JoinBattle(BattleSideEnum.Defender);
+            PlayerEncounter.JoinBattle(side);
             return false;
         }
-
-        if (!mapEvent.IsRaidHostileAction())
-            return true;
 
         if (mapEvent.IsActiveSlowVillageRaid())
         {
