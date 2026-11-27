@@ -50,6 +50,7 @@ internal class HideoutEncounterHold : IHideoutEncounterHold
         }
 
         // Native's hideout boss line reads this encounter, without it the boss only says "I am not allowed to talk with you".
+        // No gate and hold here because the party is still fighting, finishing the encounter after the battle holds it.
         if (!IsFightingInMission(encounter, mainParty, Mission.Current))
             return false;
 

@@ -88,7 +88,7 @@ public class HideoutEncounterHoldTests
         if (controller == null) return null;
 
         var mission = ObjectHelper.SkipConstructor<Mission>();
-        // TaleWorlds.MountAndBlade isn't publicized here, so the getter-only list needs its backing field.
+        // MissionBehaviors is a getter-only auto-property, so the list goes in through its backing field.
         var behaviors = new List<MissionBehavior>();
         AccessTools.Field(typeof(Mission), "<MissionBehaviors>k__BackingField").SetValue(mission, behaviors);
         if (controller == "assault") behaviors.Add(ObjectHelper.SkipConstructor<HideoutMissionController>());
