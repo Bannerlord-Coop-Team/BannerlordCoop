@@ -171,8 +171,6 @@ public class CoopClanPermissionsTests : IDisposable
             CoopClanDialoguePatches.CompanionFireConditionPostfix,
             CoopClanDialoguePatches.LeadAPartyClickableConditionPostfix,
             CoopClanDialoguePatches.ConversationHeroHireOnConditionPostfix,
-            CoopClanDialoguePatches.ConversationCaravanBuildOnConditionPostfix,
-            CoopClanDialoguePatches.CanPlayerBuyWorkshopClickableConditionPostfix,
             CoopClanDialoguePatches.NotableSupportRequestOnConditionPostfix,
             CoopClanDialoguePatches.NotableSupportEndOnConditionPostfix,
             CoopClanDialoguePatches.JoinKingdomConditionPostfix,
