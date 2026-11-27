@@ -15,6 +15,7 @@ using GameInterface.Configuration;
 using GameInterface.CoopSessionData;
 using GameInterface.Registry;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.Armies;
 using GameInterface.Services.CampaignService.Interfaces;
 using GameInterface.Services.Chat;
 using GameInterface.Services.Voice;
@@ -127,7 +128,7 @@ internal abstract class TestComponentBase
         RegisterMock<IMapEventLoadCleaner>(builder);
         RegisterMock<ILeaderlessClanResolver>(builder);
         RegisterMock<IEmptyLordPartyResetter>(builder);
-        RegisterMock<IHideoutResultEncounter>(builder);
+        RegisterMock<IHideoutEncounterHold>(builder);
         RegisterPlayerManagerMock(builder);
         RegisterMock<IPlayerPartyRestorer>(builder);
         RegisterMock<IPlayerCreationRollback>(builder);
@@ -148,6 +149,7 @@ internal abstract class TestComponentBase
         RegisterMock<IPartyDiplomaticHandlerCampaignBehaviorInterface>(builder);
         RegisterMock<IPartyVisualInterface>(builder);
         RegisterMock<ISiegeBreakOut>(builder);
+        RegisterMock<IArmyLeaver>(builder);
         RegisterMock<IAttachmentIdMapper>(builder);
         RegisterMock<ILootShipHold>(builder);
         RegisterMock<IAutoRegistryFactory>(builder);

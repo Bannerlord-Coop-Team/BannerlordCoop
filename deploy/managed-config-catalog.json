@@ -1,5 +1,5 @@
 {
-  "contentDigest": "ec2faa9b93477e6a0627f88859f5c627a179c5ceb07e111f92d856b4e5c817eb",
+  "contentDigest": "372c240ffafc04339cb933b2b2755e4f6ac6f4be33b9d97ece46f5a09e28dfb1",
   "options": [
     {
       "key": "voiceEnabled",
@@ -31,6 +31,12 @@
       "key": "allowClientTimeControls",
       "type": "boolean",
       "availableSince": "0.1.8",
+      "default": true
+    },
+    {
+      "key": "mapClickChangesTime",
+      "type": "boolean",
+      "availableSince": "0.1.9",
       "default": true
     },
     {
