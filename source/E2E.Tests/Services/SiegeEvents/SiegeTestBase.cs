@@ -6,8 +6,11 @@ using E2E.Tests.Services.MapEvents;
 using GameInterface.Services.Players;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameComponents;
+using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Siege;
+using TaleWorlds.Core;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -94,6 +97,26 @@ public abstract class SiegeTestBase : MapEventTestBase
             Server.Resolve<IMessageBroker>().Publish(
                 this,
                 new PlayerDisconnected(disconnectedClient.NetPeer, default));
+        });
+    }
+
+    /// <summary>
+    /// Makes the party the client's main party with no encounter, sitting in the siege strategies menu.
+    /// </summary>
+    protected static void ConfigureSiegeMenuClient(EnvironmentInstance client, string mainPartyId)
+    {
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(mainPartyId, out var mainParty));
+            Campaign.Current.MainParty = mainParty;
+            Campaign.Current.PlayerEncounter = null;
+
+            var gameStateManager = Game.Current.GameStateManager;
+            var mapState = gameStateManager.CreateState<MapState>();
+            var menuContext = ObjectHelper.SkipConstructor<MenuContext>();
+            menuContext.GameMenu = new GameMenu("menu_siege_strategies");
+            mapState._menuContext = menuContext;
+            gameStateManager._gameStates.Add(mapState);
         });
     }
 

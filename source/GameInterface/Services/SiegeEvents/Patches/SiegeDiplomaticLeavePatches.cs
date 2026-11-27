@@ -38,19 +38,20 @@ internal class SiegeDiplomaticLeavePatches
         __state = null;
         if (ModInformation.IsClient) return false;
 
-        // Vanilla's own conditions for the main party, read before it removes anyone. Removals only make the
-        // remaining sides easier to join, so a party that fails here and then leaves failed for itself.
+        // Player parties failing vanilla's join checks, read before vanilla removes anyone. The postfix keeps the
+        // ones that actually left.
         var settlement = siegeEvent.BesiegedSettlement;
-        __state = new PlayerSiegeParties(
-            siegeEvent.BesiegerCamp.GetInvolvedPartiesForEventType(siegeEvent.GetCurrentBattleType())
-                .Where(party => party.IsPlayerParty() && !siegeEvent.CanPartyJoinSide(party, BattleSideEnum.Attacker))
-                .Select(party => party.MobileParty)
-                .ToArray(),
-            settlement.Parties
-                .Where(party => party.Party.IsPlayerParty() &&
-                    settlement.MapFaction != party.MapFaction &&
-                    !siegeEvent.CanPartyJoinSide(party.Party, BattleSideEnum.Defender))
-                .ToArray());
+        var failedBesiegers = siegeEvent.BesiegerCamp.GetInvolvedPartiesForEventType(siegeEvent.GetCurrentBattleType())
+            .Where(party => party.IsPlayerParty() && !siegeEvent.CanPartyJoinSide(party, BattleSideEnum.Attacker))
+            .Select(party => party.MobileParty)
+            .ToArray();
+        var failedDefenders = settlement.Parties
+            .Where(party => party.Party.IsPlayerParty() &&
+                settlement.MapFaction != party.MapFaction &&
+                !siegeEvent.CanPartyJoinSide(party.Party, BattleSideEnum.Defender))
+            .ToArray();
+
+        __state = new PlayerSiegeParties(failedBesiegers, failedDefenders);
         return true;
     }
 

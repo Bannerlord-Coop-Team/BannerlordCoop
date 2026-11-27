@@ -1,15 +1,12 @@
 ﻿using Common.Util;
 using Coop.Core.Server.Services.SiegeEvents.Messages;
-using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameMenus;
-using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Siege;
-using TaleWorlds.Core;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -32,7 +29,8 @@ public class SiegeLiftedClientTests : SiegeTestBase
         var aiLeaderId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         var (_, memberPartyId) = CreatePlayerHeroParty("LiftedSiegeMember");
         var siege = SetupSiege(aiLeaderId, memberPartyId);
-        ConfigureCampedClient(client, memberPartyId);
+        ConfigureSiegeMenuClient(client, memberPartyId);
+        client.Call(() => Assert.NotNull(MobileParty.MainParty.BesiegerCamp));
 
         using var menuExit = new MethodCallRecorder(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast)));
         Server.NetworkSentMessages.Clear();
@@ -67,23 +65,5 @@ public class SiegeLiftedClientTests : SiegeTestBase
         var side = ObjectHelper.SkipConstructor<MapEventSide>();
         AccessTools.Field(typeof(MapEventSide), "_mapEvent").SetValue(side, mapEvent);
         return side;
-    }
-
-    private static void ConfigureCampedClient(EnvironmentInstance client, string mainPartyId)
-    {
-        client.Call(() =>
-        {
-            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(mainPartyId, out var mainParty));
-            Assert.NotNull(mainParty.BesiegerCamp);
-            Campaign.Current.MainParty = mainParty;
-            Campaign.Current.PlayerEncounter = null;
-
-            var gameStateManager = Game.Current.GameStateManager;
-            var mapState = gameStateManager.CreateState<MapState>();
-            var menuContext = ObjectHelper.SkipConstructor<MenuContext>();
-            menuContext.GameMenu = new GameMenu("menu_siege_strategies");
-            mapState._menuContext = menuContext;
-            gameStateManager._gameStates.Add(mapState);
-        });
     }
 }

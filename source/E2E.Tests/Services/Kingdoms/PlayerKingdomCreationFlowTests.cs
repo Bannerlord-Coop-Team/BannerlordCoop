@@ -84,6 +84,7 @@ using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.ObjectSystem;
 using Xunit.Abstractions;
+using static E2E.Tests.Util.KingdomTestSetup;
 
 namespace E2E.Tests.Services.Kingdoms;
 
@@ -6370,29 +6371,6 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         {
             EnsureKingdomRegistered(client, kingdomId);
         }
-    }
-
-    private static void EnsureKingdomRegistered(EnvironmentInstance instance, string kingdomId)
-    {
-        instance.Call(() =>
-        {
-            Assert.True(instance.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
-
-            using (new AllowedThread())
-            {
-                kingdom._activePolicies ??= new MBList<PolicyObject>();
-                kingdom._armies ??= new MBList<Army>();
-                kingdom._clans ??= new MBList<Clan>();
-                kingdom._unresolvedDecisions ??= new MBList<KingdomDecision>();
-                kingdom._factionsAtWarWith ??= new MBList<IFaction>();
-                kingdom._alliedKingdoms ??= new MBList<Kingdom>();
-
-                if (!Campaign.Current.CampaignObjectManager.Kingdoms.Contains(kingdom))
-                {
-                    Campaign.Current.CampaignObjectManager.AddKingdom(kingdom);
-                }
-            }
-        });
     }
 
     private void AssertKingdomCreatedOnServer(string kingdomId, string clanId, string cultureId, string? fiefId = null)
