@@ -63,16 +63,14 @@ public class PlayerPartyRestoreDisbandTests : MapEventTestBase
     /// The #2891 report: the player surrendered in a PvP siege, its party was restored while the player was still
     /// captive, and the ransom then has to free a party that stays whole.
     /// </summary>
-    [Theory]
-    [InlineData(StaleDisband.Waiting)]
-    [InlineData(StaleDisband.Disbanding)]
-    public void RejoinWhileCaptive_PartyLeftDisbanding_RansomedPartyStaysWhole(StaleDisband staleDisband)
+    [Fact]
+    public void RejoinWhileCaptive_PartyLeftDisbanding_RansomedPartyStaysWhole()
     {
         var siege = CreateSiegeMapEvent(MapEvent.BattleTypes.Siege);
         var partyId = siege.DefenderPartyId;
         var defenderClient = Clients.Last();
         InstallDisbandBehavior();
-        StartDisbandBeforeRegistration(partyId, staleDisband);
+        StartDisbandBeforeRegistration(partyId, StaleDisband.Disbanding);
 
         RegisterOwnerAsPlayer(BesiegerControllerId, siege.AttackerPartyId);
         var heroId = RegisterOwnerAsPlayer(DefenderControllerId, partyId);

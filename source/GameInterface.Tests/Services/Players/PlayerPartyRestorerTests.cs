@@ -58,29 +58,30 @@ public class PlayerPartyRestorerTests
     }
 
     [Theory]
-    [InlineData(false, false, false)]
-    [InlineData(true, false, true)]
-    [InlineData(false, true, true)]
-    public void Restore_SavedDisband_IsCancelled(bool isDisbanding, bool isWaitingForDisband, bool expectCancel)
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void Restore_SavedDisband_IsCancelled(bool isDisbanding, bool isWaitingForDisband)
     {
         var (hero, party, _, _) = CreatePlayerGraph();
         party.IsDisbanding = isDisbanding;
         var cancelled = new List<MobileParty>();
-        var restorer = new PlayerPartyRestorer(
-            Mock.Of<IObjectManager>(),
-            Mock.Of<IAutoRegistryFactory>(),
-            () => Array.Empty<MobileParty>(),
-            _ => throw new InvalidOperationException("Restore never creates a party"),
-            _ => throw new InvalidOperationException("Restore never removes a party"),
-            _ => isWaitingForDisband,
-            cancelled.Add);
+        var restorer = CreateDisbandRestorer(_ => isWaitingForDisband, cancelled);
 
         restorer.Restore(hero, party);
 
-        if (expectCancel)
-            Assert.Same(party, Assert.Single(cancelled));
-        else
-            Assert.Empty(cancelled);
+        Assert.Same(party, Assert.Single(cancelled));
+    }
+
+    [Fact]
+    public void Restore_NoSavedDisband_DoesNotCancel()
+    {
+        var (hero, party, _, _) = CreatePlayerGraph();
+        var cancelled = new List<MobileParty>();
+        var restorer = CreateDisbandRestorer(_ => false, cancelled);
+
+        restorer.Restore(hero, party);
+
+        Assert.Empty(cancelled);
     }
 
     [Fact]
@@ -140,7 +141,9 @@ public class PlayerPartyRestorerTests
             autoRegistryFactory.Object,
             () => new[] { party },
             _ => throw new InvalidOperationException("A live owned party should be reused"),
-            _ => throw new InvalidOperationException("A reused party should not be removed"));
+            _ => throw new InvalidOperationException("A reused party should not be removed"),
+            _ => false,
+            _ => { });
 
         Assert.True(restorer.TryRestore(player, out var restored));
 
@@ -207,7 +210,9 @@ public class PlayerPartyRestorerTests
                 Assert.Same(hero, recoveryHero);
                 return party;
             },
-            _ => throw new InvalidOperationException("A registered recovery party should not be removed"));
+            _ => throw new InvalidOperationException("A registered recovery party should not be removed"),
+            _ => false,
+            _ => { });
 
         Assert.True(restorer.TryRestore(player, out var restored));
 
@@ -247,7 +252,9 @@ public class PlayerPartyRestorerTests
             {
                 Assert.Same(party, removedRecoveryParty);
                 registrationOrder.Add("cleanup");
-            });
+            },
+            _ => false,
+            _ => { });
 
         Assert.False(restorer.TryRestore(player, out var restored));
 
@@ -286,7 +293,9 @@ public class PlayerPartyRestorerTests
             {
                 Assert.Same(party, removedRecoveryParty);
                 registrationOrder.Add("cleanup");
-            });
+            },
+            _ => false,
+            _ => { });
 
         Assert.False(restorer.TryRestore(player, out var restored));
 
@@ -320,7 +329,9 @@ public class PlayerPartyRestorerTests
             {
                 cleanupCalled = true;
                 throw new InvalidOperationException("Cleanup failed");
-            });
+            },
+            _ => false,
+            _ => { });
 
         Assert.False(restorer.TryRestore(player, out var restored));
 
@@ -343,7 +354,9 @@ public class PlayerPartyRestorerTests
             Mock.Of<IAutoRegistryFactory>(),
             () => Array.Empty<MobileParty>(),
             _ => throw new InvalidOperationException("The saved party should be reused"),
-            _ => throw new InvalidOperationException("The saved party should not be removed"));
+            _ => throw new InvalidOperationException("The saved party should not be removed"),
+            _ => false,
+            _ => { });
 
         Assert.True(restorer.TryRestore(player, out _));
         Assert.Same(party, party.PartyComponent.MobileParty);
@@ -363,7 +376,9 @@ public class PlayerPartyRestorerTests
             Mock.Of<IAutoRegistryFactory>(),
             () => new[] { party },
             _ => null,
-            _ => throw new InvalidOperationException("No recovery party was created"));
+            _ => throw new InvalidOperationException("No recovery party was created"),
+            _ => false,
+            _ => { });
 
         Assert.False(restorer.TryRestore(player, out _));
     }
@@ -402,11 +417,23 @@ public class PlayerPartyRestorerTests
                 createCalled = true;
                 return null;
             },
-            _ => throw new InvalidOperationException("No recovery party was created"));
+            _ => throw new InvalidOperationException("No recovery party was created"),
+            _ => false,
+            _ => { });
 
         Assert.False(restorer.TryRestore(player, out _));
         Assert.True(createCalled);
     }
+
+    private static PlayerPartyRestorer CreateDisbandRestorer(Func<MobileParty, bool> isWaitingForDisband, List<MobileParty> cancelled)
+        => new PlayerPartyRestorer(
+            Mock.Of<IObjectManager>(),
+            Mock.Of<IAutoRegistryFactory>(),
+            () => Array.Empty<MobileParty>(),
+            _ => throw new InvalidOperationException("Restore never creates a party"),
+            _ => throw new InvalidOperationException("Restore never removes a party"),
+            isWaitingForDisband,
+            cancelled.Add);
 
     private static (Hero Hero, MobileParty Party, Clan Clan, CharacterObject Character) CreatePlayerGraph()
     {

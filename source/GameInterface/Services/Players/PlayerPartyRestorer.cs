@@ -34,7 +34,8 @@ internal class PlayerPartyRestorer : IPlayerPartyRestorer
     private readonly Action<MobileParty> cancelDisband;
 
     public PlayerPartyRestorer(IObjectManager objectManager, IAutoRegistryFactory autoRegistryFactory)
-        : this(objectManager, autoRegistryFactory, () => MobileParty.All, CreateRecoveryParty, RemoveParty)
+        : this(objectManager, autoRegistryFactory, () => MobileParty.All, CreateRecoveryParty, RemoveParty,
+            IsWaitingForDisband, DisbandPartyAction.CancelDisband)
     {
     }
 
@@ -44,16 +45,16 @@ internal class PlayerPartyRestorer : IPlayerPartyRestorer
         Func<IEnumerable<MobileParty>> getParties,
         Func<Hero, MobileParty> createRecoveryParty,
         Action<MobileParty> removeRecoveryParty,
-        Func<MobileParty, bool> isWaitingForDisband = null,
-        Action<MobileParty> cancelDisband = null)
+        Func<MobileParty, bool> isWaitingForDisband,
+        Action<MobileParty> cancelDisband)
     {
         this.objectManager = objectManager;
         this.autoRegistryFactory = autoRegistryFactory;
         this.getParties = getParties;
         this.createRecoveryParty = createRecoveryParty;
         this.removeRecoveryParty = removeRecoveryParty;
-        this.isWaitingForDisband = isWaitingForDisband ?? IsWaitingForDisband;
-        this.cancelDisband = cancelDisband ?? DisbandPartyAction.CancelDisband;
+        this.isWaitingForDisband = isWaitingForDisband;
+        this.cancelDisband = cancelDisband;
     }
 
     public bool TryRestore(Player player, out Player restoredPlayer)
