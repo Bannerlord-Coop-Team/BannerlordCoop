@@ -30,12 +30,9 @@ internal class PlayerPartyRestorer : IPlayerPartyRestorer
     private readonly Func<IEnumerable<MobileParty>> getParties;
     private readonly Func<Hero, MobileParty> createRecoveryParty;
     private readonly Action<MobileParty> removeRecoveryParty;
-    private readonly Func<MobileParty, bool> isWaitingForDisband;
-    private readonly Action<MobileParty> cancelDisband;
 
     public PlayerPartyRestorer(IObjectManager objectManager, IAutoRegistryFactory autoRegistryFactory)
-        : this(objectManager, autoRegistryFactory, () => MobileParty.All, CreateRecoveryParty, RemoveParty,
-            IsWaitingForDisband, DisbandPartyAction.CancelDisband)
+        : this(objectManager, autoRegistryFactory, () => MobileParty.All, CreateRecoveryParty, RemoveParty)
     {
     }
 
@@ -44,17 +41,13 @@ internal class PlayerPartyRestorer : IPlayerPartyRestorer
         IAutoRegistryFactory autoRegistryFactory,
         Func<IEnumerable<MobileParty>> getParties,
         Func<Hero, MobileParty> createRecoveryParty,
-        Action<MobileParty> removeRecoveryParty,
-        Func<MobileParty, bool> isWaitingForDisband,
-        Action<MobileParty> cancelDisband)
+        Action<MobileParty> removeRecoveryParty)
     {
         this.objectManager = objectManager;
         this.autoRegistryFactory = autoRegistryFactory;
         this.getParties = getParties;
         this.createRecoveryParty = createRecoveryParty;
         this.removeRecoveryParty = removeRecoveryParty;
-        this.isWaitingForDisband = isWaitingForDisband;
-        this.cancelDisband = cancelDisband;
     }
 
     public bool TryRestore(Player player, out Player restoredPlayer)
@@ -251,12 +244,12 @@ internal class PlayerPartyRestorer : IPlayerPartyRestorer
             hero.Clan.OnLordAdded(hero);
     }
 
-    private void CancelPendingDisband(MobileParty party)
+    private static void CancelPendingDisband(MobileParty party)
     {
-        if (!party.IsDisbanding && !isWaitingForDisband(party)) return;
+        if (!party.IsDisbanding && !IsWaitingForDisband(party)) return;
 
         Logger.Warning("Cancelling the disband of player party {PartyId}", party.StringId);
-        cancelDisband(party);
+        DisbandPartyAction.CancelDisband(party);
     }
 
     private static bool IsWaitingForDisband(MobileParty party)
