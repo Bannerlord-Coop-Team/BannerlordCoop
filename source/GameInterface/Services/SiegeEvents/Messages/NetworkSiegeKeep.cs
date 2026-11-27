@@ -101,9 +101,9 @@ public readonly struct AuthoritativeSiegeKeepRequested : IEvent
 }
 
 /// <summary>
-/// [Local, server] Whether the keep stage opened on a map event whose walls mission just concluded. Opened, that
-/// mission instance ends without the conclusion record that would refuse the keep mission on the same id; not
-/// opened, the walls conclude as an attacker victory at the walls' host epoch.
+/// [Local, server] Whether the keep stage opened on a map event whose walls mission just concluded. When opened, the
+/// walls instance ends without a conclusion record, so the keep mission can reuse its id. When not opened, the walls
+/// conclude as an attacker victory at the walls' host epoch.
 /// </summary>
 public readonly struct SiegeKeepStageOpened : IEvent
 {

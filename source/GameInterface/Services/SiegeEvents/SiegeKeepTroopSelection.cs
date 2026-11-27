@@ -31,7 +31,10 @@ public readonly struct SiegeKeepSeat
 /// <summary>What the battle path reads of the keep roster; its writes go through <see cref="ISiegeKeepStage"/>.</summary>
 public interface ISiegeKeepRoster
 {
+    bool IsOpen(MapEvent mapEvent);
     bool IsLocked(MapEvent mapEvent);
+    IReadOnlyList<SiegeKeepSeat> GetSeats(MapEvent mapEvent);
+    bool TryGetSeat(MapEvent mapEvent, string mobilePartyId, out SiegeKeepSeat seat);
     /// <summary>Whether the roster is locked and this party chose a squad for the keep.</summary>
     bool IsAdmitted(MapEvent mapEvent, MobileParty party);
     void FilterReserve(MapEvent mapEvent, MapEventParty party, List<TroopReserveEntry> entries);
@@ -42,10 +45,7 @@ internal interface ISiegeKeepTroopSelection : IGameAbstraction, ISiegeKeepRoster
     /// <summary>Opens the keep stage with its seated players and the defender troops vanilla puts in the hall.</summary>
     void Open(MapEvent mapEvent, IReadOnlyList<SiegeKeepSeat> seats, IReadOnlyDictionary<string, int> defenderBudget,
         DateTime deadlineUtc);
-    bool IsOpen(MapEvent mapEvent);
     bool TryGetDeadline(MapEvent mapEvent, out DateTime deadlineUtc);
-    IReadOnlyList<SiegeKeepSeat> GetSeats(MapEvent mapEvent);
-    bool TryGetSeat(MapEvent mapEvent, string mobilePartyId, out SiegeKeepSeat seat);
     /// <summary>Whether the seated player already chose its squad.</summary>
     bool HasAnswered(MapEvent mapEvent, string mobilePartyId);
     bool TrySelect(MapEvent mapEvent, MobileParty party, IReadOnlyList<HideoutTroopSelectionEntry> requested);

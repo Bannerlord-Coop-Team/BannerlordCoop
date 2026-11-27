@@ -32,15 +32,17 @@ internal sealed class SiegeKeepStageHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly IPlayerManager playerManager;
     private readonly ISiegeKeepStage stage;
+    private readonly ISiegeKeepRoster roster;
 
     public SiegeKeepStageHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager,
-        IPlayerManager playerManager, ISiegeKeepStage stage)
+        IPlayerManager playerManager, ISiegeKeepStage stage, ISiegeKeepRoster roster)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.playerManager = playerManager;
         this.stage = stage;
+        this.roster = roster;
         messageBroker.Subscribe<AuthoritativeSiegeKeepRequested>(Handle_AuthoritativeSiegeKeepRequested);
         messageBroker.Subscribe<NetworkSiegeKeepEntryRequest>(Handle_EntryRequest);
         messageBroker.Subscribe<CampaignTick>(Handle_CampaignTick);
@@ -105,17 +107,17 @@ internal sealed class SiegeKeepStageHandler : IHandler
         if (!assaultOpen) return Reject(request, "This siege assault is no longer open.");
 
         // A later assault on a siege that already reached the hall goes straight to the keep.
-        if (!stage.IsOpen(mapEvent) && !stage.TryReopen(mapEvent))
+        if (!roster.IsOpen(mapEvent) && !stage.TryReopen(mapEvent))
             return Reject(request, "Nobody can lead the keep battle right now.");
 
-        if (!stage.TryGetSeat(mapEvent, player.MobilePartyId, out var seat))
+        if (!roster.TryGetSeat(mapEvent, player.MobilePartyId, out var seat))
         {
-            if (stage.IsLocked(mapEvent))
+            if (roster.IsLocked(mapEvent))
                 return Reject(request, "The keep battle has started without you. You will see the result.");
             return Reject(request, "The keep has no place left for you. You will see the result.");
         }
 
-        if (stage.IsLocked(mapEvent))
+        if (roster.IsLocked(mapEvent))
             return Accept(request, seat, secondsRemaining: 0, isLocked: true);
 
         var seconds = stage.SecondsRemaining(mapEvent);
@@ -125,7 +127,7 @@ internal sealed class SiegeKeepStageHandler : IHandler
         if (!stage.TrySelect(mapEvent, party, request.Troops ?? Array.Empty<HideoutTroopSelectionEntry>()))
             return Reject(request, "That troop selection is no longer available.");
 
-        return Accept(request, seat, seconds, stage.IsLocked(mapEvent));
+        return Accept(request, seat, seconds, roster.IsLocked(mapEvent));
     }
 
     private static NetworkSiegeKeepEntryReply Accept(NetworkSiegeKeepEntryRequest request, SiegeKeepSeat seat,

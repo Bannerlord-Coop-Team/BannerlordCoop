@@ -123,7 +123,7 @@ public class ServerBattleCompletionHandlerSiegeKeepTests : IDisposable
         broker.Publish(this, new SiegeKeepStageOpened(MapEventId, opened: true, hostEpoch: 1));
         Drain();
 
-        Assert.Empty(missionManager.TakeExpiredConclusions());
+        Assert.Equal(0, missionManager.GetDiagnostics().RolledBackConclusions);
         broker.Publish(this, new CampaignTick());
         Drain();
         Assert.Single(broker.Messages.GetMessages<AuthoritativeSiegeKeepRequested>());

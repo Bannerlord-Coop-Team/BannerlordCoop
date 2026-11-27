@@ -34,10 +34,6 @@ public interface ISiegeKeepStage : IGameAbstraction
     /// <summary>Opens the keep again for a later assault on a siege that already reached the lord's hall.</summary>
     bool TryReopen(MapEvent mapEvent);
 
-    bool IsOpen(MapEvent mapEvent);
-    bool IsLocked(MapEvent mapEvent);
-    bool TryGetSeat(MapEvent mapEvent, string mobilePartyId, out SiegeKeepSeat seat);
-    IReadOnlyList<SiegeKeepSeat> GetSeats(MapEvent mapEvent);
     int SecondsRemaining(MapEvent mapEvent);
 
     /// <summary>
@@ -179,15 +175,6 @@ internal sealed class SiegeKeepStage : ISiegeKeepStage
         return players;
     }
 
-    public bool IsOpen(MapEvent mapEvent) => selection.IsOpen(mapEvent);
-
-    public bool IsLocked(MapEvent mapEvent) => selection.IsLocked(mapEvent);
-
-    public bool TryGetSeat(MapEvent mapEvent, string mobilePartyId, out SiegeKeepSeat seat) =>
-        selection.TryGetSeat(mapEvent, mobilePartyId, out seat);
-
-    public IReadOnlyList<SiegeKeepSeat> GetSeats(MapEvent mapEvent) => selection.GetSeats(mapEvent);
-
     public bool TrySelect(MapEvent mapEvent, MobileParty party, IReadOnlyList<HideoutTroopSelectionEntry> troops)
     {
         if (!selection.TrySelect(mapEvent, party, troops)) return false;
@@ -253,7 +240,11 @@ internal sealed class SiegeKeepStage : ISiegeKeepStage
             }
 
             if (!selection.TrySelect(mapEvent, party, squad))
+            {
+                Logger.Warning("Suggested keep squad for {Party} in {MapEventId} was refused; dropping its seat",
+                    seat.MobilePartyId, mapEvent.StringId);
                 selection.RemoveSeat(mapEvent, seat.MobilePartyId);
+            }
         }
 
         if (selection.GetSeats(mapEvent).Count == 0)

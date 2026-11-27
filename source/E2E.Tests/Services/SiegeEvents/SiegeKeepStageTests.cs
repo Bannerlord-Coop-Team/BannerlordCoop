@@ -261,7 +261,7 @@ public class SiegeKeepStageTests : MapEventTestBase
             Server.Resolve<IPlayerManager>().ClearPeer(clients[0].NetPeer);
             Server.Resolve<IMessageBroker>().Publish(this, new CampaignTick());
             Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(keep.Battle.MapEventId, out var mapEvent));
-            Assert.False(Server.Resolve<ISiegeKeepStage>().IsOpen(mapEvent));
+            Assert.False(Server.Resolve<ISiegeKeepRoster>().IsOpen(mapEvent));
         }, keep.DisabledMethods);
 
         var closed = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkSiegeKeepPhaseChanged>(),

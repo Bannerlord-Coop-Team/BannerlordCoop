@@ -184,8 +184,8 @@ internal sealed class SiegeKeepEntryHandler : IHandler
     // The server answers through the normal mission start, which opens the keep for every seated player.
     private void RequestKeepMission(string mapEventId)
     {
-        if (!objectManager.TryGetIdWithLogging(MobileParty.MainParty, out var partyId) ||
-            !battleStarts.RequestBlocking(BattleStartMode.Mission, mapEventId, partyId))
+        if (!objectManager.TryGetIdWithLogging(MobileParty.MainParty, out var partyId)) return;
+        if (!battleStarts.RequestBlocking(BattleStartMode.Mission, mapEventId, partyId))
             ShowMessage("Unable to open the keep battle. Press Attack to try again.");
     }
 
