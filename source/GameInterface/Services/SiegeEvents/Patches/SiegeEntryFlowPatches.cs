@@ -157,11 +157,7 @@ internal class SiegeEntryFlowPatches
             return true;
         if (!ContainerProvider.TryResolve<IArmyLeaver>(out var armyLeaver)) return true;
 
-        var army = mainParty.Army;
-        if (army != null)
-        {
-            armyLeaver.Leave(mainParty, army);
-        }
+        armyLeaver.Leave(mainParty);
         PlayerSiege.FinalizePlayerSiege();
 
         return PlayerLeaveSettlementPatch.RequestLeave();
@@ -217,7 +213,6 @@ internal class SiegeEntryFlowPatches
         if (!ContainerProvider.TryResolve<IArmyLeaver>(out var armyLeaver)) return true;
 
         var mainParty = MobileParty.MainParty;
-        var army = mainParty.Army;
         GameMenu.ExitToLast();
         if (PlayerSiege.PlayerSiegeEvent != null)
         {
@@ -227,7 +222,7 @@ internal class SiegeEntryFlowPatches
         MessageBroker.Instance.Publish(
             null,
             new BreakSiegeAttempted(mainParty, finishLocalMenus: false));
-        armyLeaver.Leave(mainParty, army);
+        armyLeaver.Leave(mainParty);
         return false;
     }
 
@@ -280,10 +275,9 @@ internal class SiegeEntryFlowPatches
         if (mainParty.BesiegerCamp == null) return true;
         if (!ContainerProvider.TryResolve<IArmyLeaver>(out var armyLeaver)) return true;
 
-        var army = mainParty.Army;
-        if (army != null && army.LeaderParty != mainParty)
+        if (mainParty.Army?.LeaderParty != mainParty)
         {
-            armyLeaver.Leave(mainParty, army);
+            armyLeaver.Leave(mainParty);
         }
 
         // A besieger prompted into join_siege_event can already sit on a side of the sally-out/relief map

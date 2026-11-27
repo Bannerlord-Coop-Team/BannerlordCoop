@@ -1,8 +1,8 @@
-﻿using Common.Messaging;
+﻿using Common;
+using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Armies.Messages;
 using GameInterface.Services.Armies.Patches;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Armies;
@@ -10,9 +10,9 @@ namespace GameInterface.Services.Armies;
 public interface IArmyLeaver
 {
     /// <summary>
-    /// Takes this client's own party out of its army. Client side.
+    /// Takes this client's own party out of its army, if it is in one. Client side.
     /// </summary>
-    void Leave(MobileParty party, Army army);
+    void Leave(MobileParty party);
 }
 
 /// <summary>
@@ -28,12 +28,18 @@ internal sealed class ArmyLeaver : IArmyLeaver
         this.messageBroker = messageBroker;
     }
 
-    public void Leave(MobileParty party, Army army)
+    public void Leave(MobileParty party)
     {
-        messageBroker.Publish(army, new MobilePartyInArmyRemoved(army, party, party));
-        using (new AllowedThread())
+        var army = party.Army;
+        if (army == null) return;
+
+        messageBroker.Publish(army, new MobilePartyInArmyRemoved(army, party, clientMobileParty: party));
+        GameThread.RunSafe(() =>
         {
-            ArmyPatches.RemoveMobilePartyInArmy(party, army, party);
-        }
+            using (new AllowedThread())
+            {
+                ArmyPatches.RemoveMobilePartyInArmyImmediate(party, army, clientMobileParty: party);
+            }
+        });
     }
 }
