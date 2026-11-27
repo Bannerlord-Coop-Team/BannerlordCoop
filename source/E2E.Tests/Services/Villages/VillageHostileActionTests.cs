@@ -84,6 +84,8 @@ namespace E2E.Tests.Services.Villages;
 public class VillageHostileActionTests : MapEventTestBase
 {
     private const int MaxAdvancesToFinish = 200;
+    // One update per after battle encounter state, from capturing heroes through the loot screens to the end.
+    private const int MaxResultScreenSteps = 6;
     private static int peerPortCounter;
 
     public VillageHostileActionTests(ITestOutputHelper output) : base(output)
@@ -1534,10 +1536,13 @@ public class VillageHostileActionTests : MapEventTestBase
             prefix: new HarmonyMethod(typeof(MapEventTestBase), nameof(OpenLootPartyScreen)));
         lootScreens.Patch(AccessTools.Method(typeof(InventoryScreenHelper), nameof(InventoryScreenHelper.OpenScreenAsLoot)),
             prefix: new HarmonyMethod(typeof(MapEventTestBase), nameof(OpenLootInventoryScreen)));
-        menus = new MethodCallRecorder(Priority.First,
-            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu)),
-            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu)));
+        menus = RecordMenuSwitches();
     }
+
+    // Records, and skips, every menu the client opens.
+    private static MethodCallRecorder RecordMenuSwitches() => new MethodCallRecorder(Priority.First,
+        AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu)),
+        AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu)));
 
     private void AdvanceSimulationUntilFinished(EnvironmentInstance pacer, string mapEventId)
     {
@@ -1754,6 +1759,167 @@ public class VillageHostileActionTests : MapEventTestBase
         }, MapEventDisabledMethods);
     }
 
+    // #2619: the client can't take its party out of the village it forced, so after the result screens the leader
+    // goes back in like vanilla and leaves from the village menu, instead of staying inside with no menu.
+    [Fact]
+    public void ForceSuppliesBattleWon_LeaderReentersTheVillageAndLeaves()
+    {
+        var client = Clients.First();
+        var (context, encounter) = ArrangeForcedVillageEncounter(client);
+        client.Call(() =>
+        {
+            encounter.BattleSimulation = new BattleSimulation(null, null);
+            encounter._alternativeReceivedLootShips = new List<TaleWorlds.CampaignSystem.Naval.Ship>();
+            var mapState = Game.Current.GameStateManager.CreateState<MapState>();
+            mapState._battleSimulation = encounter.BattleSimulation;
+            Game.Current.GameStateManager._gameStates.Add(mapState);
+        }, MapEventDisabledMethods);
+
+        InstallResultScreenPatches(out var lootScreens, out var menus);
+        try
+        {
+            StartBattleSimulation(client, context);
+            Server.Call(() =>
+            {
+                var mapEvent = Server.GetRegisteredObject<MapEvent>(context.MapEventId);
+                // The harness cant simulate a combat round, so the attackers win outright and the next advance
+                // finishes the simulation the way a won auto resolve does.
+                mapEvent.BattleState = BattleState.AttackerVictory;
+                AdvanceSimulationUntilFinished(client, context.MapEventId);
+                Assert.True(mapEvent.IsFinalized);
+            }, MapEventDisabledMethods);
+
+            client.NetworkSentMessages.Clear();
+            client.Call(() =>
+            {
+                var states = Game.Current.GameStateManager;
+                var simulation = encounter.BattleSimulation;
+                states.GameStates.OfType<MapState>().Single().EndBattleSimulation();
+                simulation.OnFinished();
+                // The simulation decides whether there are prisoners, so close whichever result screens open.
+                for (var step = 0; step < MaxResultScreenSteps && PlayerEncounter.Current != null; step++)
+                {
+                    PlayerEncounter.Update();
+                    if (states.ActiveState is PartyState or InventoryState)
+                        CloseTopGameState(states);
+                }
+                Assert.Null(PlayerEncounter.Current);
+            }, MapEventDisabledMethods.Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast))));
+
+            Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestStartSettlementEncounter>());
+            client.Call(() =>
+            {
+                Assert.NotNull(PlayerEncounter.Current);
+                Assert.Same(client.GetRegisteredObject<Settlement>(context.SettlementId),
+                    PlayerEncounter.Current.EncounterSettlementAux);
+                Assert.Null(MobileParty.MainParty.MapEvent);
+            }, MapEventDisabledMethods);
+            // Vanilla's village_outside init switches to the village menu.
+            Assert.Equal("village_outside", menus.MenusFor(client).Last());
+
+            LeaveVillageFromMenu(client, context.AttackerMobilePartyId);
+        }
+        finally
+        {
+            lootScreens.UnpatchAll(lootScreens.Id);
+            menus.Dispose();
+        }
+    }
+
+    // #2619: when the village gives in as the encounter opens, the client shows the force supplies menu and reports the
+    // win. The server's finalize closes that menu, so the leader goes back into the village and leaves from there.
+    [Fact]
+    public void ForceSuppliesGiveIn_FinalizeSendsTheLeaderBackIntoTheVillage()
+    {
+        var client = Clients.First();
+        var (context, encounter) = ArrangeForcedVillageEncounter(client);
+        const string forceSuppliesMenu = "force_supplies_village";
+        client.Call(() =>
+        {
+            var states = Game.Current.GameStateManager;
+            var mapState = states.CreateState<MapState>();
+            states._gameStates.Add(mapState);
+            var gameMenus = Campaign.Current.GameMenuManager;
+            new CampaignGameStarter(gameMenus, Campaign.Current.ConversationManager)
+                .AddGameMenu(forceSuppliesMenu, "", _ => { });
+            mapState._menuContext = Game.Current.ObjectManager.CreateObject<MenuContext>();
+            mapState._menuContext.GameMenu = gameMenus.GetGameMenu(forceSuppliesMenu);
+        }, MapEventDisabledMethods);
+        using var menus = RecordMenuSwitches();
+        client.NetworkSentMessages.Clear();
+
+        // Vanilla's give in (UpdateVillageHostileActionEncounter) sets this winner as it opens the menu.
+        client.Call(() => MobileParty.MainParty.MapEvent.SetOverrideWinner(BattleSideEnum.Attacker),
+            MapEventDisabledMethods);
+
+        Server.Call(() => Assert.False(Server.ObjectManager.TryGetObject<MapEvent>(context.MapEventId, out _)));
+        Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestStartSettlementEncounter>());
+        Assert.Equal("village_outside", menus.MenusFor(client).Last());
+        client.Call(() =>
+        {
+            Assert.NotNull(PlayerEncounter.Current);
+            Assert.NotSame(encounter, PlayerEncounter.Current);
+            Assert.Same(client.GetRegisteredObject<Settlement>(context.SettlementId),
+                PlayerEncounter.Current.EncounterSettlementAux);
+        }, MapEventDisabledMethods);
+
+        LeaveVillageFromMenu(client, context.AttackerMobilePartyId);
+    }
+
+    // The client's encounter for a force supplies action it leads from inside the village, which it stays in through the battle.
+    private (RaidMapEventContext Context, PlayerEncounter Encounter) ArrangeForcedVillageEncounter(EnvironmentInstance client)
+    {
+        var context = CreateHostileActionWithOnePlayerParty(VillageHostileAction.ForceSupplies);
+        TestEnvironment.ConnectRegisteredPlayer(client, "PlayerOne");
+        client.Call(() => client.Resolve<IControllerIdProvider>().SetControllerId("PlayerOne"));
+        foreach (var instance in Clients.Prepend(Server))
+        {
+            instance.Call(() =>
+            {
+                using (new AllowedThread())
+                {
+                    instance.GetRegisteredObject<MobileParty>(context.AttackerMobilePartyId).CurrentSettlement =
+                        instance.GetRegisteredObject<Settlement>(context.SettlementId);
+                }
+            }, MapEventDisabledMethods);
+        }
+
+        EnableHeadlessEncounterFinish(client);
+        var encounter = SetMockPlayerEncounter(client, mapEventId: context.MapEventId);
+        client.Call(() =>
+        {
+            Campaign.Current.MainParty = client.GetRegisteredObject<MobileParty>(context.AttackerMobilePartyId);
+            var village = client.GetRegisteredObject<Settlement>(context.SettlementId);
+            encounter._attackerParty = MobileParty.MainParty.Party;
+            encounter._defenderParty = village.Party;
+            encounter._encounteredParty = village.Party;
+            encounter.EncounterSettlementAux = village;
+            encounter.PlayerSide = BattleSideEnum.Attacker;
+            encounter.ForceSupplies = true;
+        }, MapEventDisabledMethods);
+
+        return (context, encounter);
+    }
+
+    // Clicks Leave on the village menu and checks the party ends up outside with no encounter everywhere.
+    private void LeaveVillageFromMenu(EnvironmentInstance client, string partyId)
+    {
+        client.Call(() => PlayerTownVisitCampaignBehavior.game_menu_settlement_leave_on_consequence(
+                new MenuCallbackArgs((MenuContext)null, TextObject.GetEmpty())),
+            MapEventDisabledMethods.Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast))));
+
+        client.Call(() => Assert.Null(PlayerEncounter.Current), MapEventDisabledMethods);
+        foreach (var instance in Clients.Prepend(Server))
+        {
+            instance.Call(() =>
+            {
+                var party = instance.GetRegisteredObject<MobileParty>(partyId);
+                Assert.Null(party.CurrentSettlement);
+                Assert.Null(party.MapEvent);
+            }, MapEventDisabledMethods);
+        }
+    }
+
     [Theory]
     [InlineData(VillageHostileAction.ForceSupplies)]
     [InlineData(VillageHostileAction.ForceVolunteers)]
@@ -1797,6 +1963,8 @@ public class VillageHostileActionTests : MapEventTestBase
         var encounter = SetMockPlayerEncounter(client, mapEventId: mapEventId);
         var model = new SimulationRoundProbe();
         var router = client.Resolve<TestNetworkRouter>();
+        using var settlementStarts = new MethodCallRecorder(Priority.First, true,
+            AccessTools.Method(typeof(EncounterManager), nameof(EncounterManager.StartSettlementEncounter)));
         client.NetworkSentMessages.Clear();
         router.AutoDrainReady = false;
         try
@@ -1846,6 +2014,8 @@ public class VillageHostileActionTests : MapEventTestBase
                 Assert.True(client.ObjectManager.TryGetHandle(settlement, out var settlementHandle));
                 var finalize = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkMapEventFinalizeAttempted>());
                 var reentry = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestStartSettlementEncounter>());
+                // Only vanilla's Leave asks for the village again, the Finish patch leaves an undecided fight alone.
+                Assert.Equal(1, settlementStarts.CountFor(client));
                 Assert.Equal(mapEventId, finalize.MapEventId);
                 Assert.Equal(partyHandle, reentry.PartyId);
                 Assert.Equal(settlementHandle, reentry.SettlementId);
@@ -3625,7 +3795,7 @@ public class VillageHostileActionTests : MapEventTestBase
         {
             Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(hostileAction.MapEventId, out var mapEvent));
             Assert.True(mapEvent.IsVillageHostileAction());
-            Assert.False(mapEvent.IsVillageHostileActionWithMultiplePlayerParties());
+            Assert.False(mapEvent.HasMultiplePlayerParties());
         }, MapEventDisabledMethods);
 
         ServerBattleModeArbiter.Release(hostileAction.MapEventId);
@@ -3664,7 +3834,7 @@ public class VillageHostileActionTests : MapEventTestBase
         {
             Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(hostileAction.MapEventId, out var mapEvent));
             Assert.True(mapEvent.IsRaidHostileAction());
-            Assert.True(mapEvent.IsVillageHostileActionWithMultiplePlayerParties());
+            Assert.True(mapEvent.HasMultiplePlayerParties());
             Assert.False(mapEvent.IsUnsupportedMultiPlayerHostileAction());
         }, MapEventDisabledMethods);
 
@@ -3819,7 +3989,7 @@ public class VillageHostileActionTests : MapEventTestBase
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(hostileAction.MapEventId, out var mapEvent));
-            Assert.True(mapEvent.IsVillageHostileActionWithMultiplePlayerParties());
+            Assert.True(mapEvent.HasMultiplePlayerParties());
             Assert.True(mapEvent.IsUnsupportedMultiPlayerHostileAction());
         }, MapEventDisabledMethods);
     }
@@ -3853,7 +4023,7 @@ public class VillageHostileActionTests : MapEventTestBase
         {
             Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(hostileAction.MapEventId, out var mapEvent));
             Assert.True(mapEvent.IsRaid);
-            Assert.True(mapEvent.IsVillageHostileActionWithMultiplePlayerParties());
+            Assert.True(mapEvent.HasMultiplePlayerParties());
             Assert.True(mapEvent.BattleObserver is ForwardingBattleObserver);
         }, MapEventDisabledMethods);
 
@@ -3886,7 +4056,7 @@ public class VillageHostileActionTests : MapEventTestBase
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(hostileAction.MapEventId, out var mapEvent));
-            Assert.True(mapEvent.IsVillageHostileActionWithMultiplePlayerParties());
+            Assert.True(mapEvent.HasMultiplePlayerParties());
             Assert.False(mapEvent.BattleObserver is ForwardingBattleObserver);
             Assert.False(ServerBattleModeArbiter.IsClaimed(hostileAction.MapEventId));
         }, MapEventDisabledMethods);
@@ -4249,7 +4419,7 @@ public class VillageHostileActionTests : MapEventTestBase
             defenderParty.MemberRoster.AddToCounts(defenderTroop, 1);
             AddSyntheticMapEventParty(raidMapEvent.DefenderSide, defenderParty.Party);
 
-            Assert.False(raidMapEvent.IsVillageHostileActionWithMultiplePlayerParties());
+            Assert.False(raidMapEvent.HasMultiplePlayerParties());
             Assert.True(Server.ObjectManager.TryGetId(raidMapEvent, out mapEventId));
         }, MapEventDisabledMethods);
 
@@ -4281,7 +4451,7 @@ public class VillageHostileActionTests : MapEventTestBase
             Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId!, out var mapEvent));
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(joinerMobilePartyId, out var joinerParty));
             Assert.Same(mapEvent, joinerParty.MapEvent);
-            Assert.True(mapEvent.IsVillageHostileActionWithMultiplePlayerParties());
+            Assert.True(mapEvent.HasMultiplePlayerParties());
             Assert.True(mapEvent.BattleObserver is ForwardingBattleObserver);
             Assert.False(mapEvent.HasWinner);
         }, MapEventDisabledMethods);
@@ -4418,7 +4588,7 @@ public class VillageHostileActionTests : MapEventTestBase
             Assert.True(instance.ObjectManager.TryGetObject<PartyBase>(joinerPartyId, out var joinerParty));
 
             Assert.Same(mapEvent, joinerParty.MapEvent);
-            Assert.True(mapEvent.IsVillageHostileActionWithMultiplePlayerParties());
+            Assert.True(mapEvent.HasMultiplePlayerParties());
         }, MapEventDisabledMethods);
     }
 
@@ -4437,7 +4607,7 @@ public class VillageHostileActionTests : MapEventTestBase
             Assert.Same(mapEvent, attackerParty.MapEvent);
             Assert.Null(joinerParty.MapEventSide);
             Assert.True(mapEvent.IsVillageHostileAction());
-            Assert.False(mapEvent.IsVillageHostileActionWithMultiplePlayerParties());
+            Assert.False(mapEvent.HasMultiplePlayerParties());
         }, MapEventDisabledMethods);
     }
 
@@ -5255,7 +5425,7 @@ public class VillageHostileActionTests : MapEventTestBase
             AddSyntheticMapEventParty(mapEvent.DefenderSide, defenderParty.Party);
 
             Assert.True(mapEvent.IsVillageHostileAction());
-            Assert.False(mapEvent.IsVillageHostileActionWithMultiplePlayerParties());
+            Assert.False(mapEvent.HasMultiplePlayerParties());
             Assert.True(Server.ObjectManager.TryGetId(mapEvent, out mapEventId));
         }, MapEventDisabledMethods);
 
@@ -5300,7 +5470,7 @@ public class VillageHostileActionTests : MapEventTestBase
             mapEvent.MapEventVisual = MockMapEventVisual();
             AddSyntheticMapEventParty(mapEvent.AttackerSide, joinerParty.Party);
 
-            Assert.True(mapEvent.IsVillageHostileActionWithMultiplePlayerParties());
+            Assert.True(mapEvent.HasMultiplePlayerParties());
             Assert.True(Server.ObjectManager.TryGetId(mapEvent, out mapEventId));
         }, MapEventDisabledMethods);
 
