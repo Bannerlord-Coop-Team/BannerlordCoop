@@ -2705,17 +2705,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         });
 
         // A decision proposed later while the same kingdom screen stays open still prompts.
-        var laterTargetKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
-        var laterTargetPlayer = CreateSyncedPlayerContext("TargetKingdomNoRepromptLater", _ => false);
-        ConfigureClanInKingdom(laterTargetPlayer.ClanId, laterTargetKingdomId);
-        EnsureKingdomRegisteredEverywhere(laterTargetKingdomId);
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
-            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(laterTargetKingdomId, out var laterTargetKingdom));
-            Assert.True(Server.ObjectManager.TryGetObject<Clan>(player1.ClanId, out var proposerClan));
-            kingdom.AddDecision(new DeclareWarDecision(proposerClan, laterTargetKingdom));
-        });
+        AddDeclareWarDecision(kingdomId, player1.ClanId, "TargetKingdomNoRepromptLater");
 
         client1.Call(() =>
         {
@@ -2919,10 +2909,6 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     public void KingdomDecisionDeadline_ResolvePromptConfirmedAfterDeadlineOpensNoBallotAndOffersNextVote()
     {
         var (client1, _, player1, _, kingdomId) = SetUpPlayerDeclareWarVotes("TargetKingdomDeadlinePrompt");
-        var nextTargetKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
-        var nextTargetPlayer = CreateSyncedPlayerContext("TargetKingdomDeadlinePromptNext", _ => false);
-        ConfigureClanInKingdom(nextTargetPlayer.ClanId, nextTargetKingdomId);
-        EnsureKingdomRegisteredEverywhere(nextTargetKingdomId);
         KingdomDecisionsVM decisionsVm = null;
         InquiryData resolvePrompt = null;
 
@@ -2933,16 +2919,9 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             resolvePrompt = Assert.Single(CaptureInquiries(() => decisionsVm.HandleDecision(decision)));
         });
 
-        Server.Call(() =>
-        {
-            GetConcreteVoteManager(Server).ProcessVotingRounds(
-                DateTime.UtcNow + KingdomDecisionVoteManager.VotingRoundDuration + TimeSpan.FromSeconds(1));
-
-            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
-            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(nextTargetKingdomId, out var nextTargetKingdom));
-            Assert.True(Server.ObjectManager.TryGetObject<Clan>(player1.ClanId, out var proposerClan));
-            kingdom.AddDecision(new DeclareWarDecision(proposerClan, nextTargetKingdom));
-        });
+        Server.Call(() => GetConcreteVoteManager(Server).ProcessVotingRounds(
+            DateTime.UtcNow + KingdomDecisionVoteManager.VotingRoundDuration + TimeSpan.FromSeconds(1)));
+        AddDeclareWarDecision(kingdomId, player1.ClanId, "TargetKingdomDeadlinePromptNext");
 
         Assert.Single(
             client1.InternalMessages.GetMessages<ApplyKingdomDecisionResolved>(),
@@ -5719,28 +5698,29 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         ConfigureClanInKingdom(player2.ClanId, kingdomId);
         EnsureKingdomRegisteredEverywhere(kingdomId);
 
-        var targetKingdomIds = new List<string>();
         for (int i = 0; i < decisionCount; i++)
         {
-            var targetKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
-            var targetPlayer = CreateSyncedPlayerContext(targetControllerId + i, _ => false);
-            ConfigureClanInKingdom(targetPlayer.ClanId, targetKingdomId);
-            EnsureKingdomRegisteredEverywhere(targetKingdomId);
-            targetKingdomIds.Add(targetKingdomId);
+            AddDeclareWarDecision(kingdomId, player1.ClanId, targetControllerId + i);
         }
+
+        return (client1, client2, player1, player2, kingdomId);
+    }
+
+    // Proposes a declare-war decision from the given clan against a new target kingdom.
+    private void AddDeclareWarDecision(string kingdomId, string proposerClanId, string targetControllerId)
+    {
+        var targetKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var targetPlayer = CreateSyncedPlayerContext(targetControllerId, _ => false);
+        ConfigureClanInKingdom(targetPlayer.ClanId, targetKingdomId);
+        EnsureKingdomRegisteredEverywhere(targetKingdomId);
 
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
-            Assert.True(Server.ObjectManager.TryGetObject<Clan>(player1.ClanId, out var proposerClan));
-            foreach (string targetKingdomId in targetKingdomIds)
-            {
-                Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(targetKingdomId, out var targetKingdom));
-                kingdom.AddDecision(new DeclareWarDecision(proposerClan, targetKingdom));
-            }
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(targetKingdomId, out var targetKingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(proposerClanId, out var proposerClan));
+            kingdom.AddDecision(new DeclareWarDecision(proposerClan, targetKingdom));
         });
-
-        return (client1, client2, player1, player2, kingdomId);
     }
 
     private static DecisionItemBaseVM SubmitDeclareWarVoteFromPanel(KingdomDecisionsVM decisionsVm, KingdomDecision decision)
