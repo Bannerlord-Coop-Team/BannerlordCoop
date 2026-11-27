@@ -714,7 +714,7 @@ public sealed class HideoutMissionRuntimeTests : MissionTestEnvironment
             session.InstanceId == "raid" && session.HostControllerId == "host" &&
             session.OwnControllerId == (isLocalHost ? "host" : "lighter")));
         var areaLogic = new CoopHideoutStealthAreaLogic();
-        AccessTools.Property(typeof(MissionBehavior), nameof(MissionBehavior.Mission)).SetValue(areaLogic, mission.Shell);
+        areaLogic.Mission = mission.Shell;
         mission.Shell.MissionBehaviors.Add(areaLogic);
         mission.Shell._missionMode = MissionMode.Stealth;
         native.Apply(HideoutPhase.Stealth, null, 25);
