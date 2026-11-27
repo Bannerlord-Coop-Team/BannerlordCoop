@@ -735,6 +735,26 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
         client.SimulateMessage(Server.NetPeer, joinReply);
     }
 
+    // Only a waiting village join is cancelled by Finish, so an accepted siege join gets no leave from it.
+    [Fact]
+    public void DeferredSiegeJoin_DontGetInvolvedBeforeReply_SendsNoLeave()
+    {
+        var client = Clients.First();
+        var (_, _, joinReply) = StageDeferredSiegeJoin(client);
+
+        client.Call(() =>
+        {
+            // A party inside the town has no camp, so "Don't get involved" runs vanilla's PlayerEncounter.Finish.
+            MobileParty.MainParty._besiegerCamp = null;
+            Campaign.Current.MapStateData ??= new MapStateData();
+            ObjectHelper.SkipConstructor<EncounterGameMenuBehavior>().break_in_leave_consequence(new MenuCallbackArgs((MenuContext)null, null));
+        }, LeaveSoldiersBehindDisabledMethods);
+
+        client.NetworkSentMessages.Clear();
+        client.SimulateMessage(Server.NetPeer, joinReply);
+        Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkRequestLeaveBattle>());
+    }
+
     /// <summary>Stages a client siege join whose menu is deferred, and returns the server's undelivered snapshot and reply.</summary>
     private (string mapEventId, NetworkAddInvolvedParties involvedParties, NetworkJoinBattleReply joinReply) StageDeferredSiegeJoin(EnvironmentInstance client)
     {

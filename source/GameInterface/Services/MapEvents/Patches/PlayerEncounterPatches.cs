@@ -376,11 +376,7 @@ internal class PlayerEncounterPatches
         if (ModInformation.IsServer || CallOriginalPolicy.IsOriginalAllowedForOwnershipGate())
             return true;
 
-        // Leaving while the join waits for the server cancels it, so Finish only closes this client's encounter.
-        var cancelsPendingJoin = ContainerProvider.TryResolve<IBattleJoinRequestTracker>(out var joinRequests) &&
-            joinRequests.TryCancel(PartyBase.MainParty);
-        if (cancelsPendingJoin && PlayerEncounter.Current != null)
-            PlayerEncounter.Current._mapEvent = null;
+        CancelPendingVillageJoin();
 
         // Receive callbacks must not finalize a live raid owned by this encounter.
         var mapEvent = PlayerEncounter.Battle;
@@ -394,6 +390,21 @@ internal class PlayerEncounterPatches
             MessageBroker.Instance.Publish(mapEvent, new MapEventFinalizeAttempted(mapEvent));
 
         return false;
+    }
+
+    /// <summary>
+    /// Cancels this client's village join that still waits for the server when the player leaves its encounter, and
+    /// drops the battle, so Finish skips FinalizeBattle and the raid finalize below for an event the party never joined.
+    /// </summary>
+    private static void CancelPendingVillageJoin()
+    {
+        var mapEvent = PlayerEncounter.Battle;
+        if (!mapEvent.IsVillageHostileAction()) return;
+        if (!ContainerProvider.TryResolve<IBattleJoinRequestTracker>(out var joinRequests)) return;
+        if (!joinRequests.TryCancel(PartyBase.MainParty, mapEvent)) return;
+
+        Logger.Debug("Cancelled the waiting village join of PartyId={PartyId} on leave", DescribePartyForTrace(PartyBase.MainParty));
+        PlayerEncounter.Current._mapEvent = null;
     }
 
     // When an open-map encounter finishes on a client (e.g. you close a conversation with a lord party), the

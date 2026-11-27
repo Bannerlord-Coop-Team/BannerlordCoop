@@ -40,6 +40,12 @@ internal class VillageHostileActionJoinEncounterPatch
 
         var side = __originalMethod.Name == HelpAttackersConsequence ? BattleSideEnum.Attacker : BattleSideEnum.Defender;
         var joinsRaidAttackers = side == BattleSideEnum.Attacker && mapEvent.IsRaidHostileAction();
+        // Vanilla sends an undefended attacker that doesn't lead an army to army_wait or menu_siege_strategies, which never read its side.
+        var vanillaSkipsEncounter = side == BattleSideEnum.Attacker && !joinsRaidAttackers &&
+            mapEvent.DefenderSide.TroopCount == 0 && MobileParty.MainParty.Army?.LeaderParty != MobileParty.MainParty;
+        if (vanillaSkipsEncounter)
+            return true;
+
         if (!joinsRaidAttackers)
         {
             // Encounter menu init reads the joiner's side, so MapEventSideDataHandler opens it once the server's add lands.

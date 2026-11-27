@@ -215,7 +215,7 @@ internal class BattleJoinLeaveHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(data.JoiningParty, out var partyId)) return;
 
         var requestId = Guid.NewGuid().ToString();
-        if (!joinRequests.TryStart(partyId, requestId))
+        if (!joinRequests.TryStart(data.JoiningParty, data.MapEvent, requestId))
         {
             mapEventLogger.DebugMapEvent(data.MapEvent, "Battle join is already pending for PartyId={PartyId}", partyId);
             return;
@@ -236,13 +236,17 @@ internal class BattleJoinLeaveHandler : IHandler
         var reply = payload.What;
         GameThread.RunSafe(() =>
         {
-            if (!joinRequests.TryComplete(reply.PartyId, reply.RequestId, out var cancelled)) return;
+            if (!objectManager.TryGetObjectWithLogging<PartyBase>(reply.PartyId, out var party)) return;
+            if (!joinRequests.TryComplete(party, reply.RequestId, out var cancelled)) return;
 
             if (reply.Accepted)
             {
                 // The player left while this join waited, so the accepted join is undone without reopening any menu.
                 if (cancelled)
+                {
+                    Logger.Debug("Leaving the accepted battle join PartyId={PartyId} cancelled while it waited", reply.PartyId);
                     network.SendAll(new NetworkRequestLeaveBattle(reply.PartyId, finishLocalMenus: false));
+                }
                 return;
             }
 
@@ -253,7 +257,6 @@ internal class BattleJoinLeaveHandler : IHandler
 
             if (Campaign.Current == null) return;
             if (!objectManager.TryGetObjectWithLogging<MapEvent>(reply.MapEventId, out var mapEvent)) return;
-            if (!objectManager.TryGetObjectWithLogging<PartyBase>(reply.PartyId, out var party)) return;
 
             var encounter = PlayerEncounter.Current;
             if (!ReferenceEquals(party, PartyBase.MainParty) ||

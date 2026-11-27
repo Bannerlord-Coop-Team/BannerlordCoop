@@ -24,6 +24,7 @@ internal class MapEventSideDataHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly IMapEventInitializationBarrier initializationBarrier;
     private readonly IEncounterMenuConditionRefresher encounterMenuConditionRefresher;
+    private readonly IBattleJoinRequestTracker joinRequests;
 
     private static readonly ILogger Logger = LogManager.GetLogger<MapEventSideDataHandler>();
 
@@ -32,13 +33,15 @@ internal class MapEventSideDataHandler : IHandler
         INetwork network,
         IObjectManager objectManager,
         IMapEventInitializationBarrier initializationBarrier,
-        IEncounterMenuConditionRefresher encounterMenuConditionRefresher)
+        IEncounterMenuConditionRefresher encounterMenuConditionRefresher,
+        IBattleJoinRequestTracker joinRequests)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.initializationBarrier = initializationBarrier;
         this.encounterMenuConditionRefresher = encounterMenuConditionRefresher;
+        this.joinRequests = joinRequests;
 
         messageBroker.Subscribe<MapEventPartyRemoved>(Handle);
         messageBroker.Subscribe<NetworkRemoveMapEventParty>(Handle);
@@ -191,13 +194,17 @@ internal class MapEventSideDataHandler : IHandler
         if (ModInformation.IsServer)
             return;
 
-        SwitchVillageJoinerToEncounterIfNeeded(mapEvent);
+        SwitchVillageMenuToEncounterIfNeeded(mapEvent);
         encounterMenuConditionRefresher.RefreshForMapEvent(mapEvent);
     }
 
-    private static void SwitchVillageJoinerToEncounterIfNeeded(MapEvent mapEvent)
+    private void SwitchVillageMenuToEncounterIfNeeded(MapEvent mapEvent)
     {
         if (MobileParty.MainParty?.MapEvent != mapEvent)
+            return;
+
+        // The player left this join while it waited, and its accepted reply takes the party out again.
+        if (joinRequests.IsCancelled(PartyBase.MainParty))
             return;
 
         var encounter = PlayerEncounter.Current;
@@ -208,6 +215,7 @@ internal class MapEventSideDataHandler : IHandler
             return;
 
         var menuId = Campaign.Current.CurrentMenuContext?.GameMenu?.StringId;
+        // A defender's add interrupts the looting, so the raider faces it in the encounter menu.
         var raiderWaits = menuId == "raiding_village" && mapEvent.IsRaidHostileAction() && !mapEvent.IsActiveSlowVillageRaid();
         // VillageHostileActionJoinEncounterPatch keeps a village joiner in join_encounter until this add gives it a side.
         var joinerWaits = menuId == "join_encounter" && mapEvent.IsVillageHostileAction();
