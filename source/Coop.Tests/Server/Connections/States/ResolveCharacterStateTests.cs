@@ -11,6 +11,7 @@ using GameInterface.Services.Modules;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.Players.Messages;
 using LiteNetLib;
 using Moq;
 using ProtoBuf;
@@ -420,7 +421,7 @@ namespace Coop.Tests.Server.Connections.States
         }
 
         [Fact]
-        public void NetworkClientValidate_RegisteredPlayerWithMissingHero_DropsStaleRegistration()
+        public void NetworkClientValidate_RegisteredPlayerWithMissingHero_DropsStaleRegistrationAndAnnouncesIt()
         {
             // Arrange
             var currentState = connectionLogic.SetState<ResolveCharacterState>();
@@ -437,6 +438,7 @@ namespace Coop.Tests.Server.Connections.States
                     returnedPlayer = player;
                 })
                 .Returns(true);
+            playerManagerMock.Setup(i => i.RemovePlayer(player)).Returns(true);
 
             // Act
             var payload = new MessagePayload<NetworkClientValidate>(
@@ -448,6 +450,10 @@ namespace Coop.Tests.Server.Connections.States
             // lookup for it is ambiguous.
             playerManagerMock.Verify(i => i.RemovePlayer(player), Times.Once);
             playerManagerMock.Verify(i => i.SetPeer(It.IsAny<string>(), It.IsAny<NetPeer>()), Times.Never);
+
+            // Its issues end with it, or the character created next would collect them
+            var removed = Assert.Single(serverComponent.TestMessageBroker.GetMessagesFromType<PlayerRemoved>());
+            Assert.Equal(player.ControllerId, removed.ControllerId);
 
             var message = Assert.Single(
                 serverComponent.TestNetwork.GetPeerMessages(playerPeer).OfType<NetworkClientValidated>());

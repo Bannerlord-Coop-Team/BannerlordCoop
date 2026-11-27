@@ -2,6 +2,7 @@
 using Common.Util;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Dispatch;
+using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Tests.Bootstrap;
 using Moq;
@@ -47,7 +48,11 @@ public class IssueCancellationCoordinatorTests
             var owners = new Mock<IIssueOwnerResolver>();
             var controller = "player-A";
             owners.Setup(value => value.TryGetOwnerControllerId(issue, out controller)).Returns(true);
-            var service = new IssueCancellationCoordinator(registry.Object, owners.Object, Mock.Of<IActiveIssueDismisser>());
+            // The cancel runs as the dismisser's ending, so it is announced even when it throws
+            var dismisser = new Mock<IActiveIssueDismisser>();
+            dismisser.Setup(value => value.End(issue, IssueOutcome.QuestCancel, It.IsAny<Action>(), IssueBase.IssueUpdateDetails.IssueCancel, true))
+                .Callback<IssueBase, IssueOutcome, Action, IssueBase.IssueUpdateDetails?, bool>((_, _, ending, _, _) => ending());
+            var service = new IssueCancellationCoordinator(registry.Object, owners.Object, dismisser.Object);
 
             service.CancelForPlayerDeath(controller, hero, party);
             service.CancelForPlayerDeath(controller, hero, party);
