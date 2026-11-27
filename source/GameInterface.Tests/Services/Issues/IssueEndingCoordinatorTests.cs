@@ -70,6 +70,17 @@ public class IssueEndingCoordinatorTests
     }
 
     [Fact]
+    public void TroopReturnThatThrowsSkipsOnlyItsLogAndEveryLaterStepStillRuns()
+    {
+        issueDismisser.Setup(value => value.ReturnTroops(issue)).Throws(new InvalidOperationException("Stubbed failure"));
+        issueDismisser.Setup(value => value.IsInManager(issue)).Returns(false);
+
+        coordinator.EndAsOwner(issue, IssueOutcome.QuestCancel, () => steps.Add("ending"), Mock.Of<IDisposable>());
+
+        Assert.Equal(new[] { "send cancel", "ending", "drop owner", "close journal", "announce" }, steps);
+    }
+
+    [Fact]
     public void EndingThatLeavesTheIssueInTheManagerIsAnnouncedOnlyByTheDailyRetry()
     {
         issueDismisser.SetupSequence(value => value.IsInManager(issue)).Returns(true).Returns(false);

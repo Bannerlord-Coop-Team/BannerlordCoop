@@ -6,6 +6,7 @@ using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.Heroes.HeirSelection.Interfaces;
 using GameInterface.Services.Heroes.Patches;
+using GameInterface.Services.Issues.Framework.AcceptCoordination;
 using GameInterface.Services.Issues.Framework.CreationCapture;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
@@ -21,6 +22,7 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.LogEntries;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Localization;
 using Xunit.Abstractions;
@@ -134,6 +136,73 @@ public class RemovedPlayerIssueTests : IDisposable
             var companion = scenario.Server.GetRegisteredObject<Hero>(companionId);
             Assert.Null(companion.PartyBelongedTo);
             Assert.Equal(companionState, companion.HeroState);
+        });
+    }
+
+    [Theory]
+    [InlineData(Removal.Delete)]
+    [InlineData(Removal.Retire)]
+    public void RemovingThePlayerEndsSentTroopsWhoseAcceptThrewAfterTheyLeft(Removal removal)
+    {
+        SendTroopsThroughAnAcceptThatThrows();
+
+        Remove(removal);
+
+        AssertEnded(IssueOutcome.AlternativeSolution);
+    }
+
+    // A listener on vanilla's accept event throws once the troops left, and the accept's catch drops the owner entry
+    private void SendTroopsThroughAnAcceptThatThrows()
+    {
+        const int sentTroops = 40;
+        using var preconditions = new StubIssuePreconditions(QuestScenario.IssueType);
+        var companionId = environment.CreateRegisteredObject<Hero>();
+        var troopId = environment.CreateRegisteredObject<CharacterObject>();
+        foreach (var instance in Instances)
+        {
+            instance.Call(() =>
+            {
+                using (new AllowedThread())
+                {
+                    instance.GetRegisteredObject<CharacterObject>(troopId).Level = 16;
+                    instance.GetRegisteredObject<Hero>(companionId)._partyBelongedTo = instance.GetRegisteredObject<MobileParty>(scenario.OwnerPartyId);
+                }
+            });
+        }
+        scenario.Server.Call(() =>
+        {
+            var party = scenario.Server.GetRegisteredObject<MobileParty>(scenario.OwnerPartyId);
+            party.MemberRoster.AddToCounts(scenario.Server.GetRegisteredObject<Hero>(companionId).CharacterObject, 1);
+            party.MemberRoster.AddToCounts(scenario.Server.GetRegisteredObject<CharacterObject>(troopId), sentTroops);
+            CampaignEvents.OnIssueUpdatedEvent.AddNonSerializedListener(this, (_, detail, _) =>
+            {
+                if (detail == IssueBase.IssueUpdateDetails.PlayerSentTroopsToQuest) ThrowingMethodsScope.Throw();
+            });
+        });
+        environment.FlushCoalescer();
+
+        var client = scenario.ClientA;
+        client.Call(() =>
+        {
+            var owner = client.GetRegisteredObject<Hero>(scenario.OwnerHeroId);
+            var party = client.GetRegisteredObject<MobileParty>(scenario.OwnerPartyId);
+            using (new MainHeroSubstitutionScope(owner, party))
+            {
+                var issue = client.GetRegisteredObject<Hero>(scenario.NotableId).Issue;
+                using (new AllowedThread())
+                    issue.AlternativeSolutionSentTroops.AddToCounts(client.GetRegisteredObject<Hero>(companionId).CharacterObject, 1);
+                AlternativeSolutionPickerDriver.Commit(client, issue, owner, party, client.GetRegisteredObject<CharacterObject>(troopId), sentTroops);
+                issue.StartIssueWithAlternativeSolution();
+            }
+            // The server's accept runs inside this call, and its start log reads a settlement the test giver lacks
+        }, JournalTextLinks.Append(AccessTools.PropertyGetter(typeof(AllowedIssue), "AlternativeSolutionStartLog")));
+        environment.FlushCoalescer();
+
+        Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionAcceptRejected>());
+        scenario.Server.Call(() =>
+        {
+            Assert.True(issues[scenario.Server].IsSolvingWithAlternative);
+            Assert.False(scenario.Server.Resolve<IIssueOwnershipRegistry>().TryGetOwner(scenario.NotableId, QuestScenario.IssueId, out _));
         });
     }
 

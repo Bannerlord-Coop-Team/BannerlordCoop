@@ -29,6 +29,6 @@ internal class HeadmanNeedsToDeliverAHerdDescriptor : IQuestTypeDescriptor, ITro
         this.cleanup = cleanup;
     }
 
-    // The troops go to the owner's party the completion or cancellation substituted in, not vanilla's main party
+    // Both returns use the main party of the owner's scope, but this one empties the sent roster at once, not at finalization
     public bool ReturnTroops(IssueBase issue) => cleanup.ReturnAlternativeTroops(issue);
 }

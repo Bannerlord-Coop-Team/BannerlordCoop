@@ -84,11 +84,12 @@ internal class ActiveIssueDismisser : IHandler
         GameThread.RunSafe(() => EndIssuesWhere(IsOfAGonePlayer, announce: true), context: nameof(ActiveIssueDismisser));
     }
 
-    // Owner entries point at a controller, so the removed player's issues would otherwise come back to the controller's next character
+    // Owner entries point at a controller, so the removed player's issues would otherwise come back to the controller's next character.
+    // Troops whose accept threw lost their owner entry, so the sweep also ends every issue of a gone player.
     private void Handle_PlayerRemoved(MessagePayload<PlayerRemoved> payload)
     {
         var controllerId = payload.What.ControllerId;
-        GameThread.RunSafe(() => EndIssuesWhere(issue => IsOwnedBy(issue, controllerId), announce: true),
+        GameThread.RunSafe(() => EndIssuesWhere(issue => IsOwnedBy(issue, controllerId) || IsOfAGonePlayer(issue), announce: true),
             context: nameof(ActiveIssueDismisser));
     }
 

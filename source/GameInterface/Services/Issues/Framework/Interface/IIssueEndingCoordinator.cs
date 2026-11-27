@@ -21,4 +21,8 @@ public interface IIssueEndingCoordinator
 
     // Daily tick: tries again to take every issue whose ending threw out of the manager, deactivating it if that throws
     void RetryFailedEndings();
+
+    // Before every server troop return, notes the return on the issue's claim so an ending never returns the troops again,
+    // then leaves behind sent companions whose death already ran
+    void BeforeTroopReturn(IssueBase issue);
 }

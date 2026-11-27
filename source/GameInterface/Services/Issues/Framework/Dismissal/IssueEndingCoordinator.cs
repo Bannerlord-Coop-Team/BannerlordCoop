@@ -18,7 +18,7 @@ using TaleWorlds.CampaignSystem.LogEntries;
 namespace GameInterface.Services.Issues.Framework.Dismissal;
 
 /// <summary>
-/// Ends each issue it is handed exactly once, step by step, and announces it only once it is out of the manager.
+/// Ends each issue handed over exactly once, step by step, and announces an issue only once the manager no longer holds that issue.
 /// </summary>
 internal class IssueEndingCoordinator : IIssueEndingCoordinator
 {
@@ -88,6 +88,12 @@ internal class IssueEndingCoordinator : IIssueEndingCoordinator
         // The ending already ran, so the retry only takes the issue out of the manager
         foreach (var failed in failedEndings.ToList())
             FinishWithoutOwner(failed.Key, failed.Value, () => issueDismisser.ForceRemove(failed.Key), announce: true);
+    }
+
+    public void BeforeTroopReturn(IssueBase issue)
+    {
+        claims.NoteTroopReturn(issue);
+        issueDismisser.LeaveBehindDeadCompanions(issue);
     }
 
     // With no owner hero left to end them, the issue's unfinished journal rows go

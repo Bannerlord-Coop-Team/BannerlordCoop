@@ -845,20 +845,20 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
     }
 
     [Fact]
-    public void ReturningAlternativeTroopsTwice_AddsThemOnlyOnce()
+    public void ReturningAlternativeTroopsTwice_EmptiesTheSentRosterAtOnceAndAddsThemOnlyOnce()
     {
         var (_, troopId) = StartCompanions();
         Server.Call(() =>
         {
             using var scope = OwnerScope(Server, QuestScenario.ControllerA);
             var issue = Object<Hero>(Server, scenario.NotableId).Issue;
-            var cleanup = Server.Resolve<IHeadmanHerdCleanup>();
-            Assert.True(cleanup.ReturnAlternativeTroops(issue));
-            var first = Party(Server, QuestScenario.ControllerA).MemberRoster.GetTroopCount(Object<CharacterObject>(Server, troopId));
-            Assert.True(cleanup.ReturnAlternativeTroops(issue));
-            var second = Party(Server, QuestScenario.ControllerA).MemberRoster.GetTroopCount(Object<CharacterObject>(Server, troopId));
-            Assert.Equal(first, second);
+            var troop = Object<CharacterObject>(Server, troopId);
+            // Vanilla's return leaves the sent roster for finalization to clear, so a second return would add the troops again
+            Campaign.Current.IssueManager.TryToMakeTroopsReturn(issue);
             Assert.Empty(issue.AlternativeSolutionSentTroops.GetTroopRoster());
+            Assert.Equal(40, Party(Server, QuestScenario.ControllerA).MemberRoster.GetTroopCount(troop));
+            Campaign.Current.IssueManager.TryToMakeTroopsReturn(issue);
+            Assert.Equal(40, Party(Server, QuestScenario.ControllerA).MemberRoster.GetTroopCount(troop));
         });
     }
 

@@ -21,10 +21,6 @@ internal class IssueDismisser : IIssueDismisser
     private static readonly ILogger Logger = LogManager.GetLogger<IssueDismisser>();
     private const string ReturnedTroopsText = "{=V5Za6d4h}Your troops have returned from their mission.";
 
-    private readonly IIssueEndingClaimRegistry claims;
-
-    public IssueDismisser(IIssueEndingClaimRegistry claims) => this.claims = claims;
-
     public void Dismiss(IssueBase issue)
     {
         if (issue.IsSolvingWithAlternative)
@@ -44,13 +40,7 @@ internal class IssueDismisser : IIssueDismisser
         issue.IssueFinalized();
     }
 
-    public void PrepareTroopReturn(IssueBase issue)
-    {
-        claims.NoteTroopReturn(issue);
-        LeaveBehindDeadCompanions(issue);
-    }
-
-    private static void LeaveBehindDeadCompanions(IssueBase issue)
+    public void LeaveBehindDeadCompanions(IssueBase issue)
     {
         var troops = issue.AlternativeSolutionSentTroops;
         for (var index = troops.Count - 1; index >= 0; index--)

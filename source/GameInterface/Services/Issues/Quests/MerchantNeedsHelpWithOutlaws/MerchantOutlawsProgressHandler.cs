@@ -24,14 +24,16 @@ internal class MerchantOutlawsProgressHandler : IHandler
     private readonly IIssueResolver issueResolver;
     private readonly IObjectManager objectManager;
     private readonly IControllerIdProvider controllerIdProvider;
+    private readonly IMerchantOutlawsProgress progress;
 
     public MerchantOutlawsProgressHandler(IMessageBroker messageBroker, IIssueResolver issueResolver,
-        IObjectManager objectManager, IControllerIdProvider controllerIdProvider)
+        IObjectManager objectManager, IControllerIdProvider controllerIdProvider, IMerchantOutlawsProgress progress)
     {
         this.messageBroker = messageBroker;
         this.issueResolver = issueResolver;
         this.objectManager = objectManager;
         this.controllerIdProvider = controllerIdProvider;
+        this.progress = progress;
         messageBroker.Subscribe<NetworkMerchantOutlawsProgress>(Handle);
         messageBroker.Subscribe<IssueManagerDailyTicked>(SendAlternativeProgress);
     }
@@ -42,10 +44,8 @@ internal class MerchantOutlawsProgressHandler : IHandler
         messageBroker.Unsubscribe<IssueManagerDailyTicked>(SendAlternativeProgress);
     }
 
-    // Resolved per tick like the quest's patches do, as the journals it already sent belong to the session's scope
     private void SendAlternativeProgress(MessagePayload<IssueManagerDailyTicked> payload)
     {
-        if (!ContainerProvider.TryResolve<IMerchantOutlawsProgress>(out var progress)) return;
         foreach (var issue in Campaign.Current.IssueManager.Issues.Values.OfType<Issue>()) progress.Send(issue);
     }
 

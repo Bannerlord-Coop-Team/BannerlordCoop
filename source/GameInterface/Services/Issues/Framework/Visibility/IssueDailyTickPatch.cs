@@ -10,7 +10,7 @@ using TaleWorlds.CampaignSystem.Issues;
 namespace GameInterface.Services.Issues.Framework.Visibility;
 
 /// <summary>
-/// The only patch on the issue daily tick. Clients advance their own issues, the server retries failed endings after it.
+/// The only patch on the issue daily tick. Clients advance their own issues, the server retries failed endings after the tick.
 /// </summary>
 [HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(IssueManager), nameof(IssueManager.DailyTick))]
