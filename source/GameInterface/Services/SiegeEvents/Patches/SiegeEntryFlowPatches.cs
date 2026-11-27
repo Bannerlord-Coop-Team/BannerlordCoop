@@ -3,8 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Policies;
-using GameInterface.Services.Armies.Messages;
-using GameInterface.Services.Armies.Patches;
+using GameInterface.Services.Armies;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.MobileParties.Patches;
@@ -156,15 +155,12 @@ internal class SiegeEntryFlowPatches
         var mainParty = MobileParty.MainParty;
         if (mainParty.BesiegerCamp != null || mainParty.CurrentSettlement == null)
             return true;
+        if (!ContainerProvider.TryResolve<IArmyLeaver>(out var armyLeaver)) return true;
 
         var army = mainParty.Army;
         if (army != null)
         {
-            MessageBroker.Instance.Publish(army, new MobilePartyInArmyRemoved(army, mainParty, mainParty));
-            using (new AllowedThread())
-            {
-                ArmyPatches.RemoveMobilePartyInArmy(mainParty, army, mainParty);
-            }
+            armyLeaver.Leave(mainParty, army);
         }
         PlayerSiege.FinalizePlayerSiege();
 
@@ -210,14 +206,15 @@ internal class SiegeEntryFlowPatches
         return false;
     }
 
-    // The army follower "Leave Army" option clears the camp and the army in one consequence. Both route
-    // through the server, because OnRemovePartyInternalPrefix drops a client's native Army write without
-    // publishing it, so the server kept the party attached to the leader and in each of its sieges (#4697).
+    // The army follower "Leave Army" option clears the camp and the army in one consequence. The camp routes
+    // through the server, and the army leave goes through IArmyLeaver like BreakInLeavePrefix, because
+    // OnRemovePartyInternalPrefix drops a client's native Army write without publishing it (#4697).
     [HarmonyPatch(typeof(SiegeEventCampaignBehavior), nameof(SiegeEventCampaignBehavior.menu_siege_strategies_passive_wait_leave_on_consequence))]
     [HarmonyPrefix]
     private static bool PassiveWaitLeavePrefix()
     {
         if (ModInformation.IsServer) return true;
+        if (!ContainerProvider.TryResolve<IArmyLeaver>(out var armyLeaver)) return true;
 
         var mainParty = MobileParty.MainParty;
         var army = mainParty.Army;
@@ -230,11 +227,7 @@ internal class SiegeEntryFlowPatches
         MessageBroker.Instance.Publish(
             null,
             new BreakSiegeAttempted(mainParty, finishLocalMenus: false));
-        MessageBroker.Instance.Publish(army, new MobilePartyInArmyRemoved(army, mainParty, mainParty));
-        using (new AllowedThread())
-        {
-            ArmyPatches.RemoveMobilePartyInArmy(mainParty, army, mainParty);
-        }
+        armyLeaver.Leave(mainParty, army);
         return false;
     }
 
@@ -285,15 +278,12 @@ internal class SiegeEntryFlowPatches
 
         var mainParty = MobileParty.MainParty;
         if (mainParty.BesiegerCamp == null) return true;
+        if (!ContainerProvider.TryResolve<IArmyLeaver>(out var armyLeaver)) return true;
 
         var army = mainParty.Army;
         if (army != null && army.LeaderParty != mainParty)
         {
-            MessageBroker.Instance.Publish(army, new MobilePartyInArmyRemoved(army, mainParty, mainParty));
-            using (new AllowedThread())
-            {
-                ArmyPatches.RemoveMobilePartyInArmy(mainParty, army, mainParty);
-            }
+            armyLeaver.Leave(mainParty, army);
         }
 
         // A besieger prompted into join_siege_event can already sit on a side of the sally-out/relief map
