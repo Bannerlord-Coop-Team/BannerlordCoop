@@ -374,6 +374,8 @@ namespace GameInterface.Services.Kingdoms
         {
             if (decision == null || Clan.PlayerClan == null) return false;
             if (Clan.PlayerClan.Kingdom != decision.Kingdom) return false;
+            // A resolve prompt or kingdom tab can outlive the removal, and a ballot for it can never be sent or closed.
+            if (!IsDecisionUnresolved(decision)) return true;
             if (DecisionStates.TryGetValue(decision, out KingdomDecisionVoteState state) && state.IsResolved) return true;
             return !IsLocalPlayerEligible(decision);
         }
