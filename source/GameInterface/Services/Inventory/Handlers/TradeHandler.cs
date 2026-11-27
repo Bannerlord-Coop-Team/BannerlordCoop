@@ -540,7 +540,7 @@ internal class TradeHandler : IHandler
         return totalAmount;
     }
 
-    // The share of an entry's price for quantity of its amount, shared by the gold and the exchange event so both agree
+    // `price` scaled to `quantity` out of `amount`, shared by the gold and the exchange event so both agree
     private static int GetProratedPrice(int price, int quantity, int amount)
     {
         if (quantity <= 0 || amount <= 0) return 0;

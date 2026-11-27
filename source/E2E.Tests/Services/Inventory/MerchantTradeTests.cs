@@ -109,35 +109,26 @@ public class MerchantTradeTests : IDisposable
     {
         var client = TestEnvironment.Clients.First();
 
-        var grainId = TestEnvironment.CreateRegisteredObject<ItemObject>();
         var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
         var townId = TestEnvironment.CreateRegisteredObject<Town>();
         var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
 
-        // Same state as a player who sold everything they carried
-        foreach (var instance in TestEnvironment.Clients.Prepend(Server))
+        // The party carries nothing, the same state as a player who sold everything they carried
+        string? merchantRosterId = null;
+        string? grainId = null;
+        Server.Call(() =>
         {
-            instance.Call(() =>
-            {
-                // Roster packets resolve items through the native catalog, as a loaded campaign does
-                var grain = instance.GetRegisteredObject<ItemObject>(grainId);
-                grain.StringId = "empty_roster_grain";
-                MBObjectManager.Instance.RegisterObject(grain);
-
-                using (instance == Server ? null : new AllowedThread())
-                {
-                    var roster = instance.GetRegisteredObject<MobileParty>(partyId).ItemRoster;
-                    roster.Clear();
-                    Assert.Equal(0, roster.Count);
-                }
-            });
-        }
-
-        var merchantRosterId = SetUpMerchant(settlementId, townId, new[] { partyId }, (grainId, 10));
+            merchantRosterId = SetUpMarket(settlementId, townId, townGold: 100, (DefaultItems.Grain, 10));
+            SetUpTradingHero(partyId, 1000);
+            SetRoster(Server.GetRegisteredObject<MobileParty>(partyId).ItemRoster);
+            Assert.True(Server.ObjectManager.TryGetId(DefaultItems.Grain, out grainId));
+        });
+        TestEnvironment.FlushCoalescer();
+        client.Call(() => Assert.Equal(0, client.GetRegisteredObject<MobileParty>(partyId).ItemRoster.Count));
 
         // Buys 1 grain for 10 with nothing in the party's inventory yet
-        var trade = CaptureTrade(client, merchantRosterId, townId, partyId,
-            bought: new[] { (grainId, 1, 10) },
+        var trade = CaptureTrade(client, merchantRosterId!, townId, partyId,
+            bought: new[] { (grainId!, 1, 10) },
             sold: Array.Empty<(string, int, int)>(),
             totalAmount: 10);
 
@@ -148,28 +139,21 @@ public class MerchantTradeTests : IDisposable
             wire = client.SerializeForWire<IMessage>(trade);
             using (new AllowedThread())
             {
-                var grain = new EquipmentElement(client.GetRegisteredObject<ItemObject>(grainId));
-                client.GetRegisteredObject<ItemRoster>(merchantRosterId).AddToCounts(grain, 1);
-                client.GetRegisteredObject<MobileParty>(partyId).ItemRoster.AddToCounts(grain, -1);
+                client.GetRegisteredObject<ItemRoster>(merchantRosterId!).AddToCounts(DefaultItems.Grain, 1);
+                client.GetRegisteredObject<MobileParty>(partyId).ItemRoster.AddToCounts(DefaultItems.Grain, -1);
             }
         });
 
         Server.Call(() => Server.SimulateMessage(client.NetPeer, wire!));
         TestEnvironment.FlushCoalescer();
 
-        Server.Call(() =>
-        {
-            var grain = Server.GetRegisteredObject<ItemObject>(grainId);
-            Assert.Equal(9, Server.GetRegisteredObject<ItemRoster>(merchantRosterId).GetItemNumber(grain));
-        });
-
-        // The client's merchant stock was seeded locally, so only the player's side is compared there
         foreach (var instance in new[] { Server, client })
         {
             instance.Call(() =>
             {
                 var party = instance.GetRegisteredObject<MobileParty>(partyId);
-                Assert.Equal(1, party.ItemRoster.GetItemNumber(instance.GetRegisteredObject<ItemObject>(grainId)));
+                Assert.Equal(1, party.ItemRoster.GetItemNumber(DefaultItems.Grain));
+                Assert.Equal(9, instance.GetRegisteredObject<ItemRoster>(merchantRosterId!).GetItemNumber(DefaultItems.Grain));
                 Assert.Equal(990, party.LeaderHero.Gold);
                 Assert.Equal(110, instance.GetRegisteredObject<Town>(townId).Gold);
             });
@@ -209,7 +193,13 @@ public class MerchantTradeTests : IDisposable
             });
         }
 
-        var merchantRosterId = SetUpMerchant(settlementId, townId, new[] { partyId });
+        string? merchantRosterId = null;
+        Server.Call(() =>
+        {
+            merchantRosterId = SetUpMarket(settlementId, townId, townGold: 100);
+            SetUpTradingHero(partyId, 1000);
+        });
+        TestEnvironment.FlushCoalescer();
 
         // The inventory screen equips the armor over the old one, then Done is pressed without buying anything
         client.Call(() =>
@@ -231,7 +221,7 @@ public class MerchantTradeTests : IDisposable
             Assert.Same(armor, party.LeaderHero.BattleEquipment[EquipmentIndex.Body].Item);
         });
 
-        var trade = CaptureTrade(client, merchantRosterId, townId, partyId,
+        var trade = CaptureTrade(client, merchantRosterId!, townId, partyId,
             bought: Array.Empty<(string, int, int)>(),
             sold: Array.Empty<(string, int, int)>(),
             totalAmount: 0);
@@ -261,7 +251,7 @@ public class MerchantTradeTests : IDisposable
         // The trader's screen resets to its 5 hides after each done, so it sells them again
         CommitWhileTheServerIsHeld(trade, commits: 3, () => TradeOnTrader(trade, soldHides: 5, boughtGrain: 0));
 
-        AssertTradeState(trade, (PartyHides: 0, PartyGrain: 0, MerchantHides: 5, MerchantGrain: 10, TraderGold: 1050, TownGold: 950));
+        AssertTradeState(trade, new TradeState(PartyHides: 0, PartyGrain: 0, MerchantHides: 5, MerchantGrain: 10, TraderGold: 1050, TownGold: 950));
         var sale = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkTradeCompleted>(),
             completed => completed.SoldItems?.Length > 0);
         var (soldHides, soldPrice) = Assert.Single(sale.SoldItems);
@@ -277,7 +267,7 @@ public class MerchantTradeTests : IDisposable
         // The trader's screen still shows its 30 gold after the first purchase, so it buys again
         CommitWhileTheServerIsHeld(trade, commits: 2, () => TradeOnTrader(trade, soldHides: 0, boughtGrain: 1));
 
-        AssertTradeState(trade, (PartyHides: 5, PartyGrain: 1, MerchantHides: 0, MerchantGrain: 9, TraderGold: 10, TownGold: 1020));
+        AssertTradeState(trade, new TradeState(PartyHides: 5, PartyGrain: 1, MerchantHides: 0, MerchantGrain: 9, TraderGold: 10, TownGold: 1020));
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkTradeCompleted>());
     }
 
@@ -298,7 +288,7 @@ public class MerchantTradeTests : IDisposable
         TestEnvironment.FlushCoalescer();
 
         var trade = new JoinWindowTrade(TestEnvironment.Clients.First(), rosterId!, townId, partyId);
-        AssertTradeState(trade, (PartyHides: 5, PartyGrain: 0, MerchantHides: 0, MerchantGrain: 10, TraderGold: traderGold, TownGold: 1000));
+        AssertTradeState(trade, new TradeState(PartyHides: 5, PartyGrain: 0, MerchantHides: 0, MerchantGrain: 10, TraderGold: traderGold, TownGold: 1000));
         return trade;
     }
 
@@ -320,9 +310,7 @@ public class MerchantTradeTests : IDisposable
         TestEnvironment.FlushCoalescer();
     }
 
-    private void AssertTradeState(
-        JoinWindowTrade trade,
-        (int PartyHides, int PartyGrain, int MerchantHides, int MerchantGrain, int TraderGold, int TownGold) expected)
+    private void AssertTradeState(JoinWindowTrade trade, TradeState expected)
     {
         foreach (var instance in TestEnvironment.Clients.Prepend(Server))
         {
@@ -330,24 +318,22 @@ public class MerchantTradeTests : IDisposable
         }
     }
 
-    private static (int PartyHides, int PartyGrain, int MerchantHides, int MerchantGrain, int TraderGold, int TownGold) ReadTradeState(
-        EnvironmentInstance instance,
-        JoinWindowTrade trade)
+    private static TradeState ReadTradeState(EnvironmentInstance instance, JoinWindowTrade trade)
     {
-        (int, int, int, int, int, int) state = default;
+        TradeState? state = null;
         instance.Call(() =>
         {
             var party = instance.GetRegisteredObject<MobileParty>(trade.PartyId);
             var merchantRoster = instance.GetRegisteredObject<ItemRoster>(trade.MerchantRosterId);
-            state = (
-                party.ItemRoster.GetItemNumber(DefaultItems.Hides),
-                party.ItemRoster.GetItemNumber(DefaultItems.Grain),
-                merchantRoster.GetItemNumber(DefaultItems.Hides),
-                merchantRoster.GetItemNumber(DefaultItems.Grain),
-                party.LeaderHero.Gold,
-                instance.GetRegisteredObject<Town>(trade.TownId).Gold);
+            state = new TradeState(
+                PartyHides: party.ItemRoster.GetItemNumber(DefaultItems.Hides),
+                PartyGrain: party.ItemRoster.GetItemNumber(DefaultItems.Grain),
+                MerchantHides: merchantRoster.GetItemNumber(DefaultItems.Hides),
+                MerchantGrain: merchantRoster.GetItemNumber(DefaultItems.Grain),
+                TraderGold: party.LeaderHero.Gold,
+                TownGold: instance.GetRegisteredObject<Town>(trade.TownId).Gold);
         });
-        return state;
+        return state!;
     }
 
     // Commits the trader's screen, then puts its rosters back as the done-logic patch does until the server answers.
@@ -378,42 +364,7 @@ public class MerchantTradeTests : IDisposable
 
     private sealed record JoinWindowTrade(EnvironmentInstance Trader, string MerchantRosterId, string TownId, string PartyId);
 
-    // Gives the merchant the same opening stock and 100 gold everywhere, and each trading party 1000 gold
-    private string SetUpMerchant(string settlementId, string townId, string[] partyIds, params (string itemId, int amount)[] stock)
-    {
-        string? merchantRosterId = null;
-        Server.Call(() =>
-        {
-            var settlement = Server.GetRegisteredObject<Settlement>(settlementId);
-            Assert.True(Server.ObjectManager.TryGetId(settlement.Party.ItemRoster, out merchantRosterId));
-
-            foreach (var partyId in partyIds)
-            {
-                SetUpTradingHero(partyId, 1000);
-            }
-        });
-
-        // The harness cannot replicate test-made items, so each client is given the same opening stock and gold locally
-        foreach (var instance in TestEnvironment.Clients.Prepend(Server))
-        {
-            instance.Call(() =>
-            {
-                using (instance == Server ? null : new AllowedThread())
-                {
-                    var merchantRoster = instance.GetRegisteredObject<ItemRoster>(merchantRosterId!);
-                    foreach (var (itemId, amount) in stock)
-                    {
-                        merchantRoster.AddToCounts(new EquipmentElement(instance.GetRegisteredObject<ItemObject>(itemId)), amount);
-                    }
-
-                    var town = instance.GetRegisteredObject<Town>(townId);
-                    town.ChangeGold(100 - town.Gold);
-                }
-            });
-        }
-
-        return merchantRosterId!;
-    }
+    private sealed record TradeState(int PartyHides, int PartyGrain, int MerchantHides, int MerchantGrain, int TraderGold, int TownGold);
 
     // Runs inside Server.Call. Gives the town's merchant exactly this stock and gold, which replicate to every client
     private string SetUpMarket(string settlementId, string townId, int townGold, params (ItemObject item, int amount)[] stock)
