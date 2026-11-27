@@ -18,8 +18,8 @@ internal class CoopClanDialoguePatches
 
     [HarmonyPatch(typeof(CompanionRolesCampaignBehavior), nameof(CompanionRolesCampaignBehavior.lead_a_party_clickable_condition))]
     [HarmonyPostfix]
-    public static void LeadAPartyClickableConditionPostfix(ref bool __result)
-        => CheckCanManageClan(ref __result);
+    public static void LeadAPartyClickableConditionPostfix(ref bool __result, ref TextObject reason)
+        => CheckCanManageClan(ref __result, ref reason, "str_coop_clan_party_leader_only");
 
     [HarmonyPatch(typeof(LordConversationsCampaignBehavior), nameof(LordConversationsCampaignBehavior.conversation_clan_member_manage_inventory_on_condition))]
     [HarmonyPostfix]
