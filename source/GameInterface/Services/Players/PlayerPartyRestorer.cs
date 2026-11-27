@@ -19,12 +19,6 @@ public interface IPlayerPartyRestorer
     bool TryRestore(Player player, out Player restoredPlayer);
     void RestoreClanMembership(Hero hero);
     void Restore(Hero hero, MobileParty party);
-
-    /// <summary>
-    /// Cancels a disband the party is waiting on or already running. One started before
-    /// <c>DisbandPartyActionPatches</c> knew the party was a player's is saved with it and strips it again.
-    /// </summary>
-    void CancelDisband(MobileParty party);
 }
 
 internal class PlayerPartyRestorer : IPlayerPartyRestorer
@@ -211,6 +205,9 @@ internal class PlayerPartyRestorer : IPlayerPartyRestorer
     {
         // Transferred root references can be missing from clan, roster, and party-component state.
         RestoreClanMembership(hero);
+
+        // A disband started before DisbandPartyActionPatches guarded player parties is saved with the party,
+        // and native disbanding strips it again after load.
         CancelDisband(party);
 
         if (hero.IsPrisoner || hero.PartyBelongedToAsPrisoner != null)
@@ -247,11 +244,12 @@ internal class PlayerPartyRestorer : IPlayerPartyRestorer
             hero.Clan.OnLordAdded(hero);
     }
 
-    public void CancelDisband(MobileParty party)
+    private static void CancelDisband(MobileParty party)
     {
         // Test campaigns run without a behavior manager
         var disbandBehavior = Campaign.Current.CampaignBehaviorManager?.GetBehavior<IDisbandPartyCampaignBehavior>();
-        if (!party.IsDisbanding && disbandBehavior?.IsPartyWaitingForDisband(party) != true) return;
+        var waitingForDisband = disbandBehavior?.IsPartyWaitingForDisband(party) == true;
+        if (!party.IsDisbanding && !waitingForDisband) return;
 
         Logger.Warning("Cancelling the disband of player party {PartyId}", party.StringId);
         DisbandPartyAction.CancelDisband(party);

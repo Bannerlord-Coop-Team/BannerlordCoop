@@ -145,9 +145,9 @@ public class E2ETestEnvironment : IDisposable
 
     /// <summary>
     /// Runs a returning client's connect and validate handshake against the server, which resolves its saved
-    /// hero and restores its party.
+    /// hero and restores its party, and returns the server's single validation reply.
     /// </summary>
-    public void ConnectReturningClient(EnvironmentInstance client, string controllerId)
+    public NetworkClientValidated ConnectReturningClient(EnvironmentInstance client, string controllerId)
     {
         var endPoint = (IPEndPoint)client.NetPeer;
         if (endPoint.Address == null)
@@ -164,11 +164,17 @@ public class E2ETestEnvironment : IDisposable
             AccessTools.Method(typeof(ResolveCharacterState), nameof(ResolveCharacterState.TransferSave)),
         };
 
+        Server.NetworkSentImmediateMessages.Clear();
         Server.Call(() =>
         {
             Server.SimulateMessage(this, new PlayerConnected(client.NetPeer));
             Server.SimulateMessage(client.NetPeer, new NetworkClientValidate(controllerId));
         }, disabledMethods);
+
+        var validated = Assert.Single(Server.NetworkSentImmediateMessages.GetMessages<NetworkClientValidated>());
+        Assert.True(validated.HeroExists, "The returning player was sent to character creation.");
+        Assert.IsType<ResolveCharacterState>(Server.Resolve<ConnectionCollection>().ConnectionStates[client.NetPeer].State);
+        return validated;
     }
 
     public void Dispose()

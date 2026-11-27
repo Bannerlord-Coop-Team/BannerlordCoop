@@ -1,9 +1,6 @@
 ﻿using Common.Network;
 using Common.Network.Messages;
 using Common.Util;
-using Coop.Core.Server.Connections;
-using Coop.Core.Server.Connections.Messages;
-using Coop.Core.Server.Connections.States;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Services.MapEvents;
 using GameInterface.Services.PlayerCaptivityService.Messages;
@@ -23,11 +20,15 @@ namespace E2E.Tests.Services.PlayerCaptivityService;
 /// #2891: a player who surrendered in a PvP siege and was ransomed must get back a working party. A disband
 /// started on the party before it was guarded as a player's is saved with it, and the next hourly tick of native
 /// <see cref="DisbandPartyCampaignBehavior"/> marks it disbanding again, after which native disbanding strips it.
+/// The restore a server load or returning join runs cancels it.
 /// </summary>
 public class SiegeSurrenderRansomTests : MapEventTestBase
 {
     private const string BesiegerControllerId = "Besieger";
     private const string DefenderControllerId = "Defender";
+
+    // Outlasts the one-day wait native OnPartyDisbandStarted gives a party before it is marked disbanding
+    private const int HoursPastDisbandWait = 25;
 
     public enum StaleDisband
     {
@@ -55,6 +56,8 @@ public class SiegeSurrenderRansomTests : MapEventTestBase
         RegisterOwnerAsPlayer(BesiegerControllerId, siege.AttackerPartyId);
         var heroId = RegisterOwnerAsPlayer(DefenderControllerId, partyId);
         TestEnvironment.ConnectRegisteredPlayer(Clients.First(), BesiegerControllerId);
+        // The defender's join runs the restore every server load and rejoin runs
+        ReturnToServer(defenderClient, DefenderControllerId, partyId);
         TestEnvironment.ConnectRegisteredPlayer(defenderClient, DefenderControllerId);
 
         Server.Call(() => Server.SimulateMessage(defenderClient.NetPeer,
@@ -65,10 +68,10 @@ public class SiegeSurrenderRansomTests : MapEventTestBase
             AssertCaptivity(client, heroId, siege.AttackerPartyId);
 
         Ransom(defenderClient, heroId, partyId);
-        PassHours(25);
+        PassHours(HoursPastDisbandWait);
 
         AssertCaptivity(Server, heroId, null);
-        AssertWorkingParty(heroId, partyId);
+        AssertWorkingParty(DefenderControllerId, heroId, partyId);
         foreach (var instance in Clients.Append(Server))
         {
             // Captivity forfeits the troops, so the released party holds exactly its hero
@@ -77,9 +80,9 @@ public class SiegeSurrenderRansomTests : MapEventTestBase
         }
 
         Rejoin(defenderClient, DefenderControllerId, partyId);
-        PassHours(25);
+        PassHours(HoursPastDisbandWait);
 
-        AssertWorkingParty(heroId, partyId);
+        AssertWorkingParty(DefenderControllerId, heroId, partyId);
     }
 
     /// <summary>
@@ -92,17 +95,14 @@ public class SiegeSurrenderRansomTests : MapEventTestBase
     public void Rejoin_PartyLeftDisbanding_CancelsTheDisband(StaleDisband staleDisband)
     {
         var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
-        var client = Clients.First();
         InstallDisbandBehavior();
         StartDisbandBeforeRegistration(partyId, staleDisband);
 
         var heroId = RegisterOwnerAsPlayer(DefenderControllerId, partyId);
-        TestEnvironment.ConnectRegisteredPlayer(client, DefenderControllerId);
+        ReturnToServer(Clients.First(), DefenderControllerId, partyId);
+        PassHours(HoursPastDisbandWait);
 
-        Rejoin(client, DefenderControllerId, partyId);
-        PassHours(25);
-
-        AssertWorkingParty(heroId, partyId);
+        AssertWorkingParty(DefenderControllerId, heroId, partyId);
     }
 
     /// <summary>
@@ -154,9 +154,18 @@ public class SiegeSurrenderRansomTests : MapEventTestBase
         });
 
         if (staleDisband == StaleDisband.Disbanding)
+            PassHours(HoursPastDisbandWait);
+
+        // The clients see the disband too, so the cancel has to reach them
+        foreach (var instance in Clients.Append(Server))
         {
-            PassHours(25);
-            Server.Call(() => Assert.True(Server.GetRegisteredObject<MobileParty>(partyId).IsDisbanding));
+            instance.Call(() =>
+            {
+                var party = instance.GetRegisteredObject<MobileParty>(partyId);
+                Assert.False(TextObject.IsNullOrEmpty(party.Party.CustomName),
+                    $"Party {partyId} has no disband name on {instance.GetType().Name}");
+                Assert.Equal(staleDisband == StaleDisband.Disbanding, party.IsDisbanding);
+            });
         }
     }
 
@@ -191,33 +200,36 @@ public class SiegeSurrenderRansomTests : MapEventTestBase
     }
 
     /// <summary>
-    /// Drops the client and runs its returning connect and validate handshake, which restores its saved party.
+    /// Runs the client's returning connect and validate handshake, which restores its saved party.
+    /// </summary>
+    private void ReturnToServer(EnvironmentInstance client, string controllerId, string partyId)
+    {
+        var validated = TestEnvironment.ConnectReturningClient(client, controllerId);
+        Assert.Equal(partyId, validated.Player.MobilePartyId);
+    }
+
+    /// <summary>
+    /// Drops the client and brings it back through the returning handshake.
     /// </summary>
     private void Rejoin(EnvironmentInstance client, string controllerId, string partyId)
     {
         Server.Call(() => Server.SimulateMessage(this, new PlayerDisconnected(client.NetPeer, default)));
-        Server.NetworkSentImmediateMessages.Clear();
-        TestEnvironment.ConnectReturningClient(client, controllerId);
+        ReturnToServer(client, controllerId, partyId);
         // Runs the deferred park of the dropped party
         Server.PumpGameThread();
-
-        var validated = Assert.Single(Server.NetworkSentImmediateMessages.GetMessages<NetworkClientValidated>());
-        Assert.True(validated.HeroExists, "The returning player was sent to character creation.");
-        Assert.Equal(partyId, validated.Player.MobilePartyId);
-        Assert.IsType<ResolveCharacterState>(Server.Resolve<ConnectionCollection>().ConnectionStates[client.NetPeer].State);
     }
 
     /// <summary>
-    /// The party is still the registered player's, keeps its hero as leader, and isn't disbanding anywhere.
+    /// The party is still the controller's registered party, keeps its hero as leader, and isn't disbanding anywhere.
     /// </summary>
-    private void AssertWorkingParty(string heroId, string partyId)
+    private void AssertWorkingParty(string controllerId, string heroId, string partyId)
     {
         Server.Call(() =>
         {
             var party = Server.GetRegisteredObject<MobileParty>(partyId);
             var hero = Server.GetRegisteredObject<Hero>(heroId);
 
-            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(DefenderControllerId, out var player));
+            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(controllerId, out var player));
             Assert.Equal(partyId, player.MobilePartyId);
             Assert.Same(hero, party.LeaderHero);
             Assert.False(GetDisbandBehavior().IsPartyWaitingForDisband(party));

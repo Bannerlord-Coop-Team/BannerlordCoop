@@ -1,8 +1,5 @@
 ﻿using Common.Messaging;
 using Common.Util;
-using Coop.Core.Server.Connections;
-using Coop.Core.Server.Connections.Messages;
-using Coop.Core.Server.Connections.States;
 using Coop.Core.Server.Services.Save;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
@@ -99,15 +96,9 @@ public class DedicatedServerRestartPlayerRestoreTests : IDisposable
         });
 
         var client = environment.Clients.First();
-        server.NetworkSentImmediateMessages.Clear();
-        environment.ConnectReturningClient(client, ControllerId);
+        var validated = environment.ConnectReturningClient(client, ControllerId);
 
-        var validated = Assert.Single(server.NetworkSentImmediateMessages.GetMessages<NetworkClientValidated>());
-        Assert.True(validated.HeroExists, "The returning player was sent to character creation.");
         Assert.Equal(savedIds.HeroId, validated.Player.HeroId);
-
-        var connection = server.Resolve<ConnectionCollection>().ConnectionStates[client.NetPeer];
-        Assert.IsType<ResolveCharacterState>(connection.State);
         Assert.True(server.Resolve<IPlayerManager>().TryGetPeer(ControllerId, out var peer));
         Assert.Same(client.NetPeer, peer);
     }
