@@ -3567,6 +3567,152 @@ public class VillageHostileActionTests : MapEventTestBase
         }
     }
 
+    // Help defenders opens the encounter menu before the server places the joiner on a side.
+    [Theory]
+    [InlineData(VillageHostileAction.Raid)]
+    [InlineData(VillageHostileAction.ForceSupplies)]
+    public void VillageEncounterMenu_PendingDefenderJoin_InitAndLeaveDoNotThrow(VillageHostileAction action)
+    {
+        var client = Clients.First();
+        var (raiderHeroId, raiderMobilePartyId) = CreatePlayerHeroParty("PlayerOne");
+        var (joinerHeroId, joinerMobilePartyId) = CreatePlayerHeroParty("PlayerTwo");
+        TestEnvironment.ConnectRegisteredPlayer(client, "PlayerTwo");
+        var target = CreateVillageTarget();
+        string? mapEventId = null;
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(raiderHeroId, out var raiderHero));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(raiderMobilePartyId, out var raiderParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
+
+            using (new AllowedThread())
+            {
+                raiderParty.MemberRoster.AddToCounts(raiderHero.CharacterObject, 1);
+                raiderHero.PartyBelongedTo = raiderParty;
+            }
+
+            var mapEvent = CreateHostileActionMapEvent(raiderParty.Party, settlement.Party, action);
+            Assert.True(Server.ObjectManager.TryGetId(mapEvent, out mapEventId));
+        }, MapEventDisabledMethods);
+
+        var disabledMethods = WithoutNetworkDelivery()
+            .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu), new[] { typeof(string) }))
+            .ToList();
+
+        client.NetworkSentMessages.Clear();
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventId!, out var mapEvent));
+            Assert.True(client.ObjectManager.TryGetObject<Hero>(joinerHeroId, out var joinerHero));
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(joinerMobilePartyId, out var joinerParty));
+
+            using (new AllowedThread())
+            {
+                Campaign.Current.MainParty = joinerParty;
+                joinerHero.PartyBelongedTo = joinerParty;
+                Game.Current.PlayerTroop = joinerHero.CharacterObject;
+            }
+
+            var gameStateManager = Game.Current.GameStateManager;
+            var mapState = gameStateManager.CreateState<MapState>();
+            mapState._menuContext = ObjectHelper.SkipConstructor<MenuContext>();
+            gameStateManager._gameStates.Add(mapState);
+
+            var encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
+            encounter._encounteredParty = mapEvent.AttackerSide.LeaderParty;
+            Campaign.Current.PlayerEncounter = encounter;
+
+            var behavior = ObjectHelper.SkipConstructor<EncounterGameMenuBehavior>();
+            var args = new MenuCallbackArgs((MenuContext)null, null);
+            behavior.game_menu_join_encounter_help_defenders_on_consequence(args);
+
+            // Vanilla would now read the side PlayerSide points to, and PlayerSide is None until the server answers.
+            Assert.False(mapState.MapConversationActive);
+            Assert.Same(mapEvent, PlayerEncounter.Battle);
+            Assert.Null(joinerParty.Party.MapEventSide);
+            Assert.Equal(BattleSideEnum.None, mapEvent.PlayerSide);
+            Assert.True(mapEvent.DefenderSide.LeaderParty.IsSettlement);
+            // With defenders the old raid check already skipped vanilla, so the raid row only proves the fix without them.
+            if (action == VillageHostileAction.Raid) Assert.Equal(0, mapEvent.DefenderSide.TroopCount);
+            var defenderCount = mapEvent.DefenderSide.Parties.Count;
+
+            // Menu init calls this, and a throw reaches RemoveWaitOption which exits the encounter menu.
+            Assert.Null(Record.Exception(() => behavior.UpdateVillageHostileActionEncounter(args)));
+            Assert.Same(mapEvent, PlayerEncounter.Battle);
+            Assert.Null(joinerParty.Party.MapEventSide);
+            Assert.Equal(defenderCount, mapEvent.DefenderSide.Parties.Count);
+
+            // Vanilla Leave counts the men on side None, so it stays disabled until the server answers.
+            var leaveArgs = new MenuCallbackArgs((MenuContext)null, TextObject.GetEmpty());
+            Assert.True(behavior.game_menu_encounter_leave_on_condition(leaveArgs));
+            Assert.False(leaveArgs.IsEnabled);
+            Assert.Null(Record.Exception(() => behavior.game_menu_encounter_leave_on_consequence(leaveArgs)));
+            Assert.Same(encounter, PlayerEncounter.Current);
+            Assert.Same(mapEvent, PlayerEncounter.Battle);
+        }, disabledMethods);
+
+        var request = client.NetworkSentMessages.GetMessages<NetworkRequestJoinBattle>().Single();
+        Assert.Equal(mapEventId, request.MapEventId);
+        Assert.Equal(BattleSideEnum.Defender, request.Side);
+    }
+
+    // The pending join guard must not stop the raider, who already has a side.
+    [Theory]
+    [InlineData(VillageHostileAction.Raid, false, true)]
+    [InlineData(VillageHostileAction.Raid, true, false)]
+    [InlineData(VillageHostileAction.ForceSupplies, true, true)]
+    public void VillageEncounterMenu_Raider_RunsVanillaUnlessRaidWaitsForSurrender(
+        VillageHostileAction action, bool withDefenders, bool expectedRunOriginal)
+    {
+        var client = Clients.First();
+        var (raiderHeroId, raiderMobilePartyId) = CreatePlayerHeroParty("PlayerOne");
+        var defenderTroopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        var target = CreateVillageTarget();
+        string? mapEventId = null;
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(raiderHeroId, out var raiderHero));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(raiderMobilePartyId, out var raiderParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
+
+            using (new AllowedThread())
+            {
+                raiderParty.MemberRoster.AddToCounts(raiderHero.CharacterObject, 1);
+                raiderHero.PartyBelongedTo = raiderParty;
+            }
+
+            var mapEvent = CreateHostileActionMapEvent(raiderParty.Party, settlement.Party, action);
+            Assert.True(Server.ObjectManager.TryGetId(mapEvent, out mapEventId));
+        }, MapEventDisabledMethods);
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventId!, out var mapEvent));
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(raiderMobilePartyId, out var raiderParty));
+            Assert.True(client.ObjectManager.TryGetObject<CharacterObject>(defenderTroopId, out var defenderTroop));
+
+            using (new AllowedThread())
+            {
+                Campaign.Current.MainParty = raiderParty;
+                // The prefix reads the client replica, so the defenders go on its roster.
+                if (withDefenders) mapEvent.DefenderSide.LeaderParty.MemberRoster.AddToCounts(defenderTroop, 1);
+            }
+
+            var encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
+            encounter._mapEvent = mapEvent;
+            Campaign.Current.PlayerEncounter = encounter;
+
+            Assert.Same(mapEvent.AttackerSide, raiderParty.Party.MapEventSide);
+            Assert.Equal(withDefenders, mapEvent.DefenderSide.TroopCount > 0);
+
+            var prefix = AccessTools.Method(typeof(EncounterGameMenuBehaviorPatches), "UpdateVillageHostileActionEncounterPrefix");
+            Assert.NotNull(prefix);
+            Assert.Equal(expectedRunOriginal, (bool)prefix.Invoke(null, null)!);
+        });
+    }
+
     // Only multi-player non-raid starts are rejected, so one single-player non-raid row covers the accept path.
     [Theory]
     [InlineData(VillageHostileAction.ForceVolunteers)]
