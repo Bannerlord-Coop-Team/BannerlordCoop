@@ -145,7 +145,8 @@ public class E2ETestEnvironment : IDisposable
 
     /// <summary>
     /// Runs a returning client's connect and validate handshake against the server, which resolves its saved
-    /// hero and restores its party, and returns the server's single validation reply.
+    /// hero and restores its party, and returns the server's single validation reply. Asserts the saved hero was
+    /// found and the connection is in <see cref="ResolveCharacterState"/>.
     /// </summary>
     public NetworkClientValidated ConnectReturningClient(EnvironmentInstance client, string controllerId)
     {

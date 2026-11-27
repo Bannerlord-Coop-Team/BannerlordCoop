@@ -686,7 +686,14 @@ public abstract class MapEventTestBase : IDisposable
 
     /// <summary>
     /// Frees the captive player hero the way the live escape pop-up ("you were able to get away")
-    /// does: the owning client's <see cref="EndCaptivityAction"/> is intercepted locally and forwarded
+    /// does, through <see cref="ReleasePlayerByRequest"/>.
+    /// </summary>
+    protected void ReleasePlayerByEscapeRequest(EnvironmentInstance client, string heroId, string partyId)
+        => ReleasePlayerByRequest(client, heroId, partyId, EndCaptivityDetail.ReleasedAfterEscape);
+
+    /// <summary>
+    /// Frees the captive player hero the way a release from the captivity menus (escape, ransom) does:
+    /// the owning client's <see cref="EndCaptivityAction"/> is intercepted locally and forwarded
     /// as a <c>NetworkEndPlayerCaptivityAttempted</c> request, which the server applies
     /// authoritatively (<c>PlayerCaptivityServerHandler</c>) and replicates back. The wire message is
     /// sent directly from <paramref name="client"/> because the client-side intercept path resolves
@@ -694,10 +701,10 @@ public abstract class MapEventTestBase : IDisposable
     /// — the harness's main hero (E2ETestEnvironment.SetupMainHero) is a separate bootstrap hero, and
     /// no main party exists headlessly — so the local handler chain cannot fire for a test hero.
     /// </summary>
-    protected void ReleasePlayerByEscapeRequest(EnvironmentInstance client, string heroId, string partyId)
+    protected void ReleasePlayerByRequest(EnvironmentInstance client, string heroId, string partyId, EndCaptivityDetail detail)
     {
         var disabledMethods = MapEventDisabledMethods
-            // An escape releases from a still-active captor, so the server disengages the freed party
+            // A release from a still-active captor makes the server disengage the freed party
             // (TeleportPartyToOutSideOfEncounterRadius), which pathfinds for a reachable point and
             // needs a live map scene. The captor-defeated release path skips it (inactive captor).
             .Append(AccessTools.Method(typeof(MobileParty), nameof(MobileParty.TeleportPartyToOutSideOfEncounterRadius)))
@@ -708,7 +715,7 @@ public abstract class MapEventTestBase : IDisposable
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
 
             client.Resolve<INetwork>().SendAll(new NetworkEndPlayerCaptivityAttempted(
-                heroId, partyId, party.Position, EndCaptivityDetail.ReleasedAfterEscape, null, 0));
+                heroId, partyId, party.Position, detail, null, 0));
         }, disabledMethods);
     }
 

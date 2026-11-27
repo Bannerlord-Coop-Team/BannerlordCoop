@@ -1,11 +1,9 @@
-﻿using Common.Network;
-using Common.Network.Messages;
+﻿using Common.Network.Messages;
 using Common.Util;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Services.MapEvents;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
-using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -17,9 +15,10 @@ using Xunit.Abstractions;
 namespace E2E.Tests.Services.Players;
 
 /// <summary>
-/// #2891: the restore a server load or returning join runs cancels a disband saved with a player party. A disband
-/// started before the party was guarded as a player's is saved with it, and the next hourly tick of native
-/// <see cref="DisbandPartyCampaignBehavior"/> marks it disbanding again, after which native disbanding strips it.
+/// #2891: <c>PlayerPartyRestorer.Restore</c>, which runs on every server load and returning join, cancels a disband
+/// saved with a player party. A disband started before the party was guarded as a player's is saved with it, and the
+/// next hourly tick of native <see cref="DisbandPartyCampaignBehavior"/> marks it disbanding again, after which native
+/// disbanding strips it.
 /// </summary>
 public class PlayerPartyRestoreDisbandTests : MapEventTestBase
 {
@@ -28,6 +27,8 @@ public class PlayerPartyRestoreDisbandTests : MapEventTestBase
 
     // Outlasts the one-day wait native OnPartyDisbandStarted gives a party before it is marked disbanding
     private const int HoursPastDisbandWait = 25;
+
+    private DisbandPartyCampaignBehavior disbandBehavior = null!;
 
     public enum StaleDisband
     {
@@ -40,8 +41,8 @@ public class PlayerPartyRestoreDisbandTests : MapEventTestBase
     }
 
     /// <summary>
-    /// A save already holding a disbanding player party is repaired when its player rejoins, the same restore a
-    /// server load runs.
+    /// A save already holding a disbanding player party is repaired when its player rejoins, which runs the same
+    /// restore as a server load.
     /// </summary>
     [Theory]
     [InlineData(StaleDisband.Waiting)]
@@ -89,7 +90,7 @@ public class PlayerPartyRestoreDisbandTests : MapEventTestBase
         // The release only puts the party back on the map once its player is in the campaign again
         TestEnvironment.ConnectRegisteredPlayer(defenderClient, DefenderControllerId);
 
-        Ransom(defenderClient, heroId, partyId);
+        ReleasePlayerByRequest(defenderClient, heroId, partyId, EndCaptivityDetail.Ransom);
         PassHours(HoursPastDisbandWait);
 
         AssertCaptivity(Server, heroId, null);
@@ -128,9 +129,9 @@ public class PlayerPartyRestoreDisbandTests : MapEventTestBase
     {
         Server.Call(() =>
         {
-            var behavior = new DisbandPartyCampaignBehavior();
-            Campaign.Current.AddCampaignBehaviorManager(new CampaignBehaviorManager(new CampaignBehaviorBase[] { behavior }));
-            behavior.RegisterEvents();
+            disbandBehavior = new DisbandPartyCampaignBehavior();
+            Campaign.Current.AddCampaignBehaviorManager(new CampaignBehaviorManager(new CampaignBehaviorBase[] { disbandBehavior }));
+            disbandBehavior.RegisterEvents();
         });
     }
 
@@ -146,7 +147,7 @@ public class PlayerPartyRestoreDisbandTests : MapEventTestBase
             var party = Server.GetRegisteredObject<MobileParty>(partyId);
             DisbandPartyAction.StartDisband(party);
 
-            Assert.True(GetDisbandBehavior().IsPartyWaitingForDisband(party));
+            Assert.True(disbandBehavior.IsPartyWaitingForDisband(party));
         });
 
         if (staleDisband == StaleDisband.Disbanding)
@@ -166,24 +167,6 @@ public class PlayerPartyRestoreDisbandTests : MapEventTestBase
     }
 
     /// <summary>
-    /// The owning client pays its ransom from the captivity menu: the release request the server applies.
-    /// </summary>
-    private void Ransom(EnvironmentInstance client, string heroId, string partyId)
-    {
-        // A ransom releases from a still-active captor, so the server disengages the freed party, which needs a map scene
-        var disabledMethods = MapEventDisabledMethods
-            .Append(AccessTools.Method(typeof(MobileParty), nameof(MobileParty.TeleportPartyToOutSideOfEncounterRadius)))
-            .ToList();
-
-        client.Call(() =>
-        {
-            var party = client.GetRegisteredObject<MobileParty>(partyId);
-            client.Resolve<INetwork>().SendAll(new NetworkEndPlayerCaptivityAttempted(
-                heroId, partyId, party.Position, EndCaptivityDetail.Ransom, null, 0));
-        }, disabledMethods);
-    }
-
-    /// <summary>
     /// Advances the server clock and runs the disband behavior's hourly tick, which turns an expired wait into a disband.
     /// </summary>
     private void PassHours(int hours)
@@ -191,7 +174,7 @@ public class PlayerPartyRestoreDisbandTests : MapEventTestBase
         Server.Call(() =>
         {
             Campaign.Current.MapTimeTracker._numTicks += CampaignTime.Hours(hours).NumTicks;
-            ((DisbandPartyCampaignBehavior)GetDisbandBehavior()).HourlyTick();
+            disbandBehavior.HourlyTick();
         });
     }
 
@@ -220,7 +203,7 @@ public class PlayerPartyRestoreDisbandTests : MapEventTestBase
             Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(controllerId, out var player));
             Assert.Equal(partyId, player.MobilePartyId);
             Assert.Same(hero, party.LeaderHero);
-            Assert.False(GetDisbandBehavior().IsPartyWaitingForDisband(party));
+            Assert.False(disbandBehavior.IsPartyWaitingForDisband(party));
         });
 
         foreach (var instance in Clients.Append(Server))
@@ -236,7 +219,4 @@ public class PlayerPartyRestoreDisbandTests : MapEventTestBase
             });
         }
     }
-
-    private static IDisbandPartyCampaignBehavior GetDisbandBehavior()
-        => Campaign.Current.GetCampaignBehavior<IDisbandPartyCampaignBehavior>();
 }
