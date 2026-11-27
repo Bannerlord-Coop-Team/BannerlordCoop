@@ -246,16 +246,12 @@ internal class PlayerPartyRestorer : IPlayerPartyRestorer
 
     private static void CancelPendingDisband(MobileParty party)
     {
-        if (!party.IsDisbanding && !IsWaitingForDisband(party)) return;
+        var disbandBehavior = Campaign.Current.GetCampaignBehavior<IDisbandPartyCampaignBehavior>();
+        var waitingForDisband = disbandBehavior != null && disbandBehavior.IsPartyWaitingForDisband(party);
+        if (!party.IsDisbanding && !waitingForDisband) return;
 
         Logger.Warning("Cancelling the disband of player party {PartyId}", party.StringId);
         DisbandPartyAction.CancelDisband(party);
-    }
-
-    private static bool IsWaitingForDisband(MobileParty party)
-    {
-        var disbandBehavior = Campaign.Current.GetCampaignBehavior<IDisbandPartyCampaignBehavior>();
-        return disbandBehavior != null && disbandBehavior.IsPartyWaitingForDisband(party);
     }
 
     private static bool IsReadyPlayerParty(MobileParty party, Hero hero)
