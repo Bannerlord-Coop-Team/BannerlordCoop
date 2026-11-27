@@ -10,9 +10,7 @@ using GameInterface.Services.MapEvents.Interfaces;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.TroopRosters.Messages;
-using GameInterface.Services.Villages.Interfaces;
 using HarmonyLib;
-using Moq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Encounters;
@@ -105,7 +103,7 @@ public class CompanionDismissalSyncTests : IDisposable
             var encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
             Campaign.Current.PlayerEncounter = encounter;
 
-            new PlayerEncounterInterface(null, Mock.Of<IVillageHostileActionInterface>()).UpdateInternalAfterBattle(encounter);
+            new PlayerEncounterInterface(null).UpdateInternalAfterBattle(encounter);
 
             Assert.Same(encounter, PlayerEncounter.Current);
             Assert.True(encounter._stateHandled);

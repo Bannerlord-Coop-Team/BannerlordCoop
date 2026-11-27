@@ -5,15 +5,15 @@ using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 
-namespace GameInterface.Services.SiegeEvents.Patches;
+namespace GameInterface.Services.MapEvents.Patches;
 
 /// <summary>
-/// A fought sally out ends with PlayerEncounter.Finish leaving the besieged settlement, but a client's leave is
-/// dropped, so the party stays inside with no encounter. Ask for the settlement encounter again, like vanilla's
-/// MenuHelper.EncounterLeaveConsequence does for a party that is still in a settlement.
+/// A fought sally out or village force action ends with PlayerEncounter.Finish leaving the settlement, but a client's
+/// leave is dropped, so the party stays inside with no encounter. Ask for the settlement encounter again, like vanilla's
+/// MenuHelper.EncounterLeaveConsequence and the force action TryHandlePlayerEncounterEnd do.
 /// </summary>
 [HarmonyPatch(typeof(PlayerEncounter), nameof(PlayerEncounter.Finish))]
-internal class SallyOutFinishEncounterPatch
+internal class SettlementBattleFinishEncounterPatch
 {
     [HarmonyPrefix]
     private static void Prefix(bool forcePlayerOutFromSettlement, out Settlement __state)
@@ -22,12 +22,16 @@ internal class SallyOutFinishEncounterPatch
         if (ModInformation.IsServer || !forcePlayerOutFromSettlement) return;
 
         // Finish only calls LeaveSettlement for a party that isn't attached to an army
-        if (MobileParty.MainParty?.AttachedTo != null) return;
+        var mainParty = MobileParty.MainParty;
+        if (mainParty?.AttachedTo != null) return;
 
         var mapEvent = PlayerEncounter.Current?._mapEvent;
         // v1.5 reads the battle type from the component, which a client's map event can lack
         if (mapEvent?.Component == null) return;
-        if (!mapEvent.IsSallyOut && !mapEvent.IsBlockadeSallyOut) return;
+        bool isSallyOut = mapEvent.IsSallyOut || mapEvent.IsBlockadeSallyOut;
+        // Vanilla only sends the attacker's leader back into the village it forced (#2619)
+        bool ledForceAction = mapEvent.IsForceHostileAction() && mapEvent.AttackerSide?.LeaderParty == mainParty.Party;
+        if (!isSallyOut && !ledForceAction) return;
 
         __state = mapEvent.MapEventSettlement;
     }

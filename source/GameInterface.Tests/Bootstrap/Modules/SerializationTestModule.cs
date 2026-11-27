@@ -8,7 +8,6 @@ using GameInterface.Serialization;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Villages.Interfaces;
 using Moq;
 using Serilog;
 
@@ -32,7 +31,6 @@ namespace GameInterface.Tests.Bootstrap.Modules
             builder.RegisterInstance(new Mock<ISerializableTypeMapper>().Object).As<ISerializableTypeMapper>();
             builder.RegisterInstance(new Mock<IControllerIdProvider>().Object).As<IControllerIdProvider>();
             builder.RegisterInstance(new Mock<IMapEventInitializationBarrier>().Object).As<IMapEventInitializationBarrier>();
-            builder.RegisterInstance(new Mock<IVillageHostileActionInterface>().Object).As<IVillageHostileActionInterface>();
             builder.RegisterModule<RegistryModule>();
         }
     }

@@ -21,8 +21,12 @@ public static class RaidMapEventExtensions
 
     public static bool IsVillageHostileAction(this MapEvent mapEvent)
     {
-        return mapEvent.IsRaidHostileAction() ||
-               mapEvent?.Component is ForceVolunteersEventComponent ||
+        return mapEvent.IsRaidHostileAction() || mapEvent.IsForceHostileAction();
+    }
+
+    public static bool IsForceHostileAction(this MapEvent mapEvent)
+    {
+        return mapEvent?.Component is ForceVolunteersEventComponent ||
                mapEvent?.Component is ForceSuppliesEventComponent;
     }
 
@@ -38,7 +42,7 @@ public static class RaidMapEventExtensions
 
     public static bool IsUnsupportedMultiPlayerHostileAction(this MapEvent mapEvent)
     {
-        return mapEvent.IsVillageHostileActionWithMultiplePlayerParties() && !mapEvent.IsRaidHostileAction();
+        return mapEvent.IsForceHostileAction() && mapEvent.HasMultiplePlayerParties();
     }
 
     public static bool IsActiveSlowVillageRaid(this MapEvent mapEvent)

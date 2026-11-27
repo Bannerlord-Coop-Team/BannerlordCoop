@@ -340,20 +340,6 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
     /// <summary>Vanilla's no-resist consequences return to the village menu before the loot screen.</summary>
     public void ReturnToVillageMenu() => GameMenu.SwitchToMenu("village");
 
-    // Like vanilla's TryHandlePlayerEncounterEnd. Finish cant take a client out of the settlement, so otherwise
-    // the party stays inside with no encounter or menu to leave from (#2619).
-    public void ReenterForcedVillage(MapEvent mapEvent)
-    {
-        if (!mapEvent.IsVillageHostileAction() || mapEvent.IsRaidHostileAction()) return;
-
-        var mainParty = MobileParty.MainParty;
-        var village = mapEvent.MapEventSettlement;
-        if (village == null || mainParty.CurrentSettlement != village ||
-            mapEvent.AttackerSide?.LeaderParty != mainParty.Party) return;
-
-        EncounterManager.StartSettlementEncounter(mainParty, village);
-    }
-
     public void ApplyForceActionOutcome(MapEvent mapEvent, VillageHostileAction action)
     {
         GameThread.RunSafe(
