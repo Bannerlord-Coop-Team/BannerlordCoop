@@ -832,8 +832,8 @@ public class VillageHostileActionTests : MapEventTestBase
         Assert.Equal(expectedForceSupplies, request.ForceSupplies);
     }
 
-    // The client sets up its village visit after the server put its party in the village, which vanilla reads as defending
-    // it, and a won naval raid mission reports the encounter's side as the winner
+    // The client sets up the visit after the server put its party in the village, so vanilla reads it as defending.
+    // A won naval raid reports the encounter's side as the winner, so that side has to be the attacker.
     [Fact]
     public void BeginHostileActionPresentation_VisitSetUpInsideTheVillage_PlayerAttacks()
     {
