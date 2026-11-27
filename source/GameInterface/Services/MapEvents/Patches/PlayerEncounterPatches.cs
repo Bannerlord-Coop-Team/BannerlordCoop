@@ -427,12 +427,14 @@ internal class PlayerEncounterPatches
     }
 
     // Native blocks defender-side parties from leaving; allow a joiner (a non-leader of its side) to leave,
-    // since it is neither the aggressor nor the attacked target.
+    // since it is neither the aggressor nor the attacked target. A party inside the settlement keeps native's
+    // answer, because EncounterLeavePrefix leaves that click to native, which only finishes the encounter locally.
     [HarmonyPatch(typeof(EncounterGameMenuBehavior), "game_menu_encounter_leave_on_condition")]
     [HarmonyPostfix]
     private static void EncounterLeaveConditionPostfix(MenuCallbackArgs args, ref bool __result)
     {
         if (__result) return;
+        if (MobileParty.MainParty.CurrentSettlement != null) return;
         if (!IsBattleJoiner()) return;
 
         args.optionLeaveType = GameMenuOption.LeaveType.Leave;

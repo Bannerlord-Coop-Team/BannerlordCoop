@@ -25,6 +25,7 @@ using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.SiegeEvents;
 using GameInterface.Services.SiegeEvents.Interfaces;
+using GameInterface.Services.SiegeEvents.Messages;
 using HarmonyLib;
 using Helpers;
 using System.Reflection;
@@ -822,6 +823,84 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
             Assert.Same(mapEvent, PlayerEncounter.Battle);
             Assert.Same(mapEvent.AttackerSide, party.Party.MapEventSide);
         });
+    }
+
+    // #4858: the defender's Leave only finished the encounter on the client, so the server kept the party in the
+    // defense and the battle waited on a player that had already left.
+    [Fact]
+    public void AssaultStartsWithPlayerInsideTown_DefenderMenuHasNoLeave()
+    {
+        var battle = CreateServerMapEvent();
+        var (_, partyId) = CreatePlayerHeroParty("PlayerOne");
+        var client = Clients.First();
+        TestEnvironment.ConnectRegisteredPlayer(client, "PlayerOne");
+        SetMainParty(client, partyId);
+        var disabledMethods = MapEventDisabledMethods.Concat(SiegeLeaveDisabledMethods)
+            .Append(AccessTools.Method(typeof(PartyBaseHelper), nameof(PartyBaseHelper.HasFeat)))
+            .ToList();
+        var siegeId = TestEnvironment.CreateRegisteredObject<SiegeEvent>(disabledMethods);
+        var playerClanId = TestEnvironment.CreateRegisteredObject<Clan>();
+        var enemyClanId = TestEnvironment.CreateRegisteredObject<Clan>();
+
+        foreach (var instance in Clients.Append(Server))
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
+                Assert.True(instance.ObjectManager.TryGetObject<SiegeEvent>(siegeId, out var siege));
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(battle.AttackerPartyId, out var attacker));
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(battle.DefenderPartyId, out var defender));
+                Assert.True(instance.ObjectManager.TryGetObject<Clan>(playerClanId, out var playerClan));
+                Assert.True(instance.ObjectManager.TryGetObject<Clan>(enemyClanId, out var enemyClan));
+
+                using (new AllowedThread())
+                {
+                    party.ActualClan = playerClan;
+                    defender.ActualClan = playerClan;
+                    attacker.ActualClan = enemyClan;
+                }
+
+                mapEvent.SetBattleType(MapEvent.BattleTypes.Siege);
+                var settlement = siege.BesiegedSettlement;
+                settlement.SiegeEvent = siege;
+                settlement.Party._mapEventSide = mapEvent.DefenderSide;
+                mapEvent.DefenderSide.LeaderParty = settlement.Party;
+                mapEvent.SetMapEventSettlement(settlement);
+                party._currentSettlement = settlement;
+            }, disabledMethods);
+        }
+
+        // Vanilla's Init needs a whole town and its menu models; PromptSiegeDefense still starts the encounter.
+        var withoutEncounterInit = disabledMethods
+            .Append(AccessTools.Method(typeof(PlayerEncounter), nameof(PlayerEncounter.Init),
+                new[] { typeof(PartyBase), typeof(PartyBase), typeof(Settlement) }))
+            .ToList();
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(battle.AttackerPartyId, out var attacker));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            using (new AllowedThread())
+                FactionManager.DeclareWar(attacker.MapFaction, party.MapFaction);
+            Assert.True(mapEvent.CanPartyJoinBattle(party.Party, BattleSideEnum.Defender));
+
+            Server.Resolve<IMessageBroker>().Publish(this, new SiegeAssaultStarted(attacker, mapEvent.MapEventSettlement));
+
+            Assert.Same(mapEvent.DefenderSide, party.Party.MapEventSide);
+            Assert.Same(mapEvent.MapEventSettlement, party.CurrentSettlement);
+        }, withoutEncounterInit);
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPromptSiegeDefense>());
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
+            Assert.Same(mapEvent.DefenderSide, PartyBase.MainParty.MapEventSide);
+            Assert.NotNull(PlayerEncounter.Current);
+
+            var behavior = ObjectHelper.SkipConstructor<EncounterGameMenuBehavior>();
+            Assert.False(behavior.game_menu_encounter_leave_on_condition(new MenuCallbackArgs((MenuContext)null, null)));
+        }, MapEventDisabledMethods);
     }
 
     [Fact]
