@@ -83,6 +83,8 @@ namespace E2E.Tests.Services.Villages;
 public class VillageHostileActionTests : MapEventTestBase
 {
     private const int MaxAdvancesToFinish = 200;
+    // One update per after battle encounter state, from capturing heroes through the loot screens to the end.
+    private const int MaxResultScreenSteps = 6;
     private static int peerPortCounter;
 
     public VillageHostileActionTests(ITestOutputHelper output) : base(output)
@@ -1758,7 +1760,7 @@ public class VillageHostileActionTests : MapEventTestBase
                 states.GameStates.OfType<MapState>().Single().EndBattleSimulation();
                 simulation.OnFinished();
                 // The simulation decides whether there are prisoners, so close whichever result screens open.
-                for (var step = 0; step < 6 && PlayerEncounter.Current != null; step++)
+                for (var step = 0; step < MaxResultScreenSteps && PlayerEncounter.Current != null; step++)
                 {
                     PlayerEncounter.Update();
                     if (states.ActiveState is PartyState or InventoryState)
@@ -1794,17 +1796,17 @@ public class VillageHostileActionTests : MapEventTestBase
     {
         var client = Clients.First();
         var (context, encounter) = ArrangeForcedVillageEncounter(client, VillageHostileAction.ForceSupplies);
+        const string forceSuppliesMenu = "force_supplies_village";
         client.Call(() =>
         {
             var states = Game.Current.GameStateManager;
             var mapState = states.CreateState<MapState>();
             states._gameStates.Add(mapState);
             var gameMenus = Campaign.Current.GameMenuManager;
-            if (gameMenus.GetGameMenu("force_supplies_village") == null)
-                new CampaignGameStarter(gameMenus, Campaign.Current.ConversationManager)
-                    .AddGameMenu("force_supplies_village", "", _ => { });
+            new CampaignGameStarter(gameMenus, Campaign.Current.ConversationManager)
+                .AddGameMenu(forceSuppliesMenu, "", _ => { });
             mapState._menuContext = Game.Current.ObjectManager.CreateObject<MenuContext>();
-            mapState._menuContext.GameMenu = gameMenus.GetGameMenu("force_supplies_village");
+            mapState._menuContext.GameMenu = gameMenus.GetGameMenu(forceSuppliesMenu);
         }, MapEventDisabledMethods);
         using var menus = new MethodCallRecorder(Priority.First,
             AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu)),

@@ -21,13 +21,14 @@ internal class SettlementBattleFinishEncounterPatch
         __state = null;
         if (ModInformation.IsServer || !forcePlayerOutFromSettlement) return;
 
-        // Finish only calls LeaveSettlement for a party that isn't attached to an army
-        var mainParty = MobileParty.MainParty;
-        if (mainParty?.AttachedTo != null) return;
-
         var mapEvent = PlayerEncounter.Current?._mapEvent;
         // v1.5 reads the battle type from the component, which a client's map event can lack
         if (mapEvent?.Component == null) return;
+
+        // Finish only calls LeaveSettlement for a party that isn't attached to an army
+        var mainParty = MobileParty.MainParty;
+        if (mainParty.AttachedTo != null) return;
+
         bool isSallyOut = mapEvent.IsSallyOut || mapEvent.IsBlockadeSallyOut;
         // Vanilla only sends the attacker's leader back into the village it forced (#2619)
         bool ledForceAction = mapEvent.IsForceHostileAction() && mapEvent.AttackerSide?.LeaderParty == mainParty.Party;
