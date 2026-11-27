@@ -44,6 +44,7 @@ using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.Policies;
 using GameInterface.Services.Stances.Messages;
 using GameInterface.Services.UI.Notifications.Messages;
 using GameInterface.Services.Villages.Interfaces;
@@ -55,6 +56,7 @@ using SandBox.ViewModelCollection.Map.Tracker;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Xml;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -80,6 +82,7 @@ using TaleWorlds.Core.ViewModelCollection.Information;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
+using TaleWorlds.ObjectSystem;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Kingdoms;
@@ -89,6 +92,8 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     private const string ControllerId = "Player";
     private const string SecondControllerId = "Player2";
     private const string KingdomName = "Real Kingdom";
+    private const string UnregisteredCulturePolicyId = "policy_missing_from_loaded_modules";
+    private static readonly string[] RegisteredDefaultPolicyIds = { "policy_council_of_the_commons", "policy_senate" };
     private const string FullKingdomName = "Vlandia";
     private const string FullKingdomText = "Vlandia already has the most clans this server allows (1).";
 
@@ -353,26 +358,39 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     }
 
     [Fact]
-    public void ClientGovernorFinalization_CreatesPlayerKingdomOnServerAndSyncsClients()
+    public void ClientGovernorFinalization_WithUnregisteredCulturePolicy_CreatesKingdomAndSyncsClients()
     {
         var player = CreateSyncedPlayerContext();
         var fiefId = CreateSyncedClanFief(player.ClanId);
         var client = Clients.First();
         client.Resolve<IControllerIdProvider>().SetControllerId(ControllerId);
+        TestEnvironment.RegisterLoadedObjects<PolicyObjectRegistry, PolicyObject>();
+
+        var instances = new[] { Server }.Concat(Clients);
+        foreach (var instance in instances)
+        {
+            LoadCultureWithUnregisteredDefaultPolicy(instance, player.CultureId);
+        }
+
+        foreach (var instance in instances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<CultureObject>(player.CultureId, out var culture));
+                Assert.Equal(RegisteredDefaultPolicyIds, culture.DefaultPolicyList.Select(policy => policy?.StringId));
+            });
+        }
 
         client.Call(() =>
         {
-            var behavior = ObjectHelper.SkipConstructor<GovernorCampaignBehavior>();
             Assert.True(client.ObjectManager.TryGetObject<CultureObject>(player.CultureId, out var culture));
-
-            AccessTools.Field(typeof(GovernorCampaignBehavior), "_kingdomCreationChosenName")
-                .SetValue(behavior, new TextObject(KingdomName));
-            AccessTools.Field(typeof(GovernorCampaignBehavior), "_kingdomCreationChosenCulture")
-                .SetValue(behavior, culture);
-
-            bool runOriginal = GovernorKingdomCreationPatches.FinalizationPrefix(behavior);
-
-            Assert.False(runOriginal);
+            var behavior = new GovernorCampaignBehavior
+            {
+                _kingdomCreationChosenName = new TextObject(KingdomName),
+                _kingdomCreationChosenCulture = culture,
+            };
+            Assert.True(behavior.governor_kingdom_creation_culture_selected_on_condition());
+            behavior.governor_talk_kingdom_creation_finalization_on_consequence();
         });
 
         var request = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestCreateKingdom>());
@@ -395,6 +413,17 @@ public class PlayerKingdomCreationFlowTests : IDisposable
                 message => message.KingdomId == created.KingdomId
                            && message.KingdomName == KingdomName
                            && message.ClanId == player.ClanId);
+        }
+
+        foreach (var instance in instances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Kingdom>(created.KingdomId, out var kingdom));
+                Assert.Equal(
+                    RegisteredDefaultPolicyIds,
+                    kingdom.ActivePolicies.Select(policy => policy.StringId));
+            });
         }
 
         var notification = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPlayerKingdomCreated>());
@@ -6188,6 +6217,38 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         {
             SetClanCulture(client, clanId, cultureId);
         }
+    }
+
+    private static void LoadCultureWithUnregisteredDefaultPolicy(EnvironmentInstance instance, string cultureId)
+    {
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<CultureObject>(cultureId, out var culture));
+            var objectManager = Campaign.Current.ObjectManager;
+            using (new AllowedThread())
+            {
+                // Register the synced culture so LoadXml deserializes into this instance.
+                objectManager.RegisterObject(culture);
+                Assert.Null(objectManager.GetObject<PolicyObject>(UnregisteredCulturePolicyId));
+                objectManager.LoadXml(CreateCultureXmlWithUnregisteredPolicy(culture.StringId));
+            }
+        });
+    }
+
+    private static XmlDocument CreateCultureXmlWithUnregisteredPolicy(string cultureId)
+    {
+        var xml = new XmlDocument();
+        var cultures = xml.AppendChild(xml.CreateElement("SPCultures"));
+        var culture = (XmlElement)cultures.AppendChild(xml.CreateElement("Culture"));
+        culture.SetAttribute("id", cultureId);
+        culture.SetAttribute("name", cultureId);
+        var defaults = culture.AppendChild(xml.CreateElement("default_policies"));
+        foreach (string policyId in RegisteredDefaultPolicyIds.Append(UnregisteredCulturePolicyId))
+        {
+            var policy = (XmlElement)defaults.AppendChild(xml.CreateElement("policy"));
+            policy.SetAttribute("id", policyId);
+        }
+        return xml;
     }
 
     private static void SetClanCulture(EnvironmentInstance instance, string clanId, string cultureId)
