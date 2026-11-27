@@ -109,7 +109,8 @@ public class PrisonerSaleProcessorTests
         var registeredPlayers = new PlayerManager(
             Mock.Of<Serilog.ILogger>(),
             objectManager.Object,
-            new ControllerIdProvider());
+            new ControllerIdProvider(),
+            messageBroker.Object);
         registeredPlayers.AddPlayer(new Player(
             "controller-1",
             "player-hero",

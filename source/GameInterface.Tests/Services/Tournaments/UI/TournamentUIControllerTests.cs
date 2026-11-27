@@ -45,6 +45,29 @@ public class TournamentUIControllerTests
         Assert.Equal(canResume, controller.CanResume("town-a"));
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ReleaseReservedSlot_OnlySendsLeaveWhileTheLocalContestantIsAway(bool isDisconnected)
+    {
+        using var controller = CreateController("player-a", out var sent);
+        controller.CacheSnapshot(CreateSnapshot(
+            "session-a", "town-a", 17, TournamentSessionPhase.AwaitingChoices,
+            includeLocalContestant: true, localContestantIsDisconnected: isDisconnected));
+
+        controller.ReleaseReservedSlot("town-a");
+
+        if (!isDisconnected)
+        {
+            Assert.Empty(sent);
+            return;
+        }
+
+        var request = Assert.IsType<NetworkRequestLeaveActiveTournament>(Assert.Single(sent));
+        Assert.Equal("session-a", request.SessionId);
+        Assert.Equal(17, request.ExpectedRevision);
+    }
+
     [Fact]
     public void Tombstone_ClearsOnlyMatchingSessionAndTownCache()
     {
@@ -235,7 +258,8 @@ public class TournamentUIControllerTests
         TournamentSessionPhase phase = TournamentSessionPhase.Preparation,
         bool includeLocalContestant = false,
         string currentMatchId = null,
-        bool isCompleted = false)
+        bool isCompleted = false,
+        bool localContestantIsDisconnected = false)
     {
         var contestants = includeLocalContestant
             ? new[]
@@ -249,7 +273,8 @@ public class TournamentUIControllerTests
                     true,
                     false,
                     true,
-                    "npc-a")
+                    "npc-a",
+                    isDisconnected: localContestantIsDisconnected)
             }
             : Array.Empty<TournamentContestantData>();
 

@@ -26,6 +26,7 @@ internal interface ITournamentUIController
     void RequestStart(string townId);
     void RequestLeavePreparation(string townId);
     void RequestSpectate(string townId);
+    void ReleaseReservedSlot(string townId);
     void RequestLeaveActive(TournamentSessionSnapshot snapshot);
     void RequestChoice(TournamentSessionSnapshot snapshot, TournamentPlayerChoice choice);
     void RequestBet(TournamentSessionSnapshot snapshot, int amount);

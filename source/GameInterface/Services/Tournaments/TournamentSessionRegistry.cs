@@ -971,7 +971,9 @@ public sealed partial class TournamentSessionRegistry : ITournamentSessionRegist
         }
 
         public bool HasVotersOrReservations() =>
-            GetVoters().Length > 0 || Contestants.Any(IsReservedForAbsentPlayer);
+            GetVoters().Length > 0 || HasReservations();
+
+        private bool HasReservations() => Contestants.Any(IsReservedForAbsentPlayer);
 
         public bool IsReservedForAbsentPlayer(TournamentContestantSlot contestant) =>
             contestant.IsHuman && contestant.IsDisconnected && !IsEliminated(contestant.SlotId);
@@ -1035,7 +1037,7 @@ public sealed partial class TournamentSessionRegistry : ITournamentSessionRegist
             var voters = GetVoters();
 
             if (voters.Length == 0)
-                return HasVotersOrReservations() ? TournamentBallotOutcome.Open : TournamentBallotOutcome.SimulateMatch;
+                return HasReservations() ? TournamentBallotOutcome.Open : TournamentBallotOutcome.SimulateMatch;
 
             bool allReady = voters.All(controllerId =>
                 Choices.TryGetValue(controllerId, out var choice) &&
@@ -1132,6 +1134,7 @@ public sealed partial class TournamentSessionRegistry : ITournamentSessionRegist
         public string DisplayName;
         public bool IsHuman;
         public bool IsReplaced;
+        // Set when the player disconnects from an active tournament and cleared when they re-enter its mission.
         public bool IsDisconnected;
         public bool IsLord;
         public string DisplacedCharacterId;

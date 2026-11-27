@@ -113,15 +113,9 @@ public class TournamentDisconnectFlowTests : SyncTestBase
             Send(host, new NetworkRequestLeaveActiveTournament(SessionId, parked.Revision));
         }
 
-        Server.Call(() =>
-        {
-            var registry = Server.Resolve<ITournamentSessionRegistry>();
-            if (registry.TryGet(SessionId, out var snapshot))
-            {
-                Assert.True(snapshot.IsCompleted);
-                Assert.True(FindHostSlot(snapshot).IsReplaced);
-            }
-        });
+        var completed = Assert.Single(Server.InternalMessages.GetMessages<TournamentSessionUpdated>(),
+            update => update.Snapshot.SessionId == SessionId && update.Snapshot.IsCompleted);
+        Assert.True(FindHostSlot(completed.Snapshot).IsReplaced);
     }
 
     private TournamentSessionSnapshot ResumeTournament(

@@ -182,6 +182,15 @@ internal sealed class TournamentUIController : ITournamentUIController, IHandler
         network.SendAll(new NetworkRequestSpectateTournament(snapshot.SessionId, snapshot.Revision));
     }
 
+    public void ReleaseReservedSlot(string townId)
+    {
+        if (TryGetTownSession(townId, out var snapshot) && IsActive(snapshot) &&
+            GetLocalContestant(snapshot)?.IsDisconnected == true)
+        {
+            RequestLeaveActive(snapshot);
+        }
+    }
+
     public void RequestLeaveActive(TournamentSessionSnapshot snapshot)
     {
         if (snapshot == null) return;

@@ -59,6 +59,8 @@ public sealed class TournamentContestantData
     public readonly string DisplacedCharacterId;
     [ProtoMember(10)]
     public readonly int Score;
+
+    // Set when the player disconnects from an active tournament and cleared when they re-enter its mission.
     [ProtoMember(11)]
     public readonly bool IsDisconnected;
 

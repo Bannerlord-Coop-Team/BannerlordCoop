@@ -303,7 +303,7 @@ public class PlayerCaptivityReleasePositionTests
     private void MarkPlayerHero(Hero hero, string heroId)
     {
         SetupObject(heroId, hero);
-        var playerManager = new PlayerManager(Mock.Of<ILogger>(), objectManager.Object, new ControllerIdProvider());
+        var playerManager = new PlayerManager(Mock.Of<ILogger>(), objectManager.Object, new ControllerIdProvider(), messageBroker.Object);
         playerManager.AddPlayer(new Player("controller-1", heroId, string.Empty, string.Empty, string.Empty));
     }
 

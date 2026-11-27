@@ -1,4 +1,5 @@
-﻿using Common.Util;
+﻿using Common.Messaging;
+using Common.Util;
 using GameInterface.Services.Clans.Extensions;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MapEvents.Interfaces;
@@ -148,7 +149,7 @@ public class PlayerEncounterInterfaceTests
     public void ShouldReleaseWithoutConversation_CompanionOfHeirLedFormerPlayerClan_ReturnsTrue()
     {
         var objectManager = new Mock<IObjectManager>();
-        var playerManager = new PlayerManager(new Mock<ILogger>().Object, objectManager.Object, new ControllerIdProvider());
+        var playerManager = new PlayerManager(new Mock<ILogger>().Object, objectManager.Object, new ControllerIdProvider(), Mock.Of<IMessageBroker>());
         var localClan = ObjectHelper.SkipConstructor<Clan>();
         var formerPlayerClan = ObjectHelper.SkipConstructor<Clan>();
         var playerHero = ObjectHelper.SkipConstructor<Hero>();

@@ -330,13 +330,8 @@ public sealed class CoopTournamentCampaignBehavior : CampaignBehaviorBase
 
     private static void BackToTownConsequence(MenuCallbackArgs args)
     {
-        if (TryGetTownContext(out var townId, out var controller) &&
-            controller.TryGetTownSession(townId, out var snapshot) &&
-            snapshot.Contestants.Any(contestant => contestant.IsHuman && !contestant.IsReplaced &&
-                contestant.IsDisconnected && contestant.ControllerId == controller.LocalControllerId))
-        {
-            controller.RequestLeaveActive(snapshot);
-        }
+        if (TryGetTownContext(out var townId, out var controller))
+            controller.ReleaseReservedSlot(townId);
 
         GameMenu.SwitchToMenu(TownCenterMenuId);
     }

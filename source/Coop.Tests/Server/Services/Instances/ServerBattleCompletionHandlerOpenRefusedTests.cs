@@ -52,7 +52,8 @@ public class ServerBattleCompletionHandlerOpenRefusedTests : IDisposable
         playerManager = new PlayerManager(
             Mock.Of<ILogger>(),
             Mock.Of<IObjectManager>(),
-            Mock.Of<IControllerIdProvider>());
+            Mock.Of<IControllerIdProvider>(),
+            broker);
         missionManager = new MissionManager(playerManager);
 
         var assignment = new BattleHostAssignment(HostControllerId, Array.Empty<string>(), epoch: 1);

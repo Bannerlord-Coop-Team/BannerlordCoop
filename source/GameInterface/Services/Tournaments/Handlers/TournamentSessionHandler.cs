@@ -8,6 +8,7 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.Players.Messages;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Tournaments.Data;
 using GameInterface.Services.Tournaments.Messages;
@@ -79,8 +80,8 @@ internal sealed partial class TournamentSessionHandler : IHandler
         messageBroker.Subscribe<NetworkTournamentSpawnManifest>(Handle_SpawnManifestSnapshot);
         messageBroker.Subscribe<NetworkEnterTournamentMission>(Handle_EnterMission);
         messageBroker.Subscribe<PlayerDisconnected>(Handle_Disconnected);
+        messageBroker.Subscribe<PlayerRemoved>(Handle_PlayerRemoved);
         messageBroker.Subscribe<CampaignTick>(Handle_CampaignTick);
-        playerManager.PlayerRemoved += OnPlayerRemoved;
     }
 
     public void Dispose()
@@ -100,8 +101,8 @@ internal sealed partial class TournamentSessionHandler : IHandler
         messageBroker.Unsubscribe<NetworkTournamentSpawnManifest>(Handle_SpawnManifestSnapshot);
         messageBroker.Unsubscribe<NetworkEnterTournamentMission>(Handle_EnterMission);
         messageBroker.Unsubscribe<PlayerDisconnected>(Handle_Disconnected);
+        messageBroker.Unsubscribe<PlayerRemoved>(Handle_PlayerRemoved);
         messageBroker.Unsubscribe<CampaignTick>(Handle_CampaignTick);
-        playerManager.PlayerRemoved -= OnPlayerRemoved;
     }
 
     private void Handle_Join(MessagePayload<NetworkRequestJoinTournament> payload)
@@ -699,27 +700,29 @@ internal sealed partial class TournamentSessionHandler : IHandler
             context: nameof(Handle_Disconnected));
     }
 
-    private void OnPlayerRemoved(Player player)
+    private void Handle_PlayerRemoved(MessagePayload<PlayerRemoved> payload)
     {
         if (ModInformation.IsClient)
             return;
 
+        var removed = payload.What;
         GameThread.RunSafe(() =>
         {
-            sessionRegistry.TryTakeDisconnectLoss(player.ControllerId, out _);
+            // A removed registration cannot resume, so discard its pending loss notice and release its slot.
+            _ = sessionRegistry.TryTakeDisconnectLoss(removed.ControllerId, out _);
             foreach (var snapshot in sessionRegistry.GetAll())
             {
-                bool registeredContestant = TryGetPlayerSlot(snapshot, player.ControllerId, out var slot) &&
-                    slot.CharacterId == player.CharacterObjectId;
-                if (!registeredContestant && !snapshot.SpectatorControllerIds.Contains(player.ControllerId))
+                bool registeredContestant = TryGetPlayerSlot(snapshot, removed.ControllerId, out var slot) &&
+                    slot.CharacterId == removed.CharacterId;
+                if (!registeredContestant && !snapshot.SpectatorControllerIds.Contains(removed.ControllerId))
                     continue;
 
                 if (snapshot.Phase == TournamentSessionPhase.Preparation)
-                    LeavePreparationAfterDisconnect(player.ControllerId, snapshot);
+                    LeavePreparationAfterDisconnect(removed.ControllerId, snapshot);
                 else
-                    LeaveActive(snapshot.SessionId, snapshot.Revision, player.ControllerId, null);
+                    LeaveActive(snapshot.SessionId, snapshot.Revision, removed.ControllerId, null);
             }
-        }, context: nameof(OnPlayerRemoved));
+        }, context: nameof(Handle_PlayerRemoved));
     }
 
     private bool TryResolveDisconnectedController(NetPeer playerId, out string controllerId)

@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.ObjectManager;
@@ -31,7 +32,7 @@ public class CharacterNotificationPatchesTests
         objects.Setup(manager => manager.TryGetObjectWithLogging<Hero>("hero", out hero)).Returns(true);
         var controller = new ControllerIdProvider();
         controller.SetControllerId(isLocalPlayer ? "player" : "other");
-        var players = new PlayerManager(Mock.Of<ILogger>(), objects.Object, controller);
+        var players = new PlayerManager(Mock.Of<ILogger>(), objects.Object, controller, Mock.Of<IMessageBroker>());
         var player = new Player("player", "hero", string.Empty, string.Empty, string.Empty);
         if (isPlayer) Assert.True(players.AddPlayer(player));
         try

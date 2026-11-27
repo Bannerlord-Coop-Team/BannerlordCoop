@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.CoopSessionData;
@@ -38,7 +39,7 @@ public class StatisticsCampaignBehaviorInterfaceTests : IDisposable
 
     public StatisticsCampaignBehaviorInterfaceTests()
     {
-        playerManager = new PlayerManager(Mock.Of<ILogger>(), objectManager.Object, new ControllerIdProvider());
+        playerManager = new PlayerManager(Mock.Of<ILogger>(), objectManager.Object, new ControllerIdProvider(), Mock.Of<IMessageBroker>());
         statisticsInterface = new StatisticsCampaignBehaviorInterface(
             sessionProvider,
             objectManager.Object,
