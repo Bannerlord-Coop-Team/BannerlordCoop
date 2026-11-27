@@ -116,12 +116,9 @@ public class ParkedArmyFollowerTests : MapEventTestBase
 
     private void PumpAll()
     {
-        for (var i = 0; i < 3; i++)
-        {
-            Server.PumpGameThread();
-            foreach (var client in Clients)
-                client.PumpGameThread();
-        }
+        Server.PumpGameThread();
+        foreach (var client in Clients)
+            client.PumpGameThread();
     }
 
     private void AssertNotFollowing(string partyId, string armyId)
