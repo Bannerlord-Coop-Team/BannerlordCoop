@@ -9,6 +9,8 @@ using Quest = TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsToOffloadStolenGoo
 
 namespace GameInterface.Services.Issues.Quests.GangLeaderNeedsToOffloadStolenGoods.Patches;
 
+// The hideout's spotted state is server managed, the owner's client reveals its quest hideout for itself.
+// Only the setter runs under AllowedThread so StartQuest in the same accept still publishes QuestAcceptanceStarted.
 [HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(Quest), nameof(Quest.QuestAcceptedConsequences))]
 internal class GangLeaderNeedsToOffloadStolenGoodsHideoutRevealPatch
@@ -23,7 +25,7 @@ internal class GangLeaderNeedsToOffloadStolenGoodsHideoutRevealPatch
             if (instruction.Calls(setter))
             {
                 instruction.opcode = OpCodes.Call;
-                instruction.operand = AccessTools.Method(typeof(GangLeaderNeedsToOffloadStolenGoodsHideoutRevealPatch), nameof(Reveal));
+                instruction.operand = AccessTools.Method(typeof(GangLeaderNeedsToOffloadStolenGoodsHideoutRevealPatch), nameof(SetVisibleOnOwner));
                 replaced++;
             }
             yield return instruction;
@@ -31,9 +33,7 @@ internal class GangLeaderNeedsToOffloadStolenGoodsHideoutRevealPatch
         if (replaced != 1) throw new InvalidOperationException("Stolen goods quest accept hideout reveal changed");
     }
 
-    // The owner's client marks its quest hideout for itself like CapturedByBountyHuntersHideoutRevealPatch,
-    // only this call is allowed so StartQuest in the same accept still publishes QuestAcceptanceStarted.
-    private static void Reveal(Settlement hideout, bool visible)
+    private static void SetVisibleOnOwner(Settlement hideout, bool visible)
     {
         using (ModInformation.IsClient ? new AllowedThread() : null)
         {

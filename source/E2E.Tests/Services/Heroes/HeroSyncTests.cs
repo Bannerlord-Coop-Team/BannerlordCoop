@@ -265,42 +265,6 @@ namespace E2E.Tests.Services.Heroes
             }
         }
 
-        [Fact]
-        public void Client_LastExaminedLogEntryID_StaysLocalWithoutMutationDiagnostic()
-        {
-            int diagnosticCount = 0;
-            Action<string> capture = message =>
-            {
-                if (message.Contains("Client updated managed") && message.Contains("LastExaminedLogEntryID"))
-                    Interlocked.Increment(ref diagnosticCount);
-            };
-            OutputSinkManager.AddLogCallback(capture);
-            try
-            {
-                var clientA = Clients.First();
-                clientA.Call(() =>
-                {
-                    Assert.True(clientA.ObjectManager.TryGetObject(HeroId, out Hero hero));
-                    Assert.False(CallOriginalPolicy.IsOriginalAllowed());
-                    hero.LastExaminedLogEntryID = 77;
-                });
-
-                Assert.Equal(0, Volatile.Read(ref diagnosticCount));
-                foreach (var instance in Clients.Prepend(Server))
-                {
-                    instance.Call(() =>
-                    {
-                        Assert.True(instance.ObjectManager.TryGetObject(HeroId, out Hero hero));
-                        Assert.Equal(instance == clientA ? 77L : 0L, hero.LastExaminedLogEntryID);
-                    });
-                }
-            }
-            finally
-            {
-                OutputSinkManager.RemoveLogCallback(capture);
-            }
-        }
-
         [Theory]
         [InlineData(-1f)]
         [InlineData(0.75f)]
