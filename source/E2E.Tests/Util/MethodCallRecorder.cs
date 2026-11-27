@@ -19,7 +19,7 @@ internal sealed class MethodCallRecorder : IMethodCallRecorder
     private readonly Harmony harmony = new($"test-call-recorder-{Guid.NewGuid()}");
     private readonly bool runOriginal;
     private readonly List<MethodInfo> methods = new();
-    private readonly List<(object? Container, string? MenuId, string? Text)> calls = new();
+    private readonly List<(object? Container, string Method, string? MenuId, string? Text)> calls = new();
 
     public MethodCallRecorder(params MethodInfo[] targets) : this(Priority.Normal, targets) { }
 
@@ -61,6 +61,12 @@ internal sealed class MethodCallRecorder : IMethodCallRecorder
             .Select(call => call.MenuId!)
             .ToArray();
 
+    // Every call the instance made in order, each as its menu id or, without one, its method name.
+    public string[] CallsFor(EnvironmentInstance instance) =>
+        calls.Where(call => ReferenceEquals(call.Container, instance.Container))
+            .Select(call => call.MenuId ?? call.Method)
+            .ToArray();
+
     // The text of every message the instance showed, for targets with a message parameter.
     public string[] TextsFor(EnvironmentInstance instance) =>
         calls.Where(call => ReferenceEquals(call.Container, instance.Container) && call.Text != null)
@@ -91,7 +97,7 @@ internal sealed class MethodCallRecorder : IMethodCallRecorder
         // The container is restored across network calls; ambient game statics are not.
         GameInterface.ContainerProvider.TryGetContainer(out var container);
         var recorder = ActiveRecorders[method];
-        recorder.calls.Add((container, menuId, text));
+        recorder.calls.Add((container, method.Name, menuId, text));
         return recorder.runOriginal;
     }
 }

@@ -6308,13 +6308,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
             using (new AllowedThread())
             {
-                clan._kingdom = kingdom;
-                kingdom._rulingClan ??= clan;
-                kingdom._clans ??= new MBList<Clan>();
-                if (!kingdom._clans.Contains(clan))
-                {
-                    kingdom._clans.Add(clan);
-                }
+                PlaceClanInKingdom(clan, kingdom);
             }
         });
     }
@@ -6366,11 +6360,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
     private void EnsureKingdomRegisteredEverywhere(string kingdomId)
     {
-        EnsureKingdomRegistered(Server, kingdomId);
-        foreach (var client in Clients)
-        {
-            EnsureKingdomRegistered(client, kingdomId);
-        }
+        EnsureKingdomRegistered(Clients.Prepend(Server), kingdomId);
     }
 
     private void AssertKingdomCreatedOnServer(string kingdomId, string clanId, string cultureId, string? fiefId = null)

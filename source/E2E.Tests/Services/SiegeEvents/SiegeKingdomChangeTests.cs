@@ -31,17 +31,25 @@ public class SiegeKingdomChangeTests : SiegeTestBase
     {
     }
 
+    private enum PlayerSiegeRole
+    {
+        Besieger,
+        SoleBesieger,
+        Defender,
+    }
+
     [Fact]
     public void CampedPlayerJoinsKingdomAtPeaceWithDefenders_LeavesTheSiegeWithTheNoLongerEnemiesMenu()
     {
         var client = Clients.First();
         var bystander = Clients.Last();
-        var scenario = SetupSiegeScenario(playerInCamp: true);
+        var scenario = SetupSiegeScenario(PlayerSiegeRole.Besieger);
         ConfigureSiegeMenuClient(client, scenario.PlayerPartyId);
-        // Its own main party takes the bystander's prompt handler past the null check to the party filter.
+        // Gives the bystander a main party so its prompt handler reaches the party id check, otherwise the empty
+        // assert below proves nothing.
         ConfigureSiegeMenuClient(bystander, scenario.LeaderPartyId);
 
-        using var menus = new MenuRecorder();
+        using var menus = RecordMenus();
         JoinKingdomOnServer(scenario.PlayerClanId, scenario.NeutralKingdomId);
 
         foreach (var instance in Clients.Append(Server))
@@ -57,8 +65,33 @@ public class SiegeKingdomChangeTests : SiegeTestBase
             });
         }
 
-        Assert.Equal(new[] { PeaceMenuId }, menus.MenusFor(client));
-        Assert.Empty(menus.MenusFor(bystander));
+        Assert.Equal(new[] { PeaceMenuId }, menus.CallsFor(client));
+        Assert.Empty(menus.CallsFor(bystander));
+        AssertPeaceMenuFaction(client, scenario.DefenderKingdomId);
+    }
+
+    [Fact]
+    public void SoleBesiegerJoinsKingdomAtPeaceWithDefenders_EndsTheSiegeOnTheNoLongerEnemiesMenu()
+    {
+        var client = Clients.First();
+        var scenario = SetupSiegeScenario(PlayerSiegeRole.SoleBesieger);
+        ConfigureSiegeMenuClient(client, scenario.PlayerPartyId);
+
+        using var menus = RecordMenus();
+        JoinKingdomOnServer(scenario.PlayerClanId, scenario.NeutralKingdomId);
+
+        foreach (var instance in Clients.Append(Server))
+        {
+            instance.Call(() =>
+            {
+                Assert.Null(instance.GetRegisteredObject<MobileParty>(scenario.PlayerPartyId).BesiegerCamp);
+                Assert.Null(instance.GetRegisteredObject<Settlement>(scenario.SettlementId).SiegeEvent);
+                Assert.False(instance.ObjectManager.TryGetObject<SiegeEvent>(scenario.SiegeEventId, out _));
+            });
+        }
+
+        // The siege-ended prompt leaves the siege menu first, then the peace prompt opens its menu.
+        Assert.Equal(new[] { nameof(GameMenu.ExitToLast), PeaceMenuId }, menus.CallsFor(client));
         AssertPeaceMenuFaction(client, scenario.DefenderKingdomId);
     }
 
@@ -66,10 +99,10 @@ public class SiegeKingdomChangeTests : SiegeTestBase
     public void DefendingPlayerJoinsTheBesiegers_LeavesTheTownWithTheNoLongerEnemiesMenu()
     {
         var client = Clients.First();
-        var scenario = SetupSiegeScenario(playerInCamp: false);
+        var scenario = SetupSiegeScenario(PlayerSiegeRole.Defender);
         ConfigureSiegeMenuClient(client, scenario.PlayerPartyId);
 
-        using var menus = new MenuRecorder();
+        using var menus = RecordMenus();
         JoinKingdomOnServer(scenario.PlayerClanId, scenario.BesiegerKingdomId);
 
         foreach (var instance in Clients.Append(Server))
@@ -85,9 +118,15 @@ public class SiegeKingdomChangeTests : SiegeTestBase
             });
         }
 
-        Assert.Equal(new[] { PeaceMenuId }, menus.MenusFor(client));
+        Assert.Equal(new[] { PeaceMenuId }, menus.CallsFor(client));
         AssertPeaceMenuFaction(client, scenario.BesiegerKingdomId);
     }
+
+    // Records, without running them, every way the prompts open or leave a menu, in call order.
+    private static MethodCallRecorder RecordMenus() => new(
+        AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu)),
+        AccessTools.Method(typeof(MenuContext), nameof(MenuContext.SwitchToMenu), new[] { typeof(string) }),
+        AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast)));
 
     private void JoinKingdomOnServer(string clanId, string kingdomId)
     {
@@ -105,14 +144,15 @@ public class SiegeKingdomChangeTests : SiegeTestBase
     }
 
     /// <summary>
-    /// The besieger kingdom's lord party besieges a town of the defender kingdom, at war, with the player either
-    /// camped alongside it as a besieger vassal or inside the town as a defender vassal.
+    /// The besieger kingdom's lord party besieges a town of the defender kingdom, at war. The player is a vassal
+    /// camped alongside it, camped alone, or inside the town.
     /// </summary>
-    private SiegeScenario SetupSiegeScenario(bool playerInCamp)
+    private SiegeScenario SetupSiegeScenario(PlayerSiegeRole role)
     {
-        var besiegerKingdomId = CreateKingdomEverywhere();
-        var defenderKingdomId = CreateKingdomEverywhere();
-        var neutralKingdomId = CreateKingdomEverywhere();
+        var instances = Clients.Append(Server).ToArray();
+        var besiegerKingdomId = CreateKingdomEverywhere(instances);
+        var defenderKingdomId = CreateKingdomEverywhere(instances);
+        var neutralKingdomId = CreateKingdomEverywhere(instances);
         var besiegerClanId = TestEnvironment.CreateRegisteredObject<Clan>();
         var ownerClanId = TestEnvironment.CreateRegisteredObject<Clan>();
         var playerClanId = TestEnvironment.CreateRegisteredObject<Clan>();
@@ -120,36 +160,51 @@ public class SiegeKingdomChangeTests : SiegeTestBase
         var leaderPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         var (playerHeroId, playerPartyId) = CreatePlayerHeroParty(PlayerControllerId);
 
-        foreach (var instance in Clients.Append(Server))
+        var playerDefends = role == PlayerSiegeRole.Defender;
+        var playerKingdomId = playerDefends ? defenderKingdomId : besiegerKingdomId;
+        var playerSide = playerDefends ? BattleSideEnum.Defender : BattleSideEnum.Attacker;
+        var campPartyIds = role switch
+        {
+            PlayerSiegeRole.Besieger => new[] { leaderPartyId, playerPartyId },
+            PlayerSiegeRole.SoleBesieger => new[] { playerPartyId },
+            _ => new[] { leaderPartyId },
+        };
+
+        foreach (var instance in instances)
         {
             instance.Call(() =>
             {
                 var besiegers = instance.GetRegisteredObject<Kingdom>(besiegerKingdomId);
-                var defenders = instance.GetRegisteredObject<Kingdom>(defenderKingdomId);
+                var besiegerClan = instance.GetRegisteredObject<Clan>(besiegerClanId);
                 var playerClan = instance.GetRegisteredObject<Clan>(playerClanId);
                 var playerHero = instance.GetRegisteredObject<Hero>(playerHeroId);
                 var playerParty = instance.GetRegisteredObject<MobileParty>(playerPartyId);
 
                 using (new AllowedThread())
                 {
-                    JoinKingdom(instance.GetRegisteredObject<Clan>(besiegerClanId), besiegers);
-                    JoinKingdom(instance.GetRegisteredObject<Clan>(ownerClanId), defenders);
-                    JoinKingdom(playerClan, playerInCamp ? besiegers : defenders);
+                    KingdomTestSetup.PlaceClanInKingdom(besiegerClan, besiegers);
+                    KingdomTestSetup.PlaceClanInKingdom(
+                        instance.GetRegisteredObject<Clan>(ownerClanId),
+                        instance.GetRegisteredObject<Kingdom>(defenderKingdomId));
+                    KingdomTestSetup.PlaceClanInKingdom(playerClan, instance.GetRegisteredObject<Kingdom>(playerKingdomId));
                     playerClan.Name = new TextObject("joiner clan");
                     playerHero.Clan = playerClan;
                     playerClan.SetLeader(playerHero);
                     playerHero.PartyBelongedTo = playerParty;
                     playerParty.ActualClan = playerClan;
-                    instance.GetRegisteredObject<MobileParty>(leaderPartyId).ActualClan =
-                        instance.GetRegisteredObject<Clan>(besiegerClanId);
-                    VillageHostileFactionStanceHelper.ApplyWarStance(besiegers, defenders);
+                    instance.GetRegisteredObject<MobileParty>(leaderPartyId).ActualClan = besiegerClan;
+                    VillageHostileFactionStanceHelper.ApplyWarStance(
+                        besiegers, instance.GetRegisteredObject<Kingdom>(defenderKingdomId));
                 }
             });
         }
 
-        var siege = playerInCamp ? SetupSiege(leaderPartyId, playerPartyId) : SetupSiege(leaderPartyId);
+        var siege = SetupSiege(campPartyIds);
+        string? settlementId = null;
+        Server.Call(() => Assert.True(Server.ObjectManager.TryGetId(
+            Server.GetRegisteredObject<SiegeEvent>(siege.SiegeEventId).BesiegedSettlement, out settlementId)));
 
-        foreach (var instance in Clients.Append(Server))
+        foreach (var instance in instances)
         {
             instance.Call(() =>
             {
@@ -167,7 +222,7 @@ public class SiegeKingdomChangeTests : SiegeTestBase
                     if (!Campaign.Current.SiegeEventManager._siegeEvents.Contains(siegeEvent))
                         Campaign.Current.SiegeEventManager._siegeEvents.Add(siegeEvent);
 
-                    if (!playerInCamp)
+                    if (playerDefends)
                     {
                         playerParty._currentSettlement = settlement;
                         settlement._partiesCache.Add(playerParty);
@@ -181,13 +236,13 @@ public class SiegeKingdomChangeTests : SiegeTestBase
 
                 Assert.True(settlement.IsFortification);
                 Assert.Same(instance.GetRegisteredObject<Kingdom>(defenderKingdomId), settlement.MapFaction);
-                Assert.True(siegeEvent.CanPartyJoinSide(
-                    playerParty.Party, playerInCamp ? BattleSideEnum.Attacker : BattleSideEnum.Defender));
+                Assert.True(siegeEvent.CanPartyJoinSide(playerParty.Party, playerSide));
             });
         }
 
         return new SiegeScenario(
             siege.SiegeEventId,
+            settlementId!,
             besiegerKingdomId,
             defenderKingdomId,
             neutralKingdomId,
@@ -196,45 +251,16 @@ public class SiegeKingdomChangeTests : SiegeTestBase
             leaderPartyId);
     }
 
-    private string CreateKingdomEverywhere()
+    private string CreateKingdomEverywhere(IEnumerable<EnvironmentInstance> instances)
     {
         var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
-        foreach (var instance in Clients.Append(Server))
-        {
-            KingdomTestSetup.EnsureKingdomRegistered(instance, kingdomId);
-        }
-
+        KingdomTestSetup.EnsureKingdomRegistered(instances, kingdomId);
         return kingdomId;
-    }
-
-    private static void JoinKingdom(Clan clan, Kingdom kingdom)
-    {
-        clan._kingdom = kingdom;
-        kingdom._rulingClan ??= clan;
-        if (!kingdom._clans.Contains(clan))
-            kingdom._clans.Add(clan);
-    }
-
-    /// <summary>Records both ways a menu opens, without running them.</summary>
-    private sealed class MenuRecorder : IDisposable
-    {
-        private readonly MethodCallRecorder activated =
-            new(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu)));
-        private readonly MethodCallRecorder switched =
-            new(AccessTools.Method(typeof(MenuContext), nameof(MenuContext.SwitchToMenu), new[] { typeof(string) }));
-
-        public string[] MenusFor(EnvironmentInstance instance) =>
-            activated.MenusFor(instance).Concat(switched.MenusFor(instance)).ToArray();
-
-        public void Dispose()
-        {
-            activated.Dispose();
-            switched.Dispose();
-        }
     }
 
     private readonly record struct SiegeScenario(
         string SiegeEventId,
+        string SettlementId,
         string BesiegerKingdomId,
         string DefenderKingdomId,
         string NeutralKingdomId,

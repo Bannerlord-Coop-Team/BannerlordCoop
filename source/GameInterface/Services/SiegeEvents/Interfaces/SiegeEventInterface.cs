@@ -679,9 +679,8 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
     public void PromptSiegeLeftByDiplomacy(IFaction faction)
     {
         // The menu's text names the faction vanilla's own continuity check would have recorded here.
-        var diplomaticHandler = Campaign.Current.GetCampaignBehavior<PartyDiplomaticHandlerCampaignBehavior>();
-        if (diplomaticHandler != null)
-            diplomaticHandler._lastFactionMadePeaceWithCausedPlayerToLeaveEvent = faction;
+        Campaign.Current.GetCampaignBehavior<PartyDiplomaticHandlerCampaignBehavior>()
+            ._lastFactionMadePeaceWithCausedPlayerToLeaveEvent = faction;
 
         using (new AllowedThread())
         {

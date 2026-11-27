@@ -46,9 +46,9 @@ internal class SiegeDiplomaticLeavePatches
             .Select(party => party.MobileParty)
             .ToArray();
         var failedDefenders = settlement.Parties
-            .Where(party => party.Party.IsPlayerParty() &&
-                settlement.MapFaction != party.MapFaction &&
-                !siegeEvent.CanPartyJoinSide(party.Party, BattleSideEnum.Defender))
+            .Where(defender => defender.Party.IsPlayerParty() &&
+                settlement.MapFaction != defender.MapFaction &&
+                !siegeEvent.CanPartyJoinSide(defender.Party, BattleSideEnum.Defender))
             .ToArray();
 
         __state = new PlayerSiegeParties(failedBesiegers, failedDefenders);
@@ -61,14 +61,18 @@ internal class SiegeDiplomaticLeavePatches
         if (__state == null) return;
 
         var settlement = siegeEvent.BesiegedSettlement;
-        foreach (var party in __state.Besiegers.Where(party => party.BesiegerCamp != siegeEvent.BesiegerCamp))
+        foreach (var party in __state.Besiegers)
         {
+            if (party.BesiegerCamp == siegeEvent.BesiegerCamp) continue;
+
             MessageBroker.Instance.Publish(party, new PartyLeftSiegeByDiplomacy(party, settlement.MapFaction));
         }
 
-        // Vanilla only evicts settlement parties while besiegers remain, and names the camp leader's faction.
-        foreach (var party in __state.Defenders.Where(party => party.CurrentSettlement != settlement))
+        foreach (var party in __state.Defenders)
         {
+            // Vanilla only evicts settlement parties while besiegers remain, and names the camp leader's faction.
+            if (party.CurrentSettlement == settlement) continue;
+
             MessageBroker.Instance.Publish(party,
                 new PartyLeftSiegeByDiplomacy(party, siegeEvent.BesiegerCamp.LeaderParty.MapFaction));
         }
