@@ -575,7 +575,7 @@ public sealed class HideoutMissionRuntimeTests : MissionTestEnvironment
                 mission.MainAgent = hero;
                 AttachHideoutLogic(logic, mission, Mock.Of<IBattleSession>(value => value.IsLocalHost));
                 var areaLogic = new CoopHideoutStealthAreaLogic();
-                AccessTools.Property(typeof(MissionBehavior), nameof(MissionBehavior.Mission)).SetValue(areaLogic, mission.Shell);
+                areaLogic.Mission = mission.Shell;
                 mission.Shell.MissionBehaviors.Add(areaLogic);
                 // native OnObjectUsed completes the objective and awards the ghost-clear skill, neither of which the harness has
                 native._missionObjectiveLogic = new MissionObjectiveLogic();
