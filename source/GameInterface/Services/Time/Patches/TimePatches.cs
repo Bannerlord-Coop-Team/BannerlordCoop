@@ -214,7 +214,7 @@ internal class AllowTimeControlFromMapClickPatches
 
     [HarmonyPatch(nameof(MapScreen.HandleMouse))]
     [HarmonyTranspiler]
-    private static IEnumerable<CodeInstruction> HandleMouseTranspiler(IEnumerable<CodeInstruction> instructions)
+    internal static IEnumerable<CodeInstruction> HandleMouseTranspiler(IEnumerable<CodeInstruction> instructions)
     {
         var setTimeControlMode = AccessTools.PropertySetter(typeof(Campaign), nameof(Campaign.TimeControlMode));
         var setFromMapClick = AccessTools.Method(typeof(AllowTimeControlFromMapClickPatches), nameof(SetTimeControlModeFromMapClick));
@@ -236,7 +236,7 @@ internal class AllowTimeControlFromMapClickPatches
             Logger.Warning("{Patch} made no replacements; the target method may have changed", nameof(HandleMouseTranspiler));
     }
 
-    private static void SetTimeControlModeFromMapClick(Campaign campaign, CampaignTimeControlMode mode)
+    internal static void SetTimeControlModeFromMapClick(Campaign campaign, CampaignTimeControlMode mode)
     {
         using (AllowMapClickTimeChange())
         {
