@@ -142,8 +142,8 @@ public class PlayerPartyRestorerTests
             () => new[] { party },
             _ => throw new InvalidOperationException("A live owned party should be reused"),
             _ => throw new InvalidOperationException("A reused party should not be removed"),
-            _ => false,
-            _ => { });
+            isWaitingForDisband: _ => false,
+            cancelDisband: _ => { });
 
         Assert.True(restorer.TryRestore(player, out var restored));
 
@@ -211,8 +211,8 @@ public class PlayerPartyRestorerTests
                 return party;
             },
             _ => throw new InvalidOperationException("A registered recovery party should not be removed"),
-            _ => false,
-            _ => { });
+            isWaitingForDisband: _ => false,
+            cancelDisband: _ => { });
 
         Assert.True(restorer.TryRestore(player, out var restored));
 
@@ -253,8 +253,8 @@ public class PlayerPartyRestorerTests
                 Assert.Same(party, removedRecoveryParty);
                 registrationOrder.Add("cleanup");
             },
-            _ => false,
-            _ => { });
+            isWaitingForDisband: _ => false,
+            cancelDisband: _ => { });
 
         Assert.False(restorer.TryRestore(player, out var restored));
 
@@ -294,8 +294,8 @@ public class PlayerPartyRestorerTests
                 Assert.Same(party, removedRecoveryParty);
                 registrationOrder.Add("cleanup");
             },
-            _ => false,
-            _ => { });
+            isWaitingForDisband: _ => false,
+            cancelDisband: _ => { });
 
         Assert.False(restorer.TryRestore(player, out var restored));
 
@@ -330,8 +330,8 @@ public class PlayerPartyRestorerTests
                 cleanupCalled = true;
                 throw new InvalidOperationException("Cleanup failed");
             },
-            _ => false,
-            _ => { });
+            isWaitingForDisband: _ => false,
+            cancelDisband: _ => { });
 
         Assert.False(restorer.TryRestore(player, out var restored));
 
@@ -355,8 +355,8 @@ public class PlayerPartyRestorerTests
             () => Array.Empty<MobileParty>(),
             _ => throw new InvalidOperationException("The saved party should be reused"),
             _ => throw new InvalidOperationException("The saved party should not be removed"),
-            _ => false,
-            _ => { });
+            isWaitingForDisband: _ => false,
+            cancelDisband: _ => { });
 
         Assert.True(restorer.TryRestore(player, out _));
         Assert.Same(party, party.PartyComponent.MobileParty);
@@ -377,8 +377,8 @@ public class PlayerPartyRestorerTests
             () => new[] { party },
             _ => null,
             _ => throw new InvalidOperationException("No recovery party was created"),
-            _ => false,
-            _ => { });
+            isWaitingForDisband: _ => false,
+            cancelDisband: _ => { });
 
         Assert.False(restorer.TryRestore(player, out _));
     }
@@ -418,8 +418,8 @@ public class PlayerPartyRestorerTests
                 return null;
             },
             _ => throw new InvalidOperationException("No recovery party was created"),
-            _ => false,
-            _ => { });
+            isWaitingForDisband: _ => false,
+            cancelDisband: _ => { });
 
         Assert.False(restorer.TryRestore(player, out _));
         Assert.True(createCalled);

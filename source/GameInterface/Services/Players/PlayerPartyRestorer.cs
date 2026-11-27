@@ -215,7 +215,7 @@ internal class PlayerPartyRestorer : IPlayerPartyRestorer
 
         // A disband started before DisbandPartyActionPatches guarded player parties is saved with the party,
         // and native disbanding strips it again after load.
-        CancelDisband(party);
+        CancelPendingDisband(party);
 
         if (hero.IsPrisoner || hero.PartyBelongedToAsPrisoner != null)
         {
@@ -251,7 +251,7 @@ internal class PlayerPartyRestorer : IPlayerPartyRestorer
             hero.Clan.OnLordAdded(hero);
     }
 
-    private void CancelDisband(MobileParty party)
+    private void CancelPendingDisband(MobileParty party)
     {
         if (!party.IsDisbanding && !isWaitingForDisband(party)) return;
 
