@@ -9,10 +9,8 @@ using LiteNetLib;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using Xunit.Abstractions;
-using GameInterface.Tests.Utils;
 
 namespace E2E.Tests.Services.MapEvents;
 
@@ -134,19 +132,6 @@ public class SiegeDefenseSideTests : MapEventTestBase
                 Assert.Null(mapEvent.FindMapEventParty(party.Party));
             });
         }
-    }
-
-    private MapEventContext CreateSiegeMapEvent(MapEvent.BattleTypes battleType)
-    {
-        var battle = CreateServerMapEvent();
-        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
-        // Native siege reinforcement recalculates settlement advantage.
-        Server.Call(() => Get<MapEvent>(Server, battle.MapEventId).SetMapEventSettlement(
-            Get<Settlement>(Server, settlementId)));
-        // Keep native scene setup outside this test; exercise the replicated siege join graph.
-        foreach (var instance in Clients.Append(Server))
-            instance.Call(() => Get<MapEvent>(instance, battle.MapEventId).SetBattleType(battleType));
-        return battle;
     }
 
     private static void AssertMembership(EnvironmentInstance instance, string mapEventId,

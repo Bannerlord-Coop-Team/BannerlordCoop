@@ -7,6 +7,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 
@@ -17,6 +19,12 @@ public interface IPlayerPartyRestorer
     bool TryRestore(Player player, out Player restoredPlayer);
     void RestoreClanMembership(Hero hero);
     void Restore(Hero hero, MobileParty party);
+
+    /// <summary>
+    /// Cancels a disband the party is waiting on or already running. A player party never disbands, but one
+    /// started before <c>DisbandPartyActionPatches</c> blocked it is saved with the party and strips it again.
+    /// </summary>
+    void CancelDisband(MobileParty party);
 }
 
 internal class PlayerPartyRestorer : IPlayerPartyRestorer
@@ -203,6 +211,7 @@ internal class PlayerPartyRestorer : IPlayerPartyRestorer
     {
         // Transferred root references can be missing from clan, roster, and party-component state.
         RestoreClanMembership(hero);
+        CancelDisband(party);
 
         if (hero.IsPrisoner || hero.PartyBelongedToAsPrisoner != null)
         {
@@ -236,6 +245,16 @@ internal class PlayerPartyRestorer : IPlayerPartyRestorer
     {
         if (!hero.Clan.Heroes.Contains(hero))
             hero.Clan.OnLordAdded(hero);
+    }
+
+    public void CancelDisband(MobileParty party)
+    {
+        // Test campaigns run without a behavior manager
+        var disbandBehavior = Campaign.Current.CampaignBehaviorManager?.GetBehavior<IDisbandPartyCampaignBehavior>();
+        if (!party.IsDisbanding && disbandBehavior?.IsPartyWaitingForDisband(party) != true) return;
+
+        Logger.Warning("Cancelling the disband of player party {PartyId}", party.StringId);
+        DisbandPartyAction.CancelDisband(party);
     }
 
     private static bool IsReadyPlayerParty(MobileParty party, Hero hero)

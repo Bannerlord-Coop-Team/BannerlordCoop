@@ -130,7 +130,8 @@ public class SettlementSneakInTests
                 messageBroker,
                 playerManager.Object,
                 conversationPartyTracker,
-                Mock.Of<IPartyVisualInterface>());
+                Mock.Of<IPartyVisualInterface>(),
+                Mock.Of<IPlayerPartyRestorer>());
 
             using (ContainerProvider.UseContainerThreadSafe(container))
             {

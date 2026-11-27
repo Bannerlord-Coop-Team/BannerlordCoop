@@ -721,16 +721,4 @@ public class BattleSurrenderTests : MapEventTestBase
             Assert.Equal(expected, captor.PrisonRoster.GetElementNumber(troop));
         });
     }
-
-    private IReadOnlyList<MethodBase> BattleMenuSurrenderDisabledMethods()
-        => MapEventDisabledMethods
-            .Append(AccessTools.Method(typeof(DefaultBattleRewardModel), nameof(DefaultBattleRewardModel.GetCaptureMemberChancesForWinnerParties)))
-            .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyCasualties"))
-            .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyItems"))
-            .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyPrisoners"))
-            .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyShips"))
-            .Append(AccessTools.Method(typeof(MapEvent), "CalculateMapEventResults"))
-            .Append(AccessTools.Method(typeof(MapEvent), "CommitCalculatedMapEventResults"))
-            .Append(AccessTools.Method(typeof(MapEvent), "MovePartyToSuitablePositionOnMapEventFinalize"))
-            .ToList();
 }

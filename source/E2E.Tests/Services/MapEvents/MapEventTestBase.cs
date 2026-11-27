@@ -14,6 +14,7 @@ using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.TroopRosters.Data;
 using GameInterface.Services.TroopRosters.Interfaces;
+using GameInterface.Tests.Utils;
 using HarmonyLib;
 using LiteNetLib;
 using Helpers;
@@ -140,6 +141,22 @@ public abstract class MapEventTestBase : IDisposable
             attackerPartyId,
             defenderPartyId
         );
+    }
+
+    /// <summary>
+    /// Creates a <see cref="CreateServerMapEvent"/> battle fought over a settlement with the given siege battle type.
+    /// </summary>
+    protected MapEventContext CreateSiegeMapEvent(MapEvent.BattleTypes battleType)
+    {
+        var battle = CreateServerMapEvent();
+        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        // Native siege reinforcement recalculates settlement advantage.
+        Server.Call(() => Server.GetRegisteredObject<MapEvent>(battle.MapEventId).SetMapEventSettlement(
+            Server.GetRegisteredObject<Settlement>(settlementId)));
+        // Keep native scene setup outside the tests; exercise the replicated siege battle graph.
+        foreach (var instance in Clients.Append(Server))
+            instance.Call(() => instance.GetRegisteredObject<MapEvent>(battle.MapEventId).SetBattleType(battleType));
+        return battle;
     }
 
     /// <summary>
@@ -381,14 +398,15 @@ public abstract class MapEventTestBase : IDisposable
     /// <summary>
     /// Registers an already-synced hero/party pair as a player in every instance's player registry.
     /// </summary>
-    protected void RegisterAsPlayerParty(string controllerId, string heroId, string partyId)
+    protected void RegisterAsPlayerParty(string controllerId, string heroId, string partyId,
+        string clanId = "MyClanId", string characterObjectId = "MyCharacterObjectId")
     {
         void Register(EnvironmentInstance instance)
         {
             instance.Call(() =>
             {
                 var registry = instance.Resolve<IPlayerManager>();
-                registry.AddPlayer(new Player(controllerId, heroId, partyId, "MyClanId", "MyCharacterObjectId"));
+                registry.AddPlayer(new Player(controllerId, heroId, partyId, clanId, characterObjectId));
 
                 Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
                 Assert.True(registry.TryGetPlayer(controllerId, out var _));
@@ -581,6 +599,22 @@ public abstract class MapEventTestBase : IDisposable
             clientMapEvent.BattleState = BattleState.AttackerVictory;
         }, disabledMethods);
     }
+
+    /// <summary>
+    /// Methods a surrender's battle resolution reaches that need a live campaign world: the capture-chance
+    /// model, the loot and result commit steps, and the finalize-time party move.
+    /// </summary>
+    protected IReadOnlyList<MethodBase> BattleMenuSurrenderDisabledMethods()
+        => MapEventDisabledMethods
+            .Append(AccessTools.Method(typeof(DefaultBattleRewardModel), nameof(DefaultBattleRewardModel.GetCaptureMemberChancesForWinnerParties)))
+            .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyCasualties"))
+            .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyItems"))
+            .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyPrisoners"))
+            .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyShips"))
+            .Append(AccessTools.Method(typeof(MapEvent), "CalculateMapEventResults"))
+            .Append(AccessTools.Method(typeof(MapEvent), "CommitCalculatedMapEventResults"))
+            .Append(AccessTools.Method(typeof(MapEvent), "MovePartyToSuitablePositionOnMapEventFinalize"))
+            .ToList();
 
     /// <summary>
     /// Simulates one or more ALLIED players losing a battle to <paramref name="captorPartyId"/> through the

@@ -61,6 +61,7 @@ internal class PlayerCaptivityServerHandler : IHandler
     private readonly IPlayerManager playerManager;
     private readonly ConversationPartyTracker conversationPartyTracker;
     private readonly IPartyVisualInterface partyVisuals;
+    private readonly IPlayerPartyRestorer playerPartyRestorer;
     private readonly Dictionary<Hero, Hero> pendingExecutions = new();
 
     public PlayerCaptivityServerHandler(
@@ -69,7 +70,8 @@ internal class PlayerCaptivityServerHandler : IHandler
         IMessageBroker messageBroker,
         IPlayerManager playerManager,
         ConversationPartyTracker conversationPartyTracker,
-        IPartyVisualInterface partyVisuals)
+        IPartyVisualInterface partyVisuals,
+        IPlayerPartyRestorer playerPartyRestorer)
     {
         this.objectManager = objectManager;
         this.network = network;
@@ -77,6 +79,7 @@ internal class PlayerCaptivityServerHandler : IHandler
         this.playerManager = playerManager;
         this.conversationPartyTracker = conversationPartyTracker;
         this.partyVisuals = partyVisuals;
+        this.playerPartyRestorer = playerPartyRestorer;
 
         // ModInformation is evaluated per call (tests flip it per instance), so each handler
         // guards itself instead of gating the subscriptions here.
@@ -652,6 +655,8 @@ internal class PlayerCaptivityServerHandler : IHandler
                     CampaignTime.HoursFromNow(12));
             }
             playerParty.Party.SetAsCameraFollowParty();
+            // Otherwise a disband the party carries strips the restored roster and leader within the hour
+            playerPartyRestorer.CancelDisband(playerParty);
             playerParty.SetMoveModeHold();
             // SetMoveModeHold only resets the AI behavior, not the navigation mode, so the freed party
             // would keep whatever Party-mode target it had at capture (its old captor, or a party that
