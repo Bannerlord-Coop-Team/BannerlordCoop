@@ -17,9 +17,33 @@ internal class EncounterGameMenuBehaviorPatches
     [HarmonyPrefix]
     private static bool UpdateVillageHostileActionEncounterPrefix()
     {
+        if (ModInformation.IsServer) return true;
+
+        // A join waiting on the server leaves PlayerSide None. Vanilla only acts for the attacker and throws reading side None.
+        if (PartyBase.MainParty.MapEventSide == null) return false;
+
         var battle = PlayerEncounter.Battle;
         // The owner waits for authoritative surrender instead of detaching defenders from its replica.
-        return ModInformation.IsServer || !battle.IsRaidHostileAction() || battle.DefenderSide.TroopCount == 0;
+        return !battle.IsRaidHostileAction() || battle.DefenderSide.TroopCount == 0;
+    }
+
+    // Vanilla Leave counts the men on side None and throws. The attach refresh enables it again once the server answers.
+    [HarmonyPatch(nameof(EncounterGameMenuBehavior.game_menu_encounter_leave_on_condition))]
+    [HarmonyPostfix]
+    private static void DisableLeaveWhileJoinPendingPostfix(MenuCallbackArgs args)
+    {
+        if (args != null && IsVillageJoinPending()) args.IsEnabled = false;
+    }
+
+    // A click that was already queued before the option got disabled.
+    [HarmonyPatch(nameof(EncounterGameMenuBehavior.game_menu_encounter_leave_on_consequence))]
+    [HarmonyPrefix]
+    [HarmonyPriority(Priority.First)]
+    private static bool BlockLeaveWhileJoinPendingPrefix() => !IsVillageJoinPending();
+
+    private static bool IsVillageJoinPending()
+    {
+        return !ModInformation.IsServer && PartyBase.MainParty?.MapEventSide == null && PlayerEncounter.Battle.IsVillageHostileAction();
     }
 
     [HarmonyPatch(nameof(EncounterGameMenuBehavior.game_menu_village_raid_no_resist_on_consequence))]
