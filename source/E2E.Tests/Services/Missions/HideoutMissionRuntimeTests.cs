@@ -577,6 +577,7 @@ public sealed class HideoutMissionRuntimeTests : MissionTestEnvironment
                 var areaLogic = new CoopHideoutStealthAreaLogic();
                 AccessTools.Property(typeof(MissionBehavior), nameof(MissionBehavior.Mission)).SetValue(areaLogic, mission.Shell);
                 mission.Shell.MissionBehaviors.Add(areaLogic);
+                // native OnObjectUsed completes the objective and awards the ghost-clear skill, neither of which the harness has
                 native._missionObjectiveLogic = new MissionObjectiveLogic();
                 native._isClearedAsGhost = false;
                 mission.Shell._missionMode = MissionMode.Stealth;
@@ -605,12 +606,12 @@ public sealed class HideoutMissionRuntimeTests : MissionTestEnvironment
         finally { harmony.UnpatchAll(harmony.Id); }
     }
 
-    private static StealthAreaMissionLogic.StealthAreaData SignalFireArea(StealthAreaUsePoint fire, StealthAreaMarker marker, Agent sentry)
+    internal static StealthAreaMissionLogic.StealthAreaData SignalFireArea(StealthAreaUsePoint fire, StealthAreaMarker marker, params Agent[] sentries)
     {
         var area = ObjectHelper.SkipConstructor<StealthAreaMissionLogic.StealthAreaData>();
         AccessTools.Field(typeof(StealthAreaMissionLogic.StealthAreaData), nameof(area.StealthAreaUsePoint)).SetValue(area, fire);
         AccessTools.Field(typeof(StealthAreaMissionLogic.StealthAreaData), nameof(area.StealthAreaMarkers))
-            .SetValue(area, new Dictionary<StealthAreaMarker, List<Agent>> { [marker] = new() { sentry } });
+            .SetValue(area, new Dictionary<StealthAreaMarker, List<Agent>> { [marker] = sentries.ToList() });
         return area;
     }
 
@@ -834,12 +835,10 @@ public sealed class HideoutMissionLogicTests
         HideoutMissionRuntimeTests.RunWithSceneShims(() =>
         {
             var areaLogic = new CoopHideoutStealthAreaLogic();
-            var area = ObjectHelper.SkipConstructor<StealthAreaMissionLogic.StealthAreaData>();
             var marker = ObjectHelper.SkipConstructor<StealthAreaMarker>();
             var killed = ObjectHelper.SkipConstructor<Agent>();
             var surviving = ObjectHelper.SkipConstructor<Agent>();
-            AccessTools.Field(typeof(StealthAreaMissionLogic.StealthAreaData), nameof(area.StealthAreaMarkers))
-                .SetValue(area, new Dictionary<StealthAreaMarker, List<Agent>> { [marker] = new() { killed, surviving } });
+            var area = HideoutMissionRuntimeTests.SignalFireArea(null, marker, killed, surviving);
             areaLogic._stealthAreaData.Add(area);
             areaLogic.OnAgentRemoved(killed, null, AgentState.Killed, default);
             Assert.Equal(new[] { surviving }, area.StealthAreaMarkers[marker]);
