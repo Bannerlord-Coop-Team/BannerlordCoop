@@ -3,6 +3,7 @@ using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Armies.Messages;
 using GameInterface.Services.Armies.Patches;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Armies;
@@ -13,11 +14,15 @@ public interface IArmyLeaver
     /// Takes this client's own party out of its army, if it is in one. Client side.
     /// </summary>
     void Leave(MobileParty party);
+
+    /// <summary>
+    /// Takes a party out of its army and replicates the removal to clients. Server side.
+    /// </summary>
+    void Remove(MobileParty party, Army army);
 }
 
 /// <summary>
-/// A client's own army leave: asks the server for it and applies it locally ahead of the server's echo,
-/// because <see cref="ArmyPatches"/> drops a client's native <see cref="MobileParty.Army"/> write without publishing it.
+/// Takes a party out of its army, as a client's own leave or as a server-side removal replicated to clients.
 /// </summary>
 internal sealed class ArmyLeaver : IArmyLeaver
 {
@@ -33,6 +38,7 @@ internal sealed class ArmyLeaver : IArmyLeaver
         var army = party.Army;
         if (army == null) return;
 
+        // Applied ahead of the server's echo, because ArmyPatches drops a client's native Army write without publishing it
         messageBroker.Publish(army, new MobilePartyInArmyRemoved(army, party, clientMobileParty: party));
         GameThread.RunSafe(() =>
         {
@@ -41,5 +47,12 @@ internal sealed class ArmyLeaver : IArmyLeaver
                 ArmyPatches.RemoveMobilePartyInArmyImmediate(party, army, clientMobileParty: party);
             }
         });
+    }
+
+    public void Remove(MobileParty party, Army army)
+    {
+        // RemoveMobilePartyInArmy edits army._parties directly, so OnRemovePartyInternalPrefix never publishes this
+        messageBroker.Publish(party, new MobilePartyInArmyRemoved(army, party, clientMobileParty: null));
+        ArmyPatches.RemoveMobilePartyInArmy(party, army, clientMobileParty: null);
     }
 }
