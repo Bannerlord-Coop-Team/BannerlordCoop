@@ -43,7 +43,8 @@ public class ConnectionContext
         IJoinCampaignBaselineSender joinCampaignBaselineSender,
         IJoinCampaignKingdomBaseLineSender joinCampaignKingdomBaseLineSender,
         IJoinValidationDenialLog joinValidationDenialLog,
-        ILootShipHold lootShipHold)
+        ILootShipHold lootShipHold,
+        INetworkConfig networkConfig)
     {
         MessageBroker = messageBroker;
         Network = network;
@@ -67,6 +68,7 @@ public class ConnectionContext
         JoinCampaignKingdomBaseLineSender = joinCampaignKingdomBaseLineSender;
         JoinValidationDenialLog = joinValidationDenialLog;
         LootShipHold = lootShipHold;
+        NetworkConfig = networkConfig;
     }
 
     public IMessageBroker MessageBroker { get; }
@@ -91,4 +93,5 @@ public class ConnectionContext
     public IJoinCampaignKingdomBaseLineSender JoinCampaignKingdomBaseLineSender { get; }
     public IJoinValidationDenialLog JoinValidationDenialLog { get; }
     public ILootShipHold LootShipHold { get; }
+    public INetworkConfig NetworkConfig { get; }
 }

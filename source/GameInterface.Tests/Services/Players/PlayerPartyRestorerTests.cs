@@ -161,9 +161,37 @@ public class PlayerPartyRestorerTests
 
         Assert.Equal(registered.HeroId, restored.HeroId);
         Assert.Equal(registered.MobilePartyId, restored.MobilePartyId);
+        Assert.Equal(registered.ClanId, restored.OriginalClanId);
         Assert.Equal("Saved name", restored.PlatformName);
         Assert.Equal(40f, restored.CrimeRatings["Kingdom_empire_s"]);
         Assert.Equal(new[] { "TrackedController" }, restored.MapTrackedControllerIds);
+    }
+
+    [Theory]
+    // A dead hero waiting for heir selection keeps a party vanilla handed to a companion, but not one another saved
+    // player's hero owns now, whichever id the row spells. A living hero keeps only a party it owns.
+    [InlineData(false, "Hero", "MobileParty_Saved", true)]
+    [InlineData(false, "Companion", "MobileParty_Saved", false)]
+    [InlineData(true, "Hero", "MobileParty_Saved", true)]
+    [InlineData(true, "Companion", "MobileParty_Saved", true)]
+    [InlineData(true, "OtherPlayer", "MobileParty_Saved", false)]
+    [InlineData(true, "OtherPlayer", "Saved", false)]
+    public void TryGetOwnedParty_PartyOwner_DecidesWhetherTheRowKeepsIt(bool heroIsDead, string owner, string rowPartyId, bool expected)
+    {
+        var (hero, party, _, _) = CreatePlayerGraph();
+        if (heroIsDead) hero._heroState = Hero.CharacterStates.Dead;
+        var otherPlayerHero = (Hero)FormatterServices.GetUninitializedObject(typeof(Hero));
+        var companion = (Hero)FormatterServices.GetUninitializedObject(typeof(Hero));
+        var ownerComponent = new LordPartyComponent(owner switch { "Hero" => hero, "OtherPlayer" => otherPlayerHero, _ => companion }, null, null);
+        ownerComponent.MobileParty = party;
+        party._partyComponent = ownerComponent;
+        var registered = new Player("Controller", "Hero_Saved", "MobileParty_Saved", "Clan_Saved", "Character_Saved");
+        var objectManager = CreateRegisteredPlayerObjectManager(registered, hero);
+        Assert.True(objectManager.AddExisting(registered.MobilePartyId, party));
+        var player = new Player(registered.ControllerId, registered.HeroId, rowPartyId, registered.ClanId, registered.CharacterObjectId);
+        var restorer = new PlayerPartyRestorer(objectManager, Mock.Of<IAutoRegistryFactory>());
+
+        Assert.Equal(expected, restorer.TryGetOwnedParty(player, new[] { hero, otherPlayerHero }, out _));
     }
 
     [Fact]

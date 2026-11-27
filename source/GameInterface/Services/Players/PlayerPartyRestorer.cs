@@ -15,6 +15,13 @@ namespace GameInterface.Services.Players;
 public interface IPlayerPartyRestorer
 {
     bool TryRestore(Player player, out Player restoredPlayer);
+
+    /// <summary>
+    /// Resolves the party a saved row names if the campaign still gives it to that row: its hero owns it, or its hero
+    /// is dead and waiting for heir selection, and none of <paramref name="playerHeroes"/> owns the party now.
+    /// </summary>
+    bool TryGetOwnedParty(Player player, IReadOnlyCollection<Hero> playerHeroes, out MobileParty party);
+
     void RestoreClanMembership(Hero hero);
     void Restore(Hero hero, MobileParty party);
 }
@@ -65,20 +72,7 @@ internal class PlayerPartyRestorer : IPlayerPartyRestorer
             // Heir selection compares the heir's party id with this one, so it has to be the registered id too
             if (!objectManager.TryGetIdWithLogging(deadHeroParty, out var deadHeroPartyId)) return false;
 
-            if (heroId != player.HeroId || deadHeroPartyId != player.MobilePartyId)
-                restoredPlayer = new Player(
-                    player.ControllerId,
-                    heroId,
-                    deadHeroPartyId,
-                    player.ClanId,
-                    player.CharacterObjectId,
-                    player.OriginalClanId)
-                {
-                    PlatformName = player.PlatformName,
-                    CrimeRatings = player.CrimeRatings,
-                    MapTrackedControllerIds = player.MapTrackedControllerIds
-                };
-
+            restoredPlayer = WithRegisteredIds(player, heroId, deadHeroPartyId, player.ClanId, player.CharacterObjectId);
             return true;
         }
 
@@ -146,26 +140,39 @@ internal class PlayerPartyRestorer : IPlayerPartyRestorer
 
         Restore(hero, party);
 
-        if (heroId != player.HeroId ||
-            partyId != player.MobilePartyId ||
-            clanId != player.ClanId ||
-            characterObjectId != player.CharacterObjectId)
-        {
-            restoredPlayer = new Player(
-                player.ControllerId,
-                heroId,
-                partyId,
-                clanId,
-                characterObjectId,
-                player.OriginalClanId ?? player.ClanId)
-            {
-                PlatformName = player.PlatformName,
-                CrimeRatings = player.CrimeRatings,
-                MapTrackedControllerIds = player.MapTrackedControllerIds
-            };
-        }
-
+        restoredPlayer = WithRegisteredIds(player, heroId, partyId, clanId, characterObjectId);
         return true;
+    }
+
+    /// <inheritdoc/>
+    public bool TryGetOwnedParty(Player player, IReadOnlyCollection<Hero> playerHeroes, out MobileParty party)
+    {
+        if (!objectManager.TryGetObject(player.MobilePartyId, out party) ||
+            !objectManager.TryGetObject(player.HeroId, out Hero hero))
+            return false;
+
+        // Vanilla hands a dead hero's party to another hero in it, so the dead hero keeps it until another player owns it
+        var owner = party.Owner;
+        var heirSelectionPending = hero.IsDead && !playerHeroes.Any(playerHero => ReferenceEquals(playerHero, owner));
+        return ReferenceEquals(owner, hero) || heirSelectionPending;
+    }
+
+    // The saved row itself when its ids are already the registered ones, otherwise a copy with them that keeps the
+    // row's original clan and the fields that aren't campaign objects
+    private static Player WithRegisteredIds(Player player, string heroId, string partyId, string clanId, string characterObjectId)
+    {
+        if (heroId == player.HeroId &&
+            partyId == player.MobilePartyId &&
+            clanId == player.ClanId &&
+            characterObjectId == player.CharacterObjectId)
+            return player;
+
+        return new Player(player.ControllerId, heroId, partyId, clanId, characterObjectId, player.OriginalClanId ?? player.ClanId)
+        {
+            PlatformName = player.PlatformName,
+            CrimeRatings = player.CrimeRatings,
+            MapTrackedControllerIds = player.MapTrackedControllerIds
+        };
     }
 
     private bool TryRegisterRecoveryParty(Player player, MobileParty party, out string partyId)

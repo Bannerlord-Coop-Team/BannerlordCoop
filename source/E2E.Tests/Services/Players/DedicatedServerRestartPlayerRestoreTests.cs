@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using Common.Network;
 using Common.Network.Messages;
 using Common.Util;
 using Coop.Core.Server.Connections;
@@ -174,7 +175,7 @@ public class DedicatedServerRestartPlayerRestoreTests : IDisposable
         var rejoined = environment.Clients.Last();
 
         ConnectReturningClient(server, crashed);
-        crashed.NetPeer.SetTimeSinceLastPacket(10_000);
+        crashed.NetPeer.SetTimeSinceLastPacket((float)server.Resolve<INetworkConfig>().RejoinSilenceTimeout.TotalMilliseconds * 2);
         ConnectReturningClient(server, rejoined);
 
         var validated = Assert.Single(server.NetworkSentImmediateMessages.GetMessages<NetworkClientValidated>());

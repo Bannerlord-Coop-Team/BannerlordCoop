@@ -9,6 +9,7 @@ using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using LiteNetLib;
 using Serilog;
 using System;
@@ -28,9 +29,6 @@ public class ResolveCharacterState : ConnectionStateBase
 {
     private static readonly ILogger Logger = LogManager.GetLogger<ResolveCharacterState>();
 
-    // LiteNetLib pings every NetworkConfig.PingInterval off the game thread, so a live client is never this quiet.
-    private const float LivePeerSilenceMs = 5000f;
-
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IModuleValidator moduleValidator;
@@ -42,6 +40,7 @@ public class ResolveCharacterState : ConnectionStateBase
     private readonly IExistingPlayerSender existingPlayerSender;
     private readonly ISteamBanList steamBanList;
     private readonly IJoinValidationDenialLog denialLog;
+    private readonly INetworkConfig networkConfig;
 
     // Refused validations on this connection; only the first is logged.
     private int denials;
@@ -57,7 +56,8 @@ public class ResolveCharacterState : ConnectionStateBase
         IModuleNameProvider moduleNameProvider,
         IExistingPlayerSender existingPlayerSender,
         ISteamBanList steamBanList,
-        IJoinValidationDenialLog denialLog)
+        IJoinValidationDenialLog denialLog,
+        INetworkConfig networkConfig)
         : base(connectionLogic)
     {
         this.messageBroker = messageBroker;
@@ -71,6 +71,7 @@ public class ResolveCharacterState : ConnectionStateBase
         this.existingPlayerSender = existingPlayerSender;
         this.steamBanList = steamBanList;
         this.denialLog = denialLog;
+        this.networkConfig = networkConfig;
 
         messageBroker.Subscribe<NetworkClientValidate>(Handle_ClientValidate);
         messageBroker.Subscribe<NetworkModuleVersionsValidate>(Handle_ModuleVersionsValidate);
@@ -221,25 +222,7 @@ public class ResolveCharacterState : ConnectionStateBase
     {
         if (playerManager.TryGetPlayer(controllerId, out var player))
         {
-            // One connection per player. A quiet old connection is this player back from a crash, so
-            // drop it and let its disconnect cleanup run; one still talking keeps playing instead.
-            if (playerManager.TryGetPeer(controllerId, out var previousPeer) &&
-                previousPeer.ConnectionState == ConnectionState.Connected)
-            {
-                if (previousPeer.TimeSinceLastPacket < LivePeerSilenceMs)
-                {
-                    Logger.Warning(
-                        "Hero {HeroId} is still played from peer {PreviousPeer}; refusing the second connection from peer {Peer}",
-                        player.HeroId, previousPeer.Id, peer.Id);
-                    peer.Disconnect();
-                    return;
-                }
-
-                Logger.Warning(
-                    "Hero {HeroId} rejoined from peer {Peer}; dropping its silent old connection, peer {PreviousPeer}",
-                    player.HeroId, peer.Id, previousPeer.Id);
-                previousPeer.Disconnect();
-            }
+            if (!TryTakeOverPreviousConnection(peer, controllerId, player)) return;
 
             var heroExists = false;
             var partyRestored = false;
@@ -288,9 +271,8 @@ public class ResolveCharacterState : ConnectionStateBase
                 if (registrationReplaced)
                     network.SendAllBut(peer, new NetworkPlayerRegistrationUpdated(restoredPlayer));
 
-                ConnectionLogic.AcknowledgedPlayer = restoredPlayer;
                 network.SendImmediate(peer, new NetworkClientValidated(true, restoredPlayer));
-                ConnectionLogic.TransferSave();
+                ConnectionLogic.TransferSave(restoredPlayer);
 
                 existingPlayerSender.SendExistingPlayers(peer, controllerId);
                 return;
@@ -310,6 +292,29 @@ public class ResolveCharacterState : ConnectionStateBase
 
         network.SendImmediate(peer, new NetworkClientValidated(false, null));
         ConnectionLogic.CreateCharacter();
+    }
+
+    // One connection per player. A quiet old connection is this player back from a crash, so drop it and let its
+    // disconnect cleanup run; one still talking keeps playing, and the joiner is refused instead.
+    private bool TryTakeOverPreviousConnection(NetPeer peer, string controllerId, Player player)
+    {
+        if (!playerManager.TryGetPeer(controllerId, out var previousPeer)) return true;
+        if (previousPeer.ConnectionState != ConnectionState.Connected) return true;
+
+        if (previousPeer.TimeSinceLastPacket < networkConfig.RejoinSilenceTimeout.TotalMilliseconds)
+        {
+            Logger.Warning(
+                "Hero {HeroId} is still played from peer {PreviousPeer}; refusing the second connection from peer {Peer}",
+                player.HeroId, previousPeer.Id, peer.Id);
+            peer.Disconnect();
+            return false;
+        }
+
+        Logger.Warning(
+            "Hero {HeroId} rejoined from peer {Peer}; dropping its silent old connection, peer {PreviousPeer}",
+            player.HeroId, peer.Id, previousPeer.Id);
+        previousPeer.Disconnect();
+        return true;
     }
 
     public override void CreateCharacter()

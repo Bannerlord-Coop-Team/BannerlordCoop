@@ -21,10 +21,9 @@ public interface IPlayerManager
     IReadOnlyCollection<Player> Players { get; }
 
     /// <summary>
-    /// Adds a player to the registry. A controller id maps to exactly one player, so a
-    /// registration for a controller that already has one is refused; deregister the old one
-    /// first (<see cref="RemovePlayer"/>) when replacing it. The server also refuses a registration whose
-    /// hero or party another registered player already controls.
+    /// Adds a player to the registry. A controller already registered is refused, so deregister the old one first
+    /// (<see cref="RemovePlayer"/>) when replacing it. The server also refuses a registration whose hero or party
+    /// another registered player already controls.
     /// </summary>
     /// <param name="player">The player to be added to the registry</param>
     /// <returns>if the player was added to the registry</returns>
@@ -45,9 +44,7 @@ public interface IPlayerManager
 
     /// <summary>
     /// Associates a connected peer with the (already registered) player behind
-    /// controllerId. Call once the peer's identity is known on first character creation. A
-    /// reconnect gets a new NetPeer and binds it with <see cref="TrySetPeer"/> instead, against the
-    /// registration it validated.
+    /// controllerId. Joins bind with <see cref="TrySetPeer"/> instead, against the registration they checked.
     /// </summary>
     void SetPeer(string controllerId, NetPeer peer);
 
@@ -87,6 +84,11 @@ public interface IPlayerManager
     /// Resolves the controller a peer currently stands for; a stale peer of a player that reconnected stands for nobody.
     /// </summary>
     bool TryGetCurrentController(NetPeer peer, out string controllerId);
+
+    /// <summary>
+    /// Resolves the registration of the controller a peer currently stands for; a stale peer resolves nothing.
+    /// </summary>
+    bool TryGetCurrentPlayer(NetPeer peer, out Player player);
 
     /// <summary>
     /// Resolves the Player controlling the given hero.
@@ -253,10 +255,9 @@ public class PlayerManager : IPlayerManager
         return true;
     }
 
-    // Two controllers on one hero or party would both pass every sender check, so the server refuses it.
-    // Clients mirror the server's registry, so they keep it and only log. The clan is left out because a
-    // player can keep another player's clan as its original clan. Call it under registrySync, so the hold
-    // check and the marker write are one step.
+    // Two controllers on one hero or party would both pass every sender check, so the server refuses it; clients mirror
+    // the server's registry. The clan is left out because a player can keep another player's clan as its original clan.
+    // Call under registrySync, so the hold check and the marker write are one step.
     private bool IsHeroOrPartyHeldByAnotherPlayer(Player player)
     {
         if (ModInformation.IsClient) return false;
@@ -377,7 +378,8 @@ public class PlayerManager : IPlayerManager
             return;
         }
 
-        TrySetPeer(player, peer);
+        if (!TrySetPeer(player, peer))
+            logger.Error("Cannot associate peer with controller {ControllerId}: its registration changed", controllerId);
     }
 
     public bool TrySetPeer(Player player, NetPeer peer)
@@ -488,6 +490,12 @@ public class PlayerManager : IPlayerManager
         }
     }
 
+    public bool TryGetCurrentPlayer(NetPeer peer, out Player player)
+    {
+        player = null;
+        return TryGetCurrentController(peer, out var controllerId) && TryGetPlayer(controllerId, out player);
+    }
+
     public bool TryGetPlayer(Hero hero, out Player player)
     {
         player = null;
@@ -505,8 +513,7 @@ public class PlayerManager : IPlayerManager
 
     public bool IsSenderControllingHero(object sender, string heroId)
     {
-        if (sender is NetPeer peer && TryGetCurrentController(peer, out var controllerId) &&
-            TryGetPlayer(controllerId, out var player) && player.HeroId == heroId) return true;
+        if (sender is NetPeer peer && TryGetCurrentPlayer(peer, out var player) && player.HeroId == heroId) return true;
 
         logger.Warning("Ignoring a request for hero {HeroId} from a peer that does not control it", heroId);
         return false;
@@ -515,8 +522,8 @@ public class PlayerManager : IPlayerManager
     public bool IsSenderControllingParty(object sender, string mobilePartyId)
     {
         var peer = sender as NetPeer;
-        if (peer != null && !string.IsNullOrEmpty(mobilePartyId) && TryGetCurrentController(peer, out var controllerId) &&
-            TryGetPlayer(controllerId, out var player) && player.MobilePartyId == mobilePartyId) return true;
+        if (peer != null && !string.IsNullOrEmpty(mobilePartyId) && TryGetCurrentPlayer(peer, out var player) &&
+            player.MobilePartyId == mobilePartyId) return true;
 
         logger.Warning("Ignoring a request for party {PartyId} from peer {PeerId}, which does not control it", mobilePartyId, peer?.Id);
         return false;
@@ -525,8 +532,8 @@ public class PlayerManager : IPlayerManager
     public bool TryGetSenderHero(object sender, out Hero hero)
     {
         hero = null;
-        return sender is NetPeer peer && TryGetCurrentController(peer, out var controllerId) &&
-            TryGetPlayer(controllerId, out var player) && objectManager.TryGetObjectWithLogging(player.HeroId, out hero);
+        return sender is NetPeer peer && TryGetCurrentPlayer(peer, out var player) &&
+            objectManager.TryGetObjectWithLogging(player.HeroId, out hero);
     }
 
     public bool IsConnected(Player player)

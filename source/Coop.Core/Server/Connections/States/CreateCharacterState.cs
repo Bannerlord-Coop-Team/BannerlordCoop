@@ -88,11 +88,8 @@ public class CreateCharacterState : ConnectionStateBase
 
         if (!playerManager.AddPlayer(player))
         {
-            // The registry refused it: two joins for this controller raced into character creation, or
-            // the created hero or party is already another player's. Everything below assumes this peer
-            // owns the player it just created, so continuing would bind the peer to the *other* registration and
-            // announce this refused one to the joiner and every other client. Drop the connection
-            // instead, exactly as a failed create does above.
+            // Two joins for this controller raced into character creation, or the created hero or party is already
+            // another player's. Carrying on would bind and announce the refused registration, so drop the connection.
             Logger.Error(
                 "The player registry refused controller {ControllerId} (duplicate controller, or its hero or party " +
                 "is already controlled); disconnecting the joining peer",
@@ -101,8 +98,17 @@ public class CreateCharacterState : ConnectionStateBase
             return;
         }
 
-        // First join: associate this peer with the player it just created.
-        playerManager.SetPeer(controllerId, netPeer);
+        // First join: associate this peer with the player it just created. A deletion or heir swap on the game thread
+        // can already have changed that registration, so bind only to it.
+        if (!playerManager.TrySetPeer(player, netPeer))
+        {
+            Logger.Warning(
+                "The registration for hero {HeroId} changed while peer {Peer} was joining; disconnecting the joiner",
+                player.HeroId, netPeer.Id);
+            ConnectionLogic.Peer.Disconnect();
+            return;
+        }
+
         // Send created to all other clients
         var message = new NetworkNewPlayerHeroCreated(controllerId, player, data, registrationHandles);
         network.SendAllBut(netPeer, message);
@@ -139,10 +145,9 @@ public class CreateCharacterState : ConnectionStateBase
         }
 
         // Respond with ids for the creating client
-        ConnectionLogic.AcknowledgedPlayer = player;
         network.SendImmediate(netPeer, new NetworkHeroRecieved(player));
 
-        ConnectionLogic.TransferSave();
+        ConnectionLogic.TransferSave(player);
 
         // TransferSave has taken the save snapshot and begun queueing this peer's broadcasts, so tell the
         // joiner about every other existing player. These queue and replay once it enters its campaign.

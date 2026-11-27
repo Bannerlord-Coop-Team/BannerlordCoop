@@ -501,7 +501,8 @@ public class ServerJoinAdmissionTests
             Mock.Of<IJoinCampaignBaselineSender>(),
             Mock.Of<IJoinCampaignKingdomBaseLineSender>(),
             Mock.Of<IJoinValidationDenialLog>(),
-            Mock.Of<ILootShipHold>());
+            Mock.Of<ILootShipHold>(),
+            Mock.Of<INetworkConfig>());
     }
 
     /// <summary>The real join admission, which also signals once a shutdown has started closing it.</summary>

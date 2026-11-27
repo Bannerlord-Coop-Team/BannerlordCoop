@@ -79,6 +79,10 @@ public class NetworkConfig : INetworkConfig
     /// </summary>
     public TimeSpan PingInterval { get; } = TimeSpan.FromSeconds(1);
     /// <summary>
+    ///     LiteNetLib pings every <see cref="PingInterval"/> off the game thread, so a live client is never this quiet.
+    /// </summary>
+    public TimeSpan RejoinSilenceTimeout { get; } = TimeSpan.FromSeconds(5);
+    /// <summary>
     ///     If a connection is inactive (no requests or response) for longer than this time
     ///     frame, it will be disconnected.
     /// </summary>

@@ -126,12 +126,11 @@ public class TransferSaveState : ConnectionStateBase
         var peer = ConnectionLogic.Peer;
         string[] heldLootShipIds = Array.Empty<string>();
 
-        // A game over, deletion or heir swap on the game thread can remove or replace the registration this
-        // peer was told it plays, and a replacement keeps the peer bound. So check that exact registration is
-        // still the peer's here, where nothing else can run.
-        if (!playerManager.TryGetCurrentController(peer, out var controllerId) ||
-            !playerManager.TryGetPlayer(controllerId, out var registered) ||
-            !ReferenceEquals(registered, ConnectionLogic.AcknowledgedPlayer))
+        // A game over, deletion or heir swap can remove or replace the registration this peer was told it plays,
+        // and a replacement keeps the peer bound, so check the exact registration here on the game thread
+        var stillPlaysIt = playerManager.TryGetCurrentPlayer(peer, out var registered) &&
+            ReferenceEquals(registered, ConnectionLogic.AcknowledgedPlayer);
+        if (!stillPlaysIt)
         {
             Logger.Warning("Peer {PeerId} no longer plays the player it was told; disconnecting it instead of sending the join save", peer.Id);
             return null;

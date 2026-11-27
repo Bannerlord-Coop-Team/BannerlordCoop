@@ -44,6 +44,10 @@ namespace IntroServer.Config
         /// </summary>
         public TimeSpan PingInterval { get; } = TimeSpan.FromSeconds(1);
         /// <summary>
+        ///     The intro server restores no players, so this only satisfies the shared config.
+        /// </summary>
+        public TimeSpan RejoinSilenceTimeout => DisconnectTimeout;
+        /// <summary>
         ///     If a connection is inactive (no requests or response) for longer than this time
         ///     frame, it will be disconnected.
         /// </summary>

@@ -159,6 +159,7 @@ public class CreateCharacterStateRollbackTests
             playerManager.Setup(value => value.AddPlayer(It.IsAny<Player>()))
                 .Callback<Player>(player => createdPlayer = player)
                 .Returns(true);
+            playerManager.Setup(value => value.TrySetPeer(It.IsAny<Player>(), It.IsAny<NetPeer>())).Returns(true);
             playerManager.Setup(value => value.RemovePlayer(It.IsAny<Player>())).Returns(true);
             Rollback.Setup(value => value.CaptureRegistrationIds(It.IsAny<Player>())).Returns(RegistrationIds);
             Rollback.Setup(value => value.Rollback(It.IsAny<Player>(), It.IsAny<string[]>()))

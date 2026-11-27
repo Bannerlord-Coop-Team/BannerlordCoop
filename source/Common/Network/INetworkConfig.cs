@@ -31,6 +31,11 @@ public interface INetworkConfig
     /// <summary>Local IPv6 address the co-op UDP sockets bind; all interfaces in a real session.</summary>
     IPAddress BindAddressIPv6 { get; }
     TimeSpan PingInterval { get; }
+    /// <summary>
+    /// [Server] How long a player's old connection may go unheard before a rejoin from a new connection drops it. An old
+    /// connection heard from more recently is still playing, so the rejoin is refused instead.
+    /// </summary>
+    TimeSpan RejoinSilenceTimeout { get; }
     TimeSpan ReconnectDelay { get; }
     TimeSpan DisconnectTimeout { get; }
     /// <summary>

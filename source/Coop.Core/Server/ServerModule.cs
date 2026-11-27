@@ -77,6 +77,7 @@ public class ServerModule : CommonModule
         builder.RegisterType<UdpBindDiagnostics>().As<IUdpBindDiagnostics>().InstancePerDependency();
         builder.RegisterType<SendCoalescer>().As<ISendCoalescer>().InstancePerLifetimeScope();
         builder.RegisterType<CoopSaveManager>().As<ICoopSaveManager>().InstancePerLifetimeScope();
+        builder.RegisterType<SavedPlayerRegistrationSelector>().As<ISavedPlayerRegistrationSelector>().InstancePerDependency();
         builder.RegisterType<JoinCampaignBaselineSender>()
             .As<IJoinCampaignBaselineSender>()
             .InstancePerDependency();

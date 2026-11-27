@@ -15,6 +15,7 @@ using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.NavalDLC;
 using GameInterface.Services.Heroes.Interfaces;
+using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using LiteNetLib;
 using Moq;
@@ -27,7 +28,7 @@ namespace Coop.Tests.Server.Connections.States
 {
     public class TransferCharacterStateTests
     {
-        private readonly IConnectionLogic connectionLogic;
+        private readonly ConnectionLogic connectionLogic;
         private readonly NetPeer playerPeer;
         private readonly NetPeer differentPeer;
         private readonly ServerTestComponent serverComponent;
@@ -135,6 +136,28 @@ namespace Coop.Tests.Server.Connections.States
                 serverComponent.TestNetwork.SentPackets.TryGetValue(differentPeer.Id, out var packets) &&
                 packets.OfType<GameSaveDataChunkPacket>().Any();
             Assert.False(otherPeerGotSave);
+        }
+
+        [Theory]
+        // A game over or deletion on the game thread unbinds the peer, and an heir swap replaces the registration
+        // while the peer stays bound to it
+        [InlineData(true)]
+        [InlineData(false)]
+        public void EnteringState_PeerNoLongerPlaysTheAcknowledgedPlayer_DisconnectsWithoutTakingTheSave(bool peerUnbound)
+        {
+            var playerManager = serverComponent.Container.Resolve<Mock<IPlayerManager>>();
+            if (peerUnbound)
+                playerManager
+                    .Setup(manager => manager.TryGetCurrentPlayer(playerPeer, out It.Ref<Player>.IsAny))
+                    .Returns(false);
+            else
+                connectionLogic.AcknowledgedPlayer = new Player("BoundController", "Hero_Heir", "MobileParty_Bound", "Clan_Bound", "Character_Heir");
+
+            connectionLogic.SetState<TransferSaveState>();
+
+            serverComponent.Container.Resolve<Mock<ISaveInterface>>().Verify(save => save.SaveCurrentGame(), Times.Never);
+            Assert.Empty(serverComponent.TestNetwork.SentNetworkMessages);
+            Assert.Equal(ConnectionState.ShutdownRequested, playerPeer.ConnectionState);
         }
 
         [Fact]
