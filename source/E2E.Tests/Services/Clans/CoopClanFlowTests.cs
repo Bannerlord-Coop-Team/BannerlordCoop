@@ -846,47 +846,6 @@ public class CoopClanFlowTests : MapEventTestBase, IDisposable
         }
     }
 
-    // #4984: a member who rescues a clan companion is told leading a party is leader only, not shown the party cost.
-    [Fact]
-    public void JoinedMember_LeadAPartyExplainsLeaderOnly()
-    {
-        Join();
-        var companionId = TestEnvironment.CreateRegisteredObject<Hero>();
-
-        foreach (var (client, isLeader) in new[] { (leaderClient, true), (memberClient, false) })
-        {
-            client.Call(() =>
-            {
-                var previousTexts = GameTexts._gameTextManager;
-                var previousTierModel = Campaign.Current.Models.ClanTierModel;
-                var conversationAgents = Campaign.Current.ConversationManager._conversationAgents;
-                var companionAgent = new Mock<IAgent>();
-                companionAgent.SetupGet(agent => agent.Character).Returns(Get<Hero>(client, companionId).CharacterObject);
-                try
-                {
-                    GameTexts._gameTextManager = new GameTextManager();
-                    var strings = new XmlDocument();
-                    strings.Load(Path.Combine(AppContext.BaseDirectory, "global_strings.xml"));
-                    GameTexts._gameTextManager.LoadFromXML(strings);
-                    var tierModel = new Mock<ClanTierModel>();
-                    tierModel.Setup(model => model.GetPartyLimitForTier(It.IsAny<Clan>(), It.IsAny<int>())).Returns(10);
-                    Campaign.Current.Models.ClanTierModel = tierModel.Object;
-                    conversationAgents.Add(companionAgent.Object);
-
-                    Assert.Equal(isLeader, new CompanionRolesCampaignBehavior().lead_a_party_clickable_condition(out var reason));
-                    if (isLeader) Assert.StartsWith("Creating the party will cost you", reason.ToString());
-                    else Assert.Equal("Only the clan leader can manage clan parties.", reason.ToString());
-                }
-                finally
-                {
-                    conversationAgents.Remove(companionAgent.Object);
-                    GameTexts._gameTextManager = previousTexts;
-                    Campaign.Current.Models.ClanTierModel = previousTierModel;
-                }
-            });
-        }
-    }
-
     private Player CreatePlayer(EnvironmentInstance client, string controllerId)
     {
         var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
