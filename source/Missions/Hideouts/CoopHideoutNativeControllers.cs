@@ -291,7 +291,7 @@ internal sealed class CoopHideoutAmbushController : HideoutAmbushMissionControll
     {
         var area = _stealthAreaData.FirstOrDefault(value => value.StealthAreaUsePoint.Id.Id == usePointId);
         if (area == null || Phase != HideoutPhase.Stealth) return;
-        // Live sentries dont block the call, as in native: the fire's OnUse already paused every AI and base.OnObjectUsed fades them out.
+        // Native lets the fire be lit with sentries still alive, base.OnObjectUsed fades them out.
         var areas = Mission.GetMissionBehavior<CoopHideoutStealthAreaLogic>();
         if (areas == null || !areas.CallReinforcements(Mission.MainAgent, area.StealthAreaUsePoint)) return;
         foreach (var agent in _stealthAreaData.SelectMany(value => value.StealthAreaMarkers.Values).SelectMany(agents => agents))
