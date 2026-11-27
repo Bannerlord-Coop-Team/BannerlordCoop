@@ -34,7 +34,7 @@ public class ClientSettlementExitEnterHandler : IHandler
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly ISettlementInterface settlementInterface;
-    private readonly IHideoutResultEncounter hideoutResultEncounter;
+    private readonly IHideoutEncounterHold hideoutEncounterHold;
     private readonly IPlayerFerryInterface playerFerryInterface;
     // Local attempts and all response transitions run on the game thread.
     private PendingStart pendingStart;
@@ -47,14 +47,14 @@ public class ClientSettlementExitEnterHandler : IHandler
         INetwork network,
         IObjectManager objectManager,
         ISettlementInterface settlementInterface,
-        IHideoutResultEncounter hideoutResultEncounter,
+        IHideoutEncounterHold hideoutEncounterHold,
         IPlayerFerryInterface playerFerryInterface = null)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.settlementInterface = settlementInterface;
-        this.hideoutResultEncounter = hideoutResultEncounter;
+        this.hideoutEncounterHold = hideoutEncounterHold;
         // Only registered while War Sails is on, which is the only time a ferry leave comes back
         this.playerFerryInterface = playerFerryInterface;
         messageBroker.Subscribe<StartSettlementEncounterAttempted>(Handle);
@@ -325,8 +325,8 @@ public class ClientSettlementExitEnterHandler : IHandler
                 settlementInterface.PartyLeaveSettlement(party);
             }
 
-            // Staged hideout loot and the send troops result menu live on the encounter, so closing it here would drop them.
-            if (hideoutResultEncounter.TryKeepThroughLeave(party))
+            // Hideout flows that still use the encounter finish it themselves.
+            if (hideoutEncounterHold.TryKeepThroughLeave(party))
                 return;
 
             CloseStaleMainPartyEncounter(payload.PartyId);
