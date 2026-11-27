@@ -3219,39 +3219,31 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
         SetMainParty(client, playerPartyId);
 
         using var conversations = RecordMapConversationStarts();
-        var previousStates = CoverMapWithInventory(client);
+        using var coveredMap = CoverMapWithInventory(client);
         client.NetworkSentMessages.Clear();
 
-        try
-        {
-            // A party caught the player while the inventory is open, so the server approves without a request id.
-            DeliverConversationApproval(
-                client,
-                playerPartyId,
-                aiPartyId,
-                requestId: null!,
-                ConversationRestartSource.EncounterManager,
-                forcePlayerOutFromSettlement: false);
+        // A party caught the player while the inventory is open, so the server approves without a request id.
+        DeliverConversationApproval(
+            client,
+            playerPartyId,
+            aiPartyId,
+            requestId: null!,
+            ConversationRestartSource.EncounterManager,
+            forcePlayerOutFromSettlement: false);
 
-            // Co-op keeps ticking the campaign under the inventory.
-            TickCampaign(client);
+        // Co-op keeps ticking the campaign under the inventory.
+        TickCampaign(client);
 
-            AssertHasPlayerEncounter(client, expected: false);
-            Assert.Equal(0, conversations.CountFor(client));
-            Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkConversationEnded>());
+        AssertHasPlayerEncounter(client, expected: false);
+        Assert.Equal(0, conversations.CountFor(client));
+        Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkConversationEnded>());
 
-            CloseInventory(client);
-            TickCampaign(client);
+        CloseInventory(client);
+        TickCampaign(client);
 
-            AssertHasPlayerEncounter(client, expected: true);
-            Assert.Equal(1, conversations.CountFor(client));
-            Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkConversationEnded>());
-        }
-        finally
-        {
-            client.Call(() => Campaign.Current.PlayerEncounter = null);
-            GameStateManager._current = previousStates;
-        }
+        AssertHasPlayerEncounter(client, expected: true);
+        Assert.Equal(1, conversations.CountFor(client));
+        Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkConversationEnded>());
     }
 
     [Fact]
@@ -3264,42 +3256,34 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
         var olderRequestId = CaptureConversationRestart(client);
         var newerRequestId = CaptureConversationRestart(client);
         using var conversations = RecordMapConversationStarts();
-        var previousStates = CoverMapWithInventory(client);
+        using var coveredMap = CoverMapWithInventory(client);
         client.NetworkSentMessages.Clear();
 
-        try
-        {
-            DeliverConversationApproval(
-                client,
-                playerPartyId,
-                aiPartyId,
-                olderRequestId,
-                ConversationRestartSource.EncounterManager,
-                forcePlayerOutFromSettlement: false);
+        DeliverConversationApproval(
+            client,
+            playerPartyId,
+            aiPartyId,
+            olderRequestId,
+            ConversationRestartSource.EncounterManager,
+            forcePlayerOutFromSettlement: false);
 
-            // The game thread drains the retry's approval in the frame the inventory closes, before the campaign ticks.
-            CloseInventory(client);
-            DeliverConversationApproval(
-                client,
-                playerPartyId,
-                aiPartyId,
-                newerRequestId,
-                ConversationRestartSource.EncounterManager,
-                forcePlayerOutFromSettlement: false);
-            Assert.Equal(0, conversations.CountFor(client));
+        // The game thread drains the retry's approval in the frame the inventory closes, before the campaign ticks.
+        CloseInventory(client);
+        DeliverConversationApproval(
+            client,
+            playerPartyId,
+            aiPartyId,
+            newerRequestId,
+            ConversationRestartSource.EncounterManager,
+            forcePlayerOutFromSettlement: false);
+        Assert.Equal(0, conversations.CountFor(client));
 
-            TickCampaign(client);
+        TickCampaign(client);
 
-            Assert.Equal(1, conversations.CountFor(client));
-            Assert.Equal(newerRequestId, GetActiveConversationRequestId(client));
-            var ended = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkConversationEnded>());
-            Assert.Equal(olderRequestId, ended.RequestId);
-        }
-        finally
-        {
-            client.Call(() => Campaign.Current.PlayerEncounter = null);
-            GameStateManager._current = previousStates;
-        }
+        Assert.Equal(1, conversations.CountFor(client));
+        Assert.Equal(newerRequestId, GetActiveConversationRequestId(client));
+        var ended = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkConversationEnded>());
+        Assert.Equal(olderRequestId, ended.RequestId);
     }
 
     [Theory]
@@ -3313,37 +3297,29 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
 
         var waitingRequestId = serverDetected ? null : CaptureConversationRestart(client);
         using var conversations = RecordMapConversationStarts();
-        var previousStates = CoverMapWithInventory(client);
+        using var coveredMap = CoverMapWithInventory(client);
         client.NetworkSentMessages.Clear();
 
-        try
-        {
-            DeliverConversationApproval(
-                client,
-                playerPartyId,
-                aiPartyId,
-                waitingRequestId!,
-                ConversationRestartSource.EncounterManager,
-                forcePlayerOutFromSettlement: false);
+        DeliverConversationApproval(
+            client,
+            playerPartyId,
+            aiPartyId,
+            waitingRequestId!,
+            ConversationRestartSource.EncounterManager,
+            forcePlayerOutFromSettlement: false);
 
-            client.Call(() => client.Resolve<IMessageBroker>().Publish(this, new ConversationEnded()));
+        client.Call(() => client.Resolve<IMessageBroker>().Publish(this, new ConversationEnded()));
 
-            // A server-detected approval's null id is the same one the null fallback releases.
-            Assert.Single(
-                client.NetworkSentMessages.GetMessages<NetworkConversationEnded>(),
-                ended => ended.RequestId == waitingRequestId);
+        // A server-detected approval's null id is the same one the null fallback releases.
+        Assert.Single(
+            client.NetworkSentMessages.GetMessages<NetworkConversationEnded>(),
+            ended => ended.RequestId == waitingRequestId);
 
-            CloseInventory(client);
-            TickCampaign(client);
+        CloseInventory(client);
+        TickCampaign(client);
 
-            AssertHasPlayerEncounter(client, expected: false);
-            Assert.Equal(0, conversations.CountFor(client));
-        }
-        finally
-        {
-            client.Call(() => Campaign.Current.PlayerEncounter = null);
-            GameStateManager._current = previousStates;
-        }
+        AssertHasPlayerEncounter(client, expected: false);
+        Assert.Equal(0, conversations.CountFor(client));
     }
 
     // The patched OpenMapConversation inlines SetupAndStartMapConversation, so a patch on it never runs and the
@@ -3352,20 +3328,46 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
         typeof(ConversationManager), nameof(ConversationManager.StartNew)));
 
     // Opens the inventory over the client's map and adds the vanilla meeting menu an approved restart opens.
-    // Returns the static state manager to restore, since E2E instances share it.
-    private static GameStateManager CoverMapWithInventory(EnvironmentInstance client)
+    // The static swap is the last step, so a failure before it leaves nothing to restore.
+    private static CoveredMap CoverMapWithInventory(EnvironmentInstance client)
     {
         var previousStates = GameStateManager._current;
         client.Call(() =>
         {
-            var states = GameStateManager._current = Game.Current.GameStateManager;
+            var states = Game.Current.GameStateManager;
             states._gameStates.Add(states.CreateState<MapState>());
             states._gameStates.Add(states.CreateState<InventoryState>());
             var behavior = ObjectHelper.SkipConstructor<EncounterGameMenuBehavior>();
             new CampaignGameStarter(Campaign.Current.GameMenuManager, Campaign.Current.ConversationManager)
                 .AddGameMenu("encounter_meeting", "{=!}.", behavior.game_menu_encounter_meeting_on_init);
+            GameStateManager._current = states;
         });
-        return previousStates;
+        return new CoveredMap(client, previousStates);
+    }
+
+    // Clears the encounter the test opened and restores the static state manager, which E2E instances share.
+    private sealed class CoveredMap : IDisposable
+    {
+        private readonly EnvironmentInstance client;
+        private readonly GameStateManager previousStates;
+
+        public CoveredMap(EnvironmentInstance client, GameStateManager previousStates)
+        {
+            this.client = client;
+            this.previousStates = previousStates;
+        }
+
+        public void Dispose()
+        {
+            try
+            {
+                client.Call(() => Campaign.Current.PlayerEncounter = null);
+            }
+            finally
+            {
+                GameStateManager._current = previousStates;
+            }
+        }
     }
 
     private static void CloseInventory(EnvironmentInstance client) => client.Call(() =>

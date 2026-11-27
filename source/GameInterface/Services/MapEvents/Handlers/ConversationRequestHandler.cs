@@ -699,6 +699,7 @@ internal class ConversationRequestHandler : IHandler
             SendConversationEndedToServer(replaced.RequestId);
         }
 
+        Logger.Debug("Conversation approval {RequestId} waits for the map", message.RequestId);
         approvalWaitingForMap = message;
     }
 
@@ -708,6 +709,7 @@ internal class ConversationRequestHandler : IHandler
         if (approvalWaitingForMap is not NetworkAllowConversation message) return;
         if (!mapStateInterface.IsMapActive()) return;
 
+        Logger.Debug("Applying conversation approval {RequestId} now that the map is active", message.RequestId);
         approvalWaitingForMap = null;
         ApplyConversationApproval(message);
     }
