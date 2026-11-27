@@ -52,7 +52,7 @@ namespace GameInterface.Services.Heroes
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.LastKnownClosestSettlement)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.HitPoints)));
             //autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.DeathDay))); // Set method doesn't seem to be used
-            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.LastExaminedLogEntryID)));
+            // Hero.LastExaminedLogEntryID is the local player's lord comment bookmark, written from a dialogue condition.
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.Clan)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.SupporterOf)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.GovernorOf)));
