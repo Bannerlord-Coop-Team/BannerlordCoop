@@ -853,6 +853,9 @@ internal sealed class CoopTournamentVM : TournamentVM
         CanSkip = state.CanSkip;
         CanLeave = state.CanLeave;
         canBet = state.CanBet;
+        // another player's vote can start the match while the bet window is open, so close it when betting closes
+        if (!canBet)
+            IsBetWindowEnabled = false;
         IsCoopMatchActive = state.IsMatchActive;
 
         ReadyCountText = new TaleWorlds.Localization.TextObject(
