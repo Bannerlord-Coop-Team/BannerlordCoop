@@ -15,6 +15,7 @@ using GameInterface.Configuration;
 using GameInterface.CoopSessionData;
 using GameInterface.Registry;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.Armies;
 using GameInterface.Services.CampaignService.Interfaces;
 using GameInterface.Services.Chat;
 using GameInterface.Services.Voice;
@@ -146,6 +147,7 @@ internal abstract class TestComponentBase
         RegisterMock<ISiegeEventInterface>(builder);
         RegisterMock<IPartyVisualInterface>(builder);
         RegisterMock<ISiegeBreakOut>(builder);
+        RegisterMock<IArmyPartyRemover>(builder);
         RegisterMock<IAttachmentIdMapper>(builder);
         RegisterMock<ILootShipHold>(builder);
         RegisterMock<IAutoRegistryFactory>(builder);

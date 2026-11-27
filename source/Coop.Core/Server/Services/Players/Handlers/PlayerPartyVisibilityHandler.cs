@@ -6,8 +6,7 @@ using Common.Util;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Services.Save.Messages;
-using GameInterface.Services.Armies.Messages;
-using GameInterface.Services.Armies.Patches;
+using GameInterface.Services.Armies;
 using GameInterface.Services.Heroes.HeirSelection.Messages;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
@@ -46,6 +45,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly IPartyVisualInterface partyVisuals;
     private readonly ISiegeEventInterface siegeEventInterface;
+    private readonly IArmyPartyRemover armyPartyRemover;
     private readonly Dictionary<MobileParty, (MapEvent MapEvent, string ControllerId)> deferredMapEventParking = new();
 
     public PlayerPartyVisibilityHandler(
@@ -54,7 +54,8 @@ internal class PlayerPartyVisibilityHandler : IHandler
         IConnectionCollection connectionCollection,
         IObjectManager objectManager,
         IPartyVisualInterface partyVisuals,
-        ISiegeEventInterface siegeEventInterface)
+        ISiegeEventInterface siegeEventInterface,
+        IArmyPartyRemover armyPartyRemover)
     {
         this.messageBroker = messageBroker;
         this.playerManager = playerManager;
@@ -62,6 +63,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
         this.objectManager = objectManager;
         this.partyVisuals = partyVisuals;
         this.siegeEventInterface = siegeEventInterface;
+        this.armyPartyRemover = armyPartyRemover;
 
         messageBroker.Subscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
         messageBroker.Subscribe<PlayerCampaignSynchronized>(Handle_PlayerCampaignSynchronized);
@@ -138,13 +140,8 @@ internal class PlayerPartyVisibilityHandler : IHandler
             return;
         }
 
-        LeaveSiegeBeforeParking(party);
-        LeaveArmyBeforeParking(party);
-
         var wasActive = party.IsActive;
-        party.IsActive = false;
-        party.IsVisible = false;
-        partyVisuals.RemoveVisual(party);
+        ParkOutsideMapEvent(party, queueArmyLeave: false);
 
         if (!wasActive)
         {
@@ -302,13 +299,8 @@ internal class PlayerPartyVisibilityHandler : IHandler
                 continue;
             }
 
-            LeaveSiegeBeforeParking(party);
             // Queued because the battle can finalize while vanilla is still looping over the leader's attached parties
-            if (party.Army != null && party.Army.LeaderParty != party)
-                GameThread.EnqueueSafe(() => LeaveArmyBeforeParking(party));
-            party.IsActive = false;
-            party.IsVisible = false;
-            partyVisuals.RemoveVisual(party);
+            ParkOutsideMapEvent(party, queueArmyLeave: true);
             Logger.Information(
                 "Parked party {PartyId} after its MapEvent ended while its player was disconnected or dead",
                 party.StringId);
@@ -335,9 +327,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
                     if (member.BesiegerCamp != null)
                         siegeEventInterface.BreakSiegeForPartyOnly(member);
 
-                    // Same pair the army-removal network flow uses, the publish replicates it to clients
-                    messageBroker.Publish(member, new MobilePartyInArmyRemoved(army, member, null));
-                    ArmyPatches.RemoveMobilePartyInArmy(member, army, null);
+                    armyPartyRemover.Remove(member, army);
                 }
                 catch (Exception e)
                 {
@@ -350,20 +340,27 @@ internal class PlayerPartyVisibilityHandler : IHandler
         siegeEventInterface.BreakSiegeForPartyOnly(party);
     }
 
-    // A parked follower leaves its army, otherwise vanilla keeps copying the leader's battle side and siege camp onto it while it is attached
-    private void LeaveArmyBeforeParking(MobileParty party)
+    // The parking steps for a party outside a MapEvent, the counterpart of ActivateParty
+    private void ParkOutsideMapEvent(MobileParty party, bool queueArmyLeave)
     {
+        LeaveSiegeBeforeParking(party);
+
+        // A follower leaves its army, otherwise vanilla keeps copying the leader's battle side and siege camp onto it while it is attached
         var army = party.Army;
-        if (army == null || army.LeaderParty == party) return;
+        if (army != null && army.LeaderParty != party)
+        {
+            Logger.Information("Removing parked party {PartyId} from the army of {LeaderId}", party.StringId, army.LeaderParty?.StringId);
 
-        Logger.Information(
-            "Removing party {PartyId} from the army of {LeaderId} before parking",
-            party.StringId,
-            army.LeaderParty?.StringId);
+            // A queued leave runs on a later frame, after the party is parked
+            if (queueArmyLeave)
+                GameThread.EnqueueSafe(() => armyPartyRemover.Remove(party, army));
+            else
+                armyPartyRemover.Remove(party, army);
+        }
 
-        // Same pair the army-removal network flow uses, the publish replicates it to clients
-        messageBroker.Publish(party, new MobilePartyInArmyRemoved(army, party, null));
-        ArmyPatches.RemoveMobilePartyInArmy(party, army, null);
+        party.IsActive = false;
+        party.IsVisible = false;
+        partyVisuals.RemoveVisual(party);
     }
 
     private bool TryResolveParty(NetPeer peer, out Player player, out MobileParty party)

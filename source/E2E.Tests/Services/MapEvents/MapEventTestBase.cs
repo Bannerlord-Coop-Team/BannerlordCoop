@@ -87,8 +87,9 @@ public abstract class MapEventTestBase : IDisposable
     /// <summary>
     /// Creates and registers a <see cref="MapEvent"/> on the server with two <see cref="MobileParty"/>
     /// participants, returning the IDs of the map event, attacker party, and defender party.
+    /// <paramref name="attackerId"/> makes an existing registered party the attacker instead of a new one.
     /// </summary>
-    protected MapEventContext CreateServerMapEvent(bool commit = true)
+    protected MapEventContext CreateServerMapEvent(bool commit = true, string? attackerId = null)
     {
         string? mapEventId = null;
         string? attackerPartyId = null;
@@ -97,7 +98,9 @@ public abstract class MapEventTestBase : IDisposable
         Server.Call(() =>
         {
             var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
-            var attackerParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var attackerParty = attackerId == null
+                ? GameObjectCreator.CreateInitializedObject<MobileParty>()
+                : Server.GetRegisteredObject<MobileParty>(attackerId);
             var defenderParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
 
             // The visual must exist before Initialize is called; skip its constructor so

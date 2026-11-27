@@ -5,6 +5,7 @@ using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Services.Players.Handlers;
 using Coop.Core.Server.Services.Save.Messages;
+using GameInterface.Services.Armies;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.ObjectManager;
@@ -72,7 +73,8 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
             Mock.Of<IConnectionCollection>(),
             objectManager.Object,
             Mock.Of<IPartyVisualInterface>(),
-            Mock.Of<ISiegeEventInterface>());
+            Mock.Of<ISiegeEventInterface>(),
+            Mock.Of<IArmyPartyRemover>());
 
         broker.Publish(this, new SavedPlayerRegistrationsRestored());
 
@@ -97,7 +99,8 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
             Mock.Of<IConnectionCollection>(),
             objectManager.Object,
             Mock.Of<IPartyVisualInterface>(),
-            Mock.Of<ISiegeEventInterface>());
+            Mock.Of<ISiegeEventInterface>(),
+            Mock.Of<IArmyPartyRemover>());
 
         broker.Publish(this, new SavedPlayerRegistrationsRestored());
 
@@ -129,7 +132,8 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
             Mock.Of<IConnectionCollection>(),
             objectManager.Object,
             Mock.Of<IPartyVisualInterface>(),
-            siegeEventInterface.Object);
+            siegeEventInterface.Object,
+            Mock.Of<IArmyPartyRemover>());
 
         broker.Publish(this, new SavedPlayerRegistrationsRestored());
 
@@ -169,7 +173,8 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
             Mock.Of<IConnectionCollection>(),
             objectManager.Object,
             Mock.Of<IPartyVisualInterface>(),
-            Mock.Of<ISiegeEventInterface>());
+            Mock.Of<ISiegeEventInterface>(),
+            Mock.Of<IArmyPartyRemover>());
 
         broker.Publish(this, new PlayerCampaignEntered(peer));
         Assert.False(party.IsActive);
@@ -205,7 +210,8 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
             Mock.Of<IConnectionCollection>(),
             objectManager.Object,
             Mock.Of<IPartyVisualInterface>(),
-            Mock.Of<ISiegeEventInterface>());
+            Mock.Of<ISiegeEventInterface>(),
+            Mock.Of<IArmyPartyRemover>());
 
         broker.Publish(this, new PlayerCampaignSynchronized(supersededPeer));
         GameThread.Run(() => { }, blocking: true);
@@ -230,7 +236,8 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
             connectionCollection.Object,
             objectManager.Object,
             partyVisuals.Object,
-            Mock.Of<ISiegeEventInterface>());
+            Mock.Of<ISiegeEventInterface>(),
+            Mock.Of<IArmyPartyRemover>());
 
         broker.Publish(this, new PlayerPartyReleasedFromCaptivity(party));
 
@@ -256,7 +263,8 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
             connectionCollection.Object,
             objectManager.Object,
             Mock.Of<IPartyVisualInterface>(),
-            Mock.Of<ISiegeEventInterface>());
+            Mock.Of<ISiegeEventInterface>(),
+            Mock.Of<IArmyPartyRemover>());
 
         broker.Publish(this, new PlayerPartyReleasedFromCaptivity(party));
 
@@ -280,7 +288,8 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
             connectionCollection.Object,
             objectManager.Object,
             Mock.Of<IPartyVisualInterface>(),
-            Mock.Of<ISiegeEventInterface>());
+            Mock.Of<ISiegeEventInterface>(),
+            Mock.Of<IArmyPartyRemover>());
 
         broker.Publish(this, new PlayerPartyReleasedFromCaptivity(party));
 
@@ -310,7 +319,8 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
             connectionCollection.Object,
             objectManager.Object,
             Mock.Of<IPartyVisualInterface>(),
-            Mock.Of<ISiegeEventInterface>());
+            Mock.Of<ISiegeEventInterface>(),
+            Mock.Of<IArmyPartyRemover>());
 
         broker.Publish(this, new PlayerPartyReleasedFromCaptivity(party));
         Assert.False(party.IsActive);
@@ -344,7 +354,8 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
             connectionCollection.Object,
             objectManager.Object,
             Mock.Of<IPartyVisualInterface>(),
-            Mock.Of<ISiegeEventInterface>());
+            Mock.Of<ISiegeEventInterface>(),
+            Mock.Of<IArmyPartyRemover>());
 
         broker.Publish(this, new PlayerDisconnected(peer, default));
         GameThread.Run(() => { }, blocking: true);
@@ -384,7 +395,8 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
             Mock.Of<IConnectionCollection>(),
             objectManager.Object,
             Mock.Of<IPartyVisualInterface>(),
-            Mock.Of<ISiegeEventInterface>());
+            Mock.Of<ISiegeEventInterface>(),
+            Mock.Of<IArmyPartyRemover>());
 
         broker.Publish(this, new PlayerDisconnected(peer, default));
 

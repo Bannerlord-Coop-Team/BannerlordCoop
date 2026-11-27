@@ -1,6 +1,5 @@
 ﻿using Common.Messaging;
 using Common.Network.Messages;
-using Coop.Core.Server.Connections.Messages;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Services.MapEvents;
 using E2E.Tests.Util;
@@ -29,11 +28,11 @@ public class ParkedArmyFollowerTests : MapEventTestBase
         var (partyId, armyId) = SetupFollower(leaderId);
 
         Disconnect();
-        StartLeaderBattle(leaderId);
-        AssertNotInBattle(partyId);
-
-        Reconnect();
         AssertNotFollowing(partyId, armyId);
+
+        CreateServerMapEvent(attackerId: leaderId);
+        PumpAll();
+        AssertNotInBattle(partyId);
     }
 
     [Fact]
@@ -42,7 +41,8 @@ public class ParkedArmyFollowerTests : MapEventTestBase
         var leaderId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         var (partyId, armyId) = SetupFollower(leaderId);
 
-        // An AI member attached after the follower is the last party on the side, so the battle finalizes once the follower is out of it
+        // The AI member is attached after the follower so it is the side's last party, which makes the battle finalize
+        // only once the follower is already out of it
         var memberId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         Server.Call(() =>
         {
@@ -52,15 +52,25 @@ public class ParkedArmyFollowerTests : MapEventTestBase
         }, MapEventDisabledMethods);
         PumpAll();
 
-        var mapEventId = StartLeaderBattle(leaderId);
-        Server.Call(() => Assert.Same(Server.GetRegisteredObject<MapEvent>(mapEventId), Server.GetRegisteredObject<MobileParty>(partyId).MapEvent));
+        var mapEventId = CreateServerMapEvent(attackerId: leaderId).MapEventId;
+        PumpAll();
+        Server.Call(() =>
+        {
+            var mapEvent = Server.GetRegisteredObject<MapEvent>(mapEventId);
+            var party = Server.GetRegisteredObject<MobileParty>(partyId);
+            Assert.Same(mapEvent, party.MapEvent);
+        });
 
         // Parking waits for the battle to end
         Disconnect();
         AssertActive(partyId, expected: true);
 
         // The leader leaving takes its attached parties with it, and the battle finalizes inside vanilla's loop over them
-        Server.Call(() => Server.GetRegisteredObject<MobileParty>(leaderId).Party.MapEventSide = null, MapEventDisabledMethods);
+        Server.Call(() =>
+        {
+            var leader = Server.GetRegisteredObject<MobileParty>(leaderId);
+            leader.Party.MapEventSide = null;
+        }, MapEventDisabledMethods);
         PumpAll();
 
         AssertActive(partyId, expected: false);
@@ -98,36 +108,9 @@ public class ParkedArmyFollowerTests : MapEventTestBase
         return (partyId, armyId!);
     }
 
-    // The leader starts a field battle, which vanilla copies onto the parties attached to it.
-    private string StartLeaderBattle(string leaderId)
-    {
-        string? mapEventId = null;
-        Server.Call(() =>
-        {
-            var leader = Server.GetRegisteredObject<MobileParty>(leaderId);
-            var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
-            var defender = GameObjectCreator.CreateInitializedObject<MobileParty>();
-            mapEvent.MapEventVisual = MockMapEventVisual();
-            mapEvent.Initialize(leader.Party, defender.Party, new FieldBattleEventComponent(mapEvent));
-            mapEvent.MapEventVisual = null;
-            if (!Campaign.Current.MapEventManager.MapEvents.Contains(mapEvent))
-                Campaign.Current.MapEventManager.OnMapEventCreated(mapEvent);
-            Assert.True(Server.ObjectManager.TryGetId(mapEvent, out mapEventId));
-        }, MapEventDisabledMethods);
-        PumpAll();
-        return mapEventId!;
-    }
-
     private void Disconnect()
     {
         Server.Call(() => Server.Resolve<IMessageBroker>().Publish(this, new PlayerDisconnected(Client.NetPeer, default)));
-        PumpAll();
-    }
-
-    private void Reconnect()
-    {
-        TestEnvironment.ConnectRegisteredPlayer(Client, ControllerId);
-        Server.Call(() => Server.Resolve<IMessageBroker>().Publish(this, new PlayerCampaignSynchronized(Client.NetPeer)));
         PumpAll();
     }
 
@@ -163,9 +146,9 @@ public class ParkedArmyFollowerTests : MapEventTestBase
         {
             instance.Call(() =>
             {
+                var name = instance == Server ? "server" : "client";
                 var party = instance.GetRegisteredObject<MobileParty>(partyId);
-                Assert.True(party.Party.MapEventSide == null,
-                    $"{(instance == Server ? "server" : "client")}: party in battle {party.MapEvent?.StringId}");
+                Assert.True(party.Party.MapEventSide == null, $"{name}: party in battle {party.MapEvent?.StringId}");
             });
         }
     }
@@ -176,9 +159,9 @@ public class ParkedArmyFollowerTests : MapEventTestBase
         {
             instance.Call(() =>
             {
+                var name = instance == Server ? "server" : "client";
                 var party = instance.GetRegisteredObject<MobileParty>(partyId);
-                Assert.True(party.IsActive == expected,
-                    $"{(instance == Server ? "server" : "client")}: party active is {party.IsActive}");
+                Assert.True(party.IsActive == expected, $"{name}: party active is {party.IsActive}");
             });
         }
     }
