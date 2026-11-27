@@ -167,11 +167,15 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
                 break;
         }
 
-        if (encounter._mapEvent == null)
+        var mapEvent = encounter._mapEvent ?? PlayerEncounter.StartBattle();
+        if (mapEvent == null)
+            Logger.Warning("Village hostile action presentation started without a map event");
+        else
         {
-            var mapEvent = PlayerEncounter.StartBattle();
-            if (mapEvent == null)
-                Logger.Warning("Village hostile action presentation started without a map event");
+            // Take the side from the battle, because the visit was set up with the party already in the village, which vanilla
+            // reads as defending it, otherwise a won raid reads as the defenders winning (a naval raid even captures the raider)
+            encounter.PlayerSide = mapEvent.PlayerSide;
+            encounter.OpponentSide = encounter.PlayerSide.GetOppositeSide();
         }
 
         GameMenu.SwitchToMenu("encounter");
