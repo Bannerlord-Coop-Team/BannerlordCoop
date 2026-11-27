@@ -11,6 +11,7 @@ using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.SiegeEvents;
+using GameInterface.Services.SiegeEvents.Messages;
 using GameInterface.Services.SiegeEvents.Patches;
 using HarmonyLib;
 using SandBox.GauntletUI.Map;
@@ -490,8 +491,8 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         if (cleanup != null)
             deferredEncounterCleanup = null;
         party._mapEventSide = null;
-        bool continuedEncounter = ContinueDestroyedSimulationDefeat(mapEvent, cleanup);
-        if (!continuedEncounter && CloseStaleDestroyedEncounter(mapEvent, cleanup)) return;
+        if (EndDestroyedSimulationDefeat(mapEvent, cleanup, party.MobileParty)) return;
+        if (CloseStaleDestroyedEncounter(mapEvent, cleanup)) return;
 
         ClearEngageOrder(party.MobileParty);
     }
@@ -505,9 +506,10 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
                    .Any(state => state._battleSimulation == battleSimulation) == true;
     }
 
-    private static bool ContinueDestroyedSimulationDefeat(
+    private bool EndDestroyedSimulationDefeat(
         MapEvent mapEvent,
-        DeferredEncounterCleanup cleanup)
+        DeferredEncounterCleanup cleanup,
+        MobileParty party)
     {
         var encounter = PlayerEncounter.Current;
         bool matchesDeferredSimulation = cleanup != null &&
@@ -533,14 +535,13 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
             Campaign.Current.PlayerEncounter = null;
             Campaign.Current.LocationEncounter = null;
             ShowCaptivityMenu();
+            ClearEngageOrder(party);
             return true;
         }
 
-        // Leave must not reuse battle references whose party sides were already removed.
-        encounter._mapEvent = null;
-        encounter.BattleSimulation = null;
-        encounter.EncounterState = PlayerEncounterState.Begin;
-        GameMenu.SwitchToMenu("encounter");
+        // PlayerEncounterPatches.FinishPostfix holds the party once its MapEvent is null, which CompleteDeferredEncounterCleanup
+        // cleared, so no ClearEngageOrder here.
+        FinishUncapturedDefeat(encounter, party);
         return true;
     }
 
@@ -554,6 +555,24 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
             GameMenu.SwitchToMenu(menuId);
         else
             GameMenu.ActivateGameMenu(menuId);
+    }
+
+    // Ends the encounter like native DoPlayerDefeat, otherwise the encounter menu's init starts a new battle against the same enemy.
+    private void FinishUncapturedDefeat(PlayerEncounter encounter, MobileParty party)
+    {
+        var settlement = party.CurrentSettlement;
+        // Finish must not finalize the destroyed battle again.
+        encounter._mapEvent = null;
+        encounter.BattleSimulation = null;
+        PlayerEncounter.Finish(forcePlayerOutFromSettlement: false);
+
+        // DoPlayerDefeat also leaves the besieger camp, which the server only clears on a break siege request.
+        if (party.BesiegerCamp != null)
+            messageBroker.Publish(this, new BreakSiegeAttempted(party, finishLocalMenus: false));
+
+        // A defender still inside gets its settlement encounter back, like native Leave.
+        if (settlement != null)
+            EncounterManager.StartSettlementEncounter(party, settlement);
     }
 
     private void ClearEngageOrder(MobileParty party)

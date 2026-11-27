@@ -11,12 +11,10 @@ using GameInterface.Services.Players;
 using HarmonyLib;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
-using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
@@ -104,7 +102,7 @@ public class BattleSurrenderTests : MapEventTestBase
 
             // A second menu activation while the authoritative response is in flight must not enqueue another request.
             InvokePatchedSurrender(encounter);
-        }, BattleMenuSurrenderDisabledMethods());
+        }, BattleResultDisabledMethods);
 
         // Exactly one surrender request was forwarded, carrying the participating (surrendering) player's party.
         var request = Assert.Single(recipientClient.NetworkSentMessages.GetMessages<NetworkPlayerSurrendered>());
@@ -185,7 +183,7 @@ public class BattleSurrenderTests : MapEventTestBase
             var encounter = PlayerEncounter.Current;
             Assert.NotNull(encounter);
             InvokePatchedSurrender(encounter);
-        }, BattleMenuSurrenderDisabledMethods());
+        }, BattleResultDisabledMethods);
 
         // The surrendered hero is recorded as a prisoner of the captor everywhere.
         AssertCaptivity(Server, setup.recipientHeroId, setup.initiatorPartyId);
@@ -492,7 +490,7 @@ public class BattleSurrenderTests : MapEventTestBase
             }, MapEventDisabledMethods);
         }
 
-        leavingClient.Call(InvokePatchedEncounterLeave, BattleMenuSurrenderDisabledMethods());
+        leavingClient.Call(InvokePatchedEncounterLeave, BattleResultDisabledMethods);
         TestEnvironment.FlushCoalescer();
 
         leavingClient.Call(() =>
@@ -598,7 +596,7 @@ public class BattleSurrenderTests : MapEventTestBase
         {
             Assert.True(recipientClient.ObjectManager.TryGetObject<MapEvent>(setup.ctx.MapEventId, out var mapEvent));
             recipientClient.Resolve<IMessageBroker>().Publish(this, new PlayerSurrendered(mapEvent, MobileParty.MainParty));
-        }, BattleMenuSurrenderDisabledMethods());
+        }, BattleResultDisabledMethods);
     }
 
     // ------------------------------------------------------------------
@@ -721,16 +719,4 @@ public class BattleSurrenderTests : MapEventTestBase
             Assert.Equal(expected, captor.PrisonRoster.GetElementNumber(troop));
         });
     }
-
-    private IReadOnlyList<MethodBase> BattleMenuSurrenderDisabledMethods()
-        => MapEventDisabledMethods
-            .Append(AccessTools.Method(typeof(DefaultBattleRewardModel), nameof(DefaultBattleRewardModel.GetCaptureMemberChancesForWinnerParties)))
-            .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyCasualties"))
-            .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyItems"))
-            .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyPrisoners"))
-            .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyShips"))
-            .Append(AccessTools.Method(typeof(MapEvent), "CalculateMapEventResults"))
-            .Append(AccessTools.Method(typeof(MapEvent), "CommitCalculatedMapEventResults"))
-            .Append(AccessTools.Method(typeof(MapEvent), "MovePartyToSuitablePositionOnMapEventFinalize"))
-            .ToList();
 }
