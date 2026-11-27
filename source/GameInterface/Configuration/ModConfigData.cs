@@ -106,6 +106,9 @@ public sealed class ModOptionsData
     [ManagedConfigOption(AvailableSince = "0.1.8")]
     public bool? AllowClientTimeControls { get; set; }
 
+    [ManagedConfigOption(AvailableSince = "0.1.9")]
+    public bool? MapClickChangesTime { get; set; }
+
     [ManagedConfigOption(AvailableSince = "0.1.2")]
     public bool? ClientsCanUseCheats { get; set; }
 
