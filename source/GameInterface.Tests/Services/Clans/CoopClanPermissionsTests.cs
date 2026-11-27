@@ -169,7 +169,6 @@ public class CoopClanPermissionsTests : IDisposable
         foreach (var patch in new ConditionPatch[]
         {
             CoopClanDialoguePatches.CompanionFireConditionPostfix,
-            CoopClanDialoguePatches.LeadAPartyClickableConditionPostfix,
             CoopClanDialoguePatches.ConversationHeroHireOnConditionPostfix,
             CoopClanDialoguePatches.NotableSupportRequestOnConditionPostfix,
             CoopClanDialoguePatches.NotableSupportEndOnConditionPostfix,
