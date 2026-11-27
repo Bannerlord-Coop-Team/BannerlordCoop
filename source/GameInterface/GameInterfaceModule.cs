@@ -324,7 +324,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<OfflineWarProtection>().As<IOfflineWarProtection>().InstancePerDependency();
         builder.RegisterType<ClientClanStrengthRefresher>().As<IClientClanStrengthRefresher>().InstancePerDependency();
         builder.RegisterType<MainPartyBattleRewardsCache>().As<IMainPartyBattleRewardsCache>().SingleInstance();
-        builder.RegisterType<HideoutResultEncounter>().As<IHideoutResultEncounter>().InstancePerDependency();
+        builder.RegisterType<HideoutEncounterHold>().As<IHideoutEncounterHold>().InstancePerDependency();
         builder.RegisterType<PacketManager>().As<IPacketManager>().SingleInstance();
         builder.RegisterType<MapEventInitializationBarrierBinding>().SingleInstance().AutoActivate();
         builder.RegisterType<RetreatedMapEventPartyTracker>().As<IRetreatedMapEventPartyTracker>().SingleInstance();

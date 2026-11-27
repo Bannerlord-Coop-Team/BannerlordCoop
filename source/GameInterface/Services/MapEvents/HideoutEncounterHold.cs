@@ -10,10 +10,9 @@ using TaleWorlds.MountAndBlade;
 namespace GameInterface.Services.MapEvents;
 
 /// <summary>
-/// Keeps a hideout encounter open until its own flow finishes it, while its mission is still fighting the battle or
-/// while it holds staged battle results or a send troops result menu.
+/// Keeps a hideout encounter open through a replicated settlement leave until its own flow finishes it.
 /// </summary>
-public interface IHideoutResultEncounter
+public interface IHideoutEncounterHold
 {
     /// <summary>
     /// Keeps the main party's encounter through a replicated settlement leave while its hideout mission is still
@@ -23,10 +22,10 @@ public interface IHideoutResultEncounter
     bool TryKeepThroughLeave(MobileParty party);
 }
 
-/// <inheritdoc cref="IHideoutResultEncounter"/>
-internal class HideoutResultEncounter : IHideoutResultEncounter
+/// <inheritdoc cref="IHideoutEncounterHold"/>
+internal class HideoutEncounterHold : IHideoutEncounterHold
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<HideoutResultEncounter>();
+    private static readonly ILogger Logger = LogManager.GetLogger<HideoutEncounterHold>();
 
     public bool TryKeepThroughLeave(MobileParty party)
     {
@@ -51,7 +50,7 @@ internal class HideoutResultEncounter : IHideoutResultEncounter
         }
 
         // Native's hideout boss line reads this encounter, without it the boss only says "I am not allowed to talk with you".
-        if (!IsFightingInMission(encounter, mainParty))
+        if (!IsFightingInMission(encounter, mainParty, Mission.Current))
             return false;
 
         Logger.Debug("Kept hideout encounter {MapEventId} through replicated settlement leave while its mission runs",
@@ -63,10 +62,14 @@ internal class HideoutResultEncounter : IHideoutResultEncounter
         encounter?._mapEvent?.IsHideoutBattle == true &&
         MapEventInitializationBarrier.IsBattleResultEncounter(encounter);
 
-    // The same hideout mission check as native's boss line; co-op's hideout controllers subclass these.
-    private static bool IsFightingInMission(PlayerEncounter encounter, MobileParty mainParty) =>
-        (Mission.Current?.GetMissionBehavior<HideoutMissionController>() != null ||
-            Mission.Current?.GetMissionBehavior<HideoutAmbushMissionController>() != null) &&
-        encounter._mapEvent is { IsHideoutBattle: true, IsFinalized: false } battle &&
-        mainParty.MapEvent == battle;
+    internal static bool IsFightingInMission(PlayerEncounter encounter, MobileParty mainParty, Mission mission)
+    {
+        // The same hideout mission check as native's boss line; co-op's hideout controllers subclass these.
+        if (mission?.GetMissionBehavior<HideoutMissionController>() == null &&
+            mission?.GetMissionBehavior<HideoutAmbushMissionController>() == null)
+            return false;
+
+        return encounter._mapEvent is { IsHideoutBattle: true, IsFinalized: false } battle &&
+            mainParty.MapEvent == battle;
+    }
 }

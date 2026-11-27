@@ -1175,7 +1175,7 @@ public class HideoutMapEventTests : MapEventTestBase
     }
 
     [Fact]
-    public void ServerDrivenLeaveDuringHideoutMission_BossStillOffersTheDuel()
+    public void ServerDrivenLeaveDuringHideoutMission_KeepsEncounterForBossDuelAndLoot()
     {
         var raid = CreateSharedHideout();
         var client = Clients.First();
@@ -1187,38 +1187,42 @@ public class HideoutMapEventTests : MapEventTestBase
             Assert.True(Server.ObjectManager.TryGetId(settlement.Hideout.MapFaction, out banditClanId));
         }, MapEventDisabledMethods);
 
-        using var fixture = new MissionEngineFixture();
-        client.Call(() =>
+        using (var fixture = new MissionEngineFixture())
         {
-            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(raid.LeaderPartyId, out var leader));
-            Assert.True(client.ObjectManager.TryGetObject<Clan>(banditClanId, out var banditClan));
-            // Loaded from the bandit clan XML in a real campaign.
-            banditClan.IsBanditFaction = true;
-            Campaign.Current.MainParty = leader;
-            Campaign.Current.PlayerEncounter = null;
-            // The encounter the raid entry and the hideout mission open for the attacker.
-            BattleMissionStartHandler.InitializePlayerEncounter(leader.MapEvent);
-            fixture.CreateMission(client).Shell.MissionBehaviors.Add(ObjectHelper.SkipConstructor<HideoutMissionController>());
-            Assert.True(BossOffersDuel());
-        }, MapEventDisabledMethods);
-        EnableHeadlessEncounterFinish(client);
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<MobileParty>(raid.LeaderPartyId, out var leader));
+                Assert.True(client.ObjectManager.TryGetObject<Clan>(banditClanId, out var banditClan));
+                // Loaded from the bandit clan XML in a real campaign.
+                banditClan.IsBanditFaction = true;
+                Campaign.Current.MainParty = leader;
+                // The party walked into the hideout, so the final hold shows the cleared hideout doesn't pull it back.
+                leader._defaultBehavior = AiBehavior.GoToSettlement;
+                Campaign.Current.PlayerEncounter = null;
+                // The encounter the raid entry and the hideout mission open for the attacker.
+                BattleMissionStartHandler.InitializePlayerEncounter(leader.MapEvent);
+                fixture.CreateMission(client).Shell.MissionBehaviors.Add(ObjectHelper.SkipConstructor<HideoutMissionController>());
+                Assert.True(BossOffersDuel());
+            }, MapEventDisabledMethods);
+            EnableHeadlessEncounterFinish(client);
 
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(raid.LeaderPartyId, out var leader));
-            LeaveSettlementAction.ApplyForParty(leader);
-        }, MapEventDisabledMethods);
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(raid.LeaderPartyId, out var leader));
+                LeaveSettlementAction.ApplyForParty(leader);
+            }, MapEventDisabledMethods);
 
-        client.Call(() =>
-        {
-            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(raid.MapEventId, out var mapEvent));
-            Assert.True(BossOffersDuel());
-            Assert.Same(mapEvent, MobileParty.MainParty.MapEvent);
-            Assert.Null(MobileParty.MainParty.CurrentSettlement);
-        }, MapEventDisabledMethods);
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<MapEvent>(raid.MapEventId, out var mapEvent));
+                Assert.True(BossOffersDuel());
+                Assert.Same(mapEvent, MobileParty.MainParty.MapEvent);
+                Assert.Null(MobileParty.MainParty.CurrentSettlement);
+                Assert.Equal(AiBehavior.GoToSettlement, MobileParty.MainParty.DefaultBehavior);
+            }, MapEventDisabledMethods);
+        }
 
-        // The mission ends and the server clears the hideout for a party it already took out of it.
-        fixture.Dispose();
+        // The mission has ended, and the server clears the hideout for a party it already took out of it.
         var lootItemId = CreateHideoutLootItem();
         var prisonerId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
         Server.Call(() =>
