@@ -314,6 +314,16 @@ internal sealed class CoopHideoutAmbushController : HideoutAmbushMissionControll
         }
     }
 
+    // Undoes the fire's OnUse after the host turned the call down, so it can be lit again.
+    internal void ReopenSignalFire(int usePointId)
+    {
+        var fire = _stealthAreaData.FirstOrDefault(value => value.StealthAreaUsePoint.Id.Id == usePointId)?.StealthAreaUsePoint;
+        if (fire == null) return;
+        fire._isAlreadyUsed = false;
+        fire.EnableStealthAreaUsePoint();
+        OnAgentsShouldBeEnabled();
+    }
+
     public override void OnAgentRemoved(Agent affectedAgent, Agent affectorAgent, AgentState agentState, KillingBlow blow)
     {
         if (!affectedAgent.IsMainAgent)

@@ -1,5 +1,7 @@
 ﻿using Common.Messaging;
 using Common.Util;
+using E2E.Tests.Environment.Instance;
+using E2E.Tests.Environment.Mock;
 using E2E.Tests.Environment.MockEngine;
 using GameInterface.Services.MapEvents.TroopSupply;
 using HarmonyLib;
@@ -644,6 +646,121 @@ public sealed class HideoutMissionRuntimeTests : MissionTestEnvironment
         AccessTools.Field(typeof(CoopHideoutMissionLogic), "deployed").SetValue(logic, true);
         AccessTools.Field(typeof(CoopHideoutMissionLogic), "heroEntered").SetValue(logic, true);
     }
+
+    [Fact]
+    public void RemoteSignalFire_TurnedDownWhileTheHostIsInCombat_CanBeLitAgain()
+    {
+        using var fixture = new MissionEngineFixture();
+        var host = Clients.First();
+        var lighter = Clients.Skip(1).First();
+        SetControllerId(host, "host");
+        SetControllerId(lighter, "lighter");
+        foreach (var client in new[] { host, lighter })
+        {
+            var mesh = Assert.IsType<MockBattleNetwork>(client.Resolve<IBattleNetwork>());
+            mesh.Start();
+            mesh.ConnectToInstance("raid");
+        }
+        var harmony = new Harmony($"hideout-remote-fire.{Guid.NewGuid()}");
+        harmony.Patch(AccessTools.PropertyGetter(typeof(Agent), nameof(Agent.AIStateFlags)),
+            prefix: new HarmonyMethod(typeof(HideoutMissionRuntimeTests), nameof(AlarmFlags)));
+        harmony.Patch(AccessTools.Method(typeof(WeakGameEntity), nameof(WeakGameEntity.SetVisibilityExcludeParents)),
+            prefix: new HarmonyMethod(typeof(HideoutMissionRuntimeTests), nameof(SkipNativeVisibility)));
+        alarmedAgents.Clear();
+        CoopHideoutMissionLogic hostLogic = null, lighterLogic = null;
+        try
+        {
+            RunWithSceneShims(() =>
+            {
+                CoopHideoutAmbushController hostNative = null, lighterNative = null;
+                StealthAreaUsePoint lighterFire = null;
+                Agent lighterHero = null;
+                host.Call(() =>
+                {
+                    (hostLogic, hostNative, _, var sentry) = CreateSignalFireRaid(fixture, host, Mock.Of<IMissionContext>(
+                        context => context.ControllersInMission == new[] { "lighter" }), isLocalHost: true);
+                    // A sentry away from the fire has spotted someone, which native counts as combat.
+                    alarmedAgents.Add(sentry);
+                });
+                lighter.Call(() =>
+                {
+                    (lighterLogic, lighterNative, lighterHero, _) = CreateSignalFireRaid(fixture, lighter, Mock.Of<IMissionContext>(), isLocalHost: false);
+                    lighterFire = lighterNative._stealthAreaData.Single().StealthAreaUsePoint;
+                    // What the fire's own OnUse does before native passes the use on to the mission behaviors.
+                    lighterFire._isAlreadyUsed = true;
+                    lighterNative.OnObjectUsed(lighterHero, lighterFire);
+                });
+
+                host.Call(() => Assert.Equal(HideoutPhase.Stealth, hostNative.Phase));
+                lighter.Call(() => Assert.True(lighterFire.IsUsableByAgent(lighterHero)));
+            });
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+            alarmedAgents.Clear();
+            host.Call(() => hostLogic?.OnRemoveBehavior());
+            lighter.Call(() => lighterLogic?.OnRemoveBehavior());
+        }
+    }
+
+    // A stealth raid with one signal fire whose sentries are already down, plus a live sentry elsewhere.
+    private static (CoopHideoutMissionLogic logic, CoopHideoutAmbushController native, Agent hero, Agent sentry) CreateSignalFireRaid(
+        MissionEngineFixture fixture, EnvironmentInstance client, IMissionContext missionContext, bool isLocalHost)
+    {
+        var mission = fixture.CreateMission(client);
+        var attackerTeam = mission.AddTeam(BattleSideEnum.Attacker);
+        mission.PlayerTeam = mission.AttackerTeam;
+        var defenderTeam = mission.AddTeam(BattleSideEnum.Defender);
+        var hero = mission.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop).Team(attackerTeam).Controller(AgentControllerType.Player));
+        var sentry = mission.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop).Team(defenderTeam)
+            .Controller(isLocalHost ? AgentControllerType.AI : AgentControllerType.None));
+        mission.MainAgent = hero;
+        var attacker = new CoopTroopSupplier("raid", BattleSideEnum.Attacker, null, null);
+        var defender = new CoopTroopSupplier("raid", BattleSideEnum.Defender, null, null);
+        var logic = new CoopHideoutMissionLogic(client.Resolve<IBattleNetwork>(), client.Resolve<IMessageBroker>(),
+            missionContext, defender, attacker, false);
+        AttachHideoutLogic(logic, mission, Mock.Of<IBattleSession>(session => session.IsLocalHost == isLocalHost &&
+            session.InstanceId == "raid" && session.HostControllerId == "host" &&
+            session.OwnControllerId == (isLocalHost ? "host" : "lighter")));
+        var areaLogic = new CoopHideoutStealthAreaLogic();
+        var native = new CoopHideoutAmbushController(logic, new IMissionTroopSupplier[] { logic.Defender, logic.Attacker });
+        logic.Native = native;
+        foreach (var behavior in new MissionBehavior[] { logic, areaLogic, native })
+        {
+            AccessTools.Property(typeof(MissionBehavior), nameof(MissionBehavior.Mission)).SetValue(behavior, mission.Shell);
+            mission.Shell.MissionBehaviors.Add(behavior);
+        }
+        mission.Shell._missionMode = MissionMode.Stealth;
+        native.Apply(HideoutPhase.Stealth, null, 25);
+
+        // Each machine has its own copy of the scene's fire, matched by mission object id.
+        var fire = ObjectHelper.SkipConstructor<StealthAreaUsePoint>();
+        fire.Id = new MissionObjectId(7);
+        fire._isEnabled = true;
+        var marker = ObjectHelper.SkipConstructor<StealthAreaMarker>();
+        native._stealthAreaData.Add(SignalFireArea(fire, marker));
+        areaLogic._stealthAreaData.Add(SignalFireArea(fire, marker));
+        return (logic, native, hero, sentry);
+    }
+
+    private static StealthAreaMissionLogic.StealthAreaData SignalFireArea(StealthAreaUsePoint fire, StealthAreaMarker marker, params Agent[] sentries)
+    {
+        var area = ObjectHelper.SkipConstructor<StealthAreaMissionLogic.StealthAreaData>();
+        AccessTools.Field(typeof(StealthAreaMissionLogic.StealthAreaData), nameof(area.StealthAreaUsePoint)).SetValue(area, fire);
+        AccessTools.Field(typeof(StealthAreaMissionLogic.StealthAreaData), nameof(area.StealthAreaMarkers))
+            .SetValue(area, new Dictionary<StealthAreaMarker, List<Agent>> { [marker] = sentries.ToList() });
+        return area;
+    }
+
+    private static readonly HashSet<Agent> alarmedAgents = new();
+    private static bool AlarmFlags(Agent __instance, ref Agent.AIStateFlag __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out _)) return true;
+        __result = alarmedAgents.Contains(__instance) ? Agent.AIStateFlag.Alarmed : default;
+        return false;
+    }
+    private static bool SkipNativeVisibility() => false;
 
     [Fact]
     public void PromotionDuringDuel_RestoresOtherPlayersBeforeResumingTheGroupFight()
