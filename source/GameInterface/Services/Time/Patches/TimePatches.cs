@@ -187,6 +187,23 @@ internal class AllowTimeControlFromHotKeysPatches
     private static bool AllowTimeControlInMenu(GameMenu _) => true;
 }
 
+[HarmonyPatch(typeof(MapScreen), nameof(MapScreen.HandleClickTimeChange))]
+internal class AllowTimeControlFromMapClickPatches
+{
+    // Vanilla resumes time after a travel or parley click, so send that as a time request like the time controls do
+    [HarmonyPrefix]
+    private static void Prefix()
+    {
+        AllowedThread.AllowThisThread();
+    }
+
+    [HarmonyFinalizer]
+    private static void Finalizer()
+    {
+        AllowedThread.RevokeThisThread();
+    }
+}
+
 [HarmonyPatch(typeof(PlayerEncounter), nameof(PlayerEncounter.Finish))]
 internal class PlayerEncouterFinishPatches
 {
