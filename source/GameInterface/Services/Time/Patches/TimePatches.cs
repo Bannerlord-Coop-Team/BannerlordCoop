@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Configuration;
@@ -10,6 +11,7 @@ using GameInterface.Services.Time;
 using GameInterface.Services.Time.Interfaces;
 using HarmonyLib;
 using SandBox.View.Map;
+using Serilog;
 using System.Collections.Generic;
 using System.Reflection.Emit;
 using TaleWorlds.CampaignSystem;
@@ -194,6 +196,8 @@ internal class AllowTimeControlFromHotKeysPatches
 [HarmonyPatch(typeof(MapScreen))]
 internal class AllowTimeControlFromMapClickPatches
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<AllowTimeControlFromMapClickPatches>();
+
     [HarmonyPatch(nameof(MapScreen.HandleClickTimeChange))]
     [HarmonyPrefix]
     private static void Prefix(out AllowedThread __state)
@@ -215,16 +219,21 @@ internal class AllowTimeControlFromMapClickPatches
         var setTimeControlMode = AccessTools.PropertySetter(typeof(Campaign), nameof(Campaign.TimeControlMode));
         var setFromMapClick = AccessTools.Method(typeof(AllowTimeControlFromMapClickPatches), nameof(SetTimeControlModeFromMapClick));
 
+        int replacements = 0;
         foreach (var instr in instructions)
         {
             if (instr.Calls(setTimeControlMode))
             {
                 instr.opcode = OpCodes.Call;
                 instr.operand = setFromMapClick;
+                replacements++;
             }
 
             yield return instr;
         }
+
+        if (replacements == 0)
+            Logger.Warning("{Patch} made no replacements; the target method may have changed", nameof(HandleMouseTranspiler));
     }
 
     private static void SetTimeControlModeFromMapClick(Campaign campaign, CampaignTimeControlMode mode)
