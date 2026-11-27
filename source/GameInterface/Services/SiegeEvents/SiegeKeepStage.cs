@@ -27,7 +27,7 @@ public interface ISiegeKeepStage : IGameAbstraction
 {
     /// <summary>
     /// Seats the walls players inside vanilla's hall limits and moves the siege into the lord's hall. A throw forgets
-    /// the half-open roster and returns false; the settlement stays in the lord's hall.
+    /// the half-open roster and returns false; a throw after the siege moved into the lord's hall leaves it there.
     /// </summary>
     bool TryOpen(MapEvent mapEvent);
 
@@ -230,9 +230,13 @@ internal sealed class SiegeKeepStage : ISiegeKeepStage
         RemoveDepartedSeats(mapEvent);
         foreach (var seat in selection.GetSeats(mapEvent))
         {
-            if (!objectManager.TryGetObject<MobileParty>(seat.MobilePartyId, out var party)) continue;
-
             if (selection.HasAnswered(mapEvent, seat.MobilePartyId)) continue;
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(seat.MobilePartyId, out var party))
+            {
+                selection.RemoveSeat(mapEvent, seat.MobilePartyId);
+                continue;
+            }
+
             if (!selectionEntries.TryCreateEntries(SuggestSquad(party, seat), out var squad))
             {
                 selection.RemoveSeat(mapEvent, seat.MobilePartyId);

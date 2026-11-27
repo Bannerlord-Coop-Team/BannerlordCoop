@@ -83,8 +83,8 @@ internal class BattleMissionStartHandler : IHandler
         IBattleMissionInitializerResolver missionInitializerResolver,
         IBattleTroopReserveBuilder reserveBuilder,
         IBattleHostRetentionPolicy retentionPolicy,
-        HideoutRaidHandler hideoutRaids = null,
-        ISiegeKeepRoster keepRoster = null)
+        ISiegeKeepRoster keepRoster,
+        HideoutRaidHandler hideoutRaids = null)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -213,7 +213,7 @@ internal class BattleMissionStartHandler : IHandler
                 // Rejected before the arbiter claim so the event stays open for auto-resolve.
                 operation = "validate siege stage";
                 bool isLordsHall = mapEvent.IsSiegeKeepStage();
-                if (isLordsHall && keepRoster?.IsAdmitted(mapEvent, attackerMobileParty) != true)
+                if (isLordsHall && !keepRoster.IsAdmitted(mapEvent, attackerMobileParty))
                 {
                     Logger.Information("Rejecting keep mission for {MapEventId}: the requester has no place in a locked keep roster",
                         payload.What.MapEventId);
@@ -411,7 +411,7 @@ internal class BattleMissionStartHandler : IHandler
                 continue;
 
             // Walls players without a keep place watch for the result instead.
-            if (keepRoster?.IsLocked(mapEvent) == true && !keepRoster.IsAdmitted(mapEvent, party))
+            if (keepRoster.IsLocked(mapEvent) && !keepRoster.IsAdmitted(mapEvent, party))
                 continue;
 
             participants.Add(new MissionParticipant(

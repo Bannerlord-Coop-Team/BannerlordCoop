@@ -112,7 +112,7 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
     private readonly object gate = new object();
 
     public BattleTroopReserveBuilder(IBattleTroopLedger ledger, IObjectManager objectManager, IPlayerManager playerManager,
-        IHideoutTroopSelection hideoutSelection = null, ISiegeKeepRoster keepRoster = null)
+        ISiegeKeepRoster keepRoster, IHideoutTroopSelection hideoutSelection = null)
     {
         this.ledger = ledger;
         this.objectManager = objectManager;
@@ -385,7 +385,7 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
                 if (mapEvent.IsHideoutBattle && party.Party?.Side == BattleSideEnum.Attacker)
                     hideoutSelection.FilterReserve(mapEvent, party, entries);
                 // The keep fields only the seated players' chosen troops and vanilla's hall defenders.
-                keepRoster?.FilterReserve(mapEvent, party, entries);
+                keepRoster.FilterReserve(mapEvent, party, entries);
                 if (supplyOrders == null)
                     PlacePlayerHeroFirstInReserve(party, entries);
                 RestoreHealth(mapEventId, party.Party, entries);

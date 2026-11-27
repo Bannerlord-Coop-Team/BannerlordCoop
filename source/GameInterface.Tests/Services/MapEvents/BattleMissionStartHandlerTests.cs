@@ -1,6 +1,8 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.MapEvents.Handlers;
 using TaleWorlds.Core;
+using GameInterface.Services.SiegeEvents;
+using Moq;
 using Xunit;
 
 namespace GameInterface.Tests.Services.MapEvents;
@@ -27,7 +29,7 @@ public class BattleMissionStartHandlerTests
             null!,
             null!,
             null!,
-            null!, null!);
+            null!, null!, Mock.Of<ISiegeKeepRoster>());
 
         var initial = new MissionInitializerRecord("battle_terrain_026")
         {
