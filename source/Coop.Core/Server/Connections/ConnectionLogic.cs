@@ -10,9 +10,10 @@ using System.Collections.Generic;
 namespace Coop.Core.Server.Connections;
 
 /// <summary>
-/// Interface for client connection logic, this has a one-to-one relation per connection
+/// Interface for client connection logic, this has a one-to-one relation per connection.
+/// Not an <see cref="IConnectionState"/>, so the join save can't start without an acknowledged player.
 /// </summary>
-public interface IConnectionLogic : IConnectionState
+public interface IConnectionLogic : IDisposable
 {
     NetPeer Peer { get; }
     IConnectionState State { get; }
@@ -23,10 +24,25 @@ public interface IConnectionLogic : IConnectionState
     /// </summary>
     Player AcknowledgedPlayer { get; }
 
+    /// <inheritdoc cref="IConnectionState.IsLoading"/>
+    bool IsLoading { get; }
+
+    /// <inheritdoc cref="IConnectionState.CreateCharacter"/>
+    void CreateCharacter();
+
     /// <summary>
     /// Records <paramref name="acknowledgedPlayer"/> as the registration this peer plays, then sends the join save.
     /// </summary>
     void TransferSave(Player acknowledgedPlayer);
+
+    /// <inheritdoc cref="IConnectionState.Load"/>
+    void Load();
+
+    /// <inheritdoc cref="IConnectionState.EnterCampaign"/>
+    void EnterCampaign();
+
+    /// <inheritdoc cref="IConnectionState.EnterMission"/>
+    void EnterMission();
 }
 
 /// <inheritdoc cref="IConnectionLogic"/>
@@ -117,8 +133,6 @@ public class ConnectionLogic : IConnectionLogic
     }
 
     public void CreateCharacter() => State.CreateCharacter();
-
-    public void TransferSave() => State.TransferSave();
 
     public void TransferSave(Player acknowledgedPlayer)
     {

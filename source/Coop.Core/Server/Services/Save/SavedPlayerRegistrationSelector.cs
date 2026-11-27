@@ -16,10 +16,14 @@ namespace Coop.Core.Server.Services.Save;
 internal interface ISavedPlayerRegistrationSelector
 {
     /// <summary>
-    /// Returns one row per controller, and none for a hero or party that two controllers name. Also returns every hero
-    /// the saved rows name, which <see cref="IPlayerPartyRestorer.TryGetOwnedParty"/> needs after the restore.
+    /// Returns one row per controller, and none for a hero or party that two controllers name.
     /// </summary>
-    (IReadOnlyList<Player> Rows, IReadOnlyCollection<Hero> PlayerHeroes) Select(IEnumerable<Player> savedPlayers);
+    IReadOnlyList<Player> Select(IEnumerable<Player> savedPlayers);
+
+    /// <summary>
+    /// Returns every hero the saved rows name, the player heroes <see cref="IPlayerPartyRestorer.TryGetOwnedParty"/> takes.
+    /// </summary>
+    IReadOnlyCollection<Hero> ResolvePlayerHeroes(IEnumerable<Player> savedPlayers);
 }
 
 /// <inheritdoc cref="ISavedPlayerRegistrationSelector"/>
@@ -36,18 +40,15 @@ internal class SavedPlayerRegistrationSelector : ISavedPlayerRegistrationSelecto
         this.playerPartyRestorer = playerPartyRestorer;
     }
 
-    public (IReadOnlyList<Player> Rows, IReadOnlyCollection<Hero> PlayerHeroes) Select(IEnumerable<Player> savedPlayers)
+    public IReadOnlyCollection<Hero> ResolvePlayerHeroes(IEnumerable<Player> savedPlayers) =>
+        ResolveHeroClaims(savedPlayers.Where(player => player != null)).Select(claim => claim.Claimed).ToArray();
+
+    public IReadOnlyList<Player> Select(IEnumerable<Player> savedPlayers)
     {
         var rows = savedPlayers.Where(player => player != null).ToArray();
 
         // A row can name a hero or party by its full or its short id, so claims compare the objects they resolve to
-        var heroClaims = new List<(Player Player, Hero Claimed)>();
-        foreach (var player in rows)
-        {
-            if (objectManager.TryGetObject(player.HeroId, out Hero hero))
-                heroClaims.Add((player, hero));
-        }
-
+        var heroClaims = ResolveHeroClaims(rows);
         var playerHeroes = heroClaims.Select(claim => claim.Claimed).ToArray();
 
         var partyClaims = new List<(Player Player, MobileParty Claimed)>();
@@ -74,7 +75,19 @@ internal class SavedPlayerRegistrationSelector : ISavedPlayerRegistrationSelecto
             new HashSet<Player>(heroClaims.Select(claim => claim.Player)),
             new HashSet<Player>(partyClaims.Select(claim => claim.Player)));
 
-        return (selected.ToArray(), playerHeroes);
+        return selected.ToArray();
+    }
+
+    private List<(Player Player, Hero Claimed)> ResolveHeroClaims(IEnumerable<Player> rows)
+    {
+        var heroClaims = new List<(Player Player, Hero Claimed)>();
+        foreach (var player in rows)
+        {
+            if (objectManager.TryGetObject(player.HeroId, out Hero hero))
+                heroClaims.Add((player, hero));
+        }
+
+        return heroClaims;
     }
 
     private static IEnumerable<Player> SharedClaims<T>(IEnumerable<(Player Player, T Claimed)> claims) =>

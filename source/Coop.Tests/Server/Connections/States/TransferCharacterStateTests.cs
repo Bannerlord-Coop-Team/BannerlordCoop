@@ -69,7 +69,7 @@ namespace Coop.Tests.Server.Connections.States
 
             // Act
             connectionLogic.CreateCharacter();
-            connectionLogic.TransferSave();
+            connectionLogic.State.TransferSave();
             connectionLogic.EnterCampaign();
             connectionLogic.EnterMission();
 
@@ -138,23 +138,32 @@ namespace Coop.Tests.Server.Connections.States
             Assert.False(otherPeerGotSave);
         }
 
-        [Theory]
-        // A game over or deletion on the game thread unbinds the peer, and an heir swap replaces the registration
-        // while the peer stays bound to it
-        [InlineData(true)]
-        [InlineData(false)]
-        public void EnteringState_PeerNoLongerPlaysTheAcknowledgedPlayer_DisconnectsWithoutTakingTheSave(bool peerUnbound)
+        [Fact]
+        public void EnteringState_PeerUnbound_DisconnectsWithoutTakingTheSave()
         {
-            var playerManager = serverComponent.Container.Resolve<Mock<IPlayerManager>>();
-            if (peerUnbound)
-                playerManager
-                    .Setup(manager => manager.TryGetCurrentPlayer(playerPeer, out It.Ref<Player>.IsAny))
-                    .Returns(false);
-            else
-                connectionLogic.AcknowledgedPlayer = new Player("BoundController", "Hero_Heir", "MobileParty_Bound", "Clan_Bound", "Character_Heir");
+            // A game over or deletion on the game thread unbinds the peer
+            serverComponent.Container.Resolve<Mock<IPlayerManager>>()
+                .Setup(manager => manager.TryGetCurrentPlayer(playerPeer, out It.Ref<Player>.IsAny))
+                .Returns(false);
 
             connectionLogic.SetState<TransferSaveState>();
 
+            AssertDisconnectedWithoutTakingTheSave();
+        }
+
+        [Fact]
+        public void EnteringState_AcknowledgedPlayerReplaced_DisconnectsWithoutTakingTheSave()
+        {
+            // An heir swap replaces the registration while the peer stays bound to it
+            connectionLogic.AcknowledgedPlayer = new Player("BoundController", "Hero_Heir", "MobileParty_Bound", "Clan_Bound", "Character_Heir");
+
+            connectionLogic.SetState<TransferSaveState>();
+
+            AssertDisconnectedWithoutTakingTheSave();
+        }
+
+        private void AssertDisconnectedWithoutTakingTheSave()
+        {
             serverComponent.Container.Resolve<Mock<ISaveInterface>>().Verify(save => save.SaveCurrentGame(), Times.Never);
             Assert.Empty(serverComponent.TestNetwork.SentNetworkMessages);
             Assert.Equal(ConnectionState.ShutdownRequested, playerPeer.ConnectionState);

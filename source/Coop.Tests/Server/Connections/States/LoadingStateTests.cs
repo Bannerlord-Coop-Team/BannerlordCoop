@@ -77,7 +77,7 @@ namespace Coop.Tests.Server.Connections.States
 
             // Act
             connectionLogic.CreateCharacter();
-            connectionLogic.TransferSave();
+            connectionLogic.State.TransferSave();
             connectionLogic.Load();
             connectionLogic.EnterMission();
 

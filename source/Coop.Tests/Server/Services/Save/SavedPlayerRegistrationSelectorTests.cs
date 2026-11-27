@@ -153,6 +153,6 @@ public class SavedPlayerRegistrationSelectorTests
         objectManager.Setup(manager => manager.TryGetObject(LivePartyId, out liveHeroParty)).Returns(true);
         objectManager.Setup(manager => manager.TryGetObject(StalePartyId, out staleHeroParty)).Returns(true);
 
-        return new SavedPlayerRegistrationSelector(objectManager.Object, playerPartyRestorer.Object).Select(savedPlayers).Rows;
+        return new SavedPlayerRegistrationSelector(objectManager.Object, playerPartyRestorer.Object).Select(savedPlayers);
     }
 }
