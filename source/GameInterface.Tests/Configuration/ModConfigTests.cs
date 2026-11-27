@@ -83,6 +83,7 @@ public class ModConfigTests : IDisposable
         Assert.True(config.AdvancedStart.Enabled);
         Assert.True(config.AdvancedStart.UnknownKeys == null || config.AdvancedStart.UnknownKeys.Count == 0);
         Assert.True(config.AdvancedStart.StartTypes.UnknownKeys == null || config.AdvancedStart.StartTypes.UnknownKeys.Count == 0);
+        Assert.True(config.AdvancedStart.StartTypes.Default);
         Assert.True(config.AdvancedStart.StartTypes.Outlaw);
         Assert.True(config.AdvancedStart.StartTypes.Beggar);
         Assert.True(config.AdvancedStart.StartTypes.Trader);

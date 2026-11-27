@@ -15,6 +15,7 @@ using GameInterface.Services.Time.UI;
 using GameInterface.Services.UI.PlayerNameplates;
 using Missions.Agents;
 using Missions.Agents.Handlers;
+using Missions.Agents.Packets;
 using Missions.Agents.Patches;
 using Missions.Agents.Voice;
 using Missions.Battles;
@@ -89,6 +90,9 @@ public class MissionModule : Module
         builder.RegisterType<BattleBenchmarkMissionProbe>().As<IBattleBenchmarkMissionProbe>().InstancePerDependency();
         builder.RegisterType<JsonFileIO>().As<IJsonFileIO>().InstancePerDependency();
         builder.RegisterType<LiteNetP2PClient>().As<IBattleNetwork>().SingleInstance();
+        builder.RegisterType<MovementSnapshotCodec>()
+            .As<IMovementSnapshotCodec>()
+            .InstancePerDependency();
         builder.RegisterType<MovementPacketCompressor>()
             .As<IMovementPacketCompressor>()
             .InstancePerDependency();

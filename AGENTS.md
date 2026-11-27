@@ -159,7 +159,7 @@ Before any `gh pr edit`, re-fetch the live PR (`gh pr view --json title,body`) a
 
 Don't update any repo documentation, including `AGENTS.md` files, `doc/` and READMEs, without explicit authorization from the user.
 
-Every PR must retain an exact `## Bot Changelog Entry` heading. For War Sails updates, leave that section empty because we are not officially supporting War Sails yet. Do not add a changelog bullet just to populate the section.
+Every PR must retain an exact `## Bot Changelog Entry` heading.
 
 ### GitHub Etiquette
 

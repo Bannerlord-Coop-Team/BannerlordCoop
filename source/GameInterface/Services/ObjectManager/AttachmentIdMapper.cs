@@ -1,6 +1,5 @@
 ﻿using GameInterface.Registry.Auto;
 using System.Collections.Generic;
-using System.Linq;
 using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.ObjectManager;
@@ -39,7 +38,6 @@ internal class AttachmentIdMapper : IAttachmentIdMapper
             autoRegistryFactory.BuildIdRemap(map);
         }
 
-        var handles = objectManager.GetHandleMap().ToDictionary(entry => entry.Key, entry => entry.Value);
-        return new AttachmentIdMap(map, handles);
+        return new AttachmentIdMap(map, objectManager.GetHandleMap());
     }
 }

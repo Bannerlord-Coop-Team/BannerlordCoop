@@ -88,6 +88,7 @@ internal class AdvancedStartInterface : IAdvancedStartInterface
     internal const string NoKingdomLockId = "str_coop_advanced_start_no_kingdom";
     internal const string KingdomMissingLockId = "str_coop_advanced_start_kingdom_missing";
     internal const string KingdomRuledLockId = "str_coop_advanced_start_kingdom_ruled";
+    internal const string DefaultStartOffLockId = "str_coop_advanced_start_default_off";
 
     private readonly IModConfig modConfig;
     private readonly ILoadingInterface loadingInterface;
@@ -98,13 +99,10 @@ internal class AdvancedStartInterface : IAdvancedStartInterface
     private readonly IAdvancedStartModifier[] modifiers;
 
     private CoopStartingOptionsView startOptionsView;
-    // Client: set when a debug build skipped character creation for this join.
     private bool startOptionsSkipped;
     // Server: the campaign whose clock is being watched for its first move.
     private Campaign worldStartWatchCampaign;
-    // Server: the host's default start type was found not to be offered and logged.
     private bool warnedDefaultStartType;
-    // Client: the server offers world-changing starts.
     private bool worldStartsOffered;
     // Client: the player agreed to the first resume, so they aren't asked again while the clock catches up.
     private bool firstResumeConfirmed;
@@ -153,37 +151,47 @@ internal class AdvancedStartInterface : IAdvancedStartInterface
         var policy = CreatePolicy(startTypes, modifiers, config, HasWorldStarted(), playerRuledKingdomIds.ToArray(), joinableKingdomIds.ToArray());
 
         // Once, since the window quietly opens on the default start instead and the host has no other hint why.
-        if (!warnedDefaultStartType && policy.DefaultStartType != null && FindHostDefaultStartType(policy) == null)
+        // Vanilla's default switched off is left out of the policy on purpose, so it's no mistake to warn about.
+        bool unknownDefault = policy.DefaultStartType != null && FindHostDefaultStartType(policy) == null &&
+            !string.Equals(policy.DefaultStartType, StartOptionIds.StartTypeDefaultId, StringComparison.OrdinalIgnoreCase);
+        if (!warnedDefaultStartType && unknownDefault)
         {
             warnedDefaultStartType = true;
             Logger.Warning("mod-config.json: advancedStart.defaultStartType '{DefaultStartType}' isn't a start type this " +
-                           "server offers, so the window opens on '{Fallback}'", config.DefaultStartType, StartOptionIds.StartTypeDefaultId);
+                           "server offers, so the window opens on '{Fallback}'", config.DefaultStartType, GetDefaultStartType(policy));
         }
 
         return policy;
     }
 
     /// <summary>The policy offering the default start first, then each start type and modifier the host's config
-    /// doesn't switch off.</summary>
+    /// doesn't switch off. A switched off default start is still offered while no other start type can be picked.</summary>
     internal static AdvancedStartPolicy CreatePolicy(IEnumerable<IAdvancedStartType> startTypes,
         IEnumerable<IAdvancedStartModifier> modifiers, AdvancedStartConfigData config,
         bool worldStarted, string[] playerRuledKingdomIds, string[] joinableKingdomIds)
     {
         var offered = startTypes.Where(startType => startType.IsOffered(config)).ToArray();
         string[] IdsWhere(Func<IAdvancedStartType, bool> trait) => offered.Where(trait).Select(startType => startType.Id).ToArray();
+        var modifierLimits = modifiers
+            .Select(modifier => (modifier.OptionId, Limit: modifier.GetLimit(config)))
+            .Where(modifier => modifier.Limit > 0)
+            .ToDictionary(modifier => modifier.OptionId, modifier => modifier.Limit);
 
-        return new AdvancedStartPolicy(
-            startTypes: new[] { StartOptionIds.StartTypeDefaultId }.Concat(offered.Select(startType => startType.Id)).ToArray(),
+        AdvancedStartPolicy WithStartTypes(IEnumerable<string> ids) => new AdvancedStartPolicy(
+            startTypes: ids.ToArray(),
             worldStartTypes: IdsWhere(startType => startType.ChangesWorld),
             kingdomStartTypes: IdsWhere(startType => startType.NeedsKingdom),
-            modifierLimits: modifiers
-                .Select(modifier => (modifier.OptionId, Limit: modifier.GetLimit(config)))
-                .Where(modifier => modifier.Limit > 0)
-                .ToDictionary(modifier => modifier.OptionId, modifier => modifier.Limit),
+            modifierLimits: modifierLimits,
             defaultStartType: config?.DefaultStartType,
             worldStarted: worldStarted,
             playerRuledKingdomIds: playerRuledKingdomIds,
             joinableKingdomIds: joinableKingdomIds);
+
+        var offeredIds = offered.Select(startType => startType.Id).ToArray();
+        var withoutDefault = WithStartTypes(offeredIds);
+        if (config?.StartTypes?.Default == false && HasPickableStartType(withoutDefault)) return withoutDefault;
+
+        return WithStartTypes(new[] { StartOptionIds.StartTypeDefaultId }.Concat(offeredIds));
     }
 
     // The campaign clock only moves once someone resumes it, so an unmoved clock means no one has played yet.
@@ -204,7 +212,6 @@ internal class AdvancedStartInterface : IAdvancedStartInterface
         });
     }
 
-    // Client: the joining server's latest policy.
     private AdvancedStartPolicy ServerPolicy { get; set; }
 
     public void UpdateServerPolicy(AdvancedStartPolicy policy)
@@ -259,9 +266,12 @@ internal class AdvancedStartInterface : IAdvancedStartInterface
         if (policy?.StartTypes == null) return false;
         if (policy.ModifierLimits?.Count > 0) return true;
 
-        return policy.StartTypes.Any(startType => startType != StartOptionIds.StartTypeDefaultId &&
-                                                  GetStartTypeLockId(policy, startType, policy.JoinableKingdomIds) == null);
+        return HasPickableStartType(policy);
     }
+
+    private static bool HasPickableStartType(AdvancedStartPolicy policy) =>
+        policy.StartTypes.Any(startType => startType != StartOptionIds.StartTypeDefaultId &&
+                                           GetStartTypeLockId(policy, startType, policy.JoinableKingdomIds) == null);
 
     internal static bool IsWorldLocked(AdvancedStartPolicy policy, string startType) =>
         policy.WorldStarted && policy.WorldStartTypes?.Contains(startType) == true;
@@ -270,6 +280,8 @@ internal class AdvancedStartInterface : IAdvancedStartInterface
     /// <paramref name="kingdomIds"/> to be able to take it.</summary>
     internal static string GetStartTypeLockId(AdvancedStartPolicy policy, string startType, IEnumerable<string> kingdomIds)
     {
+        if (startType == StartOptionIds.StartTypeDefaultId && !policy.StartTypes.Contains(startType))
+            return DefaultStartOffLockId;
         if (IsWorldLocked(policy, startType)) return WorldStartedLockId;
 
         bool anyKingdomCanTakeIt = kingdomIds?.Any(kingdomId => GetKingdomLockId(policy, startType, kingdomId) == null) == true;
@@ -288,13 +300,17 @@ internal class AdvancedStartInterface : IAdvancedStartInterface
         return null;
     }
 
-    /// <summary>The start type the window opens on: the host's default when it can be picked, otherwise vanilla's.</summary>
+    /// <summary>The start type the window opens on: the host's default when it can be picked, otherwise vanilla's,
+    /// or the first start type that can be picked when the host switched vanilla's off.</summary>
     internal static string GetDefaultStartType(AdvancedStartPolicy policy)
     {
-        string hostDefault = FindHostDefaultStartType(policy);
-        if (hostDefault != null && !IsWorldLocked(policy, hostDefault)) return hostDefault;
+        bool CanPick(string startType) => GetStartTypeLockId(policy, startType, policy.JoinableKingdomIds) == null;
 
-        return StartOptionIds.StartTypeDefaultId;
+        string hostDefault = FindHostDefaultStartType(policy);
+        if (hostDefault != null && CanPick(hostDefault)) return hostDefault;
+        if (policy.StartTypes.Contains(StartOptionIds.StartTypeDefaultId)) return StartOptionIds.StartTypeDefaultId;
+
+        return policy.StartTypes.FirstOrDefault(CanPick) ?? StartOptionIds.StartTypeDefaultId;
     }
 
     // The offered start type the host set as default, or null when it isn't offered. Matched ignoring case, since the
@@ -354,13 +370,13 @@ internal class AdvancedStartInterface : IAdvancedStartInterface
     // window opened. Vanilla's own item locks are left out: the host decides what's offered, not the joining player's
     // single-player playthroughs, and its kingdom locks read world scenario options this window doesn't have.
 
-    // The start type option, keeping only the start types the policy offers.
     private ListAdvancedStartOption CopyStartTypeOption(ListAdvancedStartOption option, AdvancedStartPolicy policy)
     {
         var items = new List<(string Identifier, ListAdvancedStartOption.ListItemCondition Condition)>();
         foreach (var item in option.GetItems())
         {
-            if (!policy.StartTypes.Contains(item.Identifier)) continue;
+            // The default start stays listed when switched off, so it can unlock as the fallback once the others lock.
+            if (item.Identifier != StartOptionIds.StartTypeDefaultId && !policy.StartTypes.Contains(item.Identifier)) continue;
 
             ListAdvancedStartOption.ListItemCondition locked = (StartOptions options, out TextObject disabledText) =>
             {
@@ -373,7 +389,6 @@ internal class AdvancedStartInterface : IAdvancedStartInterface
         return new ListAdvancedStartOption(option.StringId, option.CategoryId, items, option.GetIsHidden, GetDefaultStartType(policy));
     }
 
-    // The kingdom option. Vanilla's defaults to no kingdom, which a kingdom start can't use.
     private ListAdvancedStartOption CopyKingdomOption(ListAdvancedStartOption option, AdvancedStartPolicy policy)
     {
         var items = new List<(string Identifier, ListAdvancedStartOption.ListItemCondition Condition)>();
@@ -388,6 +403,7 @@ internal class AdvancedStartInterface : IAdvancedStartInterface
         }
 
         string defaultValue = option.GetDefaultValue<string>();
+        // Vanilla's defaults to no kingdom, which a kingdom start can't use.
         if (string.IsNullOrEmpty(defaultValue) && items.Count > 0) defaultValue = items[0].Identifier;
 
         return new ListAdvancedStartOption(option.StringId, option.CategoryId, items, option.GetIsHidden, defaultValue);
@@ -414,7 +430,6 @@ internal class AdvancedStartInterface : IAdvancedStartInterface
     public bool ApplySelections(Hero hero, AdvancedStartSelection[] selections)
     {
         bool applied = false;
-        // Patches stay live so every change to the hero, party and factions replicates as its own message.
         GameThread.RunSafe(() =>
         {
             // Picked against a fresh policy because the world can move on, or another player take the kingdom, after the window opened.
@@ -468,7 +483,6 @@ internal class AdvancedStartInterface : IAdvancedStartInterface
         var pickedModifiers = new List<(IAdvancedStartModifier Modifier, int Value)>();
         foreach (var modifier in modifiers)
         {
-            // A modifier the host doesn't offer is skipped, whatever the client sent for it.
             if (!limits.TryGetValue(modifier.OptionId, out int limit)) continue;
 
             string picked = selections.FirstOrDefault(selection => selection.Id == modifier.OptionId)?.Value;
@@ -491,7 +505,6 @@ internal class AdvancedStartInterface : IAdvancedStartInterface
         return int.TryParse(value, out int number) ? number : 0;
     }
 
-    // Whether the pick is still offered and, for a kingdom start, its kingdom can still take the player.
     private static bool CanApply(AdvancedStartPolicy policy, IAdvancedStartType startType, string kingdomId)
     {
         if (policy == null || !policy.StartTypes.Contains(startType.Id)) return false;

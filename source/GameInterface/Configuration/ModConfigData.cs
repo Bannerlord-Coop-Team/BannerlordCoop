@@ -67,10 +67,12 @@ public sealed class AdvancedStartConfigData
 
 /// <summary>
 /// The "advancedStart.startTypes" block, one key per vanilla start type. false hides that start type
-/// from the window; a missing key offers it.
+/// from the window, except Default, which stays listed but locked; a missing key offers it.
 /// </summary>
 public sealed class AdvancedStartTypesConfigData
 {
+    /// <summary>false: the default start is only offered while no other start type can be picked.</summary>
+    public bool? Default { get; set; }
     public bool? Outlaw { get; set; }
     public bool? Beggar { get; set; }
     public bool? Trader { get; set; }

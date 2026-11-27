@@ -7,6 +7,8 @@ namespace GameInterface.Services.AdvancedStart.Data;
 [ProtoContract(SkipConstructor = true)]
 public class AdvancedStartPolicy
 {
+    /// <summary>The start types the window lists. A missing default start is still listed, locked, since the host
+    /// switched it off and only offers it once no other start type can be picked.</summary>
     [ProtoMember(1)]
     public readonly string[] StartTypes;
     [ProtoMember(2)]

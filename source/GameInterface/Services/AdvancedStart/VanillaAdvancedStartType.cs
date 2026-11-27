@@ -23,7 +23,6 @@ public interface IAdvancedStartType
     /// <summary>Joins the kingdom picked in the KingdomId option.</summary>
     bool NeedsKingdom { get; }
 
-    /// <summary>Whether the host's config offers it.</summary>
     bool IsOffered(AdvancedStartConfigData config);
 
     /// <summary>Server, game thread: whether the world can still run this start. The policy's locks are checked separately.</summary>

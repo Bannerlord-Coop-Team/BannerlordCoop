@@ -5,7 +5,7 @@ using TaleWorlds.MountAndBlade;
 namespace Missions.Agents.Packets
 {
     [ProtoContract(SkipConstructor = true)]
-    public struct AgentData
+    public partial struct AgentData
     {
         internal static Agent.MovementControlFlag GetLocomotionMovementFlags(
             Agent.MovementControlFlag movementFlags)
@@ -174,30 +174,34 @@ namespace Missions.Agents.Packets
                 : new Vec2(0f, throttle);
         }
 
+        // Add rider pose fields to WriteSnapshot, ReadSnapshot and SnapshotBytes too.
         [ProtoMember(1)]
-        public Vec3 Position { get; }
+        public Vec3 Position { get; private set; }
         [ProtoMember(2)]
-        public Vec2 InputVector { get; }
+        public Vec2 InputVector { get; private set; }
         [ProtoMember(3)]
-        public Vec3 LookDirection { get; }
+        public Vec3 LookDirection { get; private set; }
         [ProtoMember(4)]
-        public Vec2 MovementDirection { get; }
+        public Vec2 MovementDirection { get; private set; }
         // 5 was AgentEquipmentData — wield state moved to reliable on-change updates.
         // 6 was ActionData — actions moved to the event-driven AgentActionHandler.
         [ProtoMember(7)]
-        public AgentMountData MountData { get; }
+        public AgentMountData MountData { get; private set; }
         /// <summary>The owner's real ground speed, m/s — drives the on-foot puppet's locomotion throttle.</summary>
         [ProtoMember(8)]
         public float Speed { get; private set; }
         /// <summary>The owner's current translation and turn inputs.</summary>
         [ProtoMember(9)]
-        public uint MovementFlag { get; }
+        public uint MovementFlag { get; private set; }
         // Deck pose: 0 is a world pose, otherwise a 1-based index into the packet's DeckShips with a hull-local position.
+        // Add deck pose fields to WriteDeckSnapshot, ReadDeckSnapshot and DeckSnapshotBytes too.
         [ProtoMember(11)]
         public int DeckShipIndex { get; private set; }
         [ProtoMember(12)]
         public Vec3 DeckLocal { get; private set; }
-        public bool ShouldSerializeDeckLocal() => DeckShipIndex != 0;
+        public bool ShouldSerializeDeckLocal() => HasDeckPose;
+
+        internal bool HasDeckPose => DeckShipIndex != 0;
 
         /// <summary>The hull this deck pose is relative to, resolved from the packet's DeckShips on receive.</summary>
         [ProtoIgnore]

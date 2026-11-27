@@ -94,9 +94,11 @@
     "defaultStartType": "default",
 
     // false hides a start type from the window.
+    // When "default" is false it will only be unavailable if at least one other start type is available.
     // trader, mercenary, vassal and king change the world (workshops, fiefs, kingdom
     // rulers, wars), so they can only be picked before the campaign is first resumed.
     "startTypes": {
+      "default": true,
       "outlaw": true,
       "beggar": true,
       "trader": true,

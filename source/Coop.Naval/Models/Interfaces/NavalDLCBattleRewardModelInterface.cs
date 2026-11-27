@@ -16,32 +16,38 @@ using TaleWorlds.Library;
 
 namespace Coop.Naval.Models.Interfaces;
 
+/// <summary>[Server] Vanilla's naval battle rewards for the main party, given to every winning player instead.</summary>
 public interface INavalDLCBattleRewardModelInterface : IGameAbstraction
 {
-    MBReadOnlyList<KeyValuePair<Ship, MapEventParty>> DistributeDefeatedPartyShipsAmongWinners(NavalDLCBattleRewardModel model, MapEventParty mainParty, MBReadOnlyList<Ship> shipsToLoot, MBReadOnlyList<MapEventParty> winnerParties);
+    /// <summary>Vanilla's ship distribution, with the main party's share of the leftover ships split among the winning players.</summary>
+    MBReadOnlyList<KeyValuePair<Ship, MapEventParty>> DistributeDefeatedPartyShipsAmongWinners(NavalDLCBattleRewardModel model, MBReadOnlyList<Ship> shipsToLoot, MBReadOnlyList<MapEventParty> winnerParties);
     void CalculatePlayerFigureheadShare(MapEvent mapEvent, MBReadOnlyList<MapEventParty> defeatedParties, PartyBase defeatedLeaderParty);
 }
 
+/// <inheritdoc cref="INavalDLCBattleRewardModelInterface"/>
 public class NavalDLCBattleRewardModelInterface : INavalDLCBattleRewardModelInterface
 {
     private readonly ICoopSessionProvider coopSessionProvider;
     private readonly IObjectManager objectManager;
     private readonly IPlayerManager playerManager;
     private readonly ISessionNavalPlayerDataInterface sessionNavalPlayerDataInterface;
+    private readonly ILeftoverShipDistributor leftoverShipDistributor;
 
     public NavalDLCBattleRewardModelInterface(
         ICoopSessionProvider coopSessionProvider,
         IObjectManager objectManager,
         IPlayerManager playerManager,
-        ISessionNavalPlayerDataInterface sessionNavalPlayerDataInterface)
+        ISessionNavalPlayerDataInterface sessionNavalPlayerDataInterface,
+        ILeftoverShipDistributor leftoverShipDistributor)
     {
         this.coopSessionProvider = coopSessionProvider;
         this.objectManager = objectManager;
         this.playerManager = playerManager;
         this.sessionNavalPlayerDataInterface = sessionNavalPlayerDataInterface;
+        this.leftoverShipDistributor = leftoverShipDistributor;
     }
 
-    public MBReadOnlyList<KeyValuePair<Ship, MapEventParty>> DistributeDefeatedPartyShipsAmongWinners(NavalDLCBattleRewardModel model, MapEventParty mainParty, MBReadOnlyList<Ship> shipsToLoot, MBReadOnlyList<MapEventParty> winnerParties)
+    public MBReadOnlyList<KeyValuePair<Ship, MapEventParty>> DistributeDefeatedPartyShipsAmongWinners(NavalDLCBattleRewardModel model, MBReadOnlyList<Ship> shipsToLoot, MBReadOnlyList<MapEventParty> winnerParties)
     {
         Dictionary<Ship, MapEventParty> distributedShips = new();
         MBList<Ship> lootableShips = new();
@@ -96,22 +102,11 @@ public class NavalDLCBattleRewardModelInterface : INavalDLCBattleRewardModelInte
             }
         }
 
-        // Replace PartyBase.MainParty usage with the winning player's party
+        // Vanilla rolls the leftover ships for PartyBase.MainParty, the server rolls them for every winning player
         if (lootableShips.Count > 0)
         {
             lootableShips.Shuffle();
-            int mainPartyShipCount = distributedShips.Count(x => x.Value == mainParty);
-            if (lootableShips.Count + mainPartyShipCount > 25)
-            {
-                lootableShips = lootableShips.Take(25 - mainPartyShipCount).ToMBList();
-            }
-            int totalContribution = winnerParties.Sum(x => x.ContributionToBattle);
-            foreach (Ship ship in lootableShips)
-            {
-                if (MBRandom.RandomInt(totalContribution) >= mainParty.ContributionToBattle) break;
-
-                distributedShips[ship] = mainParty;
-            }
+            leftoverShipDistributor.GiveToPlayers(distributedShips, lootableShips, winnerParties, MBRandom.RandomInt);
         }
 
         return distributedShips.ToMBList();

@@ -1,9 +1,7 @@
 ﻿using Common.BattleBenchmark;
-using Common.Logging;
 using Common.PacketHandlers;
 using LiteNetLib;
 using Missions.Agents.Packets;
-using Serilog;
 
 namespace Missions.Services.Network;
 
@@ -12,8 +10,6 @@ namespace Missions.Services.Network;
 /// </summary>
 public class CompressedMovementPacketHandler : IPacketHandler
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<CompressedMovementPacketHandler>();
-
     private readonly IPacketManager packetManager;
     private readonly IMovementPacketCompressor movementPacketCompressor;
     private readonly IBattleBenchmarkRecorder battleBenchmark;
@@ -39,11 +35,7 @@ public class CompressedMovementPacketHandler : IPacketHandler
 
     public void HandlePacket(NetPeer peer, IPacket packet)
     {
-        if (!movementPacketCompressor.TryRestore(packet, out IPacket restored))
-        {
-            Logger.Warning("Discarding an invalid compressed movement packet");
-            return;
-        }
+        if (!movementPacketCompressor.TryRestore(packet, out IPacket restored)) return;
 
         // Counted under the packet it carries, as the sender counted it, with the bytes that arrived.
         if (battleBenchmark.IsRecording && packet is CompressedMovementPacket compressed)

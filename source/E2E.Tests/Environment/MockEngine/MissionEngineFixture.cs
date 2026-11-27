@@ -775,6 +775,11 @@ public sealed class MissionEngineFixture : IDisposable
 
         // Agent.HandleBlow ignores non-damaging blows and clamps damage under local death guards.
         if (blow.InflictedDamage <= 0) return false;
+        Mission mission = victim.Mission;
+        Agent blowAffector = blow.OwnerId != -1 ? mission.FindAgentWithIndex(blow.OwnerId) : null;
+        // Models HandleBlow calling IsEnemyOf(attacker) for an AI victim in a formation, which throws for a blow with no owner agent.
+        if (blowAffector == null && __instance.Controller == AgentControllerType.AI && __instance.Formation != null)
+            throw new NullReferenceException("Agent.HandleBlow passed a null blow owner to Agent.IsEnemyOf");
         float damage = Math.Min(blow.InflictedDamage, victim.Health);
         if (__instance.CurrentMortalityState == Agent.MortalityState.Immortal
             || victim.Mission.DisableDying
@@ -791,8 +796,6 @@ public sealed class MissionEngineFixture : IDisposable
             activeMock.DismountRiderOnNextBlow = false;
             __instance.MountAgent = null;
         }
-        Mission mission = victim.Mission;
-        Agent blowAffector = blow.OwnerId != -1 ? mission.FindAgentWithIndex(blow.OwnerId) : null;
         if (!mission.DisableDying
             && Mission.Current.Mode != MissionMode.Conversation
             && Mission.Current.Mode != MissionMode.CutScene)
