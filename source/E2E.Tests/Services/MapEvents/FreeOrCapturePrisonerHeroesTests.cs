@@ -10,7 +10,9 @@ using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.TroopRosters.Messages;
+using GameInterface.Services.Villages.Interfaces;
 using HarmonyLib;
+using Moq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Conversation;
@@ -71,7 +73,7 @@ public class FreeOrCapturePrisonerHeroesTests : IDisposable
 
         RunFreeHeroes(rescuer, fixture, new[] { companionId }, encounter =>
         {
-            new PlayerEncounterInterface(null, null).UpdateInternalAfterBattle(encounter);
+            new PlayerEncounterInterface(null, Mock.Of<IVillageHostileActionInterface>()).UpdateInternalAfterBattle(encounter);
 
             Assert.Empty(openedConversations);
             Assert.Equal(PlayerEncounterState.LootParty, encounter.EncounterState);
@@ -104,7 +106,7 @@ public class FreeOrCapturePrisonerHeroesTests : IDisposable
 
         RunFreeHeroes(rescuer, fixture, new[] { companionId }, encounter =>
         {
-            new PlayerEncounterInterface(null, null).UpdateInternalAfterBattle(encounter);
+            new PlayerEncounterInterface(null, Mock.Of<IVillageHostileActionInterface>()).UpdateInternalAfterBattle(encounter);
 
             Assert.Empty(openedConversations);
             Assert.Equal(PlayerEncounterState.LootParty, encounter.EncounterState);

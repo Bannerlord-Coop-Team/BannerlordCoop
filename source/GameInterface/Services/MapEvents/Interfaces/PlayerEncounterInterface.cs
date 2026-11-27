@@ -213,6 +213,6 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
         // Finish finalizes the battle and drops it from the encounter, so read it first
         var mapEvent = playerEncounter._mapEvent;
         PlayerEncounter.Finish(true);
-        villageHostileActionInterface?.ReenterForcedVillage(mapEvent);
+        villageHostileActionInterface.ReenterForcedVillage(mapEvent);
     }
 }

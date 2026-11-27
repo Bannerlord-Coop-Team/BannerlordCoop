@@ -349,7 +349,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         var mainParty = MobileParty.MainParty;
         var village = mapEvent.MapEventSettlement;
         if (village == null || mainParty.CurrentSettlement != village ||
-            mapEvent.AttackerSide.LeaderParty != mainParty.Party) return;
+            mapEvent.AttackerSide?.LeaderParty != mainParty.Party) return;
 
         EncounterManager.StartSettlementEncounter(mainParty, village);
     }

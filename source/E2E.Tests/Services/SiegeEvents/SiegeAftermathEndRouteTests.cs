@@ -11,6 +11,7 @@ using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.SiegeEvents.Handlers;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using GameInterface.Services.SiegeEvents.Patches;
+using GameInterface.Services.Villages.Interfaces;
 using HarmonyLib;
 using Moq;
 using TaleWorlds.CampaignSystem;
@@ -57,7 +58,7 @@ public class SiegeAftermathEndRouteTests : IDisposable
             Campaign.Current.PlayerEncounter = encounter;
             try
             {
-                new PlayerEncounterInterface(siegeEvents.Object, null).UpdateInternalAfterBattle(encounter);
+                new PlayerEncounterInterface(siegeEvents.Object, Mock.Of<IVillageHostileActionInterface>()).UpdateInternalAfterBattle(encounter);
 
                 // the route finishes the encounter itself; the plain Finish must not run first
                 Assert.Same(encounter, Campaign.Current.PlayerEncounter);
