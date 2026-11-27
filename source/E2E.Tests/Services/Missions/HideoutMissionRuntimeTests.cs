@@ -560,6 +560,7 @@ public sealed class HideoutMissionRuntimeTests : MissionTestEnvironment
     {
         using var fixture = new MissionEngineFixture();
         var harmony = new Harmony($"hideout-signal-fire.{Guid.NewGuid()}");
+        // native StealthAreaMissionLogic.OnObjectUsed refuses the fire while any active agent reads as alarmed
         harmony.Patch(AccessTools.PropertyGetter(typeof(Agent), nameof(Agent.AIStateFlags)),
             prefix: new HarmonyMethod(typeof(HideoutMissionRuntimeTests), nameof(NotAlarmed)));
         try
@@ -567,25 +568,15 @@ public sealed class HideoutMissionRuntimeTests : MissionTestEnvironment
             RunWithSceneShims(() => Clients.First().Call(() =>
             {
                 var mission = fixture.CreateMission(Clients.First());
-                var attackerTeam = mission.AddTeam(BattleSideEnum.Attacker);
-                mission.PlayerTeam = mission.AttackerTeam;
-                var defenderTeam = mission.AddTeam(BattleSideEnum.Defender);
+                var (logic, nativeLogic, attackerTeam, defenderTeam) = CreateCampHideout(mission, Mock.Of<IMessageBroker>(), false);
+                var native = (CoopHideoutAmbushController)nativeLogic;
                 var hero = mission.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop).Team(attackerTeam).Controller(AgentControllerType.Player));
                 var sentry = mission.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop).Team(defenderTeam).Controller(AgentControllerType.AI));
                 mission.MainAgent = hero;
-                var attacker = new CoopTroopSupplier("raid", BattleSideEnum.Attacker, null, null);
-                var defender = new CoopTroopSupplier("raid", BattleSideEnum.Defender, null, null);
-                var logic = new CoopHideoutMissionLogic(Mock.Of<IBattleNetwork>(), Mock.Of<IMessageBroker>(),
-                    Mock.Of<IMissionContext>(), defender, attacker, false);
                 AttachHideoutLogic(logic, mission, Mock.Of<IBattleSession>(value => value.IsLocalHost));
                 var areaLogic = new CoopHideoutStealthAreaLogic();
-                var native = new CoopHideoutAmbushController(logic, new IMissionTroopSupplier[] { logic.Defender, logic.Attacker });
-                logic.Native = native;
-                foreach (var behavior in new MissionBehavior[] { logic, areaLogic, native })
-                {
-                    AccessTools.Property(typeof(MissionBehavior), nameof(MissionBehavior.Mission)).SetValue(behavior, mission.Shell);
-                    mission.Shell.MissionBehaviors.Add(behavior);
-                }
+                AccessTools.Property(typeof(MissionBehavior), nameof(MissionBehavior.Mission)).SetValue(areaLogic, mission.Shell);
+                mission.Shell.MissionBehaviors.Add(areaLogic);
                 native._missionObjectiveLogic = new MissionObjectiveLogic();
                 native._isClearedAsGhost = false;
                 mission.Shell._missionMode = MissionMode.Stealth;
