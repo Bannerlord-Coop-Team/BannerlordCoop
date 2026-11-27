@@ -211,8 +211,8 @@ internal class SiegeEntryFlowPatches
     }
 
     // The army follower "Leave Army" option clears the camp and the army in one consequence. Both route
-    // through the server, because a client's native Army write skips the army removal patch and the server
-    // kept the party in the army, attached to its leader and pulled back into each of its sieges (#4697).
+    // through the server, because OnRemovePartyInternalPrefix drops a client's native Army write without
+    // publishing it, so the server kept the party attached to the leader and in each of its sieges (#4697).
     [HarmonyPatch(typeof(SiegeEventCampaignBehavior), nameof(SiegeEventCampaignBehavior.menu_siege_strategies_passive_wait_leave_on_consequence))]
     [HarmonyPrefix]
     private static bool PassiveWaitLeavePrefix()

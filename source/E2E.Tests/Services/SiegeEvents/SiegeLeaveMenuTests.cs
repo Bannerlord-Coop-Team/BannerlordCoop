@@ -332,10 +332,16 @@ public class SiegeLeaveMenuTests : IDisposable
         var leavingClient = Clients.First();
         var (partyId, _) = SetupBesiegingPlayerParty(leavingClient);
         var armyId = FollowAiArmy(partyId);
+        // Received messages queue for the game thread like live, so the client's own leave runs before the server echo
+        Server.Resolve<TestNetworkRouter>().ReceiveContext = TestNetworkReceiveContext.PollerThread;
+        using var leaves = new MethodCallRecorder(Priority.Normal, runOriginal: true,
+            AccessTools.Method(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnPartyLeftArmy)));
 
         leavingClient.Call(InvokePatchedPassiveArmySiegeLeave, LeaveRoundTripDisabledMethods);
-        foreach (var instance in AllEnvironmentInstances)
-            instance.PumpGameThread();
+        Assert.Equal(1, leaves.CountFor(leavingClient));
+        Server.PumpGameThread();
+        foreach (var client in Clients)
+            client.PumpGameThread();
 
         // #4697: only the camp used to reach the server, which kept the party in the army and attached to its leader
         foreach (var instance in AllEnvironmentInstances)
@@ -351,6 +357,8 @@ public class SiegeLeaveMenuTests : IDisposable
             });
         }
         Assert.Single(leavingClient.NetworkSentMessages.GetMessages<NetworkRemovePartyInArmy>());
+        // the echo finds the party already out of the army and leaves it alone
+        Assert.Equal(1, leaves.CountFor(leavingClient));
     }
 
     [Fact]
