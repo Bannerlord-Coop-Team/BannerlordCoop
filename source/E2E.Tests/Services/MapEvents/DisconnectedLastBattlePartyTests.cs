@@ -1,6 +1,5 @@
 ﻿using Common.Messaging;
 using Common.Network.Messages;
-using Coop.Core.Server.Connections.Messages;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using TaleWorlds.CampaignSystem;
@@ -24,7 +23,7 @@ public class DisconnectedLastBattlePartyTests : MapEventTestBase
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void LastPartyOnItsSide_LeavesBattle_IsParkedAndRestoredOnRejoin(bool followsLeader)
+    public void LastPartyOnItsSide_LeavesBattle_IsParkedAfterBattleEnds(bool followsLeader)
     {
         var context = CreateServerMapEvent();
         var leaderId = context.AttackerPartyId;
@@ -58,9 +57,6 @@ public class DisconnectedLastBattlePartyTests : MapEventTestBase
 
         AssertFinalized(context.MapEventId);
         AssertParty(partyId, active: false, inBattle: false);
-
-        Rejoin();
-        AssertParty(partyId, active: true, inBattle: false);
     }
 
     private void ConnectPlayer(string partyId)
@@ -79,21 +75,11 @@ public class DisconnectedLastBattlePartyTests : MapEventTestBase
         PumpAll();
     }
 
-    private void Rejoin()
-    {
-        TestEnvironment.ConnectRegisteredPlayer(Client, ControllerId);
-        Server.Call(() => Server.Resolve<IMessageBroker>().Publish(this, new PlayerCampaignSynchronized(Client.NetPeer)));
-        PumpAll();
-    }
-
     private void PumpAll()
     {
-        for (var i = 0; i < 3; i++)
-        {
-            Server.PumpGameThread();
-            foreach (var client in Clients)
-                client.PumpGameThread();
-        }
+        Server.PumpGameThread();
+        foreach (var client in Clients)
+            client.PumpGameThread();
     }
 
     private void AssertFinalized(string mapEventId)

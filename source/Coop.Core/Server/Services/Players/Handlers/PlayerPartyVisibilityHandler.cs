@@ -292,23 +292,32 @@ internal class PlayerPartyVisibilityHandler : IHandler
             .Select(entry => entry.Key)
             .ToArray();
 
-        // A party whose own removal ended the battle still points at it until vanilla's MapEventSide setter returns,
-        // and leaving its siege camp before then skips vanilla picking the camp a new leader
-        var removedParties = parties.Where(party => ReferenceEquals(party.MapEvent, mapEvent)).ToArray();
-        if (removedParties.Length > 0)
-            GameThread.EnqueueSafe(() => ParkAfterMapEvent(removedParties));
+        var leavingParties = parties.Where(party => ReferenceEquals(party.MapEvent, mapEvent)).ToArray();
+        ParkAfterMapEvent(parties.Except(leavingParties));
 
-        ParkAfterMapEvent(parties.Except(removedParties));
+        // A party whose own removal ended the battle still points at it until vanilla's MapEventSide setter returns,
+        // and leaving its siege camp before then skips vanilla picking the camp a new leader,
+        // so they are parked next frame, once the setter has cleared it
+        if (leavingParties.Length > 0)
+            GameThread.EnqueueSafe(() => ParkAfterMapEvent(leavingParties));
     }
 
     private void ParkAfterMapEvent(IEnumerable<MobileParty> parties)
     {
         foreach (var party in parties)
         {
-            if (party.MapEvent != null) continue;
-
             // A queued park finds no entry when its player synchronized again first
             if (!deferredMapEventParking.TryGetValue(party, out var deferred)) continue;
+
+            if (party.MapEvent != null)
+            {
+                Logger.Warning(
+                    "Not parking disconnected party {PartyId} because it is in MapEvent {MapEventId}",
+                    party.StringId,
+                    party.MapEvent.StringId);
+                continue;
+            }
+
             deferredMapEventParking.Remove(party);
             if (!playerManager.TryGetPlayer(deferred.ControllerId, out var player) ||
                 (playerManager.IsConnected(player) && !IsPlayerHeroDead(player)))
