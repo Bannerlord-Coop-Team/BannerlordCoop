@@ -116,31 +116,14 @@ snapshot drops a remembered issue; the snapshot path captures local ownership be
 queues the same replay. Clients do not run the alternative troop return again. An ongoing quest announces its own cancellation, so the enclosing
 issue cancellation does not announce it a second time.
 
-- A deleted, retired or game over player, or a stale registration dropped at join, publishes `PlayerRemoved`.
-  `ActiveIssueDismisser` then ends its issues at once, sent troops too, because owner entries name the controller
-  and its next character would collect them. Its unfinished journal rows are dropped, since no owner hero is left.
-- Every issue that must end now goes through `IActiveIssueDismisser.End`: the startup, disconnect and removal sweeps,
-  a cancellation whose owner can't be resolved, the heir selection and giver owner change cancels, a cancel or giver
-  death that threw as the owner (`IIssueCancellationCoordinator.AfterCancellationException`, not cancelled again) and
-  a troop completion that threw (both through `IActiveIssueDismisser.EndThrown`). A quest whose own cancel threw before
-  it finalized stays in the quest manager until its own timeout, which is accepted, since cancelling it again would
-  rerun what already ran. Each step runs even when one before it threw: the ending,
-  dropping the owner entry, closing the journal, then announcing it once it is out of `IssueManager.Issues`
-  (`IIssueDismisser.IsInManager`), not when the hero's `Issue` is cleared, since a client still holding it would
-  ignore the giver's next issue. One still in the manager keeps its outcome and is ended again after every server
-  daily tick, and a second ending reaching it before then is ignored. An ending already written in the journal is
-  never overwritten. Unfinished rows with no owner hero left to end them are dropped.
-- Only the sent troops cancel (`CompleteIssueWithCancel`) and the troop completion patches claim their issue
-  (`IActiveIssueDismisser.TryClaim`) before vanilla runs, so once one started no cancel, completion or troop return
-  runs for it again. Quest cancels, and the heir and giver owner change cancels that go straight to `End`, take no
-  claim. `AlternativeTroopsReturnPatch` notes on the claim that the return ran. If it threw before that, or before a
-  giver death reached its cancel and claimed it, `End` returns the troops once, with vanilla's returned line only
-  once they are back, and one that throws inside the return leaves its non hero troops out rather than risk
-  returning them twice. If it threw
-  before vanilla's ending event, `End` sends the owner the cancel once, which also cancels its open journal row, and a
-  written ending is left as it is. If a listener threw on that ending or cancel, the owner already has it, so the
-  server's row is closed with it too, keeping the row's own lines and the issue's. The claim notes an ending once it
-  is published, so an owner that left right then is not sent it again.
+- A deleted, retired or game over player, or a stale registration dropped at join, publishes `PlayerRemoved`, and
+  `ActiveIssueDismisser` ends its issues at once, sent troops too.
+- Every issue that must end now goes through `IActiveIssueDismisser.End`. Each step runs even when one before it threw.
+- The troop completion patches and the sent troops cancel claim their issue (`IActiveIssueDismisser.TryClaim`) before
+  vanilla runs, so nothing is paid or returned twice.
+- An ending is announced only once the issue is out of `IssueManager.Issues`. One still in the manager is ended again
+  after the server daily tick.
+- A quest whose own cancel threw before it finalized stays until its own timeout, which is accepted.
 - `FinalizationCoordinator` drops an owner entry only when it names the ending issue, so a late ending never takes the
   owner of the giver's next issue.
 - Every troop return leaves behind companions whose death already ran (`IIssueDismisser.LeaveBehindDeadCompanions`).

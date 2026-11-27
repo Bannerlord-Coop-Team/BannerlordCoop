@@ -7,13 +7,7 @@ namespace GameInterface.Services.Issues.Framework.Interface;
 /// <summary>Ends issues whose owning player is gone or whose ending threw.</summary>
 public interface IActiveIssueDismisser
 {
-    // Server: the one way an issue that must end now ends, keeping the outcome through every retry. Each step runs even
-    // when one before it threw: with a closeWith, returning a sent troops issue's troops when their return never ran and
-    // sending its owner the closeWith ending when it was sent none (run both inside the owner's scope), the ending (the
-    // dismissal for its state when none is given), dropping its owner entry, closing the owner's unfinished row with the
-    // ending it was sent or closeWith (dropping it when null), then announcing it once it is out of the manager, or trying
-    // again after the next daily tick. No vanilla outcome runs, so nothing is paid. One already waiting for that retry is
-    // left to it.
+    // Server: ends an issue now without any vanilla outcome, each step isolated, see Issues/AGENTS.md
     void End(IssueBase issue, IssueOutcome outcome, Action ending = null, IssueBase.IssueUpdateDetails? closeWith = null,
         bool announce = true);
 

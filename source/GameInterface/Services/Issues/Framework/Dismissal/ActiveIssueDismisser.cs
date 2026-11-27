@@ -53,7 +53,7 @@ internal class ActiveIssueDismisser : IHandler, IActiveIssueDismisser
 
     private sealed class Claim
     {
-        // The first ending the owner's client was sent, which its journal keeps
+        // The first ending published for the owner, even when no client got it, which its journal keeps
         public IssueBase.IssueUpdateDetails? SentEnding;
         // Its troop return ran, so they are never returned a second time
         public bool ReturnStarted;
