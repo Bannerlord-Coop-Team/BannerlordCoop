@@ -24,6 +24,7 @@ internal class OutcomeDispatcher : IOutcomeDispatcher
     private readonly IMessageBroker messageBroker;
     private readonly IQuestTypeRegistry registry;
     private readonly IIssueOwnerResolver ownerResolver;
+    private readonly IActiveIssueDismisser dismisser;
     private readonly Dictionary<QuestBase, QuestOutcomeObservation> questOutcomes =
         new Dictionary<QuestBase, QuestOutcomeObservation>(ReferenceComparer<QuestBase>.Instance);
 
@@ -34,11 +35,13 @@ internal class OutcomeDispatcher : IOutcomeDispatcher
         public IssueOutcome? Outcome;
     }
 
-    public OutcomeDispatcher(IMessageBroker messageBroker, IQuestTypeRegistry registry, IIssueOwnerResolver ownerResolver)
+    public OutcomeDispatcher(IMessageBroker messageBroker, IQuestTypeRegistry registry, IIssueOwnerResolver ownerResolver,
+        IActiveIssueDismisser dismisser)
     {
         this.messageBroker = messageBroker;
         this.registry = registry;
         this.ownerResolver = ownerResolver;
+        this.dismisser = dismisser;
     }
 
     public bool BeforeQuestOutcome(QuestBase quest, IssueOutcome outcome, out IssueBase observed, TextObject log = null)
@@ -142,6 +145,7 @@ internal class OutcomeDispatcher : IOutcomeDispatcher
 
         if (!issue.IssueOwner.IsAlive)
         {
+            // The cancel claims it before it returns the troops
             issue.CompleteIssueWithCancel();
             return false;
         }
@@ -155,16 +159,22 @@ internal class OutcomeDispatcher : IOutcomeDispatcher
         if (ownerHero.PartyBelongedTo == null) return false;
 
         var scope = new MainHeroSubstitutionScope(ownerHero, ownerHero.PartyBelongedTo);
-
-        // Vanilla tries again on the next daily tick, so the troops are not lost while the owner is busy
-        if (!Campaign.Current.Models.IssueModel.CanTroopsReturnFromAlternativeSolution())
+        try
         {
-            scope.Dispose();
-            return false;
-        }
+            // Vanilla tries again on the next daily tick, so the troops are not lost while the owner is busy
+            if (!Campaign.Current.Models.IssueModel.CanTroopsReturnFromAlternativeSolution()) return false;
 
-        owner = scope;
-        return true;
+            // Its ending already started and threw, so it is never run and paid again, the dismisser's retry ends it
+            if (!dismisser.TryClaim(issue)) return false;
+
+            owner = scope;
+            return true;
+        }
+        finally
+        {
+            // Also on a throw, which leaves the patch's state empty so its finalizer can't restore the server's hero
+            if (owner == null) scope.Dispose();
+        }
     }
 
     public void ObserveQuestCompletion(QuestBase quest, QuestBase.QuestCompleteDetails detail)
@@ -218,6 +228,16 @@ internal class OutcomeDispatcher : IOutcomeDispatcher
         }
 
         messageBroker.Publish(issue, new IssueOutcomeObserved(issue, IssueOutcome.AlternativeSolution));
+    }
+
+    public Exception AfterAlternativeSolutionException(IssueBase issue, IDisposable owner, Exception exception)
+    {
+        Logger.Error(exception, "Completing the alternative solution of {issue} failed, it is ended without running it again", issue.StringId);
+
+        // Nothing escapes it, which would unwind the daily tick and leave the issue due again. As the owner, like the
+        // IssueFinalized vanilla would have run, it frees companions still disabled on it unless vanilla took it out.
+        dismisser.EndThrown(issue, IssueOutcome.AlternativeSolution, owner);
+        return null;
     }
 
     // A vanilla listener replayed on a client, like a war or a settlement entry, can end a quest or issue there, only the server's ending may

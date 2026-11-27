@@ -33,6 +33,10 @@ public interface IOutcomeDispatcher
 
     void AfterAlternativeSolutionCompletion(IssueBase issue, IDisposable owner);
 
+    // Server: ends an alternative solution whose completion threw, disposes the owner scope and announces it once.
+    // Returns null so the daily tick moves on instead of picking the issue again on every frame.
+    Exception AfterAlternativeSolutionException(IssueBase issue, IDisposable owner, Exception exception);
+
     // Server: runs a vanilla quest listener on every running quest of that type, as its owning player
     void RunAsOwners<TQuest>(Action<TQuest> listener) where TQuest : QuestBase;
 

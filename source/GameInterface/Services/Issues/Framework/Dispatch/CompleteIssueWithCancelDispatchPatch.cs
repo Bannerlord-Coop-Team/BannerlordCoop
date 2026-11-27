@@ -30,5 +30,13 @@ internal class CompleteIssueWithCancelDispatchPatch
     }
 
     [HarmonyFinalizer]
-    private static void Finalizer((IssueBase Observed, IDisposable Owner) __state) => __state.Owner?.Dispose();
+    private static Exception Finalizer(IssueBase __instance, (IssueBase Observed, IDisposable Owner) __state, Exception __exception)
+    {
+        // The troops may be back already but the issue stays attached, so the next tick would cancel and return them again
+        if (__exception != null && __state.Owner != null && ContainerProvider.TryResolve<IIssueCancellationCoordinator>(out var coordinator))
+            return coordinator.AfterCancellationException(__instance, __state.Owner, __exception);
+
+        __state.Owner?.Dispose();
+        return __exception;
+    }
 }

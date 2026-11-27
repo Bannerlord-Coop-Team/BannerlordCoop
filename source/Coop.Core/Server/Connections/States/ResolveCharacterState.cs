@@ -9,6 +9,7 @@ using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.Players.Messages;
 using LiteNetLib;
 using Serilog;
 using System;
@@ -271,7 +272,8 @@ public class ResolveCharacterState : ConnectionStateBase
                 "dropping the stale registration and creating a new character",
                 controllerId, player.HeroId);
 
-            playerManager.RemovePlayer(player);
+            var deregistered = playerManager.RemovePlayer(player);
+            if (deregistered) messageBroker.Publish(this, new PlayerRemoved(controllerId));
         }
 
         network.SendImmediate(peer, new NetworkClientValidated(false, null));

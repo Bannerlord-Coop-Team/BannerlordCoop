@@ -13,16 +13,25 @@ internal class IssueGiverDeathDispatchPatches
 {
     [HarmonyPatch(typeof(IssueManager), nameof(IssueManager.OnHeroKilled))]
     [HarmonyPrefix]
-    private static bool Prefix(Hero victim, out IDisposable __state)
+    private static bool Prefix(Hero victim, out (IssueBase Issue, IDisposable Owner) __state)
     {
-        __state = null;
+        // Kept here, since the cancel clears the giver's issue
+        __state = (victim.Issue, null);
         return !ContainerProvider.TryResolve<IIssueCancellationCoordinator>(out var coordinator) ||
-            coordinator.BeforeGiverDeath(victim, out __state);
+            coordinator.BeforeGiverDeath(victim, out __state.Owner);
     }
 
     [HarmonyPatch(typeof(IssueManager), nameof(IssueManager.OnHeroKilled))]
     [HarmonyFinalizer]
-    private static void Finalizer(IDisposable __state) => __state?.Dispose();
+    private static Exception Finalizer((IssueBase Issue, IDisposable Owner) __state, Exception __exception)
+    {
+        // Vanilla cancels the quest inline, so a throw there would otherwise leave it unannounced and unwind the death
+        if (__exception != null && __state.Owner != null && ContainerProvider.TryResolve<IIssueCancellationCoordinator>(out var coordinator))
+            return coordinator.AfterCancellationException(__state.Issue, __state.Owner, __exception);
+
+        __state.Owner?.Dispose();
+        return __exception;
+    }
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.HourlyTick))]
     [HarmonyPostfix]

@@ -68,7 +68,8 @@ internal class IssueCancellationCoordinator : IIssueCancellationCoordinator
 
         using (owner)
         {
-            CancelQuestAndIssue(issue, BuildGiverDeathLog(issue));
+            dismisser.End(issue, IssueOutcome.QuestCancel, () => CancelQuestAndIssue(issue, BuildGiverDeathLog(issue)),
+                closeWith: IssueBase.IssueUpdateDetails.IssueCancel);
         }
 
         return false;
@@ -86,10 +87,23 @@ internal class IssueCancellationCoordinator : IIssueCancellationCoordinator
                 if (!registry.IsRegistered(issue.GetType()) || quest == null || !quest.IsOngoing || quest.IsSpecialQuest ||
                     !ownerResolver.TryGetOwnerControllerId(issue, out var owner) || owner != controllerId) continue;
 
-                try { CancelQuestAndIssue(issue, new TextObject("{=bYdhYidf}The quest was canceled because your clan leader, who made the original agreement, is no longer head of the clan.")); }
+                // A throw after the issue left the manager skips the quest outcome, so the dismisser still announces it.
+                // The controller is still here, so its row ends as a cancel instead of being dropped.
+                try
+                {
+                    dismisser.End(issue, IssueOutcome.QuestCancel, () => CancelQuestAndIssue(issue, new TextObject("{=bYdhYidf}The quest was canceled because your clan leader, who made the original agreement, is no longer head of the clan.")),
+                        closeWith: IssueBase.IssueUpdateDetails.IssueCancel);
+                }
                 catch (Exception e) { Logger.Error(e, "Cancelling quest {questId} during heir selection failed", quest.StringId); }
             }
         }
+    }
+
+    public Exception AfterCancellationException(IssueBase issue, IDisposable owner, Exception exception)
+    {
+        Logger.Error(exception, "Cancelling {issue} failed, it is ended and its troops return once at most", issue.StringId);
+        dismisser.EndThrown(issue, IssueOutcome.QuestCancel, owner);
+        return null;
     }
 
     public bool BeforeCancellation(IssueBase issue, TextObject log, out IDisposable owner)
@@ -97,6 +111,14 @@ internal class IssueCancellationCoordinator : IIssueCancellationCoordinator
         if (!PrepareCancellation(issue, out owner))
         {
             if (log != null && CanRetry(issue)) pending[issue] = log;
+            return false;
+        }
+
+        // Its troop cancel or completion already started and threw, so its troops are not returned again, End finishes it
+        if (owner != null && issue.IsSolvingWithAlternative && !dismisser.TryClaim(issue))
+        {
+            owner.Dispose();
+            owner = null;
             return false;
         }
 
@@ -141,7 +163,7 @@ internal class IssueCancellationCoordinator : IIssueCancellationCoordinator
         if (!ownerResolver.TryResolveOwnerHero(issue, out var ownerHero))
         {
             pending.Remove(issue);
-            dismisser.Dismiss(issue, IssueOutcome.QuestCancel);
+            dismisser.End(issue, IssueOutcome.QuestCancel);
             return false;
         }
 
