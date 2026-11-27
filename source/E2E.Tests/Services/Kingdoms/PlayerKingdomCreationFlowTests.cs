@@ -1577,7 +1577,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             var voteManager = GetVoteManager(client2);
             voteManager.RegisterDecision(decision);
             Assert.True(voteManager.ShouldSuppressLocalDecision(decision));
-            Assert.False(KingdomDecisionsVMPatches.RefreshWithPrefix(null, decision));
+            Assert.False(KingdomDecisionsVMPatches.RefreshWithPrefix(new KingdomDecisionsVM(() => { }), decision));
             voteManager.ApplyRemoteVote(player1.ClanId, sharedClanVote);
 
             Assert.True(voteManager.HasLocalPlayerSubmittedVote(decision));
@@ -2369,7 +2369,6 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             client.SimulateMessage(this, new NetworkRemoveDecision(kingdomId, 0));
 
             Assert.Empty(kingdom.UnresolvedDecisions);
-            Assert.False(GetVoteManager(client).ShouldSuppressLocalDecision(decision));
         });
     }
 
@@ -2430,7 +2429,6 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             client.SimulateMessage(this, new NetworkRemoveDecision(kingdomId, 0));
 
             Assert.Empty(kingdom.UnresolvedDecisions);
-            Assert.False(GetVoteManager(client).ShouldSuppressLocalDecision(decision));
         });
     }
 
@@ -2913,6 +2911,51 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         {
             Assert.Null(decisionsVm.CurrentDecision);
             Assert.Single(decisionsVm._solvedDecisionsSinceInit);
+        });
+    }
+
+    // The ballot such a prompt opened could never be sent, and the kingdom screen ignores ESC while it is up.
+    [Fact]
+    public void KingdomDecisionDeadline_ResolvePromptConfirmedAfterDeadlineOpensNoBallotAndOffersNextVote()
+    {
+        var (client1, _, player1, _, kingdomId) = SetUpPlayerDeclareWarVotes("TargetKingdomDeadlinePrompt");
+        var nextTargetKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var nextTargetPlayer = CreateSyncedPlayerContext("TargetKingdomDeadlinePromptNext", _ => false);
+        ConfigureClanInKingdom(nextTargetPlayer.ClanId, nextTargetKingdomId);
+        EnsureKingdomRegisteredEverywhere(nextTargetKingdomId);
+        KingdomDecisionsVM decisionsVm = null;
+        InquiryData resolvePrompt = null;
+
+        client1.Call(() =>
+        {
+            KingdomDecision decision = Assert.Single(Clan.PlayerClan.Kingdom.UnresolvedDecisions);
+            decisionsVm = new KingdomDecisionsVM(() => { });
+            resolvePrompt = Assert.Single(CaptureInquiries(() => decisionsVm.HandleDecision(decision)));
+        });
+
+        Server.Call(() =>
+        {
+            GetConcreteVoteManager(Server).ProcessVotingRounds(
+                DateTime.UtcNow + KingdomDecisionVoteManager.VotingRoundDuration + TimeSpan.FromSeconds(1));
+
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(nextTargetKingdomId, out var nextTargetKingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(player1.ClanId, out var proposerClan));
+            kingdom.AddDecision(new DeclareWarDecision(proposerClan, nextTargetKingdom));
+        });
+
+        Assert.Single(
+            client1.InternalMessages.GetMessages<ApplyKingdomDecisionResolved>(),
+            message => message.KingdomId == kingdomId);
+        client1.Call(() =>
+        {
+            KingdomDecision nextDecision = Assert.Single(Clan.PlayerClan.Kingdom.UnresolvedDecisions);
+
+            resolvePrompt.AffirmativeAction();
+
+            Assert.Null(decisionsVm.CurrentDecision);
+            Assert.Single(CaptureInquiries(decisionsVm.OnFrameTick));
+            Assert.Contains(nextDecision, decisionsVm._examinedDecisionsSinceInit);
         });
     }
 

@@ -137,7 +137,12 @@ namespace GameInterface.Services.Kingdoms.Patches
         [HarmonyPrefix]
         public static bool RefreshWithPrefix(KingdomDecisionsVM __instance, KingdomDecision decision)
         {
-            if (TryGetVoteManager(out var voteManager) && voteManager.ShouldSuppressLocalDecision(decision)) return false;
+            if (TryGetVoteManager(out var voteManager) && voteManager.ShouldSuppressLocalDecision(decision))
+            {
+                // Vanilla's resolve prompt stopped the checks, so resume them like its cancel button does.
+                __instance._shouldCheckForDecision = true;
+                return false;
+            }
 
             if ((CoopKingdomElection.IsPendingPlayerPeaceOffer(decision) || CoopKingdomElection.IsPendingPlayerAllianceOffer(decision)) && decision.IsSingleClanDecision())
             {
