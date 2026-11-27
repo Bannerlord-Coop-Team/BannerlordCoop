@@ -362,7 +362,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
     {
         LeaveSiegeBeforeParking(party);
         LeaveFollowedArmy(party, queueArmyLeave);
-        // Its client can't open the slink away menu anymore, so a town at war with it ejects it like at a stance change
+        // A party whose player went offline has no client to open the slink away menu, so a town at war with it ejects it
         diplomaticHandler.CheckSettlementSuitability(party);
 
         party.IsActive = false;

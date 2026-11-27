@@ -10,7 +10,8 @@ namespace GameInterface.Services.Stances.Interfaces;
 public interface IPartyDiplomaticHandlerCampaignBehaviorInterface : IGameAbstraction
 {
     /// <summary>
-    /// Server side: ejects the party from a settlement at war with it, the same way a stance change does.
+    /// Server side: ejects the party from a settlement at war with it, the same way a stance change does. A player's party is
+    /// only ejected once its owner is offline, because an online player's party is left to its own client.
     /// </summary>
     void CheckSettlementSuitability(MobileParty party);
 }

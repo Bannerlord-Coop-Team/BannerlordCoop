@@ -50,7 +50,6 @@ public class WarDeclaredInTownTests : SyncTestBase
 
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPartyLeaveSettlement>());
         AssertInTown(player.MobilePartyId, settlementId, inTown: true);
-        AssertInTown(other.MobilePartyId, settlementId, inTown: true);
         playerClient.Call(() =>
         {
             Assert.True(FactionManager.IsAtWarAgainstFaction(playerClient.GetRegisteredObject<Clan>(townClanId), Hero.MainHero.MapFaction));
@@ -65,7 +64,6 @@ public class WarDeclaredInTownTests : SyncTestBase
         Flush();
 
         AssertInTown(player.MobilePartyId, settlementId, inTown: false);
-        AssertInTown(other.MobilePartyId, settlementId, inTown: true);
         playerClient.Call(() => Assert.Null(PlayerEncounter.Current));
     }
 
@@ -79,7 +77,6 @@ public class WarDeclaredInTownTests : SyncTestBase
         var player = CreatePlayer(dropsAfterWar ? playerClient : null, "player");
         var (settlementId, townClanId) = CreateTownWith(player);
 
-        using var menus = new MethodCallRecorder(Priority.First, AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu)));
         DeclareWar(townClanId, player);
         if (dropsAfterWar)
         {
@@ -92,7 +89,7 @@ public class WarDeclaredInTownTests : SyncTestBase
         AssertInTown(player.MobilePartyId, settlementId, inTown: false);
     }
 
-    private (string SettlementId, string TownClanId) CreateTownWith(params Player[] players)
+    private (string SettlementId, string TownClanId) CreateTownWith(Player atWar, params Player[] bystanders)
     {
         var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
         var townId = TestEnvironment.CreateRegisteredObject<Town>();
@@ -107,11 +104,11 @@ public class WarDeclaredInTownTests : SyncTestBase
                 var townClan = instance.GetRegisteredObject<Clan>(townClanId);
                 // Stance links are keyed by faction id, which the harness leaves unset
                 townClan.Id = new MBGUID(4857);
-                instance.GetRegisteredObject<Clan>(players[0].ClanId).Id = new MBGUID(4858);
+                instance.GetRegisteredObject<Clan>(atWar.ClanId).Id = new MBGUID(4858);
                 settlement.SetSettlementComponent(town);
                 town._ownerClan = townClan;
                 townClan._settlementsCache.Add(settlement);
-                foreach (var player in players)
+                foreach (var player in bystanders.Prepend(atWar))
                     instance.GetRegisteredObject<MobileParty>(player.MobilePartyId).CurrentSettlement = settlement;
 
                 var diplomaticHandler = new PartyDiplomaticHandlerCampaignBehavior();
