@@ -147,7 +147,7 @@ internal abstract class TestComponentBase
         RegisterMock<ISiegeEventInterface>(builder);
         RegisterMock<IPartyVisualInterface>(builder);
         RegisterMock<ISiegeBreakOut>(builder);
-        RegisterMock<IArmyPartyRemover>(builder);
+        RegisterMock<IArmyLeaver>(builder);
         RegisterMock<IAttachmentIdMapper>(builder);
         RegisterMock<ILootShipHold>(builder);
         RegisterMock<IAutoRegistryFactory>(builder);

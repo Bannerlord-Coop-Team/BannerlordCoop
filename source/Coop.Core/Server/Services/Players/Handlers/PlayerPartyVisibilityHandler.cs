@@ -45,7 +45,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly IPartyVisualInterface partyVisuals;
     private readonly ISiegeEventInterface siegeEventInterface;
-    private readonly IArmyPartyRemover armyPartyRemover;
+    private readonly IArmyLeaver armyLeaver;
     private readonly Dictionary<MobileParty, (MapEvent MapEvent, string ControllerId)> deferredMapEventParking = new();
 
     public PlayerPartyVisibilityHandler(
@@ -55,7 +55,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
         IObjectManager objectManager,
         IPartyVisualInterface partyVisuals,
         ISiegeEventInterface siegeEventInterface,
-        IArmyPartyRemover armyPartyRemover)
+        IArmyLeaver armyLeaver)
     {
         this.messageBroker = messageBroker;
         this.playerManager = playerManager;
@@ -63,7 +63,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
         this.objectManager = objectManager;
         this.partyVisuals = partyVisuals;
         this.siegeEventInterface = siegeEventInterface;
-        this.armyPartyRemover = armyPartyRemover;
+        this.armyLeaver = armyLeaver;
 
         messageBroker.Subscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
         messageBroker.Subscribe<PlayerCampaignSynchronized>(Handle_PlayerCampaignSynchronized);
@@ -299,7 +299,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
                 continue;
             }
 
-            // Queued because the battle can finalize while vanilla is still looping over the leader's attached parties
+            // The army leave is queued because the battle can finalize while vanilla is still looping over the leader's attached parties
             ParkOutsideMapEvent(party, queueArmyLeave: true);
             Logger.Information(
                 "Parked party {PartyId} after its MapEvent ended while its player was disconnected or dead",
@@ -327,7 +327,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
                     if (member.BesiegerCamp != null)
                         siegeEventInterface.BreakSiegeForPartyOnly(member);
 
-                    armyPartyRemover.Remove(member, army);
+                    armyLeaver.Remove(member, army);
                 }
                 catch (Exception e)
                 {
@@ -351,11 +351,19 @@ internal class PlayerPartyVisibilityHandler : IHandler
         {
             Logger.Information("Removing parked party {PartyId} from the army of {LeaderId}", party.StringId, army.LeaderParty?.StringId);
 
-            // A queued leave runs on a later frame, after the party is parked
+            // A queued leave runs on a later frame, after the party is parked, so it skips an army the party already left
             if (queueArmyLeave)
-                GameThread.EnqueueSafe(() => armyPartyRemover.Remove(party, army));
+            {
+                GameThread.EnqueueSafe(() =>
+                {
+                    if (party.Army != army) return;
+                    armyLeaver.Remove(party, army);
+                });
+            }
             else
-                armyPartyRemover.Remove(party, army);
+            {
+                armyLeaver.Remove(party, army);
+            }
         }
 
         party.IsActive = false;
