@@ -335,15 +335,15 @@ public sealed class HideoutMissionRuntimeTests : MissionTestEnvironment
     }
 
     private static (CoopHideoutMissionLogic logic, MissionLogic native, Team attackerTeam, Team defenderTeam) CreateCampHideout(
-        MockMission mock, IMessageBroker broker, bool direct)
+        MockMission mock, IMessageBroker broker, bool direct, IBattleNetwork network = null, IMissionContext missionContext = null)
     {
         var attackerTeam = mock.AddTeam(BattleSideEnum.Attacker);
         mock.PlayerTeam = mock.AttackerTeam;
         var defenderTeam = mock.AddTeam(BattleSideEnum.Defender);
         var attacker = new CoopTroopSupplier("raid", BattleSideEnum.Attacker, null, null);
         var defender = new CoopTroopSupplier("raid", BattleSideEnum.Defender, null, null);
-        var logic = new CoopHideoutMissionLogic(Mock.Of<IBattleNetwork>(), broker,
-            Mock.Of<IMissionContext>(), defender, attacker, direct);
+        var logic = new CoopHideoutMissionLogic(network ?? Mock.Of<IBattleNetwork>(), broker,
+            missionContext ?? Mock.Of<IMissionContext>(), defender, attacker, direct);
         AccessTools.Property(typeof(MissionBehavior), nameof(MissionBehavior.Mission)).SetValue(logic, mock.Shell);
         AccessTools.Field(typeof(CoopHideoutMissionLogic), "initialized").SetValue(logic, true);
         var suppliers = new IMissionTroopSupplier[] { logic.Defender, logic.Attacker };
@@ -662,6 +662,7 @@ public sealed class HideoutMissionRuntimeTests : MissionTestEnvironment
             mesh.ConnectToInstance("raid");
         }
         var harmony = new Harmony($"hideout-remote-fire.{Guid.NewGuid()}");
+        // native StealthAreaMissionLogic.OnObjectUsed refuses the fire while any active agent reads as alarmed
         harmony.Patch(AccessTools.PropertyGetter(typeof(Agent), nameof(Agent.AIStateFlags)),
             prefix: new HarmonyMethod(typeof(HideoutMissionRuntimeTests), nameof(AlarmFlags)));
         harmony.Patch(AccessTools.Method(typeof(WeakGameEntity), nameof(WeakGameEntity.SetVisibilityExcludeParents)),
@@ -709,28 +710,19 @@ public sealed class HideoutMissionRuntimeTests : MissionTestEnvironment
         MissionEngineFixture fixture, EnvironmentInstance client, IMissionContext missionContext, bool isLocalHost)
     {
         var mission = fixture.CreateMission(client);
-        var attackerTeam = mission.AddTeam(BattleSideEnum.Attacker);
-        mission.PlayerTeam = mission.AttackerTeam;
-        var defenderTeam = mission.AddTeam(BattleSideEnum.Defender);
+        var (logic, nativeLogic, attackerTeam, defenderTeam) = CreateCampHideout(mission, client.Resolve<IMessageBroker>(), false,
+            client.Resolve<IBattleNetwork>(), missionContext);
+        var native = (CoopHideoutAmbushController)nativeLogic;
         var hero = mission.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop).Team(attackerTeam).Controller(AgentControllerType.Player));
         var sentry = mission.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop).Team(defenderTeam)
             .Controller(isLocalHost ? AgentControllerType.AI : AgentControllerType.None));
         mission.MainAgent = hero;
-        var attacker = new CoopTroopSupplier("raid", BattleSideEnum.Attacker, null, null);
-        var defender = new CoopTroopSupplier("raid", BattleSideEnum.Defender, null, null);
-        var logic = new CoopHideoutMissionLogic(client.Resolve<IBattleNetwork>(), client.Resolve<IMessageBroker>(),
-            missionContext, defender, attacker, false);
         AttachHideoutLogic(logic, mission, Mock.Of<IBattleSession>(session => session.IsLocalHost == isLocalHost &&
             session.InstanceId == "raid" && session.HostControllerId == "host" &&
             session.OwnControllerId == (isLocalHost ? "host" : "lighter")));
         var areaLogic = new CoopHideoutStealthAreaLogic();
-        var native = new CoopHideoutAmbushController(logic, new IMissionTroopSupplier[] { logic.Defender, logic.Attacker });
-        logic.Native = native;
-        foreach (var behavior in new MissionBehavior[] { logic, areaLogic, native })
-        {
-            AccessTools.Property(typeof(MissionBehavior), nameof(MissionBehavior.Mission)).SetValue(behavior, mission.Shell);
-            mission.Shell.MissionBehaviors.Add(behavior);
-        }
+        AccessTools.Property(typeof(MissionBehavior), nameof(MissionBehavior.Mission)).SetValue(areaLogic, mission.Shell);
+        mission.Shell.MissionBehaviors.Add(areaLogic);
         mission.Shell._missionMode = MissionMode.Stealth;
         native.Apply(HideoutPhase.Stealth, null, 25);
 
