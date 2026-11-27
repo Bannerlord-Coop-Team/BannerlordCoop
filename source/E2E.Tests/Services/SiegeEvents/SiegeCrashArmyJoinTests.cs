@@ -120,7 +120,7 @@ public class SiegeCrashArmyJoinTests : SiegeTestBase
             outsideSiegeMember.Army = army;
             playerMember.Army = army;
             playerMember.AttachedTo = army.LeaderParty;
-            Server.Resolve<IPlayerManager>().SetPeer("SiegeArmyPlayerMember", Clients.Last().NetPeer);
+            Server.Resolve<IPlayerManager>().BindRegisteredPeer("SiegeArmyPlayerMember", Clients.Last().NetPeer);
         });
         Assert.NotNull(leaderId);
 

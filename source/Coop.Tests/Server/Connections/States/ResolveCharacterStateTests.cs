@@ -329,6 +329,7 @@ namespace Coop.Tests.Server.Connections.States
                     returnedPlayer = player;
                 })
                 .Returns(true);
+            playerManagerMock.Setup(i => i.IsCurrentRegistration(player)).Returns(true);
             playerManagerMock.Setup(i => i.TrySetPeer(player, It.IsAny<NetPeer>())).Returns(true);
 
             var objectManager = serverComponent.Container.Resolve<IObjectManager>();
@@ -397,11 +398,12 @@ namespace Coop.Tests.Server.Connections.States
                 .Setup(manager => manager.ReplacePlayer(player, repaired))
                 .Callback(() => { registered = repaired; })
                 .Returns(true);
-            playerManager.Setup(manager => manager.TrySetPeer(repaired, It.IsAny<NetPeer>())).Returns(true);
             playerManager
-                .Setup(manager => manager.TryGetCurrentPlayer(IsPeer(playerPeer), out It.Ref<Player>.IsAny))
-                .Callback((NetPeer peer, out Player returnedPlayer) => { returnedPlayer = registered; })
-                .Returns(true);
+                .Setup(manager => manager.IsCurrentRegistration(It.IsAny<Player>()))
+                .Returns((Player candidate) => ReferenceEquals(candidate, registered));
+            playerManager.Setup(manager => manager.TrySetPeer(repaired, It.IsAny<NetPeer>())).Returns(true);
+            var controllerId = player.ControllerId;
+            playerManager.Setup(manager => manager.TryGetCurrentController(IsPeer(playerPeer), out controllerId)).Returns(true);
 
             var objectManager = serverComponent.Container.Resolve<IObjectManager>();
             var hero = (Hero)FormatterServices.GetUninitializedObject(typeof(Hero));
@@ -605,17 +607,8 @@ namespace Coop.Tests.Server.Connections.States
             // hero is disabled, not dead, so restoring it would build it a recovery party nobody plays.
             var currentState = connectionLogic.SetState<ResolveCharacterState>();
             var player = new Player("MyPlayer", "MyHero", "MyParty", "MyClan", "MyCharacter");
-            var heir = new Player("MyPlayer", "MyHeir", "HeirParty", "MyClan", "MyHeirCharacter");
             var playerManager = SetupRegisteredPlayer(player);
-            var registered = player;
-            playerManager
-                .Setup(manager => manager.TryGetPlayer(player.ControllerId, out It.Ref<Player>.IsAny))
-                .Callback((string id, out Player current) =>
-                {
-                    current = registered;
-                    registered = heir;
-                })
-                .Returns(true);
+            playerManager.Setup(manager => manager.IsCurrentRegistration(player)).Returns(false);
 
             currentState.Handle_ClientValidate(new MessagePayload<NetworkClientValidate>(
                 playerPeer,
@@ -651,6 +644,7 @@ namespace Coop.Tests.Server.Connections.States
                     returnedPlayer = player;
                 })
                 .Returns(true);
+            playerManagerMock.Setup(i => i.IsCurrentRegistration(player)).Returns(true);
 
             // Act
             var payload = new MessagePayload<NetworkClientValidate>(
@@ -1032,8 +1026,10 @@ namespace Coop.Tests.Server.Connections.States
             var playerManager = serverComponent.Container.Resolve<Mock<IPlayerManager>>();
             var registeredPlayer = player;
             playerManager.Setup(manager => manager.TryGetPlayer(player.ControllerId, out registeredPlayer)).Returns(true);
+            playerManager.Setup(manager => manager.IsCurrentRegistration(player)).Returns(true);
             playerManager.Setup(manager => manager.TrySetPeer(player, It.IsAny<NetPeer>())).Returns(true);
-            playerManager.Setup(manager => manager.TryGetCurrentPlayer(It.IsAny<NetPeer>(), out registeredPlayer)).Returns(true);
+            var controllerId = player.ControllerId;
+            playerManager.Setup(manager => manager.TryGetCurrentController(It.IsAny<NetPeer>(), out controllerId)).Returns(true);
 
             var hero = (Hero)FormatterServices.GetUninitializedObject(typeof(Hero));
             Assert.True(serverComponent.Container.Resolve<IObjectManager>().AddExisting(player.HeroId, hero));

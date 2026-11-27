@@ -261,7 +261,7 @@ public class BattleReserveReconnectScopeTests : MissionTestEnvironment
 
             int hostBaseline = FeedBaseline(host, mapEventId);
             int returnerBaseline = FeedBaseline(returning, mapEventId);
-            Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer("offline-ctrl", returning.NetPeer));
+            Server.Call(() => Server.Resolve<IPlayerManager>().BindRegisteredPeer("offline-ctrl", returning.NetPeer));
 
             EnterBattle(returning, mapEventId);
 
@@ -297,7 +297,7 @@ public class BattleReserveReconnectScopeTests : MissionTestEnvironment
             var loadingMepId = GetMapEventPartyId(mapEventId, partyIds[1]);
 
             // The second player is connected and registered in the MapEvent but has not entered the mission.
-            Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer("loading-ctrl", loading.NetPeer));
+            Server.Call(() => Server.Resolve<IPlayerManager>().BindRegisteredPeer("loading-ctrl", loading.NetPeer));
             EnterBattle(host, mapEventId);
             AssertHost(Server, mapEventId, "host-ctrl");
 
@@ -348,7 +348,7 @@ public class BattleReserveReconnectScopeTests : MissionTestEnvironment
         {
             GiveRoster(mapEventId, partyIds[1], ReturnerTroopCount);
             var offlineMepId = GetMapEventPartyId(mapEventId, partyIds[1]);
-            Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer("offline-ctrl", offline.NetPeer));
+            Server.Call(() => Server.Resolve<IPlayerManager>().BindRegisteredPeer("offline-ctrl", offline.NetPeer));
 
             Server.SimulateMessage(this, new PlayerDisconnected(offline.NetPeer, default));
 
@@ -948,8 +948,8 @@ public class BattleReserveReconnectScopeTests : MissionTestEnvironment
             var returnerMepId = GetMapEventPartyId(mapEventId, partyIds[1]);
             Server.Call(() =>
             {
-                players.SetPeer("host-ctrl", host.NetPeer);
-                players.SetPeer("returner-ctrl", returner.NetPeer);
+                players.BindRegisteredPeer("host-ctrl", host.NetPeer);
+                players.BindRegisteredPeer("returner-ctrl", returner.NetPeer);
             });
             EnterBattle(host, mapEventId);
             EnterBattle(returner, mapEventId);
@@ -968,7 +968,7 @@ public class BattleReserveReconnectScopeTests : MissionTestEnvironment
             Assert.DoesNotContain(returnerMepId, hostHeld);
 
             int returnerBaseline = FeedBaseline(returner, mapEventId);
-            Server.Call(() => players.SetPeer("returner-ctrl", returner.NetPeer));
+            Server.Call(() => players.BindRegisteredPeer("returner-ctrl", returner.NetPeer));
             EnterBattle(returner, mapEventId);
 
             var granted = FeedsSince(returner, mapEventId, returnerBaseline)
@@ -1004,8 +1004,8 @@ public class BattleReserveReconnectScopeTests : MissionTestEnvironment
             var returnerMepId = GetMapEventPartyId(mapEventId, partyIds[1]);
             Server.Call(() =>
             {
-                players.SetPeer("host-ctrl", host.NetPeer);
-                players.SetPeer("returner-ctrl", returner.NetPeer);
+                players.BindRegisteredPeer("host-ctrl", host.NetPeer);
+                players.BindRegisteredPeer("returner-ctrl", returner.NetPeer);
             });
             EnterBattle(host, mapEventId);
             EnterBattle(returner, mapEventId);

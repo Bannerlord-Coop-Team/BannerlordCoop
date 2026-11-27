@@ -132,8 +132,9 @@ public class TransferSaveState : ConnectionStateBase
 
         // A game over, deletion or heir swap can remove or replace the registration this peer was told it plays,
         // and a replacement keeps the peer bound, so check the exact registration here on the game thread
-        var stillPlaysIt = playerManager.TryGetCurrentPlayer(peer, out var registered) &&
-            ReferenceEquals(registered, acknowledgedPlayer);
+        var stillPlaysIt = playerManager.TryGetCurrentController(peer, out var controllerId) &&
+            controllerId == acknowledgedPlayer.ControllerId &&
+            playerManager.IsCurrentRegistration(acknowledgedPlayer);
         if (!stillPlaysIt)
         {
             Logger.Warning("Peer {PeerId} no longer plays the player it was told; disconnecting it instead of sending the join save", peer.Id);

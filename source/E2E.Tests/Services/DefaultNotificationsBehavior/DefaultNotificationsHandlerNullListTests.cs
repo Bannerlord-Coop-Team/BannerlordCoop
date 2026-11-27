@@ -186,7 +186,7 @@ public class DefaultNotificationsHandlerNullListTests : IDisposable
             Assert.True(TestEnvironment.Server.ObjectManager.TryGetId(party.LeaderHero, out var heroId));
             var playerManager = TestEnvironment.Server.Resolve<IPlayerManager>();
             Assert.True(playerManager.AddPlayer(new Player("Joiner", heroId, partyId, null, null)));
-            playerManager.SetPeer("Joiner", Client.NetPeer);
+            playerManager.BindRegisteredPeer("Joiner", Client.NetPeer);
         });
 
         TestEnvironment.Server.SimulateMessage(Client.NetPeer, new NetworkAddMobilePartyInArmy(armyId, partyId, merged));

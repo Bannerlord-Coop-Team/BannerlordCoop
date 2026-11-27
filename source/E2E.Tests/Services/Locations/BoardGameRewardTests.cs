@@ -26,7 +26,7 @@ public sealed class BoardGameRewardTests : MapEventTestBase
         var (heroId, _) = CreatePlayerHeroParty("BoardGameRewards");
         Server.Call(() =>
         {
-            Server.Resolve<IPlayerManager>().SetPeer("BoardGameRewards", client.NetPeer);
+            Server.Resolve<IPlayerManager>().BindRegisteredPeer("BoardGameRewards", client.NetPeer);
         }, MapEventDisabledMethods);
         Server.Call(() => Server.GetRegisteredObject<Hero>(heroId).Gold = 1000);
 
@@ -55,7 +55,7 @@ public sealed class BoardGameRewardTests : MapEventTestBase
         var (heroId, _) = CreatePlayerHeroParty("BoardGameRewards");
         Server.Call(() =>
         {
-            Server.Resolve<IPlayerManager>().SetPeer("BoardGameRewards", client.NetPeer);
+            Server.Resolve<IPlayerManager>().BindRegisteredPeer("BoardGameRewards", client.NetPeer);
         }, MapEventDisabledMethods);
         Server.Call(() => Server.GetRegisteredObject<Hero>(heroId).Gold = 1000);
 
@@ -132,7 +132,7 @@ public sealed class BoardGameRewardTests : MapEventTestBase
         var (heroId, _) = CreatePlayerHeroParty("BoardGameRewards");
         Server.Call(() =>
         {
-            Server.Resolve<IPlayerManager>().SetPeer("BoardGameRewards", client.NetPeer);
+            Server.Resolve<IPlayerManager>().BindRegisteredPeer("BoardGameRewards", client.NetPeer);
         }, MapEventDisabledMethods);
         Server.Call(() => Server.GetRegisteredObject<Hero>(heroId).Gold = 1000);
 
@@ -198,7 +198,7 @@ public sealed class BoardGameRewardTests : MapEventTestBase
         var opposingHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
         Server.Call(() =>
         {
-            Server.Resolve<IPlayerManager>().SetPeer("BoardGameRewards", client.NetPeer);
+            Server.Resolve<IPlayerManager>().BindRegisteredPeer("BoardGameRewards", client.NetPeer);
         }, MapEventDisabledMethods);
 
         float xpBefore = 0;
@@ -232,7 +232,7 @@ public sealed class BoardGameRewardTests : MapEventTestBase
         var opposingHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
         Server.Call(() =>
         {
-            Server.Resolve<IPlayerManager>().SetPeer("BoardGameRewards", client.NetPeer);
+            Server.Resolve<IPlayerManager>().BindRegisteredPeer("BoardGameRewards", client.NetPeer);
         }, MapEventDisabledMethods);
 
         float xpBefore = 0;
@@ -267,7 +267,7 @@ public sealed class BoardGameRewardTests : MapEventTestBase
         var opposingHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
         Server.Call(() =>
         {
-            Server.Resolve<IPlayerManager>().SetPeer("BoardGameRewards", client.NetPeer);
+            Server.Resolve<IPlayerManager>().BindRegisteredPeer("BoardGameRewards", client.NetPeer);
         }, MapEventDisabledMethods);
 
         float xpBefore = 0;
@@ -301,7 +301,7 @@ public sealed class BoardGameRewardTests : MapEventTestBase
         var opposingHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
         Server.Call(() =>
         {
-            Server.Resolve<IPlayerManager>().SetPeer("BoardGameRewards", client.NetPeer);
+            Server.Resolve<IPlayerManager>().BindRegisteredPeer("BoardGameRewards", client.NetPeer);
         }, MapEventDisabledMethods);
 
         float xpBefore = 0;

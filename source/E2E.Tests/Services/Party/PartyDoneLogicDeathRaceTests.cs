@@ -58,7 +58,7 @@ public class PartyDoneLogicDeathRaceTests : IDisposable
 
             var playerManager = Server.Resolve<IPlayerManager>();
             Assert.True(playerManager.AddPlayer(new Player("RequestingControllerId", leaderHeroId, string.Empty, string.Empty, string.Empty)));
-            playerManager.SetPeer("RequestingControllerId", Clients.First().NetPeer);
+            playerManager.BindRegisteredPeer("RequestingControllerId", Clients.First().NetPeer);
         });
         TestEnvironment.FlushCoalescer();
 

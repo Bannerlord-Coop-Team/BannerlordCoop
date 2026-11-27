@@ -103,7 +103,7 @@ public class PlayerKillFeedColorSyncTests : IDisposable
                 string.Empty,
                 string.Empty,
                 string.Empty));
-            playerManager.SetPeer(controllerId, client.NetPeer);
+            playerManager.BindRegisteredPeer(controllerId, client.NetPeer);
         });
     }
 

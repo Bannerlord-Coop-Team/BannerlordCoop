@@ -758,7 +758,7 @@ public class RomanceMarriageBarterSyncTests : MapEventTestBase
         const string controllerId = "PlayerOne";
         client.Resolve<IControllerIdProvider>().SetControllerId(controllerId);
         RegisterAsPlayerParty(controllerId, heroId, mobilePartyId);
-        Server.Resolve<IPlayerManager>().SetPeer(controllerId, client.NetPeer);
+        Server.Resolve<IPlayerManager>().BindRegisteredPeer(controllerId, client.NetPeer);
     }
 
     private void SetMainHero(string heroId)

@@ -48,7 +48,7 @@ public class HostEpochStaleConclusionTests : MapEventTestBase
         // migrations), so the CURRENT assignment carries epoch 3 while the sender's first stint was epoch 1.
         CreatePlayerHeroParty("host");
         var hostClient = Clients.First();
-        Server.Resolve<IPlayerManager>().SetPeer("host", hostClient.NetPeer);
+        Server.Resolve<IPlayerManager>().BindRegisteredPeer("host", hostClient.NetPeer);
         Server.Call(() => Server.Resolve<IBattleHostRegistry>()
             .Set(ctx.MapEventId, new BattleHostAssignment("host", Array.Empty<string>(), epoch: 3)));
 

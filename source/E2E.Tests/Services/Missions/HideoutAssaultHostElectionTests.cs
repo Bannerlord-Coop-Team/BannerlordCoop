@@ -254,9 +254,9 @@ public class HideoutAssaultHostElectionTests : MissionTestEnvironment
         {
             var players = Server.Resolve<IPlayerManager>();
             if (leaderConnected)
-                players.SetPeer(LeaderControllerId, clients[0].NetPeer);
-            players.SetPeer(AllyControllerId, clients[1].NetPeer);
-            players.SetPeer(SecondAllyControllerId, clients[2].NetPeer);
+                players.BindRegisteredPeer(LeaderControllerId, clients[0].NetPeer);
+            players.BindRegisteredPeer(AllyControllerId, clients[1].NetPeer);
+            players.BindRegisteredPeer(SecondAllyControllerId, clients[2].NetPeer);
         });
 
         Server.Call(() =>

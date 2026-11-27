@@ -135,7 +135,7 @@ public class StalledMapEventTests : MapEventTestBase
     {
         var context = CreateStalledMapEvent();
         var (_, playerPartyId) = CreatePlayerHeroParty("player");
-        Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer("player", Clients.First().NetPeer));
+        Server.Call(() => Server.Resolve<IPlayerManager>().BindRegisteredPeer("player", Clients.First().NetPeer));
 
         Server.Call(() =>
         {

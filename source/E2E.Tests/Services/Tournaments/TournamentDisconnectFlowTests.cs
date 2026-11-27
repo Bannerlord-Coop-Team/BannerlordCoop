@@ -64,8 +64,8 @@ public class TournamentDisconnectFlowTests : SyncTestBase
                 string.Empty,
                 string.Empty,
                 "successor-character")));
-            playerManager.SetPeer(HostControllerId, host.NetPeer);
-            playerManager.SetPeer(SuccessorControllerId, successor.NetPeer);
+            playerManager.BindRegisteredPeer(HostControllerId, host.NetPeer);
+            playerManager.BindRegisteredPeer(SuccessorControllerId, successor.NetPeer);
 
             Assert.True(Server.Resolve<ITournamentSessionRegistry>().ApplySnapshot(CreateSnapshot(townId)));
         });

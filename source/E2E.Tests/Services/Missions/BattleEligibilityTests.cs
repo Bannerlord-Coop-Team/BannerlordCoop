@@ -75,9 +75,9 @@ public class BattleEligibilityTests : MissionTestEnvironment
         SetControllerId(clients[2], "ctrl-Outsider");
         RegisterAsPlayerParty("ctrl-Outsider", outsiderHeroId, outsiderPartyId);
 
-        Server.Resolve<IPlayerManager>().SetPeer("ctrl-A", clients[0].NetPeer);
-        Server.Resolve<IPlayerManager>().SetPeer("ctrl-B", clients[1].NetPeer);
-        Server.Resolve<IPlayerManager>().SetPeer("ctrl-Outsider", clients[2].NetPeer);
+        Server.Resolve<IPlayerManager>().BindRegisteredPeer("ctrl-A", clients[0].NetPeer);
+        Server.Resolve<IPlayerManager>().BindRegisteredPeer("ctrl-B", clients[1].NetPeer);
+        Server.Resolve<IPlayerManager>().BindRegisteredPeer("ctrl-Outsider", clients[2].NetPeer);
 
         Server.Call(() =>
         {
@@ -191,7 +191,7 @@ public class BattleEligibilityTests : MissionTestEnvironment
         var troopId = CreateRegisteredObject<CharacterObject>();
         SetControllerId(clients[2], "ctrl-Joiner");
         RegisterAsPlayerParty("ctrl-Joiner", joiningHeroId, joiningPartyId);
-        Server.Resolve<IPlayerManager>().SetPeer("ctrl-Joiner", clients[2].NetPeer);
+        Server.Resolve<IPlayerManager>().BindRegisteredPeer("ctrl-Joiner", clients[2].NetPeer);
 
         clients[2].NetworkSentMessages.Clear();
         Server.NetworkSentMessages.Clear();

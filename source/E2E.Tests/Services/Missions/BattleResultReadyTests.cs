@@ -616,7 +616,7 @@ public class BattleResultReadyTests : MissionTestEnvironment
 
     private void RegisterPeer(EnvironmentInstance client, string controllerId)
     {
-        Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer(controllerId, client.NetPeer));
+        Server.Call(() => Server.Resolve<IPlayerManager>().BindRegisteredPeer(controllerId, client.NetPeer));
     }
 
     private void EnterBattleWithMembership(

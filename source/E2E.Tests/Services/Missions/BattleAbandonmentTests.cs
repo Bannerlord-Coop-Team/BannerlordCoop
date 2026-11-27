@@ -123,7 +123,7 @@ public class BattleAbandonmentTests : MissionTestEnvironment
         Server.Call(() =>
         {
             var playerManager = Server.Resolve<IPlayerManager>();
-            playerManager.SetPeer("connected-ctrl", connected.NetPeer);
+            playerManager.BindRegisteredPeer("connected-ctrl", connected.NetPeer);
             Assert.True(playerManager.TryGetPlayer("connected-ctrl", out var player));
             Assert.True(playerManager.IsConnected(player));
             Server.Resolve<IMessageBroker>().Publish(this, new PlayerJoinedBattle());
@@ -144,7 +144,7 @@ public class BattleAbandonmentTests : MissionTestEnvironment
         Server.Call(() =>
         {
             var playerManager = Server.Resolve<IPlayerManager>();
-            playerManager.SetPeer("connected-ctrl", connected.NetPeer);
+            playerManager.BindRegisteredPeer("connected-ctrl", connected.NetPeer);
             Server.Resolve<ITimeControlInterface>().ServerSetTimeControl(TimeControlEnum.Play_2x);
             Server.Resolve<IMessageBroker>().Publish(this, new PlayerCampaignSynchronized(connected.NetPeer));
         });
@@ -389,8 +389,8 @@ public class BattleAbandonmentTests : MissionTestEnvironment
         Server.Call(() =>
         {
             var playerManager = Server.Resolve<IPlayerManager>();
-            playerManager.SetPeer("ctrl-A", clients[0].NetPeer);
-            playerManager.SetPeer("ctrl-B", clients[1].NetPeer);
+            playerManager.BindRegisteredPeer("ctrl-A", clients[0].NetPeer);
+            playerManager.BindRegisteredPeer("ctrl-B", clients[1].NetPeer);
         });
         Server.Call(() => Assert.True(ServerBattleModeArbiter.TryClaimMission(mapEventId)));
 

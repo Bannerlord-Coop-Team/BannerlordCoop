@@ -61,7 +61,10 @@ public class ConnectionLogic : IConnectionLogic
         ChangeState((TState)stateFactories[typeof(TState)]());
 
     public TransferSaveState SetTransferSaveState(Player acknowledgedPlayer) =>
-        ChangeState(new TransferSaveState(this, context.MessageBroker, context.Network, context.CoopSessionProvider, context.SaveInterface, context.ConnectionMessageQueue, context.Coalescer, context.AttachmentIdMapper, context.ServerOptionsProvider, context.LootShipHold, context.PlayerManager, acknowledgedPlayer));
+        ChangeState(new TransferSaveState(
+            this, context.MessageBroker, context.Network, context.CoopSessionProvider, context.SaveInterface,
+            context.ConnectionMessageQueue, context.Coalescer, context.AttachmentIdMapper, context.ServerOptionsProvider,
+            context.LootShipHold, context.PlayerManager, acknowledgedPlayer));
 
     private TState ChangeState<TState>(TState newState) where TState : IConnectionState
     {

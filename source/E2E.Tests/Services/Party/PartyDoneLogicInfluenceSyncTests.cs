@@ -64,7 +64,7 @@ public class PartyDoneLogicInfluenceSyncTests : IDisposable
 
             var playerManager = Server.Resolve<IPlayerManager>();
             Assert.True(playerManager.AddPlayer(new Player("RequestingControllerId", heroId, string.Empty, string.Empty, string.Empty)));
-            playerManager.SetPeer("RequestingControllerId", Clients.First().NetPeer);
+            playerManager.BindRegisteredPeer("RequestingControllerId", Clients.First().NetPeer);
         });
 
         // Act: a client finishes the party screen with a pending influence gain and nothing else changed. This

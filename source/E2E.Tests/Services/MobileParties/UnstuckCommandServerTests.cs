@@ -377,7 +377,7 @@ public class UnstuckCommandServerTests : MapEventTestBase
         Server.Call(() =>
         {
             Server.GetRegisteredObject<Hero>(ids.heroId).SetName(new TextObject(heroName), new TextObject(heroName));
-            Server.Resolve<IPlayerManager>().SetPeer(controllerId, client.NetPeer);
+            Server.Resolve<IPlayerManager>().BindRegisteredPeer(controllerId, client.NetPeer);
         });
 
         client.Call(() =>

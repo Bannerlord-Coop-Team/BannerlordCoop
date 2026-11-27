@@ -113,7 +113,7 @@ public class GovernorChangePermissionTests : SyncTestBase
         {
             var playerManager = Server.Resolve<IPlayerManager>();
             Assert.True(playerManager.AddPlayer(new Player(controllerId, heroId, null, playerClanId, null)));
-            playerManager.SetPeer(controllerId, client.NetPeer);
+            playerManager.BindRegisteredPeer(controllerId, client.NetPeer);
         });
     }
 

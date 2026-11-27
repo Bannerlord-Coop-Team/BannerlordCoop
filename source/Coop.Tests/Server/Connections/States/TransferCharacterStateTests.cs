@@ -144,7 +144,7 @@ namespace Coop.Tests.Server.Connections.States
         {
             // A game over or deletion on the game thread unbinds the peer
             serverComponent.Container.Resolve<Mock<IPlayerManager>>()
-                .Setup(manager => manager.TryGetCurrentPlayer(playerPeer, out It.Ref<Player>.IsAny))
+                .Setup(manager => manager.TryGetCurrentController(playerPeer, out It.Ref<string>.IsAny))
                 .Returns(false);
 
             connectionLogic.TransferSave(acknowledgedPlayer);

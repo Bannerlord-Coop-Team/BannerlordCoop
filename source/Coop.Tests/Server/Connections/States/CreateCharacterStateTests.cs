@@ -371,18 +371,26 @@ namespace Coop.Tests.Server.Connections.States
             // player once this state binds it
             Player added = null;
             var bound = false;
+            string boundControllerId = null;
             playerRegistryMock
                 .Setup(p => p.AddPlayer(It.IsAny<Player>()))
                 .Callback<Player>(player => added = player)
                 .Returns(true);
             playerRegistryMock
                 .Setup(p => p.TrySetPeer(It.IsAny<Player>(), It.IsAny<NetPeer>()))
-                .Callback(() => bound = true)
+                .Callback<Player, NetPeer>((player, _) =>
+                {
+                    bound = true;
+                    boundControllerId = player.ControllerId;
+                })
                 .Returns(true);
             playerRegistryMock
-                .Setup(p => p.TryGetCurrentPlayer(It.IsAny<NetPeer>(), out It.Ref<Player>.IsAny))
-                .Callback((NetPeer peer, out Player player) => { player = added; })
+                .Setup(p => p.TryGetCurrentController(It.IsAny<NetPeer>(), out It.Ref<string>.IsAny))
+                .Callback((NetPeer peer, out string controllerId) => { controllerId = boundControllerId; })
                 .Returns(() => bound);
+            playerRegistryMock
+                .Setup(p => p.IsCurrentRegistration(It.IsAny<Player>()))
+                .Returns((Player player) => ReferenceEquals(player, added));
 
             return hero;
         }

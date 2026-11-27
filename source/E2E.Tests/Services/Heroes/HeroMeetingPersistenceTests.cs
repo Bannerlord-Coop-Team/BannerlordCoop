@@ -33,7 +33,7 @@ public class HeroMeetingPersistenceTests : SyncTestBase
             var playerManager = Server.Resolve<IPlayerManager>();
             Assert.True(playerManager.AddPlayer(
                 new Player(controllerId, playerHeroId, string.Empty, string.Empty, string.Empty)));
-            playerManager.SetPeer(controllerId, client.NetPeer);
+            playerManager.BindRegisteredPeer(controllerId, client.NetPeer);
         });
 
         client.Call(() =>
@@ -72,7 +72,7 @@ public class HeroMeetingPersistenceTests : SyncTestBase
             var playerManager = Server.Resolve<IPlayerManager>();
             Assert.True(playerManager.AddPlayer(
                 new Player(controllerId, playerHeroId, string.Empty, string.Empty, string.Empty)));
-            playerManager.SetPeer(controllerId, client.NetPeer);
+            playerManager.BindRegisteredPeer(controllerId, client.NetPeer);
 
             var playerHero = Server.GetRegisteredObject<Hero>(playerHeroId);
             var notable = Server.GetRegisteredObject<Hero>(notableId);

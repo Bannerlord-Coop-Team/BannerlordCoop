@@ -616,7 +616,7 @@ public class CoopClanFlowTests : MapEventTestBase, IDisposable
             Assert.True(players.TryGetPlayer(member.ControllerId, out var registered));
             Assert.True(players.RemovePlayer(registered));
             Assert.True(players.AddPlayer(restored));
-            players.SetPeer(member.ControllerId, memberClient.NetPeer);
+            players.BindRegisteredPeer(member.ControllerId, memberClient.NetPeer);
         }
     }
 
@@ -900,7 +900,7 @@ public class CoopClanFlowTests : MapEventTestBase, IDisposable
                 }
             });
         }
-        Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer(controllerId, client.NetPeer));
+        Server.Call(() => Server.Resolve<IPlayerManager>().BindRegisteredPeer(controllerId, client.NetPeer));
         return player;
     }
 

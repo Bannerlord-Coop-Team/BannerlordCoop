@@ -34,6 +34,9 @@ public interface IPlayerManager
     bool ReplacePlayer(Player registeredPlayer, Player replacementPlayer);
     bool TryGetPlayer(string controllerId, out Player player);
 
+    /// <summary>True while <paramref name="player"/> is still its controller's registration, not removed or replaced.</summary>
+    bool IsCurrentRegistration(Player player);
+
     /// <summary>
     /// Checks whether the given game object (hero, party, clan) belongs to a registered player.
     /// </summary>
@@ -219,9 +222,7 @@ public class PlayerManager : IPlayerManager
 
         lock (registrySync)
         {
-            if (!_players.TryGetValue(registeredPlayer.ControllerId, out var current) ||
-                !ReferenceEquals(current, registeredPlayer))
-                return false;
+            if (!IsCurrentRegistration(registeredPlayer)) return false;
 
             if (IsHeroOrPartyHeldByAnotherPlayer(replacementPlayer)) return false;
 
@@ -351,6 +352,9 @@ public class PlayerManager : IPlayerManager
         }
     }
 
+    public bool IsCurrentRegistration(Player player) =>
+        TryGetPlayer(player.ControllerId, out var registered) && ReferenceEquals(registered, player);
+
     /// <inheritdoc cref="IPlayerManager.Contains(object)"/>
     public bool Contains(object obj)
     {
@@ -369,8 +373,7 @@ public class PlayerManager : IPlayerManager
         lock (registrySync)
         {
             // Checked under the same lock as the write, so a removal or replacement can't slip in between
-            if (!_players.TryGetValue(player.ControllerId, out var registered) || !ReferenceEquals(registered, player))
-                return false;
+            if (!IsCurrentRegistration(player)) return false;
 
             peerToPlayer[peer] = player;
             controllerToPeer[player.ControllerId] = peer;
@@ -408,9 +411,7 @@ public class PlayerManager : IPlayerManager
         {
             // Match the instance, not just the controller id: a caller holding a superseded
             // Player must not deregister whoever currently holds that controller.
-            if (!_players.TryGetValue(player.ControllerId, out var registered) ||
-                !ReferenceEquals(registered, player))
-                return false;
+            if (!IsCurrentRegistration(player)) return false;
 
             _players.Remove(player.ControllerId);
             controllerToPeer.Remove(player.ControllerId);

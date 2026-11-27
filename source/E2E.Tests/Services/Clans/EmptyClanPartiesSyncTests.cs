@@ -55,7 +55,7 @@ public class EmptyClanPartiesSyncTests : SyncTestBase
         {
             var playerManager = Server.Resolve<IPlayerManager>();
             Assert.True(playerManager.AddPlayer(new Player("leader", mainHeroId, null, clanId, null)));
-            playerManager.SetPeer("leader", client.NetPeer);
+            playerManager.BindRegisteredPeer("leader", client.NetPeer);
         });
     }
 

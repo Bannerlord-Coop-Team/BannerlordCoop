@@ -244,7 +244,7 @@ public class CrimePaymentTests : IDisposable
                 }
             });
         }
-        Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer(controllerId, client.NetPeer));
+        Server.Call(() => Server.Resolve<IPlayerManager>().BindRegisteredPeer(controllerId, client.NetPeer));
         return player;
     }
 

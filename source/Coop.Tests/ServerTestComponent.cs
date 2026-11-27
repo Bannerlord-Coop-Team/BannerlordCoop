@@ -35,10 +35,12 @@ internal class ServerTestComponent : TestComponentBase
     public Player BindPeerToPlayer(NetPeer peer)
     {
         var player = new Player("BoundController", "Hero_Bound", "MobileParty_Bound", "Clan_Bound", "Character_Bound");
-        var registered = player;
-        Container.Resolve<Mock<IPlayerManager>>()
-            .Setup(manager => manager.TryGetCurrentPlayer(It.Is<NetPeer>(candidate => ReferenceEquals(candidate, peer)), out registered))
+        var controllerId = player.ControllerId;
+        var playerManager = Container.Resolve<Mock<IPlayerManager>>();
+        playerManager
+            .Setup(manager => manager.TryGetCurrentController(It.Is<NetPeer>(candidate => ReferenceEquals(candidate, peer)), out controllerId))
             .Returns(true);
+        playerManager.Setup(manager => manager.IsCurrentRegistration(player)).Returns(true);
         return player;
     }
 }

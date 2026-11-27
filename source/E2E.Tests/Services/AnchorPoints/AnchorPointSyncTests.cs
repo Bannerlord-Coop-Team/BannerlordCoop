@@ -160,7 +160,7 @@ public class AnchorPointSyncTests : SyncTestBase
             party.Anchor.SetLastUsedDisembarkPosition(party.Position);
             var players = Server.Resolve<IPlayerManager>();
             Assert.True(players.AddPlayer(new Player("anchor_owner", null, partyId, null, null)));
-            players.SetPeer("anchor_owner", Clients.First().NetPeer);
+            players.BindRegisteredPeer("anchor_owner", Clients.First().NetPeer);
         });
 
         foreach (var client in Clients)

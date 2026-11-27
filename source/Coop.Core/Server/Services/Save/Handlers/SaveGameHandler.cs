@@ -199,8 +199,8 @@ internal class SaveGameHandler : IHandler
 
         foreach (var registration in restored)
         {
-            // Checked once every row is restored, since restoring another row can hand this party to that row's hero
-            // (vanilla ChangePartyLeader also changes a lord party's owner)
+            // Checked once every row is restored, against each party's final owner, so a row is skipped when another
+            // player's hero owns its party (a dead hero's party passes the restore without an owner check)
             if (!playerPartyRestorer.TryGetOwnedParty(registration, playerHeroes, out _))
             {
                 Logger.Error(

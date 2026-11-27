@@ -466,7 +466,7 @@ public class BattleSurrenderTests : MapEventTestBase
         var leavingClient = Clients.Last();
 
         RegisterAsPlayerParty("2", TestEnvironment.CreateRegisteredObject<Hero>(), leavingPartyId);
-        Server.Resolve<IPlayerManager>().SetPeer("2", leavingClient.NetPeer);
+        Server.Resolve<IPlayerManager>().BindRegisteredPeer("2", leavingClient.NetPeer);
         SetMainPartyInBattle(leavingClient, leavingPartyId);
         EnableHeadlessEncounterFinish(leavingClient);
         SetMockPlayerEncounter(

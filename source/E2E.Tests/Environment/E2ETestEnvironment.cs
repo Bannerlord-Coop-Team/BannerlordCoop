@@ -125,7 +125,7 @@ public class E2ETestEnvironment : IDisposable
                 playerManager.TryGetPlayer(controllerId, out var player),
                 $"Player '{controllerId}' must be registered before connecting its peer.");
 
-            playerManager.SetPeer(controllerId, client.NetPeer);
+            playerManager.BindRegisteredPeer(controllerId, client.NetPeer);
 
             var connections = Server.Resolve<ConnectionCollection>();
             if (!connections.ConnectionStates.TryGetValue(client.NetPeer, out var connection))

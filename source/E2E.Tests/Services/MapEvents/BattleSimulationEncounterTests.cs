@@ -93,7 +93,7 @@ public class BattleSimulationEncounterTests : MapEventTestBase
         var context = CreateServerMapEvent();
         var client = Clients.First();
         RegisterAsPlayerParty("1", TestEnvironment.CreateRegisteredObject<Hero>(), context.AttackerPartyId);
-        Server.Resolve<IPlayerManager>().SetPeer("1", client.NetPeer);
+        Server.Resolve<IPlayerManager>().BindRegisteredPeer("1", client.NetPeer);
         EnableHeadlessEncounterFinish(client);
         client.Call(() =>
         {
@@ -160,7 +160,7 @@ public class BattleSimulationEncounterTests : MapEventTestBase
         var context = CreateServerMapEvent();
         var client = Clients.First();
         RegisterAsPlayerParty("1", TestEnvironment.CreateRegisteredObject<Hero>(), context.AttackerPartyId);
-        Server.Resolve<IPlayerManager>().SetPeer("1", client.NetPeer);
+        Server.Resolve<IPlayerManager>().BindRegisteredPeer("1", client.NetPeer);
         var ended = new List<MapEvent>();
         Server.Call(() =>
         {
@@ -230,7 +230,7 @@ public class BattleSimulationEncounterTests : MapEventTestBase
         var context = CreateServerMapEvent();
         var client = Clients.First();
         RegisterAsPlayerParty("1", TestEnvironment.CreateRegisteredObject<Hero>(), context.AttackerPartyId);
-        Server.Resolve<IPlayerManager>().SetPeer("1", client.NetPeer);
+        Server.Resolve<IPlayerManager>().BindRegisteredPeer("1", client.NetPeer);
         Server.Call(() =>
         {
             StartAcceptedSimulation(client, context);

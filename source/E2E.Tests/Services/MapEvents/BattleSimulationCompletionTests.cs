@@ -36,7 +36,7 @@ public class BattleSimulationCompletionTests : MapEventTestBase
         var context = CreateServerMapEvent();
         var client = Clients.First();
         RegisterAsPlayerParty("1", TestEnvironment.CreateRegisteredObject<Hero>(), context.AttackerPartyId);
-        Server.Resolve<IPlayerManager>().SetPeer("1", client.NetPeer);
+        Server.Resolve<IPlayerManager>().BindRegisteredPeer("1", client.NetPeer);
         var lootSawRegisteredEvent = new List<bool>();
         client.Resolve<IMessageBroker>().Subscribe<NetworkBattleSimulationLoot>(payload =>
             lootSawRegisteredEvent.Add(client.ObjectManager.TryGetObject<MapEvent>(context.MapEventId, out _)));
@@ -79,7 +79,7 @@ public class BattleSimulationCompletionTests : MapEventTestBase
         var context = CreateServerMapEvent();
         var client = Clients.First();
         RegisterAsPlayerParty("1", TestEnvironment.CreateRegisteredObject<Hero>(), context.AttackerPartyId);
-        Server.Resolve<IPlayerManager>().SetPeer("1", client.NetPeer);
+        Server.Resolve<IPlayerManager>().BindRegisteredPeer("1", client.NetPeer);
 
         Server.Call(() =>
         {

@@ -720,8 +720,8 @@ public class BattleResultDistributionTests : MapEventTestBase
 
         RegisterAsPlayerParty("1", TestEnvironment.CreateRegisteredObject<Hero>(), ctx.AttackerPartyId);
         RegisterAsPlayerParty("2", TestEnvironment.CreateRegisteredObject<Hero>(), player2PartyId);
-        Server.Resolve<IPlayerManager>().SetPeer("1", Clients.First().NetPeer);
-        Server.Resolve<IPlayerManager>().SetPeer("2", Clients.Last().NetPeer);
+        Server.Resolve<IPlayerManager>().BindRegisteredPeer("1", Clients.First().NetPeer);
+        Server.Resolve<IPlayerManager>().BindRegisteredPeer("2", Clients.Last().NetPeer);
 
         SetMainPartyInBattle(Clients.First(), ctx.AttackerPartyId);
         SetMainPartyInBattle(Clients.Last(), player2PartyId);

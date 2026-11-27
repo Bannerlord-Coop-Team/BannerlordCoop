@@ -556,7 +556,7 @@ public class MerchantOutlawsTests : IDisposable
             players.ClearPeer(ClientA.NetPeer);
             serverQuest._destroyedPartyCount++;
             Server.Resolve<IMerchantOutlawsProgress>().Send(serverQuest);
-            players.SetPeer(QuestScenario.ControllerA, ClientA.NetPeer);
+            players.BindRegisteredPeer(QuestScenario.ControllerA, ClientA.NetPeer);
         });
 
         Server.Call(() => Quest(Server).CompleteQuestWithCancel(), TextHelpers);

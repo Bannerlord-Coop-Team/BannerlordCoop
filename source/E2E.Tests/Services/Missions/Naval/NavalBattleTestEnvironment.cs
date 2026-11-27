@@ -127,7 +127,7 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment, IDisp
         foreach (var id in playerIds)
         {
             var client = battle.Players[id].Instance;
-            Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer(id, client.NetPeer));
+            Server.Call(() => Server.Resolve<IPlayerManager>().BindRegisteredPeer(id, client.NetPeer));
             if (lateJoiners.Contains(id)) continue;
 
             EnterBattle(client, battle.MapEventId);

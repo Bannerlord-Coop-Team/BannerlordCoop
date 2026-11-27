@@ -527,7 +527,7 @@ public class RejectedEncounterRecoveryTests : MapEventTestBase
     private void RegisterPeer(EnvironmentInstance client, string controllerId)
     {
         client.Resolve<IControllerIdProvider>().SetControllerId(controllerId);
-        Server.Resolve<IPlayerManager>().SetPeer(controllerId, client.NetPeer);
+        Server.Resolve<IPlayerManager>().BindRegisteredPeer(controllerId, client.NetPeer);
     }
 
     private static void SetMapEventCreationTimeout(EnvironmentInstance instance, TimeSpan timeout)

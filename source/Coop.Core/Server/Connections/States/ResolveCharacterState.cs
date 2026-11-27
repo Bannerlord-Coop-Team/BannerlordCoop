@@ -29,6 +29,15 @@ public class ResolveCharacterState : ConnectionStateBase
 {
     private static readonly ILogger Logger = LogManager.GetLogger<ResolveCharacterState>();
 
+    // How the game thread step left a rejoining player's registration
+    private enum RejoinRepair
+    {
+        RegistrationChanged,
+        HeroMissing,
+        NotRecoverable,
+        Ready,
+    }
+
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IModuleValidator moduleValidator;
@@ -224,89 +233,86 @@ public class ResolveCharacterState : ConnectionStateBase
         {
             if (!TryTakeOverPreviousConnection(peer, controllerId, player)) return;
 
-            var registrationCurrent = false;
-            var heroExists = false;
-            var partyRestored = false;
-            var registrationReplaced = false;
+            var repair = RejoinRepair.RegistrationChanged;
             var restoredPlayer = player;
 
             // Resolve campaign objects and repair the registration on the game thread. A loaded
             // party can be registered by an earlier queued apply even though this poll-thread
             // validation has already arrived.
-            GameThread.Run(() =>
+            GameThread.Run(() => repair = RepairOnGameThread(peer, player, out restoredPlayer), blocking: true);
+
+            switch (repair)
             {
-                // A retirement with an heir or a deletion queued ahead of this step can replace the registration read
-                // above, and restoring its retired hero would build a party nobody plays
-                registrationCurrent = playerManager.TryGetPlayer(controllerId, out var current) && ReferenceEquals(current, player);
-                if (!registrationCurrent) return;
+                case RejoinRepair.RegistrationChanged:
+                    Logger.Warning(
+                        "The registration for hero {HeroId} changed before peer {Peer} rejoined it; disconnecting the joiner",
+                        player.HeroId, peer.Id);
+                    peer.Disconnect();
+                    return;
 
-                heroExists = objectManager.TryGetObjectWithLogging(player.HeroId, out Hero _);
-                if (!heroExists) return;
-
-                partyRestored = playerPartyRestorer.TryRestore(player, out restoredPlayer);
-                if (!partyRestored || ReferenceEquals(restoredPlayer, player)) return;
-
-                registrationReplaced = playerManager.ReplacePlayer(player, restoredPlayer);
-
-                // Sent in the same game thread step as the swap, so a later heir swap or deletion reaches clients after it
-                if (registrationReplaced)
-                    network.SendAllBut(peer, new NetworkPlayerRegistrationUpdated(restoredPlayer));
-            }, blocking: true);
-
-            if (!registrationCurrent)
-            {
-                Logger.Warning(
-                    "The registration for hero {HeroId} changed before peer {Peer} rejoined it; disconnecting the joiner",
-                    player.HeroId, peer.Id);
-                peer.Disconnect();
-                return;
-            }
-
-            if (heroExists)
-            {
-                if (!partyRestored || (!ReferenceEquals(restoredPlayer, player) && !registrationReplaced))
-                {
+                case RejoinRepair.NotRecoverable:
                     Logger.Error(
                         "Controller {ControllerId} hero {HeroId} has no recoverable player party; disconnecting the joiner",
                         controllerId,
                         player.HeroId);
                     peer.Disconnect();
                     return;
-                }
 
-                // This peer is a new NetPeer for an already registered player, so the
-                // peer-Player link must be established here. A deletion or heir swap on the game
-                // thread can change the registration checked above, so bind only to that one.
-                if (!playerManager.TrySetPeer(restoredPlayer, peer))
-                {
+                case RejoinRepair.HeroMissing:
+                    // Registered, but the hero it names is not in the campaign. Deregister it before character creation
+                    // registers this controller id again, or the controller is ambiguous for the rest of the session.
                     Logger.Warning(
-                        "The registration for hero {HeroId} changed while peer {Peer} was joining; disconnecting the joiner",
-                        restoredPlayer.HeroId, peer.Id);
-                    peer.Disconnect();
+                        "Controller {ControllerId} is registered to hero {HeroId}, which no longer exists; " +
+                        "dropping the stale registration and creating a new character",
+                        controllerId, player.HeroId);
+                    playerManager.RemovePlayer(player);
+                    break;
+
+                case RejoinRepair.Ready:
+                    // This peer is a new NetPeer for an already registered player, so the
+                    // peer-Player link must be established here. A deletion or heir swap on the game
+                    // thread can change the registration checked above, so bind only to that one.
+                    if (!playerManager.TrySetPeer(restoredPlayer, peer))
+                    {
+                        Logger.Warning(
+                            "The registration for hero {HeroId} changed while peer {Peer} was joining; disconnecting the joiner",
+                            restoredPlayer.HeroId, peer.Id);
+                        peer.Disconnect();
+                        return;
+                    }
+
+                    network.SendImmediate(peer, new NetworkClientValidated(true, restoredPlayer));
+                    ConnectionLogic.TransferSave(restoredPlayer);
+
+                    existingPlayerSender.SendExistingPlayers(peer, controllerId);
                     return;
-                }
-
-                network.SendImmediate(peer, new NetworkClientValidated(true, restoredPlayer));
-                ConnectionLogic.TransferSave(restoredPlayer);
-
-                existingPlayerSender.SendExistingPlayers(peer, controllerId);
-                return;
             }
-
-            // Registered, but the hero it names is not in the campaign — a registration that
-            // outlived its objects. Deregister it before routing to character creation: the
-            // character created next registers this same controller id, and leaving the dead
-            // entry behind would make the controller ambiguous for the rest of the session.
-            Logger.Warning(
-                "Controller {ControllerId} is registered to hero {HeroId}, which no longer exists; " +
-                "dropping the stale registration and creating a new character",
-                controllerId, player.HeroId);
-
-            playerManager.RemovePlayer(player);
         }
 
         network.SendImmediate(peer, new NetworkClientValidated(false, null));
         ConnectionLogic.CreateCharacter();
+    }
+
+    // Checks the registration and repairs its party in one game thread step. restoredPlayer is the registration
+    // the peer plays when this returns Ready.
+    private RejoinRepair RepairOnGameThread(NetPeer peer, Player player, out Player restoredPlayer)
+    {
+        restoredPlayer = player;
+
+        // A retirement with an heir or a deletion queued ahead of this step can replace the registration the caller
+        // read, and restoring its retired hero would build a party nobody plays
+        if (!playerManager.IsCurrentRegistration(player)) return RejoinRepair.RegistrationChanged;
+
+        if (!objectManager.TryGetObjectWithLogging(player.HeroId, out Hero _)) return RejoinRepair.HeroMissing;
+
+        if (!playerPartyRestorer.TryRestore(player, out restoredPlayer)) return RejoinRepair.NotRecoverable;
+        if (ReferenceEquals(restoredPlayer, player)) return RejoinRepair.Ready;
+
+        if (!playerManager.ReplacePlayer(player, restoredPlayer)) return RejoinRepair.NotRecoverable;
+
+        // Sent in the same game thread step as the swap, so a later heir swap or deletion reaches clients after it
+        network.SendAllBut(peer, new NetworkPlayerRegistrationUpdated(restoredPlayer));
+        return RejoinRepair.Ready;
     }
 
     // One connection per player. A quiet old connection is this player back from a crash, so drop it and let its

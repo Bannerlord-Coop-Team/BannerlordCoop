@@ -398,7 +398,7 @@ public class PreferredBattleHostTests : MissionTestEnvironment, IDisposable
         {
             var playerManager = Server.Resolve<IPlayerManager>();
             for (int i = 0; i < controllerIds.Length; i++)
-                playerManager.SetPeer(controllerIds[i], clients[i].NetPeer);
+                playerManager.BindRegisteredPeer(controllerIds[i], clients[i].NetPeer);
         });
     }
 

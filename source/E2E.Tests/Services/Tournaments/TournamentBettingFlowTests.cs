@@ -190,7 +190,7 @@ public class TournamentBettingFlowTests : SyncTestBase
                 partyId,
                 hero.Clan?.StringId ?? string.Empty,
                 bettorCharacterId)));
-            playerManager.SetPeer(BettorControllerId, bettor.NetPeer);
+            playerManager.BindRegisteredPeer(BettorControllerId, bettor.NetPeer);
             if (humanOpponent)
             {
                 Assert.True(playerManager.AddPlayer(new Player(
@@ -199,7 +199,7 @@ public class TournamentBettingFlowTests : SyncTestBase
                     string.Empty,
                     string.Empty,
                     opponentCharacterId)));
-                playerManager.SetPeer(OtherControllerId, other.NetPeer);
+                playerManager.BindRegisteredPeer(OtherControllerId, other.NetPeer);
             }
 
             snapshot = CreateSnapshot(

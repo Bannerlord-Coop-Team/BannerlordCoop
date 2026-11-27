@@ -90,7 +90,7 @@ public abstract class SiegeTestBase : MapEventTestBase
     {
         Server.Call(() =>
         {
-            Server.Resolve<IPlayerManager>().SetPeer(controllerId, disconnectedClient.NetPeer);
+            Server.Resolve<IPlayerManager>().BindRegisteredPeer(controllerId, disconnectedClient.NetPeer);
             Server.Resolve<IMessageBroker>().Publish(
                 this,
                 new PlayerDisconnected(disconnectedClient.NetPeer, default));

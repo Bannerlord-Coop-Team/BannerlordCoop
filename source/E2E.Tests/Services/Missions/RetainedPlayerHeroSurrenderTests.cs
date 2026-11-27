@@ -42,13 +42,13 @@ public class RetainedPlayerHeroSurrenderTests : MissionTestEnvironment
         {
             var players = Server.Resolve<IPlayerManager>();
             for (int i = 0; i < clients.Length; i++)
-                players.SetPeer(new[] { "holder", "returner", "observer" }[i], clients[i].NetPeer);
+                players.BindRegisteredPeer(new[] { "holder", "returner", "observer" }[i], clients[i].NetPeer);
             Assert.True(players.TryGetPlayer("returner", out var player));
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(player.HeroId, out var hero));
             Assert.True(Server.ObjectManager.TryGetId(hero.CharacterObject, out var characterId));
             players.RemovePlayer(player);
             Assert.True(players.AddPlayer(new Player("returner", player.HeroId, partyIds[1], player.ClanId, characterId)));
-            players.SetPeer("returner", clients[1].NetPeer);
+            players.BindRegisteredPeer("returner", clients[1].NetPeer);
         });
         foreach (var client in clients) EnterBattle(client, battleId);
         for (int index = 0; index < clients.Length; index++)

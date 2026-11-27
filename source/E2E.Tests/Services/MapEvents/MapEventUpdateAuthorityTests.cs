@@ -250,7 +250,7 @@ public class MapEventUpdateAuthorityTests : MapEventTestBase
     }
     private void ConnectPlayer(string controllerId)
     {
-        Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer(controllerId, Clients.First().NetPeer));
+        Server.Call(() => Server.Resolve<IPlayerManager>().BindRegisteredPeer(controllerId, Clients.First().NetPeer));
     }
 
     private static void StartGracePeriodInThePast(MapEvent mapEvent) =>
