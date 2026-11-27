@@ -39,8 +39,9 @@ public class MenuViewContextPatchesTests : IDisposable
     public void MenuThatFailsToOpen_ReleasesItsPanel()
     {
         // Swap the Gauntlet menu panel for one that refreshes the same GameMenuVM without a render layer.
+        var explicitOnMenuCreate = $"{typeof(IMenuContextHandler).FullName}.{nameof(IMenuContextHandler.OnMenuCreate)}";
         presentationPatch.Patch(
-            AccessTools.Method(typeof(MenuViewContext), "TaleWorlds.CampaignSystem.GameState.IMenuContextHandler.OnMenuCreate"),
+            AccessTools.Method(typeof(MenuViewContext), explicitOnMenuCreate),
             prefix: new HarmonyMethod(typeof(MenuViewContextPatchesTests), nameof(AddMenuPanel)));
 
         var client = environment.Clients.First();
