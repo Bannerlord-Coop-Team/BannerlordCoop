@@ -8,6 +8,7 @@ using SandBox.Missions.MissionLogics.Hideout.Objectives;
 using SandBox.Objects.AnimationPoints;
 using SandBox.Objects.AreaMarkers;
 using SandBox.Objects.Usables;
+using SandBox.View.Missions;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -314,14 +315,15 @@ internal sealed class CoopHideoutAmbushController : HideoutAmbushMissionControll
         }
     }
 
-    // Undoes the fire's OnUse after the host turned the call down, so it can be lit again.
+    // Undoes what lighting the fire did locally after the host turned the call down, so it can be lit again.
     internal void ReopenSignalFire(int usePointId)
     {
         var fire = _stealthAreaData.FirstOrDefault(value => value.StealthAreaUsePoint.Id.Id == usePointId)?.StealthAreaUsePoint;
         if (fire == null) return;
         fire._isAlreadyUsed = false;
         fire.EnableStealthAreaUsePoint();
-        OnAgentsShouldBeEnabled();
+        // The call troops cinematic view suspends the sentries' alarm markers on use, and native never resumes them.
+        Mission.GetMissionBehavior<MissionAgentAlarmStateView>()?.ResumeView();
     }
 
     public override void OnAgentRemoved(Agent affectedAgent, Agent affectorAgent, AgentState agentState, KillingBlow blow)

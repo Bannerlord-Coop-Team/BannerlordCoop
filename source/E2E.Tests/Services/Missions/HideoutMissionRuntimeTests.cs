@@ -744,12 +744,12 @@ public sealed class HideoutMissionRuntimeTests : MissionTestEnvironment
         return (logic, native, hero, sentry);
     }
 
-    private static StealthAreaMissionLogic.StealthAreaData SignalFireArea(StealthAreaUsePoint fire, StealthAreaMarker marker, params Agent[] sentries)
+    private static StealthAreaMissionLogic.StealthAreaData SignalFireArea(StealthAreaUsePoint fire, StealthAreaMarker marker)
     {
         var area = ObjectHelper.SkipConstructor<StealthAreaMissionLogic.StealthAreaData>();
         AccessTools.Field(typeof(StealthAreaMissionLogic.StealthAreaData), nameof(area.StealthAreaUsePoint)).SetValue(area, fire);
         AccessTools.Field(typeof(StealthAreaMissionLogic.StealthAreaData), nameof(area.StealthAreaMarkers))
-            .SetValue(area, new Dictionary<StealthAreaMarker, List<Agent>> { [marker] = sentries.ToList() });
+            .SetValue(area, new Dictionary<StealthAreaMarker, List<Agent>> { [marker] = new() });
         return area;
     }
 
