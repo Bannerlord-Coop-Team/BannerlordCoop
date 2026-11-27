@@ -2,6 +2,7 @@
 using GameInterface.Services.CharacterObjects;
 using GameInterface.Services.Clans.Extensions;
 using GameInterface.Services.Heroes.Extensions;
+using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Missions;
 using GameInterface.Services.Players;
 using GameInterface.Services.UI.Notifications.Messages;
@@ -68,6 +69,7 @@ public class PregnancyCampaignBehaviorInterface : IPregnancyCampaignBehaviorInte
             }
             CampaignEventDispatcher.Instance.OnGivenBirth(mother, deliveredOffspring, numberOfStillbornOffspring);
             mother.IsPregnant = false;
+            messageBroker.Publish(this, new PregnantChanged(mother, false));
             behavior._heroPregnancies.Remove(pregnancy);
 
             // Replace Hero.MainHero usage
