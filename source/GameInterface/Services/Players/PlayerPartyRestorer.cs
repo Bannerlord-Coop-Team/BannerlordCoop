@@ -17,10 +17,15 @@ public interface IPlayerPartyRestorer
     bool TryRestore(Player player, out Player restoredPlayer);
 
     /// <summary>
-    /// Resolves the party a saved row names if the campaign still gives it to that row: its hero owns it, or its hero
-    /// is dead and waiting for heir selection, and none of <paramref name="playerHeroes"/> owns the party now.
+    /// Resolves the party a saved row names if <see cref="KeepsParty"/> gives it to that row's hero.
     /// </summary>
     bool TryGetOwnedParty(Player player, IReadOnlyCollection<Hero> playerHeroes, out MobileParty party);
+
+    /// <summary>
+    /// True if the campaign still gives <paramref name="party"/> to <paramref name="hero"/>: the hero owns it, or the hero
+    /// is dead and waiting for heir selection, and none of <paramref name="playerHeroes"/> owns the party now.
+    /// </summary>
+    bool KeepsParty(Hero hero, MobileParty party, IReadOnlyCollection<Hero> playerHeroes);
 
     void RestoreClanMembership(Hero hero);
     void Restore(Hero hero, MobileParty party);
@@ -167,6 +172,12 @@ internal class PlayerPartyRestorer : IPlayerPartyRestorer
             !objectManager.TryGetObject(player.HeroId, out Hero hero))
             return false;
 
+        return KeepsParty(hero, party, playerHeroes);
+    }
+
+    /// <inheritdoc/>
+    public bool KeepsParty(Hero hero, MobileParty party, IReadOnlyCollection<Hero> playerHeroes)
+    {
         // Vanilla hands a dead hero's party to another hero in it, so the dead hero keeps it until another player owns it
         var owner = party.Owner;
         var heirSelectionPending = hero.IsDead && !playerHeroes.Any(playerHero => ReferenceEquals(playerHero, owner));

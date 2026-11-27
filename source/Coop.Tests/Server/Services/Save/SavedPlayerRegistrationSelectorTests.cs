@@ -21,9 +21,13 @@ public class SavedPlayerRegistrationSelectorTests
     private const string StaleHeroId = "Hero_Stale";
     private const string StalePartyId = "Party_Stale";
     private const string MissingHeroId = "Hero_Missing";
+    private const string DeadHeroId = "Hero_Dead";
+    private const string OtherDeadHeroId = "Hero_OtherDead";
 
     private readonly Hero liveHero = ObjectHelper.SkipConstructor<Hero>();
     private readonly Hero staleHero = ObjectHelper.SkipConstructor<Hero>();
+    private readonly Hero deadHero = ObjectHelper.SkipConstructor<Hero>();
+    private readonly Hero otherDeadHero = ObjectHelper.SkipConstructor<Hero>();
     private readonly MobileParty liveParty = ObjectHelper.SkipConstructor<MobileParty>();
     private readonly MobileParty staleParty = ObjectHelper.SkipConstructor<MobileParty>();
     private readonly Mock<IPlayerPartyRestorer> playerPartyRestorer = new Mock<IPlayerPartyRestorer>();
@@ -74,7 +78,7 @@ public class SavedPlayerRegistrationSelectorTests
     {
         var stale = new Player(ControllerId, StaleHeroId, LivePartyId, "Clan_One", "Character_Stale");
         var owner = new Player(ControllerId, LiveHeroId, LivePartyId, "Clan_One", "Character_Live");
-        Owns(owner, liveParty);
+        Keeps(liveHero, liveParty);
 
         var rows = Select(staleFirst ? new[] { stale, owner } : new[] { owner, stale });
 
@@ -121,38 +125,45 @@ public class SavedPlayerRegistrationSelectorTests
     [InlineData(false)]
     public void Select_PartySharedWithAnotherController_KeepsTheControllersOtherRow(bool sharedFirst)
     {
-        var sharedRow = new Player(ControllerId, "Hero_Dead", LivePartyId, "Clan_One", "Character_Dead");
+        var sharedRow = new Player(ControllerId, DeadHeroId, LivePartyId, "Clan_One", "Character_Dead");
         var livingRow = new Player(ControllerId, StaleHeroId, StalePartyId, "Clan_One", "Character_Stale");
-        var otherDeadRow = new Player("PlayerTwo", "Hero_OtherDead", LivePartyId, "Clan_Two", "Character_OtherDead");
-        Owns(sharedRow, liveParty);
-        Owns(livingRow, staleParty);
-        Owns(otherDeadRow, liveParty);
+        var otherDeadRow = new Player("PlayerTwo", OtherDeadHeroId, LivePartyId, "Clan_Two", "Character_OtherDead");
+        Keeps(deadHero, liveParty);
+        Keeps(staleHero, staleParty);
+        Keeps(otherDeadHero, liveParty);
 
         var rows = Select(sharedFirst ? new[] { sharedRow, livingRow, otherDeadRow } : new[] { livingRow, sharedRow, otherDeadRow });
 
         Assert.Equal(new[] { livingRow }, rows);
     }
 
-    // The restorer says the campaign still gives the row this party
-    private void Owns(Player row, MobileParty party) =>
+    // The restorer says the campaign still gives the hero this party
+    private void Keeps(Hero hero, MobileParty party) =>
         playerPartyRestorer
-            .Setup(restorer => restorer.TryGetOwnedParty(row, It.IsAny<IReadOnlyCollection<Hero>>(), out party))
+            .Setup(restorer => restorer.KeepsParty(
+                It.Is<Hero>(value => ReferenceEquals(value, hero)),
+                It.Is<MobileParty>(value => ReferenceEquals(value, party)),
+                It.IsAny<IReadOnlyCollection<Hero>>()))
             .Returns(true);
 
-    // The live and stale heroes and their parties resolve in the object manager
+    // The live, stale and dead heroes and the live and stale parties resolve in the object manager
     private IReadOnlyList<Player> Select(params Player[] savedPlayers)
     {
         var live = liveHero;
         var stale = staleHero;
+        var dead = deadHero;
+        var otherDead = otherDeadHero;
         var liveHeroParty = liveParty;
         var staleHeroParty = staleParty;
         var objectManager = new Mock<IObjectManager>();
         objectManager.Setup(manager => manager.TryGetObject(LiveHeroId, out live)).Returns(true);
         objectManager.Setup(manager => manager.TryGetObject(LiveHeroFullId, out live)).Returns(true);
         objectManager.Setup(manager => manager.TryGetObject(StaleHeroId, out stale)).Returns(true);
+        objectManager.Setup(manager => manager.TryGetObject(DeadHeroId, out dead)).Returns(true);
+        objectManager.Setup(manager => manager.TryGetObject(OtherDeadHeroId, out otherDead)).Returns(true);
         objectManager.Setup(manager => manager.TryGetObject(LivePartyId, out liveHeroParty)).Returns(true);
         objectManager.Setup(manager => manager.TryGetObject(StalePartyId, out staleHeroParty)).Returns(true);
 
-        return new SavedPlayerRegistrationSelector(objectManager.Object, playerPartyRestorer.Object).Select(savedPlayers);
+        return new SavedPlayerRegistrationSelector(objectManager.Object, playerPartyRestorer.Object).Select(savedPlayers, out _);
     }
 }

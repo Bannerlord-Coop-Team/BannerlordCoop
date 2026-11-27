@@ -55,9 +55,9 @@ stateDiagram-v2
     [*] --> ResolveCharacterState
 
     ResolveCharacterState --> CreateCharacterState : NetworkClientValidate (no player) → CreateCharacter()
-    ResolveCharacterState --> TransferSaveState : NetworkClientValidate (player exists) → TransferSave()
+    ResolveCharacterState --> TransferSaveState : NetworkClientValidate (player exists) → TransferSave(player)
 
-    CreateCharacterState --> TransferSaveState : NetworkTransferNewHero (create + register) → TransferSave()
+    CreateCharacterState --> TransferSaveState : NetworkTransferNewHero (create + register) → TransferSave(player)
 
     TransferSaveState --> LoadingState : Load() (save packaged & sent)
 

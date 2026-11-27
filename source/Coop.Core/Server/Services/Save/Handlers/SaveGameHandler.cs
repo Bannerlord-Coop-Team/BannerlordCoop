@@ -165,8 +165,7 @@ internal class SaveGameHandler : IHandler
         // there is no previous session (and no players) to restore.
         if (savedSession?.Players == null) return;
 
-        var rows = registrationSelector.Select(savedSession.Players);
-        var playerHeroes = registrationSelector.ResolvePlayerHeroes(savedSession.Players);
+        var rows = registrationSelector.Select(savedSession.Players, out var playerHeroes);
 
         var restored = new List<Player>();
         foreach (var player in rows)

@@ -269,10 +269,9 @@ public class SaveGameHandlerTests
     }
 
     /// <summary>
-    /// Builds a handler over a loaded session holding <paramref name="savedPlayers"/> and drives it
-    /// through the load sequence (GameLoaded, then AllGameObjectsRegistered). The live, stale and dead
-    /// heroes resolve in the object manager. Without a given restorer, every row whose hero resolves is
-    /// restored as it is and keeps its party.
+    /// Drives a handler over a session holding <paramref name="savedPlayers"/> through GameLoaded, then
+    /// AllGameObjectsRegistered. The live, stale and dead heroes resolve, and without a given restorer every row
+    /// whose hero resolves is restored as it is and keeps its party.
     /// </summary>
     private static SaveGameHandler CreateHandler(
         Mock<IPlayerManager> playerRegistry,

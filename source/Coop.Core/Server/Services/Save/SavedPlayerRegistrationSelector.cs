@@ -16,14 +16,11 @@ namespace Coop.Core.Server.Services.Save;
 internal interface ISavedPlayerRegistrationSelector
 {
     /// <summary>
-    /// Returns one row per controller, and none for a hero or party that two controllers name.
+    /// Returns one row per controller, and none for a hero or party that two controllers name. Every hero the saved
+    /// rows name goes to <paramref name="playerHeroes"/>, the player heroes
+    /// <see cref="IPlayerPartyRestorer.TryGetOwnedParty"/> takes.
     /// </summary>
-    IReadOnlyList<Player> Select(IEnumerable<Player> savedPlayers);
-
-    /// <summary>
-    /// Returns every hero the saved rows name, the player heroes <see cref="IPlayerPartyRestorer.TryGetOwnedParty"/> takes.
-    /// </summary>
-    IReadOnlyCollection<Hero> ResolvePlayerHeroes(IEnumerable<Player> savedPlayers);
+    IReadOnlyList<Player> Select(IEnumerable<Player> savedPlayers, out IReadOnlyCollection<Hero> playerHeroes);
 }
 
 /// <inheritdoc cref="ISavedPlayerRegistrationSelector"/>
@@ -40,23 +37,12 @@ internal class SavedPlayerRegistrationSelector : ISavedPlayerRegistrationSelecto
         this.playerPartyRestorer = playerPartyRestorer;
     }
 
-    public IReadOnlyCollection<Hero> ResolvePlayerHeroes(IEnumerable<Player> savedPlayers) =>
-        ResolveHeroClaims(savedPlayers.Where(player => player != null)).Select(claim => claim.Claimed).ToArray();
-
-    public IReadOnlyList<Player> Select(IEnumerable<Player> savedPlayers)
+    public IReadOnlyList<Player> Select(IEnumerable<Player> savedPlayers, out IReadOnlyCollection<Hero> playerHeroes)
     {
-        var rows = savedPlayers.Where(player => player != null).ToArray();
-
         // A row can name a hero or party by its full or its short id, so claims compare the objects they resolve to
-        var heroClaims = ResolveHeroClaims(rows);
-        var playerHeroes = heroClaims.Select(claim => claim.Claimed).ToArray();
-
-        var partyClaims = new List<(Player Player, MobileParty Claimed)>();
-        foreach (var player in rows)
-        {
-            if (playerPartyRestorer.TryGetOwnedParty(player, playerHeroes, out var party))
-                partyClaims.Add((player, party));
-        }
+        var claims = ResolveClaims(savedPlayers.Where(player => player != null), out playerHeroes);
+        var heroClaims = claims.Where(claim => claim.Hero != null).Select(claim => (claim.Player, Claimed: claim.Hero));
+        var partyClaims = claims.Where(claim => claim.KeepsParty).Select(claim => (claim.Player, Claimed: claim.Party));
 
         // A pre-#2400 save can give one hero or party to two controllers, so restore neither; remove once those saves
         // are unsupported. Checked over every row first, so the row order can't decide which controller keeps it.
@@ -70,24 +56,29 @@ internal class SavedPlayerRegistrationSelector : ISavedPlayerRegistrationSelecto
                     player.HeroId);
         }
 
-        var selected = SelectOneRowPerController(
-            rows.Where(player => !shared.Contains(player)),
-            new HashSet<Player>(heroClaims.Select(claim => claim.Player)),
-            new HashSet<Player>(partyClaims.Select(claim => claim.Player)));
-
-        return selected.ToArray();
+        return SelectOneRowPerController(claims.Where(claim => !shared.Contains(claim.Player))).ToArray();
     }
 
-    private List<(Player Player, Hero Claimed)> ResolveHeroClaims(IEnumerable<Player> rows)
+    private SavedRowClaim[] ResolveClaims(IEnumerable<Player> rows, out IReadOnlyCollection<Hero> playerHeroes)
     {
-        var heroClaims = new List<(Player Player, Hero Claimed)>();
+        var resolved = new List<(Player Player, Hero Hero, MobileParty Party)>();
         foreach (var player in rows)
         {
-            if (objectManager.TryGetObject(player.HeroId, out Hero hero))
-                heroClaims.Add((player, hero));
+            var heroExists = objectManager.TryGetObject(player.HeroId, out Hero hero);
+            var partyExists = objectManager.TryGetObject(player.MobilePartyId, out MobileParty party);
+            resolved.Add((player, heroExists ? hero : null, partyExists ? party : null));
         }
 
-        return heroClaims;
+        var heroes = resolved.Where(row => row.Hero != null).Select(row => row.Hero).ToArray();
+        playerHeroes = heroes;
+
+        return resolved
+            .Select(row => new SavedRowClaim(
+                row.Player,
+                row.Hero,
+                row.Party,
+                row.Hero != null && row.Party != null && playerPartyRestorer.KeepsParty(row.Hero, row.Party, heroes)))
+            .ToArray();
     }
 
     private static IEnumerable<Player> SharedClaims<T>(IEnumerable<(Player Player, T Claimed)> claims) =>
@@ -100,36 +91,51 @@ internal class SavedPlayerRegistrationSelector : ISavedPlayerRegistrationSelecto
     /// The campaign decides which is real: a row whose party it still gives to that row, then one whose hero and party
     /// both exist, then one whose hero exists.
     /// </summary>
-    private IEnumerable<Player> SelectOneRowPerController(
-        IEnumerable<Player> rows,
-        ISet<Player> withHero,
-        ISet<Player> withOwnedParty)
+    private static IEnumerable<Player> SelectOneRowPerController(IEnumerable<SavedRowClaim> claims)
     {
-        foreach (var group in rows.GroupBy(player => player.ControllerId))
+        foreach (var group in claims.GroupBy(claim => claim.Player.ControllerId))
         {
             var registrations = group.ToArray();
             if (registrations.Length == 1)
             {
-                yield return registrations[0];
+                yield return registrations[0].Player;
                 continue;
             }
 
+            // A claim is a struct, so a rank with no match gives a default claim whose Player is null
             var kept =
-                registrations.FirstOrDefault(withOwnedParty.Contains) ??
-                registrations.FirstOrDefault(registration =>
-                    withHero.Contains(registration) && objectManager.TryGetObject(registration.MobilePartyId, out MobileParty _)) ??
-                registrations.FirstOrDefault(withHero.Contains) ??
-                registrations[0];
+                registrations.FirstOrDefault(claim => claim.KeepsParty).Player ??
+                registrations.FirstOrDefault(claim => claim.Hero != null && claim.Party != null).Player ??
+                registrations.FirstOrDefault(claim => claim.Hero != null).Player ??
+                registrations[0].Player;
 
             Logger.Warning(
                 "Save carries {Count} registrations for controller {ControllerId} (heroes {HeroIds}); " +
                 "restoring {KeptHeroId} and dropping the rest",
                 registrations.Length,
                 group.Key,
-                string.Join(", ", registrations.Select(registration => registration.HeroId)),
+                string.Join(", ", registrations.Select(claim => claim.Player.HeroId)),
                 kept.HeroId);
 
             yield return kept;
         }
+    }
+
+    // One saved row with its hero and party resolved once (null when missing), and whether the campaign still gives
+    // the row that party
+    private readonly struct SavedRowClaim
+    {
+        public SavedRowClaim(Player player, Hero hero, MobileParty party, bool keepsParty)
+        {
+            Player = player;
+            Hero = hero;
+            Party = party;
+            KeepsParty = keepsParty;
+        }
+
+        public Player Player { get; }
+        public Hero Hero { get; }
+        public MobileParty Party { get; }
+        public bool KeepsParty { get; }
     }
 }
