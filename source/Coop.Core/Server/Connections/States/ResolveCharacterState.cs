@@ -241,6 +241,10 @@ public class ResolveCharacterState : ConnectionStateBase
                 if (!partyRestored || ReferenceEquals(restoredPlayer, player)) return;
 
                 registrationReplaced = playerManager.ReplacePlayer(player, restoredPlayer);
+
+                // Sent in the same game thread step as the swap, so a later heir swap or deletion reaches clients after it
+                if (registrationReplaced)
+                    network.SendAllBut(peer, new NetworkPlayerRegistrationUpdated(restoredPlayer));
             }, blocking: true);
 
             if (heroExists)
@@ -266,10 +270,6 @@ public class ResolveCharacterState : ConnectionStateBase
                     peer.Disconnect();
                     return;
                 }
-
-                // Sent only once bound, so a change that won the race isn't overwritten by this older update
-                if (registrationReplaced)
-                    network.SendAllBut(peer, new NetworkPlayerRegistrationUpdated(restoredPlayer));
 
                 network.SendImmediate(peer, new NetworkClientValidated(true, restoredPlayer));
                 ConnectionLogic.TransferSave(restoredPlayer);

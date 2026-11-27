@@ -372,6 +372,52 @@ public class PlayerPartyRestorerTests
     }
 
     [Fact]
+    public void TryRestore_RestoreThrowsAfterCreatingRecoveryParty_RemovesRecoveryPartyAndReturnsFalse()
+    {
+        var (hero, party, clan, _) = CreatePlayerGraph();
+        // A clan whose lord cache is broken makes vanilla OnLordAdded throw once the recovery party is registered
+        clan._aliveLordsCache = null;
+        var player = new Player("Controller", "Hero_Saved", "MobileParty_Missing", "Clan_Saved", "Character_Saved");
+        var objectManager = CreateRegisteredPlayerObjectManager(player, hero);
+        var autoRegistryFactory = new Mock<IAutoRegistryFactory>();
+        autoRegistryFactory
+            .Setup(factory => factory.RegisterAll())
+            .Callback(() => Assert.True(objectManager.AddExisting("MobileParty_Recovered", party)));
+        var removed = new List<MobileParty>();
+
+        var restorer = new PlayerPartyRestorer(
+            objectManager,
+            autoRegistryFactory.Object,
+            () => Array.Empty<MobileParty>(),
+            _ => party,
+            removed.Add);
+
+        Assert.False(restorer.TryRestore(player, out var restored));
+
+        Assert.Same(player, restored);
+        Assert.Equal(new[] { party }, removed);
+    }
+
+    [Fact]
+    public void TryRestore_RestoreThrowsIntoTheSavedParty_KeepsThePartyAndRethrows()
+    {
+        var (hero, party, clan, _) = CreatePlayerGraph();
+        clan._aliveLordsCache = null;
+        var player = new Player("Controller", "Hero_Saved", "MobileParty_Saved", "Clan_Saved", "Character_Saved");
+        var objectManager = CreateRegisteredPlayerObjectManager(player, hero);
+        Assert.True(objectManager.AddExisting(player.MobilePartyId, party));
+
+        var restorer = new PlayerPartyRestorer(
+            objectManager,
+            Mock.Of<IAutoRegistryFactory>(),
+            () => Array.Empty<MobileParty>(),
+            _ => throw new InvalidOperationException("The saved party should be kept"),
+            _ => throw new InvalidOperationException("The saved party should not be removed"));
+
+        Assert.Throws<NullReferenceException>(() => restorer.TryRestore(player, out _));
+    }
+
+    [Fact]
     public void TryRestore_NullPartyComponentBacklink_RepairsBacklink()
     {
         var (hero, party, _, _) = CreatePlayerGraph();

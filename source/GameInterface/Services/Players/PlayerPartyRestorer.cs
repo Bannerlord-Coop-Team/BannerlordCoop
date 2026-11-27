@@ -112,7 +112,8 @@ internal class PlayerPartyRestorer : IPlayerPartyRestorer
         }
 
         string partyId;
-        if (party == null)
+        var createdRecoveryParty = party == null;
+        if (createdRecoveryParty)
         {
             party = createRecoveryParty(hero);
             if (party == null)
@@ -138,7 +139,22 @@ internal class PlayerPartyRestorer : IPlayerPartyRestorer
             return false;
         }
 
-        Restore(hero, party);
+        // Vanilla clan and party calls can throw on a broken graph; a party this attempt created must not outlive it
+        try
+        {
+            Restore(hero, party);
+        }
+        catch (Exception exception) when (createdRecoveryParty)
+        {
+            Logger.Error(
+                exception,
+                "Cannot restore player {ControllerId} hero {HeroId}: restoring into recovery party {PartyId} threw",
+                player.ControllerId,
+                player.HeroId,
+                party.StringId);
+            RemoveFailedRecoveryParty(player, party);
+            return false;
+        }
 
         restoredPlayer = WithRegisteredIds(player, heroId, partyId, clanId, characterObjectId);
         return true;

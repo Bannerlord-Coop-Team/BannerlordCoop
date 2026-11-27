@@ -384,8 +384,6 @@ public class PlayerManager : IPlayerManager
 
     public bool TrySetPeer(Player player, NetPeer peer)
     {
-        if (player == null || string.IsNullOrEmpty(player.ControllerId)) return false;
-
         lock (registrySync)
         {
             // Checked under the same lock as the write, so a removal or replacement can't slip in between

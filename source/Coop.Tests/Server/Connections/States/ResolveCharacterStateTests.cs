@@ -8,6 +8,7 @@ using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
 using Coop.Tests.Extensions;
 using Coop.Tests.Mocks;
+using GameInterface.Services.Heroes.HeirSelection.Messages;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.Modules;
 using GameInterface.Services.ObjectManager;
@@ -506,11 +507,10 @@ namespace Coop.Tests.Server.Connections.States
         }
 
         [Fact]
-        public void NetworkClientValidate_RegistrationChangedBeforeBinding_DisconnectsWithoutValidatingOrBroadcasting()
+        public void NetworkClientValidate_RegistrationChangedBeforeBinding_DisconnectsWithoutValidating()
         {
             // A deletion or an heir swap on the game thread can change the repaired registration after
-            // it was put in and before the peer is bound to it. Then the other players must not get it,
-            // since the change sends them its own update.
+            // it was put in and before the peer is bound to it.
             var currentState = connectionLogic.SetState<ResolveCharacterState>();
             var player = new Player("MyPlayer", "MyHero", "MissingParty", "MyClan", "MyCharacter");
             var repaired = new Player("MyPlayer", "MyHero", "RecoveredParty", "MyClan", "MyCharacter");
@@ -530,12 +530,72 @@ namespace Coop.Tests.Server.Connections.States
             var messages = serverComponent.TestNetwork.SentNetworkMessages
                 .GetValueOrDefault(playerPeer.Id) ?? Enumerable.Empty<IMessage>();
             Assert.Empty(messages.OfType<NetworkClientValidated>());
-            var othersMessages = serverComponent.TestNetwork.SentNetworkMessages
-                .GetValueOrDefault(differentPeer.Id) ?? Enumerable.Empty<IMessage>();
-            Assert.Empty(othersMessages.OfType<NetworkPlayerRegistrationUpdated>());
             Assert.IsType<ResolveCharacterState>(connectionLogic.State);
             Assert.Equal(ConnectionState.ShutdownRequested, playerPeer.ConnectionState);
             playerManager.Verify(manager => manager.TrySetPeer(repaired, IsPeer(playerPeer)), Times.Once);
+        }
+
+        [Fact]
+        public void NetworkClientValidate_HeirSwapRightAfterBinding_OtherClientsGetTheHeirLast()
+        {
+            var currentState = connectionLogic.SetState<ResolveCharacterState>();
+            var player = new Player("MyPlayer", "MyHero", "MissingParty", "MyClan", "MyCharacter");
+            var repaired = new Player("MyPlayer", "MyHero", "RecoveredParty", "MyClan", "MyCharacter");
+            var heir = new Player("MyPlayer", "MyHeir", "RecoveredParty", "MyClan", "MyHeirCharacter");
+            var playerManager = SetupRegisteredPlayer(player);
+            playerManager.Setup(manager => manager.ReplacePlayer(player, repaired)).Returns(true);
+            var restoredPlayer = repaired;
+            serverComponent.Container
+                .Resolve<Mock<IPlayerPartyRestorer>>()
+                .Setup(restorer => restorer.TryRestore(player, out restoredPlayer))
+                .Returns(true);
+
+            // The heir swap runs on the game thread and broadcasts itself, so it can land as soon as the peer is bound
+            playerManager
+                .Setup(manager => manager.TrySetPeer(repaired, IsPeer(playerPeer)))
+                .Callback(() => serverComponent.TestNetwork.SendAll(
+                    new NetworkChangePlayerCharacterAfterHeirSelection(heir, player.HeroId)))
+                .Returns(true);
+
+            currentState.Handle_ClientValidate(new MessagePayload<NetworkClientValidate>(
+                playerPeer,
+                new NetworkClientValidate(player.ControllerId)));
+
+            // Clients apply both in arrival order by controller id, so a repair after the heir puts the dead hero back
+            var registrations = serverComponent.TestNetwork.GetPeerMessages(differentPeer)
+                .Select(message => message switch
+                {
+                    NetworkPlayerRegistrationUpdated update => update.Player,
+                    NetworkChangePlayerCharacterAfterHeirSelection heirSwap => heirSwap.Player,
+                    _ => null
+                })
+                .Where(registration => registration != null);
+            Assert.Equal(new[] { repaired, heir }, registrations);
+        }
+
+        [Fact]
+        public void NetworkClientValidate_RepairRefusedByTheRegistry_DisconnectsWithoutBroadcasting()
+        {
+            // An heir swap that landed before the repair leaves the registry refusing it, and clients already have the heir
+            var currentState = connectionLogic.SetState<ResolveCharacterState>();
+            var player = new Player("MyPlayer", "MyHero", "MissingParty", "MyClan", "MyCharacter");
+            var repaired = new Player("MyPlayer", "MyHero", "RecoveredParty", "MyClan", "MyCharacter");
+            var playerManager = SetupRegisteredPlayer(player);
+            playerManager.Setup(manager => manager.ReplacePlayer(player, repaired)).Returns(false);
+            var restoredPlayer = repaired;
+            serverComponent.Container
+                .Resolve<Mock<IPlayerPartyRestorer>>()
+                .Setup(restorer => restorer.TryRestore(player, out restoredPlayer))
+                .Returns(true);
+
+            currentState.Handle_ClientValidate(new MessagePayload<NetworkClientValidate>(
+                playerPeer,
+                new NetworkClientValidate(player.ControllerId)));
+
+            var othersMessages = serverComponent.TestNetwork.SentNetworkMessages
+                .GetValueOrDefault(differentPeer.Id) ?? Enumerable.Empty<IMessage>();
+            Assert.Empty(othersMessages.OfType<NetworkPlayerRegistrationUpdated>());
+            Assert.Equal(ConnectionState.ShutdownRequested, playerPeer.ConnectionState);
         }
 
         [Fact]
