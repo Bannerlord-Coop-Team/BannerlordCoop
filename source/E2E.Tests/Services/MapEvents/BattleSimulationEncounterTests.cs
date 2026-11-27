@@ -17,7 +17,6 @@ using HarmonyLib;
 using Missions.Messages;
 using SandBox.ViewModelCollection;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
@@ -413,7 +412,6 @@ public class BattleSimulationEncounterTests : MapEventTestBase
             Assert.NotNull(simulation);
             Assert.True(BattleSimulationReplay.IsActiveFor(mapEventId));
         }, MapEventDisabledMethods
-            .Append(AccessTools.Method(typeof(BeHostileAction), nameof(BeHostileAction.ApplyEncounterHostileAction)))
             // The client's local troop setup reads the engine config the harness lacks; the server owns the simulation.
             .Append(AccessTools.Method(typeof(BattleSimulation), nameof(BattleSimulation.ResetSimulation))));
 
