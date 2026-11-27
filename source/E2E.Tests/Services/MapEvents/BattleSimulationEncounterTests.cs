@@ -151,7 +151,8 @@ public class BattleSimulationEncounterTests : MapEventTestBase
     {
         var context = CreateServerMapEvent();
         var client = Clients.First();
-        LoseSimulationWithoutCapture(client, context, BattleSideEnum.Defender, playerBesieges: true);
+        PlaceInBesiegerCamp(context.DefenderPartyId);
+        LoseSimulationWithoutCapture(client, context, BattleSideEnum.Defender);
 
         client.NetworkSentMessages.Clear();
         client.Call(CloseSimulationScoreboard, ScoreboardCloseDisabledMethods
@@ -165,13 +166,24 @@ public class BattleSimulationEncounterTests : MapEventTestBase
             instance.Call(() => Assert.Null(instance.GetRegisteredObject<MobileParty>(context.DefenderPartyId).BesiegerCamp));
     }
 
+    /// <summary>Puts the party in a new siege event's besieger camp on the server and every client.</summary>
+    private void PlaceInBesiegerCamp(string partyId)
+    {
+        var siegeEventId = TestEnvironment.CreateRegisteredObject<SiegeEvent>(SiegeCreationDisabledMethods);
+        string? campId = null;
+        Server.Call(() => Assert.True(Server.ObjectManager.TryGetId(
+            Server.GetRegisteredObject<SiegeEvent>(siegeEventId).BesiegerCamp, out campId)));
+        foreach (var instance in Clients.Append(Server))
+            instance.Call(() => instance.GetRegisteredObject<MobileParty>(partyId)._besiegerCamp =
+                instance.GetRegisteredObject<BesiegerCamp>(campId!));
+    }
+
     /// <summary>
     /// Has the client's party on <paramref name="playerSide"/> lose an accepted simulation without being taken prisoner,
-    /// leaving its finished scoreboard open. The party stays inside <paramref name="settlementId"/> when one is given, and
-    /// starts in a besieger camp when <paramref name="playerBesieges"/> is set.
+    /// leaving its finished scoreboard open. The party stays inside <paramref name="settlementId"/> when one is given.
     /// </summary>
     private void LoseSimulationWithoutCapture(EnvironmentInstance client, MapEventContext context, BattleSideEnum playerSide,
-        string? settlementId = null, bool playerBesieges = false)
+        string? settlementId = null)
     {
         string playerPartyId = context.AttackerPartyId;
         string enemyPartyId = context.DefenderPartyId;
@@ -185,16 +197,6 @@ public class BattleSimulationEncounterTests : MapEventTestBase
 
         client.Resolve<IControllerIdProvider>().SetControllerId("1");
         RegisterAsPlayerParty("1", TestEnvironment.CreateRegisteredObject<Hero>(), playerPartyId);
-        if (playerBesieges)
-        {
-            var siegeEventId = TestEnvironment.CreateRegisteredObject<SiegeEvent>(SiegeCreationDisabledMethods);
-            string? campId = null;
-            Server.Call(() => Assert.True(Server.ObjectManager.TryGetId(
-                Server.GetRegisteredObject<SiegeEvent>(siegeEventId).BesiegerCamp, out campId)));
-            foreach (var instance in Clients.Append(Server))
-                instance.Call(() => instance.GetRegisteredObject<MobileParty>(playerPartyId)._besiegerCamp =
-                    instance.GetRegisteredObject<BesiegerCamp>(campId!));
-        }
         Server.Resolve<IPlayerManager>().SetPeer("1", client.NetPeer);
         EnableHeadlessEncounterFinish(client);
         client.Call(() =>
