@@ -80,6 +80,7 @@ internal sealed partial class TournamentSessionHandler : IHandler
         messageBroker.Subscribe<NetworkEnterTournamentMission>(Handle_EnterMission);
         messageBroker.Subscribe<PlayerDisconnected>(Handle_Disconnected);
         messageBroker.Subscribe<CampaignTick>(Handle_CampaignTick);
+        playerManager.PlayerRemoved += OnPlayerRemoved;
     }
 
     public void Dispose()
@@ -100,6 +101,7 @@ internal sealed partial class TournamentSessionHandler : IHandler
         messageBroker.Unsubscribe<NetworkEnterTournamentMission>(Handle_EnterMission);
         messageBroker.Unsubscribe<PlayerDisconnected>(Handle_Disconnected);
         messageBroker.Unsubscribe<CampaignTick>(Handle_CampaignTick);
+        playerManager.PlayerRemoved -= OnPlayerRemoved;
     }
 
     private void Handle_Join(MessagePayload<NetworkRequestJoinTournament> payload)
@@ -695,6 +697,29 @@ internal sealed partial class TournamentSessionHandler : IHandler
         GameThread.RunSafe(
             () => ProcessDisconnected(controllerId),
             context: nameof(Handle_Disconnected));
+    }
+
+    private void OnPlayerRemoved(Player player)
+    {
+        if (ModInformation.IsClient)
+            return;
+
+        GameThread.RunSafe(() =>
+        {
+            sessionRegistry.TryTakeDisconnectLoss(player.ControllerId, out _);
+            foreach (var snapshot in sessionRegistry.GetAll())
+            {
+                bool registeredContestant = TryGetPlayerSlot(snapshot, player.ControllerId, out var slot) &&
+                    slot.CharacterId == player.CharacterObjectId;
+                if (!registeredContestant && !snapshot.SpectatorControllerIds.Contains(player.ControllerId))
+                    continue;
+
+                if (snapshot.Phase == TournamentSessionPhase.Preparation)
+                    LeavePreparationAfterDisconnect(player.ControllerId, snapshot);
+                else
+                    LeaveActive(snapshot.SessionId, snapshot.Revision, player.ControllerId, null);
+            }
+        }, context: nameof(OnPlayerRemoved));
     }
 
     private bool TryResolveDisconnectedController(NetPeer playerId, out string controllerId)

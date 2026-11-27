@@ -4,6 +4,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players.Data;
 using LiteNetLib;
 using Serilog;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -19,6 +20,7 @@ namespace GameInterface.Services.Players;
 public interface IPlayerManager
 {
     IReadOnlyCollection<Player> Players { get; }
+    event Action<Player> PlayerRemoved;
 
     /// <summary>
     /// Adds a player to the registry. A controller id maps to exactly one player, so a
@@ -123,6 +125,8 @@ public interface IPlayerManager
 /// <inheritdoc cref="IPlayerManager"/>
 public class PlayerManager : IPlayerManager
 {
+    public event Action<Player> PlayerRemoved;
+
     // Key is controlled entity, value is control info
     private static readonly ConditionalWeakTable<object, ControlledObjectInfo> PlayerObjects = new();
     private readonly ILogger logger;
@@ -383,6 +387,7 @@ public class PlayerManager : IPlayerManager
         RemovePlayerObject<Hero>(player.HeroId);
         RemovePlayerObject<Clan>(player.OriginalClanId ?? player.ClanId);
 
+        PlayerRemoved?.Invoke(player);
         return true;
     }
 

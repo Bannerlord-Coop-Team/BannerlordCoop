@@ -256,10 +256,9 @@ public class TournamentSessionRegistryTests
             snapshot.SessionId, snapshot.Revision, "player-2", out snapshot, out _));
 
         Assert.Equal(skipAllowed, snapshot.SkipAllowed);
-        Assert.Equal(skipAllowed, registry.TryGetSimulationTeams(
-            snapshot.SessionId, snapshot.Revision, out _, out var eligibleTeams, out var requiredTeams));
-        Assert.Equal(1, requiredTeams);
-        Assert.Equal(eligibleTeamCount, eligibleTeams.Length);
+        Assert.Equal(skipAllowed, registry.TryGetSimulationInput(snapshot.SessionId, snapshot.Revision, out var input));
+        Assert.Equal(1, input.WinnerTeamCount);
+        Assert.Equal(eligibleTeamCount, input.EligibleTeams.Length);
         var status = registry.TryChoose(snapshot.SessionId, snapshot.Revision, snapshot.CurrentMatchId, "spectator",
             TournamentPlayerChoice.Skip, out _, out var outcome);
         Assert.Equal(expectedStatus, status);

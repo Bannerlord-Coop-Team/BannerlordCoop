@@ -123,12 +123,10 @@ public interface ITournamentSessionRegistry : IGameAbstraction
         string sessionId,
         long expectedRevision,
         out TournamentSessionSnapshot snapshot);
-    bool TryGetSimulationTeams(
+    bool TryGetSimulationInput(
         string sessionId,
         long expectedRevision,
-        out TournamentMatchData match,
-        out TournamentTeamData[] eligibleTeams,
-        out int winnerTeamCount);
+        out TournamentSimulationInput input);
     TournamentMutationStatus TryStoreSpawnManifest(
         TournamentSpawnManifestData manifest,
         string controllerId,
@@ -556,23 +554,23 @@ public sealed partial class TournamentSessionRegistry : ITournamentSessionRegist
             // A live fight needs a confirmed host to run it and every competing player to control their agent.
             bool hostGone = session.HostControllerId == null;
             bool fighterLeftMatch = session.IsControllerInCurrentMatch(controllerId);
-            var liveOutcome = session.Phase == TournamentSessionPhase.LiveMatch && (hostGone || fighterLeftMatch)
+            var outcomeOutsideBallot = session.Phase == TournamentSessionPhase.LiveMatch && (hostGone || fighterLeftMatch)
                 ? TournamentBallotOutcome.SimulateMatch
                 : TournamentBallotOutcome.Open;
-            return CommitDeparture(session, previousHostControllerId, liveOutcome, out snapshot, out outcome);
+            return CommitDeparture(session, previousHostControllerId, outcomeOutsideBallot, out snapshot, out outcome);
         }
     }
 
     private static TournamentMutationStatus CommitDeparture(
         TournamentSessionState session,
         string previousHostControllerId,
-        TournamentBallotOutcome liveOutcome,
+        TournamentBallotOutcome outcomeOutsideBallot,
         out TournamentSessionSnapshot snapshot,
         out TournamentBallotOutcome outcome)
     {
         outcome = session.Phase == TournamentSessionPhase.AwaitingChoices
             ? session.GetBallotOutcome()
-            : liveOutcome;
+            : outcomeOutsideBallot;
         session.ApplyBallotOutcome(outcome);
         session.Revision++;
         if (session.Phase == TournamentSessionPhase.LiveMatch && session.HostControllerId != previousHostControllerId)
@@ -699,17 +697,21 @@ public sealed partial class TournamentSessionRegistry : ITournamentSessionRegist
             if (status != TournamentMutationStatus.Applied)
                 return status;
 
-            disconnectedLosers = session.ApplyRoundsAndFindDisconnectedLosers(rounds);
-            foreach (string loser in disconnectedLosers)
-                pendingDisconnectLosses[loser] = session.TownId;
-
+            var reservedContestants = session.Contestants.Where(session.IsReservedForAbsentPlayer).ToArray();
             ApplyMatchResult(
                 session,
                 result,
+                rounds,
                 contestantScores,
                 nextMatchId,
                 winnerSlotId,
                 completed);
+            disconnectedLosers = reservedContestants.Where(contestant => session.IsEliminated(contestant.SlotId))
+                .Select(contestant => contestant.ControllerId)
+                .ToArray();
+            foreach (string loser in disconnectedLosers)
+                pendingDisconnectLosses[loser] = session.TownId;
+
             snapshot = session.CreateSnapshot();
             return TournamentMutationStatus.Applied;
         }
@@ -753,6 +755,7 @@ public sealed partial class TournamentSessionRegistry : ITournamentSessionRegist
     private static void ApplyMatchResult(
         TournamentSessionState session,
         TournamentMatchResultData result,
+        TournamentRoundData[] rounds,
         IReadOnlyDictionary<string, int> contestantScores,
         string nextMatchId,
         string winnerSlotId,
@@ -761,6 +764,7 @@ public sealed partial class TournamentSessionRegistry : ITournamentSessionRegist
         foreach (TournamentContestantSlot contestant in session.Contestants)
             contestant.Score = contestantScores[contestant.SlotId];
 
+        session.Rounds = rounds ?? session.Rounds;
         session.LastResultSequence = result.Sequence;
         session.SpawnManifest = null;
         session.LastManifestSequence = 0;
@@ -966,32 +970,19 @@ public sealed partial class TournamentSessionRegistry : ITournamentSessionRegist
             return changed;
         }
 
-        public bool HasViewersOrReservations() =>
-            Spectators.Count > 0 || Contestants.Any(contestant =>
-                contestant.IsConnectedHuman || IsReservedForAbsentPlayer(contestant));
+        public bool HasVotersOrReservations() =>
+            GetVoters().Length > 0 || Contestants.Any(IsReservedForAbsentPlayer);
 
-        private bool IsReservedForAbsentPlayer(TournamentContestantSlot contestant) =>
+        public bool IsReservedForAbsentPlayer(TournamentContestantSlot contestant) =>
             contestant.IsHuman && contestant.IsDisconnected && !IsEliminated(contestant.SlotId);
 
-        private bool IsEliminated(string slotId) =>
+        public bool IsEliminated(string slotId) =>
             Rounds.SelectMany(round => round.Matches).Any(match => IsEliminatedByMatch(match, slotId));
 
         private static bool IsEliminatedByMatch(TournamentMatchData match, string slotId) =>
             match.State == (int)TournamentMatch.MatchState.Finished &&
             match.Teams.Any(team => team.ParticipantSlotIds.Contains(slotId)) &&
             !match.WinnerSlotIds.Contains(slotId);
-
-        public string[] ApplyRoundsAndFindDisconnectedLosers(TournamentRoundData[] rounds)
-        {
-            if (rounds == null)
-                return Array.Empty<string>();
-
-            var reservedContestants = Contestants.Where(IsReservedForAbsentPlayer).ToArray();
-            Rounds = rounds;
-            return reservedContestants.Where(contestant => IsEliminated(contestant.SlotId))
-                .Select(contestant => contestant.ControllerId)
-                .ToArray();
-        }
 
         public bool IsControllerInCurrentMatch(string controllerId)
         {
@@ -1015,26 +1006,27 @@ public sealed partial class TournamentSessionRegistry : ITournamentSessionRegist
             if (!MatchHasDisconnectedSlot(currentSlots))
                 return true;
 
-            return TryGetEligibleTeams(match, out _, out _);
+            bool forfeitLeavesEnoughTeams = TryGetSimulationInput(match, out _);
+            return forfeitLeavesEnoughTeams;
         }
 
-        public bool TryGetEligibleTeams(
+        public bool TryGetSimulationInput(
             TournamentMatchData match,
-            out TournamentTeamData[] eligibleTeams,
-            out int winnerTeamCount)
+            out TournamentSimulationInput input)
         {
-            eligibleTeams = Array.Empty<TournamentTeamData>();
-            winnerTeamCount = 0;
+            input = null;
             if (match.Teams.Length < 2 || match.Teams.Any(team => team?.ParticipantSlotIds?.Length is null or 0))
                 return false;
 
             var disconnectedSlots = GetDisconnectedSlots();
-            eligibleTeams = match.Teams
+            var eligibleTeams = match.Teams
                 .Where(team => !team.ParticipantSlotIds.Any(disconnectedSlots.Contains))
                 .ToArray();
             int teamSize = Math.Max(1, match.TeamSize);
             int winnerParticipants = Math.Max(1, match.NumberOfWinnerParticipants);
-            winnerTeamCount = Math.Max(1, Math.Min(match.Teams.Length, 1 + ((winnerParticipants - 1) / teamSize)));
+            int winnerTeamsNeeded = 1 + (winnerParticipants - 1) / teamSize;
+            int winnerTeamCount = Math.Min(match.Teams.Length, winnerTeamsNeeded);
+            input = new TournamentSimulationInput(match, eligibleTeams, winnerTeamCount, winnerParticipants);
             return eligibleTeams.Length >= winnerTeamCount;
         }
 
@@ -1043,7 +1035,7 @@ public sealed partial class TournamentSessionRegistry : ITournamentSessionRegist
             var voters = GetVoters();
 
             if (voters.Length == 0)
-                return HasViewersOrReservations() ? TournamentBallotOutcome.Open : TournamentBallotOutcome.SimulateMatch;
+                return HasVotersOrReservations() ? TournamentBallotOutcome.Open : TournamentBallotOutcome.SimulateMatch;
 
             bool allReady = voters.All(controllerId =>
                 Choices.TryGetValue(controllerId, out var choice) &&

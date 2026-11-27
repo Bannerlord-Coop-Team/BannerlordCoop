@@ -24,7 +24,8 @@ public class TournamentGameInterfaceTests
             5, 2, match.MatchId, null, null, null, null, null, null, 0, 0, 0, false, false, null);
         var gameInterface = new TournamentGameInterface(null, null);
 
-        var result = gameInterface.BuildSimulatedMatchResult(snapshot, match, new[] { "right", "left" }, 7);
+        var input = new TournamentSimulationInput(match, teams, WinnerTeamCount: 2, WinnerParticipantCount: 4);
+        var result = gameInterface.BuildSimulatedMatchResult(snapshot, input, new[] { "right", "left" }, 7);
 
         Assert.Equal(new[] { "right", "left" }, result.WinnerTeamIds);
         Assert.Equal(new[] { "right-1", "right-2", "left-1", "left-2" }, result.WinnerSlotIds);

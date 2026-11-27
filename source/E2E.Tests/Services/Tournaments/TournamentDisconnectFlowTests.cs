@@ -85,6 +85,45 @@ public class TournamentDisconnectFlowTests : SyncTestBase
         AssertOriginalHeroCanFight(heroCharacterId);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ParkedTournament_ResolvesWhenReservedEntrantLeavesOrIsRemoved(bool removeRegistration)
+    {
+        EnvironmentInstance host = Clients.First();
+        SetUpTournament(host, null, otherIsSpectator: false);
+        Disconnect(host);
+        var parked = GetSnapshot();
+        Assert.Equal(TournamentSessionPhase.AwaitingChoices, parked.Phase);
+        Assert.True(FindHostSlot(parked).IsDisconnected);
+
+        if (removeRegistration)
+        {
+            Server.Call(() =>
+            {
+                var players = Server.Resolve<IPlayerManager>();
+                Assert.True(players.TryGetPlayer(HostControllerId, out var player));
+                Assert.True(players.RemovePlayer(player));
+            });
+            Server.PumpGameThread();
+        }
+        else
+        {
+            Reconnect(host, host);
+            Send(host, new NetworkRequestLeaveActiveTournament(SessionId, parked.Revision));
+        }
+
+        Server.Call(() =>
+        {
+            var registry = Server.Resolve<ITournamentSessionRegistry>();
+            if (registry.TryGet(SessionId, out var snapshot))
+            {
+                Assert.True(snapshot.IsCompleted);
+                Assert.True(FindHostSlot(snapshot).IsReplaced);
+            }
+        });
+    }
+
     private TournamentSessionSnapshot ResumeTournament(
         EnvironmentInstance returning, string townId, long revision, string heroCharacterId)
     {

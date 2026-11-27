@@ -13,9 +13,7 @@ public sealed partial class TournamentGameInterface
 {
     public bool TrySimulateCurrentMatchUnbiased(
         TournamentSessionSnapshot snapshot,
-        TournamentMatchData match,
-        TournamentTeamData[] eligibleTeams,
-        int winnerTeamCount,
+        TournamentSimulationInput input,
         long sequence,
         out TournamentMatchResultData result)
     {
@@ -25,7 +23,7 @@ public sealed partial class TournamentGameInterface
 
         var rankedTeams = new List<KeyValuePair<TournamentTeamData, float>>();
         var contestants = snapshot.Contestants.ToDictionary(contestant => contestant.SlotId);
-        foreach (TournamentTeamData team in eligibleTeams)
+        foreach (TournamentTeamData team in input.EligibleTeams)
         {
             float simulationScore = 0f;
             foreach (string slotId in team.ParticipantSlotIds)
@@ -45,22 +43,23 @@ public sealed partial class TournamentGameInterface
 
         string[] winnerTeamIds = rankedTeams
             .OrderByDescending(team => team.Value)
-            .Take(winnerTeamCount)
+            .Take(input.WinnerTeamCount)
             .Select(team => team.Key.TeamId)
             .ToArray();
-        result = BuildSimulatedMatchResult(snapshot, match, winnerTeamIds, sequence);
+        result = BuildSimulatedMatchResult(snapshot, input, winnerTeamIds, sequence);
         return true;
     }
 
     public TournamentMatchResultData BuildSimulatedMatchResult(
         TournamentSessionSnapshot snapshot,
-        TournamentMatchData match,
+        TournamentSimulationInput input,
         string[] winnerTeamIds,
         long sequence)
     {
+        var match = input.Match;
         string[] winnerSlotIds = winnerTeamIds
             .SelectMany(teamId => match.Teams.Single(team => team.TeamId == teamId).ParticipantSlotIds)
-            .Take(Math.Max(1, match.NumberOfWinnerParticipants))
+            .Take(input.WinnerParticipantCount)
             .ToArray();
 
         var scores = new TournamentTeamScoreData[match.Teams.Length];

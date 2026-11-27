@@ -39,7 +39,7 @@ public sealed partial class TournamentSessionRegistry
                 return status;
             if (session.Phase != TournamentSessionPhase.AwaitingChoices)
                 return TournamentMutationStatus.InvalidPhase;
-            if (session.HasViewersOrReservations())
+            if (session.HasVotersOrReservations())
                 return TournamentMutationStatus.Rejected;
 
             session.Phase = TournamentSessionPhase.SimulatingMatch;
@@ -50,24 +50,20 @@ public sealed partial class TournamentSessionRegistry
         }
     }
 
-    public bool TryGetSimulationTeams(
+    public bool TryGetSimulationInput(
         string sessionId,
         long expectedRevision,
-        out TournamentMatchData match,
-        out TournamentTeamData[] eligibleTeams,
-        out int winnerTeamCount)
+        out TournamentSimulationInput input)
     {
         lock (gate)
         {
-            match = null;
-            eligibleTeams = null;
-            winnerTeamCount = 0;
+            input = null;
             if (sessionId == null || !sessionsById.TryGetValue(sessionId, out var session) ||
                 session.Revision != expectedRevision)
                 return false;
 
-            match = session.GetCurrentMatch();
-            return match != null && session.TryGetEligibleTeams(match, out eligibleTeams, out winnerTeamCount);
+            var match = session.GetCurrentMatch();
+            return match != null && session.TryGetSimulationInput(match, out input);
         }
     }
 }

@@ -31,6 +31,20 @@ public class TournamentUIControllerTests
         Assert.Equal(17, request.ExpectedRevision);
     }
 
+    [Theory]
+    [InlineData("character-a", true)]
+    [InlineData("another-character", false)]
+    public void CanResume_RequiresTheCharacterRegisteredInTheBracket(string characterId, bool canResume)
+    {
+        var gameInterface = new Mock<ITournamentGameInterface>();
+        gameInterface.Setup(value => value.TryGetMainHeroCharacterId(out characterId)).Returns(true);
+        using var controller = CreateController("player-a", out _, gameInterface.Object);
+        controller.CacheSnapshot(CreateSnapshot(
+            "session-a", "town-a", 1, TournamentSessionPhase.AwaitingChoices, includeLocalContestant: true));
+
+        Assert.Equal(canResume, controller.CanResume("town-a"));
+    }
+
     [Fact]
     public void Tombstone_ClearsOnlyMatchingSessionAndTownCache()
     {
@@ -195,7 +209,8 @@ public class TournamentUIControllerTests
 
     private static TournamentUIController CreateController(
         string controllerId,
-        out List<IMessage> sent)
+        out List<IMessage> sent,
+        ITournamentGameInterface gameInterface = null)
     {
         sent = new List<IMessage>();
         var captured = sent;
@@ -210,7 +225,7 @@ public class TournamentUIControllerTests
             network.Object,
             new Mock<IObjectManager>().Object,
             controllerIdProvider.Object,
-            new Mock<ITournamentGameInterface>().Object);
+            gameInterface ?? new Mock<ITournamentGameInterface>().Object);
     }
 
     private static TournamentSessionSnapshot CreateSnapshot(

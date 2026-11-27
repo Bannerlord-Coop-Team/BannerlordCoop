@@ -154,8 +154,7 @@ internal sealed class TournamentUIController : ITournamentUIController, IHandler
         => TryGetTownSession(townId, out var snapshot) &&
            IsActive(snapshot) &&
            GetLocalContestant(snapshot) is { } contestant &&
-           Hero.MainHero?.CharacterObject is { } character &&
-           objectManager.TryGetId(character, out var characterId) &&
+           tournamentGameInterface.TryGetMainHeroCharacterId(out var characterId) &&
            contestant.CharacterId == characterId;
 
     public void RequestJoin(string townId, string sessionId, long expectedRevision)

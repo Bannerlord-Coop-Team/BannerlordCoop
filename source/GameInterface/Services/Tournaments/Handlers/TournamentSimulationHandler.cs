@@ -9,7 +9,7 @@ internal interface ITournamentMatchSimulation
 {
     TournamentMutationStatus TryResolveMatch(
         TournamentSessionSnapshot snapshot,
-        TournamentMatchData match,
+        TournamentSimulationInput input,
         string[] winnerTeamIds,
         out TournamentSessionSnapshot advanced);
 }
@@ -18,7 +18,7 @@ internal sealed partial class TournamentSessionHandler : ITournamentMatchSimulat
 {
     TournamentMutationStatus ITournamentMatchSimulation.TryResolveMatch(
         TournamentSessionSnapshot snapshot,
-        TournamentMatchData match,
+        TournamentSimulationInput input,
         string[] winnerTeamIds,
         out TournamentSessionSnapshot advanced)
     {
@@ -31,7 +31,7 @@ internal sealed partial class TournamentSessionHandler : ITournamentMatchSimulat
             BroadcastSnapshot(simulating);
 
         var result = tournamentGameInterface.BuildSimulatedMatchResult(
-            simulating, match, winnerTeamIds, ++simulationSequence);
+            simulating, input, winnerTeamIds, ++simulationSequence);
         return TryAdvanceSimulatedMatch(simulating, simulating.HostControllerId, result, out advanced);
     }
 }
@@ -58,10 +58,9 @@ internal sealed partial class TournamentSessionHandler
             snapshot.Revision,
             snapshot.BracketRevision,
             DescribeBracket(snapshot.Rounds));
-        if (!sessionRegistry.TryGetSimulationTeams(
-                snapshot.SessionId, snapshot.Revision, out var match, out var eligibleTeams, out var winnerTeamCount) ||
+        if (!sessionRegistry.TryGetSimulationInput(snapshot.SessionId, snapshot.Revision, out var input) ||
             !tournamentGameInterface.TrySimulateCurrentMatchUnbiased(
-                snapshot, match, eligibleTeams, winnerTeamCount, ++simulationSequence, out var result))
+                snapshot, input, ++simulationSequence, out var result))
         {
             Logger.Warning(
                 "[Tournament] Failed to simulate match session={SessionId}, match={MatchId}, bracket={Bracket}",

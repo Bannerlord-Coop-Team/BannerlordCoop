@@ -69,8 +69,7 @@ public class TournamentDebugCommand
             if (!sessionRegistry.TryGetByTown(townId, out var snapshot) ||
                 (snapshot.Phase != TournamentSessionPhase.AwaitingChoices &&
                  snapshot.Phase != TournamentSessionPhase.SimulatingMatch) ||
-                !sessionRegistry.TryGetSimulationTeams(
-                    snapshot.SessionId, snapshot.Revision, out var match, out var eligibleTeams, out var winnerTeamCount))
+                !sessionRegistry.TryGetSimulationInput(snapshot.SessionId, snapshot.Revision, out var input))
                 return Failed("The tournament has no pending match that can be resolved.");
 
             string preferredSlotId = null;
@@ -85,12 +84,12 @@ public class TournamentDebugCommand
                 preferredSlotId = contestant.SlotId;
             }
 
-            var winnerTeamIds = eligibleTeams
+            var winnerTeamIds = input.EligibleTeams
                 .OrderByDescending(team => team.ParticipantSlotIds.Contains(preferredSlotId))
-                .Take(winnerTeamCount)
+                .Take(input.WinnerTeamCount)
                 .Select(team => team.TeamId)
                 .ToArray();
-            var status = simulation.TryResolveMatch(snapshot, match, winnerTeamIds, out var advanced);
+            var status = simulation.TryResolveMatch(snapshot, input, winnerTeamIds, out var advanced);
             if (status != TournamentMutationStatus.Applied)
                 return Failed($"The authoritative simulation did not advance the bracket ({status}).");
 
