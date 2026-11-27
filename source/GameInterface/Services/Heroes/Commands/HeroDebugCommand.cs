@@ -1161,7 +1161,13 @@ public class HeroDebugCommand
                 return Failed($"{args[2]} is not a valid integer");
             }
 
+            int relationChange = value - CharacterRelationManager.GetHeroRelation(hero1, hero2);
             CharacterRelationManager.SetHeroRelation(hero1, hero2, value);
+
+            if (relationChange != 0)
+            {
+                CampaignEventDispatcher.Instance.OnHeroRelationChanged(hero1, hero2, relationChange, false, ChangeRelationAction.ChangeRelationDetail.Default, hero1, hero2);
+            }
 
             return Succeeded($"Set relation between '{hero1.Name}' and '{hero2.Name}' to {CharacterRelationManager.GetHeroRelation(hero1, hero2)}");
         }
@@ -1331,7 +1337,7 @@ public class HeroDebugCommand
                 return Failed("A hero cannot have a relation with itself");
             }
 
-            CharacterRelationManager.SetHeroRelation(effectiveHero1, effectiveHero2, value);
+            ChangeRelationAction.SetRelationBetweenHeroes(effectiveHero1, effectiveHero2, value, false);
 
             return Succeeded($"Set effective relation between '{effectiveHero1.Name}' and '{effectiveHero2.Name}' to " +
                 CharacterRelationManager.GetHeroRelation(effectiveHero1, effectiveHero2));
