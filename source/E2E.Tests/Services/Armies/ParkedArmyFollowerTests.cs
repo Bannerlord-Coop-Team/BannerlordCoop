@@ -134,8 +134,8 @@ public class ParkedArmyFollowerTests : MapEventTestBase
                 var party = instance.GetRegisteredObject<MobileParty>(partyId);
                 Assert.True(party.Army == null, $"{name}: party still in army {party.Army?.Name}");
                 Assert.True(party.AttachedTo == null, $"{name}: party still attached to {party.AttachedTo?.StringId}");
-                if (instance.ObjectManager.TryGetObject<Army>(armyId, out var army))
-                    Assert.DoesNotContain(party, army.Parties);
+                var army = instance.GetRegisteredObject<Army>(armyId);
+                Assert.DoesNotContain(party, army.Parties);
             });
         }
     }
