@@ -71,7 +71,7 @@ public class FreeOrCapturePrisonerHeroesTests : IDisposable
 
         RunFreeHeroes(rescuer, fixture, new[] { companionId }, encounter =>
         {
-            new PlayerEncounterInterface(null).UpdateInternalAfterBattle(encounter);
+            new PlayerEncounterInterface(null, null).UpdateInternalAfterBattle(encounter);
 
             Assert.Empty(openedConversations);
             Assert.Equal(PlayerEncounterState.LootParty, encounter.EncounterState);
@@ -104,7 +104,7 @@ public class FreeOrCapturePrisonerHeroesTests : IDisposable
 
         RunFreeHeroes(rescuer, fixture, new[] { companionId }, encounter =>
         {
-            new PlayerEncounterInterface(null).UpdateInternalAfterBattle(encounter);
+            new PlayerEncounterInterface(null, null).UpdateInternalAfterBattle(encounter);
 
             Assert.Empty(openedConversations);
             Assert.Equal(PlayerEncounterState.LootParty, encounter.EncounterState);

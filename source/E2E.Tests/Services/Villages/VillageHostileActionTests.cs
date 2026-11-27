@@ -1720,6 +1720,246 @@ public class VillageHostileActionTests : MapEventTestBase
         }, MapEventDisabledMethods);
     }
 
+    // #2619: the client can't take its party out of the village it forced, so after the result screens the leader
+    // goes back in like vanilla and leaves from the village menu, instead of staying inside with no menu.
+    [Fact]
+    public void ForceSuppliesBattleWon_LeaderReentersTheVillageAndLeaves()
+    {
+        var client = Clients.First();
+        var context = CreateHostileActionWithOnePlayerParty(VillageHostileAction.ForceSupplies);
+        TestEnvironment.ConnectRegisteredPlayer(client, "PlayerOne");
+        client.Call(() => client.Resolve<IControllerIdProvider>().SetControllerId("PlayerOne"));
+        PutPartyInVillage(context.AttackerMobilePartyId, context.SettlementId);
+        EnableHeadlessEncounterFinish(client);
+        var encounter = SetMockPlayerEncounter(client, mapEventId: context.MapEventId);
+        client.Call(() =>
+        {
+            Campaign.Current.MainParty = client.GetRegisteredObject<MobileParty>(context.AttackerMobilePartyId);
+            var village = client.GetRegisteredObject<Settlement>(context.SettlementId);
+            encounter._attackerParty = MobileParty.MainParty.Party;
+            encounter._defenderParty = village.Party;
+            encounter._encounteredParty = village.Party;
+            encounter.EncounterSettlementAux = village;
+            encounter.PlayerSide = BattleSideEnum.Attacker;
+            encounter.ForceSupplies = true;
+            encounter.BattleSimulation = new BattleSimulation(null, null);
+            encounter._alternativeReceivedLootShips = new List<TaleWorlds.CampaignSystem.Naval.Ship>();
+            var mapState = Game.Current.GameStateManager.CreateState<MapState>();
+            mapState._battleSimulation = encounter.BattleSimulation;
+            Game.Current.GameStateManager._gameStates.Add(mapState);
+        }, MapEventDisabledMethods);
+
+        InstallResultScreenPatches(out var lootScreens, out var menus);
+        try
+        {
+            StartBattleSimulation(client, context);
+            Server.Call(() =>
+            {
+                var mapEvent = Server.GetRegisteredObject<MapEvent>(context.MapEventId);
+                Server.Resolve<IMessageBroker>().Publish(client.NetPeer,
+                    new NetworkAdvanceBattleSimulation(context.MapEventId, 1));
+                mapEvent.BattleState = BattleState.AttackerVictory;
+                AdvanceSimulationUntilFinished(client, context.MapEventId);
+                Assert.True(mapEvent.IsFinalized);
+            }, MapEventDisabledMethods);
+
+            client.NetworkSentMessages.Clear();
+            client.Call(() =>
+            {
+                var states = Game.Current.GameStateManager;
+                var simulation = encounter.BattleSimulation;
+                states.GameStates.OfType<MapState>().Single().EndBattleSimulation();
+                simulation.OnFinished();
+                PlayerEncounter.Update();
+                Assert.IsType<PartyState>(states.ActiveState);
+                CloseTopGameState(states);
+                PlayerEncounter.Update();
+                Assert.IsType<InventoryState>(states.ActiveState);
+                CloseTopGameState(states);
+                PlayerEncounter.Update();
+                Assert.Null(PlayerEncounter.Current);
+            }, MapEventDisabledMethods.Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast))));
+
+            Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestStartSettlementEncounter>());
+            client.Call(() =>
+            {
+                Assert.NotNull(PlayerEncounter.Current);
+                Assert.Same(client.GetRegisteredObject<Settlement>(context.SettlementId),
+                    PlayerEncounter.Current.EncounterSettlementAux);
+                Assert.Null(MobileParty.MainParty.MapEvent);
+            }, MapEventDisabledMethods);
+            // Vanilla's village_outside init switches to the village menu.
+            Assert.Equal("village_outside", menus.MenusFor(client).Last());
+
+            LeaveVillageFromMenu(client, context.AttackerMobilePartyId);
+        }
+        finally
+        {
+            lootScreens.UnpatchAll(lootScreens.Id);
+            menus.Dispose();
+        }
+    }
+
+    // #2619: a strong enough party makes the village give in when the encounter opens, which shows the force supplies
+    // menu. Its Continue waits on the server, whose finalize closes the menu and sends the leader back into the village.
+    [Fact]
+    public void ForceSuppliesGiveIn_ContinueThenLeave_LeavesTheVillage()
+    {
+        var client = Clients.First();
+        var (heroId, partyId) = CreatePlayerHeroParty("PlayerOne");
+        TestEnvironment.ConnectRegisteredPlayer(client, "PlayerOne");
+        client.Call(() => client.Resolve<IControllerIdProvider>().SetControllerId("PlayerOne"));
+        var target = CreateVillageTarget();
+        var militiaId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var componentId = TestEnvironment.CreateRegisteredObject<MilitiaPartyComponent>();
+        var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        var villageTypeId = TestEnvironment.CreateRegisteredObject<VillageType>();
+        foreach (var instance in Clients.Append(Server))
+        {
+            instance.Call(() =>
+            {
+                var militia = instance.GetRegisteredObject<MobileParty>(militiaId);
+                var component = instance.GetRegisteredObject<MilitiaPartyComponent>(componentId);
+                var settlement = instance.GetRegisteredObject<Settlement>(target.SettlementId);
+                var party = instance.GetRegisteredObject<MobileParty>(partyId);
+                var villageType = instance.GetRegisteredObject<VillageType>(villageTypeId);
+                var morale = new Mock<TaleWorlds.CampaignSystem.ComponentInterfaces.PartyMoraleModel>();
+                morale.Setup(model => model.GetEffectivePartyMorale(It.IsAny<MobileParty>(), It.IsAny<bool>()))
+                    .Returns(new ExplainedNumber(50f));
+                Campaign.Current.Models.PartyMoraleModel = morale.Object;
+                using (new AllowedThread())
+                {
+                    component.Settlement = settlement;
+                    component.MobileParty = militia;
+                    militia.SetPartyComponent(component, false);
+                    militia.IsActive = true;
+                    settlement.MilitiaPartyComponent = component;
+                    settlement._readyMilitia = 0.5f;
+                    instance.GetRegisteredObject<Hero>(heroId).PartyBelongedTo = party;
+                    party.LeaderHero.CharacterObject.DefaultCharacterSkills = new MBCharacterSkills();
+                    party.ActualClan.Id = new MBGUID(1);
+                    settlement.OwnerClan.Kingdom.Id = new MBGUID(2);
+                    villageType._productions = new MBList<(ItemObject, float)> { (GetNativeItemObject("grain"), 120f) };
+                    settlement.Village.VillageType = villageType;
+                }
+            });
+        }
+        PutPartyInVillage(partyId, target.SettlementId);
+
+        string? mapEventId = null;
+        Server.Call(() =>
+        {
+            var party = Server.GetRegisteredObject<MobileParty>(partyId);
+            var militia = Server.GetRegisteredObject<MobileParty>(militiaId);
+            var troop = Server.GetRegisteredObject<CharacterObject>(troopId);
+            var settlement = Server.GetRegisteredObject<Settlement>(target.SettlementId);
+            party.MemberRoster.AddToCounts(troop, 1000);
+            militia.MemberRoster.Clear();
+            militia.MemberRoster.AddToCounts(troop, 16);
+            Server.Resolve<IVillageHostileActionInterface>().ApplyHostileAction(party, settlement, VillageHostileAction.ForceSupplies);
+            var mapEvent = CreateHostileActionMapEvent(party.Party, settlement.Party, VillageHostileAction.ForceSupplies);
+            militia.Party.MapEventSide = mapEvent.DefenderSide;
+            Assert.True(Server.ObjectManager.TryGetId(mapEvent, out mapEventId));
+        }, MapEventDisabledMethods);
+
+        TestEnvironment.FlushCoalescer();
+        EnableHeadlessEncounterFinish(client);
+        var encounter = SetMockPlayerEncounter(client, mapEventId: mapEventId);
+        var router = client.Resolve<TestNetworkRouter>();
+        using var menus = new MethodCallRecorder(Priority.First,
+            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu)),
+            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu)));
+        client.NetworkSentMessages.Clear();
+        router.PauseLink(client.NetPeer, Server.NetPeer);
+        try
+        {
+            client.Call(() =>
+            {
+                var party = client.GetRegisteredObject<MobileParty>(partyId);
+                var village = client.GetRegisteredObject<Settlement>(target.SettlementId);
+                using (new AllowedThread())
+                {
+                    Campaign.Current.MainParty = party;
+                    Game.Current.PlayerTroop = client.GetRegisteredObject<Hero>(heroId).CharacterObject;
+                }
+                encounter._attackerParty = party.Party;
+                encounter._defenderParty = village.Party;
+                encounter._encounteredParty = village.Party;
+                encounter.EncounterSettlementAux = village;
+                encounter.PlayerSide = BattleSideEnum.Attacker;
+                encounter.ForceSupplies = true;
+                var states = Game.Current.GameStateManager;
+                var mapState = states.CreateState<MapState>();
+                states._gameStates.Add(mapState);
+                var starter = new CampaignGameStarter(Campaign.Current.GameMenuManager, Campaign.Current.ConversationManager);
+                if (Campaign.Current.GameMenuManager.GetGameMenu("encounter") == null)
+                    starter.AddGameMenu("encounter", "", _ => { });
+                mapState._menuContext = Game.Current.ObjectManager.CreateObject<MenuContext>();
+                mapState._menuContext.GameMenu = Campaign.Current.GameMenuManager.GetGameMenu("encounter");
+
+                var encounterMenus = new EncounterGameMenuBehavior();
+                Assert.True(encounterMenus.ConsiderVillageSurrenderPossibility());
+                encounterMenus.UpdateVillageHostileActionEncounter(null);
+                Assert.Equal(new[] { "force_supplies_village" }, menus.MenusFor(client));
+                new VillageHostileActionCampaignBehavior().village_force_supplies_ended_successfully_on_consequence(
+                    new MenuCallbackArgs(mapState._menuContext, TextObject.GetEmpty()));
+            }, MapEventDisabledMethods);
+            Assert.Single(client.NetworkSentMessages.GetMessages<NetworkChangeBattleState>());
+        }
+        finally
+        {
+            router.ResumeLink(client.NetPeer, Server.NetPeer);
+        }
+
+        router.DrainReady();
+        Server.Call(() => Assert.False(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId!, out _)));
+        Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestStartSettlementEncounter>());
+        Assert.Equal("village_outside", menus.MenusFor(client).Last());
+        client.Call(() =>
+        {
+            Assert.NotNull(PlayerEncounter.Current);
+            Assert.NotSame(encounter, PlayerEncounter.Current);
+            Assert.Same(client.GetRegisteredObject<Settlement>(target.SettlementId), PlayerEncounter.Current.EncounterSettlementAux);
+        }, MapEventDisabledMethods);
+
+        LeaveVillageFromMenu(client, partyId);
+    }
+
+    // Force actions are taken from inside the village, so the party stays in it through the battle.
+    private void PutPartyInVillage(string partyId, string settlementId)
+    {
+        foreach (var instance in Clients.Prepend(Server))
+        {
+            instance.Call(() =>
+            {
+                using (new AllowedThread())
+                {
+                    instance.GetRegisteredObject<MobileParty>(partyId).CurrentSettlement =
+                        instance.GetRegisteredObject<Settlement>(settlementId);
+                }
+            }, MapEventDisabledMethods);
+        }
+    }
+
+    // Clicks Leave on the village menu and checks the party ends up outside with no encounter everywhere.
+    private void LeaveVillageFromMenu(EnvironmentInstance client, string partyId)
+    {
+        client.Call(() => PlayerTownVisitCampaignBehavior.game_menu_settlement_leave_on_consequence(
+                new MenuCallbackArgs((MenuContext)null, TextObject.GetEmpty())),
+            MapEventDisabledMethods.Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast))));
+
+        client.Call(() => Assert.Null(PlayerEncounter.Current), MapEventDisabledMethods);
+        foreach (var instance in Clients.Prepend(Server))
+        {
+            instance.Call(() =>
+            {
+                var party = instance.GetRegisteredObject<MobileParty>(partyId);
+                Assert.Null(party.CurrentSettlement);
+                Assert.Null(party.MapEvent);
+            }, MapEventDisabledMethods);
+        }
+    }
+
     [Theory]
     [InlineData(VillageHostileAction.ForceSupplies)]
     [InlineData(VillageHostileAction.ForceVolunteers)]

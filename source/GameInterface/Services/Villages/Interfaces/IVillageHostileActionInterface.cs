@@ -19,6 +19,8 @@ public interface IVillageHostileActionInterface : IGameAbstraction
     bool WillVillageResist(MobileParty mobileParty, Settlement settlement);
     void ApplyUnresistedForceAction(MobileParty mobileParty, Settlement settlement, VillageHostileAction action);
     void ReturnToVillageMenu();
+    /// <summary>[Client] Sends the leader of a force action back into the village once its encounter is finished.</summary>
+    void ReenterForcedVillage(MapEvent mapEvent);
     void ResolveRaidDefenders(MapEvent mapEvent);
     void ApplyForceActionOutcome(MapEvent mapEvent, VillageHostileAction action);
     void ApproveMapEventStart(PartyBase attacker, Settlement settlement, VillageHostileAction action);

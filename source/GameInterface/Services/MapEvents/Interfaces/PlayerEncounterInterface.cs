@@ -2,6 +2,7 @@
 using Common.Logging;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.SiegeEvents.Interfaces;
+using GameInterface.Services.Villages.Interfaces;
 using Serilog;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -41,10 +42,14 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
     private const string EncounterMeetingMenuId = "encounter_meeting";
 
     private readonly ISiegeEventInterface siegeEventInterface;
+    private readonly IVillageHostileActionInterface villageHostileActionInterface;
 
-    public PlayerEncounterInterface(ISiegeEventInterface siegeEventInterface)
+    public PlayerEncounterInterface(
+        ISiegeEventInterface siegeEventInterface,
+        IVillageHostileActionInterface villageHostileActionInterface)
     {
         this.siegeEventInterface = siegeEventInterface;
+        this.villageHostileActionInterface = villageHostileActionInterface;
     }
 
     public void UpdateInternalAfterBattle(PlayerEncounter playerEncounter)
@@ -205,6 +210,9 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
         if (siegeEventInterface?.TryRouteToAftermath(playerEncounter._mapEvent) == true)
             return;
 
+        // Finish finalizes the battle and drops it from the encounter, so read it first
+        var mapEvent = playerEncounter._mapEvent;
         PlayerEncounter.Finish(true);
+        villageHostileActionInterface?.ReenterForcedVillage(mapEvent);
     }
 }

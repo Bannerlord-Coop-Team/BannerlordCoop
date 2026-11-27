@@ -5,6 +5,7 @@ using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Villages.Interfaces;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -30,16 +31,19 @@ namespace GameInterface.Services.MapEvents;
 internal class MapEventRegistry : AutoRegistryBase<MapEvent>
 {
     private readonly IMapEventInitializationBarrier initializationBarrier;
+    private readonly IVillageHostileActionInterface villageHostileActionInterface;
 
     public override bool Debug => true;
     public MapEventRegistry(
         ILogger logger,
         IAutoRegistryFactory autoRegistryFactory,
         IObjectManager objectManager,
-        IMapEventInitializationBarrier initializationBarrier)
+        IMapEventInitializationBarrier initializationBarrier,
+        IVillageHostileActionInterface villageHostileActionInterface)
         : base(logger, autoRegistryFactory, objectManager)
     {
         this.initializationBarrier = initializationBarrier;
+        this.villageHostileActionInterface = villageHostileActionInterface;
     }
 
     public override IEnumerable<MethodBase> Constructors => AccessTools.GetDeclaredConstructors(typeof(MapEvent));
@@ -193,6 +197,7 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
         }
 
         ForceCloseCurrentEncounterMenu();
+        villageHostileActionInterface.ReenterForcedVillage(mapEvent);
     }
 
     private static bool IsBackInEncounterSettlement(MapEvent mapEvent)

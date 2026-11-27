@@ -57,7 +57,7 @@ public class SiegeAftermathEndRouteTests : IDisposable
             Campaign.Current.PlayerEncounter = encounter;
             try
             {
-                new PlayerEncounterInterface(siegeEvents.Object).UpdateInternalAfterBattle(encounter);
+                new PlayerEncounterInterface(siegeEvents.Object, null).UpdateInternalAfterBattle(encounter);
 
                 // the route finishes the encounter itself; the plain Finish must not run first
                 Assert.Same(encounter, Campaign.Current.PlayerEncounter);
