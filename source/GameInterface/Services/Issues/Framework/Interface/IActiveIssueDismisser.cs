@@ -7,20 +7,25 @@ namespace GameInterface.Services.Issues.Framework.Interface;
 /// <summary>Ends issues whose owning player is gone or whose ending threw.</summary>
 public interface IActiveIssueDismisser
 {
-    // Server: ends an issue now without any vanilla outcome, each step isolated, see Issues/AGENTS.md
-    void End(IssueBase issue, IssueOutcome outcome, Action ending = null, IssueBase.IssueUpdateDetails? closeWith = null,
-        bool announce = true);
+    // Server: ends the issue of a player who is gone without any vanilla outcome and drops its unfinished journal rows.
+    // Startup passes announce false, nobody is connected to hear it. Each step runs even when one before it threw.
+    void EndWithoutOwner(IssueBase issue, IssueOutcome outcome, bool announce);
 
-    // Server: ends a cancel or troop completion that threw as the owner, disposing the owner scope after
-    void EndThrown(IssueBase issue, IssueOutcome outcome, IDisposable owner);
+    // Server: runs ending inside the owner scope the caller opened, then disposes it. Sent troops whose return or ending
+    // never ran come back and the owner's open row ends as a cancel. Each step runs even when one before it threw.
+    void EndAsOwner(IssueBase issue, IssueOutcome outcome, Action ending, IDisposable owner);
+
+    // Server: ends a cancel or troop completion that threw as the owner without running vanilla again, see EndAsOwner.
+    // Returns null, so the daily tick or the death that ran it goes on instead of picking the issue again.
+    Exception EndAfterThrow(IssueBase issue, IssueOutcome outcome, IDisposable owner, Exception exception);
 
     // Server: taken before a sent troops cancel or completion runs vanilla's consequences and troop return. False when
-    // one already started, so it must not run again, End finishes it.
+    // one already started, so it must not run again, EndAfterThrow finishes it.
     bool TryClaim(IssueBase issue);
 
-    // Server: every troop return notes it on the issue's claim, so End never returns them again
+    // Server: every troop return notes it on the issue's claim, so EndAsOwner never returns the troops again
     void NoteTroopReturn(IssueBase issue);
 
-    // Server daily tick: takes every issue whose ending threw out of the manager and ends it the same way
-    void RetryFailedDismissals();
+    // Server daily tick: takes every issue whose ending threw out of the manager without running that ending again
+    void RetryFailedEndings();
 }

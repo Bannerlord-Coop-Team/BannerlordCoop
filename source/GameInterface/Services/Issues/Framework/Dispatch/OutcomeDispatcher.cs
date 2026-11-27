@@ -145,7 +145,7 @@ internal class OutcomeDispatcher : IOutcomeDispatcher
 
         if (!issue.IssueOwner.IsAlive)
         {
-            // The cancel claims it before it returns the troops
+            // The cancel claims the issue before vanilla returns the troops
             issue.CompleteIssueWithCancel();
             return false;
         }
@@ -164,7 +164,7 @@ internal class OutcomeDispatcher : IOutcomeDispatcher
             // Vanilla tries again on the next daily tick, so the troops are not lost while the owner is busy
             if (!Campaign.Current.Models.IssueModel.CanTroopsReturnFromAlternativeSolution()) return false;
 
-            // Its ending already started and threw, so it is never run and paid again, the dismisser's retry ends it
+            // An ending of this issue already started and threw, so vanilla's completion never runs and pays a second time
             if (!dismisser.TryClaim(issue)) return false;
 
             owner = scope;
@@ -172,7 +172,7 @@ internal class OutcomeDispatcher : IOutcomeDispatcher
         }
         finally
         {
-            // Also on a throw, which leaves the patch's state empty so its finalizer can't restore the server's hero
+            // Also when the readiness check throws, as the patch's finalizer then has no scope to give the server its hero back
             if (owner == null) scope.Dispose();
         }
     }
@@ -228,16 +228,6 @@ internal class OutcomeDispatcher : IOutcomeDispatcher
         }
 
         messageBroker.Publish(issue, new IssueOutcomeObserved(issue, IssueOutcome.AlternativeSolution));
-    }
-
-    public Exception AfterAlternativeSolutionException(IssueBase issue, IDisposable owner, Exception exception)
-    {
-        Logger.Error(exception, "Completing the alternative solution of {issue} failed, it is ended without running it again", issue.StringId);
-
-        // Nothing escapes it, which would unwind the daily tick and leave the issue due again. As the owner, like the
-        // IssueFinalized vanilla would have run, it frees companions still disabled on it unless vanilla took it out.
-        dismisser.EndThrown(issue, IssueOutcome.AlternativeSolution, owner);
-        return null;
     }
 
     // A vanilla listener replayed on a client, like a war or a settlement entry, can end a quest or issue there, only the server's ending may

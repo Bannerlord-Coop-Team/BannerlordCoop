@@ -61,6 +61,22 @@ public class IssueOwnershipRegistryTests
     }
 
     [Fact]
+    public void Remove_ForAnEndingIssueKeepsTheOwnerOfTheGiversNextIssue()
+    {
+        var registry = new IssueOwnershipRegistry();
+        registry.TrySetOwner("hero", "issue_next", "player-B");
+
+        registry.Remove("hero", "issue_1");
+
+        Assert.True(registry.TryGetOwner("hero", "issue_next", out var controllerId));
+        Assert.Equal("player-B", controllerId);
+
+        registry.Remove("hero", "issue_next");
+
+        Assert.False(registry.TryGetOwner("hero", "issue_next", out _));
+    }
+
+    [Fact]
     public void GetAll_ReturnsEveryEntryAndDropsRemovedOnes()
     {
         var registry = new IssueOwnershipRegistry();

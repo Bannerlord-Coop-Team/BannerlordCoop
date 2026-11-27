@@ -11,13 +11,13 @@ namespace GameInterface.Services.Issues.Framework.Dismissal;
 /// </summary>
 [HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(IssueManager), nameof(IssueManager.DailyTick))]
-internal class FailedDismissalRetryPatch
+internal class FailedEndingRetryPatch
 {
     [HarmonyPostfix]
     private static void Postfix()
     {
         if (ModInformation.IsClient || !ContainerProvider.TryResolve<IActiveIssueDismisser>(out var dismisser)) return;
 
-        dismisser.RetryFailedDismissals();
+        dismisser.RetryFailedEndings();
     }
 }

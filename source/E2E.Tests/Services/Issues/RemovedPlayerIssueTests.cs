@@ -3,6 +3,7 @@ using Common.Network.Messages;
 using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
+using E2E.Tests.Util;
 using GameInterface.Services.Heroes.HeirSelection.Interfaces;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.CreationCapture;
@@ -34,7 +35,6 @@ namespace E2E.Tests.Services.Issues;
 public class RemovedPlayerIssueTests : IDisposable
 {
     public enum Removal { Delete, GameOver, Retire }
-    public enum DismissalFailure { BeforeFinalizing, AfterLeavingTheManager, LeavingTheManagerLater, RetryAfterLeavingTheManager }
 
     // Only patched in while a server call holds the game lock
     private static bool successConsequenceRan;
@@ -136,18 +136,58 @@ public class RemovedPlayerIssueTests : IDisposable
             Assert.Equal(Hero.CharacterStates.Disabled, scenario.Server.GetRegisteredObject<Hero>(companionId).HeroState));
     }
 
-    [Theory]
-    [InlineData(DismissalFailure.BeforeFinalizing)]
-    [InlineData(DismissalFailure.AfterLeavingTheManager)]
-    [InlineData(DismissalFailure.LeavingTheManagerLater)]
-    [InlineData(DismissalFailure.RetryAfterLeavingTheManager)]
-    public void FailedDismissalDropsTheOwnershipAndEndsTheIssueOnce(DismissalFailure failure)
+    [Fact]
+    public void EndingThatThrowsAfterLeavingTheManagerIsAnnouncedAtOnceAndKeepsTheNextIssuesOwner()
+    {
+        var archive = SendTroopsDueBackWithAnOpenRow();
+
+        // IssueFinalized throws once DeactivateIssue took the issue out of the manager
+        Remove(Removal.Delete, AccessTools.Method(typeof(IssueBase), nameof(IssueBase.RemoveAllTrackedObjects)));
+
+        // Clients drop it at once, so the giver's next issue a player accepts reaches every machine
+        Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        var nextId = CreateNextIssueEverywhere();
+        scenario.Server.Call(() => Assert.True(scenario.Server.Resolve<IIssueOwnershipRegistry>()
+            .TrySetOwner(scenario.NotableId, nextId, QuestScenario.ControllerB)));
+        DailyTickRecordingPayouts();
+
+        foreach (var instance in Instances)
+            instance.Call(() => Assert.Equal(nextId, instance.GetRegisteredObject<Hero>(scenario.NotableId).Issue?.StringId));
+        scenario.Server.Call(() => Assert.True(scenario.Server.Resolve<IIssueOwnershipRegistry>()
+            .TryGetOwner(scenario.NotableId, nextId, out _)));
+        AssertEndedOnceWithoutPaying(archive);
+    }
+
+    [Fact]
+    public void EndingThatThrowsInTheManagerIsAnnouncedByTheDailyRetryWithoutPaying()
+    {
+        var archive = SendTroopsDueBackWithAnOpenRow();
+
+        // IssueFinalized throws before it ran, so the issue stays in the manager
+        Remove(Removal.Delete, AccessTools.Method(typeof(IssueBase), nameof(IssueBase.IssueFinalized)));
+
+        // The owner entry no longer names the controller its next character comes back on, and no client hears of it yet
+        scenario.Server.Call(() =>
+        {
+            Assert.NotNull(scenario.Server.GetRegisteredObject<Hero>(scenario.NotableId).Issue);
+            Assert.False(scenario.Server.Resolve<IIssueOwnershipRegistry>().TryGetOwner(scenario.NotableId, QuestScenario.IssueId, out _));
+        });
+        Assert.Empty(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+
+        DailyTickRecordingPayouts();
+
+        foreach (var instance in Instances)
+            instance.Call(() => Assert.Null(instance.GetRegisteredObject<Hero>(scenario.NotableId).Issue));
+        AssertEndedOnceWithoutPaying(archive);
+    }
+
+    // ControllerA's troops are due back with a sure success, so a tick that let vanilla run would pay, and its row is open
+    private JournalLogEntry SendTroopsDueBackWithAnOpenRow()
     {
         scenario.SendTroops(environment.CreateRegisteredObject<Hero>(), environment.CreateRegisteredObject<CharacterObject>());
         JournalLogEntry archive = null!;
         scenario.Server.Call(() =>
         {
-            // Due back with a sure success, so a tick that let vanilla run would pay
             var issue = scenario.Server.GetRegisteredObject<Hero>(scenario.NotableId).Issue;
             issue._failureChance = 0f;
             issue.AlternativeSolutionReturnTimeForTroops = CampaignTime.DaysFromNow(-1f);
@@ -157,59 +197,18 @@ public class RemovedPlayerIssueTests : IDisposable
                 CampaignEventDispatcher.Instance.OnIssueUpdated(issue, IssueBase.IssueUpdateDetails.PlayerSentTroopsToQuest, owner);
             archive = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(entry => entry.IsRelatedTo(issue)));
         }, JournalTextLinks);
+        return archive;
+    }
 
-        // IssueFinalized throws before it ran, or once DeactivateIssue took the issue out of the manager
-        Remove(Removal.Delete, failing: failure == DismissalFailure.AfterLeavingTheManager
-            ? AccessTools.Method(typeof(IssueBase), nameof(IssueBase.RemoveAllTrackedObjects))
-            : AccessTools.Method(typeof(IssueBase), nameof(IssueBase.IssueFinalized)));
-
-        scenario.Server.Call(() =>
-        {
-            // Its owner entry no longer names the controller its next character comes back on
-            var notable = scenario.Server.GetRegisteredObject<Hero>(scenario.NotableId);
-            Assert.Equal(failure == DismissalFailure.AfterLeavingTheManager, notable.Issue == null);
-            Assert.False(scenario.Server.Resolve<IIssueOwnershipRegistry>().TryGetOwner(scenario.NotableId, QuestScenario.IssueId, out _));
-            // Something else takes it out of the manager before the retry, without announcing it
-            if (failure == DismissalFailure.LeavingTheManagerLater)
-                using (new AllowedThread()) Campaign.Current.IssueManager.DeactivateIssue(notable.Issue);
-        });
-        // One already out of the manager is announced at once, so clients drop it before its giver takes up a next issue
-        var announcedAtOnce = failure == DismissalFailure.AfterLeavingTheManager;
-        Assert.Equal(announcedAtOnce ? 1 : 0, scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>().Count());
-
-        string? nextId = null;
-        if (announcedAtOnce) nextId = CreateNextIssueEverywhere();
-        else if (failure == DismissalFailure.LeavingTheManagerLater)
-        {
-            scenario.Server.Call(() =>
-            {
-                var notable = scenario.Server.GetRegisteredObject<Hero>(scenario.NotableId);
-                using (new AllowedThread())
-                {
-                    var next = new AllowedIssue(notable, null) { StringId = "issue_next" };
-                    next._issueState = IssueBase.IssueState.SolvingWithQuestSolution;
-                    Campaign.Current.IssueManager._issues.Add(notable, next);
-                    notable.OnIssueCreatedForHero(next);
-                    nextId = next.StringId;
-                }
-            });
-        }
-        // A player accepted the next issue, ending the old one must leave its owner entry alone
-        if (nextId != null)
-            scenario.Server.Call(() => Assert.True(scenario.Server.Resolve<IIssueOwnershipRegistry>()
-                .TrySetOwner(scenario.NotableId, nextId, QuestScenario.ControllerB)));
-
-        var retryLeavesTheManager = failure == DismissalFailure.RetryAfterLeavingTheManager;
+    // The payout reads the giver's town these test heroes lack, so a wrongly run one is recorded and skipped, not thrown
+    private void DailyTickRecordingPayouts()
+    {
         successConsequenceRan = false;
         scenario.Server.Call(() =>
         {
             var harmony = new Harmony($"removed-player-tick.{Guid.NewGuid():N}");
             harmony.Patch(AccessTools.Method(typeof(AllowedIssue), "AlternativeSolutionEndWithSuccessConsequence"),
                 prefix: new HarmonyMethod(typeof(RemovedPlayerIssueTests), nameof(RecordSuccessConsequence)));
-            // The retry throws again, once DeactivateIssue took the issue out of the manager
-            if (retryLeavesTheManager)
-                harmony.Patch(AccessTools.Method(typeof(IssueBase), nameof(IssueBase.RemoveAllTrackedObjects)),
-                    prefix: new HarmonyMethod(typeof(RemovedPlayerIssueTests), nameof(Throw)));
             try
             {
                 Campaign.Current.IssueManager.DailyTick();
@@ -220,33 +219,18 @@ public class RemovedPlayerIssueTests : IDisposable
             }
         });
         environment.FlushCoalescer();
+    }
 
-        // Announced by that retry, so the giver's next issue made before any further tick reaches every client
-        if (retryLeavesTheManager)
-        {
-            nextId = CreateNextIssueEverywhere();
-            scenario.Server.Call(() => Assert.True(scenario.Server.Resolve<IIssueOwnershipRegistry>()
-                .TrySetOwner(scenario.NotableId, nextId, QuestScenario.ControllerB)));
-        }
-
-        // Every machine ends it once and keeps the next issue it was sent, and nothing was paid on the way
+    private void AssertEndedOnceWithoutPaying(JournalLogEntry archive)
+    {
         foreach (var instance in Instances)
-        {
-            instance.Call(() =>
-            {
-                Assert.Equal(instance == scenario.Server || announcedAtOnce || retryLeavesTheManager ? nextId : null,
-                    instance.GetRegisteredObject<Hero>(scenario.NotableId).Issue?.StringId);
-                Assert.False(instance.Resolve<IIssueOwnershipRegistry>().TryGetOwner(scenario.NotableId, QuestScenario.IssueId, out _));
-            });
-        }
-        if (nextId != null)
-            scenario.Server.Call(() => Assert.True(scenario.Server.Resolve<IIssueOwnershipRegistry>()
-                .TryGetOwner(scenario.NotableId, nextId, out _)));
+            instance.Call(() => Assert.False(instance.Resolve<IIssueOwnershipRegistry>().TryGetOwner(scenario.NotableId, QuestScenario.IssueId, out _)));
         Assert.Equal(IssueOutcome.AlternativeSolution,
             Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
         Assert.False(successConsequenceRan);
         Assert.DoesNotContain(updates, detail => detail is IssueBase.IssueUpdateDetails.SentTroopsFinishedQuest
             or IssueBase.IssueUpdateDetails.SentTroopsFailedQuest);
+        // No owner hero is left to end the owner's row, so it goes instead of staying open in the server save
         scenario.Server.Call(() => Assert.DoesNotContain(archive, Campaign.Current.LogEntryHistory.GameActionLogs));
     }
 
@@ -435,33 +419,21 @@ public class RemovedPlayerIssueTests : IDisposable
             .ChangeState(Hero.CharacterStates.Dead));
     }
 
-    // A failing method is patched inside the server call, which holds the game lock, so no other test runs into it
-    private void Remove(Removal removal, MethodBase? failing = null)
+    private void Remove(Removal removal, params MethodBase[] failing)
     {
         scenario.Server.Call(() =>
         {
-            var harmony = new Harmony($"removed-player.{Guid.NewGuid():N}");
-            if (failing != null)
-                harmony.Patch(failing, prefix: new HarmonyMethod(typeof(RemovedPlayerIssueTests), nameof(Throw)));
-            try
-            {
-                CampaignEvents.OnIssueUpdatedEvent.AddNonSerializedListener(this, (_, detail, _) => updates.Add(detail));
-                var broker = scenario.Server.Resolve<IMessageBroker>();
-                if (removal == Removal.Retire)
-                    broker.Publish(scenario.ClientA.NetPeer, new NetworkRequestPlayerRetirement());
-                else
-                    broker.Publish(scenario.ClientA.NetPeer,
-                        new NetworkRequestDeletePlayer(scenario.OwnerHeroId, keepConnected: removal == Removal.GameOver));
-            }
-            finally
-            {
-                harmony.UnpatchAll(harmony.Id);
-            }
+            using var throwing = new ThrowingMethodsScope(failing);
+            CampaignEvents.OnIssueUpdatedEvent.AddNonSerializedListener(this, (_, detail, _) => updates.Add(detail));
+            var broker = scenario.Server.Resolve<IMessageBroker>();
+            if (removal == Removal.Retire)
+                broker.Publish(scenario.ClientA.NetPeer, new NetworkRequestPlayerRetirement());
+            else
+                broker.Publish(scenario.ClientA.NetPeer,
+                    new NetworkRequestDeletePlayer(scenario.OwnerHeroId, keepConnected: removal == Removal.GameOver));
         }, DisabledMethods);
         environment.FlushCoalescer();
     }
-
-    private static bool Throw() => throw new InvalidOperationException("Stubbed failure");
 
     // Skips the payout, which reads the giver's town these test heroes lack, so a wrongly run one is seen and not thrown
     private static bool RecordSuccessConsequence()

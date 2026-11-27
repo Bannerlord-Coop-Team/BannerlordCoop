@@ -13,5 +13,8 @@ public interface IIssueOwnershipRegistry
 
     void Remove(string issueOwnerId);
 
+    // Removes the giver's entry only while it names this issue, so a late ending keeps the owner of the giver's next issue
+    void Remove(string issueOwnerId, string issueId);
+
     IssueOwnershipData[] GetAll();
 }

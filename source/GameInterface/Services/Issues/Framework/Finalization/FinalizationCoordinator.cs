@@ -359,8 +359,7 @@ internal class FinalizationCoordinator : IHandler, IIssueFinalizationReplay
         }
 
         commitments.ReturnForIssue(issueOwnerId, issue.StringId);
-        // Owner entries are kept per giver, so a late ending must not drop the one of the giver's next issue
-        if (ownership.TryGetOwner(issueOwnerId, issue.StringId, out _)) ownership.Remove(issueOwnerId);
+        ownership.Remove(issueOwnerId, issue.StringId);
 
         network.SendAll(new NetworkIssueFinalized(issueOwnerId, issue.StringId, payload.What.Outcome));
     }

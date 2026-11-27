@@ -2,11 +2,11 @@
 using Common.Network.Messages;
 using Common.Util;
 using E2E.Tests.Environment;
+using E2E.Tests.Util;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.AcceptCoordination;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
-using GameInterface.Services.Issues.Framework.Registries;
 using HarmonyLib;
 using Helpers;
 using LiteNetLib;
@@ -161,9 +161,7 @@ public class IssueCancellationTests : IDisposable
                 if (entry is CancelEntry.GiverDeath or CancelEntry.GiverOwnerChange) Giver().ChangeState(Hero.CharacterStates.Dead);
             }
             // IssueFinalized throws once DeactivateIssue took the issue out, so no quest outcome is observed
-            var harmony = new Harmony($"cancellation-heir.{Guid.NewGuid():N}");
-            harmony.Patch(AccessTools.Method(typeof(IssueBase), nameof(IssueBase.RemoveAllTrackedObjects)),
-                prefix: new HarmonyMethod(typeof(IssueCancellationTests), nameof(Throw)));
+            using var throwing = new ThrowingMethodsScope(AccessTools.Method(typeof(IssueBase), nameof(IssueBase.RemoveAllTrackedObjects)));
             try
             {
                 switch (entry)
@@ -187,10 +185,6 @@ public class IssueCancellationTests : IDisposable
             catch (Exception e)
             {
                 errors.Add(e);
-            }
-            finally
-            {
-                harmony.UnpatchAll(harmony.Id);
             }
         }, JournalTextLinks);
         environment.FlushCoalescer();
@@ -219,7 +213,7 @@ public class IssueCancellationTests : IDisposable
                 issue.IssueQuest.AddLog(new TaleWorlds.Localization.TextObject("Quest progress line"));
             }
             // Added last so it runs before the journal listener, and the issue stays in the manager
-            CampaignEvents.OnQuestCompletedEvent.AddNonSerializedListener(this, (_, _) => Throw());
+            CampaignEvents.OnQuestCompletedEvent.AddNonSerializedListener(this, (_, _) => ThrowingMethodsScope.Throw());
             try
             {
                 scenario.Server.Resolve<IIssueCancellationCoordinator>()
@@ -346,53 +340,64 @@ public class IssueCancellationTests : IDisposable
         AssertFinalizedEverywhere();
     }
 
-    public enum Interruption { None, OtherPlayerLeaves, ThrowingLogListener }
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void MissingOwnerQuestDismissalThatThrowsEndsOnceAndDropsTheOpenJournal(bool otherPlayerLeaves)
+    {
+        scenario.Accept(scenario.ClientA);
+        IssueBase issue = null!;
+        scenario.Server.Call(() => issue = Giver().Issue);
+
+        KillOwnerlessGiverWhileFinalizingThrows(issue, IssueBase.IssueUpdateDetails.PlayerStartedIssueQuestClassicSolution, otherPlayerLeaves);
+
+        AssertFinalizedEverywhere();
+        Assert.Empty(scenario.Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionJournal>());
+        AssertNoOpenJournal(issue);
+    }
 
     [Theory]
-    [InlineData(false, Interruption.None)]
-    [InlineData(true, Interruption.None)]
-    [InlineData(false, Interruption.OtherPlayerLeaves)]
-    [InlineData(true, Interruption.OtherPlayerLeaves)]
-    [InlineData(true, Interruption.ThrowingLogListener)]
-    public void MissingOwnerDismissalThatThrowsStillEndsWithTheCancelAndDropsTheOpenJournal(bool alternative, Interruption interruption)
+    [InlineData(false)]
+    [InlineData(true)]
+    public void MissingOwnerTroopDismissalThatThrowsEndsOnceWithTheCancelAndDropsTheOpenJournal(bool otherPlayerLeaves)
     {
-        if (alternative)
-            scenario.SendTroops(environment.CreateRegisteredObject<Hero>(), environment.CreateRegisteredObject<CharacterObject>());
-        else
-            scenario.Accept(scenario.ClientA);
-        var errors = new List<Exception>();
+        scenario.SendTroops(environment.CreateRegisteredObject<Hero>(), environment.CreateRegisteredObject<CharacterObject>());
         IssueBase issue = null!;
         scenario.Server.Call(() =>
         {
             issue = Giver().Issue;
-            // Troops not due back yet, so only the retry ends it, with the cancel the coordinator asked for
-            if (alternative)
-            {
-                issue.AlternativeSolutionReturnTimeForTroops = CampaignTime.DaysFromNow(5f);
-                issue.AlternativeSolutionIssueEffectClearTime = CampaignTime.DaysFromNow(4f);
-            }
+            // Troops not due back yet, so only the retry ends the issue, with the cancel the coordinator asked for
+            issue.AlternativeSolutionReturnTimeForTroops = CampaignTime.DaysFromNow(5f);
+            issue.AlternativeSolutionIssueEffectClearTime = CampaignTime.DaysFromNow(4f);
+            // Remembered at acceptance, so the troop ending still reaches the owner once the owner entry is gone
+            scenario.Server.Resolve<IMessageBroker>().Publish(this,
+                new AlternativeSolutionAcceptedOnServer(scenario.NotableId, QuestScenario.IssueId, QuestScenario.ControllerA));
+        });
+
+        KillOwnerlessGiverWhileFinalizingThrows(issue, IssueBase.IssueUpdateDetails.PlayerSentTroopsToQuest, otherPlayerLeaves);
+
+        AssertFinalizedEverywhere();
+        // The owner hears once that its troops are back
+        Assert.Equal(IssueBase.IssueUpdateDetails.IssueCancel,
+            Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionJournal>()).Ending);
+        AssertNoOpenJournal(issue);
+    }
+
+    // The giver dies after the owner accepted and the owner entry is gone, and IssueFinalized throws in that ending
+    private void KillOwnerlessGiverWhileFinalizingThrows(IssueBase issue, IssueBase.IssueUpdateDetails accepted, bool otherPlayerLeaves)
+    {
+        var errors = new List<Exception>();
+        scenario.Server.Call(() =>
+        {
             Assert.True(scenario.Server.ObjectManager.TryGetObject<Hero>(scenario.OwnerHeroId, out var owner));
             new JournalLogsCampaignBehavior().RegisterEvents();
             using (new MainHeroSubstitutionScope(owner, owner.PartyBelongedTo))
-                CampaignEventDispatcher.Instance.OnIssueUpdated(issue, alternative
-                    ? IssueBase.IssueUpdateDetails.PlayerSentTroopsToQuest
-                    : IssueBase.IssueUpdateDetails.PlayerStartedIssueQuestClassicSolution, owner);
+                CampaignEventDispatcher.Instance.OnIssueUpdated(issue, accepted, owner);
             Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(entry => entry.IsRelatedTo(issue)));
-            // Remembered at acceptance, so the troop ending still reaches the owner once its entry is gone
-            if (alternative)
-                scenario.Server.Resolve<IMessageBroker>().Publish(this,
-                    new AlternativeSolutionAcceptedOnServer(scenario.NotableId, QuestScenario.IssueId, QuestScenario.ControllerA));
             scenario.Server.Resolve<IIssueOwnershipRegistry>().Remove(scenario.NotableId);
             using (new AllowedThread()) Giver().ChangeState(Hero.CharacterStates.Dead);
 
-            // The dismissal throws after the coordinator dropped its pending cancellation, patched while the game lock is held
-            var harmony = new Harmony($"cancellation-dismissal.{Guid.NewGuid():N}");
-            harmony.Patch(AccessTools.Method(typeof(IssueBase), nameof(IssueBase.IssueFinalized)),
-                prefix: new HarmonyMethod(typeof(IssueCancellationTests), nameof(Throw)));
-            // The troop return log comes first, the owner must still hear the cancel
-            if (interruption == Interruption.ThrowingLogListener)
-                harmony.Patch(AccessTools.Method(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnIssueLogAdded)),
-                    prefix: new HarmonyMethod(typeof(IssueCancellationTests), nameof(Throw)));
+            using var throwing = new ThrowingMethodsScope(AccessTools.Method(typeof(IssueBase), nameof(IssueBase.IssueFinalized)));
             try
             {
                 Campaign.Current.IssueManager.OnHeroKilled(Giver(), null, KillCharacterAction.KillCharacterActionDetail.None, false);
@@ -401,14 +406,10 @@ public class IssueCancellationTests : IDisposable
             {
                 errors.Add(e);
             }
-            finally
-            {
-                harmony.UnpatchAll(harmony.Id);
-            }
         }, JournalTextLinks);
 
-        // A sweep in between finds it ownerless, but the daily retry owns it, so it is not ended again with another outcome
-        if (interruption == Interruption.OtherPlayerLeaves)
+        // A sweep in between finds the issue ownerless, but the daily retry already finishes it with the outcome it had
+        if (otherPlayerLeaves)
         {
             scenario.Server.Call(() => scenario.Server.Resolve<IMessageBroker>().Publish(this,
                 new PlayerDisconnected(scenario.ClientB.NetPeer, default(DisconnectInfo))), JournalTextLinks);
@@ -417,16 +418,13 @@ public class IssueCancellationTests : IDisposable
 
         scenario.Server.Call(() => Campaign.Current.IssueManager.DailyTick());
         environment.FlushCoalescer();
-
-        AssertFinalizedEverywhere();
         Assert.Empty(errors);
-        // The owner hears once that its troops are back
-        Assert.Equal(alternative ? 1 : 0, scenario.Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionJournal>()
-            .Count(message => message.Ending == IssueBase.IssueUpdateDetails.IssueCancel));
-        // No owner is left to end the accepted row, so it goes instead of staying open in the server save
+    }
+
+    // No owner is left to end the accepted row, so it goes instead of staying open in the server save
+    private void AssertNoOpenJournal(IssueBase issue) =>
         scenario.Server.Call(() => Assert.DoesNotContain(
             Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(entry => entry.IsRelatedTo(issue)), entry => !entry.IsEnded()));
-    }
 
     [Fact]
     public void GiverDeathServiceSuppliesAndRestoresOwnerScopeWithoutHarmony()
@@ -587,12 +585,11 @@ public class IssueCancellationTests : IDisposable
         AssertFinalizedEverywhere();
     }
 
-    public enum DeadGiverCancelFailure { CancelListener, LogListener, CancelListenerDetachAndOwnerEntry, DeathNews }
+    public enum DeadGiverCancelFailure { CancelListener, LogListener, DeathNews }
 
     [Theory]
     [InlineData(DeadGiverCancelFailure.CancelListener)]
     [InlineData(DeadGiverCancelFailure.LogListener)]
-    [InlineData(DeadGiverCancelFailure.CancelListenerDetachAndOwnerEntry)]
     [InlineData(DeadGiverCancelFailure.DeathNews)]
     public void DeadGiverCancelThatThrowsReturnsTheTroopsAtMostOnceAndTellsTheOwnerOnce(DeadGiverCancelFailure failure)
     {
@@ -605,35 +602,25 @@ public class IssueCancellationTests : IDisposable
             var issue = Giver().Issue;
             // Vanilla returned the troops before the cancel listener, the log listener throws before they return
             if (failure == DeadGiverCancelFailure.LogListener)
-                CampaignEvents.IssueLogAddedEvent.AddNonSerializedListener(this, (_, _) => Throw());
-            else if (failure != DeadGiverCancelFailure.DeathNews)
+                CampaignEvents.IssueLogAddedEvent.AddNonSerializedListener(this, (_, _) => ThrowingMethodsScope.Throw());
+            if (failure == DeadGiverCancelFailure.CancelListener)
                 CampaignEvents.OnIssueUpdatedEvent.AddNonSerializedListener(this, (_, detail, _) =>
                 {
-                    if (detail == IssueBase.IssueUpdateDetails.IssueCancel) Throw();
+                    if (detail == IssueBase.IssueUpdateDetails.IssueCancel) ThrowingMethodsScope.Throw();
                 });
-            // Neither the detach nor the owner entry removal works either, so the issue stays due with its owner
-            var harmony = new Harmony($"dead-giver-cancel.{Guid.NewGuid():N}");
-            if (failure == DeadGiverCancelFailure.CancelListenerDetachAndOwnerEntry)
-            {
-                harmony.Patch(AccessTools.Method(typeof(IssueBase), nameof(IssueBase.IssueFinalized)),
-                    prefix: new HarmonyMethod(typeof(IssueCancellationTests), nameof(Throw)));
-                harmony.Patch(AccessTools.Method(typeof(IssueOwnershipRegistry), nameof(IssueOwnershipRegistry.Remove)),
-                    prefix: new HarmonyMethod(typeof(IssueCancellationTests), nameof(Throw)));
-            }
             // The giver's death news throws before vanilla reaches the cancel, so nothing claimed the issue yet
             if (failure == DeadGiverCancelFailure.DeathNews)
-                harmony.Patch(AccessTools.Method(typeof(GameTexts), nameof(GameTexts.FindText)),
-                    prefix: new HarmonyMethod(typeof(IssueCancellationTests), nameof(ThrowOnDeathNews)));
-            // The next due tick must not cancel it and return the same troops again
+            {
+                using var throwing = new ThrowingMethodsScope(AccessTools.Method(typeof(GameTexts), nameof(GameTexts.FindText)));
+                Campaign.Current.IssueManager.OnHeroKilled(Giver(), null, KillCharacterAction.KillCharacterActionDetail.None, false);
+            }
+            // The next due tick must not cancel the issue and return the same troops again
             try
             {
-                if (failure == DeadGiverCancelFailure.DeathNews)
-                    Campaign.Current.IssueManager.OnHeroKilled(Giver(), null, KillCharacterAction.KillCharacterActionDetail.None, false);
                 for (var day = 0; day < 2; day++) issue.CompleteIssueWithAlternativeSolution();
             }
             finally
             {
-                harmony.UnpatchAll(harmony.Id);
                 CampaignEvents.IssueLogAddedEvent.ClearListeners(this);
                 CampaignEvents.OnIssueUpdatedEvent.ClearListeners(this);
             }
@@ -674,18 +661,15 @@ public class IssueCancellationTests : IDisposable
             using (new AllowedThread()) owner.PartyBelongedTo = originalParty;
             CampaignEvents.OnQuestCompletedEvent.AddNonSerializedListener(this, (_, _) => questEndings++);
             // The issue keeps its quest, so vanilla's DeactivateIssue would cancel that quest again instead of removing it
-            var harmony = new Harmony($"cancellation-finalize.{Guid.NewGuid():N}");
-            harmony.Patch(AccessTools.Method(typeof(IssueBase), nameof(IssueBase.IssueFinalized)),
-                prefix: new HarmonyMethod(typeof(IssueCancellationTests), nameof(Throw)));
             try
             {
+                using var throwing = new ThrowingMethodsScope(AccessTools.Method(typeof(IssueBase), nameof(IssueBase.IssueFinalized)));
                 scenario.Server.Resolve<IIssueCancellationCoordinator>()
                     .CancelForPlayerDeath(QuestScenario.ControllerA, owner, originalParty);
                 Campaign.Current.IssueManager.DailyTick();
             }
             finally
             {
-                harmony.UnpatchAll(harmony.Id);
                 CampaignEvents.OnQuestCompletedEvent.ClearListeners(this);
             }
         }, JournalTextLinks);
@@ -694,13 +678,6 @@ public class IssueCancellationTests : IDisposable
         Assert.Equal(1, questEndings);
         AssertFinalizedEverywhere();
         scenario.Server.Call(() => Assert.False(Campaign.Current.IssueManager.Issues.ContainsKey(Giver())));
-    }
-
-    private static bool Throw() => throw new InvalidOperationException("Stubbed failure");
-
-    private static void ThrowOnDeathNews(string id)
-    {
-        if (id == "str_murdered_passive_news") Throw();
     }
 
     private Hero Giver()

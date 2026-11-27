@@ -48,10 +48,23 @@ public class IssueCancellationCoordinatorTests
             var owners = new Mock<IIssueOwnerResolver>();
             var controller = "player-A";
             owners.Setup(value => value.TryGetOwnerControllerId(issue, out controller)).Returns(true);
-            // The cancel runs as the dismisser's ending, so it is announced even when it throws
+            // The cancel runs as the dismisser's ending inside the owner scope it hands over, which the dismisser disposes
             var dismisser = new Mock<IActiveIssueDismisser>();
-            dismisser.Setup(value => value.End(issue, IssueOutcome.QuestCancel, It.IsAny<Action>(), IssueBase.IssueUpdateDetails.IssueCancel, true))
-                .Callback<IssueBase, IssueOutcome, Action, IssueBase.IssueUpdateDetails?, bool>((_, _, ending, _, _) => ending());
+            dismisser.Setup(value => value.EndAsOwner(issue, IssueOutcome.QuestCancel, It.IsAny<Action>(), It.IsAny<IDisposable>()))
+                .Callback<IssueBase, IssueOutcome, Action, IDisposable>((_, _, ending, owner) =>
+                {
+                    using (owner)
+                    {
+                        try
+                        {
+                            ending();
+                        }
+                        catch (NullReferenceException)
+                        {
+                            // The synthetic issue has no giver for vanilla's detach, a throw the dismisser's step logs
+                        }
+                    }
+                });
             var service = new IssueCancellationCoordinator(registry.Object, owners.Object, dismisser.Object);
 
             service.CancelForPlayerDeath(controller, hero, party);

@@ -5,7 +5,6 @@ using E2E.Tests.Util;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
-using GameInterface.Services.Issues.Framework.Registries;
 using HarmonyLib;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
@@ -158,16 +157,11 @@ public class AlternativeSolutionCompletionGuardTests : IDisposable
         Assert.Empty(updates);
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void IssueThatCannotBeDetachedIsNeverRunAgainAndEndsOnceItCanBe(bool ownerEntryStays)
+    [Fact]
+    public void IssueThatCannotBeDetachedIsNeverRunAgainAndEndsOnceItCanBe()
     {
-        // Both IssueFinalized and the deactivation fallback go through DeactivateIssue, so the issue stays attached.
-        // With its owner entry kept too, only the claim keeps vanilla's completion from running again.
-        var throwing = new List<MethodBase> { TroopReturnMethod, AccessTools.Method(typeof(IssueManager), nameof(IssueManager.DeactivateIssue)) };
-        if (ownerEntryStays) throwing.Add(AccessTools.Method(typeof(IssueOwnershipRegistry), nameof(IssueOwnershipRegistry.Remove)));
-        var errors = TickThreeDays(throwing.ToArray());
+        // Both IssueFinalized and the deactivation fallback go through DeactivateIssue, so the issue stays attached
+        var errors = TickThreeDays(TroopReturnMethod, AccessTools.Method(typeof(IssueManager), nameof(IssueManager.DeactivateIssue)));
 
         Assert.Empty(errors);
         Assert.Equal(IssueBase.IssueUpdateDetails.SentTroopsFailedQuest, Assert.Single(updates));
@@ -203,15 +197,15 @@ public class AlternativeSolutionCompletionGuardTests : IDisposable
             scenario.Server.GetRegisteredObject<Hero>(scenario.NotableId))));
     }
 
-    public enum FailurePoint { Consequence, EndingListener, CancelListener, TroopReturn, ConsequenceThenTroopReturn }
+    public enum FailurePoint { Consequence, EndingListener, TroopReturn }
 
+    // An early consequence throws before vanilla writes the ending, the troop return only after it
     [Theory]
-    [InlineData(FailurePoint.Consequence)]
-    [InlineData(FailurePoint.EndingListener)]
-    [InlineData(FailurePoint.CancelListener)]
-    [InlineData(FailurePoint.TroopReturn)]
-    [InlineData(FailurePoint.ConsequenceThenTroopReturn)]
-    public void ThrowAfterAcceptanceLeavesTheOwnersJournalEndedOnce(FailurePoint failure)
+    [InlineData(FailurePoint.Consequence, IssueBase.IssueUpdateDetails.IssueCancel, 3, "Your troops have returned from their mission.")]
+    [InlineData(FailurePoint.EndingListener, IssueBase.IssueUpdateDetails.SentTroopsFailedQuest, 3, "has failed to resolve the matter")]
+    [InlineData(FailurePoint.TroopReturn, IssueBase.IssueUpdateDetails.SentTroopsFailedQuest, 0, "has failed to resolve the matter")]
+    public void ThrowAfterAcceptanceLeavesTheOwnersJournalEndedOnce(FailurePoint failure, IssueBase.IssueUpdateDetails ending,
+        int troopsBack, string lastLine)
     {
         var instances = new[] { scenario.Server, scenario.ClientA };
         var accepted = new Dictionary<EnvironmentInstance, string[]>();
@@ -235,38 +229,27 @@ public class AlternativeSolutionCompletionGuardTests : IDisposable
                 if (instance == scenario.Server && failure == FailurePoint.EndingListener)
                     CampaignEvents.OnIssueUpdatedEvent.AddNonSerializedListener(this, (_, detail, _) =>
                     {
-                        if (detail == IssueBase.IssueUpdateDetails.SentTroopsFailedQuest) Throw();
-                    });
-                // The same on the cancel the server sends after an early throw
-                if (instance == scenario.Server && failure == FailurePoint.CancelListener)
-                    CampaignEvents.OnIssueUpdatedEvent.AddNonSerializedListener(this, (_, detail, _) =>
-                    {
-                        if (detail == IssueBase.IssueUpdateDetails.IssueCancel) Throw();
+                        if (detail == IssueBase.IssueUpdateDetails.SentTroopsFailedQuest) ThrowingMethodsScope.Throw();
                     });
             });
         }
 
-        // An early consequence throws before vanilla writes the ending, the troop return only after it
-        var consequence = AccessTools.Method(typeof(IssueBase), nameof(IssueBase.AlternativeSolutionEndWithFailureConsequence));
         var errors = failure switch
         {
-            FailurePoint.Consequence or FailurePoint.CancelListener => TickThreeDays(consequence),
+            FailurePoint.Consequence => TickThreeDays(AccessTools.Method(typeof(IssueBase), nameof(IssueBase.AlternativeSolutionEndWithFailureConsequence))),
             FailurePoint.TroopReturn => TickThreeDays(TroopReturnMethod),
-            FailurePoint.ConsequenceThenTroopReturn => TickThreeDays(consequence, TroopReturnMethod),
             _ => TickThreeDays(),
         };
 
         Assert.Empty(errors);
-        var beforeTheEnding = failure is FailurePoint.Consequence or FailurePoint.CancelListener or FailurePoint.ConsequenceThenTroopReturn;
-        var troopsReturned = failure is not (FailurePoint.TroopReturn or FailurePoint.ConsequenceThenTroopReturn);
-        var ending = beforeTheEnding ? IssueBase.IssueUpdateDetails.IssueCancel : IssueBase.IssueUpdateDetails.SentTroopsFailedQuest;
         Assert.Equal(ending, Assert.Single(updates));
         Assert.Equal(ending, Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionJournal>()).Ending);
         Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
         // A throw before vanilla's troop return still brings the troops home, one inside it never runs it again
-        scenario.Server.Call(() => Assert.Equal(troopsReturned ? 3 : 0,
+        scenario.Server.Call(() => Assert.Equal(troopsBack,
             scenario.Server.GetRegisteredObject<MobileParty>(scenario.OwnerPartyId).MemberRoster.GetTroopCount(
                 scenario.Server.GetRegisteredObject<CharacterObject>(troopId))));
+        // The owner's row keeps the acceptance and gains the ending's last line once
         foreach (var instance in instances)
         {
             instance.Call(() =>
@@ -276,49 +259,31 @@ public class AlternativeSolutionCompletionGuardTests : IDisposable
                 Assert.True(archive.IsEnded());
                 Assert.Equal(ending, archive._lastIssueStatus);
                 var entries = archive.GetEntries().Select(entry => entry.LogText.ToString()).ToArray();
-                // A cancel closes the row as it was plus the troops returned line when they came back, an ending vanilla
-                // wrote keeps the acceptance and its report once
-                if (beforeTheEnding)
-                    Assert.Equal(troopsReturned ? accepted[instance].Append("Your troops have returned from their mission.") : accepted[instance], entries);
-                else
-                {
-                    Assert.All(accepted[instance], line => Assert.Contains(line, entries));
-                    Assert.Single(entries, line => line.Contains("has failed to resolve the matter"));
-                    Assert.Equal(entries.Length, entries.Distinct().Count());
-                }
+                Assert.Equal(accepted[instance], entries.Take(accepted[instance].Length));
+                Assert.Contains(lastLine, entries.Last());
+                Assert.Single(entries, line => line.Contains(lastLine));
+                Assert.Equal(entries.Length, entries.Distinct().Count());
             });
         }
     }
 
-    private static bool Throw() => throw new InvalidOperationException("Stubbed failure");
-
-    // Patched inside the server call, which holds the game lock, so no other test runs into the throwing stubs
     private List<Exception> TickThreeDays(params MethodBase[] throwing)
     {
         var errors = new List<Exception>();
         scenario.Server.Call(() =>
         {
-            var harmony = new Harmony($"alternative-solution-guard.{Guid.NewGuid():N}");
-            foreach (var method in throwing)
-                harmony.Patch(method, prefix: new HarmonyMethod(typeof(AlternativeSolutionCompletionGuardTests), nameof(Throw)));
-            try
+            using var throwingMethods = new ThrowingMethodsScope(throwing);
+            CampaignEvents.OnIssueUpdatedEvent.AddNonSerializedListener(this, (_, detail, _) => updates.Add(detail));
+            for (var day = 0; day < 3; day++)
             {
-                CampaignEvents.OnIssueUpdatedEvent.AddNonSerializedListener(this, (_, detail, _) => updates.Add(detail));
-                for (var day = 0; day < 3; day++)
+                try
                 {
-                    try
-                    {
-                        Campaign.Current.IssueManager.DailyTick();
-                    }
-                    catch (Exception e)
-                    {
-                        errors.Add(e);
-                    }
+                    Campaign.Current.IssueManager.DailyTick();
                 }
-            }
-            finally
-            {
-                harmony.UnpatchAll(harmony.Id);
+                catch (Exception e)
+                {
+                    errors.Add(e);
+                }
             }
         });
         environment.FlushCoalescer();

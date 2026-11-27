@@ -1,4 +1,5 @@
-﻿using GameInterface.Services.Issues.Framework.Interface;
+﻿using GameInterface.Services.Issues.Framework.Finalization;
+using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
 using System;
 using TaleWorlds.CampaignSystem.Issues;
@@ -36,9 +37,9 @@ internal class CompleteIssueWithAlternativeSolutionDispatchPatch
     private static Exception Finalizer(IssueBase __instance, IDisposable __state, Exception __exception)
     {
         // A throw skips the postfix, so the issue would stay attached and pay again on the next tick
-        if (__exception != null && __state != null && ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher))
+        if (__exception != null && __state != null && ContainerProvider.TryResolve<IActiveIssueDismisser>(out var dismisser))
         {
-            return dispatcher.AfterAlternativeSolutionException(__instance, __state, __exception);
+            return dismisser.EndAfterThrow(__instance, IssueOutcome.AlternativeSolution, __state, __exception);
         }
 
         __state?.Dispose();
