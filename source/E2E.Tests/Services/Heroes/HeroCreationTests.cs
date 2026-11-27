@@ -133,6 +133,36 @@ public class HeroCreationTests : IDisposable
     }
 
     [Fact]
+    public void ServerCreateChild_SyncsItsInitializedLevelToClients()
+    {
+        Hero? serverHero = null;
+        TestEnvironment.Server.Call(() =>
+        {
+            var template = GameObjectCreator.CreateInitializedObject<CharacterObject>();
+            template.Level = 27;
+            template.Culture.DefaultBattleEquipmentRoster = GameObjectCreator.CreateInitializedObject<MBEquipmentRoster>();
+            template.Culture.DefaultStealthEquipmentRoster = GameObjectCreator.CreateInitializedObject<MBEquipmentRoster>();
+            template.Culture.DefaultStealthEquipmentRoster.AllEquipments[0]._itemSlots[0].Item = GameObjectCreator.CreateInitializedObject<ItemObject>();
+            var clan = GameObjectCreator.CreateInitializedObject<Clan>();
+
+            // CreateChild sets level 1 in InitializeHeroFromSettings, after the hero copied the template's 27
+            serverHero = HeroCreator.CreateChild(template, Settlement.GetFirst, clan, 0);
+        });
+        Assert.Equal(1, serverHero!.Level);
+        Assert.True(TestEnvironment.Server.ObjectManager.TryGetId(serverHero, out var heroId));
+
+        foreach (var client in TestEnvironment.Clients)
+        {
+            client.PumpGameThread();
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Hero>(heroId, out var clientHero));
+                Assert.Equal(1, clientHero.Level);
+            });
+        }
+    }
+
+    [Fact]
     public void ServerInitialCoopTeamFill_CreatesEveryEnabledTemplateAndNeverRefills()
     {
         TestEnvironment.Server.Call(() =>
