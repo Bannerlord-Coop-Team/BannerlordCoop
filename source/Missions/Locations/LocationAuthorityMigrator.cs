@@ -271,9 +271,10 @@ public class LocationAuthorityMigrator : ILocationAuthorityMigrator
                 var agent = info.Agent;
                 if (agent == null || !agent.IsActive()) continue;
 
-                // Stop reconciling the agent toward its former owner's last-reported position — a
-                // stale interpolation target overrides the AI and pins the agent in place.
-                interpolator.Forget(agent);
+                // A kept follow target or frame lock would pin the AI on the old owner's pose. A scene horse
+                // gets no AI, so it keeps the lock instead of drifting on its last replicated input.
+                if (agent.IsMount) interpolator.Forget(agent);
+                else interpolator.Release(agent);
 
                 if (ReviveSettlementAi(agent, info.AgentId, reconnectPointUse: false)) revived++;
                 else stationary++;
@@ -313,7 +314,8 @@ public class LocationAuthorityMigrator : ILocationAuthorityMigrator
         if (!registry.TryTransferAuthority(hostControllerId, agentId, authorityRevision)) return;
         if (!session.IsLocalHost) return;
 
-        coopMissionComponent.AgentMovementHandler.Interpolator.Forget(agent);
+        if (agent.IsMount) coopMissionComponent.AgentMovementHandler.Interpolator.Forget(agent);
+        else coopMissionComponent.AgentMovementHandler.Interpolator.Release(agent);
         // The spawner has just applied any catch-up point use from its canonical frame. Preserve that
         // single fresh lifecycle and only reconnect its newly-live AI navigator; do not stop/reuse it.
         ReviveSettlementAi(agent, agentId, reconnectPointUse: true);
