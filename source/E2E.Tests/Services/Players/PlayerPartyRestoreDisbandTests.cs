@@ -53,7 +53,8 @@ public class PlayerPartyRestoreDisbandTests : MapEventTestBase
         StartDisbandBeforeRegistration(partyId, staleDisband);
 
         var heroId = RegisterOwnerAsPlayer(DefenderControllerId, partyId);
-        ReturnToServer(Clients.First(), DefenderControllerId, partyId);
+        var validated = TestEnvironment.ConnectReturningClient(Clients.First(), DefenderControllerId);
+        Assert.Equal(partyId, validated.Player.MobilePartyId);
         PassHours(HoursPastDisbandWait);
 
         AssertWorkingParty(DefenderControllerId, heroId, partyId);
@@ -195,21 +196,13 @@ public class PlayerPartyRestoreDisbandTests : MapEventTestBase
     }
 
     /// <summary>
-    /// Runs the client's returning connect and validate handshake, which restores its saved party.
-    /// </summary>
-    private void ReturnToServer(EnvironmentInstance client, string controllerId, string partyId)
-    {
-        var validated = TestEnvironment.ConnectReturningClient(client, controllerId);
-        Assert.Equal(partyId, validated.Player.MobilePartyId);
-    }
-
-    /// <summary>
     /// Drops the client and brings it back through the returning handshake.
     /// </summary>
     private void Rejoin(EnvironmentInstance client, string controllerId, string partyId)
     {
         Server.Call(() => Server.SimulateMessage(this, new PlayerDisconnected(client.NetPeer, default)));
-        ReturnToServer(client, controllerId, partyId);
+        var validated = TestEnvironment.ConnectReturningClient(client, controllerId);
+        Assert.Equal(partyId, validated.Player.MobilePartyId);
         // Runs the deferred park of the dropped party
         Server.PumpGameThread();
     }
