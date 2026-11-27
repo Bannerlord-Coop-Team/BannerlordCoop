@@ -48,6 +48,7 @@ namespace Coop.Tests.Autofac
             Assert.NotNull(client);
             Assert.NotNull(container.Resolve<IIssueCancellationCoordinator>());
             Assert.NotNull(container.Resolve<IActiveIssueDismisser>());
+            Assert.NotNull(container.Resolve<IIssueEndingCoordinator>());
             Assert.NotNull(container.Resolve<IVoiceClient>());
             Assert.NotNull(container.Resolve<global::GameInterface.Services.UI.CoopOptions.ICoopOptionsKeybinding>());
             Assert.NotNull(container.Resolve<global::GameInterface.Services.UI.CoopOptions.ICoopKeybindingPopupFactory>());
@@ -160,6 +161,7 @@ namespace Coop.Tests.Autofac
             Assert.NotNull(server);
             Assert.Same(container.Resolve<IIssueCancellationCoordinator>(), container.Resolve<IIssueCancellationCoordinator>());
             Assert.NotNull(container.Resolve<IActiveIssueDismisser>());
+            Assert.NotNull(container.Resolve<IIssueEndingCoordinator>());
             using (var session = container.BeginLifetimeScope())
             {
                 Assert.NotSame(container.Resolve<IIssueCancellationCoordinator>(), session.Resolve<IIssueCancellationCoordinator>());

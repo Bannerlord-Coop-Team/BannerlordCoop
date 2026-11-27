@@ -37,9 +37,9 @@ internal class CompleteIssueWithAlternativeSolutionDispatchPatch
     private static Exception Finalizer(IssueBase __instance, IDisposable __state, Exception __exception)
     {
         // A throw skips the postfix, so the issue would stay attached and pay again on the next tick
-        if (__exception != null && __state != null && ContainerProvider.TryResolve<IActiveIssueDismisser>(out var dismisser))
+        if (__exception != null && __state != null && ContainerProvider.TryResolve<IIssueEndingCoordinator>(out var endings))
         {
-            return dismisser.EndAfterThrow(__instance, IssueOutcome.AlternativeSolution, __state, __exception);
+            return endings.EndAfterThrow(__instance, IssueOutcome.AlternativeSolution, __state, __exception);
         }
 
         __state?.Dispose();

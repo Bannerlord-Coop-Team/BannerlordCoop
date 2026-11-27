@@ -15,6 +15,7 @@ using TaleWorlds.CampaignSystem.Encyclopedia;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.LogEntries;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Localization;
 using Xunit.Abstractions;
 
@@ -32,6 +33,7 @@ public class AlternativeSolutionCompletionGuardTests : IDisposable
     private readonly string companionId;
     private readonly string troopId;
     private readonly List<IssueBase.IssueUpdateDetails> updates = new();
+    private bool listeningForUpdates;
 
     private IEnumerable<EnvironmentInstance> Instances => environment.Clients.Prepend(environment.Server);
 
@@ -118,14 +120,44 @@ public class AlternativeSolutionCompletionGuardTests : IDisposable
     }
 
     [Fact]
-    public void ThrowingTroopReturnEndsTheMissionOnceAndFreesTheCompanion()
+    public void ThrowingTroopReturnEndsTheMissionOnceAndFreesTheCompanionBeforeTheDailyRetry()
     {
-        var errors = TickThreeDays(TroopReturnMethod);
+        Assert.Empty(CompleteBeforeTheDailyPostfix(TroopReturnMethod));
+        AssertManagerAndAnnouncements(inManager: false, announcements: 1);
+        AssertCompanionState(Hero.CharacterStates.Active);
 
-        Assert.Empty(errors);
+        Assert.Empty(TickThreeDays(TroopReturnMethod));
         AssertEndedOnce();
+        AssertCompanionState(Hero.CharacterStates.Active);
+    }
+
+    [Fact]
+    public void CompanionWhoseFirstReleaseThrowsIsFreedByTheDailyRetryAndTheIssueAnnouncedOnce()
+    {
+        var settlementId = environment.CreateRegisteredObject<Settlement>();
+        var teleports = 0;
         scenario.Server.Call(() =>
-            Assert.Equal(Hero.CharacterStates.Active, scenario.Server.GetRegisteredObject<Hero>(companionId).HeroState));
+        {
+            using (new AllowedThread())
+                scenario.Server.GetRegisteredObject<Hero>(scenario.NotableId).StayingInSettlement =
+                    scenario.Server.GetRegisteredObject<Settlement>(settlementId);
+            // Vanilla calls teleport listeners like PlayerTrackCompanionBehavior's before it activates the companion
+            CampaignEvents.OnHeroTeleportationRequestedEvent.AddNonSerializedListener(this, (_, _, _, _) =>
+            {
+                if (teleports++ == 0) ThrowingMethodsScope.Throw();
+            });
+        });
+
+        Assert.Empty(CompleteBeforeTheDailyPostfix(TroopReturnMethod));
+        // Deactivating it now would leave the companion disabled with no retry left
+        AssertManagerAndAnnouncements(inManager: true, announcements: 0);
+        AssertCompanionState(Hero.CharacterStates.Disabled);
+
+        Assert.Empty(TickThreeDays(TroopReturnMethod));
+        AssertManagerAndAnnouncements(inManager: false, announcements: 1);
+        AssertEndedOnce();
+        AssertCompanionState(Hero.CharacterStates.Active);
+        Assert.Equal(2, teleports);
     }
 
     [Fact]
@@ -169,7 +201,7 @@ public class AlternativeSolutionCompletionGuardTests : IDisposable
             Assert.NotNull(scenario.Server.GetRegisteredObject<Hero>(scenario.NotableId).Issue));
         Assert.Empty(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
 
-        // Once it can be detached, the claim ends it on the next tick without running vanilla again
+        // Once it can be detached, the daily retry ends it without running vanilla again
         Assert.Empty(TickThreeDays(TroopReturnMethod));
         AssertEndedOnce();
     }
@@ -178,23 +210,20 @@ public class AlternativeSolutionCompletionGuardTests : IDisposable
     public void IssueTheManagerStillHoldsIsNotAnnouncedUntilItIsRemoved()
     {
         // Vanilla's DeactivateIssue clears the hero's pointer before RemoveRelatedLines and the manager removal
-        var errors = TickThreeDays(TroopReturnMethod,
-            AccessTools.Method(typeof(ConversationManager), nameof(ConversationManager.RemoveRelatedLines)));
+        var removeRelatedLines = AccessTools.Method(typeof(ConversationManager), nameof(ConversationManager.RemoveRelatedLines));
+        Assert.Empty(CompleteBeforeTheDailyPostfix(TroopReturnMethod, removeRelatedLines));
 
-        Assert.Empty(errors);
         Assert.Equal(IssueBase.IssueUpdateDetails.SentTroopsFailedQuest, Assert.Single(updates));
-        scenario.Server.Call(() =>
-        {
-            var notable = scenario.Server.GetRegisteredObject<Hero>(scenario.NotableId);
-            Assert.Null(notable.Issue);
-            Assert.True(Campaign.Current.IssueManager.Issues.ContainsKey(notable));
-        });
-        Assert.Empty(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        scenario.Server.Call(() => Assert.Null(scenario.Server.GetRegisteredObject<Hero>(scenario.NotableId).Issue));
+        AssertManagerAndAnnouncements(inManager: true, announcements: 0);
+
+        // The daily retry and its deactivation fallback both throw there too
+        Assert.Empty(TickThreeDays(TroopReturnMethod, removeRelatedLines));
+        AssertManagerAndAnnouncements(inManager: true, announcements: 0);
 
         Assert.Empty(TickThreeDays(TroopReturnMethod));
         AssertEndedOnce();
-        scenario.Server.Call(() => Assert.False(Campaign.Current.IssueManager.Issues.ContainsKey(
-            scenario.Server.GetRegisteredObject<Hero>(scenario.NotableId))));
+        AssertManagerAndAnnouncements(inManager: false, announcements: 1);
     }
 
     public enum FailurePoint { Consequence, EndingListener, TroopReturn }
@@ -273,7 +302,7 @@ public class AlternativeSolutionCompletionGuardTests : IDisposable
         scenario.Server.Call(() =>
         {
             using var throwingMethods = new ThrowingMethodsScope(throwing);
-            CampaignEvents.OnIssueUpdatedEvent.AddNonSerializedListener(this, (_, detail, _) => updates.Add(detail));
+            ListenForUpdates();
             for (var day = 0; day < 3; day++)
             {
                 try
@@ -289,6 +318,45 @@ public class AlternativeSolutionCompletionGuardTests : IDisposable
         environment.FlushCoalescer();
         return errors;
     }
+
+    // Runs the troop completion the server's daily tick runs, without the tick's postfix that retries failed endings
+    private List<Exception> CompleteBeforeTheDailyPostfix(params MethodBase[] throwing)
+    {
+        var errors = new List<Exception>();
+        scenario.Server.Call(() =>
+        {
+            using var throwingMethods = new ThrowingMethodsScope(throwing);
+            ListenForUpdates();
+            try
+            {
+                scenario.Server.GetRegisteredObject<Hero>(scenario.NotableId).Issue.CompleteIssueWithAlternativeSolution();
+            }
+            catch (Exception e)
+            {
+                errors.Add(e);
+            }
+        });
+        environment.FlushCoalescer();
+        return errors;
+    }
+
+    // Added once, after a test's own listeners, so it runs before one of them throws
+    private void ListenForUpdates()
+    {
+        if (!listeningForUpdates)
+            CampaignEvents.OnIssueUpdatedEvent.AddNonSerializedListener(this, (_, detail, _) => updates.Add(detail));
+        listeningForUpdates = true;
+    }
+
+    private void AssertManagerAndAnnouncements(bool inManager, int announcements)
+    {
+        scenario.Server.Call(() => Assert.Equal(inManager, Campaign.Current.IssueManager.Issues.ContainsKey(
+            scenario.Server.GetRegisteredObject<Hero>(scenario.NotableId))));
+        Assert.Equal(announcements, scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>().Count());
+    }
+
+    private void AssertCompanionState(Hero.CharacterStates state) =>
+        scenario.Server.Call(() => Assert.Equal(state, scenario.Server.GetRegisteredObject<Hero>(companionId).HeroState));
 
     private void AssertEndedOnce()
     {

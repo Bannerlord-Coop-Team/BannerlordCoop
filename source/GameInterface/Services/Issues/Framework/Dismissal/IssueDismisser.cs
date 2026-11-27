@@ -61,14 +61,17 @@ internal class IssueDismisser : IIssueDismisser
     public bool IsInManager(IssueBase issue) =>
         Campaign.Current.IssueManager.Issues.Values.Any(registered => ReferenceEquals(registered, issue));
 
-    public void ForceRemove(IssueBase issue)
+    public void Remove(IssueBase issue)
     {
         // Finalizing an issue already out would clear its giver's next issue
-        if (!IsInManager(issue)) return;
+        if (IsInManager(issue)) Dismiss(issue);
+    }
 
+    public void ForceRemove(IssueBase issue)
+    {
         try
         {
-            Dismiss(issue);
+            Remove(issue);
         }
         finally
         {

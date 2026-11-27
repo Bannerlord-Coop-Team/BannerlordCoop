@@ -35,8 +35,8 @@ internal class IssueDailyTickPatch
     [HarmonyPostfix]
     private static void Postfix()
     {
-        if (ModInformation.IsClient || !ContainerProvider.TryResolve<IActiveIssueDismisser>(out var dismisser)) return;
+        if (ModInformation.IsClient || !ContainerProvider.TryResolve<IIssueEndingCoordinator>(out var endings)) return;
 
-        dismisser.RetryFailedEndings();
+        endings.RetryFailedEndings();
     }
 }

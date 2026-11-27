@@ -13,7 +13,10 @@ public interface IIssueDismisser
     // Whether the issue still has to be taken out of the manager
     bool IsInManager(IssueBase issue);
 
-    // Takes an issue whose ending already ran out of the manager, deactivating it when finalizing throws
+    // Takes an issue whose ending already ran out of the manager, a throw leaves it in
+    void Remove(IssueBase issue);
+
+    // Remove, and when finalizing throws deactivates it, which leaves a companion it sent disabled
     void ForceRemove(IssueBase issue);
 
     // Vanilla's troop return, as the main hero

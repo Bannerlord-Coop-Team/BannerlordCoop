@@ -27,8 +27,8 @@ internal class IssueGiverDeathDispatchPatches
     private static Exception Finalizer((IssueBase Issue, IDisposable Owner) __state, Exception __exception)
     {
         // Vanilla cancels the quest inline, so a throw there would otherwise leave it unannounced and unwind the death
-        if (__exception != null && __state.Owner != null && ContainerProvider.TryResolve<IActiveIssueDismisser>(out var dismisser))
-            return dismisser.EndAfterThrow(__state.Issue, IssueOutcome.QuestCancel, __state.Owner, __exception);
+        if (__exception != null && __state.Owner != null && ContainerProvider.TryResolve<IIssueEndingCoordinator>(out var endings))
+            return endings.EndAfterThrow(__state.Issue, IssueOutcome.QuestCancel, __state.Owner, __exception);
 
         __state.Owner?.Dispose();
         return __exception;

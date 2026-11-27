@@ -7,7 +7,7 @@ namespace GameInterface.Services.Issues.Framework.Interface;
 public interface IIssueEndingClaimRegistry
 {
     // Taken before a sent troops cancel or completion runs vanilla's consequences and troop return. False when one
-    // already started, so it must not run again, IActiveIssueDismisser.EndAfterThrow finishes it.
+    // already started, so it must not run again, IIssueEndingCoordinator.EndAfterThrow finishes it.
     bool TryClaim(IssueBase issue);
 
     // The issue's claim, taken now if nothing claimed it yet

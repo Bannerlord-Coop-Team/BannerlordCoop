@@ -24,16 +24,16 @@ internal class IssueCancellationCoordinator : IIssueCancellationCoordinator
         "{=bYdhYidf}The quest was canceled because your clan leader, who made the original agreement, is no longer head of the clan.");
     private readonly IQuestTypeRegistry registry;
     private readonly IIssueOwnerResolver ownerResolver;
-    private readonly IActiveIssueDismisser dismisser;
+    private readonly IIssueEndingCoordinator endings;
     private readonly IIssueEndingClaimRegistry claims;
     private readonly Dictionary<IssueBase, TextObject> pending = new Dictionary<IssueBase, TextObject>();
 
-    public IssueCancellationCoordinator(IQuestTypeRegistry registry, IIssueOwnerResolver ownerResolver, IActiveIssueDismisser dismisser,
+    public IssueCancellationCoordinator(IQuestTypeRegistry registry, IIssueOwnerResolver ownerResolver, IIssueEndingCoordinator endings,
         IIssueEndingClaimRegistry claims)
     {
         this.registry = registry;
         this.ownerResolver = ownerResolver;
-        this.dismisser = dismisser;
+        this.endings = endings;
         this.claims = claims;
     }
 
@@ -71,7 +71,7 @@ internal class IssueCancellationCoordinator : IIssueCancellationCoordinator
             return false;
         }
 
-        dismisser.EndAsOwner(issue, IssueOutcome.QuestCancel, () => CancelQuestAndIssue(issue, BuildGiverDeathLog(issue)), owner);
+        endings.EndAsOwner(issue, IssueOutcome.QuestCancel, () => CancelQuestAndIssue(issue, BuildGiverDeathLog(issue)), owner);
         return false;
     }
 
@@ -86,7 +86,7 @@ internal class IssueCancellationCoordinator : IIssueCancellationCoordinator
                 !ownerResolver.TryGetOwnerControllerId(issue, out var owner) || owner != controllerId) continue;
 
             // The controller is still here, so the quest's journal row ends as a cancel instead of being dropped
-            dismisser.EndAsOwner(issue, IssueOutcome.QuestCancel, () => CancelQuestAndIssue(issue, HeirCancelLog),
+            endings.EndAsOwner(issue, IssueOutcome.QuestCancel, () => CancelQuestAndIssue(issue, HeirCancelLog),
                 new MainHeroSubstitutionScope(oldHero, originalParty));
         }
     }
@@ -148,7 +148,7 @@ internal class IssueCancellationCoordinator : IIssueCancellationCoordinator
         if (!ownerResolver.TryResolveOwnerHero(issue, out var ownerHero))
         {
             pending.Remove(issue);
-            dismisser.EndWithoutOwner(issue, IssueOutcome.QuestCancel, announce: true);
+            endings.EndWithoutOwner(issue, IssueOutcome.QuestCancel, announce: true);
             return false;
         }
 

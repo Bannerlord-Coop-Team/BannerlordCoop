@@ -110,7 +110,7 @@ Keep patches thin. Owner lookups, issue scans and main hero swaps belong in a DI
 
 `IssueCancellationCoordinator` handles registered giver deaths and issue cancellation as the owner. When the
 owner has no party or the sent troops cannot return, it retains the issue and retries hourly. Its pending set
-belongs to the session's DI scope and is never saved. A missing owner uses `ActiveIssueDismisser` to release
+belongs to the session's DI scope and is never saved. A missing owner uses `IIssueEndingCoordinator` to release
 the issue and any disabled companion. Clients cancel through `NetworkIssueFinalized` or when an ownership join
 snapshot drops a remembered issue; the snapshot path captures local ownership before replacing the mirror and
 queues the same replay. Clients do not run the alternative troop return again. An ongoing quest announces its own cancellation, so the enclosing
@@ -118,13 +118,13 @@ issue cancellation does not announce it a second time.
 
 - A deleted, retired or game over player, or a stale registration dropped at join, publishes `PlayerRemoved`, and
   `ActiveIssueDismisser` ends its issues at once, sent troops too.
-- Every issue that must end now goes through `IActiveIssueDismisser.EndWithoutOwner` or, inside the owner's scope,
+- Every issue that must end now goes through `IIssueEndingCoordinator.EndWithoutOwner` or, inside the owner's scope,
   `EndAsOwner`. Each step runs even when one before it threw.
 - The troop completion patches and the sent troops cancel claim their issue (`IIssueEndingClaimRegistry.TryClaim`) before
   vanilla runs, so nothing is paid or returned twice. A quest prefix that replaces vanilla's troop return also calls
   `NoteTroopReturn` and `LeaveBehindDeadCompanions`, since it skips the framework's prefix.
-- An ending is announced only once the issue is out of `IssueManager.Issues`. One still in the manager is taken out after
-  the server daily tick, without running its ending again, and then announced.
+- An ending is announced only once the issue is out of `IssueManager.Issues`. One still in the manager is tried again after
+  the server daily tick, without running its ending again, deactivated only if that throws too, and then announced.
 - A quest whose own cancel threw before it finalized stays until its own timeout, which is accepted.
 - An ending drops its owner entry with `IIssueOwnershipRegistry.Remove(issueOwnerId, issueId)`, so a late ending never
   takes the owner of the giver's next issue.
