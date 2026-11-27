@@ -3234,14 +3234,14 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
                 forcePlayerOutFromSettlement: false);
 
             // Co-op keeps ticking the campaign under the inventory.
-            client.Call(() => client.Resolve<IMessageBroker>().Publish(this, new CampaignTick()), MapEventDisabledMethods);
+            TickCampaign(client);
 
             AssertHasPlayerEncounter(client, expected: false);
             Assert.Equal(0, conversations.CountFor(client));
             Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkConversationEnded>());
 
             CloseInventory(client);
-            client.Call(() => client.Resolve<IMessageBroker>().Publish(this, new CampaignTick()), MapEventDisabledMethods);
+            TickCampaign(client);
 
             AssertHasPlayerEncounter(client, expected: true);
             Assert.Equal(1, conversations.CountFor(client));
@@ -3261,10 +3261,10 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
         var aiPartyId = CreateMobilePartyBase();
         SetMainParty(client, playerPartyId);
 
-        using var conversations = RecordMapConversationStarts();
-        var previousStates = CoverMapWithInventory(client);
         var olderRequestId = CaptureConversationRestart(client);
         var newerRequestId = CaptureConversationRestart(client);
+        using var conversations = RecordMapConversationStarts();
+        var previousStates = CoverMapWithInventory(client);
         client.NetworkSentMessages.Clear();
 
         try
@@ -3288,7 +3288,7 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
                 forcePlayerOutFromSettlement: false);
             Assert.Equal(0, conversations.CountFor(client));
 
-            client.Call(() => client.Resolve<IMessageBroker>().Publish(this, new CampaignTick()), MapEventDisabledMethods);
+            TickCampaign(client);
 
             Assert.Equal(1, conversations.CountFor(client));
             Assert.Equal(newerRequestId, GetActiveConversationRequestId(client));
@@ -3302,13 +3302,16 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
         }
     }
 
-    [Fact]
-    public void EncounterFinishWhileApprovalWaits_DropsApprovalAndReleasesItsHoldOnce()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void EncounterFinishWhileApprovalWaits_DropsApprovalAndReleasesItsHoldOnce(bool serverDetected)
     {
         var (client, _, playerPartyId, _) = CreateTwoPlayerParties();
         var aiPartyId = CreateMobilePartyBase();
         SetMainParty(client, playerPartyId);
 
+        var waitingRequestId = serverDetected ? null : CaptureConversationRestart(client);
         using var conversations = RecordMapConversationStarts();
         var previousStates = CoverMapWithInventory(client);
         client.NetworkSentMessages.Clear();
@@ -3319,18 +3322,19 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
                 client,
                 playerPartyId,
                 aiPartyId,
-                requestId: null!,
+                waitingRequestId!,
                 ConversationRestartSource.EncounterManager,
                 forcePlayerOutFromSettlement: false);
 
             client.Call(() => client.Resolve<IMessageBroker>().Publish(this, new ConversationEnded()));
 
-            // The waiting approval's null id is the same one the server-detected fallback releases.
-            var ended = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkConversationEnded>());
-            Assert.Null(ended.RequestId);
+            // A server-detected approval's null id is the same one the null fallback releases.
+            Assert.Single(
+                client.NetworkSentMessages.GetMessages<NetworkConversationEnded>(),
+                ended => ended.RequestId == waitingRequestId);
 
             CloseInventory(client);
-            client.Call(() => client.Resolve<IMessageBroker>().Publish(this, new CampaignTick()), MapEventDisabledMethods);
+            TickCampaign(client);
 
             AssertHasPlayerEncounter(client, expected: false);
             Assert.Equal(0, conversations.CountFor(client));
@@ -3370,6 +3374,9 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
         states._gameStates.RemoveAt(states._gameStates.Count - 1);
         Assert.IsType<MapState>(states.ActiveState);
     });
+
+    private void TickCampaign(EnvironmentInstance client) =>
+        client.Call(() => client.Resolve<IMessageBroker>().Publish(this, new CampaignTick()), MapEventDisabledMethods);
 
     [Fact]
     public void StaleConversationApproval_DoesNotReleaseNewerServerEngagement()

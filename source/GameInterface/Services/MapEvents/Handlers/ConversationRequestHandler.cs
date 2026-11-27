@@ -672,6 +672,7 @@ internal class ConversationRequestHandler : IHandler
         {
             // Co-op ticks EncounterManager under screens and missions, but its meeting throws while they cover the map.
             // While one approval waits, a later one replaces it, so an older approval never opens after a newer one.
+            // With no map state the meeting menu never opens, so only a covered map has to wait.
             if (approvalWaitingForMap.HasValue ||
                 (message.Source == ConversationRestartSource.EncounterManager && mapStateInterface.IsMapCovered()))
             {
@@ -686,9 +687,14 @@ internal class ConversationRequestHandler : IHandler
     /// <summary>[Client] Keeps the approval, and the server's hold, until the player is back on the map.</summary>
     private void WaitForMap(NetworkAllowConversation message)
     {
-        // Release the replaced one, the server skips it when the newer approval already took over that hold
+        // A replaced approval releases its hold, the server ignores that when the newer one took the hold over.
+        // One that arrives again with the same id keeps it.
         if (approvalWaitingForMap is NetworkAllowConversation replaced && replaced.RequestId != message.RequestId)
         {
+            Logger.Debug(
+                "Replacing conversation approval {ReplacedRequestId} waiting for the map with {RequestId}",
+                replaced.RequestId,
+                message.RequestId);
             ClearPendingConversationRequest(replaced.RequestId);
             SendConversationEndedToServer(replaced.RequestId);
         }
