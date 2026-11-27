@@ -816,7 +816,7 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
             PlayerEncounter.Current._mapEvent = mapEvent;
             var encounter = PlayerEncounter.Current;
 
-            new SiegeEventInterface().PromptSiegeAssault(party, settlement);
+            client.Resolve<ISiegeEventInterface>().PromptSiegeAssault(party, settlement);
 
             Assert.Same(encounter, PlayerEncounter.Current);
             Assert.Same(mapEvent, PlayerEncounter.Battle);

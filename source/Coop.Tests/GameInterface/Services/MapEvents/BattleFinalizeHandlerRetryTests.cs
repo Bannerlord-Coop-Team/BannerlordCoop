@@ -8,6 +8,7 @@ using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Settlements.Interfaces;
+using GameInterface.Services.SiegeEvents.Interfaces;
 using HarmonyLib;
 using Moq;
 using System;
@@ -36,6 +37,7 @@ public class BattleFinalizeHandlerRetryTests : IDisposable
             Mock.Of<IBattleHostRegistry>(),
             Mock.Of<IPlayerManager>(),
             leaderReconciler,
+            Mock.Of<ISiegeEventInterface>(),
             Mock.Of<IBattleHostRetentionPolicy>());
     }
 

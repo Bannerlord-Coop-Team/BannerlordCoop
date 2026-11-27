@@ -43,12 +43,17 @@ internal class GameSaveDataPacketHandler : IPacketHandler
         this.packetManager = packetManager;
         this.messageBroker = messageBroker;
         packetManager.RegisterPacketHandler(this);
+        messageBroker.Subscribe<NetworkDisconnected>(HandleDisconnected);
     }
 
     public void Dispose()
     {
         packetManager.RemovePacketHandler(this);
+        messageBroker.Unsubscribe<NetworkDisconnected>(HandleDisconnected);
+        currentTransfer = null;
     }
+
+    private void HandleDisconnected(MessagePayload<NetworkDisconnected> payload) => currentTransfer = null;
 
     public void HandlePacket(NetPeer peer, IPacket packet)
     {

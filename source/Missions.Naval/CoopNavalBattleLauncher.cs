@@ -139,7 +139,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
             return null;
         }
 
-        if (MobileParty.MainParty.Ships.Count == 0)
+        if (mapEvent.IsNavalBattleWithoutShips(MobileParty.MainParty))
         {
             Logger.Error("[NavalBattle] Cannot open coop naval battle for {MapEventId}: the main party has no ships", mapEventId);
             return null;
@@ -156,18 +156,14 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
     // Opens the naval mission with the own party's ships, captains and slot, then attaches the coop and naval behaviours.
     private Mission CreateCoopNavalBattle(MissionInitializerRecord rec, MapEvent mapEvent, string mapEventId)
     {
-        bool isPlayerSergeant = mapEvent.IsPlayerSergeant();
+        bool isPlayerSergeant = CoopFieldBattleLauncher.IsLocalPlayerSergeant(mapEvent);
         bool isPlayerInArmy = MobileParty.MainParty.Army != null;
         BattleSideEnum playerSide = PartyBase.MainParty.Side;
         bool isPlayerAttacker = playerSide == BattleSideEnum.Attacker;
         var deploymentModel = NavalDLCManager.Instance.GameModels.ShipDeploymentModel;
 
-        var sideParties = mapEvent.GetMapEventSide(playerSide).Parties;
-        // The player registry the AI share and the fielder read too, so all three agree on who the side's players are.
-        Func<PartyBase, bool> isPlayerParty = party => playerManager.Contains(party.MobileParty);
-        deploymentSlot.Rank = NavalSideDeploymentSlots.RankOf(
-            sideParties.Select(party => party.Party), PartyBase.MainParty, isPlayerParty);
-        deploymentSlot.PlayerCount = NavalSideDeploymentSlots.PlayerCountOf(sideParties.Select(party => party.Party), isPlayerParty);
+        deploymentSlot.Rank = NavalSideDeploymentSlots.RankOf(mapEvent, playerSide, PartyBase.MainParty, playerManager);
+        deploymentSlot.PlayerCount = NavalSideDeploymentSlots.PlayerCountOf(mapEvent, playerSide, playerManager);
 #if DEBUG
         // The ignore_limits knob turns on vanilla's own switch, set on every launch so a later battle without it has its limits back.
         ShipDeploymentModel.IgnoreDeploymentLimits = scenarioState.Current is { IgnoreShipLimits: true } scenario && scenario.MapEventId == mapEventId;
@@ -175,6 +171,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         var enemyLimit = deploymentModel.GetTeamShipDeploymentLimit(mapEvent.GetMapEventSide(playerSide.GetOppositeSide()).Parties);
 
         // The battle host's AI share of this side subtracts this same fleet, so both come from the budget.
+        var sideParties = mapEvent.GetMapEventSide(playerSide).Parties;
         var ownFleet = shipBudget.PlayerFleet(sideParties, PartyBase.MainParty);
         var ownShips = ownFleet.Ships.Select(ship => (IShipOrigin)shipSnapshotBuilder.Build(ship)).ToMBList();
         var captains = OrderOwnCaptains(CoopFieldBattleLauncher.OwnPartyHeroesByPriority(),

@@ -30,6 +30,7 @@ public sealed class MockMission
     public PartyBase MainParty { get; set; }
     public float DamageToPlayerMultiplier { get; set; } = 1f;
     public bool EndMissionCalled { get; set; }
+    public Agent NearbyAgent { get; set; }
     public int AgentFleeingCalls { get; set; }
     public Agent LastFleeingAgent { get; set; }
     private bool deploymentInProgress;

@@ -25,7 +25,7 @@ public interface ICombatHitPresentationHandler : IHandler
         Agent attacker,
         in Blow blow,
         in AttackCollisionData collisionData,
-        string attackerControllerId);
+        string sourceControllerId);
 }
 
 /// <summary>Replicates blood and impact sounds without changing authoritative combat state.</summary>
@@ -105,7 +105,7 @@ public class CombatHitPresentationHandler : ICombatHitPresentationHandler
         Agent attacker,
         in Blow blow,
         in AttackCollisionData collisionData,
-        string attackerControllerId)
+        string sourceControllerId)
     {
         if (!TryCreateBloodPresentation(
                 victim,
@@ -121,7 +121,7 @@ public class CombatHitPresentationHandler : ICombatHitPresentationHandler
         if (!TryCreateNetworkPresentation(presentation, out NetworkMeleeHitPresentation message))
             return;
 
-        network.SendAllBut(attackerControllerId, message);
+        network.SendAllBut(sourceControllerId, message);
     }
 
     private static bool TryCreateBloodPresentation(

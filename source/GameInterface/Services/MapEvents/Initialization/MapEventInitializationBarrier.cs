@@ -11,6 +11,7 @@ using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.SiegeEvents;
+using GameInterface.Services.SiegeEvents.Patches;
 using HarmonyLib;
 using SandBox.GauntletUI.Map;
 using Serilog;
@@ -521,8 +522,8 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
             return false;
         }
 
-        // A deferred win also reaches here; a winning raid keeps its references so native loot-end can continue it.
-        if (IsStagedRaidSimulationResult(encounter))
+        // The result's End still needs its battle to continue the raid or open the siege aftermath.
+        if (KeepsStagedResultBattle(encounter))
             return false;
 
         if (PlayerCaptivity.IsCaptive)
@@ -616,7 +617,10 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         }
     }
 
-    internal static bool IsStagedRaidSimulationResult(PlayerEncounter encounter) =>
+    internal static bool KeepsStagedResultBattle(PlayerEncounter encounter) =>
+        IsStagedRaidSimulationResult(encounter) || SiegeCaptureMenuHoldPatch.HoldsCaptureResult(encounter);
+
+    private static bool IsStagedRaidSimulationResult(PlayerEncounter encounter) =>
         encounter?._mapEvent is MapEvent mapEvent &&
         mapEvent.IsRaidHostileAction() &&
         encounter.BattleSimulation != null &&

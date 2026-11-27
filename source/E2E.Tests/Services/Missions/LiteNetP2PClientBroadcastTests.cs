@@ -9,6 +9,7 @@ using GameInterface.Services.Entity;
 using GameInterface.Surrogates;
 using LiteNetLib;
 using Missions.Messages;
+using Missions.Agents.Packets;
 using Missions.Services.Network;
 using Moq;
 using TaleWorlds.MountAndBlade;
@@ -179,7 +180,7 @@ public class LiteNetP2PClientBroadcastTests
                 Mock.Of<IMessagePacketHandler>(),
                 Mock.Of<IControllerIdProvider>(),
                 Mock.Of<ISteamMissionBridge>(),
-                new MovementPacketCompressor(CountingSerializer),
+                new MovementPacketCompressor(CountingSerializer, new MovementSnapshotCodec()),
                 new ReliableMessageBatcher<string>(PlainSerializer),
                 () => new Common.Logging.ReceivePathDiagnostics(),
                 battleBenchmark);

@@ -14,6 +14,9 @@ public interface IInventoryScreenViewInterface : IGameAbstraction
 {
     /// <summary>Updates the open screen's row for <paramref name="element"/> to its current count on <paramref name="side"/>.</summary>
     void RefreshItem(InventoryLogic logic, InventoryLogic.InventorySide side, EquipmentElement element, int amount);
+
+    /// <summary>Redraws the open screen's equipment panel for the shown character.</summary>
+    void RefreshEquipment(InventoryLogic logic);
 }
 
 /// <summary>Refreshes single item rows of the open <see cref="SPInventoryVM"/> through its own transfer handling.</summary>
@@ -38,6 +41,8 @@ internal class InventoryScreenViewInterface : IInventoryScreenViewInterface
         if (current.Amount == 0) view.ExecuteRemoveZeroCounts();
         view.IsRefreshed = true;
     }
+
+    public void RefreshEquipment(InventoryLogic logic) => GetOpenView(logic)?.UpdateRightCharacter();
 
     /// <summary>Returns the view model of the inventory screen showing <paramref name="logic"/>, or null.</summary>
     private static SPInventoryVM GetOpenView(InventoryLogic logic)

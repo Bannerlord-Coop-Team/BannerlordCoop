@@ -5,6 +5,11 @@ namespace E2E.Tests.Environment.MockEngine;
 
 public class MockAgentVisualActionAccessor : IAgentVisualActionAccessor
 {
+    public bool HasVisualEntity(Agent agent)
+    {
+        return AgentMirror.TryGet(agent, out MirrorAgent mirror) && mirror.HasVisualEntity;
+    }
+
     public bool IsActionVisible(
         Agent agent,
         int channel,

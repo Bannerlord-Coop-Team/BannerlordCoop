@@ -129,8 +129,7 @@ public class NavalNpcFleetFielder : INavalNpcFleetFielder
             count);
         if (count == 0) return "no ship to field";
 
-        int sidePlayers = NavalSideDeploymentSlots.PlayerCountOf(mapEvent.GetMapEventSide(side).Parties.Select(party => party.Party),
-            party => playerManager.Contains(party.MobileParty));
+        int sidePlayers = NavalSideDeploymentSlots.PlayerCountOf(mapEvent, side, playerManager);
         AssignAndSpawnHulls(mission, shipsLogic, navalLogic, planning, side, team, formations.Take(count).ToList(), ships, parties,
             sidePlayers, work);
         if (work.Hulls.Count == 0) return "no hull spawned";

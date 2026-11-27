@@ -1,6 +1,10 @@
-﻿using System;
+﻿using GameInterface.Services.MapEvents.Extensions;
+using GameInterface.Services.Players;
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.ObjectSystem;
@@ -22,22 +26,30 @@ internal static class NavalSideDeploymentSlots
     // NavalShipsLogic.ComputeSpawnPathDeploymentOffset's distance between the two sides for a battle of two ships or fewer.
     internal const float SmallBattleSideDistance = 400f;
 
-    /// <summary>How many player parties precede <paramref name="own"/> in the side's party order.</summary>
-    internal static int RankOf<T>(IEnumerable<T> sideParties, T own, Func<T, bool> isPlayerParty) where T : class
+    /// <summary>How many of the side's slot-taking players precede <paramref name="own"/>, as every client counts them.</summary>
+    internal static int RankOf(MapEvent mapEvent, BattleSideEnum side, PartyBase own, IPlayerManager playerManager) =>
+        RankOf(PartiesOf(mapEvent, side), own, party => TakesSlot(mapEvent, party, playerManager));
+
+    /// <summary>How many of the side's players take a deployment slot, as every client counts them.</summary>
+    internal static int PlayerCountOf(MapEvent mapEvent, BattleSideEnum side, IPlayerManager playerManager) =>
+        PlayerCountOf(PartiesOf(mapEvent, side), party => TakesSlot(mapEvent, party, playerManager));
+
+    /// <summary>How many slot-taking parties precede <paramref name="own"/> in the side's party order.</summary>
+    internal static int RankOf<T>(IEnumerable<T> sideParties, T own, Func<T, bool> takesSlot) where T : class
     {
         int rank = 0;
         foreach (var party in sideParties)
         {
             if (ReferenceEquals(party, own)) return rank;
-            if (isPlayerParty(party)) rank++;
+            if (takesSlot(party)) rank++;
         }
 
         return 0;
     }
 
-    /// <summary>How many of the side's parties are player parties.</summary>
-    internal static int PlayerCountOf<T>(IEnumerable<T> sideParties, Func<T, bool> isPlayerParty) =>
-        sideParties.Count(isPlayerParty);
+    /// <summary>How many of the side's parties are slot-taking players.</summary>
+    internal static int PlayerCountOf<T>(IEnumerable<T> sideParties, Func<T, bool> takesSlot) =>
+        sideParties.Count(takesSlot);
 
     /// <summary>A team's range from its ships' deployment lengths, as vanilla's GetTeamSpawnPathOffsetRange takes it.</summary>
     internal static float LongestTeamRange(IEnumerable<float> shipDeploymentLengths) =>
@@ -98,6 +110,14 @@ internal static class NavalSideDeploymentSlots
 
         return (SlotAhead(spawnPath, frontMost + InterTeamGap, allyRange, layout.ForwardLimit), layout.OpposingBase);
     }
+
+    // The side's parties in the map event's order, which every client shares.
+    private static IEnumerable<PartyBase> PartiesOf(MapEvent mapEvent, BattleSideEnum side) =>
+        mapEvent.GetMapEventSide(side).Parties.Select(party => party.Party);
+
+    // A ship-less player takes no slot, because the server leaves it out of the mission; the ship budget still counts it.
+    private static bool TakesSlot(MapEvent mapEvent, PartyBase party, IPlayerManager playerManager) =>
+        playerManager.Contains(party.MobileParty) && !mapEvent.IsNavalBattleWithoutShips(party.MobileParty);
 
     // Vanilla's base and opposing base for the shared offset, and the offset no fleet as deep as the range goes past.
     private static (float SideBase, float OpposingBase, float ForwardLimit) Bounds(SpawnPathData spawnPath, float range)

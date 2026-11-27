@@ -1,11 +1,9 @@
-﻿using Common;
-using Common.Messaging;
+﻿using Common.Messaging;
 using Coop.Core.Server.Services.Instances.Handlers;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
-using GameInterface.Services.Players;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using HarmonyLib;
 using Missions.Messages;
@@ -124,25 +122,17 @@ public class NavalBattleEndFlowScenarioTests : NavalBattleTestEnvironment
     public void KeptHost_CannotEnterAgain_AndAnotherMembersAttackLeavesItOut()
     {
         using var battle = StartServerBattle(atSea: true, out var a, out var b, out var concluded);
+        // Both get ships, so A is left out by the kept-host rule and not the ship-less one, and B's Attack is one a real client sends.
+        GiveShip(PlayerPartyOf(a.Id));
+        GiveShip(PlayerPartyOf(b.Id));
         a.Commit();
         battle.TickAll();
         ReportWin(a);
         LeaveMission(battle, a);
-        Server.Call(() => Server.Resolve<BattleMissionStartHandler>().GetOrCreateMissionInitializerSnapshot(battle.MapEventId,
-            () => new MissionInitializerRecord("test-naval")));
         int startsToA = a.Instance.InternalMessages.GetMessages<NetworkStartAttackMission>().Count();
 
-        bool navalEnabled = ModInformation.IsNavalEnabled;
-        try
-        {
-            ModInformation.IsNavalEnabled = true;
-            RequestAttack(battle, a, "kept-host-attack");
-            RequestAttack(battle, b, "member-attack");
-        }
-        finally
-        {
-            ModInformation.IsNavalEnabled = navalEnabled;
-        }
+        RequestAttack(battle, a, "kept-host-attack");
+        RequestAttack(battle, b, "member-attack");
 
         var replies = Server.NetworkSentMessages.GetMessages<NetworkBattleStartReply>().ToArray();
         Assert.False(replies.Single(reply => reply.RequestId == "kept-host-attack").Accepted);
@@ -166,22 +156,12 @@ public class NavalBattleEndFlowScenarioTests : NavalBattleTestEnvironment
     public void HostRejoiningBeforeItsOldPeerTimesOut_IsNotRefused()
     {
         using var battle = StartServerBattle(atSea: true, out var a, out _, out var concluded);
+        GiveShip(PlayerPartyOf(a.Id));
         a.Commit();
         battle.TickAll();
-        Server.Call(() => Server.Resolve<BattleMissionStartHandler>().GetOrCreateMissionInitializerSnapshot(battle.MapEventId,
-            () => new MissionInitializerRecord("test-naval")));
         int startsToA = a.Instance.InternalMessages.GetMessages<NetworkStartAttackMission>().Count();
 
-        bool navalEnabled = ModInformation.IsNavalEnabled;
-        try
-        {
-            ModInformation.IsNavalEnabled = true;
-            RequestAttack(battle, a, "rejoined-host-attack");
-        }
-        finally
-        {
-            ModInformation.IsNavalEnabled = navalEnabled;
-        }
+        RequestAttack(battle, a, "rejoined-host-attack");
 
         var reply = Server.NetworkSentMessages.GetMessages<NetworkBattleStartReply>()
             .Single(sent => sent.RequestId == "rejoined-host-attack");
@@ -191,16 +171,44 @@ public class NavalBattleEndFlowScenarioTests : NavalBattleTestEnvironment
         Assert.Equal(0, concluded());
     }
 
-    // The player presses Attack at the battle's encounter menu.
+    // #4890: co-op fields only each player's own ships, so a ship-less army member still at the encounter is left out of
+    // another member's Attack: it isn't sent a mission it can't open, and the battle doesn't wait for it as a joiner before concluding.
+    [Fact]
+    public void ShiplessMember_IsLeftOutOfAnotherMembersAttack()
+    {
+        using var battle = StartServerBattle(atSea: true, playerIds: new[] { "A", "B" }, lateJoiners: new[] { "B" }, out var concluded);
+        var a = battle["A"];
+        // B is still at the encounter with only its client and no mission peer, and keeps the harness default of no ships.
+        var bClient = battle.Players["B"].Instance;
+        GiveShip(PlayerPartyOf(a.Id));
+        int startsToA = a.Instance.InternalMessages.GetMessages<NetworkStartAttackMission>().Count();
+        int startsToB = bClient.InternalMessages.GetMessages<NetworkStartAttackMission>().Count();
+
+        RequestAttack(battle, a, "armed-member-attack");
+
+        var reply = Server.NetworkSentMessages.GetMessages<NetworkBattleStartReply>()
+            .Single(sent => sent.RequestId == "armed-member-attack");
+        Assert.True(reply.Accepted);
+        Assert.Equal(startsToA + 1, a.Instance.InternalMessages.GetMessages<NetworkStartAttackMission>().Count());
+        Assert.Equal(startsToB, bClient.InternalMessages.GetMessages<NetworkStartAttackMission>().Count());
+
+        ReportWin(a);
+        Assert.Equal(1, concluded());
+    }
+
+    // The player presses Attack at the battle's encounter menu. The mission initializer is seeded first, so the server
+    // reuses it instead of building one from the campaign.
     private void RequestAttack(NavalBattle battle, NavalPeer player, string requestId)
     {
         // The headless manager uses Default without loading the engine's BannerlordConfig.
         var spawnSettings = new[] { AccessTools.PropertyGetter(typeof(MBGameManager), nameof(MBGameManager.UnitSpawnPrioritization)) };
+        var partyId = PlayerPartyOf(player.Id);
         Server.Call(() =>
         {
-            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(player.Id, out var registered));
+            Server.Resolve<BattleMissionStartHandler>().GetOrCreateMissionInitializerSnapshot(battle.MapEventId,
+                () => new MissionInitializerRecord("test-naval"));
             Server.SimulateMessage(player.Instance.NetPeer, new NetworkBattleStartRequest(requestId, (int)BattleStartMode.Mission,
-                battle.MapEventId, registered.MobilePartyId));
+                battle.MapEventId, partyId));
         }, spawnSettings);
     }
 

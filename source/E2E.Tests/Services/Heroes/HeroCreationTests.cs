@@ -77,13 +77,13 @@ public class HeroCreationTests : IDisposable
         Hero? serverHero = null;
         CharacterObject? serverTemplate = null;
         Clan? serverClan = null;
-        const string BattleItemId = "linen";
+        // Hero equipment replicates per slot by object id, and a live game registers every ItemObject
+        string battleItemId = TestEnvironment.CreateRegisteredObject<ItemObject>();
 
         server.Call(() =>
         {
             Assert.True(ModInformation.IsServer);
-            var battleItem = MBObjectManager.Instance.GetObject<ItemObject>(BattleItemId);
-            Assert.NotNull(battleItem);
+            Assert.True(server.ObjectManager.TryGetObject<ItemObject>(battleItemId, out var battleItem));
             var template = GameObjectCreator.CreateInitializedObject<CharacterObject>();
             using (new AllowedThread())
                 template.StringId = ConfiguredMinorFactionHeroSpawner.ConfiguredLordPrefix + "test";
@@ -114,9 +114,8 @@ public class HeroCreationTests : IDisposable
         Assert.Equal(27, serverHero.Level);
         Assert.Equal(Occupation.Lord, serverHero.Occupation);
         Assert.Same(serverTemplate!.Culture, serverHero.Culture);
-        Assert.Equal(
-            BattleItemId,
-            serverHero.BattleEquipment[EquipmentIndex.Body].Item.StringId);
+        Assert.True(server.ObjectManager.TryGetObject<ItemObject>(battleItemId, out var serverBattleItem));
+        Assert.Same(serverBattleItem, serverHero.BattleEquipment[EquipmentIndex.Body].Item);
         Assert.True(serverHero.IsMinorFactionHero);
 
         foreach (var client in TestEnvironment.Clients)
@@ -127,9 +126,8 @@ public class HeroCreationTests : IDisposable
             Assert.Equal(27, clientHero.Level);
             Assert.Equal(Occupation.Lord, clientHero.Occupation);
             Assert.Equal(serverTemplate.Culture.StringId, clientHero.Culture.StringId);
-            Assert.Equal(
-                BattleItemId,
-                clientHero.BattleEquipment[EquipmentIndex.Body].Item.StringId);
+            Assert.True(client.ObjectManager.TryGetObject<ItemObject>(battleItemId, out var clientBattleItem));
+            Assert.Same(clientBattleItem, clientHero.BattleEquipment[EquipmentIndex.Body].Item);
             Assert.True(clientHero.IsMinorFactionHero);
         }
     }

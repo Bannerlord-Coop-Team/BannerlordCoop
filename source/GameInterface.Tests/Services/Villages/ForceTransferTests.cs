@@ -769,7 +769,7 @@ public class ForceTransferTests
         public bool AddExisting(string id, object obj) { throw new NotImplementedException(); }
         public bool AddExisting(string id, object obj, uint handle) { throw new NotImplementedException(); }
         public bool AddNewObject(object obj, out string newId) { throw new NotImplementedException(); }
-        public IReadOnlyDictionary<string, uint> GetHandleMap() { throw new NotImplementedException(); }
+        public Dictionary<string, uint> GetHandleMap() { throw new NotImplementedException(); }
         public void SetJoinHandleMap(IReadOnlyDictionary<string, uint> handles) { throw new NotImplementedException(); }
         public void ClearJoinHandleMap() { throw new NotImplementedException(); }
         public bool RunRegistrationTransaction(Func<bool> registerAndValidate) { throw new NotImplementedException(); }

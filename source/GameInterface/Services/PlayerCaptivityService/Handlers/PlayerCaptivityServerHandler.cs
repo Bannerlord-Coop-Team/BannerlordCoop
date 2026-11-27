@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.BloodFeuds.Interfaces;
+using GameInterface.Services.Heroes;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.MapEventParties.Messages;
 using GameInterface.Services.MapEvents;
@@ -184,6 +185,7 @@ internal class PlayerCaptivityServerHandler : IHandler
     {
         var executer = captor?.LeaderHero;
         if (executer == null || executer.IsPlayerHero()) return;
+        if (!HeroExecutionRules.IsExecutable(hero, out _)) return;
 
         int mercy = executer.GetTraitLevel(DefaultTraits.Mercy);
         // Against the captured player's clan instead of vanilla's Clan.PlayerClan
