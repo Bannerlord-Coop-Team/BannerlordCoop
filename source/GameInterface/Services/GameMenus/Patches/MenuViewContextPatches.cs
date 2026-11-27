@@ -16,11 +16,11 @@ internal class MenuViewContextPatches
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MenuViewContextPatches>();
 
-    // MapScreen retries a menu that failed to open every frame, so each leaked view is one more stacked menu panel.
+    // ScreenManagerRobustnessPatches swallows this throw, so MapScreen retries the menu every frame and each leaked view stacks another panel.
     [HarmonyFinalizer]
-    private static Exception Finalizer(Exception __exception, MenuViewContext __instance, MenuContext menuContext)
+    private static void Finalizer(Exception __exception, MenuViewContext __instance, MenuContext menuContext)
     {
-        if (__exception == null) return null;
+        if (__exception == null) return;
 
         foreach (var menuView in __instance.MenuViews.ToArray())
         {
@@ -35,7 +35,5 @@ internal class MenuViewContextPatches
         }
 
         if (menuContext?.Handler == __instance) menuContext.Handler = null;
-
-        return __exception;
     }
 }

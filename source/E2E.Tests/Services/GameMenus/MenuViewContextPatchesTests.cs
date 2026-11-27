@@ -50,7 +50,7 @@ public class MenuViewContextPatchesTests : IDisposable
         {
             var starter = new CampaignGameStarter(Campaign.Current.GameMenuManager, Campaign.Current.ConversationManager);
             starter.AddGameMenu(BrokenMenu, "", _ => { });
-            // The #2342 throw: a hideout option read the encounter battle after the encounter closed.
+            // The reported throw: a hideout option read the encounter battle after the encounter closed.
             starter.AddGameMenuOption(BrokenMenu, "join", "", _ => PlayerEncounter.EncounteredBattle != null, _ => { });
             var context = Game.Current.ObjectManager.CreateObject<MenuContext>();
             context.SwitchToMenu(BrokenMenu);
