@@ -4,6 +4,7 @@ using Common.Network.Messages;
 using Common.Util;
 using Coop.Core.Server.Services.MobileParties.Messages;
 using E2E.Tests.Environment.Instance;
+using E2E.Tests.Environment.MockEngine;
 using E2E.Tests.Util;
 using GameInterface.Services.Barters;
 using GameInterface.Services.Hideouts.Handlers;
@@ -22,6 +23,8 @@ using GameInterface.Services.UI.Notifications.Messages;
 using HarmonyLib;
 using GameInterface.Services.Villages.Interfaces;
 using Moq;
+using SandBox.CampaignBehaviors;
+using SandBox.Missions.MissionLogics.Hideout;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -1170,6 +1173,77 @@ public class HideoutMapEventTests : MapEventTestBase
             Assert.Equal(AiBehavior.Hold, MobileParty.MainParty.DefaultBehavior);
         }, MapEventDisabledMethods);
     }
+
+    [Fact]
+    public void ServerDrivenLeaveDuringHideoutMission_KeepsEncounterForBossDuelAndLoot()
+    {
+        var raid = CreateSharedHideout();
+        var client = Clients.First();
+        string? banditClanId = null;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(raid.SettlementId, out var settlement));
+            InfestHideout(settlement, "BossLineBandits");
+            Assert.True(Server.ObjectManager.TryGetId(settlement.Hideout.MapFaction, out banditClanId));
+        }, MapEventDisabledMethods);
+
+        using (var fixture = new MissionEngineFixture())
+        {
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<MobileParty>(raid.LeaderPartyId, out var leader));
+                Assert.True(client.ObjectManager.TryGetObject<Clan>(banditClanId, out var banditClan));
+                // Loaded from the bandit clan XML in a real campaign.
+                banditClan.IsBanditFaction = true;
+                Campaign.Current.MainParty = leader;
+                // The party walked into the hideout, so the final hold shows the cleared hideout doesn't pull it back.
+                leader._defaultBehavior = AiBehavior.GoToSettlement;
+                Campaign.Current.PlayerEncounter = null;
+                // The encounter the raid entry and the hideout mission open for the attacker.
+                BattleMissionStartHandler.InitializePlayerEncounter(leader.MapEvent);
+                fixture.CreateMission(client).Shell.MissionBehaviors.Add(ObjectHelper.SkipConstructor<HideoutMissionController>());
+                Assert.True(BossOffersDuel());
+            }, MapEventDisabledMethods);
+            EnableHeadlessEncounterFinish(client);
+
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(raid.LeaderPartyId, out var leader));
+                LeaveSettlementAction.ApplyForParty(leader);
+            }, MapEventDisabledMethods);
+
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<MapEvent>(raid.MapEventId, out var mapEvent));
+                Assert.True(BossOffersDuel());
+                Assert.Same(mapEvent, MobileParty.MainParty.MapEvent);
+                Assert.Null(MobileParty.MainParty.CurrentSettlement);
+                Assert.Equal(AiBehavior.GoToSettlement, MobileParty.MainParty.DefaultBehavior);
+            }, MapEventDisabledMethods);
+        }
+
+        // The mission has ended, and the server clears the hideout for a party it already took out of it.
+        var lootItemId = CreateHideoutLootItem();
+        var prisonerId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        Server.Call(() =>
+        {
+            Campaign.Current.MainParty = null;
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(raid.MapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<ItemObject>(lootItemId, out var lootItem));
+            mapEvent._battleState = BattleState.AttackerVictory;
+            mapEvent._mapEventResultsApplied = true;
+            var broker = Server.Resolve<IMessageBroker>();
+            broker.Publish(this, new CommitMapEventResults(mapEvent));
+            SendHideoutLoot(mapEvent, client, raid.LeaderPartyId, lootItem, 2, prisonerId);
+            broker.Publish(this, new MapEventFinalizeAttempted(mapEvent));
+        });
+
+        CollectHideoutResultsFromMap(client, hasWaitingMenu: false, hasLoot: true);
+        client.Call(() => Assert.Equal(AiBehavior.Hold, MobileParty.MainParty.DefaultBehavior), MapEventDisabledMethods);
+    }
+
+    // Native's condition for the boss's "settle this one-on-one" line, without it only "I am not allowed to talk with you" is left.
+    private static bool BossOffersDuel() => new HideoutConversationsCampaignBehavior().bandit_hideout_start_defender_on_condition();
 
     [Fact]
     public void HideoutClear_ClosesUninvolvedPlayersSettlementEncounter()

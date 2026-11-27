@@ -1439,7 +1439,7 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
             this.agentRegistry = agentRegistry;
             this.shotMap = shotMap;
             missiles = new MissileHandler(network, Broker, agentRegistry, new MissileOrientationCodec(), Spawner, Items,
-                new MissionObjectPath());
+                new MissionObjectPath(), observer.Resolve<IAgentVisualActionAccessor>());
             drops = CreateHandler(observer, agentRegistry, Items, objectManager, Spawner, Broker);
             pickups = new WeaponPickupHandler(agentRegistry, Items, network, Broker, objectManager);
         }

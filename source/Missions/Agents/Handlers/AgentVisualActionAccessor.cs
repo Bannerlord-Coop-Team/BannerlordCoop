@@ -6,6 +6,8 @@ namespace Missions.Agents.Handlers;
 
 public interface IAgentVisualActionAccessor
 {
+    bool HasVisualEntity(Agent agent);
+
     bool IsActionVisible(
         Agent agent,
         int channel,
@@ -25,6 +27,11 @@ public interface IAgentVisualActionAccessor
 
 public class AgentVisualActionAccessor : IAgentVisualActionAccessor
 {
+    public bool HasVisualEntity(Agent agent)
+    {
+        return agent.AgentVisuals?.GetWeakEntity().IsValid == true;
+    }
+
     public bool IsActionVisible(
         Agent agent,
         int channel,

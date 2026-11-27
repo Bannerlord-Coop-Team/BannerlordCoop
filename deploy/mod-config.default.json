@@ -137,6 +137,12 @@
     // but after the pause for nobody online the host has to start the game again.
     "allowClientTimeControls": true,
 
+    // Toggle clicking the map to travel also changing the game speed, like in singleplayer
+    // (Default) true: Clicking the map while paused resumes the game, and a double click fast forwards.
+    // false: Map clicks never change the speed. Only the time controls and their hotkeys do.
+    // Only applies when allowClientTimeControls is true.
+    "mapClickChangesTime": true,
+
     // Toggle clients being able to use cheats
     // Vanilla bannerlord commands are always disabled on clients but this disables cheating in troops, equipment, teleporting etc.
     // Default is false.

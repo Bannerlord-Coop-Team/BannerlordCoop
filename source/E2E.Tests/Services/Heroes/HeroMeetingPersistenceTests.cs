@@ -1,8 +1,10 @@
-﻿using E2E.Tests.Util;
+﻿using Common.Util;
+using E2E.Tests.Util;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
@@ -54,6 +56,45 @@ public class HeroMeetingPersistenceTests : SyncTestBase
             Assert.True(meetings.TryGetValue(playerHeroId, out var playerMeetings));
             Assert.True(playerMeetings.TryGetValue(metHeroId, out var lastMeetingTimeTicks));
             Assert.Equal(expectedMeetingTimeTicks.Value, lastMeetingTimeTicks);
+        });
+    }
+
+    [Fact]
+    public void Client_ConversationEnded_MarksHeroMetOnClientAndServer()
+    {
+        const string controllerId = "PlayerOne";
+        var client = Clients.First();
+        var playerHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var metHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
+
+        Server.Call(() =>
+        {
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.AddPlayer(
+                new Player(controllerId, playerHeroId, string.Empty, string.Empty, string.Empty)));
+            playerManager.SetPeer(controllerId, client.NetPeer);
+        });
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Hero>(playerHeroId, out var playerHero));
+            Assert.True(client.ObjectManager.TryGetObject<Hero>(metHeroId, out var metHero));
+            Game.Current.PlayerTroop = playerHero.CharacterObject;
+            ObjectHelper.SkipConstructor<HeroKnownInformationCampaignBehavior>().RegisterEvents();
+            Assert.False(metHero.HasMet);
+
+            // Town notables and tavern wanderers are only marked met by vanilla when the conversation ends
+            CampaignEventDispatcher.Instance.OnConversationEnded(new[] { metHero.CharacterObject });
+
+            Assert.True(metHero.HasMet);
+        });
+
+        Server.Call(() =>
+        {
+            var meetings = Server.Resolve<ICoopSessionProvider>()
+                .CoopSession.HeroMeetingData.PlayerLastMeetingTimes;
+            Assert.True(meetings.TryGetValue(playerHeroId, out var playerMeetings));
+            Assert.True(playerMeetings.ContainsKey(metHeroId));
         });
     }
 

@@ -33,6 +33,7 @@ public sealed class MissionEngineFixture : IDisposable
     private const int FirstInvalidMockActionIndex = 1000000;
     private readonly Harmony harmony = new("e2e.mockengine");
     private static readonly Dictionary<ILifetimeScope, MockMission> ByContainer = new();
+    private Action? restoreProximityAgentApi;
 
     public MissionEngineFixture()
     {
@@ -43,6 +44,9 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Mission), "get_CurrentTime", nameof(Mission_get_CurrentTime));
         Prefix(typeof(Mission), "get_DamageToPlayerMultiplier", nameof(Mission_get_DamageToPlayerMultiplier));
         Prefix(typeof(Mission), nameof(Mission.EndMission), nameof(Mission_EndMission));
+        Prefix(typeof(AgentProximityMap), nameof(AgentProximityMap.BeginSearch), nameof(AgentProximityMap_BeginSearch));
+        Prefix(typeof(AgentProximityMap), nameof(AgentProximityMap.FindNext), nameof(AgentProximityMap_FindNext));
+        Prefix(typeof(Mission), nameof(Mission.GetClosestFleePositionForAgent), nameof(Mission_GetClosestFleePositionForAgent));
         Prefix(typeof(Mission), nameof(Mission.OnAgentFleeing), nameof(Mission_OnAgentFleeing));
         Prefix(typeof(Mission), nameof(Mission.SpawnAgent), nameof(Mission_SpawnAgent));
         // The BR-110 budget counts native objects until deletion via Mission.AllAgents.
@@ -326,6 +330,51 @@ public sealed class MissionEngineFixture : IDisposable
     {
         if (!MockMission.ForShell(__instance, out var mock)) return true;
         mock.EndMissionCalled = true;
+        return false;
+    }
+
+    /// <summary>Installs the headless agent API for vanilla proximity checks until the fixture is disposed.</summary>
+    public void UseProximityAgentApi()
+    {
+        if (restoreProximityAgentApi != null) return;
+
+        var originalAgentApi = MBAPI.IMBAgent;
+        MBAPI.IMBAgent = DispatchProxy.Create<IMBAgent, ProximityAgentApi>();
+        restoreProximityAgentApi = () => MBAPI.IMBAgent = originalAgentApi;
+    }
+
+    /// <summary>Represents a nearby hostile agent before the engine has started moving it in retreat mode.</summary>
+    public class ProximityAgentApi : DispatchProxy
+    {
+        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args) => targetMethod?.Name switch
+        {
+            nameof(IMBAgent.IsEnemy) => true,
+            nameof(IMBAgent.GetAIStateFlags) => Agent.AIStateFlag.Alarmed,
+            nameof(IMBAgent.IsRetreating) => false,
+            nameof(IMBAgent.SetRetreatMode) => null,
+            _ => throw new NotSupportedException(targetMethod?.Name),
+        };
+    }
+
+    private static bool AgentProximityMap_BeginSearch(Mission mission, ref AgentProximityMap.ProximityMapSearchStruct __result)
+    {
+        if (!MockMission.ForShell(mission, out var mock)) return true;
+        __result = new AgentProximityMap.ProximityMapSearchStruct { LastFoundAgent = mock.NearbyAgent };
+        return false;
+    }
+
+    private static bool AgentProximityMap_FindNext(Mission mission, ref AgentProximityMap.ProximityMapSearchStruct searchStruct)
+    {
+        if (!MockMission.ForShell(mission, out _)) return true;
+        searchStruct.LastFoundAgent = null;
+        return false;
+    }
+
+    // Adopting a routed puppet asks for a flee position, which normally uses the native scene.
+    private static bool Mission_GetClosestFleePositionForAgent(Mission __instance, ref TaleWorlds.Engine.WorldPosition __result)
+    {
+        if (!MockMission.ForShell(__instance, out _)) return true;
+        __result = TaleWorlds.Engine.WorldPosition.Invalid;
         return false;
     }
 
@@ -1588,6 +1637,8 @@ public sealed class MissionEngineFixture : IDisposable
 
     public void Dispose()
     {
+        restoreProximityAgentApi?.Invoke();
+        restoreProximityAgentApi = null;
         harmony.UnpatchAll(harmony.Id);
         ByContainer.Clear();
     }

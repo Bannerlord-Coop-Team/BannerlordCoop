@@ -3155,10 +3155,7 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
 
             client.Call(() =>
             {
-                var battleStartCoordinator = client.Resolve<BattleStartCoordinator>();
-                // E2E clients share process statics, so select this simulated client's coordinator for the patch.
-                AccessTools.Field(typeof(BattleStartCoordinator), "<Instance>k__BackingField")
-                    .SetValue(null, battleStartCoordinator);
+                var battleStartCoordinator = UseBattleStartCoordinatorOf(client);
                 Assert.Same(battleStartCoordinator, BattleStartCoordinator.Instance);
                 InvokePatchedEncounterAttack();
                 Assert.Same(battleStartCoordinator, BattleStartCoordinator.Instance);

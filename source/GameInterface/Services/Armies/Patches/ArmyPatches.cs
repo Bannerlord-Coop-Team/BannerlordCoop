@@ -338,9 +338,9 @@ public class ArmyPatches
             mobileParty.Ai.RethinkAtNextHourlyTick = true;
         }
         mobileParty._army = null;
-        if (mobileParty == MobileParty.MainParty && Game.Current.GameStateManager.ActiveState is MapState) // should be done after _army is null since it checks if it is null to remove ui
+        if (mobileParty == MobileParty.MainParty)
         {
-            ((MapState)Game.Current.GameStateManager.ActiveState).OnLeaveArmy();
+            Game.Current.GameStateManager.LastOrDefault<MapState>()?.OnLeaveArmy();
         }
         CampaignEventDispatcher.Instance.OnPartyLeftArmy(mobileParty, army);
     }

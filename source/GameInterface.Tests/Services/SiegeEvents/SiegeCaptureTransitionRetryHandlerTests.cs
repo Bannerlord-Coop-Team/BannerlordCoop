@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.PlayerCaptivityService.Messages;
+using GameInterface.Services.Settlements.Interfaces;
 using GameInterface.Services.SiegeEvents.Handlers;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using GameInterface.Services.SiegeEvents.Patches;
@@ -123,7 +124,7 @@ public sealed class SiegeCaptureTransitionRetryHandlerTests : IDisposable
         SiegeCaptureMenuHoldPatch.HoldFor(settlement);
         SiegeCaptureTransitionRetryHandler.Arm(leaderParty, settlement);
 
-        var realSiegeEventInterface = new SiegeEventInterface();
+        var realSiegeEventInterface = new SiegeEventInterface(Mock.Of<ISettlementInterface>());
         try
         {
             realSiegeEventInterface.ReleaseLocalAftermathChoice(settlement);
@@ -159,7 +160,7 @@ public sealed class SiegeCaptureTransitionRetryHandlerTests : IDisposable
         Game.Current.PlayerTroop = vassalCharacter;
         // An open scoreboard parks the prompt in the retry instead of switching menus.
         mapState._battleSimulation = ObjectHelper.SkipConstructor<BattleSimulation>();
-        var realSiegeEventInterface = new SiegeEventInterface();
+        var realSiegeEventInterface = new SiegeEventInterface(Mock.Of<ISettlementInterface>());
         try
         {
             realSiegeEventInterface.PromptLocalAftermathChoice(leaderParty, settlement, defeatedClan);

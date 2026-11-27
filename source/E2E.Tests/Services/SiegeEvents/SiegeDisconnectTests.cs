@@ -175,6 +175,47 @@ public class SiegeDisconnectTests : SiegeTestBase
         Server.PumpGameThread();
     }
 
+    [Fact]
+    public void SiegeLeaderAloneOnBattleSideDisconnects_HandsCampToRemainingPartyWhenItsRemovalEndsTheBattle()
+    {
+        var disconnectedClient = Clients.First();
+        var mapEvent = CreateServerMapEvent();
+        var disconnectedPartyId = mapEvent.AttackerPartyId;
+        RegisterAsPlayerParty("SiegeBattleLeader", TestEnvironment.CreateRegisteredObject<Hero>(), disconnectedPartyId);
+        var (_, remainingPartyId) = CreatePlayerHeroParty("SiegeMember");
+        var siege = SetupSiege(disconnectedPartyId, remainingPartyId);
+        Server.Call(() => Server.GetRegisteredObject<MobileParty>(disconnectedPartyId).IsActive = true);
+
+        DisconnectPlayer(disconnectedClient, "SiegeBattleLeader");
+
+        // The leader is alone on its battle side, so its own removal finalizes the battle
+        Server.Call(() =>
+        {
+            var party = Server.GetRegisteredObject<MobileParty>(disconnectedPartyId);
+            Assert.True(party.IsActive);
+            party.Party.MapEventSide = null;
+        }, MapEventDisabledMethods);
+        Server.PumpGameThread();
+        foreach (var client in Clients)
+            client.PumpGameThread();
+
+        foreach (var instance in Clients.Append(Server))
+        {
+            instance.Call(() =>
+            {
+                var name = instance == Server ? "server" : "client";
+                var disconnectedParty = instance.GetRegisteredObject<MobileParty>(disconnectedPartyId);
+                var remainingParty = instance.GetRegisteredObject<MobileParty>(remainingPartyId);
+                var camp = instance.GetRegisteredObject<BesiegerCamp>(siege.CampId);
+
+                Assert.True(camp.LeaderParty == remainingParty, $"{name}: camp led by {camp.LeaderParty?.StringId}");
+                Assert.Equal(new[] { remainingParty }, camp._besiegerParties);
+                Assert.Null(disconnectedParty.BesiegerCamp);
+                Assert.False(disconnectedParty.IsActive, $"{name}: disconnected party still active");
+            });
+        }
+    }
+
     [Theory]
     [InlineData(true, false, 1)]
     [InlineData(true, true, 1)]
