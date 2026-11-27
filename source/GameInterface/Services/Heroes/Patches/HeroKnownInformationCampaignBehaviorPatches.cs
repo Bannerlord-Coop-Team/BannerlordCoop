@@ -4,7 +4,10 @@ using TaleWorlds.CampaignSystem.CampaignBehaviors;
 
 namespace GameInterface.Services.Heroes.Patches;
 
-// ConversationEnded is left on for clients, it is what marks town and tavern NPCs as met after talking to them
+/// <summary>
+/// Runs <see cref="HeroKnownInformationCampaignBehavior"/>'s handlers on the server only, except ConversationEnded,
+/// which clients keep because it is what marks town and tavern NPCs as met after talking to them.
+/// </summary>
 [HarmonyPatch(typeof(HeroKnownInformationCampaignBehavior))]
 internal class HeroKnownInformationCampaignBehaviorPatches
 {
