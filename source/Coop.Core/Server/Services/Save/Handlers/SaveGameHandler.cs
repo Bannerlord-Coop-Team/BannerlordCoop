@@ -180,7 +180,9 @@ internal class SaveGameHandler : IHandler
         // A file saved after an old double join can name one hero under two controllers. Neither the
         // file nor the campaign says which one owns it, so restore neither. This runs over every row
         // before one row is picked per controller, so the row order can't decide which of a
-        // controller's heroes survive, and a dropped row can't hide a claim.
+        // controller's heroes survive, and a dropped row can't hide a claim. Only files saved before
+        // #2400 can hold such rows, since the server now refuses a second controller; remove this once
+        // those saves are no longer supported.
         var sharedClaims = new HashSet<Player>();
         foreach (var claim in claims)
         {
