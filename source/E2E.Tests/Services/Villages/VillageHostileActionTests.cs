@@ -3654,6 +3654,7 @@ public class VillageHostileActionTests : MapEventTestBase
             Campaign.Current.GameMenuManager.RefreshMenuOptionConditions(mapState._menuContext);
             leaveOption = mapState._menuContext.GameMenu.MenuOptions.Single();
             Assert.False(leaveOption.IsEnabled);
+            Assert.True(Campaign.Current.GameMenuManager.GetVirtualMenuOptionConditionsHold(mapState._menuContext, 0));
             Assert.Null(Record.Exception(() => leaveOption.OnConsequence(new MenuCallbackArgs(mapState._menuContext, leaveOption.Text))));
             Assert.Same(encounter, PlayerEncounter.Current);
             Assert.Same(mapEvent, PlayerEncounter.Battle);
@@ -3682,6 +3683,7 @@ public class VillageHostileActionTests : MapEventTestBase
             var menuContext = Campaign.Current.CurrentMenuContext;
             Assert.Same(leaveOption, menuContext.GameMenu.MenuOptions.Single());
             Assert.True(leaveOption!.IsEnabled);
+            Assert.True(Campaign.Current.GameMenuManager.GetVirtualMenuOptionConditionsHold(menuContext, 0));
             leaveOption.OnConsequence(new MenuCallbackArgs(menuContext, leaveOption.Text));
         }, disabledMethods);
 
