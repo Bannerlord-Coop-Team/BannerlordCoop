@@ -47,7 +47,6 @@ namespace Coop.Tests.Autofac
             var client = container.Resolve<INetwork>();
             Assert.NotNull(client);
             Assert.NotNull(container.Resolve<IIssueCancellationCoordinator>());
-            Assert.NotNull(container.Resolve<IActiveIssueDismisser>());
             Assert.NotNull(container.Resolve<IIssueEndingCoordinator>());
             Assert.NotNull(container.Resolve<IVoiceClient>());
             Assert.NotNull(container.Resolve<global::GameInterface.Services.UI.CoopOptions.ICoopOptionsKeybinding>());
@@ -160,7 +159,6 @@ namespace Coop.Tests.Autofac
             var server = container.Resolve<INetwork>();
             Assert.NotNull(server);
             Assert.Same(container.Resolve<IIssueCancellationCoordinator>(), container.Resolve<IIssueCancellationCoordinator>());
-            Assert.NotNull(container.Resolve<IActiveIssueDismisser>());
             Assert.NotNull(container.Resolve<IIssueEndingCoordinator>());
             using (var session = container.BeginLifetimeScope())
             {

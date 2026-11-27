@@ -4,8 +4,7 @@ using TaleWorlds.CampaignSystem;
 namespace E2E.Tests.Util;
 
 /// <summary>
-/// Lifts the bootstrap stub on <see cref="Hero.ChangeState"/>, which skips HeroFieldPatches and vanilla's
-/// state events like OnHeroActivated, for scenarios that need the native state transition.
+/// Lifts the bootstrap stub on <see cref="Hero.ChangeState"/> that skips HeroFieldPatches and events like OnHeroActivated.
 /// </summary>
 internal sealed class NativeHeroStateScope : IDisposable
 {

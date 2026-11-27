@@ -29,15 +29,11 @@ using AllowedIssue = TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsToOffloadSt
 namespace E2E.Tests.Services.Issues;
 
 /// <summary>
-/// Issues a removed player took end with that player, so they can never come back to its next character. A disconnect
-/// ends a quest the same way, keeping an ending vanilla already wrote.
+/// A removed player's issues end with it, never reaching its next character. A disconnect ends a quest the same way.
 /// </summary>
 public class RemovedPlayerIssueTests : IDisposable
 {
     public enum Removal { Delete, GameOver, Retire }
-
-    // Only patched in while a server call holds the game lock
-    private static bool successConsequenceRan;
 
     // The obituary is a game content lookup the harness can't serve, and the retirement record needs the full session
     private static readonly MethodBase[] DisabledMethods =
@@ -55,6 +51,8 @@ public class RemovedPlayerIssueTests : IDisposable
     private readonly E2ETestEnvironment environment;
     private readonly QuestScenario scenario;
     private readonly List<IssueBase.IssueUpdateDetails> updates = new();
+    // The scenario's issue on each machine, so a giver's next issue never passes for it
+    private readonly Dictionary<EnvironmentInstance, IssueBase> issues = new();
     private Hero.CharacterStates? companionStateWhenKilled;
 
     private IEnumerable<EnvironmentInstance> Instances => environment.Clients.Prepend(environment.Server);
@@ -63,20 +61,22 @@ public class RemovedPlayerIssueTests : IDisposable
     {
         environment = new E2ETestEnvironment(output);
         scenario = new QuestScenario(environment);
+        foreach (var instance in Instances)
+            instance.Call(() => issues[instance] = instance.GetRegisteredObject<Hero>(scenario.NotableId).Issue);
     }
 
     public void Dispose() => environment.Dispose();
 
     [Theory]
-    [InlineData(Removal.Delete, Hero.CharacterStates.Active)]
-    [InlineData(Removal.Retire, Hero.CharacterStates.Active)]
-    public void RemovingThePlayerEndsItsSentTroopsQuietlyAndFreesTheCompanion(Removal removal, Hero.CharacterStates companionState)
+    [InlineData(Removal.Delete)]
+    [InlineData(Removal.Retire)]
+    public void RemovingThePlayerEndsItsSentTroopsQuietlyAndFreesTheCompanion(Removal removal)
     {
         var companionId = SendTroopsWithACompanion();
 
         Remove(removal);
 
-        AssertSentTroopsEndedQuietly(companionId, companionState);
+        AssertSentTroopsEndedQuietly(companionId, Hero.CharacterStates.Active);
         Assert.Null(companionStateWhenKilled);
     }
 
@@ -168,13 +168,13 @@ public class RemovedPlayerIssueTests : IDisposable
         var nextId = CreateNextIssueEverywhere();
         scenario.Server.Call(() => Assert.True(scenario.Server.Resolve<IIssueOwnershipRegistry>()
             .TrySetOwner(scenario.NotableId, nextId, QuestScenario.ControllerB)));
-        DailyTickRecordingPayouts();
+        var payouts = DailyTickCountingPayouts();
 
         foreach (var instance in Instances)
             instance.Call(() => Assert.Equal(nextId, instance.GetRegisteredObject<Hero>(scenario.NotableId).Issue?.StringId));
         scenario.Server.Call(() => Assert.True(scenario.Server.Resolve<IIssueOwnershipRegistry>()
             .TryGetOwner(scenario.NotableId, nextId, out _)));
-        AssertEndedOnceWithoutPaying(archive);
+        AssertEndedOnceWithoutPaying(archive, payouts);
     }
 
     [Fact]
@@ -188,16 +188,16 @@ public class RemovedPlayerIssueTests : IDisposable
         // The owner entry no longer names the controller its next character comes back on, and no client hears of it yet
         scenario.Server.Call(() =>
         {
-            Assert.NotNull(scenario.Server.GetRegisteredObject<Hero>(scenario.NotableId).Issue);
+            Assert.True(InManager(scenario.Server));
             Assert.False(scenario.Server.Resolve<IIssueOwnershipRegistry>().TryGetOwner(scenario.NotableId, QuestScenario.IssueId, out _));
         });
         Assert.Empty(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
 
-        DailyTickRecordingPayouts();
+        var payouts = DailyTickCountingPayouts();
 
         foreach (var instance in Instances)
-            instance.Call(() => Assert.Null(instance.GetRegisteredObject<Hero>(scenario.NotableId).Issue));
-        AssertEndedOnceWithoutPaying(archive);
+            instance.Call(() => Assert.False(InManager(instance)));
+        AssertEndedOnceWithoutPaying(archive, payouts);
     }
 
     // ControllerA's troops are due back with a sure success, so a tick that let vanilla run would pay, and its row is open
@@ -219,34 +219,28 @@ public class RemovedPlayerIssueTests : IDisposable
         return archive;
     }
 
-    // The payout reads the giver's town these test heroes lack, so a wrongly run one is recorded and skipped, not thrown
-    private void DailyTickRecordingPayouts()
+    // The payout reads the giver's town these test heroes lack, so a wrongly run one is counted and skipped, not thrown
+    private int DailyTickCountingPayouts()
     {
-        successConsequenceRan = false;
+        var payouts = 0;
         scenario.Server.Call(() =>
         {
-            var harmony = new Harmony($"removed-player-tick.{Guid.NewGuid():N}");
-            harmony.Patch(AccessTools.Method(typeof(AllowedIssue), "AlternativeSolutionEndWithSuccessConsequence"),
-                prefix: new HarmonyMethod(typeof(RemovedPlayerIssueTests), nameof(RecordSuccessConsequence)));
-            try
-            {
-                Campaign.Current.IssueManager.DailyTick();
-            }
-            finally
-            {
-                harmony.UnpatchAll(harmony.Id);
-            }
+            using var recorder = new MethodCallRecorder(
+                AccessTools.Method(typeof(AllowedIssue), "AlternativeSolutionEndWithSuccessConsequence"));
+            Campaign.Current.IssueManager.DailyTick();
+            payouts = recorder.Count;
         });
         environment.FlushCoalescer();
+        return payouts;
     }
 
-    private void AssertEndedOnceWithoutPaying(JournalLogEntry archive)
+    private void AssertEndedOnceWithoutPaying(JournalLogEntry archive, int payouts)
     {
         foreach (var instance in Instances)
             instance.Call(() => Assert.False(instance.Resolve<IIssueOwnershipRegistry>().TryGetOwner(scenario.NotableId, QuestScenario.IssueId, out _)));
         Assert.Equal(IssueOutcome.AlternativeSolution,
             Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
-        Assert.False(successConsequenceRan);
+        Assert.Equal(0, payouts);
         Assert.DoesNotContain(updates, detail => detail is IssueBase.IssueUpdateDetails.SentTroopsFinishedQuest
             or IssueBase.IssueUpdateDetails.SentTroopsFailedQuest);
         // No owner hero is left to end the owner's row, so it goes instead of staying open in the server save
@@ -346,7 +340,7 @@ public class RemovedPlayerIssueTests : IDisposable
         {
             Assert.DoesNotContain(archive, Campaign.Current.LogEntryHistory.GameActionLogs);
             Assert.Contains(unrelated, Campaign.Current.LogEntryHistory.GameActionLogs);
-            Assert.Null(scenario.Server.GetRegisteredObject<Hero>(scenario.NotableId).Issue);
+            Assert.False(InManager(scenario.Server));
         });
         Assert.Equal(IssueOutcome.QuestCancel, Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
     }
@@ -454,12 +448,9 @@ public class RemovedPlayerIssueTests : IDisposable
         environment.FlushCoalescer();
     }
 
-    // Skips the payout, which reads the giver's town these test heroes lack, so a wrongly run one is seen and not thrown
-    private static bool RecordSuccessConsequence()
-    {
-        successConsequenceRan = true;
-        return false;
-    }
+    // Reads the manager of the instance whose call runs it, so only call it inside that instance's call
+    private bool InManager(EnvironmentInstance instance) =>
+        Campaign.Current.IssueManager.Issues.Values.Any(issue => ReferenceEquals(issue, issues[instance]));
 
     private void AssertEnded(IssueOutcome outcome)
     {
@@ -467,7 +458,7 @@ public class RemovedPlayerIssueTests : IDisposable
         {
             instance.Call(() =>
             {
-                Assert.Null(instance.GetRegisteredObject<Hero>(scenario.NotableId).Issue);
+                Assert.False(InManager(instance));
                 Assert.False(instance.Resolve<IIssueOwnershipRegistry>().TryGetOwner(scenario.NotableId, QuestScenario.IssueId, out _));
             });
         }

@@ -18,8 +18,7 @@ using TaleWorlds.CampaignSystem.LogEntries;
 namespace GameInterface.Services.Issues.Framework.Dismissal;
 
 /// <summary>
-/// Runs every ending the sweep and the dispatch services hand over step by step, so one that throws still ends once,
-/// and keeps an issue still in the manager for the daily retry.
+/// Ends each issue it is handed exactly once, step by step, and announces it only once it is out of the manager.
 /// </summary>
 internal class IssueEndingCoordinator : IIssueEndingCoordinator
 {
@@ -77,12 +76,11 @@ internal class IssueEndingCoordinator : IIssueEndingCoordinator
         }
     }
 
-    public Exception EndAfterThrow(IssueBase issue, IssueOutcome outcome, IDisposable owner, Exception exception)
+    public void EndAfterThrow(IssueBase issue, IssueOutcome outcome, IDisposable owner, Exception exception)
     {
         Logger.Error(exception, "Ending {issue} with {outcome} threw, it is ended without running vanilla's ending again", issue.StringId, outcome);
         // Vanilla's ending got as far as it got, so the issue is only taken out of the manager
         EndAsOwner(issue, outcome, () => issueDismisser.Remove(issue), owner);
-        return null;
     }
 
     public void RetryFailedEndings()
@@ -115,11 +113,10 @@ internal class IssueEndingCoordinator : IIssueEndingCoordinator
         if (announce) messageBroker.Publish(issue, new IssueOutcomeObserved(issue, outcome, issueOwnerId));
     }
 
-    // A throw before vanilla's troop return, or before the cancel claimed the issue, left the sent troops out
+    // A throw before vanilla's troop return left the sent troops out
     private IssueEndingClaim ReturnTroopsIfStillOut(IssueBase issue)
     {
-        // Claimed before the return, so no later cancel or completion returns the troops again
-        var claim = claims.GetOrClaim(issue);
+        var claim = claims.Get(issue);
         if (claim.ReturnStarted) return claim;
 
         var returned = Step(issue, "Returning the troops of {issue} failed", () => issueDismisser.ReturnTroops(issue));
@@ -153,20 +150,21 @@ internal class IssueEndingCoordinator : IIssueEndingCoordinator
 
     private void DismissQuest(IssueBase issue)
     {
-        Logger.Information("Dismissing the quest of {issue} offered by {owner}, its player is gone", issue.StringId, issue.IssueOwner?.StringId);
+        Logger.Information("Dismissing the quest of {issue} offered by {owner}, its player is gone", issue.StringId, issue.IssueOwner.StringId);
 
         var quest = issue.IssueQuest;
         var journals = Campaign.Current.GetCampaignBehavior<JournalLogsCampaignBehavior>();
-        // An ending vanilla wrote before it threw stays, the cancel would overwrite it
         var archive = Campaign.Current.LogEntryHistory.FindLastGameActionLog<JournalLogEntry>(entry => entry.IsRelatedTo(issue));
-        if (journals != null && archive?.IsEnded() != true && ownerResolver.TryResolveOwnerHero(issue, out var owner))
+        // A journal row vanilla already ended before its ending threw keeps that ending, a cancel would overwrite it
+        var rowStillOpen = archive?.IsEnded() != true;
+        if (journals != null && rowStillOpen && ownerResolver.TryResolveOwnerHero(issue, out var owner))
         {
-            // IssueFinalized detaches the issue without raising vanilla's journal completion callback.
+            // IssueFinalized detaches the issue without raising vanilla's journal completion callback, so the cancel is written here
             using (new MainHeroSubstitutionScope(owner, owner.PartyBelongedTo))
             {
                 if (quest != null && quest.IsOngoing)
                     journals.OnQuestCompleted(quest, QuestBase.QuestCompleteDetails.Cancel);
-                // The issue's accepted status takes precedence over the quest detail in IsEnded.
+                // IsEnded reads the issue's status before the quest's, so the row needs the issue cancel too
                 journals.OnIssueUpdated(issue, IssueBase.IssueUpdateDetails.IssueCancel, owner);
             }
         }
@@ -176,7 +174,7 @@ internal class IssueEndingCoordinator : IIssueEndingCoordinator
 
     private void DismissTroops(IssueBase issue)
     {
-        Logger.Information("Dismissing the troops sent for {issue} offered by {owner}, their player is gone", issue.StringId, issue.IssueOwner?.StringId);
+        Logger.Information("Dismissing the troops sent for {issue} offered by {owner}, their player is gone", issue.StringId, issue.IssueOwner.StringId);
 
         AddTroopsReturnedLog(issue);
         messageBroker.Publish(issue, new AlternativeSolutionEndingObserved(

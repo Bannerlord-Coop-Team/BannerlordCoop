@@ -57,7 +57,6 @@ internal class IssuesModule : Module
         builder.RegisterType<CaravanAmbushWorldEventService>().As<ICaravanAmbushWorldEventService>().InstancePerLifetimeScope();
         builder.RegisterType<HeadmanHerdCleanup>().As<IHeadmanHerdCleanup>().SingleInstance();
         builder.RegisterType<IssueCancellationCoordinator>().As<IIssueCancellationCoordinator>().InstancePerLifetimeScope();
-        builder.Register(context => context.Resolve<ActiveIssueDismisser>()).As<IActiveIssueDismisser>();
         builder.RegisterType<IssueConversationTracker>().As<IIssueConversationTracker>().SingleInstance();
         builder.RegisterType<IssueConversationGuard>().As<IIssueConversationGuard>().SingleInstance();
         builder.RegisterType<MerchantOutlawsProgress>().As<IMerchantOutlawsProgress>().InstancePerLifetimeScope();

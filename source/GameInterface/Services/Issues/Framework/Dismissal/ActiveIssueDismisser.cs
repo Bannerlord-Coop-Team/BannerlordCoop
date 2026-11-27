@@ -19,7 +19,7 @@ namespace GameInterface.Services.Issues.Framework.Dismissal;
 /// <summary>
 /// Ends every registered issue being solved whose player is gone, swept at server start, on a disconnect and on a removal.
 /// </summary>
-internal class ActiveIssueDismisser : IHandler, IActiveIssueDismisser
+internal class ActiveIssueDismisser : IHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<ActiveIssueDismisser>();
 
@@ -66,7 +66,7 @@ internal class ActiveIssueDismisser : IHandler, IActiveIssueDismisser
 
         try
         {
-            EndIssuesOfGonePlayers(announce: false, removedControllerId: null);
+            EndIssuesWhere(IsOfAGonePlayer, announce: false);
         }
         catch (Exception e)
         {
@@ -81,17 +81,19 @@ internal class ActiveIssueDismisser : IHandler, IActiveIssueDismisser
             return;
         }
 
-        GameThread.RunSafe(() => EndIssuesOfGonePlayers(announce: true, removedControllerId: null), context: nameof(ActiveIssueDismisser));
+        GameThread.RunSafe(() => EndIssuesWhere(IsOfAGonePlayer, announce: true), context: nameof(ActiveIssueDismisser));
     }
 
     // Owner entries point at a controller, so the removed player's issues would otherwise come back to the controller's next character
     private void Handle_PlayerRemoved(MessagePayload<PlayerRemoved> payload)
     {
         var controllerId = payload.What.ControllerId;
-        GameThread.RunSafe(() => EndIssuesOfGonePlayers(announce: true, controllerId), context: nameof(ActiveIssueDismisser));
+        GameThread.RunSafe(() => EndIssuesWhere(issue => IsOwnedBy(issue, controllerId), announce: true),
+            context: nameof(ActiveIssueDismisser));
     }
 
-    public void EndIssuesOfGonePlayers(bool announce, string removedControllerId)
+    // Startup passes announce false, nobody is connected to hear it
+    private void EndIssuesWhere(Func<IssueBase, bool> playerIsGone, bool announce)
     {
         var issueManager = Campaign.Current?.IssueManager;
         if (issueManager == null)
@@ -104,21 +106,11 @@ internal class ActiveIssueDismisser : IHandler, IActiveIssueDismisser
         foreach (var issue in issueManager.Issues.Values.ToList()
                      .Where(issue => registry.IsRegistered(issue.GetType())))
         {
-            var playerIsGone = !TryGetControllerId(issue, out var owner) || owner == removedControllerId;
-            var solvedByPlayer = issue.IsSolvingWithQuest || issue.IsSolvingWithLordSolution;
-            if (solvedByPlayer && !OwnerIsConnected(issue))
-            {
-                endings.EndWithoutOwner(issue, IssueOutcome.QuestCancel, announce);
-            }
-            else if (issue.IsSolvingWithAlternative && playerIsGone)
-            {
-                endings.EndWithoutOwner(issue, IssueOutcome.AlternativeSolution, announce);
-            }
-            else
-            {
-                continue;
-            }
+            var beingSolved = issue.IsSolvingWithQuest || issue.IsSolvingWithLordSolution || issue.IsSolvingWithAlternative;
+            if (!beingSolved || !playerIsGone(issue)) continue;
 
+            var outcome = issue.IsSolvingWithAlternative ? IssueOutcome.AlternativeSolution : IssueOutcome.QuestCancel;
+            endings.EndWithoutOwner(issue, outcome, announce);
             dismissed++;
         }
 
@@ -127,6 +119,13 @@ internal class ActiveIssueDismisser : IHandler, IActiveIssueDismisser
             Logger.Information("Dismissed {count} active issues, quests do not outlive their player or the server", dismissed);
         }
     }
+
+    // A quest ends once its player is offline, sent troops only once nobody owns them any more
+    private bool IsOfAGonePlayer(IssueBase issue) =>
+        issue.IsSolvingWithAlternative ? !TryGetControllerId(issue, out _) : !OwnerIsConnected(issue);
+
+    private bool IsOwnedBy(IssueBase issue, string controllerId) =>
+        TryGetControllerId(issue, out var owner) && owner == controllerId;
 
     private bool OwnerIsConnected(IssueBase issue)
     {

@@ -7,8 +7,9 @@ public interface IIssueDismisser
     // Ends the issue without running any vanilla outcome, freeing companions it sent as troops
     void Dismiss(IssueBase issue);
 
-    // Drops sent companions whose death already ran without making them Dead, the way vanilla's troop return drops dead ones
-    void LeaveBehindDeadCompanions(IssueBase issue);
+    // Before every server troop return: notes it on the issue's claim and drops sent companions whose death already ran
+    // without making them Dead, the way vanilla's return drops dead ones
+    void PrepareTroopReturn(IssueBase issue);
 
     // Whether the issue still has to be taken out of the manager
     bool IsInManager(IssueBase issue);

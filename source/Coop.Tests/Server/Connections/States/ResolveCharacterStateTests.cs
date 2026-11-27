@@ -451,7 +451,7 @@ namespace Coop.Tests.Server.Connections.States
             playerManagerMock.Verify(i => i.RemovePlayer(player), Times.Once);
             playerManagerMock.Verify(i => i.SetPeer(It.IsAny<string>(), It.IsAny<NetPeer>()), Times.Never);
 
-            // Its issues end with it, or the character created next would collect them
+            // The dropped registration's issues end with it, or the character created next would collect them
             var removed = Assert.Single(serverComponent.TestMessageBroker.GetMessagesFromType<PlayerRemoved>());
             Assert.Equal(player.ControllerId, removed.ControllerId);
 

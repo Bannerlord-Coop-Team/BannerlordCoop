@@ -139,48 +139,49 @@ public class IssueCancellationTests : IDisposable
         Assert.Empty(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
     }
 
-    public enum CancelEntry { PlayerCharacterChange, GiverDeath, GiverOwnerChange, Cancel }
+    [Fact]
+    public void PlayerCharacterChangeCancelThatThrowsOutOfTheManagerIsStillAnnounced() =>
+        AssertCancelThatThrowsOutOfTheManagerIsStillAnnounced((owner, originalParty) =>
+            scenario.Server.Resolve<IIssueCancellationCoordinator>().CancelForPlayerDeath(QuestScenario.ControllerA, owner, originalParty));
 
-    [Theory]
-    [InlineData(CancelEntry.PlayerCharacterChange)]
-    [InlineData(CancelEntry.GiverDeath)]
-    [InlineData(CancelEntry.GiverOwnerChange)]
-    [InlineData(CancelEntry.Cancel)]
-    public void QuestCancelThatThrowsOutOfTheManagerIsStillAnnounced(CancelEntry entry)
+    [Fact]
+    public void GiverDeathCancelThatThrowsOutOfTheManagerIsStillAnnounced() =>
+        AssertCancelThatThrowsOutOfTheManagerIsStillAnnounced((_, _) =>
+        {
+            using (new AllowedThread()) Giver().ChangeState(Hero.CharacterStates.Dead);
+            Campaign.Current.IssueManager.OnHeroKilled(Giver(), null, KillCharacterAction.KillCharacterActionDetail.None, false);
+        });
+
+    [Fact]
+    public void GiverOwnerChangeCancelThatThrowsOutOfTheManagerIsStillAnnounced()
+    {
+        var heirId = environment.CreateRegisteredObject<Hero>();
+        AssertCancelThatThrowsOutOfTheManagerIsStillAnnounced((_, _) =>
+        {
+            using (new AllowedThread()) Giver().ChangeState(Hero.CharacterStates.Dead);
+            Campaign.Current.IssueManager.ChangeIssueOwner(Giver().Issue, scenario.Server.GetRegisteredObject<Hero>(heirId));
+        });
+    }
+
+    [Fact]
+    public void IssueCancelThatThrowsOutOfTheManagerIsStillAnnounced() =>
+        AssertCancelThatThrowsOutOfTheManagerIsStillAnnounced((_, _) => Giver().Issue.CompleteIssueWithCancel());
+
+    // The owner's accepted quest is cancelled on the server by the given entry, given the owner and its party
+    private void AssertCancelThatThrowsOutOfTheManagerIsStillAnnounced(Action<Hero, MobileParty> cancel)
     {
         scenario.Accept(scenario.ClientA);
-        var heirId = environment.CreateRegisteredObject<Hero>();
         var errors = new List<Exception>();
         scenario.Server.Call(() =>
         {
             Assert.True(scenario.Server.ObjectManager.TryGetObject<Hero>(scenario.OwnerHeroId, out var owner));
             Assert.True(scenario.Server.ObjectManager.TryGetObject<MobileParty>(scenario.OwnerPartyId, out var originalParty));
-            using (new AllowedThread())
-            {
-                owner.PartyBelongedTo = originalParty;
-                if (entry is CancelEntry.GiverDeath or CancelEntry.GiverOwnerChange) Giver().ChangeState(Hero.CharacterStates.Dead);
-            }
+            using (new AllowedThread()) owner.PartyBelongedTo = originalParty;
             // IssueFinalized throws once DeactivateIssue took the issue out, so no quest outcome is observed
             using var throwing = new ThrowingMethodsScope(AccessTools.Method(typeof(IssueBase), nameof(IssueBase.RemoveAllTrackedObjects)));
             try
             {
-                switch (entry)
-                {
-                    case CancelEntry.PlayerCharacterChange:
-                        scenario.Server.Resolve<IIssueCancellationCoordinator>()
-                            .CancelForPlayerDeath(QuestScenario.ControllerA, owner, originalParty);
-                        break;
-                    case CancelEntry.GiverDeath:
-                        Campaign.Current.IssueManager.OnHeroKilled(Giver(), null, KillCharacterAction.KillCharacterActionDetail.None, false);
-                        break;
-                    case CancelEntry.GiverOwnerChange:
-                        Assert.True(scenario.Server.ObjectManager.TryGetObject<Hero>(heirId, out var heir));
-                        Campaign.Current.IssueManager.ChangeIssueOwner(Giver().Issue, heir);
-                        break;
-                    default:
-                        Giver().Issue.CompleteIssueWithCancel();
-                        break;
-                }
+                cancel(owner, originalParty);
             }
             catch (Exception e)
             {
@@ -585,13 +586,32 @@ public class IssueCancellationTests : IDisposable
         AssertFinalizedEverywhere();
     }
 
-    public enum DeadGiverCancelFailure { CancelListener, LogListener, DeathNews }
+    // Vanilla returned the troops before the cancel listener throws
+    [Fact]
+    public void DeadGiverCancelListenerThatThrowsReturnsTheTroopsOnceAndTellsTheOwnerOnce() =>
+        AssertDeadGiverCancelThatThrowsReturnsTheTroopsOnce(() =>
+            CampaignEvents.OnIssueUpdatedEvent.AddNonSerializedListener(this, (_, detail, _) =>
+            {
+                if (detail == IssueBase.IssueUpdateDetails.IssueCancel) ThrowingMethodsScope.Throw();
+            }));
 
-    [Theory]
-    [InlineData(DeadGiverCancelFailure.CancelListener)]
-    [InlineData(DeadGiverCancelFailure.LogListener)]
-    [InlineData(DeadGiverCancelFailure.DeathNews)]
-    public void DeadGiverCancelThatThrowsReturnsTheTroopsAtMostOnceAndTellsTheOwnerOnce(DeadGiverCancelFailure failure)
+    // The troops returned line's log listener throws before vanilla returns them
+    [Fact]
+    public void DeadGiverCancelLogListenerThatThrowsReturnsTheTroopsOnceAndTellsTheOwnerOnce() =>
+        AssertDeadGiverCancelThatThrowsReturnsTheTroopsOnce(() =>
+            CampaignEvents.IssueLogAddedEvent.AddNonSerializedListener(this, (_, _) => ThrowingMethodsScope.Throw()));
+
+    // The giver's death news throws before vanilla reaches the cancel
+    [Fact]
+    public void DeadGiverDeathNewsThatThrowsReturnsTheTroopsOnceAndTellsTheOwnerOnce() =>
+        AssertDeadGiverCancelThatThrowsReturnsTheTroopsOnce(() =>
+        {
+            using var throwing = new ThrowingMethodsScope(AccessTools.Method(typeof(GameTexts), nameof(GameTexts.FindText)));
+            Campaign.Current.IssueManager.OnHeroKilled(Giver(), null, KillCharacterAction.KillCharacterActionDetail.None, false);
+        });
+
+    // ControllerA's troops are out for a giver who just died, and the given fault breaks the first cancel on the server
+    private void AssertDeadGiverCancelThatThrowsReturnsTheTroopsOnce(Action breakTheFirstCancel)
     {
         var companionId = environment.CreateRegisteredObject<Hero>();
         var troopId = environment.CreateRegisteredObject<CharacterObject>();
@@ -600,20 +620,7 @@ public class IssueCancellationTests : IDisposable
         {
             using (new AllowedThread()) Giver()._heroState = Hero.CharacterStates.Dead;
             var issue = Giver().Issue;
-            // Vanilla returned the troops before the cancel listener, the log listener throws before they return
-            if (failure == DeadGiverCancelFailure.LogListener)
-                CampaignEvents.IssueLogAddedEvent.AddNonSerializedListener(this, (_, _) => ThrowingMethodsScope.Throw());
-            if (failure == DeadGiverCancelFailure.CancelListener)
-                CampaignEvents.OnIssueUpdatedEvent.AddNonSerializedListener(this, (_, detail, _) =>
-                {
-                    if (detail == IssueBase.IssueUpdateDetails.IssueCancel) ThrowingMethodsScope.Throw();
-                });
-            // The giver's death news throws before vanilla reaches the cancel, so nothing claimed the issue yet
-            if (failure == DeadGiverCancelFailure.DeathNews)
-            {
-                using var throwing = new ThrowingMethodsScope(AccessTools.Method(typeof(GameTexts), nameof(GameTexts.FindText)));
-                Campaign.Current.IssueManager.OnHeroKilled(Giver(), null, KillCharacterAction.KillCharacterActionDetail.None, false);
-            }
+            breakTheFirstCancel();
             // The next due tick must not cancel the issue and return the same troops again
             try
             {

@@ -24,7 +24,6 @@ internal class OutcomeDispatcher : IOutcomeDispatcher
     private readonly IMessageBroker messageBroker;
     private readonly IQuestTypeRegistry registry;
     private readonly IIssueOwnerResolver ownerResolver;
-    private readonly IIssueEndingClaimRegistry claims;
     private readonly Dictionary<QuestBase, QuestOutcomeObservation> questOutcomes =
         new Dictionary<QuestBase, QuestOutcomeObservation>(ReferenceComparer<QuestBase>.Instance);
 
@@ -35,13 +34,11 @@ internal class OutcomeDispatcher : IOutcomeDispatcher
         public IssueOutcome? Outcome;
     }
 
-    public OutcomeDispatcher(IMessageBroker messageBroker, IQuestTypeRegistry registry, IIssueOwnerResolver ownerResolver,
-        IIssueEndingClaimRegistry claims)
+    public OutcomeDispatcher(IMessageBroker messageBroker, IQuestTypeRegistry registry, IIssueOwnerResolver ownerResolver)
     {
         this.messageBroker = messageBroker;
         this.registry = registry;
         this.ownerResolver = ownerResolver;
-        this.claims = claims;
     }
 
     public bool BeforeQuestOutcome(QuestBase quest, IssueOutcome outcome, out IssueBase observed, TextObject log = null)
@@ -145,7 +142,6 @@ internal class OutcomeDispatcher : IOutcomeDispatcher
 
         if (!issue.IssueOwner.IsAlive)
         {
-            // The cancel claims the issue before vanilla returns the troops
             issue.CompleteIssueWithCancel();
             return false;
         }
@@ -163,9 +159,6 @@ internal class OutcomeDispatcher : IOutcomeDispatcher
         {
             // Vanilla tries again on the next daily tick, so the troops are not lost while the owner is busy
             if (!Campaign.Current.Models.IssueModel.CanTroopsReturnFromAlternativeSolution()) return false;
-
-            // An ending of this issue already started and threw, so vanilla's completion never runs and pays a second time
-            if (!claims.TryClaim(issue)) return false;
 
             owner = scope;
             return true;

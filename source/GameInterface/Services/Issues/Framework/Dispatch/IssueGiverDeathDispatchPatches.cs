@@ -22,17 +22,11 @@ internal class IssueGiverDeathDispatchPatches
             coordinator.BeforeGiverDeath(victim, out __state.Owner);
     }
 
+    // Vanilla cancels the quest inline, so a throw there would otherwise leave it unannounced and unwind the death
     [HarmonyPatch(typeof(IssueManager), nameof(IssueManager.OnHeroKilled))]
     [HarmonyFinalizer]
-    private static Exception Finalizer((IssueBase Issue, IDisposable Owner) __state, Exception __exception)
-    {
-        // Vanilla cancels the quest inline, so a throw there would otherwise leave it unannounced and unwind the death
-        if (__exception != null && __state.Owner != null && ContainerProvider.TryResolve<IIssueEndingCoordinator>(out var endings))
-            return endings.EndAfterThrow(__state.Issue, IssueOutcome.QuestCancel, __state.Owner, __exception);
-
-        __state.Owner?.Dispose();
-        return __exception;
-    }
+    private static Exception Finalizer((IssueBase Issue, IDisposable Owner) __state, Exception __exception) =>
+        OwnerEndingFinalizer.Finish(__state.Issue, IssueOutcome.QuestCancel, __state.Owner, __exception);
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.HourlyTick))]
     [HarmonyPostfix]

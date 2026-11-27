@@ -10,7 +10,6 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.ComponentInterfaces;
-using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.Encyclopedia;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.LogEntries;
@@ -131,8 +130,12 @@ public class AlternativeSolutionCompletionGuardTests : IDisposable
         AssertCompanionState(Hero.CharacterStates.Active);
     }
 
-    [Fact]
-    public void CompanionWhoseFirstReleaseThrowsIsFreedByTheDailyRetryAndTheIssueAnnouncedOnce()
+    // A teleport listener that throws once is retried, one that always throws ends in the last-resort deactivation
+    [Theory]
+    [InlineData(1, Hero.CharacterStates.Active)]
+    [InlineData(int.MaxValue, Hero.CharacterStates.Disabled)]
+    public void CompanionReleaseThatThrowsWaitsForTheDailyRetryAndTheIssueIsAnnouncedOnce(int throwingTeleports,
+        Hero.CharacterStates companionAfterRetry)
     {
         var settlementId = environment.CreateRegisteredObject<Settlement>();
         var teleports = 0;
@@ -144,7 +147,7 @@ public class AlternativeSolutionCompletionGuardTests : IDisposable
             // Vanilla calls teleport listeners like PlayerTrackCompanionBehavior's before it activates the companion
             CampaignEvents.OnHeroTeleportationRequestedEvent.AddNonSerializedListener(this, (_, _, _, _) =>
             {
-                if (teleports++ == 0) ThrowingMethodsScope.Throw();
+                if (teleports++ < throwingTeleports) ThrowingMethodsScope.Throw();
             });
         });
 
@@ -156,7 +159,7 @@ public class AlternativeSolutionCompletionGuardTests : IDisposable
         Assert.Empty(TickThreeDays(TroopReturnMethod));
         AssertManagerAndAnnouncements(inManager: false, announcements: 1);
         AssertEndedOnce();
-        AssertCompanionState(Hero.CharacterStates.Active);
+        AssertCompanionState(companionAfterRetry);
         Assert.Equal(2, teleports);
     }
 
@@ -189,51 +192,33 @@ public class AlternativeSolutionCompletionGuardTests : IDisposable
         Assert.Empty(updates);
     }
 
+    // An early consequence throws before vanilla writes the ending, so the row ends as a cancel with the troops back
     [Fact]
-    public void IssueThatCannotBeDetachedIsNeverRunAgainAndEndsOnceItCanBe()
-    {
-        // Both IssueFinalized and the deactivation fallback go through DeactivateIssue, so the issue stays attached
-        var errors = TickThreeDays(TroopReturnMethod, AccessTools.Method(typeof(IssueManager), nameof(IssueManager.DeactivateIssue)));
-
-        Assert.Empty(errors);
-        Assert.Equal(IssueBase.IssueUpdateDetails.SentTroopsFailedQuest, Assert.Single(updates));
-        scenario.Server.Call(() =>
-            Assert.NotNull(scenario.Server.GetRegisteredObject<Hero>(scenario.NotableId).Issue));
-        Assert.Empty(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
-
-        // Once it can be detached, the daily retry ends it without running vanilla again
-        Assert.Empty(TickThreeDays(TroopReturnMethod));
-        AssertEndedOnce();
-    }
+    public void ConsequenceThatThrowsEndsTheOwnersRowOnceAsACancel() =>
+        AssertTheOwnersRowEndsOnce(
+            () => TickThreeDays(AccessTools.Method(typeof(IssueBase), nameof(IssueBase.AlternativeSolutionEndWithFailureConsequence))),
+            IssueBase.IssueUpdateDetails.IssueCancel, troopsBack: 3, "Your troops have returned from their mission.");
 
     [Fact]
-    public void IssueTheManagerStillHoldsIsNotAnnouncedUntilItIsRemoved()
-    {
-        // Vanilla's DeactivateIssue clears the hero's pointer before RemoveRelatedLines and the manager removal
-        var removeRelatedLines = AccessTools.Method(typeof(ConversationManager), nameof(ConversationManager.RemoveRelatedLines));
-        Assert.Empty(CompleteBeforeTheDailyPostfix(TroopReturnMethod, removeRelatedLines));
+    public void EndingListenerThatThrowsEndsTheOwnersRowOnceWithTheSentEnding() =>
+        AssertTheOwnersRowEndsOnce(() =>
+        {
+            // Added after the journal listener so it runs before it, once the owner was already sent the ending
+            scenario.Server.Call(() => CampaignEvents.OnIssueUpdatedEvent.AddNonSerializedListener(this, (_, detail, _) =>
+            {
+                if (detail == IssueBase.IssueUpdateDetails.SentTroopsFailedQuest) ThrowingMethodsScope.Throw();
+            }));
+            return TickThreeDays();
+        }, IssueBase.IssueUpdateDetails.SentTroopsFailedQuest, troopsBack: 3, "has failed to resolve the matter");
 
-        Assert.Equal(IssueBase.IssueUpdateDetails.SentTroopsFailedQuest, Assert.Single(updates));
-        scenario.Server.Call(() => Assert.Null(scenario.Server.GetRegisteredObject<Hero>(scenario.NotableId).Issue));
-        AssertManagerAndAnnouncements(inManager: true, announcements: 0);
+    // The troop return throws after vanilla wrote the ending, and it never runs a second time
+    [Fact]
+    public void TroopReturnThatThrowsEndsTheOwnersRowOnceWithTheSentEnding() =>
+        AssertTheOwnersRowEndsOnce(() => TickThreeDays(TroopReturnMethod),
+            IssueBase.IssueUpdateDetails.SentTroopsFailedQuest, troopsBack: 0, "has failed to resolve the matter");
 
-        // The daily retry and its deactivation fallback both throw there too
-        Assert.Empty(TickThreeDays(TroopReturnMethod, removeRelatedLines));
-        AssertManagerAndAnnouncements(inManager: true, announcements: 0);
-
-        Assert.Empty(TickThreeDays(TroopReturnMethod));
-        AssertEndedOnce();
-        AssertManagerAndAnnouncements(inManager: false, announcements: 1);
-    }
-
-    public enum FailurePoint { Consequence, EndingListener, TroopReturn }
-
-    // An early consequence throws before vanilla writes the ending, the troop return only after it
-    [Theory]
-    [InlineData(FailurePoint.Consequence, IssueBase.IssueUpdateDetails.IssueCancel, 3, "Your troops have returned from their mission.")]
-    [InlineData(FailurePoint.EndingListener, IssueBase.IssueUpdateDetails.SentTroopsFailedQuest, 3, "has failed to resolve the matter")]
-    [InlineData(FailurePoint.TroopReturn, IssueBase.IssueUpdateDetails.SentTroopsFailedQuest, 0, "has failed to resolve the matter")]
-    public void ThrowAfterAcceptanceLeavesTheOwnersJournalEndedOnce(FailurePoint failure, IssueBase.IssueUpdateDetails ending,
+    // The owner accepted with an open journal row on the server and on its client, then the daily ticks run with the fault
+    private void AssertTheOwnersRowEndsOnce(Func<List<Exception>> tickWithFault, IssueBase.IssueUpdateDetails ending,
         int troopsBack, string lastLine)
     {
         var instances = new[] { scenario.Server, scenario.ClientA };
@@ -254,21 +239,10 @@ public class AlternativeSolutionCompletionGuardTests : IDisposable
                 var archive = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(entry => entry.IsRelatedTo(issue)));
                 Assert.False(archive.IsEnded());
                 accepted[instance] = archive.GetEntries().Select(entry => entry.LogText.ToString()).ToArray();
-                // Added last so it runs before the journal listener, after the owner was already sent the ending
-                if (instance == scenario.Server && failure == FailurePoint.EndingListener)
-                    CampaignEvents.OnIssueUpdatedEvent.AddNonSerializedListener(this, (_, detail, _) =>
-                    {
-                        if (detail == IssueBase.IssueUpdateDetails.SentTroopsFailedQuest) ThrowingMethodsScope.Throw();
-                    });
             });
         }
 
-        var errors = failure switch
-        {
-            FailurePoint.Consequence => TickThreeDays(AccessTools.Method(typeof(IssueBase), nameof(IssueBase.AlternativeSolutionEndWithFailureConsequence))),
-            FailurePoint.TroopReturn => TickThreeDays(TroopReturnMethod),
-            _ => TickThreeDays(),
-        };
+        var errors = tickWithFault();
 
         Assert.Empty(errors);
         Assert.Equal(ending, Assert.Single(updates));

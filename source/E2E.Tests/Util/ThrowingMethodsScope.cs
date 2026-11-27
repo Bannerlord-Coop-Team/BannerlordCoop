@@ -4,8 +4,7 @@ using System.Reflection;
 namespace E2E.Tests.Util;
 
 /// <summary>
-/// Makes each given method throw until disposed. Open it inside a server call, which holds the game lock, so no other
-/// test runs into the throwing stubs.
+/// Makes each given method throw until disposed. Open it inside a server call, whose game lock keeps other tests out.
 /// </summary>
 internal sealed class ThrowingMethodsScope : IDisposable
 {

@@ -10,7 +10,7 @@ namespace GameInterface.Services.Issues.Framework.Registries;
 internal class IssueEndingClaimRegistry : IIssueEndingClaimRegistry, IDisposable
 {
     private readonly IMessageBroker messageBroker;
-    // One claim per issue whose ending started, collected with the issue
+    // One claim per issue whose troop ending started, collected with the issue
     private readonly ConditionalWeakTable<IssueBase, IssueEndingClaim> claims = new();
 
     public IssueEndingClaimRegistry(IMessageBroker messageBroker)
@@ -21,23 +21,10 @@ internal class IssueEndingClaimRegistry : IIssueEndingClaimRegistry, IDisposable
 
     public void Dispose() => messageBroker.Unsubscribe<AlternativeSolutionEndingObserved>(RememberSentEnding);
 
-    public bool TryClaim(IssueBase issue)
-    {
-        if (claims.TryGetValue(issue, out _)) return false;
+    public IssueEndingClaim Get(IssueBase issue) => claims.GetValue(issue, _ => new IssueEndingClaim());
 
-        claims.Add(issue, new IssueEndingClaim());
-        return true;
-    }
+    public void NoteTroopReturn(IssueBase issue) => Get(issue).ReturnStarted = true;
 
-    public IssueEndingClaim GetOrClaim(IssueBase issue) => claims.GetValue(issue, _ => new IssueEndingClaim());
-
-    public void NoteTroopReturn(IssueBase issue)
-    {
-        if (claims.TryGetValue(issue, out var claim)) claim.ReturnStarted = true;
-    }
-
-    private void RememberSentEnding(MessagePayload<AlternativeSolutionEndingObserved> payload)
-    {
-        if (claims.TryGetValue(payload.What.Issue, out var claim)) claim.SentEnding ??= payload.What.Ending;
-    }
+    private void RememberSentEnding(MessagePayload<AlternativeSolutionEndingObserved> payload) =>
+        Get(payload.What.Issue).SentEnding ??= payload.What.Ending;
 }

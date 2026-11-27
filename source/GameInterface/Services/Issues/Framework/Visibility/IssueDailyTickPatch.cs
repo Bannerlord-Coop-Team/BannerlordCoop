@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Logging;
+using Common.Messaging;
 using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
 using Serilog;
@@ -9,8 +10,7 @@ using TaleWorlds.CampaignSystem.Issues;
 namespace GameInterface.Services.Issues.Framework.Visibility;
 
 /// <summary>
-/// Clients advance their own issues while the server owns expiry and foreign missions. After the server's tick, which
-/// skips an issue whose ending threw, that issue is taken out of the manager so the clients still hear about it.
+/// The only patch on the issue daily tick. Clients advance their own issues, the server retries failed endings after it.
 /// </summary>
 [HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(IssueManager), nameof(IssueManager.DailyTick))]
@@ -33,10 +33,11 @@ internal class IssueDailyTickPatch
     }
 
     [HarmonyPostfix]
-    private static void Postfix()
+    private static void Postfix(IssueManager __instance)
     {
-        if (ModInformation.IsClient || !ContainerProvider.TryResolve<IIssueEndingCoordinator>(out var endings)) return;
+        if (ModInformation.IsClient) return;
 
-        endings.RetryFailedEndings();
+        if (ContainerProvider.TryResolve<IIssueEndingCoordinator>(out var endings)) endings.RetryFailedEndings();
+        MessageBroker.Instance.Publish(__instance, new IssueManagerDailyTicked());
     }
 }

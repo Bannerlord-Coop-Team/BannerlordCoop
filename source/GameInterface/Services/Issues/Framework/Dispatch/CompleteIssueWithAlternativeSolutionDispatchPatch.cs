@@ -33,16 +33,8 @@ internal class CompleteIssueWithAlternativeSolutionDispatchPatch
         dispatcher.AfterAlternativeSolutionCompletion(__instance, __state);
     }
 
+    // A throw skips the postfix, so the issue would stay attached and pay again on the next tick
     [HarmonyFinalizer]
-    private static Exception Finalizer(IssueBase __instance, IDisposable __state, Exception __exception)
-    {
-        // A throw skips the postfix, so the issue would stay attached and pay again on the next tick
-        if (__exception != null && __state != null && ContainerProvider.TryResolve<IIssueEndingCoordinator>(out var endings))
-        {
-            return endings.EndAfterThrow(__instance, IssueOutcome.AlternativeSolution, __state, __exception);
-        }
-
-        __state?.Dispose();
-        return __exception;
-    }
+    private static Exception Finalizer(IssueBase __instance, IDisposable __state, Exception __exception) =>
+        OwnerEndingFinalizer.Finish(__instance, IssueOutcome.AlternativeSolution, __state, __exception);
 }
