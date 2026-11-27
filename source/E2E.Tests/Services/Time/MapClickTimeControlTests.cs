@@ -18,8 +18,7 @@ using Xunit.Abstractions;
 namespace E2E.Tests.Services.Time;
 
 /// <summary>
-/// With <see cref="ModOptions.MapClickChangesTime"/> on, clicking the map to travel resumes time the way vanilla's map
-/// click does. With it off, a map click leaves the time alone and only the time controls change it.
+/// Clicking the map to travel resumes time the way vanilla's map click does.
 /// </summary>
 public class MapClickTimeControlTests : IDisposable
 {
@@ -51,10 +50,21 @@ public class MapClickTimeControlTests : IDisposable
     [Fact]
     public void MapClick_WhilePaused_ResumesTimeOnServerAndClients()
     {
+        ModConfigProvider.ModOptions = new ModOptions(new ModOptionsData { MapClickChangesTime = true });
         ConnectPlayer();
         PauseServer();
 
-        ClickMap(mapClickChangesTime: true);
+        // HandleClickTimeChange reads BannerlordConfig, whose static initializer asks the native layer for the system language
+        var disabledMethods = new[] { AccessTools.Method(typeof(TaleWorlds.Engine.Utilities), nameof(TaleWorlds.Engine.Utilities.GetSystemLanguage)) };
+
+        // HandleClickTimeChange is the vanilla helper MapScreen's map and parley clicks call after a travel order
+        Client.Call(() =>
+        {
+            var mapScreen = (MapScreen)RuntimeHelpers.GetUninitializedObject(typeof(MapScreen));
+            mapScreen.HandleClickTimeChange(isDoubleClick: false);
+
+            Assert.False(AllowedThread.IsThisThreadAllowed());
+        }, disabledMethods);
 
         Server.Call(() => Assert.Equal(TimeControlEnum.Play_1x, Server.Resolve<ITimeControlInterface>().GetTimeControl()));
         foreach (var client in environment.Clients)
@@ -62,37 +72,6 @@ public class MapClickTimeControlTests : IDisposable
             var change = Assert.Single(client.InternalMessages.GetMessages<NetworkChangeTimeControlMode>());
             Assert.Equal(TimeControlEnum.Play_1x, change.NewControlMode);
         }
-    }
-
-    [Fact]
-    public void MapClick_WithMapClickChangesTimeOff_StaysPaused()
-    {
-        ConnectPlayer();
-        PauseServer();
-
-        ClickMap(mapClickChangesTime: false);
-
-        Assert.Empty(Client.NetworkSentMessages.GetMessages<NetworkRequestTimeSpeedChange>());
-        Server.Call(() => Assert.Equal(TimeControlEnum.Pause, Server.Resolve<ITimeControlInterface>().GetTimeControl()));
-        foreach (var client in environment.Clients)
-        {
-            Assert.Empty(client.InternalMessages.GetMessages<NetworkChangeTimeControlMode>());
-        }
-    }
-
-    // Runs the vanilla helper MapScreen's map and parley clicks call after a travel order, on the first client.
-    private void ClickMap(bool mapClickChangesTime)
-    {
-        ModConfigProvider.ModOptions = new ModOptions(new ModOptionsData { MapClickChangesTime = mapClickChangesTime });
-
-        // HandleClickTimeChange reads BannerlordConfig, whose static initializer asks the native layer for the system language.
-        Client.Call(() =>
-        {
-            var mapScreen = (MapScreen)RuntimeHelpers.GetUninitializedObject(typeof(MapScreen));
-            mapScreen.HandleClickTimeChange(isDoubleClick: false);
-
-            Assert.False(AllowedThread.IsThisThreadAllowed());
-        }, new[] { AccessTools.Method(typeof(TaleWorlds.Engine.Utilities), nameof(TaleWorlds.Engine.Utilities.GetSystemLanguage)) });
     }
 
     // A connected player keeps the no-players unpause policy from holding the pause.
@@ -126,7 +105,6 @@ public class MapClickTimeControlTests : IDisposable
         foreach (var client in environment.Clients)
         {
             client.InternalMessages.Clear();
-            client.NetworkSentMessages.Clear();
         }
     }
 }

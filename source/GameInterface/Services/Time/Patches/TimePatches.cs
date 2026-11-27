@@ -187,25 +187,63 @@ internal class AllowTimeControlFromHotKeysPatches
 }
 
 /// <summary>
-/// Sends the time change vanilla makes after a travel or parley click to the server as a time request, like the time controls do,
-/// when <see cref="ModOptions.MapClickChangesTime"/> is on.
+/// Sends the time changes vanilla makes for a travel or parley click to the server as time requests, like the time controls do.
+/// <see cref="MapScreen.HandleClickTimeChange"/> resumes or fast forwards, and <see cref="MapScreen.HandleMouse"/> drops a
+/// single click's fast forward back to play once the double click window runs out.
 /// </summary>
-[HarmonyPatch(typeof(MapScreen), nameof(MapScreen.HandleClickTimeChange))]
+[HarmonyPatch(typeof(MapScreen))]
 internal class AllowTimeControlFromMapClickPatches
 {
+    [HarmonyPatch(nameof(MapScreen.HandleClickTimeChange))]
     [HarmonyPrefix]
     private static void Prefix(out AllowedThread __state)
     {
-        // Without the allowed thread the time setter drops the click's change, which is the behavior with the option off.
-        // Host-only servers skip it too, otherwise every click while paused shows the host-only message.
-        var options = ModConfigProvider.ModOptions;
-        __state = options.MapClickChangesTime && options.AllowClientTimeControls ? new AllowedThread() : null;
+        __state = AllowMapClickTimeChange();
     }
 
+    [HarmonyPatch(nameof(MapScreen.HandleClickTimeChange))]
     [HarmonyFinalizer]
     private static void Finalizer(AllowedThread __state)
     {
         __state?.Dispose();
+    }
+
+    [HarmonyPatch(nameof(MapScreen.HandleMouse))]
+    [HarmonyTranspiler]
+    private static IEnumerable<CodeInstruction> HandleMouseTranspiler(IEnumerable<CodeInstruction> instructions)
+    {
+        var setTimeControlMode = AccessTools.PropertySetter(typeof(Campaign), nameof(Campaign.TimeControlMode));
+        var setFromMapClick = AccessTools.Method(typeof(AllowTimeControlFromMapClickPatches), nameof(SetTimeControlModeFromMapClick));
+
+        foreach (var instr in instructions)
+        {
+            if (instr.Calls(setTimeControlMode))
+            {
+                instr.opcode = OpCodes.Call;
+                instr.operand = setFromMapClick;
+            }
+
+            yield return instr;
+        }
+    }
+
+    private static void SetTimeControlModeFromMapClick(Campaign campaign, CampaignTimeControlMode mode)
+    {
+        using (AllowMapClickTimeChange())
+        {
+            campaign.TimeControlMode = mode;
+        }
+    }
+
+    // Without the allowed thread the time setter drops the click's change
+    private static AllowedThread AllowMapClickTimeChange()
+    {
+        var options = ModConfigProvider.ModOptions;
+        // Map clicks only change time when the server turns on mapClickChangesTime
+        if (!options.MapClickChangesTime) return null;
+        // and only when clients are allowed to control time at all
+        if (!options.AllowClientTimeControls) return null;
+        return new AllowedThread();
     }
 }
 
