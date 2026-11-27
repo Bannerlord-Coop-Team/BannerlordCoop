@@ -19,6 +19,7 @@ using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Players.Messages;
 using GameInterface.Services.SiegeEvents.Interfaces;
+using GameInterface.Services.Stances.Interfaces;
 using LiteNetLib;
 using Serilog;
 using System;
@@ -46,6 +47,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly IPartyVisualInterface partyVisuals;
     private readonly ISiegeEventInterface siegeEventInterface;
+    private readonly IPartyDiplomaticHandlerCampaignBehaviorInterface diplomaticHandler;
     private readonly Dictionary<MobileParty, (MapEvent MapEvent, string ControllerId)> deferredMapEventParking = new();
 
     public PlayerPartyVisibilityHandler(
@@ -54,7 +56,8 @@ internal class PlayerPartyVisibilityHandler : IHandler
         IConnectionCollection connectionCollection,
         IObjectManager objectManager,
         IPartyVisualInterface partyVisuals,
-        ISiegeEventInterface siegeEventInterface)
+        ISiegeEventInterface siegeEventInterface,
+        IPartyDiplomaticHandlerCampaignBehaviorInterface diplomaticHandler)
     {
         this.messageBroker = messageBroker;
         this.playerManager = playerManager;
@@ -62,6 +65,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
         this.objectManager = objectManager;
         this.partyVisuals = partyVisuals;
         this.siegeEventInterface = siegeEventInterface;
+        this.diplomaticHandler = diplomaticHandler;
 
         messageBroker.Subscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
         messageBroker.Subscribe<PlayerCampaignSynchronized>(Handle_PlayerCampaignSynchronized);
@@ -139,6 +143,8 @@ internal class PlayerPartyVisibilityHandler : IHandler
         }
 
         LeaveSiegeBeforeParking(party);
+        // Its client can't open the slink away menu anymore, so a town at war with it ejects it like at a stance change
+        diplomaticHandler.CheckSettlementSuitability(party);
 
         var wasActive = party.IsActive;
         party.IsActive = false;
@@ -326,6 +332,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
             }
 
             LeaveSiegeBeforeParking(party);
+            diplomaticHandler.CheckSettlementSuitability(party);
             party.IsActive = false;
             party.IsVisible = false;
             partyVisuals.RemoveVisual(party);

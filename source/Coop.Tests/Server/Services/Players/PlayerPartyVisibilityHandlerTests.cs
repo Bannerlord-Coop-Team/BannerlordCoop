@@ -13,6 +13,7 @@ using GameInterface.Services.PartyVisuals.Interfaces;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.SiegeEvents.Interfaces;
+using GameInterface.Services.Stances.Interfaces;
 using HarmonyLib;
 using LiteNetLib;
 using Moq;
@@ -72,7 +73,8 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
             Mock.Of<IConnectionCollection>(),
             objectManager.Object,
             Mock.Of<IPartyVisualInterface>(),
-            Mock.Of<ISiegeEventInterface>());
+            Mock.Of<ISiegeEventInterface>(),
+            Mock.Of<IPartyDiplomaticHandlerCampaignBehaviorInterface>());
 
         broker.Publish(this, new SavedPlayerRegistrationsRestored());
 
@@ -97,7 +99,8 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
             Mock.Of<IConnectionCollection>(),
             objectManager.Object,
             Mock.Of<IPartyVisualInterface>(),
-            Mock.Of<ISiegeEventInterface>());
+            Mock.Of<ISiegeEventInterface>(),
+            Mock.Of<IPartyDiplomaticHandlerCampaignBehaviorInterface>());
 
         broker.Publish(this, new SavedPlayerRegistrationsRestored());
 
@@ -129,7 +132,8 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
             Mock.Of<IConnectionCollection>(),
             objectManager.Object,
             Mock.Of<IPartyVisualInterface>(),
-            siegeEventInterface.Object);
+            siegeEventInterface.Object,
+            Mock.Of<IPartyDiplomaticHandlerCampaignBehaviorInterface>());
 
         broker.Publish(this, new SavedPlayerRegistrationsRestored());
 
@@ -169,7 +173,8 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
             Mock.Of<IConnectionCollection>(),
             objectManager.Object,
             Mock.Of<IPartyVisualInterface>(),
-            Mock.Of<ISiegeEventInterface>());
+            Mock.Of<ISiegeEventInterface>(),
+            Mock.Of<IPartyDiplomaticHandlerCampaignBehaviorInterface>());
 
         broker.Publish(this, new PlayerCampaignEntered(peer));
         Assert.False(party.IsActive);
@@ -205,7 +210,8 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
             Mock.Of<IConnectionCollection>(),
             objectManager.Object,
             Mock.Of<IPartyVisualInterface>(),
-            Mock.Of<ISiegeEventInterface>());
+            Mock.Of<ISiegeEventInterface>(),
+            Mock.Of<IPartyDiplomaticHandlerCampaignBehaviorInterface>());
 
         broker.Publish(this, new PlayerCampaignSynchronized(supersededPeer));
         GameThread.Run(() => { }, blocking: true);
@@ -230,7 +236,8 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
             connectionCollection.Object,
             objectManager.Object,
             partyVisuals.Object,
-            Mock.Of<ISiegeEventInterface>());
+            Mock.Of<ISiegeEventInterface>(),
+            Mock.Of<IPartyDiplomaticHandlerCampaignBehaviorInterface>());
 
         broker.Publish(this, new PlayerPartyReleasedFromCaptivity(party));
 
@@ -256,7 +263,8 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
             connectionCollection.Object,
             objectManager.Object,
             Mock.Of<IPartyVisualInterface>(),
-            Mock.Of<ISiegeEventInterface>());
+            Mock.Of<ISiegeEventInterface>(),
+            Mock.Of<IPartyDiplomaticHandlerCampaignBehaviorInterface>());
 
         broker.Publish(this, new PlayerPartyReleasedFromCaptivity(party));
 
@@ -280,7 +288,8 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
             connectionCollection.Object,
             objectManager.Object,
             Mock.Of<IPartyVisualInterface>(),
-            Mock.Of<ISiegeEventInterface>());
+            Mock.Of<ISiegeEventInterface>(),
+            Mock.Of<IPartyDiplomaticHandlerCampaignBehaviorInterface>());
 
         broker.Publish(this, new PlayerPartyReleasedFromCaptivity(party));
 
@@ -310,7 +319,8 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
             connectionCollection.Object,
             objectManager.Object,
             Mock.Of<IPartyVisualInterface>(),
-            Mock.Of<ISiegeEventInterface>());
+            Mock.Of<ISiegeEventInterface>(),
+            Mock.Of<IPartyDiplomaticHandlerCampaignBehaviorInterface>());
 
         broker.Publish(this, new PlayerPartyReleasedFromCaptivity(party));
         Assert.False(party.IsActive);
@@ -344,7 +354,8 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
             connectionCollection.Object,
             objectManager.Object,
             Mock.Of<IPartyVisualInterface>(),
-            Mock.Of<ISiegeEventInterface>());
+            Mock.Of<ISiegeEventInterface>(),
+            Mock.Of<IPartyDiplomaticHandlerCampaignBehaviorInterface>());
 
         broker.Publish(this, new PlayerDisconnected(peer, default));
         GameThread.Run(() => { }, blocking: true);
@@ -384,7 +395,8 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
             Mock.Of<IConnectionCollection>(),
             objectManager.Object,
             Mock.Of<IPartyVisualInterface>(),
-            Mock.Of<ISiegeEventInterface>());
+            Mock.Of<ISiegeEventInterface>(),
+            Mock.Of<IPartyDiplomaticHandlerCampaignBehaviorInterface>());
 
         broker.Publish(this, new PlayerDisconnected(peer, default));
 

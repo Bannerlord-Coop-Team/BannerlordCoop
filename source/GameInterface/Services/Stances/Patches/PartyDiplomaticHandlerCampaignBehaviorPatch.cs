@@ -44,11 +44,7 @@ namespace GameInterface.Services.Stances.Patches
                     continue;
                 }
 
-                // Vanilla keeps the main party in a hostile town and opens the slink away menu, but the server
-                // and other clients would eject it like an AI party, even out of a tournament or town mission.
-                // An offline player has no client to open that menu, so the server still ejects its party.
-                if (party.IsPlayerParty() && !party.IsControlledByThisInstance() &&
-                    !(ModInformation.IsServer && hasPlayerManager && playerManager.IsOwnerOfPartyDisconnected(party)))
+                if (IsLeftToOwnerClient(party, hasPlayerManager, playerManager))
                 {
                     Logger.Debug("Leaving player party {party} to its own client after a stance change.", party.StringId);
                     continue;
@@ -58,6 +54,17 @@ namespace GameInterface.Services.Stances.Patches
             }
 
             parties = processable;
+        }
+
+        // Vanilla keeps the main party in a hostile town and opens the slink away menu, but the server and other clients
+        // would eject it like an AI party, even out of a tournament. An offline player has no client to open that menu.
+        internal static bool IsLeftToOwnerClient(MobileParty party, bool hasPlayerManager, IPlayerManager playerManager)
+        {
+            if (!party.IsPlayerParty() || party.IsControlledByThisInstance()) return false;
+            if (ModInformation.IsClient) return true;
+
+            // Only the server holds peers, so a client would see every other player as offline
+            return hasPlayerManager && !playerManager.IsOwnerOfPartyDisconnected(party);
         }
     }
 }

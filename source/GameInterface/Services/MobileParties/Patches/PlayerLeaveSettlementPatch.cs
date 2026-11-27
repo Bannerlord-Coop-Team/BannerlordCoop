@@ -52,10 +52,15 @@ internal class PlayerLeaveSettlementPatch
 [HarmonyPatch(typeof(EncounterGameMenuBehavior))]
 internal class PlayerSlinkAwayLeavePatch
 {
-    // Vanilla's Finish keeps a party attached to an army with its leader, so that one only closes its menu locally
     [HarmonyPatch(nameof(EncounterGameMenuBehavior.game_menu_fortification_high_crime_rating_continue_on_consequence))]
     [HarmonyPrefix]
-    public static bool Prefix() => MobileParty.MainParty.AttachedTo != null || PlayerLeaveSettlementPatch.RequestLeave();
+    public static bool Prefix()
+    {
+        // Vanilla's Finish keeps a party attached to an army with its leader, so that one only closes its menu locally
+        if (MobileParty.MainParty.AttachedTo != null) return true;
+
+        return PlayerLeaveSettlementPatch.RequestLeave();
+    }
 }
 
 [HarmonyPatch(typeof(PlayerTownVisitCampaignBehavior))]

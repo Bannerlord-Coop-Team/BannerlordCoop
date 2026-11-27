@@ -1,10 +1,8 @@
-﻿using Common.Util;
+﻿using Common.Network.Messages;
+using Common.Util;
 using Coop.Core.Client.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.MobileParties.Messages;
-using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
-using GameInterface.Services.Entity;
-using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
@@ -15,7 +13,6 @@ using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 using Xunit.Abstractions;
 
@@ -35,31 +32,9 @@ public class WarDeclaredInTownTests : SyncTestBase
     public void WarOnPlayersTown_KeepsPartyInsideUntilSlinkAwayContinue()
     {
         var playerClient = Clients.First();
-        var otherClient = Clients.Last();
         var player = CreatePlayer(playerClient, "player");
-        var other = CreatePlayer(otherClient, "other");
-        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
-        var townId = TestEnvironment.CreateRegisteredObject<Town>();
-        var townClanId = TestEnvironment.CreateRegisteredObject<Clan>();
-        foreach (var instance in Clients.Prepend(Server))
-        {
-            instance.Call(() =>
-            {
-                using var scope = new AllowedThread();
-                var settlement = instance.GetRegisteredObject<Settlement>(settlementId);
-                var town = instance.GetRegisteredObject<Town>(townId);
-                var townClan = instance.GetRegisteredObject<Clan>(townClanId);
-                // Stance links are keyed by faction id, which the harness leaves unset
-                townClan.Id = new MBGUID(4857);
-                instance.GetRegisteredObject<Clan>(player.ClanId).Id = new MBGUID(4858);
-                settlement.SetSettlementComponent(town);
-                town._ownerClan = townClan;
-                townClan._settlementsCache.Add(settlement);
-                instance.GetRegisteredObject<MobileParty>(player.MobilePartyId).CurrentSettlement = settlement;
-                instance.GetRegisteredObject<MobileParty>(other.MobilePartyId).CurrentSettlement = settlement;
-                new PartyDiplomaticHandlerCampaignBehavior().RegisterEvents();
-            });
-        }
+        var other = CreatePlayer(Clients.Last(), "other");
+        var (settlementId, townClanId) = CreateTownWith(player, other);
 
         PlayerEncounter townEncounter = null;
         playerClient.Call(() =>
@@ -71,15 +46,11 @@ public class WarDeclaredInTownTests : SyncTestBase
         });
 
         using var menus = new MethodCallRecorder(Priority.First, AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu)));
-        Server.Call(() => DeclareWarAction.ApplyInternal(
-            Server.GetRegisteredObject<Clan>(townClanId),
-            Server.GetRegisteredObject<Clan>(player.ClanId),
-            DeclareWarAction.DeclareWarDetail.CausedByKingdomDecision));
-        Flush();
+        DeclareWar(townClanId, player);
 
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPartyLeaveSettlement>());
-        AssertInTown(player.MobilePartyId, settlementId, true);
-        AssertInTown(other.MobilePartyId, settlementId, true);
+        AssertInTown(player.MobilePartyId, settlementId, inTown: true);
+        AssertInTown(other.MobilePartyId, settlementId, inTown: true);
         playerClient.Call(() =>
         {
             Assert.True(FactionManager.IsAtWarAgainstFaction(playerClient.GetRegisteredObject<Clan>(townClanId), Hero.MainHero.MapFaction));
@@ -93,9 +64,72 @@ public class WarDeclaredInTownTests : SyncTestBase
         Assert.Single(playerClient.NetworkSentMessages.GetMessages<NetworkRequestEndSettlementEncounter>());
         Flush();
 
-        AssertInTown(player.MobilePartyId, settlementId, false);
-        AssertInTown(other.MobilePartyId, settlementId, true);
+        AssertInTown(player.MobilePartyId, settlementId, inTown: false);
+        AssertInTown(other.MobilePartyId, settlementId, inTown: true);
         playerClient.Call(() => Assert.Null(PlayerEncounter.Current));
+    }
+
+    // An offline player has no client to open the slink away menu, whether it was offline at the war or drops before continuing
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void OfflinePlayerInHostileTown_ServerEjectsParty(bool dropsAfterWar)
+    {
+        var playerClient = Clients.First();
+        var player = CreatePlayer(dropsAfterWar ? playerClient : null, "player");
+        var (settlementId, townClanId) = CreateTownWith(player);
+
+        using var menus = new MethodCallRecorder(Priority.First, AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu)));
+        DeclareWar(townClanId, player);
+        if (dropsAfterWar)
+        {
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPartyLeaveSettlement>());
+            Server.SimulateMessage(this, new PlayerDisconnected(playerClient.NetPeer, default));
+            Flush();
+        }
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPartyLeaveSettlement>());
+        AssertInTown(player.MobilePartyId, settlementId, inTown: false);
+    }
+
+    private (string SettlementId, string TownClanId) CreateTownWith(params Player[] players)
+    {
+        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        var townId = TestEnvironment.CreateRegisteredObject<Town>();
+        var townClanId = TestEnvironment.CreateRegisteredObject<Clan>();
+        foreach (var instance in Clients.Prepend(Server))
+        {
+            instance.Call(() =>
+            {
+                using var scope = new AllowedThread();
+                var settlement = instance.GetRegisteredObject<Settlement>(settlementId);
+                var town = instance.GetRegisteredObject<Town>(townId);
+                var townClan = instance.GetRegisteredObject<Clan>(townClanId);
+                // Stance links are keyed by faction id, which the harness leaves unset
+                townClan.Id = new MBGUID(4857);
+                instance.GetRegisteredObject<Clan>(players[0].ClanId).Id = new MBGUID(4858);
+                settlement.SetSettlementComponent(town);
+                town._ownerClan = townClan;
+                townClan._settlementsCache.Add(settlement);
+                foreach (var player in players)
+                    instance.GetRegisteredObject<MobileParty>(player.MobilePartyId).CurrentSettlement = settlement;
+
+                var diplomaticHandler = new PartyDiplomaticHandlerCampaignBehavior();
+                diplomaticHandler.RegisterEvents();
+                if (instance == Server)
+                    Campaign.Current.AddCampaignBehaviorManager(new CampaignBehaviorManager(new CampaignBehaviorBase[] { diplomaticHandler }));
+            });
+        }
+        return (settlementId, townClanId);
+    }
+
+    private void DeclareWar(string townClanId, Player player)
+    {
+        Server.Call(() => DeclareWarAction.ApplyInternal(
+            Server.GetRegisteredObject<Clan>(townClanId),
+            Server.GetRegisteredObject<Clan>(player.ClanId),
+            DeclareWarAction.DeclareWarDetail.CausedByKingdomDecision));
+        Flush();
     }
 
     private void AssertInTown(string partyId, string settlementId, bool inTown)
@@ -106,41 +140,6 @@ public class WarDeclaredInTownTests : SyncTestBase
                 inTown ? instance.GetRegisteredObject<Settlement>(settlementId) : null,
                 instance.GetRegisteredObject<MobileParty>(partyId).CurrentSettlement));
         }
-    }
-
-    private Player CreatePlayer(EnvironmentInstance client, string controllerId)
-    {
-        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
-        Player player = null;
-        Server.Call(() =>
-        {
-            var hero = Server.GetRegisteredObject<MobileParty>(partyId).LeaderHero;
-            Assert.True(Server.ObjectManager.TryGetId(hero, out var heroId));
-            Assert.True(Server.ObjectManager.TryGetId(hero.Clan, out var clanId));
-            Assert.True(Server.ObjectManager.TryGetId(hero.CharacterObject, out var characterId));
-            player = new Player(controllerId, heroId, partyId, clanId, characterId);
-        });
-        foreach (var instance in Clients.Prepend(Server))
-        {
-            instance.Call(() =>
-            {
-                using var scope = new AllowedThread();
-                var hero = instance.GetRegisteredObject<Hero>(player.HeroId);
-                hero.Clan._banner = new Banner();
-                Assert.True(instance.Resolve<IPlayerManager>().AddPlayer(new Player(
-                    controllerId, player.HeroId, partyId, player.ClanId, player.CharacterObjectId)));
-                if (instance == client)
-                {
-                    instance.Resolve<IControllerIdProvider>().SetControllerId(controllerId);
-                    Game.Current.PlayerTroop = hero.CharacterObject;
-                    Campaign.Current.MainParty = instance.GetRegisteredObject<MobileParty>(partyId);
-                    Campaign.Current.PlayerDefaultFaction = hero.Clan;
-                    Campaign.Current.PlayerEncounter = null;
-                }
-            });
-        }
-        Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer(controllerId, client.NetPeer));
-        return player;
     }
 
     // Two passes, so a reply the server sends from a game-thread action reaches the clients too
