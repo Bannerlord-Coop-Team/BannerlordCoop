@@ -21,6 +21,7 @@ using TaleWorlds.Engine;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
+using TaleWorlds.MountAndBlade.Missions.MissionLogics;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Missions;
@@ -552,6 +553,81 @@ public sealed class HideoutMissionRuntimeTests : MissionTestEnvironment
             }, new[] { AccessTools.Method(typeof(HideoutAmbushMissionController), "InitializeMission") }));
         }
         finally { harmony.UnpatchAll(harmony.Id); }
+    }
+
+    [Fact]
+    public void SignalFire_LitWhileASentryStillGuardsIt_CallsTheTroopsAndFadesTheSentry()
+    {
+        using var fixture = new MissionEngineFixture();
+        var harmony = new Harmony($"hideout-signal-fire.{Guid.NewGuid()}");
+        harmony.Patch(AccessTools.PropertyGetter(typeof(Agent), nameof(Agent.AIStateFlags)),
+            prefix: new HarmonyMethod(typeof(HideoutMissionRuntimeTests), nameof(NotAlarmed)));
+        try
+        {
+            RunWithSceneShims(() => Clients.First().Call(() =>
+            {
+                var mission = fixture.CreateMission(Clients.First());
+                var attackerTeam = mission.AddTeam(BattleSideEnum.Attacker);
+                mission.PlayerTeam = mission.AttackerTeam;
+                var defenderTeam = mission.AddTeam(BattleSideEnum.Defender);
+                var hero = mission.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop).Team(attackerTeam).Controller(AgentControllerType.Player));
+                var sentry = mission.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop).Team(defenderTeam).Controller(AgentControllerType.AI));
+                mission.MainAgent = hero;
+                var attacker = new CoopTroopSupplier("raid", BattleSideEnum.Attacker, null, null);
+                var defender = new CoopTroopSupplier("raid", BattleSideEnum.Defender, null, null);
+                var logic = new CoopHideoutMissionLogic(Mock.Of<IBattleNetwork>(), Mock.Of<IMessageBroker>(),
+                    Mock.Of<IMissionContext>(), defender, attacker, false);
+                AttachHideoutLogic(logic, mission, Mock.Of<IBattleSession>(value => value.IsLocalHost));
+                var areaLogic = new CoopHideoutStealthAreaLogic();
+                var native = new CoopHideoutAmbushController(logic, new IMissionTroopSupplier[] { logic.Defender, logic.Attacker });
+                logic.Native = native;
+                foreach (var behavior in new MissionBehavior[] { logic, areaLogic, native })
+                {
+                    AccessTools.Property(typeof(MissionBehavior), nameof(MissionBehavior.Mission)).SetValue(behavior, mission.Shell);
+                    mission.Shell.MissionBehaviors.Add(behavior);
+                }
+                native._missionObjectiveLogic = new MissionObjectiveLogic();
+                native._isClearedAsGhost = false;
+                mission.Shell._missionMode = MissionMode.Stealth;
+                native.Apply(HideoutPhase.Stealth, null, 25);
+
+                // Native's ambush controller and area logic each keep their own copy of the area's sentries.
+                var fire = ObjectHelper.SkipConstructor<StealthAreaUsePoint>();
+                var marker = ObjectHelper.SkipConstructor<StealthAreaMarker>();
+                native._stealthAreaData.Add(SignalFireArea(fire, marker, sentry));
+                areaLogic._stealthAreaData.Add(SignalFireArea(fire, marker, sentry));
+                var reinforcedMarkers = new List<StealthAreaMarker>();
+                areaLogic.SpawnReinforcementAllyTroopsEvent += (_, calledMarker) =>
+                {
+                    reinforcedMarkers.Add(calledMarker);
+                    return new MBList<Agent>();
+                };
+
+                native.OnObjectUsed(hero, fire);
+
+                Assert.Equal(new[] { marker }, reinforcedMarkers);
+                Assert.Equal(HideoutPhase.CallingTroops, native.Phase);
+                Assert.False(sentry.IsActive());
+                logic.OnRemoveBehavior();
+            }));
+        }
+        finally { harmony.UnpatchAll(harmony.Id); }
+    }
+
+    private static StealthAreaMissionLogic.StealthAreaData SignalFireArea(StealthAreaUsePoint fire, StealthAreaMarker marker, Agent sentry)
+    {
+        var area = ObjectHelper.SkipConstructor<StealthAreaMissionLogic.StealthAreaData>();
+        AccessTools.Field(typeof(StealthAreaMissionLogic.StealthAreaData), nameof(area.StealthAreaUsePoint)).SetValue(area, fire);
+        AccessTools.Field(typeof(StealthAreaMissionLogic.StealthAreaData), nameof(area.StealthAreaMarkers))
+            .SetValue(area, new Dictionary<StealthAreaMarker, List<Agent>> { [marker] = new() { sentry } });
+        return area;
+    }
+
+    private static bool NotAlarmed(Agent __instance, ref Agent.AIStateFlag __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out _)) return true;
+        __result = default;
+        return false;
     }
 
     private static float stealthClock;
