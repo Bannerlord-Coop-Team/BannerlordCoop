@@ -126,7 +126,8 @@ public class BattleSimulationEncounterTests : MapEventTestBase
         var context = CreateServerMapEvent();
         var client = Clients.First();
         var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
-        LoseSimulationWithoutCapture(client, context, BattleSideEnum.Defender, settlementId);
+        PlaceInSettlement(client, context.DefenderPartyId, settlementId);
+        LoseSimulationWithoutCapture(client, context, BattleSideEnum.Defender);
         var settlementRequests = new List<StartSettlementEncounterAttempted>();
         var leaves = new List<PartyLeaveSettlementAttempted>();
         client.Resolve<IMessageBroker>().Subscribe<StartSettlementEncounterAttempted>(payload => settlementRequests.Add(payload.What));
@@ -178,12 +179,18 @@ public class BattleSimulationEncounterTests : MapEventTestBase
                 instance.GetRegisteredObject<BesiegerCamp>(campId!));
     }
 
+    /// <summary>Puts the client's party inside the settlement.</summary>
+    private static void PlaceInSettlement(EnvironmentInstance client, string partyId, string settlementId)
+    {
+        client.Call(() => client.GetRegisteredObject<MobileParty>(partyId)._currentSettlement =
+            client.GetRegisteredObject<Settlement>(settlementId));
+    }
+
     /// <summary>
     /// Has the client's party on <paramref name="playerSide"/> lose an accepted simulation without being taken prisoner,
-    /// leaving its finished scoreboard open. The party stays inside <paramref name="settlementId"/> when one is given.
+    /// leaving its finished scoreboard open.
     /// </summary>
-    private void LoseSimulationWithoutCapture(EnvironmentInstance client, MapEventContext context, BattleSideEnum playerSide,
-        string? settlementId = null)
+    private void LoseSimulationWithoutCapture(EnvironmentInstance client, MapEventContext context, BattleSideEnum playerSide)
     {
         string playerPartyId = context.AttackerPartyId;
         string enemyPartyId = context.DefenderPartyId;
@@ -204,8 +211,6 @@ public class BattleSimulationEncounterTests : MapEventTestBase
             new EncounterGameMenuBehavior().OnSessionLaunched(
                 new CampaignGameStarter(Campaign.Current.GameMenuManager, Campaign.Current.ConversationManager));
             Campaign.Current.MainParty = client.GetRegisteredObject<MobileParty>(playerPartyId);
-            if (settlementId != null)
-                MobileParty.MainParty._currentSettlement = client.GetRegisteredObject<Settlement>(settlementId);
 
             var encounter = SetMockPlayerEncounter(client, enemyPartyId, context.MapEventId);
             encounter._attackerParty = client.GetRegisteredObject<MobileParty>(context.AttackerPartyId).Party;
@@ -257,7 +262,7 @@ public class BattleSimulationEncounterTests : MapEventTestBase
         .Append(AccessTools.Method(typeof(MobileParty), nameof(MobileParty.TeleportPartyToOutSideOfEncounterRadius)))
         // Only the encounter texts are turned off, because they read party names the headless heroes can't build.
         // EncounterGameMenuBehavior's own init still runs, so a restarted battle shows up as a NetworkRequestCreateMapEvent.
-        .Append(AccessTools.Method(typeof(PlayerEncounter), "SetEncounterMenuTexts"))
+        .Append(AccessTools.Method(typeof(PlayerEncounter), nameof(PlayerEncounter.SetEncounterMenuTexts)))
         .Append(AccessTools.Method(typeof(DefaultEncounter), nameof(DefaultEncounter.game_menu_encounter_on_init)))
         .ToList();
 
