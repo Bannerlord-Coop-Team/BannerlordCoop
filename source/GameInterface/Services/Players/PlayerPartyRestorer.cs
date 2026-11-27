@@ -21,8 +21,8 @@ public interface IPlayerPartyRestorer
     void Restore(Hero hero, MobileParty party);
 
     /// <summary>
-    /// Cancels a disband the party is waiting on or already running. A player party never disbands, but one
-    /// started before <c>DisbandPartyActionPatches</c> blocked it is saved with the party and strips it again.
+    /// Cancels a disband the party is waiting on or already running. One started before
+    /// <c>DisbandPartyActionPatches</c> knew the party was a player's is saved with it and strips it again.
     /// </summary>
     void CancelDisband(MobileParty party);
 }

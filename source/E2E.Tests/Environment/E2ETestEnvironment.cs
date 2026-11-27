@@ -15,6 +15,7 @@ using GameInterface;
 using GameInterface.AutoSync;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.Entity;
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
 using GameInterface.Services.Players;
 using GameInterface.Tests.Bootstrap;
@@ -22,6 +23,7 @@ using GameInterface.Utils;
 using HarmonyLib;
 using Moq;
 using Newtonsoft.Json;
+using System.Net;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
@@ -139,6 +141,34 @@ public class E2ETestEnvironment : IDisposable
                 playerManager.IsConnected(player),
                 $"Player '{controllerId}' was not connected to the supplied client peer.");
         });
+    }
+
+    /// <summary>
+    /// Runs a returning client's connect and validate handshake against the server, which resolves its saved
+    /// hero and restores its party.
+    /// </summary>
+    public void ConnectReturningClient(EnvironmentInstance client, string controllerId)
+    {
+        var endPoint = (IPEndPoint)client.NetPeer;
+        if (endPoint.Address == null)
+        {
+            endPoint.Address = IPAddress.Loopback;
+            endPoint.Port = 4200;
+        }
+
+        client.Resolve<IControllerIdProvider>().SetControllerId(controllerId);
+
+        // The join save transfer after resolution needs a real SaveHandler, which the harness campaign lacks.
+        var disabledMethods = new MethodBase[]
+        {
+            AccessTools.Method(typeof(ResolveCharacterState), nameof(ResolveCharacterState.TransferSave)),
+        };
+
+        Server.Call(() =>
+        {
+            Server.SimulateMessage(this, new PlayerConnected(client.NetPeer));
+            Server.SimulateMessage(client.NetPeer, new NetworkClientValidate(controllerId));
+        }, disabledMethods);
     }
 
     public void Dispose()

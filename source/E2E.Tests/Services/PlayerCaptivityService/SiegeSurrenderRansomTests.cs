@@ -6,12 +6,9 @@ using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Services.MapEvents;
-using GameInterface.Services.Entity;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
 using HarmonyLib;
-using System.Net;
-using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -23,9 +20,9 @@ using Xunit.Abstractions;
 namespace E2E.Tests.Services.PlayerCaptivityService;
 
 /// <summary>
-/// #2891: a player who surrendered in a PvP siege and was ransomed must get back a party that keeps its hero
-/// and leader. A disband started on the party before player parties were guarded against it is saved with the
-/// party, and native <see cref="DisbandPartyCampaignBehavior"/> strips the party again a day later at most.
+/// #2891: a player who surrendered in a PvP siege and was ransomed must get back a working party. A disband
+/// started on the party before it was guarded as a player's is saved with it, and the next hourly tick of native
+/// <see cref="DisbandPartyCampaignBehavior"/> marks it disbanding again, after which native disbanding strips it.
 /// </summary>
 public class SiegeSurrenderRansomTests : MapEventTestBase
 {
@@ -47,7 +44,7 @@ public class SiegeSurrenderRansomTests : MapEventTestBase
     [InlineData(StaleDisband.None)]
     [InlineData(StaleDisband.Waiting)]
     [InlineData(StaleDisband.Disbanding)]
-    public void RansomAfterSiegeSurrender_PartyKeepsItsHeroThroughADayAndARejoin(StaleDisband staleDisband)
+    public void RansomAfterSiegeSurrender_RestoresThePartyWithoutItsDisband(StaleDisband staleDisband)
     {
         var siege = CreateSiegeMapEvent(MapEvent.BattleTypes.Siege);
         var partyId = siege.DefenderPartyId;
@@ -198,28 +195,9 @@ public class SiegeSurrenderRansomTests : MapEventTestBase
     /// </summary>
     private void Rejoin(EnvironmentInstance client, string controllerId, string partyId)
     {
-        var endPoint = (IPEndPoint)client.NetPeer;
-        if (endPoint.Address == null)
-        {
-            endPoint.Address = IPAddress.Loopback;
-            endPoint.Port = 4200;
-        }
-
-        client.Resolve<IControllerIdProvider>().SetControllerId(controllerId);
+        Server.Call(() => Server.SimulateMessage(this, new PlayerDisconnected(client.NetPeer, default)));
         Server.NetworkSentImmediateMessages.Clear();
-
-        // The join save transfer after resolution needs a real SaveHandler, which the harness campaign lacks
-        var disabledMethods = new MethodBase[]
-        {
-            AccessTools.Method(typeof(ResolveCharacterState), nameof(ResolveCharacterState.TransferSave)),
-        };
-
-        Server.Call(() =>
-        {
-            Server.SimulateMessage(this, new PlayerDisconnected(client.NetPeer, default));
-            Server.SimulateMessage(this, new PlayerConnected(client.NetPeer));
-            Server.SimulateMessage(client.NetPeer, new NetworkClientValidate(controllerId));
-        }, disabledMethods);
+        TestEnvironment.ConnectReturningClient(client, controllerId);
         // Runs the deferred park of the dropped party
         Server.PumpGameThread();
 

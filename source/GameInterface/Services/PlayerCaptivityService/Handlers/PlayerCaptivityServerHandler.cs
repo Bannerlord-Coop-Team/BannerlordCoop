@@ -655,7 +655,7 @@ internal class PlayerCaptivityServerHandler : IHandler
                     CampaignTime.HoursFromNow(12));
             }
             playerParty.Party.SetAsCameraFollowParty();
-            // Otherwise a disband the party carries strips the restored roster and leader within the hour
+            // A disband saved with the party would mark it disbanding again on the next hourly tick
             playerPartyRestorer.CancelDisband(playerParty);
             playerParty.SetMoveModeHold();
             // SetMoveModeHold only resets the AI behavior, not the navigation mode, so the freed party
