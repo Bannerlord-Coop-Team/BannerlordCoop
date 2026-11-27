@@ -27,14 +27,7 @@ public class DisconnectedLastBattlePartyTests : MapEventTestBase
     {
         var context = CreateServerMapEvent();
         var leaderId = context.AttackerPartyId;
-        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
-        ConnectPlayer(partyId);
-        FollowLeader(leaderId, partyId);
-        PumpAll();
-
-        // Parking waits for the battle to end
-        Disconnect();
-        AssertParty(partyId, active: true, inBattle: true);
+        var partyId = DisconnectedFollowerOf(leaderId);
 
         // The follower is last on its side and is removed inside the leader's attached party loop, so its removal finalizes the battle
         LeaveBattle(leaderId);
@@ -44,47 +37,73 @@ public class DisconnectedLastBattlePartyTests : MapEventTestBase
         AssertParty(partyId, active: false, inBattle: false);
     }
 
-    [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void Follower_LeaderJoinsAnotherBattleBeforeParking_IsParkedAfterThatBattleEnds(bool lastOnItsSide)
+    [Fact]
+    public void LastFollower_LeaderJoinsAnotherBattleInSameFrame_IsParkedAfterThatBattleEnds()
     {
         var first = CreateServerMapEvent();
         var second = CreateServerMapEvent();
-        var leaderId = first.AttackerPartyId;
+        var partyId = DisconnectedFollowerOf(first.AttackerPartyId);
+
+        // The follower's removal ends the first battle and queues its park, which runs after the leader took it into the second battle
+        JoinOtherBattle(first.AttackerPartyId, second.MapEventId);
+        PumpAll();
+
+        AssertStaysActiveUntilSecondBattleEnds(partyId, first.MapEventId, second.MapEventId);
+    }
+
+    [Fact]
+    public void Follower_FirstBattleEndsAfterLeaderJoinsAnother_IsParkedAfterThatBattleEnds()
+    {
+        var first = CreateServerMapEvent();
+        var second = CreateServerMapEvent();
+        var partyId = DisconnectedFollowerOf(first.AttackerPartyId);
+
+        // A party after the follower keeps the first battle going once the leader took the follower into the second battle
+        JoinNewServerPartyToSide(first.MapEventId, BattleSideEnum.Attacker);
+        JoinOtherBattle(first.AttackerPartyId, second.MapEventId);
+        PumpAll();
+
+        // The first battle ending parks right away and finds the follower in the second battle
+        DestroyServerMapEvent(first.MapEventId);
+        PumpAll();
+
+        AssertStaysActiveUntilSecondBattleEnds(partyId, first.MapEventId, second.MapEventId);
+    }
+
+    // A disconnected player's party following the leader, kept active in the leader's battle until it ends
+    private string DisconnectedFollowerOf(string leaderId)
+    {
         var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         ConnectPlayer(partyId);
         FollowLeader(leaderId, partyId);
-        if (!lastOnItsSide)
-            JoinNewServerPartyToSide(first.MapEventId, BattleSideEnum.Attacker);
         PumpAll();
 
         Disconnect();
         AssertParty(partyId, active: true, inBattle: true);
+        return partyId;
+    }
 
-        // The leader takes the follower into another battle in the same frame, before the park queued by a last follower's removal runs
+    // The leader leaves its battle and joins the other one in the same frame, taking its attached follower with it
+    private void JoinOtherBattle(string leaderId, string mapEventId)
+    {
         LeaveBattle(leaderId);
-        JoinServerPartyToSide(second.MapEventId, leaderId, BattleSideEnum.Attacker);
-        PumpAll();
+        JoinServerPartyToSide(mapEventId, leaderId, BattleSideEnum.Attacker);
+    }
 
-        if (!lastOnItsSide)
-        {
-            DestroyServerMapEvent(first.MapEventId);
-            PumpAll();
-        }
-
-        AssertFinalized(first.MapEventId);
+    private void AssertStaysActiveUntilSecondBattleEnds(string partyId, string firstMapEventId, string secondMapEventId)
+    {
+        AssertFinalized(firstMapEventId);
         AssertParty(partyId, active: true, inBattle: true);
         Server.Call(() =>
         {
-            var secondEvent = Server.GetRegisteredObject<MapEvent>(second.MapEventId);
+            var secondEvent = Server.GetRegisteredObject<MapEvent>(secondMapEventId);
             Assert.Single(Server.InternalMessages.GetMessages<PlayerDisconnectedFromMapEvent>(), message => message.MapEvent == secondEvent);
         });
 
-        DestroyServerMapEvent(second.MapEventId);
+        DestroyServerMapEvent(secondMapEventId);
         PumpAll();
 
-        AssertFinalized(second.MapEventId);
+        AssertFinalized(secondMapEventId);
         AssertParty(partyId, active: false, inBattle: false);
     }
 
