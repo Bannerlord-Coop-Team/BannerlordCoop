@@ -26,8 +26,8 @@ namespace GameInterface.Services.SiegeEvents;
 public interface ISiegeKeepStage : IGameAbstraction
 {
     /// <summary>
-    /// Seats the walls players inside vanilla's hall limits and moves the siege into the lord's hall. A throw rolls the
-    /// half-open stage back and returns false.
+    /// Seats the walls players inside vanilla's hall limits and moves the siege into the lord's hall. A throw forgets
+    /// the half-open roster and returns false; the settlement stays in the lord's hall.
     /// </summary>
     bool TryOpen(MapEvent mapEvent);
 
@@ -201,13 +201,7 @@ internal sealed class SiegeKeepStage : ISiegeKeepStage
         {
             if (selection.IsLocked(mapEvent)) continue;
 
-            // A player who left before the roster locked frees the wait for the others.
-            foreach (var seat in selection.GetSeats(mapEvent))
-            {
-                if (!IsConnected(seat.ControllerId))
-                    selection.RemoveSeat(mapEvent, seat.MobilePartyId);
-            }
-
+            RemoveDepartedSeats(mapEvent);
             bool windowClosed = selection.TryGetDeadline(mapEvent, out var deadline) && UtcNow() >= deadline;
             if (selection.HaveAllAnswered(mapEvent) || windowClosed)
                 Lock(mapEvent);
@@ -233,16 +227,23 @@ internal sealed class SiegeKeepStage : ISiegeKeepStage
         }
     }
 
-    // Gives a player who never answered vanilla's suggested squad, then fixes the roster.
-    private void LockRoster(MapEvent mapEvent)
+    // A player who left the game or the battle before the roster locked frees the wait for the others.
+    private void RemoveDepartedSeats(MapEvent mapEvent)
     {
         foreach (var seat in selection.GetSeats(mapEvent))
         {
-            if (!IsConnected(seat.ControllerId) || !TryGetPartyInBattle(seat.MobilePartyId, mapEvent, out var party))
-            {
+            if (!IsConnected(seat.ControllerId) || !TryGetPartyInBattle(seat.MobilePartyId, mapEvent, out _))
                 selection.RemoveSeat(mapEvent, seat.MobilePartyId);
-                continue;
-            }
+        }
+    }
+
+    // Gives a player who never answered vanilla's suggested squad, then fixes the roster.
+    private void LockRoster(MapEvent mapEvent)
+    {
+        RemoveDepartedSeats(mapEvent);
+        foreach (var seat in selection.GetSeats(mapEvent))
+        {
+            if (!objectManager.TryGetObject<MobileParty>(seat.MobilePartyId, out var party)) continue;
 
             if (selection.HasAnswered(mapEvent, seat.MobilePartyId)) continue;
             if (!selectionEntries.TryCreateEntries(SuggestSquad(party, seat), out var squad))

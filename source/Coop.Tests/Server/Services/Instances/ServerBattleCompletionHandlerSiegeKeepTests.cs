@@ -109,6 +109,27 @@ public class ServerBattleCompletionHandlerSiegeKeepTests : IDisposable
         Assert.Equal(BattleState.AttackerVictory, conclusion.BattleState);
     }
 
+    // A walls conclusion that stalled past its deadline rolled back on its own, so the keep's release has to take it
+    // out of recovery too, otherwise the next tick retries the walls under the open keep.
+    [Fact]
+    public void WallsConclusionThatStalledBeforeTheKeepOpened_LeavesNothingToRecover()
+    {
+        GiveTheMapEventSiegeAssaultWalls();
+        Assert.True(missionManager.TryEnterMission(peer, HostControllerId, MapEventId, out _));
+        missionManager.ConclusionDeadline = TimeSpan.Zero;
+
+        broker.Publish(peer, new NetworkBattleResultReady(MapEventId, BattleState.DefenderPullBack, 1));
+        Drain();
+        broker.Publish(this, new SiegeKeepStageOpened(MapEventId, opened: true, hostEpoch: 1));
+        Drain();
+
+        Assert.Empty(missionManager.TakeExpiredConclusions());
+        broker.Publish(this, new CampaignTick());
+        Drain();
+        Assert.Single(broker.Messages.GetMessages<AuthoritativeSiegeKeepRequested>());
+        Assert.Empty(broker.Messages.GetMessages<AuthoritativeBattleConclusionRequested>());
+    }
+
     // The first keep attempt already moved the siege into the hall, so a retry has to ask for the keep again
     // instead of reading the hall as a different kind of pull-back.
     [Fact]
