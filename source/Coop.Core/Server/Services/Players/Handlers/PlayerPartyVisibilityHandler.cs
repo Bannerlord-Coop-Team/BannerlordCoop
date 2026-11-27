@@ -286,16 +286,31 @@ internal class PlayerPartyVisibilityHandler : IHandler
     {
         if (ModInformation.IsClient) return;
 
-        foreach (var party in deferredMapEventParking
-            .Where(entry => ReferenceEquals(entry.Value.MapEvent, payload.What.MapEvent))
+        var mapEvent = payload.What.MapEvent;
+        var parties = deferredMapEventParking
+            .Where(entry => ReferenceEquals(entry.Value.MapEvent, mapEvent))
             .Select(entry => entry.Key)
-            .ToArray())
+            .ToArray();
+
+        // A party whose own removal ended the battle still points at it until vanilla's MapEventSide setter returns,
+        // and leaving its siege camp before then skips vanilla picking the camp a new leader
+        var removedParties = parties.Where(party => ReferenceEquals(party.MapEvent, mapEvent)).ToArray();
+        if (removedParties.Length > 0)
+            GameThread.EnqueueSafe(() => ParkAfterMapEvent(removedParties));
+
+        ParkAfterMapEvent(parties.Except(removedParties));
+    }
+
+    private void ParkAfterMapEvent(IEnumerable<MobileParty> parties)
+    {
+        foreach (var party in parties)
         {
             if (party.MapEvent != null) continue;
 
-            var controllerId = deferredMapEventParking[party].ControllerId;
+            // A queued park finds no entry when its player synchronized again first
+            if (!deferredMapEventParking.TryGetValue(party, out var deferred)) continue;
             deferredMapEventParking.Remove(party);
-            if (!playerManager.TryGetPlayer(controllerId, out var player) ||
+            if (!playerManager.TryGetPlayer(deferred.ControllerId, out var player) ||
                 (playerManager.IsConnected(player) && !IsPlayerHeroDead(player)))
             {
                 continue;
