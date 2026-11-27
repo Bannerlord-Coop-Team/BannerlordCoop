@@ -1,7 +1,9 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using Common.Util;
+using HarmonyLib;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
@@ -57,6 +59,7 @@ public sealed class MockTeam
 public sealed class MockFormation
 {
     private static readonly ConditionalWeakTable<Formation, MockFormation> ByShell = new();
+    private static readonly FieldInfo FormationIndexField = AccessTools.Field(typeof(Formation), nameof(Formation.FormationIndex));
 
     public Formation Shell { get; }
     public MockTeam Team { get; }
@@ -76,6 +79,8 @@ public sealed class MockFormation
         Team = team;
         FormationClass = formationClass;
         Shell = ObjectHelper.SkipConstructor<Formation>();
+        // The skipped constructor sets this readonly field, which spawn records carry as the agent's formation.
+        FormationIndexField.SetValue(Shell, formationClass);
         ByShell.AddOrUpdate(Shell, this);
     }
 

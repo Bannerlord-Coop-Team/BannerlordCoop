@@ -25,6 +25,12 @@ public interface IAgentPositionInterpolator
     /// <summary>Stop tracking an agent (e.g. it dismounted or was removed).</summary>
     void Forget(Agent agent);
 
+    /// <summary>
+    /// [Game thread] Stop following a puppet this client now drives, and clear the native target frame the follow left on
+    /// it, which would otherwise hold it on its last reported pose. A frame a used game object holds stays.
+    /// </summary>
+    void Release(Agent agent);
+
     /// <summary>Read the latest owner-reported locomotion flags retained for a puppet.</summary>
     bool TryGetTargetMovementFlags(
         Agent agent,
@@ -265,6 +271,19 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
         _mountedGuardProcessedSequences.Remove(agent);
         _deckTeleportSequences.Remove(agent);
         deckDiagnostics.Forget(agent);
+    }
+
+    // The frame lock outlives the stale target eviction, so it is cleared even when nothing is tracked any more.
+    public void Release(Agent agent)
+    {
+        Forget(agent);
+        if (agent == null || !agent.IsActive()) return;
+
+        // Vanilla's StopUsingGameObject clears the frame of an object that locks its user.
+        var usedObject = agent.CurrentlyUsedGameObject;
+        if (usedObject != null && (usedObject.LockUserFrames || usedObject.LockUserPositions)) return;
+
+        agent.ClearTargetFrame();
     }
 
     /// <summary>[Game thread] Forgets the puppet's target and, if it had one, halts it, so it keeps no walk input or seek point
