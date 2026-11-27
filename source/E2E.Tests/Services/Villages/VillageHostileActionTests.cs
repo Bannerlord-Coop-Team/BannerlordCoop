@@ -1731,7 +1731,7 @@ public class VillageHostileActionTests : MapEventTestBase
     public void ForceSuppliesBattleWon_LeaderReentersTheVillageAndLeaves()
     {
         var client = Clients.First();
-        var (context, encounter) = ArrangeForcedVillageEncounter(client, VillageHostileAction.ForceSupplies);
+        var (context, encounter) = ArrangeForcedVillageEncounter(client);
         client.Call(() =>
         {
             encounter.BattleSimulation = new BattleSimulation(null, null);
@@ -1798,7 +1798,7 @@ public class VillageHostileActionTests : MapEventTestBase
     public void ForceSuppliesGiveIn_FinalizeSendsTheLeaderBackIntoTheVillage()
     {
         var client = Clients.First();
-        var (context, encounter) = ArrangeForcedVillageEncounter(client, VillageHostileAction.ForceSupplies);
+        var (context, encounter) = ArrangeForcedVillageEncounter(client);
         const string forceSuppliesMenu = "force_supplies_village";
         client.Call(() =>
         {
@@ -1832,12 +1832,10 @@ public class VillageHostileActionTests : MapEventTestBase
         LeaveVillageFromMenu(client, context.AttackerMobilePartyId);
     }
 
-    // The client's encounter for a force action it leads from inside the village, which it stays in through the battle.
-    private (RaidMapEventContext Context, PlayerEncounter Encounter) ArrangeForcedVillageEncounter(
-        EnvironmentInstance client,
-        VillageHostileAction action)
+    // The client's encounter for a force supplies action it leads from inside the village, which it stays in through the battle.
+    private (RaidMapEventContext Context, PlayerEncounter Encounter) ArrangeForcedVillageEncounter(EnvironmentInstance client)
     {
-        var context = CreateHostileActionWithOnePlayerParty(action);
+        var context = CreateHostileActionWithOnePlayerParty(VillageHostileAction.ForceSupplies);
         TestEnvironment.ConnectRegisteredPlayer(client, "PlayerOne");
         client.Call(() => client.Resolve<IControllerIdProvider>().SetControllerId("PlayerOne"));
         foreach (var instance in Clients.Prepend(Server))
@@ -1863,8 +1861,7 @@ public class VillageHostileActionTests : MapEventTestBase
             encounter._encounteredParty = village.Party;
             encounter.EncounterSettlementAux = village;
             encounter.PlayerSide = BattleSideEnum.Attacker;
-            encounter.ForceSupplies = action == VillageHostileAction.ForceSupplies;
-            encounter.ForceVolunteers = action == VillageHostileAction.ForceVolunteers;
+            encounter.ForceSupplies = true;
         }, MapEventDisabledMethods);
 
         return (context, encounter);
@@ -3760,7 +3757,7 @@ public class VillageHostileActionTests : MapEventTestBase
         {
             Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(hostileAction.MapEventId, out var mapEvent));
             Assert.True(mapEvent.IsVillageHostileAction());
-            Assert.False(mapEvent.IsVillageHostileActionWithMultiplePlayerParties());
+            Assert.False(mapEvent.HasMultiplePlayerParties());
         }, MapEventDisabledMethods);
 
         ServerBattleModeArbiter.Release(hostileAction.MapEventId);
@@ -3799,7 +3796,7 @@ public class VillageHostileActionTests : MapEventTestBase
         {
             Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(hostileAction.MapEventId, out var mapEvent));
             Assert.True(mapEvent.IsRaidHostileAction());
-            Assert.True(mapEvent.IsVillageHostileActionWithMultiplePlayerParties());
+            Assert.True(mapEvent.HasMultiplePlayerParties());
             Assert.False(mapEvent.IsUnsupportedMultiPlayerHostileAction());
         }, MapEventDisabledMethods);
 
@@ -3954,7 +3951,7 @@ public class VillageHostileActionTests : MapEventTestBase
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(hostileAction.MapEventId, out var mapEvent));
-            Assert.True(mapEvent.IsVillageHostileActionWithMultiplePlayerParties());
+            Assert.True(mapEvent.HasMultiplePlayerParties());
             Assert.True(mapEvent.IsUnsupportedMultiPlayerHostileAction());
         }, MapEventDisabledMethods);
     }
@@ -3988,7 +3985,7 @@ public class VillageHostileActionTests : MapEventTestBase
         {
             Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(hostileAction.MapEventId, out var mapEvent));
             Assert.True(mapEvent.IsRaid);
-            Assert.True(mapEvent.IsVillageHostileActionWithMultiplePlayerParties());
+            Assert.True(mapEvent.HasMultiplePlayerParties());
             Assert.True(mapEvent.BattleObserver is ForwardingBattleObserver);
         }, MapEventDisabledMethods);
 
@@ -4021,7 +4018,7 @@ public class VillageHostileActionTests : MapEventTestBase
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(hostileAction.MapEventId, out var mapEvent));
-            Assert.True(mapEvent.IsVillageHostileActionWithMultiplePlayerParties());
+            Assert.True(mapEvent.HasMultiplePlayerParties());
             Assert.False(mapEvent.BattleObserver is ForwardingBattleObserver);
             Assert.False(ServerBattleModeArbiter.IsClaimed(hostileAction.MapEventId));
         }, MapEventDisabledMethods);
@@ -4384,7 +4381,7 @@ public class VillageHostileActionTests : MapEventTestBase
             defenderParty.MemberRoster.AddToCounts(defenderTroop, 1);
             AddSyntheticMapEventParty(raidMapEvent.DefenderSide, defenderParty.Party);
 
-            Assert.False(raidMapEvent.IsVillageHostileActionWithMultiplePlayerParties());
+            Assert.False(raidMapEvent.HasMultiplePlayerParties());
             Assert.True(Server.ObjectManager.TryGetId(raidMapEvent, out mapEventId));
         }, MapEventDisabledMethods);
 
@@ -4416,7 +4413,7 @@ public class VillageHostileActionTests : MapEventTestBase
             Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId!, out var mapEvent));
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(joinerMobilePartyId, out var joinerParty));
             Assert.Same(mapEvent, joinerParty.MapEvent);
-            Assert.True(mapEvent.IsVillageHostileActionWithMultiplePlayerParties());
+            Assert.True(mapEvent.HasMultiplePlayerParties());
             Assert.True(mapEvent.BattleObserver is ForwardingBattleObserver);
             Assert.False(mapEvent.HasWinner);
         }, MapEventDisabledMethods);
@@ -4553,7 +4550,7 @@ public class VillageHostileActionTests : MapEventTestBase
             Assert.True(instance.ObjectManager.TryGetObject<PartyBase>(joinerPartyId, out var joinerParty));
 
             Assert.Same(mapEvent, joinerParty.MapEvent);
-            Assert.True(mapEvent.IsVillageHostileActionWithMultiplePlayerParties());
+            Assert.True(mapEvent.HasMultiplePlayerParties());
         }, MapEventDisabledMethods);
     }
 
@@ -4572,7 +4569,7 @@ public class VillageHostileActionTests : MapEventTestBase
             Assert.Same(mapEvent, attackerParty.MapEvent);
             Assert.Null(joinerParty.MapEventSide);
             Assert.True(mapEvent.IsVillageHostileAction());
-            Assert.False(mapEvent.IsVillageHostileActionWithMultiplePlayerParties());
+            Assert.False(mapEvent.HasMultiplePlayerParties());
         }, MapEventDisabledMethods);
     }
 
@@ -5390,7 +5387,7 @@ public class VillageHostileActionTests : MapEventTestBase
             AddSyntheticMapEventParty(mapEvent.DefenderSide, defenderParty.Party);
 
             Assert.True(mapEvent.IsVillageHostileAction());
-            Assert.False(mapEvent.IsVillageHostileActionWithMultiplePlayerParties());
+            Assert.False(mapEvent.HasMultiplePlayerParties());
             Assert.True(Server.ObjectManager.TryGetId(mapEvent, out mapEventId));
         }, MapEventDisabledMethods);
 
@@ -5435,7 +5432,7 @@ public class VillageHostileActionTests : MapEventTestBase
             mapEvent.MapEventVisual = MockMapEventVisual();
             AddSyntheticMapEventParty(mapEvent.AttackerSide, joinerParty.Party);
 
-            Assert.True(mapEvent.IsVillageHostileActionWithMultiplePlayerParties());
+            Assert.True(mapEvent.HasMultiplePlayerParties());
             Assert.True(Server.ObjectManager.TryGetId(mapEvent, out mapEventId));
         }, MapEventDisabledMethods);
 

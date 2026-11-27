@@ -35,11 +35,6 @@ public static class RaidMapEventExtensions
         return mapEvent?.Component is RaidEventComponent;
     }
 
-    public static bool IsVillageHostileActionWithMultiplePlayerParties(this MapEvent mapEvent)
-    {
-        return mapEvent.IsVillageHostileAction() && mapEvent.HasMultiplePlayerParties();
-    }
-
     public static bool IsUnsupportedMultiPlayerHostileAction(this MapEvent mapEvent)
     {
         return mapEvent.IsForceHostileAction() && mapEvent.HasMultiplePlayerParties();

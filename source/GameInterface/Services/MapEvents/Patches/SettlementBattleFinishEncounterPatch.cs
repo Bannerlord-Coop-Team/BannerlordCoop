@@ -10,7 +10,7 @@ namespace GameInterface.Services.MapEvents.Patches;
 /// <summary>
 /// A fought sally out or village force action ends with PlayerEncounter.Finish leaving the settlement, but a client's
 /// leave is dropped, so the party stays inside with no encounter. Ask for the settlement encounter again, like vanilla's
-/// MenuHelper.EncounterLeaveConsequence and the force action TryHandlePlayerEncounterEnd do.
+/// MenuHelper.EncounterLeaveConsequence and ForceSupplies/ForceVolunteersEventComponent.TryHandlePlayerEncounterEnd do.
 /// </summary>
 [HarmonyPatch(typeof(PlayerEncounter), nameof(PlayerEncounter.Finish))]
 internal class SettlementBattleFinishEncounterPatch
