@@ -30,6 +30,8 @@ internal class PlayerPartyRestorer : IPlayerPartyRestorer
     private readonly Func<IEnumerable<MobileParty>> getParties;
     private readonly Func<Hero, MobileParty> createRecoveryParty;
     private readonly Action<MobileParty> removeRecoveryParty;
+    private readonly Func<MobileParty, bool> isWaitingForDisband;
+    private readonly Action<MobileParty> cancelDisband;
 
     public PlayerPartyRestorer(IObjectManager objectManager, IAutoRegistryFactory autoRegistryFactory)
         : this(objectManager, autoRegistryFactory, () => MobileParty.All, CreateRecoveryParty, RemoveParty)
@@ -41,13 +43,17 @@ internal class PlayerPartyRestorer : IPlayerPartyRestorer
         IAutoRegistryFactory autoRegistryFactory,
         Func<IEnumerable<MobileParty>> getParties,
         Func<Hero, MobileParty> createRecoveryParty,
-        Action<MobileParty> removeRecoveryParty)
+        Action<MobileParty> removeRecoveryParty,
+        Func<MobileParty, bool> isWaitingForDisband = null,
+        Action<MobileParty> cancelDisband = null)
     {
         this.objectManager = objectManager;
         this.autoRegistryFactory = autoRegistryFactory;
         this.getParties = getParties;
         this.createRecoveryParty = createRecoveryParty;
         this.removeRecoveryParty = removeRecoveryParty;
+        this.isWaitingForDisband = isWaitingForDisband ?? IsWaitingForDisband;
+        this.cancelDisband = cancelDisband ?? DisbandPartyAction.CancelDisband;
     }
 
     public bool TryRestore(Player player, out Player restoredPlayer)
@@ -244,15 +250,18 @@ internal class PlayerPartyRestorer : IPlayerPartyRestorer
             hero.Clan.OnLordAdded(hero);
     }
 
-    private static void CancelDisband(MobileParty party)
+    private void CancelDisband(MobileParty party)
     {
-        // Test campaigns run without a behavior manager
-        var disbandBehavior = Campaign.Current.CampaignBehaviorManager?.GetBehavior<IDisbandPartyCampaignBehavior>();
-        var waitingForDisband = disbandBehavior?.IsPartyWaitingForDisband(party) == true;
-        if (!party.IsDisbanding && !waitingForDisband) return;
+        if (!party.IsDisbanding && !isWaitingForDisband(party)) return;
 
         Logger.Warning("Cancelling the disband of player party {PartyId}", party.StringId);
-        DisbandPartyAction.CancelDisband(party);
+        cancelDisband(party);
+    }
+
+    private static bool IsWaitingForDisband(MobileParty party)
+    {
+        var disbandBehavior = Campaign.Current.GetCampaignBehavior<IDisbandPartyCampaignBehavior>();
+        return disbandBehavior != null && disbandBehavior.IsPartyWaitingForDisband(party);
     }
 
     private static bool IsReadyPlayerParty(MobileParty party, Hero hero)

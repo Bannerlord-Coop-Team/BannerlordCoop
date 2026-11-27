@@ -14,15 +14,14 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Localization;
 using Xunit.Abstractions;
 
-namespace E2E.Tests.Services.PlayerCaptivityService;
+namespace E2E.Tests.Services.Players;
 
 /// <summary>
-/// #2891: a player who surrendered in a PvP siege and was ransomed must get back a working party. A disband
-/// started on the party before it was guarded as a player's is saved with it, and the next hourly tick of native
+/// #2891: the restore a server load or returning join runs cancels a disband saved with a player party. A disband
+/// started before the party was guarded as a player's is saved with it, and the next hourly tick of native
 /// <see cref="DisbandPartyCampaignBehavior"/> marks it disbanding again, after which native disbanding strips it.
-/// The restore a server load or returning join runs cancels it.
 /// </summary>
-public class SiegeSurrenderRansomTests : MapEventTestBase
+public class PlayerPartyRestoreDisbandTests : MapEventTestBase
 {
     private const string BesiegerControllerId = "Besieger";
     private const string DefenderControllerId = "Defender";
@@ -32,62 +31,17 @@ public class SiegeSurrenderRansomTests : MapEventTestBase
 
     public enum StaleDisband
     {
-        None,
         Waiting,
         Disbanding,
     }
 
-    public SiegeSurrenderRansomTests(ITestOutputHelper output) : base(output)
+    public PlayerPartyRestoreDisbandTests(ITestOutputHelper output) : base(output)
     {
-    }
-
-    [Theory]
-    [InlineData(StaleDisband.None)]
-    [InlineData(StaleDisband.Waiting)]
-    [InlineData(StaleDisband.Disbanding)]
-    public void RansomAfterSiegeSurrender_RestoresThePartyWithoutItsDisband(StaleDisband staleDisband)
-    {
-        var siege = CreateSiegeMapEvent(MapEvent.BattleTypes.Siege);
-        var partyId = siege.DefenderPartyId;
-        var defenderClient = Clients.Last();
-        InstallDisbandBehavior();
-        StartDisbandBeforeRegistration(partyId, staleDisband);
-
-        RegisterOwnerAsPlayer(BesiegerControllerId, siege.AttackerPartyId);
-        var heroId = RegisterOwnerAsPlayer(DefenderControllerId, partyId);
-        TestEnvironment.ConnectRegisteredPlayer(Clients.First(), BesiegerControllerId);
-        // The defender's join runs the restore every server load and rejoin runs
-        ReturnToServer(defenderClient, DefenderControllerId, partyId);
-        TestEnvironment.ConnectRegisteredPlayer(defenderClient, DefenderControllerId);
-
-        Server.Call(() => Server.SimulateMessage(defenderClient.NetPeer,
-            new NetworkPlayerSurrendered(partyId, siege.MapEventId)), BattleMenuSurrenderDisabledMethods());
-
-        AssertCaptivity(Server, heroId, siege.AttackerPartyId);
-        foreach (var client in Clients)
-            AssertCaptivity(client, heroId, siege.AttackerPartyId);
-
-        Ransom(defenderClient, heroId, partyId);
-        PassHours(HoursPastDisbandWait);
-
-        AssertCaptivity(Server, heroId, null);
-        AssertWorkingParty(DefenderControllerId, heroId, partyId);
-        foreach (var instance in Clients.Append(Server))
-        {
-            // Captivity forfeits the troops, so the released party holds exactly its hero
-            AssertHeroInPartyRoster(instance, heroId, partyId);
-            instance.Call(() => Assert.True(instance.GetRegisteredObject<MobileParty>(partyId).IsActive));
-        }
-
-        Rejoin(defenderClient, DefenderControllerId, partyId);
-        PassHours(HoursPastDisbandWait);
-
-        AssertWorkingParty(DefenderControllerId, heroId, partyId);
     }
 
     /// <summary>
     /// A save already holding a disbanding player party is repaired when its player rejoins, the same restore a
-    /// server load runs, without needing a captivity release.
+    /// server load runs.
     /// </summary>
     [Theory]
     [InlineData(StaleDisband.Waiting)]
@@ -103,6 +57,50 @@ public class SiegeSurrenderRansomTests : MapEventTestBase
         PassHours(HoursPastDisbandWait);
 
         AssertWorkingParty(DefenderControllerId, heroId, partyId);
+    }
+
+    /// <summary>
+    /// The #2891 report: the player surrendered in a PvP siege, its party was restored while the player was still
+    /// captive, and the ransom then has to free a party that stays whole.
+    /// </summary>
+    [Theory]
+    [InlineData(StaleDisband.Waiting)]
+    [InlineData(StaleDisband.Disbanding)]
+    public void RejoinWhileCaptive_PartyLeftDisbanding_RansomedPartyStaysWhole(StaleDisband staleDisband)
+    {
+        var siege = CreateSiegeMapEvent(MapEvent.BattleTypes.Siege);
+        var partyId = siege.DefenderPartyId;
+        var defenderClient = Clients.Last();
+        InstallDisbandBehavior();
+        StartDisbandBeforeRegistration(partyId, staleDisband);
+
+        RegisterOwnerAsPlayer(BesiegerControllerId, siege.AttackerPartyId);
+        var heroId = RegisterOwnerAsPlayer(DefenderControllerId, partyId);
+        TestEnvironment.ConnectRegisteredPlayer(Clients.First(), BesiegerControllerId);
+        TestEnvironment.ConnectRegisteredPlayer(defenderClient, DefenderControllerId);
+
+        Server.Call(() => Server.SimulateMessage(defenderClient.NetPeer,
+            new NetworkPlayerSurrendered(partyId, siege.MapEventId)), BattleMenuSurrenderDisabledMethods());
+
+        AssertCaptivity(Server, heroId, siege.AttackerPartyId);
+        foreach (var client in Clients)
+            AssertCaptivity(client, heroId, siege.AttackerPartyId);
+
+        Rejoin(defenderClient, DefenderControllerId, partyId);
+        // The release only puts the party back on the map once its player is in the campaign again
+        TestEnvironment.ConnectRegisteredPlayer(defenderClient, DefenderControllerId);
+
+        Ransom(defenderClient, heroId, partyId);
+        PassHours(HoursPastDisbandWait);
+
+        AssertCaptivity(Server, heroId, null);
+        AssertWorkingParty(DefenderControllerId, heroId, partyId);
+        foreach (var instance in Clients.Append(Server))
+        {
+            // Captivity forfeits the troops, so the released party holds exactly its hero
+            AssertHeroInPartyRoster(instance, heroId, partyId);
+            instance.Call(() => Assert.True(instance.GetRegisteredObject<MobileParty>(partyId).IsActive));
+        }
     }
 
     /// <summary>
@@ -138,13 +136,12 @@ public class SiegeSurrenderRansomTests : MapEventTestBase
     }
 
     /// <summary>
-    /// Starts the native disband while the party is not yet a registered player's, the way a disband started
-    /// before <c>DisbandPartyActionPatches</c> guarded player parties, then lets the waiting period run out.
+    /// Starts the native disband before the party is a registered player's, the way one started before
+    /// <c>DisbandPartyActionPatches</c> guarded player parties. For <see cref="StaleDisband.Disbanding"/> it passes
+    /// the wait so the hourly tick marks the party, and it checks every instance sees the disband.
     /// </summary>
     private void StartDisbandBeforeRegistration(string partyId, StaleDisband staleDisband)
     {
-        if (staleDisband == StaleDisband.None) return;
-
         Server.Call(() =>
         {
             var party = Server.GetRegisteredObject<MobileParty>(partyId);

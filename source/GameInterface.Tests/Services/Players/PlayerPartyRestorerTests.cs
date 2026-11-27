@@ -57,6 +57,32 @@ public class PlayerPartyRestorerTests
         Assert.Same(hero, party.LeaderHero);
     }
 
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(true, false, true)]
+    [InlineData(false, true, true)]
+    public void Restore_SavedDisband_IsCancelled(bool isDisbanding, bool isWaitingForDisband, bool expectCancel)
+    {
+        var (hero, party, _, _) = CreatePlayerGraph();
+        party.IsDisbanding = isDisbanding;
+        var cancelled = new List<MobileParty>();
+        var restorer = new PlayerPartyRestorer(
+            Mock.Of<IObjectManager>(),
+            Mock.Of<IAutoRegistryFactory>(),
+            () => Array.Empty<MobileParty>(),
+            _ => throw new InvalidOperationException("Restore never creates a party"),
+            _ => throw new InvalidOperationException("Restore never removes a party"),
+            _ => isWaitingForDisband,
+            cancelled.Add);
+
+        restorer.Restore(hero, party);
+
+        if (expectCancel)
+            Assert.Same(party, Assert.Single(cancelled));
+        else
+            Assert.Empty(cancelled);
+    }
+
     [Fact]
     public void RestoreClanMembership_MissingHero_RepairsOnlyClanCaches()
     {
