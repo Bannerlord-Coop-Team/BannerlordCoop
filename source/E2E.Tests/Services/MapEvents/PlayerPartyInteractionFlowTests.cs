@@ -37,6 +37,7 @@ using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.MobilePartyAIs.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyComponents.Messages;
+using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Stances.Messages;
 using GameInterface.Services.TroopRosters.Data;
@@ -54,9 +55,11 @@ using TaleWorlds.CampaignSystem.BarterSystem;
 using TaleWorlds.CampaignSystem.BarterSystem.Barterables;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.CampaignBehaviors.BarterBehaviors;
+using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
@@ -3206,6 +3209,62 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
 
         client.Call(() => Assert.Same(openedEncounter, PlayerEncounter.Current));
         Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkConversationEnded>());
+    }
+
+    [Fact]
+    public void ServerDetectedApproval_BehindInventoryScreen_OpensMeetingOnceMapIsActive()
+    {
+        var (client, _, playerPartyId, _) = CreateTwoPlayerParties();
+        var aiPartyId = CreateMobilePartyBase();
+        SetMainParty(client, playerPartyId);
+
+        // The dialog flow needs real conversation agents, so only its start is skipped. Its caller is inlined.
+        using var conversations = new MethodCallRecorder(AccessTools.Method(
+            typeof(ConversationManager), nameof(ConversationManager.StartNew)));
+        var previousStates = GameStateManager._current;
+        client.Call(() =>
+        {
+            var states = GameStateManager._current = Game.Current.GameStateManager;
+            states._gameStates.Add(states.CreateState<MapState>());
+            states._gameStates.Add(states.CreateState<InventoryState>());
+            var behavior = ObjectHelper.SkipConstructor<EncounterGameMenuBehavior>();
+            new CampaignGameStarter(Campaign.Current.GameMenuManager, Campaign.Current.ConversationManager)
+                .AddGameMenu("encounter_meeting", "{=!}.", behavior.game_menu_encounter_meeting_on_init);
+        });
+        client.NetworkSentMessages.Clear();
+
+        try
+        {
+            // A party caught the player while the inventory is open, so the server approves without a request id.
+            DeliverConversationApproval(
+                client,
+                playerPartyId,
+                aiPartyId,
+                requestId: null!,
+                ConversationRestartSource.EncounterManager,
+                forcePlayerOutFromSettlement: false);
+
+            AssertHasPlayerEncounter(client, expected: false);
+            Assert.Equal(0, conversations.CountFor(client));
+            Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkConversationEnded>());
+
+            client.Call(() =>
+            {
+                var states = GameStateManager.Current;
+                states._gameStates.RemoveAt(states._gameStates.Count - 1);
+                Assert.IsType<MapState>(states.ActiveState);
+                client.Resolve<IMessageBroker>().Publish(this, new CampaignTick());
+            }, MapEventDisabledMethods);
+
+            AssertHasPlayerEncounter(client, expected: true);
+            Assert.Equal(1, conversations.CountFor(client));
+            Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkConversationEnded>());
+        }
+        finally
+        {
+            client.Call(() => Campaign.Current.PlayerEncounter = null);
+            GameStateManager._current = previousStates;
+        }
     }
 
     [Fact]

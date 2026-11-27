@@ -9,6 +9,7 @@ using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Villages.Interfaces;
 using LiteNetLib;
@@ -18,7 +19,9 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.MapEvents.Handlers;
 
@@ -60,6 +63,7 @@ internal class ConversationRequestHandler : IHandler
     private long conversationActivationVersion;
     private int approvedRestartDepth;
     private Action<bool> pendingRestartContinuation;
+    private NetworkAllowConversation? approvalWaitingForMap;
 
     // [Server] Player-vs-player interactions in progress, keyed by the attacking player's peer -> the defending
     // player's party id. Lets the defender be told when the interaction ends (the attacker has no AI party to hold,
@@ -106,6 +110,7 @@ internal class ConversationRequestHandler : IHandler
         messageBroker.Subscribe<NetworkConversationDenied>(Handle_NetworkConversationDenied);
         messageBroker.Subscribe<NetworkPvpDefenderShown>(Handle_NetworkPvpDefenderShown);
         messageBroker.Subscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
+        messageBroker.Subscribe<CampaignTick>(Handle_CampaignTick);
     }
 
     public void Dispose()
@@ -119,6 +124,7 @@ internal class ConversationRequestHandler : IHandler
         messageBroker.Unsubscribe<NetworkConversationDenied>(Handle_NetworkConversationDenied);
         messageBroker.Unsubscribe<NetworkPvpDefenderShown>(Handle_NetworkPvpDefenderShown);
         messageBroker.Unsubscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
+        messageBroker.Unsubscribe<CampaignTick>(Handle_CampaignTick);
     }
 
     /// <summary>Route a local encounter request to the server-side approval flow.</summary>
@@ -661,77 +667,113 @@ internal class ConversationRequestHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
-            var observedActivationVersion = conversationActivationVersion;
-
-            if (!objectManager.TryGetObjectWithLogging<PartyBase>(message.DefenderId, out var defender))
+            // Co-op ticks EncounterManager under other screens, but its meeting conversation throws unless the map is active
+            if (message.Source == ConversationRestartSource.EncounterManager &&
+                GameStateManager.Current?.ActiveState is not MapState)
             {
+                WaitForMap(message);
+                return;
+            }
+
+            ApplyConversationApproval(message);
+        }, context: nameof(Handle_NetworkAllowConversation));
+    }
+
+    /// <summary>[Client] Keeps the approval, and the server's hold, until the player is back on the map.</summary>
+    private void WaitForMap(NetworkAllowConversation message)
+    {
+        // The server ignores the release when the newer approval already owns its hold
+        if (approvalWaitingForMap is NetworkAllowConversation replaced && replaced.RequestId != message.RequestId)
+        {
+            ClearPendingConversationRequest(replaced.RequestId);
+            SendConversationEndedToServer(replaced.RequestId);
+        }
+
+        approvalWaitingForMap = message;
+    }
+
+    /// <summary>[Client] Applies the approval kept by <see cref="WaitForMap"/> once the map is the active state again.</summary>
+    private void Handle_CampaignTick(MessagePayload<CampaignTick> payload)
+    {
+        if (approvalWaitingForMap is not NetworkAllowConversation message) return;
+        if (GameStateManager.Current?.ActiveState is not MapState) return;
+
+        approvalWaitingForMap = null;
+        ApplyConversationApproval(message);
+    }
+
+    private void ApplyConversationApproval(NetworkAllowConversation message)
+    {
+        var observedActivationVersion = conversationActivationVersion;
+
+        if (!objectManager.TryGetObjectWithLogging<PartyBase>(message.DefenderId, out var defender))
+        {
+            ClearPendingConversationRequest(message.RequestId);
+            SendConversationEndedToServer(message.RequestId);
+            return;
+        }
+
+        if (!objectManager.TryGetObjectWithLogging<PartyBase>(message.AttackerId, out var attacker))
+        {
+            ClearPendingConversationRequest(message.RequestId);
+            SendConversationEndedToServer(message.RequestId);
+            return;
+        }
+
+        try
+        {
+            var restartDecision = restartContextTracker.Consume(
+                message.RequestId,
+                PlayerEncounter.Current,
+                defender,
+                attacker);
+
+            if (restartDecision == ConversationRestartDecision.Duplicate)
+            {
+                Logger.Debug("Ignoring duplicate conversation approval for the already-open encounter");
+                ActivateConversationRequest(message.RequestId, observedActivationVersion);
+                return;
+            }
+
+            if (restartDecision == ConversationRestartDecision.Stale)
+            {
+                Logger.Warning("Ignoring stale conversation approval because the encounter changed after the request");
                 ClearPendingConversationRequest(message.RequestId);
                 SendConversationEndedToServer(message.RequestId);
                 return;
             }
 
-            if (!objectManager.TryGetObjectWithLogging<PartyBase>(message.AttackerId, out var attacker))
-            {
-                ClearPendingConversationRequest(message.RequestId);
-                SendConversationEndedToServer(message.RequestId);
-                return;
-            }
-
+            approvedRestartDepth++;
             try
             {
-                var restartDecision = restartContextTracker.Consume(
-                    message.RequestId,
-                    PlayerEncounter.Current,
-                    defender,
-                    attacker);
-
-                if (restartDecision == ConversationRestartDecision.Duplicate)
+                using (new AllowedThread())
                 {
-                    Logger.Debug("Ignoring duplicate conversation approval for the already-open encounter");
-                    ActivateConversationRequest(message.RequestId, observedActivationVersion);
-                    return;
-                }
-
-                if (restartDecision == ConversationRestartDecision.Stale)
-                {
-                    Logger.Warning("Ignoring stale conversation approval because the encounter changed after the request");
-                    ClearPendingConversationRequest(message.RequestId);
-                    SendConversationEndedToServer(message.RequestId);
-                    return;
-                }
-
-                approvedRestartDepth++;
-                try
-                {
-                    using (new AllowedThread())
+                    if (message.Source == ConversationRestartSource.EncounterManager)
                     {
-                        if (message.Source == ConversationRestartSource.EncounterManager)
-                        {
-                            EncounterManager.RestartPlayerEncounter(attacker, defender);
-                        }
-                        else
-                        {
-                            // PlayerEncounter.RestartPlayerEncounter(defenderParty, attackerParty, forcePlayerOutFromSettlement)
-                            PlayerEncounter.RestartPlayerEncounter(defender, attacker, message.ForcePlayerOutFromSettlement);
-                        }
+                        EncounterManager.RestartPlayerEncounter(attacker, defender);
+                    }
+                    else
+                    {
+                        // PlayerEncounter.RestartPlayerEncounter(defenderParty, attackerParty, forcePlayerOutFromSettlement)
+                        PlayerEncounter.RestartPlayerEncounter(defender, attacker, message.ForcePlayerOutFromSettlement);
                     }
                 }
-                finally
-                {
-                    approvedRestartDepth--;
-                }
-
-                ActivateConversationRequest(message.RequestId, observedActivationVersion);
             }
-            catch (Exception e)
+            finally
             {
-                // The server engaged and held the AI party before approving; if the restart fails,
-                // release that hold so the party does not stay frozen for other players.
-                Logger.Error(e, "Failed to restart approved conversation encounter; releasing the server-side party hold");
-                ClearPendingConversationRequest(message.RequestId);
-                SendConversationEndedToServer(message.RequestId);
+                approvedRestartDepth--;
             }
-        }, context: nameof(Handle_NetworkAllowConversation));
+
+            ActivateConversationRequest(message.RequestId, observedActivationVersion);
+        }
+        catch (Exception e)
+        {
+            // The server engaged and held the AI party before approving; if the restart fails,
+            // release that hold so the party does not stay frozen for other players.
+            Logger.Error(e, "Failed to restart approved conversation encounter; releasing the server-side party hold");
+            ClearPendingConversationRequest(message.RequestId);
+            SendConversationEndedToServer(message.RequestId);
+        }
     }
 
     /// <summary>[Client] This player's encounter finished; tell the server to release the held party.</summary>
