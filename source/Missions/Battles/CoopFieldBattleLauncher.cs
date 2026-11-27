@@ -5,6 +5,7 @@ using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.TroopSupply;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using Helpers;
 using Missions.Messages;
@@ -99,7 +100,7 @@ internal class CoopFieldBattleLauncher : ICoopFieldBattleLauncher
 
     private Mission CreateCoopFieldBattle(MissionInitializerRecord rec, string mapEventId)
     {
-        bool isPlayerSergeant = MobileParty.MainParty.MapEvent.IsPlayerSergeant();
+        bool isPlayerSergeant = IsLocalPlayerSergeant(MobileParty.MainParty.MapEvent);
         bool isPlayerInArmy = MobileParty.MainParty.Army != null;
         // Same source the native OpenBattleMission uses to orient deployment (which side's spawn frames the
         // player deploys onto). PartyBase.MainParty.Side is the authoritative battle side — already used below
@@ -202,6 +203,12 @@ internal class CoopFieldBattleLauncher : ICoopFieldBattleLauncher
                 return side;
 
         return BattleSideEnum.None;
+    }
+
+    internal static bool IsLocalPlayerSergeant(MapEvent mapEvent)
+    {
+        // Each player commands their own formations in a player-led army.
+        return MobileParty.MainParty.Army?.LeaderParty?.IsPlayerParty() != true && mapEvent.IsPlayerSergeant();
     }
 
     // The local player's own deployable heroes (its party leader + any companion heroes in the party), highest

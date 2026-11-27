@@ -99,7 +99,7 @@ public class InventoryFoodUpkeepTests
         var initial = new ItemRosterElement[] { new(grain, 10) };
         var submitted = new ItemRosterElement[] { new(grain, 7) };
 
-        var rebased = TradeHandler.RebaseInventoryData(authoritative, initial, submitted);
+        var rebased = TradeHandler.RebaseInventoryData(authoritative, initial, submitted, out _);
         Assert.Equal(5, rebased.Single().Amount);
     }
 
@@ -109,7 +109,7 @@ public class InventoryFoodUpkeepTests
         var grain = new ItemObject("grain");
         var submitted = new ItemRosterElement[] { new(grain, 1) };
 
-        var rebased = TradeHandler.RebaseInventoryData(new ItemRoster(), Array.Empty<ItemRosterElement>(), submitted);
+        var rebased = TradeHandler.RebaseInventoryData(new ItemRoster(), Array.Empty<ItemRosterElement>(), submitted, out _);
         Assert.Equal(1, rebased.Single().Amount);
     }
 
@@ -122,7 +122,7 @@ public class InventoryFoodUpkeepTests
         var initial = new ItemRosterElement[] { new(grain, 10) };
         var submitted = new ItemRosterElement[] { new(grain, 0) };
 
-        var rebased = TradeHandler.RebaseInventoryData(authoritative, initial, submitted);
+        var rebased = TradeHandler.RebaseInventoryData(authoritative, initial, submitted, out _);
         Assert.Empty(rebased);
     }
 
@@ -154,11 +154,11 @@ public class InventoryFoodUpkeepTests
         server.AddToCounts(grain, 3);
         var submitted = new[] { new ItemRosterElement(loot, 1) };
 
-        var rebased = TradeHandler.RebaseInventoryData(server, null, submitted);
+        var rebased = TradeHandler.RebaseInventoryData(server, null, submitted, out _);
 
         Assert.Equal(3, rebased.Single(item => item.EquipmentElement.Item == grain).Amount);
         Assert.Equal(1, rebased.Single(item => item.EquipmentElement.Item == loot).Amount);
-        Assert.Equal(3, TradeHandler.RebaseInventoryData(server, null, null).Single().Amount);
+        Assert.Equal(3, TradeHandler.RebaseInventoryData(server, null, null, out _).Single().Amount);
     }
 
     [Fact]
@@ -171,7 +171,7 @@ public class InventoryFoodUpkeepTests
         server.AddToCounts(loot, 1);
 
         var rebased = TradeHandler.RebaseInventoryData(server,
-            new[] { new ItemRosterElement(grain, 3) }, null);
+            new[] { new ItemRosterElement(grain, 3) }, null, out _);
 
         Assert.Same(loot, rebased.Single().EquipmentElement.Item);
     }

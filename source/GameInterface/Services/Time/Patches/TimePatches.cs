@@ -1,6 +1,8 @@
 ﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Util;
+using GameInterface.Configuration;
 using GameInterface.Policies;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
@@ -9,6 +11,7 @@ using GameInterface.Services.Time;
 using GameInterface.Services.Time.Interfaces;
 using HarmonyLib;
 using SandBox.View.Map;
+using Serilog;
 using System.Collections.Generic;
 using System.Reflection.Emit;
 using TaleWorlds.CampaignSystem;
@@ -29,10 +32,8 @@ internal class TimePatches
     [HarmonyPatch(MethodType.Setter)]
     private static bool Prefix(ref Campaign __instance, ref CampaignTimeControlMode value)
     {
-        // We only want ExecuteTimeControlChange, which is called from the time control button clicks,
-        // to publish the TimeSpeedChanged message.
-        // To do this we skip this method if this thread is not "allowed"
-        // We set this thread to "allowed" in AllowTimeControlFromControlsPatches
+        // Only player time input publishes a request: the time controls, hotkeys and map clicks allow this thread
+        // in the AllowTimeControlFrom*Patches classes
         if (CallOriginalPolicy.IsOriginalAllowed() == false) return false;
 
         if (value != __instance._timeControlMode)
@@ -185,6 +186,74 @@ internal class AllowTimeControlFromHotKeysPatches
     }
 
     private static bool AllowTimeControlInMenu(GameMenu _) => true;
+}
+
+/// <summary>
+/// Sends the time changes vanilla makes for a travel or parley click to the server as time requests, like the time controls do.
+/// <see cref="MapScreen.HandleClickTimeChange"/> resumes or fast forwards, and <see cref="MapScreen.HandleMouse"/> drops a
+/// single click's fast forward back to play once the double click window runs out.
+/// </summary>
+[HarmonyPatch(typeof(MapScreen))]
+internal class AllowTimeControlFromMapClickPatches
+{
+    private static readonly ILogger Logger = LogManager.GetLogger<AllowTimeControlFromMapClickPatches>();
+
+    [HarmonyPatch(nameof(MapScreen.HandleClickTimeChange))]
+    [HarmonyPrefix]
+    private static void Prefix(out AllowedThread __state)
+    {
+        __state = AllowMapClickTimeChange();
+    }
+
+    [HarmonyPatch(nameof(MapScreen.HandleClickTimeChange))]
+    [HarmonyFinalizer]
+    private static void Finalizer(AllowedThread __state)
+    {
+        __state?.Dispose();
+    }
+
+    [HarmonyPatch(nameof(MapScreen.HandleMouse))]
+    [HarmonyTranspiler]
+    internal static IEnumerable<CodeInstruction> HandleMouseTranspiler(IEnumerable<CodeInstruction> instructions)
+    {
+        var setTimeControlMode = AccessTools.PropertySetter(typeof(Campaign), nameof(Campaign.TimeControlMode));
+        var setFromMapClick = AccessTools.Method(typeof(AllowTimeControlFromMapClickPatches), nameof(SetTimeControlModeFromMapClick));
+
+        int replacements = 0;
+        foreach (var instr in instructions)
+        {
+            if (instr.Calls(setTimeControlMode))
+            {
+                instr.opcode = OpCodes.Call;
+                instr.operand = setFromMapClick;
+                replacements++;
+            }
+
+            yield return instr;
+        }
+
+        if (replacements == 0)
+            Logger.Warning("{Patch} made no replacements; the target method may have changed", nameof(HandleMouseTranspiler));
+    }
+
+    internal static void SetTimeControlModeFromMapClick(Campaign campaign, CampaignTimeControlMode mode)
+    {
+        using (AllowMapClickTimeChange())
+        {
+            campaign.TimeControlMode = mode;
+        }
+    }
+
+    // Without the allowed thread the time setter drops the click's change
+    private static AllowedThread AllowMapClickTimeChange()
+    {
+        var options = ModConfigProvider.ModOptions;
+        // Map clicks only change time when the server turns on mapClickChangesTime
+        if (!options.MapClickChangesTime) return null;
+        // and only when clients are allowed to control time at all
+        if (!options.AllowClientTimeControls) return null;
+        return new AllowedThread();
+    }
 }
 
 [HarmonyPatch(typeof(PlayerEncounter), nameof(PlayerEncounter.Finish))]

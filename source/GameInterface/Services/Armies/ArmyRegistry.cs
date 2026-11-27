@@ -75,7 +75,8 @@ internal class ArmyRegistry : AutoRegistryBase<Army>
                     return;
                 }
                 ArmyPatches.ReleaseHalfRemovedParties(obj);
-                CampaignEventDispatcher.Instance.OnArmyDispersed(obj, Army.ArmyDispersionReason.Unknown, obj.Parties.Contains(MobileParty.MainParty));
+                var playerWasMember = obj.Parties.Contains(MobileParty.MainParty);
+                CampaignEventDispatcher.Instance.OnArmyDispersed(obj, Army.ArmyDispersionReason.Unknown, playerWasMember);
                 obj._armyIsDispersing = true;
                 foreach (var party in obj._parties)
                 {
@@ -92,13 +93,14 @@ internal class ArmyRegistry : AutoRegistryBase<Army>
                 }
                 obj._parties.Clear();
                 obj.Kingdom = null;
+                var mapState = Game.Current.GameStateManager.LastOrDefault<MapState>();
                 if (obj.LeaderParty == MobileParty.MainParty)
                 {
-                    MapState mapState = Game.Current.GameStateManager.ActiveState as MapState;
-                    if (mapState != null)
-                    {
-                        mapState.OnDispersePlayerLeadedArmy();
-                    }
+                    mapState?.OnDispersePlayerLeadedArmy();
+                }
+                else if (playerWasMember)
+                {
+                    mapState?.OnLeaveArmy();
                 }
                 obj._hourlyTickEvent?.DeletePeriodicEvent();
                 obj._tickEvent?.DeletePeriodicEvent();

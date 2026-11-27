@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.SiegeEvents.Patches;
@@ -37,6 +39,17 @@ internal static class SiegeCaptureMenuHoldPatch
 
     /// <summary>True while this client holds the capture choice for the settlement.</summary>
     internal static bool IsHeld(Settlement settlement) => settlement != null && pendingChoice.ContainsKey(settlement);
+
+    /// <summary>True when this client won the encounter and still holds the capture choice.</summary>
+    internal static bool HoldsCaptureResult(PlayerEncounter encounter) =>
+        encounter?._mapEvent is MapEvent mapEvent &&
+        SiegeAftermathPatches.TryGetAftermathSide(mapEvent, out var side) &&
+        encounter.PlayerSide == side &&
+        IsHeld(mapEvent.MapEventSettlement);
+
+    /// <summary>Also true when the main party is already in a settlement whose capture choice is held.</summary>
+    internal static bool HoldsLocalCapture(PlayerEncounter encounter, Settlement currentSettlement) =>
+        HoldsCaptureResult(encounter) || IsHeld(currentSettlement);
 
     /// <summary>The defeated owner held with the settlement's capture choice, or null.</summary>
     internal static Clan GetHeldPreviousOwner(Settlement settlement)
