@@ -1929,6 +1929,8 @@ public class VillageHostileActionTests : MapEventTestBase
         var encounter = SetMockPlayerEncounter(client, mapEventId: mapEventId);
         var model = new SimulationRoundProbe();
         var router = client.Resolve<TestNetworkRouter>();
+        using var settlementStarts = new MethodCallRecorder(Priority.First, true,
+            AccessTools.Method(typeof(EncounterManager), nameof(EncounterManager.StartSettlementEncounter)));
         client.NetworkSentMessages.Clear();
         router.AutoDrainReady = false;
         try
@@ -1978,6 +1980,8 @@ public class VillageHostileActionTests : MapEventTestBase
                 Assert.True(client.ObjectManager.TryGetHandle(settlement, out var settlementHandle));
                 var finalize = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkMapEventFinalizeAttempted>());
                 var reentry = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestStartSettlementEncounter>());
+                // Only vanilla's Leave asks for the village again, the Finish patch leaves an undecided fight alone.
+                Assert.Equal(1, settlementStarts.CountFor(client));
                 Assert.Equal(mapEventId, finalize.MapEventId);
                 Assert.Equal(partyHandle, reentry.PartyId);
                 Assert.Equal(settlementHandle, reentry.SettlementId);

@@ -30,8 +30,10 @@ internal class SettlementBattleFinishEncounterPatch
         if (mainParty.AttachedTo != null) return;
 
         bool isSallyOut = mapEvent.IsSallyOut || mapEvent.IsBlockadeSallyOut;
-        // Vanilla only sends the attacker's leader back into the village it forced (#2619)
-        bool ledForceAction = mapEvent.IsForceHostileAction() && mapEvent.AttackerSide?.LeaderParty == mainParty.Party;
+        // Like vanilla's DoEnd, only a decided force action sends its leader back into the village (#2619), a Leave
+        // before the fight asks for the village again itself
+        bool ledForceAction = mapEvent.IsForceHostileAction() && mapEvent.HasWinner &&
+            mapEvent.AttackerSide?.LeaderParty == mainParty.Party;
         if (!isSallyOut && !ledForceAction) return;
 
         __state = mapEvent.MapEventSettlement;
