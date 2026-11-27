@@ -309,15 +309,6 @@ internal class PlayerPartyVisibilityHandler : IHandler
             // A queued park finds no entry when its player synchronized again first
             if (!deferredMapEventParking.TryGetValue(party, out var deferred)) continue;
 
-            if (party.MapEvent != null)
-            {
-                Logger.Warning(
-                    "Not parking disconnected party {PartyId} because it is in MapEvent {MapEventId}",
-                    party.StringId,
-                    party.MapEvent.StringId);
-                continue;
-            }
-
             deferredMapEventParking.Remove(party);
             if (!playerManager.TryGetPlayer(deferred.ControllerId, out var player) ||
                 (playerManager.IsConnected(player) && !IsPlayerHeroDead(player)))
@@ -325,13 +316,8 @@ internal class PlayerPartyVisibilityHandler : IHandler
                 continue;
             }
 
-            LeaveSiegeBeforeParking(party);
-            party.IsActive = false;
-            party.IsVisible = false;
-            partyVisuals.RemoveVisual(party);
-            Logger.Information(
-                "Parked party {PartyId} after its MapEvent ended while its player was disconnected or dead",
-                party.StringId);
+            // A party already pulled into another battle is deferred again, to that battle's end
+            ParkParty(player, party, $"MapEvent {deferred.MapEvent.StringId} ended while its player was disconnected or dead");
         }
     }
 

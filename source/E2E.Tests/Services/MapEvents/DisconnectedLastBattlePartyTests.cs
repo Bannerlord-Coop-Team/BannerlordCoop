@@ -2,15 +2,17 @@
 using Common.Network.Messages;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
+using GameInterface.Services.MapEvents.Messages;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.MapEvents;
 
 /// <summary>
-/// A disconnected player's follower that is last on its battle side leaves the battle with its leader, which finalizes it (#4945).
+/// A disconnected player's follower leaves its battle with its leader before its deferred park runs (#4945, #4952).
 /// </summary>
 public class DisconnectedLastBattlePartyTests : MapEventTestBase
 {
@@ -27,15 +29,7 @@ public class DisconnectedLastBattlePartyTests : MapEventTestBase
         var leaderId = context.AttackerPartyId;
         var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         ConnectPlayer(partyId);
-
-        // Attaching to the leader puts the follower on the leader's battle side after it
-        Server.Call(() =>
-        {
-            var leader = Server.GetRegisteredObject<MobileParty>(leaderId);
-            var party = Server.GetRegisteredObject<MobileParty>(partyId);
-            party.Army = new Army(GameObjectCreator.CreateInitializedObject<Kingdom>(), leader, Army.ArmyTypes.Patrolling);
-            party.AttachedTo = leader;
-        }, MapEventDisabledMethods);
+        FollowLeader(leaderId, partyId);
         PumpAll();
 
         // Parking waits for the battle to end
@@ -43,15 +37,72 @@ public class DisconnectedLastBattlePartyTests : MapEventTestBase
         AssertParty(partyId, active: true, inBattle: true);
 
         // The follower is last on its side and is removed inside the leader's attached party loop, so its removal finalizes the battle
-        Server.Call(() =>
-        {
-            var leader = Server.GetRegisteredObject<MobileParty>(leaderId);
-            leader.Party.MapEventSide = null;
-        }, MapEventDisabledMethods);
+        LeaveBattle(leaderId);
         PumpAll();
 
         AssertFinalized(context.MapEventId);
         AssertParty(partyId, active: false, inBattle: false);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Follower_LeaderJoinsAnotherBattleBeforeParking_IsParkedAfterThatBattleEnds(bool lastOnItsSide)
+    {
+        var first = CreateServerMapEvent();
+        var second = CreateServerMapEvent();
+        var leaderId = first.AttackerPartyId;
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        ConnectPlayer(partyId);
+        FollowLeader(leaderId, partyId);
+        if (!lastOnItsSide)
+            JoinNewServerPartyToSide(first.MapEventId, BattleSideEnum.Attacker);
+        PumpAll();
+
+        Disconnect();
+        AssertParty(partyId, active: true, inBattle: true);
+
+        // The leader takes the follower into another battle in the same frame, before the park queued by a last follower's removal runs
+        LeaveBattle(leaderId);
+        JoinServerPartyToSide(second.MapEventId, leaderId, BattleSideEnum.Attacker);
+        PumpAll();
+
+        if (!lastOnItsSide)
+        {
+            DestroyServerMapEvent(first.MapEventId);
+            PumpAll();
+        }
+
+        AssertFinalized(first.MapEventId);
+        AssertParty(partyId, active: true, inBattle: true);
+        Server.Call(() =>
+        {
+            var secondEvent = Server.GetRegisteredObject<MapEvent>(second.MapEventId);
+            Assert.Single(Server.InternalMessages.GetMessages<PlayerDisconnectedFromMapEvent>(), message => message.MapEvent == secondEvent);
+        });
+
+        DestroyServerMapEvent(second.MapEventId);
+        PumpAll();
+
+        AssertFinalized(second.MapEventId);
+        AssertParty(partyId, active: false, inBattle: false);
+    }
+
+    // Attaching to the leader puts the follower on the leader's battle side after it
+    private void FollowLeader(string leaderId, string partyId)
+    {
+        Server.Call(() =>
+        {
+            var leader = Server.GetRegisteredObject<MobileParty>(leaderId);
+            var party = Server.GetRegisteredObject<MobileParty>(partyId);
+            party.Army = new Army(GameObjectCreator.CreateInitializedObject<Kingdom>(), leader, Army.ArmyTypes.Patrolling);
+            party.AttachedTo = leader;
+        }, MapEventDisabledMethods);
+    }
+
+    private void LeaveBattle(string leaderId)
+    {
+        Server.Call(() => Server.GetRegisteredObject<MobileParty>(leaderId).Party.MapEventSide = null, MapEventDisabledMethods);
     }
 
     private void ConnectPlayer(string partyId)
