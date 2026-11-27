@@ -32,7 +32,8 @@ public class TransferSaveSnapshotTests
     [Fact]
     public async Task SnapshotFinishesAfterTimeout_DoesNotRestartCatchUpOrLoad()
     {
-        var container = new ServerTestComponent(output).Container;
+        var serverComponent = new ServerTestComponent(output);
+        var container = serverComponent.Container;
         var playerPeer = container.Resolve<TestNetwork>().CreatePeer();
         var context = container.Resolve<ConnectionContext>();
         var queue = context.ConnectionMessageQueue;
@@ -49,6 +50,7 @@ public class TransferSaveSnapshotTests
             });
         var logic = new Mock<IConnectionLogic>();
         logic.SetupGet(value => value.Peer).Returns(playerPeer);
+        logic.SetupGet(value => value.AcknowledgedPlayer).Returns(serverComponent.BindPeerToPlayer(playerPeer));
 
         var testTimeout = TimeSpan.FromSeconds(10);
         TransferSaveState state;
@@ -57,7 +59,8 @@ public class TransferSaveSnapshotTests
             using var shortWait = GameThread.Instance.LimitFrameDrain(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
             var transfer = Task.Run(() => new TransferSaveState(
                 logic.Object, context.MessageBroker, context.Network, context.CoopSessionProvider, context.SaveInterface,
-                queue, context.Coalescer, context.AttachmentIdMapper, context.ServerOptionsProvider, context.LootShipHold));
+                queue, context.Coalescer, context.AttachmentIdMapper, context.ServerOptionsProvider, context.LootShipHold,
+                context.PlayerManager));
 
             await saveStarted.Task.WaitAsync(testTimeout);
             state = await transfer.WaitAsync(testTimeout);

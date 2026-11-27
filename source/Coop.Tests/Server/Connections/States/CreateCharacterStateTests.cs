@@ -52,6 +52,7 @@ namespace Coop.Tests.Server.Connections.States
         public void TransferSave_TransitionState_LoadingState()
         {
             connectionLogic.SetState<CreateCharacterState>();
+            connectionLogic.AcknowledgedPlayer = serverComponent.BindPeerToPlayer(playerPeer);
 
             connectionLogic.TransferSave();
 
@@ -77,6 +78,14 @@ namespace Coop.Tests.Server.Connections.States
             // Arrange
             SetupUnpackedHero();
             var currentState = connectionLogic.SetState<CreateCharacterState>();
+            // The join save only goes to a peer bound to its player, so it counts as bound only once this
+            // state binds it
+            var playerManager = serverComponent.Container.Resolve<Mock<IPlayerManager>>();
+            var bound = false;
+            playerManager.Setup(manager => manager.SetPeer(It.IsAny<string>(), playerPeer)).Callback(() => bound = true);
+            playerManager
+                .Setup(manager => manager.TryGetCurrentController(playerPeer, out It.Ref<string>.IsAny))
+                .Returns(() => bound);
 
             // Act
             var payload = new MessagePayload<NetworkTransferNewHero>(
@@ -346,9 +355,20 @@ namespace Coop.Tests.Server.Connections.States
             heroInterfaceMock
                 .Setup(h => h.TryGetRegistrationHandles(hero, out handles))
                 .Returns(true);
+            // The join save only goes to a peer that still plays the player it was told, so the added player
+            // stays the registration and the peer stays bound to it
+            Player added = null;
             playerRegistryMock
                 .Setup(p => p.AddPlayer(It.IsAny<Player>()))
+                .Callback<Player>(player => added = player)
                 .Returns(true);
+            playerRegistryMock
+                .Setup(p => p.TryGetPlayer(It.IsAny<string>(), out It.Ref<Player>.IsAny))
+                .Callback((string controllerId, out Player player) => { player = added; })
+                .Returns(() => added != null);
+            playerRegistryMock
+                .Setup(p => p.TryGetCurrentController(It.IsAny<NetPeer>(), out It.Ref<string>.IsAny))
+                .Returns(() => added != null);
 
             return hero;
         }

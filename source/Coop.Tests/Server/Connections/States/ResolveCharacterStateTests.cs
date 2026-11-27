@@ -2,15 +2,19 @@
 using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client.Services.Heroes.Messages;
+using Coop.Core.Common.Network.Packets;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
+using Coop.Tests.Extensions;
 using Coop.Tests.Mocks;
+using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.Modules;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.Save.Messages;
 using LiteNetLib;
 using Moq;
 using ProtoBuf;
@@ -66,6 +70,7 @@ namespace Coop.Tests.Server.Connections.States
         {
             // Arrange
             connectionLogic.SetState<ResolveCharacterState>();
+            connectionLogic.AcknowledgedPlayer = serverComponent.BindPeerToPlayer(playerPeer);
 
             // Act
             connectionLogic.TransferSave();
@@ -326,6 +331,7 @@ namespace Coop.Tests.Server.Connections.States
                     returnedPlayer = player;
                 })
                 .Returns(true);
+            playerManagerMock.Setup(i => i.TrySetPeer(player, It.IsAny<NetPeer>())).Returns(true);
 
             var objectManager = serverComponent.Container.Resolve<IObjectManager>();
             var hero = (Hero)FormatterServices.GetUninitializedObject(typeof(Hero));
@@ -377,18 +383,30 @@ namespace Coop.Tests.Server.Connections.States
             Assert.Equal(ConnectionState.ShutdownRequested, playerPeer.ConnectionState);
         }
 
-        [Fact]
-        public void NetworkClientValidate_RegisteredHeroWithStaleParty_RepairsWithoutCreatingCharacter()
+        [Theory]
+        // The join save goes out only while the registry holds the repaired registration the peer was told
+        [InlineData(true)]
+        [InlineData(false)]
+        public void NetworkClientValidate_RegisteredHeroWithStaleParty_RepairsWithoutCreatingCharacter(bool registryHoldsTheRepair)
         {
             var currentState = connectionLogic.SetState<ResolveCharacterState>();
             var player = new Player("MyPlayer", "MyHero", "MissingParty", "MyClan", "MyCharacter");
             var repaired = new Player("MyPlayer", "MyHero", "RecoveredParty", "MyClan", "MyCharacter");
             var playerManager = serverComponent.Container.Resolve<Mock<IPlayerManager>>();
-            var registeredPlayer = player;
+            var registered = player;
+            var controllerId = player.ControllerId;
             playerManager
-                .Setup(manager => manager.TryGetPlayer(player.ControllerId, out registeredPlayer))
+                .Setup(manager => manager.TryGetPlayer(player.ControllerId, out It.Ref<Player>.IsAny))
+                .Callback((string id, out Player returnedPlayer) => { returnedPlayer = registered; })
                 .Returns(true);
-            playerManager.Setup(manager => manager.ReplacePlayer(player, repaired)).Returns(true);
+            playerManager
+                .Setup(manager => manager.ReplacePlayer(player, repaired))
+                .Callback(() => { if (registryHoldsTheRepair) registered = repaired; })
+                .Returns(true);
+            playerManager.Setup(manager => manager.TrySetPeer(repaired, It.IsAny<NetPeer>())).Returns(true);
+            playerManager
+                .Setup(manager => manager.TryGetCurrentController(IsPeer(playerPeer), out controllerId))
+                .Returns(true);
 
             var objectManager = serverComponent.Container.Resolve<IObjectManager>();
             var hero = (Hero)FormatterServices.GetUninitializedObject(typeof(Hero));
@@ -416,7 +434,193 @@ namespace Coop.Tests.Server.Connections.States
                 serverComponent.TestNetwork.GetPeerMessages(differentPeer)
                     .OfType<NetworkPlayerRegistrationUpdated>());
             Assert.Same(repaired, update.Player);
-            Assert.IsNotType<CreateCharacterState>(connectionLogic.State);
+
+            if (registryHoldsTheRepair)
+            {
+                Assert.Single(serverComponent.TestNetwork.GetPeerPacketsFromType<GameSaveDataChunkPacket>(playerPeer));
+                Assert.Equal(ConnectionState.Connected, playerPeer.ConnectionState);
+                Assert.IsType<LoadingState>(connectionLogic.State);
+            }
+            else
+            {
+                serverComponent.Container.Resolve<Mock<ISaveInterface>>().Verify(save => save.SaveCurrentGame(), Times.Never);
+                Assert.Equal(ConnectionState.ShutdownRequested, playerPeer.ConnectionState);
+                Assert.IsType<TransferSaveState>(connectionLogic.State);
+            }
+        }
+
+        [Fact]
+        public void NetworkClientValidate_PreviousConnectionWentSilent_DropsItAndValidates()
+        {
+            var currentState = connectionLogic.SetState<ResolveCharacterState>();
+            var player = new Player("MyPlayer", "MyHero", "MyParty", "MyClan", "MyCharacter");
+            var playerManager = SetupRegisteredPlayer(player);
+            var previousPeer = differentPeer;
+            playerManager.Setup(manager => manager.TryGetPeer(player.ControllerId, out previousPeer)).Returns(true);
+
+            // The old connection of a crashed client lingers until its timeout and answers nothing.
+            differentPeer.SetTimeSinceLastPacket(10_000);
+
+            currentState.Handle_ClientValidate(new MessagePayload<NetworkClientValidate>(
+                playerPeer,
+                new NetworkClientValidate(player.ControllerId)));
+
+            Assert.Equal(ConnectionState.ShutdownRequested, differentPeer.ConnectionState);
+            Assert.Equal(ConnectionState.Connected, playerPeer.ConnectionState);
+            playerManager.Verify(manager => manager.TrySetPeer(player, IsPeer(playerPeer)), Times.Once);
+            var validation = Assert.Single(
+                serverComponent.TestNetwork.GetPeerMessages(playerPeer).OfType<NetworkClientValidated>());
+            Assert.True(validation.HeroExists);
+        }
+
+        [Fact]
+        public void NetworkClientValidate_PreviousConnectionStillActive_RefusesTheNewConnection()
+        {
+            var currentState = connectionLogic.SetState<ResolveCharacterState>();
+            var player = new Player("MyPlayer", "MyHero", "MyParty", "MyClan", "MyCharacter");
+            var playerManager = SetupRegisteredPlayer(player);
+            var previousPeer = differentPeer;
+            playerManager.Setup(manager => manager.TryGetPeer(player.ControllerId, out previousPeer)).Returns(true);
+            differentPeer.SetTimeSinceLastPacket(500);
+
+            currentState.Handle_ClientValidate(new MessagePayload<NetworkClientValidate>(
+                playerPeer,
+                new NetworkClientValidate(player.ControllerId)));
+
+            Assert.Equal(ConnectionState.Connected, differentPeer.ConnectionState);
+            Assert.Equal(ConnectionState.ShutdownRequested, playerPeer.ConnectionState);
+            playerManager.Verify(manager => manager.TrySetPeer(It.IsAny<Player>(), It.IsAny<NetPeer>()), Times.Never);
+            serverComponent.Container.Resolve<Mock<IPlayerPartyRestorer>>().Verify(
+                restorer => restorer.TryRestore(It.IsAny<Player>(), out It.Ref<Player>.IsAny), Times.Never);
+            var messages = serverComponent.TestNetwork.SentNetworkMessages
+                .GetValueOrDefault(playerPeer.Id) ?? Enumerable.Empty<IMessage>();
+            Assert.Empty(messages.OfType<NetworkClientValidated>());
+        }
+
+        [Fact]
+        public void NetworkClientValidate_PreviousConnectionAlreadyClosing_Validates()
+        {
+            var currentState = connectionLogic.SetState<ResolveCharacterState>();
+            var player = new Player("MyPlayer", "MyHero", "MyParty", "MyClan", "MyCharacter");
+            var playerManager = SetupRegisteredPlayer(player);
+            var previousPeer = differentPeer;
+            playerManager.Setup(manager => manager.TryGetPeer(player.ControllerId, out previousPeer)).Returns(true);
+
+            // A player who just left the normal way and rejoins before its disconnect cleanup ran.
+            differentPeer.SetTimeSinceLastPacket(500);
+            differentPeer.Disconnect();
+
+            currentState.Handle_ClientValidate(new MessagePayload<NetworkClientValidate>(
+                playerPeer,
+                new NetworkClientValidate(player.ControllerId)));
+
+            Assert.Equal(ConnectionState.Connected, playerPeer.ConnectionState);
+            playerManager.Verify(manager => manager.TrySetPeer(player, IsPeer(playerPeer)), Times.Once);
+            var validation = Assert.Single(
+                serverComponent.TestNetwork.GetPeerMessages(playerPeer).OfType<NetworkClientValidated>());
+            Assert.True(validation.HeroExists);
+        }
+
+        [Fact]
+        public void NetworkClientValidate_RegistrationChangedBeforeBinding_DisconnectsWithoutValidatingOrBroadcasting()
+        {
+            // A deletion or an heir swap on the game thread can change the repaired registration after
+            // it was put in and before the peer is bound to it. Then the other players must not get it,
+            // since the change sends them its own update.
+            var currentState = connectionLogic.SetState<ResolveCharacterState>();
+            var player = new Player("MyPlayer", "MyHero", "MissingParty", "MyClan", "MyCharacter");
+            var repaired = new Player("MyPlayer", "MyHero", "RecoveredParty", "MyClan", "MyCharacter");
+            var playerManager = SetupRegisteredPlayer(player);
+            playerManager.Setup(manager => manager.ReplacePlayer(player, repaired)).Returns(true);
+            playerManager.Setup(manager => manager.TrySetPeer(It.IsAny<Player>(), It.IsAny<NetPeer>())).Returns(false);
+            var restoredPlayer = repaired;
+            serverComponent.Container
+                .Resolve<Mock<IPlayerPartyRestorer>>()
+                .Setup(restorer => restorer.TryRestore(player, out restoredPlayer))
+                .Returns(true);
+
+            currentState.Handle_ClientValidate(new MessagePayload<NetworkClientValidate>(
+                playerPeer,
+                new NetworkClientValidate(player.ControllerId)));
+
+            var messages = serverComponent.TestNetwork.SentNetworkMessages
+                .GetValueOrDefault(playerPeer.Id) ?? Enumerable.Empty<IMessage>();
+            Assert.Empty(messages.OfType<NetworkClientValidated>());
+            var othersMessages = serverComponent.TestNetwork.SentNetworkMessages
+                .GetValueOrDefault(differentPeer.Id) ?? Enumerable.Empty<IMessage>();
+            Assert.Empty(othersMessages.OfType<NetworkPlayerRegistrationUpdated>());
+            Assert.IsType<ResolveCharacterState>(connectionLogic.State);
+            Assert.Equal(ConnectionState.ShutdownRequested, playerPeer.ConnectionState);
+            playerManager.Verify(manager => manager.TrySetPeer(repaired, IsPeer(playerPeer)), Times.Once);
+        }
+
+        [Fact]
+        public void NetworkClientValidate_RegistrationRemovedBeforeTheSaveSnapshot_DisconnectsWithoutTakingTheSave()
+        {
+            // A game over on the game thread can remove the player after this peer was bound and told it
+            // has a hero, but before the join save is taken. That peer is no longer bound to it then.
+            var currentState = connectionLogic.SetState<ResolveCharacterState>();
+            var player = new Player("MyPlayer", "MyHero", "MyParty", "MyClan", "MyCharacter");
+            var playerManager = SetupRegisteredPlayer(player);
+            playerManager
+                .Setup(manager => manager.TryGetCurrentController(IsPeer(playerPeer), out It.Ref<string>.IsAny))
+                .Returns(false);
+
+            currentState.Handle_ClientValidate(new MessagePayload<NetworkClientValidate>(
+                playerPeer,
+                new NetworkClientValidate(player.ControllerId)));
+
+            serverComponent.Container.Resolve<Mock<ISaveInterface>>().Verify(save => save.SaveCurrentGame(), Times.Never);
+            Assert.Empty(serverComponent.TestMessageBroker.Messages.GetMessages<GameSaveStateChanged>());
+            Assert.Equal(ConnectionState.ShutdownRequested, playerPeer.ConnectionState);
+            Assert.IsType<TransferSaveState>(connectionLogic.State);
+        }
+
+        [Fact]
+        public void NetworkClientValidate_RegistrationReplacedBeforeTheSaveSnapshot_DisconnectsWithoutTakingTheSave()
+        {
+            // An heir swap on the game thread can replace the registration after this peer was told its hero.
+            // The replacement keeps the peer, so it is still bound, but not to the player it was told it plays.
+            var currentState = connectionLogic.SetState<ResolveCharacterState>();
+            var player = new Player("MyPlayer", "MyHero", "MyParty", "MyClan", "MyCharacter");
+            var heir = new Player("MyPlayer", "MyHeir", "MyParty", "MyClan", "HeirCharacter");
+            var playerManager = SetupRegisteredPlayer(player);
+            var registered = player;
+            playerManager
+                .Setup(manager => manager.TryGetPlayer(player.ControllerId, out It.Ref<Player>.IsAny))
+                .Callback((string id, out Player returnedPlayer) => { returnedPlayer = registered; })
+                .Returns(true);
+            playerManager
+                .Setup(manager => manager.TrySetPeer(player, IsPeer(playerPeer)))
+                .Callback(() => { registered = heir; })
+                .Returns(true);
+
+            currentState.Handle_ClientValidate(new MessagePayload<NetworkClientValidate>(
+                playerPeer,
+                new NetworkClientValidate(player.ControllerId)));
+
+            var validation = Assert.Single(
+                serverComponent.TestNetwork.GetPeerMessages(playerPeer).OfType<NetworkClientValidated>());
+            Assert.Same(player, validation.Player);
+            serverComponent.Container.Resolve<Mock<ISaveInterface>>().Verify(save => save.SaveCurrentGame(), Times.Never);
+            Assert.Equal(ConnectionState.ShutdownRequested, playerPeer.ConnectionState);
+            Assert.IsType<TransferSaveState>(connectionLogic.State);
+        }
+
+        [Fact]
+        public void NetworkClientValidate_RegistrationUnchangedAtTheSaveSnapshot_SendsTheSaveAndLoads()
+        {
+            var currentState = connectionLogic.SetState<ResolveCharacterState>();
+            var player = new Player("MyPlayer", "MyHero", "MyParty", "MyClan", "MyCharacter");
+            SetupRegisteredPlayer(player);
+
+            currentState.Handle_ClientValidate(new MessagePayload<NetworkClientValidate>(
+                playerPeer,
+                new NetworkClientValidate(player.ControllerId)));
+
+            Assert.Equal(ConnectionState.Connected, playerPeer.ConnectionState);
+            Assert.Single(serverComponent.TestNetwork.GetPeerPacketsFromType<GameSaveDataChunkPacket>(playerPeer));
+            Assert.IsType<LoadingState>(connectionLogic.State);
         }
 
         [Fact]
@@ -447,7 +651,7 @@ namespace Coop.Tests.Server.Connections.States
             // the character created next registers this controller a second time and every later
             // lookup for it is ambiguous.
             playerManagerMock.Verify(i => i.RemovePlayer(player), Times.Once);
-            playerManagerMock.Verify(i => i.SetPeer(It.IsAny<string>(), It.IsAny<NetPeer>()), Times.Never);
+            playerManagerMock.Verify(i => i.TrySetPeer(It.IsAny<Player>(), It.IsAny<NetPeer>()), Times.Never);
 
             var message = Assert.Single(
                 serverComponent.TestNetwork.GetPeerMessages(playerPeer).OfType<NetworkClientValidated>());
@@ -807,6 +1011,27 @@ namespace Coop.Tests.Server.Connections.States
 
         // NetPeer compares by endpoint, and both test peers share one.
         private static NetPeer IsPeer(NetPeer peer) => It.Is<NetPeer>(candidate => ReferenceEquals(candidate, peer));
+
+        // A registered player whose hero exists and whose party needs no repair. Its peer stays bound once it joins.
+        private Mock<IPlayerManager> SetupRegisteredPlayer(Player player)
+        {
+            var playerManager = serverComponent.Container.Resolve<Mock<IPlayerManager>>();
+            var registeredPlayer = player;
+            var controllerId = player.ControllerId;
+            playerManager.Setup(manager => manager.TryGetPlayer(player.ControllerId, out registeredPlayer)).Returns(true);
+            playerManager.Setup(manager => manager.TrySetPeer(player, It.IsAny<NetPeer>())).Returns(true);
+            playerManager.Setup(manager => manager.TryGetCurrentController(It.IsAny<NetPeer>(), out controllerId)).Returns(true);
+
+            var hero = (Hero)FormatterServices.GetUninitializedObject(typeof(Hero));
+            Assert.True(serverComponent.Container.Resolve<IObjectManager>().AddExisting(player.HeroId, hero));
+            var restoredPlayer = player;
+            serverComponent.Container
+                .Resolve<Mock<IPlayerPartyRestorer>>()
+                .Setup(restorer => restorer.TryRestore(player, out restoredPlayer))
+                .Returns(true);
+
+            return playerManager;
+        }
 
         private void SetServerModules(List<ModuleInfo> modules)
         {

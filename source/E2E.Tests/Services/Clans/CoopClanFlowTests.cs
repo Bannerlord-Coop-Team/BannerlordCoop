@@ -552,6 +552,74 @@ public class CoopClanFlowTests : MapEventTestBase, IDisposable
         }
     }
 
+    // #2400: a session row can name the player's hero and party by their short ids. Restored while the hero is
+    // alive or already dead and waiting, that player is still offered its heir and keeps its party.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RestoredSessionRowWithShortIds_StillChoosesItsHeir(bool restoredAfterDeath)
+    {
+        Join();
+        var heirId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var memberPromptsBefore = memberClient.InternalMessages.GetMessages<NetworkClientSelectHeir>().Count();
+        var leaderPromptsBefore = leaderClient.InternalMessages.GetMessages<NetworkClientSelectHeir>().Count();
+        Server.Call(() =>
+        {
+            var original = Get<Hero>(Server, member.HeroId);
+            if (!restoredAfterDeath) RestoreSavedRowWithShortIds();
+
+            var heir = Get<Hero>(Server, heirId);
+            heir.Occupation = Occupation.Lord;
+            heir.SetBirthDay(CampaignTime.YearsFromNow(-20));
+            heir.Father = original;
+            heir.Clan = original.Clan;
+            Get<MobileParty>(Server, member.MobilePartyId).MemberRoster.AddToCounts(heir.CharacterObject, 1);
+            Server.Resolve<IHeirSelectionCampaignBehaviorInterface>().PrepareSuccession(original);
+            original.AddDeathMark(null, KillCharacterAction.KillCharacterActionDetail.DiedInBattle);
+            original.ChangeState(Hero.CharacterStates.Dead);
+
+            if (restoredAfterDeath) RestoreSavedRowWithShortIds();
+            // What the kill action publishes for a player hero's death
+            Server.Resolve<IMessageBroker>().Publish(original, new PlayerHeirSelectionRequested(original));
+        });
+        Flush();
+
+        var choices = Assert.Single(memberClient.InternalMessages.GetMessages<NetworkClientSelectHeir>().Skip(memberPromptsBefore));
+        Assert.Equal(heirId, Assert.Single(choices.HeirIdApparents).Key);
+        Assert.Equal(leaderPromptsBefore, leaderClient.InternalMessages.GetMessages<NetworkClientSelectHeir>().Count());
+        Send(memberClient, new NetworkHeirSelectionOver(member.HeroId, heirId));
+        Flush();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(member.ControllerId, out var replacement));
+            Assert.Equal(heirId, replacement.HeroId);
+            Assert.Equal(member.MobilePartyId, replacement.MobilePartyId);
+            var party = Get<MobileParty>(Server, member.MobilePartyId);
+            Assert.Same(Get<Hero>(Server, heirId), party.LeaderHero);
+            Assert.False(party.IsDisbanding);
+        });
+
+        void RestoreSavedRowWithShortIds()
+        {
+            var players = Server.Resolve<IPlayerManager>();
+            var savedRow = new Player(member.ControllerId,
+                GameInterface.Services.ObjectManager.ObjectManager.Compact(member.HeroId, typeof(Hero)),
+                GameInterface.Services.ObjectManager.ObjectManager.Compact(member.MobilePartyId, typeof(MobileParty)),
+                member.ClanId, member.CharacterObjectId, member.OriginalClanId);
+            Assert.NotEqual(member.HeroId, savedRow.HeroId);
+            Assert.NotEqual(member.MobilePartyId, savedRow.MobilePartyId);
+            Assert.True(Server.Resolve<IPlayerPartyRestorer>().TryRestore(savedRow, out var restored));
+            // Heir selection compares these ids as strings, so the row must hold the registered ones
+            Assert.Equal(member.HeroId, restored.HeroId);
+            Assert.Equal(member.MobilePartyId, restored.MobilePartyId);
+            Assert.True(players.TryGetPlayer(member.ControllerId, out var registered));
+            Assert.True(players.RemovePlayer(registered));
+            Assert.True(players.AddPlayer(restored));
+            players.SetPeer(member.ControllerId, memberClient.NetPeer);
+        }
+    }
+
     // S13, S14, S16: the leader has first choice and an already claimed heir cannot be reused.
     [Theory]
     [InlineData(1)]

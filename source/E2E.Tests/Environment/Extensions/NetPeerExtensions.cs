@@ -15,6 +15,7 @@ internal static class NetPeerExtensions
     private static int endpointSequence;
     private static readonly IPAddress MockAddress = IPAddress.Parse("127.0.0.2");
     private static readonly FieldInfo Id = typeof(NetPeer).GetField(nameof(NetPeer.Id))!;
+    private static readonly FieldInfo TimeSinceLastPacket = typeof(NetPeer).GetField("_timeSinceLastPacket", BindingFlags.NonPublic | BindingFlags.Instance)!;
     private static readonly ConstructorInfo Ctor = typeof(NetPeer).GetConstructor(BindingFlags.NonPublic | BindingFlags.Instance, new Type[]
     {
         typeof(NetManager),
@@ -24,6 +25,12 @@ internal static class NetPeerExtensions
     public static void SetId(this NetPeer peer, int id)
     {
         Id.SetValue(peer, id);
+    }
+
+    /// <summary>Sets how long ago LiteNetLib last heard from the peer, in milliseconds.</summary>
+    public static void SetTimeSinceLastPacket(this NetPeer peer, float milliseconds)
+    {
+        TimeSinceLastPacket.SetValue(peer, milliseconds);
     }
 
     public static NetPeer CreatePeer()

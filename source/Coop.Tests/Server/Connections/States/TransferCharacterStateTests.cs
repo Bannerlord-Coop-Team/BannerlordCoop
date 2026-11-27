@@ -44,6 +44,7 @@ namespace Coop.Tests.Server.Connections.States
             differentPeer = network.CreatePeer();
             container.Resolve<IConnectionMessageQueue>().RegisterPeer(playerPeer);
             connectionLogic = container.Resolve<ConnectionLogic>(new TypedParameter(typeof(NetPeer), playerPeer));
+            connectionLogic.AcknowledgedPlayer = serverComponent.BindPeerToPlayer(playerPeer);
         }
 
         [Fact]
@@ -243,10 +244,12 @@ namespace Coop.Tests.Server.Connections.States
                 });
             var logic = new Mock<IConnectionLogic>();
             logic.SetupGet(value => value.Peer).Returns(playerPeer);
+            logic.SetupGet(value => value.AcknowledgedPlayer).Returns(connectionLogic.AcknowledgedPlayer);
 
             var state = new TransferSaveState(
                 logic.Object, context.MessageBroker, network.Object, context.CoopSessionProvider, context.SaveInterface,
-                queue, context.Coalescer, context.AttachmentIdMapper, context.ServerOptionsProvider, context.LootShipHold);
+                queue, context.Coalescer, context.AttachmentIdMapper, context.ServerOptionsProvider, context.LootShipHold,
+                context.PlayerManager);
             state.Load();
 
             Assert.Equal(peerDisconnects ? 1 : 2, attemptedChunks);

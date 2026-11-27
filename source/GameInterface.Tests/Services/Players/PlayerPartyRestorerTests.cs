@@ -100,6 +100,8 @@ public class PlayerPartyRestorerTests
         objectManager
             .Setup(manager => manager.TryGetObjectWithLogging(player.HeroId, out resolvedHero))
             .Returns(true);
+        string heroId = player.HeroId;
+        objectManager.Setup(manager => manager.TryGetIdWithLogging(resolvedHero, out heroId)).Returns(true);
         objectManager
             .Setup(manager => manager.TryGetObject(player.MobilePartyId, out missingParty))
             .Returns(false);
@@ -129,6 +131,41 @@ public class PlayerPartyRestorerTests
         Assert.Same(hero, party.LeaderHero);
     }
 
+    [Theory]
+    // A saved row can name the hero and party by their short ids. The restored registration uses the ids they
+    // are registered under, whether the hero is alive or dead and waiting for heir selection.
+    [InlineData(false)]
+    [InlineData(true)]
+    public void TryRestore_RowNamedByShortIds_UsesTheRegisteredIds(bool heroIsDead)
+    {
+        var (hero, party, _, _) = CreatePlayerGraph();
+        if (heroIsDead) hero._heroState = Hero.CharacterStates.Dead;
+        var registered = new Player("Controller", "Hero_Saved", "MobileParty_Saved", "Clan_Saved", "Character_Saved");
+        var objectManager = CreateRegisteredPlayerObjectManager(registered, hero);
+        Assert.True(objectManager.AddExisting(registered.MobilePartyId, party));
+        var player = new Player(registered.ControllerId, "Saved", "Saved", registered.ClanId,
+            registered.CharacterObjectId)
+        {
+            PlatformName = "Saved name"
+        };
+        player.CrimeRatings["Kingdom_empire_s"] = 40f;
+        player.MapTrackedControllerIds.Add("TrackedController");
+        var restorer = new PlayerPartyRestorer(
+            objectManager,
+            Mock.Of<IAutoRegistryFactory>(),
+            () => Array.Empty<MobileParty>(),
+            _ => throw new InvalidOperationException("The saved party should be kept"),
+            _ => throw new InvalidOperationException("No recovery party was created"));
+
+        Assert.True(restorer.TryRestore(player, out var restored));
+
+        Assert.Equal(registered.HeroId, restored.HeroId);
+        Assert.Equal(registered.MobilePartyId, restored.MobilePartyId);
+        Assert.Equal("Saved name", restored.PlatformName);
+        Assert.Equal(40f, restored.CrimeRatings["Kingdom_empire_s"]);
+        Assert.Equal(new[] { "TrackedController" }, restored.MapTrackedControllerIds);
+    }
+
     [Fact]
     public void TryRestore_MissingCaptiveParty_CreatesParkedLeaderlessRecoveryParty()
     {
@@ -154,6 +191,8 @@ public class PlayerPartyRestorerTests
         objectManager
             .Setup(manager => manager.TryGetObjectWithLogging(player.HeroId, out resolvedHero))
             .Returns(true);
+        string heroId = player.HeroId;
+        objectManager.Setup(manager => manager.TryGetIdWithLogging(resolvedHero, out heroId)).Returns(true);
         objectManager
             .Setup(manager => manager.TryGetObject(player.MobilePartyId, out missingParty))
             .Returns(false);
@@ -360,6 +399,8 @@ public class PlayerPartyRestorerTests
         objectManager
             .Setup(manager => manager.TryGetObjectWithLogging(player.HeroId, out resolvedHero))
             .Returns(true);
+        string heroId = player.HeroId;
+        objectManager.Setup(manager => manager.TryGetIdWithLogging(resolvedHero, out heroId)).Returns(true);
         objectManager
             .Setup(manager => manager.TryGetObject(player.MobilePartyId, out missingParty))
             .Returns(false);
@@ -424,6 +465,8 @@ public class PlayerPartyRestorerTests
         objectManager
             .Setup(manager => manager.TryGetObjectWithLogging(player.HeroId, out resolvedHero))
             .Returns(true);
+        string heroId = player.HeroId;
+        objectManager.Setup(manager => manager.TryGetIdWithLogging(resolvedHero, out heroId)).Returns(true);
         objectManager
             .Setup(manager => manager.TryGetObject(player.MobilePartyId, out resolvedParty))
             .Returns(true);
@@ -443,6 +486,8 @@ public class PlayerPartyRestorerTests
         objectManager
             .Setup(manager => manager.TryGetObjectWithLogging(player.HeroId, out resolvedHero))
             .Returns(true);
+        string heroId = player.HeroId;
+        objectManager.Setup(manager => manager.TryGetIdWithLogging(resolvedHero, out heroId)).Returns(true);
         objectManager
             .Setup(manager => manager.TryGetObject(player.MobilePartyId, out missingParty))
             .Returns(false);
