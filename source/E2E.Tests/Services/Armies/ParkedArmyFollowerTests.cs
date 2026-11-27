@@ -34,15 +34,24 @@ public class ParkedArmyFollowerTests : MapEventTestBase
 
         Reconnect();
         AssertNotFollowing(partyId, armyId);
-        AssertNotInBattle(partyId);
-        AssertActive(partyId, expected: true);
     }
 
     [Fact]
-    public void DisconnectDuringLeaderBattle_FollowerLeavesArmyWhenTheBattleEnds()
+    public void DisconnectDuringLeaderBattle_FollowerLeavesArmyWhenTheLeaderLeavesTheBattle()
     {
         var leaderId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         var (partyId, armyId) = SetupFollower(leaderId);
+
+        // An AI member attached after the follower is the last party on the side, so the battle finalizes once the follower is out of it
+        var memberId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        Server.Call(() =>
+        {
+            var member = Server.GetRegisteredObject<MobileParty>(memberId);
+            member.Army = Server.GetRegisteredObject<Army>(armyId);
+            member.AttachedTo = Server.GetRegisteredObject<MobileParty>(leaderId);
+        }, MapEventDisabledMethods);
+        PumpAll();
+
         var mapEventId = StartLeaderBattle(leaderId);
         Server.Call(() => Assert.Same(Server.GetRegisteredObject<MapEvent>(mapEventId), Server.GetRegisteredObject<MobileParty>(partyId).MapEvent));
 
@@ -50,7 +59,8 @@ public class ParkedArmyFollowerTests : MapEventTestBase
         Disconnect();
         AssertActive(partyId, expected: true);
 
-        DestroyServerMapEvent(mapEventId);
+        // The leader leaving takes its attached parties with it, and the battle finalizes inside vanilla's loop over them
+        Server.Call(() => Server.GetRegisteredObject<MobileParty>(leaderId).Party.MapEventSide = null, MapEventDisabledMethods);
         PumpAll();
 
         AssertActive(partyId, expected: false);

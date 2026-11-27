@@ -303,7 +303,9 @@ internal class PlayerPartyVisibilityHandler : IHandler
             }
 
             LeaveSiegeBeforeParking(party);
-            LeaveArmyBeforeParking(party);
+            // Queued because the battle can finalize while vanilla is still looping over the leader's attached parties
+            if (party.Army != null && party.Army.LeaderParty != party)
+                GameThread.EnqueueSafe(() => LeaveArmyBeforeParking(party));
             party.IsActive = false;
             party.IsVisible = false;
             partyVisuals.RemoveVisual(party);
@@ -355,7 +357,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
         if (army == null || army.LeaderParty == party) return;
 
         Logger.Information(
-            "Removing disconnected party {PartyId} from the army of {LeaderId} before parking",
+            "Removing party {PartyId} from the army of {LeaderId} before parking",
             party.StringId,
             army.LeaderParty?.StringId);
 
