@@ -3579,6 +3579,7 @@ public class VillageHostileActionTests : MapEventTestBase
         TestEnvironment.ConnectRegisteredPlayer(client, "PlayerTwo");
         var target = CreateVillageTarget();
         string? mapEventId = null;
+        GameMenuOption? leaveOption = null;
 
         Server.Call(() =>
         {
@@ -3643,11 +3644,17 @@ public class VillageHostileActionTests : MapEventTestBase
             Assert.Null(joinerParty.Party.MapEventSide);
             Assert.Equal(defenderCount, mapEvent.DefenderSide.Parties.Count);
 
-            // Vanilla Leave counts the men on side None, so it stays disabled until the server answers.
-            var leaveArgs = new MenuCallbackArgs((MenuContext)null, TextObject.GetEmpty());
-            Assert.True(behavior.game_menu_encounter_leave_on_condition(leaveArgs));
-            Assert.False(leaveArgs.IsEnabled);
-            Assert.Null(Record.Exception(() => behavior.game_menu_encounter_leave_on_consequence(leaveArgs)));
+            // Vanilla Leave counts the men on side None, so the open menu's Leave stays disabled until the server answers.
+            var starter = new CampaignGameStarter(Campaign.Current.GameMenuManager, Campaign.Current.ConversationManager);
+            starter.AddGameMenu("encounter", "Encounter", _ => { });
+            starter.AddGameMenuOption("encounter", "leave", "Leave...",
+                leaveArgs => behavior.game_menu_encounter_leave_on_condition(leaveArgs),
+                leaveArgs => behavior.game_menu_encounter_leave_on_consequence(leaveArgs), isLeave: true);
+            mapState._menuContext.GameMenu = Campaign.Current.GameMenuManager.GetGameMenu("encounter");
+            Campaign.Current.GameMenuManager.RefreshMenuOptionConditions(mapState._menuContext);
+            leaveOption = mapState._menuContext.GameMenu.MenuOptions.Single();
+            Assert.False(leaveOption.IsEnabled);
+            Assert.Null(Record.Exception(() => leaveOption.OnConsequence(new MenuCallbackArgs(mapState._menuContext, leaveOption.Text))));
             Assert.Same(encounter, PlayerEncounter.Current);
             Assert.Same(mapEvent, PlayerEncounter.Battle);
         }, disabledMethods);
@@ -3671,12 +3678,11 @@ public class VillageHostileActionTests : MapEventTestBase
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(joinerMobilePartyId, out var joinerParty));
             Assert.Same(mapEvent.DefenderSide, joinerParty.Party.MapEventSide);
 
-            // Leave works again once the join is answered, and a click asks the server to remove the joiner.
-            var behavior = ObjectHelper.SkipConstructor<EncounterGameMenuBehavior>();
-            var leaveArgs = new MenuCallbackArgs((MenuContext)null, TextObject.GetEmpty());
-            Assert.True(behavior.game_menu_encounter_leave_on_condition(leaveArgs));
-            Assert.True(leaveArgs.IsEnabled);
-            behavior.game_menu_encounter_leave_on_consequence(leaveArgs);
+            // The add refreshes the open menu, so its Leave works again and a click asks the server to remove the joiner.
+            var menuContext = Campaign.Current.CurrentMenuContext;
+            Assert.Same(leaveOption, menuContext.GameMenu.MenuOptions.Single());
+            Assert.True(leaveOption!.IsEnabled);
+            leaveOption.OnConsequence(new MenuCallbackArgs(menuContext, leaveOption.Text));
         }, disabledMethods);
 
         var leave = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestLeaveBattle>());
