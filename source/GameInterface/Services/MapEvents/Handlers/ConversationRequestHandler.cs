@@ -667,10 +667,12 @@ internal class ConversationRequestHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
-            // Co-op ticks EncounterManager under screens and missions, but its meeting throws while they cover the map
+            // Co-op ticks EncounterManager under screens and missions, but its meeting throws while they cover the map.
+            // Later approvals queue behind a waiting one so they still apply in the order they came.
             var states = GameStateManager.Current;
-            if (message.Source == ConversationRestartSource.EncounterManager &&
-                states?.ActiveState is not MapState && states?.LastOrDefault<MapState>() != null)
+            if (approvalWaitingForMap.HasValue ||
+                (message.Source == ConversationRestartSource.EncounterManager &&
+                 states?.ActiveState is not MapState && states?.LastOrDefault<MapState>() != null))
             {
                 WaitForMap(message);
                 return;
@@ -683,7 +685,7 @@ internal class ConversationRequestHandler : IHandler
     /// <summary>[Client] Keeps the approval, and the server's hold, until the player is back on the map.</summary>
     private void WaitForMap(NetworkAllowConversation message)
     {
-        // The server ignores the release when the newer approval already owns its hold
+        // Release the replaced one, the server skips it when the newer approval already took over that hold
         if (approvalWaitingForMap is NetworkAllowConversation replaced && replaced.RequestId != message.RequestId)
         {
             ClearPendingConversationRequest(replaced.RequestId);
@@ -785,22 +787,32 @@ internal class ConversationRequestHandler : IHandler
         var pendingRequestId = pendingConversationRequestId;
         var activeRequestId = activeConversationRequestId;
         var hadActiveConversationRequest = hasActiveConversationRequest;
+        var waitingApproval = approvalWaitingForMap;
 
         ClearPendingConversationRequest(pendingRequestId);
         activeConversationRequestId = null;
         hasActiveConversationRequest = false;
+        approvalWaitingForMap = null;
         var finishedMapEventId = payload.What.FinishedMapEventId;
 
         // Release every request id the server may still hold; null only covers legacy or server-detected engagements.
+        var releasedRequestIds = new List<string>();
         if (pendingRequestId != null)
-            SendConversationEndedToServer(pendingRequestId, finishedMapEventId);
+            releasedRequestIds.Add(pendingRequestId);
 
         if (hadActiveConversationRequest &&
             (pendingRequestId == null || activeRequestId != pendingRequestId))
-            SendConversationEndedToServer(activeRequestId, finishedMapEventId);
+            releasedRequestIds.Add(activeRequestId);
 
         if (pendingRequestId == null && !hadActiveConversationRequest)
-            SendConversationEndedToServer(null, finishedMapEventId);
+            releasedRequestIds.Add(null);
+
+        // An approval waiting for the map is dropped with the encounter, otherwise it would open without its hold
+        if (waitingApproval is NetworkAllowConversation waiting && !releasedRequestIds.Contains(waiting.RequestId))
+            releasedRequestIds.Add(waiting.RequestId);
+
+        foreach (var requestId in releasedRequestIds)
+            SendConversationEndedToServer(requestId, finishedMapEventId);
     }
 
     /// <summary>
