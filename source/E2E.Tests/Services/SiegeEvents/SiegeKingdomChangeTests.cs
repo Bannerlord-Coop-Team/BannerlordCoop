@@ -150,82 +150,127 @@ public class SiegeKingdomChangeTests : SiegeTestBase
     private SiegeScenario SetupSiegeScenario(PlayerSiegeRole role)
     {
         var instances = Clients.Append(Server).ToArray();
-        var besiegerKingdomId = CreateKingdomEverywhere(instances);
-        var defenderKingdomId = CreateKingdomEverywhere(instances);
-        var neutralKingdomId = CreateKingdomEverywhere(instances);
-        var besiegerClanId = TestEnvironment.CreateRegisteredObject<Clan>();
-        var ownerClanId = TestEnvironment.CreateRegisteredObject<Clan>();
-        var playerClanId = TestEnvironment.CreateRegisteredObject<Clan>();
-        var townId = TestEnvironment.CreateRegisteredObject<Town>();
-        var leaderPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var participants = CreateParticipants(instances);
+        var playerDefends = role == PlayerSiegeRole.Defender;
+
+        StageKingdomsAtWar(
+            instances,
+            participants,
+            playerDefends ? participants.DefenderKingdomId : participants.BesiegerKingdomId);
+        var siege = SetupSiege(role switch
+        {
+            PlayerSiegeRole.Besieger => new[] { participants.LeaderPartyId, participants.PlayerPartyId },
+            PlayerSiegeRole.SoleBesieger => new[] { participants.PlayerPartyId },
+            _ => new[] { participants.LeaderPartyId },
+        });
+        var settlementId = StageBesiegedTown(
+            instances,
+            siege.SiegeEventId,
+            participants,
+            playerDefends ? participants.PlayerPartyId : null);
+        AssertPlayerCanJoin(
+            instances,
+            siege.SiegeEventId,
+            participants.PlayerPartyId,
+            playerDefends ? BattleSideEnum.Defender : BattleSideEnum.Attacker);
+
+        return new SiegeScenario(
+            siege.SiegeEventId,
+            settlementId,
+            participants.BesiegerKingdomId,
+            participants.DefenderKingdomId,
+            participants.NeutralKingdomId,
+            participants.PlayerClanId,
+            participants.PlayerPartyId,
+            participants.LeaderPartyId);
+    }
+
+    private SiegeParticipants CreateParticipants(IReadOnlyList<EnvironmentInstance> instances)
+    {
         var (playerHeroId, playerPartyId) = CreatePlayerHeroParty(PlayerControllerId);
 
-        var playerDefends = role == PlayerSiegeRole.Defender;
-        var playerKingdomId = playerDefends ? defenderKingdomId : besiegerKingdomId;
-        var playerSide = playerDefends ? BattleSideEnum.Defender : BattleSideEnum.Attacker;
-        var campPartyIds = role switch
-        {
-            PlayerSiegeRole.Besieger => new[] { leaderPartyId, playerPartyId },
-            PlayerSiegeRole.SoleBesieger => new[] { playerPartyId },
-            _ => new[] { leaderPartyId },
-        };
+        return new SiegeParticipants(
+            CreateKingdomEverywhere(instances),
+            CreateKingdomEverywhere(instances),
+            CreateKingdomEverywhere(instances),
+            TestEnvironment.CreateRegisteredObject<Clan>(),
+            TestEnvironment.CreateRegisteredObject<Clan>(),
+            TestEnvironment.CreateRegisteredObject<Clan>(),
+            TestEnvironment.CreateRegisteredObject<Town>(),
+            TestEnvironment.CreateRegisteredObject<MobileParty>(),
+            playerHeroId,
+            playerPartyId);
+    }
 
+    // Puts the lord's clan, the town owner's clan and the player's clan in their kingdoms, and the two kingdoms at war.
+    private static void StageKingdomsAtWar(
+        IReadOnlyList<EnvironmentInstance> instances,
+        SiegeParticipants participants,
+        string playerKingdomId)
+    {
         foreach (var instance in instances)
         {
             instance.Call(() =>
             {
-                var besiegers = instance.GetRegisteredObject<Kingdom>(besiegerKingdomId);
-                var besiegerClan = instance.GetRegisteredObject<Clan>(besiegerClanId);
-                var playerClan = instance.GetRegisteredObject<Clan>(playerClanId);
-                var playerHero = instance.GetRegisteredObject<Hero>(playerHeroId);
-                var playerParty = instance.GetRegisteredObject<MobileParty>(playerPartyId);
+                var besiegers = instance.GetRegisteredObject<Kingdom>(participants.BesiegerKingdomId);
+                var defenders = instance.GetRegisteredObject<Kingdom>(participants.DefenderKingdomId);
+                var besiegerClan = instance.GetRegisteredObject<Clan>(participants.BesiegerClanId);
+                var playerClan = instance.GetRegisteredObject<Clan>(participants.PlayerClanId);
+                var playerHero = instance.GetRegisteredObject<Hero>(participants.PlayerHeroId);
+                var playerParty = instance.GetRegisteredObject<MobileParty>(participants.PlayerPartyId);
 
                 using (new AllowedThread())
                 {
                     KingdomTestSetup.PlaceClanInKingdom(besiegerClan, besiegers);
                     KingdomTestSetup.PlaceClanInKingdom(
-                        instance.GetRegisteredObject<Clan>(ownerClanId),
-                        instance.GetRegisteredObject<Kingdom>(defenderKingdomId));
+                        instance.GetRegisteredObject<Clan>(participants.OwnerClanId), defenders);
                     KingdomTestSetup.PlaceClanInKingdom(playerClan, instance.GetRegisteredObject<Kingdom>(playerKingdomId));
                     playerClan.Name = new TextObject("joiner clan");
                     playerHero.Clan = playerClan;
                     playerClan.SetLeader(playerHero);
                     playerHero.PartyBelongedTo = playerParty;
                     playerParty.ActualClan = playerClan;
-                    instance.GetRegisteredObject<MobileParty>(leaderPartyId).ActualClan = besiegerClan;
-                    VillageHostileFactionStanceHelper.ApplyWarStance(
-                        besiegers, instance.GetRegisteredObject<Kingdom>(defenderKingdomId));
+                    instance.GetRegisteredObject<MobileParty>(participants.LeaderPartyId).ActualClan = besiegerClan;
+                    VillageHostileFactionStanceHelper.ApplyWarStance(besiegers, defenders);
                 }
             });
         }
+    }
 
-        var siege = SetupSiege(campPartyIds);
+    // Turns the besieged settlement into the owner clan's listed town with the diplomatic behavior attached, and puts
+    // the defending party inside when there is one. Returns the settlement id, which outlives the siege graph.
+    private string StageBesiegedTown(
+        IReadOnlyList<EnvironmentInstance> instances,
+        string siegeEventId,
+        SiegeParticipants participants,
+        string? defenderPartyId)
+    {
         string? settlementId = null;
         Server.Call(() => Assert.True(Server.ObjectManager.TryGetId(
-            Server.GetRegisteredObject<SiegeEvent>(siege.SiegeEventId).BesiegedSettlement, out settlementId)));
+            Server.GetRegisteredObject<SiegeEvent>(siegeEventId).BesiegedSettlement, out settlementId)));
 
         foreach (var instance in instances)
         {
             instance.Call(() =>
             {
-                var siegeEvent = instance.GetRegisteredObject<SiegeEvent>(siege.SiegeEventId);
+                var siegeEvent = instance.GetRegisteredObject<SiegeEvent>(siegeEventId);
                 var settlement = siegeEvent.BesiegedSettlement;
-                var town = instance.GetRegisteredObject<Town>(townId);
-                var playerParty = instance.GetRegisteredObject<MobileParty>(playerPartyId);
+                var town = instance.GetRegisteredObject<Town>(participants.TownId);
 
                 using (new AllowedThread())
                 {
                     settlement.SetSettlementComponent(town);
-                    town._ownerClan = instance.GetRegisteredObject<Clan>(ownerClanId);
+                    town._ownerClan = instance.GetRegisteredObject<Clan>(participants.OwnerClanId);
                     settlement.SiegeEvent = siegeEvent;
                     // The live server starts sieges through SiegeEventManager.StartSiegeEvent, which lists them.
                     if (!Campaign.Current.SiegeEventManager._siegeEvents.Contains(siegeEvent))
                         Campaign.Current.SiegeEventManager._siegeEvents.Add(siegeEvent);
 
-                    if (playerDefends)
+                    if (defenderPartyId != null)
                     {
-                        playerParty._currentSettlement = settlement;
-                        settlement._partiesCache.Add(playerParty);
+                        var defender = instance.GetRegisteredObject<MobileParty>(defenderPartyId);
+                        defender._currentSettlement = settlement;
+                        settlement._partiesCache.Add(defender);
                     }
                 }
 
@@ -235,20 +280,24 @@ public class SiegeKingdomChangeTests : SiegeTestBase
                 diplomaticHandler.RegisterEvents();
 
                 Assert.True(settlement.IsFortification);
-                Assert.Same(instance.GetRegisteredObject<Kingdom>(defenderKingdomId), settlement.MapFaction);
-                Assert.True(siegeEvent.CanPartyJoinSide(playerParty.Party, playerSide));
+                Assert.Same(instance.GetRegisteredObject<Kingdom>(participants.DefenderKingdomId), settlement.MapFaction);
             });
         }
 
-        return new SiegeScenario(
-            siege.SiegeEventId,
-            settlementId!,
-            besiegerKingdomId,
-            defenderKingdomId,
-            neutralKingdomId,
-            playerClanId,
-            playerPartyId,
-            leaderPartyId);
+        return settlementId!;
+    }
+
+    private static void AssertPlayerCanJoin(
+        IReadOnlyList<EnvironmentInstance> instances,
+        string siegeEventId,
+        string playerPartyId,
+        BattleSideEnum side)
+    {
+        foreach (var instance in instances)
+        {
+            instance.Call(() => Assert.True(instance.GetRegisteredObject<SiegeEvent>(siegeEventId)
+                .CanPartyJoinSide(instance.GetRegisteredObject<MobileParty>(playerPartyId).Party, side)));
+        }
     }
 
     private string CreateKingdomEverywhere(IEnumerable<EnvironmentInstance> instances)
@@ -257,6 +306,18 @@ public class SiegeKingdomChangeTests : SiegeTestBase
         KingdomTestSetup.EnsureKingdomRegistered(instances, kingdomId);
         return kingdomId;
     }
+
+    private readonly record struct SiegeParticipants(
+        string BesiegerKingdomId,
+        string DefenderKingdomId,
+        string NeutralKingdomId,
+        string BesiegerClanId,
+        string OwnerClanId,
+        string PlayerClanId,
+        string TownId,
+        string LeaderPartyId,
+        string PlayerHeroId,
+        string PlayerPartyId);
 
     private readonly record struct SiegeScenario(
         string SiegeEventId,

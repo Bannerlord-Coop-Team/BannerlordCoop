@@ -7,7 +7,6 @@ using System.Linq;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Siege;
-using TaleWorlds.Core;
 
 namespace GameInterface.Services.SiegeEvents.Patches;
 
@@ -38,20 +37,16 @@ internal class SiegeDiplomaticLeavePatches
         __state = null;
         if (ModInformation.IsClient) return false;
 
-        // Player parties failing vanilla's join checks, read before vanilla removes anyone. The postfix keeps the
-        // ones that actually left.
-        var settlement = siegeEvent.BesiegedSettlement;
-        var failedBesiegers = siegeEvent.BesiegerCamp.GetInvolvedPartiesForEventType(siegeEvent.GetCurrentBattleType())
-            .Where(party => party.IsPlayerParty() && !siegeEvent.CanPartyJoinSide(party, BattleSideEnum.Attacker))
+        // Player parties on each side before vanilla removes anyone. The postfix keeps the ones it pulled out.
+        var besiegers = siegeEvent.BesiegerCamp.GetInvolvedPartiesForEventType(siegeEvent.GetCurrentBattleType())
+            .Where(party => party.IsPlayerParty())
             .Select(party => party.MobileParty)
             .ToArray();
-        var failedDefenders = settlement.Parties
-            .Where(defender => defender.Party.IsPlayerParty() &&
-                settlement.MapFaction != defender.MapFaction &&
-                !siegeEvent.CanPartyJoinSide(defender.Party, BattleSideEnum.Defender))
+        var defenders = siegeEvent.BesiegedSettlement.Parties
+            .Where(defender => defender.Party.IsPlayerParty())
             .ToArray();
 
-        __state = new PlayerSiegeParties(failedBesiegers, failedDefenders);
+        __state = new PlayerSiegeParties(besiegers, defenders);
         return true;
     }
 
