@@ -32,8 +32,7 @@ internal class RaidJoinEncounterPatch
         if (ModInformation.IsServer) return true;
 
         var mapEvent = PlayerEncounter.Current.GetEncounteredBattleOrNull();
-        var mainParty = MobileParty.MainParty?.Party;
-        if (!mapEvent.IsVillageHostileAction() || mainParty == null)
+        if (!mapEvent.IsVillageHostileAction())
             return true;
 
         if (__originalMethod.Name == HelpDefendersConsequence)
@@ -59,19 +58,13 @@ internal class RaidJoinEncounterPatch
 
     private static void SwitchToJoinedEncounterMenu(MapEvent mapEvent)
     {
-        if (mapEvent?.DefenderSide?.TroopCount > 0 && !mapEvent.IsActiveSlowVillageRaid())
+        if (mapEvent.DefenderSide.TroopCount > 0)
         {
             GameMenu.SwitchToMenu("encounter");
             return;
         }
 
-        if (mapEvent.IsRaidHostileAction())
-        {
-            GameMenu.SwitchToMenu("raiding_village");
-            MobileParty.MainParty.SetMoveModeHold();
-            return;
-        }
-
-        GameMenu.SwitchToMenu("encounter");
+        GameMenu.SwitchToMenu("raiding_village");
+        MobileParty.MainParty.SetMoveModeHold();
     }
 }
