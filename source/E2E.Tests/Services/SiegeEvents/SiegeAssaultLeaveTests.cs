@@ -456,13 +456,7 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
             Assert.True(client.ObjectManager.TryGetObject<SiegeEvent>(siegeEventId, out var siegeEvent));
 
-            mapEvent.SetBattleType(MapEvent.BattleTypes.Siege);
-            var settlement = siegeEvent.BesiegedSettlement;
-            settlement.SiegeEvent = siegeEvent;
-            settlement.Party._mapEventSide = mapEvent.DefenderSide;
-            mapEvent.DefenderSide.LeaderParty = settlement.Party;
-            mapEvent.SetMapEventSettlement(settlement);
-            party._currentSettlement = settlement;
+            StageSettlementSiege(mapEvent, siegeEvent, party);
 
             var encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
             encounter._mapEvent = mapEvent;
@@ -760,13 +754,7 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
             Assert.True(client.ObjectManager.TryGetObject<SiegeEvent>(siegeEventId, out var siegeEvent));
 
-            mapEvent.SetBattleType(MapEvent.BattleTypes.Siege);
-            var settlement = siegeEvent.BesiegedSettlement;
-            settlement.SiegeEvent = siegeEvent;
-            settlement.Party._mapEventSide = mapEvent.DefenderSide;
-            mapEvent.DefenderSide.LeaderParty = settlement.Party;
-            mapEvent.SetMapEventSettlement(settlement);
-            party._currentSettlement = settlement;
+            StageSettlementSiege(mapEvent, siegeEvent, party);
 
             var encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
             encounter._mapEvent = mapEvent;
@@ -861,13 +849,7 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
                     attacker.ActualClan = enemyClan;
                 }
 
-                mapEvent.SetBattleType(MapEvent.BattleTypes.Siege);
-                var settlement = siege.BesiegedSettlement;
-                settlement.SiegeEvent = siege;
-                settlement.Party._mapEventSide = mapEvent.DefenderSide;
-                mapEvent.DefenderSide.LeaderParty = settlement.Party;
-                mapEvent.SetMapEventSettlement(settlement);
-                party._currentSettlement = settlement;
+                StageSettlementSiege(mapEvent, siege, party);
             }, disabledMethods);
         }
 
@@ -1065,6 +1047,17 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
 
             party._besiegerCamp = siegeEvent.BesiegerCamp;
         });
+    }
+
+    private static void StageSettlementSiege(MapEvent mapEvent, SiegeEvent siege, MobileParty party)
+    {
+        mapEvent.SetBattleType(MapEvent.BattleTypes.Siege);
+        var settlement = siege.BesiegedSettlement;
+        settlement.SiegeEvent = siege;
+        settlement.Party._mapEventSide = mapEvent.DefenderSide;
+        mapEvent.DefenderSide.LeaderParty = settlement.Party;
+        mapEvent.SetMapEventSettlement(settlement);
+        party._currentSettlement = settlement;
     }
 
     private static void SetMainParty(EnvironmentInstance instance, string partyId)
