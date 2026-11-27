@@ -3,6 +3,7 @@ using Common.Network;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.BloodFeuds.Data;
 using GameInterface.Services.BloodFeuds.Messages;
+using GameInterface.Services.Heroes;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -80,6 +81,7 @@ internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorIn
             {
                 Hero prisoner = troop.HeroObject;
                 if (!troop.IsHero || prisoner.IsPlayerHero() || prisoner.Clan != player.Clan) continue;
+                if (!HeroExecutionRules.IsExecutable(prisoner, out _)) continue;
                 if (TryGetPendingSettlementExecution(player.HeroId, prisoner, out _)) continue;
 
                 StartClanMemberExecutionAtSettlement(player, prisoner, feudedClan);
@@ -157,6 +159,7 @@ internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorIn
 
         // PlayerCaptivityServerHandler rolls a captured player's execution
         if (prisoner.IsPlayerHero()) return;
+        if (!HeroExecutionRules.IsExecutable(prisoner, out _)) return;
 
         foreach (var player in GetPlayers())
         {
@@ -185,6 +188,7 @@ internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorIn
 
     public void DailyTickHero(Hero hero)
     {
+        if (!HeroExecutionRules.IsExecutable(hero, out _)) return;
         if (!objectManager.TryGetId(hero, out var heroId)) return;
 
         foreach (var pendingExecutions in Data.PlayerPendingSettlementExecutions.Values)
@@ -228,6 +232,7 @@ internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorIn
                     pendingExecutions.Remove(heroId);
                     continue;
                 }
+                if (!HeroExecutionRules.IsExecutable(hero, out _)) continue;
 
                 PartyBase captorParty = hero.PartyBelongedToAsPrisoner;
                 if (hero.IsPrisoner && captorParty?.LeaderHero != null && captorParty.MapEvent == null &&
@@ -242,6 +247,8 @@ internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorIn
 
     public void CanHeroBeReleased(Hero hero, ref bool result)
     {
+        // Holding a captive the host's config never lets anyone execute would keep them captive for good
+        if (!HeroExecutionRules.IsExecutable(hero, out _)) return;
         if (!objectManager.TryGetId(hero, out var heroId)) return;
 
         if (Data.PlayerPendingSettlementExecutions.Values.Any(pendingExecutions => pendingExecutions.ContainsKey(heroId)) ||
@@ -423,7 +430,8 @@ internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorIn
             objectManager.TryGetObjectWithLogging(pendingExecution.CapturerClanId, out pendingClan);
         }
 
-        if (GetClanMemberCurrentExecutionData(player, clanMember, pendingClan, out var currentExecutorClan))
+        if (HeroExecutionRules.IsExecutable(clanMember, out _) &&
+            GetClanMemberCurrentExecutionData(player, clanMember, pendingClan, out var currentExecutorClan))
         {
             if (pendingClan == null)
             {
