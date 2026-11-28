@@ -195,6 +195,8 @@ internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorIn
 
     public void OnHeroChangedClan(Hero hero)
     {
+        MovePendingExecutions(hero);
+
         if (!playerManager.TryGetPlayer(hero, out var player)) return;
 
         Dictionary<string, BloodFeudData> feuds = null;
@@ -217,6 +219,62 @@ internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorIn
 
             SendToPlayer(player, new NetworkNotifyBloodFeudSettlementExecutionStarted(
                 pendingExecution.Key, pendingExecution.Value.CapturerClanId, settlementId, pendingExecution.Value.ExecutionDateTicks));
+        }
+    }
+
+    // Pending executions are kept under a player clan, so a hero who changes clan takes them along or they end
+    private void MovePendingExecutions(Hero hero)
+    {
+        if (!objectManager.TryGetId(hero, out var heroId)) return;
+        TryGetPlayerClan(hero.Clan, out var newPlayerClan);
+
+        PendingSettlementExecution movedExecution = null;
+        foreach (var pendingExecutions in Data.PlayerClanPendingSettlementExecutions)
+        {
+            if (pendingExecutions.Key == newPlayerClan?.ClanId) continue;
+            if (!pendingExecutions.Value.TryGetValue(heroId, out var pendingExecution)) continue;
+
+            pendingExecutions.Value.Remove(heroId);
+            movedExecution = pendingExecution;
+
+            var oldPlayerClan = GetPlayerClans().FirstOrDefault(candidate => candidate.ClanId == pendingExecutions.Key);
+            if (oldPlayerClan != null)
+                SendToClan(oldPlayerClan, new NetworkNotifyBloodFeudSettlementExecutionCancelled(heroId, pendingExecution.CapturerClanId));
+        }
+
+        if (newPlayerClan != null && !hero.IsPlayerHero())
+        {
+            if (movedExecution != null && hero.PartyBelongedToAsPrisoner?.Settlement != null &&
+                objectManager.TryGetObject<Clan>(movedExecution.CapturerClanId, out var capturerClan) &&
+                HasBloodFeud(newPlayerClan.ClanId, capturerClan))
+            {
+                StartClanMemberExecutionAtSettlement(newPlayerClan, hero, capturerClan, new CampaignTime(movedExecution.ExecutionDateTicks));
+            }
+            else
+            {
+                UpdateClanMemberExecutionState(newPlayerClan, hero);
+            }
+        }
+
+        // After battle executions are kept under the captor's clan, so a party leader takes their prisoners' along
+        MobileParty party = hero.PartyBelongedTo;
+        if (party?.LeaderHero != hero) return;
+
+        foreach (var prisonerElement in party.PrisonRoster.GetTroopRoster())
+        {
+            Hero prisoner = prisonerElement.Character.HeroObject;
+            if (prisoner == null || !objectManager.TryGetId(prisoner, out var prisonerId)) continue;
+
+            bool wasPending = false;
+            foreach (var pendingExecutions in Data.PlayerClanHeroesPendingMapEventEndExecution)
+            {
+                if (pendingExecutions.Key == newPlayerClan?.ClanId) continue;
+
+                wasPending |= pendingExecutions.Value.Remove(prisonerId);
+            }
+
+            if (wasPending && newPlayerClan != null && HasBloodFeud(newPlayerClan.ClanId, prisoner.Clan))
+                AddPendingMapEventEndExecution(newPlayerClan.ClanId, prisoner);
         }
     }
 
@@ -555,22 +613,22 @@ internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorIn
         return false;
     }
 
-    private void StartClanMemberExecutionAtSettlement(BloodFeudPlayerClan playerClan, Hero clanMember, Clan clanWithFeud)
+    private void StartClanMemberExecutionAtSettlement(BloodFeudPlayerClan playerClan, Hero clanMember, Clan clanWithFeud, CampaignTime? executionDate = null)
     {
         Settlement settlement = clanMember.PartyBelongedToAsPrisoner.Settlement;
         if (!objectManager.TryGetIdWithLogging(clanMember, out var clanMemberId)) return;
         if (!objectManager.TryGetIdWithLogging(clanWithFeud, out var clanId)) return;
         if (!objectManager.TryGetIdWithLogging(settlement, out var settlementId)) return;
 
-        CampaignTime executionDate = CampaignTime.DaysFromNow(ExecutionCampaignBehavior.DaysTillBloodFeudExecutionInSettlement);
+        long executionDateTicks = (executionDate ?? CampaignTime.DaysFromNow(ExecutionCampaignBehavior.DaysTillBloodFeudExecutionInSettlement)).NumTicks;
         if (!Data.PlayerClanPendingSettlementExecutions.TryGetValue(playerClan.ClanId, out var pendingExecutions))
         {
             pendingExecutions = new Dictionary<string, PendingSettlementExecution>();
             Data.PlayerClanPendingSettlementExecutions[playerClan.ClanId] = pendingExecutions;
         }
-        pendingExecutions[clanMemberId] = new PendingSettlementExecution(clanId, executionDate.NumTicks);
+        pendingExecutions[clanMemberId] = new PendingSettlementExecution(clanId, executionDateTicks);
 
-        SendToClan(playerClan, new NetworkNotifyBloodFeudSettlementExecutionStarted(clanMemberId, clanId, settlementId, executionDate.NumTicks));
+        SendToClan(playerClan, new NetworkNotifyBloodFeudSettlementExecutionStarted(clanMemberId, clanId, settlementId, executionDateTicks));
     }
 
     private void CancelClanMemberExecutionAtSettlement(BloodFeudPlayerClan playerClan, Hero clanMember, Clan capturerClan)
@@ -638,7 +696,8 @@ internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorIn
             pendingExecutions = new List<string>();
             Data.PlayerClanHeroesPendingMapEventEndExecution[playerClanId] = pendingExecutions;
         }
-        pendingExecutions.Add(heroId);
+        if (!pendingExecutions.Contains(heroId))
+            pendingExecutions.Add(heroId);
     }
 
     private bool TryGetPendingSettlementExecution(string playerClanId, Hero hero, out PendingSettlementExecution pendingExecution)

@@ -8,6 +8,7 @@ using GameInterface.Services.BloodFeuds.Messages;
 using GameInterface.Services.Players;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.Settlements;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.BloodFeuds;
@@ -95,6 +96,52 @@ public class ExecutionCampaignBehaviorInterfaceTests : MapEventTestBase
 
             var update = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkUpdateBloodFeuds>());
             Assert.True(update.Feuds[feudClanId].HasBloodFeud);
+        });
+    }
+
+    [Fact]
+    public void ClanMemberMovingToAnotherFeudingPlayerClan_TakesTheirPendingSettlementExecutionAlong()
+    {
+        var (oldLeaderId, _) = CreatePlayerHeroParty("OldClanLeader");
+        var (newLeaderId, _) = CreatePlayerHeroParty("NewClanLeader");
+        var oldClanId = TestEnvironment.CreateRegisteredObject<Clan>();
+        var newClanId = TestEnvironment.CreateRegisteredObject<Clan>();
+        var memberId = TestEnvironment.CreateRegisteredObject<Hero>();
+
+        Server.Call(() =>
+        {
+            var oldClan = Server.GetRegisteredObject<Clan>(oldClanId);
+            var newClan = Server.GetRegisteredObject<Clan>(newClanId);
+            var member = Server.GetRegisteredObject<Hero>(memberId);
+            var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
+            var town = GameObjectCreator.CreateInitializedObject<Town>();
+            var captorClan = GameObjectCreator.CreateInitializedObject<Clan>();
+            Assert.True(Server.ObjectManager.TryGetId(captorClan, out var captorClanId));
+
+            using (new AllowedThread())
+            {
+                oldClan.InitMembers();
+                newClan.InitMembers();
+                Server.GetRegisteredObject<Hero>(oldLeaderId).Clan = oldClan;
+                Server.GetRegisteredObject<Hero>(newLeaderId).Clan = newClan;
+                member.Clan = oldClan;
+                settlement.Town = town;
+                settlement.SetSettlementComponent(town);
+                town.OwnerClan = captorClan;
+            }
+            TakePrisonerAction.Apply(settlement.Party, member);
+
+            var data = Server.Resolve<ICoopSessionProvider>().CoopSession.BloodFeudPlayerData;
+            data.PlayerClanBloodFeuds[oldClanId] = new() { [captorClanId] = new BloodFeudData { HasBloodFeud = true } };
+            data.PlayerClanBloodFeuds[newClanId] = new() { [captorClanId] = new BloodFeudData { HasBloodFeud = true } };
+            long executionDateTicks = CampaignTime.DaysFromNow(3).NumTicks;
+            data.PlayerClanPendingSettlementExecutions[oldClanId] = new() { [memberId] = new PendingSettlementExecution(captorClanId, executionDateTicks) };
+
+            member.Clan = newClan;
+
+            Assert.Empty(data.PlayerClanPendingSettlementExecutions[oldClanId]);
+            var moved = data.PlayerClanPendingSettlementExecutions[newClanId][memberId];
+            Assert.Equal((captorClanId, executionDateTicks), (moved.CapturerClanId, moved.ExecutionDateTicks));
         });
     }
 }
