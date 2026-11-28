@@ -124,7 +124,11 @@ public class ParkedArmyFollowerTests : MapEventTestBase
     private string PutInTownAtWarWithFollower(string partyId, params string[] otherPartyIds)
     {
         string? clanId = null;
-        Server.Call(() => Assert.True(Server.ObjectManager.TryGetId(Server.GetRegisteredObject<MobileParty>(partyId).ActualClan, out clanId)));
+        Server.Call(() =>
+        {
+            var clan = Server.GetRegisteredObject<MobileParty>(partyId).ActualClan;
+            Assert.True(Server.ObjectManager.TryGetId(clan, out clanId));
+        });
         var (settlementId, townClanId) = HostileTownSetup.CreateTown(TestEnvironment, clanId!, otherPartyIds.Prepend(partyId).ToArray());
         HostileTownSetup.DeclareWar(TestEnvironment, townClanId, clanId!);
 

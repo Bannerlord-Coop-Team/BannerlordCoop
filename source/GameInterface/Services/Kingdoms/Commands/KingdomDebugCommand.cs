@@ -1665,10 +1665,12 @@ public class KingdomDebugCommand
         {
             if (ModInformation.IsClient) return Failed("Run this command on the server.");
             Action<IFaction, IFaction> declare;
+            bool needsActor = true;
             switch (args[2])
             {
                 case "default": declare = DeclareWarAction.ApplyByDefault; break;
-                case "decision": declare = DeclareWarAction.ApplyByKingdomDecision; break;
+                // The server applies a passed DeclareWarDecision with no player swapped in, so a decision war needs no actor
+                case "decision": declare = DeclareWarAction.ApplyByKingdomDecision; needsActor = false; break;
                 case "hostility": declare = DeclareWarAction.ApplyByPlayerHostility; break;
                 case "rebellion": declare = DeclareWarAction.ApplyByRebellion; break;
                 case "crime": declare = DeclareWarAction.ApplyByCrimeRatingChange; break;
@@ -1677,9 +1679,8 @@ public class KingdomDebugCommand
                 case "agreement": declare = DeclareWarAction.ApplyByCallToWarAgreement; break;
                 default: return Failed("Unknown war cause.");
             }
-            // The server applies a passed DeclareWarDecision with no player swapped in, so a decision war needs no actor
             bool hasActor = args.Count > 3 && args[3] != "none";
-            if (!hasActor && args[2] != "decision") return Failed("A registered acting player is required.");
+            if (needsActor && !hasActor) return Failed("A registered acting player is required.");
             if (TryGetObjectManager(out var objectManager) == false)
             {
                 return Failed("Unable to resolve ObjectManager");

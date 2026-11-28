@@ -102,7 +102,15 @@ internal class PlayerPartyVisibilityHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party))
                 continue;
 
-            ParkParty(player, party, "its saved player is offline", queueArmyLeave: false);
+            // One party's broken siege, army or town state must not stop the rest being parked
+            try
+            {
+                ParkParty(player, party, "its saved player is offline", queueArmyLeave: false);
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "Could not park offline party {PartyId} after its save loaded", party.StringId);
+            }
         }
     }
 
