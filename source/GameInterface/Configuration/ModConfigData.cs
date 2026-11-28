@@ -59,6 +59,8 @@ public sealed class AdvancedStartConfigData
 
     public AdvancedStartTypesConfigData StartTypes { get; set; }
 
+    public bool? PersonalShip { get; set; }
+
     [JsonExtensionData]
     public IDictionary<string, JToken> UnknownKeys { get; set; }
 }
@@ -77,6 +79,8 @@ public sealed class AdvancedStartTypesConfigData
     public bool? Mercenary { get; set; }
     public bool? Vassal { get; set; }
     public bool? King { get; set; }
+    public bool? FleetAdmiral { get; set; }
+    public bool? MerchantVenturer { get; set; }
 
     [JsonExtensionData]
     public IDictionary<string, JToken> UnknownKeys { get; set; }

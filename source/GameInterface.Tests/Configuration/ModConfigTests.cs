@@ -89,6 +89,9 @@ public class ModConfigTests : IDisposable
         Assert.True(config.AdvancedStart.StartTypes.Mercenary);
         Assert.True(config.AdvancedStart.StartTypes.Vassal);
         Assert.True(config.AdvancedStart.StartTypes.King);
+        Assert.True(config.AdvancedStart.StartTypes.FleetAdmiral);
+        Assert.True(config.AdvancedStart.StartTypes.MerchantVenturer);
+        Assert.True(config.AdvancedStart.PersonalShip);
     }
 
     [Fact]
