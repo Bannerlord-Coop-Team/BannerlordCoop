@@ -36,8 +36,8 @@ public class RetainedPlayerHeroServerTests : MissionTestEnvironment
         Server.Call(() =>
         {
             var players = Server.Resolve<IPlayerManager>();
-            players.SetPeer("holder", clients[0].NetPeer);
-            players.SetPeer("returner", clients[1].NetPeer);
+            players.BindRegisteredPeer("holder", clients[0].NetPeer);
+            players.BindRegisteredPeer("returner", clients[1].NetPeer);
         });
         EnterBattle(clients[0], battleId);
         if (variant == "before-mission-ready")

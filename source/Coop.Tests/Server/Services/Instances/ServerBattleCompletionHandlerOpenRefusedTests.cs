@@ -146,7 +146,8 @@ public class ServerBattleCompletionHandlerOpenRefusedTests : IDisposable
     {
         var stalePeer = RegisterPlayer(JoinerControllerId, port: 52205);
         Reserve(stalePeer, MapEventId, JoinerControllerId);
-        playerManager.SetPeer(JoinerControllerId, CreatePeer(52206));
+        Assert.True(playerManager.TryGetPlayer(JoinerControllerId, out var joiner));
+        Assert.True(playerManager.TrySetPeer(joiner, CreatePeer(52206)));
 
         broker.Publish(stalePeer, new NetworkFieldBattleOpenRefused(MapEventId));
         Drain();
@@ -190,9 +191,9 @@ public class ServerBattleCompletionHandlerOpenRefusedTests : IDisposable
     private NetPeer RegisterPlayer(string controllerId, int port)
     {
         var peer = CreatePeer(port);
-        Assert.True(playerManager.AddPlayer(
-            new Player(controllerId, string.Empty, string.Empty, string.Empty, string.Empty)));
-        playerManager.SetPeer(controllerId, peer);
+        var player = new Player(controllerId, string.Empty, string.Empty, string.Empty, string.Empty);
+        Assert.True(playerManager.AddPlayer(player));
+        Assert.True(playerManager.TrySetPeer(player, peer));
         return peer;
     }
 

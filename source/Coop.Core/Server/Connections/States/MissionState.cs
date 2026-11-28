@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using Coop.Core.Server.Connections.Messages;
+using GameInterface.Services.Players.Data;
 using LiteNetLib;
 
 namespace Coop.Core.Server.Connections.States;
@@ -35,7 +36,7 @@ public class MissionState : ConnectionStateBase
     {
     }
 
-    public override void TransferSave()
+    public override void TransferSave(Player acknowledgedPlayer)
     {
     }
 

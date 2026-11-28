@@ -53,7 +53,7 @@ namespace Coop.Tests.Server.Connections.States
         {
             connectionLogic.SetState<CreateCharacterState>();
 
-            connectionLogic.TransferSave();
+            connectionLogic.TransferSave(serverComponent.BindPeerToPlayer(playerPeer));
 
             Assert.IsType<LoadingState>(connectionLogic.State);
         }
@@ -303,8 +303,29 @@ namespace Coop.Tests.Server.Connections.States
             // only this peer is ejected and nothing is sent.
             Assert.Equal(ConnectionState.ShutdownRequested, playerPeer.ConnectionState);
             Assert.NotEqual(ConnectionState.ShutdownRequested, differentPeer.ConnectionState);
-            playerRegistryMock.Verify(p => p.SetPeer(It.IsAny<string>(), It.IsAny<NetPeer>()), Times.Never);
+            playerRegistryMock.Verify(p => p.TrySetPeer(It.IsAny<Player>(), It.IsAny<NetPeer>()), Times.Never);
             Assert.Empty(serverComponent.TestNetwork.SentNetworkMessages);
+            Assert.IsType<CreateCharacterState>(connectionLogic.State);
+        }
+
+        [Fact]
+        public void NetworkTransferNewHero_RegistrationChangedBeforeBinding_DisconnectsWithoutAnnouncing()
+        {
+            // A deletion or heir swap on the game thread can change the registration between AddPlayer and the bind
+            var hero = SetupUnpackedHero();
+            var playerRegistryMock = serverComponent.Container.Resolve<Mock<IPlayerManager>>();
+            playerRegistryMock
+                .Setup(p => p.TrySetPeer(It.IsAny<Player>(), It.IsAny<NetPeer>()))
+                .Returns(false);
+            var currentState = connectionLogic.SetState<CreateCharacterState>();
+
+            currentState.Handle_NetworkTransferNewHero(new MessagePayload<NetworkTransferNewHero>(
+                playerPeer, new NetworkTransferNewHero("MyId", Array.Empty<byte>())));
+
+            Assert.Equal(ConnectionState.ShutdownRequested, playerPeer.ConnectionState);
+            Assert.NotEqual(ConnectionState.ShutdownRequested, differentPeer.ConnectionState);
+            Assert.Empty(serverComponent.TestNetwork.SentNetworkMessages);
+            serverComponent.Container.Resolve<Mock<IHeroInterface>>().Verify(h => h.SetupServerHero(hero), Times.Never);
             Assert.IsType<CreateCharacterState>(connectionLogic.State);
         }
 
@@ -346,9 +367,30 @@ namespace Coop.Tests.Server.Connections.States
             heroInterfaceMock
                 .Setup(h => h.TryGetRegistrationHandles(hero, out handles))
                 .Returns(true);
+            // The join save only goes to a peer that still plays the player it was told, so the peer plays the added
+            // player once this state binds it
+            Player added = null;
+            var bound = false;
+            string boundControllerId = null;
             playerRegistryMock
                 .Setup(p => p.AddPlayer(It.IsAny<Player>()))
+                .Callback<Player>(player => added = player)
                 .Returns(true);
+            playerRegistryMock
+                .Setup(p => p.TrySetPeer(It.IsAny<Player>(), It.IsAny<NetPeer>()))
+                .Callback<Player, NetPeer>((player, _) =>
+                {
+                    bound = true;
+                    boundControllerId = player.ControllerId;
+                })
+                .Returns(true);
+            playerRegistryMock
+                .Setup(p => p.TryGetCurrentController(It.IsAny<NetPeer>(), out It.Ref<string>.IsAny))
+                .Callback((NetPeer peer, out string controllerId) => { controllerId = boundControllerId; })
+                .Returns(() => bound);
+            playerRegistryMock
+                .Setup(p => p.IsCurrentRegistration(It.IsAny<Player>()))
+                .Returns((Player player) => ReferenceEquals(player, added));
 
             return hero;
         }

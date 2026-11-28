@@ -183,7 +183,7 @@ public class UnstuckArmyPreservationTests : MapEventTestBase
                 Campaign.Current.MainParty = party;
             }
         });
-        Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer(controllerId, client.NetPeer));
+        Server.Call(() => Server.Resolve<IPlayerManager>().BindRegisteredPeer(controllerId, client.NetPeer));
         return player;
     }
 

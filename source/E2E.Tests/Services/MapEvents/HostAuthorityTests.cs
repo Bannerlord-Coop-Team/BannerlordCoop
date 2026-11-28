@@ -55,8 +55,8 @@ public class HostAuthorityTests : MapEventTestBase
 
         // Associate each client's connection with its controller on the SERVER's player registry so
         // Handle_NetworkChangeBattleState can resolve the sender, and seed the server's host assignment.
-        Server.Resolve<IPlayerManager>().SetPeer("host", hostClient.NetPeer);
-        Server.Resolve<IPlayerManager>().SetPeer("guest", guestClient.NetPeer);
+        Server.Resolve<IPlayerManager>().BindRegisteredPeer("host", hostClient.NetPeer);
+        Server.Resolve<IPlayerManager>().BindRegisteredPeer("guest", guestClient.NetPeer);
         Server.Call(() => Server.Resolve<IBattleHostRegistry>()
             .Set(ctx.MapEventId, new BattleHostAssignment("host", Array.Empty<string>())));
 

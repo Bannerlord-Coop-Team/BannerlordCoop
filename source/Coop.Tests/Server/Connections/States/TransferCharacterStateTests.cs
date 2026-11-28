@@ -15,6 +15,7 @@ using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.NavalDLC;
 using GameInterface.Services.Heroes.Interfaces;
+using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using LiteNetLib;
 using Moq;
@@ -27,10 +28,11 @@ namespace Coop.Tests.Server.Connections.States
 {
     public class TransferCharacterStateTests
     {
-        private readonly IConnectionLogic connectionLogic;
+        private readonly ConnectionLogic connectionLogic;
         private readonly NetPeer playerPeer;
         private readonly NetPeer differentPeer;
         private readonly ServerTestComponent serverComponent;
+        private readonly Player acknowledgedPlayer;
 
         public TransferCharacterStateTests(ITestOutputHelper output)
         {
@@ -44,13 +46,14 @@ namespace Coop.Tests.Server.Connections.States
             differentPeer = network.CreatePeer();
             container.Resolve<IConnectionMessageQueue>().RegisterPeer(playerPeer);
             connectionLogic = container.Resolve<ConnectionLogic>(new TypedParameter(typeof(NetPeer), playerPeer));
+            acknowledgedPlayer = serverComponent.BindPeerToPlayer(playerPeer);
         }
 
         [Fact]
         public void LoadMethod_TransitionState_LoadingState()
         {
             // Arrange
-            connectionLogic.SetState<TransferSaveState>();
+            connectionLogic.SetTransferSaveState(acknowledgedPlayer);
 
             // Act
             connectionLogic.Load();
@@ -63,11 +66,11 @@ namespace Coop.Tests.Server.Connections.States
         public void UnusedStatesMethods_DoNothing()
         {
             // Arrange
-            connectionLogic.SetState<TransferSaveState>();
+            connectionLogic.SetTransferSaveState(acknowledgedPlayer);
 
             // Act
             connectionLogic.CreateCharacter();
-            connectionLogic.TransferSave();
+            connectionLogic.TransferSave(acknowledgedPlayer);
             connectionLogic.EnterCampaign();
             connectionLogic.EnterMission();
 
@@ -111,7 +114,7 @@ namespace Coop.Tests.Server.Connections.States
                 .Returns(session);
 
             // Act — entering the state packages the save and sends it to the joining peer.
-            connectionLogic.SetState<TransferSaveState>();
+            connectionLogic.TransferSave(acknowledgedPlayer);
 
             // Assert — exactly one save chunk for this tiny save, carrying the deflate-compressed
             // save data to the joining peer.
@@ -137,6 +140,35 @@ namespace Coop.Tests.Server.Connections.States
         }
 
         [Fact]
+        public void EnteringState_PeerUnbound_DisconnectsWithoutTakingTheSave()
+        {
+            // A game over or deletion on the game thread unbinds the peer
+            serverComponent.Container.Resolve<Mock<IPlayerManager>>()
+                .Setup(manager => manager.TryGetCurrentController(playerPeer, out It.Ref<string>.IsAny))
+                .Returns(false);
+
+            connectionLogic.TransferSave(acknowledgedPlayer);
+
+            AssertDisconnectedWithoutTakingTheSave();
+        }
+
+        [Fact]
+        public void EnteringState_AcknowledgedPlayerReplaced_DisconnectsWithoutTakingTheSave()
+        {
+            // An heir swap replaces the registration while the peer stays bound to it
+            connectionLogic.TransferSave(new Player("BoundController", "Hero_Heir", "MobileParty_Bound", "Clan_Bound", "Character_Heir"));
+
+            AssertDisconnectedWithoutTakingTheSave();
+        }
+
+        private void AssertDisconnectedWithoutTakingTheSave()
+        {
+            serverComponent.Container.Resolve<Mock<ISaveInterface>>().Verify(save => save.SaveCurrentGame(), Times.Never);
+            Assert.Empty(serverComponent.TestNetwork.SentNetworkMessages);
+            Assert.Equal(ConnectionState.ShutdownRequested, playerPeer.ConnectionState);
+        }
+
+        [Fact]
         public void EnteringState_BroadcastsSavingStateAroundSnapshot()
         {
             var saveMock = serverComponent.Container.Resolve<Mock<ISaveInterface>>();
@@ -153,7 +185,7 @@ namespace Coop.Tests.Server.Connections.States
                 })
                 .Returns(new SaveResults(true, new byte[] { 1, 2, 3 }, "12345"));
 
-            connectionLogic.SetState<TransferSaveState>();
+            connectionLogic.TransferSave(acknowledgedPlayer);
 
             var messages = serverComponent.TestNetwork
                 .GetPeerMessagesFromType<NetworkGameSaveStateChanged>(differentPeer)
@@ -167,7 +199,7 @@ namespace Coop.Tests.Server.Connections.States
             serverComponent.TestNetwork.FlushPendingMessagesException =
                 new InvalidOperationException("Flush failed.");
 
-            connectionLogic.SetState<TransferSaveState>();
+            connectionLogic.TransferSave(acknowledgedPlayer);
 
             var messages = serverComponent.TestNetwork
                 .GetPeerMessagesFromType<NetworkGameSaveStateChanged>(differentPeer)
@@ -186,7 +218,7 @@ namespace Coop.Tests.Server.Connections.States
             var saveMock = serverComponent.Container.Resolve<Mock<ISaveInterface>>();
             saveMock.Setup(m => m.SaveCurrentGame()).Returns(new SaveResults(true, data, "12345"));
 
-            connectionLogic.SetState<TransferSaveState>();
+            connectionLogic.TransferSave(acknowledgedPlayer);
 
             var serializer = serverComponent.Container.Resolve<ICommonSerializer>();
             var packets = serverComponent.TestNetwork.GetPeerPacketsFromType<GameSaveDataChunkPacket>(playerPeer)
@@ -246,7 +278,8 @@ namespace Coop.Tests.Server.Connections.States
 
             var state = new TransferSaveState(
                 logic.Object, context.MessageBroker, network.Object, context.CoopSessionProvider, context.SaveInterface,
-                queue, context.Coalescer, context.AttachmentIdMapper, context.ServerOptionsProvider, context.LootShipHold);
+                queue, context.Coalescer, context.AttachmentIdMapper, context.ServerOptionsProvider, context.LootShipHold,
+                context.PlayerManager, acknowledgedPlayer);
             state.Load();
 
             Assert.Equal(peerDisconnects ? 1 : 2, attemptedChunks);

@@ -203,7 +203,7 @@ public class BattleSimulationEncounterTests : MapEventTestBase
 
         client.Resolve<IControllerIdProvider>().SetControllerId("1");
         RegisterAsPlayerParty("1", TestEnvironment.CreateRegisteredObject<Hero>(), playerPartyId);
-        Server.Resolve<IPlayerManager>().SetPeer("1", client.NetPeer);
+        Server.Resolve<IPlayerManager>().BindRegisteredPeer("1", client.NetPeer);
         EnableHeadlessEncounterFinish(client);
         client.Call(() =>
         {
@@ -271,7 +271,7 @@ public class BattleSimulationEncounterTests : MapEventTestBase
         var context = CreateServerMapEvent();
         var client = Clients.First();
         RegisterAsPlayerParty("1", TestEnvironment.CreateRegisteredObject<Hero>(), context.AttackerPartyId);
-        Server.Resolve<IPlayerManager>().SetPeer("1", client.NetPeer);
+        Server.Resolve<IPlayerManager>().BindRegisteredPeer("1", client.NetPeer);
         var ended = new List<MapEvent>();
         Server.Call(() =>
         {
@@ -341,7 +341,7 @@ public class BattleSimulationEncounterTests : MapEventTestBase
         var context = CreateServerMapEvent();
         var client = Clients.First();
         RegisterAsPlayerParty("1", TestEnvironment.CreateRegisteredObject<Hero>(), context.AttackerPartyId);
-        Server.Resolve<IPlayerManager>().SetPeer("1", client.NetPeer);
+        Server.Resolve<IPlayerManager>().BindRegisteredPeer("1", client.NetPeer);
         Server.Call(() =>
         {
             StartAcceptedSimulation(client, context);
@@ -373,7 +373,7 @@ public class BattleSimulationEncounterTests : MapEventTestBase
         var client = Clients.First();
         client.Resolve<IControllerIdProvider>().SetControllerId(playerId);
         var (heroId, partyId) = CreatePlayerHeroParty(playerId);
-        Server.Resolve<IPlayerManager>().SetPeer(playerId, client.NetPeer);
+        Server.Resolve<IPlayerManager>().BindRegisteredPeer(playerId, client.NetPeer);
         var captorId = CreateServerParty();
         var mapEventId = CreateBattleStateDefeatMapEvent(heroId, partyId, captorId);
 

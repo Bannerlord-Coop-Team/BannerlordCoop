@@ -201,7 +201,7 @@ public class MissionReadyElectionTests : MissionTestEnvironment
             Server.Call(() =>
             {
                 var playerManager = Server.Resolve<IPlayerManager>();
-                playerManager.SetPeer("other-ctrl", clients[1].NetPeer);
+                playerManager.BindRegisteredPeer("other-ctrl", clients[1].NetPeer);
                 Assert.True(playerManager.TryGetPlayer("other-ctrl", out var otherPlayer));
                 Assert.True(playerManager.IsConnected(otherPlayer));
             });

@@ -160,8 +160,8 @@ public class UnstuckCommandTests : MapEventTestBase
                 secondPartyId,
                 null,
                 secondCharacterId)));
-            playerManager.SetPeer("bug-report-requester", Client.NetPeer);
-            playerManager.SetPeer("bug-report-second", SecondClient.NetPeer);
+            playerManager.BindRegisteredPeer("bug-report-requester", Client.NetPeer);
+            playerManager.BindRegisteredPeer("bug-report-second", SecondClient.NetPeer);
         });
 
         SecondClient.Call(() => ((IDisposable)SecondClient.Resolve<IBugReportService>()).Dispose());
@@ -201,8 +201,8 @@ public class UnstuckCommandTests : MapEventTestBase
                 secondPartyId,
                 null,
                 secondCharacterId)));
-            playerManager.SetPeer("repeated-report-requester", Client.NetPeer);
-            playerManager.SetPeer("repeated-report-second", SecondClient.NetPeer);
+            playerManager.BindRegisteredPeer("repeated-report-requester", Client.NetPeer);
+            playerManager.BindRegisteredPeer("repeated-report-second", SecondClient.NetPeer);
         });
 
         Client.Call(() => ((IDisposable)Client.Resolve<IBugReportService>()).Dispose());
@@ -468,7 +468,7 @@ public class UnstuckCommandTests : MapEventTestBase
                 player.PartyId,
                 null,
                 player.CharacterId)));
-            playerManager.SetPeer(controllerId, client.NetPeer);
+            playerManager.BindRegisteredPeer(controllerId, client.NetPeer);
         });
     }
 

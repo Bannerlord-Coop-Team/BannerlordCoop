@@ -388,7 +388,7 @@ public class CompanionRescueSyncTests : IDisposable
                 context.TargetPartyId,
                 context.ClanId,
                 characterId)));
-            playerManager.SetPeer(controllerId, client.NetPeer);
+            playerManager.BindRegisteredPeer(controllerId, client.NetPeer);
         });
     }
 

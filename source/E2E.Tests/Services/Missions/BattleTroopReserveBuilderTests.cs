@@ -266,8 +266,8 @@ public class BattleTroopReserveBuilderTests : MissionTestEnvironment
         Server.Call(() =>
         {
             var players = Server.Resolve<IPlayerManager>();
-            players.SetPeer("host", host.NetPeer);
-            players.SetPeer("peer", peer.NetPeer);
+            players.BindRegisteredPeer("host", host.NetPeer);
+            players.BindRegisteredPeer("peer", peer.NetPeer);
         });
         EnterBattle(host, mapEventId);
         EnterBattle(peer, mapEventId);

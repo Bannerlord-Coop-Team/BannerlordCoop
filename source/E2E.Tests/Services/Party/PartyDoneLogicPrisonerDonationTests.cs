@@ -155,7 +155,7 @@ public class PartyDoneLogicPrisonerDonationTests : IDisposable
 
             var playerManager = Server.Resolve<IPlayerManager>();
             Assert.True(playerManager.AddPlayer(new Player("RequestingControllerId", mainHeroId, string.Empty, string.Empty, string.Empty)));
-            playerManager.SetPeer("RequestingControllerId", Client.NetPeer);
+            playerManager.BindRegisteredPeer("RequestingControllerId", Client.NetPeer);
 
             fixture = new DonationFixture(
                 mainHeroId,

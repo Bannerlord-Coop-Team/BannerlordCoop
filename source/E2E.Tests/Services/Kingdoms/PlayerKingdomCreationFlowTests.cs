@@ -632,7 +632,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         ConfigureClanInKingdom(ruler.ClanId, kingdomId);
         SetClanTierEverywhere(player.ClanId, 2);
 
-        Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer(ControllerId, client.NetPeer));
+        Server.Call(() => Server.Resolve<IPlayerManager>().BindRegisteredPeer(ControllerId, client.NetPeer));
 
         Assert.True(client.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
         client.SimulateMessage(this, new VassalServiceAccepted(kingdom, grantRewards: false));
@@ -670,7 +670,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         var ruler = CreateSyncedPlayerContext("VassalRuler", _ => false);
         var kingdomId = CreateNamedKingdomEverywhere(ruler.ClanId);
         SetClanTierEverywhere(player.ClanId, 2);
-        Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer(ControllerId, client.NetPeer));
+        Server.Call(() => Server.Resolve<IPlayerManager>().BindRegisteredPeer(ControllerId, client.NetPeer));
         Server.NetworkSentMessages.Clear();
 
         Assert.True(client.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
@@ -714,7 +714,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
                     instance.GetRegisteredObject<Clan>(mercenary.ClanId).IsUnderMercenaryService = true;
             });
         }
-        Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer(ControllerId, client.NetPeer));
+        Server.Call(() => Server.Resolve<IPlayerManager>().BindRegisteredPeer(ControllerId, client.NetPeer));
 
         using var notices = new MethodCallRecorder(AccessTools.Method(typeof(MBInformationManager), nameof(MBInformationManager.AddQuickInformation)));
         client.SimulateMessage(this, new MercenaryServiceAccepted(
@@ -768,7 +768,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         var lateClanId = TestEnvironment.CreateRegisteredObject<Clan>();
         Server.Call(() =>
         {
-            Server.Resolve<IPlayerManager>().SetPeer(ControllerId, client.NetPeer);
+            Server.Resolve<IPlayerManager>().BindRegisteredPeer(ControllerId, client.NetPeer);
             var kingdom = Server.GetRegisteredObject<Kingdom>(kingdomId);
             var lateClan = Server.GetRegisteredObject<Clan>(lateClanId);
             using (new AllowedThread())
@@ -802,7 +802,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         var kingdomId = CreateNamedKingdomEverywhere(ruler.ClanId);
         Server.Call(() =>
         {
-            Server.Resolve<IPlayerManager>().SetPeer(ControllerId, client.NetPeer);
+            Server.Resolve<IPlayerManager>().BindRegisteredPeer(ControllerId, client.NetPeer);
             ServerOffers()[player.HeroId] = new VassalAndMercenaryOfferData(kingdomId, CampaignTime.Now.NumTicks, new Dictionary<string, long>(), false);
         });
         Server.NetworkSentMessages.Clear();
@@ -836,7 +836,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         ConfigureClanInKingdom(ruler.ClanId, kingdomId);
         SetClanTierEverywhere(joiner.ClanId, 2);
 
-        Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer(ControllerId, client.NetPeer));
+        Server.Call(() => Server.Resolve<IPlayerManager>().BindRegisteredPeer(ControllerId, client.NetPeer));
 
         var onAgentInteractionPrefix = AccessTools.Method(typeof(LocationConversationPatches), "OnAgentInteractionPrefix");
         var onConversationEndPostfix = AccessTools.Method(typeof(LocationConversationPatches), "OnConversationEndPostfix");

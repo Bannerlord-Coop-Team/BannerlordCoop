@@ -253,8 +253,8 @@ public class AuthoritativeCompletionTests : MapEventTestBase
                 new BattleHostAssignment(HostControllerId, new[] { GuestControllerId }));
 
             var playerManager = Server.Resolve<IPlayerManager>();
-            playerManager.SetPeer(HostControllerId, Clients.First().NetPeer);
-            playerManager.SetPeer(GuestControllerId, Clients.Last().NetPeer);
+            playerManager.BindRegisteredPeer(HostControllerId, Clients.First().NetPeer);
+            playerManager.BindRegisteredPeer(GuestControllerId, Clients.Last().NetPeer);
         });
 
         return ctx.MapEventId;

@@ -7,6 +7,7 @@ using Common.Network.Messages;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Services.MobileParties;
 using Coop.Core.Server.Services.Kingdoms;
+using GameInterface.Services.Players.Data;
 using LiteNetLib;
 using Serilog;
 using System;
@@ -491,7 +492,7 @@ public class LoadingState : ConnectionStateBase
     {
     }
 
-    public override void TransferSave()
+    public override void TransferSave(Player acknowledgedPlayer)
     {
     }
 

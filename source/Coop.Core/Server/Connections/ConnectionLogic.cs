@@ -1,6 +1,7 @@
 ﻿using Common.Logging;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
+using GameInterface.Services.Players.Data;
 using LiteNetLib;
 using Serilog;
 using System;
@@ -16,6 +17,10 @@ public interface IConnectionLogic : IConnectionState
     NetPeer Peer { get; }
     IConnectionState State { get; }
     TState SetState<TState>() where TState : IConnectionState;
+
+    /// <summary>The only way into <see cref="TransferSaveState"/>.</summary>
+    /// <param name="acknowledgedPlayer">The join save is only sent while this is still the peer's registration</param>
+    TransferSaveState SetTransferSaveState(Player acknowledgedPlayer);
 }
 
 /// <inheritdoc cref="IConnectionLogic"/>
@@ -52,10 +57,17 @@ public class ConnectionLogic : IConnectionLogic
 
     public bool IsLoading => State?.IsLoading ?? false;
 
-    public TState SetState<TState>() where TState : IConnectionState
-    {
-        TState newState = (TState)stateFactories[typeof(TState)]();
+    public TState SetState<TState>() where TState : IConnectionState =>
+        ChangeState((TState)stateFactories[typeof(TState)]());
 
+    public TransferSaveState SetTransferSaveState(Player acknowledgedPlayer) =>
+        ChangeState(new TransferSaveState(
+            this, context.MessageBroker, context.Network, context.CoopSessionProvider, context.SaveInterface,
+            context.ConnectionMessageQueue, context.Coalescer, context.AttachmentIdMapper, context.ServerOptionsProvider,
+            context.LootShipHold, context.PlayerManager, acknowledgedPlayer));
+
+    private TState ChangeState<TState>(TState newState) where TState : IConnectionState
+    {
         lock (stateGate)
         {
             if (disposed)
@@ -80,9 +92,8 @@ public class ConnectionLogic : IConnectionLogic
     private IReadOnlyDictionary<Type, Func<IConnectionState>> CreateStateFactories() =>
         new Dictionary<Type, Func<IConnectionState>>
         {
-            [typeof(ResolveCharacterState)] = () => new ResolveCharacterState(this, context.MessageBroker, context.Network, context.ModuleValidator, context.PlayerManager, context.PlayerPartyRestorer, context.ObjectManager, context.ModuleInfoProvider, context.ModuleNameProvider, context.ExistingPlayerSender, context.SteamBanList, context.JoinValidationDenialLog),
+            [typeof(ResolveCharacterState)] = () => new ResolveCharacterState(this, context.MessageBroker, context.Network, context.ModuleValidator, context.PlayerManager, context.PlayerPartyRestorer, context.ObjectManager, context.ModuleInfoProvider, context.ModuleNameProvider, context.ExistingPlayerSender, context.SteamBanList, context.JoinValidationDenialLog, context.NetworkConfig),
             [typeof(CreateCharacterState)] = () => new CreateCharacterState(this, context.ObjectManager, context.MessageBroker, context.Network, context.HeroInterface, context.PlayerManager, context.PlayerCreationRollback, context.ExistingPlayerSender),
-            [typeof(TransferSaveState)] = () => new TransferSaveState(this, context.MessageBroker, context.Network, context.CoopSessionProvider, context.SaveInterface, context.ConnectionMessageQueue, context.Coalescer, context.AttachmentIdMapper, context.ServerOptionsProvider, context.LootShipHold),
             [typeof(LoadingState)] = () => new LoadingState(this, context.MessageBroker, context.Network, context.JoinCampaignBaselineSender, context.JoinCampaignKingdomBaseLineSender, context.ConnectionMessageQueue, context.Coalescer),
             [typeof(CampaignState)] = () => new CampaignState(this, context.MessageBroker),
             [typeof(MissionState)] = () => new MissionState(this, context.MessageBroker),
@@ -106,7 +117,7 @@ public class ConnectionLogic : IConnectionLogic
 
     public void CreateCharacter() => State.CreateCharacter();
 
-    public void TransferSave() => State.TransferSave();
+    public void TransferSave(Player acknowledgedPlayer) => State.TransferSave(acknowledgedPlayer);
 
     public void Load() => State.Load();
 

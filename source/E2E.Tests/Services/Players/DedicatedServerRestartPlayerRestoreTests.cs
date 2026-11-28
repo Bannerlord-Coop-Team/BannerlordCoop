@@ -1,18 +1,23 @@
 ﻿using Common.Messaging;
+using Common.Network;
+using Common.Network.Messages;
 using Common.Util;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
 using Coop.Core.Server.Services.Save;
 using E2E.Tests.Environment;
+using E2E.Tests.Environment.Extensions;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
+using GameInterface.CoopSessionData.Save.Data;
 using GameInterface.Registry.Messages;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using HarmonyLib;
+using LiteNetLib;
 using System.Net;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.Party;
@@ -24,10 +29,12 @@ namespace E2E.Tests.Services.Players;
 
 /// <summary>
 /// Regression for #3396: a dedicated-server restart must keep the controller to hero/party/clan mapping.
+/// Regression for #2400: a returning player never shares its hero with another controller or connection.
 /// </summary>
 public class DedicatedServerRestartPlayerRestoreTests : IDisposable
 {
     private const string ControllerId = "PlayerOne";
+    private const string OtherControllerId = "PlayerTwo";
     private const string UserDirVariable = "BANNERLORD_USER_DIR";
 
     private readonly ITestOutputHelper output;
@@ -114,6 +121,94 @@ public class DedicatedServerRestartPlayerRestoreTests : IDisposable
     }
 
     /// <summary>
+    /// A session json naming one hero under two controllers restores neither, since it can't say which one owns it.
+    /// </summary>
+    [Fact]
+    public void DedicatedServerRestart_HeroClaimedByTwoControllers_RestoresNeither()
+    {
+        var environment = StartServer();
+        var server = environment.Server;
+        var claim = new Player(ControllerId, "Hero_Claimed", "Party_Claimed", "Clan_Claimed", "Character_Claimed");
+        var secondClaim = new Player(OtherControllerId, claim.HeroId, claim.MobilePartyId, claim.ClanId, claim.CharacterObjectId);
+        var empty = CoopSession.Empty;
+        server.Resolve<ICoopSaveManager>().SaveCoopSession(saveName, new CoopSession(
+            saveName,
+            new[] { claim, secondClaim },
+            empty.CraftingPlayerData,
+            empty.WorkshopPlayerData,
+            empty.CaravansPlayerData,
+            empty.AlleyPlayerData,
+            empty.InteractionsPlayerData,
+            empty.TradePlayerData,
+            empty.InventoryPlayerData,
+            empty.HeroMeetingData,
+            empty.AgingPlayerData,
+            empty.NavalPlayerData));
+
+        RegisterRecreatedPlayerGraph(server, claim);
+        RestoreSavedPlayers(server);
+
+        server.Call(() =>
+        {
+            var playerManager = server.Resolve<IPlayerManager>();
+            Assert.False(playerManager.TryGetPlayer(ControllerId, out _));
+            Assert.False(playerManager.TryGetPlayer(OtherControllerId, out _));
+        });
+
+        ConnectReturningClient(server, environment.Clients.First());
+
+        var validated = Assert.Single(server.NetworkSentImmediateMessages.GetMessages<NetworkClientValidated>());
+        Assert.False(validated.HeroExists);
+    }
+
+    /// <summary>A rejoin drops the crashed player's lingering connection, and only the new one controls the hero.</summary>
+    /// <remarks>The party parked by the old connection's disconnect comes back once the new one syncs.</remarks>
+    [Fact]
+    public void ReturningPlayerRejoinsWhileOldConnectionLingers_OnlyTheNewConnectionControlsTheHero()
+    {
+        var environment = StartServer(numClients: 2);
+        var server = environment.Server;
+        var player = CreateRegisteredPlayer(server);
+        var crashed = environment.Clients.First();
+        var rejoined = environment.Clients.Last();
+
+        ConnectReturningClient(server, crashed);
+        crashed.NetPeer.SetTimeSinceLastPacket((float)server.Resolve<INetworkConfig>().RejoinSilenceTimeout.TotalMilliseconds * 2);
+        ConnectReturningClient(server, rejoined);
+
+        var validated = Assert.Single(server.NetworkSentImmediateMessages.GetMessages<NetworkClientValidated>());
+        Assert.True(validated.HeroExists);
+        Assert.Equal(ConnectionState.ShutdownRequested, crashed.NetPeer.ConnectionState);
+        server.Call(() =>
+        {
+            var playerManager = server.Resolve<IPlayerManager>();
+            Assert.False(playerManager.IsSenderControllingHero(crashed.NetPeer, player.HeroId));
+            Assert.True(playerManager.IsSenderControllingHero(rejoined.NetPeer, player.HeroId));
+        });
+
+        // LiteNetLib raises the disconnect once the dropped connection closes, long before the new one syncs.
+        server.SimulateMessage(this, new PlayerDisconnected(crashed.NetPeer, default));
+        server.PumpGameThread();
+
+        MobileParty party = null;
+        server.Call(() =>
+        {
+            Assert.True(server.ObjectManager.TryGetObject(player.MobilePartyId, out party));
+            Assert.False(party.IsActive, "The old connection's disconnect did not park the party.");
+        });
+
+        server.SimulateMessage(this, new PlayerCampaignSynchronized(rejoined.NetPeer));
+        server.PumpGameThread();
+
+        server.Call(() =>
+        {
+            Assert.True(server.Resolve<IPlayerManager>().TryGetPeer(ControllerId, out var peer));
+            Assert.Same(rejoined.NetPeer, peer);
+            Assert.True(party.IsActive, "The rejoined player's party stayed parked.");
+        });
+    }
+
+    /// <summary>
     /// Registers a player, saves through the dedicated server's driver, checks the sidecar, then shuts down.
     /// </summary>
     private Player RunFirstServerLifetime()
@@ -137,9 +232,9 @@ public class DedicatedServerRestartPlayerRestoreTests : IDisposable
     /// <summary>
     /// Builds a fresh server lifetime and tracks it so a failing assertion still tears it down.
     /// </summary>
-    private E2ETestEnvironment StartServer()
+    private E2ETestEnvironment StartServer(int numClients = 1)
     {
-        liveEnvironment = new E2ETestEnvironment(output, numClients: 1);
+        liveEnvironment = new E2ETestEnvironment(output, numClients: numClients);
         return liveEnvironment;
     }
 

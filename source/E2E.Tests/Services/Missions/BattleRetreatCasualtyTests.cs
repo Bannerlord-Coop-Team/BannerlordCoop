@@ -35,7 +35,7 @@ public class BattleRetreatCasualtyTests : MissionTestEnvironment
         // is the successor that will retreat.
         var (mapEventId, _) = SetupCoopBattle("host-ctrl", "retreat-ctrl");
         var clients = Clients.ToArray();
-        Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer("host-ctrl", clients[0].NetPeer));
+        Server.Call(() => Server.Resolve<IPlayerManager>().BindRegisteredPeer("host-ctrl", clients[0].NetPeer));
 
         // Seed the retreating player's party with five identical troops BEFORE any reserve is flattened, and
         // build its flattened battle roster the way the engine does (OnTroopKilled/Wounded then key off it).

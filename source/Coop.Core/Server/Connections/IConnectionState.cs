@@ -1,4 +1,5 @@
-﻿using System;
+﻿using GameInterface.Services.Players.Data;
+using System;
 
 namespace Coop.Core.Server.Connections;
 
@@ -18,9 +19,9 @@ public interface IConnectionState : IDisposable
     void CreateCharacter();
 
     /// <summary>
-    /// New character info is being transferred to server
+    /// Sends the join save for <paramref name="acknowledgedPlayer"/>, the registration the peer was just told it plays
     /// </summary>
-    void TransferSave();
+    void TransferSave(Player acknowledgedPlayer);
 
     /// <summary>
     /// Player loading server data as a whole

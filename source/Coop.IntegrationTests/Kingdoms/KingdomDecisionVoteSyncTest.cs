@@ -24,8 +24,9 @@ namespace Coop.IntegrationTests.Kingdoms
             var voteData = new KingdomDecisionVoteData("kingdom1", 0, 1, (int)Supporter.SupportWeights.FullyPush, false);
             // The server votes as the controller registered to the sending peer.
             var playerManager = server.Resolve<IPlayerManager>();
-            playerManager.AddPlayer(new Player("player1", "hero1", null, "clan1", "character1"));
-            playerManager.SetPeer("player1", client1.NetPeer);
+            var player = new Player("player1", "hero1", null, "clan1", "character1");
+            Assert.True(playerManager.AddPlayer(player));
+            Assert.True(playerManager.TrySetPeer(player, client1.NetPeer));
 
             GameThreadTestRunner.Run(() =>
                 client1.SimulateMessage(this, new KingdomDecisionVoteRequested(voteData)));

@@ -62,8 +62,8 @@ public sealed class LocationConversationFlowTests : MapEventTestBase
                 Assert.True(Server.ObjectManager.AddExisting(receiverCharacterId = "LocationReceiverCharacter", receiverHero.CharacterObject));
 
             var playerManager = Server.Resolve<IPlayerManager>();
-            playerManager.SetPeer("LocationInitiator", initiatorClient.NetPeer);
-            playerManager.SetPeer("LocationReceiver", receiverClient.NetPeer);
+            playerManager.BindRegisteredPeer("LocationInitiator", initiatorClient.NetPeer);
+            playerManager.BindRegisteredPeer("LocationReceiver", receiverClient.NetPeer);
         }, MapEventDisabledMethods);
 
         Server.NetworkSentMessages.Clear();
@@ -281,7 +281,7 @@ public sealed class LocationConversationFlowTests : MapEventTestBase
         foreach (var instance in Clients)
             Register(instance);
 
-        Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer(controllerId, client.NetPeer));
+        Server.Call(() => Server.Resolve<IPlayerManager>().BindRegisteredPeer(controllerId, client.NetPeer));
 
         return (characterId, mobilePartyId);
     }

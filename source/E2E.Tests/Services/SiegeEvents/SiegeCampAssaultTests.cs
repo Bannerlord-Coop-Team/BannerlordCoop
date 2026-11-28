@@ -193,7 +193,7 @@ public class SiegeCampAssaultTests : MapEventTestBase
         var client = Clients.First();
         var context = CreateContext(client, OwnerStance.OwnClan);
         client.Resolve<IControllerIdProvider>().SetControllerId(ControllerId);
-        Server.Resolve<IPlayerManager>().SetPeer(ControllerId, client.NetPeer);
+        Server.Resolve<IPlayerManager>().BindRegisteredPeer(ControllerId, client.NetPeer);
         string? playerId = null;
         string? settlementId = null;
 

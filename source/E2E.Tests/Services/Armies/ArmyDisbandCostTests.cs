@@ -50,7 +50,7 @@ public class ArmyDisbandCostTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetId(memberHero, out var heroId));
             var playerManager = Server.Resolve<IPlayerManager>();
             Assert.True(playerManager.AddPlayer(new Player("Member", heroId, memberPartyId, null, null)));
-            playerManager.SetPeer("Member", Member.NetPeer);
+            playerManager.BindRegisteredPeer("Member", Member.NetPeer);
 
             // The dedicated server runs vanilla's army wait behavior, which opens a menu for its own player's army
             ObjectHelper.SkipConstructor<PlayerArmyWaitBehavior>().RegisterEvents();

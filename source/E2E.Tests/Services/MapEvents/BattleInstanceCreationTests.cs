@@ -42,8 +42,8 @@ public class BattleInstanceCreationTests : MissionTestEnvironment
         var troopId = CreateRegisteredObject<CharacterObject>();
         var clients = Clients.ToArray();
         var client = clients[0];
-        Server.Resolve<IPlayerManager>().SetPeer("ctrl-A", clients[0].NetPeer);
-        Server.Resolve<IPlayerManager>().SetPeer("ctrl-B", clients[1].NetPeer);
+        Server.Resolve<IPlayerManager>().BindRegisteredPeer("ctrl-A", clients[0].NetPeer);
+        Server.Resolve<IPlayerManager>().BindRegisteredPeer("ctrl-B", clients[1].NetPeer);
 
         // Give both sides some troops so the native make-ready step has something to field (mirrors the working
         // village-raid mission-start path). Seeded server-side only (that is where the handler makes sides ready).

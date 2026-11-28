@@ -43,7 +43,7 @@ public class BattleTroopHealthAuthorizationTests : MissionTestEnvironment
         Server.Call(() =>
         {
             var players = Server.Resolve<IPlayerManager>();
-            if (invalidSender == "stale-connection") players.SetPeer("owner", NetPeerExtensions.CreatePeer());
+            if (invalidSender == "stale-connection") players.BindRegisteredPeer("owner", NetPeerExtensions.CreatePeer());
             if (invalidSender == "disconnected") players.ClearPeer(owner.NetPeer);
             if (invalidSender == "missing-sender") sender = this;
             if (invalidSender == "unknown-peer") sender = NetPeerExtensions.CreatePeer();
@@ -58,7 +58,7 @@ public class BattleTroopHealthAuthorizationTests : MissionTestEnvironment
 
         Server.Call(() =>
         {
-            Server.Resolve<IPlayerManager>().SetPeer("owner", owner.NetPeer);
+            Server.Resolve<IPlayerManager>().BindRegisteredPeer("owner", owner.NetPeer);
         });
         if (invalidSender == "not-entered" || invalidSender == "departed") EnterBattle(owner, battleId);
 
@@ -73,9 +73,9 @@ public class BattleTroopHealthAuthorizationTests : MissionTestEnvironment
         var owner = Clients.ElementAt(1);
         var report = HealthReport(battleId, partyId, entries, routedHealth: 1f);
         Server.SimulateMessage(owner.NetPeer, report, markGameThread: false);
-        Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer("owner", NetPeerExtensions.CreatePeer()));
+        Server.Call(() => Server.Resolve<IPlayerManager>().BindRegisteredPeer("owner", NetPeerExtensions.CreatePeer()));
         Server.PumpGameThread();
-        Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer("owner", owner.NetPeer));
+        Server.Call(() => Server.Resolve<IPlayerManager>().BindRegisteredPeer("owner", owner.NetPeer));
 
         SendHealth(owner, HealthReport(battleId, partyId, entries, routedHealth: null));
         AssertRebuiltHealth(battleId, partyId, entries, routedHealth: null);
@@ -182,10 +182,10 @@ public class BattleTroopHealthAuthorizationTests : MissionTestEnvironment
             new Dictionary<int, float> { [entries[0].Seed] = 37f }, 0, snapshotId: id);
         SendHealth(holder, Reply(Guid.NewGuid()));
         SendHealth(owner, Reply(request.SnapshotId));
-        Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer(holderId, NetPeerExtensions.CreatePeer()));
+        Server.Call(() => Server.Resolve<IPlayerManager>().BindRegisteredPeer(holderId, NetPeerExtensions.CreatePeer()));
         SendHealth(holder, Reply(request.SnapshotId));
         Assert.Equal(reserveCount, Server.NetworkSentMessages.GetMessageCount<NetworkBattleTroopReserve>());
-        Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer(holderId, holder.NetPeer));
+        Server.Call(() => Server.Resolve<IPlayerManager>().BindRegisteredPeer(holderId, holder.NetPeer));
         SendHealth(holder, Reply(request.SnapshotId));
         Assert.True(Server.NetworkSentMessages.GetMessageCount<NetworkBattleTroopReserve>() > reserveCount);
         Server.Call(() =>
@@ -225,8 +225,8 @@ public class BattleTroopHealthAuthorizationTests : MissionTestEnvironment
         {
             // The owner is offline when the host is elected, so the host's grant takes its party.
             var players = Server.Resolve<IPlayerManager>();
-            players.SetPeer("host", host.NetPeer);
-            players.SetPeer("successor", successor.NetPeer);
+            players.BindRegisteredPeer("host", host.NetPeer);
+            players.BindRegisteredPeer("successor", successor.NetPeer);
             var mapEvent = Server.GetRegisteredObject<MapEvent>(battleId);
             mapEvent.Position = new CampaignVec2(Vec2.Zero, isOnLand: false);
             var party = mapEvent.DefenderSide.Parties[0];
@@ -237,7 +237,7 @@ public class BattleTroopHealthAuthorizationTests : MissionTestEnvironment
         }, MapEventDisabledMethods);
         EnterBattle(host, battleId);
         EnterBattle(successor, battleId);
-        Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer("owner", owner.NetPeer));
+        Server.Call(() => Server.Resolve<IPlayerManager>().BindRegisteredPeer("owner", owner.NetPeer));
         EnterBattle(owner, battleId);
         Server.Call(() => Server.Resolve<IMessageBroker>().Publish(this,
             new BattleResolvedStateRecorded(battleId, BattleState.DefenderVictory)));
@@ -286,9 +286,9 @@ public class BattleTroopHealthAuthorizationTests : MissionTestEnvironment
         Server.Call(() =>
         {
             var players = Server.Resolve<IPlayerManager>();
-            players.SetPeer("host", Clients.First().NetPeer);
-            players.SetPeer("owner", Clients.ElementAt(1).NetPeer);
-            if (successor) players.SetPeer("successor", Clients.ElementAt(2).NetPeer);
+            players.BindRegisteredPeer("host", Clients.First().NetPeer);
+            players.BindRegisteredPeer("owner", Clients.ElementAt(1).NetPeer);
+            if (successor) players.BindRegisteredPeer("successor", Clients.ElementAt(2).NetPeer);
             var mapEvent = Server.GetRegisteredObject<MapEvent>(battleId);
             var party = hostParty ? mapEvent.AttackerSide.Parties[0] : mapEvent.DefenderSide.Parties[0];
             if (aiParty)

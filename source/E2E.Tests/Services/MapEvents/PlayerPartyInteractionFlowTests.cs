@@ -3011,7 +3011,7 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
         var playerPartyId = GetPartyBaseId(Server, playerMobilePartyId);
         var aiPartyId = GetPartyBaseId(Server, aiMobilePartyId);
 
-        Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client.NetPeer);
+        Server.Resolve<IPlayerManager>().BindRegisteredPeer("PlayerOne", client.NetPeer);
         SetMainParty(client, playerPartyId);
         EnableHeadlessEncounterFinish(client);
         SetMockPlayerEncounter(client);
@@ -3118,7 +3118,7 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
         var opponentMobilePartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         var playerPartyId = GetPartyBaseId(Server, playerMobilePartyId);
         var opponentPartyId = GetPartyBaseId(Server, opponentMobilePartyId);
-        Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client.NetPeer);
+        Server.Resolve<IPlayerManager>().BindRegisteredPeer("PlayerOne", client.NetPeer);
         SetMainParty(client, playerPartyId);
 
         string? mapEventId = null;
@@ -3706,7 +3706,7 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
         var playerPartyId = GetPartyBaseId(Server, playerMobilePartyId);
         var aiPartyId = CreateMobilePartyBase();
 
-        Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client.NetPeer);
+        Server.Resolve<IPlayerManager>().BindRegisteredPeer("PlayerOne", client.NetPeer);
         Server.NetworkSentMessages.Clear();
 
         Server.Call(() =>
@@ -3737,7 +3737,7 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
         var firstAiPartyId = CreateMobilePartyBase();
         var secondAiPartyId = CreateMobilePartyBase();
 
-        Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client.NetPeer);
+        Server.Resolve<IPlayerManager>().BindRegisteredPeer("PlayerOne", client.NetPeer);
         StartServerAiPartyEncounter(firstAiPartyId, playerPartyId);
         Assert.Equal(firstAiPartyId, Server.NetworkSentMessages.GetMessages<NetworkAllowConversation>().Single().AttackerId);
         Server.NetworkSentMessages.Clear();
@@ -3884,7 +3884,7 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
         var (targetHeroId, targetMobilePartyId, targetPartyId) = CreateAiPartyWithRegisteredLeader();
         var (playerClanId, targetClanId) = MakePartiesHostile(playerPartyId, targetPartyId);
 
-        Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client.NetPeer);
+        Server.Resolve<IPlayerManager>().BindRegisteredPeer("PlayerOne", client.NetPeer);
         Server.Call(() =>
         {
             new GoldBarterBehavior().RegisterEvents();
@@ -3985,7 +3985,7 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
         var siege = CreateSyncedSiege(targetMobilePartyId);
         MakePartiesHostile(playerPartyId, targetPartyId);
 
-        Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client.NetPeer);
+        Server.Resolve<IPlayerManager>().BindRegisteredPeer("PlayerOne", client.NetPeer);
         Server.Call(() =>
         {
             new GoldBarterBehavior().RegisterEvents();
@@ -4058,7 +4058,7 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
         var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
         var harmony = new Harmony($"e2e.settlement-peace.{Guid.NewGuid():N}");
 
-        Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client.NetPeer);
+        Server.Resolve<IPlayerManager>().BindRegisteredPeer("PlayerOne", client.NetPeer);
         Server.Call(() =>
         {
             new GoldBarterBehavior().RegisterEvents();
@@ -4172,7 +4172,7 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
         var (playerClanId, _) = MakePartiesHostile(playerPartyId, activeTargetPartyId);
         var requestedTargetClanId = TestEnvironment.CreateRegisteredObject<Clan>();
 
-        Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client.NetPeer);
+        Server.Resolve<IPlayerManager>().BindRegisteredPeer("PlayerOne", client.NetPeer);
         Server.Call(() =>
         {
             new GoldBarterBehavior().RegisterEvents();
@@ -4262,7 +4262,7 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
         var (targetHeroId, _, targetPartyId) = CreateAiPartyWithRegisteredLeader();
         var (playerClanId, targetClanId) = MakePartiesHostile(playerPartyId, targetPartyId);
 
-        Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client.NetPeer);
+        Server.Resolve<IPlayerManager>().BindRegisteredPeer("PlayerOne", client.NetPeer);
         Server.Call(() =>
         {
             new GoldBarterBehavior().RegisterEvents();
@@ -4352,7 +4352,7 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
         var (targetHeroId, _, targetPartyId) = CreateAiPartyWithRegisteredLeader();
         var (playerClanId, targetClanId) = MakePartiesHostile(playerPartyId, targetPartyId);
 
-        Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client.NetPeer);
+        Server.Resolve<IPlayerManager>().BindRegisteredPeer("PlayerOne", client.NetPeer);
         Server.Call(() =>
         {
             new GoldBarterBehavior().RegisterEvents();
@@ -4426,7 +4426,7 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
         var banditMobilePartyId = CreateBanditParty();
         var joiningBanditMobilePartyId = CreateBanditParty("E2EBanditSafePassageJoiner");
 
-        Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client.NetPeer);
+        Server.Resolve<IPlayerManager>().BindRegisteredPeer("PlayerOne", client.NetPeer);
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(playerHeroId, out var playerHero));
@@ -4578,7 +4578,7 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
         var banditPartyId = GetPartyBaseId(Server, banditMobilePartyId);
         var harmony = new Harmony($"e2e.bandit-post-apply.{Guid.NewGuid():N}");
 
-        Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client.NetPeer);
+        Server.Resolve<IPlayerManager>().BindRegisteredPeer("PlayerOne", client.NetPeer);
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(playerHeroId, out var playerHero));
@@ -4705,7 +4705,7 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
         var playerPartyId = GetPartyBaseId(Server, playerMobilePartyId);
         var banditMobilePartyId = CreateBanditParty();
 
-        Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client.NetPeer);
+        Server.Resolve<IPlayerManager>().BindRegisteredPeer("PlayerOne", client.NetPeer);
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(playerHeroId, out var playerHero));
@@ -4772,7 +4772,7 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
         var playerPartyId = GetPartyBaseId(Server, playerMobilePartyId);
         var banditMobilePartyId = CreateBanditParty();
 
-        Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client.NetPeer);
+        Server.Resolve<IPlayerManager>().BindRegisteredPeer("PlayerOne", client.NetPeer);
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(playerHeroId, out var playerHero));
@@ -4914,8 +4914,8 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
         Server.Call(() =>
         {
             var playerManager = Server.Resolve<IPlayerManager>();
-            playerManager.SetPeer("PlayerOne", client1.NetPeer);
-            playerManager.SetPeer("PlayerTwo", client2.NetPeer);
+            playerManager.BindRegisteredPeer("PlayerOne", client1.NetPeer);
+            playerManager.BindRegisteredPeer("PlayerTwo", client2.NetPeer);
         });
 
         return new TwoPlayerParties(

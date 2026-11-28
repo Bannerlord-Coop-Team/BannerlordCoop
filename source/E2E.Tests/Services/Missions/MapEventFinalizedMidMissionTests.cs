@@ -196,7 +196,7 @@ public class MapEventFinalizedMidMissionTests : MissionTestEnvironment
 
     private MockMission EnterBattleMission(MissionEngineFixture fixture, EnvironmentInstance client, string controllerId, string mapEventId)
     {
-        Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer(controllerId, client.NetPeer));
+        Server.Call(() => Server.Resolve<IPlayerManager>().BindRegisteredPeer(controllerId, client.NetPeer));
         EnterBattle(client, mapEventId);
         Server.SimulateMessage(client.NetPeer, new NetworkMissionEntered(controllerId, mapEventId));
         return OpenBattleMission(fixture, client, mapEventId);
@@ -206,7 +206,7 @@ public class MapEventFinalizedMidMissionTests : MissionTestEnvironment
     {
         Server.Call(() =>
         {
-            Server.Resolve<IPlayerManager>().SetPeer(controllerId, joiner.NetPeer);
+            Server.Resolve<IPlayerManager>().BindRegisteredPeer(controllerId, joiner.NetPeer);
             Server.Resolve<IMessageBroker>().Publish(joiner.NetPeer, new BattleJoinAccepted(mapEventId, controllerId, Guid.NewGuid()));
         });
     }

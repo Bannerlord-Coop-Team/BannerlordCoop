@@ -340,7 +340,7 @@ public class MapEventCollectionTests : MapEventTestBase
         Server.Call(() =>
         {
             Get<MobileParty>(Server, mapEvent.AttackerPartyId).IsActive = true;
-            Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client.NetPeer);
+            Server.Resolve<IPlayerManager>().BindRegisteredPeer("PlayerOne", client.NetPeer);
         });
 
         Server.SimulateMessage(this, new PlayerDisconnected(client.NetPeer, default));
@@ -355,7 +355,7 @@ public class MapEventCollectionTests : MapEventTestBase
 
         if (reconnectBeforeMapEventEnds)
         {
-            Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client.NetPeer));
+            Server.Call(() => Server.Resolve<IPlayerManager>().BindRegisteredPeer("PlayerOne", client.NetPeer));
             Server.SimulateMessage(this, new PlayerCampaignEntered(client.NetPeer));
         }
 

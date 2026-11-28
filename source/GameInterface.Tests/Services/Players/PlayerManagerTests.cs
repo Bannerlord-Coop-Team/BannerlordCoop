@@ -18,9 +18,11 @@ using Xunit;
 
 namespace GameInterface.Tests.Services.Players;
 
+[Collection(ModInformationRoleCollection.Name)]
 public class PlayerManagerTests
 {
     private const string ControllerId = "PlayerOne";
+    private const string OtherControllerId = "PlayerTwo";
     private const string HeroId = "HeroOne";
     private const string PartyId = "PartyOne";
 
@@ -127,7 +129,7 @@ public class PlayerManagerTests
     }
 
     [Fact]
-    public void SetPeer_KnownController_AssociatesPeerWithPlayer()
+    public void TrySetPeer_RegisteredPlayer_AssociatesPeerWithPlayer()
     {
         var playerManager = CreatePlayerManager(out _);
         var player = new Player(ControllerId, string.Empty, string.Empty, string.Empty, string.Empty);
@@ -136,7 +138,7 @@ public class PlayerManagerTests
 
         Assert.True(playerManager.AddPlayer(player));
 
-        playerManager.SetPeer(ControllerId, peer);
+        Assert.True(playerManager.TrySetPeer(player, peer));
 
         Assert.True(playerManager.TryGetPlayer(peer, out var resolvedPlayer));
         Assert.Same(player, resolvedPlayer);
@@ -144,17 +146,55 @@ public class PlayerManagerTests
         Assert.Same(peer, resolvedPeer);
     }
 
+    // A join checks a registration on the network thread, and a deletion on the game thread can remove it before the peer is bound.
     [Fact]
-    public void SetPeer_UnknownController_DoesNotAssociatePeer()
+    public void TrySetPeer_RegistrationRemovedAfterValidation_BindsNothing()
     {
         var playerManager = CreatePlayerManager(out _);
-        var network = new TestNetwork();
-        var peer = network.CreatePeer();
+        var validated = new Player(ControllerId, "Hero", string.Empty, string.Empty, string.Empty);
+        var peer = new TestNetwork().CreatePeer();
+        Assert.True(playerManager.AddPlayer(validated));
+        Assert.True(playerManager.RemovePlayer(validated));
 
-        // No AddPlayer call, "UnknownController" was never registered.
-        playerManager.SetPeer("UnknownController", peer);
+        Assert.False(playerManager.TrySetPeer(validated, peer));
 
         Assert.False(playerManager.TryGetPlayer(peer, out _));
+        Assert.False(playerManager.TryGetPeer(ControllerId, out _));
+    }
+
+    // An heir swap can replace it instead, and the peer must not land on a registration it wasn't checked against.
+    [Fact]
+    public void TrySetPeer_RegistrationReplacedAfterValidation_BindsNothing()
+    {
+        var playerManager = CreatePlayerManager(out _);
+        var validated = new Player(ControllerId, "Hero", string.Empty, string.Empty, string.Empty);
+        var replacement = new Player(ControllerId, "Heir", string.Empty, string.Empty, string.Empty);
+        var peer = new TestNetwork().CreatePeer();
+        Assert.True(playerManager.AddPlayer(validated));
+        Assert.True(playerManager.ReplacePlayer(validated, replacement));
+
+        Assert.False(playerManager.TrySetPeer(validated, peer));
+
+        Assert.False(playerManager.TryGetPlayer(peer, out _));
+        Assert.False(playerManager.TryGetPeer(ControllerId, out _));
+    }
+
+    [Fact]
+    public void TrySetPeer_ReplacementRegistration_BindsIt()
+    {
+        var playerManager = CreatePlayerManager(out _);
+        var validated = new Player(ControllerId, "Hero", string.Empty, string.Empty, string.Empty);
+        var replacement = new Player(ControllerId, "Heir", string.Empty, string.Empty, string.Empty);
+        var peer = new TestNetwork().CreatePeer();
+        Assert.True(playerManager.AddPlayer(validated));
+        Assert.True(playerManager.ReplacePlayer(validated, replacement));
+
+        Assert.True(playerManager.TrySetPeer(replacement, peer));
+
+        Assert.True(playerManager.TryGetPlayer(peer, out var bound));
+        Assert.Same(replacement, bound);
+        Assert.True(playerManager.TryGetPeer(ControllerId, out var boundPeer));
+        Assert.Same(peer, boundPeer);
     }
 
     [Fact]
@@ -166,7 +206,7 @@ public class PlayerManagerTests
         var peer = network.CreatePeer();
 
         Assert.True(playerManager.AddPlayer(player));
-        playerManager.SetPeer(ControllerId, peer);
+        Assert.True(playerManager.TrySetPeer(player, peer));
 
         playerManager.ClearPeer(peer);
 
@@ -186,8 +226,8 @@ public class PlayerManagerTests
         Assert.True(playerManager.AddPlayer(player));
 
         // Simulates a reconnect: same controllerId, new NetPeer.
-        playerManager.SetPeer(ControllerId, firstPeer);
-        playerManager.SetPeer(ControllerId, secondPeer);
+        Assert.True(playerManager.TrySetPeer(player, firstPeer));
+        Assert.True(playerManager.TrySetPeer(player, secondPeer));
 
         Assert.True(playerManager.TryGetPlayer(secondPeer, out var resolvedPlayer));
         Assert.Same(player, resolvedPlayer);
@@ -210,8 +250,9 @@ public class PlayerManagerTests
         var playerManager = CreatePlayerManager(out _);
         var peer = new TestNetwork().CreatePeer();
 
-        Assert.True(playerManager.AddPlayer(new Player(ControllerId, string.Empty, string.Empty, string.Empty, string.Empty)));
-        playerManager.SetPeer(ControllerId, peer);
+        var player = new Player(ControllerId, string.Empty, string.Empty, string.Empty, string.Empty);
+        Assert.True(playerManager.AddPlayer(player));
+        Assert.True(playerManager.TrySetPeer(player, peer));
 
         Assert.True(playerManager.TryGetCurrentController(peer, out var controllerId));
         Assert.Equal(ControllerId, controllerId);
@@ -225,9 +266,10 @@ public class PlayerManagerTests
         var stalePeer = network.CreatePeer();
         var currentPeer = network.CreatePeer();
 
-        Assert.True(playerManager.AddPlayer(new Player(ControllerId, string.Empty, string.Empty, string.Empty, string.Empty)));
-        playerManager.SetPeer(ControllerId, stalePeer);
-        playerManager.SetPeer(ControllerId, currentPeer);
+        var player = new Player(ControllerId, string.Empty, string.Empty, string.Empty, string.Empty);
+        Assert.True(playerManager.AddPlayer(player));
+        Assert.True(playerManager.TrySetPeer(player, stalePeer));
+        Assert.True(playerManager.TrySetPeer(player, currentPeer));
 
         Assert.False(playerManager.TryGetCurrentController(stalePeer, out var controllerId));
         Assert.Null(controllerId);
@@ -242,12 +284,35 @@ public class PlayerManagerTests
         var stalePeer = network.CreatePeer("10.0.0.8");
         var currentPeer = network.CreatePeer();
 
-        Assert.True(playerManager.AddPlayer(new Player(ControllerId, string.Empty, PartyId, string.Empty, string.Empty)));
-        playerManager.SetPeer(ControllerId, stalePeer);
-        playerManager.SetPeer(ControllerId, currentPeer);
+        var player = new Player(ControllerId, string.Empty, PartyId, string.Empty, string.Empty);
+        Assert.True(playerManager.AddPlayer(player));
+        Assert.True(playerManager.TrySetPeer(player, stalePeer));
+        Assert.True(playerManager.TrySetPeer(player, currentPeer));
 
         Assert.False(playerManager.IsSenderControllingParty(stalePeer, PartyId));
         Assert.True(playerManager.IsSenderControllingParty(currentPeer, PartyId));
+    }
+
+    [Fact]
+    public void SenderHeroChecks_StalePeerAfterReconnect_AreFalse()
+    {
+        var playerManager = CreatePlayerManager(out var objectManager);
+        var hero = ObjectHelper.SkipConstructor<Hero>();
+        Resolve(objectManager, HeroId, hero);
+        var network = new TestNetwork();
+        var stalePeer = network.CreatePeer("10.0.0.8");
+        var currentPeer = network.CreatePeer();
+
+        var player = new Player(ControllerId, HeroId, string.Empty, string.Empty, string.Empty);
+        Assert.True(playerManager.AddPlayer(player));
+        Assert.True(playerManager.TrySetPeer(player, stalePeer));
+        Assert.True(playerManager.TrySetPeer(player, currentPeer));
+
+        Assert.False(playerManager.IsSenderControllingHero(stalePeer, HeroId));
+        Assert.False(playerManager.TryGetSenderHero(stalePeer, out _));
+        Assert.True(playerManager.IsSenderControllingHero(currentPeer, HeroId));
+        Assert.True(playerManager.TryGetSenderHero(currentPeer, out var senderHero));
+        Assert.Same(hero, senderHero);
     }
 
     [Fact]
@@ -266,8 +331,9 @@ public class PlayerManagerTests
         var playerManager = new PlayerManager(logger.Object, new Mock<IObjectManager>().Object, new ControllerIdProvider());
         var peer = new TestNetwork().CreatePeer();
 
-        Assert.True(playerManager.AddPlayer(new Player(ControllerId, string.Empty, PartyId, string.Empty, string.Empty)));
-        playerManager.SetPeer(ControllerId, peer);
+        var player = new Player(ControllerId, string.Empty, PartyId, string.Empty, string.Empty);
+        Assert.True(playerManager.AddPlayer(player));
+        Assert.True(playerManager.TrySetPeer(player, peer));
 
         Assert.True(playerManager.IsSenderControllingParty(peer, PartyId));
         logger.Verify(log => log.Warning(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int?>()), Times.Never());
@@ -280,8 +346,9 @@ public class PlayerManagerTests
         var playerManager = new PlayerManager(logger.Object, new Mock<IObjectManager>().Object, new ControllerIdProvider());
         var peer = new TestNetwork().CreatePeer();
 
-        Assert.True(playerManager.AddPlayer(new Player(ControllerId, string.Empty, PartyId, string.Empty, string.Empty)));
-        playerManager.SetPeer(ControllerId, peer);
+        var player = new Player(ControllerId, string.Empty, PartyId, string.Empty, string.Empty);
+        Assert.True(playerManager.AddPlayer(player));
+        Assert.True(playerManager.TrySetPeer(player, peer));
 
         Assert.False(playerManager.IsSenderControllingParty(peer, "PartyTwo"));
         logger.Verify(log => log.Warning(
@@ -304,8 +371,9 @@ public class PlayerManagerTests
         var playerManager = new PlayerManager(new Mock<ILogger>().Object, new Mock<IObjectManager>().Object, new ControllerIdProvider());
         var peer = new TestNetwork().CreatePeer();
 
-        Assert.True(playerManager.AddPlayer(new Player(ControllerId, string.Empty, string.Empty, string.Empty, string.Empty)));
-        playerManager.SetPeer(ControllerId, peer);
+        var player = new Player(ControllerId, string.Empty, string.Empty, string.Empty, string.Empty);
+        Assert.True(playerManager.AddPlayer(player));
+        Assert.True(playerManager.TrySetPeer(player, peer));
 
         Assert.False(playerManager.IsSenderControllingParty(peer, string.Empty));
         Assert.False(playerManager.IsSenderControllingParty(peer, null));
@@ -392,6 +460,169 @@ public class PlayerManagerTests
         Assert.Same(current, resolved);
     }
 
+    // Clients mirror the server's registry, so only the server refuses a second controller for one hero.
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void AddPlayer_SecondControllerForRegisteredHero_IsRefusedOnServer(bool isServer, bool expectedAdded)
+    {
+        var wasServer = ModInformation.IsServer;
+        var hero = ObjectHelper.SkipConstructor<Hero>();
+        var playerManager = CreatePlayerManager(out var objectManager);
+        Resolve(objectManager, HeroId, hero);
+        try
+        {
+            ModInformation.IsServer = isServer;
+            Assert.True(playerManager.AddPlayer(new Player(ControllerId, HeroId, string.Empty, string.Empty, string.Empty)));
+
+            Assert.Equal(expectedAdded, playerManager.AddPlayer(
+                new Player(OtherControllerId, HeroId, string.Empty, string.Empty, string.Empty)));
+
+            Assert.Equal(expectedAdded ? 2 : 1, playerManager.Players.Count);
+            Assert.True(PlayerManager.TryGetControlledObjectInfo(hero, out var control));
+            Assert.Equal(ControllerId, control.ObjectControllerId);
+        }
+        finally
+        {
+            ModInformation.IsServer = wasServer;
+            GetPlayerObjects().Remove(hero);
+        }
+    }
+
+    [Fact]
+    public void AddPlayer_SecondControllerForRegisteredParty_IsRefusedOnServer()
+    {
+        var wasServer = ModInformation.IsServer;
+        var party = ObjectHelper.SkipConstructor<MobileParty>();
+        var playerManager = CreatePlayerManager(out var objectManager);
+        Resolve(objectManager, PartyId, party);
+        try
+        {
+            ModInformation.IsServer = true;
+            Assert.True(playerManager.AddPlayer(new Player(ControllerId, string.Empty, PartyId, string.Empty, string.Empty)));
+
+            Assert.False(playerManager.AddPlayer(
+                new Player(OtherControllerId, "HeroTwo", PartyId, string.Empty, string.Empty)));
+
+            Assert.Single(playerManager.Players);
+            Assert.True(PlayerManager.TryGetControlledObjectInfo(party, out var control));
+            Assert.Equal(ControllerId, control.ObjectControllerId);
+        }
+        finally
+        {
+            ModInformation.IsServer = wasServer;
+            GetPlayerObjects().Remove(party);
+        }
+    }
+
+    // A player can keep another player's clan as its clan and original clan, so a shared clan is not a hold.
+    [Fact]
+    public void AddPlayer_SecondControllerSharingAClan_IsAddedOnServer()
+    {
+        var wasServer = ModInformation.IsServer;
+        var clan = ObjectHelper.SkipConstructor<Clan>();
+        var playerManager = CreatePlayerManager(out var objectManager);
+        Resolve(objectManager, "ClanOne", clan);
+        try
+        {
+            ModInformation.IsServer = true;
+            Assert.True(playerManager.AddPlayer(new Player(ControllerId, HeroId, string.Empty, "ClanOne", string.Empty)));
+
+            Assert.True(playerManager.AddPlayer(new Player(OtherControllerId, "HeroTwo", string.Empty, "ClanOne", string.Empty)));
+
+            Assert.Equal(2, playerManager.Players.Count);
+        }
+        finally
+        {
+            ModInformation.IsServer = wasServer;
+            GetPlayerObjects().Remove(clan);
+        }
+    }
+
+    [Fact]
+    public void ReplacePlayer_OntoHeroHeldByAnotherController_IsRefusedOnServer()
+    {
+        var wasServer = ModInformation.IsServer;
+        var heldHero = ObjectHelper.SkipConstructor<Hero>();
+        var ownHero = ObjectHelper.SkipConstructor<Hero>();
+        var playerManager = CreatePlayerManager(out var objectManager);
+        Resolve(objectManager, HeroId, heldHero);
+        Resolve(objectManager, "HeroTwo", ownHero);
+        var other = new Player(OtherControllerId, "HeroTwo", string.Empty, string.Empty, string.Empty);
+        try
+        {
+            ModInformation.IsServer = true;
+            Assert.True(playerManager.AddPlayer(new Player(ControllerId, HeroId, string.Empty, string.Empty, string.Empty)));
+            Assert.True(playerManager.AddPlayer(other));
+
+            Assert.False(playerManager.ReplacePlayer(
+                other, new Player(OtherControllerId, HeroId, string.Empty, string.Empty, string.Empty)));
+
+            Assert.True(playerManager.TryGetPlayer(OtherControllerId, out var resolved));
+            Assert.Same(other, resolved);
+            Assert.True(PlayerManager.TryGetControlledObjectInfo(heldHero, out var heldControl));
+            Assert.Equal(ControllerId, heldControl.ObjectControllerId);
+            Assert.True(PlayerManager.TryGetControlledObjectInfo(ownHero, out var ownControl));
+            Assert.Equal(OtherControllerId, ownControl.ObjectControllerId);
+        }
+        finally
+        {
+            ModInformation.IsServer = wasServer;
+            GetPlayerObjects().Remove(heldHero);
+            GetPlayerObjects().Remove(ownHero);
+        }
+    }
+
+    [Fact]
+    public void AddPlayer_HeroMarkedForUnregisteredController_TakesTheMarker()
+    {
+        var wasServer = ModInformation.IsServer;
+        var hero = ObjectHelper.SkipConstructor<Hero>();
+        var playerManager = CreatePlayerManager(out var objectManager);
+        Resolve(objectManager, HeroId, hero);
+        GetPlayerObjects().Add(hero, new ControlledObjectInfo("GoneController", new ControllerIdProvider()));
+        try
+        {
+            ModInformation.IsServer = true;
+            Assert.True(playerManager.AddPlayer(new Player(ControllerId, HeroId, string.Empty, string.Empty, string.Empty)));
+
+            Assert.True(PlayerManager.TryGetControlledObjectInfo(hero, out var control));
+            Assert.Equal(ControllerId, control.ObjectControllerId);
+        }
+        finally
+        {
+            ModInformation.IsServer = wasServer;
+            GetPlayerObjects().Remove(hero);
+        }
+    }
+
+    [Fact]
+    public void RemovePlayer_OfAControllerThatNeverHeldTheHero_KeepsTheHoldersMarker()
+    {
+        var wasServer = ModInformation.IsServer;
+        var hero = ObjectHelper.SkipConstructor<Hero>();
+        var playerManager = CreatePlayerManager(out var objectManager);
+        Resolve(objectManager, HeroId, hero);
+        var other = new Player(OtherControllerId, HeroId, string.Empty, string.Empty, string.Empty);
+        try
+        {
+            // A client keeps a second registration for a held hero (logged only), but the marker stays with the holder.
+            ModInformation.IsServer = false;
+            Assert.True(playerManager.AddPlayer(new Player(ControllerId, HeroId, string.Empty, string.Empty, string.Empty)));
+            Assert.True(playerManager.AddPlayer(other));
+
+            Assert.True(playerManager.RemovePlayer(other));
+
+            Assert.True(PlayerManager.TryGetControlledObjectInfo(hero, out var control));
+            Assert.Equal(ControllerId, control.ObjectControllerId);
+        }
+        finally
+        {
+            ModInformation.IsServer = wasServer;
+            GetPlayerObjects().Remove(hero);
+        }
+    }
+
     [Theory]
     [InlineData(true, "Hero", 40f)]
     [InlineData(true, "Heir", 5f)]
@@ -430,7 +661,7 @@ public class PlayerManagerTests
         var peer = new TestNetwork().CreatePeer();
 
         Assert.True(playerManager.AddPlayer(registered));
-        playerManager.SetPeer(ControllerId, peer);
+        Assert.True(playerManager.TrySetPeer(registered, peer));
 
         Assert.True(playerManager.ReplacePlayer(registered, replacement));
 
@@ -566,11 +797,12 @@ public class PlayerManagerTests
     {
         var playerManager = CreatePlayerManager(out var objectManager);
         var hero = ObjectHelper.SkipConstructor<Hero>();
-        objectManager.Setup(o => o.TryGetObject(HeroId, out hero)).Returns(true);
+        Resolve(objectManager, HeroId, hero);
         var peer = new TestNetwork().CreatePeer();
 
-        Assert.True(playerManager.AddPlayer(new Player(ControllerId, HeroId, string.Empty, string.Empty, string.Empty)));
-        playerManager.SetPeer(ControllerId, peer);
+        var player = new Player(ControllerId, HeroId, string.Empty, string.Empty, string.Empty);
+        Assert.True(playerManager.AddPlayer(player));
+        Assert.True(playerManager.TrySetPeer(player, peer));
 
         try
         {
@@ -592,6 +824,13 @@ public class PlayerManagerTests
         Assert.Null(unknownPeerHero);
         Assert.False(playerManager.TryGetSenderHero(new object(), out var notAPeerHero));
         Assert.Null(notAPeerHero);
+    }
+
+    // Registration resolves with logging, the hold check and RemovePlayer resolve without it.
+    private static void Resolve<T>(Mock<IObjectManager> objectManager, string id, T obj)
+    {
+        objectManager.Setup(o => o.TryGetObject(id, out obj)).Returns(true);
+        objectManager.Setup(o => o.TryGetObjectWithLogging(id, out obj)).Returns(true);
     }
 
     private static ConditionalWeakTable<object, ControlledObjectInfo> GetPlayerObjects() =>

@@ -267,7 +267,7 @@ public class CompanionDismissalSyncTests : IDisposable
         {
             var playerManager = Server.Resolve<IPlayerManager>();
             Assert.True(playerManager.AddPlayer(new Player("ClanLeader", leaderId, null, clanId, null)));
-            playerManager.SetPeer("ClanLeader", Clients[0].NetPeer);
+            playerManager.BindRegisteredPeer("ClanLeader", Clients[0].NetPeer);
         });
 
         return new CompanionContext(partyId, clanId, heroId, characterId);

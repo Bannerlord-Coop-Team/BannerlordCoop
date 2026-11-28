@@ -185,9 +185,9 @@ public class ServerBattleCompletionHandlerAbandonedJoinTests : IDisposable
     private NetPeer RegisterPlayer(string controllerId, int port)
     {
         var peer = CreatePeer(port);
-        Assert.True(playerManager.AddPlayer(
-            new Player(controllerId, string.Empty, string.Empty, string.Empty, string.Empty)));
-        playerManager.SetPeer(controllerId, peer);
+        var player = new Player(controllerId, string.Empty, string.Empty, string.Empty, string.Empty);
+        Assert.True(playerManager.AddPlayer(player));
+        Assert.True(playerManager.TrySetPeer(player, peer));
         return peer;
     }
 

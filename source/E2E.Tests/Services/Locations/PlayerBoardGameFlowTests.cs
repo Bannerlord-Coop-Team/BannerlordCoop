@@ -46,8 +46,8 @@ public sealed class PlayerBoardGameFlowTests : MapEventTestBase
             Server.Call(() =>
             {
                 var playerManager = Server.Resolve<IPlayerManager>();
-                playerManager.SetPeer("BoardGameInitiator", initiatorClient.NetPeer);
-                playerManager.SetPeer("BoardGameReceiver", receiverClient.NetPeer);
+                playerManager.BindRegisteredPeer("BoardGameInitiator", initiatorClient.NetPeer);
+                playerManager.BindRegisteredPeer("BoardGameReceiver", receiverClient.NetPeer);
             }, MapEventDisabledMethods);
 
             Server.NetworkSentMessages.Clear();

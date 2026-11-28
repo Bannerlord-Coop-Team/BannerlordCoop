@@ -62,7 +62,7 @@ public class RetreatedPartyOutcomeTests : MissionTestEnvironment
         var authenticatedRetreater = Clients.ElementAt(2);
 
         Server.Call(() => Server.Resolve<GameInterface.Services.Players.IPlayerManager>()
-            .SetPeer(RetreaterController, authenticatedRetreater.NetPeer));
+            .BindRegisteredPeer(RetreaterController, authenticatedRetreater.NetPeer));
         authenticatedRetreater.Call(() => authenticatedRetreater.Resolve<Common.Network.INetwork>()
             .SendAll(new NetworkBattleRetreated(mapEventId)));
 

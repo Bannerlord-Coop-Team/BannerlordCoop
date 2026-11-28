@@ -1,0 +1,161 @@
+﻿using Common.Util;
+using Coop.Core.Server.Services.Save;
+using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
+using Moq;
+using System.Collections.Generic;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
+using Xunit;
+
+namespace Coop.Tests.Server.Services.Save;
+
+public class SavedPlayerRegistrationSelectorTests
+{
+    private const string ControllerId = "PlayerOne";
+    private const string LiveHeroId = "Hero_Live";
+    private const string LivePartyId = "Party_Live";
+    // The object manager resolves an id with or without its type prefix, so both name the same hero
+    private const string LiveHeroFullId = "Hero_" + LiveHeroId;
+    private const string StaleHeroId = "Hero_Stale";
+    private const string StalePartyId = "Party_Stale";
+    private const string MissingHeroId = "Hero_Missing";
+    private const string DeadHeroId = "Hero_Dead";
+    private const string OtherDeadHeroId = "Hero_OtherDead";
+
+    private readonly Hero liveHero = ObjectHelper.SkipConstructor<Hero>();
+    private readonly Hero staleHero = ObjectHelper.SkipConstructor<Hero>();
+    private readonly Hero deadHero = ObjectHelper.SkipConstructor<Hero>();
+    private readonly Hero otherDeadHero = ObjectHelper.SkipConstructor<Hero>();
+    private readonly MobileParty liveParty = ObjectHelper.SkipConstructor<MobileParty>();
+    private readonly MobileParty staleParty = ObjectHelper.SkipConstructor<MobileParty>();
+    private readonly Mock<IPlayerPartyRestorer> playerPartyRestorer = new Mock<IPlayerPartyRestorer>();
+
+    [Theory]
+    // A save written before controller ids were unique can hold the duplicates in either order,
+    // and the dead one comes first as often as not.
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Select_DuplicateController_KeepsTheRowWhoseGraphExists(bool missingFirst)
+    {
+        var missing = new Player(ControllerId, MissingHeroId, "Party_Missing", "Clan_One", "Character_Missing");
+        var live = new Player(ControllerId, LiveHeroId, LivePartyId, "Clan_One", "Character_Live");
+
+        var rows = Select(missingFirst ? new[] { missing, live } : new[] { live, missing });
+
+        Assert.Equal(new[] { live }, rows);
+    }
+
+    [Fact]
+    public void Select_DuplicateController_DropsTheRowWithAMissingParty()
+    {
+        var stale = new Player(ControllerId, StaleHeroId, "Party_Gone", "Clan_One", "Character_Stale");
+        var live = new Player(ControllerId, LiveHeroId, LivePartyId, "Clan_One", "Character_Live");
+
+        var rows = Select(stale, live);
+
+        Assert.Equal(new[] { live }, rows);
+    }
+
+    [Fact]
+    public void Select_DuplicateControllerWithStaleParties_KeepsTheRowWhoseHeroExists()
+    {
+        var missing = new Player(ControllerId, MissingHeroId, "Party_Missing", "Clan_One", "Character_Missing");
+        var recoverable = new Player(ControllerId, LiveHeroId, "Party_Gone", "Clan_One", "Character_Live");
+
+        var rows = Select(missing, recoverable);
+
+        Assert.Equal(new[] { recoverable }, rows);
+    }
+
+    [Theory]
+    // One controller's old save can hold a stale row and a row for its living hero, both naming the party the living
+    // hero owns. Only the owner's row can keep that party, in either order.
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Select_DuplicateController_KeepsTheRowThatOwnsItsParty(bool staleFirst)
+    {
+        var stale = new Player(ControllerId, StaleHeroId, LivePartyId, "Clan_One", "Character_Stale");
+        var owner = new Player(ControllerId, LiveHeroId, LivePartyId, "Clan_One", "Character_Live");
+        Keeps(liveHero, liveParty);
+
+        var rows = Select(staleFirst ? new[] { stale, owner } : new[] { owner, stale });
+
+        Assert.Equal(new[] { owner }, rows);
+    }
+
+    [Theory]
+    // The file can't tell which controller really owns the hero, so neither gets it, whichever id each row spells
+    [InlineData(LiveHeroId)]
+    [InlineData(LiveHeroFullId)]
+    public void Select_TwoControllersClaimOneHero_SelectsNeither(string secondHeroId)
+    {
+        var first = new Player("PlayerOne", LiveHeroId, LivePartyId, "Clan_One", "Character_Live");
+        var second = new Player("PlayerTwo", secondHeroId, LivePartyId, "Clan_One", "Character_Live");
+        var other = new Player("PlayerThree", StaleHeroId, StalePartyId, "Clan_Three", "Character_Stale");
+
+        var rows = Select(first, second, other);
+
+        Assert.Equal(new[] { other }, rows);
+    }
+
+    [Fact]
+    public void Select_SharedHeroInDuplicateController_KeepsTheControllersOtherHero()
+    {
+        var own = new Player("PlayerOne", StaleHeroId, StalePartyId, "Clan_One", "Character_Stale");
+        // Both of PlayerOne's rows have a live graph, and the shared row spells the hero by its full id
+        var shared = new Player("PlayerOne", LiveHeroFullId, LivePartyId, "Clan_One", "Character_Live");
+        var claimed = new Player("PlayerTwo", LiveHeroId, LivePartyId, "Clan_Two", "Character_Live");
+
+        var rows = Select(shared, own, claimed);
+
+        Assert.Equal(new[] { own }, rows);
+    }
+
+    [Fact]
+    public void Select_PartySharedWithAnotherController_KeepsTheControllersOtherRow()
+    {
+        // Two controllers' dead heroes can both still be given one party, which neither then owns
+        var sharedRow = new Player(ControllerId, DeadHeroId, LivePartyId, "Clan_One", "Character_Dead");
+        var livingRow = new Player(ControllerId, StaleHeroId, StalePartyId, "Clan_One", "Character_Stale");
+        var otherDeadRow = new Player("PlayerTwo", OtherDeadHeroId, LivePartyId, "Clan_Two", "Character_OtherDead");
+        Keeps(deadHero, liveParty);
+        Keeps(staleHero, staleParty);
+        Keeps(otherDeadHero, liveParty);
+
+        var rows = Select(sharedRow, livingRow, otherDeadRow);
+
+        Assert.Equal(new[] { livingRow }, rows);
+    }
+
+    // The restorer says the campaign still gives the hero this party
+    private void Keeps(Hero hero, MobileParty party) =>
+        playerPartyRestorer
+            .Setup(restorer => restorer.KeepsParty(
+                It.Is<Hero>(value => ReferenceEquals(value, hero)),
+                It.Is<MobileParty>(value => ReferenceEquals(value, party)),
+                It.IsAny<IReadOnlyCollection<Hero>>()))
+            .Returns(true);
+
+    // The live, stale and dead heroes and the live and stale parties resolve in the object manager
+    private IReadOnlyList<Player> Select(params Player[] savedPlayers)
+    {
+        var live = liveHero;
+        var stale = staleHero;
+        var dead = deadHero;
+        var otherDead = otherDeadHero;
+        var liveHeroParty = liveParty;
+        var staleHeroParty = staleParty;
+        var objectManager = new Mock<IObjectManager>();
+        objectManager.Setup(manager => manager.TryGetObject(LiveHeroId, out live)).Returns(true);
+        objectManager.Setup(manager => manager.TryGetObject(LiveHeroFullId, out live)).Returns(true);
+        objectManager.Setup(manager => manager.TryGetObject(StaleHeroId, out stale)).Returns(true);
+        objectManager.Setup(manager => manager.TryGetObject(DeadHeroId, out dead)).Returns(true);
+        objectManager.Setup(manager => manager.TryGetObject(OtherDeadHeroId, out otherDead)).Returns(true);
+        objectManager.Setup(manager => manager.TryGetObject(LivePartyId, out liveHeroParty)).Returns(true);
+        objectManager.Setup(manager => manager.TryGetObject(StalePartyId, out staleHeroParty)).Returns(true);
+
+        return new SavedPlayerRegistrationSelector(objectManager.Object, playerPartyRestorer.Object).Select(savedPlayers, out _);
+    }
+}

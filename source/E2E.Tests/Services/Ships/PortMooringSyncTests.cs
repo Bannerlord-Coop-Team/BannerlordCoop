@@ -191,7 +191,7 @@ public class PortMooringSyncTests : IDisposable
 
             var players = Server.Resolve<IPlayerManager>();
             Assert.True(players.AddPlayer(new Player(controllerId, heroId, partyId, clanId, null)));
-            players.SetPeer(controllerId, client.NetPeer);
+            players.BindRegisteredPeer(controllerId, client.NetPeer);
         });
         PumpClients();
 

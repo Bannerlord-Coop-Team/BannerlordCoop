@@ -15,6 +15,16 @@ namespace GameInterface.Services.Players;
 public interface IPlayerPartyRestorer
 {
     bool TryRestore(Player player, out Player restoredPlayer);
+
+    /// <summary>
+    /// Resolves the party a saved row names if <see cref="KeepsParty"/> gives it to that row's hero.
+    /// </summary>
+    bool TryGetOwnedParty(Player player, IReadOnlyCollection<Hero> playerHeroes, out MobileParty party);
+
+    /// <summary>True if the campaign still gives <paramref name="party"/> to <paramref name="hero"/>: the hero owns it, or
+    /// the hero is dead and waiting for heir selection, and none of <paramref name="playerHeroes"/> owns the party now.</summary>
+    bool KeepsParty(Hero hero, MobileParty party, IReadOnlyCollection<Hero> playerHeroes);
+
     void RestoreClanMembership(Hero hero);
     void Restore(Hero hero, MobileParty party);
 }
@@ -53,12 +63,20 @@ internal class PlayerPartyRestorer : IPlayerPartyRestorer
         restoredPlayer = player;
         if (player == null) return false;
         if (!objectManager.TryGetObjectWithLogging(player.HeroId, out Hero hero)) return false;
+        // A saved row can name the hero by its short id, and hero ids are compared as strings everywhere else
+        // (heir selection, sender checks), so the restored registration uses the id the hero is registered under
+        if (!objectManager.TryGetIdWithLogging(hero, out var heroId)) return false;
 
         // A dead registered hero is waiting for heir selection. Keep its saved party association
         // intact instead of restoring the dead hero into the roster as its leader.
         if (hero.IsDead)
         {
-            return objectManager.TryGetObjectWithLogging(player.MobilePartyId, out MobileParty _);
+            if (!objectManager.TryGetObjectWithLogging(player.MobilePartyId, out MobileParty deadHeroParty)) return false;
+            // Heir selection compares the heir's party id with this one, so it has to be the registered id too
+            if (!objectManager.TryGetIdWithLogging(deadHeroParty, out var deadHeroPartyId)) return false;
+
+            restoredPlayer = WithRegisteredIds(player, heroId, deadHeroPartyId, player.ClanId, player.CharacterObjectId);
+            return true;
         }
 
         if (hero.Clan == null || hero.CharacterObject == null)
@@ -97,7 +115,8 @@ internal class PlayerPartyRestorer : IPlayerPartyRestorer
         }
 
         string partyId;
-        if (party == null)
+        var createdRecoveryParty = party == null;
+        if (createdRecoveryParty)
         {
             party = createRecoveryParty(hero);
             if (party == null)
@@ -123,25 +142,62 @@ internal class PlayerPartyRestorer : IPlayerPartyRestorer
             return false;
         }
 
-        Restore(hero, party);
-
-        if (partyId != player.MobilePartyId ||
-            clanId != player.ClanId ||
-            characterObjectId != player.CharacterObjectId)
+        // Vanilla clan and party calls can throw on a broken graph; a party this attempt created must not outlive it
+        try
         {
-            restoredPlayer = new Player(
+            Restore(hero, party);
+        }
+        catch (Exception exception) when (createdRecoveryParty)
+        {
+            Logger.Error(
+                exception,
+                "Cannot restore player {ControllerId} hero {HeroId}: restoring into recovery party {PartyId} threw",
                 player.ControllerId,
                 player.HeroId,
-                partyId,
-                clanId,
-                characterObjectId,
-                player.OriginalClanId ?? player.ClanId)
-            {
-                CrimeRatings = player.CrimeRatings
-            };
+                party.StringId);
+            RemoveFailedRecoveryParty(player, party);
+            return false;
         }
 
+        restoredPlayer = WithRegisteredIds(player, heroId, partyId, clanId, characterObjectId);
         return true;
+    }
+
+    /// <inheritdoc/>
+    public bool TryGetOwnedParty(Player player, IReadOnlyCollection<Hero> playerHeroes, out MobileParty party)
+    {
+        if (!objectManager.TryGetObject(player.MobilePartyId, out party) ||
+            !objectManager.TryGetObject(player.HeroId, out Hero hero))
+            return false;
+
+        return KeepsParty(hero, party, playerHeroes);
+    }
+
+    /// <inheritdoc/>
+    public bool KeepsParty(Hero hero, MobileParty party, IReadOnlyCollection<Hero> playerHeroes)
+    {
+        // Vanilla hands a dead hero's party to another hero in it, so the dead hero keeps it until another player owns it
+        var owner = party.Owner;
+        var heirSelectionPending = hero.IsDead && !playerHeroes.Any(playerHero => ReferenceEquals(playerHero, owner));
+        return ReferenceEquals(owner, hero) || heirSelectionPending;
+    }
+
+    // The saved row itself when its ids are already the registered ones, otherwise a copy with them that keeps the
+    // row's original clan and the fields that aren't campaign objects
+    private static Player WithRegisteredIds(Player player, string heroId, string partyId, string clanId, string characterObjectId)
+    {
+        if (heroId == player.HeroId &&
+            partyId == player.MobilePartyId &&
+            clanId == player.ClanId &&
+            characterObjectId == player.CharacterObjectId)
+            return player;
+
+        return new Player(player.ControllerId, heroId, partyId, clanId, characterObjectId, player.OriginalClanId ?? player.ClanId)
+        {
+            PlatformName = player.PlatformName,
+            CrimeRatings = player.CrimeRatings,
+            MapTrackedControllerIds = player.MapTrackedControllerIds
+        };
     }
 
     private bool TryRegisterRecoveryParty(Player player, MobileParty party, out string partyId)

@@ -704,8 +704,8 @@ public class VillageHostileActionTests : MapEventTestBase
         var aiId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         firstClient.Resolve<IControllerIdProvider>().SetControllerId("PlayerOne");
         secondClient.Resolve<IControllerIdProvider>().SetControllerId("PlayerTwo");
-        Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", firstClient.NetPeer);
-        Server.Resolve<IPlayerManager>().SetPeer("PlayerTwo", secondClient.NetPeer);
+        Server.Resolve<IPlayerManager>().BindRegisteredPeer("PlayerOne", firstClient.NetPeer);
+        Server.Resolve<IPlayerManager>().BindRegisteredPeer("PlayerTwo", secondClient.NetPeer);
         var firstPartyId = GetPartyBaseId(firstPlayerId);
         var secondPartyId = GetPartyBaseId(secondPlayerId);
         var aiPartyId = GetPartyBaseId(aiId);
@@ -1694,7 +1694,7 @@ public class VillageHostileActionTests : MapEventTestBase
             .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu)))
             .ToList();
 
-        Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client.NetPeer);
+        Server.Resolve<IPlayerManager>().BindRegisteredPeer("PlayerOne", client.NetPeer);
         client.Call(() => Assert.False(PlayerEncounterPatches.UpdatePrefix()), disabledMethods);
 
         var started = Server.NetworkSentMessages.GetMessages<NetworkPromptRaidContinuation>().Single();
@@ -2152,7 +2152,7 @@ public class VillageHostileActionTests : MapEventTestBase
 
         Assert.NotNull(mapEventId);
         Server.NetworkSentMessages.Clear();
-        Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client.NetPeer);
+        Server.Resolve<IPlayerManager>().BindRegisteredPeer("PlayerOne", client.NetPeer);
 
         client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkMapEventFinalizeAttempted(mapEventId!)), MapEventDisabledMethods);
 
@@ -2228,8 +2228,8 @@ public class VillageHostileActionTests : MapEventTestBase
             Assert.Contains(joinerParty, settlement.Parties);
             Assert.Equal(leaderPosition, leaderParty.Position);
             Assert.Equal(joinerPosition, joinerParty.Position);
-            Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", leaderClient.NetPeer);
-            Server.Resolve<IPlayerManager>().SetPeer("PlayerTwo", joinerClient.NetPeer);
+            Server.Resolve<IPlayerManager>().BindRegisteredPeer("PlayerOne", leaderClient.NetPeer);
+            Server.Resolve<IPlayerManager>().BindRegisteredPeer("PlayerTwo", joinerClient.NetPeer);
             mapEvent._battleState = BattleState.AttackerVictory;
         });
 
@@ -2385,7 +2385,7 @@ public class VillageHostileActionTests : MapEventTestBase
             .ToList();
 
         var raidCompletedCount = 0;
-        Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client.NetPeer);
+        Server.Resolve<IPlayerManager>().BindRegisteredPeer("PlayerOne", client.NetPeer);
         if (naturalCompletion)
         {
             var villageTypeId = TestEnvironment.CreateRegisteredObject<VillageType>();
@@ -2548,7 +2548,7 @@ public class VillageHostileActionTests : MapEventTestBase
         }, MapEventDisabledMethods);
 
         Assert.NotNull(mapEventId);
-        Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client.NetPeer);
+        Server.Resolve<IPlayerManager>().BindRegisteredPeer("PlayerOne", client.NetPeer);
         Server.NetworkSentMessages.Clear();
 
         client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkMapEventFinalizeAttempted(mapEventId!)),
@@ -2700,7 +2700,7 @@ public class VillageHostileActionTests : MapEventTestBase
 
         Assert.Equal(mapEventId, Server.NetworkSentMessages.GetMessages<NetworkStartAttackMission>().Single().MapEventId);
 
-        Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client.NetPeer));
+        Server.Call(() => Server.Resolve<IPlayerManager>().BindRegisteredPeer("PlayerOne", client.NetPeer));
         Server.SimulateMessage(client.NetPeer, new NetworkMissionEntered("PlayerOne", mapEventId!));
 
         Server.Call(() => Assert.False(InvokeMapEventUpdatePrefix(mapEvent!)), MapEventDisabledMethods);
@@ -2718,7 +2718,7 @@ public class VillageHostileActionTests : MapEventTestBase
         var defenderTroopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
         var target = CreateVillageTarget();
         // an offline raider's battle is resolved by the server (#3864), so the raider stays connected here
-        Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", Clients.First().NetPeer);
+        Server.Resolve<IPlayerManager>().BindRegisteredPeer("PlayerOne", Clients.First().NetPeer);
 
         Server.Call(() =>
         {
