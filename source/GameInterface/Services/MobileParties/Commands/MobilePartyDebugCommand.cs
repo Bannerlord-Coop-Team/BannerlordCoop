@@ -6,6 +6,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Utils.Commands;
 using Helpers;
+using Newtonsoft.Json;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -101,8 +102,13 @@ internal class MobilePartyDebugCommand
     public sealed class InfoCoopCommand : ICoopCommand
     {
         private readonly ICommandObjectResolver resolver;
+        private readonly IObjectManager objectManager;
 
-        public InfoCoopCommand(ICommandObjectResolver resolver) => this.resolver = resolver;
+        public InfoCoopCommand(ICommandObjectResolver resolver, IObjectManager objectManager)
+        {
+            this.resolver = resolver;
+            this.objectManager = objectManager;
+        }
 
         public string Prefix => "coop.debug.mobileparty";
 
@@ -144,7 +150,33 @@ internal class MobilePartyDebugCommand
 
             Logger.Debug("{Party}, {PartyBase}", partyResult, partyBaseResults);
 
-            return Succeeded($"{partyResult}\n{partyBaseResults}");
+            string GetId(object value) => value == null ? null
+                : objectManager.TryGetId(value, out var id) ? id : "unregistered";
+            var state = JsonConvert.SerializeObject(new
+            {
+                authoritative = ModInformation.IsServer,
+                partyId = GetId(mobileParty),
+                partyStringId = mobileParty.StringId,
+                name = mobileParty.Name?.ToString(),
+                active = mobileParty.IsActive,
+                heroId = GetId(mobileParty.LeaderHero),
+                armyId = GetId(mobileParty.Army),
+                attachedToId = GetId(mobileParty.AttachedTo),
+                attachedPartyIds = mobileParty.AttachedParties.Select(GetId).ToArray(),
+                mapEventId = GetId(mobileParty.MapEvent),
+                mapEventSidePresent = mobileParty.Party.MapEventSide != null,
+                missionSide = mobileParty.Party.MapEventSide?.MissionSide.ToString(),
+                defaultBehavior = mobileParty.DefaultBehavior.ToString(),
+                targetPartyId = GetId(mobileParty.TargetParty),
+                targetSettlementId = GetId(mobileParty.TargetSettlement),
+                desiredAiNavigationType = mobileParty.DesiredAiNavigationType.ToString(),
+                partyMoveMode = mobileParty.PartyMoveMode.ToString(),
+                moveTargetPartyId = GetId(mobileParty.MoveTargetParty),
+                shortTermBehavior = mobileParty.ShortTermBehavior.ToString(),
+                shortTermTargetPartyId = GetId(mobileParty.ShortTermTargetParty),
+                isCurrentlyAtSea = mobileParty.IsCurrentlyAtSea,
+            });
+            return Succeeded($"{partyResult}\n{partyBaseResults}\nLIVE_TEST_JSON={state}");
 
         }
     }

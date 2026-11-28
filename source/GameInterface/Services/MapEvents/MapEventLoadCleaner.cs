@@ -1,11 +1,9 @@
 ﻿using Common.Messaging;
 using GameInterface.Registry.Auto;
-using GameInterface.Services.Armies;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
-using Helpers;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -43,7 +41,6 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
     private readonly IMessageBroker messageBroker;
     private readonly IPlayerManager playerManager;
     private readonly IObjectManager objectManager;
-    private readonly IArmyDisbander armyDisbander;
     private readonly IStalledMapEventResolver stalledMapEventResolver;
 
     public MapEventLoadCleaner(
@@ -51,14 +48,12 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
         IMessageBroker messageBroker,
         IPlayerManager playerManager,
         IObjectManager objectManager,
-        IArmyDisbander armyDisbander,
         IStalledMapEventResolver stalledMapEventResolver)
     {
         this.logger = logger;
         this.messageBroker = messageBroker;
         this.playerManager = playerManager;
         this.objectManager = objectManager;
-        this.armyDisbander = armyDisbander;
         this.stalledMapEventResolver = stalledMapEventResolver;
     }
 
@@ -102,7 +97,7 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
             FinalizeOrRepairEvent(mapEvent);
         });
 
-        TryStage(mapEvent, "party release", () => ReleasePlayerMapEventParties(mapEvent, parties));
+        TryStage(mapEvent, "party release", () => ReleasePlayerMapEventParties(parties));
     }
 
     // Runs one cleanup stage of a loaded player battle and logs its failure instead of throwing.
@@ -124,32 +119,13 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
     private bool TryStage(MapEvent mapEvent, string stage, Action action) =>
         TryStage(mapEvent, stage, () => { action(); return true; }, out _);
 
-    // The parties a loaded player battle releases: those that fought, the player-led armies and their members.
-    private sealed record PlayerMapEventParties(
-        MobileParty[] InvolvedMobileParties,
-        Army[] PlayerLedArmies,
-        MobileParty[] ReleasedArmyParties);
-
-    // Collected before the finalize detaches the parties, so the release still knows which ones fought.
-    private static PlayerMapEventParties CollectPlayerMapEventParties(MapEvent mapEvent)
-    {
-        var involvedMobileParties = mapEvent.InvolvedParties
+    // Collected before finalization detaches the parties from the battle.
+    private static MobileParty[] CollectPlayerMapEventParties(MapEvent mapEvent) =>
+        mapEvent.InvolvedParties
             .Where(party => party.IsMobile && party.MobileParty.IsActive)
             .Select(party => party.MobileParty)
-            .ToArray();
-        var playerLedArmies = involvedMobileParties
-            .Select(mobileParty => mobileParty.Army)
-            .Where(army => army != null && army.LeaderParty.IsPlayerParty())
             .Distinct()
             .ToArray();
-        var releasedArmyParties = playerLedArmies
-            .SelectMany(army => army.Parties)
-            .Where(mobileParty => mobileParty.IsActive && !mobileParty.IsPlayerParty())
-            .Distinct()
-            .ToArray();
-
-        return new PlayerMapEventParties(involvedMobileParties, playerLedArmies, releasedArmyParties);
-    }
 
     // The event's sides can list a party that holds no link to it; detaching releases that party as well.
     private static PartyBase[] CollectReleaseCandidates(MapEvent mapEvent, IEnumerable<PartyBase> linkedParties)
@@ -163,35 +139,27 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
         return linkedParties.Concat(sideParties).Distinct().ToArray();
     }
 
-    private void ReleasePlayerMapEventParties(MapEvent mapEvent, PlayerMapEventParties parties)
+    private static void ReleasePlayerMapEventParties(IEnumerable<MobileParty> parties)
     {
-        foreach (var army in parties.PlayerLedArmies)
+        foreach (var party in parties)
+            ResetReleasedPartyNavigation(party);
+    }
+
+    private static void ResetReleasedPartyNavigation(MobileParty party)
+    {
+        if (party == null || !party.IsActive || party.IsPlayerParty())
+            return;
+
+        // Keep existing army attachments and orders to gather at the player leader.
+        var leader = party.Army?.LeaderParty;
+        if (leader != null && leader.IsPlayerParty() &&
+            (party.AttachedTo == leader ||
+             (party.DefaultBehavior == AiBehavior.EscortParty && party.TargetParty == leader)))
         {
-            logger.Information(
-                "Dispersing loaded player-led army {ArmyName} released from map event {MapEventId}",
-                army.Name,
-                mapEvent.StringId);
-            armyDisbander.Disband(army, Army.ArmyDispersionReason.Unknown);
+            return;
         }
 
-        foreach (var mobileParty in parties.InvolvedMobileParties.Concat(parties.ReleasedArmyParties).Distinct())
-        {
-            if (!mobileParty.IsActive || mobileParty.IsPlayerParty())
-                continue;
-
-            if (parties.ReleasedArmyParties.Contains(mobileParty) &&
-                TrySetReleasedPartySettlementObjective(mobileParty, out var settlement))
-            {
-                logger.Information(
-                    "Sending released army party {PartyId} to {SettlementId} after finalizing map event {MapEventId}",
-                    mobileParty.StringId,
-                    settlement.StringId,
-                    mapEvent.StringId);
-                continue;
-            }
-
-            mobileParty.ResetNavigationToHold();
-        }
+        party.ResetNavigationToHold();
     }
 
     // A save can hold parties still linked to a battle that already ended (finalized, or no longer
@@ -295,11 +263,7 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
             string.Join(", ", released.Select(party => party.Id)));
 
         foreach (var party in released)
-        {
-            var mobileParty = party.MobileParty;
-            if (mobileParty != null && mobileParty.IsActive && !mobileParty.IsPlayerParty())
-                mobileParty.ResetNavigationToHold();
-        }
+            ResetReleasedPartyNavigation(party.MobileParty);
 
         return released;
     }
@@ -536,65 +500,5 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
             "Resolved saved player party {PartyId} from CampaignObjectManager because it was missing from the network object manager",
             partyId);
         return true;
-    }
-
-    private static bool TrySetReleasedPartySettlementObjective(
-        MobileParty mobileParty,
-        out Settlement settlement)
-    {
-        var navigationType = mobileParty.IsCurrentlyAtSea
-            ? MobileParty.NavigationType.Naval
-            : MobileParty.NavigationType.Default;
-
-        settlement = FindDestination(mobileParty, navigationType, requireFriendly: true) ??
-            FindDestination(mobileParty, navigationType, requireFriendly: false);
-        if (settlement == null)
-            return false;
-
-        SetPartyAiAction.GetActionForVisitingSettlement(
-            mobileParty,
-            settlement,
-            navigationType,
-            isFromPort: false,
-            isTargetingPort: mobileParty.IsCurrentlyAtSea);
-        return true;
-    }
-
-    private static Settlement FindDestination(
-        MobileParty mobileParty,
-        MobileParty.NavigationType navigationType,
-        bool requireFriendly)
-    {
-        bool IsEligible(Settlement candidate) =>
-            IsEligibleDestination(mobileParty, candidate, requireFriendly);
-
-        if (IsEligible(mobileParty.HomeSettlement))
-            return mobileParty.HomeSettlement;
-
-        return SettlementHelper.FindNearestSettlementToMobileParty(
-                mobileParty,
-                navigationType,
-                IsEligible) ??
-            SettlementHelper.FindNearestSettlementToPoint(mobileParty.Position, IsEligible);
-    }
-
-    private static bool IsEligibleDestination(
-        MobileParty mobileParty,
-        Settlement settlement,
-        bool requireFriendly)
-    {
-        if (settlement == null ||
-            (!settlement.IsFortification && !settlement.IsVillage) ||
-            settlement.IsUnderSiege ||
-            settlement.IsUnderRaid ||
-            (mobileParty.IsCurrentlyAtSea && !settlement.HasPort))
-        {
-            return false;
-        }
-
-        return !requireFriendly ||
-            mobileParty.MapFaction == null ||
-            settlement.MapFaction == null ||
-            !FactionManager.IsAtWarAgainstFaction(mobileParty.MapFaction, settlement.MapFaction);
     }
 }
