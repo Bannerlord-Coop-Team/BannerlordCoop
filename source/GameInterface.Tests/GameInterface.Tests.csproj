@@ -195,6 +195,7 @@
   </ItemGroup>
   <ItemGroup>
     <Publicize Include="SandBox" />
+    <Publicize Include="SandBox.View:SandBox.View.Map.MapScreen.HandleMouse" />
     <Publicize Include="TaleWorlds.CampaignSystem" />
     <Publicize Include="TaleWorlds.CampaignSystem.ViewModelCollection" />
     <Publicize Include="TaleWorlds.Core" />

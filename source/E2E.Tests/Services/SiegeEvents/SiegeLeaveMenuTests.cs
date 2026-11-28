@@ -5,6 +5,7 @@ using Coop.Core.Server.Services.SiegeEvents.Messages;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
+using GameInterface.Services.Armies.Messages;
 using GameInterface.Services.Armies.Patches;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.SiegeEvents.Patches;
@@ -304,6 +305,7 @@ public class SiegeLeaveMenuTests : IDisposable
     {
         var leavingClient = Clients.First();
         var (partyId, _) = SetupBesiegingPlayerParty(leavingClient);
+        FollowAiArmy(partyId);
 
         var disabledMethods = LeaveRoundTripDisabledMethods
             .Where(method => method.DeclaringType != typeof(GameMenu) ||
@@ -322,6 +324,41 @@ public class SiegeLeaveMenuTests : IDisposable
         AssertBesiegerCamp(Server, partyId, expectCamp: false);
         AssertBesiegerCamp(leavingClient, partyId, expectCamp: false);
         Assert.Equal(1, menuExit.CountFor(leavingClient));
+    }
+
+    [Fact]
+    public void ClientPassiveArmySiegeLeave_LeavesTheArmyOnServerAndClients()
+    {
+        var leavingClient = Clients.First();
+        var (partyId, _) = SetupBesiegingPlayerParty(leavingClient);
+        var armyId = FollowAiArmy(partyId);
+        // Received messages queue for the game thread like live, so the client's own leave runs before the server echo
+        Server.Resolve<TestNetworkRouter>().ReceiveContext = TestNetworkReceiveContext.PollerThread;
+        using var leaves = new MethodCallRecorder(Priority.Normal, runOriginal: true,
+            AccessTools.Method(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnPartyLeftArmy)));
+
+        leavingClient.Call(InvokePatchedPassiveArmySiegeLeave, LeaveRoundTripDisabledMethods);
+        Assert.Equal(1, leaves.CountFor(leavingClient));
+        Server.PumpGameThread();
+        foreach (var client in Clients)
+            client.PumpGameThread();
+
+        // #4697: only the camp used to reach the server, which kept the party in the army and attached to its leader
+        foreach (var instance in AllEnvironmentInstances)
+        {
+            instance.Call(() =>
+            {
+                var party = instance.GetRegisteredObject<MobileParty>(partyId);
+                var army = instance.GetRegisteredObject<Army>(armyId);
+                Assert.Null(party.AttachedTo);
+                Assert.Null(party.Army);
+                Assert.DoesNotContain(party, army.Parties);
+                Assert.DoesNotContain(party, army.LeaderParty.AttachedParties);
+            });
+        }
+        Assert.Single(leavingClient.NetworkSentMessages.GetMessages<NetworkRemovePartyInArmy>());
+        // the echo finds the party already out of the army and leaves it alone
+        Assert.Equal(1, leaves.CountFor(leavingClient));
     }
 
     [Fact]
@@ -810,6 +847,48 @@ public class SiegeLeaveMenuTests : IDisposable
         SetMainParty(leavingInstance, partyId);
 
         return (partyId, siegeEventId);
+    }
+
+    /// <summary>
+    /// Puts the besieging party in an AI lord's army as a follower attached to the leader, which shares its
+    /// camp, the state the passive siege menu's Leave Army option needs. Returns the army's id.
+    /// </summary>
+    private string FollowAiArmy(string partyId)
+    {
+        var leaderId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        foreach (var instance in AllEnvironmentInstances)
+        {
+            instance.Call(() =>
+            {
+                var party = instance.GetRegisteredObject<MobileParty>(partyId);
+                instance.GetRegisteredObject<MobileParty>(leaderId)._besiegerCamp = party.BesiegerCamp;
+            });
+        }
+
+        string? armyId = null;
+        Server.Call(() =>
+        {
+            var leader = Server.GetRegisteredObject<MobileParty>(leaderId);
+            var army = new Army(GameObjectCreator.CreateInitializedObject<Kingdom>(), leader, Army.ArmyTypes.Besieger);
+            Assert.True(Server.ObjectManager.TryGetId(army, out armyId));
+            var party = Server.GetRegisteredObject<MobileParty>(partyId);
+            party.Army = army;
+            party.AttachedTo = leader;
+        });
+
+        foreach (var instance in AllEnvironmentInstances)
+        {
+            instance.PumpGameThread();
+            instance.Call(() =>
+            {
+                var party = instance.GetRegisteredObject<MobileParty>(partyId);
+                Assert.Same(instance.GetRegisteredObject<Army>(armyId!), party.Army);
+                Assert.Same(instance.GetRegisteredObject<MobileParty>(leaderId), party.AttachedTo);
+                Assert.NotNull(party.BesiegerCamp);
+            });
+        }
+
+        return armyId!;
     }
 
     /// <summary>Makes the party the instance's <see cref="MobileParty.MainParty"/>. Runs in the
