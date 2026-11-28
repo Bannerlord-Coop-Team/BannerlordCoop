@@ -1,6 +1,4 @@
-﻿using GameInterface.Services.Heroes.Patches;
-using HarmonyLib;
-using SandBox.View.Map;
+﻿using HarmonyLib;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -13,6 +11,11 @@ namespace GameInterface.Services.Time.Patches;
 [HarmonyPatch]
 internal static class DisableGameMenuPausePatches
 {
+    // Swapped in for the TimeControlMode setter so the write is dropped
+    private static void DropTimeControlModeWrite(Campaign _, CampaignTimeControlMode _2)
+    {
+    }
+
     static IEnumerable<MethodBase> TargetMethods()
     {
         return new MethodBase[]
@@ -22,8 +25,6 @@ internal static class DisableGameMenuPausePatches
             AccessTools.Method(typeof(GameMenu), nameof(GameMenu.EndWait)),
             AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast)),
             AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu)),
-            AccessTools.Method(typeof(MapScreen), "HandleLeftMouseButtonClick"),
-            AccessTools.Method(typeof(MapScreen), "HandleMouse"),
         };
     }
 
@@ -33,7 +34,7 @@ internal static class DisableGameMenuPausePatches
         List<CodeInstruction> instrs = instructions.ToList();
 
         MethodInfo timeControlSetter = typeof(Campaign).GetProperty(nameof(Campaign.TimeControlMode)).GetSetMethod();
-        MethodInfo deferFunction = typeof(DisableMapClickTimeChange).GetMethod("SetTimeControlModeDeference", BindingFlags.Static | BindingFlags.NonPublic);
+        MethodInfo dropWrite = typeof(DisableGameMenuPausePatches).GetMethod(nameof(DropTimeControlModeWrite), BindingFlags.Static | BindingFlags.NonPublic);
 
         foreach (var instr in instructions)
         {
@@ -41,7 +42,7 @@ internal static class DisableGameMenuPausePatches
                 instr.operand as MethodInfo == timeControlSetter)
             {
                 instr.opcode = OpCodes.Call;
-                instr.operand = deferFunction;
+                instr.operand = dropWrite;
             }
         }
 

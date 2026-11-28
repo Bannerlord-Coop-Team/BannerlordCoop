@@ -11,7 +11,6 @@ using HarmonyLib;
 using Missions;
 using Missions.Battles;
 using Missions.Messages;
-using Moq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
@@ -464,14 +463,8 @@ public class BattleActivationJoinTests : MissionTestEnvironment
         {
             var mock = CreateConnectedMission(fixture, joiner, mapEventId);
             mock.PlayerTeam = playerSide == BattleSideEnum.Attacker ? mock.AttackerTeam : mock.DefenderTeam;
-            var missionProperty = AccessTools.Property(typeof(MissionBehavior), nameof(MissionBehavior.Mission));
-            var endLogic = new BattleEndLogic();
-            missionProperty.SetValue(endLogic, mock.Shell);
-            endLogic._missionAgentSpawnLogic = new Mock<IMissionAgentSpawnLogic>().Object;
-            mock.Shell.MissionBehaviors.Add(endLogic);
-
             var controller = joiner.Resolve<CoopBattleController>();
-            missionProperty.SetValue(controller, mock.Shell);
+            var endLogic = AttachBattleEndLogic(mock, controller);
             controller.Session.TryBegin(mapEventId);
             joiner.Resolve<IMessageBroker>().Publish(host, new NetworkBattleResultSnapshot(
                 mapEventId,

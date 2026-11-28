@@ -222,6 +222,56 @@ public class TradeHandlerTests
     }
 
     [Fact]
+    public void ReconcileSales_KeepsSellingMeatSlaughteredOnTheScreen()
+    {
+        var sheep = new ItemObject("sheep");
+        var meat = new ItemObject("meat");
+
+        // Slaughter puts the meat straight into the screen's roster, so neither the opening nor the live roster has it
+        var partyRoster = new ItemRoster();
+        partyRoster.AddToCounts(new EquipmentElement(sheep, null), 2);
+        var initialRoster = new[] { new ItemRosterElement(new EquipmentElement(sheep, null), 2) };
+        var submittedRoster = new[] { new ItemRosterElement(new EquipmentElement(sheep, null), 1) };
+
+        var soldItems = new List<(ItemRosterElement, int)>
+        {
+            (new ItemRosterElement(new EquipmentElement(meat, null), 2), 60)
+        };
+
+        TradeHandler.RebaseInventoryData(partyRoster, initialRoster, submittedRoster, out var unremovedItems);
+        int result = TradeHandler.ReconcileSales(unremovedItems, soldItems, totalAmount: -60, out var keptSales);
+
+        Assert.Equal(-60, result);
+        var (kept, price) = Assert.Single(keptSales);
+        Assert.Equal(2, kept.Amount);
+        Assert.Equal(60, price);
+    }
+
+    [Fact]
+    public void ReconcileSales_PaysOnlyForWhatThePartyStillHad()
+    {
+        var hides = new ItemObject("hides");
+
+        // An earlier sale of 3 already applied, but the screen still sells all 5
+        var partyRoster = new ItemRoster();
+        partyRoster.AddToCounts(new EquipmentElement(hides, null), 2);
+        var initialRoster = new[] { new ItemRosterElement(new EquipmentElement(hides, null), 5) };
+
+        var soldItems = new List<(ItemRosterElement, int)>
+        {
+            (new ItemRosterElement(new EquipmentElement(hides, null), 5), 50)
+        };
+
+        TradeHandler.RebaseInventoryData(partyRoster, initialRoster, System.Array.Empty<ItemRosterElement>(), out var unremovedItems);
+        int result = TradeHandler.ReconcileSales(unremovedItems, soldItems, totalAmount: -50, out var keptSales);
+
+        Assert.Equal(-20, result);
+        var (kept, price) = Assert.Single(keptSales);
+        Assert.Equal(2, kept.Amount);
+        Assert.Equal(20, price);
+    }
+
+    [Fact]
     public void ApplyTradeToLiveStock_KeepsWhatOtherPlayersTradedSinceTheSnapshot()
     {
         var grain = new ItemObject("grain");

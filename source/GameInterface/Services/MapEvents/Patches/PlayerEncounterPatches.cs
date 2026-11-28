@@ -427,12 +427,14 @@ internal class PlayerEncounterPatches
     }
 
     // Native blocks defender-side parties from leaving; allow a joiner (a non-leader of its side) to leave,
-    // since it is neither the aggressor nor the attacked target.
+    // since it is neither the aggressor nor the attacked target. A party inside the settlement keeps native's answer,
+    // because EncounterLeavePrefix hands a settlement Leave click to native, which only finishes the encounter locally.
     [HarmonyPatch(typeof(EncounterGameMenuBehavior), "game_menu_encounter_leave_on_condition")]
     [HarmonyPostfix]
     private static void EncounterLeaveConditionPostfix(MenuCallbackArgs args, ref bool __result)
     {
         if (__result) return;
+        if (MobileParty.MainParty.CurrentSettlement != null) return;
         if (!IsBattleJoiner()) return;
 
         args.optionLeaveType = GameMenuOption.LeaveType.Leave;
@@ -442,7 +444,8 @@ internal class PlayerEncounterPatches
     // Open-field "encounter" Leave runs local-only on the client (teleport out, local auto-sim, side leave), so the
     // server keeps the party engaged and pulls it back. A side leader leaving ends the event: route the authoritative
     // finalize round-trip. A joiner only removes itself (battle continues): replicate the removal, then let native do
-    // the local teardown. Both clear the engage order. Settlements/sieges keep their own synced flows.
+    // the local teardown. Both clear the engage order. Settlements/sieges keep their own synced flows, and a defender
+    // inside a settlement never sees this Leave because EncounterLeaveConditionPostfix keeps native's hidden answer.
     [HarmonyPatch(typeof(EncounterGameMenuBehavior), "game_menu_encounter_leave_on_consequence")]
     [HarmonyPrefix]
     private static bool EncounterLeavePrefix()

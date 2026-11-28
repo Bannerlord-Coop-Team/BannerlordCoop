@@ -23,14 +23,17 @@ using HarmonyLib;
 using Moq;
 using SandBox.GauntletUI.Menu;
 using SandBox.View.Menu;
+using System.Xml;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.ComponentInterfaces;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Election;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Buildings;
+using TaleWorlds.CampaignSystem.Settlements.Workshops;
 using TaleWorlds.CampaignSystem.ViewModelCollection.GameMenu.TownManagement;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
@@ -868,6 +871,47 @@ public class CoopClanFlowTests : MapEventTestBase, IDisposable
             Assert.True(enemyParty.Party.IsVisualDirty);
             Assert.True(Get<Settlement>(memberClient, settlementId).Party.IsVisualDirty);
         });
+    }
+
+    // #4859: a member is shown why caravans and workshop purchases are leader only, instead of a missing option or a "Yes" that does nothing.
+    [Fact]
+    public void JoinedMember_CaravanAndWorkshopPurchaseExplainLeaderOnly()
+    {
+        Join();
+        var workshopId = TestEnvironment.CreateRegisteredObject<Workshop>();
+
+        foreach (var (client, isLeader) in new[] { (leaderClient, true), (memberClient, false) })
+        {
+            client.Call(() =>
+            {
+                var previousTexts = GameTexts._gameTextManager;
+                var previousWorkshopModel = Campaign.Current.Models.WorkshopModel;
+                try
+                {
+                    GameTexts._gameTextManager = new GameTextManager();
+                    var strings = new XmlDocument();
+                    strings.Load(Path.Combine(AppContext.BaseDirectory, "global_strings.xml"));
+                    GameTexts._gameTextManager.LoadFromXML(strings);
+                    var workshopModel = new Mock<WorkshopModel>();
+                    workshopModel.Setup(model => model.GetMaxWorkshopCountForClanTier(It.IsAny<int>())).Returns(1);
+                    Campaign.Current.Models.WorkshopModel = workshopModel.Object;
+                    Hero.MainHero._ownedWorkshops ??= new MBList<Workshop>();
+
+                    Assert.Equal(isLeader, new CaravanConversationsCampaignBehavior()
+                        .conversation_caravan_build_clickable_condition(out var caravanReason));
+                    Assert.Equal(isLeader ? null : "Only the clan leader can form caravans.", caravanReason?.ToString());
+
+                    Assert.Equal(isLeader, new WorkshopsCharactersCampaignBehavior()
+                        .can_player_buy_workshop_clickable_condition(Get<Workshop>(client, workshopId), out var workshopReason));
+                    Assert.Equal(isLeader ? null : "Only the clan leader can buy workshops.", workshopReason?.ToString());
+                }
+                finally
+                {
+                    GameTexts._gameTextManager = previousTexts;
+                    Campaign.Current.Models.WorkshopModel = previousWorkshopModel;
+                }
+            });
+        }
     }
 
     private Player CreatePlayer(EnvironmentInstance client, string controllerId)
