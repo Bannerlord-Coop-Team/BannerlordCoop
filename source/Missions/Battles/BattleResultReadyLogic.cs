@@ -86,7 +86,9 @@ public class BattleResultReadyLogic : MissionLogic
 
         GameThread.RunSafe(() =>
         {
-            if (payload.What.MapEventId != session.InstanceId ||
+            // Mission is null once the finalized mission removed this behavior, which can happen before this action runs.
+            if (Mission == null ||
+                payload.What.MapEventId != session.InstanceId ||
                 Mission.CurrentState == Mission.State.EndingNextFrame ||
                 Mission.CurrentState == Mission.State.Over)
                 return;
