@@ -74,6 +74,7 @@ internal class ServerSiegeEntryHandler : IHandler
         messageBroker.Subscribe<SiegeAssaultStarted>(HandleAssaultStarted);
         messageBroker.Subscribe<SiegePreparationStarted>(HandlePreparationStarted);
         messageBroker.Subscribe<SiegeEndedWithoutBattle>(HandleSiegeEnded);
+        messageBroker.Subscribe<PartyLeftSiegeByDiplomacy>(HandleLeftByDiplomacy);
         messageBroker.Subscribe<SiegeCampPositionRolled>(HandleCampPosition);
         messageBroker.Subscribe<NetworkRequestBreakInContinuation>(HandleBreakInContinuation);
     }
@@ -232,6 +233,19 @@ internal class ServerSiegeEntryHandler : IHandler
             GetPlayerPartyIds(obj.AttackerParties),
             GetPlayerPartyIds(obj.DefenderParties),
             obj.InterruptedActiveAssault));
+    }
+
+    // Runs on the game thread already, published from the server's siege continuity check after the party's
+    // camp or settlement leave was sent.
+    private void HandleLeftByDiplomacy(MessagePayload<PartyLeftSiegeByDiplomacy> payload)
+    {
+        var obj = payload.What;
+
+        if (!objectManager.TryGetIdWithLogging(obj.Party, out var partyId)) return;
+        if (!objectManager.TryGetIdWithLogging(obj.Faction, out var factionId)) return;
+
+        // Broadcast; each client checks locally whether its own party left.
+        network.SendAll(new NetworkPromptSiegeLeftByDiplomacy(partyId, factionId));
     }
 
     private string[] GetPlayerPartyIds(IEnumerable<MobileParty> parties)
@@ -532,6 +546,7 @@ internal class ServerSiegeEntryHandler : IHandler
         messageBroker.Unsubscribe<SiegeAssaultStarted>(HandleAssaultStarted);
         messageBroker.Unsubscribe<SiegePreparationStarted>(HandlePreparationStarted);
         messageBroker.Unsubscribe<SiegeEndedWithoutBattle>(HandleSiegeEnded);
+        messageBroker.Unsubscribe<PartyLeftSiegeByDiplomacy>(HandleLeftByDiplomacy);
         messageBroker.Unsubscribe<SiegeCampPositionRolled>(HandleCampPosition);
         messageBroker.Unsubscribe<NetworkRequestBreakInContinuation>(HandleBreakInContinuation);
     }

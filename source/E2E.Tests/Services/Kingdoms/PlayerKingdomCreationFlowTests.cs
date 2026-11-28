@@ -84,6 +84,7 @@ using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.ObjectSystem;
 using Xunit.Abstractions;
+using static E2E.Tests.Util.KingdomTestSetup;
 
 namespace E2E.Tests.Services.Kingdoms;
 
@@ -6329,16 +6330,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Assert.True(instance.ObjectManager.TryGetObject<Clan>(clanId, out var clan));
             Assert.True(instance.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
 
-            using (new AllowedThread())
-            {
-                clan._kingdom = kingdom;
-                kingdom._rulingClan ??= clan;
-                kingdom._clans ??= new MBList<Clan>();
-                if (!kingdom._clans.Contains(clan))
-                {
-                    kingdom._clans.Add(clan);
-                }
-            }
+            PlaceClanInKingdom(clan, kingdom);
         });
     }
 
@@ -6389,34 +6381,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
     private void EnsureKingdomRegisteredEverywhere(string kingdomId)
     {
-        EnsureKingdomRegistered(Server, kingdomId);
-        foreach (var client in Clients)
-        {
-            EnsureKingdomRegistered(client, kingdomId);
-        }
-    }
-
-    private static void EnsureKingdomRegistered(EnvironmentInstance instance, string kingdomId)
-    {
-        instance.Call(() =>
-        {
-            Assert.True(instance.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
-
-            using (new AllowedThread())
-            {
-                kingdom._activePolicies ??= new MBList<PolicyObject>();
-                kingdom._armies ??= new MBList<Army>();
-                kingdom._clans ??= new MBList<Clan>();
-                kingdom._unresolvedDecisions ??= new MBList<KingdomDecision>();
-                kingdom._factionsAtWarWith ??= new MBList<IFaction>();
-                kingdom._alliedKingdoms ??= new MBList<Kingdom>();
-
-                if (!Campaign.Current.CampaignObjectManager.Kingdoms.Contains(kingdom))
-                {
-                    Campaign.Current.CampaignObjectManager.AddKingdom(kingdom);
-                }
-            }
-        });
+        EnsureKingdomRegistered(Clients.Prepend(Server), kingdomId);
     }
 
     private void AssertKingdomCreatedOnServer(string kingdomId, string clanId, string cultureId, string? fiefId = null)

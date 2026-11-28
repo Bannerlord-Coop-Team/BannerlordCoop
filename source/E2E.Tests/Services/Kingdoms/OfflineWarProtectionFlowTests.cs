@@ -2,6 +2,7 @@
 using GameInterface.Services.Kingdoms.Messages;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
+using E2E.Tests.Util;
 using GameInterface.Configuration;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
@@ -251,12 +252,9 @@ public class OfflineWarProtectionFlowTests : IDisposable
 
                 using (new AllowedThread())
                 {
-                    clan._kingdom = kingdom;
-                    kingdom._rulingClan ??= clan;
-                    kingdom._clans ??= new MBList<Clan>();
                     kingdom._unresolvedDecisions ??= new MBList<KingdomDecision>();
                     kingdom._activePolicies ??= new MBList<PolicyObject>();
-                    if (!kingdom._clans.Contains(clan)) kingdom._clans.Add(clan);
+                    KingdomTestSetup.PlaceClanInKingdom(clan, kingdom);
                 }
             });
         }
