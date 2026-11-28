@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Messaging;
 using Common.Network;
 using GameInterface;
 using GameInterface.Services.Entity;
@@ -43,10 +44,14 @@ internal class NavalRaidMissionPatches
     {
         if (__state == null || __result is not Mission mission) return;
         if (!ContainerProvider.TryResolve<INetwork>(out var network) ||
-            !ContainerProvider.TryResolve<IControllerIdProvider>(out var controllerIdProvider)) return;
+            !ContainerProvider.TryResolve<IControllerIdProvider>(out var controllerIdProvider) ||
+            !ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker)) return;
 
         network.SendAll(new NetworkMissionEntered(controllerIdProvider.ControllerId, __state));
         mission.AddMissionBehavior(new NavalRaidMissionMembershipLogic(network, controllerIdProvider.ControllerId, __state));
+        // A raid scene without landing points throws in vanilla's deployment end (Bjorenbyr, #4953); the guard ends the mission
+        // instead of the tick catch rerunning the team setup, which spawns the fleet again each time.
+        mission.AddMissionBehavior(new NavalSetupGuard(messageBroker));
     }
 }
 
