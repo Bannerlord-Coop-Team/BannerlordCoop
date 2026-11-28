@@ -250,6 +250,10 @@ internal class BattleJoinLeaveHandler : IHandler
                 return;
             }
 
+            // The server never added the party, so no removal will end its cancelled join.
+            if (cancelled)
+                joinRequests.EndCancelled(party);
+
             siegeJoinMenuDeferralTracker.Clear();
 
             Logger.Warning("Server rejected battle join for party {PartyId} and map event {MapEventId}",
@@ -467,6 +471,7 @@ internal class BattleJoinLeaveHandler : IHandler
                     party,
                     message.LeaveSiege,
                     message.FinishLocalMenus);
+                joinRequests.EndCancelled(party);
             },
             context: nameof(Handle_NetworkPartyLeftBattle));
     }

@@ -39,28 +39,27 @@ internal class VillageHostileActionJoinEncounterPatch
             return true;
 
         var side = __originalMethod.Name == HelpAttackersConsequence ? BattleSideEnum.Attacker : BattleSideEnum.Defender;
-        var joinsRaidAttackers = side == BattleSideEnum.Attacker && mapEvent.IsRaidHostileAction();
+        if (side == BattleSideEnum.Attacker && mapEvent.IsRaidHostileAction())
+        {
+            if (mapEvent.IsActiveSlowVillageRaid())
+            {
+                GameMenu.SwitchToMenu("raid_occupied");
+                return false;
+            }
+
+            PlayerEncounter.JoinBattle(BattleSideEnum.Attacker);
+            SwitchToJoinedEncounterMenu(mapEvent);
+            return false;
+        }
+
         // Vanilla sends an undefended attacker that doesn't lead an army to army_wait or menu_siege_strategies, which never read its side.
-        var vanillaSkipsEncounter = side == BattleSideEnum.Attacker && !joinsRaidAttackers &&
+        var vanillaSkipsEncounter = side == BattleSideEnum.Attacker &&
             mapEvent.DefenderSide.TroopCount == 0 && MobileParty.MainParty.Army?.LeaderParty != MobileParty.MainParty;
         if (vanillaSkipsEncounter)
             return true;
 
-        if (!joinsRaidAttackers)
-        {
-            // Encounter menu init reads the joiner's side, so MapEventSideDataHandler opens it once the server's add lands.
-            PlayerEncounter.JoinBattle(side);
-            return false;
-        }
-
-        if (mapEvent.IsActiveSlowVillageRaid())
-        {
-            GameMenu.SwitchToMenu("raid_occupied");
-            return false;
-        }
-
-        PlayerEncounter.JoinBattle(BattleSideEnum.Attacker);
-        SwitchToJoinedEncounterMenu(mapEvent);
+        // Encounter menu init reads the joiner's side, so MapEventSideDataHandler opens it once the server's add lands.
+        PlayerEncounter.JoinBattle(side);
         return false;
     }
 

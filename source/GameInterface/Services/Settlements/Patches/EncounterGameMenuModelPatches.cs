@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Messaging;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.Encounters;
@@ -18,6 +19,14 @@ internal class EncounterGameMenuModelPatches
     [HarmonyPostfix]
     private static void Postfix(ref string __result)
     {
+        // A cancelled village join keeps the party in the joined event until the server's removal lands, and Campaign.Tick must not reopen that encounter.
+        if (__result == "encounter" && ContainerProvider.TryResolve<IBattleJoinRequestTracker>(out var joinRequests) &&
+            joinRequests.IsCancelled(PartyBase.MainParty, MobileParty.MainParty.MapEvent))
+        {
+            __result = null;
+            return;
+        }
+
         if (ModInformation.IsServer || (__result != "join_encounter" && __result != "naval_town_outside") || PlayerEncounter.Current != null)
             return;
 

@@ -200,11 +200,11 @@ internal class MapEventSideDataHandler : IHandler
 
     private void SwitchVillageMenuToEncounterIfNeeded(MapEvent mapEvent)
     {
-        if (MobileParty.MainParty?.MapEvent != mapEvent)
+        if (MobileParty.MainParty.MapEvent != mapEvent)
             return;
 
         // The player left this join while it waited, and its accepted reply takes the party out again.
-        if (joinRequests.IsCancelled(PartyBase.MainParty))
+        if (joinRequests.IsCancelled(PartyBase.MainParty, mapEvent))
             return;
 
         var encounter = PlayerEncounter.Current;
@@ -214,10 +214,11 @@ internal class MapEventSideDataHandler : IHandler
         if (encounter.GetBattleOrPlayerMapEvent() != mapEvent)
             return;
 
-        var menuId = Campaign.Current.CurrentMenuContext?.GameMenu?.StringId;
+        var menuId = Campaign.Current.CurrentMenuContext?.GameMenu.StringId;
         // A defender's add interrupts the looting, so the raider faces it in the encounter menu.
         var raiderWaits = menuId == "raiding_village" && mapEvent.IsRaidHostileAction() && !mapEvent.IsActiveSlowVillageRaid();
         // VillageHostileActionJoinEncounterPatch keeps a village joiner in join_encounter until this add gives it a side.
+        // encounter_interrupted runs the same join callbacks, but only StartBattleAction opens it, and clients send that to the server.
         var joinerWaits = menuId == "join_encounter" && mapEvent.IsVillageHostileAction();
         if (raiderWaits || joinerWaits)
             GameMenu.SwitchToMenu("encounter");
