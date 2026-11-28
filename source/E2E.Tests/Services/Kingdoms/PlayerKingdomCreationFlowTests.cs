@@ -714,24 +714,28 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         var start = AccessTools.Method(typeof(Clan), nameof(Clan.StartMercenaryService));
         var end = AccessTools.Method(typeof(Clan), nameof(Clan.EndMercenaryService));
         var setter = AccessTools.PropertySetter(typeof(Clan), nameof(Clan.IsUnderMercenaryService));
+        int replacements = 0;
         foreach (var instruction in instructions)
         {
             if (instruction.Calls(start))
             {
                 yield return new CodeInstruction(OpCodes.Ldc_I4_1).MoveLabelsFrom(instruction);
                 yield return new CodeInstruction(OpCodes.Call, setter);
+                replacements++;
             }
             else if (instruction.Calls(end))
             {
-                yield return new CodeInstruction(OpCodes.Pop).MoveLabelsFrom(instruction);
+                yield return new CodeInstruction(OpCodes.Pop).MoveLabelsFrom(instruction); // drop isByLeavingKingdom, the setter only takes the value
                 yield return new CodeInstruction(OpCodes.Ldc_I4_0);
                 yield return new CodeInstruction(OpCodes.Call, setter);
+                replacements++;
             }
             else
             {
                 yield return instruction;
             }
         }
+        Assert.Equal(1, replacements);
     }
 
     // The kingdom has one clan, its ruler's.
