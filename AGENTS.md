@@ -33,6 +33,10 @@ Network-receive handlers run on the single `Poller` thread, but the object an id
 
 **Reach for `GameThread.RunSafe` before `GameThread.Run`.** `RunSafe` wraps the action in a try/catch that travels onto the game thread and logs the failure where it runs, instead of letting it escape `Update` — an unguarded throw from a plain `Run` action kills that frame's queue drain and can strand a blocking caller until the 30-second `BlockingTimeout`. Use plain `Run` only when you actually want the exception to propagate (a `blocking: true` call that must rethrow to its waiting caller so the caller learns the work failed), or when the action already carries its own try/catch.
 
+### Wait on the State the Reply Produces
+
+When a client waits for the server to apply a request, **wait on the exact state the reply produces**, captured before sending, not a condition that is already true. Otherwise the code after the wait runs before the reply applies and its failure branch can never run. Send one state change as one message too, because splitting it across two leaves a handler polling for the second.
+
 ## Environment, Build & Logs
 
 ### Project Structure

@@ -7,6 +7,9 @@
 - Keep changes scoped to the owning project.
 - Write the positive role check, `ModInformation.IsServer` or `ModInformation.IsClient`, not `!ModInformation.IsClient`. `IsClient` is defined as `!IsServer`, so the negation reads as a double negative.
 - Don't add `#region`/`#endregion` blocks; the codebase doesn't use them.
+- Split a condition with several clauses into one guard clause per reason, or name it with a `bool` local, so each rule reads on its own line. A single check stays inline, as in Fit the Existing Codebase.
+- Keep filters out of `foreach` headers and lambdas, and keep side effects and `out` variables out of conditions. Iterate the source and open the body with a `continue` guard, so the rule is visible.
+- Dispatch on an enum with a `switch` that has a case per value and a throwing `default`, not an `if`/`else if` chain, because a bare final `else` silently takes values added later.
 
 ## Fit the Existing Codebase
 
@@ -49,6 +52,8 @@ Don't add a `static` class, or a `*Gate`, that other code writes and patches rea
 - A class that subscribes to a message implements `IDisposable` and unsubscribes in `Dispose`.
 - Static collections in patches outlive the session. Keep that state in a DI'd service, or clear it when the campaign ends.
 - Use the result of `ContainerProvider.TryResolve(out var x)` instead of ignoring it and null-checking `x` afterwards.
+- Give a shared field one writer, a method that also does what must go with the write, like nulling it before a destroy or sending the sync message. Otherwise every caller has to remember the sequence and one eventually forgets.
+- Don't expose steps a caller must call in a set order or on a set thread; expose one method that does them. Put a check and the record it guards in one method under one lock, otherwise another thread can run between them.
 
 ## Harmony
 
@@ -59,8 +64,10 @@ Don't add a `static` class, or a `*Gate`, that other code writes and patches rea
 
 ## Validation
 
-- Don't validate inputs that are always valid, such as constructor-injected dependencies (Autofac never injects null).
+- Don't validate inputs that are always valid, such as constructor-injected dependencies (Autofac never injects null), or a value an earlier step guarantees. Use `First` over `FirstOrDefault` plus a return, so a broken invariant throws into a logging catch like `GameThread.RunSafe` instead of silently falling back to vanilla.
 - Validate only where bad data can actually arrive, like network message contents or game state that can really be gone by the time a message applies.
+- Log a warning with the ids involved at every early exit that drops requested work, and don't report success from a path that did nothing. Don't send a normal-looking value, like an empty id, in place of a failed lookup.
+- Check every precondition before the first state change, so a failure can't leave state half applied. Put must-run cleanup, like releasing a claim or sending the finished message, in a `finally` so an earlier throw can't skip it.
 - Co-op assumes people are playing with their friends, so cheating gets dealt with in house and the mod isn't responsible for anti-cheat. Don't add validation or tests whose only justification is stopping a cheating, malicious or modified client or a forged packet. A check, including one on network message contents, is justified by an honest failure path like a double-click, race, disconnect or stale local state.
 - When a check is warranted, use the statement form `if (x == null) throw ...`, not `x ?? throw new ArgumentNullException(...)`.
 - Data and message types just assign.
@@ -80,6 +87,9 @@ Don't add a `static` class, or a `*Gate`, that other code writes and patches rea
 
 - One line stating the non-obvious why is the norm. Two or three lines are fine when the mechanism needs them; never write a 6+ line block.
 - Put longer rationale in the commit message, where `git blame` surfaces it, instead of narrating vanilla behavior in a patch comment.
+- A patch that blocks, narrows or copies a vanilla method still gets its one line: why, and where the work now lives or what differs, like `// Equipment creation is handled by the auto-registry (see EquipmentRegistry.Constructors).`
+- Comment early exits whose outcome isn't obvious, such as discard versus retry later, and a `Try*` method that returns true with a null or empty result.
+- When code moves or changes, re-read the summaries, doc comments and listed cases around it, and keep each comment on the class or method it describes. Interface docs state what callers can rely on, not how the implementation waits.
 - Don't write `->`/`→` arrow chains.
 
 ## Files and Tooling
