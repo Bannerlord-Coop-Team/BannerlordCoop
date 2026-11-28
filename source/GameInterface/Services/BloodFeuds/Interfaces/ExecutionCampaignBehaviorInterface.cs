@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+﻿using Common.Logging;
+using Common.Messaging;
 using Common.Network;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.BloodFeuds.Data;
@@ -9,6 +10,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using Helpers;
+using Serilog;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -53,6 +55,8 @@ public interface IExecutionCampaignBehaviorInterface : IGameAbstraction
 
 internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorInterface
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<ExecutionCampaignBehaviorInterface>();
+
     private readonly ICoopSessionProvider coopSessionProvider;
     private readonly IObjectManager objectManager;
     private readonly IPlayerManager playerManager;
@@ -377,7 +381,11 @@ internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorIn
 
         // The client priced it from its last counts, which can be behind the server's
         int bloodMoney = GetBloodMoneyForPlayerToPayAgainstClan(feud);
-        if (playerHero.Gold < bloodMoney) return;
+        if (playerHero.Gold < bloodMoney)
+        {
+            Logger.Warning("{Hero} can't pay the {BloodMoney} blood money to end the feud with {Clan}, they have {Gold}", playerHero.Name, bloodMoney, clan.Name, playerHero.Gold);
+            return;
+        }
 
         GiveGoldAction.ApplyBetweenCharacters(playerHero, null, bloodMoney);
         ChangeBloodFeudState(playerClan, clan, null, ChangeBloodFeudActionDetail.SettledByRansomPayment);
