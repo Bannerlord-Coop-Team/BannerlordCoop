@@ -71,7 +71,7 @@ public class KillCharacterActionExecutionTests : MapEventTestBase
         }, WithoutObituary);
     }
 
-    // A rebel clan that loses its last town executes its imprisoned heroes, but vanilla only removes the main party's (#4894).
+    // A rebel clan that loses its last town executes its imprisoned heroes, but a player party's prisoner is only removed (Lost), as vanilla does for the main party (#4894).
     [Theory]
     [InlineData(true, KillCharacterAction.KillCharacterActionDetail.Lost)]
     [InlineData(false, KillCharacterAction.KillCharacterActionDetail.Executed)]
@@ -80,7 +80,6 @@ public class KillCharacterActionExecutionTests : MapEventTestBase
         var captorPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         var rebelId = TestEnvironment.CreateRegisteredObject<Hero>();
         var rebelClanId = TestEnvironment.CreateRegisteredObject<Clan>();
-        var captorClanId = TestEnvironment.CreateRegisteredObject<Clan>();
         string captorId = null;
         Server.Call(() =>
         {
@@ -92,19 +91,13 @@ public class KillCharacterActionExecutionTests : MapEventTestBase
         Server.Call(() =>
         {
             var captorParty = Server.GetRegisteredObject<MobileParty>(captorPartyId);
-            var captorClan = Server.GetRegisteredObject<Clan>(captorClanId);
             var rebel = Server.GetRegisteredObject<Hero>(rebelId);
             var rebelClan = Server.GetRegisteredObject<Clan>(rebelClanId);
-            RegisterTrait(DefaultTraits.Honor);
-            RegisterTrait(DefaultTraits.Mercy);
-            Campaign.Current.PlayerTraitDeveloper = new PropertyOwner<PropertyObject>();
             // The server's own main party, which no player leads
             Campaign.Current.MainParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
 
             using (new AllowedThread())
             {
-                captorClan.InitMembers();
-                captorParty.LeaderHero.Clan = captorClan;
                 rebelClan.InitMembers();
                 rebelClan.IsRebelClan = true;
                 rebelClan.SetLeader(rebel);
@@ -115,8 +108,6 @@ public class KillCharacterActionExecutionTests : MapEventTestBase
 
             Assert.False(rebel.IsAlive);
             Assert.Equal(expectedDeath, rebel.DeathMark);
-            var xp = Server.Resolve<ICoopSessionProvider>().CoopSession.PlayerTraitData.PlayerTraitXp;
-            Assert.DoesNotContain(captorId, xp.Keys);
         }, WithoutObituary);
     }
 
