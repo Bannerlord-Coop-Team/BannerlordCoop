@@ -1,4 +1,5 @@
-﻿using Common.Util;
+﻿using Common.Network;
+using Common.Util;
 using E2E.Tests.Services.MapEvents;
 using E2E.Tests.Util;
 using GameInterface.CoopSessionData;
@@ -90,7 +91,55 @@ public class ExecutionCampaignBehaviorInterfaceTests : MapEventTestBase
 
             var update = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkUpdateBloodFeuds>());
             Assert.True(update.Feuds[feudClanId].HasBloodFeud);
+            // The server keeps feuds per player clan, so only clients set vanilla's flag
+            Assert.False(Server.GetRegisteredObject<Clan>(feudClanId).HasBloodFeudWithPlayer);
         });
+
+        var client = Clients.First();
+        client.PumpGameThread();
+        client.Call(() => Assert.True(client.GetRegisteredObject<Clan>(feudClanId).HasBloodFeudWithPlayer));
+    }
+
+    [Fact]
+    public void LeaderPayingRansom_EndsTheFeudForTheServersBloodMoney()
+    {
+        var (playerId, _) = CreatePlayerHeroParty("Payer");
+        var playerClanId = TestEnvironment.CreateRegisteredObject<Clan>();
+        var feudClanId = TestEnvironment.CreateRegisteredObject<Clan>();
+        var feudLeaderId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var client = Clients.First();
+        var feud = new BloodFeudData { HasBloodFeud = true, ExecutionsDoneCount = 1, ExecutionsReceivedCount = 2 };
+
+        Server.Call(() =>
+        {
+            var player = Server.GetRegisteredObject<Hero>(playerId);
+            var playerClan = Server.GetRegisteredObject<Clan>(playerClanId);
+            var feudClan = Server.GetRegisteredObject<Clan>(feudClanId);
+            var feudLeader = Server.GetRegisteredObject<Hero>(feudLeaderId);
+
+            using (new AllowedThread())
+            {
+                playerClan.InitMembers();
+                feudClan.InitMembers();
+                player.Clan = playerClan;
+                playerClan.SetLeader(player);
+                feudLeader.Clan = feudClan;
+                feudClan.SetLeader(feudLeader);
+                player.Gold = 100000;
+            }
+
+            Server.Resolve<IPlayerManager>().SetPeer("Payer", client.NetPeer);
+            Server.Resolve<ICoopSessionProvider>().CoopSession.BloodFeudPlayerData.PlayerClanBloodFeuds[playerClanId] = new() { [feudClanId] = feud };
+        });
+        Server.NetworkSentMessages.Clear();
+
+        client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkSettleBloodFeudByRansomPayment(feudClanId)));
+        Server.PumpGameThread();
+
+        Server.Call(() => Assert.Equal(100000 - 55000, Server.GetRegisteredObject<Hero>(playerId).Gold));
+        Assert.Equal((false, 0, 0), (feud.HasBloodFeud, feud.ExecutionsDoneCount, feud.ExecutionsReceivedCount));
+        var notice = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkNotifyBloodFeudStateChanged>());
+        Assert.Equal((ChangeBloodFeudStateAction.ChangeBloodFeudActionDetail.SettledByRansomPayment, false), (notice.Detail, notice.SettledByAgreement));
     }
 
     [Fact]
