@@ -125,7 +125,7 @@ internal static class HideoutDebugCommands
             var attackers = humans.Where(agent => agent.Team?.Side == BattleSideEnum.Attacker).ToArray();
             var troops = attackers.Where(agent => !CoopHideoutMissionLogic.IsPlayerHero(agent)).ToArray();
             var defenders = humans.Where(agent => agent.Team?.Side == BattleSideEnum.Defender).ToArray();
-            // Used is this machine's fire, Called is set only where the call troops request ran, on the battle host.
+            // Used and Enabled are this machine's copy of the fire; Called is only set on the battle host, where the call troops request runs.
             var fires = mission.ActiveMissionObjects.FindAllWithType<StealthAreaUsePoint>()
                 .Select(fire => new
                 {
