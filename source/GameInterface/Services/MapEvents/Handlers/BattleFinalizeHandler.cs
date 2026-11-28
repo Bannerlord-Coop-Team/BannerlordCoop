@@ -15,7 +15,6 @@ using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Settlements.Interfaces;
-using GameInterface.Services.SiegeEvents.Interfaces;
 using GameInterface.Services.SiegeEvents.Patches;
 using GameInterface.Services.Villages.Messages;
 using LiteNetLib;
@@ -65,7 +64,6 @@ internal class BattleFinalizeHandler : IHandler
     private readonly IBattleHostRegistry hostRegistry;
     private readonly IPlayerManager playerManager;
     private readonly ISiegeMapEventLeaderReconciler siegeMapEventLeaderReconciler;
-    private readonly ISiegeEventInterface siegeEventInterface;
     private readonly IBattleHostRetentionPolicy retentionPolicy;
 
     public BattleFinalizeHandler(
@@ -79,7 +77,6 @@ internal class BattleFinalizeHandler : IHandler
         IBattleHostRegistry hostRegistry,
         IPlayerManager playerManager,
         ISiegeMapEventLeaderReconciler siegeMapEventLeaderReconciler,
-        ISiegeEventInterface siegeEventInterface,
         IBattleHostRetentionPolicy retentionPolicy)
     {
         this.messageBroker = messageBroker;
@@ -92,7 +89,6 @@ internal class BattleFinalizeHandler : IHandler
         this.hostRegistry = hostRegistry;
         this.playerManager = playerManager;
         this.siegeMapEventLeaderReconciler = siegeMapEventLeaderReconciler;
-        this.siegeEventInterface = siegeEventInterface;
         this.retentionPolicy = retentionPolicy;
 
         messageBroker.Subscribe<MapEventFinalizeAttempted>(Handle_MapEventFinalizeAttempted);
@@ -368,7 +364,7 @@ internal class BattleFinalizeHandler : IHandler
             knownPlayerPartyIds,
             MapEventPlayerPartyCollector.CollectPartyIds(mapEvent, objectManager));
 
-        bool isPlayerCapture = SiegeAftermathPatches.TryGetPlayerCaptureLeader(mapEvent, out var capturingLeader, out var capturedSettlement);
+        var capturingLeader = SiegeAftermathPatches.GetPlayerCaptureLeader(mapEvent);
         var excludedIds = CollectExcludedPlayerPartyIds(mapEvent, capturingLeader);
         if (excludedIds.Count > 0)
             playerPartyIds = playerPartyIds.Where(id => !excludedIds.Contains(id)).ToArray();
@@ -410,8 +406,6 @@ internal class BattleFinalizeHandler : IHandler
 
         // Keep the close ids available to the caller if a post-finalize action throws.
         finalizedPlayerPartyIds = playerPartyIds;
-        if (isPlayerCapture)
-            siegeEventInterface.EnterPendingCaptureLeader(capturingLeader, capturedSettlement);
 
         ApplyRaidAftermath(raidAftermath);
 

@@ -22,7 +22,23 @@ internal class DisableGarrisonTroopsCampaignBehavior
         if (mobileParty == null)
             return true;
 
-        return !mobileParty.IsPlayerParty() && !settlement.OwnerClan.IsPlayerClan();
+        if (settlement.OwnerClan.IsPlayerClan())
+            return false;
+
+        if (!mobileParty.IsPlayerParty())
+            return true;
+
+        // Vanilla only runs this for the player when they lead an army, the postfixes below keep player clan parties out of the transfer
+        return mobileParty.Army?.LeaderParty == mobileParty;
+    }
+
+    // OnSettlementEnteredPrefix skips a player clan's fortification, so vanilla never clears _newlyConqueredFortification there, otherwise every AI garrison keeps the conquest sizing
+    [HarmonyPatch(nameof(GarrisonTroopsCampaignBehavior.OnSettlementOwnerChanged))]
+    [HarmonyPostfix]
+    private static void OnSettlementOwnerChangedPostfix(GarrisonTroopsCampaignBehavior __instance, Settlement settlement)
+    {
+        if (__instance._newlyConqueredFortification == settlement && settlement.OwnerClan.IsPlayerClan())
+            __instance._newlyConqueredFortification = null;
     }
 
     // Vanilla only leaves out MainParty and Clan.PlayerClan, which are never a co-op player's on the server, and its newly conquered exception can stay open after AI captures, so player clan parties are dropped outright
