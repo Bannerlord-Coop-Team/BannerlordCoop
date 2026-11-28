@@ -7,6 +7,7 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.BattleWreckages;
 using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
@@ -114,6 +115,7 @@ public sealed partial class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSn
             PartyMoveMode = partyMoveMode,
             MoveTargetPartyId = moveTargetPartyId,
             IsInteractableAnchor = isInteractableAnchor,
+            IsInteractableWreckage = party.Ai.AiBehaviorInteractable is BattleWreckage,
             IsCurrentlyAtSea = party.IsCurrentlyAtSea,
         };
         return true;
@@ -478,6 +480,8 @@ public sealed partial class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSn
         if (interactable == null) return true;
         if (interactable is AnchorPoint anchor)
             return anchor.Owner != null && liveParties.Contains(anchor.Owner);
+        if (interactable is BattleWreckage battleWreckage)
+            return Campaign.Current?.CampaignObjectManager?.Wreckages.Contains(battleWreckage) == true;
         if (interactable is PartyBase partyBase)
         {
             if (partyBase.MobileParty != null) return liveParties.Contains(partyBase.MobileParty);
@@ -549,6 +553,12 @@ public sealed partial class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSn
         if (data.IsInteractableAnchor)
             return TryResolve(data.InteractablePointId, out MobileParty owner, logLookupFailures) &&
                 (interactable = owner.Anchor) != null;
+        if (data.IsInteractableWreckage)
+        {
+            if (!TryResolve(data.InteractablePointId, out BattleWreckage battleWreckage, logLookupFailures)) return false;
+            interactable = battleWreckage;
+            return true;
+        }
         return TryResolve(data.InteractablePointId, out PartyBase partyBase, logLookupFailures) &&
             (interactable = partyBase) != null;
     }
@@ -561,13 +571,18 @@ public sealed partial class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSn
             : objectManager.TryGetObject(id, out value));
     }
 
-    private bool TryGetInteractableReference(IInteractablePoint interactable, out string id, out bool isAnchor)
+    private bool TryGetInteractableReference(
+        IInteractablePoint interactable,
+        out string id,
+        out bool isAnchor)
     {
         isAnchor = interactable is AnchorPoint;
         if (interactable is PartyBase partyBase)
             return TryGetCompactId(partyBase, out id);
         if (interactable is AnchorPoint anchor && anchor.Owner != null)
             return TryGetCompactId(anchor.Owner, out id);
+        if (interactable is BattleWreckage battleWreckage)
+            return TryGetCompactId(battleWreckage, out id);
         id = null;
         return interactable == null;
     }

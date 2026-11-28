@@ -70,6 +70,9 @@ public struct PartyBehaviorUpdateData
     [ProtoMember(19)]
     public bool ResetMovementToHold { get; set; }
 
+    [ProtoMember(20)]
+    public bool IsInteractableWreckage { get; set; }
+
     public PartyBehaviorUpdateData(
         string mobilePartyId,
         AiBehavior newAiBehavior,
@@ -99,6 +102,7 @@ public struct PartyBehaviorUpdateData
         IsInteractableAnchor = false;
         IsCurrentlyAtSea = false;
         ResetMovementToHold = false;
+        IsInteractableWreckage = false;
     }
 }
 
@@ -124,4 +128,5 @@ public struct NetworkPartyBehaviorUpdateData
     [ProtoMember(17)] public bool IsInteractableAnchor { get; set; }
     [ProtoMember(18)] public bool IsCurrentlyAtSea { get; set; }
     [ProtoMember(19)] public bool ResetMovementToHold { get; set; }
+    [ProtoMember(20)] public bool IsInteractableWreckage { get; set; }
 }

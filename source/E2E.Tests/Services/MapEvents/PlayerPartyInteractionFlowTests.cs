@@ -3727,6 +3727,37 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkConversationDenied>());
     }
 
+    // Vanilla StartPartyEncounter is skipped for server detected encounters, so the server fires its OnPartyEncounter
+    // once it approves, which is what interrupts a player who is attacked mid wreckage investigation
+    [Fact]
+    public void ServerAiPartyEncounter_FiresOnPartyEncounterOnceForTheApprovedConversation()
+    {
+        var client = Clients.First();
+        client.Resolve<IControllerIdProvider>().SetControllerId("PlayerOne");
+        var (_, playerMobilePartyId) = CreatePlayerHeroParty("PlayerOne");
+        var playerPartyId = GetPartyBaseId(Server, playerMobilePartyId);
+        var firstAiPartyId = CreateMobilePartyBase();
+        var secondAiPartyId = CreateMobilePartyBase();
+
+        Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client.NetPeer);
+        using var partyEncounters = new MethodCallRecorder(
+            AccessTools.Method(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnPartyEncounter)));
+
+        StartServerAiPartyEncounter(firstAiPartyId, playerPartyId);
+
+        Assert.Equal(1, partyEncounters.CountFor(Server));
+
+        // The second attacker's retries wait while the first conversation is open, so they fire nothing
+        StartServerAiPartyEncounter(secondAiPartyId, playerPartyId);
+        StartServerAiPartyEncounter(secondAiPartyId, playerPartyId);
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkAllowConversation>().Where(allowed => allowed.AttackerId == secondAiPartyId));
+        Assert.Equal(1, partyEncounters.CountFor(Server));
+
+        client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkConversationEnded()));
+        Server.PumpGameThread();
+    }
+
     [Fact]
     public void ServerAiPartyEncounter_WhilePlayerTalksToAnotherParty_WaitsWithoutDenial()
     {

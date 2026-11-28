@@ -51,6 +51,11 @@ public interface IPlayerManager
     bool TryGetPeer(string controllerId, out NetPeer peer);
 
     /// <summary>
+    /// Resolves the currently associated peer for the player controlling the given hero.
+    /// </summary>
+    bool TryGetPeer(Hero hero, out NetPeer peer);
+
+    /// <summary>
     /// Removes a peer's association, for example, on disconnect. The Player
     /// registration is untouched, only the live peer link is dropped.
     /// </summary>
@@ -339,6 +344,13 @@ public class PlayerManager : IPlayerManager
         {
             return controllerToPeer.TryGetValue(controllerId, out peer);
         }
+    }
+
+    /// <inheritdoc cref="IPlayerManager.TryGetPeer(Hero, out NetPeer)"/>
+    public bool TryGetPeer(Hero hero, out NetPeer peer)
+    {
+        peer = null;
+        return TryGetPlayer(hero, out var player) && TryGetPeer(player.ControllerId, out peer);
     }
 
     public void ClearPeer(NetPeer peer)
