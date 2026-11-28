@@ -3,7 +3,6 @@ using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
-using TaleWorlds.Core;
 using Quest = TaleWorlds.CampaignSystem.Issues.CapturedByBountyHuntersIssueBehavior.CapturedByBountyHuntersIssueQuest;
 
 namespace GameInterface.Services.Issues.Quests.CapturedByBountyHunters.Patches;
@@ -20,7 +19,8 @@ internal class CapturedByBountyHuntersOutcomePatches
     [HarmonyPostfix]
     private static void OnMapEventEndedPostfix(MapEvent mapEvent)
     {
-        if (!ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher))
+        if (!ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher) ||
+            !ContainerProvider.TryResolve<IOwnerCaptureValidator>(out var captureValidator))
         {
             return;
         }
@@ -33,7 +33,7 @@ internal class CapturedByBountyHuntersOutcomePatches
             // vanilla branches are decided here. Losing the hideout battle removes the owner's party before it ends.
             if (owner?.PartyBelongedTo == null)
             {
-                if (mapEvent.MapEventSettlement == quest._questHideout && WasCapturedLosingThisAssault(owner, mapEvent))
+                if (mapEvent.MapEventSettlement == quest._questHideout && captureValidator.WasCapturedLosingThisAssault(owner, mapEvent))
                 {
                     quest.AddLog(quest.PlayerLostTheFightLogText);
                     quest.FailConsequences(isTimedOut: false);
@@ -49,17 +49,6 @@ internal class CapturedByBountyHuntersOutcomePatches
 
             quest.OnMapEventEnded(mapEvent);
         });
-    }
-
-    // Taken prisoner during this battle by the defenders who beat the assault, not merely held by someone who fought it
-    private static bool WasCapturedLosingThisAssault(Hero owner, MapEvent mapEvent)
-    {
-        var captor = owner?.IsPrisoner == true ? owner.PartyBelongedToAsPrisoner : null;
-
-        return captor?.MapEvent == mapEvent &&
-            captor.Side == BattleSideEnum.Defender &&
-            mapEvent.DefeatedSide == BattleSideEnum.Attacker &&
-            owner.CaptivityStartTime >= mapEvent.BattleStartTime;
     }
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnMapEventEnded))]
