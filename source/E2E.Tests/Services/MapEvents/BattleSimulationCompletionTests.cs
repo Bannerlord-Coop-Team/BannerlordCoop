@@ -22,6 +22,7 @@ using Moq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.ComponentInterfaces;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -108,6 +109,72 @@ public class BattleSimulationCompletionTests : MapEventTestBase
             var results = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkCommitMapEventResults>());
             // Only parties kept in the winners get a loot entry, even when it's empty.
             Assert.Contains(results.PlayerMapEventPartyId, results.PlayerLootData.LootedItems.Keys);
+        }, MapEventDisabledMethods);
+    }
+
+    [Fact]
+    public void SimulatedHit_OnServer_ScalesOnlyPlayerPartyDamageByDifficulty()
+    {
+        var context = CreateServerMapEvent();
+        RegisterAsPlayerParty("1", TestEnvironment.CreateRegisteredObject<Hero>(), context.AttackerPartyId);
+        var attackerHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var defenderHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
+
+        Server.Call(() =>
+        {
+            var mapEvent = Server.GetRegisteredObject<MapEvent>(context.MapEventId);
+            var attackerHero = Server.GetRegisteredObject<Hero>(attackerHeroId);
+            var defenderHero = Server.GetRegisteredObject<Hero>(defenderHeroId);
+            // Each side only holds one healthy hero, so every hit lands on it and shows up in its hit points.
+            using (new AllowedThread())
+            {
+                foreach (var (partyId, hero) in new[] { (context.AttackerPartyId, attackerHero), (context.DefenderPartyId, defenderHero) })
+                {
+                    hero.HitPoints = hero.CharacterObject.MaxHitPoints();
+                    var roster = Server.GetRegisteredObject<MobileParty>(partyId).MemberRoster;
+                    roster.Clear();
+                    roster.AddToCounts(hero.CharacterObject, 1);
+                }
+            }
+            mapEvent.SimulateBattleSetup(null);
+            int attackerHitPoints = attackerHero.HitPoints;
+            int defenderHitPoints = defenderHero.HitPoints;
+
+            var models = Campaign.Current.Models;
+            var previousCombatModel = models.CombatSimulationModel;
+            var previousXpModel = models.CombatXpModel;
+            var previousDifficultyModel = models.DifficultyModel;
+            var combatModel = new Mock<CombatSimulationModel>();
+            // Even unscaled this hit leaves a full health hero standing.
+            combatModel.Setup(m => m.SimulateHit(It.IsAny<CharacterObject>(), It.IsAny<CharacterObject>(), It.IsAny<PartyBase>(),
+                It.IsAny<PartyBase>(), It.IsAny<float>(), It.IsAny<MapEvent>(), It.IsAny<BattleEnvironment>(), It.IsAny<float>(), It.IsAny<float>()))
+                .Returns(new ExplainedNumber(10));
+            // The striker's hit reward should get the same damage the struck hero takes.
+            var hitDamage = new List<int>();
+            var xpModel = new Mock<CombatXpModel>();
+            xpModel.Setup(m => m.GetXpFromHit(It.IsAny<CharacterObject>(), It.IsAny<CharacterObject>(), It.IsAny<CharacterObject>(),
+                It.IsAny<PartyBase>(), It.IsAny<int>(), It.IsAny<bool>(), It.IsAny<CombatXpModel.MissionTypeEnum>()))
+                .Callback<CharacterObject, CharacterObject, CharacterObject, PartyBase, int, bool, CombatXpModel.MissionTypeEnum>(
+                    (_, _, _, _, damage, _, _) => hitDamage.Add(damage));
+            try
+            {
+                models.CombatSimulationModel = combatModel.Object;
+                models.CombatXpModel = xpModel.Object;
+                models.DifficultyModel = Mock.Of<DifficultyModel>(m => m.GetPlayerTroopsReceivedDamageMultiplier() == 0.5f);
+
+                mapEvent.SimulateSingleTroopHit(BattleSideEnum.Defender, 0f, 1f, 1f);
+                mapEvent.SimulateSingleTroopHit(BattleSideEnum.Attacker, 0f, 1f, 1f);
+
+                Assert.Equal(attackerHitPoints - 5, attackerHero.HitPoints);
+                Assert.Equal(defenderHitPoints - 10, defenderHero.HitPoints);
+                Assert.Equal(new[] { 5, 10 }, hitDamage);
+            }
+            finally
+            {
+                models.CombatSimulationModel = previousCombatModel;
+                models.CombatXpModel = previousXpModel;
+                models.DifficultyModel = previousDifficultyModel;
+            }
         }, MapEventDisabledMethods);
     }
 
