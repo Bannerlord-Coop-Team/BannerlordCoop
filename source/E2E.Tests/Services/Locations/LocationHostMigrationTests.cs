@@ -119,7 +119,8 @@ public class LocationHostMigrationTests : SettlementTestEnvironment
         DrainNetwork();
         successor.Tick(0.1f);
 
-        Agent adoptedNpc = GetAgentInfo(successor, GetAgentInfo(departedHost, ownedNpc).AgentId).Agent;
+        CoopAgentInfo ownedInfo = GetAgentInfo(departedHost, ownedNpc);
+        Agent adoptedNpc = GetAgentInfo(successor, ownedInfo.AgentId).Agent;
         Assert.Equal(AgentMovementLockedState.FrameLocked, GetAgentState(adoptedNpc).MovementLockedState);
 
         Disconnect(clients[0]);
