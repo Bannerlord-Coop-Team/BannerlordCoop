@@ -1,11 +1,14 @@
 ﻿using Common;
 using GameInterface.Services.BloodFeuds.Interfaces;
 using HarmonyLib;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.Core;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Services.BloodFeuds.Patches;
 
@@ -156,6 +159,30 @@ internal class ExecutionCampaignBehaviorPatches
     [HarmonyPatch(nameof(ExecutionCampaignBehavior.OnSessionLaunched))]
     [HarmonyPrefix]
     private static bool OnSessionLaunchedPrefix() => ModInformation.IsClient;
+
+    private const string RansomBrokerEndFeudLineId = "ransom_broker_talk_end_blood_feud";
+
+    [HarmonyPatch(nameof(ExecutionCampaignBehavior.OnSessionLaunched))]
+    [HarmonyPostfix]
+    private static void OnSessionLaunchedPostfix()
+    {
+        var targetSentence = Campaign.Current.ConversationManager._sentences.FirstOrDefault(sentence => sentence.Id == RansomBrokerEndFeudLineId);
+        if (targetSentence == null) return;
+
+        targetSentence.OnClickableCondition = RansomBrokerEndFeudClickableCondition;
+    }
+
+    private static bool RansomBrokerEndFeudClickableCondition(out TextObject explanation)
+    {
+        if (!Hero.MainHero.IsClanLeader)
+        {
+            explanation = GameTexts.FindText("str_coop_clan_blood_feud_leader_only");
+            return false;
+        }
+
+        explanation = null;
+        return true;
+    }
 
     [HarmonyPatch(nameof(ExecutionCampaignBehavior.conversation_ransom_broker_end_feud_on_consequence))]
     [HarmonyPrefix]

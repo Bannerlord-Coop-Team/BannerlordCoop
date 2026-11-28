@@ -314,6 +314,8 @@ internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorIn
 
     public void SettleBloodFeudByRansomPayment(Hero playerHero, Clan clan)
     {
+        // Ending a feud is the clan's decision, vanilla's player always leads their clan
+        if (!playerHero.IsClanLeader) return;
         if (!TryGetPlayerClan(playerHero.Clan, out var playerClan)) return;
         if (!TryGetBloodFeud(playerClan.ClanId, clan, out var feud) || !feud.HasBloodFeud) return;
 
