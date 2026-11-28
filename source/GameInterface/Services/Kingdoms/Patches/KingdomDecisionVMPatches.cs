@@ -1,7 +1,9 @@
 ﻿using Common.Logging;
+using Common;
 using GameInterface.Services.Clans.Handlers;
 using GameInterface.Services.Kingdoms.Extentions;
 using HarmonyLib;
+using SandBox.View.Map;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -16,10 +18,39 @@ using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Decisions;
 using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Decisions.ItemTypes;
 using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Diplomacy;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using TaleWorlds.Localization;
+using TaleWorlds.ScreenSystem;
 
 namespace GameInterface.Services.Kingdoms.Patches
 {
+    /// <summary>Opens the kingdom screen when a fief result arrives while the player is on the map.</summary>
+    [HarmonyPatch(typeof(MapScreen), nameof(MapScreen.OnFrameTick))]
+    internal class SettlementDecisionResultMapPatch
+    {
+        private static void Postfix(MapScreen __instance)
+        {
+            if (ModInformation.IsServer || ScreenManager.TopScreen != __instance) return;
+            if (!KingdomDecisionsVMPatches.TryGetVoteManager(out var voteManager) ||
+                !voteManager.TryGetPendingSettlementDecisionResult(out _)) return;
+            if (!CanOpenKingdomScreen(__instance)) return;
+
+            __instance.OpenKingdom();
+        }
+
+        // Match the native map conditions for opening the kingdom decision screen.
+        private static bool CanOpenKingdomScreen(MapScreen mapScreen)
+        {
+            if (mapScreen.IsInMenu || mapScreen.IsInBattleSimulation || mapScreen.IsInArmyManagement) return false;
+            if (mapScreen.IsMarriageOfferPopupActive || mapScreen.IsHeirSelectionPopupActive ||
+                InformationManager.IsAnyInquiryActive()) return false;
+            if (mapScreen.IsMapCheatsActive || mapScreen.IsMapIncidentActive || mapScreen.IsOverlayContextMenuEnabled ||
+                mapScreen.EncyclopediaScreenManager.IsEncyclopediaOpen) return false;
+
+            return CampaignUIHelper.GetMapScreenActionIsEnabledWithReason(out _);
+        }
+    }
+
     [HarmonyPatch(typeof(KingdomDecisionsVM))]
     internal class KingdomDecisionsVMPatches
     {
@@ -55,12 +86,28 @@ namespace GameInterface.Services.Kingdoms.Patches
             KingdomDecisionWaitingStatusWidgetPatch.EnsureAttached(__instance);
         }
 
-        // A submitted decision reopens only when clicked, so the automatic check skips it.
+        // Skip submitted ballots and show queued results before prompting for a new vote.
         [HarmonyPatch(nameof(KingdomDecisionsVM.OnFrameTick))]
         [HarmonyPrefix]
         private static void OnFrameTickPrefix(KingdomDecisionsVM __instance)
         {
             MarkSubmittedDecisionsExamined(__instance);
+            if (__instance.CurrentDecision != null || !__instance._shouldCheckForDecision) return;
+            if (!TryGetVoteManager(out var voteManager) || !voteManager.TryGetPendingSettlementDecisionResult(out var decision)) return;
+            if (InformationManager.IsAnyInquiryActive() || !CampaignUIHelper.GetMapScreenActionIsEnabledWithReason(out _)) return;
+
+            DecisionItemBaseVM item = __instance.GetDecisionItemBasedOnType(decision);
+            if (!voteManager.TryShowPendingSettlementDecisionResult(item))
+            {
+                // Vanilla ExecuteDone clears this listener, and OnFinalize leaves it registered.
+                CampaignEvents.KingdomDecisionConcluded.ClearListeners(item);
+                item.OnFinalize();
+                return;
+            }
+
+            item.SetDoneInputKey(__instance.DoneInputKey);
+            __instance._shouldCheckForDecision = false;
+            __instance.CurrentDecision = item;
         }
 
         // Vanilla prefers the last solved decision's follow-up without checking the examined list.
@@ -119,6 +166,12 @@ namespace GameInterface.Services.Kingdoms.Patches
             if (!TryGetVoteManager(out var voteManager)) return;
             DecisionItemBaseVM currentDecision = __instance.CurrentDecision;
             if (currentDecision == null) return;
+            if (voteManager.IsShowingSettlementDecisionResult(currentDecision))
+            {
+                // The result screen has no waiting status, so hide the overlay.
+                KingdomDecisionWaitingStatusWidgetPatch.Refresh(__instance, header: null, columns: null);
+                return;
+            }
 
             voteManager.RefreshDecisionTitle(currentDecision);
             string feedback = voteManager.RefreshDecisionWaitingStatus(currentDecision);
@@ -196,6 +249,7 @@ namespace GameInterface.Services.Kingdoms.Patches
         private static bool ExecuteFinalSelectionPrefix(DecisionItemBaseVM __instance)
         {
             if (!KingdomDecisionsVMPatches.TryGetVoteManager(out var voteManager)) return true;
+            if (voteManager.IsShowingSettlementDecisionResult(__instance)) return false;
             if (voteManager.IsSubmittedDecision(__instance.KingdomDecisionMaker?._decision))
             {
                 voteManager.DismissSubmittedDecisionItem(__instance);
@@ -214,6 +268,7 @@ namespace GameInterface.Services.Kingdoms.Patches
         {
             if (!__instance._finalSelectionDone || !__instance.IsActive) return;
             if (!KingdomDecisionsVMPatches.TryGetVoteManager(out var voteManager)) return;
+            if (voteManager.IsShowingSettlementDecisionResult(__instance)) return;
             if (!voteManager.IsSubmittedDecision(__instance.KingdomDecisionMaker?._decision)) return;
 
             __instance.CanEndDecision = true;
