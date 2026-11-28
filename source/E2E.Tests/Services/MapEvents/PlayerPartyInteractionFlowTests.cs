@@ -37,6 +37,7 @@ using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.MobilePartyAIs.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyComponents.Messages;
+using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Stances.Messages;
 using GameInterface.Services.TroopRosters.Data;
@@ -54,9 +55,11 @@ using TaleWorlds.CampaignSystem.BarterSystem;
 using TaleWorlds.CampaignSystem.BarterSystem.Barterables;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.CampaignBehaviors.BarterBehaviors;
+using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
@@ -3207,6 +3210,175 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
         client.Call(() => Assert.Same(openedEncounter, PlayerEncounter.Current));
         Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkConversationEnded>());
     }
+
+    [Fact]
+    public void ServerDetectedApproval_BehindInventoryScreen_OpensMeetingOnceMapIsActive()
+    {
+        var (client, _, playerPartyId, _) = CreateTwoPlayerParties();
+        var aiPartyId = CreateMobilePartyBase();
+        SetMainParty(client, playerPartyId);
+
+        using var conversations = RecordMapConversationStarts();
+        using var coveredMap = CoverMapWithInventory(client);
+        client.NetworkSentMessages.Clear();
+
+        // A party caught the player while the inventory is open, so the server approves without a request id.
+        DeliverConversationApproval(
+            client,
+            playerPartyId,
+            aiPartyId,
+            requestId: null!,
+            ConversationRestartSource.EncounterManager,
+            forcePlayerOutFromSettlement: false);
+
+        // Co-op keeps ticking the campaign under the inventory.
+        TickCampaign(client);
+
+        AssertHasPlayerEncounter(client, expected: false);
+        Assert.Equal(0, conversations.CountFor(client));
+        Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkConversationEnded>());
+
+        CloseInventory(client);
+        TickCampaign(client);
+
+        AssertHasPlayerEncounter(client, expected: true);
+        Assert.Equal(1, conversations.CountFor(client));
+        Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkConversationEnded>());
+    }
+
+    [Fact]
+    public void ApprovalAfterInventoryCloses_ReplacesWaitingApprovalAndReleasesOlder()
+    {
+        var (client, _, playerPartyId, _) = CreateTwoPlayerParties();
+        var aiPartyId = CreateMobilePartyBase();
+        SetMainParty(client, playerPartyId);
+
+        var olderRequestId = CaptureConversationRestart(client);
+        var newerRequestId = CaptureConversationRestart(client);
+        using var conversations = RecordMapConversationStarts();
+        using var coveredMap = CoverMapWithInventory(client);
+        client.NetworkSentMessages.Clear();
+
+        DeliverConversationApproval(
+            client,
+            playerPartyId,
+            aiPartyId,
+            olderRequestId,
+            ConversationRestartSource.EncounterManager,
+            forcePlayerOutFromSettlement: false);
+
+        // The game thread drains the retry's approval in the frame the inventory closes, before the campaign ticks.
+        CloseInventory(client);
+        DeliverConversationApproval(
+            client,
+            playerPartyId,
+            aiPartyId,
+            newerRequestId,
+            ConversationRestartSource.EncounterManager,
+            forcePlayerOutFromSettlement: false);
+        Assert.Equal(0, conversations.CountFor(client));
+
+        TickCampaign(client);
+
+        Assert.Equal(1, conversations.CountFor(client));
+        Assert.Equal(newerRequestId, GetActiveConversationRequestId(client));
+        var ended = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkConversationEnded>());
+        Assert.Equal(olderRequestId, ended.RequestId);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void EncounterFinishWhileApprovalWaits_DropsApprovalAndReleasesItsHoldOnce(bool serverDetected)
+    {
+        var (client, _, playerPartyId, _) = CreateTwoPlayerParties();
+        var aiPartyId = CreateMobilePartyBase();
+        SetMainParty(client, playerPartyId);
+
+        var waitingRequestId = serverDetected ? null : CaptureConversationRestart(client);
+        using var conversations = RecordMapConversationStarts();
+        using var coveredMap = CoverMapWithInventory(client);
+        client.NetworkSentMessages.Clear();
+
+        DeliverConversationApproval(
+            client,
+            playerPartyId,
+            aiPartyId,
+            waitingRequestId!,
+            ConversationRestartSource.EncounterManager,
+            forcePlayerOutFromSettlement: false);
+
+        client.Call(() => client.Resolve<IMessageBroker>().Publish(this, new ConversationEnded()));
+
+        // A server-detected approval's null id is the same one the null fallback releases.
+        Assert.Single(
+            client.NetworkSentMessages.GetMessages<NetworkConversationEnded>(),
+            ended => ended.RequestId == waitingRequestId);
+
+        CloseInventory(client);
+        TickCampaign(client);
+
+        AssertHasPlayerEncounter(client, expected: false);
+        Assert.Equal(0, conversations.CountFor(client));
+    }
+
+    // The patched OpenMapConversation inlines SetupAndStartMapConversation, so a patch on it never runs and the
+    // recorder sits on StartNew, its next call. Skipping it also keeps the dialog flow, which needs real agents, out.
+    private static MethodCallRecorder RecordMapConversationStarts() => new(AccessTools.Method(
+        typeof(ConversationManager), nameof(ConversationManager.StartNew)));
+
+    // Opens the inventory over the client's map and adds the vanilla meeting menu an approved restart opens.
+    // The static swap is the last step, so a failure before it leaves nothing to restore.
+    private static CoveredMap CoverMapWithInventory(EnvironmentInstance client)
+    {
+        var previousStates = GameStateManager._current;
+        client.Call(() =>
+        {
+            var states = Game.Current.GameStateManager;
+            states._gameStates.Add(states.CreateState<MapState>());
+            states._gameStates.Add(states.CreateState<InventoryState>());
+            var behavior = ObjectHelper.SkipConstructor<EncounterGameMenuBehavior>();
+            new CampaignGameStarter(Campaign.Current.GameMenuManager, Campaign.Current.ConversationManager)
+                .AddGameMenu("encounter_meeting", "{=!}.", behavior.game_menu_encounter_meeting_on_init);
+            GameStateManager._current = states;
+        });
+        return new CoveredMap(client, previousStates);
+    }
+
+    // Clears the encounter the test opened and restores the static state manager, which E2E instances share.
+    private sealed class CoveredMap : IDisposable
+    {
+        private readonly EnvironmentInstance client;
+        private readonly GameStateManager previousStates;
+
+        public CoveredMap(EnvironmentInstance client, GameStateManager previousStates)
+        {
+            this.client = client;
+            this.previousStates = previousStates;
+        }
+
+        public void Dispose()
+        {
+            try
+            {
+                client.Call(() => Campaign.Current.PlayerEncounter = null);
+            }
+            finally
+            {
+                GameStateManager._current = previousStates;
+            }
+        }
+    }
+
+    private static void CloseInventory(EnvironmentInstance client) => client.Call(() =>
+    {
+        var states = GameStateManager.Current;
+        states._gameStates.RemoveAt(states._gameStates.Count - 1);
+        Assert.IsType<MapState>(states.ActiveState);
+    });
+
+    private void TickCampaign(EnvironmentInstance client) =>
+        client.Call(() => client.Resolve<IMessageBroker>().Publish(this, new CampaignTick()), MapEventDisabledMethods);
 
     [Fact]
     public void StaleConversationApproval_DoesNotReleaseNewerServerEngagement()
