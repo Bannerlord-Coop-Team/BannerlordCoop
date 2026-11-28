@@ -54,6 +54,7 @@ using HarmonyLib;
 using SandBox.Conversation.MissionLogics;
 using SandBox.ViewModelCollection.Map.Tracker;
 using System.Reflection;
+using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Xml;
@@ -658,6 +659,79 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         Assert.False(rejected.Accepted);
 
         Server.PumpGameThread();
+    }
+
+    // A mercenary taking the oath to the kingdom it serves (#4891). The JIT inlines the one-line
+    // Clan.StartMercenaryService and EndMercenaryService into callers compiled before coop patches them.
+    [Fact]
+    public void VassalServiceAccepted_MercenaryOfTheSameKingdom_BecomesAVassalOnEveryClient()
+    {
+        var client = Clients.First();
+        var player = CreateSyncedPlayerContext(ControllerId, client);
+        var ruler = CreateSyncedPlayerContext("VassalRuler", _ => false);
+        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        ConfigureClanInKingdom(ruler.ClanId, kingdomId);
+        SetClanTierEverywhere(player.ClanId, 2);
+        Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer(ControllerId, client.NetPeer));
+
+        var harmony = new Harmony($"e2e.inlined-mercenary-service.{Guid.NewGuid():N}");
+        var inline = new HarmonyMethod(AccessTools.Method(typeof(PlayerKingdomCreationFlowTests), nameof(InlineMercenaryServiceTranspiler)));
+        try
+        {
+            harmony.Patch(AccessTools.Method(typeof(StartMercenaryServiceAction), nameof(StartMercenaryServiceAction.ApplyStart)), transpiler: inline);
+            harmony.Patch(AccessTools.Method(typeof(EndMercenaryServiceAction), nameof(EndMercenaryServiceAction.Apply)), transpiler: inline);
+            client.SimulateMessage(this, new MercenaryServiceAccepted(
+                client.GetRegisteredObject<Kingdom>(kingdomId), 50, client.GetRegisteredObject<Clan>(player.ClanId)));
+            foreach (var instance in Clients.Append(Server))
+            {
+                instance.Call(() =>
+                {
+                    var clan = instance.GetRegisteredObject<Clan>(player.ClanId);
+                    Assert.Same(instance.GetRegisteredObject<Kingdom>(kingdomId), clan.Kingdom);
+                    Assert.True(clan.IsUnderMercenaryService);
+                });
+            }
+
+            Server.NetworkSentMessages.Clear();
+            client.SimulateMessage(this, new VassalServiceAccepted(client.GetRegisteredObject<Kingdom>(kingdomId), grantRewards: false));
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+        }
+
+        Assert.True(Assert.Single(Server.NetworkSentMessages.GetMessages<VassalServiceResult>()).Accepted);
+        Server.Call(() => AssertVassalMembership(Server, player.ClanId, kingdomId));
+        foreach (var instance in Clients)
+        {
+            instance.Call(() => AssertVassalMembership(instance, player.ClanId, kingdomId));
+        }
+    }
+
+    // Replaces each call to Clan.StartMercenaryService or EndMercenaryService with the setter it wraps, as an inlined call runs.
+    private static IEnumerable<CodeInstruction> InlineMercenaryServiceTranspiler(IEnumerable<CodeInstruction> instructions)
+    {
+        var start = AccessTools.Method(typeof(Clan), nameof(Clan.StartMercenaryService));
+        var end = AccessTools.Method(typeof(Clan), nameof(Clan.EndMercenaryService));
+        var setter = AccessTools.PropertySetter(typeof(Clan), nameof(Clan.IsUnderMercenaryService));
+        foreach (var instruction in instructions)
+        {
+            if (instruction.Calls(start))
+            {
+                yield return new CodeInstruction(OpCodes.Ldc_I4_1).MoveLabelsFrom(instruction);
+                yield return new CodeInstruction(OpCodes.Call, setter);
+            }
+            else if (instruction.Calls(end))
+            {
+                yield return new CodeInstruction(OpCodes.Pop).MoveLabelsFrom(instruction);
+                yield return new CodeInstruction(OpCodes.Ldc_I4_0);
+                yield return new CodeInstruction(OpCodes.Call, setter);
+            }
+            else
+            {
+                yield return instruction;
+            }
+        }
     }
 
     // The kingdom has one clan, its ruler's.
