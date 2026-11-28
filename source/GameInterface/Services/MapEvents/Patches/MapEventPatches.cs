@@ -394,10 +394,15 @@ internal class MapEventPatches
             __instance._sides.Select(side => side?.RenownValue ?? 0f).ToArray(), 
             __instance._sides.Select(side => side?.InfluenceValue ?? 0f).ToArray());
 
-        foreach (RemovedMapEventParty removedParty in removedParties)
+        foreach (IGrouping<MapEventSide, RemovedMapEventParty> retreatedSide in removedParties.GroupBy(removedParty => removedParty.Side))
         {
-            int side = (int)removedParty.Side.MissionSide;
-            __instance.StrengthOfSide[side] -= removedParty.Party.Party.GetCustomStrength(removedParty.Side.MissionSide, __instance.SimulationContext);
+            MapEventSide side = retreatedSide.Key;
+            float retreatedStrength = retreatedSide.Sum(removedParty => removedParty.Party.Party.GetCustomStrength(side.MissionSide, __instance.SimulationContext));
+            float remainingStrength = side.Parties.Sum(party => party.Party.GetCustomStrength(side.MissionSide, __instance.SimulationContext));
+            // A retreater can count for more than it added when it joined (its morale got back over 30), and a side below
+            // its remaining parties makes the winners' rewards negative, or NaN once it drops under 0 (#4999)
+            int index = (int)side.MissionSide;
+            __instance.StrengthOfSide[index] = Math.Max(__instance.StrengthOfSide[index] - retreatedStrength, remainingStrength);
         }
 
         foreach (MapEventSide side in __instance._sides)

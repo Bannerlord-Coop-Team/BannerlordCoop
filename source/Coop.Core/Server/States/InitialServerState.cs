@@ -27,6 +27,7 @@ public class InitialServerState : ServerStateBase
     private readonly IMapEventLoadCleaner mapEventLoadCleaner;
     private readonly ILeaderlessClanResolver leaderlessClanResolver;
     private readonly IEmptyLordPartyResetter emptyLordPartyResetter;
+    private readonly IBattleRewardLoadRepairer battleRewardLoadRepairer;
     private readonly IModuleValidator moduleValidator;
     private readonly IGameStateInterface gameStateInterface;
     private readonly ILoadingInterface loadingInterface;
@@ -39,6 +40,7 @@ public class InitialServerState : ServerStateBase
         IMapEventLoadCleaner mapEventLoadCleaner,
         ILeaderlessClanResolver leaderlessClanResolver,
         IEmptyLordPartyResetter emptyLordPartyResetter,
+        IBattleRewardLoadRepairer battleRewardLoadRepairer,
         IModuleInfoProvider moduleInfoProvider,
         IModuleValidator moduleValidator,
         IGameStateInterface gameStateInterface,
@@ -50,6 +52,7 @@ public class InitialServerState : ServerStateBase
         this.mapEventLoadCleaner = mapEventLoadCleaner;
         this.leaderlessClanResolver = leaderlessClanResolver;
         this.emptyLordPartyResetter = emptyLordPartyResetter;
+        this.battleRewardLoadRepairer = battleRewardLoadRepairer;
         this.moduleValidator = moduleValidator;
         this.gameStateInterface = gameStateInterface;
         this.loadingInterface = loadingInterface;
@@ -84,6 +87,7 @@ public class InitialServerState : ServerStateBase
         mapEventLoadCleaner.CleanUpLoadedMapEvents();
         leaderlessClanResolver.RepairLoadedClans();
         emptyLordPartyResetter.ResetEmptyLordParties();
+        battleRewardLoadRepairer.RepairLoadedRewards();
 
         Logic.SetState<ServerRunningState>();
     }

@@ -25,6 +25,7 @@ public class ServerContext
         IMapEventLoadCleaner mapEventLoadCleaner,
         ILeaderlessClanResolver leaderlessClanResolver,
         IEmptyLordPartyResetter emptyLordPartyResetter,
+        IBattleRewardLoadRepairer battleRewardLoadRepairer,
         IModuleValidator moduleValidator,
         IModuleInfoProvider moduleInfoProvider,
         IGameStateInterface gameStateInterface,
@@ -36,6 +37,7 @@ public class ServerContext
         MapEventLoadCleaner = mapEventLoadCleaner;
         LeaderlessClanResolver = leaderlessClanResolver;
         EmptyLordPartyResetter = emptyLordPartyResetter;
+        BattleRewardLoadRepairer = battleRewardLoadRepairer;
         ModuleValidator = moduleValidator;
         ModuleInfoProvider = moduleInfoProvider;
         GameStateInterface = gameStateInterface;
@@ -48,6 +50,7 @@ public class ServerContext
     public IMapEventLoadCleaner MapEventLoadCleaner { get; }
     public ILeaderlessClanResolver LeaderlessClanResolver { get; }
     public IEmptyLordPartyResetter EmptyLordPartyResetter { get; }
+    public IBattleRewardLoadRepairer BattleRewardLoadRepairer { get; }
     public IModuleValidator ModuleValidator { get; }
     public IModuleInfoProvider ModuleInfoProvider { get; }
     public IGameStateInterface GameStateInterface { get; }
