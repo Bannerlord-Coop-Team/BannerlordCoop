@@ -45,15 +45,18 @@ internal static class KingdomTestSetup
         });
     }
 
-    /// <summary>Puts the clan in the kingdom's membership directly, on the calling instance; wrap it in an AllowedThread.</summary>
+    /// <summary>Puts the clan in the kingdom's membership directly, on the calling instance.</summary>
     public static void PlaceClanInKingdom(Clan clan, Kingdom kingdom)
     {
-        clan._kingdom = kingdom;
-        kingdom._rulingClan ??= clan;
-        kingdom._clans ??= new MBList<Clan>();
-        if (!kingdom._clans.Contains(clan))
+        using (new AllowedThread())
         {
-            kingdom._clans.Add(clan);
+            clan._kingdom = kingdom;
+            kingdom._rulingClan ??= clan;
+            kingdom._clans ??= new MBList<Clan>();
+            if (!kingdom._clans.Contains(clan))
+            {
+                kingdom._clans.Add(clan);
+            }
         }
     }
 }
