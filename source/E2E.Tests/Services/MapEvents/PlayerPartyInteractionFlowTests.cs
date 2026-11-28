@@ -689,6 +689,42 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
         }
     }
 
+    // The kingdom has one clan, its ruler's, and the limit is one. Mercenaries only meet the limit when counted.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void OfferServices_KingdomAtMaxClans_DisablesVassalAndACountedMercenary(bool countMercenaries)
+    {
+        var (client1, _, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
+        SetupResponderKingdomLeader(initiatorPartyId, responderPartyId, initiatorClanTier: 2);
+        var previousOptions = ModConfigProvider.ModOptions;
+        ModConfigProvider.ModOptions = new ModOptions(new ModOptionsData { MaxClansPerKingdom = 1, MaxClansPerKingdomCountsMercenaries = countMercenaries });
+        try
+        {
+            RequestInteraction(client1, initiatorPartyId, responderPartyId);
+            var sessionId = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>().Single().SessionId;
+            var initialState = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>().Single(s =>
+                s.SessionId == sessionId &&
+                s.PartyId == initiatorPartyId &&
+                s.Phase == PlayerPartyInteractionPhase.InitialOptions);
+            OpenServiceOptions(client1, initialState);
+
+            const string fullText = "That kingdom already has the most clans this server allows (1).";
+            client1.Call(() =>
+            {
+                Assert.False(PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.Vassal, out var vassalExplanation));
+                Assert.Equal(fullText, vassalExplanation.ToString());
+                Assert.Equal(!countMercenaries, PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.Mercenary, out var mercenaryExplanation));
+                if (countMercenaries)
+                    Assert.Equal(fullText, mercenaryExplanation.ToString());
+            });
+        }
+        finally
+        {
+            ModConfigProvider.ModOptions = previousOptions;
+        }
+    }
+
     [Fact]
     public void MercenarySelected_ShowsConfirmPromptAndDoesNotNotifyResponder()
     {
@@ -3119,10 +3155,7 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
 
             client.Call(() =>
             {
-                var battleStartCoordinator = client.Resolve<BattleStartCoordinator>();
-                // E2E clients share process statics, so select this simulated client's coordinator for the patch.
-                AccessTools.Field(typeof(BattleStartCoordinator), "<Instance>k__BackingField")
-                    .SetValue(null, battleStartCoordinator);
+                var battleStartCoordinator = UseBattleStartCoordinatorOf(client);
                 Assert.Same(battleStartCoordinator, BattleStartCoordinator.Instance);
                 InvokePatchedEncounterAttack();
                 Assert.Same(battleStartCoordinator, BattleStartCoordinator.Instance);

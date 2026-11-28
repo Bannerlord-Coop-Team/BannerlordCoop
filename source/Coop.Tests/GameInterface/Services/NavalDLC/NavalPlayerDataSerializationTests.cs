@@ -21,7 +21,7 @@ public class NavalPlayerDataSerializationTests
     }
 
     [Fact]
-    public void NetworkUpdateCoopSession_KeepsSentTroopsAndCachedFleets()
+    public void NetworkUpdateCoopSession_KeepsSentTroopsCachedFleetsMooredShipOwnersAndFerryDepartures()
     {
         var session = CoopSession.Empty;
         session.NavalPlayerData.PlayerSentTroops["MyHero1"] = new()
@@ -39,8 +39,14 @@ public class NavalPlayerDataSerializationTests
             new() { ["slot1"] = "piece_1" },
             new() { "piece_1" });
         session.NavalPlayerData.PlayerCachedFleets["MyHero1"] = new PlayerCachedFleetData(new() { cachedShip }, float.NaN, 20f, false, 31f, 41f, true);
+        session.NavalPlayerData.MooredShipOwnerClans["town_ES1"] = new() { "player_clan_1", string.Empty };
+        session.NavalPlayerData.PlayerFerryDepartures["MyHero1"] = "village_ES1_1";
 
         var received = RoundTrip(new NetworkUpdateCoopSession(session)).UpdatedSession.NavalPlayerData;
+
+        // A ship moored before co-op has no owner, which must keep its place in the stash order
+        Assert.Equal(new[] { "player_clan_1", string.Empty }, received.MooredShipOwnerClans["town_ES1"]);
+        Assert.Equal("village_ES1_1", received.PlayerFerryDepartures["MyHero1"]);
 
         var sentTroops = Assert.Single(received.PlayerSentTroops["MyHero1"]);
         Assert.Equal((99999L, "Sea Wolf", "Garrison Run"), (sentTroops.ReturnTimeTicks, sentTroops.ShipName, sentTroops.PartyName));

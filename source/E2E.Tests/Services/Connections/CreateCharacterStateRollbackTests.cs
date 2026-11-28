@@ -152,7 +152,7 @@ public class CreateCharacterStateRollbackTests
 
             var heroInterface = new Mock<IHeroInterface>();
             heroInterface.Setup(value => value.ServerUnpackHero(It.IsAny<byte[]>())).Returns(hero);
-            var handles = new PlayerRegistrationHandles(1, 2, 3, 4, 5, 6, 7, 8, 9);
+            var handles = new PlayerRegistrationHandles(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12);
             heroInterface.Setup(value => value.TryGetRegistrationHandles(hero, out handles)).Returns(!handleCaptureFails);
             heroInterface.Setup(value => value.SetupServerHero(hero)).Throws(new InvalidOperationException("setup failed"));
 

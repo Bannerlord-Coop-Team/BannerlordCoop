@@ -95,8 +95,8 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
             return;
         }
 
-        // A hideout or siege assault defender who already left the mission keeps its encounter for the server's
-        // staged loot, which StagedBattleResultUpdatePatch resumes, or for the send troops result menu.
+        // A held battle result encounter (HoldsBattleResultEncounter) stays open for the server's staged loot, which
+        // StagedBattleResultUpdatePatch resumes, or for the send troops result menu.
         if (!holdsBattleResultEncounter)
             CloseDestroyedMapEventEncounterIfNeeded(obj, id, localPartyWasInvolved);
     }
@@ -126,13 +126,7 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
         if (mainParty.MapEvent == mapEvent)
             return true;
 
-        var encounter = PlayerEncounter.Current;
-        var battle = GetPlayerEncounterBattle();
-        var encounteredBattle = GetPlayerEncounterEncounteredBattle();
-        if (encounter?._mapEvent == mapEvent ||
-            encounter?.BattleSimulation?.MapEvent == mapEvent ||
-            battle == mapEvent ||
-            encounteredBattle == mapEvent)
+        if (PlayerEncounter.Current.ReferencesMapEvent(mapEvent))
             return true;
 
         var party = mainParty.Party;
@@ -229,30 +223,6 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
         return PlayerEncounter.Current != null ||
                Campaign.Current?.CurrentMenuContext != null ||
                mapState?.AtMenu == true;
-    }
-
-    private static MapEvent GetPlayerEncounterBattle()
-    {
-        try
-        {
-            return PlayerEncounter.Battle;
-        }
-        catch (NullReferenceException)
-        {
-            return null;
-        }
-    }
-
-    private static MapEvent GetPlayerEncounterEncounteredBattle()
-    {
-        try
-        {
-            return PlayerEncounter.EncounteredBattle;
-        }
-        catch (NullReferenceException)
-        {
-            return null;
-        }
     }
 
     private void ForceCloseCurrentEncounterMenu()

@@ -45,21 +45,8 @@ namespace E2E.Tests.Services.SiegeEvents;
 
 public class SiegeEntryValidationFlowTests : MapEventTestBase
 {
-    private static IReadOnlyList<MethodBase> SiegeCreationDisabledMethods => new[]
-    {
-        AccessTools.Method(
-            typeof(MobileParty),
-            nameof(MobileParty.OnPartyJoinedSiegeInternal)),
-        AccessTools.Method(
-            typeof(BesiegerCamp),
-            nameof(BesiegerCamp.InitializeSiegeEventSide)),
-        AccessTools.Method(
-            typeof(Settlement),
-            nameof(Settlement.InitializeSiegeEventSide)),
-        AccessTools.Method(
-            typeof(ChangeRelationAction),
-            "ApplyInternal"),
-    };
+    private static IEnumerable<MethodBase> SiegeEntryDisabledMethods => SiegeCreationDisabledMethods
+        .Append(AccessTools.Method(typeof(ChangeRelationAction), "ApplyInternal"));
 
     public SiegeEntryValidationFlowTests(ITestOutputHelper output) : base(output)
     {
@@ -287,7 +274,7 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
         var context = CreateEntryContext(client);
         IgnoreEntryResults(client);
 
-        SendBesiegeRequest(client, context, SiegeCreationDisabledMethods);
+        SendBesiegeRequest(client, context, SiegeEntryDisabledMethods);
 
         Assert.True(GetBesiegeApproval().Approved);
         AssertSiegeStarted(context);
@@ -300,7 +287,7 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
         var context = CreateEntryContext(client);
         IgnoreEntryResults(client);
 
-        SendBesiegeRequest(client, context, SiegeCreationDisabledMethods);
+        SendBesiegeRequest(client, context, SiegeEntryDisabledMethods);
 
         SiegeEvent? originalSiege = null;
         Server.Call(() =>
@@ -355,11 +342,11 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
             Assert.True(settlement.SiegeEvent.CanPartyJoinSide(
                 party.Party,
                 BattleSideEnum.Attacker));
-        }, SiegeCreationDisabledMethods);
+        }, SiegeEntryDisabledMethods);
         Server.NetworkSentMessages.Clear();
         IgnoreEntryResults(client);
 
-        SendJoinRequest(client, context, SiegeCreationDisabledMethods);
+        SendJoinRequest(client, context, SiegeEntryDisabledMethods);
 
         var approval = GetJoinApproval();
         Assert.True(approval.Approved);
@@ -391,7 +378,7 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
                     party.Position = arrivalPosition;
                     party.SetShortTermBehavior(AiBehavior.EngageParty, camp.LeaderParty.Party);
                 }
-            }, SiegeCreationDisabledMethods);
+            }, SiegeEntryDisabledMethods);
         }
         ClearMessages();
 
@@ -424,7 +411,7 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
         client.NetworkSentMessages.Clear();
 
         // Replay the captured native request without the player-local menu continuation.
-        client.Call(() => client.Resolve<INetwork>().SendAll(request), SiegeCreationDisabledMethods);
+        client.Call(() => client.Resolve<INetwork>().SendAll(request), SiegeEntryDisabledMethods);
 
         Assert.True(GetJoinApproval().Approved);
         AssertJoinedSiege(context);
@@ -480,7 +467,7 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
         var context = CreateEntryContext(client);
         foreach (var instance in Clients.Append(Server))
         {
-            instance.Call(() => CreatePresentedTownSiege(instance, context), SiegeCreationDisabledMethods);
+            instance.Call(() => CreatePresentedTownSiege(instance, context), SiegeEntryDisabledMethods);
         }
         ClearMessages();
 
@@ -492,7 +479,7 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
             Campaign.Current.PlayerEncounter = null;
 
             EncounterManager.StartSettlementEncounter(MobileParty.MainParty, settlement);
-        }, SiegeCreationDisabledMethods);
+        }, SiegeEntryDisabledMethods);
 
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkStartSettlementEncounter>());
 
@@ -511,7 +498,7 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
             EncounterManager.HandleEncounterForMobileParty(MobileParty.MainParty, 0f);
 
             Assert.Same(encounter, PlayerEncounter.Current);
-        }, SiegeCreationDisabledMethods);
+        }, SiegeEntryDisabledMethods);
 
         Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestStartSettlementEncounter>());
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkStartSettlementEncounter>());
@@ -666,7 +653,7 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
             AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu), new[] { typeof(string) }));
         using var menuSwitch = new MethodCallRecorder(
             AccessTools.Method(typeof(MenuContext), nameof(MenuContext.SwitchToMenu), new[] { typeof(string) }));
-        var disabledMethods = MapEventDisabledMethods.Concat(SiegeCreationDisabledMethods).ToList();
+        var disabledMethods = MapEventDisabledMethods.Concat(SiegeEntryDisabledMethods).ToList();
         foreach (var instance in Clients.Append(Server))
         {
             instance.Call(() =>
@@ -927,7 +914,7 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
             {
                 CreatePresentedSiege(party, settlement);
             }
-        }, SiegeCreationDisabledMethods);
+        }, SiegeEntryDisabledMethods);
         Server.NetworkSentMessages.Clear();
         return context;
     }

@@ -182,6 +182,7 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         {
             ReannounceAuthorityAfterPromotion();
             ReactivateIfPromoted();
+            RevokeDestroyedMachineClaims();
             EvaluateProximityCrewGrants(elapsed);
         }
         else
@@ -323,6 +324,20 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
                     network.SendAll(Stamp(ladderAnimation));
                 }
             }
+        }
+    }
+
+    private void RevokeDestroyedMachineClaims()
+    {
+        // Publish the host's authority before any snapshot of the wreck.
+        foreach (var machine in machines)
+        {
+            int machineId = machine.Id.Id;
+            if (!claimedMachines.ContainsKey(machineId) || machine.DestructionComponent?.IsDestroyed != true)
+                continue;
+
+            proximityGrants.Remove(machineId);
+            SetMachineAuthority(machineId, null);
         }
     }
 
@@ -663,10 +678,8 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             if (claimedMachines.ContainsKey(machineId))
             {
                 ClearGrantStreak(machineId);
-                // Our own mounted player outranks a crew grant (never a mount claim); so does the
-                // machine dying under the grantee.
-                if (proximityGrants.Contains(machineId)
-                    && (HasLocalPlayerUser(machine) || machine.DestructionComponent?.IsDestroyed == true))
+                // Our own mounted player outranks a crew grant.
+                if (proximityGrants.Contains(machineId) && HasLocalPlayerUser(machine))
                 {
                     proximityGrants.Remove(machineId);
                     SetMachineAuthority(machineId, null);
@@ -1007,8 +1020,8 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         }
     }
 
-    // [Host] Arbitrate a peer's claim: first come keeps it, our own mounted player outranks it, and a
-    // release hands the machine back. Every decision is (re-)announced so the requester stops waiting.
+    // [Host] First come keeps the claim, our own mounted player outranks it, and a wreck stays with the host.
+    // A release hands the machine back. Re-announce decisions so the requester stops waiting.
     private void Handle_NetworkMachineClaim(MessagePayload<NetworkSiegeMachineClaim> payload)
     {
         var obj = payload.What;
@@ -1035,6 +1048,13 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
                 return;
             }
 
+            bool isRegistered = machinesById.TryGetValue(obj.MachineId, out var machine);
+            if (isRegistered && machine.DestructionComponent?.IsDestroyed == true)
+            {
+                AnnounceCurrentAuthority(obj.MachineId);
+                return;
+            }
+
             if (claimedMachines.TryGetValue(obj.MachineId, out var current))
             {
                 if (current == obj.ControllerId)
@@ -1052,23 +1072,13 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
                     return;
                 }
 
-                network.SendAll(new NetworkSiegeMachineAuthority(
-                    obj.MachineId,
-                    current,
-                    GetSnapshotAuthorityEpoch(obj.MachineId),
-                    GetAuthorityRevision(obj.MachineId),
-                    session.OwnControllerId));
+                AnnounceCurrentAuthority(obj.MachineId);
                 return;
             }
 
-            if (machinesById.TryGetValue(obj.MachineId, out var machine) && HasLocalPlayerUser(machine))
+            if (isRegistered && HasLocalPlayerUser(machine))
             {
-                network.SendAll(new NetworkSiegeMachineAuthority(
-                    obj.MachineId,
-                    string.Empty,
-                    GetSnapshotAuthorityEpoch(obj.MachineId),
-                    GetAuthorityRevision(obj.MachineId),
-                    session.OwnControllerId));
+                AnnounceCurrentAuthority(obj.MachineId);
                 return;
             }
 
@@ -1076,6 +1086,14 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             SetMachineAuthority(obj.MachineId, obj.ControllerId);
         });
     }
+
+    private void AnnounceCurrentAuthority(int machineId)
+        => network.SendAll(new NetworkSiegeMachineAuthority(
+            machineId,
+            CurrentAuthorityOwner(machineId),
+            GetSnapshotAuthorityEpoch(machineId),
+            GetAuthorityRevision(machineId),
+            session.OwnControllerId));
 
     // [Host, game thread] Record and announce a machine's simulation owner (null = back to the host).
     private void SetMachineAuthority(int machineId, string controllerId)
@@ -1445,12 +1463,12 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         hasArrived = false;
         if (machine is BatteringRam ram)
         {
-            moveDistance = ram.MovementComponent._pathTracker.TotalDistanceTraveled;
+            moveDistance = ram.MovementComponent.GetTotalDistanceTraveledForPathTracker();
             hasArrived = ram.HasArrivedAtTarget;
         }
         else if (machine is SiegeTower tower)
         {
-            moveDistance = tower.MovementComponent._pathTracker.TotalDistanceTraveled;
+            moveDistance = tower.MovementComponent.GetTotalDistanceTraveledForPathTracker();
             hasArrived = tower.HasArrivedAtTarget;
         }
     }
@@ -1688,37 +1706,39 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
 
     private static void Apply(UsableMachine machine, NetworkSiegeMachineState state)
     {
-        // The movement simulator ignores movement echoes (a stale pre-grant broadcast must not
-        // fight its own tracker); everyone else eases toward the received distance.
-        if (state.MoveDistance >= 0f && !SiegeMissionAuthorityGate.IsMachineSimulatedLocally(machine.Id.Id))
-        {
-            var movement = (machine as BatteringRam)?.MovementComponent ?? (machine as SiegeTower)?.MovementComponent;
-            if (movement != null)
-            {
-                // Vanilla MP's steady-state client recipe (MissionNetworkComponent's siege machine movement
-                // handler): feed the distance into the movement component's advancement error and let its own
-                // per-frame tick ease toward it — wheels turn and the move sound plays. The hard snap is
-                // vanilla's JOIN-TIME recipe (BatteringRam.OnAfterReadFromNetwork), kept for a big gap
-                // (joiner catch-up) and for a real backward correction; small negative error is the easing's
-                // own overshoot and gets left alone.
-                float error = state.MoveDistance - movement.GetTotalDistanceTraveledForPathTracker();
-                if (error > MoveDistanceSnapThreshold || error < -MoveDistanceThreshold)
-                {
-                    movement.SetTotalDistanceTraveledForPathTracker(state.MoveDistance);
-                    movement.SetTargetFrameForPathTracker();
-                }
-                else if (error > 0f)
-                {
-                    movement.SetDistanceTraveledAsClient(state.MoveDistance);
-                }
+        bool isMachineSimulatedLocally = SiegeMissionAuthorityGate.IsMachineSimulatedLocally(machine.Id.Id);
+        bool wasDestroyed = machine.DestructionComponent?.IsDestroyed == true;
+        var movement = (machine as BatteringRam)?.MovementComponent
+            ?? (machine as SiegeTower)?.MovementComponent;
 
-                // Finish the tracker before the native arrival logic updates interaction and navigation.
-                if (state.HasArrived)
-                {
-                    // The ram tick must complete arrival itself so its standing points and navigation change too.
-                    if (machine is SiegeTower tower && !tower.HasArrivedAtTarget) tower.HasArrivedAtTarget = true;
-                    movement.MoveToTargetAsClient();
-                }
+        // Other peers ease toward the simulator's distance while the machine is intact.
+        // Skip destroyed machines, otherwise a claimant snapshot arriving before the host revokes the claim
+        // can move the wreck.
+        if (state.MoveDistance >= 0f && !isMachineSimulatedLocally && movement != null && !wasDestroyed)
+        {
+            // Vanilla MP's steady-state client recipe (MissionNetworkComponent's siege machine movement
+            // handler): feed the distance into the movement component's advancement error and let its own
+            // per-frame tick ease toward it — wheels turn and the move sound plays. The hard snap is
+            // vanilla's JOIN-TIME recipe (BatteringRam.OnAfterReadFromNetwork), kept for a big gap
+            // (joiner catch-up) and for a real backward correction; small negative error is the easing's
+            // own overshoot and gets left alone.
+            float error = state.MoveDistance - movement.GetTotalDistanceTraveledForPathTracker();
+            if (ShouldSnapMovement(error))
+            {
+                movement.SetTotalDistanceTraveledForPathTracker(state.MoveDistance);
+                movement.SetTargetFrameForPathTracker();
+            }
+            else if (error > 0f)
+            {
+                movement.SetDistanceTraveledAsClient(state.MoveDistance);
+            }
+
+            // Finish the tracker before the native arrival logic updates interaction and navigation.
+            if (state.HasArrived)
+            {
+                // The ram tick must complete arrival itself so its standing points and navigation change too.
+                if (machine is SiegeTower tower && !tower.HasArrivedAtTarget) tower.HasArrivedAtTarget = true;
+                movement.MoveToTargetAsClient();
             }
         }
 
@@ -1755,7 +1775,7 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             }
         }
 
-        if (state.HasStoneAmmo && !SiegeMissionAuthorityGate.IsMachineSimulatedLocally(machine.Id.Id)
+        if (state.HasStoneAmmo && !isMachineSimulatedLocally
             && machine is StonePile stonePile && stonePile.AmmoCount != state.StoneAmmo)
         {
             stonePile.SetAmmo(state.StoneAmmo);
@@ -1766,15 +1786,16 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         if (state.HitPoints >= 0f && machine.DestructionComponent != null)
         {
             var destruction = machine.DestructionComponent;
-            bool wasDestroyed = destruction.IsDestroyed;
             destruction.HitPoint = state.HitPoints;
             SyncMissionSiegeWeaponHealth(destruction, state.HitPoints);
-            // Assigning HitPoint raises no destroyed event, so run the gate's own handler before the mesh swap like
-            // vanilla OnHit: it hides the plank, turns off the standing points and opens the gate navmesh. The
-            // component's OnDestroyed event isn't raised here, so its other listeners only run where the hit happened.
-            if (!wasDestroyed && destruction.IsDestroyed && machine is CastleGate destroyedGate)
+            // Assigning HitPoint raises no destroyed event, so replay the UsableMachine.Disable step of vanilla
+            // Mission.OnObjectDisabled, and a gate's own handler, before the mesh swap. Its nav face and mission
+            // behavior steps run only where the hit occurred, since a behavior can request campaign engine removal.
+            if (!wasDestroyed && destruction.IsDestroyed)
             {
-                destroyedGate.OnDestroyed(destruction, null, in MissionWeapon.Invalid, null, 0);
+                machine.Disable();
+                if (machine is CastleGate destroyedGate)
+                    destroyedGate.OnDestroyed(destruction, null, in MissionWeapon.Invalid, null, 0);
             }
 
             // Forward only: destruction states never regress, and vanilla's broken-entity swap indexes
@@ -1783,10 +1804,25 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             // matching vanilla's local destruction path.
             if (state.DestructionState > destruction._currentStateIndex)
             {
+                // Snap and stop the movement before the broken entity is created because it uses the tracker's frame.
+                if (movement != null && state.MoveDistance >= 0f)
+                    StopMovementAtDestruction(movement, state.MoveDistance);
                 destruction.SetDestructionLevel(state.DestructionState, -1, 0f, TaleWorlds.Library.Vec3.Zero, TaleWorlds.Library.Vec3.Zero);
             }
         }
     }
+
+    private static void StopMovementAtDestruction(SiegeWeaponMovementComponent movement, float moveDistance)
+    {
+        movement.SetTotalDistanceTraveledForPathTracker(moveDistance);
+        // Clear the client easing error after snapping the tracker.
+        movement.SetDistanceTraveledAsClient(moveDistance);
+        movement.CurrentSpeed = 0f;
+        movement.SetTargetFrameForPathTracker();
+    }
+
+    private static bool ShouldSnapMovement(float error)
+        => error > MoveDistanceSnapThreshold || error < -MoveDistanceThreshold;
 
     private static void ApplyLadderAnimation(SiegeLadder ladder, NetworkSiegeLadderAnimationState state)
     {
@@ -1936,6 +1972,7 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
                 }
 
                 ReannounceAuthorityAfterPromotion();
+                RevokeDestroyedMachineClaims();
                 // BR-102: the replay asserts arbitration authority NOW, so it carries the CURRENT epoch
                 // (not the epoch each claim was granted under) — a joiner already holds the newest
                 // assignment the server gave it on entry.

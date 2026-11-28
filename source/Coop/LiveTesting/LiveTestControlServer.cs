@@ -60,7 +60,6 @@ namespace Coop.LiveTesting
         private readonly string endpointDirectory;
         private readonly string endpointRegistrationPath;
         private int shutdownScheduled;
-        private int deferredClientJoinAttempted;
         private bool trackedRenderingEnabled = true;
         private bool renderStateTrackable = true;
         private int renderToggleCount;
@@ -725,41 +724,34 @@ namespace Coop.LiveTesting
 
             return ExecuteOnGameThread(request, () =>
             {
-                if (Volatile.Read(ref deferredClientJoinAttempted) != 0)
-                {
-                    return Failure(
-                        request.Id,
-                        "join_already_attempted",
-                        "The deferred client join was already attempted.",
-                        false);
-                }
-
-                if (!(GameStateManager.Current?.ActiveState is InitialState) || Campaign.Current != null)
-                {
-                    return Failure(
-                        request.Id,
-                        "client_not_at_main_menu",
-                        "The client must be at the main menu with no campaign loaded before joining.",
-                        false);
-                }
-
-                if (Interlocked.Exchange(ref deferredClientJoinAttempted, 1) != 0)
-                {
-                    return Failure(
-                        request.Id,
-                        "join_already_attempted",
-                        "The deferred client join was already attempted.",
-                        false);
-                }
+                var refusal = GetClientJoinRefusal();
+                if (refusal != null)
+                    return Failure(request.Id, refusal);
 
                 bool started = startAsClient();
                 Logger.Information("[LiveTest] Deferred StartAsClient() returned {Started}", started);
-                return Success(request.Id, new
-                {
-                    attempted = true,
-                    started,
-                });
+                if (!started)
+                    return Failure(
+                        request.Id,
+                        "client_start_refused",
+                        "The client session did not start: another start is still running or the /autoconnect arguments are invalid.",
+                        false);
+                return Success(request.Id, new { started = true });
             }, true);
+        }
+
+        private static LiveTestError GetClientJoinRefusal()
+        {
+            if (ContainerProvider.TryResolve<ILogic>(out _))
+                return new LiveTestError("client_session_active", "A client session is still active.", false);
+
+            if (!(GameStateManager.Current?.ActiveState is InitialState) || Campaign.Current != null)
+                return new LiveTestError(
+                    "client_not_at_main_menu",
+                    "The client must be at the main menu with no campaign loaded before joining.",
+                    false);
+
+            return null;
         }
 
         private LiveTestResponse CreateStatusResponse(string requestId)
@@ -897,10 +889,7 @@ namespace Coop.LiveTesting
                 registeredControllerIds,
                 connectedControllerIds,
                 deferredClientJoinEnabled,
-                readyForClientJoin = !isServer && deferredClientJoinEnabled &&
-                    Volatile.Read(ref deferredClientJoinAttempted) == 0 &&
-                    GameStateManager.Current?.ActiveState is InitialState && !campaignLoaded,
-                deferredClientJoinAttempted = Volatile.Read(ref deferredClientJoinAttempted) != 0,
+                readyForClientJoin = !isServer && deferredClientJoinEnabled && GetClientJoinRefusal() == null,
                 readyForCampaignTests,
                 readyForMissionTests = readyForCampaignTests && missionActive,
             });
@@ -1013,10 +1002,12 @@ namespace Coop.LiveTesting
             string message,
             bool outcomeUncertain)
         {
-            return LiveTestResponse.Failure(
-                id,
-                GetProcessInfo(),
-                new LiveTestError(code, message, outcomeUncertain));
+            return Failure(id, new LiveTestError(code, message, outcomeUncertain));
+        }
+
+        private LiveTestResponse Failure(string id, LiveTestError error)
+        {
+            return LiveTestResponse.Failure(id, GetProcessInfo(), error);
         }
 
         private LiveTestProcessInfo GetProcessInfo()

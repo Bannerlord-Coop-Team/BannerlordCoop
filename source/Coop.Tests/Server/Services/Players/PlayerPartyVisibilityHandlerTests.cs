@@ -1,15 +1,17 @@
 ﻿using Common;
-using Common.Network;
+using Common.Messaging;
 using Common.Network.Messages;
 using Common.Tests.Utils;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Services.Players.Handlers;
 using Coop.Core.Server.Services.Save.Messages;
+using GameInterface.Services.Armies;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PlayerCaptivityService.Messages;
+using GameInterface.Services.PartyVisuals.Interfaces;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.SiegeEvents.Interfaces;
@@ -32,8 +34,6 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
 {
     private readonly bool wasServer = ModInformation.IsServer;
     private readonly Campaign? previousCampaign;
-    private readonly Type sandBoxViewSubModuleType;
-    private readonly object? previousSandBoxViewSubModule;
 
     public PlayerPartyVisibilityHandlerTests()
     {
@@ -43,28 +43,12 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
         var campaign = (Campaign)FormatterServices.GetUninitializedObject(typeof(Campaign));
         campaign.CampaignEventDispatcher = new CampaignEventDispatcher(Array.Empty<CampaignEventReceiver>());
         Campaign.Current = campaign;
-
-        sandBoxViewSubModuleType = Type.GetType(
-            "SandBox.View.SandBoxViewSubModule, SandBox.View",
-            throwOnError: true)!;
-        var visualManagerType = Type.GetType(
-            "SandBox.View.SandBoxViewVisualManager, SandBox.View",
-            throwOnError: true)!;
-        var instanceField = AccessTools.Field(sandBoxViewSubModuleType, "_instance");
-        previousSandBoxViewSubModule = instanceField.GetValue(null);
-
-        var subModule = FormatterServices.GetUninitializedObject(sandBoxViewSubModuleType);
-        AccessTools.Field(sandBoxViewSubModuleType, "_sandBoxViewVisualManager")
-            .SetValue(subModule, Activator.CreateInstance(visualManagerType));
-        instanceField.SetValue(null, subModule);
     }
 
     public void Dispose()
     {
         ModInformation.IsServer = wasServer;
         Campaign.Current = previousCampaign;
-        AccessTools.Field(sandBoxViewSubModuleType, "_instance")
-            .SetValue(null, previousSandBoxViewSubModule);
     }
 
     [Theory]
@@ -84,13 +68,7 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
             .Returns(true);
 
         var broker = new TestMessageBroker();
-        using var handler = new PlayerPartyVisibilityHandler(
-            broker,
-            playerManager.Object,
-            Mock.Of<IConnectionCollection>(),
-            objectManager.Object,
-            Mock.Of<INetwork>(),
-            Mock.Of<ISiegeEventInterface>());
+        using var handler = CreateHandler(broker, playerManager.Object, objectManager.Object);
 
         broker.Publish(this, new SavedPlayerRegistrationsRestored());
 
@@ -109,13 +87,7 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
 
         var objectManager = new Mock<IObjectManager>();
         var broker = new TestMessageBroker();
-        using var handler = new PlayerPartyVisibilityHandler(
-            broker,
-            playerManager.Object,
-            Mock.Of<IConnectionCollection>(),
-            objectManager.Object,
-            Mock.Of<INetwork>(),
-            Mock.Of<ISiegeEventInterface>());
+        using var handler = CreateHandler(broker, playerManager.Object, objectManager.Object);
 
         broker.Publish(this, new SavedPlayerRegistrationsRestored());
 
@@ -141,13 +113,11 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
 
         var siegeEventInterface = new Mock<ISiegeEventInterface>();
         var broker = new TestMessageBroker();
-        using var handler = new PlayerPartyVisibilityHandler(
+        using var handler = CreateHandler(
             broker,
             playerManager.Object,
-            Mock.Of<IConnectionCollection>(),
             objectManager.Object,
-            Mock.Of<INetwork>(),
-            siegeEventInterface.Object);
+            siegeEventInterface: siegeEventInterface.Object);
 
         broker.Publish(this, new SavedPlayerRegistrationsRestored());
 
@@ -181,13 +151,7 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
             .Returns(true);
 
         var broker = new TestMessageBroker();
-        using var handler = new PlayerPartyVisibilityHandler(
-            broker,
-            playerManager.Object,
-            Mock.Of<IConnectionCollection>(),
-            objectManager.Object,
-            Mock.Of<INetwork>(),
-            Mock.Of<ISiegeEventInterface>());
+        using var handler = CreateHandler(broker, playerManager.Object, objectManager.Object);
 
         broker.Publish(this, new PlayerCampaignEntered(peer));
         Assert.False(party.IsActive);
@@ -217,13 +181,7 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
 
         var objectManager = new Mock<IObjectManager>();
         var broker = new TestMessageBroker();
-        using var handler = new PlayerPartyVisibilityHandler(
-            broker,
-            playerManager.Object,
-            Mock.Of<IConnectionCollection>(),
-            objectManager.Object,
-            Mock.Of<INetwork>(),
-            Mock.Of<ISiegeEventInterface>());
+        using var handler = CreateHandler(broker, playerManager.Object, objectManager.Object);
 
         broker.Publish(this, new PlayerCampaignSynchronized(supersededPeer));
         GameThread.Run(() => { }, blocking: true);
@@ -240,21 +198,21 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
         var peer = (NetPeer)FormatterServices.GetUninitializedObject(typeof(NetPeer));
         var (playerManager, connectionCollection, objectManager) =
             CreateReleaseMocks(player, party, peer, isConnected: false, isSynchronized: false);
-        var network = new Mock<INetwork>();
+        var partyVisuals = new Mock<IPartyVisualInterface>();
         var broker = new TestMessageBroker();
-        using var handler = new PlayerPartyVisibilityHandler(
+        using var handler = CreateHandler(
             broker,
             playerManager.Object,
-            connectionCollection.Object,
             objectManager.Object,
-            network.Object,
-            Mock.Of<ISiegeEventInterface>());
+            connections: connectionCollection.Object,
+            partyVisuals: partyVisuals.Object);
 
         broker.Publish(this, new PlayerPartyReleasedFromCaptivity(party));
 
         Assert.False(party.IsActive);
         Assert.False(party.IsVisible);
-        network.VerifyNoOtherCalls();
+        partyVisuals.Verify(visuals => visuals.RemoveVisual(party), Times.Once);
+        partyVisuals.VerifyNoOtherCalls();
     }
 
     [Fact]
@@ -267,13 +225,11 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
         var (playerManager, connectionCollection, objectManager) =
             CreateReleaseMocks(player, party, peer, isConnected: true, isSynchronized: true);
         var broker = new TestMessageBroker();
-        using var handler = new PlayerPartyVisibilityHandler(
+        using var handler = CreateHandler(
             broker,
             playerManager.Object,
-            connectionCollection.Object,
             objectManager.Object,
-            Mock.Of<INetwork>(),
-            Mock.Of<ISiegeEventInterface>());
+            connections: connectionCollection.Object);
 
         broker.Publish(this, new PlayerPartyReleasedFromCaptivity(party));
 
@@ -291,13 +247,11 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
         var (playerManager, connectionCollection, objectManager) =
             CreateReleaseMocks(player, party, peer, isConnected: true, isSynchronized: false);
         var broker = new TestMessageBroker();
-        using var handler = new PlayerPartyVisibilityHandler(
+        using var handler = CreateHandler(
             broker,
             playerManager.Object,
-            connectionCollection.Object,
             objectManager.Object,
-            Mock.Of<INetwork>(),
-            Mock.Of<ISiegeEventInterface>());
+            connections: connectionCollection.Object);
 
         broker.Publish(this, new PlayerPartyReleasedFromCaptivity(party));
 
@@ -321,13 +275,11 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
             .Setup(manager => manager.TryGetObjectWithLogging(player.HeroId, out hero))
             .Returns(true);
         var broker = new TestMessageBroker();
-        using var handler = new PlayerPartyVisibilityHandler(
+        using var handler = CreateHandler(
             broker,
             playerManager.Object,
-            connectionCollection.Object,
             objectManager.Object,
-            Mock.Of<INetwork>(),
-            Mock.Of<ISiegeEventInterface>());
+            connections: connectionCollection.Object);
 
         broker.Publish(this, new PlayerPartyReleasedFromCaptivity(party));
         Assert.False(party.IsActive);
@@ -355,13 +307,11 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
             .Setup(manager => manager.TryGetObjectWithLogging(player.MobilePartyId, out party))
             .Returns(true);
         var broker = new TestMessageBroker();
-        using var handler = new PlayerPartyVisibilityHandler(
+        using var handler = CreateHandler(
             broker,
             playerManager.Object,
-            connectionCollection.Object,
             objectManager.Object,
-            Mock.Of<INetwork>(),
-            Mock.Of<ISiegeEventInterface>());
+            connections: connectionCollection.Object);
 
         broker.Publish(this, new PlayerDisconnected(peer, default));
         GameThread.Run(() => { }, blocking: true);
@@ -395,18 +345,30 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
             .Returns(true);
 
         var broker = new TestMessageBroker();
-        using var handler = new PlayerPartyVisibilityHandler(
-            broker,
-            playerManager.Object,
-            Mock.Of<IConnectionCollection>(),
-            objectManager.Object,
-            Mock.Of<INetwork>(),
-            Mock.Of<ISiegeEventInterface>());
+        using var handler = CreateHandler(broker, playerManager.Object, objectManager.Object);
 
         broker.Publish(this, new PlayerDisconnected(peer, default));
 
         playerManager.Verify(manager => manager.ClearPeer(peer), Times.Once);
         Assert.Single(broker.GetMessagesFromType<PlayerConnectionStateChanged>());
+    }
+
+    private static PlayerPartyVisibilityHandler CreateHandler(
+        IMessageBroker broker,
+        IPlayerManager playerManager,
+        IObjectManager objectManager,
+        IConnectionCollection? connections = null,
+        IPartyVisualInterface? partyVisuals = null,
+        ISiegeEventInterface? siegeEventInterface = null)
+    {
+        return new PlayerPartyVisibilityHandler(
+            broker,
+            playerManager,
+            connections ?? Mock.Of<IConnectionCollection>(),
+            objectManager,
+            partyVisuals ?? Mock.Of<IPartyVisualInterface>(),
+            siegeEventInterface ?? Mock.Of<ISiegeEventInterface>(),
+            Mock.Of<IArmyLeaver>());
     }
 
     private static (Mock<IPlayerManager>, Mock<IConnectionCollection>, Mock<IObjectManager>)

@@ -89,6 +89,12 @@ public readonly struct ModOptions
     public readonly int PvpResponseTimerSeconds { get; } = 0;
     [ProtoMember(33)]
     public readonly bool AllowClientTimeControls { get; } = true;
+    [ProtoMember(34)]
+    public readonly int MaxClansPerKingdom { get; } = 0;
+    [ProtoMember(35)]
+    public readonly bool MaxClansPerKingdomCountsMercenaries { get; } = false;
+    [ProtoMember(36)]
+    public readonly bool MapClickChangesTime { get; } = true;
 
     public ModOptions(ModOptions previous, bool voiceEnabled)
     {
@@ -102,6 +108,7 @@ public readonly struct ModOptions
         FastForwardEnabled = modOptionsData.FastForwardEnabled ?? FastForwardEnabled;
         AutoPauseEnabled = modOptionsData.AutoPauseEnabled ?? AutoPauseEnabled;
         AllowClientTimeControls = modOptionsData.AllowClientTimeControls ?? AllowClientTimeControls;
+        MapClickChangesTime = modOptionsData.MapClickChangesTime ?? MapClickChangesTime;
         ClientsCanUseCheats = modOptionsData.ClientsCanUseCheats ?? ClientsCanUseCheats;
         GoldFoodInfluenceChangeInSettlements = modOptionsData.GoldFoodInfluenceChangeInSettlements ?? GoldFoodInfluenceChangeInSettlements;
         GoldFoodInfluenceChangeInBattles = modOptionsData.GoldFoodInfluenceChangeInBattles ?? GoldFoodInfluenceChangeInBattles;
@@ -131,5 +138,7 @@ public readonly struct ModOptions
         PreferredBattleHosts = modOptionsData.PreferredBattleHosts?.FindAll(id => id != null) ?? PreferredBattleHosts;
         PvpBlockLeave = modOptionsData.PvpBlockLeave ?? PvpBlockLeave;
         PvpResponseTimerSeconds = modOptionsData.PvpResponseTimerSeconds ?? PvpResponseTimerSeconds;
+        MaxClansPerKingdom = modOptionsData.MaxClansPerKingdom ?? MaxClansPerKingdom;
+        MaxClansPerKingdomCountsMercenaries = modOptionsData.MaxClansPerKingdomCountsMercenaries ?? MaxClansPerKingdomCountsMercenaries;
     }
 }

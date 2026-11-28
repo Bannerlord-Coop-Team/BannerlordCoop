@@ -178,7 +178,7 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
   `Missions.Naval`/`Coop.Naval` compile and ship. When it's false they build empty and `Coop`/`Coop.Core`/`Coop.Tests`
   skip them.
 - `ModInformation.IsNavalEnabled` is set once at startup, like `IsServer`. `CoopMod` turns it on when NavalDLC is enabled
-  and `NavalFeatureFlag` says this build can run it: a `TESTER` build with the naval code and both naval assemblies loading.
+  and `NavalFeatureFlag` says this build can run it: a build with the naval code and both naval assemblies loading.
   The dedicated server sets it from its own `warSails` setting and refuses to start when this build can't run it. Nothing
   in Coop reads `warSails`. The
   module validator, the host warning and the server's naval battle gate all read it, so a build without the naval code
@@ -882,9 +882,8 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
 - **Boarding.** Ropes and bridges replicate, but plank crossing and melee on a foreign deck were never seen live, and a
   rope cut from the target side isn't replicated. A weapon hit on another owner's rope does nothing yet (#4607).
 - **Sea raids** still open the land raid scene.
-- **CI** has NavalDLC, so its builds compile and ship `Missions.Naval.dll` and `Coop.Naval.dll`. Release builds still reject
-  NavalDLC clients, because only `TESTER` builds turn War Sails on. What ships follows the CI image; pass `-p:CoopNavalDlc=`
-  in the release workflows to make it explicit.
+- **CI** has NavalDLC, so its builds compile and ship `Missions.Naval.dll` and `Coop.Naval.dll`. The release workflow
+  passes `-p:CoopNavalDlc=true`, so a release fails to build instead of shipping without War Sails.
 
 ## 7. Debug surface
 

@@ -59,8 +59,8 @@ internal class EscortQuestEventPatches
     internal static bool RunOwned(Quest quest, Action<Quest> action)
     {
         if (ModInformation.IsClient || !quest.IsOngoing || quest._questCaravanMobileParty == null) return false;
-        if (!ContainerProvider.TryResolve<IEscortOwnerParty>(out var parties) ||
-            !parties.TryGet(IssueManager.GetIssueOfQuest(quest), out var party))
+        if (!ContainerProvider.TryResolve<IIssueOwnerResolver>(out var owners) ||
+            !owners.TryResolveOwnerParty(IssueManager.GetIssueOfQuest(quest), out var party))
         {
             quest.CompleteQuestWithCancel(new TextObject("{=r3953PartyGone}Your caravan escort ended because your party is no longer available."));
             return false;

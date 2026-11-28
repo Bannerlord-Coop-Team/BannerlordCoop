@@ -15,12 +15,14 @@ using GameInterface.Configuration;
 using GameInterface.Registry;
 using GameInterface.Serialization;
 using GameInterface.Services;
+using GameInterface.Services.Villages;
 using GameInterface.Services.Armies;
 using GameInterface.Services.Alleys;
 using GameInterface.Services.Bandits;
 using GameInterface.Services.Barters;
 using GameInterface.Services.BugReporting;
 using GameInterface.Services.Chat;
+using GameInterface.Services.CultureObjects;
 using GameInterface.Services.Entity;
 using GameInterface.Services.GameDebug.Metrics;
 using GameInterface.Services.GameMenus;
@@ -56,6 +58,9 @@ using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.MapEventComponents;
 using GameInterface.Services.AnchorPoints.Handlers;
 using GameInterface.Services.MapEventComponents.Handlers;
+using GameInterface.Services.Ferries;
+using GameInterface.Services.Ferries.Handlers;
+using GameInterface.Services.Ferries.Interfaces;
 using GameInterface.Services.Rafts.Commands;
 using GameInterface.Services.Rafts.Handlers;
 using GameInterface.Services.Rafts.Interfaces;
@@ -124,6 +129,9 @@ public class GameInterfaceModule : Module
         typeof(SiegeBlockadeHandler),
         typeof(PlayerRaftFleetInterface),
         typeof(RaftDebugCommands.StrandOnRaftCoopCommand),
+        typeof(PlayerFerryHandler),
+        typeof(PlayerFerryInterface),
+        typeof(PlayerFerryTracker),
 #if DEBUG
         typeof(NavalScenarioClientHandler),
         typeof(NavalScenarioRejoinHandler),
@@ -174,6 +182,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<BinaryPackageFactory>().As<IBinaryPackageFactory>().SingleInstance();
         builder.RegisterType<ControllerIdProvider>().As<IControllerIdProvider>().SingleInstance();
         builder.RegisterType<TimeControlModeConverter>().As<ITimeControlModeConverter>().SingleInstance();
+        builder.RegisterType<OrderAttackRule>().As<IOrderAttackRule>().InstancePerDependency();
         builder.RegisterType<RomanceRetryHistory>().As<IRomanceRetryHistory>().SingleInstance();
         builder.RegisterType<RomanceRetryCooldown>().As<IRomanceRetryCooldown>().InstancePerDependency();
         builder.RegisterType<Services.Crime.CrimeRatingService>().As<Services.Crime.ICrimeRatingService>().InstancePerDependency();
@@ -254,10 +263,12 @@ public class GameInterfaceModule : Module
         builder.RegisterType<SiegeDefenderCommandAuthority>().As<ISiegeDefenderCommandAuthority>().InstancePerDependency();
         builder.RegisterType<AiSiegeTerminalPolicy>().As<IAiSiegeTerminalPolicy>().SingleInstance();
         builder.RegisterType<SiegeFinalizeTracker>().As<ISiegeFinalizeTracker>().InstancePerLifetimeScope();
+        builder.RegisterType<ClientVillageHostileActionTracker>().As<IClientVillageHostileActionTracker>().InstancePerLifetimeScope();
         builder.RegisterType<SiegeEventGraphSynchronizer>().As<ISiegeEventGraphSynchronizer>().InstancePerDependency();
         builder.RegisterType<MapEventContributionBarrier>().As<IMapEventContributionBarrier>().InstancePerDependency();
         builder.RegisterType<SiegeBreakOut>().As<ISiegeBreakOut>().InstancePerDependency();
         builder.RegisterType<ArmyDisbander>().As<IArmyDisbander>().InstancePerDependency();
+        builder.RegisterType<ArmyLeaver>().As<IArmyLeaver>().InstancePerDependency();
         builder.RegisterType<PlayerSiegeTargetScoring>().As<IPlayerSiegeTargetScoring>().InstancePerDependency();
         builder.RegisterType<ArmyFormationPositionConvergence>().As<IArmyFormationPositionConvergence>().InstancePerDependency();
         builder.RegisterType<MapEventLoadCleaner>().As<IMapEventLoadCleaner>().InstancePerDependency();
@@ -287,6 +298,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<WorkshopRepairer>().As<IWorkshopRepairer>().InstancePerDependency();
         builder.RegisterType<BloodFeudRepairer>().As<IBloodFeudRepairer>().InstancePerDependency();
         builder.RegisterType<PlayerCharacterLoadRepairer>().As<IPlayerCharacterLoadRepairer>().InstancePerDependency();
+        builder.RegisterType<CultureDefaultPolicyRepairer>().As<ICultureDefaultPolicyRepairer>().InstancePerDependency();
         builder.RegisterType<MapEventLogger>().As<IMapEventLogger>().SingleInstance();
         builder.RegisterType<TroopRosterLogger>().As<ITroopRosterLogger>().SingleInstance();
         builder.RegisterType<PartySyncPerformanceClock>().As<IPartySyncPerformanceClock>().SingleInstance();
@@ -312,7 +324,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<OfflineWarProtection>().As<IOfflineWarProtection>().InstancePerDependency();
         builder.RegisterType<ClientClanStrengthRefresher>().As<IClientClanStrengthRefresher>().InstancePerDependency();
         builder.RegisterType<MainPartyBattleRewardsCache>().As<IMainPartyBattleRewardsCache>().SingleInstance();
-        builder.RegisterType<HideoutResultEncounter>().As<IHideoutResultEncounter>().InstancePerDependency();
+        builder.RegisterType<HideoutEncounterHold>().As<IHideoutEncounterHold>().InstancePerDependency();
         builder.RegisterType<PacketManager>().As<IPacketManager>().SingleInstance();
         builder.RegisterType<MapEventInitializationBarrierBinding>().SingleInstance().AutoActivate();
         builder.RegisterType<RetreatedMapEventPartyTracker>().As<IRetreatedMapEventPartyTracker>().SingleInstance();

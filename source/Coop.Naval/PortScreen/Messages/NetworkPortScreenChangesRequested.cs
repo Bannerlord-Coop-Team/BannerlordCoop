@@ -47,6 +47,12 @@ internal readonly struct NetworkPortScreenChangesRequested : ICommand
     [ProtoMember(13)]
     public readonly MBReadOnlyList<uint> PackedShipsToSend;
 
+    [ProtoMember(14)]
+    public readonly MBReadOnlyList<uint> PackedShipsToStash;
+
+    [ProtoMember(15)]
+    public readonly MBReadOnlyList<uint> PackedShipsToRetrieveFromStash;
+
     public NetworkPortScreenChangesRequested(
         PortScreenMode mode,
         uint rightOwnerHandle,
@@ -60,7 +66,9 @@ internal readonly struct NetworkPortScreenChangesRequested : ICommand
         MBReadOnlyList<ShipRenameData> packedShipsToRename,
         MBReadOnlyList<ShipUpgradePieceData> packedSelectedShipPieces,
         MBReadOnlyList<ShipFigureheadData> packedSelectedFigureheads,
-        MBReadOnlyList<uint> packedShipsToSend)
+        MBReadOnlyList<uint> packedShipsToSend,
+        MBReadOnlyList<uint> packedShipsToStash,
+        MBReadOnlyList<uint> packedShipsToRetrieveFromStash)
     {
         Mode = mode;
         RightOwnerHandle = rightOwnerHandle;
@@ -75,5 +83,7 @@ internal readonly struct NetworkPortScreenChangesRequested : ICommand
         PackedSelectedShipPieces = packedSelectedShipPieces;
         PackedSelectedFigureheads = packedSelectedFigureheads;
         PackedShipsToSend = packedShipsToSend;
+        PackedShipsToStash = packedShipsToStash;
+        PackedShipsToRetrieveFromStash = packedShipsToRetrieveFromStash;
     }
 }

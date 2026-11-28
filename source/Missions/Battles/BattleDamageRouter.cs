@@ -555,21 +555,38 @@ public class BattleDamageRouter : IBattleDamageRouter
     {
         if (!coopMissionComponent.AgentRegistry.TryGetAgentInfo(damage.VictimAgentId, out var info))
         {
-            Logger.Warning(
+            // A dead victim means the sender hit the puppet before this owner's death broadcast reached it.
+            var (level, reason) = ClassifyUnregisteredVictimDrop(damage, "unregistered-victim");
+            Logger.Write(
+                level,
                 "[BattleDamage] Dropping routed blow at receive: victimId={VictimId} attackerId={AttackerId} " +
                 "localController={LocalController} damage={Damage} riderKeyedMount={RiderKeyedMount} " +
-                "missile={Missile} " +
-                "reason=unregistered-victim",
+                "missile={Missile} reason={Reason}",
                 damage.VictimAgentId,
                 damage.AttackerAgentId,
                 session.OwnControllerId,
                 damage.Blow.InflictedDamage,
                 damage.IsMount,
-                IsMissileDamage(damage));
+                IsMissileDamage(damage),
+                reason);
             return false;
         }
 
         return info.CurrentAuthority == session.OwnControllerId;
+    }
+
+    // Picks the log level and reason for an unregistered-victim drop, at Debug when the victim is already a corpse.
+    // Mounts are excluded because a mount blow is keyed by its rider's id, so a dead rider says nothing about the mount.
+    private (LogEventLevel Level, string Reason) ClassifyUnregisteredVictimDrop(
+        NetworkApplyBattleDamage damage,
+        string fallbackReason)
+    {
+        if (!damage.IsMount
+            && coopMissionComponent.AgentRegistry.TryGetCosmeticAgent(damage.VictimAgentId, out Agent corpse)
+            && !corpse.IsActive())
+            return (LogEventLevel.Debug, "victim-already-dead");
+
+        return (LogEventLevel.Warning, fallbackReason);
     }
 
     private void ApplyDeferredDamage(NetworkApplyBattleDamage damage)
@@ -608,13 +625,17 @@ public class BattleDamageRouter : IBattleDamageRouter
         {
             if (authorityWasVerified)
             {
-                Logger.Warning(
+                // An earlier queued blow can kill the victim after this one was accepted.
+                var (level, reason) = ClassifyUnregisteredVictimDrop(damage, "registry-lost-after-accept");
+                Logger.Write(
+                    level,
                     "[BattleDamage] Dropping routed blow at apply: victimId={VictimId} attackerId={AttackerId} " +
-                    "localController={LocalController} damage={Damage} reason=registry-lost-after-accept",
+                    "localController={LocalController} damage={Damage} reason={Reason}",
                     damage.VictimAgentId,
                     damage.AttackerAgentId,
                     session.OwnControllerId,
-                    damage.Blow.InflictedDamage);
+                    damage.Blow.InflictedDamage,
+                    reason);
             }
             return;
         }
@@ -673,20 +694,21 @@ public class BattleDamageRouter : IBattleDamageRouter
                 damage.AttackerAgentId);
         }
 
-        Agent attacker = null;
-        string attackerControllerId = null;
-        if (damage.AttackerAgentId != Guid.Empty &&
-            registry.TryGetAgentInfo(damage.AttackerAgentId, out var attackerInfo) &&
-            attackerInfo.Agent != null)
+        // The cosmetic identity outlives deregistration until native deletion, so this resolves a live attacker or its corpse.
+        Agent attacker = registry.TryGetCosmeticAgent(damage.AttackerAgentId, out Agent cosmeticAttacker) ? cosmeticAttacker : null;
+        // Vanilla HandleBlow calls IsEnemyOf on the blow owner for an AI victim in a formation, which throws without one.
+        if (attacker == null && victim.Controller == AgentControllerType.AI && victim.Formation != null)
         {
-            attacker = attackerInfo.Agent;
-            attackerControllerId = attackerInfo.CurrentAuthority;
-            blow.OwnerId = attacker.Index;
+            Logger.Warning(
+                "[BattleDamage] Dropping routed blow at apply: victimId={VictimId} attackerId={AttackerId} " +
+                "localController={LocalController} damage={Damage} reason=unresolved-attacker",
+                damage.VictimAgentId,
+                damage.AttackerAgentId,
+                session.OwnControllerId,
+                damage.Blow.InflictedDamage);
+            return;
         }
-        else
-        {
-            blow.OwnerId = -1;
-        }
+        blow.OwnerId = attacker?.Index ?? -1;
         int routedDamage = blow.InflictedDamage;
         // The source calculated this blow against a puppet, so vanilla could not apply its main-agent multiplier.
         ApplyPlayerReceivedDamageMultiplier(victim, ref blow, ref collisionData);
@@ -699,7 +721,7 @@ public class BattleDamageRouter : IBattleDamageRouter
             attacker,
             in blow,
             in collisionData,
-            attackerControllerId);
+            damage.SourceControllerId);
         if (wasMissile)
         {
             blow.WeaponRecord._isMissile = false;
@@ -730,7 +752,7 @@ public class BattleDamageRouter : IBattleDamageRouter
             Logger.Debug(
                 "[BattleDamage] Applied routed blow: victimId={VictimId} victimAuthority={VictimAuthority} " +
                 "victimIndex={VictimIndex} victimName={VictimName} attackerId={AttackerId} " +
-                "attackerAuthority={AttackerAuthority} routedDamage={RoutedDamage} inputDamage={InputDamage} " +
+                "sourceController={SourceController} routedDamage={RoutedDamage} inputDamage={InputDamage} " +
                 "appliedDamage={AppliedDamage:0.0} " +
                 "victimIsMount={VictimIsMount} riderKeyedMount={RiderKeyedMount} missile={Missile} " +
                 "healthBefore={HealthBefore:0.0} healthAfter={HealthAfter:0.0} activeAfter={ActiveAfter} " +
@@ -741,7 +763,7 @@ public class BattleDamageRouter : IBattleDamageRouter
                 victim.Index,
                 victim.Name,
                 damage.AttackerAgentId,
-                attackerControllerId,
+                damage.SourceControllerId,
                 routedDamage,
                 inputDamage,
                 appliedDamage,

@@ -6,6 +6,7 @@ using Coop.Core.Client.Services.MobileParties.Messages;
 using GameInterface.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.Settlements;
+using GameInterface.Services.Ferries.Interfaces;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.MapEvents;
@@ -34,6 +35,7 @@ public class ServerSettlementExitEnterHandler : IHandler
     private readonly ISettlementInterface settlementInterface;
     private readonly IKingdomCreationSettlementTracker settlementTracker;
     private readonly ISettlementEncounterDistanceValidator distanceValidator;
+    private readonly IPlayerFerryInterface playerFerryInterface;
     private readonly ILogger Logger = LogManager.GetLogger<ServerSettlementExitEnterHandler>();
 
     public ServerSettlementExitEnterHandler(
@@ -43,7 +45,8 @@ public class ServerSettlementExitEnterHandler : IHandler
         IPlayerManager playerManager,
         ISettlementInterface settlementInterface,
         IKingdomCreationSettlementTracker settlementTracker,
-        ISettlementEncounterDistanceValidator distanceValidator)
+        ISettlementEncounterDistanceValidator distanceValidator,
+        IPlayerFerryInterface playerFerryInterface = null)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -52,6 +55,8 @@ public class ServerSettlementExitEnterHandler : IHandler
         this.settlementInterface = settlementInterface;
         this.settlementTracker = settlementTracker;
         this.distanceValidator = distanceValidator;
+        // Only registered while War Sails is on, which is the only time a client asks for a ferry
+        this.playerFerryInterface = playerFerryInterface;
         messageBroker.Subscribe<NetworkRequestStartSettlementEncounter>(Handle);
         messageBroker.Subscribe<NetworkRequestEndSettlementEncounter>(Handle);
 
@@ -147,16 +152,19 @@ public class ServerSettlementExitEnterHandler : IHandler
             Logger.Debug("SettlementEncounterRecovery phase=approve branch=validated-entry partyHandle={PartyHandle} settlementHandle={SettlementHandle}",
                 payload.PartyId, payload.SettlementId);
 #endif
-            network.Send(peer, new NetworkStartSettlementEncounter(payload));
-
             // Vanilla starts under-siege and under-raid encounters outside the settlement.
-            if (settlement.IsUnderSiege || (settlement.IsVillage && settlement.IsUnderRaid)) return;
+            bool startsOutside = settlement.IsUnderSiege || (settlement.IsVillage && settlement.IsUnderRaid);
+            if (!startsOutside)
+            {
+                network.SendAllBut(peer, new NetworkPartyEnterSettlement(
+                    payload.SettlementId,
+                    payload.PartyId));
 
-            network.SendAllBut(peer, new NetworkPartyEnterSettlement(
-                payload.SettlementId,
-                payload.PartyId));
+                settlementInterface.PartyEnterSettlement(mobileParty, settlement);
+            }
 
-            settlementInterface.PartyEnterSettlement(mobileParty, settlement);
+            // The approval opens the client's town menu, whose Set sail option reads the fleet the entry anchored, so it goes last
+            network.Send(peer, new NetworkStartSettlementEncounter(payload));
         }, context: nameof(NetworkRequestStartSettlementEncounter));
     }
 
@@ -217,6 +225,15 @@ public class ServerSettlementExitEnterHandler : IHandler
             }
 
             var leftSettlement = mobileParty.CurrentSettlement;
+
+            // A ferry the party can't take keeps it in the village menu, like vanilla's disabled option
+            bool takesFerry = payload.LeaveType == SettlementLeaveType.Ferry;
+            if (takesFerry && (playerFerryInterface == null || !playerFerryInterface.CanTakeFerry(mobileParty, leftSettlement)))
+            {
+                RejectSettlementEncounterLeave(peer, payload.PartyId, "the ferry can't take your party");
+                return;
+            }
+
             LeaveSettlementMapEvent(mobileParty);
 
             // Vanilla disembarks before leaving, otherwise leaving at sea resets the anchor
@@ -232,6 +249,11 @@ public class ServerSettlementExitEnterHandler : IHandler
             else
             {
                 settlementInterface.PartyLeaveSettlement(mobileParty);
+            }
+
+            if (takesFerry)
+            {
+                playerFerryInterface.StartFerry(mobileParty, leftSettlement);
             }
 
             network.Send(

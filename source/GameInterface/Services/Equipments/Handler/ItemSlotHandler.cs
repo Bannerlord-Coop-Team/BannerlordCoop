@@ -2,7 +2,9 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using GameInterface.Services.Equipments.Interfaces;
 using GameInterface.Services.Equipments.Messages;
+using GameInterface.Services.Inventory.Interfaces;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using System;
@@ -19,15 +21,24 @@ namespace GameInterface.Services.Equipments.Handlers
         private readonly IMessageBroker messageBroker;
         private readonly IObjectManager objectManager;
         private readonly INetwork network;
+        private readonly IEquipmentInterface equipmentInterface;
+        private readonly IInventoryScreenRosterRefresher inventory;
         private readonly ILogger Logger = LogManager.GetLogger<ItemSlotHandler>();
 
 
 
-        public ItemSlotHandler(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network)
+        public ItemSlotHandler(
+            IMessageBroker messageBroker,
+            IObjectManager objectManager,
+            INetwork network,
+            IEquipmentInterface equipmentInterface,
+            IInventoryScreenRosterRefresher inventory)
         {
             this.messageBroker = messageBroker;
             this.objectManager = objectManager;
             this.network = network;
+            this.equipmentInterface = equipmentInterface;
+            this.inventory = inventory;
             messageBroker.Subscribe<ItemSlotsArrayUpdated>(Handle);
             messageBroker.Subscribe<NetworkUpdateItemSlots>(Handle);
         }
@@ -72,8 +83,16 @@ namespace GameInterface.Services.Equipments.Handlers
                         data.ItemModifierId,
                         out itemModifier)) return;
 
-                equipment._itemSlots[data.Index] =
-                    new EquipmentElement(item, itemModifier);
+                // The server also sends unchanged slots, so only a stale copy gets written and redrawn
+                var element = new EquipmentElement(item, itemModifier);
+                if (equipment._itemSlots[data.Index].IsEqualTo(element)) return;
+
+                // An open inventory screen also keeps the slot in its reset copy, otherwise Reset would undo it
+                if (!inventory.TryApplyEquipmentUpdate(equipment, data.Index, element))
+                {
+                    equipment._itemSlots[data.Index] = element;
+                }
+                equipmentInterface.RefreshOwnerVisuals(equipment);
             }, context: nameof(NetworkUpdateItemSlots));
         }
 

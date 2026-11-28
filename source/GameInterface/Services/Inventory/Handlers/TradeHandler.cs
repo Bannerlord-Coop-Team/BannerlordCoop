@@ -57,7 +57,6 @@ internal class TradeHandler : IHandler
 
         messageBroker.Subscribe<TradeAttempted>(Handle_TradeAttempted);
         messageBroker.Subscribe<CompleteTrade>(Handle_CompleteTrade);
-        messageBroker.Subscribe<UpdateEquipmentClients>(Handle_UpdateEquipmentClients);
         messageBroker.Subscribe<NetworkTradeCompleted>(Handle_TradeCompleted);
     }
 
@@ -65,7 +64,6 @@ internal class TradeHandler : IHandler
     {
         messageBroker.Unsubscribe<TradeAttempted>(Handle_TradeAttempted);
         messageBroker.Unsubscribe<CompleteTrade>(Handle_CompleteTrade);
-        messageBroker.Unsubscribe<UpdateEquipmentClients>(Handle_UpdateEquipmentClients);
         messageBroker.Unsubscribe<NetworkTradeCompleted>(Handle_TradeCompleted);
     }
 
@@ -85,7 +83,6 @@ internal class TradeHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(what.ToRoster, out var toRosterId)) return;
         if (!objectManager.TryGetIdWithLogging(what.Hero, out var heroId)) return;
         if (!objectManager.TryGetIdWithLogging(what.OwnerParty, out var ownerPartyId)) return;
-        if (!objectManager.TryGetIdWithLogging(what.InitialCharacterEquipment.HeroObject, out var initialHeroId)) return;
 
         // CurrentMobileParty can be already destroyed when this logic runs. Attempt to get an id without logging
         objectManager.TryGetId(what.CurrentMobileParty, out var currentMobilePartyId);
@@ -117,7 +114,6 @@ internal class TradeHandler : IHandler
             what.CanGainXpFromDiscarding,
             isManagingWarehouse,
             heroId,
-            initialHeroId,
             what.TotalAmount,
             what.MerchantGold,
             ownerPartyId,
@@ -146,8 +142,6 @@ internal class TradeHandler : IHandler
 
             if (!objectManager.TryGetObjectWithLogging<ItemRoster>(message.ToItemRosterId, out var toRoster)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(message.HeroId, out var hero)) return;
-            if (!objectManager.TryGetObjectWithLogging<MobileParty>(message.OwnerPartyId, out var ownerParty)) return;
-            if (!objectManager.TryGetObjectWithLogging<Hero>(message.InitialHeroId, out var initialHero)) return;
 
             SettlementComponent currentSettlementComponent = null;
             if (!message.IsSettlementComponentNull &&
@@ -157,7 +151,7 @@ internal class TradeHandler : IHandler
             if (message.CurrentMobilePartyId != null && !objectManager.TryGetObjectWithLogging<MobileParty>(message.CurrentMobilePartyId, out currentMobileParty)) return;
 
             var toItemRosterData = RebaseInventoryData(
-                toRoster, message.InitialPlayerRoster, message.ToItemRosterData);
+                toRoster, message.InitialPlayerRoster, message.ToItemRosterData, out var unremovedItems);
 
             var boughtItems = ResolveTradeItems(message.BoughtItems);
             var soldItems = ResolveTradeItems(message.SoldItems);
@@ -187,6 +181,7 @@ internal class TradeHandler : IHandler
             var totalAmount = message.TotalAmount;
             var merchantGold = message.MerchantGold;
             var purchasedItems = boughtItems;
+            var keptSales = soldItems;
 
             // Undo any purchases that are no longer present in the roster
             // When looting, taken items are treated as bought items
@@ -196,11 +191,28 @@ internal class TradeHandler : IHandler
                 totalAmount = ReconcilePurchases(fromRoster, toItemRosterData, heroEquipments, boughtItems, totalAmount, out var keptItems);
                 purchasedItems = GetKeptPurchases(boughtItems, keptItems);
 
-                // Merchants are shared, the client's snapshot misses what other players traded since it was taken
-                if (message.IsTrading) fromItemRosterData = ApplyTradeToLiveStock(fromRoster, keptItems, soldItems);
+                if (message.IsTrading)
+                {
+                    // A screen that hasn't seen the player's last sale yet, like during a join, offers the same items again
+                    totalAmount = ReconcileSales(unremovedItems, soldItems, totalAmount, out keptSales);
+
+                    // Merchants are shared, the client's snapshot misses what other players traded since it was taken
+                    fromItemRosterData = ApplyTradeToLiveStock(fromRoster, keptItems, keptSales);
+                }
             }
 
-            if (message.IsTrading) merchantGold = GetLiveMerchantGold(currentSettlementComponent, currentMobileParty, merchantGold);
+            if (message.IsTrading)
+            {
+                if (hero.Gold - totalAmount < 0)
+                {
+                    // Vanilla's done logic refuses this too, the screen's gold was stale
+                    logger.Warning("Trade refused, {HeroId} owes {TotalAmount} with {Gold} gold", message.HeroId, totalAmount, hero.Gold);
+                    if (peer != null) network.Send(peer, new SendInformationMessage("You don't have enough money for that trade."));
+                    return;
+                }
+
+                merchantGold = GetLiveMerchantGold(currentSettlementComponent, currentMobileParty, merchantGold);
+            }
 
             ResolveCharacterEquipmentsData(message.CharacterIdEquipmentsData, out var characterEquipmentsData);
 
@@ -214,8 +226,7 @@ internal class TradeHandler : IHandler
             }
 
             // Update hero equipment with new data
-            inventoryLogicInterface.UpdateEquipmentWithData(ownerParty, characterEquipmentsData, initialHero);
-            network.SendAll(new UpdateEquipmentClients(message.CharacterIdEquipmentsData, message.OwnerPartyId, message.InitialHeroId));
+            inventoryLogicInterface.UpdateEquipmentWithData(characterEquipmentsData);
 
             inventoryLogicInterface.ApplyDoneLogic(
                 fromRoster,
@@ -227,11 +238,11 @@ internal class TradeHandler : IHandler
                 merchantGold,
                 currentMobileParty,
                 currentSettlementComponent,
-                boughtItems,
-                soldItems
+                purchasedItems,
+                keptSales
             );
 
-            var exchangedSoldItems = message.CanGainXpFromDiscarding ? ResolveTradeItems(message.TransactionSoldItems) : soldItems;
+            var exchangedSoldItems = message.CanGainXpFromDiscarding ? ResolveTradeItems(message.TransactionSoldItems) : keptSales;
             SendTradeCompleted(peer, toRoster, hero, purchasedItems, exchangedSoldItems, message.IsTrading);
         });
     }
@@ -301,17 +312,23 @@ internal class TradeHandler : IHandler
             var kept = keptItems[i];
             if (kept.Amount <= 0) continue;
 
-            purchases.Add((kept, price - GetRefund(price, bought.Amount - kept.Amount, bought.Amount)));
+            purchases.Add((kept, price - GetProratedPrice(price, bought.Amount - kept.Amount, bought.Amount)));
         }
 
         return purchases;
     }
 
+    /// <summary>
+    /// Applies the screen's roster changes to the live roster. Outputs, per element, how much of the screen's removal
+    /// the live roster no longer held.
+    /// </summary>
     internal static ItemRosterElement[] RebaseInventoryData(
         ItemRoster authoritativeRoster,
         ItemRosterElement[] initialRoster,
-        ItemRosterElement[] submittedRoster)
+        ItemRosterElement[] submittedRoster,
+        out List<ItemRosterElement> unremovedItems)
     {
+        unremovedItems = new List<ItemRosterElement>();
         initialRoster ??= Array.Empty<ItemRosterElement>();
         submittedRoster ??= Array.Empty<ItemRosterElement>();
         var elements = new List<EquipmentElement>();
@@ -325,7 +342,9 @@ internal class TradeHandler : IHandler
         {
             long delta = (long)FindAmount(submittedRoster, element) - FindAmount(initialRoster, element);
             int current = FindAmount(rebased, element);
-            int final = (int)Math.Max(0L, Math.Min(int.MaxValue, current + delta));
+            long wanted = current + delta;
+            if (wanted < 0) unremovedItems.Add(new ItemRosterElement(element, (int)Math.Min(int.MaxValue, -wanted)));
+            int final = (int)Math.Max(0L, Math.Min(int.MaxValue, wanted));
             if (final != current) rebased.AddToCounts(element, final - current);
         }
         return rebased.ToArray();
@@ -444,20 +463,6 @@ internal class TradeHandler : IHandler
         return true;
     }
 
-    private void Handle_UpdateEquipmentClients(MessagePayload<UpdateEquipmentClients> obj)    {
-        GameThread.RunSafe(() =>
-        {
-            using (new AllowedThread())
-            {
-                if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out var mobileParty)) return;
-                if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.InitialHeroId, out var initialHero)) return;
-
-                ResolveCharacterEquipmentsData(obj.What.CharacterIdEquipmentsData, out var characterEquipmentsData);
-                inventoryLogicInterface.UpdateEquipmentWithData(mobileParty, characterEquipmentsData, initialHero);
-            }
-        });
-    }
-
     /// <summary>
     /// Takes any purchased quantity the merchant can no longer supply back out of the party roster data, then the
     /// slots that gained it this trade, and refunds the prorated cost of what was taken back. Outputs each purchase's kept quantity.
@@ -489,7 +494,7 @@ internal class TradeHandler : IHandler
                     shortfall - removed, element.Item?.StringId);
             }
 
-            totalAmount -= GetRefund(boughtItem.Item2, removed, amount);
+            totalAmount -= GetProratedPrice(boughtItem.Item2, removed, amount);
 
             var kept = boughtItem.Item1;
             kept.Amount = amount - removed;
@@ -499,12 +504,48 @@ internal class TradeHandler : IHandler
         return totalAmount;
     }
 
-    // The prorated price of the purchased quantity taken back, shared by the gold charge and the exchange event so both agree
-    private static int GetRefund(int price, int removed, int amount)
+    /// <summary>
+    /// Cuts each sale by what <see cref="RebaseInventoryData"/> could not remove from the party roster, and adds the
+    /// unpaid share of its price back to the total the hero pays, which is negative when the hero is paid.
+    /// Outputs each sale that is kept, at its kept quantity and price.
+    /// </summary>
+    internal static int ReconcileSales(
+        List<ItemRosterElement> unremovedItems,
+        List<(ItemRosterElement, int)> soldItems,
+        int totalAmount,
+        out List<(ItemRosterElement, int)> keptSales)
     {
-        if (removed <= 0 || amount <= 0) return 0;
+        keptSales = new List<(ItemRosterElement, int)>();
 
-        return (int)((long)price * removed / amount);
+        foreach (var (sold, price) in soldItems)
+        {
+            var element = sold.EquipmentElement;
+            int amount = sold.Amount;
+            int kept = Math.Max(0, amount - FindAmount(unremovedItems, element));
+            if (kept < amount)
+            {
+                logger.Warning("Sale of {Amount} {Item} cut to {Kept}, the party no longer had the rest",
+                    amount, element.Item?.StringId, kept);
+            }
+
+            int unpaid = GetProratedPrice(price, amount - kept, amount);
+            totalAmount += unpaid;
+            if (kept <= 0) continue;
+
+            var keptSale = sold;
+            keptSale.Amount = kept;
+            keptSales.Add((keptSale, price - unpaid));
+        }
+
+        return totalAmount;
+    }
+
+    // `price` scaled to `quantity` out of `amount`, shared by the gold and the exchange event so both agree
+    private static int GetProratedPrice(int price, int quantity, int amount)
+    {
+        if (quantity <= 0 || amount <= 0) return 0;
+
+        return (int)((long)price * quantity / amount);
     }
 
     /// <summary>

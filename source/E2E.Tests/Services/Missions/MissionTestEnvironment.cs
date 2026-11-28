@@ -14,6 +14,7 @@ using GameInterface.Services.Players.Data;
 using HarmonyLib;
 using Missions.Battles;
 using Missions.Messages;
+using Moq;
 using SandBox.GauntletUI.Map;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
@@ -23,6 +24,7 @@ using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
+using TaleWorlds.MountAndBlade;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Missions;
@@ -50,6 +52,15 @@ public class MissionTestEnvironment : E2ETestEnvironment
             // The real map-event visual needs a live render context; the mocked visual NREs in Initialize.
             AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize)),
         };
+    }
+
+    protected static void PollReadingEachActionTypeOnce(MirrorAgent mirror, Action poll)
+    {
+        mirror.Action0TypeReads = 0;
+        mirror.Action1TypeReads = 0;
+        poll();
+        Assert.Equal(1, mirror.Action0TypeReads);
+        Assert.Equal(1, mirror.Action1TypeReads);
     }
 
     /// <summary>
@@ -99,6 +110,19 @@ public class MissionTestEnvironment : E2ETestEnvironment
         mesh.Start();
         mesh.ConnectToInstance(instanceId);
         return mission;
+    }
+
+    /// <summary>Attaches the real battle end logic with a headless troop spawner.</summary>
+    protected static BattleEndLogic AttachBattleEndLogic(MockMission mission, CoopBattleController controller)
+    {
+        var endLogic = new BattleEndLogic
+        {
+            Mission = mission.Shell,
+            _missionAgentSpawnLogic = Mock.Of<IMissionAgentSpawnLogic>(),
+        };
+        mission.Shell.MissionBehaviors.Add(endLogic);
+        controller.Mission = mission.Shell;
+        return endLogic;
     }
 
     /// <summary>Decodes a received battle-agent batch from its actual wire payload.</summary>

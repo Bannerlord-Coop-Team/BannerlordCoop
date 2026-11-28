@@ -101,6 +101,7 @@ public class RapidGuardTransitionSyncTests : MissionTestEnvironment
             puppetMirror.SetActionChannelCalls = 0;
             var release = new AgentActionData(
                 owner,
+                new AgentActionData.ActionChannels(owner),
                 Agent.MovementControlFlag.None,
                 Agent.GuardMode.None);
 
@@ -222,7 +223,9 @@ public class RapidGuardTransitionSyncTests : MissionTestEnvironment
             mirror.MovementFlags =
                 Agent.MovementControlFlag.DefendBlock
                 | Agent.MovementControlFlag.DefendRight;
-            context.Component.AgentActionHandler.PollActions();
+            PollReadingEachActionTypeOnce(
+                mirror,
+                context.Component.AgentActionHandler.PollActions);
 
             AgentActionPacket requestedRightPacket = Assert.Single(
                 context.Network.NetworkSentPackets
@@ -236,8 +239,9 @@ public class RapidGuardTransitionSyncTests : MissionTestEnvironment
             mirror.MovementFlags =
                 Agent.MovementControlFlag.DefendBlock
                 | Agent.MovementControlFlag.DefendUp;
-            context.Component.AgentActionHandler
-                .PollActionsAfterNativeTick();
+            PollReadingEachActionTypeOnce(
+                mirror,
+                () => context.Component.AgentActionHandler.PollActionsAfterNativeTick());
 
             Assert.Empty(
                 context.Network.NetworkSentPackets
@@ -247,8 +251,9 @@ public class RapidGuardTransitionSyncTests : MissionTestEnvironment
             mirror.Action1Index = 3070;
             mirror.Action1CodeType = Agent.ActionCodeType.DefendRight1h;
             mirror.Action1Direction = Agent.UsageDirection.DefendRight;
-            context.Component.AgentActionHandler
-                .PollActionsAfterNativeTick();
+            PollReadingEachActionTypeOnce(
+                mirror,
+                () => context.Component.AgentActionHandler.PollActionsAfterNativeTick());
 
             AgentActionPacket realizedRightPacket = Assert.Single(
                 context.Network.NetworkSentPackets

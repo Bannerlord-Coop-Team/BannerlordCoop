@@ -45,7 +45,9 @@ internal class PortScreenHandlerPatches
             __instance.ShipsToRename,
             __instance.SelectedShipPieces,
             __instance.SelectedFigureheads,
-            __instance.ShipsToSend);
+            __instance.ShipsToSend,
+            __instance.ShipsToStash,
+            __instance.ShipsToRetrieveFromStash);
         MessageBroker.Instance.Publish(__instance, message);
 
         return false;

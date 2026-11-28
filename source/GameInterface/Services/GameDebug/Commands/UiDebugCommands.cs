@@ -3,6 +3,7 @@ using Common;
 using Common.Logging;
 using Common.Util;
 using GameInterface.Services.Settlements.Interfaces;
+using GameInterface.Services.UI;
 using GameInterface.Utils.Commands;
 using SandBox.GauntletUI.Map;
 using SandBox.View.Map;
@@ -18,6 +19,8 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
 using TaleWorlds.Library;
+using TaleWorlds.MountAndBlade.View;
+using TaleWorlds.ScreenSystem;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.GameDebug.Commands;
@@ -335,6 +338,25 @@ internal class UiDebugCommands
                 $"settlement={mainParty.CurrentSettlement?.StringId ?? "none"}|" +
                 $"encounter={PlayerEncounter.EncounterSettlement?.StringId ?? "none"}|" +
                 $"time={Campaign.Current.TimeControlMode}");
+        }
+    }
+
+    public sealed class UiOpenJoinScreenCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.ui";
+
+        public string Name => "open_join_screen";
+
+        public string Description => "Opens the Join Co-op screen, which DEBUG builds skip by connecting directly.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            ScreenManager.PushScreen(ViewCreatorManager.CreateScreenView<CoopConnectionUI>());
+            return Succeeded("Opened the Join Co-op screen.");
         }
     }
 #endif

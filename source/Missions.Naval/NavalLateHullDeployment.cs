@@ -12,7 +12,8 @@ namespace Missions.Naval;
 /// </summary>
 public interface INavalLateHullDeployment
 {
-    /// <summary>Runs vanilla's deployment pass on a hull spawned after deployment, and queues its formation and the targets.</summary>
+    /// <summary>Runs vanilla's late-spawn deployment pass, machines included, on a hull spawned after deployment, and queues its
+    /// formation and the targets.</summary>
     void Deploy(MissionShip hull);
 
     /// <summary>[Mission tick] Refreshes the ballista targets of <paramref name="ships"/> and the queued formations' tactics.</summary>
@@ -35,11 +36,12 @@ public class NavalLateHullDeployment : INavalLateHullDeployment
     /// <summary>How many formations wait for the next check (diagnostics, tests).</summary>
     internal int Noted => joined.Count;
 
-    // Runs once per hull: vanilla's removed-hull pool is emptied at deployment end, so no late hull has had the pass, the
-    // non-repeatable rope machine setup included.
+    // MissionShip.OnDeploymentFinished skips the machines, so ClimbingMachine never adds its gravity-reset component to a late
+    // hull's nets and climbers get stuck; vanilla's late spawns (PirateBattleMissionController) pass initializeMachines too.
+    // No hull gets the component twice: NavalShipsLogic._removedShipsPool, the only hull reuse, is cleared when deployment ends.
     public void Deploy(MissionShip hull)
     {
-        hull.OnDeploymentFinished();
+        hull.FinalizeDeployment(initializeMachines: true);
         targetsStale = true;
         Note(hull.Formation);
     }

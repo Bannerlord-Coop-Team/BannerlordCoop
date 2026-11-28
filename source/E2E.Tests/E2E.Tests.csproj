@@ -112,6 +112,9 @@
     <Reference Include="TaleWorlds.SaveSystem">
       <HintPath>$(BannerlordDir)bin\Win64_Shipping_Client\TaleWorlds.SaveSystem.dll</HintPath>
     </Reference>
+    <Reference Include="TaleWorlds.ScreenSystem">
+      <HintPath>$(BannerlordDir)bin\Win64_Shipping_Client\TaleWorlds.ScreenSystem.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
 	<AssemblyAttribute Include="Xunit.CollectionBehaviorAttribute">
@@ -120,7 +123,9 @@
 	</AssemblyAttribute>
   </ItemGroup>
 <ItemGroup>
+	<Publicize Include="Coop.Naval" />
 	<Publicize Include="SandBox" />
+	<Publicize Include="SandBox.View:SandBox.View.Map.MapScreen.HandleClickTimeChange" />
 	<Publicize Include="TaleWorlds.CampaignSystem" />
 	<Publicize Include="TaleWorlds.CampaignSystem.ViewModelCollection" />
 	<Publicize Include="TaleWorlds.Core" />

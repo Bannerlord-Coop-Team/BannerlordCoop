@@ -2,11 +2,14 @@
 using Common.Commands;
 using Common.Messaging;
 using Common.Util;
+using Coop.Naval.CoopSession.Interfaces;
+using Coop.Naval.Models;
 using Coop.Naval.PortScreen;
 using GameInterface;
 using GameInterface.AutoSync;
 using GameInterface.Registry.Auto;
 using GameInterface.Services;
+using GameInterface.Services.NavalDLC;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -48,6 +51,8 @@ public class CoopNavalModule : Module
         }
 
         builder.RegisterType<PortTransactionPricer>().As<IPortTransactionPricer>().InstancePerDependency();
+        builder.RegisterType<MainHeroFigureheadsScope>().As<IMainHeroFigureheadsScope>().InstancePerDependency();
+        builder.RegisterType<LeftoverShipDistributor>().As<ILeftoverShipDistributor>().InstancePerDependency();
 
         // AutoSyncModule only scans GameInterface, and these must activate before AutoSyncPatcher builds
         foreach (var type in GetConcreteTypes<IAutoSync>())

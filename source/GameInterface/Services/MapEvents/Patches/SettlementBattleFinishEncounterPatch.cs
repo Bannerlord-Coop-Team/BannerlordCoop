@@ -1,0 +1,52 @@
+﻿using Common;
+using HarmonyLib;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
+
+namespace GameInterface.Services.MapEvents.Patches;
+
+/// <summary>
+/// A fought sally out or village force action ends with PlayerEncounter.Finish leaving the settlement, but a client's
+/// leave is dropped, so the party stays inside with no encounter. Ask for the settlement encounter again, like vanilla's
+/// MenuHelper.EncounterLeaveConsequence and ForceSupplies/ForceVolunteersEventComponent.TryHandlePlayerEncounterEnd do.
+/// </summary>
+[HarmonyPatch(typeof(PlayerEncounter), nameof(PlayerEncounter.Finish))]
+internal class SettlementBattleFinishEncounterPatch
+{
+    [HarmonyPrefix]
+    private static void Prefix(bool forcePlayerOutFromSettlement, out Settlement __state)
+    {
+        __state = null;
+        if (ModInformation.IsServer || !forcePlayerOutFromSettlement) return;
+
+        var mapEvent = PlayerEncounter.Current?._mapEvent;
+        // v1.5 reads the battle type from the component, which a client's map event can lack
+        if (mapEvent?.Component == null) return;
+
+        // Finish only calls LeaveSettlement for a party that isn't attached to an army
+        var mainParty = MobileParty.MainParty;
+        if (mainParty.AttachedTo != null) return;
+
+        bool isSallyOut = mapEvent.IsSallyOut || mapEvent.IsBlockadeSallyOut;
+        // Like vanilla's DoEnd, only a decided force action sends its leader back into the village (#2619), a Leave
+        // before the fight asks for the village again itself
+        bool ledForceAction = mapEvent.IsForceHostileAction() && mapEvent.HasWinner &&
+            mapEvent.AttackerSide?.LeaderParty == mainParty.Party;
+        if (!isSallyOut && !ledForceAction) return;
+
+        __state = mapEvent.MapEventSettlement;
+    }
+
+    [HarmonyPostfix]
+    private static void Postfix(Settlement __state)
+    {
+        if (__state == null) return;
+        if (PlayerEncounter.Current != null) return;
+        if (PlayerCaptivity.IsCaptive) return;
+        if (MobileParty.MainParty?.CurrentSettlement != __state) return;
+
+        EncounterManager.StartSettlementEncounter(MobileParty.MainParty, __state);
+    }
+}

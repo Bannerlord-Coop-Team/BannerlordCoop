@@ -11,6 +11,9 @@
   // password, ports, autosaves) live in the dedicated server's own
   // DedicatedServer\server-config.json instead. Comments and trailing commas
   // are allowed here.
+  // The server adds settings from new mod versions to this file when it loads,
+  // so a deleted setting comes back with its default value. Comment a setting
+  // out with // instead to keep it out of the file.
 
   // Campaign difficulty, applied by the HOSTING side at every boot; joining
   // players inherit the values with the save transfer. These values mirror a
@@ -103,6 +106,12 @@
     // Players can't resume those pauses themselves. The pauses for catching up and auto pause end on their own,
     // but after the pause for nobody online the host has to start the game again.
     "allowClientTimeControls": true,
+
+    // Toggle clicking the map to travel also changing the game speed, like in singleplayer
+    // (Default) true: Clicking the map while paused resumes the game, and a double click fast forwards.
+    // false: Map clicks never change the speed. Only the time controls and their hotkeys do.
+    // Only applies when allowClientTimeControls is true.
+    "mapClickChangesTime": true,
 
     // Toggle clients being able to use cheats
     // Vanilla bannerlord commands are always disabled on clients but this disables cheating in troops, equipment, teleporting etc.
@@ -267,6 +276,17 @@
     // Any other unanswered meeting just ends, so the timer never starts a war. A player who caught someone and does nothing for this long lets them go.
     // Values from 1 to 9 count as 10. The time starts again after every answer. Trades are never timed.
     "pvpResponseTimerSeconds": 0,
+
+    // Set the most clans one kingdom may have, so one kingdom can't take every clan on a big server.
+    // (Default) 0: No limit.
+    // Above 0: The ruling clan counts too. A full kingdom can't take a player as a vassal, and its ruler can't recruit another lord or make a companion a lord.
+    // The player who asked is told why. Clans already in a kingdom always stay, and new kingdoms and rebellions work as before.
+    "maxClansPerKingdom": 0,
+
+    // Count mercenary clans toward maxClansPerKingdom.
+    // (Default) false: Mercenaries don't count, so a full kingdom can still hire them and a player can still sign on as one.
+    // true: Mercenaries count, and a full kingdom can't take on another mercenary either.
+    "maxClansPerKingdomCountsMercenaries": false,
 
     // Toggle War Sails (NavalDLC) co-op on a dedicated server. War Sails is not officially supported yet.
     // Only the dedicated server reads this. Hosting in game and joining follow the launcher's NavalDLC setting.

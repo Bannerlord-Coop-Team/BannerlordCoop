@@ -1,4 +1,5 @@
 ﻿using GameInterface.Services.Heroes.Patches;
+using GameInterface.Services.NavalDLC;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -17,6 +18,14 @@ public interface IIncidentsInterface : IGameAbstraction
 
 public class IncidentsInterface : IIncidentsInterface
 {
+    private readonly IMainHeroFigureheadsScope figureheadsScope;
+
+    // Only registered while War Sails is on
+    public IncidentsInterface(IMainHeroFigureheadsScope figureheadsScope = null)
+    {
+        this.figureheadsScope = figureheadsScope;
+    }
+
     public bool TryPrepareIncidentText(Incident incident, long activeIncidentSeed)
     {
         if (Campaign.Current?.GetCampaignBehavior<IncidentsCampaignBehaviour>() == null) return false;
@@ -37,6 +46,8 @@ public class IncidentsInterface : IIncidentsInterface
         Campaign.Current.IncidentManager._activeIncidentSeed = activeIncidentSeed;
 
         using (new MainHeroSubstitutionScope(mainHero, mainParty))
+        // Naval incident effects check the main hero's unlocked figureheads, which on the server aren't this player's
+        using (figureheadsScope?.Enter(mainHero))
         {
             // The player's state can change between the incident being sent and an option being picked
             if (selectedOption.Condition != null && !selectedOption.Condition(selectedOption.Text)) return false;

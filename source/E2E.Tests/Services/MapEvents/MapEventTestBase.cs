@@ -31,6 +31,8 @@ using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
@@ -75,6 +77,18 @@ public abstract class MapEventTestBase : IDisposable
         AccessTools.Method(typeof(Campaign), nameof(Campaign.Tick)),
     }).ToList();
 
+    /// <summary>The map event methods plus the battle-result steps that need a live campaign world, so a decided battle can finalize.</summary>
+    protected IReadOnlyList<MethodBase> BattleResultDisabledMethods => MapEventDisabledMethods
+        .Append(AccessTools.Method(typeof(DefaultBattleRewardModel), nameof(DefaultBattleRewardModel.GetCaptureMemberChancesForWinnerParties)))
+        .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyCasualties"))
+        .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyItems"))
+        .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyPrisoners"))
+        .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyShips"))
+        .Append(AccessTools.Method(typeof(MapEvent), "CalculateMapEventResults"))
+        .Append(AccessTools.Method(typeof(MapEvent), "CommitCalculatedMapEventResults"))
+        .Append(AccessTools.Method(typeof(MapEvent), "MovePartyToSuitablePositionOnMapEventFinalize"))
+        .ToList();
+
     protected IReadOnlyList<MethodBase> WithoutNetworkDelivery() => MapEventDisabledMethods
         .Append(AccessTools.Method(typeof(TestNetworkRouter), nameof(TestNetworkRouter.SendReliablePayload),
             new[] { typeof(NetPeer), typeof(NetPeer), typeof(byte[]) }))
@@ -85,8 +99,9 @@ public abstract class MapEventTestBase : IDisposable
     /// <summary>
     /// Creates and registers a <see cref="MapEvent"/> on the server with two <see cref="MobileParty"/>
     /// participants, returning the IDs of the map event, attacker party, and defender party.
+    /// <paramref name="attackerId"/> makes an existing registered party the attacker instead of a new one.
     /// </summary>
-    protected MapEventContext CreateServerMapEvent(bool commit = true)
+    protected MapEventContext CreateServerMapEvent(bool commit = true, string? attackerId = null)
     {
         string? mapEventId = null;
         string? attackerPartyId = null;
@@ -95,7 +110,9 @@ public abstract class MapEventTestBase : IDisposable
         Server.Call(() =>
         {
             var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
-            var attackerParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var attackerParty = attackerId == null
+                ? GameObjectCreator.CreateInitializedObject<MobileParty>()
+                : Server.GetRegisteredObject<MobileParty>(attackerId);
             var defenderParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
 
             // The visual must exist before Initialize is called; skip its constructor so
@@ -171,6 +188,29 @@ public abstract class MapEventTestBase : IDisposable
     /// </summary>
     protected static GauntletMapEventVisual MockMapEventVisual()
         => ObjectHelper.SkipConstructor<GauntletMapEventVisual>();
+
+    // Stub camp joins and side initialization so fixtures can create sieges without town positions or a siege model.
+    protected static IReadOnlyList<MethodBase> SiegeCreationDisabledMethods => new[]
+    {
+        AccessTools.Method(typeof(MobileParty), nameof(MobileParty.OnPartyJoinedSiegeInternal)),
+        AccessTools.Method(typeof(BesiegerCamp), nameof(BesiegerCamp.InitializeSiegeEventSide)),
+        AccessTools.Method(typeof(Settlement), nameof(Settlement.InitializeSiegeEventSide)),
+    };
+
+    /// <summary>
+    /// Creates a registered siege graph. Callers must disable <see cref="SiegeCreationDisabledMethods"/>.
+    /// </summary>
+    protected static void CreateReplicableSiegeEvent(Settlement settlement, MobileParty besieger)
+    {
+        var siegeEvent = new SiegeEvent(settlement, besieger);
+        siegeEvent.BesiegerCamp.SiegeEngines = new SiegeEvent.SiegeEnginesContainer(
+            BattleSideEnum.Attacker, null);
+        settlement.SiegeEngines = new SiegeEvent.SiegeEnginesContainer(
+            BattleSideEnum.Defender, null);
+        siegeEvent.BesiegerCamp._besiegerParties.Add(besieger);
+        siegeEvent.BesiegerCamp._leaderParty = besieger;
+        siegeEvent.BesiegerCamp._faction = besieger.MapFaction;
+    }
 
     // The harness campaign has no encounter model, which distance checks and party searches read.
     protected static void EnsureEncounterModel()
@@ -343,14 +383,28 @@ public abstract class MapEventTestBase : IDisposable
         return (heroId, partyId);
     }
 
-    /// <summary>Requests a simulation of the context's battle for the client's attacker party and asserts the server accepts it.</summary>
-    protected void StartAcceptedSimulation(EnvironmentInstance client, MapEventContext context)
+    /// <summary>
+    /// Requests a simulation of the context's battle for the client's party (the attacker unless <paramref name="partyId"/>
+    /// is given) and asserts the server accepts it.
+    /// </summary>
+    protected void StartAcceptedSimulation(EnvironmentInstance client, MapEventContext context, string? partyId = null)
     {
         var requestId = System.Guid.NewGuid().ToString();
         Server.Resolve<IMessageBroker>().Publish(client.NetPeer, new NetworkBattleStartRequest(
-            requestId, (int)BattleStartMode.Simulation, context.MapEventId, context.AttackerPartyId));
+            requestId, (int)BattleStartMode.Simulation, context.MapEventId, partyId ?? context.AttackerPartyId));
         Assert.True(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleStartReply>(),
             reply => reply.RequestId == requestId).Accepted);
+    }
+
+    /// <summary>
+    /// Points the static <see cref="BattleStartCoordinator.Instance"/> the consequence patches read at
+    /// <paramref name="client"/>'s coordinator, because E2E clients share process statics.
+    /// </summary>
+    private protected static BattleStartCoordinator UseBattleStartCoordinatorOf(EnvironmentInstance client)
+    {
+        var coordinator = client.Resolve<BattleStartCoordinator>();
+        AccessTools.Property(typeof(BattleStartCoordinator), nameof(BattleStartCoordinator.Instance)).SetValue(null, coordinator);
+        return coordinator;
     }
 
     /// <summary>

@@ -130,7 +130,7 @@ internal class BattleSimulationFinishedPatch
     {
         if (ModInformation.IsServer) return;
 
-        // The scoreboard has restored the encounter menu, so the retained defeat can now continue through it.
+        // The scoreboard has closed, so the retained defeat can now end the encounter.
         if (ContainerProvider.TryResolve<IMapEventInitializationBarrier>(out var barrier))
             barrier.CompleteDeferredEncounterCleanup();
     }

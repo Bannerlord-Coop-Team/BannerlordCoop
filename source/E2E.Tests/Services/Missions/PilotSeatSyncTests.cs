@@ -496,6 +496,47 @@ public partial class ActionEquipmentSyncTests
     }
 
     [Fact]
+    public void PilotSeat_LocalHandoffClearsReplicationAndPreservesTheLocalUser()
+    {
+        RunScenario(context =>
+        {
+            using var seats = new PilotSeatFixture(context);
+            var agent = seats.Spawn("owner", out var id);
+            context.Receive(seats.Packet(agent, id, 1));
+            Assert.True(context.Registry.TryGetAgentInfo(id, out var info));
+            Assert.Same(seats.Point, info.ReplicatedPilotPoint);
+
+            Assert.True(context.Registry.TryTransferAuthority("peer", id, 1));
+            Assert.Null(info.ReplicatedPilotPoint);
+            context.Receive(seats.Packet(agent, id, 2, usingSeat: false));
+            Assert.Same(seats.Point, agent.CurrentlyUsedGameObject);
+            Assert.Same(agent, seats.Point.UserAgent);
+        });
+    }
+
+    [Fact]
+    public void PilotSeat_RemovalClearsDeferredUseBeforeTheAgentRegistersAgain()
+    {
+        RunScenario(context =>
+        {
+            using var seats = new PilotSeatFixture(context);
+            var agent = seats.Spawn("owner", out var id);
+            var contender = seats.Spawn("peer", out _);
+            contender.UseGameObject(seats.Point);
+            context.Receive(seats.Packet(agent, id, 5));
+
+            Assert.True(context.Registry.RemoveAgent(id));
+            seats.Register(agent, id, "owner");
+            contender.StopUsingGameObject();
+            context.Component.AgentActionHandler.ApplyRemoteGuardStates();
+            Assert.Null(seats.Point.UserAgent);
+
+            context.Receive(seats.Packet(agent, id, 1));
+            Assert.Same(agent, seats.Point.UserAgent);
+        });
+    }
+
+    [Fact]
     public void PilotSeat_MangonelLoadPointAndUntrackedUseRemainUntouched()
     {
         RunScenario(context =>

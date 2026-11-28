@@ -25,6 +25,7 @@ using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.SiegeEvents;
 using GameInterface.Services.SiegeEvents.Interfaces;
+using GameInterface.Services.SiegeEvents.Messages;
 using HarmonyLib;
 using Helpers;
 using System.Reflection;
@@ -38,6 +39,7 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
+using TaleWorlds.Localization;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -49,13 +51,8 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
     {
     }
 
-    private static List<MethodBase> SiegeCreationDisabledMethods => new()
-    {
-        AccessTools.Method(typeof(MobileParty), nameof(MobileParty.OnPartyJoinedSiegeInternal)),
-        AccessTools.Method(typeof(BesiegerCamp), nameof(BesiegerCamp.InitializeSiegeEventSide)),
-        AccessTools.Method(typeof(Settlement), nameof(Settlement.InitializeSiegeEventSide)),
-        AccessTools.Method(typeof(CultureObject), nameof(CultureObject.HasFeat)),
-    };
+    private static IEnumerable<MethodBase> SiegeLeaveDisabledMethods => SiegeCreationDisabledMethods
+        .Append(AccessTools.Method(typeof(CultureObject), nameof(CultureObject.HasFeat)));
 
     [Theory]
     [InlineData(false)]
@@ -68,7 +65,7 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
         RegisterAsPlayerParty("PlayerOne", heroId, partyId);
         TestEnvironment.ConnectRegisteredPlayer(client, "PlayerOne");
         SetMainParty(client, partyId);
-        var disabledMethods = MapEventDisabledMethods.Concat(SiegeCreationDisabledMethods)
+        var disabledMethods = MapEventDisabledMethods.Concat(SiegeLeaveDisabledMethods)
             .Append(AccessTools.Method(typeof(PartyBaseHelper), nameof(PartyBaseHelper.HasFeat)))
             .ToList();
         var siegeId = TestEnvironment.CreateRegisteredObject<SiegeEvent>(disabledMethods);
@@ -193,7 +190,7 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
         {
             leavingClient.Resolve<INetwork>().SendAll(new NetworkRequestBreakSiege(partyId, finishLocalMenus: true));
         }, MapEventDisabledMethods
-            .Concat(SiegeCreationDisabledMethods)
+            .Concat(SiegeLeaveDisabledMethods)
             .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast)))
             .ToList());
 
@@ -459,13 +456,7 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
             Assert.True(client.ObjectManager.TryGetObject<SiegeEvent>(siegeEventId, out var siegeEvent));
 
-            mapEvent.SetBattleType(MapEvent.BattleTypes.Siege);
-            var settlement = siegeEvent.BesiegedSettlement;
-            settlement.SiegeEvent = siegeEvent;
-            settlement.Party._mapEventSide = mapEvent.DefenderSide;
-            mapEvent.DefenderSide.LeaderParty = settlement.Party;
-            mapEvent.SetMapEventSettlement(settlement);
-            party._currentSettlement = settlement;
+            StageSettlementSiege(mapEvent, siegeEvent, party);
 
             var encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
             encounter._mapEvent = mapEvent;
@@ -556,6 +547,109 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
         }, MapEventDisabledMethods);
     }
 
+    [Fact]
+    public void OrderAttackFallback_PreservesVisibilityLeaveTypeAndText()
+    {
+        var battle = CreateServerMapEvent();
+        var allyId = JoinNewServerPartyToSide(battle.MapEventId, BattleSideEnum.Attacker);
+        var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        var client = Clients.First();
+        SetMainParty(client, battle.AttackerPartyId);
+        var disabledMethods = MapEventDisabledMethods
+            .Append(AccessTools.Method(typeof(MobilePartyHelper), nameof(MobilePartyHelper.CanPartyAttackWithCurrentMorale)))
+            .ToList();
+
+        client.Call(() =>
+        {
+            var mapEvent = client.GetRegisteredObject<MapEvent>(battle.MapEventId);
+            var attacker = client.GetRegisteredObject<MobileParty>(battle.AttackerPartyId);
+            var defender = client.GetRegisteredObject<MobileParty>(battle.DefenderPartyId);
+            var ally = client.GetRegisteredObject<MobileParty>(allyId);
+            var encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
+            encounter._mapEvent = mapEvent;
+            encounter._encounteredParty = defender.Party;
+            encounter.PlayerSide = BattleSideEnum.Attacker;
+            encounter.OpponentSide = BattleSideEnum.Defender;
+            Campaign.Current.PlayerEncounter = encounter;
+
+            var attackerSide = mapEvent.AttackerSide;
+            var defenderSide = mapEvent.DefenderSide;
+            var troop = client.GetRegisteredObject<CharacterObject>(troopId);
+            const string unchanged = "unset order attack text";
+            const string sendTroops = "Send troops.";
+            const string leaveToOthers = "Leave it to the others.";
+            const string originalTooltip = "unset order attack tooltip";
+            const string lowMoraleTooltip = "Your men lack the courage to continue the battle without you. (Low Morale)";
+            var sendType = GameMenuOption.LeaveType.OrderTroopsToAttack;
+            var untouchedType = new MenuCallbackArgs((MenuContext)null, null).optionLeaveType;
+
+            (string Name, bool Attached, bool DefenderRaft, bool DefenderHasTroops, bool HasLeader, bool PlayerOnly, bool Naval, bool AttackerRaft,
+                bool CanOrder, bool Shown, GameMenuOption.LeaveType LeaveType, string Text)[] rows =
+            {
+                (Name: "attached", Attached: true, DefenderRaft: false, DefenderHasTroops: true, HasLeader: true, PlayerOnly: false, Naval: false, AttackerRaft: false,
+                    CanOrder: true, Shown: true, LeaveType: sendType, Text: sendTroops),
+                ("unattached", false, false, true, true, false, false, false, false, false, untouchedType, unchanged),
+                ("opponent in raft", true, true, true, true, false, false, false, false, false, sendType, unchanged),
+                ("opponent in raft with no troops", true, true, false, true, false, false, false, false, false, sendType, unchanged),
+                ("no opposing troops", true, false, false, true, false, false, false, false, true, sendType, sendTroops),
+                ("no opposing leader", true, false, true, false, false, false, false, false, true, sendType, sendTroops),
+                ("no orderable troops", true, false, true, true, true, false, false, false, false, sendType, unchanged),
+                ("player alone with no opposing troops", true, false, false, true, true, false, false, false, false, sendType, unchanged),
+                ("naval", true, false, true, true, false, true, false, true, true, GameMenuOption.LeaveType.OrderShipsToAttack, "Send ships."),
+                ("player in raft with an ally able to fight", true, false, true, true, false, false, true, true, true, sendType, leaveToOthers),
+            };
+
+            using var allowed = new AllowedThread();
+            var orderAttackRule = client.Resolve<IOrderAttackRule>();
+            var defenderFaction = defender.MapFaction;
+            var originalProtection = defenderFaction.NotAttackableByPlayerUntilTime;
+            foreach (var row in rows)
+            {
+                mapEvent.Position = new CampaignVec2(default, isOnLand: !row.Naval);
+                attacker.Party._mapEventSide = row.Attached ? attackerSide : null;
+                // During the join window vanilla hasn't set the party's side or added it to the event.
+                var attackerEntry = Assert.Single(attackerSide.Parties, entry => entry.Party == attacker.Party);
+                if (!row.Attached)
+                    attackerSide._battleParties.Remove(attackerEntry);
+                defender.IsInRaftState = row.DefenderRaft;
+                attacker.IsInRaftState = row.AttackerRaft;
+                defenderSide.LeaderParty = row.HasLeader ? defender.Party : null;
+                attacker.MemberRoster.Clear();
+                defender.MemberRoster.Clear();
+                ally.MemberRoster.Clear();
+                attacker.MemberRoster.AddToCounts(row.PlayerOnly ? CharacterObject.PlayerCharacter : troop, 1);
+                if (row.DefenderHasTroops)
+                    defender.MemberRoster.AddToCounts(troop, 1);
+                if (row.AttackerRaft)
+                    ally.MemberRoster.AddToCounts(troop, 1);
+
+                var tooltip = new TextObject(originalTooltip);
+                // A protected opponent makes the honor check write both fields, even with no orderable troops.
+                if (row.PlayerOnly)
+                {
+                    defenderFaction.NotAttackableByPlayerUntilTime = CampaignTime.DaysFromNow(1f);
+                    var honorArgs = new MenuCallbackArgs((MenuContext)null, null) { IsEnabled = true, Tooltip = tooltip };
+                    MenuHelper.CheckEnemyAttackableHonorably(honorArgs);
+                    Assert.False(honorArgs.IsEnabled);
+                    Assert.NotSame(tooltip, honorArgs.Tooltip);
+                }
+
+                MBTextManager.SetTextVariable("SEND_TROOPS_TEXT", unchanged);
+                var (shown, args) = InvokeSiegeOrderAttackFallback(tooltip);
+                defenderFaction.NotAttackableByPlayerUntilTime = originalProtection;
+                var text = new TextObject("{=!}{SEND_TROOPS_TEXT}").ToString();
+
+                Assert.Equal(
+                    (row.Name, row.CanOrder, row.Shown, row.LeaveType, row.Text,
+                        Enabled: !row.Shown, Tooltip: row.Shown ? lowMoraleTooltip : originalTooltip),
+                    (row.Name, orderAttackRule.CanOrderAttack(mapEvent, attacker, CharacterObject.PlayerCharacter),
+                        shown, args.optionLeaveType, text, args.IsEnabled, args.Tooltip?.ToString()));
+                if (!row.Attached)
+                    attackerSide._battleParties.Add(attackerEntry);
+            }
+        }, disabledMethods);
+    }
+
     private static (bool shown, MenuCallbackArgs args) InvokePatchedEncounterAttackCondition()
     {
         var method = AccessTools.Method(
@@ -579,6 +673,16 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
         var args = new MenuCallbackArgs((MenuContext)null, null);
         var behavior = ObjectHelper.SkipConstructor<EncounterGameMenuBehavior>();
         var shown = (bool)method.Invoke(behavior, new object[] { args });
+        return (shown, args);
+    }
+
+    private static (bool shown, MenuCallbackArgs args) InvokeSiegeOrderAttackFallback(TextObject tooltip)
+    {
+        var method = AccessTools.Method(typeof(BattleModeEncounterOptionsPatch), "TryApplyClientSiegeOrderAttackOptionState");
+        Assert.NotNull(method);
+
+        var args = new MenuCallbackArgs((MenuContext)null, null) { IsEnabled = true, Tooltip = tooltip };
+        var shown = (bool)method.Invoke(null, new object[] { args });
         return (shown, args);
     }
 
@@ -650,13 +754,7 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
             Assert.True(client.ObjectManager.TryGetObject<SiegeEvent>(siegeEventId, out var siegeEvent));
 
-            mapEvent.SetBattleType(MapEvent.BattleTypes.Siege);
-            var settlement = siegeEvent.BesiegedSettlement;
-            settlement.SiegeEvent = siegeEvent;
-            settlement.Party._mapEventSide = mapEvent.DefenderSide;
-            mapEvent.DefenderSide.LeaderParty = settlement.Party;
-            mapEvent.SetMapEventSettlement(settlement);
-            party._currentSettlement = settlement;
+            StageSettlementSiege(mapEvent, siegeEvent, party);
 
             var encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
             encounter._mapEvent = mapEvent;
@@ -707,12 +805,84 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
             PlayerEncounter.Current._mapEvent = mapEvent;
             var encounter = PlayerEncounter.Current;
 
-            new SiegeEventInterface().PromptSiegeAssault(party, settlement);
+            client.Resolve<ISiegeEventInterface>().PromptSiegeAssault(party, settlement);
 
             Assert.Same(encounter, PlayerEncounter.Current);
             Assert.Same(mapEvent, PlayerEncounter.Battle);
             Assert.Same(mapEvent.AttackerSide, party.Party.MapEventSide);
         });
+    }
+
+    // #4858: the defender's Leave only finished the encounter on the client, so the server kept the party in the
+    // defense and the battle waited on a player that had already left.
+    [Fact]
+    public void AssaultStartsWithPlayerInsideTown_DefenderMenuHasNoLeave()
+    {
+        var battle = CreateServerMapEvent();
+        var (_, partyId) = CreatePlayerHeroParty("PlayerOne");
+        var client = Clients.First();
+        TestEnvironment.ConnectRegisteredPlayer(client, "PlayerOne");
+        SetMainParty(client, partyId);
+        var disabledMethods = MapEventDisabledMethods.Concat(SiegeLeaveDisabledMethods)
+            .Append(AccessTools.Method(typeof(PartyBaseHelper), nameof(PartyBaseHelper.HasFeat)))
+            .ToList();
+        var siegeId = TestEnvironment.CreateRegisteredObject<SiegeEvent>(disabledMethods);
+        var playerClanId = TestEnvironment.CreateRegisteredObject<Clan>();
+        var enemyClanId = TestEnvironment.CreateRegisteredObject<Clan>();
+
+        foreach (var instance in Clients.Append(Server))
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
+                Assert.True(instance.ObjectManager.TryGetObject<SiegeEvent>(siegeId, out var siege));
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(battle.AttackerPartyId, out var attacker));
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(battle.DefenderPartyId, out var defender));
+                Assert.True(instance.ObjectManager.TryGetObject<Clan>(playerClanId, out var playerClan));
+                Assert.True(instance.ObjectManager.TryGetObject<Clan>(enemyClanId, out var enemyClan));
+
+                using (new AllowedThread())
+                {
+                    party.ActualClan = playerClan;
+                    defender.ActualClan = playerClan;
+                    attacker.ActualClan = enemyClan;
+                }
+
+                StageSettlementSiege(mapEvent, siege, party);
+            }, disabledMethods);
+        }
+
+        // Vanilla's Init needs a whole town and its menu models; PromptSiegeDefense still starts the encounter.
+        var withoutEncounterInit = disabledMethods
+            .Append(AccessTools.Method(typeof(PlayerEncounter), nameof(PlayerEncounter.Init),
+                new[] { typeof(PartyBase), typeof(PartyBase), typeof(Settlement) }))
+            .ToList();
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(battle.AttackerPartyId, out var attacker));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            using (new AllowedThread())
+                FactionManager.DeclareWar(attacker.MapFaction, party.MapFaction);
+            Assert.True(mapEvent.CanPartyJoinBattle(party.Party, BattleSideEnum.Defender));
+
+            Server.Resolve<IMessageBroker>().Publish(this, new SiegeAssaultStarted(attacker, mapEvent.MapEventSettlement));
+
+            Assert.Same(mapEvent.DefenderSide, party.Party.MapEventSide);
+            Assert.Same(mapEvent.MapEventSettlement, party.CurrentSettlement);
+        }, withoutEncounterInit);
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPromptSiegeDefense>());
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
+            Assert.Same(mapEvent.DefenderSide, PartyBase.MainParty.MapEventSide);
+            Assert.NotNull(PlayerEncounter.Current);
+
+            var behavior = ObjectHelper.SkipConstructor<EncounterGameMenuBehavior>();
+            Assert.False(behavior.game_menu_encounter_leave_on_condition(new MenuCallbackArgs((MenuContext)null, null)));
+        }, MapEventDisabledMethods);
     }
 
     [Fact]
@@ -859,7 +1029,7 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
 
     private string SetClientOnlyCamp(EnvironmentInstance client, string partyId)
     {
-        var disabledMethods = SiegeCreationDisabledMethods
+        var disabledMethods = SiegeLeaveDisabledMethods
             .Append(AccessTools.Method(typeof(PartyBaseHelper), nameof(PartyBaseHelper.HasFeat)))
             .ToList();
         var siegeEventId = TestEnvironment.CreateRegisteredObject<SiegeEvent>(disabledMethods);
@@ -879,6 +1049,17 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
         });
     }
 
+    private static void StageSettlementSiege(MapEvent mapEvent, SiegeEvent siege, MobileParty party)
+    {
+        mapEvent.SetBattleType(MapEvent.BattleTypes.Siege);
+        var settlement = siege.BesiegedSettlement;
+        settlement.SiegeEvent = siege;
+        settlement.Party._mapEventSide = mapEvent.DefenderSide;
+        mapEvent.DefenderSide.LeaderParty = settlement.Party;
+        mapEvent.SetMapEventSettlement(settlement);
+        party._currentSettlement = settlement;
+    }
+
     private static void SetMainParty(EnvironmentInstance instance, string partyId)
     {
         instance.Call(() =>
@@ -889,7 +1070,7 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
     }
 
     private List<MethodBase> LeaveSoldiersBehindDisabledMethods => MapEventDisabledMethods
-        .Concat(SiegeCreationDisabledMethods)
+        .Concat(SiegeLeaveDisabledMethods)
         .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu), new[] { typeof(string) }))
         .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu), new[] { typeof(string) }))
         .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast)))

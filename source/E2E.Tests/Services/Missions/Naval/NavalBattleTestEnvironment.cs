@@ -20,7 +20,9 @@ using Moq;
 using Newtonsoft.Json.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
@@ -41,6 +43,10 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment, IDisp
     protected const string PirateId = "pirates";
 
     protected const float TickSeconds = 0.05f;
+
+    // The full condition of a ship from GiveShip.
+    protected const float MaxHitPoints = 1000f;
+    protected const float MaxSailHitPoints = 500f;
 
     private readonly bool previousNavalEnabled = ModInformation.IsNavalEnabled;
 
@@ -105,20 +111,30 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment, IDisp
     }
 
     /// <summary>A battle at sea or on land of <paramref name="playerIds"/> on one side, elected in that order, every member on the mesh.</summary>
-    protected NavalBattle StartServerBattle(bool atSea, out Func<int> concluded, params string[] playerIds)
+    protected NavalBattle StartServerBattle(bool atSea, out Func<int> concluded, params string[] playerIds) =>
+        StartServerBattle(atSea, playerIds, Array.Empty<string>(), out concluded);
+
+    /// <summary>
+    /// A battle at sea or on land of <paramref name="playerIds"/> on one side, its members elected in that order. Players in
+    /// <paramref name="lateJoiners"/> are connected to the server but still at the encounter, off the mesh and the mission.
+    /// </summary>
+    protected NavalBattle StartServerBattle(bool atSea, string[] playerIds, string[] lateJoiners, out Func<int> concluded)
     {
-        var battle = StartNavalBattle(playerIds.Select(id => (id, BattleSideEnum.Attacker)).ToArray());
+        var battle = StartNavalBattle(playerIds.Select(id => (id, BattleSideEnum.Attacker)).ToArray(), lateJoiners: lateJoiners);
         Server.Call(() => Server.GetRegisteredObject<MapEvent>(battle.MapEventId).Position =
             new CampaignVec2(Vec2.Zero, isOnLand: !atSea));
 
-        foreach (var peer in battle.Peers)
+        foreach (var id in playerIds)
         {
-            var member = peer;
-            Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer(member.Id, member.Instance.NetPeer));
-            EnterBattle(member.Instance, battle.MapEventId);
-            Server.SimulateMessage(member.Instance.NetPeer, new NetworkMissionEntered(member.Id, battle.MapEventId));
+            var client = battle.Players[id].Instance;
+            Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer(id, client.NetPeer));
+            if (lateJoiners.Contains(id)) continue;
+
+            EnterBattle(client, battle.MapEventId);
+            Server.SimulateMessage(client.NetPeer, new NetworkMissionEntered(id, battle.MapEventId));
         }
-        AssertHost(Server, battle.MapEventId, playerIds[0], playerIds.Skip(1).ToArray());
+        var members = playerIds.Except(lateJoiners).ToArray();
+        AssertHost(Server, battle.MapEventId, members[0], members.Skip(1).ToArray());
 
         int conclusions = 0;
         Server.Resolve<IMessageBroker>().Subscribe<MapEventConcluded>(_ => conclusions++);
@@ -161,6 +177,39 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment, IDisp
         Server.Call(() => Server.SimulateMessage(this, new PlayerDisconnected(departed.Instance.NetPeer, default)),
             VictoryConclusionDisabledMethods());
         Server.PumpGameThread();
+    }
+
+    // A registered ship at full condition, given to the party through the vanilla production ownership path on the server.
+    protected string GiveShip(string mobilePartyId)
+    {
+        var shipId = CreateRegisteredObject<Ship>();
+        foreach (var instance in new[] { Server }.Concat(Clients))
+            instance.Call(() =>
+            {
+                var hull = instance.GetRegisteredObject<Ship>(shipId).ShipHull;
+                hull.MaxHitPoints = (int)MaxHitPoints;
+                hull.MaxSailHitPoints = (int)MaxSailHitPoints;
+            });
+        Server.Call(() =>
+        {
+            var ship = Server.GetRegisteredObject<Ship>(shipId);
+            ChangeShipOwnerAction.ApplyByProduction(Server.GetRegisteredObject<MobileParty>(mobilePartyId).Party, ship);
+            ship.HitPoints = MaxHitPoints;
+            ship.SailHitPoints = MaxSailHitPoints;
+        });
+        return shipId;
+    }
+
+    // The party the server registered for the player.
+    protected string PlayerPartyOf(string controllerId)
+    {
+        string partyId = null!;
+        Server.Call(() =>
+        {
+            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(controllerId, out var player));
+            partyId = player.MobilePartyId;
+        });
+        return partyId;
     }
 
     protected void AssertMapEventRemoved(string mapEventId) =>
