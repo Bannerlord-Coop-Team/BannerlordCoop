@@ -1,4 +1,6 @@
 ﻿using Common;
+using GameInterface.Services.AdvancedStart;
+using GameInterface.Services.AdvancedStart.Interfaces;
 using HarmonyLib;
 using SandBox.GauntletUI.CharacterCreation;
 using System.Collections.Generic;
@@ -25,7 +27,8 @@ internal class SkipCampaignOptionsPatch
 }
 
 /// <summary>
-/// Replaces "Next" text in the review stage to show client this is the last stage before joining
+/// Replaces "Next" text in the review stage to show client this is the last stage before joining,
+/// unless the server's starting options window comes next
 /// </summary>
 [HarmonyPatch(typeof(CharacterCreationReviewStageView), MethodType.Constructor,
     new[] { typeof(CharacterCreationManager), typeof(ControlCharacterCreationStage),
@@ -37,7 +40,7 @@ internal class SkipCampaignOptionsPatch
     typeof(ControlCharacterCreationStageWithInt) })]
 internal static class ReplaceCharacterReviewStageTextPatch
 {
-    private static readonly string ReplacementText = "Join Coop";
+    private const string NextText = CoopCampaignStartingOptionsVM.NextLabel;
 
     private static readonly MethodInfo GetAffirmativeButtonTextMethod = AccessTools.Method(typeof(ReplaceCharacterReviewStageTextPatch), nameof(GetAffirmativeButtonText));
 
@@ -46,7 +49,7 @@ internal static class ReplaceCharacterReviewStageTextPatch
     {
         foreach (var instruction in instructions)
         {
-            if (instruction.opcode == OpCodes.Ldstr && instruction.operand as string == "{=Rvr1bcu8}Next")
+            if (instruction.opcode == OpCodes.Ldstr && instruction.operand as string == NextText)
             {
                 yield return new CodeInstruction(OpCodes.Call, GetAffirmativeButtonTextMethod);
 
@@ -59,6 +62,12 @@ internal static class ReplaceCharacterReviewStageTextPatch
 
     private static string GetAffirmativeButtonText()
     {
-        return ModInformation.IsClient ? ReplacementText : "{=Rvr1bcu8}Next";
+        if (ModInformation.IsServer) return NextText;
+
+        if (ContainerProvider.TryResolve<IAdvancedStartInterface>(out var advancedStartInterface) &&
+            advancedStartInterface.WillShowStartOptions())
+            return NextText;
+
+        return CoopCampaignStartingOptionsVM.JoinLabel;
     }
 }

@@ -55,7 +55,7 @@ namespace Coop.Tests.Client.States
                 new AgingPlayerData(new()),
                 new NavalPlayerData(new(), new(), new(), new()),
                 new AttachmentIdMap(new(), new()),
-                new ServerOptions(new()));
+                new ServerOptions(new(), false));
 
         [Fact]
         public void StateEntered_Shows_LoadingProgressMessage()

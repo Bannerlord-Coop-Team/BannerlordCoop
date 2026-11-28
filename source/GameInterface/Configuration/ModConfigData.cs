@@ -39,6 +39,45 @@ public sealed class ModConfigData
 
     public VoiceConfigData Voice { get; set; } = new VoiceConfigData();
 
+    public AdvancedStartConfigData AdvancedStart { get; set; } = new AdvancedStartConfigData();
+
+    [JsonExtensionData]
+    public IDictionary<string, JToken> UnknownKeys { get; set; }
+}
+
+/// <summary>
+/// The "advancedStart" block: which vanilla advanced starting options a joining player
+/// is offered after character creation. Read by AdvancedStartInterface on the server.
+/// </summary>
+public sealed class AdvancedStartConfigData
+{
+    /// <summary>false: joining players never see the starting options window. Defaults to true.</summary>
+    public bool? Enabled { get; set; }
+
+    /// <summary>The start type selected when the window opens. Defaults to vanilla's "default".</summary>
+    public string DefaultStartType { get; set; }
+
+    public AdvancedStartTypesConfigData StartTypes { get; set; }
+
+    [JsonExtensionData]
+    public IDictionary<string, JToken> UnknownKeys { get; set; }
+}
+
+/// <summary>
+/// The "advancedStart.startTypes" block, one key per vanilla start type. false hides that start type
+/// from the window, except Default, which stays listed but locked; a missing key offers it.
+/// </summary>
+public sealed class AdvancedStartTypesConfigData
+{
+    /// <summary>false: the default start is only offered while no other start type can be picked.</summary>
+    public bool? Default { get; set; }
+    public bool? Outlaw { get; set; }
+    public bool? Beggar { get; set; }
+    public bool? Trader { get; set; }
+    public bool? Mercenary { get; set; }
+    public bool? Vassal { get; set; }
+    public bool? King { get; set; }
+
     [JsonExtensionData]
     public IDictionary<string, JToken> UnknownKeys { get; set; }
 }

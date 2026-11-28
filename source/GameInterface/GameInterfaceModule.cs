@@ -1,4 +1,5 @@
-﻿using GameInterface.Services.CharacterObjects;
+﻿using GameInterface.Services.AdvancedStart;
+using GameInterface.Services.CharacterObjects;
 using GameInterface.Services.Clans;
 using GameInterface.Services.Heroes.RomanceFlow;
 using GameInterface.Services.UI.CoopOptions.Providers.UITab;
@@ -200,6 +201,15 @@ public class GameInterfaceModule : Module
         builder.RegisterType<BugReportSubmissionConsent>().As<IBugReportSubmissionConsent>().InstancePerDependency();
         builder.RegisterType<UIOptionsTabProvider>().As<ICoopOptionsTabProvider>().InstancePerDependency();
         builder.RegisterType<NetworkOptionsTabProvider>().As<ICoopOptionsTabProvider>().InstancePerDependency();
+        foreach (var startType in VanillaAdvancedStartType.All)
+            builder.RegisterInstance(startType).As<IAdvancedStartType>();
+        builder.RegisterAssemblyTypes(typeof(GameInterfaceModule).Assembly)
+            .Where(type => type.IsClass &&
+                           !type.IsAbstract &&
+                           typeof(IAdvancedStartModifier).IsAssignableFrom(type) &&
+                           ShouldRegister(type))
+            .As<IAdvancedStartModifier>()
+            .InstancePerDependency();
         builder.RegisterType<LocalMovementBandwidth>().As<ILocalMovementBandwidth>().InstancePerDependency();
         // Only naval battle services use it. Also in the server container, which never opens a naval battle; the patch
         // itself refuses to install on a server.

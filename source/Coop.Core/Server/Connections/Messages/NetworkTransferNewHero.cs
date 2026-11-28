@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using GameInterface.Services.AdvancedStart.Data;
 using ProtoBuf;
 
 namespace Coop.Core.Server.Connections.Messages;
@@ -15,9 +16,13 @@ public readonly struct NetworkTransferNewHero : IEvent
     [ProtoMember(2)]
     public readonly byte[] PlayerHero;
 
-    public NetworkTransferNewHero(string playerId, byte[] playerHero)
+    [ProtoMember(3)]
+    public readonly AdvancedStartSelection[] AdvancedStart;
+
+    public NetworkTransferNewHero(string playerId, byte[] playerHero, AdvancedStartSelection[] advancedStart = null)
     {
         PlayerId = playerId;
         PlayerHero = playerHero;
+        AdvancedStart = advancedStart;
     }
 }

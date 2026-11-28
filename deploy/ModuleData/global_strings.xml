@@ -144,5 +144,20 @@
     <string id="str_coop_prison_break_prisoner_lost" text="{=str_coop_prison_break_prisoner_lost}{PRISONER.NAME} is no longer held in this prison." />
     <string id="str_coop_prison_break_player_prisoner" text="{=str_coop_prison_break_player_prisoner}Players can't be broken out of prison." />
     <string id="str_coop_prison_break_in_progress" text="{=str_coop_prison_break_in_progress}Another player is breaking a prisoner out of this dungeon." />
+    <string id="str_coop_advanced_start_world_started" text="{=str_coop_advanced_start_world_started}Only available before the campaign is first resumed." />
+    <string id="str_coop_advanced_start_kingdom_ruled" text="{=str_coop_advanced_start_kingdom_ruled}Another player already rules this kingdom." />
+    <string id="str_coop_advanced_start_kingdom_missing" text="{=str_coop_advanced_start_kingdom_missing}This kingdom isn't part of this world." />
+    <string id="str_coop_advanced_start_no_kingdom" text="{=str_coop_advanced_start_no_kingdom}No kingdom in this world can take this start." />
+    <string id="str_coop_advanced_start_default_off" text="{=str_coop_advanced_start_default_off}The host only offers this start when no other start can be picked." />
+    <string id="str_coop_advanced_start_join" text="{=str_coop_advanced_start_join}Join Coop" />
+    <string id="str_coop_advanced_start_locked_title" text="{=str_coop_advanced_start_locked_title}Starting option not available" />
+    <string id="str_coop_advanced_start_locked_text" text="{=str_coop_advanced_start_locked_text}{OPTION} can't be picked. {REASON}" />
+    <string id="str_coop_advanced_start_leave_title" text="{=str_coop_advanced_start_leave_title}Leave the server?" />
+    <string id="str_coop_advanced_start_leave_text" text="{=str_coop_advanced_start_leave_text}Your new character will be lost and you will return to the main menu." />
+    <string id="str_coop_advanced_start_leave_confirm" text="{=str_coop_advanced_start_leave_confirm}Leave" />
+    <string id="str_coop_advanced_start_resume_title" text="{=str_coop_advanced_start_resume_title}Start the campaign?" />
+    <string id="str_coop_advanced_start_resume_text" text="{=str_coop_advanced_start_resume_text}Once time starts, players who join later can no longer pick starting options that change the world. Make sure everyone who wants one has joined first." />
+    <string id="str_coop_advanced_start_resume_confirm" text="{=str_coop_advanced_start_resume_confirm}Start" />
+    <string id="str_coop_advanced_start_resume_wait" text="{=str_coop_advanced_start_resume_wait}Wait" />
     <!-- Add other custom text here in the future-->
 </strings>

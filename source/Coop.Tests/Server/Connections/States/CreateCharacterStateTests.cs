@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using Common;
 using Common.Messaging;
 using Coop.Core.Client.Messages;
 using Coop.Core.Client.Services.Heroes.Messages;
@@ -7,6 +8,9 @@ using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
 using Coop.Tests.Mocks;
+using GameInterface.Services.AdvancedStart.Data;
+using GameInterface.Services.AdvancedStart.Interfaces;
+using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.Heroes.Data;
 using GameInterface.Services.Heroes.Interfaces;
@@ -308,6 +312,51 @@ namespace Coop.Tests.Server.Connections.States
             Assert.IsType<CreateCharacterState>(connectionLogic.State);
         }
 
+        [Fact]
+        public void RequestAdvancedStartPolicy_CreatePolicyThrows_RepliesWithNullPolicy()
+        {
+            // Arrange
+            serverComponent.Container.Resolve<Mock<IAdvancedStartInterface>>()
+                .Setup(a => a.CreatePolicy())
+                .Throws(new InvalidOperationException("policy failed"));
+            var currentState = connectionLogic.SetState<CreateCharacterState>();
+
+            // Act
+            currentState.Handle_NetworkRequestAdvancedStartPolicy(new MessagePayload<NetworkRequestAdvancedStartPolicy>(
+                playerPeer, new NetworkRequestAdvancedStartPolicy()));
+            GameThread.Run(() => { }, blocking: true);
+
+            // Assert: the joiner waits on this reply, so it still comes, with the window turned off.
+            var reply = Assert.Single(serverComponent.TestNetwork.ImmediateSends, send => send.Payload is NetworkAdvancedStartPolicy);
+            Assert.Equal(playerPeer, reply.Peer);
+            Assert.Null(((NetworkAdvancedStartPolicy)reply.Payload).Policy);
+        }
+
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public void NetworkTransferNewHero_TellsJoinerOnlyWhenStartNotApplied(bool applied)
+        {
+            // Arrange
+            var hero = SetupUnpackedHero();
+            var selections = new[] { new AdvancedStartSelection("StartType", "outlaw") };
+            var advancedStartMock = serverComponent.Container.Resolve<Mock<IAdvancedStartInterface>>();
+            advancedStartMock.Setup(a => a.ApplySelections(hero, selections)).Returns(applied);
+            var currentState = connectionLogic.SetState<CreateCharacterState>();
+
+            // Act
+            currentState.Handle_NetworkTransferNewHero(new MessagePayload<NetworkTransferNewHero>(
+                playerPeer, new NetworkTransferNewHero("MyId", Array.Empty<byte>(), selections)));
+
+            // Assert
+            advancedStartMock.Verify(a => a.ApplySelections(hero, selections), Times.Once);
+            var notices = serverComponent.TestNetwork.GetPeerMessagesFromType<SendInformationMessage>(playerPeer);
+            if (applied)
+                Assert.Empty(notices);
+            else
+                Assert.Single(notices);
+        }
+
         /// <summary>
         /// Configures the mocked <see cref="IHeroInterface.ServerUnpackHero"/> to return a hero whose
         /// hero/party/clan/character-object are registered in the (real) object manager, so
@@ -348,6 +397,10 @@ namespace Coop.Tests.Server.Connections.States
                 .Returns(true);
             playerRegistryMock
                 .Setup(p => p.AddPlayer(It.IsAny<Player>()))
+                .Returns(true);
+            // A default start always applies.
+            serverComponent.Container.Resolve<Mock<IAdvancedStartInterface>>()
+                .Setup(a => a.ApplySelections(It.IsAny<Hero>(), It.IsAny<AdvancedStartSelection[]>()))
                 .Returns(true);
 
             return hero;

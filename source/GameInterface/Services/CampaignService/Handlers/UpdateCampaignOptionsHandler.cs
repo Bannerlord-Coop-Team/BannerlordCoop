@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using GameInterface.Services.AdvancedStart.Interfaces;
 using GameInterface.Services.CampaignService.Data;
 using GameInterface.Services.CampaignService.Interfaces;
 using GameInterface.Services.CampaignService.Messages;
@@ -18,15 +19,18 @@ internal class UpdateCampaignOptionsHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IServerOptionsProvider serverOptionsProvider;
+    private readonly IAdvancedStartInterface advancedStartInterface;
 
     public UpdateCampaignOptionsHandler(
         IMessageBroker messageBroker,
         INetwork network,
-        IServerOptionsProvider serverOptionsProvider)
+        IServerOptionsProvider serverOptionsProvider,
+        IAdvancedStartInterface advancedStartInterface)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.serverOptionsProvider = serverOptionsProvider;
+        this.advancedStartInterface = advancedStartInterface;
         messageBroker.Subscribe<UpdateCampaignOptions>(Handle_UpdateCampaignOptions);
         messageBroker.Subscribe<NetworkUpdateCampaignOptions>(Handle_NetworkUpdateCampaignOptions);
 
@@ -119,5 +123,6 @@ internal class UpdateCampaignOptionsHandler : IHandler
     {
         // Add other server options as needed
         BannerlordConfig.PlayerReceivedDamageDifficulty = newOptions.PlayerReceivedDamage;
+        advancedStartInterface.UpdateWorldStartsOffered(newOptions.WorldStartsOffered);
     }
 }

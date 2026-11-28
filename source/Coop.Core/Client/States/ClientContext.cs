@@ -4,6 +4,7 @@ using Coop.Core.Common;
 using Coop.Core.Common.Session;
 using GameInterface;
 using GameInterface.Registry;
+using GameInterface.Services.AdvancedStart.Interfaces;
 using GameInterface.Services.Entity;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.Heroes.Interfaces;
@@ -40,7 +41,8 @@ public class ClientContext
         IMapTimeTrackerInterface mapTimeTrackerInterface,
         IJoinAttemptOverlay joinAttemptOverlay,
         JoinAttemptPresentation joinAttempt,
-        IPatchFailureReport patchFailureReport)
+        IPatchFailureReport patchFailureReport,
+        IAdvancedStartInterface advancedStartInterface)
     {
         MessageBroker = messageBroker;
         Network = network;
@@ -59,6 +61,7 @@ public class ClientContext
         JoinAttemptOverlay = joinAttemptOverlay;
         JoinAttempt = joinAttempt;
         PatchFailureReport = patchFailureReport;
+        AdvancedStartInterface = advancedStartInterface;
     }
 
     public IMessageBroker MessageBroker { get; }
@@ -78,4 +81,5 @@ public class ClientContext
     public IJoinAttemptOverlay JoinAttemptOverlay { get; }
     public JoinAttemptPresentation JoinAttempt { get; }
     public IPatchFailureReport PatchFailureReport { get; }
+    public IAdvancedStartInterface AdvancedStartInterface { get; }
 }

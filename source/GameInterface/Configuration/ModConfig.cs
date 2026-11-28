@@ -227,6 +227,8 @@ internal sealed class ModConfig : IModConfig
         if (data.UnknownKeys != null) WarnUnknownKeys(data.UnknownKeys);
         if (data.Difficulty?.UnknownKeys != null) WarnUnknownKeys(data.Difficulty.UnknownKeys, "difficulty ");
         if (data.ModOptions?.UnknownKeys != null) WarnUnknownKeys(data.ModOptions.UnknownKeys, "mod option ");
+        if (data.AdvancedStart?.UnknownKeys != null) WarnUnknownKeys(data.AdvancedStart.UnknownKeys, "advanced start ");
+        if (data.AdvancedStart?.StartTypes?.UnknownKeys != null) WarnUnknownKeys(data.AdvancedStart.StartTypes.UnknownKeys, "advanced start type ");
     }
 
     private static void WarnUnknownKeys(IDictionary<string, JToken> unknownKeys, string keyType = "")

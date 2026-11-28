@@ -10,6 +10,7 @@ using Coop.Core.Client.Messages;
 using Coop.Core.Common.Services.Connection.Messages;
 using Coop.Core.Server;
 using Coop.Core.Server.Connections;
+using GameInterface.Services.AdvancedStart.Interfaces;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Services.Instances;
 using Coop.Core.Server.Services.Kingdoms;
@@ -501,7 +502,8 @@ public class ServerJoinAdmissionTests
             Mock.Of<IJoinCampaignBaselineSender>(),
             Mock.Of<IJoinCampaignKingdomBaseLineSender>(),
             Mock.Of<IJoinValidationDenialLog>(),
-            Mock.Of<ILootShipHold>());
+            Mock.Of<ILootShipHold>(),
+            Mock.Of<IAdvancedStartInterface>());
     }
 
     /// <summary>The real join admission, which also signals once a shutdown has started closing it.</summary>
