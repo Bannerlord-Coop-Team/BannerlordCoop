@@ -1,6 +1,8 @@
 ﻿using Common;
 using Common.Logging;
+using Common.Messaging;
 using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.Players;
 using HarmonyLib;
 using Serilog;
@@ -14,15 +16,16 @@ namespace GameInterface.Services.Stances.Patches
     /// Filters the parties vanilla's <c>CheckSettlementSuitabilityForParties</c> checks after a stance change. Drops a null
     /// party, and a party in a settlement whose MapFaction isn't synced yet (vanilla would throw). Also drops a player's
     /// party on every machine but its own client, where it is the main party. The server keeps a party whose owner is
-    /// offline, since no client can open the slink away menu for it.
+    /// offline, since no client can open the slink away menu for it, and holds it once vanilla ejects it.
     /// </summary>
     [HarmonyPatch(typeof(PartyDiplomaticHandlerCampaignBehavior), "CheckSettlementSuitabilityForParties")]
     internal class PartyDiplomaticHandlerCampaignBehaviorPatch
     {
         private static readonly ILogger Logger = LogManager.GetLogger<PartyDiplomaticHandlerCampaignBehaviorPatch>();
 
-        private static void Prefix(ref IEnumerable<MobileParty> parties)
+        private static void Prefix(ref IEnumerable<MobileParty> parties, out List<MobileParty> __state)
         {
+            __state = new List<MobileParty>();
             if (parties == null) return;
 
             bool hasPlayerManager = ContainerProvider.TryResolve<IPlayerManager>(out var playerManager);
@@ -52,9 +55,23 @@ namespace GameInterface.Services.Stances.Patches
                 }
 
                 processable.Add(party);
+                if (party.CurrentSettlement != null && party.IsPlayerParty())
+                    __state.Add(party);
             }
 
             parties = processable;
+        }
+
+        // An ejected player's party still targets the town it walked into, so it holds like a client's own leave, otherwise it walks back in once its owner rejoins
+        private static void Postfix(List<MobileParty> __state)
+        {
+            foreach (var party in __state)
+            {
+                if (party.CurrentSettlement != null) continue;
+
+                party.SetMoveModeHold();
+                MessageBroker.Instance.Publish(party, new PartyBehaviorChangeAttempted(party, resetMovementToHold: true));
+            }
         }
 
         // Vanilla keeps the main party in a hostile town and opens the slink away menu, but the server and other clients
