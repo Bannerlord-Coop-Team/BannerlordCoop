@@ -141,9 +141,10 @@ public class BattleSimulationCompletionTests : MapEventTestBase
             var previousXpModel = models.CombatXpModel;
             var previousDifficultyModel = models.DifficultyModel;
             var combatModel = new Mock<CombatSimulationModel>();
+            // Even unscaled this hit can't down a troop, so the second hit still finds a standing one.
             combatModel.Setup(m => m.SimulateHit(It.IsAny<CharacterObject>(), It.IsAny<CharacterObject>(), It.IsAny<PartyBase>(),
                 It.IsAny<PartyBase>(), It.IsAny<float>(), It.IsAny<MapEvent>(), It.IsAny<BattleEnvironment>(), It.IsAny<float>(), It.IsAny<float>()))
-                .Returns(new ExplainedNumber(40));
+                .Returns(new ExplainedNumber(10));
             // The striker's hit reward gets the same damage the struck troop takes.
             var hitDamage = new List<int>();
             var xpModel = new Mock<CombatXpModel>();
@@ -160,7 +161,7 @@ public class BattleSimulationCompletionTests : MapEventTestBase
                 mapEvent.SimulateSingleTroopHit(BattleSideEnum.Defender, 0f, 1f, 1f);
                 mapEvent.SimulateSingleTroopHit(BattleSideEnum.Attacker, 0f, 1f, 1f);
 
-                Assert.Equal(new[] { 20, 40 }, hitDamage);
+                Assert.Equal(new[] { 5, 10 }, hitDamage);
             }
             finally
             {

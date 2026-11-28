@@ -97,9 +97,10 @@ internal class SimulatedTroopHitDifficultyPatch
 
         int damageLocal = codes[damageStoreIndex].LocalIndex();
         int positiveDamageIndex = codes.FindIndex(damageStoreIndex, instruction => instruction.IsLdloc() && instruction.LocalIndex() == damageLocal);
-        if (positiveDamageIndex < 0 || positiveDamageIndex + 2 >= codes.Count
-            || !codes[positiveDamageIndex + 1].LoadsConstant(0)
-            || (codes[positiveDamageIndex + 2].opcode != OpCodes.Ble && codes[positiveDamageIndex + 2].opcode != OpCodes.Ble_S))
+        bool isPositiveDamageBranch = positiveDamageIndex >= 0 && positiveDamageIndex + 2 < codes.Count
+            && codes[positiveDamageIndex + 1].LoadsConstant(0)
+            && new[] { OpCodes.Ble, OpCodes.Ble_S }.Contains(codes[positiveDamageIndex + 2].opcode);
+        if (!isPositiveDamageBranch)
             throw new InvalidOperationException("Failed to find the positive damage branch in MapEvent.SimulateSingleTroopHit.");
 
         // Scales inside vanilla's damage > 0 block, so the damage and the striker's hit reward both use it.
