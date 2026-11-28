@@ -85,8 +85,8 @@
 
   // Advanced starting options offered to a player creating a new character on join.
   "advancedStart": {
-    // (Default) true: a joining player picks between the default start and the start types below.
-    // false: the window never shows and everyone gets the default start.
+    // (Default) true: A joining player picks between the default start and the start types below.
+    // false: The window never shows and everyone gets the default start.
     "enabled": true,
 
     // The start type selected when the window opens:
