@@ -121,6 +121,7 @@ public class WarDeclaredInTownTests : SyncTestBase
 
                 var diplomaticHandler = new PartyDiplomaticHandlerCampaignBehavior();
                 diplomaticHandler.RegisterEvents();
+                // Only the server's parking path finds the behavior through GetCampaignBehavior, which needs the manager
                 if (instance == Server)
                     Campaign.Current.AddCampaignBehaviorManager(new CampaignBehaviorManager(new CampaignBehaviorBase[] { diplomaticHandler }));
             });
