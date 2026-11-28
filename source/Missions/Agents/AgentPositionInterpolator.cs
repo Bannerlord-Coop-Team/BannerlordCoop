@@ -22,7 +22,10 @@ public interface IAgentPositionInterpolator
     /// <summary>Record the latest continuous frame the owner reported for a mount puppet.</summary>
     void SetMountTarget(Agent mountAgent, AgentMountData data);
 
-    /// <summary>Stop tracking an agent (e.g. it dismounted or was removed).</summary>
+    /// <summary>
+    /// Stop tracking an agent (e.g. it dismounted or was removed). Leaves the native target frame the follow set; use
+    /// <see cref="Release"/> to clear it.
+    /// </summary>
     void Forget(Agent agent);
 
     /// <summary>

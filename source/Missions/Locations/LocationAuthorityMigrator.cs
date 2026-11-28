@@ -338,10 +338,11 @@ public class LocationAuthorityMigrator : ILocationAuthorityMigrator
     // back to plain engine AI — stationary for humans (SR-031), native idle wandering for animals.
     private bool ReviveSettlementAi(Agent agent, System.Guid agentId, bool reconnectPointUse)
     {
+        var interpolator = coopMissionComponent.AgentMovementHandler.Interpolator;
+
         // An adopted MOUNT (scene horses) only changes authority — it is not a simulated combatant
         // and must not get an engine AI controller, mirroring battle mount adoption. It keeps the follow's
         // frame lock, otherwise it would drift on its last replicated input.
-        var interpolator = coopMissionComponent.AgentMovementHandler.Interpolator;
         if (agent.IsMount)
         {
             interpolator.Forget(agent);
