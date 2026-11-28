@@ -48,6 +48,7 @@ using GameInterface.Services.Settlements.Interfaces;
 using GameInterface.Services.Ships;
 using GameInterface.Services.SiegeEvents;
 using GameInterface.Services.SiegeEvents.Interfaces;
+using GameInterface.Services.Stances.Interfaces;
 using GameInterface.Services.Time.Interfaces;
 using GameInterface.Services.TroopRosters.Interfaces;
 using GameInterface.Services.UI;
@@ -145,6 +146,7 @@ internal abstract class TestComponentBase
         RegisterMock<IGameStateInterface>(builder);
         RegisterMock<ISettlementInterface>(builder);
         RegisterMock<ISiegeEventInterface>(builder);
+        RegisterMock<IPartyDiplomaticHandlerCampaignBehaviorInterface>(builder);
         RegisterMock<IPartyVisualInterface>(builder);
         RegisterMock<ISiegeBreakOut>(builder);
         RegisterMock<IArmyLeaver>(builder);

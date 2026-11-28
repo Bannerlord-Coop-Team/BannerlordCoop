@@ -1658,18 +1658,19 @@ public class KingdomDebugCommand
             new ExpectedArgs("faction1_id", "First faction (kingdom or clan) name or id; quote names with spaces."),
             new ExpectedArgs("faction2_id", "Second faction (kingdom or clan) name or id; quote names with spaces."),
             new ExpectedArgs("cause", "default, decision, hostility, rebellion, crime, creation, claim or agreement."),
-            new ExpectedArgs("actor_controller_id", "The registered acting player, required for native war callbacks."),
+            new ExpectedArgs("actor_controller_id", "The registered acting player, required for native war callbacks except a decision war.", false),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (ModInformation.IsClient) return Failed("Run this command on the server.");
-            if (args.Count < 4 || args[3] == "none") return Failed("A registered acting player is required.");
             Action<IFaction, IFaction> declare;
+            bool needsActor = true;
             switch (args[2])
             {
                 case "default": declare = DeclareWarAction.ApplyByDefault; break;
-                case "decision": declare = DeclareWarAction.ApplyByKingdomDecision; break;
+                // The server applies a passed DeclareWarDecision with no player swapped in, so a decision war needs no actor
+                case "decision": declare = DeclareWarAction.ApplyByKingdomDecision; needsActor = false; break;
                 case "hostility": declare = DeclareWarAction.ApplyByPlayerHostility; break;
                 case "rebellion": declare = DeclareWarAction.ApplyByRebellion; break;
                 case "crime": declare = DeclareWarAction.ApplyByCrimeRatingChange; break;
@@ -1678,6 +1679,8 @@ public class KingdomDebugCommand
                 case "agreement": declare = DeclareWarAction.ApplyByCallToWarAgreement; break;
                 default: return Failed("Unknown war cause.");
             }
+            bool hasActor = args.Count > 3 && args[3] != "none";
+            if (needsActor && !hasActor) return Failed("A registered acting player is required.");
             if (TryGetObjectManager(out var objectManager) == false)
             {
                 return Failed("Unable to resolve ObjectManager");
@@ -1695,14 +1698,21 @@ public class KingdomDebugCommand
 
             if (faction1 == faction2 || FactionManager.IsAtWarAgainstFaction(faction1, faction2))
                 return Failed("Select different factions that are currently at peace.");
-            if (!ContainerProvider.TryResolve<IPlayerManager>(out var players) ||
-                !players.TryGetPlayer(args[3], out var player) ||
-                !objectManager.TryGetObject<Hero>(player.HeroId, out var hero) ||
-                !objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party))
-                return Failed("The acting player's registered hero and party are required.");
-            if (hero.MapFaction != faction1 && hero.MapFaction != faction2)
-                return Failed("The acting player must belong to one of the factions.");
-            using (new MainHeroSubstitutionScope(hero, party)) declare(faction1, faction2);
+            if (!hasActor)
+            {
+                declare(faction1, faction2);
+            }
+            else
+            {
+                if (!ContainerProvider.TryResolve<IPlayerManager>(out var players) ||
+                    !players.TryGetPlayer(args[3], out var player) ||
+                    !objectManager.TryGetObject<Hero>(player.HeroId, out var hero) ||
+                    !objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party))
+                    return Failed("The acting player's registered hero and party are required.");
+                if (hero.MapFaction != faction1 && hero.MapFaction != faction2)
+                    return Failed("The acting player must belong to one of the factions.");
+                using (new MainHeroSubstitutionScope(hero, party)) declare(faction1, faction2);
+            }
             return Succeeded($"Declared war between '{faction1.Name}' and '{faction2.Name}'.");
         }
     }

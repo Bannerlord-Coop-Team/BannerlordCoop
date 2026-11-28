@@ -504,6 +504,20 @@ public class E2ETestEnvironment : IDisposable
     }
 
     /// <summary>
+    /// Pumps the server, flushes its coalesced sends and pumps every client, twice, so a reply the server sends from a
+    /// game-thread action reaches the clients too.
+    /// </summary>
+    public void PumpAndFlush()
+    {
+        for (int i = 0; i < 2; i++)
+        {
+            Server.PumpGameThread();
+            FlushCoalescer();
+            foreach (var client in Clients) client.PumpGameThread();
+        }
+    }
+
+    /// <summary>
     /// Assert if the given field with a ValueType is properly synced between server and clients
     /// </summary>
     /// <typeparam name="TInstance">Type of instance that is tested</typeparam>

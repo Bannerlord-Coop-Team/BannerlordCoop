@@ -1,4 +1,9 @@
+﻿using Common;
 using Common.Logging;
+using Common.Messaging;
+using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Services.MobileParties.Messages.Behavior;
+using GameInterface.Services.Players;
 using HarmonyLib;
 using Serilog;
 using System.Collections.Generic;
@@ -8,24 +13,22 @@ using TaleWorlds.CampaignSystem.Party;
 namespace GameInterface.Services.Stances.Patches
 {
     /// <summary>
-    /// Vanilla's <c>CheckSettlementSuitabilityForParties</c> (run when a faction's stance changes)
-    /// reads <see cref="MobileParty.MapFaction"/> for any party in a settlement, but a not-yet-synced
-    /// party on a receiving machine can be in a settlement with a null MapFaction, throwing a
-    /// NullReferenceException. Drop those entries (and any null party) before the loop, reading
-    /// MapFaction only when CurrentSettlement is set so a party that is not in a settlement (which
-    /// vanilla would skip anyway) is left untouched. Runs even under
-    /// <see cref="Common.Util.AllowedThread"/> (prefixes always execute); dropped parties are logged
-    /// at debug level.
+    /// Filters the parties vanilla's <c>CheckSettlementSuitabilityForParties</c> checks after a stance change. Drops a null
+    /// party, and a party in a settlement whose MapFaction isn't synced yet (vanilla would throw). Also drops a player's
+    /// party on every machine but its own client, where it is the main party. The server keeps a party whose owner is
+    /// offline, since no client can open the slink away menu for it, and holds it once vanilla ejects it.
     /// </summary>
     [HarmonyPatch(typeof(PartyDiplomaticHandlerCampaignBehavior), "CheckSettlementSuitabilityForParties")]
     internal class PartyDiplomaticHandlerCampaignBehaviorPatch
     {
         private static readonly ILogger Logger = LogManager.GetLogger<PartyDiplomaticHandlerCampaignBehaviorPatch>();
 
-        private static void Prefix(ref IEnumerable<MobileParty> parties)
+        private static void Prefix(ref IEnumerable<MobileParty> parties, out List<MobileParty> __state)
         {
+            __state = new List<MobileParty>();
             if (parties == null) return;
 
+            bool hasPlayerManager = ContainerProvider.TryResolve<IPlayerManager>(out var playerManager);
             var processable = new List<MobileParty>();
             foreach (var party in parties)
             {
@@ -45,10 +48,41 @@ namespace GameInterface.Services.Stances.Patches
                     continue;
                 }
 
+                if (IsLeftToOwnerClient(party, hasPlayerManager, playerManager))
+                {
+                    Logger.Debug("Leaving player party {party} to its own client after a stance change.", party.StringId);
+                    continue;
+                }
+
                 processable.Add(party);
+                if (party.CurrentSettlement != null && party.IsPlayerParty())
+                    __state.Add(party);
             }
 
             parties = processable;
+        }
+
+        // An ejected player's party still targets the town it walked into, so it holds like a client's own leave, otherwise it walks back in once its owner rejoins
+        private static void Postfix(List<MobileParty> __state)
+        {
+            foreach (var party in __state)
+            {
+                if (party.CurrentSettlement != null) continue;
+
+                party.SetMoveModeHold();
+                MessageBroker.Instance.Publish(party, new PartyBehaviorChangeAttempted(party, resetMovementToHold: true));
+            }
+        }
+
+        // Vanilla keeps the main party in a hostile town and opens the slink away menu, but the server and other clients
+        // would eject it like an AI party, even out of a tournament. An offline player has no client to open that menu.
+        internal static bool IsLeftToOwnerClient(MobileParty party, bool hasPlayerManager, IPlayerManager playerManager)
+        {
+            if (!party.IsPlayerParty() || party.IsControlledByThisInstance()) return false;
+            if (ModInformation.IsClient) return true;
+
+            // Only the server holds peers, so a client would see every other player as offline
+            return hasPlayerManager && !playerManager.IsOwnerOfPartyDisconnected(party);
         }
     }
 }

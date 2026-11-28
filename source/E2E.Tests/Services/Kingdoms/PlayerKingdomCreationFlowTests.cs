@@ -141,7 +141,6 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             var previousParty = Campaign.Current.MainParty;
             var args = new CoopCommandArgsFactory();
             var war = new KingdomDebugCommand.KingdomDeclareWarCoopCommand(Server.Resolve<ICommandObjectResolver>());
-            Assert.False(war.ProcessCommand(args.FromValues(new[] { kingdomId, enemyId })).Succeeded);
             Assert.False(war.ProcessCommand(args.FromValues(new[] { kingdomId, enemyId, "hostility", "none" })).Succeeded);
             Assert.False(kingdom.IsAtWarWith(enemyKingdom));
             Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkDeclareWar>());

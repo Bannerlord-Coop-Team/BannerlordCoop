@@ -18,6 +18,7 @@ using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Players.Messages;
 using GameInterface.Services.SiegeEvents.Interfaces;
+using GameInterface.Services.Stances.Interfaces;
 using LiteNetLib;
 using Serilog;
 using System;
@@ -31,7 +32,8 @@ namespace Coop.Core.Server.Services.Players.Handlers;
 /// <summary>
 /// Server-side: hides a disconnected player's party from the map and stops it being simulated, then
 /// restores it once the peer has synchronized the campaign. Parties in a MapEvent remain active so reconnect
-/// saves preserve their battle membership.
+/// saves preserve their battle membership. Parking also runs vanilla's diplomatic settlement check, so a town at war
+/// with the party ejects it, because its offline owner can't open the slink away menu.
 /// <see cref="MobileParty.IsActive"/> syncs through AutoSync. <see cref="IPartyVisualInterface"/>
 /// replicates the separate lifetime of the rendered map figure.
 /// </summary>
@@ -46,6 +48,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
     private readonly IPartyVisualInterface partyVisuals;
     private readonly ISiegeEventInterface siegeEventInterface;
     private readonly IArmyLeaver armyLeaver;
+    private readonly IPartyDiplomaticHandlerCampaignBehaviorInterface diplomaticHandler;
     private readonly Dictionary<MobileParty, (MapEvent MapEvent, string ControllerId)> deferredMapEventParking = new();
 
     public PlayerPartyVisibilityHandler(
@@ -55,7 +58,8 @@ internal class PlayerPartyVisibilityHandler : IHandler
         IObjectManager objectManager,
         IPartyVisualInterface partyVisuals,
         ISiegeEventInterface siegeEventInterface,
-        IArmyLeaver armyLeaver)
+        IArmyLeaver armyLeaver,
+        IPartyDiplomaticHandlerCampaignBehaviorInterface diplomaticHandler)
     {
         this.messageBroker = messageBroker;
         this.playerManager = playerManager;
@@ -64,6 +68,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
         this.partyVisuals = partyVisuals;
         this.siegeEventInterface = siegeEventInterface;
         this.armyLeaver = armyLeaver;
+        this.diplomaticHandler = diplomaticHandler;
 
         messageBroker.Subscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
         messageBroker.Subscribe<PlayerCampaignSynchronized>(Handle_PlayerCampaignSynchronized);
@@ -97,7 +102,15 @@ internal class PlayerPartyVisibilityHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party))
                 continue;
 
-            ParkParty(player, party, "its saved player is offline", queueArmyLeave: false);
+            // One party's broken siege, army or town state must not stop the rest being parked
+            try
+            {
+                ParkParty(player, party, "its saved player is offline", queueArmyLeave: false);
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "Could not park offline party {PartyId} after its save loaded", party.StringId);
+            }
         }
     }
 
@@ -357,33 +370,32 @@ internal class PlayerPartyVisibilityHandler : IHandler
     private void ParkOutsideMapEvent(MobileParty party, bool queueArmyLeave)
     {
         LeaveSiegeBeforeParking(party);
-        LeaveFollowedArmy(party, queueArmyLeave);
 
+        // Parked first, so a throw from the army leave or the town eject still leaves the party off the map
         party.IsActive = false;
         party.IsVisible = false;
         partyVisuals.RemoveVisual(party);
+
+        var followedArmy = party.Army?.LeaderParty != party ? party.Army : null;
+        if (queueArmyLeave && followedArmy != null)
+            GameThread.EnqueueSafe(() => LeaveArmyThenCheckTown(party, followedArmy));
+        else
+            LeaveArmyThenCheckTown(party, followedArmy);
     }
 
-    // A follower leaves its army, otherwise vanilla keeps copying the leader's battle side and siege camp onto it while it is attached
-    private void LeaveFollowedArmy(MobileParty party, bool queue)
+    // A follower leaves its army, otherwise vanilla keeps copying the leader's battle side and siege camp onto it while it is attached.
+    // Vanilla skips a party attached to an army, so the town is checked after the leave. Its eject doesn't read IsActive, so it still works on the parked party
+    private void LeaveArmyThenCheckTown(MobileParty party, Army followedArmy)
     {
-        var army = party.Army;
-        if (army == null || army.LeaderParty == party) return;
-
-        Logger.Information("Removing parked party {PartyId} from the army of {LeaderId}", party.StringId, army.LeaderParty?.StringId);
-
-        if (!queue)
+        // A queued leave skips an army the party already left
+        if (followedArmy != null && party.Army == followedArmy)
         {
-            armyLeaver.Remove(party, army);
-            return;
+            Logger.Information("Removing parked party {PartyId} from the army of {LeaderId}", party.StringId, followedArmy.LeaderParty?.StringId);
+            armyLeaver.Remove(party, followedArmy);
         }
 
-        // A queued leave runs on a later frame, after the party is parked, so it skips an army the party already left
-        GameThread.EnqueueSafe(() =>
-        {
-            if (party.Army != army) return;
-            armyLeaver.Remove(party, army);
-        });
+        // A party whose player went offline has no client to open the slink away menu, so a town at war with it ejects it
+        diplomaticHandler.CheckSettlementSuitability(party);
     }
 
     private bool TryResolveParty(NetPeer peer, out Player player, out MobileParty party)

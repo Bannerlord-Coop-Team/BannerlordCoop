@@ -61,16 +61,20 @@ public class AlleyRequestSenderTests : AlleyTestEnvironment
         var scenario = CreateAlleyDomainScenario();
         var fights = new[] { (OwnerClient, scenario.PlayerAlleyId, scenario.OwnerHeroId), (OtherClient, scenario.AttackerAlleyId, scenario.OverseerHeroId) };
         var sent = new Dictionary<EnvironmentInstance, Hero>();
+        // The broker only holds its subscribers weakly, so the handlers are kept here until the test ends
+        var handlers = new List<(EnvironmentInstance Client, Action<MessagePayload<AlleyAcquiredRequested>> Handler)>();
         try
         {
             foreach (var (client, alleyId, heroId) in fights)
             {
                 var mission = new Mock<ICampaignMission>();
+                Action<MessagePayload<AlleyAcquiredRequested>> handler = payload => sent[client] = payload.What.PreviousOwner;
+                handlers.Add((client, handler));
                 client.Call(() =>
                 {
                     mission.SetupGet(value => value.LastVisitedAlley).Returns(client.GetRegisteredObject<Alley>(alleyId));
                     Game.Current.PlayerTroop = client.GetRegisteredObject<Hero>(heroId).CharacterObject;
-                    client.Resolve<IMessageBroker>().Subscribe<AlleyAcquiredRequested>(payload => sent[client] = payload.What.PreviousOwner);
+                    client.Resolve<IMessageBroker>().Subscribe(handler);
                 });
                 client.CampaignMissionContext = mission.Object;
                 StartFight(client, alleyId);
@@ -89,6 +93,7 @@ public class AlleyRequestSenderTests : AlleyTestEnvironment
         finally
         {
             foreach (var (client, _, _) in fights) client.CampaignMissionContext = null;
+            foreach (var (client, handler) in handlers) client.Resolve<IMessageBroker>().Unsubscribe(handler);
         }
 
         Assert.Null(sent[OwnerClient]);

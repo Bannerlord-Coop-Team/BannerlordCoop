@@ -15,6 +15,7 @@ using GameInterface.Services.PartyVisuals.Interfaces;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.SiegeEvents.Interfaces;
+using GameInterface.Services.Stances.Interfaces;
 using HarmonyLib;
 using LiteNetLib;
 using Moq;
@@ -368,7 +369,8 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
             objectManager,
             partyVisuals ?? Mock.Of<IPartyVisualInterface>(),
             siegeEventInterface ?? Mock.Of<ISiegeEventInterface>(),
-            Mock.Of<IArmyLeaver>());
+            Mock.Of<IArmyLeaver>(),
+            Mock.Of<IPartyDiplomaticHandlerCampaignBehaviorInterface>());
     }
 
     private static (Mock<IPlayerManager>, Mock<IConnectionCollection>, Mock<IObjectManager>)
