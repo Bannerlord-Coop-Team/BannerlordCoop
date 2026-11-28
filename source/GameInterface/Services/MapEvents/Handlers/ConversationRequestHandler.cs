@@ -34,7 +34,8 @@ namespace GameInterface.Services.MapEvents.Handlers;
 /// Server: validates the request and replies with <see cref="NetworkAllowConversation"/>, or rejects it silently when
 /// both parties are players or either party is already in a <see cref="TaleWorlds.CampaignSystem.MapEvents.MapEvent"/>.
 /// Client (on approval): re-runs <c>PlayerEncounter.RestartPlayerEncounter</c> with the same parameters under an
-/// <see cref="AllowedThread"/> so the now-approved original executes.
+/// <see cref="AllowedThread"/> so the now-approved original executes, or, for an <c>EncounterManager</c> restart behind
+/// a screen or mission, on the first campaign tick back on the map.
 /// Server (additionally): while a conversation is open, the AI party is held in place for exactly one player. A
 /// second player is refused the hold rather than sharing it, hostile or not. Simultaneous attackers still converge
 /// on one MapEvent, but by retrying rather than by sharing: once the holder has started the battle, the map-event
@@ -670,11 +671,16 @@ internal class ConversationRequestHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
-            // Co-op ticks EncounterManager under screens and missions, but its meeting throws while they cover the map.
             // While one approval waits, a later one replaces it, so an older approval never opens after a newer one.
+            if (approvalWaitingForMap.HasValue)
+            {
+                WaitForMap(message);
+                return;
+            }
+
+            // Co-op ticks EncounterManager under screens and missions, but its meeting throws while they cover the map.
             // With no map state the meeting menu never opens, so only a covered map has to wait.
-            if (approvalWaitingForMap.HasValue ||
-                (message.Source == ConversationRestartSource.EncounterManager && mapStateInterface.IsMapCovered()))
+            if (message.Source == ConversationRestartSource.EncounterManager && mapStateInterface.IsMapCovered())
             {
                 WaitForMap(message);
                 return;

@@ -18,9 +18,5 @@ internal class MapStateInterface : IMapStateInterface
     // Reads the static vanilla OpenMapConversation reads, so both see the same active state
     public bool IsMapActive() => GameStateManager.Current?.ActiveState is MapState;
 
-    public bool IsMapCovered()
-    {
-        var states = GameStateManager.Current;
-        return states != null && states.ActiveState is not MapState && states.LastOrDefault<MapState>() != null;
-    }
+    public bool IsMapCovered() => !IsMapActive() && GameStateManager.Current?.LastOrDefault<MapState>() != null;
 }
