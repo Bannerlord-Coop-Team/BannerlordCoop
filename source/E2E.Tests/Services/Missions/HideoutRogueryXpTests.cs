@@ -107,11 +107,9 @@ public sealed class HideoutRogueryXpTests : MissionTestEnvironment
         {
             var mock = fixture.CreateMission(host);
             var (logic, _, _, _) = CreateHideout(mock, host.Resolve<IMessageBroker>(), direct: false, HideoutPhase.Stealth);
-            var battle = ObjectHelper.SkipConstructor<CoopBattleController>();
-            AccessTools.Field(typeof(CoopBattleController), "<Session>k__BackingField").SetValue(battle,
+            var battle = AttachBattle(logic,
                 Mock.Of<IBattleSession>(value => value.HasInstance && value.IsLocalHost && value.HostEpoch == 1 && value.InstanceId == "raid"));
-            AccessTools.Field(typeof(CoopHideoutMissionLogic), "battle").SetValue(logic, battle);
-            mock.Shell.MissionBehaviors.Add(new BattleEndLogic { Mission = mock.Shell, _missionAgentSpawnLogic = Mock.Of<IMissionAgentSpawnLogic>() });
+            AttachBattleEndLogic(mock, battle);
             // The resolved phase snapshot reads the defenders still standing.
             mock.DefenderTeam.Shell._activeAgents = new MBList<Agent>();
             try

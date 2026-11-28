@@ -143,6 +143,15 @@ public class MissionTestEnvironment : E2ETestEnvironment
         return (logic, native, attackerTeam, defenderTeam);
     }
 
+    /// <summary>Gives a hideout raid a skip-constructor battle controller running <paramref name="session"/>.</summary>
+    internal static CoopBattleController AttachBattle(CoopHideoutMissionLogic logic, IBattleSession session)
+    {
+        var battle = ObjectHelper.SkipConstructor<CoopBattleController>();
+        AccessTools.Field(typeof(CoopBattleController), "<Session>k__BackingField").SetValue(battle, session);
+        AccessTools.Field(typeof(CoopHideoutMissionLogic), "battle").SetValue(logic, battle);
+        return battle;
+    }
+
     /// <summary>Attaches the real battle end logic with a headless troop spawner.</summary>
     protected static BattleEndLogic AttachBattleEndLogic(MockMission mission, CoopBattleController controller)
     {

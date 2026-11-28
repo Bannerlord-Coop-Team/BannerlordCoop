@@ -544,9 +544,7 @@ public sealed class HideoutMissionRuntimeTests : MissionTestEnvironment
     private static void AttachHideoutLogic(CoopHideoutMissionLogic logic, MockMission mission, IBattleSession session)
     {
         AccessTools.Property(typeof(MissionBehavior), nameof(MissionBehavior.Mission)).SetValue(logic, mission.Shell);
-        var battle = ObjectHelper.SkipConstructor<CoopBattleController>();
-        AccessTools.Field(typeof(CoopBattleController), "<Session>k__BackingField").SetValue(battle, session);
-        AccessTools.Field(typeof(CoopHideoutMissionLogic), "battle").SetValue(logic, battle);
+        AttachBattle(logic, session);
         AccessTools.Field(typeof(CoopHideoutMissionLogic), "deployed").SetValue(logic, true);
         AccessTools.Field(typeof(CoopHideoutMissionLogic), "heroEntered").SetValue(logic, true);
     }
@@ -568,10 +566,8 @@ public sealed class HideoutMissionRuntimeTests : MissionTestEnvironment
             var logic = new CoopHideoutMissionLogic(Mock.Of<IBattleNetwork>(), Mock.Of<IMessageBroker>(),
                 Mock.Of<IMissionContext>(), defender, attacker, false);
             AccessTools.Property(typeof(MissionBehavior), nameof(MissionBehavior.Mission)).SetValue(logic, mission.Shell);
-            var battle = ObjectHelper.SkipConstructor<CoopBattleController>();
-            AccessTools.Field(typeof(CoopBattleController), "<Session>k__BackingField").SetValue(battle,
+            AttachBattle(logic,
                 Mock.Of<IBattleSession>(value => value.HasInstance && value.IsLocalHost && value.HostEpoch == 2 && value.InstanceId == "raid"));
-            AccessTools.Field(typeof(CoopHideoutMissionLogic), "battle").SetValue(logic, battle);
             AccessTools.Field(typeof(CoopHideoutMissionLogic), "initialized").SetValue(logic, true);
             AccessTools.Field(typeof(CoopHideoutMissionLogic), "deployed").SetValue(logic, true);
             AccessTools.Field(typeof(CoopHideoutMissionLogic), "heroEntered").SetValue(logic, true);
