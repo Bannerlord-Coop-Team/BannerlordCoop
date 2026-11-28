@@ -7,7 +7,9 @@ using HarmonyLib;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using Xunit;
 using Xunit.Abstractions;
@@ -66,6 +68,46 @@ public class KillCharacterActionExecutionTests : MapEventTestBase
             Assert.True(mercy < 0);
             Assert.Equal(0, serverStore.GetPropertyValue(DefaultTraits.Honor));
             Assert.Equal(0, serverStore.GetPropertyValue(DefaultTraits.Mercy));
+        }, WithoutObituary);
+    }
+
+    // A rebel clan that loses its last town executes its imprisoned heroes, but a player party's prisoner is only removed (Lost), as vanilla does for the main party (#4894).
+    [Theory]
+    [InlineData(true, KillCharacterAction.KillCharacterActionDetail.Lost)]
+    [InlineData(false, KillCharacterAction.KillCharacterActionDetail.Executed)]
+    public void RebelClanWithoutTowns_ExecutesOnlyRebelsHeldByAiParties(bool heldByPlayer, KillCharacterAction.KillCharacterActionDetail expectedDeath)
+    {
+        var captorPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var rebelId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var rebelClanId = TestEnvironment.CreateRegisteredObject<Clan>();
+        string captorId = null;
+        Server.Call(() =>
+        {
+            var captorParty = Server.GetRegisteredObject<MobileParty>(captorPartyId);
+            Assert.True(Server.ObjectManager.TryGetId(captorParty.LeaderHero, out captorId));
+        });
+        if (heldByPlayer) RegisterAsPlayerParty("RebelCaptor", captorId, captorPartyId);
+
+        Server.Call(() =>
+        {
+            var captorParty = Server.GetRegisteredObject<MobileParty>(captorPartyId);
+            var rebel = Server.GetRegisteredObject<Hero>(rebelId);
+            var rebelClan = Server.GetRegisteredObject<Clan>(rebelClanId);
+            // The server's own main party, which no player leads
+            Campaign.Current.MainParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
+
+            using (new AllowedThread())
+            {
+                rebelClan.InitMembers();
+                rebelClan.IsRebelClan = true;
+                rebelClan.SetLeader(rebel);
+            }
+            TakePrisonerAction.Apply(captorParty.Party, rebel);
+
+            new RebellionsCampaignBehavior().DailyTickClan(rebelClan);
+
+            Assert.False(rebel.IsAlive);
+            Assert.Equal(expectedDeath, rebel.DeathMark);
         }, WithoutObituary);
     }
 
