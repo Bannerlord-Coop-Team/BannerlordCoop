@@ -72,6 +72,8 @@ internal class PrisonBreakDebugCommands
             if (!behaviorInterface.IsHeldIn(hero, settlement))
                 return Failed($"{hero.Name} ({hero.StringId}) did not end up in the {settlement.Name} prison.");
 
+            CampaignEventDispatcher.Instance.OnPrisonersChangeInSettlement(settlement, null, hero, false);
+
             return Succeeded($"{hero.Name} ({hero.StringId}) is now a prisoner in {settlement.Name} ({settlement.StringId}).");
         }
     }
