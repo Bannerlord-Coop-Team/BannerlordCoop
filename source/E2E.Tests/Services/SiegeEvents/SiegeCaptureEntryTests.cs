@@ -72,7 +72,9 @@ public class SiegeCaptureEntryTests : MapEventTestBase
             // What KingdomManager.SiegeCompleted does for the capture, without the campaign's kingdom and army state
             CampaignEvents.SiegeCompletedEvent.AddNonSerializedListener(this, (Settlement captured, MobileParty party, bool won, MapEvent.BattleTypes _) =>
             {
+                // RemoveAllSiegeParties empties the camp, which the disabled leave cascade would otherwise do
                 party.BesiegerCamp = null;
+                captured.SiegeEvent.BesiegerCamp._besiegerParties.Clear();
                 ChangeOwnerOfSettlementAction.ApplyBySiege(party.LeaderHero, party.LeaderHero, captured);
                 conqueredAfterCapture = garrisons._newlyConqueredFortification;
                 EnterSettlementAction.ApplyForParty(party, captured);

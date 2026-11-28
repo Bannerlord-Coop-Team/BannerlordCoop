@@ -112,7 +112,8 @@ internal class SiegeAftermathPatches
     /// <summary>
     /// True when this map event captured a settlement for a co-op player. The same winner/settlement
     /// computation OnMapEventEndedPrefix uses; BattleFinalizeHandler calls it to keep the capturing
-    /// player's encounter open and enter the leader into the captured settlement after finalization.
+    /// player's encounter open, and SiegeCaptureEntryPatches to enter the leader into the captured
+    /// settlement after finalization.
     /// </summary>
     internal static bool TryGetPlayerCaptureLeader(MapEvent mapEvent, out MobileParty leaderParty, out Settlement settlement)
     {
