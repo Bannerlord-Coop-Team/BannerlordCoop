@@ -8,6 +8,7 @@ using GameInterface.Services.Players.Data;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
 using System.Reflection;
 using AllowedIssue = TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssue;
 
@@ -121,6 +122,35 @@ internal sealed class QuestScenario
         });
 
         return quest;
+    }
+
+    // ControllerA's disabled companion and three troops are out on the issue on every machine
+    public void SendTroops(string companionId, string troopId)
+    {
+        var rosterId = testEnvironment.CreateRegisteredObject<TroopRoster>();
+        foreach (var instance in new[] { Server, ClientA, ClientB })
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(NotableId, out var giver));
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(OwnerHeroId, out var owner));
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(OwnerPartyId, out var party));
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(companionId, out var companion));
+                Assert.True(instance.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+                Assert.True(instance.ObjectManager.TryGetObject<TroopRoster>(rosterId, out var roster));
+                using (new AllowedThread())
+                {
+                    party.Party.MemberRoster = roster;
+                    roster.OwnerParty = party.Party;
+                    owner.PartyBelongedTo = party;
+                    giver.Issue._issueState = IssueBase.IssueState.SolvingWithAlternativeSolution;
+                    giver.Issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 1);
+                    giver.Issue.AlternativeSolutionSentTroops.AddToCounts(troop, 3);
+                    companion._heroState = Hero.CharacterStates.Disabled;
+                }
+                Assert.True(instance.Resolve<IIssueOwnershipRegistry>().TrySetOwner(NotableId, IssueId, ControllerA));
+            });
+        }
     }
 
     public string OwnerOnServer()

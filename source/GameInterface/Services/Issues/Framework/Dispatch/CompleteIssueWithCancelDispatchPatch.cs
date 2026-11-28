@@ -29,6 +29,8 @@ internal class CompleteIssueWithCancelDispatchPatch
         if (ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher)) dispatcher.After(__state.Observed, IssueOutcome.QuestCancel);
     }
 
+    // The troops may be back already but the issue stays attached, so the next tick would cancel and return them again
     [HarmonyFinalizer]
-    private static void Finalizer((IssueBase Observed, IDisposable Owner) __state) => __state.Owner?.Dispose();
+    private static Exception Finalizer(IssueBase __instance, (IssueBase Observed, IDisposable Owner) __state, Exception __exception) =>
+        OwnerEndingFinalizer.Finish(__instance, IssueOutcome.QuestCancel, __state.Owner, __exception);
 }

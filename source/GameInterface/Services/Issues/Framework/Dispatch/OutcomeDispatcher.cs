@@ -155,16 +155,19 @@ internal class OutcomeDispatcher : IOutcomeDispatcher
         if (ownerHero.PartyBelongedTo == null) return false;
 
         var scope = new MainHeroSubstitutionScope(ownerHero, ownerHero.PartyBelongedTo);
-
-        // Vanilla tries again on the next daily tick, so the troops are not lost while the owner is busy
-        if (!Campaign.Current.Models.IssueModel.CanTroopsReturnFromAlternativeSolution())
+        try
         {
-            scope.Dispose();
-            return false;
-        }
+            // Vanilla tries again on the next daily tick, so the troops are not lost while the owner is busy
+            if (!Campaign.Current.Models.IssueModel.CanTroopsReturnFromAlternativeSolution()) return false;
 
-        owner = scope;
-        return true;
+            owner = scope;
+            return true;
+        }
+        finally
+        {
+            // Also when the readiness check throws, as the patch's finalizer then has no scope to give the server its hero back
+            if (owner == null) scope.Dispose();
+        }
     }
 
     public void ObserveQuestCompletion(QuestBase quest, QuestBase.QuestCompleteDetails detail)

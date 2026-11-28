@@ -2,6 +2,7 @@
 using Common.Util;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Dispatch;
+using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Tests.Bootstrap;
 using Moq;
@@ -47,7 +48,24 @@ public class IssueCancellationCoordinatorTests
             var owners = new Mock<IIssueOwnerResolver>();
             var controller = "player-A";
             owners.Setup(value => value.TryGetOwnerControllerId(issue, out controller)).Returns(true);
-            var service = new IssueCancellationCoordinator(registry.Object, owners.Object, Mock.Of<IActiveIssueDismisser>());
+            // The cancel runs as the ending coordinator's ending inside the owner scope it hands over, which it disposes
+            var endings = new Mock<IIssueEndingCoordinator>();
+            endings.Setup(value => value.EndAsOwner(issue, IssueOutcome.QuestCancel, It.IsAny<Action>(), It.IsAny<IDisposable>()))
+                .Callback<IssueBase, IssueOutcome, Action, IDisposable>((_, _, ending, owner) =>
+                {
+                    using (owner)
+                    {
+                        try
+                        {
+                            ending();
+                        }
+                        catch (NullReferenceException)
+                        {
+                            // The synthetic issue has no giver for vanilla's detach, a throw the ending coordinator's step logs
+                        }
+                    }
+                });
+            var service = new IssueCancellationCoordinator(registry.Object, owners.Object, endings.Object);
 
             service.CancelForPlayerDeath(controller, hero, party);
             service.CancelForPlayerDeath(controller, hero, party);

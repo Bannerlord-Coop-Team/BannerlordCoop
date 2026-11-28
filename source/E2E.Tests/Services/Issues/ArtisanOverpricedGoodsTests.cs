@@ -1171,28 +1171,5 @@ public class ArtisanOverpricedGoodsTests : IDisposable
         }
     }
 
-    // The bootstrap stub skips HeroFieldPatches, so this scenario needs the native state transition.
-    private sealed class NativeHeroStateScope : IDisposable
-    {
-        private readonly System.Reflection.MethodInfo target = AccessTools.Method(typeof(Hero), nameof(Hero.ChangeState));
-        private readonly Patch stub;
-        private readonly Harmony harmony;
-
-        public NativeHeroStateScope()
-        {
-            stub = Assert.Single(Harmony.GetPatchInfo(target).Prefixes,
-                patch => patch.PatchMethod.DeclaringType.FullName == "GameInterface.Tests.Bootstrap.Patches.HeroPatches");
-            harmony = new Harmony(stub.owner);
-            harmony.Unpatch(target, stub.PatchMethod);
-        }
-
-        public void Dispose() => harmony.Patch(target, prefix: new HarmonyMethod(stub.PatchMethod)
-        {
-            priority = stub.priority,
-            before = stub.before,
-            after = stub.after,
-        });
-    }
-
     private static T Get<T>(EnvironmentInstance instance, string id) where T : class => instance.GetRegisteredObject<T>(id);
 }

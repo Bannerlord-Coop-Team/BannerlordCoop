@@ -3,40 +3,32 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network.Messages;
 using GameInterface.Registry.Messages;
-using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
-using GameInterface.Services.UI.Notifications;
+using GameInterface.Services.Players.Messages;
 using Serilog;
 using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Issues;
-using TaleWorlds.CampaignSystem.LogEntries;
-using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Issues.Framework.Dismissal;
 
 /// <summary>
-/// When the server starts and whenever a player leaves,every registered issue being solved whose
-/// player is gone is ended silently, so its notable does not stay stuck on it. For this first
-/// iteration of quests, this will be the behavior, but this will change in the future.
+/// Ends every registered issue being solved whose player is gone, swept at server start, on a disconnect and on a removal.
 /// </summary>
-internal class ActiveIssueDismisser : IHandler, IActiveIssueDismisser
+internal class ActiveIssueDismisser : IHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<ActiveIssueDismisser>();
-    private const string ReturnedTroopsText = "{=V5Za6d4h}Your troops have returned from their mission.";
 
     private readonly IMessageBroker messageBroker;
     private readonly IQuestTypeRegistry registry;
     private readonly IIssueOwnershipRegistry ownership;
     private readonly IPlayerManager playerManager;
     private readonly IObjectManager objectManager;
-    private readonly IIssueDismisser issueDismisser;
-    private readonly IIssueOwnerResolver ownerResolver;
+    private readonly IIssueEndingCoordinator endings;
 
     public ActiveIssueDismisser(
         IMessageBroker messageBroker,
@@ -44,25 +36,25 @@ internal class ActiveIssueDismisser : IHandler, IActiveIssueDismisser
         IIssueOwnershipRegistry ownership,
         IPlayerManager playerManager,
         IObjectManager objectManager,
-        IIssueDismisser issueDismisser,
-        IIssueOwnerResolver ownerResolver)
+        IIssueEndingCoordinator endings)
     {
         this.messageBroker = messageBroker;
         this.registry = registry;
         this.ownership = ownership;
         this.playerManager = playerManager;
         this.objectManager = objectManager;
-        this.issueDismisser = issueDismisser;
-        this.ownerResolver = ownerResolver;
+        this.endings = endings;
 
         messageBroker.Subscribe<AllGameObjectsRegistered>(Handle_AllGameObjectsRegistered);
         messageBroker.Subscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
+        messageBroker.Subscribe<PlayerRemoved>(Handle_PlayerRemoved);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<AllGameObjectsRegistered>(Handle_AllGameObjectsRegistered);
         messageBroker.Unsubscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
+        messageBroker.Unsubscribe<PlayerRemoved>(Handle_PlayerRemoved);
     }
 
     private void Handle_AllGameObjectsRegistered(MessagePayload<AllGameObjectsRegistered> payload)
@@ -74,7 +66,7 @@ internal class ActiveIssueDismisser : IHandler, IActiveIssueDismisser
 
         try
         {
-            Dismiss(announce: false);
+            EndIssuesWhere(IsOfAGonePlayer, announce: false);
         }
         catch (Exception e)
         {
@@ -89,10 +81,20 @@ internal class ActiveIssueDismisser : IHandler, IActiveIssueDismisser
             return;
         }
 
-        GameThread.RunSafe(() => Dismiss(announce: true), context: nameof(ActiveIssueDismisser));
+        GameThread.RunSafe(() => EndIssuesWhere(IsOfAGonePlayer, announce: true), context: nameof(ActiveIssueDismisser));
     }
 
-    private void Dismiss(bool announce)
+    // Owner entries point at a controller, so the removed player's issues would otherwise come back to the controller's next character.
+    // Troops whose accept threw lost their owner entry, so the sweep also ends every issue of a gone player.
+    private void Handle_PlayerRemoved(MessagePayload<PlayerRemoved> payload)
+    {
+        var controllerId = payload.What.ControllerId;
+        GameThread.RunSafe(() => EndIssuesWhere(issue => IsOwnedBy(issue, controllerId) || IsOfAGonePlayer(issue), announce: true),
+            context: nameof(ActiveIssueDismisser));
+    }
+
+    // Startup passes announce false, nobody is connected to hear it
+    private void EndIssuesWhere(Func<IssueBase, bool> playerIsGone, bool announce)
     {
         var issueManager = Campaign.Current?.IssueManager;
         if (issueManager == null)
@@ -105,31 +107,12 @@ internal class ActiveIssueDismisser : IHandler, IActiveIssueDismisser
         foreach (var issue in issueManager.Issues.Values.ToList()
                      .Where(issue => registry.IsRegistered(issue.GetType())))
         {
-            try
-            {
-                if ((issue.IsSolvingWithQuest || issue.IsSolvingWithLordSolution) && !OwnerIsConnected(issue))
-                {
-                    DismissQuest(issue, announce);
-                }
-                else if (issue.IsSolvingWithAlternative && !HasOwner(issue))
-                {
-                    DismissTroops(issue, announce);
-                }
-                else
-                {
-                    continue;
-                }
+            var beingSolved = issue.IsSolvingWithQuest || issue.IsSolvingWithLordSolution || issue.IsSolvingWithAlternative;
+            if (!beingSolved || !playerIsGone(issue)) continue;
 
-                dismissed++;
-                // Startup has no client replay to remove stale unfinished rows, but cancelled history stays.
-                if (!announce)
-                    Campaign.Current.LogEntryHistory._logs.RemoveAll(
-                        entry => entry is JournalLogEntry journal && journal.IsRelatedTo(issue) && !journal.IsEnded());
-            }
-            catch (Exception e)
-            {
-                Logger.Error(e, "Dismissing {issue} failed", issue.StringId);
-            }
+            var outcome = issue.IsSolvingWithAlternative ? IssueOutcome.AlternativeSolution : IssueOutcome.QuestCancel;
+            endings.EndWithoutOwner(issue, outcome, announce);
+            dismissed++;
         }
 
         if (dismissed > 0 || !announce)
@@ -138,16 +121,18 @@ internal class ActiveIssueDismisser : IHandler, IActiveIssueDismisser
         }
     }
 
+    // A quest ends once its player is offline, sent troops only once nobody owns them any more
+    private bool IsOfAGonePlayer(IssueBase issue) =>
+        issue.IsSolvingWithAlternative ? !TryGetControllerId(issue, out _) : !OwnerIsConnected(issue);
+
+    private bool IsOwnedBy(IssueBase issue, string controllerId) =>
+        TryGetControllerId(issue, out var owner) && owner == controllerId;
+
     private bool OwnerIsConnected(IssueBase issue)
     {
         return TryGetControllerId(issue, out var controllerId)
             && playerManager.TryGetPlayer(controllerId, out var player)
             && playerManager.IsConnected(player);
-    }
-
-    private bool HasOwner(IssueBase issue)
-    {
-        return TryGetControllerId(issue, out _);
     }
 
     private bool TryGetControllerId(IssueBase issue, out string controllerId)
@@ -156,57 +141,5 @@ internal class ActiveIssueDismisser : IHandler, IActiveIssueDismisser
 
         return objectManager.TryGetId(issue.IssueOwner, out var issueOwnerId)
             && ownership.TryGetOwner(issueOwnerId, issue.StringId, out controllerId);
-    }
-
-    private void DismissQuest(IssueBase issue, bool announce)
-    {
-        Logger.Information("Dismissing the quest of {issue} offered by {owner}, its player is gone", issue.StringId, issue.IssueOwner?.StringId);
-        objectManager.TryGetId(issue.IssueOwner, out var issueOwnerId);
-
-        var quest = issue.IssueQuest;
-        var journals = Campaign.Current.GetCampaignBehavior<JournalLogsCampaignBehavior>();
-        if (journals != null && ownerResolver.TryResolveOwnerHero(issue, out var owner))
-        {
-            // IssueFinalized detaches the issue without raising vanilla's journal completion callback.
-            using (new MainHeroSubstitutionScope(owner, owner.PartyBelongedTo))
-            {
-                if (quest != null && quest.IsOngoing)
-                    journals.OnQuestCompleted(quest, QuestBase.QuestCompleteDetails.Cancel);
-                // The issue's accepted status takes precedence over the quest detail in IsEnded.
-                journals.OnIssueUpdated(issue, IssueBase.IssueUpdateDetails.IssueCancel, owner);
-            }
-        }
-
-        issueDismisser.Dismiss(issue);
-
-        if (announce)
-        {
-            messageBroker.Publish(issue, new IssueOutcomeObserved(issue, IssueOutcome.QuestCancel, issueOwnerId));
-        }
-    }
-
-    public void Dismiss(IssueBase issue, IssueOutcome outcome)
-    {
-        objectManager.TryGetId(issue.IssueOwner, out var issueOwnerId);
-        if (issue.IsSolvingWithAlternative) DismissTroops(issue, announce: false);
-        else DismissQuest(issue, announce: false);
-
-        messageBroker.Publish(issue, new IssueOutcomeObserved(issue, outcome, issueOwnerId));
-    }
-
-    private void DismissTroops(IssueBase issue, bool announce)
-    {
-        Logger.Information("Dismissing the troops sent for {issue} offered by {owner}, nobody owns them", issue.StringId, issue.IssueOwner?.StringId);
-
-        if (!issue.JournalEntries.Any(log => log.LogText?.Value == ReturnedTroopsText))
-            issue.AddLog(new JournalLog(CampaignTime.Now, new TextObject(ReturnedTroopsText)));
-        messageBroker.Publish(issue, new AlternativeSolutionEndingObserved(
-            issue, IssueBase.IssueUpdateDetails.IssueCancel));
-        issueDismisser.Dismiss(issue);
-
-        if (announce)
-        {
-            messageBroker.Publish(issue, new IssueOutcomeObserved(issue, IssueOutcome.AlternativeSolution));
-        }
     }
 }

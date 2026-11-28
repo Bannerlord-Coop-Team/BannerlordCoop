@@ -110,11 +110,30 @@ Keep patches thin. Owner lookups, issue scans and main hero swaps belong in a DI
 
 `IssueCancellationCoordinator` handles registered giver deaths and issue cancellation as the owner. When the
 owner has no party or the sent troops cannot return, it retains the issue and retries hourly. Its pending set
-belongs to the session's DI scope and is never saved. A missing owner uses `ActiveIssueDismisser` to release
+belongs to the session's DI scope and is never saved. A missing owner uses `IIssueEndingCoordinator` to release
 the issue and any disabled companion. Clients cancel through `NetworkIssueFinalized` or when an ownership join
 snapshot drops a remembered issue; the snapshot path captures local ownership before replacing the mirror and
 queues the same replay. Clients do not run the alternative troop return again. An ongoing quest announces its own cancellation, so the enclosing
 issue cancellation does not announce it a second time.
+
+- A deleted, retired or game over player, or a stale registration dropped at join, publishes `PlayerRemoved`, and
+  `ActiveIssueDismisser` ends its issues at once, sent troops too, along with every issue of a gone player, such as
+  troops whose accept threw after they left and so lost their owner entry.
+- Every issue that must end now goes through `IIssueEndingCoordinator.EndWithoutOwner` or, inside the owner's scope,
+  `EndAsOwner`. Each step runs even when one before it threw.
+- `AlternativeTroopsReturnPatch` is the only patch on `IssueManager.TryToMakeTroopsReturn`, and `IssueDailyTickPatch` the
+  only one on `IssueManager.DailyTick`. A quest replaces the troop return with `ITroopReturnDescriptor` and reacts to
+  `AlternativeTroopsReturned` or `IssueManagerDailyTicked`, never with a patch of its own.
+- Every server troop return runs `IIssueEndingCoordinator.BeforeTroopReturn` first, which notes the return on the issue's
+  claim. `AlternativeSolutionJournalHandler` notes the first troop ending sent to the owner on the claim too, so an ending
+  that threw neither returns the troops nor writes the owner's ending twice. Its owner entry is gone by then, so no later
+  completion pays again.
+- An ending is announced only once the issue is out of `IssueManager.Issues`. One still in the manager is tried again after
+  the server daily tick, without running its ending again, deactivated only if that throws too, and then announced.
+- A quest whose own cancel threw before it finalized stays until its own timeout, which is accepted.
+- A forced ending drops its owner entry with `IIssueOwnershipRegistry.Remove(issueOwnerId, issueId)`, so a late ending
+  never takes the owner of the giver's next issue.
+- Every troop return leaves behind companions whose death already ran (`IIssueEndingCoordinator.BeforeTroopReturn`).
 
 ## Verification
 

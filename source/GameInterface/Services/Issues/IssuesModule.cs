@@ -39,6 +39,8 @@ internal class IssuesModule : Module
         builder.RegisterType<IssueResolver>().As<IIssueResolver>().SingleInstance();
         builder.RegisterType<IssueOwnerResolver>().As<IIssueOwnerResolver>().SingleInstance();
         builder.RegisterType<IssueOwnershipRegistry>().As<IIssueOwnershipRegistry>().SingleInstance();
+        builder.RegisterType<IssueEndingClaimRegistry>().As<IIssueEndingClaimRegistry>().SingleInstance();
+        builder.RegisterType<IssueEndingCoordinator>().As<IIssueEndingCoordinator>().SingleInstance();
         builder.RegisterType<AlternativeSolutionTroopValidator>().As<IAlternativeSolutionTroopValidator>().InstancePerDependency();
         builder.Register(context => context.Resolve<AlternativeSolutionCommitments>()).As<IAlternativeSolutionCommitments>();
         builder.Register(context => context.Resolve<AlternativeSolutionPicker>()).As<IAlternativeSolutionPicker>();
@@ -55,7 +57,6 @@ internal class IssuesModule : Module
         builder.RegisterType<CaravanAmbushWorldEventService>().As<ICaravanAmbushWorldEventService>().InstancePerLifetimeScope();
         builder.RegisterType<HeadmanHerdCleanup>().As<IHeadmanHerdCleanup>().SingleInstance();
         builder.RegisterType<IssueCancellationCoordinator>().As<IIssueCancellationCoordinator>().InstancePerLifetimeScope();
-        builder.Register(context => context.Resolve<ActiveIssueDismisser>()).As<IActiveIssueDismisser>();
         builder.RegisterType<IssueConversationTracker>().As<IIssueConversationTracker>().SingleInstance();
         builder.RegisterType<IssueConversationGuard>().As<IIssueConversationGuard>().SingleInstance();
         builder.RegisterType<MerchantOutlawsProgress>().As<IMerchantOutlawsProgress>().InstancePerLifetimeScope();

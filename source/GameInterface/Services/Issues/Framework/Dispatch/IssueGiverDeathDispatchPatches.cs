@@ -1,4 +1,5 @@
-﻿using GameInterface.Services.Issues.Framework.Interface;
+﻿using GameInterface.Services.Issues.Framework.Finalization;
+using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
 using System;
 using TaleWorlds.CampaignSystem;
@@ -13,16 +14,19 @@ internal class IssueGiverDeathDispatchPatches
 {
     [HarmonyPatch(typeof(IssueManager), nameof(IssueManager.OnHeroKilled))]
     [HarmonyPrefix]
-    private static bool Prefix(Hero victim, out IDisposable __state)
+    private static bool Prefix(Hero victim, out (IssueBase Issue, IDisposable Owner) __state)
     {
-        __state = null;
+        // Kept here, since the cancel clears the giver's issue
+        __state = (victim.Issue, null);
         return !ContainerProvider.TryResolve<IIssueCancellationCoordinator>(out var coordinator) ||
-            coordinator.BeforeGiverDeath(victim, out __state);
+            coordinator.BeforeGiverDeath(victim, out __state.Owner);
     }
 
+    // Vanilla cancels the quest inline, so a throw there would otherwise leave it unannounced and unwind the death
     [HarmonyPatch(typeof(IssueManager), nameof(IssueManager.OnHeroKilled))]
     [HarmonyFinalizer]
-    private static void Finalizer(IDisposable __state) => __state?.Dispose();
+    private static Exception Finalizer((IssueBase Issue, IDisposable Owner) __state, Exception __exception) =>
+        OwnerEndingFinalizer.Finish(__state.Issue, IssueOutcome.QuestCancel, __state.Owner, __exception);
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.HourlyTick))]
     [HarmonyPostfix]

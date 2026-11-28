@@ -44,10 +44,12 @@ internal class AlternativeSolutionJournalHandler : IHandler
     private readonly ConditionalWeakTable<IssueBase, NetPeer> ownerPeers = new();
     private readonly object ownerPeersLock = new();
     private readonly IIssueConversationGuard conversationGuard;
+    private readonly IIssueEndingClaimRegistry claims;
 
     public AlternativeSolutionJournalHandler(IMessageBroker broker, INetwork network, IObjectManager objects,
         IIssueResolver resolver, IIssueOwnerResolver owners, IQuestTypeRegistry registry,
-        IControllerIdProvider controller, IPlayerManager players, IIssueConversationGuard conversationGuard)
+        IControllerIdProvider controller, IPlayerManager players, IIssueConversationGuard conversationGuard,
+        IIssueEndingClaimRegistry claims)
     {
         this.broker = broker;
         this.network = network;
@@ -58,6 +60,7 @@ internal class AlternativeSolutionJournalHandler : IHandler
         this.controller = controller;
         this.players = players;
         this.conversationGuard = conversationGuard;
+        this.claims = claims;
         broker.Subscribe<AlternativeSolutionEndingObserved>(HandleObserved);
         broker.Subscribe<AlternativeSolutionAcceptedOnServer>(RememberOwnerPeer);
         broker.Subscribe<NetworkAlternativeSolutionJournal>(HandleJournal);
@@ -93,6 +96,7 @@ internal class AlternativeSolutionJournalHandler : IHandler
         var issue = payload.What.Issue;
         if (!IsEnding(payload.What.Ending) || !issue.IsSolvingWithAlternative ||
             !registry.IsRegistered(issue.GetType())) return;
+        claims.NoteSentEnding(issue, payload.What.Ending);
         if (!objects.TryGetIdWithLogging(issue.IssueOwner, out var giverId)) return;
         var report = issue.JournalEntries.LastOrDefault()?.LogText;
         // Vanilla failure binds the companion globally instead of saving it on the report.

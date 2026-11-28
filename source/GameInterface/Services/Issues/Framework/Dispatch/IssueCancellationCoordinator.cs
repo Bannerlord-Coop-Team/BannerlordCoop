@@ -20,16 +20,18 @@ namespace GameInterface.Services.Issues.Framework.Dispatch;
 internal class IssueCancellationCoordinator : IIssueCancellationCoordinator
 {
     private static readonly ILogger Logger = LogManager.GetLogger<IssueCancellationCoordinator>();
+    private static readonly TextObject HeirCancelLog = new TextObject(
+        "{=bYdhYidf}The quest was canceled because your clan leader, who made the original agreement, is no longer head of the clan.");
     private readonly IQuestTypeRegistry registry;
     private readonly IIssueOwnerResolver ownerResolver;
-    private readonly IActiveIssueDismisser dismisser;
+    private readonly IIssueEndingCoordinator endings;
     private readonly Dictionary<IssueBase, TextObject> pending = new Dictionary<IssueBase, TextObject>();
 
-    public IssueCancellationCoordinator(IQuestTypeRegistry registry, IIssueOwnerResolver ownerResolver, IActiveIssueDismisser dismisser)
+    public IssueCancellationCoordinator(IQuestTypeRegistry registry, IIssueOwnerResolver ownerResolver, IIssueEndingCoordinator endings)
     {
         this.registry = registry;
         this.ownerResolver = ownerResolver;
-        this.dismisser = dismisser;
+        this.endings = endings;
     }
 
     public bool IsPending(IssueBase issue) => issue != null && pending.ContainsKey(issue);
@@ -66,11 +68,7 @@ internal class IssueCancellationCoordinator : IIssueCancellationCoordinator
             return false;
         }
 
-        using (owner)
-        {
-            CancelQuestAndIssue(issue, BuildGiverDeathLog(issue));
-        }
-
+        endings.EndAsOwner(issue, IssueOutcome.QuestCancel, () => CancelQuestAndIssue(issue, BuildGiverDeathLog(issue)), owner);
         return false;
     }
 
@@ -78,17 +76,15 @@ internal class IssueCancellationCoordinator : IIssueCancellationCoordinator
     {
         if (ModInformation.IsClient) return;
 
-        using (new MainHeroSubstitutionScope(oldHero, originalParty))
+        foreach (var issue in Campaign.Current.IssueManager.Issues.Values.ToList())
         {
-            foreach (var issue in Campaign.Current.IssueManager.Issues.Values.ToList())
-            {
-                var quest = issue.IssueQuest;
-                if (!registry.IsRegistered(issue.GetType()) || quest == null || !quest.IsOngoing || quest.IsSpecialQuest ||
-                    !ownerResolver.TryGetOwnerControllerId(issue, out var owner) || owner != controllerId) continue;
+            var quest = issue.IssueQuest;
+            if (!registry.IsRegistered(issue.GetType()) || quest == null || !quest.IsOngoing || quest.IsSpecialQuest ||
+                !ownerResolver.TryGetOwnerControllerId(issue, out var owner) || owner != controllerId) continue;
 
-                try { CancelQuestAndIssue(issue, new TextObject("{=bYdhYidf}The quest was canceled because your clan leader, who made the original agreement, is no longer head of the clan.")); }
-                catch (Exception e) { Logger.Error(e, "Cancelling quest {questId} during heir selection failed", quest.StringId); }
-            }
+            // The controller is still here, so the quest's journal row ends as a cancel instead of being dropped
+            endings.EndAsOwner(issue, IssueOutcome.QuestCancel, () => CancelQuestAndIssue(issue, HeirCancelLog),
+                new MainHeroSubstitutionScope(oldHero, originalParty));
         }
     }
 
@@ -141,7 +137,7 @@ internal class IssueCancellationCoordinator : IIssueCancellationCoordinator
         if (!ownerResolver.TryResolveOwnerHero(issue, out var ownerHero))
         {
             pending.Remove(issue);
-            dismisser.Dismiss(issue, IssueOutcome.QuestCancel);
+            endings.EndWithoutOwner(issue, IssueOutcome.QuestCancel, announce: true);
             return false;
         }
 

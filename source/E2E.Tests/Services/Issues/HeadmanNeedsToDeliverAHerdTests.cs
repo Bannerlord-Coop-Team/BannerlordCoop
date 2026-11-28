@@ -635,6 +635,36 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
             instance.Call(() => Assert.True(Object<Hero>(instance, secondGiver).Issue.IsSolvingWithQuest));
     }
 
+    [Fact]
+    public void CompanionWhoseDeathAlreadyRanStaysBehindWhenTheHerdTroopsReturn()
+    {
+        var (companionId, troopId) = StartCompanions();
+        using var nativeState = new NativeHeroStateScope();
+
+        Server.Call(() =>
+        {
+            var companion = Object<Hero>(Server, companionId);
+            using (new AllowedThread())
+            {
+                companion.SetBirthDay(CampaignTime.YearsFromNow(-30f));
+                companion._defaultAge = 30f;
+                // What vanilla's death clears, while the hero stays Disabled on the mission like in #4887
+                companion.OnDeath();
+            }
+            new CharacterDevelopmentCampaignBehavior().RegisterEvents();
+            var issue = Object<Hero>(Server, scenario.NotableId).Issue;
+            issue._failureChance = 1f;
+
+            // Without the herd's own step, activating the companion throws in CharacterDevelopmentCampaignBehavior.OnHeroActivated
+            issue.CompleteIssueWithAlternativeSolution();
+
+            var roster = Party(Server, QuestScenario.ControllerA).MemberRoster;
+            Assert.Equal(Hero.CharacterStates.Disabled, companion.HeroState);
+            Assert.Equal(0, roster.GetTroopCount(companion.CharacterObject));
+            Assert.Equal(40, roster.GetTroopCount(Object<CharacterObject>(Server, troopId)));
+        });
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -815,20 +845,20 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
     }
 
     [Fact]
-    public void ReturningAlternativeTroopsTwice_AddsThemOnlyOnce()
+    public void ReturningAlternativeTroopsTwice_EmptiesTheSentRosterAtOnceAndAddsThemOnlyOnce()
     {
         var (_, troopId) = StartCompanions();
         Server.Call(() =>
         {
             using var scope = OwnerScope(Server, QuestScenario.ControllerA);
             var issue = Object<Hero>(Server, scenario.NotableId).Issue;
-            var cleanup = Server.Resolve<IHeadmanHerdCleanup>();
-            Assert.True(cleanup.ReturnAlternativeTroops(issue));
-            var first = Party(Server, QuestScenario.ControllerA).MemberRoster.GetTroopCount(Object<CharacterObject>(Server, troopId));
-            Assert.True(cleanup.ReturnAlternativeTroops(issue));
-            var second = Party(Server, QuestScenario.ControllerA).MemberRoster.GetTroopCount(Object<CharacterObject>(Server, troopId));
-            Assert.Equal(first, second);
+            var troop = Object<CharacterObject>(Server, troopId);
+            // Vanilla's return leaves the sent roster for finalization to clear, so a second return would add the troops again
+            Campaign.Current.IssueManager.TryToMakeTroopsReturn(issue);
             Assert.Empty(issue.AlternativeSolutionSentTroops.GetTroopRoster());
+            Assert.Equal(40, Party(Server, QuestScenario.ControllerA).MemberRoster.GetTroopCount(troop));
+            Campaign.Current.IssueManager.TryToMakeTroopsReturn(issue);
+            Assert.Equal(40, Party(Server, QuestScenario.ControllerA).MemberRoster.GetTroopCount(troop));
         });
     }
 

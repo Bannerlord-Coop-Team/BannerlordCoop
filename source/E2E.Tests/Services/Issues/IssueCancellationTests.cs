@@ -1,12 +1,23 @@
-﻿using Common.Util;
+﻿using Common.Messaging;
+using Common.Network.Messages;
+using Common.Util;
 using E2E.Tests.Environment;
+using E2E.Tests.Util;
+using GameInterface.Services.Heroes.Patches;
+using GameInterface.Services.Issues.Framework.AcceptCoordination;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
+using HarmonyLib;
+using Helpers;
+using LiteNetLib;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.LogEntries;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.Core;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Issues;
@@ -14,6 +25,12 @@ namespace E2E.Tests.Services.Issues;
 /// <summary>Exercises registered issue cancellation through the patched vanilla entry points.</summary>
 public class IssueCancellationTests : IDisposable
 {
+    // Synthetic heroes have no encyclopedia entries for the journal text links
+    private static readonly MethodBase[] JournalTextLinks =
+    {
+        AccessTools.Method(typeof(StringHelpers), nameof(StringHelpers.GetCharacterProperties)),
+    };
+
     private readonly StubIssueQuestGenerator quests = new();
     private readonly StubIssuePreconditions preconditions = new(QuestScenario.IssueType);
     private readonly E2ETestEnvironment environment;
@@ -105,7 +122,7 @@ public class IssueCancellationTests : IDisposable
     [Fact]
     public void PlayerDeathDoesNotReturnOrCancelPendingAlternativeTroops()
     {
-        StageAlternative(environment.CreateRegisteredObject<Hero>(), environment.CreateRegisteredObject<CharacterObject>());
+        scenario.SendTroops(environment.CreateRegisteredObject<Hero>(), environment.CreateRegisteredObject<CharacterObject>());
         scenario.Server.Call(() =>
         {
             Assert.True(scenario.Server.ObjectManager.TryGetObject<Hero>(scenario.OwnerHeroId, out var owner));
@@ -120,6 +137,105 @@ public class IssueCancellationTests : IDisposable
             Assert.Empty(Campaign.Current.IssueManager._awaitingAlternativeSolutionTroops.GetTroopRoster());
         });
         Assert.Empty(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+    }
+
+    [Fact]
+    public void PlayerCharacterChangeCancelThatThrowsOutOfTheManagerIsStillAnnounced() =>
+        AssertCancelThatThrowsOutOfTheManagerIsStillAnnounced((owner, originalParty) =>
+            scenario.Server.Resolve<IIssueCancellationCoordinator>().CancelForPlayerDeath(QuestScenario.ControllerA, owner, originalParty));
+
+    [Fact]
+    public void GiverDeathCancelThatThrowsOutOfTheManagerIsStillAnnounced() =>
+        AssertCancelThatThrowsOutOfTheManagerIsStillAnnounced((_, _) =>
+        {
+            using (new AllowedThread()) Giver().ChangeState(Hero.CharacterStates.Dead);
+            Campaign.Current.IssueManager.OnHeroKilled(Giver(), null, KillCharacterAction.KillCharacterActionDetail.None, false);
+        });
+
+    [Fact]
+    public void GiverOwnerChangeCancelThatThrowsOutOfTheManagerIsStillAnnounced()
+    {
+        var heirId = environment.CreateRegisteredObject<Hero>();
+        AssertCancelThatThrowsOutOfTheManagerIsStillAnnounced((_, _) =>
+        {
+            using (new AllowedThread()) Giver().ChangeState(Hero.CharacterStates.Dead);
+            Campaign.Current.IssueManager.ChangeIssueOwner(Giver().Issue, scenario.Server.GetRegisteredObject<Hero>(heirId));
+        });
+    }
+
+    [Fact]
+    public void IssueCancelThatThrowsOutOfTheManagerIsStillAnnounced() =>
+        AssertCancelThatThrowsOutOfTheManagerIsStillAnnounced((_, _) => Giver().Issue.CompleteIssueWithCancel());
+
+    // The owner's accepted quest is cancelled on the server by the given entry, given the owner and its party
+    private void AssertCancelThatThrowsOutOfTheManagerIsStillAnnounced(Action<Hero, MobileParty> cancel)
+    {
+        scenario.Accept(scenario.ClientA);
+        var errors = new List<Exception>();
+        scenario.Server.Call(() =>
+        {
+            Assert.True(scenario.Server.ObjectManager.TryGetObject<Hero>(scenario.OwnerHeroId, out var owner));
+            Assert.True(scenario.Server.ObjectManager.TryGetObject<MobileParty>(scenario.OwnerPartyId, out var originalParty));
+            using (new AllowedThread()) owner.PartyBelongedTo = originalParty;
+            // IssueFinalized throws once DeactivateIssue took the issue out, so no quest outcome is observed
+            using var throwing = new ThrowingMethodsScope(AccessTools.Method(typeof(IssueBase), nameof(IssueBase.RemoveAllTrackedObjects)));
+            try
+            {
+                cancel(owner, originalParty);
+            }
+            catch (Exception e)
+            {
+                errors.Add(e);
+            }
+        }, JournalTextLinks);
+        environment.FlushCoalescer();
+
+        // Clients drop it and the controller's next character can't collect it
+        AssertFinalizedEverywhere();
+        scenario.Server.Call(() => Assert.False(scenario.Server.Resolve<IIssueOwnershipRegistry>()
+            .TryGetOwner(scenario.NotableId, QuestScenario.IssueId, out _)));
+        Assert.Empty(errors);
+    }
+
+    [Fact]
+    public void PlayerCharacterChangeCancelThatThrowsBeforeTheJournalEndsTheRowAsACancel()
+    {
+        scenario.Accept(scenario.ClientA);
+        IssueBase issue = null!;
+        scenario.Server.Call(() =>
+        {
+            issue = Giver().Issue;
+            Assert.True(scenario.Server.ObjectManager.TryGetObject<Hero>(scenario.OwnerHeroId, out var owner));
+            Assert.True(scenario.Server.ObjectManager.TryGetObject<MobileParty>(scenario.OwnerPartyId, out var originalParty));
+            new JournalLogsCampaignBehavior().RegisterEvents();
+            using (new MainHeroSubstitutionScope(owner, owner.PartyBelongedTo))
+            {
+                CampaignEventDispatcher.Instance.OnIssueUpdated(issue, IssueBase.IssueUpdateDetails.PlayerStartedIssueQuestClassicSolution, owner);
+                issue.IssueQuest.AddLog(new TaleWorlds.Localization.TextObject("Quest progress line"));
+            }
+            // Added last so it runs before the journal listener, and the issue stays in the manager
+            CampaignEvents.OnQuestCompletedEvent.AddNonSerializedListener(this, (_, _) => ThrowingMethodsScope.Throw());
+            try
+            {
+                scenario.Server.Resolve<IIssueCancellationCoordinator>()
+                    .CancelForPlayerDeath(QuestScenario.ControllerA, owner, originalParty);
+            }
+            finally
+            {
+                CampaignEvents.OnQuestCompletedEvent.ClearListeners(this);
+            }
+        }, JournalTextLinks);
+        scenario.Server.Call(() => Campaign.Current.IssueManager.DailyTick());
+        environment.FlushCoalescer();
+
+        AssertFinalizedEverywhere();
+        // The connected player's history ends as a cancel instead of being deleted, keeping its quest's own lines
+        scenario.Server.Call(() =>
+        {
+            var archive = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(entry => entry.IsRelatedTo(issue)));
+            Assert.Equal(IssueBase.IssueUpdateDetails.IssueCancel, archive._lastIssueStatus);
+            Assert.Single(archive.GetEntries(), entry => entry.LogText.ToString() == "Quest progress line");
+        });
     }
 
     private sealed class SpecialQuest : UnstartedQuest
@@ -225,6 +341,92 @@ public class IssueCancellationTests : IDisposable
         AssertFinalizedEverywhere();
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void MissingOwnerQuestDismissalThatThrowsEndsOnceAndDropsTheOpenJournal(bool otherPlayerLeaves)
+    {
+        scenario.Accept(scenario.ClientA);
+        IssueBase issue = null!;
+        scenario.Server.Call(() => issue = Giver().Issue);
+
+        KillOwnerlessGiverWhileFinalizingThrows(issue, IssueBase.IssueUpdateDetails.PlayerStartedIssueQuestClassicSolution, otherPlayerLeaves);
+
+        AssertFinalizedEverywhere();
+        Assert.Empty(scenario.Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionJournal>());
+        AssertNoOpenJournal(issue);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void MissingOwnerTroopDismissalThatThrowsEndsOnceWithTheCancelAndDropsTheOpenJournal(bool otherPlayerLeaves)
+    {
+        scenario.SendTroops(environment.CreateRegisteredObject<Hero>(), environment.CreateRegisteredObject<CharacterObject>());
+        IssueBase issue = null!;
+        scenario.Server.Call(() =>
+        {
+            issue = Giver().Issue;
+            // Troops not due back yet, so only the retry ends the issue, with the cancel the coordinator asked for
+            issue.AlternativeSolutionReturnTimeForTroops = CampaignTime.DaysFromNow(5f);
+            issue.AlternativeSolutionIssueEffectClearTime = CampaignTime.DaysFromNow(4f);
+            // Remembered at acceptance, so the troop ending still reaches the owner once the owner entry is gone
+            scenario.Server.Resolve<IMessageBroker>().Publish(this,
+                new AlternativeSolutionAcceptedOnServer(scenario.NotableId, QuestScenario.IssueId, QuestScenario.ControllerA));
+        });
+
+        KillOwnerlessGiverWhileFinalizingThrows(issue, IssueBase.IssueUpdateDetails.PlayerSentTroopsToQuest, otherPlayerLeaves);
+
+        AssertFinalizedEverywhere();
+        // The owner hears once that its troops are back
+        Assert.Equal(IssueBase.IssueUpdateDetails.IssueCancel,
+            Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionJournal>()).Ending);
+        AssertNoOpenJournal(issue);
+    }
+
+    // The giver dies after the owner accepted and the owner entry is gone, and IssueFinalized throws in that ending
+    private void KillOwnerlessGiverWhileFinalizingThrows(IssueBase issue, IssueBase.IssueUpdateDetails accepted, bool otherPlayerLeaves)
+    {
+        var errors = new List<Exception>();
+        scenario.Server.Call(() =>
+        {
+            Assert.True(scenario.Server.ObjectManager.TryGetObject<Hero>(scenario.OwnerHeroId, out var owner));
+            new JournalLogsCampaignBehavior().RegisterEvents();
+            using (new MainHeroSubstitutionScope(owner, owner.PartyBelongedTo))
+                CampaignEventDispatcher.Instance.OnIssueUpdated(issue, accepted, owner);
+            Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(entry => entry.IsRelatedTo(issue)));
+            scenario.Server.Resolve<IIssueOwnershipRegistry>().Remove(scenario.NotableId);
+            using (new AllowedThread()) Giver().ChangeState(Hero.CharacterStates.Dead);
+
+            using var throwing = new ThrowingMethodsScope(AccessTools.Method(typeof(IssueBase), nameof(IssueBase.IssueFinalized)));
+            try
+            {
+                Campaign.Current.IssueManager.OnHeroKilled(Giver(), null, KillCharacterAction.KillCharacterActionDetail.None, false);
+            }
+            catch (Exception e)
+            {
+                errors.Add(e);
+            }
+        }, JournalTextLinks);
+
+        // A sweep in between finds the issue ownerless, but the daily retry already finishes it with the outcome it had
+        if (otherPlayerLeaves)
+        {
+            scenario.Server.Call(() => scenario.Server.Resolve<IMessageBroker>().Publish(this,
+                new PlayerDisconnected(scenario.ClientB.NetPeer, default(DisconnectInfo))), JournalTextLinks);
+            scenario.Server.PumpGameThread();
+        }
+
+        scenario.Server.Call(() => Campaign.Current.IssueManager.DailyTick());
+        environment.FlushCoalescer();
+        Assert.Empty(errors);
+    }
+
+    // No owner is left to end the accepted row, so it goes instead of staying open in the server save
+    private void AssertNoOpenJournal(IssueBase issue) =>
+        scenario.Server.Call(() => Assert.DoesNotContain(
+            Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(entry => entry.IsRelatedTo(issue)), entry => !entry.IsEnded()));
+
     [Fact]
     public void GiverDeathServiceSuppliesAndRestoresOwnerScopeWithoutHarmony()
     {
@@ -253,7 +455,7 @@ public class IssueCancellationTests : IDisposable
     {
         var companionId = environment.CreateRegisteredObject<Hero>();
         var troopId = environment.CreateRegisteredObject<CharacterObject>();
-        StageAlternative(companionId, troopId);
+        scenario.SendTroops(companionId, troopId);
         scenario.Server.Call(() =>
         {
             Assert.True(scenario.Server.ObjectManager.TryGetObject<Hero>(scenario.OwnerHeroId, out var owner));
@@ -294,7 +496,7 @@ public class IssueCancellationTests : IDisposable
     {
         var companionId = environment.CreateRegisteredObject<Hero>();
         var troopId = environment.CreateRegisteredObject<CharacterObject>();
-        StageAlternative(companionId, troopId);
+        scenario.SendTroops(companionId, troopId);
         var updates = new List<(IssueBase Issue, IssueBase.IssueUpdateDetails Detail, Hero Solver, bool Attached, int Troops)>();
         Hero expectedSolver = null!;
         scenario.ClientA.Call(() =>
@@ -336,7 +538,7 @@ public class IssueCancellationTests : IDisposable
     public void MissingAlternativeOwnerFreesDisabledCompanionAndDismissesOnce()
     {
         var companionId = environment.CreateRegisteredObject<Hero>();
-        StageAlternative(companionId, environment.CreateRegisteredObject<CharacterObject>());
+        scenario.SendTroops(companionId, environment.CreateRegisteredObject<CharacterObject>());
         scenario.Server.Call(() =>
         {
             var issue = Giver().Issue;
@@ -375,7 +577,7 @@ public class IssueCancellationTests : IDisposable
     [Fact]
     public void DeadGiverCancelsInsteadOfCompletingTheAlternativeSolution()
     {
-        StageAlternative(environment.CreateRegisteredObject<Hero>(), environment.CreateRegisteredObject<CharacterObject>());
+        scenario.SendTroops(environment.CreateRegisteredObject<Hero>(), environment.CreateRegisteredObject<CharacterObject>());
         scenario.Server.Call(() =>
         {
             using (new AllowedThread()) Giver()._heroState = Hero.CharacterStates.Dead;
@@ -384,32 +586,105 @@ public class IssueCancellationTests : IDisposable
         AssertFinalizedEverywhere();
     }
 
-    private void StageAlternative(string companionId, string troopId)
+    // Vanilla returned the troops before the cancel listener throws
+    [Fact]
+    public void DeadGiverCancelListenerThatThrowsReturnsTheTroopsOnceAndTellsTheOwnerOnce() =>
+        AssertDeadGiverCancelThatThrowsReturnsTheTroopsOnce(() =>
+            CampaignEvents.OnIssueUpdatedEvent.AddNonSerializedListener(this, (_, detail, _) =>
+            {
+                if (detail == IssueBase.IssueUpdateDetails.IssueCancel) ThrowingMethodsScope.Throw();
+            }));
+
+    // The troops returned line's log listener throws before vanilla returns them
+    [Fact]
+    public void DeadGiverCancelLogListenerThatThrowsReturnsTheTroopsOnceAndTellsTheOwnerOnce() =>
+        AssertDeadGiverCancelThatThrowsReturnsTheTroopsOnce(() =>
+            CampaignEvents.IssueLogAddedEvent.AddNonSerializedListener(this, (_, _) => ThrowingMethodsScope.Throw()));
+
+    // The giver's death news throws before vanilla reaches the cancel
+    [Fact]
+    public void DeadGiverDeathNewsThatThrowsReturnsTheTroopsOnceAndTellsTheOwnerOnce() =>
+        AssertDeadGiverCancelThatThrowsReturnsTheTroopsOnce(() =>
+        {
+            using var throwing = new ThrowingMethodsScope(AccessTools.Method(typeof(GameTexts), nameof(GameTexts.FindText)));
+            Campaign.Current.IssueManager.OnHeroKilled(Giver(), null, KillCharacterAction.KillCharacterActionDetail.None, false);
+        });
+
+    // ControllerA's troops are out for a giver who just died, and the given fault breaks the first cancel on the server
+    private void AssertDeadGiverCancelThatThrowsReturnsTheTroopsOnce(Action breakTheFirstCancel)
     {
-        var rosterId = environment.CreateRegisteredObject<TroopRoster>();
+        var companionId = environment.CreateRegisteredObject<Hero>();
+        var troopId = environment.CreateRegisteredObject<CharacterObject>();
+        scenario.SendTroops(companionId, troopId);
+        scenario.Server.Call(() =>
+        {
+            using (new AllowedThread()) Giver()._heroState = Hero.CharacterStates.Dead;
+            var issue = Giver().Issue;
+            breakTheFirstCancel();
+            // The next due tick must not cancel the issue and return the same troops again
+            try
+            {
+                for (var day = 0; day < 2; day++) issue.CompleteIssueWithAlternativeSolution();
+            }
+            finally
+            {
+                CampaignEvents.IssueLogAddedEvent.ClearListeners(this);
+                CampaignEvents.OnIssueUpdatedEvent.ClearListeners(this);
+            }
+            // Once it can be detached, the retry ends it
+            Campaign.Current.IssueManager.DailyTick();
+        });
+        environment.FlushCoalescer();
+
+        // A throw before vanilla returned them returns them once in the ending, the return never runs a second time
         foreach (var instance in new[] { scenario.Server, scenario.ClientA, scenario.ClientB })
         {
             instance.Call(() =>
             {
-                Assert.True(instance.ObjectManager.TryGetObject<Hero>(scenario.NotableId, out var giver));
-                Assert.True(instance.ObjectManager.TryGetObject<Hero>(scenario.OwnerHeroId, out var owner));
                 Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(scenario.OwnerPartyId, out var party));
                 Assert.True(instance.ObjectManager.TryGetObject<Hero>(companionId, out var companion));
                 Assert.True(instance.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
-                Assert.True(instance.ObjectManager.TryGetObject<TroopRoster>(rosterId, out var roster));
-                using (new AllowedThread())
-                {
-                    party.Party.MemberRoster = roster;
-                    roster.OwnerParty = party.Party;
-                    owner.PartyBelongedTo = party;
-                    giver.Issue._issueState = IssueBase.IssueState.SolvingWithAlternativeSolution;
-                    giver.Issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 1);
-                    giver.Issue.AlternativeSolutionSentTroops.AddToCounts(troop, 3);
-                    companion._heroState = Hero.CharacterStates.Disabled;
-                }
-                Assert.True(instance.Resolve<IIssueOwnershipRegistry>().TrySetOwner(scenario.NotableId, QuestScenario.IssueId, QuestScenario.ControllerA));
+                Assert.Equal(1, party.MemberRoster.GetTroopCount(companion.CharacterObject));
+                Assert.Equal(3, party.MemberRoster.GetTroopCount(troop));
             });
         }
+        AssertFinalizedEverywhere();
+        // The owner's accepted journal hears the cancel once, also when it threw before vanilla's cancel event, and its
+        // troops returned line is true
+        var journal = Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionJournal>());
+        Assert.Equal(IssueBase.IssueUpdateDetails.IssueCancel, journal.Ending);
+        Assert.Single(journal.Entries, entry => entry.Text.Value == "{=V5Za6d4h}Your troops have returned from their mission.");
+    }
+
+    [Fact]
+    public void QuestCancelWhoseIssueCannotBeFinalizedLeavesTheManagerWithoutCancellingTheQuestAgain()
+    {
+        scenario.Accept(scenario.ClientA);
+        var questEndings = 0;
+        scenario.Server.Call(() =>
+        {
+            Assert.True(scenario.Server.ObjectManager.TryGetObject<Hero>(scenario.OwnerHeroId, out var owner));
+            Assert.True(scenario.Server.ObjectManager.TryGetObject<MobileParty>(scenario.OwnerPartyId, out var originalParty));
+            using (new AllowedThread()) owner.PartyBelongedTo = originalParty;
+            CampaignEvents.OnQuestCompletedEvent.AddNonSerializedListener(this, (_, _) => questEndings++);
+            // The issue keeps its quest, so vanilla's DeactivateIssue would cancel that quest again instead of removing it
+            try
+            {
+                using var throwing = new ThrowingMethodsScope(AccessTools.Method(typeof(IssueBase), nameof(IssueBase.IssueFinalized)));
+                scenario.Server.Resolve<IIssueCancellationCoordinator>()
+                    .CancelForPlayerDeath(QuestScenario.ControllerA, owner, originalParty);
+                Campaign.Current.IssueManager.DailyTick();
+            }
+            finally
+            {
+                CampaignEvents.OnQuestCompletedEvent.ClearListeners(this);
+            }
+        }, JournalTextLinks);
+        environment.FlushCoalescer();
+
+        Assert.Equal(1, questEndings);
+        AssertFinalizedEverywhere();
+        scenario.Server.Call(() => Assert.False(Campaign.Current.IssueManager.Issues.ContainsKey(Giver())));
     }
 
     private Hero Giver()

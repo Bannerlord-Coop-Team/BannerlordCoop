@@ -1,7 +1,5 @@
 ﻿using Common;
-using Common.Messaging;
 using GameInterface.Services.Issues.Framework.Interface;
-using GameInterface.Services.Heroes.Messages;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.LogEntries;
@@ -9,7 +7,6 @@ using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Extensions;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.Localization;
-using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Settlements;
 using Issue = TaleWorlds.CampaignSystem.Issues.HeadmanNeedsGrainIssueBehavior.HeadmanNeedsGrainIssue;
 using Quest = TaleWorlds.CampaignSystem.Issues.HeadmanNeedsGrainIssueBehavior.HeadmanNeedsGrainIssueQuest;
@@ -81,20 +78,5 @@ internal class HeadmanNeedsGrainBranchPatches
             return false;
         }
         return true;
-    }
-
-    [HarmonyPatch(typeof(IssueManager), nameof(IssueManager.TryToMakeTroopsReturn))]
-    [HarmonyPostfix]
-    private static void ReturnPostfix(IssueBase issue)
-    {
-        if (ModInformation.IsClient || !(issue is Issue)) return;
-        foreach (var troop in issue.AlternativeSolutionSentTroops.GetTroopRoster())
-        {
-            if (troop.Character.IsHero && troop.Character.HeroObject.HeroState == Hero.CharacterStates.Active)
-            {
-                var hero = troop.Character.HeroObject;
-                MessageBroker.Instance.Publish(hero, new HeroStateChanged((int)hero.HeroState, hero));
-            }
-        }
     }
 }

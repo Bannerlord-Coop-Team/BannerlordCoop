@@ -188,6 +188,7 @@ internal class PlayerDeletionHandler : IHandler
             Logger.Warning("Could not remove player registration for {ControllerId} during retirement", player.ControllerId);
             return;
         }
+        messageBroker.Publish(this, new PlayerRemoved(player.ControllerId));
         sessionProvider.CoopSession.StatisticsPlayerData.PlayerStatistics.Remove(player.HeroId);
 
         network.Send(peer, new NetworkPlayerRetired(player.ControllerId, player.HeroId, statistics));
@@ -263,7 +264,8 @@ internal class PlayerDeletionHandler : IHandler
             TryStep("party settlement exit", () => LeaveSettlementAction.ApplyForParty(party));
         }
 
-        playerManager.RemovePlayer(player);
+        var deregistered = playerManager.RemovePlayer(player);
+        if (deregistered) messageBroker.Publish(this, new PlayerRemoved(player.ControllerId));
         sessionProvider.CoopSession.AgingPlayerData.PlayerSuccessions.Remove(player.HeroId);
         sessionProvider.CoopSession.StatisticsPlayerData.PlayerStatistics.Remove(player.HeroId);
 

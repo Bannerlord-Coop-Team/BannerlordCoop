@@ -4,6 +4,7 @@ using Common.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.Issues.Framework.Visibility;
 using GameInterface.Services.ObjectManager;
 using System;
 using System.Linq;
@@ -12,6 +13,7 @@ using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
+using Issue = TaleWorlds.CampaignSystem.Issues.MerchantNeedsHelpWithOutlawsIssueQuestBehavior.MerchantNeedsHelpWithOutlawsIssue;
 using Quest = TaleWorlds.CampaignSystem.Issues.MerchantNeedsHelpWithOutlawsIssueQuestBehavior.MerchantNeedsHelpWithOutlawsIssueQuest;
 
 namespace GameInterface.Services.Issues.Quests.MerchantNeedsHelpWithOutlaws;
@@ -22,18 +24,30 @@ internal class MerchantOutlawsProgressHandler : IHandler
     private readonly IIssueResolver issueResolver;
     private readonly IObjectManager objectManager;
     private readonly IControllerIdProvider controllerIdProvider;
+    private readonly IMerchantOutlawsProgress progress;
 
     public MerchantOutlawsProgressHandler(IMessageBroker messageBroker, IIssueResolver issueResolver,
-        IObjectManager objectManager, IControllerIdProvider controllerIdProvider)
+        IObjectManager objectManager, IControllerIdProvider controllerIdProvider, IMerchantOutlawsProgress progress)
     {
         this.messageBroker = messageBroker;
         this.issueResolver = issueResolver;
         this.objectManager = objectManager;
         this.controllerIdProvider = controllerIdProvider;
+        this.progress = progress;
         messageBroker.Subscribe<NetworkMerchantOutlawsProgress>(Handle);
+        messageBroker.Subscribe<IssueManagerDailyTicked>(SendAlternativeProgress);
     }
 
-    public void Dispose() => messageBroker.Unsubscribe<NetworkMerchantOutlawsProgress>(Handle);
+    public void Dispose()
+    {
+        messageBroker.Unsubscribe<NetworkMerchantOutlawsProgress>(Handle);
+        messageBroker.Unsubscribe<IssueManagerDailyTicked>(SendAlternativeProgress);
+    }
+
+    private void SendAlternativeProgress(MessagePayload<IssueManagerDailyTicked> payload)
+    {
+        foreach (var issue in Campaign.Current.IssueManager.Issues.Values.OfType<Issue>()) progress.Send(issue);
+    }
 
     private void Handle(MessagePayload<NetworkMerchantOutlawsProgress> payload)
     {
