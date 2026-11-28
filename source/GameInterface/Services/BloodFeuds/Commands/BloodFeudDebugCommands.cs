@@ -1,10 +1,6 @@
 ﻿using Common;
 using Common.Commands;
-using Common.Messaging;
 using GameInterface.CoopSessionData;
-using GameInterface.Services.Party.Messages;
-using System.Reflection;
-using TaleWorlds.MountAndBlade.GauntletUI.SceneNotification;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Utils.Commands;
 using System.Linq;
@@ -148,66 +144,6 @@ internal class BloodFeudDebugCommands
             behavior._selectedBloodFeudClan = clan;
             behavior.conversation_ransom_broker_end_feud_on_consequence();
             return Succeeded($"Ran end feud consequence for {clan.StringId}, local feud={clan.HasBloodFeudWithPlayer} gold={Hero.MainHero.Gold}");
-        }
-    }
-
-    // coop.debug.blood_feud.client_execute lord_1_56
-    /// <summary>
-    /// Publishes the same HeroExecuted the party screen execute button publishes on this client, skipping the host's execution config gate.
-    /// </summary>
-    public sealed class BloodFeudClientExecuteCoopCommand : ICoopCommand
-    {
-        private readonly ICommandObjectResolver resolver;
-
-        public BloodFeudClientExecuteCoopCommand(ICommandObjectResolver resolver)
-        {
-            this.resolver = resolver;
-        }
-
-        public string Prefix => "coop.debug.blood_feud";
-        public string Name => "client_execute";
-        public string Description => "Executes a prisoner of this client's party through the party screen execute message.";
-        public CoopCommandSide Side => CoopCommandSide.Client;
-        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
-        {
-            new ExpectedArgs("prisoner_hero", "Prisoner hero name or id."),
-        };
-
-        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
-        {
-            if (!resolver.TryResolveHero(args[0], out var prisoner, out var error)) return Failed(error);
-            if (prisoner.PartyBelongedToAsPrisoner != PartyBase_MainParty()) return Failed($"{prisoner.Name} is not held by this client's party.");
-
-            MessageBroker.Instance.Publish(this, new HeroExecuted(prisoner, Hero.MainHero, KillCharacterAction.KillCharacterActionDetail.Executed, false));
-            return Succeeded($"Published HeroExecuted for {prisoner.StringId} by {Hero.MainHero.StringId}");
-        }
-
-        private static TaleWorlds.CampaignSystem.Party.PartyBase PartyBase_MainParty() => TaleWorlds.CampaignSystem.Party.PartyBase.MainParty;
-    }
-
-    // coop.debug.blood_feud.close_scene_notification
-    /// <summary>
-    /// Closes the scene notification shown on this client, as clicking to continue does.
-    /// </summary>
-    public sealed class BloodFeudCloseSceneNotificationCoopCommand : ICoopCommand
-    {
-        public string Prefix => "coop.debug.blood_feud";
-        public string Name => "close_scene_notification";
-        public string Description => "Closes the active scene notification on this client.";
-        public CoopCommandSide Side => CoopCommandSide.Client;
-        public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
-
-        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
-        {
-            var current = GauntletSceneNotification.Current;
-            if (current == null) return Failed("No GauntletSceneNotification.");
-            var dataSource = typeof(GauntletSceneNotification).GetField("_dataSource", BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(current);
-            if (dataSource == null) return Failed("No scene notification data source.");
-            var activeData = dataSource.GetType().GetProperty("ActiveData")?.GetValue(dataSource);
-            if (activeData == null) return Failed("No active scene notification.");
-
-            dataSource.GetType().GetMethod("ExecuteClose")?.Invoke(dataSource, null);
-            return Succeeded($"Closed scene notification {activeData.GetType().Name}");
         }
     }
 }
