@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Util;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.Settlements.Interfaces;
 using GameInterface.Services.SiegeEvents.Handlers;
 using GameInterface.Services.SiegeEvents.Patches;
@@ -118,6 +119,9 @@ public interface ISiegeEventInterface : IGameAbstraction
 
     /// <summary>Enters the leader of a pending capture after the server finalizes the battle.</summary>
     void EnterPendingCaptureLeader(MobileParty party, Settlement settlement);
+
+    /// <summary>Enters the AI besiegers of a settlement that changed hands after the server finalizes the battle.</summary>
+    void EnterAiCapturers(Settlement settlement, IFaction factionBeforeBattle, MobileParty[] besiegers);
 
     /// <summary>
     /// Returns a stable snapshot of valid server-owned aftermath prompts. Used to re-prompt a
@@ -458,6 +462,21 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
 
         // SiegeCompleted tries to enter before the battle detaches the capturer, so the entry patch refuses it.
         settlementInterface.PartyEnterSettlement(party, settlement);
+    }
+
+    public void EnterAiCapturers(Settlement settlement, IFaction factionBeforeBattle, MobileParty[] besiegers)
+    {
+        if (settlement.MapFaction == factionBeforeBattle) return;
+
+        foreach (var party in besiegers)
+        {
+            if (!party.IsActive || party.IsPlayerParty()) continue;
+            // Vanilla leaves the player's army to the player's own encounter
+            if (party.Army != null && party.Army.Parties.Any(member => member.IsPlayerParty())) continue;
+
+            // SiegeCompleted tries to enter before the battle detaches the capturers, so the entry patch refuses it.
+            settlementInterface.PartyEnterSettlement(party, settlement);
+        }
     }
 
     public PendingSiegeAftermathPrompt[] GetPendingSiegeAftermathPrompts()

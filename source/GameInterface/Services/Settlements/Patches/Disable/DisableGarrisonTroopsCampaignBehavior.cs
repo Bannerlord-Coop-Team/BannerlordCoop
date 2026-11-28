@@ -32,7 +32,7 @@ internal class DisableGarrisonTroopsCampaignBehavior
         return mobileParty.Army?.LeaderParty == mobileParty;
     }
 
-    // Vanilla clears this when a lord enters the conquest, which a player clan's fortification skips above, otherwise every AI garrison keeps the conquest sizing
+    // OnSettlementEnteredPrefix skips a player clan's fortification, so vanilla never clears _newlyConqueredFortification there, otherwise every AI garrison keeps the conquest sizing
     [HarmonyPatch(nameof(GarrisonTroopsCampaignBehavior.OnSettlementOwnerChanged))]
     [HarmonyPostfix]
     private static void OnSettlementOwnerChangedPostfix(GarrisonTroopsCampaignBehavior __instance, Settlement settlement)

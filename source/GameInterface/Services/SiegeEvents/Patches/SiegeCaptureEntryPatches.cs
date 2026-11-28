@@ -1,6 +1,5 @@
 ﻿using Common;
-using GameInterface.Services.MobileParties.Extensions;
-using GameInterface.Services.Settlements.Interfaces;
+using GameInterface.Services.SiegeEvents.Interfaces;
 using HarmonyLib;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -12,7 +11,8 @@ namespace GameInterface.Services.SiegeEvents.Patches;
 
 /// <summary>
 /// Vanilla's <c>KingdomManager.SiegeCompleted</c> enters the capturers while the battle still holds them, which
-/// <c>EnterSettlementActionPatches</c> refuses, so the server enters its AI capturers once the battle lets go of them.
+/// <c>EnterSettlementActionPatches</c> refuses, so the server hands the besiegers to
+/// <see cref="ISiegeEventInterface.EnterAiCapturers"/> once the battle lets go of them.
 /// </summary>
 [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.FinalizeEventAux))]
 internal class SiegeCaptureEntryPatches
@@ -39,18 +39,8 @@ internal class SiegeCaptureEntryPatches
     {
         if (!__runOriginal || __state == null) return;
 
-        var settlement = __state.Settlement;
-        if (settlement.MapFaction == __state.FactionBeforeBattle) return;
-        if (!ContainerProvider.TryResolve<ISettlementInterface>(out var settlementInterface)) return;
-
-        foreach (var party in __state.Besiegers)
-        {
-            if (!party.IsActive || party.IsPlayerParty()) continue;
-            // Vanilla leaves the player's army to the player's own encounter
-            if (party.Army != null && party.Army.Parties.Any(member => member.IsPlayerParty())) continue;
-
-            settlementInterface.PartyEnterSettlement(party, settlement);
-        }
+        if (ContainerProvider.TryResolve<ISiegeEventInterface>(out var siegeEventInterface))
+            siegeEventInterface.EnterAiCapturers(__state.Settlement, __state.FactionBeforeBattle, __state.Besiegers);
     }
 
     private class SiegeCapture

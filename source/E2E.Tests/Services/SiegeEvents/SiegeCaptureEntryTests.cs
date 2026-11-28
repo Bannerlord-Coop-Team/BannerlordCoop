@@ -35,11 +35,13 @@ public class SiegeCaptureEntryTests : MapEventTestBase
                 .SetSettlementComponent(client.GetRegisteredObject<Town>(townId)));
         }
 
-        // The garrison transfer reads sizing models the harness doesn't have, the clear after it still runs
         var disabledMethods = BattleResultDisabledMethods
             .Concat(SiegeCreationDisabledMethods)
+            // Taking the defeated party's members prisoner needs a live campaign world
             .Append(AccessTools.Method(typeof(MapEvent), nameof(MapEvent.CaptureDefeatedPartyMembers)))
+            // The camp leave cascade needs a live campaign world, the BesiegerCamp setter itself still runs and replicates
             .Append(AccessTools.Method(typeof(MobileParty), nameof(MobileParty.OnPartyLeftSiegeInternal)))
+            // The garrison transfer reads sizing models the harness doesn't have. The flag clear after it still runs.
             .Append(AccessTools.Method(typeof(GarrisonTroopsCampaignBehavior), nameof(GarrisonTroopsCampaignBehavior.CalculateSettlementGarrisonPartySizeLimitWithFoodAndWage)))
             .Append(AccessTools.Method(typeof(GarrisonTroopsCampaignBehavior), nameof(GarrisonTroopsCampaignBehavior.CalculateSettlementIdealPartySizeWithEffects)))
             .Append(AccessTools.Method(typeof(GarrisonTroopsCampaignBehavior), nameof(GarrisonTroopsCampaignBehavior.CalculateMobilePartySizeLimitWithFoodAndWage)))
@@ -76,6 +78,7 @@ public class SiegeCaptureEntryTests : MapEventTestBase
                 EnterSettlementAction.ApplyForParty(party, captured);
             });
             bool gameStarted = Campaign.Current.GameStarted;
+            // GarrisonTroopsCampaignBehavior.OnSettlementEntered returns early until the game has started
             Campaign.Current.GameStarted = true;
             try
             {
