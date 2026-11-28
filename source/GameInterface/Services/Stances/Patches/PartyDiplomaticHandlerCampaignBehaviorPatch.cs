@@ -11,10 +11,10 @@ using TaleWorlds.CampaignSystem.Party;
 namespace GameInterface.Services.Stances.Patches
 {
     /// <summary>
-    /// Filters the parties vanilla's <c>CheckSettlementSuitabilityForParties</c> checks after a stance change: a null
-    /// party, a party in a settlement whose MapFaction isn't synced yet (vanilla would throw), and a player's party
-    /// anywhere but its own client, where it is the main party, unless its owner is offline, since then no client can
-    /// open the slink away menu.
+    /// Filters the parties vanilla's <c>CheckSettlementSuitabilityForParties</c> checks after a stance change. Drops a null
+    /// party, and a party in a settlement whose MapFaction isn't synced yet (vanilla would throw). Also drops a player's
+    /// party on every machine but its own client, where it is the main party. The server keeps a party whose owner is
+    /// offline, since no client can open the slink away menu for it.
     /// </summary>
     [HarmonyPatch(typeof(PartyDiplomaticHandlerCampaignBehavior), "CheckSettlementSuitabilityForParties")]
     internal class PartyDiplomaticHandlerCampaignBehaviorPatch

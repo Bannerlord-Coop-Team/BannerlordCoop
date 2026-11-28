@@ -361,10 +361,13 @@ internal class PlayerPartyVisibilityHandler : IHandler
     private void ParkOutsideMapEvent(MobileParty party, bool queueArmyLeave)
     {
         LeaveSiegeBeforeParking(party);
-        // A party whose player went offline has no client to open the slink away menu, so a town at war with it ejects it
-        bool townCheckQueued = LeaveFollowedArmy(party, queueArmyLeave);
-        if (!townCheckQueued)
-            diplomaticHandler.CheckSettlementSuitability(party);
+
+        // A queued leave runs on a later frame, after the party is parked
+        var army = party.Army;
+        if (queueArmyLeave && army != null && army.LeaderParty != party)
+            GameThread.EnqueueSafe(() => LeaveArmyThenCheckTown(party, army));
+        else
+            LeaveArmyThenCheckTown(party, army);
 
         party.IsActive = false;
         party.IsVisible = false;
@@ -372,29 +375,18 @@ internal class PlayerPartyVisibilityHandler : IHandler
     }
 
     // A follower leaves its army, otherwise vanilla keeps copying the leader's battle side and siege camp onto it while it is attached.
-    // Returns whether the leave was queued, which then also checks the party's town
-    private bool LeaveFollowedArmy(MobileParty party, bool queue)
+    // Vanilla skips a party attached to an army, so the town is checked after the leave. Its eject still works on a party that is already parked
+    private void LeaveArmyThenCheckTown(MobileParty party, Army army)
     {
-        var army = party.Army;
-        if (army == null || army.LeaderParty == party) return false;
-
-        Logger.Information("Removing parked party {PartyId} from the army of {LeaderId}", party.StringId, army.LeaderParty?.StringId);
-
-        if (!queue)
+        // A queued leave skips an army the party already left
+        if (army != null && army.LeaderParty != party && party.Army == army)
         {
+            Logger.Information("Removing parked party {PartyId} from the army of {LeaderId}", party.StringId, army.LeaderParty?.StringId);
             armyLeaver.Remove(party, army);
-            return false;
         }
 
-        // A queued leave runs on a later frame, after the party is parked, so it skips an army the party already left
-        GameThread.EnqueueSafe(() =>
-        {
-            if (party.Army == army) armyLeaver.Remove(party, army);
-
-            // Vanilla skips a party attached to an army, so the town is checked after the leave. Its eject still works on a party that is already parked
-            diplomaticHandler.CheckSettlementSuitability(party);
-        });
-        return true;
+        // A party whose player went offline has no client to open the slink away menu, so a town at war with it ejects it
+        diplomaticHandler.CheckSettlementSuitability(party);
     }
 
     private bool TryResolveParty(NetPeer peer, out Player player, out MobileParty party)
