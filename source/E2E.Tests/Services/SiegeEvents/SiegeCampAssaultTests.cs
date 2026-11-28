@@ -2,6 +2,7 @@
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Services.MapEvents;
 using E2E.Tests.Util;
@@ -11,6 +12,8 @@ using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
+using GameInterface.Services.SiegeEvents.Interfaces;
 using GameInterface.Services.Villages.Interfaces;
 using HarmonyLib;
 using Moq;
@@ -19,7 +22,9 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.GameMenus.GameMenuInitializationHandlers;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -216,6 +221,169 @@ public class SiegeCampAssaultTests : MapEventTestBase
             Assert.True(Server.ObjectManager.TryGetObject<Settlement>(context.SettlementId, out var settlement));
             Assert.Null(settlement.Party.MapEvent);
         });
+    }
+
+    [Fact]
+    public void RelieveOwnCastle_DuringWallAssault_ContinuesTheDefendersEncounter()
+    {
+        var client = Clients.First();
+        var castleId = CreateCastleAssault(client, playerIsBesieger: false);
+        var router = client.Resolve<TestNetworkRouter>();
+        router.SetLatency(client.NetPeer, Server.NetPeer, TimeSpan.FromMilliseconds(50));
+
+        client.Call(() =>
+        {
+            var castle = client.GetRegisteredObject<Settlement>(castleId);
+            Assert.NotNull(castle.OwnerClan);
+            Assert.Same(Hero.MainHero.Clan, castle.OwnerClan);
+            Assert.Null(MobileParty.MainParty.MapEvent);
+            PlayerEncounter.Start();
+            PlayerEncounter.Current.SetupFields(PartyBase.MainParty, castle.Party);
+            // The menu opens before the server attaches the outside defender and changes Siege to SiegeOutside.
+            AssertMenuAfter(client, "encounter", () =>
+                new EncounterGameMenuBehavior().game_menu_join_encounter_help_defenders_on_consequence(
+                    new MenuCallbackArgs(Campaign.Current.CurrentMenuContext, null)));
+            Assert.Same(castle.Party.MapEvent, PlayerEncounter.Battle);
+            Assert.True(PlayerEncounter.Battle.IsSiegeAssault);
+            Assert.Equal(BattleSideEnum.Defender, PlayerEncounter.Current.PlayerSide);
+        }, new[] { AccessTools.Method(typeof(PlayerEncounter), nameof(PlayerEncounter.CalculateStrengthOfParties)) });
+
+        var request = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestJoinBattle>());
+        Assert.Equal(BattleSideEnum.Defender, request.Side);
+        Server.Call(() => router.RunUntilIdle(), MapEventDisabledMethods);
+        Assert.True(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkJoinBattleReply>()).Accepted);
+        client.Call(() =>
+        {
+            var battle = client.GetRegisteredObject<MapEvent>(request.MapEventId);
+            Assert.Same(battle.DefenderSide, PartyBase.MainParty.MapEventSide);
+            PlayerEncounter.Update();
+            Assert.Same(battle, PlayerEncounter.Battle);
+            Assert.Equal(PlayerEncounterState.Wait, PlayerEncounter.Current.EncounterState);
+            Assert.False(battle.HasWinner);
+        });
+    }
+
+    [Fact]
+    public void CaptureCastle_AfterWinningWallAssault_OpensAftermathForBesieger()
+    {
+        var client = Clients.First();
+        var castleId = CreateCastleAssault(client, playerIsBesieger: true);
+        client.Call(() =>
+        {
+            var castle = client.GetRegisteredObject<Settlement>(castleId);
+            Assert.NotSame(Hero.MainHero.Clan, castle.OwnerClan);
+            PlayerEncounter.Init();
+            Assert.Same(PartyBase.MainParty, PlayerEncounter.Battle.AttackerSide.LeaderParty);
+            Assert.Equal(BattleSideEnum.Attacker, PlayerEncounter.Current.PlayerSide);
+        });
+
+        // Deliver the victory and ownership while the client still has its pre-mission encounter.
+        using (new MethodCallRecorder(Priority.First, AccessTools.Method(typeof(MapEvent), nameof(MapEvent.OnBattleWon))))
+        {
+            Server.Call(() =>
+            {
+                var castle = Server.GetRegisteredObject<Settlement>(castleId);
+                var battle = castle.Party.MapEvent;
+                battle.BattleState = BattleState.AttackerVictory;
+                var besiegerClan = battle.AttackerSide.LeaderParty.MobileParty.ActualClan;
+                Assert.True(Server.ObjectManager.TryGetId(castle.Town, out var townId));
+                Assert.True(Server.ObjectManager.TryGetId(besiegerClan, out var clanId));
+                TestEnvironment.AssertReferenceField<Town, Clan>(nameof(Town._ownerClan), townId, clanId, castle.OwnerClan);
+            });
+        }
+
+        client.Call(() =>
+        {
+            Assert.Equal(BattleSideEnum.Attacker, PlayerEncounter.Battle.WinningSide);
+            Assert.Same(Hero.MainHero.Clan, PlayerEncounter.EncounterSettlement.OwnerClan);
+            AssertMenuAfter(client, "menu_settlement_taken", () => GameMenu.SwitchToMenu("encounter"));
+        });
+    }
+
+    private string CreateCastleAssault(EnvironmentInstance client, bool playerIsBesieger)
+    {
+        var castleId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        var townId = TestEnvironment.CreateRegisteredObject<Town>();
+        var ownerPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var besiegerId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var playerPartyId = playerIsBesieger ? besiegerId : ownerPartyId;
+        TestEnvironment.AssertField<Town, bool>(nameof(Town._isCastle), true, townId);
+
+        // The fixture supplies the two side leaders and has no world data for fortification bonuses.
+        var disabled = MapEventDisabledMethods.Concat(SiegeCreationDisabledMethods)
+            .Append(AccessTools.Method(typeof(DefaultCombatSimulationModel), nameof(DefaultCombatSimulationModel.GetSettlementAdvantage)))
+            .Append(AccessTools.Method(typeof(SiegeAssaultEventComponent), nameof(SiegeAssaultEventComponent.AddMapEventParties)))
+            .Append(AccessTools.Method(typeof(SiegeAssaultEventComponent), nameof(SiegeAssaultEventComponent.AddInsideSettlementParties)));
+        Server.Call(() =>
+        {
+            var castle = Server.GetRegisteredObject<Settlement>(castleId);
+            var owner = Server.GetRegisteredObject<MobileParty>(ownerPartyId);
+            var besieger = Server.GetRegisteredObject<MobileParty>(besiegerId);
+            CreateReplicableSiegeEvent(castle, besieger);
+            castle.SetSettlementComponent(Server.GetRegisteredObject<Town>(townId));
+            Assert.True(Server.ObjectManager.TryGetId(owner.ActualClan, out var ownerClanId));
+            TestEnvironment.AssertReferenceField<Town, Clan>(nameof(Town._ownerClan), townId, ownerClanId);
+            VillageHostileFactionStanceHelper.ApplyWarStance(owner.MapFaction, besieger.MapFaction);
+            SiegeAssaultEventComponent.CreateSiegeAssaultMapEvent(besieger.Party, castle.Party);
+        }, disabled);
+
+        var playerParty = client.GetRegisteredObject<MobileParty>(playerPartyId);
+        client.Call(() =>
+        {
+            Campaign.Current.MainParty = playerParty;
+            Game.Current.PlayerTroop = playerParty.LeaderHero.CharacterObject;
+            client.Resolve<IControllerIdProvider>().SetControllerId(ControllerId);
+            var castle = client.GetRegisteredObject<Settlement>(castleId);
+            Assert.True(castle.IsCastle);
+            Assert.True(castle.Party.MapEvent.IsSiegeAssault);
+            Assert.Null(playerParty.CurrentSettlement);
+
+            Campaign.Current.MapStateData ??= new MapStateData();
+            var starter = new CampaignGameStarter(Campaign.Current.GameMenuManager, Campaign.Current.ConversationManager);
+            starter.AddGameMenu("encounter", "Encounter", new EncounterGameMenuBehavior().game_menu_encounter_on_init);
+            starter.AddGameMenu("menu_settlement_taken", "Settlement taken", _ => { });
+            var state = Game.Current.GameStateManager.CreateState<MapState>();
+            state._menuContext = Game.Current.ObjectManager.CreateObject<MenuContext>();
+            state._menuContext.GameMenu = ObjectHelper.SkipConstructor<GameMenu>();
+            state._menuContext.GameMenu.StringId = playerIsBesieger ? "encounter" : "join_siege_event";
+            Game.Current.GameStateManager._gameStates.Add(state);
+        });
+        foreach (var instance in Clients.Prepend(Server))
+        {
+            instance.Call(() =>
+            {
+                var party = instance.GetRegisteredObject<MobileParty>(playerPartyId);
+                Assert.True(instance.ObjectManager.TryGetId(party.LeaderHero, out var heroId));
+                Assert.True(instance.ObjectManager.TryGetId(party.ActualClan, out var clanId));
+                Assert.True(instance.ObjectManager.TryGetId(party.LeaderHero.CharacterObject, out var characterId));
+                Assert.True(instance.Resolve<IPlayerManager>().AddPlayer(
+                    new Player(ControllerId, heroId, playerPartyId, clanId, characterId)));
+            });
+        }
+        TestEnvironment.ConnectRegisteredPlayer(client, ControllerId);
+        return castleId;
+    }
+
+    private static void AssertMenuAfter(EnvironmentInstance client, string expectedMenu, Action openMenu)
+    {
+        var castle = PlayerEncounter.EncounterSettlement;
+        // Skip the castle entry and vanilla encounter UI, but let the encounter behavior redirect the menu.
+        using var engineCalls = new MethodCallRecorder(Priority.First,
+            AccessTools.Method(typeof(PlayerEncounter), nameof(PlayerEncounter.Finish)),
+            AccessTools.Method(typeof(EnterSettlementAction), nameof(EnterSettlementAction.ApplyForParty)),
+            AccessTools.Method(typeof(EncounterManager), nameof(EncounterManager.StartSettlementEncounter)),
+            AccessTools.Method(typeof(DefaultEncounter), nameof(DefaultEncounter.game_menu_encounter_on_init)));
+        using var menus = new MethodCallRecorder(Priority.First, runOriginal: true,
+            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu)));
+        try
+        {
+            openMenu();
+            Assert.Equal(expectedMenu, menus.MenusFor(client).LastOrDefault());
+        }
+        finally
+        {
+            client.Resolve<ISiegeEventInterface>().ReleaseLocalAftermathChoice(castle);
+        }
     }
 
     private SiegeContext CreateContext(EnvironmentInstance client, OwnerStance stance)
