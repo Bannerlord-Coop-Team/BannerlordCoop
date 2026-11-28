@@ -1658,13 +1658,15 @@ public class KingdomDebugCommand
             new ExpectedArgs("faction1_id", "First faction (kingdom or clan) name or id; quote names with spaces."),
             new ExpectedArgs("faction2_id", "Second faction (kingdom or clan) name or id; quote names with spaces."),
             new ExpectedArgs("cause", "default, decision, hostility, rebellion, crime, creation, claim or agreement."),
-            new ExpectedArgs("actor_controller_id", "The registered acting player, required for native war callbacks."),
+            new ExpectedArgs("actor_controller_id", "The registered acting player, required for native war callbacks except a decision war.", false),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (ModInformation.IsClient) return Failed("Run this command on the server.");
-            if (args.Count < 4 || args[3] == "none") return Failed("A registered acting player is required.");
+            // The server applies a passed DeclareWarDecision with no player swapped in, so a decision war needs no actor
+            bool hasActor = args.Count > 3 && args[3] != "none";
+            if (args.Count < 3 || (!hasActor && args[2] != "decision")) return Failed("A registered acting player is required.");
             Action<IFaction, IFaction> declare;
             switch (args[2])
             {
@@ -1695,6 +1697,11 @@ public class KingdomDebugCommand
 
             if (faction1 == faction2 || FactionManager.IsAtWarAgainstFaction(faction1, faction2))
                 return Failed("Select different factions that are currently at peace.");
+            if (!hasActor)
+            {
+                declare(faction1, faction2);
+                return Succeeded($"Declared war between '{faction1.Name}' and '{faction2.Name}'.");
+            }
             if (!ContainerProvider.TryResolve<IPlayerManager>(out var players) ||
                 !players.TryGetPlayer(args[3], out var player) ||
                 !objectManager.TryGetObject<Hero>(player.HeroId, out var hero) ||

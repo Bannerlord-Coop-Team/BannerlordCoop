@@ -1,7 +1,7 @@
-﻿using Common.Util;
+﻿using Common.Commands;
+using Common.Util;
 using E2E.Tests.Environment;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -53,12 +53,19 @@ internal static class HostileTownSetup
         return (settlementId, townClanId);
     }
 
+    /// <summary>
+    /// Declares the war through the live test's console command, which applies it like a passed kingdom decision, with no
+    /// player swapped in.
+    /// </summary>
     internal static void DeclareWar(E2ETestEnvironment environment, string townClanId, string atWarClanId)
     {
-        environment.Server.Call(() => DeclareWarAction.ApplyInternal(
-            environment.Server.GetRegisteredObject<Clan>(townClanId),
-            environment.Server.GetRegisteredObject<Clan>(atWarClanId),
-            DeclareWarAction.DeclareWarDetail.CausedByKingdomDecision));
+        environment.Server.Call(() =>
+        {
+            var result = environment.Server.Resolve<ICoopCommandRegistry>().ProcessCommand(
+                "coop.debug.kingdom.declare_war",
+                new CoopCommandArgsFactory().FromValues(new[] { townClanId, atWarClanId, "decision" }));
+            Assert.True(result.Succeeded, result.Output);
+        });
         environment.PumpAndFlush();
     }
 
