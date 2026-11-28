@@ -35,7 +35,7 @@ public class ServerTroopRosterHandlerTests : IDisposable
     public ServerTroopRosterHandlerTests()
     {
         var objectManager = Mock.Of<IObjectManager>();
-        players = new PlayerManager(logger.Object, objectManager, new ControllerIdProvider());
+        players = new PlayerManager(logger.Object, objectManager, new ControllerIdProvider(), broker);
         Assert.True(players.AddPlayer(new Player("requester", "hero", OwnPartyId, "clan", "character")));
         peer = network.CreatePeer();
         players.SetPeer("requester", peer);

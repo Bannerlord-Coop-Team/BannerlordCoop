@@ -60,6 +60,10 @@ public sealed class TournamentContestantData
     [ProtoMember(10)]
     public readonly int Score;
 
+    // Set when the player disconnects from an active tournament and cleared when they re-enter its mission.
+    [ProtoMember(11)]
+    public readonly bool IsDisconnected;
+
     public TournamentContestantData(
         string slotId,
         string characterId,
@@ -70,7 +74,8 @@ public sealed class TournamentContestantData
         bool isReplaced,
         bool isLord,
         string displacedCharacterId,
-        int score = 0)
+        int score = 0,
+        bool isDisconnected = false)
     {
         SlotId = slotId;
         CharacterId = characterId;
@@ -82,6 +87,7 @@ public sealed class TournamentContestantData
         IsLord = isLord;
         DisplacedCharacterId = displacedCharacterId;
         Score = score;
+        IsDisconnected = isDisconnected;
     }
 }
 

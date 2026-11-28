@@ -1,9 +1,10 @@
-﻿using GameInterface.Services.Tournaments;
+using GameInterface.Services.Tournaments;
 using GameInterface.Services.Tournaments.Data;
 using GameInterface.Services.Tournaments.Handlers;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using TaleWorlds.CampaignSystem.TournamentGames;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using Xunit;
@@ -215,6 +216,121 @@ public class TournamentSessionRegistryTests
     }
 
     [Fact]
+    public void WatchingAnAbsentEntrant_KeepsTheBallotOpen()
+    {
+        var registry = new TournamentSessionRegistry();
+        var snapshot = CreateStartedSession(registry, humanInMatch: true);
+        Assert.Equal(TournamentMutationStatus.Applied, registry.TryDisconnect(
+            snapshot.SessionId, snapshot.Revision, "player-1", out snapshot, out _));
+        Assert.Equal(TournamentMutationStatus.Applied, registry.TryRequestSpectate(
+            snapshot.SessionId, snapshot.Revision, "spectator", out snapshot));
+        Assert.Equal(TournamentMutationStatus.Applied, registry.TryChoose(
+            snapshot.SessionId, snapshot.Revision, snapshot.CurrentMatchId, "player-2",
+            TournamentPlayerChoice.Watch, out snapshot, out _));
+
+        Assert.Equal(TournamentMutationStatus.Applied, registry.TryChoose(
+            snapshot.SessionId, snapshot.Revision, snapshot.CurrentMatchId, "spectator",
+            TournamentPlayerChoice.Watch, out snapshot, out var outcome));
+        Assert.Equal(TournamentBallotOutcome.Open, outcome);
+        Assert.Equal(TournamentSessionPhase.AwaitingChoices, snapshot.Phase);
+        Assert.Equal(snapshot.VoterCount, snapshot.ReadyCount);
+    }
+
+    [Theory]
+    [InlineData(false, true, 1, TournamentMutationStatus.Applied, TournamentBallotOutcome.SimulateMatch)]
+    [InlineData(true, false, 0, TournamentMutationStatus.InvalidChoice, TournamentBallotOutcome.Open)]
+    public void SkipRequiresEnoughTeamsWithoutAbsentEntrants(
+        bool bothTeamsForfeit,
+        bool skipAllowed,
+        int eligibleTeamCount,
+        TournamentMutationStatus expectedStatus,
+        TournamentBallotOutcome expectedOutcome)
+    {
+        var registry = new TournamentSessionRegistry();
+        var snapshot = CreateStartedSession(registry, humanInMatch: true, bothTeamsHaveHumans: bothTeamsForfeit);
+        Assert.Equal(TournamentMutationStatus.Applied, registry.TryRequestSpectate(
+            snapshot.SessionId, snapshot.Revision, "spectator", out snapshot));
+        Assert.Equal(TournamentMutationStatus.Applied, registry.TryDisconnect(
+            snapshot.SessionId, snapshot.Revision, "player-1", out snapshot, out _));
+        Assert.Equal(TournamentMutationStatus.Applied, registry.TryDisconnect(
+            snapshot.SessionId, snapshot.Revision, "player-2", out snapshot, out _));
+
+        Assert.Equal(skipAllowed, snapshot.SkipAllowed);
+        Assert.Equal(skipAllowed, registry.TryGetSimulationInput(snapshot.SessionId, snapshot.Revision, out var input));
+        Assert.Equal(1, input.WinnerTeamCount);
+        Assert.Equal(eligibleTeamCount, input.EligibleTeams.Length);
+        var status = registry.TryChoose(snapshot.SessionId, snapshot.Revision, snapshot.CurrentMatchId, "spectator",
+            TournamentPlayerChoice.Skip, out _, out var outcome);
+        Assert.Equal(expectedStatus, status);
+        Assert.Equal(expectedOutcome, outcome);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void DisconnectLoss_CanBeTakenOnceAndSurvivesFinalRetirement(bool retire)
+    {
+        var registry = new TournamentSessionRegistry();
+        var snapshot = CreateStartedSession(registry, humanInMatch: true);
+        Assert.Equal(TournamentMutationStatus.Applied, registry.TryDisconnect(
+            snapshot.SessionId, snapshot.Revision, "player-1", out snapshot, out _));
+        Assert.False(registry.TryTakeDisconnectLoss("player-1", out _));
+        Assert.Equal(TournamentMutationStatus.Applied, registry.TryChoose(
+            snapshot.SessionId, snapshot.Revision, snapshot.CurrentMatchId, "player-2",
+            TournamentPlayerChoice.Skip, out snapshot, out var outcome));
+        Assert.Equal(TournamentBallotOutcome.SimulateMatch, outcome);
+
+        snapshot = ApplyFinishedMatch(registry, snapshot, complete: retire);
+        if (retire)
+            Assert.True(registry.Remove(snapshot.SessionId));
+
+        Assert.False(registry.TryTakeDisconnectLoss("player-2", out _));
+        Assert.True(registry.TryTakeDisconnectLoss("player-1", out var townId));
+        Assert.Equal(snapshot.TownId, townId);
+        Assert.False(registry.TryTakeDisconnectLoss("player-1", out _));
+    }
+
+    [Fact]
+    public void EliminatedAbsentEntrant_NoLongerReservesBracket()
+    {
+        var registry = new TournamentSessionRegistry();
+        var snapshot = CreateStartedSession(registry, humanInMatch: true);
+        Assert.Equal(TournamentMutationStatus.Applied, registry.TryLeaveActive(
+            snapshot.SessionId, snapshot.Revision, "player-2", 900, "Tournament Recruit", out snapshot, out _));
+        Assert.Equal(TournamentMutationStatus.Applied, registry.TryEnterMission(
+            snapshot.SessionId, snapshot.Revision, "player-1", out snapshot));
+        Assert.Equal(TournamentMutationStatus.Applied, registry.TryChoose(
+            snapshot.SessionId, snapshot.Revision, snapshot.CurrentMatchId, "player-1",
+            TournamentPlayerChoice.Join, out snapshot, out var ready));
+        Assert.Equal(TournamentBallotOutcome.StartLiveMatch, ready);
+        Assert.Equal(TournamentMutationStatus.Applied, registry.TryDisconnect(
+            snapshot.SessionId, snapshot.Revision, "player-1", out snapshot, out var disconnect));
+        Assert.Equal(TournamentBallotOutcome.SimulateMatch, disconnect);
+        snapshot = ApplyFinishedMatch(registry, snapshot, complete: false);
+
+        Assert.Equal(TournamentMutationStatus.Applied, registry.TryBeginEmptySimulation(
+            snapshot.SessionId, snapshot.Revision, out _));
+    }
+
+    private static TournamentSessionSnapshot ApplyFinishedMatch(
+        TournamentSessionRegistry registry, TournamentSessionSnapshot snapshot, bool complete)
+    {
+        var match = snapshot.Rounds[0].Matches[0];
+        var winners = match.Teams[1].ParticipantSlotIds;
+        var finished = new TournamentMatchData(match.MatchId, match.RoundId, (int)TournamentMatch.MatchState.Finished,
+            match.TeamSize, match.NumberOfWinnerParticipants, match.Teams, winners, match.QualificationMode);
+        var rounds = new[] { new TournamentRoundData(match.RoundId, 0, 0, new[] { finished }) };
+        var scores = snapshot.Contestants.ToDictionary(contestant => contestant.SlotId, contestant => contestant.Score);
+        var result = new TournamentMatchResultData(snapshot.SessionId, match.MatchId, snapshot.Revision,
+            snapshot.BracketRevision, 1, new[] { match.Teams[1].TeamId }, winners, Array.Empty<TournamentTeamScoreData>());
+        Assert.Equal(TournamentMutationStatus.Applied, registry.TryApplyMatchResult(result, snapshot.HostControllerId,
+            rounds, scores, complete ? null : "next-match", complete ? winners[0] : null, complete,
+            out snapshot, out var disconnectedLosers));
+        Assert.Equal(new[] { "player-1" }, disconnectedLosers);
+        return snapshot;
+    }
+
+    [Fact]
     public void LateSpectator_JoinsOpenBallotImmediately()
     {
         var registry = new TournamentSessionRegistry();
@@ -363,7 +479,6 @@ public class TournamentSessionRegistryTests
             900,
             "Tournament Recruit",
             out snapshot,
-            out _,
             out _));
 
         Assert.Equal("player-2", snapshot.HostControllerId);
@@ -416,7 +531,6 @@ public class TournamentSessionRegistryTests
             900,
             "Tournament Recruit",
             out snapshot,
-            out _,
             out _));
         Assert.Equal("player-2", snapshot.HostControllerId);
         Assert.True(registry.TryGetSpawnManifest(snapshot.SessionId, out var firstMigration));
@@ -431,7 +545,6 @@ public class TournamentSessionRegistryTests
             901,
             "Tournament Recruit",
             out snapshot,
-            out _,
             out _));
         Assert.Equal("player-3", snapshot.HostControllerId);
         Assert.True(registry.TryGetSpawnManifest(snapshot.SessionId, out var rejoinManifest));
@@ -526,8 +639,7 @@ public class TournamentSessionRegistryTests
             900,
             "Tournament Recruit",
             out snapshot,
-            out var outcome,
-            out _));
+            out var outcome));
 
         Assert.Equal(TournamentBallotOutcome.SimulateMatch, outcome);
         Assert.Equal(TournamentSessionPhase.SimulatingMatch, snapshot.Phase);
@@ -563,7 +675,8 @@ public class TournamentSessionRegistryTests
             "next-match",
             null,
             false,
-            out snapshot));
+            out snapshot,
+            out _));
         Assert.Equal(7, snapshot.Contestants[0].Score);
     }
 
@@ -590,6 +703,7 @@ public class TournamentSessionRegistryTests
             null,
             null,
             false,
+            out _,
             out _));
     }
 
@@ -623,7 +737,6 @@ public class TournamentSessionRegistryTests
             900,
             "Tournament Recruit",
             out snapshot,
-            out _,
             out _));
         Assert.Equal(TournamentMutationStatus.NoChange, registry.TryLeaveActive(
             snapshot.SessionId,
@@ -632,7 +745,6 @@ public class TournamentSessionRegistryTests
             901,
             "Another Recruit",
             out snapshot,
-            out _,
             out _));
 
         Assert.Single(snapshot.Contestants.Where(contestant => contestant.IsReplaced));
@@ -668,16 +780,28 @@ public class TournamentSessionRegistryTests
             900,
             "Tournament Recruit",
             out snapshot,
-            out var outcome,
-            out var noViewers);
+            out var outcome);
 
         Assert.Equal(TournamentMutationStatus.Applied, status);
         Assert.Equal(TournamentBallotOutcome.Open, outcome);
         Assert.DoesNotContain("spectator", snapshot.SpectatorControllerIds);
         Assert.Equal(TournamentSessionPhase.LiveMatch, snapshot.Phase);
-        Assert.False(noViewers);
         Assert.Equal(2, snapshot.Contestants.Count(contestant => contestant.IsHuman));
         Assert.DoesNotContain(snapshot.Contestants, contestant => contestant.IsReplaced);
+    }
+
+    [Fact]
+    public void Disconnect_WatchingEntrantDuringLiveMatch_KeepsFightRunning()
+    {
+        var registry = new TournamentSessionRegistry();
+        var snapshot = CreateLiveSession(registry);
+
+        Assert.Equal(TournamentMutationStatus.Applied, registry.TryDisconnect(
+            snapshot.SessionId, snapshot.Revision, "player-2", out snapshot, out var outcome));
+
+        Assert.Equal(TournamentBallotOutcome.Open, outcome);
+        Assert.Equal(TournamentSessionPhase.LiveMatch, snapshot.Phase);
+        Assert.Equal("player-1", snapshot.HostControllerId);
     }
 
     [Fact]
@@ -710,6 +834,7 @@ public class TournamentSessionRegistryTests
             null,
             null,
             true,
+            out _,
             out _));
     }
 
@@ -759,7 +884,8 @@ public class TournamentSessionRegistryTests
 
     private static TournamentSessionSnapshot CreateStartedSession(
         TournamentSessionRegistry registry,
-        bool humanInMatch)
+        bool humanInMatch,
+        bool bothTeamsHaveHumans = false)
     {
         TournamentSessionSnapshot snapshot = CreateSession(registry, "session-1", "town-1");
         registry.TryJoin(
@@ -787,6 +913,8 @@ public class TournamentSessionRegistryTests
         string secondSlot = humanInMatch
             ? "session-1:slot:0"
             : "session-1:slot:1";
+        if (bothTeamsHaveHumans)
+            secondSlot = snapshot.Contestants.Single(contestant => contestant.ControllerId == "player-2").SlotId;
         var teams = new[]
         {
             new TournamentTeamData("team-1", new[] { firstSlot }, 0, false, 1, null),

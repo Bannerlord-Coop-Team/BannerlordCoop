@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Tournaments.Data;
+using GameInterface.Services.Tournaments.Handlers;
 using GameInterface.Services.Tournaments.Messages;
 using GameInterface.Services.Tournaments.UI;
 using GameInterface.Utils.Commands;
@@ -28,6 +29,74 @@ public class TournamentDebugCommand
         new CoopCommandResult(false, output, "command_failed");
 
 #if DEBUG
+    /// <summary>Resolves a pending tournament match through the server's bracket simulation.</summary>
+    internal sealed class ResolveMatchCoopCommand : ICoopCommand
+    {
+        private readonly ICommandObjectResolver resolver;
+        private readonly IObjectManager objectManager;
+        private readonly ITournamentSessionRegistry sessionRegistry;
+        private readonly ITournamentMatchSimulation simulation;
+
+        public ResolveMatchCoopCommand(
+            ICommandObjectResolver resolver,
+            IObjectManager objectManager,
+            ITournamentSessionRegistry sessionRegistry,
+            ITournamentMatchSimulation simulation)
+        {
+            this.resolver = resolver;
+            this.objectManager = objectManager;
+            this.sessionRegistry = sessionRegistry;
+            this.simulation = simulation;
+        }
+
+        public string Prefix => "coop.debug.tournaments";
+        public string Name => "resolve_match";
+        public string Description => "Simulates the current pending match and advances the tournament.";
+        public CoopCommandSide Side => CoopCommandSide.Server;
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("town", "Town name or id."),
+            new ExpectedArgs("winner_controller", "Guarantee this entrant's team advances if present in this match.", false)
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!resolver.TryResolveTown(args[0], out var town, out var error))
+                return Failed(error);
+            if (!objectManager.TryGetId(town, out var townId))
+                return Failed($"Town {town.StringId} is not registered.");
+
+            if (!sessionRegistry.TryGetByTown(townId, out var snapshot) ||
+                (snapshot.Phase != TournamentSessionPhase.AwaitingChoices &&
+                 snapshot.Phase != TournamentSessionPhase.SimulatingMatch) ||
+                !sessionRegistry.TryGetSimulationInput(snapshot.SessionId, snapshot.Revision, out var input))
+                return Failed("The tournament has no pending match that can be resolved.");
+
+            string preferredSlotId = null;
+            if (args.Count > 1)
+            {
+                string controllerId = args[1];
+                var contestant = snapshot.Contestants.FirstOrDefault(candidate =>
+                    candidate.ControllerId == controllerId && candidate.IsHuman &&
+                    !candidate.IsReplaced && !candidate.IsDisconnected);
+                if (contestant == null)
+                    return Failed($"No connected contestant for {controllerId}.");
+                preferredSlotId = contestant.SlotId;
+            }
+
+            var winnerTeamIds = input.EligibleTeams
+                .OrderByDescending(team => team.ParticipantSlotIds.Contains(preferredSlotId))
+                .Take(input.WinnerTeamCount)
+                .Select(team => team.TeamId)
+                .ToArray();
+            var status = simulation.TryResolveMatch(snapshot, input, winnerTeamIds, out var advanced);
+            if (status != TournamentMutationStatus.Applied)
+                return Failed($"The authoritative simulation did not advance the bracket ({status}).");
+
+            return Succeeded($"Resolved {snapshot.CurrentMatchId}. Next match: {advanced.CurrentMatchId ?? "none"}.");
+        }
+    }
+
     private const string DanusticaSettlementId = "town_ES1";
     private static DanusticaTournamentFixture fixture;
 
@@ -319,9 +388,9 @@ public class TournamentDebugCommand
                 controller.RequestJoin(townId, null, 0);
                 return Succeeded($"DANUSTICA_TOURNAMENT_JOIN_REQUESTED townId={townId}|sessionId=none|revision=0");
             }
-            if (snapshot.Phase != TournamentSessionPhase.Preparation)
+            if (snapshot.Phase != TournamentSessionPhase.Preparation && !controller.CanResume(townId))
             {
-                return Failed($"Danustica session {snapshot.SessionId} is in phase {snapshot.Phase}, not Preparation.");
+                return Failed($"Danustica session {snapshot.SessionId} is not open to this player.");
             }
 
             controller.RequestJoin(townId, snapshot.SessionId, snapshot.Revision);
@@ -515,6 +584,12 @@ public class TournamentDebugCommand
 
         int humans = snapshot.Contestants.Count(contestant =>
             contestant.IsHuman && !contestant.IsReplaced);
+        var currentRound = snapshot.Rounds.FirstOrDefault(round =>
+            round.Matches.Any(match => match.MatchId == snapshot.CurrentMatchId));
+        string competitors = string.Join(",", snapshot.Contestants
+            .Where(contestant => contestant.IsHuman && !contestant.IsReplaced)
+            .Select(contestant =>
+                $"{contestant.ControllerId}/{contestant.SlotId}/{contestant.CharacterId}/{contestant.IsDisconnected}"));
         string choices = string.Join(
             ",",
             snapshot.Choices
@@ -525,7 +600,8 @@ public class TournamentDebugCommand
             $"bracketRevision={snapshot.BracketRevision}|matchId={snapshot.CurrentMatchId ?? "none"}|" +
             $"host={snapshot.HostControllerId ?? "none"}|localChoice={localChoice}|humans={humans}|" +
             $"spectators={snapshot.SpectatorControllerIds.Length}|ready={snapshot.ReadyCount}|" +
-            $"skip={snapshot.SkipCount}|voters={snapshot.VoterCount}|choices={choices}");
+            $"skip={snapshot.SkipCount}|voters={snapshot.VoterCount}|choices={choices}|" +
+            $"roundIndex={currentRound?.RoundIndex ?? -1}|competitors={competitors}");
     }
 
     private static void AppendMissionState(StringBuilder output)
@@ -544,10 +620,14 @@ public class TournamentDebugCommand
                 .Where(name => name.IndexOf("Tournament", StringComparison.OrdinalIgnoreCase) >= 0)
                 .OrderBy(name => name, StringComparer.Ordinal));
         TournamentBehavior tournamentBehavior = mission.GetMissionBehavior<TournamentBehavior>();
+        string mainAgentCharacterId = null;
+        if (mission.MainAgent?.Character is CharacterObject character &&
+            ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
+            objectManager.TryGetId(character, out mainAgentCharacterId);
         output.AppendLine(
             $"mission=active|scene={mission.SceneName}|mode={mission.Mode}|" +
             $"ending={mission.IsMissionEnding}|agents={mission.Agents.Count}|" +
-            $"mainAgent={mission.MainAgent?.Name ?? "none"}|" +
+            $"mainAgent={mission.MainAgent?.Name ?? "none"}|mainAgentCharacterId={mainAgentCharacterId ?? "none"}|" +
             $"nativeBracketReady={IsNativeBracketReady(tournamentBehavior)}|" +
             $"tournamentBehaviors={tournamentBehaviors}");
     }

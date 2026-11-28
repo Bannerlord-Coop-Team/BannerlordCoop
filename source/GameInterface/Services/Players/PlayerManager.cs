@@ -1,7 +1,9 @@
 ﻿using Common;
+using Common.Messaging;
 using GameInterface.Services.Entity;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.Players.Messages;
 using LiteNetLib;
 using Serilog;
 using System.Collections.Concurrent;
@@ -128,6 +130,7 @@ public class PlayerManager : IPlayerManager
     private readonly ILogger logger;
     private readonly IObjectManager objectManager;
     private readonly IControllerIdProvider controllerIdProvider;
+    private readonly IMessageBroker messageBroker;
     private readonly ConcurrentDictionary<NetPeer, Player> peerToPlayer = new();
     private readonly Dictionary<string, NetPeer> controllerToPeer = new();
 
@@ -154,11 +157,16 @@ public class PlayerManager : IPlayerManager
     // no reply and leaving that client on the validation screen until its deadline expired.
     private readonly Dictionary<string, Player> _players = new Dictionary<string, Player>();
 
-    public PlayerManager(ILogger logger, IObjectManager objectManager, IControllerIdProvider controllerIdProvider)
+    public PlayerManager(
+        ILogger logger,
+        IObjectManager objectManager,
+        IControllerIdProvider controllerIdProvider,
+        IMessageBroker messageBroker)
     {
         this.logger = logger;
         this.objectManager = objectManager;
         this.controllerIdProvider = controllerIdProvider;
+        this.messageBroker = messageBroker;
     }
 
     /// <inheritdoc cref="IPlayerManager.AddPlayer(Player)"/>
@@ -383,6 +391,7 @@ public class PlayerManager : IPlayerManager
         RemovePlayerObject<Hero>(player.HeroId);
         RemovePlayerObject<Clan>(player.OriginalClanId ?? player.ClanId);
 
+        messageBroker.Publish(this, new PlayerRemoved(player.ControllerId, player.CharacterObjectId));
         return true;
     }
 

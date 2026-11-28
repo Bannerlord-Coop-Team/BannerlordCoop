@@ -150,6 +150,13 @@ internal sealed class TournamentUIController : ITournamentUIController, IHandler
            IsActive(snapshot) &&
            !IsActiveLocalContestant(snapshot);
 
+    public bool CanResume(string townId)
+        => TryGetTownSession(townId, out var snapshot) &&
+           IsActive(snapshot) &&
+           GetLocalContestant(snapshot) is { } contestant &&
+           tournamentGameInterface.TryGetMainHeroCharacterId(out var characterId) &&
+           contestant.CharacterId == characterId;
+
     public void RequestJoin(string townId, string sessionId, long expectedRevision)
         => network.SendAll(new NetworkRequestJoinTournament(townId, sessionId, expectedRevision));
 
@@ -173,6 +180,15 @@ internal sealed class TournamentUIController : ITournamentUIController, IHandler
         if (!TryGetTownSession(townId, out var snapshot)) return;
 
         network.SendAll(new NetworkRequestSpectateTournament(snapshot.SessionId, snapshot.Revision));
+    }
+
+    public void ReleaseReservedSlot(string townId)
+    {
+        if (TryGetTownSession(townId, out var snapshot) && IsActive(snapshot) &&
+            GetLocalContestant(snapshot)?.IsDisconnected == true)
+        {
+            RequestLeaveActive(snapshot);
+        }
     }
 
     public void RequestLeaveActive(TournamentSessionSnapshot snapshot)
@@ -441,7 +457,10 @@ internal sealed class TournamentUIController : ITournamentUIController, IHandler
     }
 
     private bool IsActiveLocalContestant(TournamentSessionSnapshot snapshot)
-        => snapshot.Contestants.Any(contestant =>
+        => GetLocalContestant(snapshot) != null;
+
+    private TournamentContestantData GetLocalContestant(TournamentSessionSnapshot snapshot)
+        => snapshot.Contestants.FirstOrDefault(contestant =>
             contestant.IsHuman &&
             !contestant.IsReplaced &&
             contestant.ControllerId == LocalControllerId);

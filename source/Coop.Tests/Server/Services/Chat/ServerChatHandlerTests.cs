@@ -37,7 +37,8 @@ public class ServerChatHandlerTests : IDisposable
         playerManager = new PlayerManager(
             Mock.Of<ILogger>(),
             objectManager.Object,
-            Mock.Of<IControllerIdProvider>());
+            Mock.Of<IControllerIdProvider>(),
+            messageBroker);
         playerNameResolver
             .Setup(resolver => resolver.Resolve(It.IsAny<Player>()))
             .Returns((Player player) => player.ControllerId);

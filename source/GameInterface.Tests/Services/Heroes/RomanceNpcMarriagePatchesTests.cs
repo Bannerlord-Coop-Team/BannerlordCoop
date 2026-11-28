@@ -1,3 +1,4 @@
+using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Patches;
@@ -38,7 +39,8 @@ public class RomanceNpcMarriagePatchesTests
         var playerManager = new PlayerManager(
             Mock.Of<ILogger>(),
             objectManager.Object,
-            new ControllerIdProvider());
+            new ControllerIdProvider(),
+            Mock.Of<IMessageBroker>());
         var player = new Player("offline-player", string.Empty, string.Empty, clanId, string.Empty);
 
         Assert.True(playerManager.AddPlayer(player));

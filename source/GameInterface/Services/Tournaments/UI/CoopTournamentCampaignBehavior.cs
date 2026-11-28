@@ -72,6 +72,17 @@ public sealed class CoopTournamentCampaignBehavior : CampaignBehaviorBase
 
         starter.AddGameMenuOption(
             ActiveMenuId,
+            "coop_tournament_resume",
+            "{=coop_tournament_resume}Continue tournament",
+            ResumeCondition,
+            ResumeConsequence,
+            false,
+            0,
+            false,
+            null);
+
+        starter.AddGameMenuOption(
+            ActiveMenuId,
             "coop_tournament_spectate",
             "{=coop_tournament_spectate}Spectate tournament",
             SpectateCondition,
@@ -287,7 +298,22 @@ public sealed class CoopTournamentCampaignBehavior : CampaignBehaviorBase
         args.optionLeaveType = GameMenuOption.LeaveType.Mission;
         args.IsEnabled = TryGetTownContext(out var townId, out var controller) &&
                          controller.CanSpectate(townId);
-        return true;
+        return args.IsEnabled;
+    }
+
+    private static bool ResumeCondition(MenuCallbackArgs args)
+    {
+        args.optionLeaveType = GameMenuOption.LeaveType.Mission;
+        args.IsEnabled = TryGetTownContext(out var townId, out var controller) &&
+                         controller.CanResume(townId);
+        return args.IsEnabled;
+    }
+
+    private static void ResumeConsequence(MenuCallbackArgs args)
+    {
+        if (TryGetTownContext(out var townId, out var controller) &&
+            controller.TryGetTownSession(townId, out var snapshot))
+            controller.RequestJoin(townId, snapshot.SessionId, snapshot.Revision);
     }
 
     private static void SpectateConsequence(MenuCallbackArgs args)
@@ -304,6 +330,9 @@ public sealed class CoopTournamentCampaignBehavior : CampaignBehaviorBase
 
     private static void BackToTownConsequence(MenuCallbackArgs args)
     {
+        if (TryGetTownContext(out var townId, out var controller))
+            controller.ReleaseReservedSlot(townId);
+
         GameMenu.SwitchToMenu(TownCenterMenuId);
     }
 

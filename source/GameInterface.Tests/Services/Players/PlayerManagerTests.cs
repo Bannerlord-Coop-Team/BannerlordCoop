@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Messaging;
 using Common.Util;
 using Coop.Tests.Mocks;
 using GameInterface.Services.Entity;
@@ -34,7 +35,7 @@ public class PlayerManagerTests
         objectManager = new Mock<IObjectManager>();
         var controllerIdProvider = new ControllerIdProvider();
 
-        return new PlayerManager(new Mock<ILogger>().Object, objectManager.Object, controllerIdProvider);
+        return new PlayerManager(new Mock<ILogger>().Object, objectManager.Object, controllerIdProvider, Mock.Of<IMessageBroker>());
     }
 
     [Fact]
@@ -263,7 +264,7 @@ public class PlayerManagerTests
     public void IsSenderControllingParty_OwnParty_ReturnsTrue()
     {
         var logger = new Mock<ILogger>();
-        var playerManager = new PlayerManager(logger.Object, new Mock<IObjectManager>().Object, new ControllerIdProvider());
+        var playerManager = new PlayerManager(logger.Object, new Mock<IObjectManager>().Object, new ControllerIdProvider(), Mock.Of<IMessageBroker>());
         var peer = new TestNetwork().CreatePeer();
 
         Assert.True(playerManager.AddPlayer(new Player(ControllerId, string.Empty, PartyId, string.Empty, string.Empty)));
@@ -277,7 +278,7 @@ public class PlayerManagerTests
     public void IsSenderControllingParty_AnotherParty_ReturnsFalseAndWarnsWithThePeer()
     {
         var logger = new Mock<ILogger>();
-        var playerManager = new PlayerManager(logger.Object, new Mock<IObjectManager>().Object, new ControllerIdProvider());
+        var playerManager = new PlayerManager(logger.Object, new Mock<IObjectManager>().Object, new ControllerIdProvider(), Mock.Of<IMessageBroker>());
         var peer = new TestNetwork().CreatePeer();
 
         Assert.True(playerManager.AddPlayer(new Player(ControllerId, string.Empty, PartyId, string.Empty, string.Empty)));
@@ -301,7 +302,7 @@ public class PlayerManagerTests
     [Fact]
     public void IsSenderControllingParty_EmptyPartyIdOnBothSides_ReturnsFalse()
     {
-        var playerManager = new PlayerManager(new Mock<ILogger>().Object, new Mock<IObjectManager>().Object, new ControllerIdProvider());
+        var playerManager = new PlayerManager(new Mock<ILogger>().Object, new Mock<IObjectManager>().Object, new ControllerIdProvider(), Mock.Of<IMessageBroker>());
         var peer = new TestNetwork().CreatePeer();
 
         Assert.True(playerManager.AddPlayer(new Player(ControllerId, string.Empty, string.Empty, string.Empty, string.Empty)));

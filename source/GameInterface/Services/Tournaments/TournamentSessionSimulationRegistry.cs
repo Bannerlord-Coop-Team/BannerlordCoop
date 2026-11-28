@@ -39,7 +39,7 @@ public sealed partial class TournamentSessionRegistry
                 return status;
             if (session.Phase != TournamentSessionPhase.AwaitingChoices)
                 return TournamentMutationStatus.InvalidPhase;
-            if (session.Contestants.Exists(contestant => contestant.IsHuman) || session.Spectators.Count > 0)
+            if (session.HasVotersOrReservations())
                 return TournamentMutationStatus.Rejected;
 
             session.Phase = TournamentSessionPhase.SimulatingMatch;
@@ -47,6 +47,23 @@ public sealed partial class TournamentSessionRegistry
             session.Revision++;
             snapshot = session.CreateSnapshot();
             return TournamentMutationStatus.Applied;
+        }
+    }
+
+    public bool TryGetSimulationInput(
+        string sessionId,
+        long expectedRevision,
+        out TournamentSimulationInput input)
+    {
+        lock (gate)
+        {
+            input = null;
+            if (sessionId == null || !sessionsById.TryGetValue(sessionId, out var session) ||
+                session.Revision != expectedRevision)
+                return false;
+
+            var match = session.GetCurrentMatch();
+            return match != null && session.TryGetSimulationInput(match, out input);
         }
     }
 }

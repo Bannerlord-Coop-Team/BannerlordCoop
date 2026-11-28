@@ -19,6 +19,19 @@ public readonly struct NetworkTournamentRequestRejected : ICommand
     }
 }
 
+/// <summary>Tells a player that their reserved entrant was eliminated while they were away.</summary>
+[ProtoContract(SkipConstructor = true)]
+public readonly struct NetworkTournamentDisconnectLoss : ICommand
+{
+    [ProtoMember(1)]
+    public readonly string TownId;
+
+    public NetworkTournamentDisconnectLoss(string townId)
+    {
+        TownId = townId;
+    }
+}
+
 [ProtoContract(SkipConstructor = true)]
 public readonly struct NetworkRequestJoinTournament : ICommand
 {

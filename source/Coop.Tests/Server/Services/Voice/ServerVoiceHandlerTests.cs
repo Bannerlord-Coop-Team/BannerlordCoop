@@ -46,7 +46,7 @@ public partial class ServerVoiceHandlerTests : IDisposable
 
     public ServerVoiceHandlerTests()
     {
-        players = new PlayerManager(Mock.Of<ILogger>(), objects.Object, Mock.Of<IControllerIdProvider>());
+        players = new PlayerManager(Mock.Of<ILogger>(), objects.Object, Mock.Of<IControllerIdProvider>(), broker);
         missions = new MissionManager(players);
         var clock = new Mock<IVoiceClock>();
         clock.SetupGet(x => x.Milliseconds).Returns(() => now);

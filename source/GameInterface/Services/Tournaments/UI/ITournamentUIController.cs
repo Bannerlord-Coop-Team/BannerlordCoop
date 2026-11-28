@@ -19,12 +19,14 @@ internal interface ITournamentUIController
     string GetPreparationPlayerNames(string townId);
     bool CanStartPreparation(string townId);
     bool CanLeavePreparation(string townId);
+    bool CanResume(string townId);
     bool CanSpectate(string townId);
 
     void RequestJoin(string townId, string sessionId, long expectedRevision);
     void RequestStart(string townId);
     void RequestLeavePreparation(string townId);
     void RequestSpectate(string townId);
+    void ReleaseReservedSlot(string townId);
     void RequestLeaveActive(TournamentSessionSnapshot snapshot);
     void RequestChoice(TournamentSessionSnapshot snapshot, TournamentPlayerChoice choice);
     void RequestBet(TournamentSessionSnapshot snapshot, int amount);

@@ -43,7 +43,7 @@ public class CrimeRatingServiceTests
         var previousHero = ResolvedMainHeroContext.ResolvedMainHero;
         var objects = new Mock<IObjectManager>();
         var network = new Mock<INetwork>();
-        var players = new PlayerManager(Mock.Of<ILogger>(), objects.Object, new ControllerIdProvider());
+        var players = new PlayerManager(Mock.Of<ILogger>(), objects.Object, new ControllerIdProvider(), Mock.Of<IMessageBroker>());
         var firstHero = ObjectHelper.SkipConstructor<Hero>();
         var secondHero = ObjectHelper.SkipConstructor<Hero>();
         var faction = ObjectHelper.SkipConstructor<Kingdom>();

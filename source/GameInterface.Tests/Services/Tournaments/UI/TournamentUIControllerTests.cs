@@ -31,6 +31,43 @@ public class TournamentUIControllerTests
         Assert.Equal(17, request.ExpectedRevision);
     }
 
+    [Theory]
+    [InlineData("character-a", true)]
+    [InlineData("another-character", false)]
+    public void CanResume_RequiresTheCharacterRegisteredInTheBracket(string characterId, bool canResume)
+    {
+        var gameInterface = new Mock<ITournamentGameInterface>();
+        gameInterface.Setup(value => value.TryGetMainHeroCharacterId(out characterId)).Returns(true);
+        using var controller = CreateController("player-a", out _, gameInterface.Object);
+        controller.CacheSnapshot(CreateSnapshot(
+            "session-a", "town-a", 1, TournamentSessionPhase.AwaitingChoices, includeLocalContestant: true));
+
+        Assert.Equal(canResume, controller.CanResume("town-a"));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ReleaseReservedSlot_OnlySendsLeaveWhileTheLocalContestantIsAway(bool isDisconnected)
+    {
+        using var controller = CreateController("player-a", out var sent);
+        controller.CacheSnapshot(CreateSnapshot(
+            "session-a", "town-a", 17, TournamentSessionPhase.AwaitingChoices,
+            includeLocalContestant: true, localContestantIsDisconnected: isDisconnected));
+
+        controller.ReleaseReservedSlot("town-a");
+
+        if (!isDisconnected)
+        {
+            Assert.Empty(sent);
+            return;
+        }
+
+        var request = Assert.IsType<NetworkRequestLeaveActiveTournament>(Assert.Single(sent));
+        Assert.Equal("session-a", request.SessionId);
+        Assert.Equal(17, request.ExpectedRevision);
+    }
+
     [Fact]
     public void Tombstone_ClearsOnlyMatchingSessionAndTownCache()
     {
@@ -195,7 +232,8 @@ public class TournamentUIControllerTests
 
     private static TournamentUIController CreateController(
         string controllerId,
-        out List<IMessage> sent)
+        out List<IMessage> sent,
+        ITournamentGameInterface gameInterface = null)
     {
         sent = new List<IMessage>();
         var captured = sent;
@@ -210,7 +248,7 @@ public class TournamentUIControllerTests
             network.Object,
             new Mock<IObjectManager>().Object,
             controllerIdProvider.Object,
-            new Mock<ITournamentGameInterface>().Object);
+            gameInterface ?? new Mock<ITournamentGameInterface>().Object);
     }
 
     private static TournamentSessionSnapshot CreateSnapshot(
@@ -220,7 +258,8 @@ public class TournamentUIControllerTests
         TournamentSessionPhase phase = TournamentSessionPhase.Preparation,
         bool includeLocalContestant = false,
         string currentMatchId = null,
-        bool isCompleted = false)
+        bool isCompleted = false,
+        bool localContestantIsDisconnected = false)
     {
         var contestants = includeLocalContestant
             ? new[]
@@ -234,7 +273,8 @@ public class TournamentUIControllerTests
                     true,
                     false,
                     true,
-                    "npc-a")
+                    "npc-a",
+                    isDisconnected: localContestantIsDisconnected)
             }
             : Array.Empty<TournamentContestantData>();
 

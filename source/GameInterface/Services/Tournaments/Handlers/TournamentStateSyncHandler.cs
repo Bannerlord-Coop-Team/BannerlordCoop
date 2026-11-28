@@ -70,16 +70,20 @@ internal sealed class TournamentStateSyncHandler : IHandler
 
     private void Handle_StateRequest(MessagePayload<NetworkRequestTournamentState> payload)
     {
-        if (ModInformation.IsClient ||
-            payload.Who is not NetPeer peer ||
-            !playerManager.TryGetPlayer(peer, out _))
+        if (ModInformation.IsClient || payload.Who is not NetPeer peer)
         {
             return;
         }
 
-        GameThread.RunSafe(
-            () => network.Send(peer, CreateStateSnapshot()),
-            context: nameof(Handle_StateRequest));
+        GameThread.RunSafe(() =>
+        {
+            if (!playerManager.TryGetCurrentController(peer, out var controllerId))
+                return;
+
+            network.Send(peer, CreateStateSnapshot());
+            if (sessionRegistry.TryTakeDisconnectLoss(controllerId, out var townId))
+                network.Send(peer, new NetworkTournamentDisconnectLoss(townId));
+        }, context: nameof(Handle_StateRequest));
     }
 
     private void Handle_NativeStateChanged(MessagePayload<TournamentNativeStateChanged> payload)

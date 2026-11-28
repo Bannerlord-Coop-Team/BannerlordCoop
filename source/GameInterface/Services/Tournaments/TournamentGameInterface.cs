@@ -52,9 +52,16 @@ public interface ITournamentGameInterface : IGameAbstraction
     bool TryApplyLockedPrize(TournamentSessionSnapshot snapshot);
     bool TrySimulateCurrentMatchUnbiased(
         TournamentSessionSnapshot snapshot,
+        TournamentSimulationInput input,
         long sequence,
         out TournamentMatchResultData result);
+    TournamentMatchResultData BuildSimulatedMatchResult(
+        TournamentSessionSnapshot snapshot,
+        TournamentSimulationInput input,
+        string[] winnerTeamIds,
+        long sequence);
     bool TryGetBetQuote(TournamentSessionSnapshot snapshot, Hero hero, string slotId, out TournamentBetQuote quote);
+    bool TryGetMainHeroCharacterId(out string characterId);
 }
 
 public sealed partial class TournamentGameInterface : ITournamentGameInterface
@@ -66,6 +73,13 @@ public sealed partial class TournamentGameInterface : ITournamentGameInterface
     {
         this.objectManager = objectManager;
         this.playerManager = playerManager;
+    }
+
+    public bool TryGetMainHeroCharacterId(out string characterId)
+    {
+        characterId = null;
+        return Hero.MainHero?.CharacterObject is { } character &&
+            objectManager.TryGetId(character, out characterId);
     }
 
     public bool TryFreezeTournament(Town town, FightTournamentGame tournamentGame, out TournamentSessionSeed seed)
