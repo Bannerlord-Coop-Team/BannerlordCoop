@@ -17,12 +17,19 @@ internal class DisableGarrisonTroopsCampaignBehavior
 
     [HarmonyPatch(nameof(GarrisonTroopsCampaignBehavior.OnSettlementEntered))]
     [HarmonyPrefix]
-    public static bool OnSettlementEnteredPrefix(MobileParty mobileParty, Settlement settlement)
+    public static bool OnSettlementEnteredPrefix(GarrisonTroopsCampaignBehavior __instance, MobileParty mobileParty, Settlement settlement)
     {
         if (mobileParty == null)
             return true;
 
-        return !mobileParty.IsPlayerParty() && !settlement.OwnerClan.IsPlayerClan();
+        if (settlement.OwnerClan.IsPlayerClan())
+            return false;
+
+        if (!mobileParty.IsPlayerParty())
+            return true;
+
+        // Like vanilla, a player's army garrisons its fresh conquest with its AI lords, the postfixes below leave player clan parties out
+        return mobileParty.Army?.LeaderParty == mobileParty && settlement == __instance._newlyConqueredFortification;
     }
 
     // Vanilla clears this when a lord enters the conquest, which a player clan's fortification skips above, otherwise every AI garrison keeps the conquest sizing
