@@ -32,7 +32,7 @@ public class WarDeclaredInTownTests : SyncTestBase
     {
         var playerClient = Clients.First();
         var player = CreatePlayer(playerClient, "player");
-        // Gives the second client its own main party, which every real client has, waiting in the town like B in the manual test
+        // Gives the second client its own main party, which every real client has, waiting in the town
         var other = CreatePlayer(Clients.Last(), "other");
         var (settlementId, townClanId) = HostileTownSetup.CreateTown(TestEnvironment, player.ClanId, player.MobilePartyId, other.MobilePartyId);
 
@@ -82,13 +82,25 @@ public class WarDeclaredInTownTests : SyncTestBase
         HostileTownSetup.AssertInTown(TestEnvironment, player.MobilePartyId, settlementId, inTown: false);
     }
 
-    // A player who drops before pressing continue leaves no client to open the menu, so parking its party ejects it
+    // A player who drops before pressing continue leaves no client to open the menu, so parking its party ejects it.
+    // The party walked into the town, so it then holds, otherwise the client that rejoins walks it straight back in
     [Fact]
-    public void DropsBeforeSlinkAwayContinue_ServerEjectsPartyOnPark()
+    public void DropsBeforeSlinkAwayContinue_ParkEjectsPartyAndHoldsIt()
     {
         var playerClient = Clients.First();
         var player = CreatePlayer(playerClient, "player");
         var (settlementId, townClanId) = HostileTownSetup.CreateTown(TestEnvironment, player.ClanId, player.MobilePartyId);
+        var instances = Clients.Prepend(Server).ToArray();
+        foreach (var instance in instances)
+        {
+            instance.Call(() =>
+            {
+                using var scope = new AllowedThread();
+                var party = instance.GetRegisteredObject<MobileParty>(player.MobilePartyId);
+                party.DefaultBehavior = AiBehavior.GoToSettlement;
+                party.SetTargetSettlement(instance.GetRegisteredObject<Settlement>(settlementId), isTargetingPort: false);
+            });
+        }
 
         HostileTownSetup.DeclareWar(TestEnvironment, townClanId, player.ClanId);
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPartyLeaveSettlement>());
@@ -97,26 +109,17 @@ public class WarDeclaredInTownTests : SyncTestBase
 
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPartyLeaveSettlement>());
         HostileTownSetup.AssertInTown(TestEnvironment, player.MobilePartyId, settlementId, inTown: false);
-    }
-
-    // The rejoined client loads the server's party, which walked into the town, so a town target would walk it straight back in
-    [Fact]
-    public void DropsBeforeSlinkAwayContinue_RejoinedPartyHoldsOutsideTown()
-    {
-        var playerClient = Clients.First();
-        var player = CreatePlayer(playerClient, "player");
-        var (settlementId, townClanId) = HostileTownSetup.CreateTown(TestEnvironment, player.ClanId, player.MobilePartyId);
-        Server.Call(() =>
+        foreach (var instance in instances)
         {
-            using var scope = new AllowedThread();
-            var party = Server.GetRegisteredObject<MobileParty>(player.MobilePartyId);
-            party.DefaultBehavior = AiBehavior.GoToSettlement;
-            party.SetTargetSettlement(Server.GetRegisteredObject<Settlement>(settlementId), isTargetingPort: false);
-        });
+            instance.Call(() =>
+            {
+                var party = instance.GetRegisteredObject<MobileParty>(player.MobilePartyId);
+                Assert.Equal(AiBehavior.Hold, party.DefaultBehavior);
+                Assert.Null(party.TargetSettlement);
+            });
+        }
 
-        HostileTownSetup.DeclareWar(TestEnvironment, townClanId, player.ClanId);
-        Server.SimulateMessage(this, new PlayerDisconnected(playerClient.NetPeer, default));
-        TestEnvironment.PumpAndFlush();
+        // The rejoining client loads the server's save, so it gets the server's hold
         Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer("player", playerClient.NetPeer));
         Server.SimulateMessage(this, new PlayerCampaignSynchronized(playerClient.NetPeer));
         TestEnvironment.PumpAndFlush();
@@ -127,7 +130,6 @@ public class WarDeclaredInTownTests : SyncTestBase
             var party = Server.GetRegisteredObject<MobileParty>(player.MobilePartyId);
             Assert.True(party.IsActive);
             Assert.Equal(AiBehavior.Hold, party.DefaultBehavior);
-            Assert.Null(party.TargetSettlement);
         });
     }
 }
