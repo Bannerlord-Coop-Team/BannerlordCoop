@@ -703,7 +703,7 @@ public sealed class HideoutMissionRuntimeTests : MissionTestEnvironment
         MissionEngineFixture fixture, EnvironmentInstance client, IMissionContext missionContext, bool isLocalHost)
     {
         var mission = fixture.CreateMission(client);
-        var (logic, nativeLogic, attackerTeam, defenderTeam) = CreateCampHideout(mission, client.Resolve<IMessageBroker>(), false,
+        var (logic, nativeLogic, attackerTeam, defenderTeam) = CreateCampHideout(mission, client.Resolve<IMessageBroker>(), direct: false,
             client.Resolve<IBattleNetwork>(), missionContext);
         var native = (CoopHideoutAmbushController)nativeLogic;
         var hero = mission.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop).Team(attackerTeam).Controller(AgentControllerType.Player));
