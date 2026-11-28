@@ -8,7 +8,6 @@ using HarmonyLib;
 using Missions.Battles;
 using Missions.Hideouts;
 using Moq;
-using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -27,7 +26,7 @@ public sealed class HideoutRogueryXpTests : MissionTestEnvironment
     private const float FailedXp = 300f;
     private const float GhostXp = 1200f;
 
-    public HideoutRogueryXpTests(ITestOutputHelper output) : base(output)
+    public HideoutRogueryXpTests(ITestOutputHelper output) : base(output, numClients: 3)
     {
         // The headless environment omits join-time registration of pre-existing skills.
         uint rogueryHandle = 0;
@@ -62,6 +61,7 @@ public sealed class HideoutRogueryXpTests : MissionTestEnvironment
             var (logic, nativeLogic, attackerTeam, defenderTeam) =
                 CreateHideout(mock, host.Resolve<IMessageBroker>(), direct: false, HideoutPhase.BossBattle);
             var native = (CoopHideoutAmbushController)nativeLogic;
+            // These stand in for the mission init the headless ambush skips, so TickAuthority reaches the boss fight's resolution.
             native._isMissionInitialized = true;
             native._troopsInitialized = true;
             native._playerPriorTroops = new List<IAgentOriginBase>();
@@ -141,8 +141,9 @@ public sealed class HideoutRogueryXpTests : MissionTestEnvironment
         var (hostHeroId, defenderHeroId, joinerHeroId) = (heroIds[0], heroIds[1], heroIds[2]);
         var hostPartyId = partyIds[0];
         var raiderIds = new[] { hostHeroId, joinerHeroId };
-        var host = Clients.First();
-        var defenderClient = Clients.Last();
+        var host = Clients.ElementAt(0);
+        var defenderClient = Clients.ElementAt(1);
+        var raiderClients = new Dictionary<string, EnvironmentInstance> { [hostHeroId] = host, [joinerHeroId] = Clients.ElementAt(2) };
         var before = new Dictionary<string, float>();
         var gain = new Dictionary<string, float>();
         float defenderBefore = 0;
@@ -151,6 +152,7 @@ public sealed class HideoutRogueryXpTests : MissionTestEnvironment
             var players = Server.Resolve<IPlayerManager>();
             players.SetPeer("host", host.NetPeer);
             players.SetPeer("bandits", defenderClient.NetPeer);
+            players.SetPeer("joiner", raiderClients[joinerHeroId].NetPeer);
             defenderBefore = Server.GetRegisteredObject<Hero>(defenderHeroId).HeroDeveloper.GetSkillXp(DefaultSkills.Roguery);
             foreach (var heroId in raiderIds)
             {
@@ -181,7 +183,7 @@ public sealed class HideoutRogueryXpTests : MissionTestEnvironment
                     raidOnBattleHost(host, fixture);
                 }
                 finally { Campaign.Current.MainParty = previousMainParty; }
-            }, new MethodBase[] { AccessTools.Method(typeof(MapEvent), nameof(MapEvent.SetOverrideWinner)) });
+            });
         }
         finally { harmony.UnpatchAll(harmony.Id); }
 
@@ -203,17 +205,20 @@ public sealed class HideoutRogueryXpTests : MissionTestEnvironment
             Assert.Equal(before[heroId] + gain[heroId], after[heroId]);
         }
 
-        // Only the ghost bonus is announced, and only to the raider it went to; the joiner has no client here.
-        var hostBonuses = host.InternalMessages.GetMessages<NetworkHideoutGhostBonusGained>();
-        if (reward == HideoutRogueryXpReward.ClearedAsGhost)
+        // Only the ghost bonus is announced, and each raider's own client is told its own gain.
+        foreach (var heroId in raiderIds)
         {
-            var bonus = Assert.Single(hostBonuses);
-            Assert.Equal(after[hostHeroId] - before[hostHeroId], bonus.Xp);
-            Assert.Equal(rolledXp, bonus.BaseXp);
-        }
-        else
-        {
-            Assert.Empty(hostBonuses);
+            var bonuses = raiderClients[heroId].InternalMessages.GetMessages<NetworkHideoutGhostBonusGained>();
+            if (reward == HideoutRogueryXpReward.ClearedAsGhost)
+            {
+                var bonus = Assert.Single(bonuses);
+                Assert.Equal(after[heroId] - before[heroId], bonus.Xp);
+                Assert.Equal(rolledXp, bonus.BaseXp);
+            }
+            else
+            {
+                Assert.Empty(bonuses);
+            }
         }
         Assert.Empty(defenderClient.InternalMessages.GetMessages<NetworkHideoutGhostBonusGained>());
 
