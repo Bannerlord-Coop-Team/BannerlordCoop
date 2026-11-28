@@ -33,9 +33,10 @@ The local decompilations are retained under ignored `artifacts/3762-*.cs`.
 - The new accept path has no conversation-tracker precondition. The old map-conversation tracking
   cherry-pick targets a deleted file and is unnecessary here.
 - Retain the framework's existing disconnect/restart dismissal policy. Active direct quests do not
-  resume after their owner disconnects. Server restart discards unowned companion missions after
-  freeing their companions; ordinary sent troops are not restored by that shared policy. This port
-  does not add a separate persistence lifecycle or claim active-quest resumption.
+  resume after their owner disconnects. The save keeps each issue's owner (#3982), so a server
+  restart keeps a companion mission whose owner is offline, as a disconnect does, and discards only
+  unowned ones after freeing their companions. This port does not add a separate persistence
+  lifecycle or claim active-quest resumption.
 
 ## Automated checks
 

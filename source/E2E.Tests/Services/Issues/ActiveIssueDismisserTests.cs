@@ -143,7 +143,7 @@ public class ActiveIssueDismisserTests : IDisposable
 
         Assert.False(HasIssue(Server, notableId));
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
-        // Startup does not restore issue ownership, so dismissal cannot attribute this archive to a player.
+        // The save held no owner for this issue, so dismissal cannot attribute this archive to a player.
         Server.Call(() => Assert.False(archive.IsEnded()));
     }
 
@@ -286,6 +286,22 @@ public class ActiveIssueDismisserTests : IDisposable
 
         Assert.True(HasIssue(Server, idleNotableId));
         Assert.True(HasIssue(Server, unregisteredNotableId));
+    }
+
+    // #3982: the save restores the owner before the dismisser runs, so troops sent by an offline player stay out.
+    [Fact]
+    public void ServerStart_KeepsATroopsIssueWhoseSavedOwnerIsOffline()
+    {
+        var notableId = TestEnvironment.CreateRegisteredObject<Hero>();
+        RegisterPlayer(ControllerId);
+        AddIssue(Server, notableId, IssueBase.IssueState.SolvingWithAlternativeSolution);
+        SetOwner(notableId, ControllerId);
+
+        PublishServerStarted(Server);
+
+        Assert.True(HasIssue(Server, notableId));
+        Assert.True(HasOwner(notableId));
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
     }
 
     [Fact]
