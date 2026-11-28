@@ -362,7 +362,8 @@ internal class PlayerPartyVisibilityHandler : IHandler
     {
         LeaveSiegeBeforeParking(party);
         // A party whose player went offline has no client to open the slink away menu, so a town at war with it ejects it
-        if (!LeaveFollowedArmy(party, queueArmyLeave))
+        bool townCheckQueued = LeaveFollowedArmy(party, queueArmyLeave);
+        if (!townCheckQueued)
             diplomaticHandler.CheckSettlementSuitability(party);
 
         party.IsActive = false;
@@ -390,7 +391,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
         {
             if (party.Army == army) armyLeaver.Remove(party, army);
 
-            // Vanilla skips an attached follower, so the town waits for the army leave, and its eject also works on a parked party
+            // Vanilla skips a party attached to an army, so the town is checked after the leave. Its eject still works on a party that is already parked
             diplomaticHandler.CheckSettlementSuitability(party);
         });
         return true;

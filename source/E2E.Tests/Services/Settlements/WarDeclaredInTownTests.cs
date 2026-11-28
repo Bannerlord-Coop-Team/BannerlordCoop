@@ -32,6 +32,8 @@ public class WarDeclaredInTownTests : SyncTestBase
         var other = CreatePlayer(Clients.Last(), "other");
         var (settlementId, townClanId) = HostileTownSetup.CreateTown(TestEnvironment, player.ClanId, player.MobilePartyId, other.MobilePartyId);
 
+        // Puts the client's main party in a town encounter the way entering the town would. PlayerEncounter.Finish writes
+        // MapStateData.GameMenuId when no menu is open, which the harness campaign doesn't create
         PlayerEncounter townEncounter = null;
         playerClient.Call(() =>
         {
