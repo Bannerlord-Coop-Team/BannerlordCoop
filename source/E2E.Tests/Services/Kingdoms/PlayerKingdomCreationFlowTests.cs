@@ -673,6 +673,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         ConfigureClanInKingdom(ruler.ClanId, kingdomId);
         SetClanTierEverywhere(player.ClanId, 2);
         Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer(ControllerId, client.NetPeer));
+        var kingdom = client.GetRegisteredObject<Kingdom>(kingdomId);
 
         var harmony = new Harmony($"e2e.inlined-mercenary-service.{Guid.NewGuid():N}");
         var inline = new HarmonyMethod(AccessTools.Method(typeof(PlayerKingdomCreationFlowTests), nameof(InlineMercenaryServiceTranspiler)));
@@ -680,8 +681,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         {
             harmony.Patch(AccessTools.Method(typeof(StartMercenaryServiceAction), nameof(StartMercenaryServiceAction.ApplyStart)), transpiler: inline);
             harmony.Patch(AccessTools.Method(typeof(EndMercenaryServiceAction), nameof(EndMercenaryServiceAction.Apply)), transpiler: inline);
-            client.SimulateMessage(this, new MercenaryServiceAccepted(
-                client.GetRegisteredObject<Kingdom>(kingdomId), 50, client.GetRegisteredObject<Clan>(player.ClanId)));
+            client.SimulateMessage(this, new MercenaryServiceAccepted(kingdom, 50, client.GetRegisteredObject<Clan>(player.ClanId)));
             foreach (var instance in Clients.Append(Server))
             {
                 instance.Call(() =>
@@ -693,7 +693,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             }
 
             Server.NetworkSentMessages.Clear();
-            client.SimulateMessage(this, new VassalServiceAccepted(client.GetRegisteredObject<Kingdom>(kingdomId), grantRewards: false));
+            client.SimulateMessage(this, new VassalServiceAccepted(kingdom, grantRewards: false));
         }
         finally
         {
@@ -708,7 +708,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         }
     }
 
-    // Replaces each call to Clan.StartMercenaryService or EndMercenaryService with the setter it wraps, as an inlined call runs.
+    // Replaces the one Clan.StartMercenaryService or EndMercenaryService call in each patched action with the setter it wraps, as an inlined call runs.
     private static IEnumerable<CodeInstruction> InlineMercenaryServiceTranspiler(IEnumerable<CodeInstruction> instructions)
     {
         var start = AccessTools.Method(typeof(Clan), nameof(Clan.StartMercenaryService));
