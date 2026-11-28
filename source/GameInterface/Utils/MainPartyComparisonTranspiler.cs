@@ -1,5 +1,6 @@
 using Common.Logging;
 using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Services.PartyBases.Extensions;
 using HarmonyLib;
 using Serilog;
 using System.Collections.Generic;
@@ -11,9 +12,10 @@ namespace GameInterface.Utils;
 
 /// <summary>
 /// Reusable transpiler helper that rewrites reference comparisons against
-/// <see cref="MobileParty.MainParty"/> into the equivalent
-/// <see cref="MobilePartyExtensions.IsPlayerParty(MobileParty)"/> check, so that game logic
-/// which special-cases the single local <see cref="MobileParty.MainParty"/> instead treats
+/// <see cref="MobileParty.MainParty"/> or <see cref="PartyBase.MainParty"/> into the equivalent
+/// <see cref="MobilePartyExtensions.IsPlayerParty(MobileParty)"/> or
+/// <see cref="PartyBaseExtensions.IsPlayerParty(PartyBase)"/> check, so that game logic
+/// which special-cases the single local main party instead treats
 /// every player-controlled party as "the player" in co-op.
 ///
 /// The rewrite is driven entirely by the IL comparison opcode that follows the
@@ -29,7 +31,8 @@ namespace GameInterface.Utils;
 /// </summary>
 /// <remarks>
 /// Apply this from the <see cref="HarmonyTranspiler"/> of any method that compares a
-/// <see cref="MobileParty"/> against <see cref="MobileParty.MainParty"/>:
+/// <see cref="MobileParty"/> against <see cref="MobileParty.MainParty"/>, or a
+/// <see cref="PartyBase"/> against <see cref="PartyBase.MainParty"/>:
 /// <code>
 /// [HarmonyTranspiler]
 /// static IEnumerable&lt;CodeInstruction&gt; Transpiler(IEnumerable&lt;CodeInstruction&gt; instructions)
@@ -43,17 +46,12 @@ public class MainPartyComparisonTranspiler
     private MainPartyComparisonTranspiler() { }
 
     /// <summary>
-    /// Replaces every reference comparison against <see cref="MobileParty.MainParty"/> with the
-    /// equivalent <see cref="MobilePartyExtensions.IsPlayerParty(MobileParty)"/> check.
+    /// Replaces every reference comparison against <see cref="MobileParty.MainParty"/> or
+    /// <see cref="PartyBase.MainParty"/> with the matching IsPlayerParty check.
     /// </summary>
     public static IEnumerable<CodeInstruction> ReplaceMainPartyComparisonsWithIsPlayerParty(
         IEnumerable<CodeInstruction> instructions)
     {
-        var isPlayerParty = AccessTools.Method(
-            typeof(MobilePartyExtensions),
-            nameof(MobilePartyExtensions.IsPlayerParty),
-            new[] { typeof(MobileParty) });
-
         var codes = new List<CodeInstruction>(instructions);
         var result = new List<CodeInstruction>(codes.Count);
         var replacements = 0;
@@ -62,8 +60,8 @@ public class MainPartyComparisonTranspiler
         {
             var current = codes[i];
 
-            // Look for: call/callvirt MobileParty::get_MainParty  immediately followed by a comparison.
-            if (!IsMainPartyGetter(current) || i + 1 >= codes.Count)
+            // Look for: call/callvirt MobileParty::get_MainParty or PartyBase::get_MainParty immediately followed by a comparison.
+            if (!TryGetIsPlayerPartyCheck(current, out var isPlayerParty) || i + 1 >= codes.Count)
             {
                 result.Add(current);
                 continue;
@@ -112,7 +110,7 @@ public class MainPartyComparisonTranspiler
                 // Unrecognized usage of get_MainParty (e.g. stored, passed as an argument).
                 // Leave it alone rather than risk corrupting the method body.
                 Logger.Warning(
-                    "Skipping a MobileParty.MainParty use that is not a direct comparison (followed by {OpCode})",
+                    "Skipping a MainParty use that is not a direct comparison (followed by {OpCode})",
                     comparison.opcode);
                 result.Add(current);
             }
@@ -127,18 +125,28 @@ public class MainPartyComparisonTranspiler
         else
         {
             Logger.Debug(
-                "{Transpiler} replaced {Count} MobileParty.MainParty comparison(s) with IsPlayerParty()",
+                "{Transpiler} replaced {Count} MainParty comparison(s) with IsPlayerParty()",
                 nameof(ReplaceMainPartyComparisonsWithIsPlayerParty), replacements);
         }
 
         return result;
     }
 
-    private static bool IsMainPartyGetter(CodeInstruction instruction)
+    private static bool TryGetIsPlayerPartyCheck(CodeInstruction instruction, out MethodInfo isPlayerParty)
     {
-        return (instruction.opcode == OpCodes.Call || instruction.opcode == OpCodes.Callvirt)
-            && instruction.operand is MethodInfo method
-            && method.DeclaringType == typeof(MobileParty)
-            && method.Name == "get_MainParty";
+        isPlayerParty = null;
+        if (instruction.opcode != OpCodes.Call && instruction.opcode != OpCodes.Callvirt) return false;
+        if (instruction.operand is not MethodInfo method || method.Name != "get_MainParty") return false;
+
+        if (method.DeclaringType == typeof(MobileParty))
+        {
+            isPlayerParty = AccessTools.Method(typeof(MobilePartyExtensions), nameof(MobilePartyExtensions.IsPlayerParty), new[] { typeof(MobileParty) });
+        }
+        else if (method.DeclaringType == typeof(PartyBase))
+        {
+            isPlayerParty = AccessTools.Method(typeof(PartyBaseExtensions), nameof(PartyBaseExtensions.IsPlayerParty), new[] { typeof(PartyBase) });
+        }
+
+        return isPlayerParty != null;
     }
 }
