@@ -63,6 +63,7 @@ internal class PlayerCaptivityServerHandler : IHandler
     private readonly ConversationPartyTracker conversationPartyTracker;
     private readonly IPartyVisualInterface partyVisuals;
     private readonly IExecutionCampaignBehaviorInterface executionInterface;
+    private readonly Dictionary<Hero, Hero> pendingExecutions = new();
 
     public PlayerCaptivityServerHandler(
         IObjectManager objectManager,
@@ -192,7 +193,7 @@ internal class PlayerCaptivityServerHandler : IHandler
         int relation = executer.Clan.GetRelationWithClan(hero.Clan);
         bool hasBloodFeud = executionInterface.HasBloodFeud(hero.Clan, executer.Clan);
         if (MBRandom.RandomFloat <= PlayerExecutionChance(hasBloodFeud, mercy, relation))
-            executionInterface.SetPendingPlayerExecution(hero, executer);
+            pendingExecutions[hero] = executer;
     }
 
     // Vanilla ExecutionCampaignBehavior.CalculatePlayerExecutionProbability
@@ -712,7 +713,12 @@ internal class PlayerCaptivityServerHandler : IHandler
         if (ModInformation.IsClient) return;
 
         // Deferred like native OnGameMenuOpened, so the kill doesn't run mid battle capture processing.
-        executionInterface.ExecutePendingPlayers();
+        foreach (var execution in pendingExecutions.ToArray())
+        {
+            pendingExecutions.Remove(execution.Key);
+            if (execution.Key.IsPrisoner)
+                KillCharacterAction.ApplyByExecution(execution.Key, execution.Value);
+        }
 
         foreach (var (hero, mobileParty) in PlayerHeros())
         {

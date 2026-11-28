@@ -47,8 +47,6 @@ public interface IExecutionCampaignBehaviorInterface : IGameAbstraction
     void SettleBloodFeudByAgreement(Clan playerClan, Clan otherPlayerClan);
     bool HasBloodFeud(Clan playerClan, Clan clan);
     bool HasBloodFeudWithAnyPlayer(Clan clan);
-    void SetPendingPlayerExecution(Hero playerHero, Hero executor);
-    void ExecutePendingPlayers();
     void ApplyBloodFeuds(Dictionary<string, BloodFeudData> feuds);
     void ShowSettlementExecutionNotice(Hero clanMember, Clan clanWithFeud, Settlement settlement, CampaignTime executionDate);
 }
@@ -59,9 +57,6 @@ internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorIn
     private readonly IObjectManager objectManager;
     private readonly IPlayerManager playerManager;
     private readonly INetwork network;
-
-    // Dictionary<PlayerHeroId, ExecutorHeroId> for _isMainHeroExecuted, executed on the next CampaignTick
-    private readonly Dictionary<string, string> pendingPlayerExecutions = new();
 
     private BloodFeudPlayerData Data => coopSessionProvider.CoopSession.BloodFeudPlayerData;
 
@@ -413,30 +408,6 @@ internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorIn
     public bool HasBloodFeudWithAnyPlayer(Clan clan)
     {
         return GetPlayerClans().Any(playerClan => HasBloodFeud(playerClan.ClanId, clan));
-    }
-
-    public void SetPendingPlayerExecution(Hero playerHero, Hero executor)
-    {
-        if (!objectManager.TryGetIdWithLogging(playerHero, out var playerHeroId)) return;
-        if (!objectManager.TryGetIdWithLogging(executor, out var executorId)) return;
-
-        pendingPlayerExecutions[playerHeroId] = executorId;
-    }
-
-    public void ExecutePendingPlayers()
-    {
-        if (pendingPlayerExecutions.Count == 0) return;
-
-        foreach (var pendingExecution in pendingPlayerExecutions.ToArray())
-        {
-            pendingPlayerExecutions.Remove(pendingExecution.Key);
-
-            if (!objectManager.TryGetObjectWithLogging<Hero>(pendingExecution.Key, out var playerHero)) continue;
-            if (!objectManager.TryGetObjectWithLogging<Hero>(pendingExecution.Value, out var executor)) continue;
-
-            if (playerHero.IsPrisoner)
-                KillCharacterAction.ApplyByExecution(playerHero, executor);
-        }
     }
 
     public void ApplyBloodFeuds(Dictionary<string, BloodFeudData> feuds)
