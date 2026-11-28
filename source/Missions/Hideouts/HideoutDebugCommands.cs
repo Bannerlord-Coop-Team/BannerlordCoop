@@ -1,5 +1,8 @@
 ﻿using Common.Commands;
 using Newtonsoft.Json;
+using SandBox;
+using SandBox.Missions;
+using SandBox.Missions.AgentBehaviors;
 using SandBox.Objects.Usables;
 using System;
 using System.Linq;
@@ -63,6 +66,43 @@ internal static class HideoutDebugCommands
         }
     }
 
+    /// <summary>Has the nearest sentry spot this client's hero, the way a sentry that sees the player alarms itself.</summary>
+    public sealed class AlarmCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.hideout";
+        public string Name => "alarm";
+        public string Description => "On the battle host, has the nearest sentry spot this client's hero in a stealth hideout.";
+        public CoopCommandSide Side => CoopCommandSide.Client;
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!TryGetAmbush(out var mission, out var logic, out var native))
+                return Failed("Not in a co-op stealth hideout mission.", "mission_unavailable");
+            // Only the battle host runs the sentries' AI; elsewhere they are puppets without an alarm behavior.
+            if (!logic.IsAuthority)
+                return Failed("Run this on the battle host.", "battle_host_only");
+            if (native.Phase != HideoutPhase.Stealth)
+                return Failed($"The hideout is in its {native.Phase} phase; sentries only spot someone while sneaking.", "phase_unavailable");
+            var hero = mission.MainAgent;
+            if (hero?.IsActive() != true)
+                return Failed("This client's hero isn't on the field.", "hero_unavailable");
+            var sentry = mission.Agents
+                .Where(agent => agent.IsActive() && agent.IsHuman && agent.Team?.Side == BattleSideEnum.Defender)
+                .Select(agent => (agent, alarm: agent.GetComponent<CampaignAgentComponent>()?.AgentNavigator?.GetBehaviorGroup<AlarmedBehaviorGroup>()))
+                .Where(pair => pair.alarm != null)
+                .OrderBy(pair => pair.agent.Position.DistanceSquared(hero.Position))
+                .FirstOrDefault();
+            if (sentry.agent == null)
+                return Failed("No standing sentry can spot anyone.", "sentry_unavailable");
+            // AlarmedBehaviorGroup's own steps on sighting an enemy: raise the alarm toward the target, then escalate
+            // to Alarmed, which the engine reports through OnAgentAlarmedStateChanged.
+            sentry.alarm.AddAlarmFactor(2f, hero.GetWorldPosition());
+            sentry.agent.SetAlarmState(Agent.AIStateFlag.Alarmed);
+            return new CoopCommandResult(true, $"Sentry {sentry.agent.Index} spotted the hero.");
+        }
+    }
+
     /// <summary>Prints the stealth phase, the signal fires, the troops on the field and the sentries still standing.</summary>
     public sealed class StealthStatusCoopCommand : ICoopCommand
     {
@@ -101,6 +141,9 @@ internal static class HideoutDebugCommands
                 AttackerTroops = attackers.Count(agent => !CoopHideoutMissionLogic.IsPlayerHero(agent)),
                 ActiveSentries = native.ActiveSentryCount,
                 ActiveDefenders = defenders.Length,
+                // Alarm state lives on the battle host; a peer's puppets don't carry it.
+                AlarmedAgents = humans.Count(agent => agent.IsAlarmed()),
+                FailCounterElapsed = mission.GetMissionBehavior<StealthFailCounterMissionLogic>().FailCounterElapsedTime,
             };
             return new CoopCommandResult(true, "LIVE_TEST_JSON=" + JsonConvert.SerializeObject(status));
         }
