@@ -1,7 +1,9 @@
 ﻿using Common.Messaging;
 using Common.Network.Messages;
+using Coop.Core.Client.Services.MobileParties.Messages;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Services.MapEvents;
+using E2E.Tests.Services.Settlements;
 using E2E.Tests.Util;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -41,8 +43,52 @@ public class ParkedArmyFollowerTests : MapEventTestBase
         var leaderId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         var (partyId, armyId) = SetupFollower(leaderId);
 
-        // The AI member is attached after the follower so it is the side's last party, which makes the battle finalize
-        // only once the follower is already out of it
+        StartLeaderBattle(leaderId, partyId, armyId);
+
+        // Parking waits for the battle to end
+        Disconnect();
+        AssertActive(partyId, expected: true);
+
+        EndLeaderBattle(leaderId);
+
+        AssertActive(partyId, expected: false);
+        AssertNotFollowing(partyId, armyId);
+    }
+
+    // #4857: vanilla skips a party attached to another party's army, so the town is checked only once the follower left it
+    [Fact]
+    public void Disconnect_FollowerInHostileTown_IsEjectedAfterLeavingArmy()
+    {
+        var leaderId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var (partyId, armyId) = SetupFollower(leaderId);
+        var settlementId = PutInTownAtWarWithFollower(partyId, leaderId);
+
+        Disconnect();
+
+        AssertNotFollowing(partyId, armyId);
+        AssertEjected(partyId, settlementId);
+    }
+
+    // After a battle the army leave is queued past the park, so the town is checked again once the follower left the army
+    [Fact]
+    public void DisconnectDuringLeaderBattle_FollowerInHostileTown_IsEjectedAfterQueuedArmyLeave()
+    {
+        var leaderId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var (partyId, armyId) = SetupFollower(leaderId);
+        var memberId = StartLeaderBattle(leaderId, partyId, armyId);
+        var settlementId = PutInTownAtWarWithFollower(partyId, leaderId, memberId);
+
+        Disconnect();
+        AssertActive(partyId, expected: true);
+        EndLeaderBattle(leaderId);
+
+        AssertNotFollowing(partyId, armyId);
+        AssertEjected(partyId, settlementId);
+    }
+
+    // An AI member attached after the follower is the side's last party, so the leader's battle finalizes only once the follower is out of it
+    private string StartLeaderBattle(string leaderId, string partyId, string armyId)
+    {
         var memberId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         Server.Call(() =>
         {
@@ -60,21 +106,43 @@ public class ParkedArmyFollowerTests : MapEventTestBase
             var party = Server.GetRegisteredObject<MobileParty>(partyId);
             Assert.Same(mapEvent, party.MapEvent);
         });
+        return memberId;
+    }
 
-        // Parking waits for the battle to end
-        Disconnect();
-        AssertActive(partyId, expected: true);
-
-        // The leader leaving takes its attached parties with it, and the battle finalizes inside vanilla's loop over them
+    // The leader leaving takes its attached parties with it, and the battle finalizes inside vanilla's loop over them
+    private void EndLeaderBattle(string leaderId)
+    {
         Server.Call(() =>
         {
             var leader = Server.GetRegisteredObject<MobileParty>(leaderId);
             leader.Party.MapEventSide = null;
         }, MapEventDisabledMethods);
         PumpAll();
+    }
 
-        AssertActive(partyId, expected: false);
-        AssertNotFollowing(partyId, armyId);
+    // The parties go in a town whose clan then goes to war with the follower's clan, which keeps the online follower inside
+    private string PutInTownAtWarWithFollower(string partyId, params string[] otherPartyIds)
+    {
+        string? clanId = null;
+        Server.Call(() => Assert.True(Server.ObjectManager.TryGetId(Server.GetRegisteredObject<MobileParty>(partyId).ActualClan, out clanId)));
+        var (settlementId, townClanId) = HostileTownSetup.CreateTown(TestEnvironment, clanId!, otherPartyIds.Prepend(partyId).ToArray());
+        HostileTownSetup.DeclareWar(TestEnvironment, townClanId, clanId!);
+
+        Assert.Empty(LeavesOf(partyId));
+        HostileTownSetup.AssertInTown(TestEnvironment, partyId, settlementId, inTown: true);
+        return settlementId;
+    }
+
+    private void AssertEjected(string partyId, string settlementId)
+    {
+        Assert.Single(LeavesOf(partyId));
+        HostileTownSetup.AssertInTown(TestEnvironment, partyId, settlementId, inTown: false);
+    }
+
+    private IEnumerable<NetworkPartyLeaveSettlement> LeavesOf(string partyId)
+    {
+        var handle = Server.GetHandle<MobileParty>(partyId);
+        return Server.NetworkSentMessages.GetMessages<NetworkPartyLeaveSettlement>().Where(message => message.PartyId == handle);
     }
 
     // A connected player's party following the AI leader's army, attached to the leader.

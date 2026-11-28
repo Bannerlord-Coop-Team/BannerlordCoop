@@ -3,17 +3,13 @@ using Common.Util;
 using Coop.Core.Client.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.MobileParties.Messages;
 using E2E.Tests.Util;
-using GameInterface.Services.Players.Data;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.GameState;
-using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.ObjectSystem;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Settlements;
@@ -34,7 +30,7 @@ public class WarDeclaredInTownTests : SyncTestBase
         var playerClient = Clients.First();
         var player = CreatePlayer(playerClient, "player");
         var other = CreatePlayer(Clients.Last(), "other");
-        var (settlementId, townClanId) = CreateTownWith(player, other);
+        var (settlementId, townClanId) = HostileTownSetup.CreateTown(TestEnvironment, player.ClanId, player.MobilePartyId, other.MobilePartyId);
 
         PlayerEncounter townEncounter = null;
         playerClient.Call(() =>
@@ -46,10 +42,10 @@ public class WarDeclaredInTownTests : SyncTestBase
         });
 
         using var menus = new MethodCallRecorder(Priority.First, AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu)));
-        DeclareWar(townClanId, player);
+        HostileTownSetup.DeclareWar(TestEnvironment, townClanId, player.ClanId);
 
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPartyLeaveSettlement>());
-        AssertInTown(player.MobilePartyId, settlementId, inTown: true);
+        HostileTownSetup.AssertInTown(TestEnvironment, player.MobilePartyId, settlementId, inTown: true);
         playerClient.Call(() =>
         {
             Assert.True(FactionManager.IsAtWarAgainstFaction(playerClient.GetRegisteredObject<Clan>(townClanId), Hero.MainHero.MapFaction));
@@ -61,9 +57,9 @@ public class WarDeclaredInTownTests : SyncTestBase
         playerClient.Call(() => ObjectHelper.SkipConstructor<EncounterGameMenuBehavior>()
             .game_menu_fortification_high_crime_rating_continue_on_consequence(new MenuCallbackArgs((MenuContext)null, null)));
         Assert.Single(playerClient.NetworkSentMessages.GetMessages<NetworkRequestEndSettlementEncounter>());
-        Flush();
+        HostileTownSetup.Flush(TestEnvironment);
 
-        AssertInTown(player.MobilePartyId, settlementId, inTown: false);
+        HostileTownSetup.AssertInTown(TestEnvironment, player.MobilePartyId, settlementId, inTown: false);
         playerClient.Call(() => Assert.Null(PlayerEncounter.Current));
     }
 
@@ -72,12 +68,12 @@ public class WarDeclaredInTownTests : SyncTestBase
     public void OfflineAtWar_ServerEjectsParty()
     {
         var player = CreatePlayer(null, "player");
-        var (settlementId, townClanId) = CreateTownWith(player);
+        var (settlementId, townClanId) = HostileTownSetup.CreateTown(TestEnvironment, player.ClanId, player.MobilePartyId);
 
-        DeclareWar(townClanId, player);
+        HostileTownSetup.DeclareWar(TestEnvironment, townClanId, player.ClanId);
 
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPartyLeaveSettlement>());
-        AssertInTown(player.MobilePartyId, settlementId, inTown: false);
+        HostileTownSetup.AssertInTown(TestEnvironment, player.MobilePartyId, settlementId, inTown: false);
     }
 
     // A player who drops before pressing continue leaves no client to open the menu, so parking its party ejects it
@@ -86,76 +82,14 @@ public class WarDeclaredInTownTests : SyncTestBase
     {
         var playerClient = Clients.First();
         var player = CreatePlayer(playerClient, "player");
-        var (settlementId, townClanId) = CreateTownWith(player);
+        var (settlementId, townClanId) = HostileTownSetup.CreateTown(TestEnvironment, player.ClanId, player.MobilePartyId);
 
-        DeclareWar(townClanId, player);
+        HostileTownSetup.DeclareWar(TestEnvironment, townClanId, player.ClanId);
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPartyLeaveSettlement>());
         Server.SimulateMessage(this, new PlayerDisconnected(playerClient.NetPeer, default));
-        Flush();
+        HostileTownSetup.Flush(TestEnvironment);
 
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPartyLeaveSettlement>());
-        AssertInTown(player.MobilePartyId, settlementId, inTown: false);
-    }
-
-    private (string SettlementId, string TownClanId) CreateTownWith(Player atWar, params Player[] bystanders)
-    {
-        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
-        var townId = TestEnvironment.CreateRegisteredObject<Town>();
-        var townClanId = TestEnvironment.CreateRegisteredObject<Clan>();
-        foreach (var instance in Clients.Prepend(Server))
-        {
-            instance.Call(() =>
-            {
-                using var scope = new AllowedThread();
-                var settlement = instance.GetRegisteredObject<Settlement>(settlementId);
-                var town = instance.GetRegisteredObject<Town>(townId);
-                var townClan = instance.GetRegisteredObject<Clan>(townClanId);
-                // Stance links are keyed by faction id, which the harness leaves unset
-                townClan.Id = new MBGUID(4857);
-                instance.GetRegisteredObject<Clan>(atWar.ClanId).Id = new MBGUID(4858);
-                settlement.SetSettlementComponent(town);
-                town._ownerClan = townClan;
-                townClan._settlementsCache.Add(settlement);
-                foreach (var player in bystanders.Prepend(atWar))
-                    instance.GetRegisteredObject<MobileParty>(player.MobilePartyId).CurrentSettlement = settlement;
-
-                var diplomaticHandler = new PartyDiplomaticHandlerCampaignBehavior();
-                diplomaticHandler.RegisterEvents();
-                // Only the server's parking path finds the behavior through GetCampaignBehavior, which needs the manager
-                if (instance == Server)
-                    Campaign.Current.AddCampaignBehaviorManager(new CampaignBehaviorManager(new CampaignBehaviorBase[] { diplomaticHandler }));
-            });
-        }
-        return (settlementId, townClanId);
-    }
-
-    private void DeclareWar(string townClanId, Player player)
-    {
-        Server.Call(() => DeclareWarAction.ApplyInternal(
-            Server.GetRegisteredObject<Clan>(townClanId),
-            Server.GetRegisteredObject<Clan>(player.ClanId),
-            DeclareWarAction.DeclareWarDetail.CausedByKingdomDecision));
-        Flush();
-    }
-
-    private void AssertInTown(string partyId, string settlementId, bool inTown)
-    {
-        foreach (var instance in Clients.Prepend(Server))
-        {
-            instance.Call(() => Assert.Same(
-                inTown ? instance.GetRegisteredObject<Settlement>(settlementId) : null,
-                instance.GetRegisteredObject<MobileParty>(partyId).CurrentSettlement));
-        }
-    }
-
-    // Two passes, so a reply the server sends from a game-thread action reaches the clients too
-    private void Flush()
-    {
-        for (int i = 0; i < 2; i++)
-        {
-            Server.PumpGameThread();
-            TestEnvironment.FlushCoalescer();
-            foreach (var client in Clients) client.PumpGameThread();
-        }
+        HostileTownSetup.AssertInTown(TestEnvironment, player.MobilePartyId, settlementId, inTown: false);
     }
 }
