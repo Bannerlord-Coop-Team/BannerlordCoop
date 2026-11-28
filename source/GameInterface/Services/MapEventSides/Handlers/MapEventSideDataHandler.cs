@@ -218,7 +218,7 @@ internal class MapEventSideDataHandler : IHandler
         // A defender's add interrupts the looting, so the raider faces it in the encounter menu.
         var raiderWaits = menuId == "raiding_village" && mapEvent.IsRaidHostileAction() && !mapEvent.IsActiveSlowVillageRaid();
         // VillageHostileActionJoinEncounterPatch keeps a village joiner in join_encounter until this add gives it a side.
-        // encounter_interrupted runs the same join callbacks, but only StartBattleAction opens it, and clients send that to the server.
+        // encounter_interrupted runs the same join callbacks, but only StartBattleAction opens it, and StartBattleActionPatches skips that on clients.
         var joinerWaits = menuId == "join_encounter" && mapEvent.IsVillageHostileAction();
         if (raiderWaits || joinerWaits)
             GameMenu.SwitchToMenu("encounter");

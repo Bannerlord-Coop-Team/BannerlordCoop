@@ -3820,6 +3820,38 @@ public class VillageHostileActionTests : MapEventTestBase
         AssertNewDefenderJoinIsRequested(join);
     }
 
+    // A second Help before the late add and a second Leave after its acceptance must not keep the cancel past the removal.
+    [Fact]
+    public void VillageJoinEncounter_HelpAndLeaveAgainBeforeRemoval_IgnoresBothAndAllowsNewJoin()
+    {
+        var join = OpenVillageJoinEncounter(VillageHostileAction.ForceSupplies, defended: false);
+        var client = join.Client;
+        var request = LeaveWhileDefenderJoinPending(join);
+
+        client.NetworkSentMessages.Clear();
+        client.Call(() =>
+        {
+            EnterJoinEncounter(join);
+            join.Behavior.game_menu_join_encounter_help_defenders_on_consequence(new MenuCallbackArgs((MenuContext)null, null));
+            Assert.Null(PlayerEncounter.Battle);
+        }, WithoutNetworkDelivery());
+        Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkRequestJoinBattle>());
+
+        AddJoinerOnServer(join, BattleSideEnum.Defender);
+        var leave = AcceptWithoutDeliveringLeave(join, request);
+
+        client.NetworkSentMessages.Clear();
+        client.Call(() =>
+        {
+            ClickDontGetInvolved();
+            Assert.Null(PlayerEncounter.Current);
+        }, WithoutNetworkDelivery());
+        Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkRequestLeaveBattle>());
+
+        DeliverLeave(join, leave);
+        AssertNewDefenderJoinIsRequested(join);
+    }
+
     // Campaign.Tick can't run in the harness, so this runs its GetGenericStateMenu, which opens the returned menu when the map shows none.
     private static void AssertTickOpensNoEncounter(VillageJoinEncounter join)
     {
@@ -3873,11 +3905,7 @@ public class VillageHostileActionTests : MapEventTestBase
         client.Call(() =>
         {
             join.Behavior.game_menu_join_encounter_help_defenders_on_consequence(new MenuCallbackArgs((MenuContext)null, null));
-            var menuContext = Campaign.Current.CurrentMenuContext;
-            // Finish exits the menu, which unregisters its context by id.
-            menuContext.StringId = "village_join_menu_context";
-            var leaveOption = menuContext.GameMenu.MenuOptions.Single();
-            leaveOption.OnConsequence(new MenuCallbackArgs(menuContext, leaveOption.Text));
+            ClickDontGetInvolved();
 
             Assert.Null(PlayerEncounter.Current);
             Assert.Null(Campaign.Current.CurrentMenuContext);
@@ -3886,6 +3914,16 @@ public class VillageHostileActionTests : MapEventTestBase
         Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkMapEventFinalizeAttempted>());
         Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkRequestLeaveBattle>());
         return client.NetworkSentMessages.GetMessages<NetworkRequestJoinBattle>().Single();
+    }
+
+    // Clicks vanilla's "Don't get involved" in join_encounter.
+    private static void ClickDontGetInvolved()
+    {
+        var menuContext = Campaign.Current.CurrentMenuContext;
+        // Finish exits the menu, which unregisters its context by id.
+        menuContext.StringId = "village_join_menu_context";
+        var leaveOption = menuContext.GameMenu.MenuOptions.Single();
+        leaveOption.OnConsequence(new MenuCallbackArgs(menuContext, leaveOption.Text));
     }
 
     /// <summary>PlayerTwo's client in join_encounter on PlayerOne's village action.</summary>

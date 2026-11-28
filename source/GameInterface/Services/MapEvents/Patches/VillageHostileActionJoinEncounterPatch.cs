@@ -1,7 +1,9 @@
 ﻿using Common;
+using Common.Logging;
 using GameInterface.Policies;
 using GameInterface.Services.MapEvents.Extensions;
 using HarmonyLib;
+using Serilog;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -22,6 +24,8 @@ internal class VillageHostileActionJoinEncounterPatch
     private const string HelpAttackersConsequence = nameof(EncounterGameMenuBehavior.game_menu_join_encounter_help_attackers_on_consequence);
     private const string HelpDefendersConsequence = nameof(EncounterGameMenuBehavior.game_menu_join_encounter_help_defenders_on_consequence);
 
+    private static readonly ILogger Logger = LogManager.GetLogger<VillageHostileActionJoinEncounterPatch>();
+
     private static IEnumerable<MethodBase> TargetMethods()
     {
         yield return AccessTools.Method(typeof(EncounterGameMenuBehavior), HelpAttackersConsequence);
@@ -37,6 +41,13 @@ internal class VillageHostileActionJoinEncounterPatch
         var mapEvent = PlayerEncounter.Current.GetEncounteredBattleOrNull();
         if (!mapEvent.IsVillageHostileAction())
             return true;
+
+        // TryStart refuses a new join while the party's last one waits or its cancel isn't ended, so Help must not set the battle either.
+        if (ContainerProvider.TryResolve<IBattleJoinRequestTracker>(out var joinRequests) && joinRequests.HasRequest(PartyBase.MainParty))
+        {
+            Logger.Debug("Ignored Help on {MapEventId} while the main party's last battle join is open", mapEvent.StringId);
+            return false;
+        }
 
         var side = __originalMethod.Name == HelpAttackersConsequence ? BattleSideEnum.Attacker : BattleSideEnum.Defender;
         if (side == BattleSideEnum.Attacker && mapEvent.IsRaidHostileAction())

@@ -44,4 +44,19 @@ public class BattleJoinRequestTrackerTests
         Assert.True(tracker.TryComplete(party, "request", out var cancelled));
         Assert.True(cancelled);
     }
+
+    // A second Leave can land between the accepted reply and the removal, which must still end the cancel.
+    [Fact]
+    public void TryCancel_AfterTheCancelledReply_KeepsTheCancelEndable()
+    {
+        Assert.True(tracker.TryStart(party, joinedEvent, "request"));
+        Assert.True(tracker.TryCancel(party, joinedEvent));
+        Assert.True(tracker.TryComplete(party, "request", out var cancelled));
+        Assert.True(cancelled);
+
+        Assert.True(tracker.TryCancel(party, joinedEvent));
+        tracker.EndCancelled(party);
+
+        Assert.True(tracker.TryStart(party, joinedEvent, "next request"));
+    }
 }

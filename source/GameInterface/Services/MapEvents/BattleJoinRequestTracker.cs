@@ -14,6 +14,9 @@ public interface IBattleJoinRequestTracker : IGameAbstraction
     /// <summary>Records a join request to the map event; false while the party already has a waiting or cancelled join.</summary>
     bool TryStart(PartyBase party, MapEvent mapEvent, string requestId);
 
+    /// <summary>Whether the party has a waiting or cancelled join, which makes <see cref="TryStart"/> refuse a new one.</summary>
+    bool HasRequest(PartyBase party);
+
     /// <summary>Marks the party's join to the map event cancelled, so an accepted reply takes the party out again; false when the party has no join to it.</summary>
     bool TryCancel(PartyBase party, MapEvent mapEvent);
 
@@ -42,10 +45,14 @@ internal sealed class BattleJoinRequestTracker : IBattleJoinRequestTracker
 
     public bool TryStart(PartyBase party, MapEvent mapEvent, string requestId) => requests.TryAdd(party, (requestId, mapEvent, JoinState.Waiting));
 
+    public bool HasRequest(PartyBase party) => requests.ContainsKey(party);
+
     public bool TryCancel(PartyBase party, MapEvent mapEvent)
     {
         if (!requests.TryGetValue(party, out var request)) return false;
         if (request.MapEvent != mapEvent) return false;
+        // A second Leave keeps an answered cancel, which the party's removal still has to end.
+        if (request.State != JoinState.Waiting) return true;
 
         return requests.TryUpdate(party, (request.RequestId, mapEvent, JoinState.Cancelled), request);
     }
