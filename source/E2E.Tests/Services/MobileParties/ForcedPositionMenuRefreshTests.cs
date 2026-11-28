@@ -13,7 +13,7 @@ using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.MobileParties;
 
-/// <summary>Covers the client menu refresh that follows a forced sea state change on the main party.</summary>
+/// <summary>Covers the client menu refresh that follows every forced position on the main party, here one that changes the sea state.</summary>
 public class ForcedPositionMenuRefreshTests : IDisposable
 {
     private static readonly Vec2 ForcedPosition = new Vec2(40f, 50f);
