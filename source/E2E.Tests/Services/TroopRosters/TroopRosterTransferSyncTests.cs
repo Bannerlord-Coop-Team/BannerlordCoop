@@ -17,9 +17,8 @@ namespace E2E.Tests.Services.TroopRosters;
 /// untouched by the transfer of regular troops.
 ///
 /// Like <see cref="TroopRosterDiscardSyncTests"/> this drives the underlying roster-mutation sync (server
-/// AddToCounts -> TroopRosterPatches -> broadcast -> client apply) rather than the PartyDoneLogic plumbing,
-/// so it passes identically whether the server rebuilds rosters from absolute data or applies a
-/// client-computed delta.
+/// AddToCounts -> TroopRosterPatches -> broadcast -> client apply) rather than the party screen commit,
+/// so it passes identically whatever the server replays the roster change from.
 /// </summary>
 public class TroopRosterTransferSyncTests : IDisposable
 {

@@ -7,6 +7,8 @@ using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party.Messages;
 using GameInterface.Services.Players;
+using GameInterface.Services.TroopRosters.Data;
+using GameInterface.Services.TroopRosters.Interfaces;
 using LiteNetLib;
 using System.Collections.Generic;
 using System.Linq;
@@ -29,11 +31,12 @@ internal class AlternativeSolutionPicker : IAlternativeSolutionPicker, IHandler
     private readonly IControllerIdProvider controller;
     private readonly IAlternativeSolutionCommitments commitments;
     private readonly IAlternativeSolutionTroopValidator troops;
+    private readonly ITroopRosterInterface rosters;
     private readonly Dictionary<TroopRoster, (IssueBase Issue, PartyScreenLogic Logic)> pickers = new();
 
     public AlternativeSolutionPicker(IMessageBroker broker, INetwork network, IObjectManager objects,
         IPlayerManager players, IControllerIdProvider controller, IAlternativeSolutionCommitments commitments,
-        IAlternativeSolutionTroopValidator troops)
+        IAlternativeSolutionTroopValidator troops, ITroopRosterInterface rosters)
     {
         this.broker = broker;
         this.network = network;
@@ -42,16 +45,19 @@ internal class AlternativeSolutionPicker : IAlternativeSolutionPicker, IHandler
         this.controller = controller;
         this.commitments = commitments;
         this.troops = troops;
-        broker.Subscribe<PartyDoneLogicAttempted>(Handle_Done);
+        this.rosters = rosters;
+        broker.Subscribe<PartyScreenCommitAttempted>(Handle_Done);
         broker.Subscribe<RequestAlternativeSolutionCancellation>(Handle_Cancel);
         broker.Subscribe<NetworkAlternativeSolutionAccepted>(Handle_Accepted);
+        broker.Subscribe<NetworkAlternativeSolutionSelection>(Handle_Selection);
     }
 
     public void Dispose()
     {
-        broker.Unsubscribe<PartyDoneLogicAttempted>(Handle_Done);
+        broker.Unsubscribe<PartyScreenCommitAttempted>(Handle_Done);
         broker.Unsubscribe<RequestAlternativeSolutionCancellation>(Handle_Cancel);
         broker.Unsubscribe<NetworkAlternativeSolutionAccepted>(Handle_Accepted);
+        broker.Unsubscribe<NetworkAlternativeSolutionSelection>(Handle_Selection);
         pickers.Clear();
     }
 
@@ -95,11 +101,11 @@ internal class AlternativeSolutionPicker : IAlternativeSolutionPicker, IHandler
             network.SendAll(new RequestAlternativeSolutionCancellation(giverId, issue.StringId));
     }
 
-    private void Handle_Done(MessagePayload<PartyDoneLogicAttempted> payload)
+    private void Handle_Done(MessagePayload<PartyScreenCommitAttempted> payload)
     {
-        if (ModInformation.IsClient && payload.What.LeftMemberRoster != null &&
-            pickers.TryGetValue(payload.What.LeftMemberRoster, out var picker))
-            pickers[payload.What.LeftMemberRoster] = (picker.Issue, null);
+        var leftMemberRoster = payload.What.LeftMemberRoster;
+        if (ModInformation.IsClient && leftMemberRoster != null && pickers.TryGetValue(leftMemberRoster, out var picker))
+            pickers[leftMemberRoster] = (picker.Issue, null);
     }
 
     private void Handle_Accepted(MessagePayload<NetworkAlternativeSolutionAccepted> payload)
@@ -113,6 +119,37 @@ internal class AlternativeSolutionPicker : IAlternativeSolutionPicker, IHandler
                 if (entry.Value.Issue.StringId == data.IssueId &&
                     objects.TryGetId(entry.Value.Issue.IssueOwner, out var giverId) && giverId == data.IssueOwnerId)
                     pickers.Remove(entry.Key);
+            }
+        }, context: nameof(AlternativeSolutionPicker));
+    }
+
+    private void Handle_Selection(MessagePayload<NetworkAlternativeSolutionSelection> payload)
+    {
+        var data = payload.What;
+        GameThread.RunSafe(() =>
+        {
+            (IssueBase Issue, PartyScreenLogic Logic) picker = default;
+            foreach (var entry in pickers.Values)
+            {
+                if (entry.Issue.StringId != data.IssueId) continue;
+                if (!objects.TryGetId(entry.Issue.IssueOwner, out var giverId) || giverId != data.IssueOwnerId) continue;
+                picker = entry;
+                break;
+            }
+            if (picker.Issue == null) return;
+
+            // A picker on screen keeps its rows, the server replays its next Done against the held troops anyway.
+            bool pickerOnScreen = picker.Logic != null &&
+                Game.Current.GameStateManager.ActiveState is PartyState state && state.PartyScreenLogic == picker.Logic;
+            if (pickerOnScreen) return;
+
+            var sent = picker.Issue.AlternativeSolutionSentTroops;
+            using (new AllowedThread())
+            {
+                foreach (var element in sent.GetTroopRoster().Where(element => !element.Character.IsHero).ToArray())
+                    sent.AddToCounts(element.Character, -element.Number, woundedCount: -element.WoundedNumber, xpChange: -element.Xp);
+                foreach (var element in rosters.UnpackTroopRosterData(new TroopRosterData(data.Troops ?? System.Array.Empty<TroopRosterElementData>())))
+                    sent.AddToCounts(element.Character, element.Number, woundedCount: element.WoundedNumber, xpChange: element.Xp);
             }
         }, context: nameof(AlternativeSolutionPicker));
     }

@@ -18,7 +18,7 @@ internal class DisableMobilePartyTrainingBehavior
     static bool Prefix() => ModInformation.IsServer;
 }
 
-// OnPlayerUpgradedTroops already replaced in PartyDoneLogicHandler.ApplyUpgradedTroopHistory
+// OnPlayerUpgradedTroops already replaced in PartyScreenCommandProcessor.Upgrade
 [HarmonyPatch(typeof(MobilePartyTrainingBehavior))]
 internal class MobilePartyTrainingBehaviorPatches
 {

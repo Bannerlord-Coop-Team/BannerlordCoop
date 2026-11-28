@@ -2,9 +2,11 @@
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Heroes;
+using GameInterface.Services.Party.Data;
 using GameInterface.Services.Party.Messages;
 using GameInterface.Services.Villages;
 using HarmonyLib;
+using Helpers;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -34,13 +36,9 @@ internal class PartyScreenLogicPatches
     [HarmonyPrefix]
     public static bool ValidateCommandPrefix(PartyScreenLogic.PartyCommand command, ref bool __result)
     {
-        // Force-transfer loot screens only honor member takes and dismissals: the
-        // commit validation rejects any prisoner, upgrade, gold, influence, or
-        // morale movement, which would fail after the screen already reset.
-        // Block those operations up front so the buttons simply stay disabled.
-        // ValidateCommand is also queried per-frame by the UI, so no message.
-        // Member transfers stay allowed (takes and dismissals); shifts and sorts
-        // only reorder and never affect the commit deltas.
+        // Force-transfer loot screens only honor member takes and dismissals, the server
+        // rejects prisoner, upgrade and recruit commands there. Block them up front so the
+        // buttons stay disabled. ValidateCommand is also queried per-frame by the UI, so no message.
         if (ForceTransferScreenTracker.HasOpenForceTransferScreen() &&
             IsBlockedOnForceTransferScreen(command.Code, command.Type))
         {
@@ -95,57 +93,21 @@ internal class PartyScreenLogicPatches
             }
         }
 
-        PartyScreenHelperPatches.ResetReleasedAndTakenPrisonerActionsRequest();
-        PartyScreenHelperPatches.ResetPrisonerDonationRequest();
         var partyScreenMode = __instance._partyScreenMode;
+        bool isDonating = false;
         if (Game.Current.GameStateManager.ActiveState is PartyState activePartyState)
         {
             partyScreenMode = activePartyState.PartyScreenMode;
+            isDonating = activePartyState.IsDonating;
         }
+        // The PartyScreenHelper done handlers are patched to do nothing here, the server runs their effects.
         bool flag = __instance.PartyPresentationDoneButtonDelegate(__instance.MemberRosters[0], __instance.PrisonerRosters[0], __instance.MemberRosters[1], __instance.PrisonerRosters[1], takenPrisonersRoster, releasedPrisonersRoster, isForced, __instance.LeftOwnerParty, __instance.RightOwnerParty);
-        bool applyReleasedAndTakenPrisonerActions =
-            PartyScreenHelperPatches.ConsumeReleasedAndTakenPrisonerActionsRequest();
-        PartyScreenHelperPatches.ConsumePrisonerDonationRequest(
-            out var donationSettlement,
-            out var donatedPrisonersRoster);
         if (flag)
         {
-            FlattenedTroopRoster recruitedPrisonersRoster = new FlattenedTroopRoster(4);
-            foreach (Tuple<CharacterObject, int> tuple in __instance.CurrentData.RecruitedPrisonersHistory)
-            {
-                recruitedPrisonersRoster.Add(tuple.Item1, tuple.Item2, 0);
-            }
-
             ForceTransferScreenTracker.TryClaimForceTransferId(__instance.MemberRosters[0], out var forceTransferId);
-            var message = new PartyDoneLogicAttempted(
-                Hero.MainHero,
-                releasedPrisonersRoster,
-                takenPrisonersRoster,
-                recruitedPrisonersRoster,
-                __instance.MemberRosters[0],
-                __instance.PrisonerRosters[0],
-                __instance.MemberRosters[1],
-                __instance.PrisonerRosters[1],
-                __instance._initialData.LeftMemberRoster,
-                __instance._initialData.LeftPrisonerRoster,
-                __instance._initialData.RightMemberRoster,
-                __instance._initialData.RightPrisonerRoster,
-                __instance.RightOwnerParty.ItemRoster,
-                __instance.CurrentData.UpgradedTroopsHistory,
-                __instance.CurrentData.LeftParty,
-                __instance.CurrentData.PartyGoldChangeAmount,
-                __instance.CurrentData.PartyInfluenceChangeAmount.Item2,
-                __instance.CurrentData.PartyMoraleChangeAmount,
-                __instance.DoNotApplyGoldTransactions,
-                partyScreenMode,
-                applyReleasedAndTakenPrisonerActions,
-                donationSettlement,
-                donatedPrisonersRoster,
-                forceTransferId
-            );
+            MessageBroker.Instance.Publish(__instance, CreateCommitAttempted(__instance, Hero.MainHero, partyScreenMode, isDonating, forceTransferId));
 
-            MessageBroker.Instance.Publish(__instance, message);
-            // Manage changing rosters on the server
+            // The server replays the commands and sends the results back, so undo them here.
             using (new AllowedThread())
             {
                 TroopRoster duplicateLeftMemberRoster = __instance.MemberRosters[0].CloneRosterData();
@@ -214,6 +176,62 @@ internal class PartyScreenLogicPatches
     {
         sentTroops.Clear();
         sentTroops.Add(transferredTroops);
+    }
+
+    /// <summary>What the commit needs from the screen, taken before the screen resets.</summary>
+    internal static PartyScreenCommitAttempted CreateCommitAttempted(
+        PartyScreenLogic logic,
+        Hero mainHero,
+        PartyScreenHelper.PartyScreenMode mode,
+        bool isDonating,
+        string forceTransferId)
+    {
+        IReadOnlyList<PartyScreenLogic.PartyCommand> commands = ContainerProvider.TryResolve<IPartyScreenCommandTracker>(out var tracker)
+            ? tracker.GetCommands(logic)
+            : Array.Empty<PartyScreenLogic.PartyCommand>();
+        // Copied with Add, because CloneRosterData drops the xp the server seeds a client-only left side with.
+        var initialLeftMembers = TroopRoster.CreateDummyTroopRoster();
+        initialLeftMembers.Add(logic._initialData.LeftMemberRoster);
+        var initialLeftPrisoners = TroopRoster.CreateDummyTroopRoster();
+        initialLeftPrisoners.Add(logic._initialData.LeftPrisonerRoster);
+
+        return new PartyScreenCommitAttempted(
+            mainHero,
+            mode,
+            GetDoneKind(logic),
+            isDonating,
+            logic.DoNotApplyGoldTransactions,
+            forceTransferId,
+            commands,
+            logic.LeftOwnerParty,
+            logic.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Left],
+            initialLeftMembers,
+            initialLeftPrisoners,
+            logic.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Right].CloneRosterData());
+    }
+
+    // Which vanilla done handler the screen uses decides the done effects the server runs.
+    internal static PartyScreenDoneKind GetDoneKind(PartyScreenLogic logic)
+    {
+        // The closed delegate is an event, so the create clan party screen is told apart by its transferable delegate.
+        var transferable = logic.IsTroopTransferableDelegate?.Method;
+        if (transferable?.DeclaringType == typeof(PartyScreenHelper) &&
+            transferable.Name == nameof(PartyScreenHelper.OpenScreenAsCreateClanPartyForHeroTroopTransferableDelegate))
+            return PartyScreenDoneKind.CreateClanParty;
+
+        var method = logic.PartyPresentationDoneButtonDelegate?.Method;
+        var kind = method?.DeclaringType != typeof(PartyScreenHelper) ? PartyScreenDoneKind.None : method.Name switch
+        {
+            nameof(PartyScreenHelper.DefaultDoneHandler) => PartyScreenDoneKind.Default,
+            nameof(PartyScreenHelper.SellPrisonersDoneHandler) => PartyScreenDoneKind.SellPrisoners,
+            nameof(PartyScreenHelper.DonateGarrisonDoneHandler) => PartyScreenDoneKind.DonateGarrison,
+            nameof(PartyScreenHelper.DonatePrisonersDoneHandler) => PartyScreenDoneKind.DonatePrisoners,
+            nameof(PartyScreenHelper.ManageGarrisonDoneHandler) => PartyScreenDoneKind.ManageGarrison,
+            _ => PartyScreenDoneKind.None,
+        };
+        if (kind == PartyScreenDoneKind.None)
+            Logger.Debug("Party screen done handler {Type}.{Method} has no done effects", method?.DeclaringType?.Name, method?.Name);
+        return kind;
     }
 
     [HarmonyPatch(nameof(PartyScreenLogic.OnPartyScreenClosed))]
