@@ -78,12 +78,15 @@ public class KillCharacterActionExecutionTests : MapEventTestBase
     public void RebelClanWithoutTowns_ExecutesOnlyRebelsHeldByAiParties(bool heldByPlayer, KillCharacterAction.KillCharacterActionDetail expectedDeath)
     {
         var captorPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
-        var serverMainPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         var rebelId = TestEnvironment.CreateRegisteredObject<Hero>();
         var rebelClanId = TestEnvironment.CreateRegisteredObject<Clan>();
         var captorClanId = TestEnvironment.CreateRegisteredObject<Clan>();
         string captorId = null;
-        Server.Call(() => Assert.True(Server.ObjectManager.TryGetId(Server.GetRegisteredObject<MobileParty>(captorPartyId).LeaderHero, out captorId)));
+        Server.Call(() =>
+        {
+            var captorParty = Server.GetRegisteredObject<MobileParty>(captorPartyId);
+            Assert.True(Server.ObjectManager.TryGetId(captorParty.LeaderHero, out captorId));
+        });
         if (heldByPlayer) RegisterAsPlayerParty("RebelCaptor", captorId, captorPartyId);
 
         Server.Call(() =>
@@ -96,7 +99,7 @@ public class KillCharacterActionExecutionTests : MapEventTestBase
             RegisterTrait(DefaultTraits.Mercy);
             Campaign.Current.PlayerTraitDeveloper = new PropertyOwner<PropertyObject>();
             // The server's own main party, which no player leads
-            Campaign.Current.MainParty = Server.GetRegisteredObject<MobileParty>(serverMainPartyId);
+            Campaign.Current.MainParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
 
             using (new AllowedThread())
             {

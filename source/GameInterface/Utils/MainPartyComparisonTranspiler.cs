@@ -42,6 +42,10 @@ namespace GameInterface.Utils;
 public class MainPartyComparisonTranspiler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MainPartyComparisonTranspiler>();
+    private static readonly MethodInfo MobilePartyIsPlayerParty = AccessTools.Method(
+        typeof(MobilePartyExtensions), nameof(MobilePartyExtensions.IsPlayerParty), new[] { typeof(MobileParty) });
+    private static readonly MethodInfo PartyBaseIsPlayerParty = AccessTools.Method(
+        typeof(PartyBaseExtensions), nameof(PartyBaseExtensions.IsPlayerParty), new[] { typeof(PartyBase) });
 
     private MainPartyComparisonTranspiler() { }
 
@@ -140,13 +144,15 @@ public class MainPartyComparisonTranspiler
 
         if (method.DeclaringType == typeof(MobileParty))
         {
-            isPlayerParty = AccessTools.Method(typeof(MobilePartyExtensions), nameof(MobilePartyExtensions.IsPlayerParty), new[] { typeof(MobileParty) });
+            isPlayerParty = MobilePartyIsPlayerParty;
+            return true;
         }
-        else if (method.DeclaringType == typeof(PartyBase))
+        if (method.DeclaringType == typeof(PartyBase))
         {
-            isPlayerParty = AccessTools.Method(typeof(PartyBaseExtensions), nameof(PartyBaseExtensions.IsPlayerParty), new[] { typeof(PartyBase) });
+            isPlayerParty = PartyBaseIsPlayerParty;
+            return true;
         }
 
-        return isPlayerParty != null;
+        return false;
     }
 }
