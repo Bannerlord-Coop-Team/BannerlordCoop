@@ -1,19 +1,14 @@
 ﻿using Common.Messaging;
 using Common.Util;
-using Coop.Core.Server.Connections;
-using Coop.Core.Server.Connections.Messages;
-using Coop.Core.Server.Connections.States;
 using Coop.Core.Server.Services.Save;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Registry.Messages;
-using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using HarmonyLib;
-using System.Net;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
@@ -101,14 +96,9 @@ public class DedicatedServerRestartPlayerRestoreTests : IDisposable
         });
 
         var client = environment.Clients.First();
-        ConnectReturningClient(server, client);
+        var validated = environment.ConnectReturningClient(client, ControllerId);
 
-        var validated = Assert.Single(server.NetworkSentImmediateMessages.GetMessages<NetworkClientValidated>());
-        Assert.True(validated.HeroExists, "The returning player was sent to character creation.");
         Assert.Equal(savedIds.HeroId, validated.Player.HeroId);
-
-        var connection = server.Resolve<ConnectionCollection>().ConnectionStates[client.NetPeer];
-        Assert.IsType<ResolveCharacterState>(connection.State);
         Assert.True(server.Resolve<IPlayerManager>().TryGetPeer(ControllerId, out var peer));
         Assert.Same(client.NetPeer, peer);
     }
@@ -212,33 +202,5 @@ public class DedicatedServerRestartPlayerRestoreTests : IDisposable
             messageBroker.Publish(this, new GameLoaded(saveName));
             messageBroker.Publish(this, new AllGameObjectsRegistered());
         });
-    }
-
-    /// <summary>
-    /// Runs the returning client's connect and validate handshake against the restarted server.
-    /// </summary>
-    private void ConnectReturningClient(EnvironmentInstance server, EnvironmentInstance client)
-    {
-        var endPoint = (IPEndPoint)client.NetPeer;
-        if (endPoint.Address == null)
-        {
-            endPoint.Address = IPAddress.Loopback;
-            endPoint.Port = 4200;
-        }
-
-        client.Resolve<IControllerIdProvider>().SetControllerId(ControllerId);
-        server.NetworkSentImmediateMessages.Clear();
-
-        // The join save transfer after resolution needs a real SaveHandler, which the harness campaign lacks.
-        var disabledMethods = new MethodBase[]
-        {
-            AccessTools.Method(typeof(ResolveCharacterState), nameof(ResolveCharacterState.TransferSave)),
-        };
-
-        server.Call(() =>
-        {
-            server.SimulateMessage(this, new PlayerConnected(client.NetPeer));
-            server.SimulateMessage(client.NetPeer, new NetworkClientValidate(ControllerId));
-        }, disabledMethods);
     }
 }

@@ -14,6 +14,7 @@ using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.TroopRosters.Data;
 using GameInterface.Services.TroopRosters.Interfaces;
+using GameInterface.Tests.Utils;
 using HarmonyLib;
 using LiteNetLib;
 using Helpers;
@@ -155,6 +156,22 @@ public abstract class MapEventTestBase : IDisposable
             attackerPartyId,
             defenderPartyId
         );
+    }
+
+    /// <summary>
+    /// Creates a <see cref="CreateServerMapEvent"/> battle fought over a settlement with the given siege battle type.
+    /// </summary>
+    protected MapEventContext CreateSiegeMapEvent(MapEvent.BattleTypes battleType)
+    {
+        var battle = CreateServerMapEvent();
+        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        // Native siege reinforcement recalculates settlement advantage.
+        Server.Call(() => Server.GetRegisteredObject<MapEvent>(battle.MapEventId).SetMapEventSettlement(
+            Server.GetRegisteredObject<Settlement>(settlementId)));
+        // Keep native scene setup outside the tests; exercise the replicated siege battle graph.
+        foreach (var instance in Clients.Append(Server))
+            instance.Call(() => instance.GetRegisteredObject<MapEvent>(battle.MapEventId).SetBattleType(battleType));
+        return battle;
     }
 
     /// <summary>
@@ -410,14 +427,15 @@ public abstract class MapEventTestBase : IDisposable
     /// <summary>
     /// Registers an already-synced hero/party pair as a player in every instance's player registry.
     /// </summary>
-    protected void RegisterAsPlayerParty(string controllerId, string heroId, string partyId)
+    protected void RegisterAsPlayerParty(string controllerId, string heroId, string partyId,
+        string clanId = "MyClanId", string characterObjectId = "MyCharacterObjectId")
     {
         void Register(EnvironmentInstance instance)
         {
             instance.Call(() =>
             {
                 var registry = instance.Resolve<IPlayerManager>();
-                registry.AddPlayer(new Player(controllerId, heroId, partyId, "MyClanId", "MyCharacterObjectId"));
+                registry.AddPlayer(new Player(controllerId, heroId, partyId, clanId, characterObjectId));
 
                 Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
                 Assert.True(registry.TryGetPlayer(controllerId, out var _));
@@ -612,6 +630,22 @@ public abstract class MapEventTestBase : IDisposable
     }
 
     /// <summary>
+    /// Methods a surrender's battle resolution reaches that need a live campaign world: the capture-chance
+    /// model, the loot and result commit steps, and the finalize-time party move.
+    /// </summary>
+    protected IReadOnlyList<MethodBase> BattleMenuSurrenderDisabledMethods()
+        => MapEventDisabledMethods
+            .Append(AccessTools.Method(typeof(DefaultBattleRewardModel), nameof(DefaultBattleRewardModel.GetCaptureMemberChancesForWinnerParties)))
+            .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyCasualties"))
+            .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyItems"))
+            .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyPrisoners"))
+            .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyShips"))
+            .Append(AccessTools.Method(typeof(MapEvent), "CalculateMapEventResults"))
+            .Append(AccessTools.Method(typeof(MapEvent), "CommitCalculatedMapEventResults"))
+            .Append(AccessTools.Method(typeof(MapEvent), "MovePartyToSuitablePositionOnMapEventFinalize"))
+            .ToList();
+
+    /// <summary>
     /// Simulates one or more ALLIED players losing a battle to <paramref name="captorPartyId"/> through the
     /// <em>real</em> result path: the losers share the defender side, a client commits the captor's victory
     /// <see cref="BattleState.AttackerVictory"/>, and the server applies it authoritatively — capturing every
@@ -681,7 +715,14 @@ public abstract class MapEventTestBase : IDisposable
 
     /// <summary>
     /// Frees the captive player hero the way the live escape pop-up ("you were able to get away")
-    /// does: the owning client's <see cref="EndCaptivityAction"/> is intercepted locally and forwarded
+    /// does, through <see cref="ReleasePlayerByRequest"/>.
+    /// </summary>
+    protected void ReleasePlayerByEscapeRequest(EnvironmentInstance client, string heroId, string partyId)
+        => ReleasePlayerByRequest(client, heroId, partyId, EndCaptivityDetail.ReleasedAfterEscape);
+
+    /// <summary>
+    /// Frees the captive player hero the way a release from the captivity menus (escape, ransom) does:
+    /// the owning client's <see cref="EndCaptivityAction"/> is intercepted locally and forwarded
     /// as a <c>NetworkEndPlayerCaptivityAttempted</c> request, which the server applies
     /// authoritatively (<c>PlayerCaptivityServerHandler</c>) and replicates back. The wire message is
     /// sent directly from <paramref name="client"/> because the client-side intercept path resolves
@@ -689,10 +730,10 @@ public abstract class MapEventTestBase : IDisposable
     /// — the harness's main hero (E2ETestEnvironment.SetupMainHero) is a separate bootstrap hero, and
     /// no main party exists headlessly — so the local handler chain cannot fire for a test hero.
     /// </summary>
-    protected void ReleasePlayerByEscapeRequest(EnvironmentInstance client, string heroId, string partyId)
+    protected void ReleasePlayerByRequest(EnvironmentInstance client, string heroId, string partyId, EndCaptivityDetail detail)
     {
         var disabledMethods = MapEventDisabledMethods
-            // An escape releases from a still-active captor, so the server disengages the freed party
+            // A release from a still-active captor makes the server disengage the freed party
             // (TeleportPartyToOutSideOfEncounterRadius), which pathfinds for a reachable point and
             // needs a live map scene. The captor-defeated release path skips it (inactive captor).
             .Append(AccessTools.Method(typeof(MobileParty), nameof(MobileParty.TeleportPartyToOutSideOfEncounterRadius)))
@@ -703,7 +744,7 @@ public abstract class MapEventTestBase : IDisposable
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
 
             client.Resolve<INetwork>().SendAll(new NetworkEndPlayerCaptivityAttempted(
-                heroId, partyId, party.Position, EndCaptivityDetail.ReleasedAfterEscape, null, 0));
+                heroId, partyId, party.Position, detail, null, 0));
         }, disabledMethods);
     }
 

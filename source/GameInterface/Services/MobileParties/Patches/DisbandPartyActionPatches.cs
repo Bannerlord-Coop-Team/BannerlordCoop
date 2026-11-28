@@ -2,6 +2,8 @@
 using GameInterface.Services.MobileParties.Extensions;
 using HarmonyLib;
 using Serilog;
+using System;
+using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 
@@ -22,4 +24,11 @@ internal class DisbandPartyActionPatches
 
         return false;
     }
+
+    // Vanilla StartDisband without the prefix above, for coop.debug.mobileparty.start_disband
+    [HarmonyReversePatch]
+    [HarmonyPatch(nameof(DisbandPartyAction.StartDisband))]
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    public static void StartDisbandUnguarded(MobileParty disbandParty) =>
+        throw new NotSupportedException("StartDisband reverse patch was not installed.");
 }

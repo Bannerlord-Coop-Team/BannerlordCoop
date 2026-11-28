@@ -2,6 +2,7 @@
 using Common;
 using Common.Logging;
 using GameInterface.Services.MobileParties.Audit;
+using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Utils.Commands;
@@ -14,6 +15,7 @@ using System.Reflection;
 using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.ViewModelCollection.ClanManagement;
@@ -588,6 +590,54 @@ internal class MobilePartyDebugCommand
 
             return Succeeded($"Destroyed {nameof(MobileParty)} with string id: {party.StringId}");
 
+        }
+    }
+
+    // coop.debug.mobileparty.start_disband MobileParty_Player disbanding
+    public sealed class StartDisbandCoopCommand : ICoopCommand
+    {
+        private readonly ICommandObjectResolver resolver;
+
+        public StartDisbandCoopCommand(ICommandObjectResolver resolver) => this.resolver = resolver;
+
+        public string Prefix => "coop.debug.mobileparty";
+
+        public string Name => "start_disband";
+
+        public string Description => "Starts a native disband on a party past the player-party guard, so a rejoin or load can be checked to cancel it.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("partyId", "Party name or id; quote names with spaces."),
+            new ExpectedArgs("state", "waiting (the default) leaves it in the native one-day wait, disbanding ends the wait so it is marked disbanding.", isRequired: false),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient) return Failed("Command can only be run on the server.");
+            if (args.Count < 1 || args.Count > 2) return Failed("Expected a party name or id and optionally waiting or disbanding.");
+
+            var state = args.Count == 2 ? args[1] : "waiting";
+            if (state != "waiting" && state != "disbanding") return Failed($"Unknown state '{state}', expected waiting or disbanding.");
+            if (!resolver.TryResolveMobileParty(args[0], out var party, out var error)) return Failed(error);
+
+            var partyId = resolver.DisplayId(party);
+            var disbandBehavior = Campaign.Current.GetCampaignBehavior<DisbandPartyCampaignBehavior>();
+            if (disbandBehavior == null) return Failed("The campaign has no DisbandPartyCampaignBehavior.");
+            if (party.IsDisbanding || disbandBehavior.IsPartyWaitingForDisband(party)) return Failed($"{partyId} is already disbanding.");
+
+            DisbandPartyActionPatches.StartDisbandUnguarded(party);
+
+            if (state == "disbanding" && disbandBehavior.IsPartyWaitingForDisband(party))
+            {
+                // Ends the one-day wait so the native hourly tick marks the party disbanding
+                disbandBehavior._partiesThatWaitingToDisband[party] = CampaignTime.Zero;
+                disbandBehavior.HourlyTick();
+            }
+
+            return Succeeded($"PartyId={partyId} IsDisbanding={party.IsDisbanding} WaitingForDisband={disbandBehavior.IsPartyWaitingForDisband(party)}");
         }
     }
 
