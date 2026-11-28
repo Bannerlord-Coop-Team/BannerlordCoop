@@ -1,0 +1,17 @@
+{
+    "Phase":  "Stealth",
+    "BattleHost":  true,
+    "Fires":  [
+                  {
+                      "Id":  130,
+                      "Used":  true,
+                      "Enabled":  true,
+                      "Called":  false
+                  }
+              ],
+    "PlayerHeroes":  1,
+    "PlayerTroops":  0,
+    "AttackerTroops":  0,
+    "ActiveSentries":  14,
+    "ActiveDefenders":  26
+}
