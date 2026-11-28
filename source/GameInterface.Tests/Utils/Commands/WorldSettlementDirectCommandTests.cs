@@ -50,9 +50,9 @@ public class WorldSettlementDirectCommandTests
         Type[] commandTypes = GetCommandTypes();
 
 #if DEBUG
-        Assert.Equal(150, commandTypes.Length);
+        Assert.Equal(151, commandTypes.Length);
 #else
-        Assert.Equal(125, commandTypes.Length);
+        Assert.Equal(126, commandTypes.Length);
 #endif
         Assert.All(commandTypes, type =>
         {
