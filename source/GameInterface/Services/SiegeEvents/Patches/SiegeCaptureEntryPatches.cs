@@ -21,7 +21,7 @@ internal class SiegeCaptureEntryPatches
     private static void Prefix(MapEvent __instance, bool __runOriginal, out SiegeCapture __state)
     {
         __state = null;
-        if (ModInformation.IsClient || !__runOriginal || __instance.IsFinalized) return;
+        if (ModInformation.IsClient || !__runOriginal) return;
 
         var settlement = __instance.MapEventSettlement;
         var besiegerCamp = settlement?.SiegeEvent?.BesiegerCamp;
