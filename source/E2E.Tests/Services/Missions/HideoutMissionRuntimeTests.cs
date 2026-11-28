@@ -241,7 +241,7 @@ public sealed class HideoutMissionRuntimeTests : MissionTestEnvironment
         {
             Assert.True(client.ObjectManager.TryGetObject<Hero>(heroIds[0], out var playerHero));
             var mock = fixture.CreateMission(client);
-            var (logic, native, attackerTeam, defenderTeam) = CreateCampHideout(mock, client.Resolve<IMessageBroker>(), direct);
+            var (logic, native, attackerTeam, defenderTeam) = CreateHideout(mock, client.Resolve<IMessageBroker>(), direct, HideoutPhase.Camp);
             var leader = mock.SpawnAgent(new AgentBuildData(playerHero.CharacterObject).Team(attackerTeam).Controller(AgentControllerType.Player));
             var troop = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop).Team(attackerTeam).Controller(AgentControllerType.AI));
             var guard = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop).Team(defenderTeam).Controller(AgentControllerType.AI));
@@ -282,7 +282,7 @@ public sealed class HideoutMissionRuntimeTests : MissionTestEnvironment
             Assert.True(client.ObjectManager.TryGetObject<Hero>(heroIds[0], out var playerHero));
             Assert.True(client.ObjectManager.TryGetObject<Hero>(heroIds[1], out var otherHero));
             var mock = fixture.CreateMission(client);
-            var (logic, native, attackerTeam, defenderTeam) = CreateCampHideout(mock, client.Resolve<IMessageBroker>(), direct);
+            var (logic, native, attackerTeam, defenderTeam) = CreateHideout(mock, client.Resolve<IMessageBroker>(), direct, HideoutPhase.Camp);
             var allyTeam = mock.AddTeam(BattleSideEnum.Attacker);
             var leader = mock.SpawnAgent(new AgentBuildData(playerHero.CharacterObject).Team(attackerTeam).Controller(AgentControllerType.Player));
             var other = mock.SpawnAgent(new AgentBuildData(otherHero.CharacterObject).Team(allyTeam).Controller(AgentControllerType.None));
@@ -316,7 +316,7 @@ public sealed class HideoutMissionRuntimeTests : MissionTestEnvironment
         client.Call(() =>
         {
             var mock = fixture.CreateMission(client);
-            var (logic, _, attackerTeam, defenderTeam) = CreateCampHideout(mock, client.Resolve<IMessageBroker>(), direct);
+            var (logic, _, attackerTeam, defenderTeam) = CreateHideout(mock, client.Resolve<IMessageBroker>(), direct, HideoutPhase.Camp);
             var troop = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop).Team(attackerTeam).Controller(AgentControllerType.AI));
             var guard = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop).Team(defenderTeam).Controller(AgentControllerType.AI));
             foreach (var agent in new[] { troop, guard }) logic.OnAgentBuild(agent, null);
@@ -329,29 +329,6 @@ public sealed class HideoutMissionRuntimeTests : MissionTestEnvironment
             }
             finally { logic.OnRemoveBehavior(); }
         });
-    }
-
-    private static (CoopHideoutMissionLogic logic, MissionLogic native, Team attackerTeam, Team defenderTeam) CreateCampHideout(
-        MockMission mock, IMessageBroker broker, bool direct)
-    {
-        var attackerTeam = mock.AddTeam(BattleSideEnum.Attacker);
-        mock.PlayerTeam = mock.AttackerTeam;
-        var defenderTeam = mock.AddTeam(BattleSideEnum.Defender);
-        var attacker = new CoopTroopSupplier("raid", BattleSideEnum.Attacker, null, null);
-        var defender = new CoopTroopSupplier("raid", BattleSideEnum.Defender, null, null);
-        var logic = new CoopHideoutMissionLogic(Mock.Of<IBattleNetwork>(), broker,
-            Mock.Of<IMissionContext>(), defender, attacker, direct);
-        AccessTools.Property(typeof(MissionBehavior), nameof(MissionBehavior.Mission)).SetValue(logic, mock.Shell);
-        AccessTools.Field(typeof(CoopHideoutMissionLogic), "initialized").SetValue(logic, true);
-        var suppliers = new IMissionTroopSupplier[] { logic.Defender, logic.Attacker };
-        var native = direct ? (MissionLogic)new CoopHideoutAssaultController(logic, suppliers)
-            : new CoopHideoutAmbushController(logic, suppliers);
-        AccessTools.Property(typeof(MissionBehavior), nameof(MissionBehavior.Mission)).SetValue(native, mock.Shell);
-        logic.Native = (ICoopHideoutNativeController)native;
-        mock.Shell.MissionBehaviors.Add(logic);
-        mock.Shell.MissionBehaviors.Add(native);
-        logic.Native.Apply(HideoutPhase.Camp, null, 25);
-        return (logic, native, attackerTeam, defenderTeam);
     }
 
     [Fact]

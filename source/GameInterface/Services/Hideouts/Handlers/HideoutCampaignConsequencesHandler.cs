@@ -304,13 +304,8 @@ internal sealed class HideoutCampaignConsequencesHandler : IHandler
         if (clearRewards.TryGetValue(settlement, out var previous) && previous.MapEvent == mapEvent) return;
 
         var rewards = new ClearRewardSnapshot(settlement) { Component = component };
-        foreach (var player in playerManager.Players)
-        {
-            if (objectManager.TryGetObject<Hero>(player.HeroId, out var hero) &&
-                objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party) &&
-                party.Party.MapEventSide == mapEvent.AttackerSide)
-                rewards.Participants.Add((hero, party));
-        }
+        foreach (var (_, hero, party) in playerManager.GetPlayersOnSide(mapEvent.AttackerSide))
+            rewards.Participants.Add((hero, party));
 
         pendingClearRewards[mapEvent] = rewards;
         clearRewards.Remove(settlement);

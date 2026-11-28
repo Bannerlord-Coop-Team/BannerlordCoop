@@ -3,15 +3,11 @@ using Common.Util;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Environment.MockEngine;
 using GameInterface.Services.Hideouts.Messages;
-using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.Players;
 using HarmonyLib;
-using Missions;
 using Missions.Battles;
 using Missions.Hideouts;
-using Missions.Services.Network;
 using Moq;
-using SandBox.Missions.MissionLogics.Hideout;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameComponents;
@@ -62,15 +58,17 @@ public sealed class HideoutRogueryXpTests : MissionTestEnvironment
     {
         AssertEachRaiderGetsRogueryXpOnce(HideoutRogueryXpReward.MissionSucceeded, SucceededXp, (host, fixture) =>
         {
-            var (mock, logic, native) = CreateAmbushOnBattleHost(fixture, host);
-            native.Apply(HideoutPhase.BossBattle, null, 25);
+            var mock = fixture.CreateMission(host);
+            var (logic, nativeLogic, attackerTeam, defenderTeam) =
+                CreateHideout(mock, host.Resolve<IMessageBroker>(), direct: false, HideoutPhase.BossBattle);
+            var native = (CoopHideoutAmbushController)nativeLogic;
             native._isMissionInitialized = true;
             native._troopsInitialized = true;
             native._playerPriorTroops = new List<IAgentOriginBase>();
             native._battleEndLogic = new BattleEndLogic { Mission = mock.Shell, _missionAgentSpawnLogic = Mock.Of<IMissionAgentSpawnLogic>() };
             native._missionObjectiveLogic = ObjectHelper.SkipConstructor<MissionObjectiveLogic>();
-            var leader = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop).Team(mock.AttackerTeam.Shell).Controller(AgentControllerType.Player));
-            var boss = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop).Team(mock.DefenderTeam.Shell).Controller(AgentControllerType.AI));
+            var leader = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop).Team(attackerTeam).Controller(AgentControllerType.Player));
+            var boss = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop).Team(defenderTeam).Controller(AgentControllerType.AI));
             mock.MainAgent = leader;
             logic.OnAgentBuild(leader, null);
             logic.OnAgentBuild(boss, null);
@@ -107,7 +105,8 @@ public sealed class HideoutRogueryXpTests : MissionTestEnvironment
     {
         AssertEachRaiderGetsRogueryXpOnce(HideoutRogueryXpReward.MissionFailed, FailedXp, (host, fixture) =>
         {
-            var (mock, logic, native) = CreateAmbushOnBattleHost(fixture, host);
+            var mock = fixture.CreateMission(host);
+            var (logic, _, _, _) = CreateHideout(mock, host.Resolve<IMessageBroker>(), direct: false, HideoutPhase.Stealth);
             var battle = ObjectHelper.SkipConstructor<CoopBattleController>();
             AccessTools.Field(typeof(CoopBattleController), "<Session>k__BackingField").SetValue(battle,
                 Mock.Of<IBattleSession>(value => value.HasInstance && value.IsLocalHost && value.HostEpoch == 1 && value.InstanceId == "raid"));
@@ -115,47 +114,46 @@ public sealed class HideoutRogueryXpTests : MissionTestEnvironment
             mock.Shell.MissionBehaviors.Add(new BattleEndLogic { Mission = mock.Shell, _missionAgentSpawnLogic = Mock.Of<IMissionAgentSpawnLogic>() });
             // The resolved phase snapshot reads the defenders still standing.
             mock.DefenderTeam.Shell._activeAgents = new MBList<Agent>();
-            native.Apply(HideoutPhase.Stealth, null, 25);
             try
             {
                 // Both the fail counter and its popup end the raid, as they do natively.
                 logic.OnStealthFailure();
                 logic.OnStealthFailure();
-                Assert.Equal(HideoutPhase.Resolved, native.Phase);
+                Assert.Equal(HideoutPhase.Resolved, logic.Native.Phase);
             }
             finally { logic.OnRemoveBehavior(); }
         });
     }
 
     [Fact]
-    public void NativeGhostBonusOnTheBattleHost_EachRaidingPlayerHeroGetsItOnceAndSeesIt()
+    public void NativeGhostBonusOnTheBattleHost_EachRaidingPlayerHeroGetsItOnceAndIsSentTheBonus()
     {
         // Native HideoutAmbushMissionController.OnObjectUsed gives it when the signal fire is lit unseen.
-        float hostGain = AssertEachRaiderGetsRogueryXpOnce(HideoutRogueryXpReward.ClearedAsGhost, GhostXp,
+        AssertEachRaiderGetsRogueryXpOnce(HideoutRogueryXpReward.ClearedAsGhost, GhostXp,
             (_, _) => Campaign.Current.SkillLevelingManager.OnHideoutClearedAsGhost());
-
-        // Only the host's player is connected here, so only it is told about its bonus.
-        var bonus = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkHideoutGhostBonusGained>());
-        Assert.Equal(hostGain, bonus.Xp);
-        Assert.Equal(GhostXp, bonus.BaseXp);
     }
 
-    private float AssertEachRaiderGetsRogueryXpOnce(
+    private void AssertEachRaiderGetsRogueryXpOnce(
         HideoutRogueryXpReward reward,
         float rolledXp,
         Action<EnvironmentInstance, MissionEngineFixture> raidOnBattleHost)
     {
         // The battle helper needs a second side, so "bandits" defends; the host and "joiner" raid.
         var (mapEventId, partyIds, heroIds) = SetupCoopBattleWithHeroes("host", "bandits", "joiner");
-        var raiderIds = new[] { heroIds[0], heroIds[2] };
+        var (hostHeroId, defenderHeroId, joinerHeroId) = (heroIds[0], heroIds[1], heroIds[2]);
+        var hostPartyId = partyIds[0];
+        var raiderIds = new[] { hostHeroId, joinerHeroId };
+        var host = Clients.First();
+        var defenderClient = Clients.Last();
         var before = new Dictionary<string, float>();
         var gain = new Dictionary<string, float>();
         float defenderBefore = 0;
-        var host = Clients.First();
         Server.Call(() =>
         {
-            Server.Resolve<IPlayerManager>().SetPeer("host", host.NetPeer);
-            defenderBefore = Server.GetRegisteredObject<Hero>(heroIds[1]).HeroDeveloper.GetSkillXp(DefaultSkills.Roguery);
+            var players = Server.Resolve<IPlayerManager>();
+            players.SetPeer("host", host.NetPeer);
+            players.SetPeer("bandits", defenderClient.NetPeer);
+            defenderBefore = Server.GetRegisteredObject<Hero>(defenderHeroId).HeroDeveloper.GetSkillXp(DefaultSkills.Roguery);
             foreach (var heroId in raiderIds)
             {
                 var hero = Server.GetRegisteredObject<Hero>(heroId);
@@ -178,7 +176,7 @@ public sealed class HideoutRogueryXpTests : MissionTestEnvironment
             host.Call(() =>
             {
                 var previousMainParty = Campaign.Current.MainParty;
-                Campaign.Current.MainParty = host.GetRegisteredObject<MobileParty>(partyIds[0]);
+                Campaign.Current.MainParty = host.GetRegisteredObject<MobileParty>(hostPartyId);
                 try
                 {
                     Assert.NotNull(MapEvent.PlayerMapEvent);
@@ -196,7 +194,7 @@ public sealed class HideoutRogueryXpTests : MissionTestEnvironment
         float defenderAfter = 0;
         Server.Call(() =>
         {
-            defenderAfter = Server.GetRegisteredObject<Hero>(heroIds[1]).HeroDeveloper.GetSkillXp(DefaultSkills.Roguery);
+            defenderAfter = Server.GetRegisteredObject<Hero>(defenderHeroId).HeroDeveloper.GetSkillXp(DefaultSkills.Roguery);
             foreach (var heroId in raiderIds)
                 after[heroId] = Server.GetRegisteredObject<Hero>(heroId).HeroDeveloper.GetSkillXp(DefaultSkills.Roguery);
         });
@@ -207,6 +205,20 @@ public sealed class HideoutRogueryXpTests : MissionTestEnvironment
             Assert.Equal(before[heroId] + gain[heroId], after[heroId]);
         }
 
+        // Only the ghost bonus is announced, and only to the raider it went to; the joiner has no client here.
+        var hostBonuses = host.InternalMessages.GetMessages<NetworkHideoutGhostBonusGained>();
+        if (reward == HideoutRogueryXpReward.ClearedAsGhost)
+        {
+            var bonus = Assert.Single(hostBonuses);
+            Assert.Equal(after[hostHeroId] - before[hostHeroId], bonus.Xp);
+            Assert.Equal(rolledXp, bonus.BaseXp);
+        }
+        else
+        {
+            Assert.Empty(hostBonuses);
+        }
+        Assert.Empty(defenderClient.InternalMessages.GetMessages<NetworkHideoutGhostBonusGained>());
+
         FlushCoalescer();
         foreach (var client in Clients)
             client.Call(() =>
@@ -214,27 +226,5 @@ public sealed class HideoutRogueryXpTests : MissionTestEnvironment
                 foreach (var heroId in raiderIds)
                     Assert.Equal(after[heroId], client.GetRegisteredObject<Hero>(heroId).HeroDeveloper.GetSkillXp(DefaultSkills.Roguery));
             });
-        return after[heroIds[0]] - before[heroIds[0]];
-    }
-
-    private static (MockMission mock, CoopHideoutMissionLogic logic, CoopHideoutAmbushController native) CreateAmbushOnBattleHost(
-        MissionEngineFixture fixture, EnvironmentInstance host)
-    {
-        var mock = fixture.CreateMission(host);
-        mock.AddTeam(BattleSideEnum.Attacker);
-        mock.AddTeam(BattleSideEnum.Defender);
-        mock.PlayerTeam = mock.AttackerTeam;
-        var attacker = new CoopTroopSupplier("raid", BattleSideEnum.Attacker, null, null);
-        var defender = new CoopTroopSupplier("raid", BattleSideEnum.Defender, null, null);
-        var logic = new CoopHideoutMissionLogic(Mock.Of<IBattleNetwork>(), host.Resolve<IMessageBroker>(),
-            Mock.Of<IMissionContext>(), defender, attacker, false);
-        AccessTools.Property(typeof(MissionBehavior), nameof(MissionBehavior.Mission)).SetValue(logic, mock.Shell);
-        AccessTools.Field(typeof(CoopHideoutMissionLogic), "initialized").SetValue(logic, true);
-        var native = new CoopHideoutAmbushController(logic, new IMissionTroopSupplier[] { logic.Defender, logic.Attacker });
-        AccessTools.Property(typeof(MissionBehavior), nameof(MissionBehavior.Mission)).SetValue(native, mock.Shell);
-        logic.Native = native;
-        mock.Shell.MissionBehaviors.Add(logic);
-        mock.Shell.MissionBehaviors.Add(native);
-        return (mock, logic, native);
     }
 }

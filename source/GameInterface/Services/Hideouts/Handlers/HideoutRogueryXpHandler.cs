@@ -6,7 +6,6 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
-using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
@@ -60,27 +59,18 @@ internal class HideoutRogueryXpHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<MapEvent>(data.MapEventId, out var mapEvent)) return;
 
             var model = Campaign.Current.Models.HideoutModel;
-            foreach (var player in playerManager.Players)
+            foreach (var (player, hero, _) in playerManager.GetPlayersOnSide(mapEvent.AttackerSide))
             {
-                if (!objectManager.TryGetObject<Hero>(player.HeroId, out var hero) ||
-                    !objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party) ||
-                    party.Party.MapEventSide != mapEvent.AttackerSide)
-                    continue;
-
                 // Vanilla DefaultSkillLevelingManager, keyed off each raiding player's hero instead of Hero.MainHero.
-                if (data.Reward != HideoutRogueryXpReward.ClearedAsGhost)
-                {
-                    hero.AddSkillXp(DefaultSkills.Roguery,
-                        model.GetRogueryXpGainOnHideoutMissionEnd(data.Reward == HideoutRogueryXpReward.MissionSucceeded));
-                    continue;
-                }
-
-                float baseXp = model.GetRogueryXpGainAsGhost();
+                float xp = data.Reward == HideoutRogueryXpReward.ClearedAsGhost
+                    ? model.GetRogueryXpGainAsGhost()
+                    : model.GetRogueryXpGainOnHideoutMissionEnd(data.Reward == HideoutRogueryXpReward.MissionSucceeded);
                 float before = hero.HeroDeveloper.GetSkillXp(DefaultSkills.Roguery);
-                hero.AddSkillXp(DefaultSkills.Roguery, baseXp);
-                if (playerManager.TryGetPeer(player.ControllerId, out var peer))
-                    network.Send(peer, new NetworkHideoutGhostBonusGained(
-                        hero.HeroDeveloper.GetSkillXp(DefaultSkills.Roguery) - before, baseXp));
+                hero.AddSkillXp(DefaultSkills.Roguery, xp);
+                float gained = hero.HeroDeveloper.GetSkillXp(DefaultSkills.Roguery) - before;
+
+                if (data.Reward == HideoutRogueryXpReward.ClearedAsGhost && playerManager.TryGetPeer(player.ControllerId, out var peer))
+                    network.Send(peer, new NetworkHideoutGhostBonusGained(gained, xp));
             }
         });
     }
