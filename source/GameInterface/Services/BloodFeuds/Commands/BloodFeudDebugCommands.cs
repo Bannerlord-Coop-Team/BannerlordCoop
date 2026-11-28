@@ -104,10 +104,6 @@ internal class BloodFeudDebugCommands
             if (prisoner.IsPrisoner) return Failed($"{prisoner.Name} is already a prisoner.");
             if (prisoner.IsPlayerHero()) return Failed($"{prisoner.Name} is a player hero, use coop.debug.player_captivity.capture_player.");
 
-            // A party leader is detached from their party first, like a defeated lord
-            if (prisoner.PartyBelongedTo != null && prisoner.PartyBelongedTo.LeaderHero == prisoner)
-                prisoner.PartyBelongedTo.RemovePartyLeader();
-
             TakePrisonerAction.Apply(captor.PartyBelongedTo.Party, prisoner);
             return Succeeded($"{prisoner.Name} ({prisoner.StringId}) clan={prisoner.Clan?.StringId} IsPrisoner={prisoner.IsPrisoner} held by {prisoner.PartyBelongedToAsPrisoner?.Name}");
         }

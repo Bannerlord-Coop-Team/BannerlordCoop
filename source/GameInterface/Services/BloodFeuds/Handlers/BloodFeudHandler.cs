@@ -9,13 +9,13 @@ using SandBox.GauntletUI.Map;
 using SandBox.View.Map;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.MapNotificationTypes;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
+using static TaleWorlds.CampaignSystem.Actions.ChangeBloodFeudStateAction;
 
 namespace GameInterface.Services.BloodFeuds.Handlers;
 
@@ -82,11 +82,10 @@ internal class BloodFeudHandler : IHandler
             Hero executedHero = null;
             if (data.ExecutedHeroId != null) objectManager.TryGetObjectWithLogging(data.ExecutedHeroId, out executedHero);
 
-            if (data.Detail == ChangeBloodFeudStateAction.ChangeBloodFeudActionDetail.StartedByPlayerExecuteAHero ||
-                data.Detail == ChangeBloodFeudStateAction.ChangeBloodFeudActionDetail.StartedByAIExecutePlayerRelative)
+            if (clanWithFeud.HasBloodFeudWithPlayer)
             {
                 TextObject textObject;
-                if (data.Detail == ChangeBloodFeudStateAction.ChangeBloodFeudActionDetail.StartedByPlayerExecuteAHero)
+                if (data.Detail == ChangeBloodFeudActionDetail.StartedByPlayerExecuteAHero)
                 {
                     textObject = new TextObject("{=3RvhG1HN}You have started a blood feud with the {CLAN}.");
                 }
@@ -111,13 +110,13 @@ internal class BloodFeudHandler : IHandler
                 TextObject textObject = new TextObject("{=Px3DDMvV}You have decided not to pursue your blood feud with the {CLAN}, and it has ended.");
                 switch (data.Detail)
                 {
-                    case ChangeBloodFeudStateAction.ChangeBloodFeudActionDetail.SettledByRansomPayment when data.SettledByAgreement:
-                        textObject = new TextObject("{=str_coop_blood_feud_ended_by_agreement}Your blood feud with the {CLAN} has ended by agreement.");
+                    case ChangeBloodFeudActionDetail.SettledByRansomPayment when data.SettledByAgreement:
+                        textObject = GameTexts.FindText("str_coop_blood_feud_ended_by_agreement");
                         break;
-                    case ChangeBloodFeudStateAction.ChangeBloodFeudActionDetail.SettledByRansomPayment:
+                    case ChangeBloodFeudActionDetail.SettledByRansomPayment:
                         textObject = new TextObject("{=fsfeamMz}Your blood feud with the {CLAN} has ended, as you paid them money to settle it.");
                         break;
-                    case ChangeBloodFeudStateAction.ChangeBloodFeudActionDetail.SettledByRelationIncrease:
+                    case ChangeBloodFeudActionDetail.SettledByRelationIncrease:
                         textObject = new TextObject("{=iNPcIqUj}Your blood feud with the {CLAN} has ended after relations between your clans improved.");
                         break;
                 }
@@ -197,8 +196,8 @@ internal class BloodFeudHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Clan>(data.FeudedClanId, out var feudedClan)) return;
 
             // Vanilla leaves the pending notice counting down when the execution is cancelled while the hero stays imprisoned
-            var pendingNotice = MapScreen.Instance?.GetMapView<GauntletMapNotificationView>()?._dataSource?.NotificationItems
-                .FirstOrDefault(item => item.Data is BloodFeudClanMemberCapturedMapNotification notice && notice.CaptiveHero == clanMember && notice.Settlement != null);
+            var notificationItems = MapScreen.Instance?.GetMapView<GauntletMapNotificationView>()?._dataSource?.NotificationItems;
+            var pendingNotice = notificationItems?.FirstOrDefault(item => item.Data is BloodFeudClanMemberCapturedMapNotification notice && notice.CaptiveHero == clanMember && notice.Settlement != null);
             pendingNotice?.ExecuteRemove();
 
             TextObject textObject = new TextObject("{=*}Your {RELATION} {CLAN_MEMBER.NAME} is no longer at risk of being executed as part of your blood feud with {FEUDED_CLAN}.");

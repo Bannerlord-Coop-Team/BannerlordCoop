@@ -238,8 +238,6 @@ are registered later, at `CampaignReady` (`MapScreen.OnInitialize`), through
 
 ## Known gaps
 
-- `MarriageOfferCampaignBehavior` and `DiplomaticBartersBehavior` read `Clan.HasBloodFeudWithPlayer` on the
-  server, where it stays false because feuds are kept per player (`ExecutionCampaignBehaviorInterface`).
 - Empty clan parties are keyed on the local main hero. They run on the server only and are not
   multiplayer-aware yet.
 - War Sails v1.3.7 builds and loads on v1.5.7 (#4602), but sea play hasn't been checked live on v1.5.7

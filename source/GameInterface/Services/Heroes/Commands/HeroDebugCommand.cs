@@ -1337,7 +1337,7 @@ public class HeroDebugCommand
                 return Failed("A hero cannot have a relation with itself");
             }
 
-            ChangeRelationAction.SetRelationBetweenHeroes(effectiveHero1, effectiveHero2, value, false);
+            ChangeRelationAction.SetRelationBetweenHeroes(effectiveHero1, effectiveHero2, value, showQuickNotification: false);
 
             return Succeeded($"Set effective relation between '{effectiveHero1.Name}' and '{effectiveHero2.Name}' to " +
                 CharacterRelationManager.GetHeroRelation(effectiveHero1, effectiveHero2));
