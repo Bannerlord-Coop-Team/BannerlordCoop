@@ -104,8 +104,8 @@ public class SiegeKingdomChangeTests : SiegeTestBase
         var bystander = Clients.Last();
         var scenario = SetupSiegeScenario(PlayerSiegeRole.Defender);
         ConfigureSiegeMenuClient(client, scenario.Participants.PlayerPartyId);
-        // The bystander plays a defender of the owner clan the check leaves in the town, so the empty assert below
-        // fails if the server's stayed check goes away.
+        // The bystander plays a second defender, from the owner clan, that the check leaves in the town, so the empty
+        // assert below fails if either the server's stayed check or the client's party id check goes away.
         ConfigureSiegeMenuClient(bystander, scenario.Participants.TownStayerPartyId);
 
         using var menus = RecordMenus();

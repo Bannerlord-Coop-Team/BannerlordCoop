@@ -6306,10 +6306,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Assert.True(instance.ObjectManager.TryGetObject<Clan>(clanId, out var clan));
             Assert.True(instance.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
 
-            using (new AllowedThread())
-            {
-                PlaceClanInKingdom(clan, kingdom);
-            }
+            PlaceClanInKingdom(clan, kingdom);
         });
     }
 
