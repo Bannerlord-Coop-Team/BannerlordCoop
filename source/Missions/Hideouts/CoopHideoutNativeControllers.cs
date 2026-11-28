@@ -172,6 +172,11 @@ internal sealed class CoopHideoutAmbushController : HideoutAmbushMissionControll
         _ => HideoutPhase.BossBattle,
     };
 
+    internal int ActiveSentryCount => _stealthAreaData.Sum(CountActiveSentries);
+
+    private static int CountActiveSentries(StealthAreaMissionLogic.StealthAreaData area)
+        => area.StealthAreaMarkers.Values.Sum(sentries => sentries.Count(sentry => sentry.IsActive()));
+
     public Agent Boss => _bossAgent;
     public BattleSideEnum PlayerSide => BattleSideEnum.Attacker;
     public void StartSpawner(BattleSideEnum side) { }
@@ -346,6 +351,9 @@ internal sealed class CoopHideoutStealthAreaLogic : StealthAreaMissionLogic
         base.OnObjectUsed(userAgent, point);
         return area.IsReinforcementCalled;
     }
+
+    public bool IsReinforcementCalled(StealthAreaUsePoint point)
+        => _stealthAreaData.FirstOrDefault(value => value.StealthAreaUsePoint == point)?.IsReinforcementCalled == true;
 
     public override void OnAgentRemoved(Agent affectedAgent, Agent affectorAgent, AgentState agentState, KillingBlow blow)
     {

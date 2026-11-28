@@ -87,7 +87,7 @@ internal static class HideoutDebugCommands
                     Id = fire.Id.Id,
                     Used = fire._isAlreadyUsed,
                     Enabled = fire._isEnabled,
-                    Called = areas._stealthAreaData.FirstOrDefault(area => area.StealthAreaUsePoint == fire)?.IsReinforcementCalled == true,
+                    Called = areas.IsReinforcementCalled(fire),
                 })
                 .ToArray();
             var status = new
@@ -99,8 +99,7 @@ internal static class HideoutDebugCommands
                 PlayerTroops = attackers.Count(agent => !CoopHideoutMissionLogic.IsPlayerHero(agent) &&
                     agent.Origin?.BattleCombatant == PartyBase.MainParty),
                 AttackerTroops = attackers.Count(agent => !CoopHideoutMissionLogic.IsPlayerHero(agent)),
-                ActiveSentries = native._stealthAreaData.Sum(area =>
-                    area.StealthAreaMarkers.Values.Sum(sentries => sentries.Count(sentry => sentry.IsActive()))),
+                ActiveSentries = native.ActiveSentryCount,
                 ActiveDefenders = defenders.Length,
             };
             return new CoopCommandResult(true, "LIVE_TEST_JSON=" + JsonConvert.SerializeObject(status));
