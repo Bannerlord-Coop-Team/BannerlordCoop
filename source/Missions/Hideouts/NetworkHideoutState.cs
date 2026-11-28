@@ -88,3 +88,16 @@ internal readonly struct NetworkHideoutCallTroops : IEvent
         UsePointId = usePointId;
     }
 }
+
+[ProtoContract(SkipConstructor = true)]
+internal readonly struct NetworkHideoutCallTroopsRejected : IEvent
+{
+    [ProtoMember(1)] public string InstanceId { get; }
+    [ProtoMember(2)] public int UsePointId { get; }
+
+    public NetworkHideoutCallTroopsRejected(string instanceId, int usePointId)
+    {
+        InstanceId = instanceId;
+        UsePointId = usePointId;
+    }
+}

@@ -68,6 +68,7 @@ internal sealed class CoopHideoutMissionLogic : MissionLogic
         Attacker = new HideoutTroopSupplier(attackerSource, ledger);
         broker.Subscribe<NetworkHideoutState>(HandleState);
         broker.Subscribe<NetworkHideoutCallTroops>(HandleCallTroops);
+        broker.Subscribe<NetworkHideoutCallTroopsRejected>(HandleCallTroopsRejected);
     }
 
     public override void AfterStart() => battle = Mission.GetMissionBehavior<CoopBattleController>();
@@ -348,6 +349,19 @@ internal sealed class CoopHideoutMissionLogic : MissionLogic
             if (!IsAuthority || message.InstanceId != battle.Session.InstanceId ||
                 !missionContext.ControllersInMission.Contains(message.ControllerId)) return;
             (Native as CoopHideoutAmbushController)?.CallTroops(message.UsePointId);
+            // The lighter's OnUse already spent its fire, so it has to hear when the call was turned down.
+            if (Native.Phase == HideoutPhase.Stealth)
+                network.Send(message.ControllerId, new NetworkHideoutCallTroopsRejected(message.InstanceId, message.UsePointId));
+        });
+    }
+
+    private void HandleCallTroopsRejected(MessagePayload<NetworkHideoutCallTroopsRejected> payload)
+    {
+        var message = payload.What;
+        GameThread.RunSafe(() =>
+        {
+            if (battle == null || message.InstanceId != battle.Session.InstanceId || Native.Phase != HideoutPhase.Stealth) return;
+            (Native as CoopHideoutAmbushController)?.ReopenSignalFire(message.UsePointId);
         });
     }
 
@@ -485,6 +499,7 @@ internal sealed class CoopHideoutMissionLogic : MissionLogic
     {
         broker.Unsubscribe<NetworkHideoutState>(HandleState);
         broker.Unsubscribe<NetworkHideoutCallTroops>(HandleCallTroops);
+        broker.Unsubscribe<NetworkHideoutCallTroopsRejected>(HandleCallTroopsRejected);
         base.OnRemoveBehavior();
     }
 }
