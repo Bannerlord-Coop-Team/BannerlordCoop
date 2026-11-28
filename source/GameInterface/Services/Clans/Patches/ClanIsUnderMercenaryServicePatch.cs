@@ -7,16 +7,18 @@ using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Clans.Patches;
 
-[HarmonyPatch(typeof(Clan))]
+// Clan.StartMercenaryService and EndMercenaryService only set IsUnderMercenaryService, so the JIT inlines them into
+// callers compiled before they are patched. Publish from the mercenary events vanilla raises right after them instead.
+[HarmonyPatch(typeof(CampaignEventDispatcher))]
 internal class ClanIsUnderMercenaryServicePatch
 {
-    [HarmonyPatch(nameof(Clan.StartMercenaryService))]
+    [HarmonyPatch(nameof(CampaignEventDispatcher.OnMercenaryServiceStarted))]
     [HarmonyPostfix]
-    private static void StartMercenaryServicePostfix(Clan __instance) => PublishMercenaryService(__instance);
+    private static void OnMercenaryServiceStartedPostfix(Clan mercenaryClan) => PublishMercenaryService(mercenaryClan);
 
-    [HarmonyPatch(nameof(Clan.EndMercenaryService))]
+    [HarmonyPatch(nameof(CampaignEventDispatcher.OnMercenaryServiceEnded))]
     [HarmonyPostfix]
-    private static void EndMercenaryServicePostfix(Clan __instance) => PublishMercenaryService(__instance);
+    private static void OnMercenaryServiceEndedPostfix(Clan mercenaryClan) => PublishMercenaryService(mercenaryClan);
 
     private static void PublishMercenaryService(Clan clan)
     {
