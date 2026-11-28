@@ -568,10 +568,11 @@ public sealed class HideoutMissionRuntimeTests : MissionTestEnvironment
             RunWithSceneShims(() => Clients.First().Call(() =>
             {
                 var mission = fixture.CreateMission(Clients.First());
-                var (logic, nativeLogic, attackerTeam, defenderTeam) = CreateCampHideout(mission, Mock.Of<IMessageBroker>(), false);
+                var (logic, nativeLogic, attackerTeam, defenderTeam) = CreateCampHideout(mission, Mock.Of<IMessageBroker>(), direct: false);
                 var native = (CoopHideoutAmbushController)nativeLogic;
                 var hero = mission.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop).Team(attackerTeam).Controller(AgentControllerType.Player));
-                var sentry = mission.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop).Team(defenderTeam).Controller(AgentControllerType.AI));
+                var sentry = mission.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop).Team(defenderTeam).Controller(AgentControllerType.AI)
+                    .TroopOrigin(Mock.Of<IAgentOriginBase>(value => value.Troop == Game.Current.PlayerTroop && value.UniqueSeed == 7)));
                 mission.MainAgent = hero;
                 AttachHideoutLogic(logic, mission, Mock.Of<IBattleSession>(value => value.IsLocalHost));
                 var areaLogic = new CoopHideoutStealthAreaLogic();
@@ -600,6 +601,8 @@ public sealed class HideoutMissionRuntimeTests : MissionTestEnvironment
                 Assert.Equal(new[] { marker }, reinforcedMarkers);
                 Assert.Equal(HideoutPhase.CallingTroops, native.Phase);
                 Assert.False(sentry.IsActive());
+                // Other players fade the sentry through this seed in the next HiddenSeeds snapshot.
+                Assert.Contains(7, (HashSet<int>)AccessTools.Field(typeof(CoopHideoutMissionLogic), "hidden").GetValue(logic));
                 logic.OnRemoveBehavior();
             }));
         }
