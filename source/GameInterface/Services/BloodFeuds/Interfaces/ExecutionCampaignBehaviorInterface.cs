@@ -376,6 +376,8 @@ internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorIn
         // Ending a feud is the clan's decision, vanilla's player always leads their clan
         if (!playerHero.IsClanLeader) return;
         if (!TryGetPlayerClan(playerHero.Clan, out var playerClan)) return;
+        // Player clans end their feuds with each other by agreement in a trade
+        if (TryGetPlayerClan(clan, out _)) return;
         if (!TryGetBloodFeud(playerClan.ClanId, clan, out var feud) || !feud.HasBloodFeud) return;
 
         // The client priced it from its last counts, which can be behind the server's

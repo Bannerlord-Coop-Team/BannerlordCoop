@@ -1,10 +1,12 @@
 ﻿using Common;
 using GameInterface.Services.BloodFeuds.Interfaces;
+using GameInterface.Services.Clans.Extensions;
 using HarmonyLib;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
@@ -161,15 +163,19 @@ internal class ExecutionCampaignBehaviorPatches
     private static bool OnSessionLaunchedPrefix() => ModInformation.IsClient;
 
     private const string RansomBrokerEndFeudLineId = "ransom_broker_talk_end_blood_feud";
+    private const string RansomBrokerFeudClanLineId = "ransom_broker_end_feud_clan";
 
     [HarmonyPatch(nameof(ExecutionCampaignBehavior.OnSessionLaunched))]
     [HarmonyPostfix]
     private static void OnSessionLaunchedPostfix()
     {
-        var targetSentence = Campaign.Current.ConversationManager._sentences.FirstOrDefault(sentence => sentence.Id == RansomBrokerEndFeudLineId);
-        if (targetSentence == null) return;
+        var sentences = Campaign.Current.ConversationManager._sentences;
 
-        targetSentence.OnClickableCondition = RansomBrokerEndFeudClickableCondition;
+        var endFeudSentence = sentences.FirstOrDefault(sentence => sentence.Id == RansomBrokerEndFeudLineId);
+        if (endFeudSentence != null) endFeudSentence.OnClickableCondition = RansomBrokerEndFeudClickableCondition;
+
+        var feudClanSentence = sentences.FirstOrDefault(sentence => sentence.Id == RansomBrokerFeudClanLineId);
+        if (feudClanSentence != null) feudClanSentence.OnClickableCondition = RansomBrokerFeudClanClickableCondition;
     }
 
     private static bool RansomBrokerEndFeudClickableCondition(out TextObject explanation)
@@ -177,6 +183,19 @@ internal class ExecutionCampaignBehaviorPatches
         if (!Hero.MainHero.IsClanLeader)
         {
             explanation = GameTexts.FindText("str_coop_clan_blood_feud_leader_only");
+            return false;
+        }
+
+        explanation = null;
+        return true;
+    }
+
+    // Player clans end their feuds with each other by agreement in a trade
+    private static bool RansomBrokerFeudClanClickableCondition(out TextObject explanation)
+    {
+        if (ConversationSentence.CurrentProcessedRepeatObject is Clan clan && clan.IsPlayerClan())
+        {
+            explanation = GameTexts.FindText("str_coop_blood_feud_player_clan_agreement_only");
             return false;
         }
 

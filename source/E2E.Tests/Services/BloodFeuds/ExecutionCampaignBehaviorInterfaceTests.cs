@@ -20,7 +20,7 @@ public class ExecutionCampaignBehaviorInterfaceTests : MapEventTestBase
     }
 
     [Fact]
-    public void PlayerExecutingAnotherPlayerClansMember_StartsTheFeudOnBothClans_AndRansomEndsBoth()
+    public void PlayerExecutingAnotherPlayerClansMember_StartsTheFeudOnBothClans()
     {
         var (playerAId, _) = CreatePlayerHeroParty("PlayerA");
         var (playerBId, _) = CreatePlayerHeroParty("PlayerB");
@@ -45,7 +45,6 @@ public class ExecutionCampaignBehaviorInterfaceTests : MapEventTestBase
                 playerB.Clan = clanB;
                 clanB.SetLeader(playerB);
                 victim.Clan = clanB;
-                playerA.Gold = 100000;
             }
 
             var executionInterface = Server.Resolve<IExecutionCampaignBehaviorInterface>();
@@ -57,11 +56,6 @@ public class ExecutionCampaignBehaviorInterfaceTests : MapEventTestBase
             var executedSide = feuds[clanBId][clanAId];
             Assert.Equal((true, 0, 1), (executingSide.HasBloodFeud, executingSide.ExecutionsDoneCount, executingSide.ExecutionsReceivedCount));
             Assert.Equal((true, 1, 0), (executedSide.HasBloodFeud, executedSide.ExecutionsDoneCount, executedSide.ExecutionsReceivedCount));
-
-            executionInterface.SettleBloodFeudByRansomPayment(playerA, clanB);
-
-            Assert.Equal((false, 0, 0), (executingSide.HasBloodFeud, executingSide.ExecutionsDoneCount, executingSide.ExecutionsReceivedCount));
-            Assert.Equal((false, 0, 0), (executedSide.HasBloodFeud, executedSide.ExecutionsDoneCount, executedSide.ExecutionsReceivedCount));
         });
     }
 
