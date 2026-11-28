@@ -67,23 +67,31 @@ public class WarDeclaredInTownTests : SyncTestBase
         playerClient.Call(() => Assert.Null(PlayerEncounter.Current));
     }
 
-    // An offline player has no client to open the slink away menu, whether it was offline at the war or drops before continuing
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void OfflinePlayerInHostileTown_ServerEjectsParty(bool dropsAfterWar)
+    // An offline player has no client to open the slink away menu, so the stance change ejects its party
+    [Fact]
+    public void OfflineAtWar_ServerEjectsParty()
     {
-        var playerClient = Clients.First();
-        var player = CreatePlayer(dropsAfterWar ? playerClient : null, "player");
+        var player = CreatePlayer(null, "player");
         var (settlementId, townClanId) = CreateTownWith(player);
 
         DeclareWar(townClanId, player);
-        if (dropsAfterWar)
-        {
-            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPartyLeaveSettlement>());
-            Server.SimulateMessage(this, new PlayerDisconnected(playerClient.NetPeer, default));
-            Flush();
-        }
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPartyLeaveSettlement>());
+        AssertInTown(player.MobilePartyId, settlementId, inTown: false);
+    }
+
+    // A player who drops before pressing continue leaves no client to open the menu, so parking its party ejects it
+    [Fact]
+    public void DropsBeforeSlinkAwayContinue_ServerEjectsPartyOnPark()
+    {
+        var playerClient = Clients.First();
+        var player = CreatePlayer(playerClient, "player");
+        var (settlementId, townClanId) = CreateTownWith(player);
+
+        DeclareWar(townClanId, player);
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPartyLeaveSettlement>());
+        Server.SimulateMessage(this, new PlayerDisconnected(playerClient.NetPeer, default));
+        Flush();
 
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPartyLeaveSettlement>());
         AssertInTown(player.MobilePartyId, settlementId, inTown: false);
