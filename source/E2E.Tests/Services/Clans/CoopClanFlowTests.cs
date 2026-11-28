@@ -3,6 +3,10 @@ using Common.Network;
 using Common.Util;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Services.MapEvents;
+using E2E.Tests.Util;
+using GameInterface.CoopSessionData;
+using GameInterface.Services.BloodFeuds.Data;
+using GameInterface.Services.BloodFeuds.Messages;
 using GameInterface.Services.Buildings.Messages;
 using GameInterface.Services.Buildings.Patches;
 using GameInterface.Services.Clans;
@@ -326,6 +330,47 @@ public class CoopClanFlowTests : MapEventTestBase, IDisposable
                 Assert.NotSame(Get<Hero>(instance, companionId), party.Scout);
             });
         }
+    }
+
+    [Fact]
+    public void Join_BothClansFeudWithTheCompanionsCaptor_TheLeadersClanTakesOverThePendingExecution()
+    {
+        var companionId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var captorClanId = TestEnvironment.CreateRegisteredObject<Clan>();
+        long executionDateTicks = 0;
+        Server.Call(() =>
+        {
+            var companion = Get<Hero>(Server, companionId);
+            var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
+            var town = GameObjectCreator.CreateInitializedObject<Town>();
+            using (new AllowedThread())
+            {
+                companion.CompanionOf = Get<Hero>(Server, member.HeroId).Clan;
+                settlement.Town = town;
+                settlement.SetSettlementComponent(town);
+                town.OwnerClan = Get<Clan>(Server, captorClanId);
+            }
+            TakePrisonerAction.Apply(settlement.Party, companion);
+
+            var data = Server.Resolve<ICoopSessionProvider>().CoopSession.BloodFeudPlayerData;
+            data.PlayerClanBloodFeuds[member.ClanId] = new() { [captorClanId] = new BloodFeudData { HasBloodFeud = true } };
+            data.PlayerClanBloodFeuds[leader.ClanId] = new() { [captorClanId] = new BloodFeudData { HasBloodFeud = true } };
+            executionDateTicks = CampaignTime.DaysFromNow(3).NumTicks;
+            data.PlayerClanPendingSettlementExecutions[member.ClanId] = new() { [companionId] = new PendingSettlementExecution(captorClanId, executionDateTicks) };
+        });
+        leaderClient.InternalMessages.Clear();
+
+        Join();
+
+        Server.Call(() =>
+        {
+            var data = Server.Resolve<ICoopSessionProvider>().CoopSession.BloodFeudPlayerData;
+            Assert.Empty(data.PlayerClanPendingSettlementExecutions[member.ClanId]);
+            var moved = data.PlayerClanPendingSettlementExecutions[leader.ClanId][companionId];
+            Assert.Equal((captorClanId, executionDateTicks), (moved.CapturerClanId, moved.ExecutionDateTicks));
+        });
+        var notice = Assert.Single(leaderClient.InternalMessages.GetMessages<NetworkNotifyBloodFeudSettlementExecutionStarted>());
+        Assert.Equal(companionId, notice.ClanMemberId);
     }
 
     // A03, A04, A08: transfer into empty/occupied warehouses, including a harmless repeated transfer.
