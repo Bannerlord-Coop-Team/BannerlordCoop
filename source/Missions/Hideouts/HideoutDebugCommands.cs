@@ -67,10 +67,13 @@ internal static class HideoutDebugCommands
     }
 
     /// <summary>Has the nearest sentry spot this client's hero, the way a sentry that sees the player alarms itself.</summary>
-    public sealed class AlarmCoopCommand : ICoopCommand
+    public sealed class AlarmNearestSentryCoopCommand : ICoopCommand
     {
+        // AlarmedBehaviorGroup's AlarmFactor cap, the value its sighting branch sets.
+        private const float FullAlarmFactor = 2f;
+
         public string Prefix => "coop.debug.hideout";
-        public string Name => "alarm";
+        public string Name => "alarm_nearest_sentry";
         public string Description => "On the battle host, has the nearest sentry spot this client's hero in a stealth hideout.";
         public CoopCommandSide Side => CoopCommandSide.Client;
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
@@ -87,19 +90,20 @@ internal static class HideoutDebugCommands
             var hero = mission.MainAgent;
             if (hero?.IsActive() != true)
                 return Failed("This client's hero isn't on the field.", "hero_unavailable");
+            static AlarmedBehaviorGroup GetAlarm(Agent agent)
+                => agent.GetComponent<CampaignAgentComponent>()?.AgentNavigator?.GetBehaviorGroup<AlarmedBehaviorGroup>();
+
             var sentry = mission.Agents
-                .Where(agent => agent.IsActive() && agent.IsHuman && agent.Team?.Side == BattleSideEnum.Defender)
-                .Select(agent => (agent, alarm: agent.GetComponent<CampaignAgentComponent>()?.AgentNavigator?.GetBehaviorGroup<AlarmedBehaviorGroup>()))
-                .Where(pair => pair.alarm != null)
-                .OrderBy(pair => pair.agent.Position.DistanceSquared(hero.Position))
+                .Where(agent => agent.IsActive() && agent.IsHuman && agent.Team?.Side == BattleSideEnum.Defender && GetAlarm(agent) != null)
+                .OrderBy(agent => agent.Position.DistanceSquared(hero.Position))
                 .FirstOrDefault();
-            if (sentry.agent == null)
+            if (sentry == null)
                 return Failed("No standing sentry can spot anyone.", "sentry_unavailable");
-            // AlarmedBehaviorGroup's own steps on sighting an enemy: raise the alarm toward the target, then escalate
+            // Close to AlarmedBehaviorGroup's sighting branch: fill the alarm toward the hero, then escalate
             // to Alarmed, which the engine reports through OnAgentAlarmedStateChanged.
-            sentry.alarm.AddAlarmFactor(2f, hero.GetWorldPosition());
-            sentry.agent.SetAlarmState(Agent.AIStateFlag.Alarmed);
-            return new CoopCommandResult(true, $"Sentry {sentry.agent.Index} spotted the hero.");
+            GetAlarm(sentry).AddAlarmFactor(FullAlarmFactor, hero.GetWorldPosition());
+            sentry.SetAlarmState(Agent.AIStateFlag.Alarmed);
+            return new CoopCommandResult(true, $"Sentry {sentry.Index} spotted the hero.");
         }
     }
 
@@ -119,6 +123,7 @@ internal static class HideoutDebugCommands
             var areas = mission.GetMissionBehavior<CoopHideoutStealthAreaLogic>();
             var humans = mission.Agents.Where(agent => agent.IsActive() && agent.IsHuman).ToArray();
             var attackers = humans.Where(agent => agent.Team?.Side == BattleSideEnum.Attacker).ToArray();
+            var troops = attackers.Where(agent => !CoopHideoutMissionLogic.IsPlayerHero(agent)).ToArray();
             var defenders = humans.Where(agent => agent.Team?.Side == BattleSideEnum.Defender).ToArray();
             // Used is this machine's fire, Called is set only where the call troops request ran, on the battle host.
             var fires = mission.ActiveMissionObjects.FindAllWithType<StealthAreaUsePoint>()
@@ -136,9 +141,8 @@ internal static class HideoutDebugCommands
                 BattleHost = logic.IsAuthority,
                 Fires = fires,
                 PlayerHeroes = attackers.Count(CoopHideoutMissionLogic.IsPlayerHero),
-                PlayerTroops = attackers.Count(agent => !CoopHideoutMissionLogic.IsPlayerHero(agent) &&
-                    agent.Origin?.BattleCombatant == PartyBase.MainParty),
-                AttackerTroops = attackers.Count(agent => !CoopHideoutMissionLogic.IsPlayerHero(agent)),
+                PlayerTroops = troops.Count(agent => agent.Origin?.BattleCombatant == PartyBase.MainParty),
+                AttackerTroops = troops.Length,
                 ActiveSentries = native.ActiveSentryCount,
                 ActiveDefenders = defenders.Length,
                 // Alarm state lives on the battle host; a peer's puppets don't carry it.
