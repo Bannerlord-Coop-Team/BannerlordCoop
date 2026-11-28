@@ -110,24 +110,20 @@ internal class SiegeAftermathPatches
     internal static readonly ConcurrentDictionary<Settlement, PendingAftermath> PendingAftermaths = new ConcurrentDictionary<Settlement, PendingAftermath>();
 
     /// <summary>
-    /// True when this map event captured a settlement for a co-op player. The same winner/settlement
-    /// computation OnMapEventEndedPrefix uses; BattleFinalizeHandler calls it to keep the capturing
-    /// player's encounter open, and SiegeCaptureEntryPatches to enter the leader into the captured
-    /// settlement after finalization.
+    /// The co-op player's party that captured a settlement in this map event, or null when it isn't a player
+    /// capture. The same winner/settlement computation OnMapEventEndedPrefix uses; BattleFinalizeHandler calls
+    /// it to keep the capturing player's encounter open, and SiegeCaptureEntryPatches to enter the leader into
+    /// the captured settlement after finalization.
     /// </summary>
-    internal static bool TryGetPlayerCaptureLeader(MapEvent mapEvent, out MobileParty leaderParty, out Settlement settlement)
+    internal static MobileParty GetPlayerCaptureLeader(MapEvent mapEvent)
     {
-        leaderParty = null;
-        settlement = null;
-        if (mapEvent == null) return false;
-        if (!TryGetAftermathSide(mapEvent, out var battleSide)) return false;
+        if (mapEvent == null) return null;
+        if (!TryGetAftermathSide(mapEvent, out var battleSide)) return null;
 
-        var lp = mapEvent.GetMapEventSide(battleSide)?.LeaderParty?.MobileParty;
-        if (lp?.LeaderHero == null || !lp.LeaderHero.IsPlayerHero()) return false;
+        var leaderParty = mapEvent.GetMapEventSide(battleSide)?.LeaderParty?.MobileParty;
+        if (leaderParty?.LeaderHero == null || !leaderParty.LeaderHero.IsPlayerHero()) return null;
 
-        leaderParty = lp;
-        settlement = mapEvent.MapEventSettlement;
-        return true;
+        return leaderParty;
     }
 
     // Vanilla's aftermath trigger: a siege assault or sally out at a settlement, won by the attacker

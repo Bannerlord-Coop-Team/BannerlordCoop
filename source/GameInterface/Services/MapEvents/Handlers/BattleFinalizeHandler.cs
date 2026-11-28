@@ -364,7 +364,7 @@ internal class BattleFinalizeHandler : IHandler
             knownPlayerPartyIds,
             MapEventPlayerPartyCollector.CollectPartyIds(mapEvent, objectManager));
 
-        SiegeAftermathPatches.TryGetPlayerCaptureLeader(mapEvent, out var capturingLeader, out _);
+        var capturingLeader = SiegeAftermathPatches.GetPlayerCaptureLeader(mapEvent);
         var excludedIds = CollectExcludedPlayerPartyIds(mapEvent, capturingLeader);
         if (excludedIds.Count > 0)
             playerPartyIds = playerPartyIds.Where(id => !excludedIds.Contains(id)).ToArray();

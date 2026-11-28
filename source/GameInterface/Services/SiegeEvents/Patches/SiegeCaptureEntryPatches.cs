@@ -1,6 +1,8 @@
 ﻿using Common;
+using Common.Logging;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using HarmonyLib;
+using Serilog;
 using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -18,6 +20,8 @@ namespace GameInterface.Services.SiegeEvents.Patches;
 [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.FinalizeEventAux))]
 internal class SiegeCaptureEntryPatches
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<SiegeCaptureEntryPatches>();
+
     [HarmonyPrefix]
     private static void Prefix(MapEvent __instance, bool __runOriginal, out SiegeCapture __state)
     {
@@ -28,12 +32,13 @@ internal class SiegeCaptureEntryPatches
         if (settlement == null) return;
 
         // Read before finalizing clears the battle sides
-        SiegeAftermathPatches.TryGetPlayerCaptureLeader(__instance, out var playerCaptureLeader, out _);
+        var playerCaptureLeader = SiegeAftermathPatches.GetPlayerCaptureLeader(__instance);
         // The parties SiegeCompleted enters, before it removes them from the camp
-        var besiegers = settlement.SiegeEvent?.BesiegerCamp?.GetInvolvedPartiesForEventType().Select(party => party.MobileParty).ToArray();
-        if (playerCaptureLeader == null && besiegers == null) return;
+        var besiegers = settlement.SiegeEvent?.BesiegerCamp?.GetInvolvedPartiesForEventType().Select(party => party.MobileParty).ToArray()
+            ?? Array.Empty<MobileParty>();
+        if (playerCaptureLeader == null && besiegers.Length == 0) return;
 
-        __state = new SiegeCapture(settlement, settlement.MapFaction, besiegers ?? Array.Empty<MobileParty>(), playerCaptureLeader);
+        __state = new SiegeCapture(settlement, settlement.MapFaction, besiegers, playerCaptureLeader);
     }
 
     // Runs after MapEventPatches sends the destroy, otherwise clients still have the parties in the battle and refuse the entry
@@ -44,10 +49,18 @@ internal class SiegeCaptureEntryPatches
         if (!__runOriginal || __state == null) return;
         if (!ContainerProvider.TryResolve<ISiegeEventInterface>(out var siegeEventInterface)) return;
 
-        if (__state.PlayerCaptureLeader != null)
-            siegeEventInterface.EnterPendingCaptureLeader(__state.PlayerCaptureLeader, __state.Settlement);
+        // Caught here, otherwise Finalizer_FinalizeEventAux reports it as a failed finalize and releases a finished battle again
+        try
+        {
+            if (__state.PlayerCaptureLeader != null)
+                siegeEventInterface.EnterPendingCaptureLeader(__state.PlayerCaptureLeader, __state.Settlement);
 
-        siegeEventInterface.EnterAiCapturers(__state.Settlement, __state.FactionBeforeBattle, __state.Besiegers);
+            siegeEventInterface.EnterAiCapturers(__state.Settlement, __state.FactionBeforeBattle, __state.Besiegers);
+        }
+        catch (Exception e)
+        {
+            Logger.Error(e, "Failed to enter the capturers of {Settlement}", __state.Settlement.StringId);
+        }
     }
 
     private class SiegeCapture
