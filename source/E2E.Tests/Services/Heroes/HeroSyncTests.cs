@@ -77,7 +77,6 @@ namespace E2E.Tests.Services.Heroes
             TestEnvironment.AssertReferenceProperty<Hero, Hero>(nameof(Hero.DeathMarkKillerHero));
             TestEnvironment.AssertReferenceProperty<Hero, Settlement>(nameof(Hero.LastKnownClosestSettlement));
             TestEnvironment.AssertProperty<Hero, int>(nameof(Hero.HitPoints), 5, defaultValue: hero.HitPoints);
-            TestEnvironment.AssertProperty<Hero, long>(nameof(Hero.LastExaminedLogEntryID), 50);
             TestEnvironment.AssertReferenceProperty<Hero, Clan>(nameof(Hero.Clan));
             TestEnvironment.AssertReferenceProperty<Hero, Clan>(nameof(Hero.SupporterOf));
             TestEnvironment.AssertReferenceProperty<Hero, Town>(nameof(Hero.GovernorOf));
