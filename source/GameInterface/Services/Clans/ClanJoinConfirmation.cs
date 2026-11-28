@@ -47,7 +47,8 @@ public class ClanJoinConfirmation : IClanJoinConfirmation
             paragraphs.Add(GameTexts.FindText(context == ClanJoinConfirmationContext.JoinRequest
                 ? "str_coop_clan_join_forfeit_warning" : "str_coop_marriage_forfeit_warning").ToString());
         }
-        else if (context != ClanJoinConfirmationContext.JoinRequest)
+
+        if (context != ClanJoinConfirmationContext.JoinRequest)
         {
             paragraphs.Add(GameTexts.FindText("str_coop_marriage_clan_commitment").ToString());
         }
