@@ -165,6 +165,7 @@ public class SiegeKingdomChangeTests : SiegeTestBase
         };
 
         StageKingdomsAtWar(instances, participants, playerKingdomId);
+        LinkPartiesToClans(instances, participants);
         var siege = SetupSiege(campPartyIds);
         var settlementId = StageBesiegedTown(instances, siege.SiegeEventId, participants, defenderPartyId);
         AssertPlayerCanJoin(instances, siege.SiegeEventId, participants.PlayerPartyId, playerSide);
@@ -201,24 +202,43 @@ public class SiegeKingdomChangeTests : SiegeTestBase
             {
                 var besiegers = instance.GetRegisteredObject<Kingdom>(participants.BesiegerKingdomId);
                 var defenders = instance.GetRegisteredObject<Kingdom>(participants.DefenderKingdomId);
+                var playerKingdom = instance.GetRegisteredObject<Kingdom>(playerKingdomId);
                 var besiegerClan = instance.GetRegisteredObject<Clan>(participants.BesiegerClanId);
+                var ownerClan = instance.GetRegisteredObject<Clan>(participants.OwnerClanId);
                 var playerClan = instance.GetRegisteredObject<Clan>(participants.PlayerClanId);
-                var playerHero = instance.GetRegisteredObject<Hero>(participants.PlayerHeroId);
-                var playerParty = instance.GetRegisteredObject<MobileParty>(participants.PlayerPartyId);
 
                 using (new AllowedThread())
                 {
                     KingdomTestSetup.PlaceClanInKingdom(besiegerClan, besiegers);
-                    KingdomTestSetup.PlaceClanInKingdom(
-                        instance.GetRegisteredObject<Clan>(participants.OwnerClanId), defenders);
-                    KingdomTestSetup.PlaceClanInKingdom(playerClan, instance.GetRegisteredObject<Kingdom>(playerKingdomId));
+                    KingdomTestSetup.PlaceClanInKingdom(ownerClan, defenders);
+                    KingdomTestSetup.PlaceClanInKingdom(playerClan, playerKingdom);
+                    VillageHostileFactionStanceHelper.ApplyWarStance(besiegers, defenders);
+                }
+            });
+        }
+    }
+
+    // Makes the player hero lead its named clan and party, and gives the lord party the besieger clan.
+    private static void LinkPartiesToClans(IReadOnlyList<EnvironmentInstance> instances, SiegeParticipants participants)
+    {
+        foreach (var instance in instances)
+        {
+            instance.Call(() =>
+            {
+                var besiegerClan = instance.GetRegisteredObject<Clan>(participants.BesiegerClanId);
+                var playerClan = instance.GetRegisteredObject<Clan>(participants.PlayerClanId);
+                var playerHero = instance.GetRegisteredObject<Hero>(participants.PlayerHeroId);
+                var playerParty = instance.GetRegisteredObject<MobileParty>(participants.PlayerPartyId);
+                var leaderParty = instance.GetRegisteredObject<MobileParty>(participants.LeaderPartyId);
+
+                using (new AllowedThread())
+                {
                     playerClan.Name = new TextObject("joiner clan");
                     playerHero.Clan = playerClan;
                     playerClan.SetLeader(playerHero);
                     playerHero.PartyBelongedTo = playerParty;
                     playerParty.ActualClan = playerClan;
-                    instance.GetRegisteredObject<MobileParty>(participants.LeaderPartyId).ActualClan = besiegerClan;
-                    VillageHostileFactionStanceHelper.ApplyWarStance(besiegers, defenders);
+                    leaderParty.ActualClan = besiegerClan;
                 }
             });
         }

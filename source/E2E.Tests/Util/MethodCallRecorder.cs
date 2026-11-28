@@ -9,6 +9,7 @@ internal interface IMethodCallRecorder : IDisposable
     int Count { get; }
     int CountFor(EnvironmentInstance instance);
     string[] MenusFor(EnvironmentInstance instance);
+    string[] CallsFor(EnvironmentInstance instance);
     string[] TextsFor(EnvironmentInstance instance);
     void Clear();
 }
