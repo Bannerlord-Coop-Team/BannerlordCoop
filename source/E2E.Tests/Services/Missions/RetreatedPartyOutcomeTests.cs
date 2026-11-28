@@ -5,6 +5,7 @@ using E2E.Tests.Util;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Participation;
 using GameInterface.Services.MapEvents.Patches;
+using GameInterface.Services.Players;
 using HarmonyLib;
 using Missions.Messages;
 using TaleWorlds.CampaignSystem;
@@ -180,6 +181,51 @@ public class RetreatedPartyOutcomeTests : MissionTestEnvironment
 
             Assert.Equal(expectedRenown, enemyMapEventParty.GainedRenown, precision: 5);
             Assert.Equal(expectedInfluence, enemyMapEventParty.GainedInfluence, precision: 5);
+        }, MapEventDisabledMethods);
+    }
+
+    [Theory]
+    [InlineData(10)]
+    [InlineData(100)]
+    public void AlliedPlayerRetreatsStrongerThanAtJoin_AllyLaterLoses_WinnerRewardsAreNotNegativeOrNaN(int retreaterTroops)
+    {
+        var setup = SetupBattle();
+        Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(EnemyController, out var enemy));
+        SeedHeroInParty(enemy.HeroId, setup.EnemyPartyId);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(setup.MapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(setup.EnemyPartyId, out var enemyParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(setup.RetreaterPartyId, out var retreaterParty));
+            var troop = GameObjectCreator.CreateInitializedObject<CharacterObject>();
+            enemyParty.MemberRoster.AddToCounts(troop, 10);
+            retreaterParty.MemberRoster.AddToCounts(troop, retreaterTroops);
+            enemyParty.LeaderHero.Clan.Kingdom = GameObjectCreator.CreateInitializedObject<Kingdom>();
+
+            // Under 30 morale the retreater's troops count at 0.7 when it joins, and its morale recovers before the end
+            retreaterParty.RecentEventsMorale = -100f;
+            mapEvent.RecalculateStrengthOfSides();
+            retreaterParty.RecentEventsMorale = 100f;
+        }, MapEventDisabledMethods);
+
+        EnterBattle(Clients.ElementAt(1), setup.MapEventId);
+        EnterBattle(Clients.ElementAt(2), setup.MapEventId);
+        DepartBattle(RetreaterController, setup.MapEventId, wasRetreat: true);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(setup.MapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(setup.EnemyPartyId, out var enemyParty));
+            MapEventParty enemyMapEventParty = mapEvent.AttackerSide.Parties.Single(party => ReferenceEquals(party.Party, enemyParty.Party));
+
+            // The field, because the setter also commits the results and captures the losers before this runs
+            mapEvent._battleState = BattleState.AttackerVictory;
+            mapEvent.CalculateMapEventResults();
+
+            Assert.True(enemyMapEventParty.GainedRenown >= 0f);
+            Assert.True(enemyMapEventParty.GainedInfluence >= 0f);
+            Assert.True(enemyMapEventParty.GainedMorale > 0f);
         }, MapEventDisabledMethods);
     }
 

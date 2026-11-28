@@ -283,6 +283,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<PlayerPartyTradeOfferResolver>().As<IPlayerPartyTradeOfferResolver>().InstancePerDependency();
         builder.RegisterType<LeaderlessClanResolver>().As<ILeaderlessClanResolver>().InstancePerDependency();
         builder.RegisterType<EmptyLordPartyResetter>().As<IEmptyLordPartyResetter>().InstancePerDependency();
+        builder.RegisterType<BattleRewardLoadRepairer>().As<IBattleRewardLoadRepairer>().InstancePerDependency();
         builder.RegisterType<EncounterMenuConditionRefresher>().As<IEncounterMenuConditionRefresher>().InstancePerDependency();
         builder.RegisterType<MenuOptionsRefresher>().As<IMenuOptionsRefresher>().InstancePerDependency();
         builder.RegisterType<PartyScreenRosterRefresher>().As<IPartyScreenRosterRefresher>().InstancePerDependency();

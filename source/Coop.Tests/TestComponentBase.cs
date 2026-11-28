@@ -127,6 +127,7 @@ internal abstract class TestComponentBase
         RegisterMock<IMapEventLoadCleaner>(builder);
         RegisterMock<ILeaderlessClanResolver>(builder);
         RegisterMock<IEmptyLordPartyResetter>(builder);
+        RegisterMock<IBattleRewardLoadRepairer>(builder);
         RegisterMock<IHideoutEncounterHold>(builder);
         RegisterPlayerManagerMock(builder);
         RegisterMock<IPlayerPartyRestorer>(builder);

@@ -38,7 +38,7 @@ public sealed class InitialServerStateNavalStartupTests : IDisposable
         using var broker = new MessageBroker();
         using var state = new InitialServerState(Mock.Of<IServerLogic>(), broker, Mock.Of<IRegistryManager>(),
             Mock.Of<IMapEventLoadCleaner>(), Mock.Of<ILeaderlessClanResolver>(),
-            Mock.Of<IEmptyLordPartyResetter>(), Mock.Of<IModuleInfoProvider>(), Mock.Of<IModuleValidator>(),
+            Mock.Of<IEmptyLordPartyResetter>(), Mock.Of<IBattleRewardLoadRepairer>(), Mock.Of<IModuleInfoProvider>(), Mock.Of<IModuleValidator>(),
             game.Object, Mock.Of<ILoadingInterface>());
 
         state.Start();
