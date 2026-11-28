@@ -108,12 +108,12 @@ internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorIn
                     OnPlayerMemberExecutedAHero(player, victim, killer);
                 }
 
-                if (TryGetBloodFeud(player.HeroId, victim.Clan, out var victimClanFeud) && victimClanFeud.HasBloodFeud)
+                if (killer.Clan == player.Clan && TryGetBloodFeud(player.HeroId, victim.Clan, out var victimClanFeud) && victimClanFeud.HasBloodFeud)
                 {
                     victimClanFeud.ExecutionsReceivedCount++;
                     SendBloodFeuds(player.Player);
                 }
-                else if (TryGetBloodFeud(player.HeroId, killer.Clan, out var killerClanFeud) && killerClanFeud.HasBloodFeud)
+                else if (victim.Clan == player.Clan && TryGetBloodFeud(player.HeroId, killer.Clan, out var killerClanFeud) && killerClanFeud.HasBloodFeud)
                 {
                     killerClanFeud.ExecutionsDoneCount++;
                     SendBloodFeuds(player.Player);
