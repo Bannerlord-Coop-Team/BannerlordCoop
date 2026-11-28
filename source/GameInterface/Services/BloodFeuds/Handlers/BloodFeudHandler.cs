@@ -5,6 +5,9 @@ using GameInterface.Services.BloodFeuds.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using Helpers;
+using SandBox.GauntletUI.Map;
+using SandBox.View.Map;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Conversation;
@@ -197,6 +200,11 @@ internal class BloodFeudHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.ClanMemberId, out var clanMember)) return;
             if (!objectManager.TryGetObjectWithLogging<Clan>(data.FeudedClanId, out var feudedClan)) return;
+
+            // Vanilla leaves the pending notice counting down when the execution is cancelled while the hero stays imprisoned
+            var pendingNotice = MapScreen.Instance?.GetMapView<GauntletMapNotificationView>()?._dataSource?.NotificationItems
+                .FirstOrDefault(item => item.Data is BloodFeudClanMemberCapturedMapNotification notice && notice.CaptiveHero == clanMember && notice.Settlement != null);
+            pendingNotice?.ExecuteRemove();
 
             TextObject textObject = new TextObject("{=*}Your {RELATION} {CLAN_MEMBER.NAME} is no longer at risk of being executed as part of your blood feud with {FEUDED_CLAN}.");
             StringHelpers.SetCharacterProperties("CLAN_MEMBER", clanMember.CharacterObject, textObject);
