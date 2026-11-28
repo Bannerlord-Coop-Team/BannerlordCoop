@@ -28,7 +28,7 @@ public class PlayerPartyRestoreDisbandTests : MapEventTestBase
     // Outlasts the one-day wait native OnPartyDisbandStarted gives a party before it is marked disbanding
     private const int HoursPastDisbandWait = 25;
 
-    private DisbandPartyCampaignBehavior disbandBehavior = null!;
+    private readonly DisbandPartyCampaignBehavior disbandBehavior;
 
     public enum StaleDisband
     {
@@ -38,6 +38,12 @@ public class PlayerPartyRestoreDisbandTests : MapEventTestBase
 
     public PlayerPartyRestoreDisbandTests(ITestOutputHelper output) : base(output)
     {
+        disbandBehavior = new DisbandPartyCampaignBehavior();
+        Server.Call(() =>
+        {
+            Campaign.Current.AddCampaignBehaviorManager(new CampaignBehaviorManager(new CampaignBehaviorBase[] { disbandBehavior }));
+            disbandBehavior.RegisterEvents();
+        });
     }
 
     /// <summary>
@@ -50,7 +56,6 @@ public class PlayerPartyRestoreDisbandTests : MapEventTestBase
     public void Rejoin_PartyLeftDisbanding_CancelsTheDisband(StaleDisband staleDisband)
     {
         var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
-        InstallDisbandBehavior();
         StartDisbandBeforeRegistration(partyId, staleDisband);
 
         var heroId = RegisterOwnerAsPlayer(DefenderControllerId, partyId);
@@ -71,7 +76,6 @@ public class PlayerPartyRestoreDisbandTests : MapEventTestBase
         var siege = CreateSiegeMapEvent(MapEvent.BattleTypes.Siege);
         var partyId = siege.DefenderPartyId;
         var defenderClient = Clients.Last();
-        InstallDisbandBehavior();
         StartDisbandBeforeRegistration(partyId, StaleDisband.Disbanding);
 
         RegisterOwnerAsPlayer(BesiegerControllerId, siege.AttackerPartyId);
@@ -121,16 +125,6 @@ public class PlayerPartyRestoreDisbandTests : MapEventTestBase
 
         RegisterAsPlayerParty(controllerId, heroId!, partyId, clanId!, characterObjectId!);
         return heroId!;
-    }
-
-    private void InstallDisbandBehavior()
-    {
-        Server.Call(() =>
-        {
-            disbandBehavior = new DisbandPartyCampaignBehavior();
-            Campaign.Current.AddCampaignBehaviorManager(new CampaignBehaviorManager(new CampaignBehaviorBase[] { disbandBehavior }));
-            disbandBehavior.RegisterEvents();
-        });
     }
 
     /// <summary>
