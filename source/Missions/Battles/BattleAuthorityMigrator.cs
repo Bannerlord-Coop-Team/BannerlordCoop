@@ -245,7 +245,7 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
             PromoteReturnedPlayer(info.Agent);
             if (data.MountAgentId != Guid.Empty && registry.TryGetAgentInfo(data.MountAgentId, out var mount)
                 && mount.Agent != null && mount.Agent.IsActive())
-                coopMissionComponent.AgentMovementHandler.Interpolator.Forget(mount.Agent);
+                coopMissionComponent.AgentMovementHandler.Interpolator.Release(mount.Agent);
         }
         else if (wasLocal)
         {
@@ -260,7 +260,7 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
             var mission = Mission.Current;
             if (agent == null || !agent.IsActive() || agent.Mission != mission
                 || agent.Character != Hero.MainHero?.CharacterObject) return;
-            coopMissionComponent.AgentMovementHandler.Interpolator.Forget(agent);
+            coopMissionComponent.AgentMovementHandler.Interpolator.Release(agent);
             if (mission.InitialPlayerAgent == null)
                 mission._initialPlayerAgent = agent;
             if (!deployment.IsCommitted && mission.GetMissionBehavior<DeploymentMissionController>() != null)
@@ -481,8 +481,8 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
             Mission.Current.AllowAiTicking = true;
 
         var interpolator = coopMissionComponent.AgentMovementHandler.Interpolator;
-        interpolator.Forget(agent);
-        if (mount != null) interpolator.Forget(mount);
+        interpolator.Release(agent);
+        if (mount != null) interpolator.Release(mount);
 
         // A drained spawn record of a won hideout's surrendered bandit spawns awake as our own agent, so idle it again
         var hideout = Mission.Current.GetMissionBehavior<CoopHideoutMissionLogic>();
@@ -578,12 +578,8 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
                     var agent = info.Agent;
                     if (agent == null || !agent.IsActive()) continue;
 
-                    // The agent is no longer a puppet: stop reconciling it toward its former owner's last-reported
-                    // position. The interpolator teleport-lerps every tracked agent back toward its target each
-                    // frame, so a stale target overrides the AI and pins the agent in place — the "adopted troops
-                    // don't move after host migration" freeze. A mounted puppet is tracked by its MOUNT's target,
-                    // so forget that too.
-                    interpolator.Forget(agent);
+                    // No longer a puppet: a kept follow target or frame lock would pin the AI on the old owner's pose.
+                    interpolator.Release(agent);
                     if (agent.MountAgent != null) interpolator.Forget(agent.MountAgent);
 
                     // An adopted MOUNT only changes authority (damage routing + death broadcast now answer to

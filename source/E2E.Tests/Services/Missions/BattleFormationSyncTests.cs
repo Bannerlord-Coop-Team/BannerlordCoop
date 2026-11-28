@@ -122,7 +122,6 @@ public class BattleFormationSyncTests : MissionTestEnvironment
                 owner.Resolve<ICoopMissionComponent>(), session, new CasualtyAttributionMap(),
                 Mock.Of<IBattleDeploymentCoordinator>(), new BattleAgentSpawnBatchCodec(), owner.Resolve<IMissionWeaponDataMapper>());
             var target = mission.DefenderTeam.GetFormation(FormationClass.Ranged).Shell;
-            AccessTools.Field(typeof(Formation), nameof(Formation.FormationIndex)).SetValue(target, FormationClass.Ranged);
 
             for (int i = 0; i < NetworkBattleAgentFormations.MaxUpdates + 1; i++)
             {
@@ -316,7 +315,6 @@ public class BattleFormationSyncTests : MissionTestEnvironment
     private static Guid RegisterHull(INetworkShipRegistry ships, MockTeam team, FormationClass formationClass, Guid shipId = default)
     {
         var formation = team.GetFormation(formationClass).Shell;
-        AccessTools.Field(typeof(Formation), nameof(Formation.FormationIndex)).SetValue(formation, formationClass);
         if (shipId == Guid.Empty) shipId = Guid.NewGuid();
         Assert.True(ships.TryRegister(new NetworkShipInfo(shipId, "owner", null, false, MissionTestObjects.CreateHull(), formation)));
         return shipId;
