@@ -10,6 +10,7 @@ using SandBox.View.Map;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.MapNotificationTypes;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -155,12 +156,7 @@ internal class BloodFeudHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.ExecutedHeroId, out var heroToExecute)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.ClanMemberId, out var clanMember)) return;
 
-            TextObject textObject = new TextObject("{=9OTgBLHx}{CLAN_MEMBER} ordered the execution of {LORD}, continuing the blood feud between the {PLAYER_CLAN} and the {OTHER_CLAN}.");
-            textObject.SetTextVariable("LORD", heroToExecute.Name);
-            textObject.SetTextVariable("CLAN_MEMBER", clanMember.Name);
-            textObject.SetTextVariable("PLAYER_CLAN", Clan.PlayerClan.Name);
-            textObject.SetTextVariable("OTHER_CLAN", heroToExecute.Clan.Name);
-            Campaign.Current.CampaignInformationManager.NewMapNoticeAdded(new BloodFeudClanMemberExecutedLordMapNotification(heroToExecute, clanMember, CampaignTime.Now, textObject));
+            Campaign.Current.GetCampaignBehavior<ExecutionCampaignBehavior>()?.OnPlayerMemberExecutedAHero(heroToExecute, clanMember);
         });
     }
 
@@ -173,11 +169,7 @@ internal class BloodFeudHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.ClanMemberId, out var clanMember)) return;
             if (!objectManager.TryGetObjectWithLogging<Clan>(data.FeudedClanId, out var feudedClan)) return;
 
-            TextObject textObject = new TextObject("{=tOGIagn0}The {FEUDED_CLAN} has captured your {RELATION} {CLAN_MEMBER.NAME}. Unless {?CLAN_MEMBER.GENDER}she{?}he{\\?} is freed, they are likely to execute {?CLAN_MEMBER.GENDER}her{?}him{\\?} within a few days.");
-            StringHelpers.SetCharacterProperties("CLAN_MEMBER", clanMember.CharacterObject, textObject);
-            textObject.SetTextVariable("FEUDED_CLAN", feudedClan.Name);
-            textObject.SetTextVariable("RELATION", ConversationHelper.GetHeroRelationToHeroTextShort(clanMember, Hero.MainHero, uppercaseFirst: false));
-            Campaign.Current.CampaignInformationManager.NewMapNoticeAdded(new BloodFeudClanMemberCapturedMapNotification(clanMember, textObject));
+            Campaign.Current.GetCampaignBehavior<ExecutionCampaignBehavior>()?.ShowClanMemberCapturedByFeudedClanNotification(clanMember, feudedClan);
         });
     }
 
