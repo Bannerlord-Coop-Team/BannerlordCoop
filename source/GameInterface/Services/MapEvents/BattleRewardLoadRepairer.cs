@@ -35,6 +35,8 @@ internal sealed class BattleRewardLoadRepairer : IBattleRewardLoadRepairer
             if (!float.IsNaN(party._moraleDueToEvents)) continue;
 
             party._moraleDueToEvents = 0f;
+            // The load already cached a NaN estimated strength from the NaN morale, and that cache only refreshes on roster changes
+            party.Party._lastEstimatedStrengthVersionNo = -1;
             repaired++;
             logger.Warning("Reset NaN morale of party {PartyId} after load", party.StringId);
         }
