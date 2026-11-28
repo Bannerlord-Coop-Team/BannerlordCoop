@@ -224,7 +224,7 @@ internal sealed class HideoutRaidHandler : IHandler
             return Reject(request, "Your party is already in another battle.");
         if (party.Party.MapEventSide != null && !ReferenceEquals(party.Party.MapEventSide, mapEvent?.AttackerSide))
             return Reject(request, "Your party is already fighting against this attack.");
-        if (!joining && (!settlement.Hideout.IsInfested || !settlement.Hideout.NextPossibleAttackTime.IsPast))
+        if (!joining && !preparation.CanBeAttacked(settlement))
             return Reject(request, "This hideout cannot be attacked yet.");
         if (!joining && preparation.GetState(settlement, party) == HideoutEntryState.Waiting)
             return Reject(request, $"Waiting for {preparation.GetAttackLeader(settlement)?.Name} to set up their attack.");

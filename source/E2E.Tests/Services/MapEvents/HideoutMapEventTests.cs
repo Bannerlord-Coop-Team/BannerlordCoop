@@ -406,7 +406,7 @@ public class HideoutMapEventTests : MapEventTestBase
             foreach (var banditParty in settlement.Parties.Where(party => party.IsBandit).ToList())
                 banditParty.CurrentSettlement = null;
 
-            Assert.False(settlement.Hideout.IsInfested);
+            Assert.DoesNotContain(settlement.Parties, party => party.IsBandit);
             Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(client.NetPeer, out var registeredPlayer));
             Assert.Equal(playerHeroId, registeredPlayer.HeroId);
             Assert.Equal(playerPartyId, registeredPlayer.MobilePartyId);

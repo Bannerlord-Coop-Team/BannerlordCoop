@@ -11,12 +11,16 @@ using TaleWorlds.Core;
 
 namespace GameInterface.Services.Hideouts;
 
+/// <summary>Answers whether a hideout can be attacked and which entry state a player party sees while an attack is set up.</summary>
 internal interface IHideoutPreparation
 {
     Hero GetAttackLeader(Settlement settlement);
     HideoutEntryState GetState(Settlement settlement, MobileParty party);
+    bool HasBandits(Settlement settlement);
+    bool CanBeAttacked(Settlement settlement);
 }
 
+/// <summary>Reads hideout attack eligibility and attack setup state from the settlement and the registered players.</summary>
 internal sealed class HideoutPreparation : IHideoutPreparation
 {
     private readonly IPlayerManager players;
@@ -53,6 +57,13 @@ internal sealed class HideoutPreparation : IHideoutPreparation
         var preparing = GetPreparingParty(settlement);
         return preparing != null && preparing != party ? HideoutEntryState.Waiting : HideoutEntryState.Start;
     }
+
+    /// <summary>Whether any bandit party is inside. Not Hideout.IsInfested, which needs more parties than native attacks do.</summary>
+    public bool HasBandits(Settlement settlement) => settlement.Parties.Any(party => party.IsBandit);
+
+    /// <summary>Matches the native hideout attack menus: a bandit party is inside and the cooldown is over.</summary>
+    public bool CanBeAttacked(Settlement settlement) =>
+        HasBandits(settlement) && settlement.Hideout.NextPossibleAttackTime.IsPast;
 }
 
 internal enum HideoutEntryState
