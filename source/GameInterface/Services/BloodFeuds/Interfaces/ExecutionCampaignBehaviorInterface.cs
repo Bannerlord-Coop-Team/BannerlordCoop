@@ -244,9 +244,12 @@ internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorIn
 
         if (newPlayerClan != null && !hero.IsPlayerHero())
         {
-            if (movedExecution != null && hero.PartyBelongedToAsPrisoner?.Settlement != null &&
-                objectManager.TryGetObject<Clan>(movedExecution.CapturerClanId, out var capturerClan) &&
-                HasBloodFeud(newPlayerClan.ClanId, capturerClan))
+            Clan capturerClan = null;
+            bool newClanTakesOverExecution = movedExecution != null && hero.PartyBelongedToAsPrisoner?.Settlement != null &&
+                objectManager.TryGetObject(movedExecution.CapturerClanId, out capturerClan) &&
+                HasBloodFeud(newPlayerClan.ClanId, capturerClan);
+
+            if (newClanTakesOverExecution)
             {
                 StartClanMemberExecutionAtSettlement(newPlayerClan, hero, capturerClan, new CampaignTime(movedExecution.ExecutionDateTicks));
             }
@@ -300,6 +303,7 @@ internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorIn
             {
                 KillCharacterAction.ApplyByExecution(hero, capturerClan.Leader);
             }
+            // A pending settlement execution replaces the daily roll, like vanilla's else
             return;
         }
 
@@ -336,7 +340,8 @@ internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorIn
 
                 PartyBase captorParty = hero.PartyBelongedToAsPrisoner;
                 Hero captor = captorParty?.LeaderHero;
-                if (!hero.IsPrisoner || captor == null || IsHeldByPlayer(captorParty) || captorParty.MapEvent != null || captor.Clan != playerClan.Clan) continue;
+                if (!hero.IsPrisoner || captor == null || captor.Clan != playerClan.Clan) continue;
+                if (IsHeldByPlayer(captorParty) || captorParty.MapEvent != null) continue;
                 if (MBRandom.RandomFloat > 0.125f) continue;
 
                 KillCharacterAction.ApplyByExecution(hero, captor);
@@ -589,7 +594,9 @@ internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorIn
 
         Settlement prison = hero.PartyBelongedToAsPrisoner?.Settlement;
 
-        if (pendingClan != null && HasBloodFeud(playerClan.ClanId, pendingClan) && prison?.OwnerClan.MapFaction == pendingClan.MapFaction && !pendingClan.IsEliminated)
+        bool pendingClanCanStillExecute = pendingClan != null && HasBloodFeud(playerClan.ClanId, pendingClan) &&
+            prison?.OwnerClan.MapFaction == pendingClan.MapFaction && !pendingClan.IsEliminated;
+        if (pendingClanCanStillExecute)
         {
             currentExecutorClan = pendingClan;
             return true;

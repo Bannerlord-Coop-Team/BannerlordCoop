@@ -1166,7 +1166,7 @@ public class HeroDebugCommand
 
             if (relationChange != 0)
             {
-                CampaignEventDispatcher.Instance.OnHeroRelationChanged(hero1, hero2, relationChange, false, ChangeRelationAction.ChangeRelationDetail.Default, hero1, hero2);
+                CampaignEventDispatcher.Instance.OnHeroRelationChanged(hero1, hero2, relationChange, showNotification: false, ChangeRelationAction.ChangeRelationDetail.Default, hero1, hero2);
             }
 
             return Succeeded($"Set relation between '{hero1.Name}' and '{hero2.Name}' to {CharacterRelationManager.GetHeroRelation(hero1, hero2)}");
