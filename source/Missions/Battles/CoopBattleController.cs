@@ -21,6 +21,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
@@ -439,6 +440,14 @@ public class CoopBattleController : CoopMissionController
     {
         var battleEndLogic = ManagedBattleEndLogic();
         if (battleEndLogic == null || !ResultCommitter.TryGetResolvedState(out var state)) return;
+
+        // The host counted the defenders falling back to the keep; this client ends the walls the same way.
+        if (state == BattleState.DefenderPullBack && battleEndLogic is CoopSiegeWallsEndLogic wallsEnd)
+        {
+            wallsEnd.AcceptPullBack();
+            return;
+        }
+
         if (state != BattleState.AttackerVictory && state != BattleState.DefenderVictory) return;
 
         bool playerWon = (state == BattleState.AttackerVictory) == (Mission.PlayerTeam.Side == BattleSideEnum.Attacker);

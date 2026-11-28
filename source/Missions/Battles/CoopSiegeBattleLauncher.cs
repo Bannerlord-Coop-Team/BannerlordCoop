@@ -4,6 +4,7 @@ using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.MapEvents.Extensions;
 using SandBox.Missions.MissionLogics;
 using SandBox.Missions.MissionLogics.Towns;
 using Serilog;
@@ -26,10 +27,9 @@ namespace Missions.Battles;
 
 /// <summary>
 /// Coop replacement for <c>SandBoxMissions.OpenSiegeMissionWithDeployment</c> for walls assaults and
-/// siege-engine ambushes, with the same coop swaps as <see cref="CoopFieldBattleLauncher"/>. It opens under the
-/// exact name "SiegeMissionWithDeployment" so the native siege view stack attaches. BattleEndLogic
-/// deliberately does not arm the defender pull-back: the lords-hall stage is not supported, so the
-/// walls mission only ends in the resolved victory states the result-commit flow already handles.
+/// siege-engine ambushes, and for <c>SandBoxMissions.OpenSiegeLordsHallFightMission</c> for the keep after the
+/// walls, with the same coop swaps as <see cref="CoopFieldBattleLauncher"/>. Each opens under the native mission
+/// name so the native view stack attaches.
 /// </summary>
 internal class CoopSiegeBattleLauncher : ICoopSiegeBattleLauncher
 {
@@ -113,7 +113,7 @@ internal class CoopSiegeBattleLauncher : ICoopSiegeBattleLauncher
                 new BattleSpawnLogic(isSallyOut ? "sally_out_set" : "battle_set"),
                 new MissionOptionsComponent(),
                 new CampaignMissionComponent(),
-                new BattleEndLogic(),
+                CreateWallsEndLogic(mapEvent, isSallyOut),
                 new BattleReinforcementsSpawnController(),
                 new MissionCombatantsLogic(
                     (IEnumerable<IBattleCombatant>)mapEvent.InvolvedParties,
@@ -174,6 +174,74 @@ internal class CoopSiegeBattleLauncher : ICoopSiegeBattleLauncher
         mission.SetPlayerCanTakeControlOfAnotherAgentWhenDead();
         Logger.Information("[BattleSync] Opened coop siege battle for {MapEventId} (player side {Side}, sallyOut={SallyOut})",
             mapEventId, PartyBase.MainParty.Side, isSallyOut);
+        return mission;
+    }
+
+    // Vanilla arms the defenders' fall back to the keep for an attacking player. The server opens the keep only for
+    // attacking players with no player defending, so the walls keep their plain end otherwise.
+    private static BattleEndLogic CreateWallsEndLogic(MapEvent mapEvent, bool isSallyOut)
+    {
+        if (isSallyOut || PartyBase.MainParty.Side != BattleSideEnum.Attacker || !mapEvent.CanFallBackToKeep())
+            return new BattleEndLogic();
+
+        Logger.Information("[BattleSync] Armed the defender pull-back to the keep for {Settlement}",
+            mapEvent.MapEventSettlement.StringId);
+        return new CoopSiegeWallsEndLogic(
+            Campaign.Current.Models.SiegeLordsHallFightModel.DefenderTroopNumberForSuccessfulPullBack);
+    }
+
+    public Mission OpenCoopLordsHallBattle(MissionInitializerRecord rec)
+    {
+        var mapEvent = PlayerEncounter.Battle ?? MobileParty.MainParty?.MapEvent;
+        if (mapEvent == null || !objectManager.TryGetId(mapEvent, out var mapEventId))
+        {
+            Logger.Error("[BattleSync] Cannot open coop keep battle: no resolvable map event");
+            return null;
+        }
+
+        var mission = MissionState.OpenNew("SiegeLordsHallFightMission", rec, (InitializeMissionBehaviorsDelegate)delegate
+        {
+            var defenderSupplier = new CoopTroopSupplier(mapEventId, BattleSideEnum.Defender, objectManager,
+                agentBudget);
+            var attackerSupplier = new CoopTroopSupplier(mapEventId, BattleSideEnum.Attacker, objectManager,
+                agentBudget);
+            CoopTroopSupplierRegistry.Register(defenderSupplier);
+            CoopTroopSupplierRegistry.Register(attackerSupplier);
+
+            return new MissionBehavior[]
+            {
+                new MissionOptionsComponent(),
+                new CampaignMissionComponent(),
+                new BattleEndLogic(),
+                new MissionCombatantsLogic(
+                    (IEnumerable<IBattleCombatant>)mapEvent.InvolvedParties,
+                    PartyBase.MainParty,
+                    mapEvent.GetLeaderParty(BattleSideEnum.Defender),
+                    mapEvent.GetLeaderParty(BattleSideEnum.Attacker),
+                    Mission.MissionTeamAITypeEnum.NoTeamAI,
+                    isPlayerSergeant: false),
+                new AgentHumanAILogic(),
+                new CoopLordsHallFightMissionController(defenderSupplier, attackerSupplier, PartyBase.MainParty.Side,
+                    Campaign.Current.Models.SiegeLordsHallFightModel),
+                new BattleObserverMissionLogic(),
+                new BattleAgentLogic(),
+                new AgentVictoryLogic(),
+                new AmmoSupplyLogic(new List<BattleSideEnum> { BattleSideEnum.Defender }),
+                new MissionHardBorderPlacer(),
+                new MissionBoundaryPlacer(),
+                new MissionBoundaryCrossingHandler(),
+                new EquipmentControllerLeaveLogic(),
+                new BattleMissionAgentInteractionLogic(),
+                new HighlightsController(),
+                new BattleHighlightsController(),
+                new BattleSurgeonLogic(),
+            };
+        }, true, true);
+
+        behaviorAttacher.Attach(mission);
+        messageBroker.Publish(mapEvent, new PlayerEnteredBattle(mapEvent));
+        Logger.Information("[BattleSync] Opened coop keep battle for {MapEventId} (player side {Side})",
+            mapEventId, PartyBase.MainParty.Side);
         return mission;
     }
 }

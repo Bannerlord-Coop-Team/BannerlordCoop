@@ -4,7 +4,7 @@ using ProtoBuf;
 namespace GameInterface.Services.MapEvents.Messages.Start;
 
 /// <summary>
-/// Opens a walls-assault or siege-ambush mission on an authoritative participant. Carries the server's siege inputs,
+/// Opens a walls-assault, keep or siege-ambush mission on an authoritative participant. Carries the server's siege inputs,
 /// rebuilt on each new mission claim and shared by every entrant of that mission so they load the same scene.
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
@@ -26,10 +26,13 @@ internal record NetworkStartSiegeMission : ICommand
     public bool IsSallyOut { get; }
     [ProtoMember(8)]
     public string SettlementId { get; }
+    /// <summary>The keep (lord's hall) battle after the walls, instead of the walls themselves.</summary>
+    [ProtoMember(9)]
+    public bool IsLordsHall { get; }
 
     public NetworkStartSiegeMission(string mapEventId, int wallLevel, float[] wallHitPointRatios,
         SiegeEngineState[] attackerEngines, SiegeEngineState[] defenderEngines, string initiatingPartyId,
-        string settlementId, bool isSallyOut = false)
+        string settlementId, bool isSallyOut = false, bool isLordsHall = false)
     {
         MapEventId = mapEventId;
         WallLevel = wallLevel;
@@ -39,6 +42,7 @@ internal record NetworkStartSiegeMission : ICommand
         InitiatingPartyId = initiatingPartyId;
         SettlementId = settlementId;
         IsSallyOut = isSallyOut;
+        IsLordsHall = isLordsHall;
     }
 }
 

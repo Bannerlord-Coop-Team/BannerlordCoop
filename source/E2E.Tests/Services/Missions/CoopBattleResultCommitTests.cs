@@ -43,8 +43,17 @@ public class CoopBattleResultCommitTests : MissionTestEnvironment
         Assert.Equal(0, report.HostEpoch);
     }
 
-    [Fact]
-    public void SiegeAmbushCompletion_ReportsDefenderPullBackSignal()
+    public static TheoryData<MissionResult> PullBackResults => new()
+    {
+        // A finished siege ambush.
+        new MissionResult(BattleState.DefenderPullBack, playerVictory: true, playerDefeated: false, enemyRetreated: false),
+        // Vanilla ends the walls with a pushed-back result that is neither a victory nor a defeat, and that report opens the keep.
+        MissionResult.CreateDefenderPushedBack(),
+    };
+
+    [Theory]
+    [MemberData(nameof(PullBackResults))]
+    public void PullBackResult_ReportsDefenderPullBackSignal(MissionResult result)
     {
         using var fixture = new MissionEngineFixture();
         var host = Clients.First();
@@ -53,14 +62,10 @@ public class CoopBattleResultCommitTests : MissionTestEnvironment
         host.Call(() =>
         {
             var mock = fixture.CreateMission(host);
-            mock.Shell.MissionResult = new MissionResult(
-                BattleState.DefenderPullBack,
-                playerVictory: true,
-                playerDefeated: false,
-                enemyRetreated: false);
+            mock.Shell.MissionResult = result;
 
             var controller = host.Resolve<CoopBattleController>();
-            controller.Session.TryBegin("ambush");
+            controller.Session.TryBegin("pull-back");
             host.NetworkSentMessages.Clear();
             controller.ResultCommitter.ReportResolvedResult(mock.Shell.MissionResult);
 

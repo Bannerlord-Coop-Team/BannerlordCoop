@@ -29,6 +29,8 @@ public sealed class MockMission
     public int InitialPlayerBuildCount { get; private set; }
     public PartyBase MainParty { get; set; }
     public float DamageToPlayerMultiplier { get; set; } = 1f;
+    /// <summary>What <c>Mission.CurrentTime</c> returns for this shell.</summary>
+    public float CurrentTime { get; set; }
     public bool EndMissionCalled { get; set; }
     public Agent NearbyAgent { get; set; }
     public int AgentFleeingCalls { get; set; }
@@ -155,6 +157,10 @@ public sealed class MockMission
     public bool CloneSpawnEquipmentOnSpawn { get; set; }
 
     public bool DismountRiderOnNextBlow { get; set; }
+
+    /// <summary>While true, <see cref="Mission.SpawnTroop"/> spawns the troop on its side's team instead of reading
+    /// a spawn frame from the scene.</summary>
+    public bool SpawnTroopsOnTeams { get; set; }
 
     /// <summary>Headless replacement for <see cref="Mission.SpawnAgent"/>: mints a skip-ctor agent, mirrors the
     /// build data, assigns a mission-local index, and tracks it.</summary>

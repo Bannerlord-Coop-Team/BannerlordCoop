@@ -1,5 +1,4 @@
-﻿using GameInterface.Configuration;
-using GameInterface.Services.MapEvents.TroopSupply;
+﻿using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using ProtoBuf;
@@ -52,13 +51,15 @@ public sealed class HideoutTroopSelection : IHideoutTroopSelection
 
     private readonly IObjectManager objectManager;
     private readonly IPlayerManager playerManager;
+    private readonly ITroopSelectionRules rules;
     private readonly Dictionary<Settlement, Attempt> attempts = new();
     private readonly object gate = new();
 
-    public HideoutTroopSelection(IObjectManager objectManager, IPlayerManager playerManager)
+    public HideoutTroopSelection(IObjectManager objectManager, IPlayerManager playerManager, ITroopSelectionRules rules)
     {
         this.objectManager = objectManager;
         this.playerManager = playerManager;
+        this.rules = rules;
     }
 
     public bool TrySelect(Settlement settlement, MobileParty party, string controllerId, int escortLimit,
@@ -83,54 +84,17 @@ public sealed class HideoutTroopSelection : IHideoutTroopSelection
                 return true;
             }
 
-            var healthy = new Dictionary<string, int>();
-            foreach (var element in party.MemberRoster.GetTroopRoster())
-            {
-                if (element.Character == null || !objectManager.TryGetId(element.Character, out var characterId))
-                    continue;
-
-                var count = element.Number - element.WoundedNumber;
-                if (characterId == player.CharacterObjectId && ModConfigProvider.ModOptions.PlayerWoundedBattleEntry)
-                    count = element.Number;
-                healthy[characterId] = count;
-            }
-
-            if (!healthy.TryGetValue(player.CharacterObjectId, out var heroes) || heroes < 1)
-                return false;
-
-            var selection = new List<HideoutTroopSelectionEntry>
-            {
-                new HideoutTroopSelectionEntry(player.CharacterObjectId, 1),
-            };
-            var selectedCounts = new Dictionary<string, int>();
-            var escorts = 0;
             remaining = attempt == null ? escortLimit : attempt.Limit - attempt.Used;
-            foreach (var entry in requested)
-            {
-                if (string.IsNullOrEmpty(entry.CharacterId) || entry.Count < 1)
-                    return false;
-                if (entry.CharacterId == player.CharacterObjectId)
-                {
-                    if (entry.Count != 1) return false;
-                    continue;
-                }
-
-                selectedCounts.TryGetValue(entry.CharacterId, out var alreadySelected);
-                if (!healthy.TryGetValue(entry.CharacterId, out var available) ||
-                    entry.Count > available - alreadySelected || entry.Count > remaining - escorts)
-                    return false;
-
-                selectedCounts[entry.CharacterId] = alreadySelected + entry.Count;
-                escorts += entry.Count;
-                selection.Add(entry);
-            }
+            var healthy = rules.CountHealthy(party, player.CharacterObjectId);
+            if (!rules.TryAccept(healthy, player.CharacterObjectId, remaining, requested, out var selection, out var escorts))
+                return false;
 
             if (attempt == null)
             {
                 attempt = new Attempt { Limit = escortLimit };
                 attempts.Add(settlement, attempt);
             }
-            accepted = selection.ToArray();
+            accepted = selection;
             attempt.Parties.Add(partyId, accepted.ToArray());
             attempt.Used += escorts;
             remaining = attempt.Limit - attempt.Used;
@@ -193,17 +157,7 @@ public sealed class HideoutTroopSelection : IHideoutTroopSelection
                 return;
             }
 
-            var selected = new List<TroopReserveEntry>();
-            var available = entries.GroupBy(entry => entry.CharacterId)
-                .ToDictionary(group => group.Key, group => new Queue<TroopReserveEntry>(group));
-            foreach (var entry in selection)
-            {
-                if (!available.TryGetValue(entry.CharacterId, out var queue)) continue;
-                for (var count = 0; count < entry.Count && queue.Count > 0; count++)
-                    selected.Add(queue.Dequeue());
-            }
-            entries.Clear();
-            entries.AddRange(selected);
+            rules.TrimReserve(entries, selection);
         }
     }
 

@@ -21,6 +21,7 @@ using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.SiegeEvents.Patches;
 using HarmonyLib;
+using GameInterface.Services.SiegeEvents;
 using Moq;
 using Missions.Battles;
 using Missions.Messages;
@@ -607,7 +608,7 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
                 client.Resolve<INetwork>(),
                 client.Resolve<IMapEventLogger>(),
                 client.Resolve<IBattleMissionInitializerResolver>(),
-                null!, Mock.Of<IBattleHostRetentionPolicy>());
+                null!, Mock.Of<IBattleHostRetentionPolicy>(), Mock.Of<ISiegeKeepRoster>());
 
             try
             {
@@ -880,7 +881,7 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
                 client.Resolve<INetwork>(),
                 client.Resolve<IMapEventLogger>(),
                 resolver,
-                null!, Mock.Of<IBattleHostRetentionPolicy>());
+                null!, Mock.Of<IBattleHostRetentionPolicy>(), Mock.Of<ISiegeKeepRoster>());
 
             try
             {

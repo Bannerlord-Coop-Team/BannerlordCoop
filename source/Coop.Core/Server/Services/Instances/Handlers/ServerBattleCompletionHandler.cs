@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using Common.Network.Messages;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
@@ -11,6 +12,7 @@ using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
+using GameInterface.Services.SiegeEvents.Messages;
 using LiteNetLib;
 using Missions.Messages;
 using Serilog;
@@ -77,6 +79,7 @@ public class ServerBattleCompletionHandler : IHandler
         messageBroker.Subscribe<MapEventFinalized>(Handle_MapEventFinalized);
         messageBroker.Subscribe<BattleStateChangeProcessed>(Handle_BattleStateChangeProcessed);
         messageBroker.Subscribe<CampaignTick>(Handle_CampaignTick);
+        messageBroker.Subscribe<SiegeKeepStageOpened>(Handle_SiegeKeepStageOpened);
     }
 
     public void Dispose()
@@ -92,6 +95,7 @@ public class ServerBattleCompletionHandler : IHandler
         messageBroker.Unsubscribe<MapEventFinalized>(Handle_MapEventFinalized);
         messageBroker.Unsubscribe<BattleStateChangeProcessed>(Handle_BattleStateChangeProcessed);
         messageBroker.Unsubscribe<CampaignTick>(Handle_CampaignTick);
+        messageBroker.Unsubscribe<SiegeKeepStageOpened>(Handle_SiegeKeepStageOpened);
     }
 
     private void Handle_NetworkBattleResultReady(MessagePayload<NetworkBattleResultReady> payload)
@@ -164,8 +168,8 @@ public class ServerBattleCompletionHandler : IHandler
 
         return battleState == BattleState.DefenderPullBack
             && objectManager.TryGetObject<MapEvent>(instanceId, out var mapEvent)
-            && mapEvent.IsSiegeAmbush
-            && mapEvent.BattleState == BattleState.None;
+            && mapEvent.BattleState == BattleState.None
+            && mapEvent.ConcludesPullBackOnServer();
     }
 
     private void Handle_MissionMemberDeparted(MessagePayload<MissionMemberDeparted> payload)
@@ -529,11 +533,7 @@ public class ServerBattleCompletionHandler : IHandler
             mapEvent.BattleState == BattleState.AttackerVictory ||
             mapEvent.BattleState == BattleState.DefenderVictory)
         {
-            conclusionRetries.Remove(mapEventId);
-            keptHostDeadlines.Remove(mapEventId);
-            lock (pendingJoinersGate)
-                pendingJoiners.Remove(mapEventId);
-            completionTracker.Clear(mapEventId);
+            ForgetConclusionState(mapEventId);
             Logger.Warning("Battle conclusion for {Instance} was not applied because the map event is no longer active",
                 mapEventId);
             return;
@@ -611,11 +611,54 @@ public class ServerBattleCompletionHandler : IHandler
             memberCount, concludedState, instanceId, hostEpoch);
         if (concludedState == BattleState.DefenderPullBack)
         {
-            messageBroker.Publish(this, new AuthoritativeSiegeAmbushCompletionRequested(instanceId));
+            // Branch on what can't change between attempts: a retried keep has already moved the siege into the hall.
+            if (objectManager.TryGetObject<MapEvent>(instanceId, out var mapEvent) && mapEvent.IsSiegeAmbush)
+                messageBroker.Publish(this, new AuthoritativeSiegeAmbushCompletionRequested(instanceId));
+            else
+                messageBroker.Publish(this, new AuthoritativeSiegeKeepRequested(instanceId, hostEpoch));
             return;
         }
 
         messageBroker.Publish(this, new AuthoritativeBattleConclusionRequested(instanceId, concludedState, hostEpoch));
+    }
+
+    // The walls instance isnt recorded as concluded, otherwise the keep mission on the same map event id gets
+    // refused. The walls host and reports are dropped too.
+    private void Handle_SiegeKeepStageOpened(MessagePayload<SiegeKeepStageOpened> payload)
+    {
+        var result = payload.What;
+        var mapEventId = result.MapEventId;
+        RunSerialized(() =>
+        {
+            if (!result.Opened)
+            {
+                // Nobody can lead the keep, so the walls end the way an AI-led assault does.
+                Logger.Information("Keep stage for {Instance} did not open; concluding the walls as an attacker victory",
+                    mapEventId);
+                messageBroker.Publish(this, new AuthoritativeBattleConclusionRequested(
+                    mapEventId, BattleState.AttackerVictory, result.HostEpoch));
+                return;
+            }
+
+            if (!missionManager.ReleaseInstanceForNextStage(mapEventId))
+            {
+                // A stalled walls conclusion already rolled back, so its recovery must not retry the walls under the keep.
+                missionManager.TryTakeExpiredConclusion(mapEventId);
+                Logger.Warning("Walls conclusion for {Instance} was no longer concluding when its keep opened", mapEventId);
+            }
+            hostRegistry.Remove(mapEventId);
+            ForgetConclusionState(mapEventId);
+        });
+    }
+
+    // Everything this handler holds for one battle's conclusion: its retry, kept-host deadline, joins and reports.
+    private void ForgetConclusionState(string mapEventId)
+    {
+        conclusionRetries.Remove(mapEventId);
+        keptHostDeadlines.Remove(mapEventId);
+        lock (pendingJoinersGate)
+            pendingJoiners.Remove(mapEventId);
+        completionTracker.Clear(mapEventId);
     }
 
     private void ConcludeAbandonedBattle(

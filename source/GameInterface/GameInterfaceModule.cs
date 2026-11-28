@@ -46,6 +46,7 @@ using GameInterface.Services.MapEvents.NavalScenarios;
 #endif
 using GameInterface.Services.MapEvents.Participation;
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
+using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Commands;
@@ -188,6 +189,10 @@ public class GameInterfaceModule : Module
         builder.RegisterType<Services.Crime.CrimeRatingService>().As<Services.Crime.ICrimeRatingService>().InstancePerDependency();
         builder.RegisterType<PlayerManager>().As<IPlayerManager>().SingleInstance();
         builder.RegisterType<HideoutPreparation>().As<IHideoutPreparation>().InstancePerDependency();
+        builder.RegisterType<TroopSelectionRules>().As<ITroopSelectionRules>().InstancePerDependency();
+        builder.RegisterType<TroopSelectionEntries>().As<ITroopSelectionEntries>().InstancePerDependency();
+        // The battle path only reads the keep roster; its writes go through ISiegeKeepStage.
+        builder.Register<ISiegeKeepRoster>(context => context.Resolve<ISiegeKeepTroopSelection>());
         builder.RegisterType<PartyConfigurationService>().As<IPartyConfigurationService>().InstancePerDependency();
         builder.RegisterType<BugReportService>().As<IBugReportService>().SingleInstance().AutoActivate();
         builder.RegisterType<BugReportOverlay>().As<IBugReportOverlay>().SingleInstance();

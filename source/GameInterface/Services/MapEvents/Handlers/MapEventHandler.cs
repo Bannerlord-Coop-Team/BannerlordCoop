@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.ObjectManager;
@@ -136,9 +137,11 @@ internal class MapEventHandler : IHandler
                     return;
                 }
 
-                // CampaignMissionComponent sets this on an attacker client before its result-ready report. The
-                // server keeps the map event unresolved until the coop completion barrier finalizes the ambush.
-                if (ModInformation.IsServer && battleState == BattleState.DefenderPullBack && mapEvent.IsSiegeAmbush)
+                // CampaignMissionComponent sets this on an attacker client before its result-ready report, and a walls
+                // peer's pull-back report can arrive after the keep opened. The server keeps the map event unresolved
+                // until the coop completion barrier finalizes the ambush or the keep ends.
+                if (ModInformation.IsServer && battleState == BattleState.DefenderPullBack &&
+                    mapEvent.HoldsPullBackOnServer())
                     return;
 
                 // Only the elected battle host's conclusion is authoritative: a non-host's local mission can

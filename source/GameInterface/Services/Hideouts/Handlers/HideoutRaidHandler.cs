@@ -7,6 +7,7 @@ using GameInterface.Services.Hideouts.Messages;
 using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages.Leave;
+using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using Helpers;
@@ -40,13 +41,15 @@ internal sealed class HideoutRaidHandler : IHandler
     private readonly INetworkConfig configuration;
     private readonly IHideoutTroopSelection troopSelection;
     private readonly IHideoutPreparation preparation;
+    private readonly ITroopSelectionEntries selectionEntries;
     private readonly HideoutCampaignConsequencesHandler consequences;
     private readonly Dictionary<MapEvent, HideoutRaidState> raids = new();
     private readonly ConcurrentDictionary<string, PendingEntry> pendingEntries = new();
 
     public HideoutRaidHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager,
         IPlayerManager playerManager, INetworkConfig configuration, IHideoutTroopSelection troopSelection,
-        HideoutCampaignConsequencesHandler consequences, IHideoutPreparation preparation)
+        HideoutCampaignConsequencesHandler consequences, IHideoutPreparation preparation,
+        ITroopSelectionEntries selectionEntries)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -56,6 +59,7 @@ internal sealed class HideoutRaidHandler : IHandler
         this.troopSelection = troopSelection;
         this.consequences = consequences;
         this.preparation = preparation;
+        this.selectionEntries = selectionEntries;
         messageBroker.Subscribe<NetworkHideoutRaidEntryRequest>(HandleRequest);
         messageBroker.Subscribe<NetworkHideoutRaidEntryReply>(HandleReply);
         messageBroker.Subscribe<MapEventFinalized>(HandleFinalized);
@@ -101,9 +105,7 @@ internal sealed class HideoutRaidHandler : IHandler
         if (behavior == null) return;
         if (reply.IsAdmitted || (reply.IsJoining && reply.RemainingTroops == 0))
         {
-            var heroOnly = TroopRoster.CreateDummyTroopRoster();
-            heroOnly.AddToCounts(Hero.MainHero.CharacterObject, 1);
-            StartRaid(behavior, heroOnly, reply.IsDirectAssault);
+            StartRaid(behavior, selectionEntries.CreateHeroOnlyRoster(Hero.MainHero), reply.IsDirectAssault);
             return;
         }
 
@@ -118,16 +120,9 @@ internal sealed class HideoutRaidHandler : IHandler
 
     internal void StartRaid(HideoutCampaignBehavior behavior, TroopRoster selected, bool isDirectAssault)
     {
-        if (selected == null) return;
-        var troops = new List<HideoutTroopSelectionEntry>();
-        foreach (var element in selected.GetTroopRoster())
-        {
-            if (element.Number <= 0) continue;
-            if (!objectManager.TryGetIdWithLogging(element.Character, out var characterId)) return;
-            troops.Add(new HideoutTroopSelectionEntry(characterId, element.Number));
-        }
+        if (selected == null || !selectionEntries.TryCreateEntries(selected, out var troops)) return;
 
-        if (!RequestBlocking(Settlement.CurrentSettlement, isDirectAssault, false, troops.ToArray(), out var reply))
+        if (!RequestBlocking(Settlement.CurrentSettlement, isDirectAssault, false, troops, out var reply))
             return;
 
         MapEvent mapEvent = null;

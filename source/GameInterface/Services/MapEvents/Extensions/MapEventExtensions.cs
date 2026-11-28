@@ -1,7 +1,9 @@
 ﻿using GameInterface.Services.PartyBases.Extensions;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 
@@ -16,6 +18,45 @@ public static class MapEventExtensions
     /// <summary>Whether the battle's results were calculated or applied, after which no battle report may change what they read.</summary>
     public static bool HasCalculatedResults(this MapEvent mapEvent)
         => mapEvent._mapEventResultsCalculated || mapEvent._mapEventResultsApplied;
+
+    /// <summary>The town location the keep battle is fought in.</summary>
+    public const string LordsHallLocationId = "lordshall";
+
+    /// <summary>Whether a siege assault can fall back into the keep: the town has a lord's hall and no player defends it.</summary>
+    public static bool CanFallBackToKeep(this MapEvent mapEvent)
+    {
+        if (!mapEvent.IsSiegeAssault) return false;
+
+        bool hasLordsHall = mapEvent.MapEventSettlement?.LocationComplex?.GetLocationWithId(LordsHallLocationId) != null;
+        bool playerDefends = mapEvent.DefenderSide.Parties.Any(party => party.Party.IsPlayerParty());
+        return hasLordsHall && !playerDefends;
+    }
+
+    /// <summary>Whether a siege assault is still being fought, with no result applied to it yet.</summary>
+    public static bool IsRunningSiegeAssault(this MapEvent mapEvent)
+        => mapEvent.IsSiegeAssault && !mapEvent.IsFinalized && mapEvent.BattleState == BattleState.None;
+
+    /// <summary>Whether a siege assault is still fought at its walls.</summary>
+    public static bool IsSiegeWallsStage(this MapEvent mapEvent)
+        => mapEvent.IsSiegeAssault && mapEvent.MapEventSettlement?.CurrentSiegeState == Settlement.SiegeState.OnTheWalls;
+
+    /// <summary>
+    /// Whether the completion barrier concludes a defender pull-back reported here once every mission member reported it:
+    /// a finished ambush, or walls that fell back to the keep.
+    /// </summary>
+    public static bool ConcludesPullBackOnServer(this MapEvent mapEvent)
+        => mapEvent.IsSiegeAmbush || mapEvent.IsSiegeWallsStage();
+
+    /// <summary>
+    /// Whether the server holds a client's pull-back unapplied: a finished ambush, or walls falling back to the keep,
+    /// including a walls report that lands after the keep opened.
+    /// </summary>
+    public static bool HoldsPullBackOnServer(this MapEvent mapEvent)
+        => mapEvent.IsSiegeAmbush || mapEvent.CanFallBackToKeep();
+
+    /// <summary>Whether a siege assault is past its walls and fought in the lord's hall.</summary>
+    public static bool IsSiegeKeepStage(this MapEvent mapEvent)
+        => mapEvent.IsSiegeAssault && mapEvent.MapEventSettlement?.CurrentSiegeState == Settlement.SiegeState.InTheLordsHall;
 
     /// <summary>Whether the battle is a send troops hideout raid.</summary>
     public static bool IsSendTroopsHideout(this MapEvent mapEvent)

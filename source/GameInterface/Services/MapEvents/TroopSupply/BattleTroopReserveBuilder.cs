@@ -10,6 +10,7 @@ using System.Linq;
 using GameInterface.Configuration;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Hideouts;
+using GameInterface.Services.SiegeEvents;
 using Helpers;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -97,6 +98,7 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
     private readonly IObjectManager objectManager;
     private readonly IPlayerManager playerManager;
     private readonly IHideoutTroopSelection hideoutSelection;
+    private readonly ISiegeKeepRoster keepRoster;
 
     // Parties already flattened into the ledger (by object-manager id). Per-PARTY, not per-map-event, so a
     // party that joins AFTER the battle started (a mid-battle joiner) gets flattened on demand the next time
@@ -110,12 +112,13 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
     private readonly object gate = new object();
 
     public BattleTroopReserveBuilder(IBattleTroopLedger ledger, IObjectManager objectManager, IPlayerManager playerManager,
-        IHideoutTroopSelection hideoutSelection = null)
+        ISiegeKeepRoster keepRoster, IHideoutTroopSelection hideoutSelection = null)
     {
         this.ledger = ledger;
         this.objectManager = objectManager;
         this.playerManager = playerManager;
         this.hideoutSelection = hideoutSelection;
+        this.keepRoster = keepRoster;
     }
 
     public void PrepareMissionReserves(MapEvent mapEvent, MobileParty initiatingParty)
@@ -381,6 +384,8 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
                 var entries = FlattenParty(party, supplyOrders, ref nextAmbushSupplyOrder);
                 if (mapEvent.IsHideoutBattle && party.Party?.Side == BattleSideEnum.Attacker)
                     hideoutSelection.FilterReserve(mapEvent, party, entries);
+                // The keep fields only the seated players' chosen troops and vanilla's hall defenders.
+                keepRoster.FilterReserve(mapEvent, party, entries);
                 if (supplyOrders == null)
                     PlacePlayerHeroFirstInReserve(party, entries);
                 RestoreHealth(mapEventId, party.Party, entries);

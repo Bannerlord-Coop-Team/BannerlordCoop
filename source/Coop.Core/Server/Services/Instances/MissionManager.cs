@@ -87,6 +87,12 @@ public interface IMissionManager
     bool CompleteInstanceConclusion(string instanceId, bool succeeded);
 
     /// <summary>
+    /// Ends a concluding instance's entry fence without recording a conclusion, so the battle's next stage (the siege
+    /// keep after the walls) can open a mission on the same instance id.
+    /// </summary>
+    bool ReleaseInstanceForNextStage(string instanceId);
+
+    /// <summary>
     /// Hands over every instance whose conclusion was rolled back after its deadline, so the coordinator
     /// can recover it. Each instance is handed over once.
     /// </summary>
@@ -708,6 +714,23 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
     }
 
     /// <inheritdoc/>
+    public bool ReleaseInstanceForNextStage(string instanceId)
+    {
+        if (string.IsNullOrEmpty(instanceId))
+            return false;
+
+        lock (gate)
+        {
+            PruneExpired(DateTime.UtcNow);
+            if (!concludingInstances.Remove(instanceId))
+                return false;
+
+            RestorePendingEmptyInstance(instanceId);
+            return true;
+        }
+    }
+
+    /// <inheritdoc/>
     public IReadOnlyList<string> TakeExpiredConclusions()
     {
         lock (gate)
@@ -748,13 +771,17 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
             return true;
         }
 
-        if (pendingEmptyInstances.TryGetValue(instanceId, out var emptyInstance))
-        {
-            byInstanceId[instanceId] = emptyInstance;
-            pendingEmptyInstances.Remove(instanceId);
-        }
-
+        RestorePendingEmptyInstance(instanceId);
         return true;
+    }
+
+    // An instance that emptied while concluding goes back to the index unconcluded. Caller holds the lock.
+    private void RestorePendingEmptyInstance(string instanceId)
+    {
+        if (!pendingEmptyInstances.TryGetValue(instanceId, out var emptyInstance)) return;
+
+        byInstanceId[instanceId] = emptyInstance;
+        pendingEmptyInstances.Remove(instanceId);
     }
 
     // Every entry point below runs this before it reads an index, because rolling back a stalled

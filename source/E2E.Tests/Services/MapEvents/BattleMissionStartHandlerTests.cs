@@ -9,6 +9,7 @@ using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.Players;
+using GameInterface.Services.SiegeEvents;
 using Moq;
 using SandBox.GameComponents;
 using TaleWorlds.CampaignSystem;
@@ -95,7 +96,7 @@ public class BattleMissionStartHandlerTests : MapEventTestBase
                 client.Resolve<INetwork>(),
                 client.Resolve<IMapEventLogger>(),
                 missionInitializerResolver,
-                null!, Mock.Of<IBattleHostRetentionPolicy>());
+                null!, Mock.Of<IBattleHostRetentionPolicy>(), Mock.Of<ISiegeKeepRoster>());
 
             try
             {
@@ -225,7 +226,7 @@ public class BattleMissionStartHandlerTests : MapEventTestBase
                 using var messageBroker = new MessageBroker();
                 using var handler = new BattleMissionStartHandler(messageBroker, client.ObjectManager,
                     client.Resolve<IPlayerManager>(), client.Resolve<INetwork>(),
-                    client.Resolve<IMapEventLogger>(), new RecordingMissionInitializerResolver(), null!, Mock.Of<IBattleHostRetentionPolicy>());
+                    client.Resolve<IMapEventLogger>(), new RecordingMissionInitializerResolver(), null!, Mock.Of<IBattleHostRetentionPolicy>(), Mock.Of<ISiegeKeepRoster>());
                 ContainerProvider.SetContainer(launcherScope);
                 messageBroker.Publish(this, new NetworkStartSiegeMission(mapEvent.MapEventId, 0,
                     new[] { 1f, 1f }, Array.Empty<SiegeEngineState>(), Array.Empty<SiegeEngineState>(),
@@ -308,7 +309,7 @@ public class BattleMissionStartHandlerTests : MapEventTestBase
                     client.Resolve<INetwork>(),
                     client.Resolve<IMapEventLogger>(),
                     missionInitializerResolver,
-                    null!, Mock.Of<IBattleHostRetentionPolicy>());
+                    null!, Mock.Of<IBattleHostRetentionPolicy>(), Mock.Of<ISiegeKeepRoster>());
 
                 messageBroker.Publish(this, new NetworkStartAttackMission(
                     mapEvent.MapEventId,

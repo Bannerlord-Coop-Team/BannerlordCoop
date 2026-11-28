@@ -44,7 +44,7 @@ public class BattleResultReadyLogic : MissionLogic
 
     public override void OnMissionResultReady(MissionResult missionResult)
     {
-        if (missionResult?.BattleResolved == true)
+        if (missionResult != null && BattleResultCommitter.EndsMission(missionResult))
         {
             hasResolvedMissionResult = true;
             siegeEngineStateReporter.ReportConcludedIfHost();
