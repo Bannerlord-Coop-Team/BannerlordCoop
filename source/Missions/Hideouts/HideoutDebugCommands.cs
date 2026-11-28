@@ -94,7 +94,7 @@ internal static class HideoutDebugCommands
                 => agent.GetComponent<CampaignAgentComponent>()?.AgentNavigator?.GetBehaviorGroup<AlarmedBehaviorGroup>();
 
             var sentry = mission.Agents
-                .Where(agent => agent.IsActive() && agent.IsHuman && agent.Team?.Side == BattleSideEnum.Defender && GetAlarm(agent) != null)
+                .Where(agent => agent.IsActive() && native.IsSentry(agent) && GetAlarm(agent) != null)
                 .OrderBy(agent => agent.Position.DistanceSquared(hero.Position))
                 .FirstOrDefault();
             if (sentry == null)

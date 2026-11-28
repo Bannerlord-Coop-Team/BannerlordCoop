@@ -177,6 +177,9 @@ internal sealed class CoopHideoutAmbushController : HideoutAmbushMissionControll
     private static int CountActiveSentries(StealthAreaMissionLogic.StealthAreaData area)
         => area.StealthAreaMarkers.Values.Sum(sentries => sentries.Count(sentry => sentry.IsActive()));
 
+    internal bool IsSentry(Agent agent)
+        => _stealthAreaData.Any(area => area.StealthAreaMarkers.Values.Any(sentries => sentries.Contains(agent)));
+
     public Agent Boss => _bossAgent;
     public BattleSideEnum PlayerSide => BattleSideEnum.Attacker;
     public void StartSpawner(BattleSideEnum side) { }
