@@ -90,13 +90,15 @@
     "enabled": true,
 
     // The start type selected when the window opens:
-    // "default", "outlaw", "beggar", "trader", "mercenary", "vassal" or "king".
+    // "default", "outlaw", "beggar", "trader", "mercenary", "vassal" or "king",
+    // or with War Sails "fleetadmiral" or "merchantventurer".
     "defaultStartType": "default",
 
     // false hides a start type from the window.
     // When "default" is false it will only be unavailable if at least one other start type is available.
-    // trader, mercenary, vassal and king change the world (workshops, fiefs, kingdom
-    // rulers, wars), so they can only be picked before the campaign is first resumed.
+    // trader, mercenary, vassal, king, fleetAdmiral and merchantVenturer change the world (workshops, fiefs, kingdom rulers, wars)
+    // so they can only be picked before the campaign is first resumed.
+    // fleetAdmiral and merchantVenturer are only offered when War Sails is enabled.
     "startTypes": {
       "default": true,
       "outlaw": true,
@@ -104,8 +106,15 @@
       "trader": true,
       "mercenary": true,
       "vassal": true,
-      "king": true
-    }
+      "king": true,
+      "fleetAdmiral": true,
+      "merchantVenturer": true
+    },
+
+    // War Sails only. Set whether a joining player can tick a personal trade ship on top of whichever start they pick.
+    // (Default) true: Provides a starting ship.
+    // false: Hides the option.
+    "personalShip": true
   },
 
   "modOptions": {
