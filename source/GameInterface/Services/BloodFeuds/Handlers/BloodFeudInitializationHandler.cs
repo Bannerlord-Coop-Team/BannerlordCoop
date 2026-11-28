@@ -6,6 +6,8 @@ using GameInterface.Services.BloodFeuds.Messages;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.ObjectManager;
 using System.Collections.Generic;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.BloodFeuds.Handlers;
 
@@ -58,6 +60,22 @@ internal class BloodFeudInitializationHandler : IHandler
             Dictionary<string, BloodFeudData> feuds = null;
             bloodFeudPlayerData?.PlayerBloodFeuds?.TryGetValue(playerHeroId, out feuds);
             executionInterface.ApplyBloodFeuds(feuds);
+
+            // The notice only lives on the client, so a rejoining player needs pending executions shown again
+            Dictionary<string, PendingSettlementExecution> pendingExecutions = null;
+            bloodFeudPlayerData?.PlayerPendingSettlementExecutions?.TryGetValue(playerHeroId, out pendingExecutions);
+            if (pendingExecutions == null) return;
+
+            foreach (var pendingExecution in pendingExecutions)
+            {
+                if (!objectManager.TryGetObjectWithLogging<Hero>(pendingExecution.Key, out var clanMember)) continue;
+                if (!objectManager.TryGetObjectWithLogging<Clan>(pendingExecution.Value.CapturerClanId, out var clanWithFeud)) continue;
+
+                Settlement settlement = clanMember.PartyBelongedToAsPrisoner?.Settlement;
+                if (settlement == null) continue;
+
+                executionInterface.ShowSettlementExecutionNotice(clanMember, clanWithFeud, settlement, new CampaignTime(pendingExecution.Value.ExecutionDateTicks));
+            }
         });
     }
 }

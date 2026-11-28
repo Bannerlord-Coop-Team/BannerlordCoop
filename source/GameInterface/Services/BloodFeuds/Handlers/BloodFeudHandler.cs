@@ -185,14 +185,7 @@ internal class BloodFeudHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Clan>(data.FeudedClanId, out var clanWithFeud)) return;
             if (!objectManager.TryGetObjectWithLogging<Settlement>(data.SettlementId, out var settlement)) return;
 
-            CampaignTime executionDate = new CampaignTime(data.ExecutionDateTicks);
-            TextObject textObject = new TextObject("{=8IP5qoyq}{CLAN_MEMBER.NAME}, your {RELATION}, is held prisoner by the {OTHER_CLAN} in {SETTLEMENT}. As your two clans have a blood feud, they plan to execute {?CLAN_MEMBER.GENDER}her{?}him{\\?} in {DAYS} {?DAYS > 1}days{?}day{\\?}.");
-            StringHelpers.SetCharacterProperties("CLAN_MEMBER", clanMember.CharacterObject, textObject);
-            textObject.SetTextVariable("SETTLEMENT", settlement.Name);
-            textObject.SetTextVariable("DAYS", executionDate.RemainingDaysFromNow);
-            textObject.SetTextVariable("OTHER_CLAN", clanWithFeud.Name);
-            textObject.SetTextVariable("RELATION", ConversationHelper.GetHeroRelationToHeroTextShort(clanMember, Hero.MainHero, uppercaseFirst: false));
-            Campaign.Current.CampaignInformationManager.NewMapNoticeAdded(new BloodFeudClanMemberCapturedMapNotification(clanMember, executionDate, settlement, textObject));
+            executionInterface.ShowSettlementExecutionNotice(clanMember, clanWithFeud, settlement, new CampaignTime(data.ExecutionDateTicks));
         });
     }
 

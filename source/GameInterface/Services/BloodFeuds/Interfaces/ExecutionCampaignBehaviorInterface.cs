@@ -8,17 +8,21 @@ using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using Helpers;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
+using TaleWorlds.CampaignSystem.Conversation;
+using TaleWorlds.CampaignSystem.MapNotificationTypes;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
+using TaleWorlds.Localization;
 using static TaleWorlds.CampaignSystem.Actions.ChangeBloodFeudStateAction;
 
 namespace GameInterface.Services.BloodFeuds.Interfaces;
@@ -44,6 +48,7 @@ public interface IExecutionCampaignBehaviorInterface : IGameAbstraction
     void SetPendingPlayerExecution(Hero playerHero, Hero executor);
     void ExecutePendingPlayers();
     void ApplyBloodFeuds(Dictionary<string, BloodFeudData> feuds);
+    void ShowSettlementExecutionNotice(Hero clanMember, Clan clanWithFeud, Settlement settlement, CampaignTime executionDate);
 }
 
 internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorInterface
@@ -336,6 +341,17 @@ internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorIn
             clan.BloodFeudExecutionsDoneCount = feud?.ExecutionsDoneCount ?? 0;
             clan.BloodFeudExecutionsReceivedCount = feud?.ExecutionsReceivedCount ?? 0;
         }
+    }
+
+    public void ShowSettlementExecutionNotice(Hero clanMember, Clan clanWithFeud, Settlement settlement, CampaignTime executionDate)
+    {
+        TextObject textObject = new TextObject("{=8IP5qoyq}{CLAN_MEMBER.NAME}, your {RELATION}, is held prisoner by the {OTHER_CLAN} in {SETTLEMENT}. As your two clans have a blood feud, they plan to execute {?CLAN_MEMBER.GENDER}her{?}him{\\?} in {DAYS} {?DAYS > 1}days{?}day{\\?}.");
+        StringHelpers.SetCharacterProperties("CLAN_MEMBER", clanMember.CharacterObject, textObject);
+        textObject.SetTextVariable("SETTLEMENT", settlement.Name);
+        textObject.SetTextVariable("DAYS", executionDate.RemainingDaysFromNow);
+        textObject.SetTextVariable("OTHER_CLAN", clanWithFeud.Name);
+        textObject.SetTextVariable("RELATION", ConversationHelper.GetHeroRelationToHeroTextShort(clanMember, Hero.MainHero, uppercaseFirst: false));
+        Campaign.Current.CampaignInformationManager.NewMapNoticeAdded(new BloodFeudClanMemberCapturedMapNotification(clanMember, executionDate, settlement, textObject));
     }
 
     private void OnPlayerExecutedHero(BloodFeudPlayer player, Hero victim)
