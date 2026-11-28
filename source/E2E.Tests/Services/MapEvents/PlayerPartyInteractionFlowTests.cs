@@ -16,6 +16,8 @@ using GameInterface.CoopSessionData;
 using GameInterface.Services.Bandits.Messages;
 using GameInterface.Services.Barters;
 using GameInterface.Services.Barters.Messages;
+using GameInterface.Services.BloodFeuds.Data;
+using GameInterface.Services.BloodFeuds.Messages;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.Locations.Conversations;
@@ -1685,6 +1687,67 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
                 message.Faction1Id == initiatorClanId &&
                 message.Faction2Id == responderClanId);
             AssertPeaceMade(syncedClient, initiatorClanId, responderClanId);
+        }
+    }
+
+    [Fact]
+    public void BloodFeudTrade_LeadersOfferFromBothSides_AcceptingTradeEndsTheFeudOnBothClans()
+    {
+        var (client1, client2, initiatorHeroId, responderHeroId, initiatorPartyId, responderPartyId) = CreateTwoPlayerPartiesWithHeroes();
+        var (initiatorClanId, responderClanId) = MakePartiesHostile(initiatorPartyId, responderPartyId);
+        var initiatorFeud = new BloodFeudData { HasBloodFeud = true, ExecutionsReceivedCount = 1 };
+        var responderFeud = new BloodFeudData { HasBloodFeud = true, ExecutionsDoneCount = 1 };
+        Server.Call(() =>
+        {
+            // Feuds belong to the players' clans, so the registered player heroes join the party leaders' clans
+            using (new AllowedThread())
+            {
+                Server.GetRegisteredObject<Hero>(initiatorHeroId).Clan = Server.GetRegisteredObject<Clan>(initiatorClanId);
+                Server.GetRegisteredObject<Hero>(responderHeroId).Clan = Server.GetRegisteredObject<Clan>(responderClanId);
+            }
+
+            var feuds = Server.Resolve<ICoopSessionProvider>().CoopSession.BloodFeudPlayerData.PlayerClanBloodFeuds;
+            feuds[initiatorClanId] = new() { [responderClanId] = initiatorFeud };
+            feuds[responderClanId] = new() { [initiatorClanId] = responderFeud };
+        });
+
+        var sessionId = StartTrade(client1, client2, initiatorPartyId, responderPartyId);
+
+        Server.NetworkSentMessages.Clear();
+        client1.Call(() => client1.Resolve<INetwork>().SendAll(new NetworkPlayerPartyTradeOfferUpdated(
+            sessionId,
+            initiatorPartyId,
+            Array.Empty<ItemRosterElementData>(),
+            Array.Empty<TroopRosterElementData>(),
+            offeredBloodFeudSettlement: true)));
+        client2.Call(() => client2.Resolve<INetwork>().SendAll(new NetworkPlayerPartyTradeOfferUpdated(
+            sessionId,
+            responderPartyId,
+            Array.Empty<ItemRosterElementData>(),
+            Array.Empty<TroopRosterElementData>(),
+            offeredBloodFeudSettlement: true)));
+
+        var settlementOffers = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyTradeOfferUpdated>()
+            .Where(message => message.OfferedBloodFeudSettlement)
+            .ToArray();
+        // Each offer is relayed to both peers
+        Assert.Equal(2, settlementOffers.Count(offer => offer.PartyId == initiatorPartyId));
+        Assert.Equal(2, settlementOffers.Count(offer => offer.PartyId == responderPartyId));
+
+        Server.NetworkSentMessages.Clear();
+        client1.InternalMessages.Clear();
+        client2.InternalMessages.Clear();
+        client1.Call(() => client1.Resolve<INetwork>().SendAll(new NetworkPlayerPartyTradeAcceptChanged(sessionId, accepted: true)));
+        client2.Call(() => client2.Resolve<INetwork>().SendAll(new NetworkPlayerPartyTradeAcceptChanged(sessionId, accepted: true)));
+
+        var ended = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionEnded>().Single();
+        Assert.Equal(PlayerPartyInteractionOutcomeType.TradeAccepted, ended.OutcomeType);
+        Assert.Equal((false, 0, 0), (initiatorFeud.HasBloodFeud, initiatorFeud.ExecutionsDoneCount, initiatorFeud.ExecutionsReceivedCount));
+        Assert.Equal((false, 0, 0), (responderFeud.HasBloodFeud, responderFeud.ExecutionsDoneCount, responderFeud.ExecutionsReceivedCount));
+        foreach (var client in new[] { client1, client2 })
+        {
+            var notice = Assert.Single(client.InternalMessages.GetMessages<NetworkNotifyBloodFeudStateChanged>());
+            Assert.True(notice.SettledByAgreement);
         }
     }
 

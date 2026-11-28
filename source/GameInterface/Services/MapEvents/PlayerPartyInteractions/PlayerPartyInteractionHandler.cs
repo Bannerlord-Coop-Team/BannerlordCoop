@@ -6,6 +6,7 @@ using Common.Network.Coalescing;
 using Common.Network.Messages;
 using Common.Util;
 using GameInterface.Configuration;
+using GameInterface.Services.BloodFeuds.Interfaces;
 using GameInterface.Services.Clans;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.MapTracking;
@@ -73,6 +74,7 @@ internal class PlayerPartyInteractionHandler : IHandler
     private readonly IPlayerPartyTradeContext trade;
     private readonly IPlayerPartyPvpRules pvpRules;
     private readonly IKingdomClanLimit kingdomClanLimit;
+    private readonly IExecutionCampaignBehaviorInterface executionInterface;
     private readonly ISendCoalescer sendCoalescer;
 
     private readonly ConcurrentDictionary<string, PlayerPartyInteractionSession> sessionsById = new ConcurrentDictionary<string, PlayerPartyInteractionSession>();
@@ -105,6 +107,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         IPlayerPartyTradeContext trade,
         IPlayerPartyPvpRules pvpRules,
         IKingdomClanLimit kingdomClanLimit,
+        IExecutionCampaignBehaviorInterface executionInterface,
         // Only the server container registers a send coalescer.
         ISendCoalescer sendCoalescer = null)
     {
@@ -122,6 +125,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         this.trade = trade;
         this.pvpRules = pvpRules;
         this.kingdomClanLimit = kingdomClanLimit;
+        this.executionInterface = executionInterface;
         this.sendCoalescer = sendCoalescer;
         outcomeHandler = new PlayerPartyInteractionOutcomeHandler(
             objectManager,
@@ -131,7 +135,8 @@ internal class PlayerPartyInteractionHandler : IHandler
             playerMarriageRules,
             playerDivorceRules,
             mapTracking,
-            kingdomClanLimit);
+            kingdomClanLimit,
+            executionInterface);
 
         messageBroker.Subscribe<NetworkPlayerPartyInteractionStarted>(Handle_NetworkPlayerPartyInteractionStarted);
         messageBroker.Subscribe<NetworkPlayerPartyInteractionState>(Handle_NetworkPlayerPartyInteractionState);
@@ -423,6 +428,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         if (!TryGetSessionPartyId(session, peer, out var partyId)) return;
 
         var offeredPeace = message.OfferedPeace && CanOfferPeace(session, partyId);
+        var offeredBloodFeudSettlement = message.OfferedBloodFeudSettlement && CanOfferBloodFeudSettlement(session, partyId);
         session.SetTradeOffer(
             partyId,
             message.OfferedItems,
@@ -431,7 +437,8 @@ internal class PlayerPartyInteractionHandler : IHandler
             message.OfferedFiefs,
             message.OfferedPrisoners,
             offeredPeace,
-            message.OfferedMarriages);
+            message.OfferedMarriages,
+            offeredBloodFeudSettlement);
         session.InitiatorAcceptedTrade = false;
         session.ResponderAcceptedTrade = false;
         var relayedOffer = new NetworkPlayerPartyTradeOfferUpdated(
@@ -443,7 +450,8 @@ internal class PlayerPartyInteractionHandler : IHandler
             message.OfferedFiefs,
             message.OfferedPrisoners,
             offeredPeace,
-            message.OfferedMarriages);
+            message.OfferedMarriages,
+            offeredBloodFeudSettlement);
         // Clients clear both acceptances when the offer arrives, so no trade state is sent for it.
         // ResponderPeer is always set here, because a trade only starts after the responder accepted it from that peer.
         network.Send(session.InitiatorPeer, relayedOffer);
@@ -457,6 +465,16 @@ internal class PlayerPartyInteractionHandler : IHandler
         if (!objectManager.TryGetObject<PartyBase>(otherPartyId, out var otherParty)) return false;
 
         return PlayerPartyPeaceBarterable.CanOfferPeace(party, otherParty);
+    }
+
+    private bool CanOfferBloodFeudSettlement(PlayerPartyInteractionSession session, string partyId)
+    {
+        var otherPartyId = session.GetOtherPartyId(partyId);
+        if (!objectManager.TryGetObject<PartyBase>(partyId, out var party)) return false;
+        if (!objectManager.TryGetObject<PartyBase>(otherPartyId, out var otherParty)) return false;
+
+        return PlayerPartyBloodFeudBarterable.TryGetLeaderClans(party, otherParty, out var clan, out var otherClan) &&
+            executionInterface.HasBloodFeud(clan, otherClan);
     }
 
     private void Handle_NetworkPlayerPartyTradeAcceptChanged(MessagePayload<NetworkPlayerPartyTradeAcceptChanged> payload)
@@ -1887,6 +1905,7 @@ internal class PlayerPartyInteractionHandler : IHandler
             Math.Max(0, ownerHero.Gold)), false);
 
         AddPartyPeaceBarterable(barterData, ownerHero, otherHero, ownerParty, otherParty);
+        AddPartyBloodFeudBarterable(barterData, ownerHero, otherHero, ownerParty, otherParty);
         AddPartyFiefBarterables(barterData, ownerHero, otherHero);
         AddPartyPrisonerBarterables(barterData, ownerHero, otherHero, ownerParty, otherParty);
         AddPartyItemBarterables(barterData, ownerHero, otherHero, ownerParty, otherParty);
@@ -1905,6 +1924,22 @@ internal class PlayerPartyInteractionHandler : IHandler
 
         barterData.AddBarterable<OtherBarterGroup>(
             new PlayerPartyPeaceBarterable(ownerHero, otherHero, ownerParty, otherParty),
+            false);
+    }
+
+    private static void AddPartyBloodFeudBarterable(
+        BarterData barterData,
+        Hero ownerHero,
+        Hero otherHero,
+        PartyBase ownerParty,
+        PartyBase otherParty)
+    {
+        if (!PlayerPartyBloodFeudBarterable.TryGetLeaderClans(ownerParty, otherParty, out var ownerClan, out var otherClan)) return;
+        // A client only has its own clan's feud flags, and a feud between player clans is on both of them
+        if (!ownerClan.HasBloodFeudWithPlayer && !otherClan.HasBloodFeudWithPlayer) return;
+
+        barterData.AddBarterable<OtherBarterGroup>(
+            new PlayerPartyBloodFeudBarterable(ownerHero, otherHero, ownerParty, otherParty),
             false);
     }
 

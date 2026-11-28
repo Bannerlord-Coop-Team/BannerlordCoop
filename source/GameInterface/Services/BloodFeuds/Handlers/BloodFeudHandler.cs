@@ -110,6 +110,9 @@ internal class BloodFeudHandler : IHandler
                 TextObject textObject = new TextObject("{=Px3DDMvV}You have decided not to pursue your blood feud with the {CLAN}, and it has ended.");
                 switch (data.Detail)
                 {
+                    case ChangeBloodFeudStateAction.ChangeBloodFeudActionDetail.SettledByRansomPayment when data.SettledByAgreement:
+                        textObject = new TextObject("{=str_coop_blood_feud_ended_by_agreement}Your blood feud with the {CLAN} has ended by agreement.");
+                        break;
                     case ChangeBloodFeudStateAction.ChangeBloodFeudActionDetail.SettledByRansomPayment:
                         textObject = new TextObject("{=fsfeamMz}Your blood feud with the {CLAN} has ended, as you paid them money to settle it.");
                         break;

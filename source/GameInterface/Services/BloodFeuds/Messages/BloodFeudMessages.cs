@@ -42,13 +42,17 @@ internal readonly struct NetworkNotifyBloodFeudStateChanged : ICommand
     public readonly ChangeBloodFeudStateAction.ChangeBloodFeudActionDetail Detail;
     [ProtoMember(4)]
     public readonly int PenalizedClanCount;
+    // Player clans settle a feud with each other in a trade, which vanilla's details have no text for
+    [ProtoMember(5)]
+    public readonly bool SettledByAgreement;
 
-    public NetworkNotifyBloodFeudStateChanged(string clanId, string executedHeroId, ChangeBloodFeudStateAction.ChangeBloodFeudActionDetail detail, int penalizedClanCount)
+    public NetworkNotifyBloodFeudStateChanged(string clanId, string executedHeroId, ChangeBloodFeudStateAction.ChangeBloodFeudActionDetail detail, int penalizedClanCount, bool settledByAgreement)
     {
         ClanId = clanId;
         ExecutedHeroId = executedHeroId;
         Detail = detail;
         PenalizedClanCount = penalizedClanCount;
+        SettledByAgreement = settledByAgreement;
     }
 }
 

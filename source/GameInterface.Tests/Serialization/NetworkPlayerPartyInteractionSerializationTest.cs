@@ -158,7 +158,8 @@ public class NetworkPlayerPartyInteractionSerializationTest
             offeredFiefs: new[] { "fief-1" },
             offeredPrisoners: new[] { new TroopRosterElementData(2, 1, 0, 0) },
             offeredPeace: true,
-            offeredMarriages: new[] { new PlayerPartyMarriageOfferData("hero-1", "spouse-1") });
+            offeredMarriages: new[] { new PlayerPartyMarriageOfferData("hero-1", "spouse-1") },
+            offeredBloodFeudSettlement: true);
 
         var result = RoundTrip(original);
 
@@ -177,6 +178,7 @@ public class NetworkPlayerPartyInteractionSerializationTest
         Assert.Single(result.OfferedMarriages);
         Assert.Equal("hero-1", result.OfferedMarriages[0].HeroId);
         Assert.Equal("spouse-1", result.OfferedMarriages[0].SpouseId);
+        Assert.True(result.OfferedBloodFeudSettlement);
     }
 
     [Fact]

@@ -44,6 +44,7 @@ public interface IExecutionCampaignBehaviorInterface : IGameAbstraction
     void CanHeroBeReleased(Hero hero, ref bool result);
     void SettleBloodFeudByRansomPayment(Hero playerHero, Clan clan);
     void RequestSettleBloodFeudByRansomPayment(Clan clan);
+    void SettleBloodFeudByAgreement(Clan playerClan, Clan otherPlayerClan);
     bool HasBloodFeud(Clan playerClan, Clan clan);
     bool HasBloodFeudWithAnyPlayer(Clan clan);
     void SetPendingPlayerExecution(Hero playerHero, Hero executor);
@@ -386,6 +387,15 @@ internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorIn
         ChangeRelationAction.SetRelationBetweenHeroes(playerClan.Clan.Leader, clan.Leader, -49);
     }
 
+    public void SettleBloodFeudByAgreement(Clan playerClan, Clan otherPlayerClan)
+    {
+        if (!TryGetPlayerClan(playerClan, out var feudingPlayerClan)) return;
+        if (!HasBloodFeud(feudingPlayerClan.ClanId, otherPlayerClan)) return;
+
+        // Vanilla has no agreement detail, and the ransom one also clears the execution counts
+        ChangeBloodFeudState(feudingPlayerClan, otherPlayerClan, null, ChangeBloodFeudActionDetail.SettledByRansomPayment, settledByAgreement: true);
+    }
+
     public void RequestSettleBloodFeudByRansomPayment(Clan clan)
     {
         if (!objectManager.TryGetIdWithLogging(clan, out var clanId)) return;
@@ -484,7 +494,7 @@ internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorIn
     }
 
     // ChangeBloodFeudStateAction.ApplyInternal for one player clan
-    private void ChangeBloodFeudState(BloodFeudPlayerClan playerClan, Clan clanWithFeud, Hero executedHero, ChangeBloodFeudActionDetail detail)
+    private void ChangeBloodFeudState(BloodFeudPlayerClan playerClan, Clan clanWithFeud, Hero executedHero, ChangeBloodFeudActionDetail detail, bool settledByAgreement = false)
     {
         if (!objectManager.TryGetIdWithLogging(clanWithFeud, out var clanWithFeudId)) return;
 
@@ -507,17 +517,17 @@ internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorIn
             }
         }
 
-        ApplyBloodFeudState(playerClan, clanWithFeudId, executedHero, detail, penalizedClanCount);
+        ApplyBloodFeudState(playerClan, clanWithFeudId, executedHero, detail, penalizedClanCount, settledByAgreement);
 
         // A feud between two player clans is one feud, so the other clan starts or ends it too
         if (!TryGetPlayerClan(clanWithFeud, out var otherPlayerClan)) return;
         if (HasBloodFeud(otherPlayerClan.ClanId, playerClan.Clan) == hasBloodFeud) return;
 
-        ApplyBloodFeudState(otherPlayerClan, playerClan.ClanId, executedHero, GetOtherSideDetail(detail), penalizedClanCount: 0);
+        ApplyBloodFeudState(otherPlayerClan, playerClan.ClanId, executedHero, GetOtherSideDetail(detail), penalizedClanCount: 0, settledByAgreement);
     }
 
     // ChangeBloodFeudStateAction's clan fields and OnBloodFeudStateChanged for one player clan
-    private void ApplyBloodFeudState(BloodFeudPlayerClan playerClan, string clanId, Hero executedHero, ChangeBloodFeudActionDetail detail, int penalizedClanCount)
+    private void ApplyBloodFeudState(BloodFeudPlayerClan playerClan, string clanId, Hero executedHero, ChangeBloodFeudActionDetail detail, int penalizedClanCount, bool settledByAgreement)
     {
         BloodFeudData feud = GetOrAddBloodFeud(playerClan.ClanId, clanId);
         feud.HasBloodFeud = IsBloodFeudStart(detail);
@@ -529,7 +539,7 @@ internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorIn
         SendBloodFeuds(playerClan);
 
         objectManager.TryGetId(executedHero, out var executedHeroId);
-        SendToClan(playerClan, new NetworkNotifyBloodFeudStateChanged(clanId, executedHeroId, detail, penalizedClanCount));
+        SendToClan(playerClan, new NetworkNotifyBloodFeudStateChanged(clanId, executedHeroId, detail, penalizedClanCount, settledByAgreement));
 
         UpdateAllPlayerClanMemberExecutionStates(playerClan);
     }

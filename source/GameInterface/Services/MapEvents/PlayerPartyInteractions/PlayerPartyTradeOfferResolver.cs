@@ -46,6 +46,9 @@ internal class PlayerPartyTradeOfferResolver : IPlayerPartyTradeOfferResolver
                 case PlayerPartyPeaceBarterable:
                     yield return (item, offer.OfferedPeace ? 1 : 0);
                     break;
+                case PlayerPartyBloodFeudBarterable:
+                    yield return (item, offer.OfferedBloodFeudSettlement ? 1 : 0);
+                    break;
                 case ItemBarterable itemBarterable when keyResolver.TryResolveItem(itemBarterable, out var itemKey):
                     offeredItems.TryGetValue(GetItemKey(itemKey), out var itemAmount);
                     yield return (item, itemAmount);

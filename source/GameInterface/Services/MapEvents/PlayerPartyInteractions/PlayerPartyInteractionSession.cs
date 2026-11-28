@@ -42,6 +42,8 @@ internal sealed class PlayerPartyInteractionSession
     public TroopRosterElementData[] ResponderOfferedTroops { get; set; } = new TroopRosterElementData[0];
     public bool InitiatorOfferedPeace { get; set; }
     public bool ResponderOfferedPeace { get; set; }
+    public bool InitiatorOfferedBloodFeudSettlement { get; set; }
+    public bool ResponderOfferedBloodFeudSettlement { get; set; }
     public PlayerPartyMarriageOfferData[] InitiatorOfferedMarriages { get; set; } = System.Array.Empty<PlayerPartyMarriageOfferData>();
     public PlayerPartyMarriageOfferData[] ResponderOfferedMarriages { get; set; } = System.Array.Empty<PlayerPartyMarriageOfferData>();
     public Kingdom TargetKingdom { get; set; }
@@ -127,7 +129,8 @@ internal sealed class PlayerPartyInteractionSession
         string[] offeredFiefs,
         TroopRosterElementData[] offeredPrisoners,
         bool offeredPeace,
-        PlayerPartyMarriageOfferData[] offeredMarriages)
+        PlayerPartyMarriageOfferData[] offeredMarriages,
+        bool offeredBloodFeudSettlement)
     {
         if (partyId == InitiatorPartyId)
         {
@@ -138,6 +141,7 @@ internal sealed class PlayerPartyInteractionSession
             InitiatorOfferedPrisoners = offeredPrisoners ?? new TroopRosterElementData[0];
             InitiatorOfferedPeace = offeredPeace;
             InitiatorOfferedMarriages = offeredMarriages ?? System.Array.Empty<PlayerPartyMarriageOfferData>();
+            InitiatorOfferedBloodFeudSettlement = offeredBloodFeudSettlement;
             return;
         }
 
@@ -150,6 +154,7 @@ internal sealed class PlayerPartyInteractionSession
             ResponderOfferedPrisoners = offeredPrisoners ?? new TroopRosterElementData[0];
             ResponderOfferedPeace = offeredPeace;
             ResponderOfferedMarriages = offeredMarriages ?? System.Array.Empty<PlayerPartyMarriageOfferData>();
+            ResponderOfferedBloodFeudSettlement = offeredBloodFeudSettlement;
         }
     }
 }
