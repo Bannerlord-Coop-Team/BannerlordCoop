@@ -262,7 +262,6 @@ public class LocationAuthorityMigrator : ILocationAuthorityMigrator
 
             if (Mission.Current == null) return;
 
-            var interpolator = coopMissionComponent.AgentMovementHandler.Interpolator;
             var adoptedHumans = new List<(Agent Agent, AgentNavigator Navigator)>();
             int revived = 0;
             int stationary = 0;
@@ -270,10 +269,6 @@ public class LocationAuthorityMigrator : ILocationAuthorityMigrator
             {
                 var agent = info.Agent;
                 if (agent == null || !agent.IsActive()) continue;
-
-                // Stop reconciling the agent toward its former owner's last-reported position — a
-                // stale interpolation target overrides the AI and pins the agent in place.
-                interpolator.Forget(agent);
 
                 if (ReviveSettlementAi(agent, info.AgentId, reconnectPointUse: false)) revived++;
                 else stationary++;
@@ -313,7 +308,6 @@ public class LocationAuthorityMigrator : ILocationAuthorityMigrator
         if (!registry.TryTransferAuthority(hostControllerId, agentId, authorityRevision)) return;
         if (!session.IsLocalHost) return;
 
-        coopMissionComponent.AgentMovementHandler.Interpolator.Forget(agent);
         // The spawner has just applied any catch-up point use from its canonical frame. Preserve that
         // single fresh lifecycle and only reconnect its newly-live AI navigator; do not stop/reuse it.
         ReviveSettlementAi(agent, agentId, reconnectPointUse: true);
@@ -344,10 +338,19 @@ public class LocationAuthorityMigrator : ILocationAuthorityMigrator
     // back to plain engine AI — stationary for humans (SR-031), native idle wandering for animals.
     private bool ReviveSettlementAi(Agent agent, System.Guid agentId, bool reconnectPointUse)
     {
-        // An adopted MOUNT (scene horses) only changes authority — it is not a simulated combatant
-        // and must not get an engine AI controller, mirroring battle mount adoption.
-        if (agent.IsMount) return true;
+        var interpolator = coopMissionComponent.AgentMovementHandler.Interpolator;
 
+        // An adopted MOUNT (scene horses) only changes authority — it is not a simulated combatant
+        // and must not get an engine AI controller, mirroring battle mount adoption. It keeps the follow's
+        // frame lock, otherwise it would drift on its last replicated input.
+        if (agent.IsMount)
+        {
+            interpolator.Forget(agent);
+            return true;
+        }
+
+        // A kept follow target or frame lock would pin the AI on the old owner's pose.
+        interpolator.Release(agent);
         agent.Controller = AgentControllerType.AI;
         agent.SetIsAIPaused(false);
 

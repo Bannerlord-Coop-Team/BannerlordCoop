@@ -28,8 +28,11 @@ public class TournamentMigrationMirrorTests : MissionTestEnvironment
             Agent rider = mock.SpawnAgent(
                 new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.None));
             Agent mount = mock.SpawnMount(rider);
+            Assert.True(AgentMirror.TryGet(rider, out var riderMirror));
             Assert.True(AgentMirror.TryGet(mount, out var mountMirror));
             mountMirror.MaximumSpeedLimit = 0f;
+            riderMirror.MovementLockedState = AgentMovementLockedState.FrameLocked;
+            mountMirror.MovementLockedState = AgentMovementLockedState.FrameLocked;
 
             MethodInfo wakeTransferredAgent = typeof(CoopTournamentController).GetMethod(
                 "WakeTransferredAgent",
@@ -37,11 +40,12 @@ public class TournamentMigrationMirrorTests : MissionTestEnvironment
             Assert.NotNull(wakeTransferredAgent);
             wakeTransferredAgent.Invoke(controller, new object[] { rider });
 
-            Assert.True(AgentMirror.TryGet(rider, out var riderMirror));
             Assert.Equal(AgentControllerType.AI, riderMirror.Controller);
             Assert.Equal(AgentControllerType.AI, mountMirror.Controller);
             Assert.Equal(-1f, mountMirror.MaximumSpeedLimit);
             Assert.Equal(1, mountMirror.SetMaximumSpeedLimitCalls);
+            Assert.Equal(AgentMovementLockedState.None, riderMirror.MovementLockedState);
+            Assert.Equal(AgentMovementLockedState.None, mountMirror.MovementLockedState);
         });
     }
 }

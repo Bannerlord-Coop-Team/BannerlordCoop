@@ -1963,10 +1963,10 @@ public class CoopTournamentController : CoopMissionController
     {
         if (agent == null || agent.IsMount || !agent.IsActive() || !session.IsLocalHost) return;
 
-        coopMissionComponent.AgentMovementHandler.Interpolator.Forget(agent);
+        coopMissionComponent.AgentMovementHandler.Interpolator.Release(agent);
         if (agent.MountAgent != null)
         {
-            coopMissionComponent.AgentMovementHandler.Interpolator.Forget(agent.MountAgent);
+            coopMissionComponent.AgentMovementHandler.Interpolator.Release(agent.MountAgent);
             agent.MountAgent.SetMaximumSpeedLimit(-1f, isMultiplier: false);
             agent.MountAgent.Controller = AgentControllerType.AI;
         }

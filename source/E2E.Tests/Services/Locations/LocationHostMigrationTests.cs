@@ -101,6 +101,35 @@ public class LocationHostMigrationTests : SettlementTestEnvironment
         Assert.Single(GetAgentsWithId(entrant, ownedInfo.AgentId));
     }
 
+    // The successor's follow pins a walking NPC on the last pose its host sent; once adopted, its AI has to walk it again.
+    [Fact]
+    public void AbruptHostDisconnect_FreesTheAdoptedWalkingNpcFromTheFollowLock()
+    {
+        EnvironmentInstance[] clients = Clients.ToArray();
+        var (instanceId, _) = CreateSettlement("A", "B", "C");
+        SettlementClientFixture departedHost = EnterLocation(clients[0], instanceId);
+        SettlementClientFixture successor = EnterLocation(clients[1], instanceId);
+        string characterId = CreateRegisteredObject<CharacterObject>();
+
+        Agent ownedNpc = SpawnNpc(departedHost, characterId, new Vec3(2f, 3f, 0f), Vec2.Forward);
+        DrainNetwork();
+        Tick(0f);
+        MoveAgent(ownedNpc, new Vec3(3f, 3f, 0f), Vec2.Forward);
+        departedHost.Tick(0.1f);
+        DrainNetwork();
+        successor.Tick(0.1f);
+
+        CoopAgentInfo ownedInfo = GetAgentInfo(departedHost, ownedNpc);
+        Agent adoptedNpc = GetAgentInfo(successor, ownedInfo.AgentId).Agent;
+        Assert.Equal(AgentMovementLockedState.FrameLocked, GetAgentState(adoptedNpc).MovementLockedState);
+
+        Disconnect(clients[0]);
+
+        Assert.Equal("B", GetAgentInfo(successor, adoptedNpc).CurrentAuthority);
+        Assert.Equal(AgentControllerType.AI, GetAgentState(adoptedNpc).Controller);
+        Assert.Equal(AgentMovementLockedState.None, GetAgentState(adoptedNpc).MovementLockedState);
+    }
+
     private static CoopAgentInfo GetAgentInfo(SettlementClientFixture fixture, Agent agent)
     {
         CoopAgentInfo info = null;
