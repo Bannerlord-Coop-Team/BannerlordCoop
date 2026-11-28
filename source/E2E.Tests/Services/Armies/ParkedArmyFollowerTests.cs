@@ -69,7 +69,7 @@ public class ParkedArmyFollowerTests : MapEventTestBase
         AssertEjected(partyId, settlementId);
     }
 
-    // After a battle the army leave is queued past the park, so the town is checked again once the follower left the army
+    // After a battle the army leave is queued past the park, so the town check is queued with it
     [Fact]
     public void DisconnectDuringLeaderBattle_FollowerInHostileTown_IsEjectedAfterQueuedArmyLeave()
     {
