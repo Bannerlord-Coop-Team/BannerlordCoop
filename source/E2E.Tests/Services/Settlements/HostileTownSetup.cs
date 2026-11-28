@@ -15,7 +15,8 @@ namespace E2E.Tests.Services.Settlements;
 internal static class HostileTownSetup
 {
     /// <summary>
-    /// Puts the parties in a new town on every instance. Only <paramref name="atWarClanId"/> gets a faction id, the one the war targets.
+    /// Puts the parties in a new town on every instance. Gives the town clan and <paramref name="atWarClanId"/> the faction ids the
+    /// stance link is keyed by, and leaves the other parties' clans without one.
     /// </summary>
     internal static (string SettlementId, string TownClanId) CreateTown(E2ETestEnvironment environment, string atWarClanId, params string[] partyIds)
     {
@@ -41,9 +42,12 @@ internal static class HostileTownSetup
 
                 var diplomaticHandler = new PartyDiplomaticHandlerCampaignBehavior();
                 diplomaticHandler.RegisterEvents();
+                if (instance != environment.Server) return;
+
                 // Only the server's parking path finds the behavior through GetCampaignBehavior, which needs the manager
-                if (instance == environment.Server)
-                    Campaign.Current.AddCampaignBehaviorManager(new CampaignBehaviorManager(new CampaignBehaviorBase[] { diplomaticHandler }));
+                Campaign.Current.AddCampaignBehaviorManager(new CampaignBehaviorManager(new CampaignBehaviorBase[] { diplomaticHandler }));
+                // The server's other war listener that sends lord parties out of a hostile fortification
+                new PrisonerCaptureCampaignBehavior().RegisterEvents();
             });
         }
         return (settlementId, townClanId);
@@ -55,7 +59,7 @@ internal static class HostileTownSetup
             environment.Server.GetRegisteredObject<Clan>(townClanId),
             environment.Server.GetRegisteredObject<Clan>(atWarClanId),
             DeclareWarAction.DeclareWarDetail.CausedByKingdomDecision));
-        Flush(environment);
+        environment.PumpAndFlush();
     }
 
     internal static void AssertInTown(E2ETestEnvironment environment, string partyId, string settlementId, bool inTown)
@@ -65,17 +69,6 @@ internal static class HostileTownSetup
             instance.Call(() => Assert.Same(
                 inTown ? instance.GetRegisteredObject<Settlement>(settlementId) : null,
                 instance.GetRegisteredObject<MobileParty>(partyId).CurrentSettlement));
-        }
-    }
-
-    // Two passes, so a reply the server sends from a game-thread action reaches the clients too
-    internal static void Flush(E2ETestEnvironment environment)
-    {
-        for (int i = 0; i < 2; i++)
-        {
-            environment.Server.PumpGameThread();
-            environment.FlushCoalescer();
-            foreach (var client in environment.Clients) client.PumpGameThread();
         }
     }
 }

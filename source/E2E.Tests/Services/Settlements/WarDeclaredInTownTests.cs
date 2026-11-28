@@ -57,7 +57,7 @@ public class WarDeclaredInTownTests : SyncTestBase
         playerClient.Call(() => ObjectHelper.SkipConstructor<EncounterGameMenuBehavior>()
             .game_menu_fortification_high_crime_rating_continue_on_consequence(new MenuCallbackArgs((MenuContext)null, null)));
         Assert.Single(playerClient.NetworkSentMessages.GetMessages<NetworkRequestEndSettlementEncounter>());
-        HostileTownSetup.Flush(TestEnvironment);
+        TestEnvironment.PumpAndFlush();
 
         HostileTownSetup.AssertInTown(TestEnvironment, player.MobilePartyId, settlementId, inTown: false);
         playerClient.Call(() => Assert.Null(PlayerEncounter.Current));
@@ -87,7 +87,7 @@ public class WarDeclaredInTownTests : SyncTestBase
         HostileTownSetup.DeclareWar(TestEnvironment, townClanId, player.ClanId);
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPartyLeaveSettlement>());
         Server.SimulateMessage(this, new PlayerDisconnected(playerClient.NetPeer, default));
-        HostileTownSetup.Flush(TestEnvironment);
+        TestEnvironment.PumpAndFlush();
 
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPartyLeaveSettlement>());
         HostileTownSetup.AssertInTown(TestEnvironment, player.MobilePartyId, settlementId, inTown: false);
