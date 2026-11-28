@@ -1664,9 +1664,6 @@ public class KingdomDebugCommand
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (ModInformation.IsClient) return Failed("Run this command on the server.");
-            // The server applies a passed DeclareWarDecision with no player swapped in, so a decision war needs no actor
-            bool hasActor = args.Count > 3 && args[3] != "none";
-            if (args.Count < 3 || (!hasActor && args[2] != "decision")) return Failed("A registered acting player is required.");
             Action<IFaction, IFaction> declare;
             switch (args[2])
             {
@@ -1680,6 +1677,9 @@ public class KingdomDebugCommand
                 case "agreement": declare = DeclareWarAction.ApplyByCallToWarAgreement; break;
                 default: return Failed("Unknown war cause.");
             }
+            // The server applies a passed DeclareWarDecision with no player swapped in, so a decision war needs no actor
+            bool hasActor = args.Count > 3 && args[3] != "none";
+            if (!hasActor && args[2] != "decision") return Failed("A registered acting player is required.");
             if (TryGetObjectManager(out var objectManager) == false)
             {
                 return Failed("Unable to resolve ObjectManager");
@@ -1700,16 +1700,18 @@ public class KingdomDebugCommand
             if (!hasActor)
             {
                 declare(faction1, faction2);
-                return Succeeded($"Declared war between '{faction1.Name}' and '{faction2.Name}'.");
             }
-            if (!ContainerProvider.TryResolve<IPlayerManager>(out var players) ||
-                !players.TryGetPlayer(args[3], out var player) ||
-                !objectManager.TryGetObject<Hero>(player.HeroId, out var hero) ||
-                !objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party))
-                return Failed("The acting player's registered hero and party are required.");
-            if (hero.MapFaction != faction1 && hero.MapFaction != faction2)
-                return Failed("The acting player must belong to one of the factions.");
-            using (new MainHeroSubstitutionScope(hero, party)) declare(faction1, faction2);
+            else
+            {
+                if (!ContainerProvider.TryResolve<IPlayerManager>(out var players) ||
+                    !players.TryGetPlayer(args[3], out var player) ||
+                    !objectManager.TryGetObject<Hero>(player.HeroId, out var hero) ||
+                    !objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party))
+                    return Failed("The acting player's registered hero and party are required.");
+                if (hero.MapFaction != faction1 && hero.MapFaction != faction2)
+                    return Failed("The acting player must belong to one of the factions.");
+                using (new MainHeroSubstitutionScope(hero, party)) declare(faction1, faction2);
+            }
             return Succeeded($"Declared war between '{faction1.Name}' and '{faction2.Name}'.");
         }
     }

@@ -29,6 +29,7 @@ public class WarDeclaredInTownTests : SyncTestBase
     {
         var playerClient = Clients.First();
         var player = CreatePlayer(playerClient, "player");
+        // Gives the second client its own main party, which every real client has, waiting in the town like B in the manual test
         var other = CreatePlayer(Clients.Last(), "other");
         var (settlementId, townClanId) = HostileTownSetup.CreateTown(TestEnvironment, player.ClanId, player.MobilePartyId, other.MobilePartyId);
 
