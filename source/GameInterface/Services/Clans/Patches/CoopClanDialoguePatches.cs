@@ -3,6 +3,8 @@ using TaleWorlds.CampaignSystem;
 using GameInterface.Services.Heroes.Extensions;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.Core;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Clans.Patches;
 
@@ -16,8 +18,8 @@ internal class CoopClanDialoguePatches
 
     [HarmonyPatch(typeof(CompanionRolesCampaignBehavior), nameof(CompanionRolesCampaignBehavior.lead_a_party_clickable_condition))]
     [HarmonyPostfix]
-    public static void LeadAPartyClickableConditionPostfix(ref bool __result)
-        => CheckCanManageClan(ref __result);
+    public static void LeadAPartyClickableConditionPostfix(ref bool __result, ref TextObject reason)
+        => CheckCanManageClan(ref __result, ref reason, "str_coop_clan_party_leader_only");
 
     [HarmonyPatch(typeof(LordConversationsCampaignBehavior), nameof(LordConversationsCampaignBehavior.conversation_clan_member_manage_inventory_on_condition))]
     [HarmonyPostfix]
@@ -34,15 +36,15 @@ internal class CoopClanDialoguePatches
     public static void ConversationHeroHireOnConditionPostfix(ref bool __result)
         => CheckCanManageClan(ref __result);
 
-    [HarmonyPatch(typeof(CaravanConversationsCampaignBehavior), nameof(CaravanConversationsCampaignBehavior.conversation_caravan_build_on_condition))]
+    [HarmonyPatch(typeof(CaravanConversationsCampaignBehavior), nameof(CaravanConversationsCampaignBehavior.conversation_caravan_build_clickable_condition))]
     [HarmonyPostfix]
-    public static void ConversationCaravanBuildOnConditionPostfix(ref bool __result)
-        => CheckCanManageClan(ref __result);
+    public static void ConversationCaravanBuildClickableConditionPostfix(ref bool __result, ref TextObject explanation)
+        => CheckCanManageClan(ref __result, ref explanation, "str_coop_clan_caravans_leader_only");
 
     [HarmonyPatch(typeof(WorkshopsCharactersCampaignBehavior), nameof(WorkshopsCharactersCampaignBehavior.can_player_buy_workshop_clickable_condition))]
     [HarmonyPostfix]
-    public static void CanPlayerBuyWorkshopClickableConditionPostfix(ref bool __result)
-        => CheckCanManageClan(ref __result);
+    public static void CanPlayerBuyWorkshopClickableConditionPostfix(ref bool __result, ref TextObject explanation)
+        => CheckCanManageClan(ref __result, ref explanation, "str_coop_clan_workshops_leader_only");
 
     [HarmonyPatch(typeof(NotableSupportersCampaignBehavior), nameof(NotableSupportersCampaignBehavior.notable_support_request_on_condition))]
     [HarmonyPostfix]
@@ -109,6 +111,15 @@ internal class CoopClanDialoguePatches
         {
             __result = false;
         }
+    }
+
+    // Keeps the option visible but disabled with a reason, otherwise members see it missing or greyed out with no hint
+    private static void CheckCanManageClan(ref bool __result, ref TextObject explanation, string reasonId)
+    {
+        if (CoopClanPermissions.CanManageClan(Hero.MainHero.Clan)) return;
+
+        __result = false;
+        explanation = GameTexts.FindText(reasonId);
     }
 
     private static void CheckCanManageParty(ref bool __result)
