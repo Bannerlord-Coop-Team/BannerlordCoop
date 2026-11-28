@@ -291,7 +291,7 @@ internal sealed class CoopHideoutMissionLogic : MissionLogic
     private bool HasActive(BattleSideEnum side)
         => Mission.Agents.Any(agent => agent.IsHuman && agent.IsActive() && agent.Team?.Side == side);
 
-    private static bool IsPlayerHero(Agent agent)
+    internal static bool IsPlayerHero(Agent agent)
         => (agent.Character as CharacterObject)?.HeroObject?.IsPlayerHero() == true;
 
     public bool ShouldResumeBossBattle(HideoutPhase phase)

@@ -1,18 +1,16 @@
 ﻿using Common.Commands;
-using GameInterface.Services.Heroes.Extensions;
 using Newtonsoft.Json;
 using SandBox.Objects.Usables;
 using System;
 using System.Linq;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Hideouts;
 
-/// <summary>Live-test commands for the stealth hideout signal fire on this client.</summary>
-internal static class HideoutSignalFireCommands
+/// <summary>Live-test commands for the co-op hideout missions on this client.</summary>
+internal static class HideoutDebugCommands
 {
     private static CoopCommandResult Failed(string output, string errorCode) => new CoopCommandResult(false, output, errorCode);
 
@@ -23,8 +21,6 @@ internal static class HideoutSignalFireCommands
         native = logic?.Native as CoopHideoutAmbushController;
         return native != null;
     }
-
-    private static bool IsPlayerHero(Agent agent) => (agent.Character as CharacterObject)?.HeroObject?.IsPlayerHero() == true;
 
     /// <summary>Has this client's hero light the nearest usable signal fire the way the use key does.</summary>
     public sealed class LightSignalFireCoopCommand : ICoopCommand
@@ -51,14 +47,16 @@ internal static class HideoutSignalFireCommands
             if (fires.Length == 0)
                 return Failed("This hideout has no signal fire.", "fire_unavailable");
             // The gates MissionMainAgentInteractionComponent checks before the use key calls HandleStartUsingAction.
-            var fire = fires.FirstOrDefault(point => mission.IsMainAgentObjectInteractionEnabled && !hero.IsUsingGameObject &&
-                hero.IsAbleToUseMachine() && hero.ObjectHasVacantPosition(point) && hero.CanUseObject(point));
+            if (!mission.IsMainAgentObjectInteractionEnabled || hero.IsUsingGameObject || !hero.IsAbleToUseMachine())
+                return Failed($"This client's hero can't use objects now (interaction={mission.IsMainAgentObjectInteractionEnabled}, " +
+                    $"using={hero.IsUsingGameObject}, able={hero.IsAbleToUseMachine()}).", "hero_busy");
+            var fire = fires.FirstOrDefault(point => hero.ObjectHasVacantPosition(point) && hero.CanUseObject(point));
             if (fire == null)
             {
                 var nearest = fires[0];
                 return Failed($"No signal fire can be lit now (nearest {nearest.Id.Id}: used={nearest._isAlreadyUsed}, " +
-                    $"enabled={nearest._isEnabled}, in combat={nearest.IsInCombat()}, " +
-                    $"interaction={mission.IsMainAgentObjectInteractionEnabled}).", "fire_unusable");
+                    $"enabled={nearest._isEnabled}, vacant={hero.ObjectHasVacantPosition(nearest)}, " +
+                    $"in combat={nearest.IsInCombat()}).", "fire_unusable");
             }
             hero.HandleStartUsingAction(fire, -1);
             return new CoopCommandResult(true, $"Lit signal fire {fire.Id.Id}.");
@@ -79,29 +77,31 @@ internal static class HideoutSignalFireCommands
             if (!TryGetAmbush(out var mission, out var logic, out var native))
                 return Failed("Not in a co-op stealth hideout mission.", "mission_unavailable");
             var areas = mission.GetMissionBehavior<CoopHideoutStealthAreaLogic>();
-            var attackers = mission.Agents.Where(agent => agent.IsActive() && agent.IsHuman &&
-                agent.Team?.Side == BattleSideEnum.Attacker).ToArray();
+            var humans = mission.Agents.Where(agent => agent.IsActive() && agent.IsHuman).ToArray();
+            var attackers = humans.Where(agent => agent.Team?.Side == BattleSideEnum.Attacker).ToArray();
+            var defenders = humans.Where(agent => agent.Team?.Side == BattleSideEnum.Defender).ToArray();
+            // Used is this machine's fire, Called is set only where the call troops request ran, on the battle host.
+            var fires = mission.ActiveMissionObjects.FindAllWithType<StealthAreaUsePoint>()
+                .Select(fire => new
+                {
+                    Id = fire.Id.Id,
+                    Used = fire._isAlreadyUsed,
+                    Enabled = fire._isEnabled,
+                    Called = areas._stealthAreaData.FirstOrDefault(area => area.StealthAreaUsePoint == fire)?.IsReinforcementCalled == true,
+                })
+                .ToArray();
             var status = new
             {
                 Phase = native.Phase.ToString(),
                 BattleHost = logic.IsAuthority,
-                // Used is this machine's fire, Called is set only where the call troops request ran, on the battle host.
-                Fires = mission.ActiveMissionObjects.FindAllWithType<StealthAreaUsePoint>()
-                    .Select(fire => new
-                    {
-                        Id = fire.Id.Id,
-                        Used = fire._isAlreadyUsed,
-                        Enabled = fire._isEnabled,
-                        Called = areas?._stealthAreaData.FirstOrDefault(area => area.StealthAreaUsePoint == fire)?.IsReinforcementCalled == true,
-                    })
-                    .ToArray(),
-                PlayerHeroes = attackers.Count(IsPlayerHero),
-                PlayerTroops = attackers.Count(agent => !IsPlayerHero(agent) && agent.Origin?.BattleCombatant == PartyBase.MainParty),
-                AttackerTroops = attackers.Count(agent => !IsPlayerHero(agent)),
+                Fires = fires,
+                PlayerHeroes = attackers.Count(CoopHideoutMissionLogic.IsPlayerHero),
+                PlayerTroops = attackers.Count(agent => !CoopHideoutMissionLogic.IsPlayerHero(agent) &&
+                    agent.Origin?.BattleCombatant == PartyBase.MainParty),
+                AttackerTroops = attackers.Count(agent => !CoopHideoutMissionLogic.IsPlayerHero(agent)),
                 ActiveSentries = native._stealthAreaData.Sum(area =>
                     area.StealthAreaMarkers.Values.Sum(sentries => sentries.Count(sentry => sentry.IsActive()))),
-                ActiveDefenders = mission.Agents.Count(agent => agent.IsActive() && agent.IsHuman &&
-                    agent.Team?.Side == BattleSideEnum.Defender),
+                ActiveDefenders = defenders.Length,
             };
             return new CoopCommandResult(true, "LIVE_TEST_JSON=" + JsonConvert.SerializeObject(status));
         }
