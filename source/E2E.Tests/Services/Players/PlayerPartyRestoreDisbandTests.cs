@@ -87,8 +87,6 @@ public class PlayerPartyRestoreDisbandTests : MapEventTestBase
             AssertCaptivity(client, heroId, siege.AttackerPartyId);
 
         Rejoin(defenderClient, DefenderControllerId, partyId);
-        // The release only puts the party back on the map once its player is in the campaign again
-        TestEnvironment.ConnectRegisteredPlayer(defenderClient, DefenderControllerId);
 
         ReleasePlayerByRequest(defenderClient, heroId, partyId, EndCaptivityDetail.Ransom);
         PassHours(HoursPastDisbandWait);
@@ -179,7 +177,7 @@ public class PlayerPartyRestoreDisbandTests : MapEventTestBase
     }
 
     /// <summary>
-    /// Drops the client and brings it back through the returning handshake.
+    /// Drops the client and brings it back into the campaign through the returning handshake.
     /// </summary>
     private void Rejoin(EnvironmentInstance client, string controllerId, string partyId)
     {
@@ -188,6 +186,8 @@ public class PlayerPartyRestoreDisbandTests : MapEventTestBase
         Assert.Equal(partyId, validated.Player.MobilePartyId);
         // Runs the deferred park of the dropped party
         Server.PumpGameThread();
+        // The release only puts the party back on the map once its player is in the campaign again
+        TestEnvironment.ConnectRegisteredPlayer(client, controllerId);
     }
 
     /// <summary>
