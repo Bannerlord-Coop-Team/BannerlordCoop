@@ -50,6 +50,18 @@ public sealed class HideoutResolvedMigrationTests : MissionTestEnvironment
         Assert.NotEqual(AgentControllerType.AI, mirror.Controller);
     }
 
+    // Once the spectators are restored, a won duel's guards stay teamless but still count as surrendered
+    [Fact]
+    public void PromotedAfterADuelWin_LeavesARestoredTeamlessBanditIdle()
+    {
+        var (mirror, formation, _) = AdoptDefender(HideoutPhase.Resolved, BattleSideEnum.Attacker,
+            teamlessSpectator: true, restoreSpectators: true);
+
+        Assert.Equal(BattleSideEnum.None, mirror.Team?.Side);
+        Assert.NotEqual(AgentControllerType.AI, mirror.Controller);
+        Assert.False(formation?.IsAIControlled ?? false);
+    }
+
     [Fact]
     public void PromotedDuringALiveHideoutFight_ChargesTheAdoptedBandits()
     {
@@ -176,7 +188,7 @@ public sealed class HideoutResolvedMigrationTests : MissionTestEnvironment
 
     // The old host "A" ran a defender NPC that this client mirrors as an inert puppet; A leaves and this client adopts it
     private (MirrorAgent Mirror, MockFormation? Formation, CoopHideoutMissionLogic? Hideout) AdoptDefender(
-        HideoutPhase phase, BattleSideEnum winner, bool teamlessSpectator = false)
+        HideoutPhase phase, BattleSideEnum winner, bool teamlessSpectator = false, bool restoreSpectators = false)
     {
         using var fixture = new MissionEngineFixture();
         var newHost = Clients.First();
@@ -202,6 +214,8 @@ public sealed class HideoutResolvedMigrationTests : MissionTestEnvironment
             if (teamlessSpectator)
                 ((Dictionary<Agent, Team>)AccessTools.Field(typeof(CoopHideoutMissionLogic), "spectatorTeams").GetValue(hideout)!)
                     .Add(bandit, defenders.Shell);
+            if (restoreSpectators)
+                hideout.RestoreSpectators();
             Assert.True(registry.TryRegisterAgent("A", Guid.NewGuid(), bandit));
 
             newHost.Resolve<IMessageBroker>().Publish(this, new BattleHostMigrated("mapEvent1", "A"));

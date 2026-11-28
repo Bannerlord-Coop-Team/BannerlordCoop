@@ -154,6 +154,7 @@ internal sealed class CoopHideoutAmbushController : HideoutAmbushMissionControll
         AccessTools.FieldRefAccess<HideoutAmbushMissionController, int>(nameof(_playerTroopCount));
     private readonly CoopHideoutMissionLogic coop;
     private bool locationListenerRegistered;
+    private NetworkHideoutState appliedFailCounter;
 
     public CoopHideoutAmbushController(CoopHideoutMissionLogic coop, IMissionTroopSupplier[] suppliers)
         : base(suppliers, BattleSideEnum.Attacker, 0) => this.coop = coop;
@@ -297,6 +298,20 @@ internal sealed class CoopHideoutAmbushController : HideoutAmbushMissionControll
         foreach (var agent in _stealthAreaData.SelectMany(value => value.StealthAreaMarkers.Values).SelectMany(agents => agents))
             coop.RecordHidden(agent);
         base.OnObjectUsed(Mission.MainAgent, area.StealthAreaUsePoint);
+    }
+
+    private StealthFailCounterMissionLogic FailCounter => Mission.GetMissionBehavior<StealthFailCounterMissionLogic>();
+
+    internal float FailCounterElapsed => HideoutFailCounterSync.Elapsed(FailCounter, Mission.CurrentTime);
+
+    internal void StopFailCounter() => HideoutFailCounterSync.Stop(FailCounter);
+
+    internal void ApplyFailCounter(NetworkHideoutState state)
+    {
+        // Peers re-apply the latest snapshot every tick; restarting the timer from a stale one would freeze the bar.
+        if (ReferenceEquals(state, appliedFailCounter)) return;
+        appliedFailCounter = state;
+        HideoutFailCounterSync.Apply(FailCounter, state, Mission.Agents, Mission.CurrentTime);
     }
 
     internal void RestoreDefender(Agent agent)

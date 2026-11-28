@@ -33,11 +33,13 @@ internal sealed class NetworkHideoutState : IEvent
     [ProtoMember(11)] public int[] HiddenSeeds { get; }
     [ProtoMember(12)] public HideoutDefenderState[] Defenders { get; }
     [ProtoMember(13)] public int[] ActiveHeroSeeds { get; }
+    // Seconds the host's stealth fail countdown has run, negative while it is idle
+    [ProtoMember(14)] public float FailCounterElapsed { get; }
 
     public NetworkHideoutState(string instanceId, string hostControllerId, int hostEpoch,
         long revision, HideoutPhase phase, int bossSeed, int speakerSeed, int[] spawnedSeeds,
         BattleSideEnum winner, int initialPopulation, int[] hiddenSeeds = null, HideoutDefenderState[] defenders = null,
-        int[] activeHeroSeeds = null)
+        int[] activeHeroSeeds = null, float failCounterElapsed = -1f)
     {
         InstanceId = instanceId;
         HostControllerId = hostControllerId;
@@ -52,6 +54,7 @@ internal sealed class NetworkHideoutState : IEvent
         HiddenSeeds = hiddenSeeds;
         Defenders = defenders;
         ActiveHeroSeeds = activeHeroSeeds;
+        FailCounterElapsed = failCounterElapsed;
     }
 }
 
@@ -72,6 +75,14 @@ internal sealed class HideoutDefenderState
         StandingPointId = standingPointId;
         Patrolling = patrolling;
     }
+}
+
+[ProtoContract(SkipConstructor = true)]
+internal readonly struct NetworkHideoutTeleportToBoss : IEvent
+{
+    [ProtoMember(1)] public string InstanceId { get; }
+
+    public NetworkHideoutTeleportToBoss(string instanceId) => InstanceId = instanceId;
 }
 
 [ProtoContract(SkipConstructor = true)]

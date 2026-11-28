@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.Heroes.Extensions;
@@ -7,6 +8,7 @@ using Missions.Battles;
 using Missions.Services.Network;
 using Missions.Messages;
 using SandBox.Conversation.MissionLogics;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -20,6 +22,8 @@ namespace Missions.Hideouts;
 
 internal sealed class CoopHideoutMissionLogic : MissionLogic
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<CoopHideoutMissionLogic>();
+
     private readonly IBattleNetwork network;
     private readonly IMessageBroker broker;
     private readonly IMissionContext missionContext;
@@ -30,6 +34,7 @@ internal sealed class CoopHideoutMissionLogic : MissionLogic
     private readonly HashSet<int> hidden = new();
     private readonly Dictionary<Agent, AgentControllerType> spectatorControllers = new();
     private readonly Dictionary<Agent, Team> spectatorTeams = new();
+    private readonly HideoutBossSceneJoin bossScene = new();
     private NetworkHideoutState pendingState;
     private CoopBattleController battle;
     private bool initialized;
@@ -54,6 +59,9 @@ internal sealed class CoopHideoutMissionLogic : MissionLogic
     public bool IsAuthority => battle?.Session.IsLocalHost == true;
     public bool HasPhaseSnapshot => initialized && ledger.Latest != null;
     public int InitialPopulation => defenderSource.SideTotalTroops;
+    // A lost raid, such as a stealth failure, can leave living heroes among the bandits.
+    public bool IsLostToDefenders => Native?.Phase == HideoutPhase.Resolved && winner == BattleSideEnum.Defender;
+    public bool HasOtherPlayers => missionContext.ControllersInMission.Count > 0;
 
     public CoopHideoutMissionLogic(IBattleNetwork network, IMessageBroker broker, IMissionContext missionContext,
         CoopTroopSupplier defenderSource, CoopTroopSupplier attackerSource, bool direct)
@@ -68,6 +76,7 @@ internal sealed class CoopHideoutMissionLogic : MissionLogic
         Attacker = new HideoutTroopSupplier(attackerSource, ledger);
         broker.Subscribe<NetworkHideoutState>(HandleState);
         broker.Subscribe<NetworkHideoutCallTroops>(HandleCallTroops);
+        broker.Subscribe<NetworkHideoutTeleportToBoss>(HandleTeleportToBoss);
     }
 
     public override void AfterStart() => battle = Mission.GetMissionBehavior<CoopBattleController>();
@@ -163,6 +172,8 @@ internal sealed class CoopHideoutMissionLogic : MissionLogic
             snapshotTimer -= dt;
             if (Native.Phase != lastPhase || snapshotTimer <= 0f)
             {
+                if (Native.Phase != lastPhase)
+                    Logger.Debug("Hideout phase {Old} -> {New}, winner {Winner}", lastPhase, Native.Phase, winner);
                 lastPhase = Native.Phase;
                 snapshotTimer = 0.5f;
                 BroadcastState();
@@ -171,8 +182,11 @@ internal sealed class CoopHideoutMissionLogic : MissionLogic
         else
         {
             ApplyLatest();
+            bossScene.Tick(Native.Phase, Mission.MainAgent, Speaker(), Native.Boss);
         }
         ApplySpectators();
+        ApplyVerdict();
+        ApplyDefeatTruce();
         if (!reportedSuccessorReady && HasPhaseSnapshot)
         {
             reportedSuccessorReady = true;
@@ -251,7 +265,7 @@ internal sealed class CoopHideoutMissionLogic : MissionLogic
     // A won duel leaves the leftover bandits surrendered (vanilla makes them teamless), so nothing may wake or charge them
     public bool HoldsSurrenderedDefenders => Native?.Phase == HideoutPhase.Resolved && winner == BattleSideEnum.Attacker;
 
-    // A duel spectator stays teamless until RestoreSpectators runs, so its real side is the team it was taken from
+    // A duel spectator is teamless, and a won duel's guards stay that way, so its real side is the team it was taken from
     public bool IsSurrenderedDefender(Agent agent) => HoldsSurrenderedDefenders &&
         (spectatorTeams.TryGetValue(agent, out var team) ? team : agent.Team)?.Side == BattleSideEnum.Defender;
 
@@ -277,7 +291,7 @@ internal sealed class CoopHideoutMissionLogic : MissionLogic
         if (Native.Phase == HideoutPhase.CallingTroops) return false;
         if (Native.Phase == HideoutPhase.Duel)
             return side == BattleSideEnum.Attacker
-                ? (Mission.Agents.FirstOrDefault(agent => agent.Origin?.UniqueSeed == speakerSeed) ?? Mission.MainAgent)?.IsActive() != true
+                ? (Speaker() ?? Mission.MainAgent)?.IsActive() != true
                 : Native.Boss?.IsActive() != true;
         // Native loses the first fight once its main agent falls, here only once every player's hero has.
         if (side == BattleSideEnum.Attacker && Native.Phase == HideoutPhase.Camp && hadPlayerHeroes &&
@@ -290,6 +304,9 @@ internal sealed class CoopHideoutMissionLogic : MissionLogic
 
     private bool HasActive(BattleSideEnum side)
         => Mission.Agents.Any(agent => agent.IsHuman && agent.IsActive() && agent.Team?.Side == side);
+
+    // The host's leader, who speaks to the boss and fights the duel.
+    private Agent Speaker() => Mission.Agents.FirstOrDefault(agent => agent.Origin?.UniqueSeed == speakerSeed);
 
     private static bool IsPlayerHero(Agent agent)
         => (agent.Character as CharacterObject)?.HeroObject?.IsPlayerHero() == true;
@@ -351,6 +368,33 @@ internal sealed class CoopHideoutMissionLogic : MissionLogic
         });
     }
 
+    // Debug command: each client owns its hero's position, so every player moves its own hero.
+    public bool RequestTeleportToBoss()
+    {
+        if (battle == null || Native.Boss?.IsActive() != true) return false;
+        network.SendAll(new NetworkHideoutTeleportToBoss(battle.Session.InstanceId));
+        TeleportToBoss();
+        return true;
+    }
+
+    private void TeleportToBoss()
+    {
+        var boss = Native.Boss;
+        var hero = Mission.MainAgent;
+        if (boss?.IsActive() == true && hero?.IsActive() == true)
+            hero.TeleportToPosition(HideoutBossSceneJoin.BesideBoss(boss));
+    }
+
+    private void HandleTeleportToBoss(MessagePayload<NetworkHideoutTeleportToBoss> payload)
+    {
+        var message = payload.What;
+        GameThread.RunSafe(() =>
+        {
+            if (battle != null && message.InstanceId == battle.Session.InstanceId)
+                TeleportToBoss();
+        });
+    }
+
     private void HandleState(MessagePayload<NetworkHideoutState> payload)
     {
         var state = payload.What;
@@ -398,16 +442,14 @@ internal sealed class CoopHideoutMissionLogic : MissionLogic
         };
         if (Mission.Mode != mode)
             Mission.SetMissionMode(mode, false);
-        bool enemies = state.Phase is not (HideoutPhase.Cinematic or HideoutPhase.Conversation);
+        (Native as CoopHideoutAmbushController)?.ApplyFailCounter(state);
+        bool enemies = state.Phase is not (HideoutPhase.Cinematic or HideoutPhase.Conversation) && !IsLostToDefenders;
         Mission.AttackerTeam.SetIsEnemyOf(Mission.DefenderTeam, enemies);
         foreach (var agent in Mission.Agents)
             if (agent.IsActive() && agent.Origin != null && hidden.Contains(agent.Origin.UniqueSeed))
                 agent.FadeOut(true, true);
         if (state.Phase == HideoutPhase.Resolved && winner != BattleSideEnum.None)
-        {
-            MapEvent.PlayerMapEvent.SetOverrideWinner(winner);
-            Mission.GetMissionBehavior<BattleEndLogic>().ChangeCanCheckForEndCondition(true);
-        }
+            MapEvent.PlayerMapEvent?.SetOverrideWinner(winner);
     }
 
     private void ApplySpectators()
@@ -439,11 +481,18 @@ internal sealed class CoopHideoutMissionLogic : MissionLogic
 
     public void RestoreSpectators()
     {
+        // Native leaves the boss's guards teamless after a won duel, otherwise they block every nearby player's exit.
+        // They stay listed with the team they were taken from, which is how IsSurrenderedDefender knows their side.
+        bool keepGuards = HoldsSurrenderedDefenders;
         foreach (var pair in spectatorTeams)
-            if (pair.Key.IsActive()) pair.Key.SetTeam(pair.Value, true);
+        {
+            bool guard = keepGuards && pair.Value.Side == BattleSideEnum.Defender;
+            if (!guard && pair.Key.IsActive() && pair.Key.Team != pair.Value)
+                pair.Key.SetTeam(pair.Value, true);
+        }
         foreach (var pair in spectatorControllers)
             if (pair.Key.IsActive()) pair.Key.Controller = pair.Value;
-        spectatorTeams.Clear();
+        if (!keepGuards) spectatorTeams.Clear();
         spectatorControllers.Clear();
     }
 
@@ -456,7 +505,8 @@ internal sealed class CoopHideoutMissionLogic : MissionLogic
                     new HideoutDefenderState(agent.Origin.UniqueSeed, (int)agent.CurrentWatchState,
                         agent.IsAlarmed(), -1, false)).ToArray(),
             Mission.Agents.Where(agent => agent.IsActive() && agent.IsHero && agent.Origin != null)
-                .Select(agent => agent.Origin.UniqueSeed).ToArray());
+                .Select(agent => agent.Origin.UniqueSeed).ToArray(),
+            (Native as CoopHideoutAmbushController)?.FailCounterElapsed ?? HideoutFailCounterSync.NotRunning);
 
     private void BroadcastState()
     {
@@ -473,18 +523,44 @@ internal sealed class CoopHideoutMissionLogic : MissionLogic
 
     public void OnStealthFailure()
     {
-        if (!IsAuthority || Native.Phase != HideoutPhase.Stealth) return;
-        winner = BattleSideEnum.Defender;
-        Native.Apply(HideoutPhase.Resolved, Native.Boss, InitialPopulation);
-        MapEvent.PlayerMapEvent.SetOverrideWinner(winner);
-        Mission.GetMissionBehavior<BattleEndLogic>().ChangeCanCheckForEndCondition(true);
+        // The counter only runs in stealth mode, so any unresolved phase it expires in is a failure.
+        if (!IsAuthority || Native.Phase == HideoutPhase.Resolved) return;
+        Logger.Debug("Hideout stealth fail countdown expired in phase {Phase}", Native.Phase);
+        Resolve(BattleSideEnum.Defender);
+        // The prefix skipped the native popup that stops the counter, so stop it here or the bar restarts.
+        (Native as CoopHideoutAmbushController)?.StopFailCounter();
         BroadcastState();
+        MapEvent.PlayerMapEvent?.SetOverrideWinner(winner);
+    }
+
+    internal void Resolve(BattleSideEnum side)
+    {
+        winner = side;
+        Native.Apply(HideoutPhase.Resolved, Native.Boss, InitialPopulation);
+    }
+
+    // Runs every tick on every client. The native end check reads the verdict through IsSideDepleted.
+    internal void ApplyVerdict()
+    {
+        if (Native.Phase != HideoutPhase.Resolved || winner == BattleSideEnum.None) return;
+        // Native's ambush switches the end check off and only a finished fight turns it back on.
+        Mission.GetMissionBehavior<BattleEndLogic>()?.ChangeCanCheckForEndCondition(true);
+    }
+
+    // Native ends a failed stealth mission at once; here it stays open for the results, so the bandits stand down.
+    private void ApplyDefeatTruce()
+    {
+        if (!IsLostToDefenders || Mission.DefenderTeam == null) return;
+        foreach (var team in new[] { Mission.AttackerTeam, Mission.AttackerAllyTeam })
+            if (team != null && team.IsEnemyOf(Mission.DefenderTeam))
+                team.SetIsEnemyOf(Mission.DefenderTeam, false);
     }
 
     public override void OnRemoveBehavior()
     {
         broker.Unsubscribe<NetworkHideoutState>(HandleState);
         broker.Unsubscribe<NetworkHideoutCallTroops>(HandleCallTroops);
+        broker.Unsubscribe<NetworkHideoutTeleportToBoss>(HandleTeleportToBoss);
         base.OnRemoveBehavior();
     }
 }

@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using Common.Util;
+using HarmonyLib;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
@@ -31,6 +32,8 @@ public sealed class MockTeam
     {
         Side = side;
         Shell = ObjectHelper.SkipConstructor<Team>();
+        // A skip-constructor shell would otherwise report side 0, which is Defender.
+        AccessTools.Field(typeof(Team), "<Side>k__BackingField").SetValue(Shell, side);
         ByShell.AddOrUpdate(Shell, this);
         ByQuerySystem.AddOrUpdate(QuerySystem, this);
     }

@@ -1,9 +1,15 @@
-﻿using HarmonyLib;
+﻿using Common.Logging;
+using HarmonyLib;
+using SandBox.CampaignBehaviors;
 using SandBox.Missions;
 using SandBox.Missions.MissionLogics.Hideout;
+using Serilog;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
+using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Hideouts;
@@ -51,6 +57,57 @@ internal static class HideoutStealthFailurePopupPatch
         coop.OnStealthFailure();
         return false;
     }
+}
+
+// Native refuses to leave while an enemy is close, but a failed stealth raid ends with living heroes beside the bandits.
+[HarmonyPatch(typeof(BattleEndLogic), nameof(BattleEndLogic.TryExit))]
+[HarmonyPatchCategory(MissionModule.HideoutPatchCategory)]
+internal static class HideoutLostRaidExitPatch
+{
+    private static void Postfix(BattleEndLogic __instance, ref BattleEndLogic.ExitResult __result)
+    {
+        if (__result != BattleEndLogic.ExitResult.False) return;
+        if (__instance.Mission?.GetMissionBehavior<CoopHideoutMissionLogic>()?.IsLostToDefenders != true) return;
+        __instance.Mission.EndMission();
+        __result = BattleEndLogic.ExitResult.True;
+    }
+}
+
+[HarmonyPatch(typeof(HideoutConversationsCampaignBehavior))]
+[HarmonyPatchCategory(MissionModule.HideoutPatchCategory)]
+internal static class HideoutBossDuelPatches
+{
+    private const string DuelLineId = "bandit_hideout_start_defender_1";
+    private static readonly ILogger Logger = LogManager.GetLogger(typeof(HideoutBossDuelPatches));
+
+    // Native's duel answer has no condition, so attach one that hides it while other players share the mission.
+    [HarmonyPatch(nameof(HideoutConversationsCampaignBehavior.AddDialogs))]
+    [HarmonyPostfix]
+    private static void HideDuelWithOtherPlayers()
+    {
+        var sentences = Campaign.Current?.ConversationManager?._sentences;
+        if (sentences == null) return;
+        var line = sentences.FirstOrDefault(sentence => sentence.Id == DuelLineId);
+        if (line == null)
+        {
+            Logger.Warning("Hideout duel line {Id} was not found, so the duel stays on offer with other players present", DuelLineId);
+            return;
+        }
+        line.OnCondition = () => !HasOtherPlayers();
+    }
+
+    // Native only counts AI companions, so the battle answer must stay clickable when the other fighters are players.
+    [HarmonyPatch(nameof(HideoutConversationsCampaignBehavior.bandit_hideout_continue_battle_on_clickable_condition))]
+    [HarmonyPostfix]
+    private static void AllowBattleWithOtherPlayers(ref bool __result, ref TextObject explanation)
+    {
+        if (__result || !HasOtherPlayers()) return;
+        __result = true;
+        explanation = TextObject.GetEmpty();
+    }
+
+    private static bool HasOtherPlayers()
+        => Mission.Current?.GetMissionBehavior<CoopHideoutMissionLogic>()?.HasOtherPlayers == true;
 }
 
 [HarmonyPatch(typeof(HideoutAmbushMissionController), nameof(HideoutAmbushMissionController.SpawnRemainingTroopsForBossFight))]
