@@ -12,7 +12,7 @@ using TaleWorlds.CampaignSystem.Settlements;
 namespace GameInterface.Services.BloodFeuds.Handlers;
 
 /// <summary>
-/// On a joining client, applies the player's blood feuds from the transferred CoopSession once that client's main hero is known
+/// On a joining client, applies the player clan's blood feuds from the transferred CoopSession once that client's main hero is known
 /// </summary>
 internal class BloodFeudInitializationHandler : IHandler
 {
@@ -55,15 +55,15 @@ internal class BloodFeudInitializationHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
-            if (!objectManager.TryGetIdWithLogging(newHero, out var playerHeroId)) return;
+            if (!objectManager.TryGetIdWithLogging(newHero.Clan, out var playerClanId)) return;
 
             Dictionary<string, BloodFeudData> feuds = null;
-            bloodFeudPlayerData?.PlayerBloodFeuds?.TryGetValue(playerHeroId, out feuds);
+            bloodFeudPlayerData?.PlayerClanBloodFeuds?.TryGetValue(playerClanId, out feuds);
             executionInterface.ApplyBloodFeuds(feuds);
 
             // The notice only lives on the client, so a rejoining player needs pending executions shown again
             Dictionary<string, PendingSettlementExecution> pendingExecutions = null;
-            bloodFeudPlayerData?.PlayerPendingSettlementExecutions?.TryGetValue(playerHeroId, out pendingExecutions);
+            bloodFeudPlayerData?.PlayerClanPendingSettlementExecutions?.TryGetValue(playerClanId, out pendingExecutions);
             if (pendingExecutions == null) return;
 
             foreach (var pendingExecution in pendingExecutions)

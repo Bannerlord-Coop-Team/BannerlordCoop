@@ -49,7 +49,7 @@ internal class ExecutionCampaignBehaviorPatches
         return false;
     }
 
-    // The server changes feuds per player in the interface, the client fires this only to refresh feud icons
+    // The server changes feuds per player clan in the interface, the client fires this only to refresh feud icons
     [HarmonyPatch(nameof(ExecutionCampaignBehavior.OnBloodFeudStateChanged))]
     [HarmonyPrefix]
     private static bool OnBloodFeudStateChangedPrefix() => !ContainerProvider.TryResolve<IExecutionCampaignBehaviorInterface>(out _);

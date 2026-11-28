@@ -174,7 +174,7 @@ internal class KillCharacterActionPatches
         if (victim.Clan == null || killer?.Clan == null) return;
         if (!killer.IsPlayerHero()) return;
         if (ContainerProvider.TryResolve<IExecutionCampaignBehaviorInterface>(out var executionInterface) &&
-            executionInterface.HasBloodFeud(killer, victim.Clan)) return;
+            executionInterface.HasBloodFeud(killer.Clan, victim.Clan)) return;
 
         using (new MainHeroSubstitutionScope(killer, killer.PartyBelongedTo))
         {

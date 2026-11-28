@@ -60,9 +60,9 @@ internal static class CoopSessionMigrationRules
 
         PreserveWithMigration.Add(AccessTools.Property(typeof(HeroMeetingData), nameof(HeroMeetingData.PlayerLastMeetingTimes)));
 
-        PreserveWithMigration.Add(AccessTools.Property(typeof(BloodFeudPlayerData), nameof(BloodFeudPlayerData.PlayerBloodFeuds)));
-        PreserveWithMigration.Add(AccessTools.Property(typeof(BloodFeudPlayerData), nameof(BloodFeudPlayerData.PlayerPendingSettlementExecutions)));
-        PreserveWithMigration.Add(AccessTools.Property(typeof(BloodFeudPlayerData), nameof(BloodFeudPlayerData.PlayerHeroesPendingMapEventEndExecution)));
+        PreserveWithMigration.Add(AccessTools.Property(typeof(BloodFeudPlayerData), nameof(BloodFeudPlayerData.PlayerClanBloodFeuds)));
+        PreserveWithMigration.Add(AccessTools.Property(typeof(BloodFeudPlayerData), nameof(BloodFeudPlayerData.PlayerClanPendingSettlementExecutions)));
+        PreserveWithMigration.Add(AccessTools.Property(typeof(BloodFeudPlayerData), nameof(BloodFeudPlayerData.PlayerClanHeroesPendingMapEventEndExecution)));
 
         /// Define fields that should have their data cleared
         ClearWithMigration.Add(AccessTools.Property(typeof(CaravansPlayerData), nameof(CaravansPlayerData.PlayerTradeRumorTakenCaravans)));

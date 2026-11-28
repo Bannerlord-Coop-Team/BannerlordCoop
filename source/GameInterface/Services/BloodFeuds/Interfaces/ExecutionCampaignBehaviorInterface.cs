@@ -28,8 +28,8 @@ using static TaleWorlds.CampaignSystem.Actions.ChangeBloodFeudStateAction;
 namespace GameInterface.Services.BloodFeuds.Interfaces;
 
 /// <summary>
-/// Server side <see cref="ExecutionCampaignBehavior"/> with its blood feud state kept per player in <see cref="BloodFeudPlayerData"/>.
-/// The server's clan blood feud fields stay unset, each client mirrors only its own player's feuds into them.
+/// Server side <see cref="ExecutionCampaignBehavior"/> with its blood feud state kept per player clan in <see cref="BloodFeudPlayerData"/>.
+/// The server's clan blood feud fields stay unset, each client mirrors only its own clan's feuds into them.
 /// </summary>
 public interface IExecutionCampaignBehaviorInterface : IGameAbstraction
 {
@@ -37,13 +37,14 @@ public interface IExecutionCampaignBehaviorInterface : IGameAbstraction
     void OnHeroKilled(Hero victim, Hero killer, KillCharacterAction.KillCharacterActionDetail detail);
     void OnHeroRelationChanged(Hero effectiveHero, Hero effectiveHeroGainedRelationWith);
     void OnHeroTakenPrisoner(PartyBase capturer, Hero prisoner);
+    void OnHeroChangedClan(Hero hero);
     void UpdateAllPlayerClanMemberExecutionStates();
     void DailyTickHero(Hero hero);
     void QuarterHourlyTick();
     void CanHeroBeReleased(Hero hero, ref bool result);
     void SettleBloodFeudByRansomPayment(Hero playerHero, Clan clan);
     void RequestSettleBloodFeudByRansomPayment(Clan clan);
-    bool HasBloodFeud(Hero playerHero, Clan clan);
+    bool HasBloodFeud(Clan playerClan, Clan clan);
     bool HasBloodFeudWithAnyPlayer(Clan clan);
     void SetPendingPlayerExecution(Hero playerHero, Hero executor);
     void ExecutePendingPlayers();
@@ -78,18 +79,18 @@ internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorIn
     public void OnPrisonerDonatedToSettlement(MobileParty oldOwner, FlattenedTroopRoster prisonerRoster)
     {
         Clan feudedClan = oldOwner.ActualClan;
-        foreach (var player in GetPlayers())
+        foreach (var playerClan in GetPlayerClans())
         {
-            if (!HasBloodFeud(player.HeroId, feudedClan)) continue;
+            if (!HasBloodFeud(playerClan.ClanId, feudedClan)) continue;
 
             foreach (CharacterObject troop in prisonerRoster.Troops)
             {
                 Hero prisoner = troop.HeroObject;
-                if (!troop.IsHero || prisoner.IsPlayerHero() || prisoner.Clan != player.Clan) continue;
+                if (!troop.IsHero || prisoner.IsPlayerHero() || prisoner.Clan != playerClan.Clan) continue;
                 if (!HeroExecutionRules.IsExecutable(prisoner, out _)) continue;
-                if (TryGetPendingSettlementExecution(player.HeroId, prisoner, out _)) continue;
+                if (TryGetPendingSettlementExecution(playerClan.ClanId, prisoner, out _)) continue;
 
-                StartClanMemberExecutionAtSettlement(player, prisoner, feudedClan);
+                StartClanMemberExecutionAtSettlement(playerClan, prisoner, feudedClan);
             }
         }
     }
@@ -98,40 +99,39 @@ internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorIn
     {
         if (detail == KillCharacterAction.KillCharacterActionDetail.Executed && victim.Clan != null && killer?.Clan != null)
         {
-            foreach (var player in GetPlayers())
+            foreach (var playerClan in GetPlayerClans())
             {
-                if (killer == player.Hero)
+                if (killer.Clan == playerClan.Clan && killer.IsPlayerHero())
                 {
-                    OnPlayerExecutedHero(player, victim);
+                    OnPlayerExecutedHero(playerClan, victim);
                 }
-                else if (victim.Clan == player.Clan)
+                else if (victim.Clan == playerClan.Clan)
                 {
-                    OnPlayerClanMemberExecuted(player, victim, killer);
+                    OnPlayerClanMemberExecuted(playerClan, victim, killer);
                 }
-                else if (killer.Clan == player.Clan && HasBloodFeud(player.HeroId, victim.Clan))
+                else if (killer.Clan == playerClan.Clan && HasBloodFeud(playerClan.ClanId, victim.Clan))
                 {
-                    OnPlayerMemberExecutedAHero(player, victim, killer);
+                    OnPlayerMemberExecutedAHero(playerClan, victim, killer);
                 }
 
-                if (killer.Clan == player.Clan && TryGetBloodFeud(player.HeroId, victim.Clan, out var victimClanFeud) && victimClanFeud.HasBloodFeud)
+                if (killer.Clan == playerClan.Clan && TryGetBloodFeud(playerClan.ClanId, victim.Clan, out var victimClanFeud) && victimClanFeud.HasBloodFeud)
                 {
                     victimClanFeud.ExecutionsReceivedCount++;
-                    SendBloodFeuds(player.Player);
+                    SendBloodFeuds(playerClan);
                 }
-                else if (victim.Clan == player.Clan && TryGetBloodFeud(player.HeroId, killer.Clan, out var killerClanFeud) && killerClanFeud.HasBloodFeud)
+                else if (victim.Clan == playerClan.Clan && TryGetBloodFeud(playerClan.ClanId, killer.Clan, out var killerClanFeud) && killerClanFeud.HasBloodFeud)
                 {
                     killerClanFeud.ExecutionsDoneCount++;
-                    SendBloodFeuds(player.Player);
+                    SendBloodFeuds(playerClan);
                 }
             }
         }
-
         if (!objectManager.TryGetId(victim, out var victimId)) return;
 
-        foreach (var pendingExecutions in Data.PlayerHeroesPendingMapEventEndExecution.Values)
+        foreach (var pendingExecutions in Data.PlayerClanHeroesPendingMapEventEndExecution.Values)
             pendingExecutions.Remove(victimId);
 
-        foreach (var pendingExecutions in Data.PlayerPendingSettlementExecutions.Values)
+        foreach (var pendingExecutions in Data.PlayerClanPendingSettlementExecutions.Values)
             pendingExecutions.Remove(victimId);
     }
 
@@ -142,17 +142,17 @@ internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorIn
         if (effectiveClan == null || gainedRelationWithClan == null) return;
         if (effectiveClan.GetRelationWithClan(gainedRelationWithClan) < ExecutionCampaignBehavior.BloodFeudEndRelationLevel) return;
 
-        foreach (var player in GetPlayers())
+        foreach (var playerClan in GetPlayerClans())
         {
-            if (effectiveClan != player.Clan && gainedRelationWithClan != player.Clan) continue;
+            if (effectiveClan != playerClan.Clan && gainedRelationWithClan != playerClan.Clan) continue;
 
-            if (HasBloodFeud(player.HeroId, effectiveClan))
+            if (HasBloodFeud(playerClan.ClanId, effectiveClan))
             {
-                ChangeBloodFeudState(player, effectiveClan, null, ChangeBloodFeudActionDetail.SettledByRelationIncrease);
+                ChangeBloodFeudState(playerClan, effectiveClan, null, ChangeBloodFeudActionDetail.SettledByRelationIncrease);
             }
-            else if (HasBloodFeud(player.HeroId, gainedRelationWithClan))
+            else if (HasBloodFeud(playerClan.ClanId, gainedRelationWithClan))
             {
-                ChangeBloodFeudState(player, gainedRelationWithClan, null, ChangeBloodFeudActionDetail.SettledByRelationIncrease);
+                ChangeBloodFeudState(playerClan, gainedRelationWithClan, null, ChangeBloodFeudActionDetail.SettledByRelationIncrease);
             }
         }
     }
@@ -166,28 +166,55 @@ internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorIn
         if (prisoner.IsPlayerHero()) return;
         if (!HeroExecutionRules.IsExecutable(prisoner, out _)) return;
 
-        foreach (var player in GetPlayers())
+        foreach (var playerClan in GetPlayerClans())
         {
-            if (capturerLeader.Clan == player.Clan)
+            if (capturerLeader.Clan == playerClan.Clan)
             {
-                if (!capturerLeader.IsPlayerHero() && HasBloodFeud(player.HeroId, prisoner.Clan))
-                    AddPendingMapEventEndExecution(player.HeroId, prisoner);
+                if (!capturerLeader.IsPlayerHero() && HasBloodFeud(playerClan.ClanId, prisoner.Clan))
+                    AddPendingMapEventEndExecution(playerClan.ClanId, prisoner);
             }
-            else if (prisoner.Clan == player.Clan && HasBloodFeud(player.HeroId, capturerLeader.Clan))
+            else if (prisoner.Clan == playerClan.Clan && HasBloodFeud(playerClan.ClanId, capturerLeader.Clan))
             {
                 if (!objectManager.TryGetIdWithLogging(prisoner, out var prisonerId)) continue;
                 if (!objectManager.TryGetIdWithLogging(capturerLeader.Clan, out var feudedClanId)) continue;
 
-                SendToPlayer(player.Player, new NetworkNotifyBloodFeudClanMemberCaptured(prisonerId, feudedClanId));
+                SendToClan(playerClan, new NetworkNotifyBloodFeudClanMemberCaptured(prisonerId, feudedClanId));
             }
+        }
+    }
+
+    public void OnHeroChangedClan(Hero hero)
+    {
+        if (!playerManager.TryGetPlayer(hero, out var player)) return;
+
+        Dictionary<string, BloodFeudData> feuds = null;
+        Dictionary<string, PendingSettlementExecution> pendingExecutions = null;
+        if (hero.Clan != null && objectManager.TryGetIdWithLogging(hero.Clan, out var clanId))
+        {
+            Data.PlayerClanBloodFeuds.TryGetValue(clanId, out feuds);
+            Data.PlayerClanPendingSettlementExecutions.TryGetValue(clanId, out pendingExecutions);
+        }
+
+        SendToPlayer(player, new NetworkUpdateBloodFeuds(feuds));
+        if (pendingExecutions == null) return;
+
+        foreach (var pendingExecution in pendingExecutions)
+        {
+            if (!objectManager.TryGetObjectWithLogging<Hero>(pendingExecution.Key, out var clanMember)) continue;
+
+            Settlement settlement = clanMember.PartyBelongedToAsPrisoner?.Settlement;
+            if (settlement == null || !objectManager.TryGetIdWithLogging(settlement, out var settlementId)) continue;
+
+            SendToPlayer(player, new NetworkNotifyBloodFeudSettlementExecutionStarted(
+                pendingExecution.Key, pendingExecution.Value.CapturerClanId, settlementId, pendingExecution.Value.ExecutionDateTicks));
         }
     }
 
     public void UpdateAllPlayerClanMemberExecutionStates()
     {
-        foreach (var player in GetPlayers())
+        foreach (var playerClan in GetPlayerClans())
         {
-            UpdateAllPlayerClanMemberExecutionStates(player);
+            UpdateAllPlayerClanMemberExecutionStates(playerClan);
         }
     }
 
@@ -196,7 +223,7 @@ internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorIn
         if (!HeroExecutionRules.IsExecutable(hero, out _)) return;
         if (!objectManager.TryGetId(hero, out var heroId)) return;
 
-        foreach (var pendingExecutions in Data.PlayerPendingSettlementExecutions.Values)
+        foreach (var pendingExecutions in Data.PlayerClanPendingSettlementExecutions.Values)
         {
             if (!pendingExecutions.TryGetValue(heroId, out var pendingExecution)) continue;
 
@@ -210,15 +237,14 @@ internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorIn
 
         if (hero.IsPlayerHero() || hero.PartyBelongedToAsPrisoner == null) return;
 
-        var clanPlayers = GetPlayers().Where(player => player.Clan == hero.Clan).ToList();
-        if (clanPlayers.Count == 0) return;
+        if (!TryGetPlayerClan(hero.Clan, out var playerClan)) return;
 
         PartyBase captorParty = hero.PartyBelongedToAsPrisoner;
         Hero executor = captorParty.IsMobile ? captorParty.LeaderHero : captorParty.Settlement.OwnerClan.Leader;
         // Another player holding the captive decides for themselves, vanilla only rolls this for AI captors
         if (executor == null || executor.IsPlayerHero()) return;
 
-        if (MBRandom.RandomFloat <= CalculatePlayerClanMemberExecutionProbability(clanPlayers, hero, executor))
+        if (MBRandom.RandomFloat <= CalculatePlayerClanMemberExecutionProbability(playerClan, hero, executor))
         {
             KillCharacterAction.ApplyByExecution(hero, executor);
         }
@@ -226,9 +252,9 @@ internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorIn
 
     public void QuarterHourlyTick()
     {
-        foreach (var player in GetPlayers())
+        foreach (var playerClan in GetPlayerClans())
         {
-            if (!Data.PlayerHeroesPendingMapEventEndExecution.TryGetValue(player.HeroId, out var pendingExecutions)) continue;
+            if (!Data.PlayerClanHeroesPendingMapEventEndExecution.TryGetValue(playerClan.ClanId, out var pendingExecutions)) continue;
 
             foreach (var heroId in pendingExecutions.ToArray())
             {
@@ -241,7 +267,7 @@ internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorIn
 
                 PartyBase captorParty = hero.PartyBelongedToAsPrisoner;
                 if (hero.IsPrisoner && captorParty?.LeaderHero != null && captorParty.MapEvent == null &&
-                    captorParty.LeaderHero.Clan == player.Clan && MBRandom.RandomFloat <= 0.125f)
+                    captorParty.LeaderHero.Clan == playerClan.Clan && MBRandom.RandomFloat <= 0.125f)
                 {
                     KillCharacterAction.ApplyByExecution(hero, captorParty.LeaderHero);
                     return;
@@ -256,8 +282,8 @@ internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorIn
         if (!HeroExecutionRules.IsExecutable(hero, out _)) return;
         if (!objectManager.TryGetId(hero, out var heroId)) return;
 
-        if (Data.PlayerPendingSettlementExecutions.Values.Any(pendingExecutions => pendingExecutions.ContainsKey(heroId)) ||
-            Data.PlayerHeroesPendingMapEventEndExecution.Values.Any(pendingExecutions => pendingExecutions.Contains(heroId)))
+        if (Data.PlayerClanPendingSettlementExecutions.Values.Any(pendingExecutions => pendingExecutions.ContainsKey(heroId)) ||
+            Data.PlayerClanHeroesPendingMapEventEndExecution.Values.Any(pendingExecutions => pendingExecutions.Contains(heroId)))
         {
             result = false;
             return;
@@ -267,7 +293,7 @@ internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorIn
         if (!hero.IsPrisoner || captorParty?.IsMobile != true || captorParty.LeaderHero == null) return;
 
         Clan captorClan = captorParty.MobileParty.ActualClan;
-        if (GetPlayers().Any(player => hero.Clan == player.Clan && HasBloodFeud(player.HeroId, captorClan)))
+        if (TryGetPlayerClan(hero.Clan, out var playerClan) && HasBloodFeud(playerClan.ClanId, captorClan))
         {
             result = false;
         }
@@ -275,17 +301,16 @@ internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorIn
 
     public void SettleBloodFeudByRansomPayment(Hero playerHero, Clan clan)
     {
-        var player = GetPlayers().FirstOrDefault(candidate => candidate.Hero == playerHero);
-        if (player.Hero == null) return;
-        if (!TryGetBloodFeud(player.HeroId, clan, out var feud) || !feud.HasBloodFeud) return;
+        if (!TryGetPlayerClan(playerHero.Clan, out var playerClan)) return;
+        if (!TryGetBloodFeud(playerClan.ClanId, clan, out var feud) || !feud.HasBloodFeud) return;
 
         // The client priced it from its last counts, which can be behind the server's
         int bloodMoney = GetBloodMoneyForPlayerToPayAgainstClan(feud);
         if (playerHero.Gold < bloodMoney) return;
 
         GiveGoldAction.ApplyBetweenCharacters(playerHero, null, bloodMoney);
-        ChangeBloodFeudState(player, clan, null, ChangeBloodFeudActionDetail.SettledByRansomPayment);
-        ChangeRelationAction.SetRelationBetweenHeroes(player.Clan.Leader, clan.Leader, -49);
+        ChangeBloodFeudState(playerClan, clan, null, ChangeBloodFeudActionDetail.SettledByRansomPayment);
+        ChangeRelationAction.SetRelationBetweenHeroes(playerClan.Clan.Leader, clan.Leader, -49);
     }
 
     public void RequestSettleBloodFeudByRansomPayment(Clan clan)
@@ -295,14 +320,14 @@ internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorIn
         network.SendAll(new NetworkSettleBloodFeudByRansomPayment(clanId));
     }
 
-    public bool HasBloodFeud(Hero playerHero, Clan clan)
+    public bool HasBloodFeud(Clan playerClan, Clan clan)
     {
-        return objectManager.TryGetId(playerHero, out var playerHeroId) && HasBloodFeud(playerHeroId, clan);
+        return objectManager.TryGetId(playerClan, out var playerClanId) && HasBloodFeud(playerClanId, clan);
     }
 
     public bool HasBloodFeudWithAnyPlayer(Clan clan)
     {
-        return GetPlayers().Any(player => HasBloodFeud(player.HeroId, clan));
+        return GetPlayerClans().Any(playerClan => HasBloodFeud(playerClan.ClanId, clan));
     }
 
     public void SetPendingPlayerExecution(Hero playerHero, Hero executor)
@@ -354,59 +379,59 @@ internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorIn
         Campaign.Current.CampaignInformationManager.NewMapNoticeAdded(new BloodFeudClanMemberCapturedMapNotification(clanMember, executionDate, settlement, textObject));
     }
 
-    private void OnPlayerExecutedHero(BloodFeudPlayer player, Hero victim)
+    private void OnPlayerExecutedHero(BloodFeudPlayerClan playerClan, Hero victim)
     {
         // KillCharacterActionPatches charges the trait penalty, since it runs before this event
-        if (!HasBloodFeud(player.HeroId, victim.Clan))
+        if (!HasBloodFeud(playerClan.ClanId, victim.Clan))
         {
-            ChangeBloodFeudState(player, victim.Clan, victim, ChangeBloodFeudActionDetail.StartedByPlayerExecuteAHero);
+            ChangeBloodFeudState(playerClan, victim.Clan, victim, ChangeBloodFeudActionDetail.StartedByPlayerExecuteAHero);
         }
     }
 
-    private void OnPlayerClanMemberExecuted(BloodFeudPlayer player, Hero executedHero, Hero executor)
+    private void OnPlayerClanMemberExecuted(BloodFeudPlayerClan playerClan, Hero executedHero, Hero executor)
     {
-        if (!HasBloodFeud(player.HeroId, executor.Clan))
+        if (!HasBloodFeud(playerClan.ClanId, executor.Clan))
         {
-            ChangeBloodFeudState(player, executor.Clan, executedHero, ChangeBloodFeudActionDetail.StartedByAIExecutePlayerRelative);
+            ChangeBloodFeudState(playerClan, executor.Clan, executedHero, ChangeBloodFeudActionDetail.StartedByAIExecutePlayerRelative);
         }
 
         if (executedHero.IsPlayerHero()) return;
         if (!objectManager.TryGetIdWithLogging(executedHero, out var executedHeroId)) return;
         if (!objectManager.TryGetIdWithLogging(executor, out var executorId)) return;
 
-        SendToPlayer(player.Player, new NetworkNotifyBloodFeudClanMemberExecuted(executedHeroId, executorId));
+        SendToClan(playerClan, new NetworkNotifyBloodFeudClanMemberExecuted(executedHeroId, executorId));
     }
 
-    private void OnPlayerMemberExecutedAHero(BloodFeudPlayer player, Hero heroToExecute, Hero clanMember)
+    private void OnPlayerMemberExecutedAHero(BloodFeudPlayerClan playerClan, Hero heroToExecute, Hero clanMember)
     {
         if (!objectManager.TryGetIdWithLogging(heroToExecute, out var executedHeroId)) return;
         if (!objectManager.TryGetIdWithLogging(clanMember, out var clanMemberId)) return;
 
-        SendToPlayer(player.Player, new NetworkNotifyBloodFeudLordExecuted(executedHeroId, clanMemberId));
+        SendToClan(playerClan, new NetworkNotifyBloodFeudLordExecuted(executedHeroId, clanMemberId));
     }
 
-    // ChangeBloodFeudStateAction.ApplyInternal and OnBloodFeudStateChanged for one player
-    private void ChangeBloodFeudState(BloodFeudPlayer player, Clan clanWithFeud, Hero executedHero, ChangeBloodFeudActionDetail detail)
+    // ChangeBloodFeudStateAction.ApplyInternal and OnBloodFeudStateChanged for one player clan
+    private void ChangeBloodFeudState(BloodFeudPlayerClan playerClan, Clan clanWithFeud, Hero executedHero, ChangeBloodFeudActionDetail detail)
     {
         if (!objectManager.TryGetIdWithLogging(clanWithFeud, out var clanId)) return;
 
-        BloodFeudData feud = GetOrAddBloodFeud(player.HeroId, clanId);
+        BloodFeudData feud = GetOrAddBloodFeud(playerClan.ClanId, clanId);
         feud.HasBloodFeud = detail == ChangeBloodFeudActionDetail.StartedByPlayerExecuteAHero || detail == ChangeBloodFeudActionDetail.StartedByAIExecutePlayerRelative;
         if (detail == ChangeBloodFeudActionDetail.SettledByRansomPayment)
         {
             feud.ExecutionsDoneCount = 0;
             feud.ExecutionsReceivedCount = 0;
         }
-        SendBloodFeuds(player.Player);
+        SendBloodFeuds(playerClan);
 
         int penalizedClanCount = 0;
         if (feud.HasBloodFeud)
         {
-            Hero playerClanLeader = player.Clan.Leader;
+            Hero playerClanLeader = playerClan.Clan.Leader;
             ChangeRelationAction.SetRelationBetweenHeroes(playerClanLeader, clanWithFeud.Leader, Campaign.Current.Models.DiplomacyModel.MinRelationLimit);
             foreach (Clan clan in Clan.All)
             {
-                if (clan == player.Clan) continue;
+                if (clan == playerClan.Clan) continue;
 
                 int relationPenalty = ExecutionCampaignBehavior.GetBloodFeudStartRelationPenaltyToOtherClan(executedHero, clan);
                 if (relationPenalty == 0) continue;
@@ -417,76 +442,72 @@ internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorIn
         }
 
         objectManager.TryGetId(executedHero, out var executedHeroId);
-        SendToPlayer(player.Player, new NetworkNotifyBloodFeudStateChanged(clanId, executedHeroId, detail, penalizedClanCount));
+        SendToClan(playerClan, new NetworkNotifyBloodFeudStateChanged(clanId, executedHeroId, detail, penalizedClanCount));
 
-        UpdateAllPlayerClanMemberExecutionStates(player);
+        UpdateAllPlayerClanMemberExecutionStates(playerClan);
     }
-
-    private void UpdateAllPlayerClanMemberExecutionStates(BloodFeudPlayer player)
+    private void UpdateAllPlayerClanMemberExecutionStates(BloodFeudPlayerClan playerClan)
     {
-        bool hasBloodFeud = Data.PlayerBloodFeuds.TryGetValue(player.HeroId, out var feuds) && feuds.Values.Any(feud => feud.HasBloodFeud);
-        bool hasPendingExecution = Data.PlayerPendingSettlementExecutions.TryGetValue(player.HeroId, out var pendingExecutions) && pendingExecutions.Count > 0;
+        bool hasBloodFeud = Data.PlayerClanBloodFeuds.TryGetValue(playerClan.ClanId, out var feuds) && feuds.Values.Any(feud => feud.HasBloodFeud);
+        bool hasPendingExecution = Data.PlayerClanPendingSettlementExecutions.TryGetValue(playerClan.ClanId, out var pendingExecutions) && pendingExecutions.Count > 0;
         if (!hasBloodFeud && !hasPendingExecution) return;
 
-        foreach (Hero hero in player.Clan.Heroes.ToList())
+        foreach (Hero hero in playerClan.Clan.Heroes.ToList())
         {
             if (!hero.IsPlayerHero())
             {
-                UpdateClanMemberExecutionState(player, hero);
+                UpdateClanMemberExecutionState(playerClan, hero);
             }
         }
     }
 
-    private void UpdateClanMemberExecutionState(BloodFeudPlayer player, Hero clanMember)
+    private void UpdateClanMemberExecutionState(BloodFeudPlayerClan playerClan, Hero clanMember)
     {
         Clan pendingClan = null;
-        if (TryGetPendingSettlementExecution(player.HeroId, clanMember, out var pendingExecution))
+        if (TryGetPendingSettlementExecution(playerClan.ClanId, clanMember, out var pendingExecution))
         {
             objectManager.TryGetObjectWithLogging(pendingExecution.CapturerClanId, out pendingClan);
         }
 
         if (HeroExecutionRules.IsExecutable(clanMember, out _) &&
-            GetClanMemberCurrentExecutionData(player, clanMember, pendingClan, out var currentExecutorClan))
+            GetClanMemberCurrentExecutionData(playerClan, clanMember, pendingClan, out var currentExecutorClan))
         {
             if (pendingClan == null)
             {
-                StartClanMemberExecutionAtSettlement(player, clanMember, currentExecutorClan);
+                StartClanMemberExecutionAtSettlement(playerClan, clanMember, currentExecutorClan);
             }
             else if (pendingClan != currentExecutorClan)
             {
-                CancelClanMemberExecutionAtSettlement(player, clanMember, pendingClan);
-                StartClanMemberExecutionAtSettlement(player, clanMember, currentExecutorClan);
+                CancelClanMemberExecutionAtSettlement(playerClan, clanMember, pendingClan);
+                StartClanMemberExecutionAtSettlement(playerClan, clanMember, currentExecutorClan);
             }
         }
         else if (pendingClan != null)
         {
-            CancelClanMemberExecutionAtSettlement(player, clanMember, pendingClan);
+            CancelClanMemberExecutionAtSettlement(playerClan, clanMember, pendingClan);
         }
     }
 
-    private bool GetClanMemberCurrentExecutionData(BloodFeudPlayer player, Hero hero, Clan pendingClan, out Clan currentExecutorClan)
+    private bool GetClanMemberCurrentExecutionData(BloodFeudPlayerClan playerClan, Hero hero, Clan pendingClan, out Clan currentExecutorClan)
     {
+        currentExecutorClan = null;
         Settlement prison = hero.PartyBelongedToAsPrisoner?.Settlement;
-        if (pendingClan != null && HasBloodFeud(player.HeroId, pendingClan) && prison?.OwnerClan.MapFaction == pendingClan.MapFaction && !pendingClan.IsEliminated)
+        if (pendingClan != null && HasBloodFeud(playerClan.ClanId, pendingClan) && prison?.OwnerClan.MapFaction == pendingClan.MapFaction && !pendingClan.IsEliminated)
         {
             currentExecutorClan = pendingClan;
             return true;
         }
 
-        if (prison != null)
+        if (prison != null && HasBloodFeud(playerClan.ClanId, prison.OwnerClan))
         {
             currentExecutorClan = prison.OwnerClan;
-            if (HasBloodFeud(player.HeroId, currentExecutorClan))
-            {
-                return true;
-            }
+            return true;
         }
 
-        currentExecutorClan = null;
         return false;
     }
 
-    private void StartClanMemberExecutionAtSettlement(BloodFeudPlayer player, Hero clanMember, Clan clanWithFeud)
+    private void StartClanMemberExecutionAtSettlement(BloodFeudPlayerClan playerClan, Hero clanMember, Clan clanWithFeud)
     {
         Settlement settlement = clanMember.PartyBelongedToAsPrisoner.Settlement;
         if (!objectManager.TryGetIdWithLogging(clanMember, out var clanMemberId)) return;
@@ -494,29 +515,29 @@ internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorIn
         if (!objectManager.TryGetIdWithLogging(settlement, out var settlementId)) return;
 
         CampaignTime executionDate = CampaignTime.DaysFromNow(ExecutionCampaignBehavior.DaysTillBloodFeudExecutionInSettlement);
-        if (!Data.PlayerPendingSettlementExecutions.TryGetValue(player.HeroId, out var pendingExecutions))
+        if (!Data.PlayerClanPendingSettlementExecutions.TryGetValue(playerClan.ClanId, out var pendingExecutions))
         {
             pendingExecutions = new Dictionary<string, PendingSettlementExecution>();
-            Data.PlayerPendingSettlementExecutions[player.HeroId] = pendingExecutions;
+            Data.PlayerClanPendingSettlementExecutions[playerClan.ClanId] = pendingExecutions;
         }
         pendingExecutions[clanMemberId] = new PendingSettlementExecution(clanId, executionDate.NumTicks);
 
-        SendToPlayer(player.Player, new NetworkNotifyBloodFeudSettlementExecutionStarted(clanMemberId, clanId, settlementId, executionDate.NumTicks));
+        SendToClan(playerClan, new NetworkNotifyBloodFeudSettlementExecutionStarted(clanMemberId, clanId, settlementId, executionDate.NumTicks));
     }
 
-    private void CancelClanMemberExecutionAtSettlement(BloodFeudPlayer player, Hero clanMember, Clan capturerClan)
+    private void CancelClanMemberExecutionAtSettlement(BloodFeudPlayerClan playerClan, Hero clanMember, Clan capturerClan)
     {
         if (!objectManager.TryGetIdWithLogging(clanMember, out var clanMemberId)) return;
         if (!objectManager.TryGetIdWithLogging(capturerClan, out var clanId)) return;
 
-        Data.PlayerPendingSettlementExecutions[player.HeroId].Remove(clanMemberId);
+        Data.PlayerClanPendingSettlementExecutions[playerClan.ClanId].Remove(clanMemberId);
 
-        SendToPlayer(player.Player, new NetworkNotifyBloodFeudSettlementExecutionCancelled(clanMemberId, clanId));
+        SendToClan(playerClan, new NetworkNotifyBloodFeudSettlementExecutionCancelled(clanMemberId, clanId));
     }
 
-    private float CalculatePlayerClanMemberExecutionProbability(List<BloodFeudPlayer> clanPlayers, Hero clanMember, Hero executor)
+    private float CalculatePlayerClanMemberExecutionProbability(BloodFeudPlayerClan playerClan, Hero clanMember, Hero executor)
     {
-        if (clanPlayers.Any(player => HasBloodFeud(player.HeroId, executor.Clan)))
+        if (HasBloodFeud(playerClan.ClanId, executor.Clan))
         {
             float chance = MBMath.ClampFloat(clanMember.CaptivityStartTime.ElapsedDaysUntilNow * 0.1f, 0f, 1f);
             return chance * chance;
@@ -539,10 +560,18 @@ internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorIn
         return bloodMoney;
     }
 
-    private void SendBloodFeuds(Player player)
+    private void SendBloodFeuds(BloodFeudPlayerClan playerClan)
     {
-        Data.PlayerBloodFeuds.TryGetValue(player.HeroId, out var feuds);
-        SendToPlayer(player, new NetworkUpdateBloodFeuds(feuds));
+        Data.PlayerClanBloodFeuds.TryGetValue(playerClan.ClanId, out var feuds);
+        SendToClan(playerClan, new NetworkUpdateBloodFeuds(feuds));
+    }
+
+    private void SendToClan(BloodFeudPlayerClan playerClan, IMessage message)
+    {
+        foreach (var player in playerClan.Players)
+        {
+            SendToPlayer(player, message);
+        }
     }
 
     private void SendToPlayer(Player player, IMessage message)
@@ -552,46 +581,46 @@ internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorIn
         network.Send(peer, message);
     }
 
-    private void AddPendingMapEventEndExecution(string playerHeroId, Hero hero)
+    private void AddPendingMapEventEndExecution(string playerClanId, Hero hero)
     {
         if (!objectManager.TryGetIdWithLogging(hero, out var heroId)) return;
 
-        if (!Data.PlayerHeroesPendingMapEventEndExecution.TryGetValue(playerHeroId, out var pendingExecutions))
+        if (!Data.PlayerClanHeroesPendingMapEventEndExecution.TryGetValue(playerClanId, out var pendingExecutions))
         {
             pendingExecutions = new List<string>();
-            Data.PlayerHeroesPendingMapEventEndExecution[playerHeroId] = pendingExecutions;
+            Data.PlayerClanHeroesPendingMapEventEndExecution[playerClanId] = pendingExecutions;
         }
         pendingExecutions.Add(heroId);
     }
 
-    private bool TryGetPendingSettlementExecution(string playerHeroId, Hero hero, out PendingSettlementExecution pendingExecution)
+    private bool TryGetPendingSettlementExecution(string playerClanId, Hero hero, out PendingSettlementExecution pendingExecution)
     {
         pendingExecution = null;
         return objectManager.TryGetId(hero, out var heroId) &&
-            Data.PlayerPendingSettlementExecutions.TryGetValue(playerHeroId, out var pendingExecutions) &&
+            Data.PlayerClanPendingSettlementExecutions.TryGetValue(playerClanId, out var pendingExecutions) &&
             pendingExecutions.TryGetValue(heroId, out pendingExecution);
     }
 
-    private bool HasBloodFeud(string playerHeroId, Clan clan)
+    private bool HasBloodFeud(string playerClanId, Clan clan)
     {
-        return TryGetBloodFeud(playerHeroId, clan, out var feud) && feud.HasBloodFeud;
+        return TryGetBloodFeud(playerClanId, clan, out var feud) && feud.HasBloodFeud;
     }
 
-    private bool TryGetBloodFeud(string playerHeroId, Clan clan, out BloodFeudData feud)
+    private bool TryGetBloodFeud(string playerClanId, Clan clan, out BloodFeudData feud)
     {
         feud = null;
         return clan != null &&
             objectManager.TryGetId(clan, out var clanId) &&
-            Data.PlayerBloodFeuds.TryGetValue(playerHeroId, out var feuds) &&
+            Data.PlayerClanBloodFeuds.TryGetValue(playerClanId, out var feuds) &&
             feuds.TryGetValue(clanId, out feud);
     }
 
-    private BloodFeudData GetOrAddBloodFeud(string playerHeroId, string clanId)
+    private BloodFeudData GetOrAddBloodFeud(string playerClanId, string clanId)
     {
-        if (!Data.PlayerBloodFeuds.TryGetValue(playerHeroId, out var feuds))
+        if (!Data.PlayerClanBloodFeuds.TryGetValue(playerClanId, out var feuds))
         {
             feuds = new Dictionary<string, BloodFeudData>();
-            Data.PlayerBloodFeuds[playerHeroId] = feuds;
+            Data.PlayerClanBloodFeuds[playerClanId] = feuds;
         }
 
         if (!feuds.TryGetValue(clanId, out var feud))
@@ -602,30 +631,42 @@ internal class ExecutionCampaignBehaviorInterface : IExecutionCampaignBehaviorIn
         return feud;
     }
 
-    private List<BloodFeudPlayer> GetPlayers()
+    private bool TryGetPlayerClan(Clan clan, out BloodFeudPlayerClan playerClan)
     {
-        var players = new List<BloodFeudPlayer>();
+        playerClan = clan == null ? null : GetPlayerClans().FirstOrDefault(candidate => candidate.Clan == clan);
+        return playerClan != null;
+    }
+
+    private List<BloodFeudPlayerClan> GetPlayerClans()
+    {
+        var playerClans = new List<BloodFeudPlayerClan>();
         foreach (var player in playerManager.Players)
         {
             if (!objectManager.TryGetObject<Hero>(player.HeroId, out var hero) || hero.Clan == null) continue;
 
-            players.Add(new BloodFeudPlayer(player, hero));
+            var playerClan = playerClans.FirstOrDefault(candidate => candidate.Clan == hero.Clan);
+            if (playerClan == null)
+            {
+                if (!objectManager.TryGetId(hero.Clan, out var clanId)) continue;
+
+                playerClan = new BloodFeudPlayerClan(hero.Clan, clanId);
+                playerClans.Add(playerClan);
+            }
+            playerClan.Players.Add(player);
         }
-        return players;
+        return playerClans;
     }
 
-    private readonly struct BloodFeudPlayer
+    private sealed class BloodFeudPlayerClan
     {
-        public readonly Player Player;
-        public readonly Hero Hero;
+        public Clan Clan { get; }
+        public string ClanId { get; }
+        public List<Player> Players { get; } = new();
 
-        public string HeroId => Player.HeroId;
-        public Clan Clan => Hero.Clan;
-
-        public BloodFeudPlayer(Player player, Hero hero)
+        public BloodFeudPlayerClan(Clan clan, string clanId)
         {
-            Player = player;
-            Hero = hero;
+            Clan = clan;
+            ClanId = clanId;
         }
     }
 }

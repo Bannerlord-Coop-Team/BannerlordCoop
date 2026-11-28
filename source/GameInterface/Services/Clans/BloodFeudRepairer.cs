@@ -10,8 +10,8 @@ namespace GameInterface.Services.Clans;
 /// Clears blood feud state a loaded save carries, because the flag belongs to one player clan and coop has several.
 /// </summary>
 /// <remarks>
-/// <see cref="IExecutionCampaignBehaviorInterface"/> keeps each player's feuds in the co-op session and each client applies its
-/// own player's after the load, so the save's own feuds would only be another player clan's.
+/// <see cref="IExecutionCampaignBehaviorInterface"/> keeps each player clan's feuds in the co-op session and each client applies its
+/// own clan's after the load, so the save's own feuds would only be another player clan's.
 /// </remarks>
 internal interface IBloodFeudRepairer
 {

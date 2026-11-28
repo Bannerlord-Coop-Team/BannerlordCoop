@@ -22,7 +22,7 @@ internal class BloodFeudDebugCommands
 
     // coop.debug.blood_feud.state
     /// <summary>
-    /// Lists the clans flagged as feuding with this instance's player, and on the server the per player feud data.
+    /// Lists the clans flagged as feuding with this instance's player clan, and on the server the per player clan feud data.
     /// </summary>
     public sealed class BloodFeudStateCoopCommand : ICoopCommand
     {
@@ -35,7 +35,7 @@ internal class BloodFeudDebugCommands
 
         public string Prefix => "coop.debug.blood_feud";
         public string Name => "state";
-        public string Description => "Lists local clan blood feud flags, and the server's per player blood feud data.";
+        public string Description => "Lists local clan blood feud flags, and the server's per player clan blood feud data.";
         public CoopCommandSide Side => CoopCommandSide.Both;
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
@@ -54,19 +54,19 @@ internal class BloodFeudDebugCommands
                 var data = coopSessionProvider.CoopSession?.BloodFeudPlayerData;
                 if (data == null) return Succeeded(sb.AppendLine("Server BloodFeudPlayerData is null").ToString());
 
-                sb.AppendLine("Server PlayerBloodFeuds:");
-                foreach (var player in data.PlayerBloodFeuds)
-                    foreach (var feud in player.Value)
-                        sb.AppendLine($"  player={player.Key} clan={feud.Key} feud={feud.Value.HasBloodFeud} done={feud.Value.ExecutionsDoneCount} received={feud.Value.ExecutionsReceivedCount}");
+                sb.AppendLine("Server PlayerClanBloodFeuds:");
+                foreach (var playerClan in data.PlayerClanBloodFeuds)
+                    foreach (var feud in playerClan.Value)
+                        sb.AppendLine($"  playerClan={playerClan.Key} clan={feud.Key} feud={feud.Value.HasBloodFeud} done={feud.Value.ExecutionsDoneCount} received={feud.Value.ExecutionsReceivedCount}");
 
-                sb.AppendLine("Server PlayerPendingSettlementExecutions:");
-                foreach (var player in data.PlayerPendingSettlementExecutions)
-                    foreach (var pending in player.Value)
-                        sb.AppendLine($"  player={player.Key} hero={pending.Key} capturerClan={pending.Value.CapturerClanId} date={new CampaignTime(pending.Value.ExecutionDateTicks)} remainingDays={new CampaignTime(pending.Value.ExecutionDateTicks).RemainingDaysFromNow:0.00}");
+                sb.AppendLine("Server PlayerClanPendingSettlementExecutions:");
+                foreach (var playerClan in data.PlayerClanPendingSettlementExecutions)
+                    foreach (var pending in playerClan.Value)
+                        sb.AppendLine($"  playerClan={playerClan.Key} hero={pending.Key} capturerClan={pending.Value.CapturerClanId} date={new CampaignTime(pending.Value.ExecutionDateTicks)} remainingDays={new CampaignTime(pending.Value.ExecutionDateTicks).RemainingDaysFromNow:0.00}");
 
-                sb.AppendLine("Server PlayerHeroesPendingMapEventEndExecution:");
-                foreach (var player in data.PlayerHeroesPendingMapEventEndExecution)
-                    sb.AppendLine($"  player={player.Key} heroes={string.Join(",", player.Value)}");
+                sb.AppendLine("Server PlayerClanHeroesPendingMapEventEndExecution:");
+                foreach (var playerClan in data.PlayerClanHeroesPendingMapEventEndExecution)
+                    sb.AppendLine($"  playerClan={playerClan.Key} heroes={string.Join(",", playerClan.Value)}");
             }
 
             return Succeeded(sb.ToString());

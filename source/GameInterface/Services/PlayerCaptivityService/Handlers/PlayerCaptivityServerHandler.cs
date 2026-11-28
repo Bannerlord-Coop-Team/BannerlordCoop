@@ -190,7 +190,7 @@ internal class PlayerCaptivityServerHandler : IHandler
         int mercy = executer.GetTraitLevel(DefaultTraits.Mercy);
         // Against the captured player's clan instead of vanilla's Clan.PlayerClan
         int relation = executer.Clan.GetRelationWithClan(hero.Clan);
-        bool hasBloodFeud = executionInterface.HasBloodFeud(hero, executer.Clan);
+        bool hasBloodFeud = executionInterface.HasBloodFeud(hero.Clan, executer.Clan);
         if (MBRandom.RandomFloat <= PlayerExecutionChance(hasBloodFeud, mercy, relation))
             executionInterface.SetPendingPlayerExecution(hero, executer);
     }

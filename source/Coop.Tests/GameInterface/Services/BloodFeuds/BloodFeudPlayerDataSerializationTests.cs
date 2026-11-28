@@ -44,32 +44,32 @@ public class BloodFeudPlayerDataSerializationTests
     {
         var session = CoopSession.Empty;
         var data = session.BloodFeudPlayerData;
-        data.PlayerBloodFeuds["MyHero1"] = new()
+        data.PlayerClanBloodFeuds["Clan_Player1"] = new()
         {
             // A settled feud keeps its counts, like vanilla after relations improve
             ["clan_empire_south_2"] = new BloodFeudData { HasBloodFeud = false, ExecutionsDoneCount = 2, ExecutionsReceivedCount = 1 },
             ["clan_empire_south_3"] = new BloodFeudData { HasBloodFeud = true, ExecutionsDoneCount = 0, ExecutionsReceivedCount = 3 },
         };
-        data.PlayerPendingSettlementExecutions["MyHero1"] = new()
+        data.PlayerClanPendingSettlementExecutions["Clan_Player1"] = new()
         {
             ["companion_1"] = new PendingSettlementExecution("clan_empire_south_3", 78691296244235L),
         };
-        data.PlayerHeroesPendingMapEventEndExecution["MyHero1"] = new() { "lord_1_17", "lord_1_29" };
+        data.PlayerClanHeroesPendingMapEventEndExecution["Clan_Player1"] = new() { "lord_1_17", "lord_1_29" };
         return session;
     }
 
     private static void AssertMatchesCreatedSession(BloodFeudPlayerData data)
     {
-        var feuds = data.PlayerBloodFeuds["MyHero1"];
+        var feuds = data.PlayerClanBloodFeuds["Clan_Player1"];
         var settled = feuds["clan_empire_south_2"];
         Assert.Equal((false, 2, 1), (settled.HasBloodFeud, settled.ExecutionsDoneCount, settled.ExecutionsReceivedCount));
         var active = feuds["clan_empire_south_3"];
         Assert.Equal((true, 0, 3), (active.HasBloodFeud, active.ExecutionsDoneCount, active.ExecutionsReceivedCount));
 
-        var pending = data.PlayerPendingSettlementExecutions["MyHero1"]["companion_1"];
+        var pending = data.PlayerClanPendingSettlementExecutions["Clan_Player1"]["companion_1"];
         Assert.Equal(("clan_empire_south_3", 78691296244235L), (pending.CapturerClanId, pending.ExecutionDateTicks));
 
-        Assert.Equal(new[] { "lord_1_17", "lord_1_29" }, data.PlayerHeroesPendingMapEventEndExecution["MyHero1"]);
+        Assert.Equal(new[] { "lord_1_17", "lord_1_29" }, data.PlayerClanHeroesPendingMapEventEndExecution["Clan_Player1"]);
     }
 
     private static T RoundTrip<T>(T message)

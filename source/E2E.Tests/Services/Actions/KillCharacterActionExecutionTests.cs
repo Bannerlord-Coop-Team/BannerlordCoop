@@ -100,7 +100,7 @@ public class KillCharacterActionExecutionTests : MapEventTestBase
             }
 
             var session = Server.Resolve<ICoopSessionProvider>().CoopSession;
-            session.BloodFeudPlayerData.PlayerBloodFeuds[killerId] = new()
+            session.BloodFeudPlayerData.PlayerClanBloodFeuds[killerClanId] = new()
             {
                 [victimClanId] = new BloodFeudData { HasBloodFeud = true },
             };

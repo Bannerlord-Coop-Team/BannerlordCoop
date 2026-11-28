@@ -19,7 +19,7 @@ using TaleWorlds.Localization;
 namespace GameInterface.Services.BloodFeuds.Handlers;
 
 /// <summary>
-/// Mirrors the server's per player blood feuds into this client's clans and shows the vanilla <see cref="TaleWorlds.CampaignSystem.CampaignBehaviors.ExecutionCampaignBehavior"/> notices
+/// Mirrors the server's per player clan blood feuds into this client's clans and shows the vanilla <see cref="TaleWorlds.CampaignSystem.CampaignBehaviors.ExecutionCampaignBehavior"/> notices
 /// </summary>
 internal class BloodFeudHandler : IHandler
 {
