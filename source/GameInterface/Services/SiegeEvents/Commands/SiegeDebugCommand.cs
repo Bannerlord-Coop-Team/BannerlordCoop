@@ -1950,6 +1950,87 @@ public class SiegeDebugCommand
         }
     }
 
+#if DEBUG
+    /// <summary>Stages the unfinished-equipment case for the AI siege assault roll.</summary>
+    public sealed class StageAiReadinessCoopCommand : ICoopCommand
+    {
+        private readonly ICommandObjectResolver resolver;
+        private readonly ISiegeEventInterface siegeEventInterface;
+
+        public StageAiReadinessCoopCommand(ICommandObjectResolver resolver, ISiegeEventInterface siegeEventInterface)
+        {
+            this.resolver = resolver;
+            this.siegeEventInterface = siegeEventInterface;
+        }
+
+        public string Prefix => "coop.debug.siege";
+
+        public string Name => "stage_ai_readiness";
+
+        public string Description => "Stages a prepared AI siege with an unfinished engine.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("settlementId", "Settlement name or id; quote names with spaces."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!resolver.TryResolveSettlement(args[0], out var settlement, out var settlementError))
+                return Failed(settlementError);
+
+            var siegeEvent = settlement.SiegeEvent;
+            var camp = siegeEvent?.BesiegerCamp;
+            var leader = camp?.LeaderParty;
+            if (leader == null || leader.IsPlayerParty())
+                return Failed("The assault readiness fixture needs an AI siege leader.");
+
+            if (leader.MapEvent != null || settlement.Party.MapEvent != null)
+                return Failed($"{settlement.Name} already has an active map event.");
+
+            var engines = camp.SiegeEngines;
+            ClearSiegeEngines(engines);
+            if (engines.DeployedSiegeEngines.Count > 0 || engines.ReservedSiegeEngines.Count > 0)
+                return Failed($"Failed to clear the attacker siege engines at {settlement.Name}.");
+
+            var preparations = engines.SiegePreparations;
+            if (!preparations.IsConstructed)
+            {
+                preparations.SetProgress(1f);
+                siegeEvent.CreateSiegeObject(preparations, camp);
+            }
+
+            var machines = new (SiegeEngineType Type, int Index, float Progress)[]
+            {
+                (DefaultSiegeEngineTypes.Ram, 0, 1f),
+                (DefaultSiegeEngineTypes.Onager, 0, 1f),
+                (DefaultSiegeEngineTypes.Trebuchet, 1, 0.5f),
+            };
+            var staged = new List<string>();
+            foreach (var machine in machines)
+            {
+                siegeEventInterface.DeploySiegeEngine(siegeEvent, BattleSideEnum.Attacker, machine.Type, machine.Index);
+                var slots = machine.Type.IsRanged ? engines.DeployedRangedSiegeEngines : engines.DeployedMeleeSiegeEngines;
+                var engine = slots[machine.Index];
+                if (engine == null || engine.SiegeEngine != machine.Type)
+                    return Failed($"Failed to stage {machine.Type.StringId} at {settlement.Name}.");
+
+                engine.SetProgress(machine.Progress);
+                if (engine.IsConstructed)
+                    siegeEvent.CreateSiegeObject(engine, camp);
+
+                staged.Add($"{engine.SiegeEngine.StringId}={engine.Progress:P0}");
+            }
+
+            const int siegeAgeDays = 21;
+            siegeEvent.SiegeStartTime = CampaignTime.DaysFromNow(-siegeAgeDays);
+            return Succeeded($"Staged a {siegeAgeDays}-day AI siege at {settlement.Name}: {string.Join(", ", staged)}");
+        }
+    }
+#endif
+
     public sealed class StageMachinesCoopCommand : ICoopCommand
     {
         private readonly ICommandObjectResolver resolver;

@@ -71,7 +71,7 @@ public interface IAiSiegeAssaultReadiness
     bool ShouldStartAssault(BesiegerCamp camp);
 }
 
-/// <summary>Evaluates the inputs used by vanilla's AI siege assault roll.</summary>
+/// <summary>Evaluates AI siege assault readiness with the co-op equipment penalty cap.</summary>
 internal class AiSiegeAssaultReadiness : IAiSiegeAssaultReadiness
 {
     public AiSiegeAssaultReadinessResult Evaluate(BesiegerCamp camp)
@@ -146,7 +146,8 @@ internal class AiSiegeAssaultReadiness : IAiSiegeAssaultReadiness
         if (powerRatioBeforeEquipment > 1f)
         {
             powerRatioAfterEquipment *= (float)MathF.Min(3, input.EquipmentBuilt) / 3f;
-            float equipmentProgress = input.MaximumEquipmentProgress + (0.25f * (float)(5 - input.EquipmentBuilt));
+            // Cap vanilla's uncapped penalty so missing slots and unfinished engines cannot make the assault chance negative (#3738).
+            float equipmentProgress = MathF.Min(1f, input.MaximumEquipmentProgress + (0.25f * (5 - input.EquipmentBuilt)));
             powerRatioAfterEquipment *= 1f - (0.85f * (equipmentProgress * equipmentProgress));
         }
 

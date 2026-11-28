@@ -26,6 +26,22 @@ public class AiSiegeAssaultReadinessTests
     }
 
     [Fact]
+    public void UnfinishedEngine_WithMissingSlots_KeepsAssaultChancePositive()
+    {
+        var result = readiness.Evaluate(new AiSiegeAssaultReadinessInput(
+            attackerStrength: 200f,
+            defenderStrength: 100f,
+            settlementAdvantage: 1f,
+            siegeElapsedHours: 96f,
+            hasRam: true,
+            hasSiegeTower: false,
+            equipmentBuilt: 2,
+            maximumEquipmentProgress: 0.5f));
+
+        Assert.Equal(0.02f, result.AssaultChance, precision: 4);
+    }
+
+    [Fact]
     public void StrongAttack_WithoutBuiltEquipment_IsNotYetViable()
     {
         var result = readiness.Evaluate(new AiSiegeAssaultReadinessInput(
