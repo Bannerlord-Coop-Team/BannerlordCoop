@@ -1545,4 +1545,34 @@
       </EquipmentRoster>
     </Equipments>
   </NPCCharacter>
+  <NPCCharacter
+    id="coop_fixed_npc_ac6be64f"
+    name="{=!}Vendrick Drangleic"
+    default_group="Infantry"
+    level="1"
+    is_female="false"
+    is_hero="false"
+    is_template="false"
+    occupation="Townsfolk"
+    culture="Culture.battania"
+    is_hidden_encyclopedia="true"
+    coop_settlement="town_B2"
+    coop_location="tavern"
+    coop_spawn_tag="npc_common"
+    coop_dialogue="I am Vendrick of Drangleic few still tread these forgotten paths, yet fate has brought you before me. Speak your purpose- how may i be of assistance"
+    coop_enabled="true">
+    <face>
+      <face_key_template value="BodyProperty.townsman_battania" />
+    </face>
+    <skills />
+    <Equipments>
+      <EquipmentRoster civilian="true">
+        <equipment slot="Head" id="Item.wolfhead" />
+        <equipment slot="Cape" id="Item.battania_cloak_furr" />
+        <equipment slot="Body" id="Item.battanian_chainmail_armor_d" />
+        <equipment slot="Gloves" id="Item.highland_gloves" />
+        <equipment slot="Leg" id="Item.highland_boots" />
+      </EquipmentRoster>
+    </Equipments>
+  </NPCCharacter>
 </NPCCharacters>
