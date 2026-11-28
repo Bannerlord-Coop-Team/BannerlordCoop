@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Network;
 using GameInterface.CoopSessionData;
+using GameInterface.Services.BloodFeuds.Interfaces;
 using GameInterface.Services.Clans.Extensions;
 using GameInterface.Services.Heroes.Data;
 using GameInterface.Services.Heroes.Extensions;
@@ -47,6 +48,7 @@ public class MarriageOfferCampaignBehaviorInterface : IMarriageOfferCampaignBeha
     private readonly ICoopSessionProvider coopSessionProvider;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly IExecutionCampaignBehaviorInterface executionInterface;
 
     private Dictionary<string, MarriageOfferData> PlayerMarriageOffers => coopSessionProvider.CoopSession.AgingPlayerData.PlayerMarriageOffers;
 
@@ -55,11 +57,13 @@ public class MarriageOfferCampaignBehaviorInterface : IMarriageOfferCampaignBeha
     public MarriageOfferCampaignBehaviorInterface(
         ICoopSessionProvider coopSessionProvider,
         IObjectManager objectManager,
-        INetwork network)
+        INetwork network,
+        IExecutionCampaignBehaviorInterface executionInterface)
     {
         this.coopSessionProvider = coopSessionProvider;
         this.objectManager = objectManager;
         this.network = network;
+        this.executionInterface = executionInterface;
     }
 
     public void DailyTickClan(Clan consideringClan)
@@ -84,6 +88,7 @@ public class MarriageOfferCampaignBehaviorInterface : IMarriageOfferCampaignBeha
                 new CampaignTime(offer.LastMarriageOfferTimeNumTicks).ElapsedDaysUntilNow < MarriageOfferCampaignBehavior.MarriageOfferCooldownDurationAsDays ||
                 playerHero.IsPrisoner ||
                 playerHero.PartyBelongedTo?.IsInRaftState != false ||
+                executionInterface.HasBloodFeud(playerClan, consideringClan) ||
                 !MarriageModel.ShouldNpcMarriageBetweenClansBeAllowed(playerClan, consideringClan)) continue;
 
             float distance = Campaign.Current.Models.MapDistanceModel.GetDistance(playerClan.FactionMidSettlement, consideringClan.FactionMidSettlement, false, false, navigationType);

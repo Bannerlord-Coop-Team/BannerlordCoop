@@ -2,6 +2,7 @@
 using Coop.Core.Client.Messages;
 using Coop.Core.Server.Services.Save.Messages;
 using GameInterface.Services.Alleys.Messages;
+using GameInterface.Services.BloodFeuds.Messages;
 using GameInterface.Services.CampaignService.Messages;
 using GameInterface.Services.Caravans.Messages;
 using GameInterface.Services.Clans.Messages;
@@ -76,6 +77,7 @@ internal class SaveDataHandler : IHandler
         messageBroker.Publish(this, new InitializeClientMooredShips(saveDataMessage.NavalPlayerData));
         messageBroker.Publish(this, new InitializeClientOrderOfBattleData(saveDataMessage.OrderOfBattlePlayerData));
         messageBroker.Publish(this, new InitializeClientViewData(saveDataMessage.ViewDataPlayerData));
+        messageBroker.Publish(this, new InitializeClientBloodFeudData(saveDataMessage.BloodFeudPlayerData));
         messageBroker.Publish(this, new InitializeClientAttachmentIdMap(saveDataMessage.AttachmentIdMap));
         messageBroker.Publish(this, new InitializeClientHeldLootShips(saveDataMessage.HeldLootShipIds));
         // Add any other CoopSession data initialisations for clients here

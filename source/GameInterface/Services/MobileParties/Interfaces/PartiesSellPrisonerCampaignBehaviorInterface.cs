@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Logging;
+using GameInterface.Services.BloodFeuds.Interfaces;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.MobileParties.Extensions;
 using Serilog;
@@ -24,6 +25,13 @@ public interface IPartiesSellPrisonerCampaignBehaviorInterface : IGameAbstractio
 public class PartiesSellPrisonerCampaignBehaviorInterface : IPartiesSellPrisonerCampaignBehaviorInterface
 {
     private static readonly ILogger Logger = LogManager.GetLogger<PartiesSellPrisonerCampaignBehaviorInterface>();
+
+    private readonly IExecutionCampaignBehaviorInterface executionInterface;
+
+    public PartiesSellPrisonerCampaignBehaviorInterface(IExecutionCampaignBehaviorInterface executionInterface)
+    {
+        this.executionInterface = executionInterface;
+    }
 
     public void OnSettlementEntered(PartiesSellPrisonerCampaignBehavior behavior, MobileParty mobileParty, Settlement settlement)
     {
@@ -53,7 +61,7 @@ public class PartiesSellPrisonerCampaignBehaviorInterface : IPartiesSellPrisoner
 
                     // Blood-feud heroes stay out of other factions' prisons.
                     bool isOwnFactionPrison = mobileParty.MapFaction == settlement.MapFaction;
-                    if (prisonerHero.Clan?.HasBloodFeudWithPlayer == true && !isOwnFactionPrison) continue;
+                    if (!isOwnFactionPrison && executionInterface.HasBloodFeudWithAnyPlayer(prisonerHero.Clan)) continue;
 
                     troopRoster.Add(troopRosterElement);
                 }

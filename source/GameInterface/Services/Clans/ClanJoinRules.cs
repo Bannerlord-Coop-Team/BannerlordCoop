@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.Banners.Messages;
+using GameInterface.Services.BloodFeuds.Interfaces;
 using GameInterface.Services.Clans.Data;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.Players;
@@ -26,12 +27,18 @@ public class ClanJoinRules : IClanJoinRules
     private readonly IPlayerManager playerManager;
     private readonly IMessageBroker messageBroker;
     private readonly ISessionWorkshopPlayerDataInterface workshopPlayerData;
+    private readonly IExecutionCampaignBehaviorInterface executionInterface;
 
-    public ClanJoinRules(IPlayerManager playerManager, IMessageBroker messageBroker, ISessionWorkshopPlayerDataInterface workshopPlayerData)
+    public ClanJoinRules(
+        IPlayerManager playerManager,
+        IMessageBroker messageBroker,
+        ISessionWorkshopPlayerDataInterface workshopPlayerData,
+        IExecutionCampaignBehaviorInterface executionInterface)
     {
         this.playerManager = playerManager;
         this.messageBroker = messageBroker;
         this.workshopPlayerData = workshopPlayerData;
+        this.executionInterface = executionInterface;
     }
 
     public ClanJoinUnavailableReason GetUnavailableReason(Hero joiningHero, Hero targetHero)
@@ -126,6 +133,8 @@ public class ClanJoinRules : IClanJoinRules
         foreach (var companion in sourceClan.Companions.ToArray())
         {
             companion.CompanionOf = targetClan;
+            // Vanilla only fires OnHeroChangedClan from the Clan setter, so an imprisoned companion's pending execution has to move here
+            executionInterface.OnHeroChangedClan(companion);
         }
     }
 

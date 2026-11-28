@@ -41,7 +41,8 @@ internal class PlayerPartyTradeOfferBuilder : IPlayerPartyTradeOfferBuilder
             offeredFiefs: ResolveFiefs(offered.OfType<FiefBarterable>()),
             offeredPrisoners: ResolvePrisoners(offered.OfType<TransferPrisonerBarterable>()),
             offeredPeace: offeredPeace,
-            offeredMarriages: ResolveMarriages(offered.OfType<PlayerPartyMarriageBarterable>()));
+            offeredMarriages: ResolveMarriages(offered.OfType<PlayerPartyMarriageBarterable>()),
+            offeredBloodFeudSettlement: offered.OfType<PlayerPartyBloodFeudBarterable>().Any());
     }
 
     // Resolves offered item stacks, capped at what the roster holds.

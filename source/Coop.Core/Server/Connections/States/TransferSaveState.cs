@@ -7,6 +7,7 @@ using Coop.Core.Common.Network.Packets;
 using GameInterface.Services.Save.Messages;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.Alleys;
+using GameInterface.Services.BloodFeuds;
 using GameInterface.Services.CampaignService.Data;
 using GameInterface.Services.CampaignService.Interfaces;
 using GameInterface.Services.Caravans;
@@ -218,6 +219,7 @@ public class TransferSaveState : ConnectionStateBase
             OrderOfBattlePlayerData = Clone(session?.OrderOfBattlePlayerData),
             HeldLootShipIds = heldLootShipIds,
             ViewDataPlayerData = Clone(session?.ViewDataPlayerData),
+            BloodFeudPlayerData = Clone(session?.BloodFeudPlayerData),
         };
     }
 
@@ -271,7 +273,8 @@ public class TransferSaveState : ConnectionStateBase
                 chunkIndex == 0 ? snapshot.ClanFinance : null,
                 chunkIndex == 0 ? snapshot.OrderOfBattlePlayerData : null,
                 chunkIndex == 0 ? snapshot.HeldLootShipIds : null,
-                chunkIndex == 0 ? snapshot.ViewDataPlayerData : null);
+                chunkIndex == 0 ? snapshot.ViewDataPlayerData : null,
+                chunkIndex == 0 ? snapshot.BloodFeudPlayerData : null);
 
             network.SendImmediate(peer, chunkPacket);
         }
@@ -330,5 +333,6 @@ public class TransferSaveState : ConnectionStateBase
         public OrderOfBattlePlayerData OrderOfBattlePlayerData { get; set; }
         public string[] HeldLootShipIds { get; set; }
         public ViewDataPlayerData ViewDataPlayerData { get; set; }
+        public BloodFeudPlayerData BloodFeudPlayerData { get; set; }
     }
 }

@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using GameInterface.Configuration;
+using GameInterface.Services.BloodFeuds.Interfaces;
 using GameInterface.Services.Clans;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Inventory.Data;
@@ -40,6 +41,8 @@ internal readonly struct PlayerPartyInteractionOutcome
     public readonly TroopRosterElementData[] ResponderOfferedTroops;
     public readonly bool InitiatorOfferedPeace;
     public readonly bool ResponderOfferedPeace;
+    public readonly bool InitiatorOfferedBloodFeudSettlement;
+    public readonly bool ResponderOfferedBloodFeudSettlement;
     public readonly PlayerPartyMarriageOfferData[] InitiatorOfferedMarriages;
     public readonly PlayerPartyMarriageOfferData[] ResponderOfferedMarriages;
     public readonly PlayerPartyInteractionProposal Proposal;
@@ -69,6 +72,8 @@ internal readonly struct PlayerPartyInteractionOutcome
         ResponderOfferedTroops = session.ResponderOfferedTroops ?? Array.Empty<TroopRosterElementData>();
         InitiatorOfferedPeace = session.InitiatorOfferedPeace;
         ResponderOfferedPeace = session.ResponderOfferedPeace;
+        InitiatorOfferedBloodFeudSettlement = session.InitiatorOfferedBloodFeudSettlement;
+        ResponderOfferedBloodFeudSettlement = session.ResponderOfferedBloodFeudSettlement;
         InitiatorOfferedMarriages = session.InitiatorOfferedMarriages ?? Array.Empty<PlayerPartyMarriageOfferData>();
         ResponderOfferedMarriages = session.ResponderOfferedMarriages ?? Array.Empty<PlayerPartyMarriageOfferData>();
         Proposal = session.Proposal;
@@ -91,6 +96,7 @@ internal class PlayerPartyInteractionOutcomeHandler
     private readonly IPlayerDivorceRules playerDivorceRules;
     private readonly IPlayerMapTracking mapTracking;
     private readonly IKingdomClanLimit kingdomClanLimit;
+    private readonly IExecutionCampaignBehaviorInterface executionInterface;
 
     public PlayerPartyInteractionOutcomeHandler(
         IObjectManager objectManager,
@@ -100,7 +106,8 @@ internal class PlayerPartyInteractionOutcomeHandler
         IPlayerMarriageRules playerMarriageRules,
         IPlayerDivorceRules playerDivorceRules,
         IPlayerMapTracking mapTracking,
-        IKingdomClanLimit kingdomClanLimit)
+        IKingdomClanLimit kingdomClanLimit,
+        IExecutionCampaignBehaviorInterface executionInterface)
     {
         this.objectManager = objectManager;
         this.kingdomMembershipState = kingdomMembershipState;
@@ -110,6 +117,7 @@ internal class PlayerPartyInteractionOutcomeHandler
         this.playerDivorceRules = playerDivorceRules;
         this.mapTracking = mapTracking;
         this.kingdomClanLimit = kingdomClanLimit;
+        this.executionInterface = executionInterface;
     }
 
     public bool Handle(PlayerPartyInteractionOutcome outcome)
@@ -548,6 +556,12 @@ internal class PlayerPartyInteractionOutcomeHandler
         if (outcome.InitiatorOfferedPeace && outcome.ResponderOfferedPeace)
         {
             ApplyPeace(initiatorParty, responderParty);
+        }
+
+        if (outcome.InitiatorOfferedBloodFeudSettlement && outcome.ResponderOfferedBloodFeudSettlement &&
+            PlayerPartyBloodFeudBarterable.TryGetLeaderClans(initiatorParty, responderParty, out var initiatorClan, out var responderClan))
+        {
+            executionInterface.SettleBloodFeudByAgreement(initiatorClan, responderClan);
         }
 
         foreach (var (hero, spouse) in marriages)

@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using GameInterface.Services.BloodFeuds.Interfaces;
 using GameInterface.Services.Heroes;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.MapEventParties.Messages;
@@ -61,6 +62,7 @@ internal class PlayerCaptivityServerHandler : IHandler
     private readonly IPlayerManager playerManager;
     private readonly ConversationPartyTracker conversationPartyTracker;
     private readonly IPartyVisualInterface partyVisuals;
+    private readonly IExecutionCampaignBehaviorInterface executionInterface;
     private readonly Dictionary<Hero, Hero> pendingExecutions = new();
 
     public PlayerCaptivityServerHandler(
@@ -69,7 +71,8 @@ internal class PlayerCaptivityServerHandler : IHandler
         IMessageBroker messageBroker,
         IPlayerManager playerManager,
         ConversationPartyTracker conversationPartyTracker,
-        IPartyVisualInterface partyVisuals)
+        IPartyVisualInterface partyVisuals,
+        IExecutionCampaignBehaviorInterface executionInterface)
     {
         this.objectManager = objectManager;
         this.network = network;
@@ -77,6 +80,7 @@ internal class PlayerCaptivityServerHandler : IHandler
         this.playerManager = playerManager;
         this.conversationPartyTracker = conversationPartyTracker;
         this.partyVisuals = partyVisuals;
+        this.executionInterface = executionInterface;
 
         // ModInformation is evaluated per call (tests flip it per instance), so each handler
         // guards itself instead of gating the subscriptions here.
@@ -187,13 +191,15 @@ internal class PlayerCaptivityServerHandler : IHandler
         int mercy = executer.GetTraitLevel(DefaultTraits.Mercy);
         // Against the captured player's clan instead of vanilla's Clan.PlayerClan
         int relation = executer.Clan.GetRelationWithClan(hero.Clan);
-        if (MBRandom.RandomFloat <= PlayerExecutionChance(mercy, relation))
+        bool hasBloodFeud = executionInterface.HasBloodFeud(hero.Clan, executer.Clan);
+        if (MBRandom.RandomFloat <= PlayerExecutionChance(hasBloodFeud, mercy, relation))
             pendingExecutions[hero] = executer;
     }
 
-    // Vanilla ExecutionCampaignBehavior.CalculatePlayerExecutionProbability, its blood feud case comes with #3851
-    private static float PlayerExecutionChance(int mercy, int relation)
+    // Vanilla ExecutionCampaignBehavior.CalculatePlayerExecutionProbability
+    private static float PlayerExecutionChance(bool hasBloodFeud, int mercy, int relation)
     {
+        if (hasBloodFeud) return 1f;
         if (relation >= (mercy * 10) - 50) return 0f;
 
         return Math.Max(((-relation * 0.3f) - (mercy * 5f)) * 0.01f, 0f);

@@ -4,6 +4,7 @@ using Common.PacketHandlers;
 using Coop.Core.Client.Messages;
 using Coop.Core.Common.Network.Packets;
 using GameInterface.Services.Alleys;
+using GameInterface.Services.BloodFeuds;
 using GameInterface.Services.CampaignService.Data;
 using GameInterface.Services.Caravans;
 using GameInterface.Services.Clans;
@@ -130,7 +131,8 @@ internal class GameSaveDataPacketHandler : IPacketHandler
             completedTransfer.ClanFinance,
             completedTransfer.OrderOfBattlePlayerData,
             completedTransfer.HeldLootShipIds,
-            completedTransfer.ViewDataPlayerData));
+            completedTransfer.ViewDataPlayerData,
+            completedTransfer.BloodFeudPlayerData));
     }
 
     private sealed class PendingTransfer
@@ -160,6 +162,7 @@ internal class GameSaveDataPacketHandler : IPacketHandler
             OrderOfBattlePlayerData = firstChunk.OrderOfBattlePlayerData;
             HeldLootShipIds = firstChunk.HeldLootShipIds;
             ViewDataPlayerData = firstChunk.ViewDataPlayerData;
+            BloodFeudPlayerData = firstChunk.BloodFeudPlayerData;
         }
 
         public int TransferId { get; }
@@ -182,6 +185,7 @@ internal class GameSaveDataPacketHandler : IPacketHandler
         public OrderOfBattlePlayerData OrderOfBattlePlayerData { get; }
         public string[] HeldLootShipIds { get; }
         public ViewDataPlayerData ViewDataPlayerData { get; }
+        public BloodFeudPlayerData BloodFeudPlayerData { get; }
 
         public bool TryAdd(GameSaveDataChunkPacket chunk)
         {

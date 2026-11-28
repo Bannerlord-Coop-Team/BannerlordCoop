@@ -27,6 +27,8 @@ internal readonly struct NetworkPlayerPartyTradeOfferUpdated : ICommand
     public readonly bool OfferedPeace;
     [ProtoMember(9)]
     public readonly PlayerPartyMarriageOfferData[] OfferedMarriages;
+    [ProtoMember(10)]
+    public readonly bool OfferedBloodFeudSettlement;
 
     public NetworkPlayerPartyTradeOfferUpdated(
         string sessionId,
@@ -37,7 +39,8 @@ internal readonly struct NetworkPlayerPartyTradeOfferUpdated : ICommand
         string[] offeredFiefs = null,
         TroopRosterElementData[] offeredPrisoners = null,
         bool offeredPeace = false,
-        PlayerPartyMarriageOfferData[] offeredMarriages = null)
+        PlayerPartyMarriageOfferData[] offeredMarriages = null,
+        bool offeredBloodFeudSettlement = false)
     {
         SessionId = sessionId;
         PartyId = partyId;
@@ -48,5 +51,6 @@ internal readonly struct NetworkPlayerPartyTradeOfferUpdated : ICommand
         OfferedPrisoners = offeredPrisoners ?? new TroopRosterElementData[0];
         OfferedPeace = offeredPeace;
         OfferedMarriages = offeredMarriages ?? System.Array.Empty<PlayerPartyMarriageOfferData>();
+        OfferedBloodFeudSettlement = offeredBloodFeudSettlement;
     }
 }
