@@ -1,0 +1,143 @@
+#!/usr/bin/env bash
+# Runs Stryker.NET on the lines a branch changes in the projects the Linux unit tests cover.
+# Usage: run-mutation-tests.sh [--list] [base-ref] [output-dir] [project]
+#   --list      print the projects that have changed lines, one per line, and exit
+#   base-ref    branch or commit to diff against (default origin/development, diffed from the merge base)
+#   output-dir  where each project's report and summary.md go, relative to the repo root
+#               (default artifacts/mutation)
+#   project     mutate only this project, one of mutated_projects
+set -euo pipefail
+# Keep -e inside $(...) too, so a failing helper stops the run instead of reading as empty output.
+shopt -s inherit_errexit
+
+# The mutated projects. mutation-test-projects.cjs finds the unit test projects that cover each one, and
+# the settings shared by all of them are in source/stryker-config.json.
+mutated_projects=(Common Coop.Core GameInterface)
+
+list_only=false
+if [[ "${1:-}" == "--list" ]]; then
+  list_only=true
+  shift
+fi
+
+repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
+scripts="$repo_root/.github/scripts"
+cd "$repo_root"
+base_ref="${1:-origin/development}"
+# Absolute, like every path handed to Stryker, because Stryker runs from inside each project folder.
+output_directory=$(realpath -m "${2:-artifacts/mutation}")
+only_project="${3:-}"
+
+# Succeeds when the name is one of mutated_projects.
+is_mutated_project() {
+  local project
+  for project in "${mutated_projects[@]}"; do
+    if [[ "$project" == "$1" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+if [[ -n "$only_project" ]]; then
+  if ! is_mutated_project "$only_project"; then
+    echo "Unknown project '$only_project'. Mutated projects: ${mutated_projects[*]}" >&2
+    exit 1
+  fi
+  mutated_projects=("$only_project")
+fi
+
+if ! command -v node >/dev/null; then
+  echo "node is required to find the changed lines, the test projects and write the summary." >&2
+  exit 1
+fi
+
+merge_base=$(git merge-base "$base_ref" HEAD)
+
+# Prints a mutated project's repo-relative csproj path, the one place the source/<P>/<P>.csproj
+# layout is spelled out.
+csproj_for() {
+  echo "source/$1/$1.csproj"
+}
+
+# Prints the folder Stryker writes one project's output to.
+output_for() {
+  echo "$output_directory/$1"
+}
+
+# Prints the JSON report Stryker writes under a project's output folder.
+report_for() {
+  echo "$(output_for "$1")/reports/mutation-report.json"
+}
+
+# Prints the --mutate patterns, relative to the project folder, covering one project's changed lines.
+mutate_patterns() {
+  local csproj
+  csproj=$(csproj_for "$1")
+  node "$scripts/mutation-spans.cjs" "$merge_base" "$(dirname "$csproj")"
+}
+
+# Prints the mutated projects that have changed lines, in the order of mutated_projects, for --list.
+changed_projects() {
+  local project patterns
+  for project in "${mutated_projects[@]}"; do
+    patterns=$(mutate_patterns "$project")
+    if [[ -n "$patterns" ]]; then
+      echo "$project"
+    fi
+  done
+}
+
+# Runs Stryker in one project, mutating the given newline-separated patterns against the tests
+# that cover it.
+mutate_project() {
+  local project="$1"
+  local patterns="$2"
+  local csproj test_projects test_project pattern
+  csproj=$(csproj_for "$project")
+  test_projects=$(node "$scripts/mutation-test-projects.cjs" "$csproj")
+  local args=(
+    --config-file "$repo_root/source/stryker-config.json"
+    --project "$(basename "$csproj")"
+    --output "$(output_for "$project")"
+  )
+  while IFS= read -r test_project; do
+    args+=(--test-project "$repo_root/$test_project")
+  done <<< "$test_projects"
+  while IFS= read -r pattern; do
+    args+=(--mutate "$pattern")
+  done <<< "$patterns"
+
+  echo "== Stryker $project ($(wc -l <<< "$patterns") changed files)"
+  (cd "$(dirname "$csproj")" && dotnet stryker "${args[@]}")
+}
+
+if [[ "$list_only" == true ]]; then
+  changed_projects
+  exit 0
+fi
+
+mkdir -p "$output_directory"
+rm -f "$output_directory/summary.md"
+
+# Stryker builds with Platform=AnyCPU, where Coop.Core treats warnings as errors, so the
+# Scriban advisory from NuGet's audit would fail the build. The audit adds nothing to a mutation run.
+export NuGetAudit=false
+dotnet tool restore
+
+reports=()
+for project in "${mutated_projects[@]}"; do
+  patterns=$(mutate_patterns "$project")
+  if [[ -z "$patterns" ]]; then
+    continue
+  fi
+  project_output=$(output_for "$project")
+  rm -rf "${project_output:?}"
+  mutate_project "$project" "$patterns"
+  reports+=("$project=$(report_for "$project")")
+done
+
+# Captured first, so a summary that fails to render leaves no summary.md behind.
+summary=$(node "$scripts/mutation-summary.cjs" "${reports[@]}")
+echo "$summary" > "$output_directory/summary.md"
+echo "$summary"
