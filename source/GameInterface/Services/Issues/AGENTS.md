@@ -131,8 +131,8 @@ issue cancellation does not announce it a second time.
 - An ending is announced only once the issue is out of `IssueManager.Issues`. One still in the manager is tried again after
   the server daily tick, without running its ending again, deactivated only if that throws too, and then announced.
 - A quest whose own cancel threw before it finalized stays until its own timeout, which is accepted.
-- An ending drops its owner entry with `IIssueOwnershipRegistry.Remove(issueOwnerId, issueId)`, so a late ending never
-  takes the owner of the giver's next issue.
+- A forced ending drops its owner entry with `IIssueOwnershipRegistry.Remove(issueOwnerId, issueId)`, so a late ending
+  never takes the owner of the giver's next issue.
 - Every troop return leaves behind companions whose death already ran (`IIssueEndingCoordinator.BeforeTroopReturn`).
 
 ## Verification

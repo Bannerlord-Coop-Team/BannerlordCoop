@@ -359,7 +359,7 @@ internal class FinalizationCoordinator : IHandler, IIssueFinalizationReplay
         }
 
         commitments.ReturnForIssue(issueOwnerId, issue.StringId);
-        ownership.Remove(issueOwnerId, issue.StringId);
+        ownership.Remove(issueOwnerId);
 
         network.SendAll(new NetworkIssueFinalized(issueOwnerId, issue.StringId, payload.What.Outcome));
     }
