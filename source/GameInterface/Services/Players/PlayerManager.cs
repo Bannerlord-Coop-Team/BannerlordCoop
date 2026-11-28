@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Players;
@@ -85,6 +86,11 @@ public interface IPlayerManager
     /// Resolves the Player controlling the given party.
     /// </summary>
     bool TryGetPlayer(MobileParty mobileParty, out Player player);
+
+    /// <summary>
+    /// Resolves every player whose party is on the given map event side, with its hero and party.
+    /// </summary>
+    IEnumerable<(Player Player, Hero Hero, MobileParty Party)> GetPlayersOnSide(MapEventSide side);
 
     /// <summary>
     /// Checks whether a message sender is the peer controlling the given hero, logging a warning
@@ -434,6 +440,18 @@ public class PlayerManager : IPlayerManager
         player = null;
         return mobileParty != null && TryGetControlledObjectInfo(mobileParty, out var control)
             && TryGetPlayer(control.ObjectControllerId, out player);
+    }
+
+    /// <inheritdoc cref="IPlayerManager.GetPlayersOnSide(MapEventSide)"/>
+    public IEnumerable<(Player Player, Hero Hero, MobileParty Party)> GetPlayersOnSide(MapEventSide side)
+    {
+        foreach (var player in Players)
+        {
+            if (objectManager.TryGetObject<Hero>(player.HeroId, out var hero) &&
+                objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party) &&
+                party.Party.MapEventSide == side)
+                yield return (player, hero, party);
+        }
     }
 
     public bool IsSenderControllingHero(object sender, string heroId)

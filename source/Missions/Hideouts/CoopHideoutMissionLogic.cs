@@ -474,6 +474,8 @@ internal sealed class CoopHideoutMissionLogic : MissionLogic
     public void OnStealthFailure()
     {
         if (!IsAuthority || Native.Phase != HideoutPhase.Stealth) return;
+        // Native OnStealthMissionCounterFailed gives the failed raid's roguery xp, which HideoutStealthFailurePatch skips.
+        Campaign.Current.SkillLevelingManager.OnHideoutMissionEnd(isSucceeded: false);
         winner = BattleSideEnum.Defender;
         Native.Apply(HideoutPhase.Resolved, Native.Boss, InitialPopulation);
         MapEvent.PlayerMapEvent.SetOverrideWinner(winner);

@@ -681,14 +681,8 @@ internal class BattleFinalizeHandler : IHandler
         if (mapEvent.EventType != MapEvent.BattleTypes.Hideout)
             return null;
 
-        foreach (var player in playerManager.Players)
-        {
-            if (objectManager.TryGetObject<Hero>(player.HeroId, out var hero) &&
-                objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party) &&
-                party.Party.MapEventSide == mapEvent.AttackerSide)
-                return new BarterPlayerContext(hero, party);
-        }
-        return null;
+        var raider = playerManager.GetPlayersOnSide(mapEvent.AttackerSide).FirstOrDefault();
+        return raider.Hero == null ? null : new BarterPlayerContext(raider.Hero, raider.Party);
     }
 
     private static Settlement GetRaidFinalizationSettlement(MapEvent mapEvent)

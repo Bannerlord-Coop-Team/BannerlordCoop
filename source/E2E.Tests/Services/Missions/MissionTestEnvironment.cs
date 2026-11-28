@@ -9,11 +9,15 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Patches;
+using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using HarmonyLib;
+using Missions;
 using Missions.Battles;
+using Missions.Hideouts;
 using Missions.Messages;
+using Missions.Services.Network;
 using Moq;
 using SandBox.GauntletUI.Map;
 using System.Reflection;
@@ -110,6 +114,42 @@ public class MissionTestEnvironment : E2ETestEnvironment
         mesh.Start();
         mesh.ConnectToInstance(instanceId);
         return mission;
+    }
+
+    /// <summary>
+    /// Builds an initialized co-op hideout raid in <paramref name="mock"/>, with the real native assault (direct) or
+    /// ambush controller as its <see cref="CoopHideoutMissionLogic.Native"/>, starting in <paramref name="phase"/>.
+    /// </summary>
+    internal static (CoopHideoutMissionLogic logic, MissionLogic native, Team attackerTeam, Team defenderTeam) CreateHideout(
+        MockMission mock, IMessageBroker broker, bool direct, HideoutPhase phase)
+    {
+        var attackerTeam = mock.AddTeam(BattleSideEnum.Attacker);
+        mock.PlayerTeam = mock.AttackerTeam;
+        var defenderTeam = mock.AddTeam(BattleSideEnum.Defender);
+        var attacker = new CoopTroopSupplier("raid", BattleSideEnum.Attacker, null, null);
+        var defender = new CoopTroopSupplier("raid", BattleSideEnum.Defender, null, null);
+        var logic = new CoopHideoutMissionLogic(Mock.Of<IBattleNetwork>(), broker,
+            Mock.Of<IMissionContext>(), defender, attacker, direct);
+        AccessTools.Property(typeof(MissionBehavior), nameof(MissionBehavior.Mission)).SetValue(logic, mock.Shell);
+        AccessTools.Field(typeof(CoopHideoutMissionLogic), "initialized").SetValue(logic, true);
+        var suppliers = new IMissionTroopSupplier[] { logic.Defender, logic.Attacker };
+        var native = direct ? (MissionLogic)new CoopHideoutAssaultController(logic, suppliers)
+            : new CoopHideoutAmbushController(logic, suppliers);
+        AccessTools.Property(typeof(MissionBehavior), nameof(MissionBehavior.Mission)).SetValue(native, mock.Shell);
+        logic.Native = (ICoopHideoutNativeController)native;
+        mock.Shell.MissionBehaviors.Add(logic);
+        mock.Shell.MissionBehaviors.Add(native);
+        logic.Native.Apply(phase, null, 25);
+        return (logic, native, attackerTeam, defenderTeam);
+    }
+
+    /// <summary>Gives a hideout raid a skip-constructor battle controller running <paramref name="session"/>.</summary>
+    internal static CoopBattleController AttachBattle(CoopHideoutMissionLogic logic, IBattleSession session)
+    {
+        var battle = ObjectHelper.SkipConstructor<CoopBattleController>();
+        AccessTools.Field(typeof(CoopBattleController), "<Session>k__BackingField").SetValue(battle, session);
+        AccessTools.Field(typeof(CoopHideoutMissionLogic), "battle").SetValue(logic, battle);
+        return battle;
     }
 
     /// <summary>Attaches the real battle end logic with a headless troop spawner.</summary>
